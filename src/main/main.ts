@@ -5,10 +5,9 @@
 
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import * as path from 'path';
-import { initDatabase, getGameState } from './gameDb';
-import { submitOrders, ready } from './gameActions';
+import { initDatabase, getGameState, resetGameForNewMatch } from './gameDb';
+import { submitOrders, ready, type SubmitOrdersPayload, type RangedAttackOrder } from './gameActions';
 import {
-  loadKey,
   saveKey,
   hasKey,
   listModels,
@@ -70,27 +69,55 @@ export interface AiMove {
   toH3Index: string;
 }
 
+/** Count of AI ranged attacks by unit type (e.g. { armor: 2, naval: 1 }). */
+export interface AiRangedByType {
+  armor?: number;
+  naval?: number;
+}
+
 export interface ReadyResult {
   success: boolean;
   reason?: string;
   aiSkipped?: boolean;
   aiSkipReason?: string;
   aiOrderCount?: number;
+  aiRangedByType?: AiRangedByType;
   aiDropped?: number;
   aiDropReasons?: string[];
   aiMovesLog?: string[];
   aiMoves?: AiMove[];
+  combatHexes?: string[];
+  removedUnitIds?: string[];
+  casualtyHexes?: string[];
+  removedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
+  rangedCombatHexes?: string[];
+  rangedCasualtyHexes?: string[];
+  rangedRemovedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
+  meleeCombatHexes?: string[];
+  meleeCasualtyHexes?: string[];
+  meleeRemovedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
 }
 
 function registerIpcHandlers(): void {
   ipcMain.handle('game:getState', () => getGameState());
-  ipcMain.handle('game:submitOrders', (_event, orders: { unitId: string; toH3Index: string }[]) =>
-    submitOrders(orders)
-  );
+  ipcMain.handle('game:newGame', () => {
+    resetGameForNewMatch();
+    return getGameState();
+  });
+  ipcMain.handle('game:submitOrders', (_event, payload: SubmitOrdersPayload | { unitId: string; toH3Index: string }[]) => {
+    const normalized: SubmitOrdersPayload = Array.isArray(payload)
+      ? { movementOrders: payload }
+      : {
+          movementOrders: payload.movementOrders ?? [],
+          rangedAttacks: payload.rangedAttacks,
+        };
+    return submitOrders(normalized);
+  });
   ipcMain.handle('game:ready', async (): Promise<ReadyResult> => {
     const state = getGameState();
     const modelId = getSelectedModel();
     let aiOrders: { unitId: string; toH3Index: string }[] = [];
+    let aiRangedOrders: RangedAttackOrder[] = [];
     let aiSkipped = false;
     let aiDropped: number | undefined;
     let aiDropReasons: string[] | undefined;
@@ -100,6 +127,7 @@ function registerIpcHandlers(): void {
       const result = await requestOrders(state, modelId);
       if (result.success) {
         aiOrders = result.orders;
+        aiRangedOrders = result.rangedAttacks ?? [];
         aiDropped = result.dropped;
         aiDropReasons = result.dropReasons?.length ? result.dropReasons : undefined;
       } else {
@@ -122,12 +150,19 @@ function registerIpcHandlers(): void {
             .filter((m): m is AiMove => m !== null)
         : [];
 
-    const readyResult = ready(aiOrders);
+    const readyResult = ready(aiOrders, aiRangedOrders);
     if (!readyResult.success) {
       return {
         success: false,
         reason: readyResult.reason,
       };
+    }
+    const aiRangedByType: AiRangedByType = {};
+    for (const r of aiRangedOrders) {
+      const u = state.units.find((unit) => unit.id === r.unitId);
+      if (u && (u.unitType === 'armor' || u.unitType === 'naval')) {
+        aiRangedByType[u.unitType] = (aiRangedByType[u.unitType] ?? 0) + 1;
+      }
     }
     const aiMovesLog =
       aiOrders.length > 0
@@ -138,10 +173,21 @@ function registerIpcHandlers(): void {
       aiSkipped: aiSkipped && aiOrders.length === 0,
       aiSkipReason,
       aiOrderCount: aiOrders.length,
+      aiRangedByType: Object.keys(aiRangedByType).length > 0 ? aiRangedByType : undefined,
       aiDropped,
       aiDropReasons,
       aiMovesLog,
       aiMoves: aiMoves.length > 0 ? aiMoves : undefined,
+      combatHexes: readyResult.combatHexes,
+      removedUnitIds: readyResult.removedUnitIds,
+      casualtyHexes: readyResult.casualtyHexes,
+      removedUnits: readyResult.removedUnits,
+      rangedCombatHexes: readyResult.rangedCombatHexes,
+      rangedCasualtyHexes: readyResult.rangedCasualtyHexes,
+      rangedRemovedUnits: readyResult.rangedRemovedUnits,
+      meleeCombatHexes: readyResult.meleeCombatHexes,
+      meleeCasualtyHexes: readyResult.meleeCasualtyHexes,
+      meleeRemovedUnits: readyResult.meleeRemovedUnits,
     };
   });
 

@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { app, safeStorage } from 'electron';
 import { gridDistance } from 'h3-js';
+import { getRange } from './combatConstants';
 import { logDebug, logError } from './logger';
 import type { GameStateSnapshot } from './gameDb';
 
@@ -16,7 +17,7 @@ const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const MOVEMENT_RANGE: Record<string, number> = {
   infantry: 1,
   armor: 2,
-  naval: 1,
+  naval: 2,
 };
 
 /** Returns the path to the OpenRouter config file (userData). Call after app is ready. */
@@ -186,8 +187,55 @@ function getValidDestinations(unit: { h3Index: string; unitType: string }, state
 }
 
 /**
- * Builds the system prompt for the LLM: game rules, map summary, opponent units with valid destinations, and required JSON format.
- * Including valid toH3Index per unit so the LLM only picks in-range hexes.
+ * Returns H3 indices of enemy-occupied hexes within the unit's ranged attack range.
+ * Used to list valid ranged targets in the AI prompt.
+ */
+function getValidRangedTargets(unit: { h3Index: string; unitType: string; player: string }, state: GameStateSnapshot): string[] {
+  const range = getRange(unit.unitType);
+  if (range < 1) return [];
+  const valid: string[] = [];
+  for (const h of state.hexes) {
+    if (h.h3Index === unit.h3Index) continue;
+    const hasEnemy = state.units.some((u) => u.h3Index === h.h3Index && u.player !== unit.player);
+    if (!hasEnemy) continue;
+    let dist: number;
+    try {
+      dist = gridDistance(unit.h3Index, h.h3Index);
+    } catch {
+      continue;
+    }
+    if (dist >= 1 && dist <= range) valid.push(h.h3Index);
+  }
+  return valid;
+}
+
+/**
+ * Validates a single AI ranged order against the state snapshot. Unit must be opponent-owned, have range ≥ 1, target in range, target has enemy.
+ */
+function validateAiRangedOrder(
+  order: { unitId: string; targetH3Index: string },
+  state: GameStateSnapshot
+): { valid: true } | { valid: false; reason: string } {
+  const unit = state.units.find((u) => u.id === order.unitId);
+  if (!unit) return { valid: false, reason: `Unit not found: ${order.unitId}` };
+  if (unit.player !== 'opponent') return { valid: false, reason: 'Only opponent units can have AI ranged orders' };
+  if (getRange(unit.unitType) < 1) return { valid: false, reason: `${unit.unitType} has no ranged attack` };
+  const hexIds = new Set(state.hexes.map((h) => h.h3Index));
+  if (!hexIds.has(order.targetH3Index)) return { valid: false, reason: 'Target not on map' };
+  let dist: number;
+  try {
+    dist = gridDistance(unit.h3Index, order.targetH3Index);
+  } catch {
+    return { valid: false, reason: 'Invalid distance' };
+  }
+  if (dist > getRange(unit.unitType)) return { valid: false, reason: 'Target out of range' };
+  const hasEnemy = state.units.some((u) => u.h3Index === order.targetH3Index && u.player !== unit.player);
+  if (!hasEnemy) return { valid: false, reason: 'Target hex has no enemy' };
+  return { valid: true };
+}
+
+/**
+ * Builds the system prompt for the LLM: game rules, map summary, opponent units with valid move and ranged targets, and required JSON format.
  */
 function buildSystemPrompt(state: GameStateSnapshot): string {
   const opponentUnits = state.units.filter((u) => u.player === 'opponent');
@@ -196,19 +244,31 @@ function buildSystemPrompt(state: GameStateSnapshot): string {
     const dests = getValidDestinations(u, state);
     return `${u.id} (${u.unitType}) at ${u.h3Index} can move to: ${dests.length ? dests.join(', ') : 'none (no valid hex)'}`;
   });
+  const rangedLines = opponentUnits
+    .filter((u) => getRange(u.unitType) >= 1)
+    .map((u) => {
+      const targets = getValidRangedTargets(u, state);
+      return `${u.id} (${u.unitType}, range ${getRange(u.unitType)}) can ranged-attack: ${targets.length ? targets.join(', ') : 'none'}`;
+    });
+  const rangedBlock =
+    rangedLines.length > 0
+      ? `\nRanged attacks (optional): Armor has range 1, naval has range 2. You may declare a target hex (enemy, within range) per unit. Valid targets per unit:\n${rangedLines.join('\n')}\n`
+      : '';
+
   return `You are the opponent in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}.
 
 Your units — use ONLY these toH3Index values (each unit can move only to the listed hexes):
 ${unitLines.join('\n')}
-
+${rangedBlock}
 Human units: ${humanUnits.map((u) => `${u.id} at ${u.h3Index}`).join('; ')}.
 
-Respond with a JSON array of movement orders only. Each order: { "unitId": "<unit id>", "toH3Index": "<h3 index from that unit's list above>" }. One order per unit. Pick only from the "can move to" list for each unit. Example: [{"unitId":"opponent-infantry-1","toH3Index":"821c07fffffffff"}].`;
+Respond with a JSON object: { "movementOrders": [ { "unitId": "<id>", "toH3Index": "<h3 from can move to>" }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetH3Index": "<h3 from can ranged-attack>" }, ... ] }. Both arrays optional. movementOrders: one per unit from "can move to". rangedAttacks: only for units with range (armor, naval); use only "can ranged-attack" targets. Example: {"movementOrders":[{"unitId":"opponent-armor-1","toH3Index":"821c07fffffffff"}],"rangedAttacks":[{"unitId":"opponent-armor-1","targetH3Index":"821c0ffffffffff"}]}.`;
 }
 
 export interface RequestOrdersResult {
   success: true;
   orders: { unitId: string; toH3Index: string }[];
+  rangedAttacks?: { unitId: string; targetH3Index: string }[];
   dropped?: number;
   dropReasons?: string[];
 }
@@ -238,7 +298,7 @@ export async function requestOrders(
   }
 
   const systemPrompt = buildSystemPrompt(state);
-  const userMessage = `Return a JSON array of movement orders for your units this turn. Only valid moves. Format: [{"unitId":"...","toH3Index":"..."}]`;
+  const userMessage = `Return a JSON object with "movementOrders" (array of { unitId, toH3Index }) and optional "rangedAttacks" (array of { unitId, targetH3Index }). Only valid moves and valid ranged targets from the lists above.`;
 
   try {
     const res = await fetch(OPENROUTER_CHAT_URL, {
@@ -270,7 +330,7 @@ export async function requestOrders(
       return { success: false, error: 'Invalid response: no content' };
     }
 
-    const parsed = parseOrdersJson(content);
+    const parsed = parseOrdersResponse(content);
     if (!parsed) {
       logError('openRouter requestOrders: failed to parse JSON', content.slice(0, 300));
       return { success: false, error: 'Invalid response: could not parse orders' };
@@ -280,7 +340,7 @@ export async function requestOrders(
     const dropReasons: string[] = [];
     const seenUnits = new Set<string>();
 
-    for (const order of parsed) {
+    for (const order of parsed.movementOrders) {
       if (seenUnits.has(order.unitId)) {
         dropReasons.push(`Duplicate order for ${order.unitId}`);
         continue;
@@ -294,6 +354,22 @@ export async function requestOrders(
       }
     }
 
+    const validatedRanged: { unitId: string; targetH3Index: string }[] = [];
+    const seenRanged = new Set<string>();
+    for (const r of parsed.rangedAttacks) {
+      if (seenRanged.has(r.unitId)) {
+        dropReasons.push(`Duplicate ranged for ${r.unitId}`);
+        continue;
+      }
+      const result = validateAiRangedOrder(r, state);
+      if (result.valid) {
+        validatedRanged.push(r);
+        seenRanged.add(r.unitId);
+      } else {
+        dropReasons.push(`Ranged ${r.unitId} → ${r.targetH3Index}: ${result.reason}`);
+      }
+    }
+
     if (dropReasons.length > 0) {
       logDebug('openRouter requestOrders: dropped invalid orders', {
         dropped: dropReasons.length,
@@ -304,6 +380,7 @@ export async function requestOrders(
     return {
       success: true,
       orders: validated,
+      rangedAttacks: validatedRanged.length > 0 ? validatedRanged : undefined,
       dropped: dropReasons.length,
       dropReasons: dropReasons.length > 0 ? dropReasons : undefined,
     };
@@ -314,45 +391,64 @@ export async function requestOrders(
 }
 
 /**
- * Tries to extract a JSON array of { unitId, toH3Index } from LLM response (may be wrapped in markdown).
+ * Parses the LLM response into movement orders and optional ranged attacks.
+ * Accepts either an object { movementOrders: [...], rangedAttacks: [...] } or a bare array (legacy) as movementOrders.
  */
-function parseOrdersJson(content: string): { unitId: string; toH3Index: string }[] | null {
+function parseOrdersResponse(content: string): {
+  movementOrders: { unitId: string; toH3Index: string }[];
+  rangedAttacks: { unitId: string; targetH3Index: string }[];
+} | null {
   const trimmed = content.trim();
   let jsonStr = trimmed;
-  // #region agent log
-  const hasClosingBracket = trimmed.includes(']');
-  const hasClosingCodeBlock = /```\s*$/.test(trimmed) || trimmed.split('```').length >= 3;
-  fetch('http://127.0.0.1:7290/ingest/870e72e6-57a6-475f-b192-9cde676f76b4', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'f6f7e5' }, body: JSON.stringify({ sessionId: 'f6f7e5', location: 'openRouter.ts:parseOrdersJson', message: 'parseOrdersJson entry', data: { contentLen: content.length, trimmedLen: trimmed.length, hasClosingBracket, hasClosingCodeBlock, head: trimmed.slice(0, 120) }, timestamp: Date.now(), hypothesisId: 'A' }) }).catch(() => {});
-  // #endregion
   const codeBlock = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (codeBlock) jsonStr = codeBlock[1].trim();
-  const arrayMatch = trimmed.match(/\[\s*[\s\S]*\s*\]/);
-  if (arrayMatch) jsonStr = arrayMatch[0];
-  // #region agent log
-  fetch('http://127.0.0.1:7290/ingest/870e72e6-57a6-475f-b192-9cde676f76b4', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'f6f7e5' }, body: JSON.stringify({ sessionId: 'f6f7e5', location: 'openRouter.ts:parseOrdersJson', message: 'after extraction', data: { usedCodeBlock: !!codeBlock, usedArrayMatch: !!arrayMatch, jsonStrLen: jsonStr.length, jsonStrTail: jsonStr.slice(-80) }, timestamp: Date.now(), hypothesisId: 'B' }) }).catch(() => {});
-  // #endregion
+  const firstBrace = jsonStr.search(/\{/);
+  const firstBracket = jsonStr.search(/\[/);
+  if (firstBrace >= 0 && (firstBracket < 0 || firstBrace < firstBracket)) {
+    const objectMatch = jsonStr.slice(firstBrace).match(/\{[\s\S]*\}/);
+    if (objectMatch) jsonStr = objectMatch[0];
+  } else if (firstBracket >= 0) {
+    const arrayMatch = jsonStr.slice(firstBracket).match(/\[[\s\S]*\]/);
+    if (arrayMatch) jsonStr = arrayMatch[0];
+  }
   try {
-    const arr = JSON.parse(jsonStr) as unknown;
-    if (!Array.isArray(arr)) return null;
-    const orders: { unitId: string; toH3Index: string }[] = [];
-    for (const item of arr) {
-      if (item && typeof item === 'object' && typeof (item as { unitId?: unknown }).unitId === 'string' && typeof (item as { toH3Index?: unknown }).toH3Index === 'string') {
-        orders.push({
-          unitId: (item as { unitId: string }).unitId,
-          toH3Index: (item as { toH3Index: string }).toH3Index,
-        });
-      }
+    const parsed = JSON.parse(jsonStr) as unknown;
+    if (Array.isArray(parsed)) {
+      const movementOrders = parseOrdersArray(parsed);
+      return { movementOrders, rangedAttacks: [] };
     }
-    return orders;
-  } catch (err) {
-    // #region agent log
-    const e = err as Error;
-    fetch('http://127.0.0.1:7290/ingest/870e72e6-57a6-475f-b192-9cde676f76b4', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'f6f7e5' }, body: JSON.stringify({ sessionId: 'f6f7e5', location: 'openRouter.ts:parseOrdersJson', message: 'parse catch', data: { parseError: e.message, jsonStrLen: jsonStr.length, jsonStrHead: jsonStr.slice(0, 100), jsonStrTail: jsonStr.slice(-100) }, timestamp: Date.now(), hypothesisId: 'E' }) }).catch(() => {});
-    // #endregion
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const obj = parsed as { movementOrders?: unknown; rangedAttacks?: unknown };
+      const movementOrders = Array.isArray(obj.movementOrders) ? parseOrdersArray(obj.movementOrders) : [];
+      const rangedAttacks = Array.isArray(obj.rangedAttacks) ? parseRangedArray(obj.rangedAttacks) : [];
+      return { movementOrders, rangedAttacks };
+    }
+    return null;
+  } catch {
     const repaired = repairTruncatedOrdersJson(trimmed);
-    if (repaired.length > 0) return repaired;
+    if (repaired.length > 0) return { movementOrders: repaired, rangedAttacks: [] };
     return null;
   }
+}
+
+function parseOrdersArray(arr: unknown[]): { unitId: string; toH3Index: string }[] {
+  const orders: { unitId: string; toH3Index: string }[] = [];
+  for (const item of arr) {
+    if (item && typeof item === 'object' && typeof (item as { unitId?: unknown }).unitId === 'string' && typeof (item as { toH3Index?: unknown }).toH3Index === 'string') {
+      orders.push({ unitId: (item as { unitId: string }).unitId, toH3Index: (item as { toH3Index: string }).toH3Index });
+    }
+  }
+  return orders;
+}
+
+function parseRangedArray(arr: unknown[]): { unitId: string; targetH3Index: string }[] {
+  const orders: { unitId: string; targetH3Index: string }[] = [];
+  for (const item of arr) {
+    if (item && typeof item === 'object' && typeof (item as { unitId?: unknown }).unitId === 'string' && typeof (item as { targetH3Index?: unknown }).targetH3Index === 'string') {
+      orders.push({ unitId: (item as { unitId: string }).unitId, targetH3Index: (item as { targetH3Index: string }).targetH3Index });
+    }
+  }
+  return orders;
 }
 
 /**

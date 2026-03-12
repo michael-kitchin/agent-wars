@@ -7,7 +7,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
+import { gridDistance } from 'h3-js';
 import { getOrderedHexList } from './mapData';
+import { createSeededRng } from './seededRng';
 import { logTrace } from './logger';
 
 import type { Database } from 'sql.js';
@@ -57,8 +59,38 @@ function getDbPath(): string {
 }
 
 /**
+ * Seeds the game RNG seed in game_config when missing. Used for deterministic combat and participant IDs.
+ * Seed is stored in game_config under key 'game_seed' as a string integer.
+ */
+function seedGameSeedIfMissing(): void {
+  if (db === null) return;
+  const row = getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'game_seed'");
+  if (row) return;
+  const seed = Math.floor(Math.random() * 2 ** 31);
+  run("INSERT INTO game_config (key, value) VALUES ('game_seed', ?)", [String(seed)]);
+}
+
+/**
+ * Returns the game seed for the current session. Used by combat resolution and participant ID assignment.
+ * Seed is stored in game_config; same seed is used for the whole game until a new game is started.
+ */
+export function getGameSeed(): number {
+  logTrace('getGameSeed');
+  if (db === null) return 0;
+  const row = getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'game_seed'");
+  if (!row) return 0;
+  const n = parseInt(row.value, 10);
+  return Number.isNaN(n) ? 0 : n;
+}
+
+/** Number of water blob centers; each blob is a disk of hexes within BLOB_RADIUS. */
+const WATER_BLOB_COUNT = 5;
+/** H3 grid distance from blob center to include a hex in that water blob. */
+const WATER_BLOB_RADIUS = 2;
+
+/**
  * Seeds the hexes table with the ordered map hexes and terrain (land/water).
- * Uses a simple rule: every 4th hex is water so both terrain types appear. Idempotent if hexes already exist.
+ * Water is generated as blobs: seeded RNG picks blob centers; any hex within WATER_BLOB_RADIUS of a center is water. Idempotent if hexes already exist.
  */
 function seedHexesIfEmpty(): void {
   if (db === null) return;
@@ -66,15 +98,33 @@ function seedHexesIfEmpty(): void {
   if (count && count.c > 0) return;
 
   const hexes = getOrderedHexList();
+  const seed = getGameSeed();
+  const next = createSeededRng(seed);
+  const centerIndices: number[] = [];
+  for (let k = 0; k < WATER_BLOB_COUNT; k++) {
+    centerIndices.push(Math.floor(next() * hexes.length));
+  }
   for (let i = 0; i < hexes.length; i++) {
-    const terrain = i % 4 === 0 ? 'water' : 'land';
+    let water = false;
+    for (const c of centerIndices) {
+      try {
+        if (gridDistance(hexes[i]!, hexes[c]!) <= WATER_BLOB_RADIUS) {
+          water = true;
+          break;
+        }
+      } catch {
+        // ignore invalid/distance errors
+      }
+    }
+    const terrain = water ? 'water' : 'land';
     run('INSERT INTO hexes (h3_index, terrain) VALUES (?, ?)', [hexes[i], terrain]);
   }
 }
 
 /**
  * Seeds the units table with 3–5 units per side (human and opponent) when empty.
- * Human units on land hexes (and one naval on water); opponent on the opposite side. Idempotent.
+ * Land units (infantry, armor) only on land hexes; naval only on water hexes, using terrain from the hexes table.
+ * Idempotent.
  */
 function seedUnitsIfEmpty(): void {
   if (db === null) return;
@@ -85,23 +135,27 @@ function seedUnitsIfEmpty(): void {
   const landIndices: number[] = [];
   const waterIndices: number[] = [];
   for (let i = 0; i < hexes.length; i++) {
-    if (i % 4 === 0) waterIndices.push(i);
+    const row = getOne<{ terrain: string }>('SELECT terrain FROM hexes WHERE h3_index = ?', [hexes[i]]);
+    const terrain = row?.terrain ?? 'land';
+    if (terrain === 'water') waterIndices.push(i);
     else landIndices.push(i);
   }
 
   /* Place human on “near” side (low indices), opponent on “far” side (high indices). */
+  if (landIndices.length < 4) return;
   const humanLand = landIndices.slice(0, 4);
-  const humanWater = waterIndices[0];
   const opponentLand = landIndices.slice(-4);
-  const opponentWater = waterIndices[waterIndices.length - 1] ?? waterIndices[0];
 
   const humanUnits: [string, string, string][] = [
     ['human-infantry-1', 'infantry', hexes[humanLand[0]!]!],
     ['human-armor-1', 'armor', hexes[humanLand[1]!]!],
     ['human-infantry-2', 'infantry', hexes[humanLand[2]!]!],
     ['human-armor-2', 'armor', hexes[humanLand[3]!]!],
-    ['human-naval-1', 'naval', hexes[humanWater]!],
   ];
+  if (waterIndices.length > 0) {
+    const humanWater = waterIndices[0]!;
+    humanUnits.push(['human-naval-1', 'naval', hexes[humanWater]!]);
+  }
   for (const [id, unitType, h3Index] of humanUnits) {
     run('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [id, 'human', unitType, h3Index]);
   }
@@ -111,8 +165,11 @@ function seedUnitsIfEmpty(): void {
     ['opponent-armor-1', 'armor', hexes[opponentLand[1]!]!],
     ['opponent-infantry-2', 'infantry', hexes[opponentLand[2]!]!],
     ['opponent-armor-2', 'armor', hexes[opponentLand[3]!]!],
-    ['opponent-naval-1', 'naval', hexes[opponentWater]!],
   ];
+  if (waterIndices.length > 0) {
+    const opponentWater = waterIndices[waterIndices.length - 1]!;
+    opponentUnits.push(['opponent-naval-1', 'naval', hexes[opponentWater]!]);
+  }
   for (const [id, unitType, h3Index] of opponentUnits) {
     run('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [id, 'opponent', unitType, h3Index]);
   }
@@ -133,7 +190,7 @@ export function saveDatabase(): void {
 }
 
 /**
- * Creates or loads the database and tables. Idempotent. Async because sql.js loads WASM.
+ * Creates a fresh game database and tables on every startup. Async because sql.js loads WASM.
  * Call once when the main process is ready (e.g. in app.whenReady()).
  */
 export async function initDatabase(): Promise<void> {
@@ -142,13 +199,10 @@ export async function initDatabase(): Promise<void> {
   const SQL = await initSqlJs();
 
   dbPath = getDbPath();
-
   if (fs.existsSync(dbPath)) {
-    const fileBuffer = fs.readFileSync(dbPath);
-    db = new SQL.Database(new Uint8Array(fileBuffer));
-  } else {
-    db = new SQL.Database();
+    fs.unlinkSync(dbPath);
   }
+  db = new SQL.Database();
 
   const database = db!;
   database.run(`
@@ -176,6 +230,16 @@ export async function initDatabase(): Promise<void> {
       to_h3_index TEXT NOT NULL,
       PRIMARY KEY (unit_id)
     );
+
+    CREATE TABLE IF NOT EXISTS pending_ranged_orders (
+      unit_id TEXT PRIMARY KEY,
+      target_h3_index TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS game_config (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
 
   const row = getOne('SELECT 1 FROM turn_state WHERE id = 1');
@@ -183,6 +247,7 @@ export async function initDatabase(): Promise<void> {
     run('INSERT INTO turn_state (id, phase, turn_number) VALUES (1, ?, ?)', ['planning', 1]);
   }
 
+  seedGameSeedIfMissing();
   seedHexesIfEmpty();
   seedUnitsIfEmpty();
   saveDatabase();
@@ -216,6 +281,10 @@ export function getGameState(): GameStateSnapshot {
   const orderRows = getAll<{ unitId: string; toH3Index: string }>(
     'SELECT unit_id AS unitId, to_h3_index AS toH3Index FROM pending_orders'
   );
+  const gameOverRow = getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'game_over'");
+  const winnerRow = getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'winner'");
+  const gameOver = gameOverRow?.value === '1';
+  const winner = winnerRow?.value ?? undefined;
 
   return {
     hexes: hexRows,
@@ -223,6 +292,8 @@ export function getGameState(): GameStateSnapshot {
     phase: turnRow?.phase ?? 'planning',
     turnNumber: turnRow?.turnNumber ?? 1,
     pendingOrders: orderRows,
+    gameOver: gameOver || undefined,
+    winner,
   };
 }
 
@@ -233,6 +304,8 @@ export interface GameStateSnapshot {
   phase: string;
   turnNumber: number;
   pendingOrders: { unitId: string; toH3Index: string }[];
+  gameOver?: boolean;
+  winner?: string;
 }
 
 /**
@@ -261,4 +334,41 @@ export function dbGetAll<T extends Record<string, unknown>>(sql: string, params:
  */
 export function isDbReady(): boolean {
   return db !== null;
+}
+
+/**
+ * Sets game-over state and winner. Called after combat when one side has no units left.
+ * Stores in game_config: game_over=1, winner=<player id>.
+ */
+export function setGameOver(winner: string): void {
+  if (!db) return;
+  run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('game_over', '1')");
+  run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('winner', ?)", [winner]);
+}
+
+/**
+ * Clears game-over state and winner. Called when starting a new game.
+ */
+export function clearGameOver(): void {
+  if (!db) return;
+  run("DELETE FROM game_config WHERE key IN ('game_over', 'winner')");
+}
+
+/**
+ * Re-initializes the game for a new match: deletes all units, generates a new seed, re-seeds hexes and units,
+ * clears game_over/winner, resets turn and phase, clears pending orders. Call from newGame() IPC.
+ */
+export function resetGameForNewMatch(): void {
+  if (!db) return;
+  run('DELETE FROM units');
+  run('DELETE FROM hexes');
+  run("DELETE FROM game_config WHERE key = 'game_seed'");
+  seedGameSeedIfMissing();
+  seedHexesIfEmpty();
+  seedUnitsIfEmpty();
+  run('DELETE FROM pending_orders');
+  run('DELETE FROM pending_ranged_orders');
+  run('UPDATE turn_state SET phase = ?, turn_number = 1 WHERE id = 1', ['planning']);
+  clearGameOver();
+  saveDatabase();
 }

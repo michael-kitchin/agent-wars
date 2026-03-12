@@ -14,8 +14,8 @@ export const H3_RESOLUTION = 2;
 export const GRID_CENTER_LAT = 0;
 export const GRID_CENTER_LNG = 0;
 
-/** k-ring radius: 6 gives 1+6+12+18+24+30+36 = 127 hexes. */
-const K_RING = 6;
+/** k-ring radius: 9 gives ~271 hexes (about double the previous 127). Existing DBs may need to be reset to see the new map. */
+const K_RING = 9;
 
 /**
  * Returns the ordered list of H3 cell indices for the map (center first, then by ring).
@@ -29,4 +29,18 @@ export function getOrderedHexList(): string[] {
   );
   const rings = gridDiskDistances(center, K_RING);
   return rings.flat();
+}
+
+/**
+ * Returns the ring index (0 = center, 1 = first ring, ...) for a flat index into getOrderedHexList().
+ * Used for terrain seeding so contiguous rings can form large land or water bodies.
+ */
+export function getRingForFlatIndex(flatIndex: number): number {
+  let offset = 0;
+  for (let ring = 0; ring <= K_RING; ring++) {
+    const size = ring === 0 ? 1 : 6 * ring;
+    if (flatIndex < offset + size) return ring;
+    offset += size;
+  }
+  return K_RING;
 }

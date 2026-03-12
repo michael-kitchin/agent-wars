@@ -127,6 +127,25 @@
       border-color: #2e5a7b;
     }
     .map-toast.hidden { display: none; }
+    .game-over-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    .game-over-overlay.hidden { display: none; }
+    .game-over-box {
+      background: #f0eeea;
+      padding: 1.5rem 2rem;
+      border-radius: 4px;
+      border: 1px solid #666;
+      text-align: center;
+    }
+    .game-over-box p { margin: 0 0 1rem 0; font-size: 1.1rem; font-weight: 600; }
+    .game-over-box button { padding: 0.5rem 1rem; font-size: 14px; }
     .map-toast p { margin: 0; flex: 1; white-space: pre-line; }
     #map-toast-dismiss {
       flex-shrink: 0;
@@ -139,11 +158,32 @@
       color: #666;
     }
     #map-toast-dismiss:hover { color: #333; }
+    .hex-tooltip {
+      position: fixed;
+      pointer-events: none;
+      padding: 0.35rem 0.5rem;
+      background: rgba(240, 238, 234, 0.96);
+      border: 1px solid #666;
+      border-radius: 2px;
+      font-size: 12px;
+      color: #333;
+      white-space: nowrap;
+      z-index: 5;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    }
+    .hex-tooltip.hidden { display: none; }
   </style>
 </head>
 <body>
   <div id="canvas-container">
     <canvas id="canvas"></canvas>
+    <div id="hex-tooltip" class="hex-tooltip hidden" aria-hidden="true"></div>
+    <div id="game-over-overlay" class="game-over-overlay hidden" aria-live="polite">
+      <div class="game-over-box">
+        <p id="game-over-message"></p>
+        <button type="button" id="new-game-btn">New game</button>
+      </div>
+    </div>
     <div id="map-toast" class="map-toast hidden" aria-live="polite">
       <p id="map-toast-text"></p>
       <button type="button" id="map-toast-dismiss" aria-label="Dismiss">×</button>
@@ -157,6 +197,9 @@
       <p><strong>Game state</strong><br><span id="sidebar-phase">—</span><br><span id="sidebar-turn">—</span></p>
       <p><strong>Pending orders</strong></p>
       <div id="pending-orders-list"></div>
+      <p><strong>Ranged attacks</strong></p>
+      <div id="ranged-attacks-list"></div>
+      <button type="button" id="ranged-attack-btn" style="display: none;">Ranged attack (click target hex)</button>
       <button type="button" id="ready-btn">Ready</button>
       <p id="sidebar-error" style="color: #a03030; font-size: 0.9em; display: none;"></p>
       <p style="color: #666; font-size: 0.9em;">Stage orders for as many units as you like, then Ready. Click unit → destination (same unit again = replace). Cancel below to clear an order.</p>
@@ -178,7 +221,7 @@
         </div>
       </div>
       <div class="openrouter-row">
-        <label>Status</label>
+        <label>Status (AI interactions and errors only)</label>
         <div id="openrouter-log" class="openrouter-log"></div>
       </div>
     </div>

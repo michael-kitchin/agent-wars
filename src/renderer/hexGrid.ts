@@ -306,8 +306,11 @@ export function getHexCanvasCenter(
     GRID_CENTER_LAT,
     1
   );
-  const cx = gridPts.reduce((s, p) => s + p.x, 0) / gridPts.length;
-  const cy = gridPts.reduce((s, p) => s + p.y, 0) / gridPts.length;
+  /* Use only distinct vertices for centroid (H3 may return closed loop with duplicate first point). */
+  const ptsForCenter = gridPts.length > 6 ? gridPts.slice(0, -1) : gridPts;
+  const n = ptsForCenter.length;
+  const cx = n ? ptsForCenter.reduce((s, p) => s + p.x, 0) / n : 0;
+  const cy = n ? ptsForCenter.reduce((s, p) => s + p.y, 0) / n : 0;
   return gridToCanvas(
     cx,
     cy,
