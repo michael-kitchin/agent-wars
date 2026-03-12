@@ -412,7 +412,7 @@ function buildSystemPromptLegacy(state: GameStateSnapshot): string {
 
 Combat: each unit rolls d6 when attacking (hit if roll ≤ attack) or when defending (hit if roll ≤ defender's defense). Higher values are better. Unit stats — ${combatSummary}.
 
-Hex positions below use H3 hex IDs (opaque strings). Copy them exactly from the lists; do not modify or invent IDs.
+Coordinate format: H3 hex IDs only (cube coordinates (i, j, k) are not used for this map — map size exceeds H3 local IJ range). Hex positions below are opaque strings; copy them exactly from the lists; do not modify or invent IDs.
 
 Here are your units, their H3 hex positions, and the H3 positions they can move to (Pursuit = suggested hex to close on a human unit):
 ${unitLines.join('\n')}
@@ -458,6 +458,11 @@ export async function requestOrders(
   const cubeMap = buildCubeMap(state);
   const useCube =
     state.hexes.length > 0 && cubeMap.cubeToH3.size === state.hexes.length;
+  if (!useCube && state.hexes.length > 0) {
+    logDebug(
+      `openRouter requestOrders: using legacy H3 prompt (cube map has ${cubeMap.cubeToH3.size} hexes, map has ${state.hexes.length}; (i,j,k) only used when all hexes convert)`
+    );
+  }
   const systemPrompt = useCube ? buildSystemPrompt(state, cubeMap) : buildSystemPromptLegacy(state);
   const userMessage = useCube
     ? `Return a JSON object with "strategy" (one-line explanation of your focus or goal this turn), "movementOrders" (array of { unitId, toCube: [i, j, k] }), and optional "rangedAttacks" (array of { unitId, targetCube: [i, j, k] }). Use cube coordinates from the lists above. Only valid moves and valid ranged targets.`
