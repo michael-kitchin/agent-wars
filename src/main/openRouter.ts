@@ -278,16 +278,16 @@ function validateAiRangedOrder(
   return { valid: true };
 }
 
-/** Preamble for (x, y) axial coordinates: origin, neighbors, distance, and axis direction for LLM-friendly reasoning. */
-const XY_PREAMBLE = `Positions use (x, y) coordinates. (0, 0) is the map center. x increases to the right, y increases toward the top-right.
-Neighbors: from (x, y) you can move to (x±1, y), (x, y±1), (x±1, y∓1) — six hexes.
-Distance: hex distance between (x1, y1) and (x2, y2) is max(|x2−x1|, |y2−y1|). Use only (x, y) from the unit and target lists below; do not invent coordinates.
+/** Preamble for [x, y] axial coordinates: origin, neighbors, distance, and axis direction for LLM-friendly reasoning. */
+const XY_PREAMBLE = `Positions use [x, y] coordinates. [0, 0] is the map center. x increases to the right, y increases toward the top-right.
+Neighbors: from [x, y] you can move to [x±1, y], [x, y±1], [x±1, y∓1] — six hexes.
+Distance: hex distance between [x1, y1] and [x2, y2] is max(|x2−x1|, |y2−y1|). Use only [x, y] from the unit and target lists below; do not invent coordinates.
 
 Response format: You must reply with movementOrders and rangedAttacks using only toXY and targetXY. Each is an array of two integers [x, y]. Do not use toH3Index, targetH3Index, or any hex/string IDs — only [x, y] arrays.`;
 
 /**
- * Builds the system prompt using (x, y) axial coordinates. Origin (0,0) at map center; neighbors and distance rules in preamble.
- * Only includes hexes that have (x, y) in the axial map so the prompt never contains H3 indices.
+ * Builds the system prompt using [x, y] axial coordinates. Origin [0,0] at map center; neighbors and distance rules in preamble.
+ * Only includes hexes that have [x, y] in the axial map so the prompt never contains H3 indices.
  */
 function buildSystemPromptXY(
   state: GameStateSnapshot,
@@ -338,7 +338,7 @@ ${XY_PREAMBLE}
 
 Combat: each unit rolls d6 when attacking (hit if roll ≤ attack) or when defending (hit if roll ≤ defender's defense). Higher values are better. Unit stats — ${combatSummary}.
 
-Here are your units, their positions as (x, y), and the positions they can move to (Pursuit = suggested hex to close on a human unit):
+Here are your units, their positions as [x, y], and the positions they can move to (Pursuit = suggested hex to close on a human unit):
 ${unitLines.join('\n')}
 ${rangedBlock}
 Human units: ${humanList || 'none'}.
@@ -382,15 +382,15 @@ export async function requestOrders(
   const { xyByH3, h3ByXY } = buildAxialCoordinateMap();
   const formatXY = (h3: string): string => {
     const xy = xyByH3.get(h3);
-    return xy ? `(${xy[0]}, ${xy[1]})` : h3;
+    return xy ? `[${xy[0]}, ${xy[1]}]` : h3;
   };
   const xyMap = { xyByH3, formatXY };
   if (state.hexes.length > 0 && !state.hexes.every((h) => xyByH3.has(h.h3Index))) {
-    logDebug('openRouter requestOrders: some hexes missing from axial map; listing only hexes with (x,y)');
+    logDebug('openRouter requestOrders: some hexes missing from axial map; listing only hexes with [x,y]');
   }
 
   const systemPrompt = buildSystemPromptXY(state, xyMap);
-  const userMessage = `Return JSON with "strategy", "movementOrders" (array of { unitId, toXY: [x, y] }), and optional "rangedAttacks". Use only [x, y] arrays for toXY and targetXY. Issue one movement order per unit that has valid moves (move all your units that can move). Only (x, y) from the lists above.`;
+  const userMessage = `Return JSON with "strategy", "movementOrders" (array of { unitId, toXY: [x, y] }), and optional "rangedAttacks". Use only [x, y] arrays for toXY and targetXY. Issue one movement order per unit that has valid moves (move all your units that can move). Only [x, y] from the lists above.`;
 
   console.log('[LLM prompt (system)]', systemPrompt);
   console.log('[LLM prompt (user)]', userMessage);
