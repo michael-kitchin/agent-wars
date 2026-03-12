@@ -18,7 +18,7 @@ From the project root:
 | `npm run dist:linux` | Linux: unpacked app directory (zip to ship) |
 | `npm run dist:mac` | macOS: unpacked .app directory (zip to ship; or build on a Mac for .dmg) |
 
-Each command runs `npm run build` first, then runs electron-builder. Artifacts are written to the **`release/`** directory.
+`dist:win`, `dist:linux`, and `dist:mac` run **`clean:release`** first (removes the `release/` folder so no locked files from a previous run or a running app), then build, then electron-builder. If you see "Release folder in use", close the app and any tools using `release/`, then retry. `npm run dist` does not clean. Artifacts are written to the **`release/`** directory.
 
 ## Cross-platform from one machine
 

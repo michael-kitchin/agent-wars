@@ -412,12 +412,14 @@ function buildSystemPromptLegacy(state: GameStateSnapshot): string {
 
 Combat: each unit rolls d6 when attacking (hit if roll ≤ attack) or when defending (hit if roll ≤ defender's defense). Higher values are better. Unit stats — ${combatSummary}.
 
-Here are your units, their H3Index hex positions, and the H3Index positions they can move to (Pursuit = suggested hex to close on a human unit):
+Hex positions below use H3 hex IDs (opaque strings). Copy them exactly from the lists; do not modify or invent IDs.
+
+Here are your units, their H3 hex positions, and the H3 positions they can move to (Pursuit = suggested hex to close on a human unit):
 ${unitLines.join('\n')}
 ${rangedBlock}
 Human units: ${humanUnits.map((u) => `${u.id} at ${u.h3Index}`).join('; ')}.
 
-Respond with a JSON object: { "strategy": "<one-line explanation>", "movementOrders": [ { "unitId": "<id>", "toH3Index": "<h3 from can move to>" }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetH3Index": "<h3 from can ranged-attack>" }, ... ] }. Include "strategy". Use only valid H3 indices from the lists above. Example: {"strategy":"Advancing toward human units.","movementOrders":[{"unitId":"opponent-armor-1","toH3Index":"821c07fffffffff"}],"rangedAttacks":[]}.`;
+Respond with a JSON object: { "strategy": "<one-line explanation>", "movementOrders": [ { "unitId": "<id>", "toH3Index": "<exact H3 from can move to>" }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetH3Index": "<exact H3 from can ranged-attack>" }, ... ] }. Include "strategy". Use only valid H3 indices from the lists above — copy the exact string. Example: {"strategy":"Advancing toward human units.","movementOrders":[{"unitId":"opponent-armor-1","toH3Index":"821c07fffffffff"}],"rangedAttacks":[]}.`;
 }
 
 export interface RequestOrdersResult {
