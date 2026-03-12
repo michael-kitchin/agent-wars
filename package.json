@@ -8,15 +8,38 @@
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "esbuild src/renderer/renderer.ts --bundle --outfile=static/renderer.js --platform=browser --target=es2022",
     "start": "electron .",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "dist": "npm run build && node scripts/clean-release.js && node node_modules/electron-builder/cli.js",
+    "dist:win": "npm run build && node scripts/clean-release.js win && node node_modules/electron-builder/cli.js --win",
+    "dist:linux": "npm run build && node scripts/clean-release.js linux && node node_modules/electron-builder/cli.js --linux",
+    "dist:mac": "node -e \"if (process.platform !== 'darwin') { console.error('Build for macOS is supported only on macOS. Run npm run dist:mac on a Mac. See .spec/packaging.md'); process.exit(1); }\" && npm run build && node scripts/clean-release.js mac && node node_modules/electron-builder/cli.js --mac"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "build": {
+    "appId": "com.agent-wars.app",
+    "productName": "Agent Wars",
+    "directories": {
+      "output": "release"
+    },
+    "files": ["dist", "static", "package.json", "node_modules"],
+    "win": {
+      "target": ["nsis", "portable"]
+    },
+    "linux": {
+      "target": ["dir"]
+    },
+    "mac": {
+      "target": ["dir"],
+      "category": "public.app-category.games"
+    }
+  },
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",
     "@types/node": "^22.10.1",
     "electron": "^40.0.0",
+    "electron-builder": "^25.0.0",
     "esbuild": "^0.27.3",
     "eslint": "^9.16.0",
     "typescript": "^5.7.2",

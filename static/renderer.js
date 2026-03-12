@@ -14270,7 +14270,7 @@
   var ORDER_LINE_WIDTH = 2.5;
   var ORDER_ARROW_SIZE = 10;
   var AI_ORDER_LINE_COLOR = "#7b4a2e";
-  var AI_MOVE_FADE_MS = 2e3;
+  var RESOLUTION_FADE_MS = 2e3;
   function getUnitAtHex(h3Index) {
     if (!gameState) return null;
     return gameState.units.find((u) => u.h3Index === h3Index) ?? null;
@@ -14294,8 +14294,8 @@
   var dragStartOffsetY = 0;
   var DRAG_THRESHOLD_PX = 5;
   var dragDistanceSq = 0;
-  var aiMoveAnimation = null;
-  var aiMoveAnimationFrameId = null;
+  var resolutionMoveAnimation = null;
+  var resolutionMoveAnimationFrameId = null;
   function appendOpenRouterLog(line, isError = false) {
     const el = document.getElementById("openrouter-log");
     if (!el) return;
@@ -14361,11 +14361,11 @@
     }
     drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
     const hexList = gameState.hexes.map((h2) => h2.h3Index);
-    let aiOpacity = 1;
-    if (aiMoveAnimation) {
-      const elapsed = Date.now() - aiMoveAnimation.startTime;
-      aiOpacity = Math.max(0, 1 - elapsed / AI_MOVE_FADE_MS);
-      drawAiMoveLines(ctx, view, w, h, aiMoveAnimation.moves, gameState.units, hexList, aiOpacity);
+    let resolutionOpacity = 1;
+    if (resolutionMoveAnimation) {
+      const elapsed = Date.now() - resolutionMoveAnimation.startTime;
+      resolutionOpacity = Math.max(0, 1 - elapsed / RESOLUTION_FADE_MS);
+      drawResolutionMoveLines(ctx, view, w, h, resolutionMoveAnimation.moves, gameState.units, hexList, resolutionOpacity);
     }
     if (pendingOrders.length > 0 && gameState.units.length && hexList) {
       drawOrderLines(ctx, view, w, h, pendingOrders, gameState.units, hexList);
@@ -14373,8 +14373,8 @@
     if (gameState.units.length) {
       drawUnits(ctx, view, w, h, gameState.units, hexList);
     }
-    if (aiMoveAnimation && hexList) {
-      drawGhostUnits(ctx, view, w, h, aiMoveAnimation.moves, gameState.units, hexList, aiOpacity);
+    if (resolutionMoveAnimation && hexList) {
+      drawGhostUnits(ctx, view, w, h, resolutionMoveAnimation.moves, gameState.units, hexList, resolutionOpacity);
     }
   }
   function drawUnits(ctx, view2, canvasWidth, canvasHeight, units, hexList) {
@@ -14441,13 +14441,14 @@
       ctx.stroke();
     }
   }
-  function drawAiMoveLines(ctx, view2, canvasWidth, canvasHeight, moves, units, hexList, opacity) {
+  function drawResolutionMoveLines(ctx, view2, canvasWidth, canvasHeight, moves, units, hexList, opacity) {
     if (moves.length === 0 || !hexList || opacity <= 0) return;
     ctx.save();
     ctx.globalAlpha = opacity;
     for (const move of moves) {
       const unit = units.find((u) => u.id === move.unitId);
       if (!unit) continue;
+      const lineColor = unit.player === "human" ? ORDER_LINE_COLOR : AI_ORDER_LINE_COLOR;
       const from = getHexCanvasCenter(move.fromH3Index, view2, canvasWidth, canvasHeight, hexList);
       const to = getHexCanvasCenter(move.toH3Index, view2, canvasWidth, canvasHeight, hexList);
       const dx = to.x - from.x;
@@ -14461,7 +14462,7 @@
       ctx.beginPath();
       ctx.moveTo(from.x, from.y);
       ctx.lineTo(endX, endY);
-      ctx.strokeStyle = AI_ORDER_LINE_COLOR;
+      ctx.strokeStyle = lineColor;
       ctx.lineWidth = ORDER_LINE_WIDTH;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
@@ -14475,9 +14476,9 @@
       ctx.lineTo(endX - perpX, endY - perpY);
       ctx.lineTo(endX + perpX, endY + perpY);
       ctx.closePath();
-      ctx.fillStyle = AI_ORDER_LINE_COLOR;
+      ctx.fillStyle = lineColor;
       ctx.fill();
-      ctx.strokeStyle = AI_ORDER_LINE_COLOR;
+      ctx.strokeStyle = lineColor;
       ctx.lineWidth = ORDER_LINE_WIDTH;
       ctx.stroke();
     }
@@ -14532,11 +14533,11 @@
     }
     drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
     const hexList = gameState.hexes.map((h2) => h2.h3Index);
-    let aiOpacity = 1;
-    if (aiMoveAnimation) {
-      const elapsed = Date.now() - aiMoveAnimation.startTime;
-      aiOpacity = Math.max(0, 1 - elapsed / AI_MOVE_FADE_MS);
-      drawAiMoveLines(ctx, view, w, h, aiMoveAnimation.moves, gameState.units, hexList, aiOpacity);
+    let resolutionOpacity = 1;
+    if (resolutionMoveAnimation) {
+      const elapsed = Date.now() - resolutionMoveAnimation.startTime;
+      resolutionOpacity = Math.max(0, 1 - elapsed / RESOLUTION_FADE_MS);
+      drawResolutionMoveLines(ctx, view, w, h, resolutionMoveAnimation.moves, gameState.units, hexList, resolutionOpacity);
     }
     if (pendingOrders.length > 0 && gameState.units.length && hexList) {
       drawOrderLines(ctx, view, w, h, pendingOrders, gameState.units, hexList);
@@ -14544,19 +14545,19 @@
     if (gameState.units.length) {
       drawUnits(ctx, view, w, h, gameState.units, hexList);
     }
-    if (aiMoveAnimation && hexList) {
-      drawGhostUnits(ctx, view, w, h, aiMoveAnimation.moves, gameState.units, hexList, aiOpacity);
+    if (resolutionMoveAnimation && hexList) {
+      drawGhostUnits(ctx, view, w, h, resolutionMoveAnimation.moves, gameState.units, hexList, resolutionOpacity);
     }
   }
-  function tickAiMoveAnimation() {
-    if (!aiMoveAnimation) return;
-    const elapsed = Date.now() - aiMoveAnimation.startTime;
+  function tickResolutionMoveAnimation() {
+    if (!resolutionMoveAnimation) return;
+    const elapsed = Date.now() - resolutionMoveAnimation.startTime;
     redraw();
-    if (elapsed < AI_MOVE_FADE_MS) {
-      aiMoveAnimationFrameId = requestAnimationFrame(tickAiMoveAnimation);
+    if (elapsed < RESOLUTION_FADE_MS) {
+      resolutionMoveAnimationFrameId = requestAnimationFrame(tickResolutionMoveAnimation);
     } else {
-      aiMoveAnimation = null;
-      aiMoveAnimationFrameId = null;
+      resolutionMoveAnimation = null;
+      resolutionMoveAnimationFrameId = null;
       redraw();
     }
   }
@@ -14789,6 +14790,11 @@
             showSidebarError(submitResult.reason ?? "Submit failed");
             return;
           }
+          const humanMoves = gameState && pendingOrders.length > 0 ? pendingOrders.map((o) => {
+            const from = gameState.units.find((u) => u.id === o.unitId)?.h3Index;
+            if (!from || from === o.toH3Index) return null;
+            return { unitId: o.unitId, fromH3Index: from, toH3Index: o.toH3Index };
+          }).filter((m) => m !== null) : [];
           appendOpenRouterLog("Requesting AI orders\u2026");
           const readyResult = await window.gameApi.ready();
           if (!readyResult.success) {
@@ -14809,11 +14815,6 @@
               toastText += "\n\nValidation issues (dropped): " + dropReasons.join("; ");
             }
             showMapToast(toastText, { isError: dropReasons.length > 0 });
-            if (readyResult.aiMoves && readyResult.aiMoves.length > 0) {
-              if (aiMoveAnimationFrameId !== null) cancelAnimationFrame(aiMoveAnimationFrameId);
-              aiMoveAnimation = { moves: readyResult.aiMoves, startTime: Date.now() };
-              aiMoveAnimationFrameId = requestAnimationFrame(tickAiMoveAnimation);
-            }
           } else if (readyResult.aiOrderCount === 0) {
             appendOpenRouterLog("Turn resolved (no AI orders).");
             hideMapToast();
@@ -14824,6 +14825,13 @@
           const state = await window.gameApi.getGameState();
           gameState = state;
           selectedUnitId = null;
+          const aiMoves = readyResult.aiMoves ?? [];
+          const resolutionMoves = [...humanMoves, ...aiMoves];
+          if (resolutionMoves.length > 0) {
+            if (resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(resolutionMoveAnimationFrameId);
+            resolutionMoveAnimation = { moves: resolutionMoves, startTime: Date.now() };
+            resolutionMoveAnimationFrameId = requestAnimationFrame(tickResolutionMoveAnimation);
+          }
           pendingOrders = [];
           updateGameStateSidebar(state);
           updatePendingOrdersSidebar();
