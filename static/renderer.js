@@ -14589,7 +14589,7 @@
     ctx.strokeStyle = CASUALTY_X_COLOR;
     ctx.lineWidth = 4;
     ctx.lineCap = "round";
-    const size = 14;
+    const size = 20;
     for (const h3Index of casualtyHexes) {
       const { x, y } = getHexCanvasCenter(h3Index, view2, canvasWidth, canvasHeight, hexList);
       ctx.beginPath();

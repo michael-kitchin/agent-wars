@@ -300,6 +300,9 @@ export async function requestOrders(
   const systemPrompt = buildSystemPrompt(state);
   const userMessage = `Return a JSON object with "movementOrders" (array of { unitId, toH3Index }) and optional "rangedAttacks" (array of { unitId, targetH3Index }). Only valid moves and valid ranged targets from the lists above.`;
 
+  console.log('[LLM prompt (system)]', systemPrompt);
+  console.log('[LLM prompt (user)]', userMessage);
+
   try {
     const res = await fetch(OPENROUTER_CHAT_URL, {
       method: 'POST',
@@ -329,6 +332,8 @@ export async function requestOrders(
       logError('openRouter requestOrders: no content in response');
       return { success: false, error: 'Invalid response: no content' };
     }
+
+    console.log('[LLM response]', content);
 
     const parsed = parseOrdersResponse(content);
     if (!parsed) {
