@@ -127,6 +127,11 @@
       border-color: #2e5a7b;
     }
     .map-toast.hidden { display: none; }
+    .ai-strategy-toast {
+      top: 12px;
+      left: 12px;
+      bottom: auto;
+    }
     .game-over-overlay {
       position: absolute;
       inset: 0;
@@ -158,6 +163,17 @@
       color: #666;
     }
     #map-toast-dismiss:hover { color: #333; }
+    #ai-strategy-toast-dismiss {
+      flex-shrink: 0;
+      padding: 0.1rem 0.35rem;
+      font-size: 1.1rem;
+      line-height: 1;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: #666;
+    }
+    #ai-strategy-toast-dismiss:hover { color: #333; }
     .hex-tooltip {
       position: fixed;
       pointer-events: none;
@@ -172,12 +188,62 @@
       box-shadow: 0 1px 4px rgba(0,0,0,0.15);
     }
     .hex-tooltip.hidden { display: none; }
+    .stack-callout {
+      position: fixed;
+      pointer-events: auto;
+      padding: 0.35rem 0.5rem;
+      min-width: 160px;
+      max-width: 280px;
+      background: rgba(240, 238, 234, 0.96);
+      border: 1px solid #666;
+      border-radius: 2px;
+      font-size: 12px;
+      color: #333;
+      z-index: 6;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    }
+    .stack-callout.hidden { display: none; }
+    .stack-callout ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .stack-callout li {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-bottom: 0.25rem;
+      white-space: nowrap;
+    }
+    .stack-callout li:last-child { margin-bottom: 0; }
+    .stack-callout .unit-label {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .stack-callout .unit-select {
+      flex-shrink: 0;
+      padding: 0.15rem 0.4rem;
+      font-size: 11px;
+      cursor: pointer;
+      background: #2e5a7b;
+      color: #fff;
+      border: none;
+      border-radius: 2px;
+    }
+    .stack-callout .unit-select:hover {
+      background: #3a6a8f;
+    }
   </style>
 </head>
 <body>
   <div id="canvas-container">
     <canvas id="canvas"></canvas>
     <div id="hex-tooltip" class="hex-tooltip hidden" aria-hidden="true"></div>
+    <div id="stack-callout" class="stack-callout hidden" aria-label="Units in this hex">
+      <ul id="stack-callout-list"></ul>
+    </div>
     <div id="game-over-overlay" class="game-over-overlay hidden" aria-live="polite">
       <div class="game-over-box">
         <p id="game-over-message"></p>
@@ -187,6 +253,10 @@
     <div id="map-toast" class="map-toast hidden" aria-live="polite">
       <p id="map-toast-text"></p>
       <button type="button" id="map-toast-dismiss" aria-label="Dismiss">×</button>
+    </div>
+    <div id="ai-strategy-toast" class="map-toast ai-strategy-toast hidden" aria-live="polite">
+      <p id="ai-strategy-toast-text"></p>
+      <button type="button" id="ai-strategy-toast-dismiss" aria-label="Dismiss">×</button>
     </div>
   </div>
   <aside id="sidebar">

@@ -176,6 +176,61 @@ function formatStackTooltip(units: GameStateSnapshot['units']): string {
     .join(', ');
 }
 
+/** Hides the stack callout popover (e.g. after selecting a unit or clicking elsewhere). */
+function hideStackCallout(): void {
+  const el = document.getElementById('stack-callout');
+  if (el) el.classList.add('hidden');
+}
+
+/**
+ * Shows the stack callout at the given screen position with an alphabetized list of units.
+ * Units belonging to the human player get a "Select" button to select that unit for movement or ranged fire.
+ */
+function showStackCallout(
+  units: GameStateSnapshot['units'],
+  clientX: number,
+  clientY: number
+): void {
+  const calloutEl = document.getElementById('stack-callout');
+  const listEl = document.getElementById('stack-callout-list');
+  const tooltipEl = document.getElementById('hex-tooltip');
+  if (!calloutEl || !listEl) return;
+  tooltipEl?.classList.add('hidden');
+
+  const sorted = [...units].sort(
+    (a, b) =>
+      `${a.player} ${a.unitType} ${a.id}`.localeCompare(`${b.player} ${b.unitType} ${b.id}`)
+  );
+
+  listEl.innerHTML = '';
+  for (const u of sorted) {
+    const li = document.createElement('li');
+    const label = document.createElement('span');
+    label.className = 'unit-label';
+    label.textContent = u.id;
+    li.appendChild(label);
+    if (u.player === 'human') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'unit-select';
+      btn.textContent = 'Select';
+      btn.addEventListener('click', () => {
+        selectUnitOnMap(u.id);
+        hideStackCallout();
+        updateSidebar();
+        updateRangedSidebar();
+        redraw();
+      });
+      li.appendChild(btn);
+    }
+    listEl.appendChild(li);
+  }
+
+  calloutEl.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
+  calloutEl.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
+  calloutEl.classList.remove('hidden');
+}
+
 const TOOLTIP_OFFSET_PX = 12;
 
 const MIN_SCALE = 0.2;
@@ -234,6 +289,7 @@ function appendOpenRouterLog(line: string, isError = false): void {
 /** Toast: show message for a readable duration, then auto-hide; can dismiss early. */
 const TOAST_DURATION_MS = 8000;
 let toastHideTimer: ReturnType<typeof setTimeout> | null = null;
+let aiStrategyToastHideTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Shows a toast message over the map. Auto-hides after TOAST_DURATION_MS unless dismissed.
@@ -263,6 +319,36 @@ function hideMapToast(): void {
     toastHideTimer = null;
   }
   const el = document.getElementById('map-toast');
+  if (el) el.classList.add('hidden');
+}
+
+/**
+ * Shows the AI strategy toast (upper-left). Same duration and dismiss behavior as the map toast.
+ */
+function showAiStrategyToast(message: string): void {
+  if (aiStrategyToastHideTimer !== null) {
+    clearTimeout(aiStrategyToastHideTimer);
+    aiStrategyToastHideTimer = null;
+  }
+  const el = document.getElementById('ai-strategy-toast');
+  const textEl = document.getElementById('ai-strategy-toast-text');
+  if (el && textEl) {
+    textEl.textContent = message;
+    el.classList.add('toast-info');
+    el.classList.remove('hidden');
+  }
+  aiStrategyToastHideTimer = setTimeout(() => {
+    aiStrategyToastHideTimer = null;
+    hideAiStrategyToast();
+  }, TOAST_DURATION_MS);
+}
+
+function hideAiStrategyToast(): void {
+  if (aiStrategyToastHideTimer !== null) {
+    clearTimeout(aiStrategyToastHideTimer);
+    aiStrategyToastHideTimer = null;
+  }
+  const el = document.getElementById('ai-strategy-toast');
   if (el) el.classList.add('hidden');
 }
 
@@ -482,28 +568,22 @@ function drawCombatLightning(
   if (combatHexes.length === 0 || opacity <= 0) return;
   ctx.save();
   ctx.globalAlpha = opacity;
-  ctx.strokeStyle = LIGHTNING_COLOR;
-  ctx.lineWidth = 3;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  const boltHalfHeight = 18;
+  const h = 18;
   for (const h3Index of combatHexes) {
     const { x, y } = getHexCanvasCenter(h3Index, view, canvasWidth, canvasHeight, hexList);
     ctx.beginPath();
-    ctx.moveTo(x, y - boltHalfHeight);
-    ctx.lineTo(x - 6, y);
-    ctx.lineTo(x + 5, y + boltHalfHeight * 0.5);
-    ctx.lineTo(x - 4, y + boltHalfHeight);
-    ctx.lineTo(x, y + boltHalfHeight * 0.3);
-    ctx.lineTo(x + 6, y - boltHalfHeight * 0.4);
-    ctx.lineTo(x, y - boltHalfHeight * 0.2);
-    ctx.lineTo(x - 6, y);
-    ctx.closePath();
+    ctx.moveTo(x, y - h);
+    ctx.lineTo(x + 6, y - 4);
+    ctx.lineTo(x - 4, y + 6);
+    ctx.lineTo(x + 5, y + h);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 5;
     ctx.stroke();
-    ctx.fillStyle = LIGHTNING_COLOR;
-    ctx.globalAlpha = opacity * 0.25;
-    ctx.fill();
-    ctx.globalAlpha = opacity;
+    ctx.strokeStyle = LIGHTNING_COLOR;
+    ctx.lineWidth = 3;
+    ctx.stroke();
   }
   ctx.restore();
 }
@@ -525,8 +605,6 @@ function drawCasualtyOverlay(
   if (casualtyHexes.length === 0 || opacity <= 0) return;
   ctx.save();
   ctx.globalAlpha = opacity;
-  ctx.strokeStyle = CASUALTY_X_COLOR;
-  ctx.lineWidth = 4;
   ctx.lineCap = 'round';
   const size = 20;
   for (const h3Index of casualtyHexes) {
@@ -536,6 +614,11 @@ function drawCasualtyOverlay(
     ctx.lineTo(x + size, y + size);
     ctx.moveTo(x + size, y - size);
     ctx.lineTo(x - size, y + size);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    ctx.strokeStyle = CASUALTY_X_COLOR;
+    ctx.lineWidth = 4;
     ctx.stroke();
   }
   ctx.restore();
@@ -924,6 +1007,7 @@ function initNewGameButton(): void {
       rangedModeActive = false;
       selectedUnitId = null;
       selectedHexIndex = null;
+      hideStackCallout();
       updateGameStateSidebar(state);
       updatePendingOrdersSidebar();
       updateRangedSidebar();
@@ -1121,6 +1205,7 @@ function initOpenRouterUI(): void {
   if (refreshBtn) refreshBtn.addEventListener('click', refreshModels);
 
   document.getElementById('map-toast-dismiss')?.addEventListener('click', hideMapToast);
+  document.getElementById('ai-strategy-toast-dismiss')?.addEventListener('click', hideAiStrategyToast);
 }
 
 function init(): void {
@@ -1207,32 +1292,6 @@ function init(): void {
     redraw();
   });
 
-  canvas.addEventListener('mousemove', (e) => {
-    if (isDragging) return;
-    const info = getCanvasAndSize();
-    if (!info || !gameState) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const hexList = gameState.hexes.map((h) => h.h3Index);
-    const hit = hitTest(x, y, view, info.width, info.height, hexList);
-    const tooltipEl = document.getElementById('hex-tooltip');
-    if (!tooltipEl) return;
-    if (!hit) {
-      tooltipEl.classList.add('hidden');
-      return;
-    }
-    const units = getUnitsAtHex(hit);
-    if (units.length <= 1) {
-      tooltipEl.classList.add('hidden');
-      return;
-    }
-    tooltipEl.textContent = formatStackTooltip(units);
-    tooltipEl.style.left = `${e.clientX + TOOLTIP_OFFSET_PX}px`;
-    tooltipEl.style.top = `${e.clientY + TOOLTIP_OFFSET_PX}px`;
-    tooltipEl.classList.remove('hidden');
-  });
-
   canvas.addEventListener('mouseleave', () => {
     document.getElementById('hex-tooltip')?.classList.add('hidden');
   });
@@ -1290,11 +1349,24 @@ function init(): void {
           updateRangedSidebar();
         }
       }
+      hideStackCallout();
       updateSidebar();
       redraw();
       return;
     }
 
+    const unitsAtHit = hit ? getUnitsAtHex(hit) : [];
+    const isStack = unitsAtHit.length >= 2;
+    const isLoneAi = unitsAtHit.length === 1 && unitsAtHit[0]?.player !== 'human';
+    if (hit && (isStack || isLoneAi)) {
+      showStackCallout(unitsAtHit, e.clientX, e.clientY);
+      updateSidebar();
+      updateRangedSidebar();
+      redraw();
+      return;
+    }
+
+    hideStackCallout();
     if (hit) {
       const unit = getUnitAtHex(hit);
       if (unit?.player === 'human') {
@@ -1350,6 +1422,7 @@ function init(): void {
         }
         if (readyResult.aiSkipped) {
           appendOpenRouterLog(readyResult.aiSkipReason ?? 'AI skipped.', true);
+          hideAiStrategyToast();
           showMapToast(readyResult.aiSkipReason ?? 'Set your OpenRouter API key and select a model in the panel on the right.', { isError: true });
         } else if (
           (readyResult.aiOrderCount !== undefined && readyResult.aiOrderCount > 0) ||
@@ -1375,12 +1448,17 @@ function init(): void {
             toastText += '\n\nDropped: ' + dropReasons.join('; ');
           }
           showMapToast(toastText, { isError: dropReasons.length > 0 });
+          if (readyResult.aiStrategy) {
+            showAiStrategyToast(readyResult.aiStrategy);
+          }
         } else if (readyResult.aiOrderCount === 0) {
           appendOpenRouterLog('Turn resolved (no AI orders).');
           hideMapToast();
+          hideAiStrategyToast();
         } else {
           appendOpenRouterLog('Turn resolved.');
           hideMapToast();
+          hideAiStrategyToast();
         }
         const state = (await window.gameApi.getGameState()) as GameStateSnapshot;
         gameState = state;
@@ -1405,6 +1483,13 @@ function init(): void {
             meleeCasualtyHexes: readyResult.meleeCasualtyHexes?.length ? readyResult.meleeCasualtyHexes : undefined,
             meleeRemovedUnits: readyResult.meleeRemovedUnits?.length ? readyResult.meleeRemovedUnits : undefined,
           };
+          const kills = readyResult.kills;
+          if (kills?.length) {
+            const killLines = kills.map(
+              (k) => `${k.victimId} destroyed by ${k.killerIds.join(', ')}`
+            );
+            showMapToast(killLines.join('\n'), { isError: false });
+          }
           resolutionMoveAnimationFrameId = requestAnimationFrame(tickResolutionMoveAnimation);
         }
         pendingOrders = [];

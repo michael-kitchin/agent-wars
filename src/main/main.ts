@@ -96,6 +96,8 @@ export interface ReadyResult {
   meleeCombatHexes?: string[];
   meleeCasualtyHexes?: string[];
   meleeRemovedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
+  kills?: { victimId: string; killerIds: string[] }[];
+  aiStrategy?: string;
 }
 
 function registerIpcHandlers(): void {
@@ -123,11 +125,13 @@ function registerIpcHandlers(): void {
     let aiDropReasons: string[] | undefined;
 
     let aiSkipReason: string | undefined;
+    let aiStrategy: string | undefined;
     if (modelId && hasKey()) {
       const result = await requestOrders(state, modelId);
       if (result.success) {
         aiOrders = result.orders;
         aiRangedOrders = result.rangedAttacks ?? [];
+        aiStrategy = result.strategy;
         aiDropped = result.dropped;
         aiDropReasons = result.dropReasons?.length ? result.dropReasons : undefined;
       } else {
@@ -188,6 +192,8 @@ function registerIpcHandlers(): void {
       meleeCombatHexes: readyResult.meleeCombatHexes,
       meleeCasualtyHexes: readyResult.meleeCasualtyHexes,
       meleeRemovedUnits: readyResult.meleeRemovedUnits,
+      kills: readyResult.kills,
+      aiStrategy,
     };
   });
 

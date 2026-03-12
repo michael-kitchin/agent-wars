@@ -6,8 +6,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { app, safeStorage } from 'electron';
-import { gridDistance } from 'h3-js';
-import { getRange } from './combatConstants';
+import { gridDistance, cellToLocalIj } from 'h3-js';
+import { getAttack, getDefense, getRange } from './combatConstants';
 import { logDebug, logError } from './logger';
 import type { GameStateSnapshot } from './gameDb';
 
@@ -19,6 +19,59 @@ const MOVEMENT_RANGE: Record<string, number> = {
   armor: 2,
   naval: 2,
 };
+
+/** Cube coordinates (i, j, k) with i + j + k = 0; used in prompts so the LLM can reason about distance and adjacency. */
+type CubeCoord = [number, number, number];
+
+function cubeKey(c: CubeCoord): string {
+  return `${c[0]},${c[1]},${c[2]}`;
+}
+
+/**
+ * Converts an H3 index to cube coordinates (i, j, k) relative to an origin cell.
+ * Uses H3 local IJ; k = -i - j so that i + j + k = 0. Returns null if conversion throws.
+ */
+function h3ToCube(h3Index: string, originH3: string): CubeCoord | null {
+  try {
+    const ij = cellToLocalIj(originH3, h3Index) as { i: number; j: number };
+    const i = ij.i;
+    const j = ij.j;
+    return [i, j, -i - j];
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Builds a map from cube key to H3 index for all hexes in the state.
+ * Origin is the first hex in state.hexes. Used to show (i,j,k) in the prompt and to resolve toCube/targetCube in the response.
+ * If no origin or cellToLocalIj fails for too many hexes (e.g. large map), cubeToH3 may be empty or partial; caller should fall back to H3-index prompt when cubeToH3.size === 0.
+ */
+function buildCubeMap(state: GameStateSnapshot): { cubeToH3: Map<string, string>; origin: string; formatCube: (h3: string) => string } {
+  const cubeToH3 = new Map<string, string>();
+  const origin = state.hexes[0]?.h3Index ?? '';
+  if (!origin) {
+    const formatCube = (h3: string): string => h3;
+    return { cubeToH3, origin, formatCube };
+  }
+  try {
+    for (const h of state.hexes) {
+      const c = h3ToCube(h.h3Index, origin);
+      if (c) cubeToH3.set(cubeKey(c), h.h3Index);
+    }
+  } catch (err) {
+    logDebug('openRouter buildCubeMap: cellToLocalIj failed for some hexes', err);
+  }
+  const formatCube = (h3: string): string => {
+    try {
+      const c = h3ToCube(h3, origin);
+      return c ? `(${c[0]}, ${c[1]}, ${c[2]})` : h3;
+    } catch {
+      return h3;
+    }
+  };
+  return { cubeToH3, origin, formatCube };
+}
 
 /** Returns the path to the OpenRouter config file (userData). Call after app is ready. */
 function getConfigPath(): string {
@@ -187,6 +240,39 @@ function getValidDestinations(unit: { h3Index: string; unitType: string }, state
 }
 
 /**
+ * Returns a suggested move for the unit that minimizes distance to the nearest human unit.
+ * Used to give the LLM a concrete "pursuit" option so it can advance toward the player without interpreting H3 geometry.
+ */
+function getPursuitSuggestion(
+  unit: { id: string; h3Index: string; unitType: string },
+  state: GameStateSnapshot
+): { toH3Index: string; nearestHumanId: string; distanceHexes: number } | null {
+  const humanUnits = state.units.filter((u) => u.player === 'human');
+  if (humanUnits.length === 0) return null;
+  const dests = getValidDestinations(unit, state);
+  if (dests.length === 0) return null;
+  let bestDest: string | null = null;
+  let bestDist = Infinity;
+  let bestHumanId = humanUnits[0]!.id;
+  for (const dest of dests) {
+    for (const h of humanUnits) {
+      try {
+        const d = gridDistance(dest, h.h3Index);
+        if (d < bestDist) {
+          bestDist = d;
+          bestDest = dest;
+          bestHumanId = h.id;
+        }
+      } catch {
+        /* skip */
+      }
+    }
+  }
+  if (bestDest == null) return null;
+  return { toH3Index: bestDest, nearestHumanId: bestHumanId, distanceHexes: bestDist };
+}
+
+/**
  * Returns H3 indices of enemy-occupied hexes within the unit's ranged attack range.
  * Used to list valid ranged targets in the AI prompt.
  */
@@ -234,15 +320,74 @@ function validateAiRangedOrder(
   return { valid: true };
 }
 
+const CUBE_PREAMBLE = `Hex positions use cube coordinates (i, j, k): three integers with i + j + k = 0. Adjacent hexes differ by 1 in two of the three. You can reason about distance: e.g. (0, 0, 0) and (2, -1, -1) are two steps apart.`;
+
 /**
  * Builds the system prompt for the LLM: game rules, map summary, opponent units with valid move and ranged targets, and required JSON format.
+ * Uses cube coordinates (i, j, k) in the prompt when cubeMap is provided so the LLM can reason about positions.
  */
-function buildSystemPrompt(state: GameStateSnapshot): string {
+function buildSystemPrompt(state: GameStateSnapshot, cubeMap: { formatCube: (h3: string) => string }): string {
+  const opponentUnits = state.units.filter((u) => u.player === 'opponent');
+  const humanUnits = state.units.filter((u) => u.player === 'human');
+  const fmt = cubeMap.formatCube;
+  const unitLines = opponentUnits.map((u) => {
+    const dests = getValidDestinations(u, state);
+    const destStr = dests.length ? dests.map((h) => fmt(h)).join(', ') : 'none (no valid hex)';
+    const base = `${u.id} (${u.unitType}) at ${fmt(u.h3Index)} can move to: ${destStr}`;
+    const pursuit = getPursuitSuggestion(u, state);
+    if (pursuit) {
+      return `${base}. Pursuit: move to ${fmt(pursuit.toH3Index)} to close on ${pursuit.nearestHumanId} (${pursuit.distanceHexes} hexes away).`;
+    }
+    return base;
+  });
+  const rangedLines = opponentUnits
+    .filter((u) => getRange(u.unitType) >= 1)
+    .map((u) => {
+      const targets = getValidRangedTargets(u, state);
+      const targetStr = targets.length ? targets.map((h) => fmt(h)).join(', ') : 'none';
+      return `${u.id} (${u.unitType}, range ${getRange(u.unitType)}) can ranged-attack: ${targetStr}`;
+    });
+  const rangedBlock =
+    rangedLines.length > 0
+      ? `\nRanged attacks (optional): Armor has range 1, naval has range 2. You may declare a target hex (enemy, within range) per unit. Valid targets per unit:\n${rangedLines.join('\n')}\n`
+      : '';
+
+  const unitTypes: Array<'infantry' | 'armor' | 'naval'> = ['infantry', 'armor', 'naval'];
+  const combatSummary = unitTypes
+    .map(
+      (t) =>
+        `${t}: ${getAttack(t)} attack / ${getDefense(t)} defense${getRange(t) >= 1 ? `, range ${getRange(t)}` : ', melee only'}`
+    )
+    .join('; ');
+
+  return `You are the opponent in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}. Your objective is to destroy all human units. Move toward human units to get in ranged or melee range; do not stay passive. When a "Pursuit" suggestion is given, prefer that move to close on the enemy unless you have a better strategic or tactical reason (e.g. already in range to fire).
+
+${CUBE_PREAMBLE}
+
+Combat: each unit rolls d6 when attacking (hit if roll ≤ attack) or when defending (hit if roll ≤ defender's defense). Higher values are better. Unit stats — ${combatSummary}.
+
+Here are your units, their positions as (i, j, k), and the positions they can move to (Pursuit = suggested hex to close on a human unit):
+${unitLines.join('\n')}
+${rangedBlock}
+Human units: ${humanUnits.map((u) => `${u.id} at ${fmt(u.h3Index)}`).join('; ')}.
+
+Respond with a JSON object: { "strategy": "<one-line explanation of what you are focusing on or trying to accomplish this turn>", "movementOrders": [ { "unitId": "<id>", "toCube": [i, j, k] }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetCube": [i, j, k] }, ... ] }. Use cube coordinates: "toCube" and "targetCube" are arrays of three integers [i, j, k] with i + j + k = 0. Include "strategy": a single short sentence. Both arrays optional. movementOrders: one per unit from "can move to". rangedAttacks: only for units with range (armor, naval); use only "can ranged-attack" targets. Example: {"strategy":"Advancing toward human units to set up ranged fire.","movementOrders":[{"unitId":"opponent-armor-1","toCube":[1,0,-1]}],"rangedAttacks":[{"unitId":"opponent-armor-1","targetCube":[2,-1,-1]}]}.`;
+}
+
+/**
+ * Builds the system prompt using raw H3 indices (fallback when cube coordinates are not available, e.g. map too large for localIj).
+ */
+function buildSystemPromptLegacy(state: GameStateSnapshot): string {
   const opponentUnits = state.units.filter((u) => u.player === 'opponent');
   const humanUnits = state.units.filter((u) => u.player === 'human');
   const unitLines = opponentUnits.map((u) => {
     const dests = getValidDestinations(u, state);
-    return `${u.id} (${u.unitType}) at ${u.h3Index} can move to: ${dests.length ? dests.join(', ') : 'none (no valid hex)'}`;
+    const base = `${u.id} (${u.unitType}) at ${u.h3Index} can move to: ${dests.length ? dests.join(', ') : 'none (no valid hex)'}`;
+    const pursuit = getPursuitSuggestion(u, state);
+    if (pursuit) {
+      return `${base}. Pursuit: move to ${pursuit.toH3Index} to close on ${pursuit.nearestHumanId} (${pursuit.distanceHexes} hexes away).`;
+    }
+    return base;
   });
   const rangedLines = opponentUnits
     .filter((u) => getRange(u.unitType) >= 1)
@@ -252,23 +397,34 @@ function buildSystemPrompt(state: GameStateSnapshot): string {
     });
   const rangedBlock =
     rangedLines.length > 0
-      ? `\nRanged attacks (optional): Armor has range 1, naval has range 2. You may declare a target hex (enemy, within range) per unit. Valid targets per unit:\n${rangedLines.join('\n')}\n`
+      ? `\nRanged attacks (optional): Armor has range 1, naval has range 2. Valid targets per unit:\n${rangedLines.join('\n')}\n`
       : '';
 
-  return `You are the opponent in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}.
+  const unitTypes: Array<'infantry' | 'armor' | 'naval'> = ['infantry', 'armor', 'naval'];
+  const combatSummary = unitTypes
+    .map(
+      (t) =>
+        `${t}: ${getAttack(t)} attack / ${getDefense(t)} defense${getRange(t) >= 1 ? `, range ${getRange(t)}` : ', melee only'}`
+    )
+    .join('; ');
 
-Your units — use ONLY these toH3Index values (each unit can move only to the listed hexes):
+  return `You are the opponent in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}. Your objective is to destroy all human units. Move toward human units to get in ranged or melee range.
+
+Combat: each unit rolls d6 when attacking (hit if roll ≤ attack) or when defending (hit if roll ≤ defender's defense). Higher values are better. Unit stats — ${combatSummary}.
+
+Here are your units, their H3Index hex positions, and the H3Index positions they can move to (Pursuit = suggested hex to close on a human unit):
 ${unitLines.join('\n')}
 ${rangedBlock}
 Human units: ${humanUnits.map((u) => `${u.id} at ${u.h3Index}`).join('; ')}.
 
-Respond with a JSON object: { "movementOrders": [ { "unitId": "<id>", "toH3Index": "<h3 from can move to>" }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetH3Index": "<h3 from can ranged-attack>" }, ... ] }. Both arrays optional. movementOrders: one per unit from "can move to". rangedAttacks: only for units with range (armor, naval); use only "can ranged-attack" targets. Example: {"movementOrders":[{"unitId":"opponent-armor-1","toH3Index":"821c07fffffffff"}],"rangedAttacks":[{"unitId":"opponent-armor-1","targetH3Index":"821c0ffffffffff"}]}.`;
+Respond with a JSON object: { "strategy": "<one-line explanation>", "movementOrders": [ { "unitId": "<id>", "toH3Index": "<h3 from can move to>" }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetH3Index": "<h3 from can ranged-attack>" }, ... ] }. Include "strategy". Use only valid H3 indices from the lists above. Example: {"strategy":"Advancing toward human units.","movementOrders":[{"unitId":"opponent-armor-1","toH3Index":"821c07fffffffff"}],"rangedAttacks":[]}.`;
 }
 
 export interface RequestOrdersResult {
   success: true;
   orders: { unitId: string; toH3Index: string }[];
   rangedAttacks?: { unitId: string; targetH3Index: string }[];
+  strategy?: string;
   dropped?: number;
   dropReasons?: string[];
 }
@@ -297,8 +453,13 @@ export async function requestOrders(
     return { success: false, error: 'No model selected' };
   }
 
-  const systemPrompt = buildSystemPrompt(state);
-  const userMessage = `Return a JSON object with "movementOrders" (array of { unitId, toH3Index }) and optional "rangedAttacks" (array of { unitId, targetH3Index }). Only valid moves and valid ranged targets from the lists above.`;
+  const cubeMap = buildCubeMap(state);
+  const useCube =
+    state.hexes.length > 0 && cubeMap.cubeToH3.size === state.hexes.length;
+  const systemPrompt = useCube ? buildSystemPrompt(state, cubeMap) : buildSystemPromptLegacy(state);
+  const userMessage = useCube
+    ? `Return a JSON object with "strategy" (one-line explanation of your focus or goal this turn), "movementOrders" (array of { unitId, toCube: [i, j, k] }), and optional "rangedAttacks" (array of { unitId, targetCube: [i, j, k] }). Use cube coordinates from the lists above. Only valid moves and valid ranged targets.`
+    : `Return a JSON object with "strategy" (one-line explanation), "movementOrders" (array of { unitId, toH3Index }), and optional "rangedAttacks" (array of { unitId, targetH3Index }). Only valid H3 indices from the lists above.`;
 
   console.log('[LLM prompt (system)]', systemPrompt);
   console.log('[LLM prompt (user)]', userMessage);
@@ -333,9 +494,7 @@ export async function requestOrders(
       return { success: false, error: 'Invalid response: no content' };
     }
 
-    console.log('[LLM response]', content);
-
-    const parsed = parseOrdersResponse(content);
+    const parsed = parseOrdersResponse(content, cubeMap.cubeToH3);
     if (!parsed) {
       logError('openRouter requestOrders: failed to parse JSON', content.slice(0, 300));
       return { success: false, error: 'Invalid response: could not parse orders' };
@@ -386,6 +545,7 @@ export async function requestOrders(
       success: true,
       orders: validated,
       rangedAttacks: validatedRanged.length > 0 ? validatedRanged : undefined,
+      strategy: parsed.strategy,
       dropped: dropReasons.length,
       dropReasons: dropReasons.length > 0 ? dropReasons : undefined,
     };
@@ -397,11 +557,15 @@ export async function requestOrders(
 
 /**
  * Parses the LLM response into movement orders and optional ranged attacks.
- * Accepts either an object { movementOrders: [...], rangedAttacks: [...] } or a bare array (legacy) as movementOrders.
+ * Accepts toCube: [i,j,k] or legacy toH3Index; resolves cube to h3Index via cubeToH3.
  */
-function parseOrdersResponse(content: string): {
+function parseOrdersResponse(
+  content: string,
+  cubeToH3: Map<string, string>
+): {
   movementOrders: { unitId: string; toH3Index: string }[];
   rangedAttacks: { unitId: string; targetH3Index: string }[];
+  strategy?: string;
 } | null {
   const trimmed = content.trim();
   let jsonStr = trimmed;
@@ -419,14 +583,15 @@ function parseOrdersResponse(content: string): {
   try {
     const parsed = JSON.parse(jsonStr) as unknown;
     if (Array.isArray(parsed)) {
-      const movementOrders = parseOrdersArray(parsed);
+      const movementOrders = parseOrdersArray(parsed, cubeToH3);
       return { movementOrders, rangedAttacks: [] };
     }
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      const obj = parsed as { movementOrders?: unknown; rangedAttacks?: unknown };
-      const movementOrders = Array.isArray(obj.movementOrders) ? parseOrdersArray(obj.movementOrders) : [];
-      const rangedAttacks = Array.isArray(obj.rangedAttacks) ? parseRangedArray(obj.rangedAttacks) : [];
-      return { movementOrders, rangedAttacks };
+      const obj = parsed as { movementOrders?: unknown; rangedAttacks?: unknown; strategy?: unknown };
+      const movementOrders = Array.isArray(obj.movementOrders) ? parseOrdersArray(obj.movementOrders, cubeToH3) : [];
+      const rangedAttacks = Array.isArray(obj.rangedAttacks) ? parseRangedArray(obj.rangedAttacks, cubeToH3) : [];
+      const strategy = typeof obj.strategy === 'string' && obj.strategy.trim() ? obj.strategy.trim() : undefined;
+      return { movementOrders, rangedAttacks, strategy };
     }
     return null;
   } catch {
@@ -436,22 +601,34 @@ function parseOrdersResponse(content: string): {
   }
 }
 
-function parseOrdersArray(arr: unknown[]): { unitId: string; toH3Index: string }[] {
+function parseOrdersArray(arr: unknown[], cubeToH3: Map<string, string>): { unitId: string; toH3Index: string }[] {
   const orders: { unitId: string; toH3Index: string }[] = [];
   for (const item of arr) {
-    if (item && typeof item === 'object' && typeof (item as { unitId?: unknown }).unitId === 'string' && typeof (item as { toH3Index?: unknown }).toH3Index === 'string') {
-      orders.push({ unitId: (item as { unitId: string }).unitId, toH3Index: (item as { toH3Index: string }).toH3Index });
+    if (!item || typeof item !== 'object' || typeof (item as { unitId?: unknown }).unitId !== 'string') continue;
+    const o = item as { unitId: string; toCube?: unknown; toH3Index?: unknown };
+    let toH3Index: string | undefined;
+    if (Array.isArray(o.toCube) && o.toCube.length === 3 && o.toCube.every((n) => typeof n === 'number')) {
+      const key = cubeKey([o.toCube[0], o.toCube[1], o.toCube[2]]);
+      toH3Index = cubeToH3.get(key);
     }
+    if (!toH3Index && typeof o.toH3Index === 'string') toH3Index = o.toH3Index;
+    if (toH3Index) orders.push({ unitId: o.unitId, toH3Index });
   }
   return orders;
 }
 
-function parseRangedArray(arr: unknown[]): { unitId: string; targetH3Index: string }[] {
+function parseRangedArray(arr: unknown[], cubeToH3: Map<string, string>): { unitId: string; targetH3Index: string }[] {
   const orders: { unitId: string; targetH3Index: string }[] = [];
   for (const item of arr) {
-    if (item && typeof item === 'object' && typeof (item as { unitId?: unknown }).unitId === 'string' && typeof (item as { targetH3Index?: unknown }).targetH3Index === 'string') {
-      orders.push({ unitId: (item as { unitId: string }).unitId, targetH3Index: (item as { targetH3Index: string }).targetH3Index });
+    if (!item || typeof item !== 'object' || typeof (item as { unitId?: unknown }).unitId !== 'string') continue;
+    const o = item as { unitId: string; targetCube?: unknown; targetH3Index?: unknown };
+    let targetH3Index: string | undefined;
+    if (Array.isArray(o.targetCube) && o.targetCube.length === 3 && o.targetCube.every((n) => typeof n === 'number')) {
+      const key = cubeKey([o.targetCube[0], o.targetCube[1], o.targetCube[2]]);
+      targetH3Index = cubeToH3.get(key);
     }
+    if (!targetH3Index && typeof o.targetH3Index === 'string') targetH3Index = o.targetH3Index;
+    if (targetH3Index) orders.push({ unitId: o.unitId, targetH3Index });
   }
   return orders;
 }

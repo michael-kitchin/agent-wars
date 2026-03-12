@@ -210,6 +210,7 @@ export function ready(
   removedUnitIds?: string[];
   casualtyHexes?: string[];
   removedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
+  kills?: { victimId: string; killerIds: string[] }[];
   rangedCombatHexes?: string[];
   rangedCasualtyHexes?: string[];
   rangedRemovedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
@@ -224,7 +225,9 @@ export function ready(
       return { success: false, reason: 'Database not initialized' };
     }
 
-    const turnRow = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1');
+    const turnRow = dbGetOne<{ phase: string; turn_number: number }>(
+      'SELECT phase, turn_number FROM turn_state WHERE id = 1'
+    );
     if (turnRow?.phase !== VALID_PHASE) {
       logError('ready: not in planning phase', turnRow?.phase);
       return { success: false, reason: 'Not in planning phase' };
@@ -248,7 +251,8 @@ export function ready(
     ).map((r) => ({ unitId: r.unit_id, targetH3Index: r.target_h3_index }));
     const allRanged = [...humanRanged, ...aiRangedOrders];
 
-    const seed = getGameSeed();
+    const turnNumber = turnRow?.turn_number ?? 1;
+    const seed = (getGameSeed() + turnNumber * 7919) >>> 0;
     const next = createCombatRng(seed);
 
     const rangedResult = runRangedPhase(combatUnitsBefore, hexList, allRanged, next);
@@ -268,12 +272,16 @@ export function ready(
     const unitsAfterMove = dbGetAll<{ id: string; player: string; unit_type: string; h3_index: string }>(
       'SELECT id, player, unit_type, h3_index FROM units'
     ).map((r) => ({ id: r.id, player: r.player, unitType: r.unit_type, h3Index: r.h3_index }));
-    const combatUnitsAfter: CombatUnit[] = unitsAfterMove.map((u) => ({
-      id: u.id,
-      player: u.player,
-      unitType: u.unitType,
-      h3Index: u.h3Index,
-    }));
+    const rangedRemovedSet = new Set(rangedResult.removedUnitIds);
+    // Melee must not see units removed in ranged phase; exclude them explicitly so attackers cannot engage dead defenders.
+    const combatUnitsAfter: CombatUnit[] = unitsAfterMove
+      .filter((u) => !rangedRemovedSet.has(u.id))
+      .map((u) => ({
+        id: u.id,
+        player: u.player,
+        unitType: u.unitType,
+        h3Index: u.h3Index,
+      }));
 
     const meleeResult = runMeleePhase(combatUnitsAfter, hexList, next);
     for (const id of meleeResult.removedUnitIds) {
@@ -287,15 +295,15 @@ export function ready(
 
     dbRun('DELETE FROM pending_orders');
     dbRun('DELETE FROM pending_ranged_orders');
-    const turnNumberRow = dbGetOne<{ turn_number: number }>('SELECT turn_number FROM turn_state WHERE id = 1');
     dbRun('UPDATE turn_state SET phase = ?, turn_number = ? WHERE id = 1', [
       'planning',
-      (turnNumberRow?.turn_number ?? 1) + 1,
+      turnNumber + 1,
     ]);
 
     saveDatabase();
     const allRemovedIds = [...rangedResult.removedUnitIds, ...meleeResult.removedUnitIds];
     const allRemovedUnits = [...rangedResult.removedUnits, ...meleeResult.removedUnits];
+    const allKills = [...rangedResult.kills, ...meleeResult.kills];
     const allCombatHexes = [...rangedResult.combatHexes, ...meleeResult.combatHexes];
     const allCasualtyHexes = [...rangedResult.casualtyHexes, ...meleeResult.casualtyHexes];
     return {
@@ -304,6 +312,7 @@ export function ready(
       removedUnitIds: allRemovedIds.length > 0 ? allRemovedIds : undefined,
       casualtyHexes: allCasualtyHexes.length > 0 ? allCasualtyHexes : undefined,
       removedUnits: allRemovedUnits.length > 0 ? allRemovedUnits : undefined,
+      kills: allKills.length > 0 ? allKills : undefined,
       rangedCombatHexes: rangedResult.combatHexes.length > 0 ? rangedResult.combatHexes : undefined,
       rangedCasualtyHexes: rangedResult.casualtyHexes.length > 0 ? rangedResult.casualtyHexes : undefined,
       rangedRemovedUnits: rangedResult.removedUnits.length > 0 ? rangedResult.removedUnits : undefined,
