@@ -20,22 +20,48 @@ interface GameStateSnapshot {
   pendingOrders: { unitId: string; toH3Index: string }[];
 }
 
+interface AiMove {
+  unitId: string;
+  fromH3Index: string;
+  toH3Index: string;
+}
+
+interface ReadyResult {
+  success: boolean;
+  reason?: string;
+  aiSkipped?: boolean;
+  aiSkipReason?: string;
+  aiOrderCount?: number;
+  aiDropped?: number;
+  aiDropReasons?: string[];
+  aiMovesLog?: string[];
+  aiMoves?: AiMove[];
+}
+
 declare global {
   interface Window {
     gameApi?: {
       getGameState: () => Promise<unknown>;
       submitOrders: (orders: { unitId: string; toH3Index: string }[]) => Promise<unknown>;
-      ready: () => Promise<unknown>;
+      ready: () => Promise<ReadyResult>;
+      openRouter?: {
+        getKey: () => Promise<{ hasKey: boolean }>;
+        setKey: (key: string) => Promise<void>;
+        listModels: () => Promise<{ models?: { id: string; name?: string }[]; error?: string }>;
+        setSelectedModel: (modelId: string) => Promise<void>;
+      };
     };
   }
 }
 
-const BACKGROUND_COLOR = '#e8e8e8';
+/** Map background (style guide: neutral, recedes). */
+const BACKGROUND_COLOR = '#e0dcd4';
 
 const UNIT_RADIUS = 22;
+/** Player accents (style guide: P1 #2e5a7b, P2 #7b4a2e). */
 const PLAYER_COLORS: Record<string, string> = {
-  human: '#1a5a8a',
-  opponent: '#8a1a1a',
+  human: '#2e5a7b',
+  opponent: '#7b4a2e',
 };
 const UNIT_TYPE_LABELS: Record<string, string> = {
   infantry: 'I',
@@ -43,9 +69,12 @@ const UNIT_TYPE_LABELS: Record<string, string> = {
   naval: 'N',
 };
 
-const ORDER_LINE_COLOR = '#1a5a8a';
+const ORDER_LINE_COLOR = '#2e5a7b';
 const ORDER_LINE_WIDTH = 2.5;
 const ORDER_ARROW_SIZE = 10;
+/** AI movement arrow (opponent accent). */
+const AI_ORDER_LINE_COLOR = '#7b4a2e';
+const AI_MOVE_FADE_MS = 2000;
 
 function getUnitAtHex(h3Index: string): GameStateSnapshot['units'][0] | null {
   if (!gameState) return null;
@@ -74,6 +103,57 @@ let dragStartOffsetY = 0;
 const DRAG_THRESHOLD_PX = 5;
 let dragDistanceSq = 0;
 
+/** When non-null, we are animating AI moves: draw arrow + ghost unit, then fade out over AI_MOVE_FADE_MS. */
+let aiMoveAnimation: { moves: AiMove[]; startTime: number } | null = null;
+let aiMoveAnimationFrameId: number | null = null;
+
+/** OpenRouter status log: append a line with optional error styling. */
+function appendOpenRouterLog(line: string, isError = false): void {
+  const el = document.getElementById('openrouter-log');
+  if (!el) return;
+  const time = new Date().toLocaleTimeString();
+  const span = document.createElement('div');
+  span.textContent = `${time} ${line}`;
+  if (isError) span.style.color = '#a03030';
+  el.appendChild(span);
+  el.scrollTop = el.scrollHeight;
+}
+
+/** Toast: show message for a readable duration, then auto-hide; can dismiss early. */
+const TOAST_DURATION_MS = 8000;
+let toastHideTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Shows a toast message over the map. Auto-hides after TOAST_DURATION_MS unless dismissed.
+ * Use for errors (red border) or info e.g. AI moves (blue border).
+ */
+function showMapToast(message: string, options?: { isError?: boolean }): void {
+  if (toastHideTimer !== null) {
+    clearTimeout(toastHideTimer);
+    toastHideTimer = null;
+  }
+  const el = document.getElementById('map-toast');
+  const textEl = document.getElementById('map-toast-text');
+  if (el && textEl) {
+    textEl.textContent = message;
+    el.classList.toggle('toast-info', options?.isError === false);
+    el.classList.remove('hidden');
+  }
+  toastHideTimer = setTimeout(() => {
+    toastHideTimer = null;
+    hideMapToast();
+  }, TOAST_DURATION_MS);
+}
+
+function hideMapToast(): void {
+  if (toastHideTimer !== null) {
+    clearTimeout(toastHideTimer);
+    toastHideTimer = null;
+  }
+  const el = document.getElementById('map-toast');
+  if (el) el.classList.add('hidden');
+}
+
 /**
  * Resizes the canvas to match its container (including devicePixelRatio) and redraws the hex grid.
  */
@@ -97,13 +177,34 @@ function resizeAndRedraw(): void {
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.scale(dpr, dpr);
-  drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState?.hexes);
-  const hexList = gameState?.hexes?.map((h) => h.h3Index);
-  if (pendingOrders.length > 0 && gameState?.units?.length && hexList) {
+
+  if (!gameState) {
+    ctx.fillStyle = BACKGROUND_COLOR;
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#666';
+    ctx.font = '14px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Loading…', w / 2, h / 2);
+    return;
+  }
+
+  drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
+  const hexList = gameState.hexes.map((h) => h.h3Index);
+  let aiOpacity = 1;
+  if (aiMoveAnimation) {
+    const elapsed = Date.now() - aiMoveAnimation.startTime;
+    aiOpacity = Math.max(0, 1 - elapsed / AI_MOVE_FADE_MS);
+    drawAiMoveLines(ctx, view, w, h, aiMoveAnimation.moves, gameState.units, hexList, aiOpacity);
+  }
+  if (pendingOrders.length > 0 && gameState.units.length && hexList) {
     drawOrderLines(ctx, view, w, h, pendingOrders, gameState.units, hexList);
   }
-  if (gameState?.units?.length) {
+  if (gameState.units.length) {
     drawUnits(ctx, view, w, h, gameState.units, hexList);
+  }
+  if (aiMoveAnimation && hexList) {
+    drawGhostUnits(ctx, view, w, h, aiMoveAnimation.moves, gameState.units, hexList, aiOpacity);
   }
 }
 
@@ -202,6 +303,101 @@ function drawOrderLines(
   }
 }
 
+/**
+ * Draws AI movement arrows (from → to) with optional opacity. Same style as human order lines but opponent color.
+ * Call after hexes, before units. opacity in [0, 1].
+ */
+function drawAiMoveLines(
+  ctx: CanvasRenderingContext2D,
+  view: ViewState,
+  canvasWidth: number,
+  canvasHeight: number,
+  moves: AiMove[],
+  units: GameStateSnapshot['units'],
+  hexList: string[] | undefined,
+  opacity: number
+): void {
+  if (moves.length === 0 || !hexList || opacity <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  for (const move of moves) {
+    const unit = units.find((u) => u.id === move.unitId);
+    if (!unit) continue;
+    const from = getHexCanvasCenter(move.fromH3Index, view, canvasWidth, canvasHeight, hexList);
+    const to = getHexCanvasCenter(move.toH3Index, view, canvasWidth, canvasHeight, hexList);
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    const inset = UNIT_RADIUS + ORDER_ARROW_SIZE;
+    const endX = to.x - ux * inset;
+    const endY = to.y - uy * inset;
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(endX, endY);
+    ctx.strokeStyle = AI_ORDER_LINE_COLOR;
+    ctx.lineWidth = ORDER_LINE_WIDTH;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    const ax = endX + ux * ORDER_ARROW_SIZE;
+    const ay = endY + uy * ORDER_ARROW_SIZE;
+    const perpX = -uy * (ORDER_ARROW_SIZE * 0.6);
+    const perpY = ux * (ORDER_ARROW_SIZE * 0.6);
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(endX - perpX, endY - perpY);
+    ctx.lineTo(endX + perpX, endY + perpY);
+    ctx.closePath();
+    ctx.fillStyle = AI_ORDER_LINE_COLOR;
+    ctx.fill();
+    ctx.strokeStyle = AI_ORDER_LINE_COLOR;
+    ctx.lineWidth = ORDER_LINE_WIDTH;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * Draws ghost (duplicate) units at their pre-move positions with optional opacity for fade-out.
+ * units are the current game state (post-move); moves give fromH3Index for each unit to draw as ghost.
+ */
+function drawGhostUnits(
+  ctx: CanvasRenderingContext2D,
+  view: ViewState,
+  canvasWidth: number,
+  canvasHeight: number,
+  moves: AiMove[],
+  units: GameStateSnapshot['units'],
+  hexList: string[] | undefined,
+  opacity: number
+): void {
+  if (moves.length === 0 || !hexList || opacity <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  for (const move of moves) {
+    const unit = units.find((u) => u.id === move.unitId);
+    if (!unit) continue;
+    const { x, y } = getHexCanvasCenter(move.fromH3Index, view, canvasWidth, canvasHeight, hexList);
+    const color = PLAYER_COLORS[unit.player] ?? '#333';
+    const label = UNIT_TYPE_LABELS[unit.unitType] ?? '?';
+    ctx.beginPath();
+    ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 14px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, x, y);
+  }
+  ctx.restore();
+}
+
 /** Redraws the hex grid without resizing the canvas. Use after pan/zoom or selection change. */
 function redraw(): void {
   const container = document.getElementById('canvas-container');
@@ -218,13 +414,47 @@ function redraw(): void {
   const dpr = window.devicePixelRatio ?? 1;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.scale(dpr, dpr);
-  drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState?.hexes);
-  const hexList = gameState?.hexes?.map((h) => h.h3Index);
-  if (pendingOrders.length > 0 && gameState?.units?.length && hexList) {
+
+  if (!gameState) {
+    ctx.fillStyle = BACKGROUND_COLOR;
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#666';
+    ctx.font = '14px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Loading…', w / 2, h / 2);
+    return;
+  }
+
+  drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
+  const hexList = gameState.hexes.map((h) => h.h3Index);
+  let aiOpacity = 1;
+  if (aiMoveAnimation) {
+    const elapsed = Date.now() - aiMoveAnimation.startTime;
+    aiOpacity = Math.max(0, 1 - elapsed / AI_MOVE_FADE_MS);
+    drawAiMoveLines(ctx, view, w, h, aiMoveAnimation.moves, gameState.units, hexList, aiOpacity);
+  }
+  if (pendingOrders.length > 0 && gameState.units.length && hexList) {
     drawOrderLines(ctx, view, w, h, pendingOrders, gameState.units, hexList);
   }
-  if (gameState?.units?.length) {
+  if (gameState.units.length) {
     drawUnits(ctx, view, w, h, gameState.units, hexList);
+  }
+  if (aiMoveAnimation && hexList) {
+    drawGhostUnits(ctx, view, w, h, aiMoveAnimation.moves, gameState.units, hexList, aiOpacity);
+  }
+}
+
+function tickAiMoveAnimation(): void {
+  if (!aiMoveAnimation) return;
+  const elapsed = Date.now() - aiMoveAnimation.startTime;
+  redraw();
+  if (elapsed < AI_MOVE_FADE_MS) {
+    aiMoveAnimationFrameId = requestAnimationFrame(tickAiMoveAnimation);
+  } else {
+    aiMoveAnimation = null;
+    aiMoveAnimationFrameId = null;
+    redraw();
   }
 }
 
@@ -323,11 +553,70 @@ function clearSidebarError(): void {
   if (el) el.style.display = 'none';
 }
 
+function initOpenRouterUI(): void {
+  const api = window.gameApi?.openRouter;
+  if (!api) return;
+
+  const keyInput = document.getElementById('openrouter-key') as HTMLInputElement | null;
+  const keyHint = document.getElementById('openrouter-key-hint');
+  const modelSelect = document.getElementById('openrouter-model') as HTMLSelectElement | null;
+  const refreshBtn = document.getElementById('openrouter-refresh-models');
+
+  function refreshModels(): void {
+    api!.listModels().then((result) => {
+      if (!modelSelect) return;
+      const kept = modelSelect.value;
+      modelSelect.innerHTML = '<option value="">— Select model —</option>';
+      if ('error' in result && result.error) {
+        appendOpenRouterLog(`Models: ${result.error}`, true);
+        return;
+      }
+      const models = 'models' in result ? result.models ?? [] : [];
+      for (const m of models) {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.name ?? m.id;
+        modelSelect.appendChild(opt);
+      }
+      if (kept && Array.from(modelSelect.options).some((o) => o.value === kept)) {
+        modelSelect.value = kept;
+      }
+    });
+  }
+
+  api.getKey().then((r) => {
+    if (keyHint) keyHint.textContent = r.hasKey ? 'Saved' : 'Not set';
+  });
+  refreshModels();
+
+  if (keyInput) {
+    keyInput.addEventListener('blur', () => {
+      const v = keyInput.value.trim();
+      api!.setKey(v).then(() => {
+        if (keyHint) keyHint.textContent = v ? 'Saved' : 'Not set';
+        if (!v) hideMapToast();
+      });
+    });
+  }
+
+  if (modelSelect) {
+    modelSelect.addEventListener('change', () => {
+      api!.setSelectedModel(modelSelect.value);
+      if (modelSelect.value) hideMapToast();
+    });
+  }
+
+  if (refreshBtn) refreshBtn.addEventListener('click', refreshModels);
+
+  document.getElementById('map-toast-dismiss')?.addEventListener('click', hideMapToast);
+}
+
 function init(): void {
   resizeAndRedraw();
   updateSidebar();
   updateGameStateSidebar(null);
   updatePendingOrdersSidebar();
+  initOpenRouterUI();
 
   if (window.gameApi) {
     window.gameApi
@@ -338,7 +627,6 @@ function init(): void {
         updateGameStateSidebar(state);
         updateSidebar();
         redraw();
-        console.log('Game state:', state);
       })
       .catch((err) => console.error('getGameState failed:', err));
   }
@@ -444,10 +732,40 @@ function init(): void {
           showSidebarError(submitResult.reason ?? 'Submit failed');
           return;
         }
-        const readyResult = (await window.gameApi.ready()) as { success: boolean; reason?: string };
+        appendOpenRouterLog('Requesting AI orders…');
+        const readyResult = await window.gameApi.ready();
         if (!readyResult.success) {
           showSidebarError(readyResult.reason ?? 'Ready failed');
+          appendOpenRouterLog(`Ready failed: ${readyResult.reason ?? 'Unknown'}`, true);
+          showMapToast(readyResult.reason ?? 'Ready failed. See panel on the right.', { isError: true });
           return;
+        }
+        if (readyResult.aiSkipped) {
+          appendOpenRouterLog(readyResult.aiSkipReason ?? 'AI skipped.', true);
+          showMapToast(readyResult.aiSkipReason ?? 'Set your OpenRouter API key and select a model in the panel on the right.', { isError: true });
+        } else if (readyResult.aiOrderCount !== undefined && readyResult.aiOrderCount > 0) {
+          const dropped = readyResult.aiDropped ?? 0;
+          const dropReasons = readyResult.aiDropReasons ?? [];
+          appendOpenRouterLog(`AI orders applied: ${readyResult.aiOrderCount}${dropped > 0 ? `, ${dropped} dropped` : ''}.`);
+          let toastText =
+            readyResult.aiMovesLog && readyResult.aiMovesLog.length > 0
+              ? 'AI moves:\n' + readyResult.aiMovesLog.join('\n')
+              : `AI applied ${readyResult.aiOrderCount} order(s).`;
+          if (dropReasons.length > 0) {
+            toastText += '\n\nValidation issues (dropped): ' + dropReasons.join('; ');
+          }
+          showMapToast(toastText, { isError: dropReasons.length > 0 });
+          if (readyResult.aiMoves && readyResult.aiMoves.length > 0) {
+            if (aiMoveAnimationFrameId !== null) cancelAnimationFrame(aiMoveAnimationFrameId);
+            aiMoveAnimation = { moves: readyResult.aiMoves, startTime: Date.now() };
+            aiMoveAnimationFrameId = requestAnimationFrame(tickAiMoveAnimation);
+          }
+        } else if (readyResult.aiOrderCount === 0) {
+          appendOpenRouterLog('Turn resolved (no AI orders).');
+          hideMapToast();
+        } else {
+          appendOpenRouterLog('Turn resolved.');
+          hideMapToast();
         }
         const state = (await window.gameApi.getGameState()) as GameStateSnapshot;
         gameState = state;
@@ -459,6 +777,8 @@ function init(): void {
         redraw();
       } catch (err) {
         showSidebarError(String(err));
+        appendOpenRouterLog(String(err), true);
+        showMapToast('Error: ' + String(err), { isError: true });
       }
     });
   }

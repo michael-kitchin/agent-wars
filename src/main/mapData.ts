@@ -1,7 +1,8 @@
 /**
  * Map data for the game: ordered H3 hex list and terrain seeding.
- * Uses the same H3 resolution and center as the renderer hex grid (Milestone 0.1)
- * so that coordinate systems stay consistent. k-ring 3 yields 37 hexes (~50-hex map).
+ * Uses the same H3 resolution and center as the renderer hex grid.
+ * k-ring 6 yields 127 hexes (triple the previous ~37).
+ * If you had an existing game DB with 37 hexes, delete the DB file (see gameDb userData path) to get the new 127-hex map.
  */
 
 import { latLngToCell, gridDiskDistances } from 'h3-js';
@@ -13,8 +14,8 @@ export const H3_RESOLUTION = 2;
 export const GRID_CENTER_LAT = 0;
 export const GRID_CENTER_LNG = 0;
 
-/** k-ring radius: 3 gives 1+6+12+18 = 37 hexes. */
-const K_RING = 3;
+/** k-ring radius: 6 gives 1+6+12+18+24+30+36 = 127 hexes. */
+const K_RING = 6;
 
 /**
  * Returns the ordered list of H3 cell indices for the map (center first, then by ring).

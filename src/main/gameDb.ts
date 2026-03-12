@@ -89,10 +89,11 @@ function seedUnitsIfEmpty(): void {
     else landIndices.push(i);
   }
 
+  /* Place human on “near” side (low indices), opponent on “far” side (high indices). */
   const humanLand = landIndices.slice(0, 4);
   const humanWater = waterIndices[0];
   const opponentLand = landIndices.slice(-4);
-  const opponentWater = waterIndices[waterIndices.length - 1];
+  const opponentWater = waterIndices[waterIndices.length - 1] ?? waterIndices[0];
 
   const humanUnits: [string, string, string][] = [
     ['human-infantry-1', 'infantry', hexes[humanLand[0]!]!],

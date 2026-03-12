@@ -3,14 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hello Hex World</title>
+  <title>Agent Wars</title>
   <style>
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; }
     body {
       display: flex;
       flex-direction: row;
-      font-family: system-ui, sans-serif;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 13px;
     }
     #canvas-container {
       flex: 1;
@@ -21,32 +22,166 @@
       display: block;
       width: 100%;
       height: 100%;
-      background: #e8e8e8;
+      background: #e0dcd4;
     }
     #sidebar {
-      width: 260px;
+      width: 320px;
+      min-width: 320px;
       flex-shrink: 0;
-      padding: 1rem;
-      background: #f5f5f5;
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      background: #f0eeea;
       border-left: 1px solid #ccc;
+      overflow: hidden;
+    }
+    #sidebar-top {
+      flex: 1 1 auto;
+      min-height: 0;
+      padding: 1rem;
       overflow: auto;
     }
+    #sidebar-bottom {
+      flex: 0 0 auto;
+      min-height: 180px;
+      padding: 1rem;
+      border-top: 1px solid #ccc;
+      background: #f0eeea;
+    }
+    #sidebar-bottom h3 {
+      margin: 0 0 0.5rem 0;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+    .openrouter-row {
+      margin-bottom: 0.6rem;
+    }
+    .openrouter-row label {
+      display: block;
+      font-size: 0.85rem;
+      color: #444;
+      margin-bottom: 0.2rem;
+    }
+    .openrouter-row input[type="password"],
+    .openrouter-row select {
+      width: 100%;
+      padding: 0.3rem 0.4rem;
+      font-size: 12px;
+      border: 1px solid #ccc;
+      border-radius: 2px;
+      box-sizing: border-box;
+    }
+    .openrouter-model-row {
+      display: flex;
+      gap: 0.4rem;
+    }
+    .openrouter-model-row select {
+      flex: 1;
+      min-width: 0;
+    }
+    .openrouter-log {
+      font-size: 11px;
+      max-height: 80px;
+      overflow-y: auto;
+      padding: 0.3rem;
+      background: #e8e4e0;
+      border: 1px solid #ccc;
+      border-radius: 2px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .hint { font-size: 0.8rem; color: #666; }
+    button {
+      padding: 0.4rem 0.75rem;
+      font-size: 13px;
+      cursor: pointer;
+      background: #e8e4e0;
+      border: 1px solid #ccc;
+      border-radius: 2px;
+    }
+    button:hover {
+      background: #ddd8d2;
+    }
+    button:focus {
+      outline: 1px solid #2e5a7b;
+    }
+    .map-toast {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      max-width: 360px;
+      max-height: 40vh;
+      overflow-y: auto;
+      padding: 0.5rem 0.75rem;
+      background: rgba(240, 238, 234, 0.95);
+      border: 1px solid #a03030;
+      border-radius: 2px;
+      font-size: 12px;
+      color: #333;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .map-toast.toast-info {
+      border-color: #2e5a7b;
+    }
+    .map-toast.hidden { display: none; }
+    .map-toast p { margin: 0; flex: 1; white-space: pre-line; }
+    #map-toast-dismiss {
+      flex-shrink: 0;
+      padding: 0.1rem 0.35rem;
+      font-size: 1.1rem;
+      line-height: 1;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: #666;
+    }
+    #map-toast-dismiss:hover { color: #333; }
   </style>
 </head>
 <body>
   <div id="canvas-container">
     <canvas id="canvas"></canvas>
+    <div id="map-toast" class="map-toast hidden" aria-live="polite">
+      <p id="map-toast-text"></p>
+      <button type="button" id="map-toast-dismiss" aria-label="Dismiss">×</button>
+    </div>
   </div>
   <aside id="sidebar">
-    <h2 style="margin-top: 0;">Selected hex</h2>
-    <p><strong>H3 index</strong><br><span id="sidebar-h3">—</span></p>
-    <p><strong>Cube (x, y, z)</strong><br><span id="sidebar-cube">—</span></p>
-    <p><strong>Game state</strong><br><span id="sidebar-phase">—</span><br><span id="sidebar-turn">—</span></p>
-    <p><strong>Pending orders</strong></p>
-    <div id="pending-orders-list"></div>
-    <button type="button" id="ready-btn">Ready</button>
-    <p id="sidebar-error" style="color: #c00; font-size: 0.9em; display: none;"></p>
-    <p style="color: #666; font-size: 0.9em;">Stage orders for as many units as you like, then Ready. Click unit → destination (same unit again = replace). Cancel below to clear an order.</p>
+    <div id="sidebar-top">
+      <h2 style="margin-top: 0;">Selected hex</h2>
+      <p><strong>H3 index</strong><br><span id="sidebar-h3">—</span></p>
+      <p><strong>Cube (x, y, z)</strong><br><span id="sidebar-cube">—</span></p>
+      <p><strong>Game state</strong><br><span id="sidebar-phase">—</span><br><span id="sidebar-turn">—</span></p>
+      <p><strong>Pending orders</strong></p>
+      <div id="pending-orders-list"></div>
+      <button type="button" id="ready-btn">Ready</button>
+      <p id="sidebar-error" style="color: #a03030; font-size: 0.9em; display: none;"></p>
+      <p style="color: #666; font-size: 0.9em;">Stage orders for as many units as you like, then Ready. Click unit → destination (same unit again = replace). Cancel below to clear an order.</p>
+    </div>
+    <div id="sidebar-bottom">
+      <h3>OpenRouter (AI)</h3>
+      <div class="openrouter-row">
+        <label for="openrouter-key">API key</label>
+        <input type="password" id="openrouter-key" placeholder="Set key and blur to save" autocomplete="off" />
+        <span id="openrouter-key-hint" class="hint"></span>
+      </div>
+      <div class="openrouter-row">
+        <label for="openrouter-model">Model</label>
+        <div class="openrouter-model-row">
+          <select id="openrouter-model">
+            <option value="">— Select model —</option>
+          </select>
+          <button type="button" id="openrouter-refresh-models">Refresh</button>
+        </div>
+      </div>
+      <div class="openrouter-row">
+        <label>Status</label>
+        <div id="openrouter-log" class="openrouter-log"></div>
+      </div>
+    </div>
   </aside>
   <script type="module" src="renderer.js"></script>
 </body>

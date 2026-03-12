@@ -14145,11 +14145,13 @@
     };
   }
   var TERRAIN_STYLES = {
-    land: { fill: "#dde8ef", stroke: "#6b8a9a" },
-    water: { fill: "#a8c8e0", stroke: "#2a5a8a" }
+    land: { fill: "#c4a574", stroke: "#6b5d4a" },
+    water: { fill: "#7a9eb5", stroke: "#3d5a6c" }
   };
-  var DEFAULT_FILL = "#dde8ef";
-  var DEFAULT_STROKE = "#6b8a9a";
+  var DEFAULT_FILL = "#c4a574";
+  var DEFAULT_STROKE = "#6b5d4a";
+  var SELECTION_FILL = "#c49b2e";
+  var SELECTION_STROKE = "#8a7020";
   function drawHexes(ctx, view2, canvasWidth, canvasHeight, backgroundColor, selectedIndex, hexesWithTerrain) {
     const cells = hexesWithTerrain?.map((h) => h.h3Index) ?? getHexCells();
     const centerLat = GRID_CENTER_LAT;
@@ -14175,9 +14177,9 @@
         ctx.lineTo(pts[j].x, pts[j].y);
       }
       ctx.closePath();
-      ctx.fillStyle = isSelected ? "#b8d4e8" : styles.fill;
+      ctx.fillStyle = isSelected ? SELECTION_FILL : styles.fill;
       ctx.fill();
-      ctx.strokeStyle = isSelected ? "#1a5a8a" : styles.stroke;
+      ctx.strokeStyle = isSelected ? SELECTION_STROKE : styles.stroke;
       ctx.lineWidth = isSelected ? 3 : 1;
       ctx.stroke();
     }
@@ -14253,20 +14255,22 @@
   }
 
   // src/renderer/renderer.ts
-  var BACKGROUND_COLOR = "#e8e8e8";
+  var BACKGROUND_COLOR = "#e0dcd4";
   var UNIT_RADIUS = 22;
   var PLAYER_COLORS = {
-    human: "#1a5a8a",
-    opponent: "#8a1a1a"
+    human: "#2e5a7b",
+    opponent: "#7b4a2e"
   };
   var UNIT_TYPE_LABELS = {
     infantry: "I",
     armor: "A",
     naval: "N"
   };
-  var ORDER_LINE_COLOR = "#1a5a8a";
+  var ORDER_LINE_COLOR = "#2e5a7b";
   var ORDER_LINE_WIDTH = 2.5;
   var ORDER_ARROW_SIZE = 10;
+  var AI_ORDER_LINE_COLOR = "#7b4a2e";
+  var AI_MOVE_FADE_MS = 2e3;
   function getUnitAtHex(h3Index) {
     if (!gameState) return null;
     return gameState.units.find((u) => u.h3Index === h3Index) ?? null;
@@ -14290,6 +14294,45 @@
   var dragStartOffsetY = 0;
   var DRAG_THRESHOLD_PX = 5;
   var dragDistanceSq = 0;
+  var aiMoveAnimation = null;
+  var aiMoveAnimationFrameId = null;
+  function appendOpenRouterLog(line, isError = false) {
+    const el = document.getElementById("openrouter-log");
+    if (!el) return;
+    const time = (/* @__PURE__ */ new Date()).toLocaleTimeString();
+    const span = document.createElement("div");
+    span.textContent = `${time} ${line}`;
+    if (isError) span.style.color = "#a03030";
+    el.appendChild(span);
+    el.scrollTop = el.scrollHeight;
+  }
+  var TOAST_DURATION_MS = 8e3;
+  var toastHideTimer = null;
+  function showMapToast(message, options) {
+    if (toastHideTimer !== null) {
+      clearTimeout(toastHideTimer);
+      toastHideTimer = null;
+    }
+    const el = document.getElementById("map-toast");
+    const textEl = document.getElementById("map-toast-text");
+    if (el && textEl) {
+      textEl.textContent = message;
+      el.classList.toggle("toast-info", options?.isError === false);
+      el.classList.remove("hidden");
+    }
+    toastHideTimer = setTimeout(() => {
+      toastHideTimer = null;
+      hideMapToast();
+    }, TOAST_DURATION_MS);
+  }
+  function hideMapToast() {
+    if (toastHideTimer !== null) {
+      clearTimeout(toastHideTimer);
+      toastHideTimer = null;
+    }
+    const el = document.getElementById("map-toast");
+    if (el) el.classList.add("hidden");
+  }
   function resizeAndRedraw() {
     const container = document.getElementById("canvas-container");
     const canvas = document.getElementById("canvas");
@@ -14306,13 +14349,32 @@
     if (!ctx) return;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
-    drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState?.hexes);
-    const hexList = gameState?.hexes?.map((h2) => h2.h3Index);
-    if (pendingOrders.length > 0 && gameState?.units?.length && hexList) {
+    if (!gameState) {
+      ctx.fillStyle = BACKGROUND_COLOR;
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = "#666";
+      ctx.font = "14px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Loading\u2026", w / 2, h / 2);
+      return;
+    }
+    drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
+    const hexList = gameState.hexes.map((h2) => h2.h3Index);
+    let aiOpacity = 1;
+    if (aiMoveAnimation) {
+      const elapsed = Date.now() - aiMoveAnimation.startTime;
+      aiOpacity = Math.max(0, 1 - elapsed / AI_MOVE_FADE_MS);
+      drawAiMoveLines(ctx, view, w, h, aiMoveAnimation.moves, gameState.units, hexList, aiOpacity);
+    }
+    if (pendingOrders.length > 0 && gameState.units.length && hexList) {
       drawOrderLines(ctx, view, w, h, pendingOrders, gameState.units, hexList);
     }
-    if (gameState?.units?.length) {
+    if (gameState.units.length) {
       drawUnits(ctx, view, w, h, gameState.units, hexList);
+    }
+    if (aiMoveAnimation && hexList) {
+      drawGhostUnits(ctx, view, w, h, aiMoveAnimation.moves, gameState.units, hexList, aiOpacity);
     }
   }
   function drawUnits(ctx, view2, canvasWidth, canvasHeight, units, hexList) {
@@ -14379,6 +14441,73 @@
       ctx.stroke();
     }
   }
+  function drawAiMoveLines(ctx, view2, canvasWidth, canvasHeight, moves, units, hexList, opacity) {
+    if (moves.length === 0 || !hexList || opacity <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    for (const move of moves) {
+      const unit = units.find((u) => u.id === move.unitId);
+      if (!unit) continue;
+      const from = getHexCanvasCenter(move.fromH3Index, view2, canvasWidth, canvasHeight, hexList);
+      const to = getHexCanvasCenter(move.toH3Index, view2, canvasWidth, canvasHeight, hexList);
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len;
+      const uy = dy / len;
+      const inset = UNIT_RADIUS + ORDER_ARROW_SIZE;
+      const endX = to.x - ux * inset;
+      const endY = to.y - uy * inset;
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(endX, endY);
+      ctx.strokeStyle = AI_ORDER_LINE_COLOR;
+      ctx.lineWidth = ORDER_LINE_WIDTH;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.stroke();
+      const ax = endX + ux * ORDER_ARROW_SIZE;
+      const ay = endY + uy * ORDER_ARROW_SIZE;
+      const perpX = -uy * (ORDER_ARROW_SIZE * 0.6);
+      const perpY = ux * (ORDER_ARROW_SIZE * 0.6);
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(endX - perpX, endY - perpY);
+      ctx.lineTo(endX + perpX, endY + perpY);
+      ctx.closePath();
+      ctx.fillStyle = AI_ORDER_LINE_COLOR;
+      ctx.fill();
+      ctx.strokeStyle = AI_ORDER_LINE_COLOR;
+      ctx.lineWidth = ORDER_LINE_WIDTH;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function drawGhostUnits(ctx, view2, canvasWidth, canvasHeight, moves, units, hexList, opacity) {
+    if (moves.length === 0 || !hexList || opacity <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    for (const move of moves) {
+      const unit = units.find((u) => u.id === move.unitId);
+      if (!unit) continue;
+      const { x, y } = getHexCanvasCenter(move.fromH3Index, view2, canvasWidth, canvasHeight, hexList);
+      const color = PLAYER_COLORS[unit.player] ?? "#333";
+      const label = UNIT_TYPE_LABELS[unit.unitType] ?? "?";
+      ctx.beginPath();
+      ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 14px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, x, y);
+    }
+    ctx.restore();
+  }
   function redraw() {
     const container = document.getElementById("canvas-container");
     const canvas = document.getElementById("canvas");
@@ -14391,13 +14520,44 @@
     const dpr = window.devicePixelRatio ?? 1;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
-    drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState?.hexes);
-    const hexList = gameState?.hexes?.map((h2) => h2.h3Index);
-    if (pendingOrders.length > 0 && gameState?.units?.length && hexList) {
+    if (!gameState) {
+      ctx.fillStyle = BACKGROUND_COLOR;
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = "#666";
+      ctx.font = "14px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Loading\u2026", w / 2, h / 2);
+      return;
+    }
+    drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
+    const hexList = gameState.hexes.map((h2) => h2.h3Index);
+    let aiOpacity = 1;
+    if (aiMoveAnimation) {
+      const elapsed = Date.now() - aiMoveAnimation.startTime;
+      aiOpacity = Math.max(0, 1 - elapsed / AI_MOVE_FADE_MS);
+      drawAiMoveLines(ctx, view, w, h, aiMoveAnimation.moves, gameState.units, hexList, aiOpacity);
+    }
+    if (pendingOrders.length > 0 && gameState.units.length && hexList) {
       drawOrderLines(ctx, view, w, h, pendingOrders, gameState.units, hexList);
     }
-    if (gameState?.units?.length) {
+    if (gameState.units.length) {
       drawUnits(ctx, view, w, h, gameState.units, hexList);
+    }
+    if (aiMoveAnimation && hexList) {
+      drawGhostUnits(ctx, view, w, h, aiMoveAnimation.moves, gameState.units, hexList, aiOpacity);
+    }
+  }
+  function tickAiMoveAnimation() {
+    if (!aiMoveAnimation) return;
+    const elapsed = Date.now() - aiMoveAnimation.startTime;
+    redraw();
+    if (elapsed < AI_MOVE_FADE_MS) {
+      aiMoveAnimationFrameId = requestAnimationFrame(tickAiMoveAnimation);
+    } else {
+      aiMoveAnimation = null;
+      aiMoveAnimationFrameId = null;
+      redraw();
     }
   }
   function updateSidebar() {
@@ -14480,11 +14640,62 @@
     const el = document.getElementById("sidebar-error");
     if (el) el.style.display = "none";
   }
+  function initOpenRouterUI() {
+    const api = window.gameApi?.openRouter;
+    if (!api) return;
+    const keyInput = document.getElementById("openrouter-key");
+    const keyHint = document.getElementById("openrouter-key-hint");
+    const modelSelect = document.getElementById("openrouter-model");
+    const refreshBtn = document.getElementById("openrouter-refresh-models");
+    function refreshModels() {
+      api.listModels().then((result) => {
+        if (!modelSelect) return;
+        const kept = modelSelect.value;
+        modelSelect.innerHTML = '<option value="">\u2014 Select model \u2014</option>';
+        if ("error" in result && result.error) {
+          appendOpenRouterLog(`Models: ${result.error}`, true);
+          return;
+        }
+        const models = "models" in result ? result.models ?? [] : [];
+        for (const m of models) {
+          const opt = document.createElement("option");
+          opt.value = m.id;
+          opt.textContent = m.name ?? m.id;
+          modelSelect.appendChild(opt);
+        }
+        if (kept && Array.from(modelSelect.options).some((o) => o.value === kept)) {
+          modelSelect.value = kept;
+        }
+      });
+    }
+    api.getKey().then((r) => {
+      if (keyHint) keyHint.textContent = r.hasKey ? "Saved" : "Not set";
+    });
+    refreshModels();
+    if (keyInput) {
+      keyInput.addEventListener("blur", () => {
+        const v = keyInput.value.trim();
+        api.setKey(v).then(() => {
+          if (keyHint) keyHint.textContent = v ? "Saved" : "Not set";
+          if (!v) hideMapToast();
+        });
+      });
+    }
+    if (modelSelect) {
+      modelSelect.addEventListener("change", () => {
+        api.setSelectedModel(modelSelect.value);
+        if (modelSelect.value) hideMapToast();
+      });
+    }
+    if (refreshBtn) refreshBtn.addEventListener("click", refreshModels);
+    document.getElementById("map-toast-dismiss")?.addEventListener("click", hideMapToast);
+  }
   function init() {
     resizeAndRedraw();
     updateSidebar();
     updateGameStateSidebar(null);
     updatePendingOrdersSidebar();
+    initOpenRouterUI();
     if (window.gameApi) {
       window.gameApi.getGameState().then((raw) => {
         const state = raw;
@@ -14492,7 +14703,6 @@
         updateGameStateSidebar(state);
         updateSidebar();
         redraw();
-        console.log("Game state:", state);
       }).catch((err) => console.error("getGameState failed:", err));
     }
     window.addEventListener("resize", resizeAndRedraw);
@@ -14579,10 +14789,37 @@
             showSidebarError(submitResult.reason ?? "Submit failed");
             return;
           }
+          appendOpenRouterLog("Requesting AI orders\u2026");
           const readyResult = await window.gameApi.ready();
           if (!readyResult.success) {
             showSidebarError(readyResult.reason ?? "Ready failed");
+            appendOpenRouterLog(`Ready failed: ${readyResult.reason ?? "Unknown"}`, true);
+            showMapToast(readyResult.reason ?? "Ready failed. See panel on the right.", { isError: true });
             return;
+          }
+          if (readyResult.aiSkipped) {
+            appendOpenRouterLog(readyResult.aiSkipReason ?? "AI skipped.", true);
+            showMapToast(readyResult.aiSkipReason ?? "Set your OpenRouter API key and select a model in the panel on the right.", { isError: true });
+          } else if (readyResult.aiOrderCount !== void 0 && readyResult.aiOrderCount > 0) {
+            const dropped = readyResult.aiDropped ?? 0;
+            const dropReasons = readyResult.aiDropReasons ?? [];
+            appendOpenRouterLog(`AI orders applied: ${readyResult.aiOrderCount}${dropped > 0 ? `, ${dropped} dropped` : ""}.`);
+            let toastText = readyResult.aiMovesLog && readyResult.aiMovesLog.length > 0 ? "AI moves:\n" + readyResult.aiMovesLog.join("\n") : `AI applied ${readyResult.aiOrderCount} order(s).`;
+            if (dropReasons.length > 0) {
+              toastText += "\n\nValidation issues (dropped): " + dropReasons.join("; ");
+            }
+            showMapToast(toastText, { isError: dropReasons.length > 0 });
+            if (readyResult.aiMoves && readyResult.aiMoves.length > 0) {
+              if (aiMoveAnimationFrameId !== null) cancelAnimationFrame(aiMoveAnimationFrameId);
+              aiMoveAnimation = { moves: readyResult.aiMoves, startTime: Date.now() };
+              aiMoveAnimationFrameId = requestAnimationFrame(tickAiMoveAnimation);
+            }
+          } else if (readyResult.aiOrderCount === 0) {
+            appendOpenRouterLog("Turn resolved (no AI orders).");
+            hideMapToast();
+          } else {
+            appendOpenRouterLog("Turn resolved.");
+            hideMapToast();
           }
           const state = await window.gameApi.getGameState();
           gameState = state;
@@ -14594,6 +14831,8 @@
           redraw();
         } catch (err) {
           showSidebarError(String(err));
+          appendOpenRouterLog(String(err), true);
+          showMapToast("Error: " + String(err), { isError: true });
         }
       });
     }

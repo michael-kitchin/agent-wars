@@ -106,10 +106,12 @@ export function submitOrders(orders: MovementOrder[]): SubmitOrdersResult {
 }
 
 /**
- * Ends the planning phase and resolves all pending orders simultaneously: updates each unit's position, clears pending orders, increments turn number, and sets phase back to planning. Call only when phase is planning.
+ * Ends the planning phase and resolves all pending orders (human + optional AI) simultaneously:
+ * updates each unit's position, clears pending orders, increments turn number, and sets phase back to planning.
+ * Call only when phase is planning. If aiOrders is provided, they are merged with human orders from the DB.
  */
-export function ready(): SubmitOrdersResult {
-  logDebug('ready');
+export function ready(aiOrders: MovementOrder[] = []): SubmitOrdersResult {
+  logDebug('ready', { aiOrderCount: aiOrders.length });
   try {
     if (!isDbReady()) {
       logError('ready: database not initialized');
@@ -122,12 +124,16 @@ export function ready(): SubmitOrdersResult {
       return { success: false, reason: 'Not in planning phase' };
     }
 
-    const orders = dbGetAll<{ unit_id: string; to_h3_index: string }>('SELECT unit_id, to_h3_index FROM pending_orders');
+    const humanOrders = dbGetAll<{ unit_id: string; to_h3_index: string }>('SELECT unit_id, to_h3_index FROM pending_orders');
+    const allOrders = [
+      ...humanOrders.map((o) => ({ unitId: o.unit_id, toH3Index: o.to_h3_index })),
+      ...aiOrders,
+    ];
 
     dbRun('UPDATE turn_state SET phase = ? WHERE id = 1', ['resolution']);
 
-    for (const order of orders) {
-      dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [order.to_h3_index, order.unit_id]);
+    for (const order of allOrders) {
+      dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [order.toH3Index, order.unitId]);
     }
 
     dbRun('DELETE FROM pending_orders');

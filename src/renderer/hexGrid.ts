@@ -152,14 +152,18 @@ export function canvasToGrid(
   };
 }
 
-/** Terrain fill and stroke colors when drawing from game state. */
+/** Terrain fill and stroke colors (UI style guide: muted, topographic). */
 const TERRAIN_STYLES: Record<string, { fill: string; stroke: string }> = {
-  land: { fill: '#dde8ef', stroke: '#6b8a9a' },
-  water: { fill: '#a8c8e0', stroke: '#2a5a8a' },
+  land: { fill: '#c4a574', stroke: '#6b5d4a' },
+  water: { fill: '#7a9eb5', stroke: '#3d5a6c' },
 };
 
-const DEFAULT_FILL = '#dde8ef';
-const DEFAULT_STROKE = '#6b8a9a';
+const DEFAULT_FILL = '#c4a574';
+const DEFAULT_STROKE = '#6b5d4a';
+
+/** Selection/focus highlight (style guide). */
+const SELECTION_FILL = '#c49b2e';
+const SELECTION_STROKE = '#8a7020';
 
 /**
  * Draws hexes onto the given context. If hexesWithTerrain is provided (from game state), draws that list with terrain colors; otherwise draws the default 19-hex grid. Clears the canvas with the background color first.
@@ -200,9 +204,9 @@ export function drawHexes(
       ctx.lineTo(pts[j].x, pts[j].y);
     }
     ctx.closePath();
-    ctx.fillStyle = isSelected ? '#b8d4e8' : styles.fill;
+    ctx.fillStyle = isSelected ? SELECTION_FILL : styles.fill;
     ctx.fill();
-    ctx.strokeStyle = isSelected ? '#1a5a8a' : styles.stroke;
+    ctx.strokeStyle = isSelected ? SELECTION_STROKE : styles.stroke;
     ctx.lineWidth = isSelected ? 3 : 1;
     ctx.stroke();
   }
