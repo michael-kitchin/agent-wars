@@ -14902,6 +14902,10 @@
     if (!sidebar) return;
     const h3El = document.getElementById("sidebar-h3");
     const cubeEl = document.getElementById("sidebar-cube");
+    const selectedUnitEl = document.getElementById("sidebar-selected-unit");
+    if (selectedUnitEl) {
+      selectedUnitEl.textContent = selectedUnitId ?? "\u2014";
+    }
     if (selectedHexIndex === null) {
       if (h3El) h3El.textContent = "\u2014";
       if (cubeEl) cubeEl.textContent = "\u2014";

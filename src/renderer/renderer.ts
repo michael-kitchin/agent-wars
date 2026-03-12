@@ -932,13 +932,18 @@ function tickResolutionMoveAnimation(): void {
   }
 }
 
-/** Updates the sidebar with the selected hex's H3 index and cube coordinates, or a placeholder. */
+/** Updates the sidebar with the selected hex's H3 index, cube coordinates, and selected unit, or placeholders. */
 function updateSidebar(): void {
   const sidebar = document.getElementById('sidebar');
   if (!sidebar) return;
 
   const h3El = document.getElementById('sidebar-h3');
   const cubeEl = document.getElementById('sidebar-cube');
+  const selectedUnitEl = document.getElementById('sidebar-selected-unit');
+
+  if (selectedUnitEl) {
+    selectedUnitEl.textContent = selectedUnitId ?? '—';
+  }
 
   if (selectedHexIndex === null) {
     if (h3El) h3El.textContent = '—';
