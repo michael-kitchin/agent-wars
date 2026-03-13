@@ -15,14 +15,14 @@ From the project root:
 |--------|--------|
 | `npm run dist` | Build for the **current platform** only |
 | `npm run dist:win` | Windows: NSIS installer + portable exe |
-| `npm run dist:linux` | Linux: unpacked app directory (zip to ship) |
+| `npm run dist:linux` | Linux: unpacked app directory + TGZ archive (executable bit set, ready to ship) |
 | `npm run dist:mac` | macOS: unpacked .app directory (zip to ship; or build on a Mac for .dmg) |
 
 `dist:win`, `dist:linux`, and `dist:mac` run **`clean:release`** first (removes the `release/` folder so no locked files from a previous run or a running app), then build, then electron-builder. If you see "Release folder in use", close the app and any tools using `release/`, then retry. `npm run dist` does not clean. Artifacts are written to the **`release/`** directory.
 
 ## Cross-platform from one machine
 
-- **On Windows:** `npm run dist:win` and `npm run dist:linux` both work. Linux output is an unpacked folder in `release/linux-unpacked/`; the runnable is **`agent-wars`** (no extension) inside that folder. Zip the whole folder for Linux users; they unzip and run `./agent-wars`. AppImage/.deb require building on Linux. Use a Mac or CI for macOS.
+- **On Windows:** `npm run dist:win` and `npm run dist:linux` both work. Linux output is `release/linux-unpacked/` (with the main binary executable bit set) and a **`release/agent-wars-<version>-linux-x64.tar.gz`** archive ready to distribute. Recipients extract the TGZ and run `./agent-wars`. AppImage/.deb require building on Linux. Use a Mac or CI for macOS.
 - **On Linux:** `npm run dist:linux`, `npm run dist:win`, and (on some setups) `npm run dist:mac` may work.
 - **On macOS:** You can build for all three; use `npm run dist` to build for the current platform only.
 
@@ -33,7 +33,7 @@ After `npm run dist:win`, `release/` typically contains:
 - `Agent Wars Setup x.x.x.exe` — NSIS installer
 - `agent-wars x.x.x.exe` — portable (no install) executable
 
-Linux (from Windows) produces `release/linux-unpacked/` — a directory you can zip and run on Linux. For AppImage or .deb, run `npm run dist:linux` on a Linux machine and change the Linux target in `package.json` to `["AppImage", "deb"]`. For a signed .dmg, run `npm run dist:mac` on a Mac and change the Mac target to `["dmg"]`.
+Linux produces `release/linux-unpacked/` (main executable has +x) and `release/agent-wars-<version>-linux-x64.tar.gz` for distribution. For AppImage or .deb, run `npm run dist:linux` on a Linux machine and change the Linux target in `package.json` to `["AppImage", "deb"]`. For a signed .dmg, run `npm run dist:mac` on a Mac and change the Mac target to `["dmg"]`.
 
 ## Configuration
 

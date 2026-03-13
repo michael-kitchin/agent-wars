@@ -1,7 +1,7 @@
 {
   "name": "agent-wars",
-  "version": "0.1.0",
-  "description": "Grand strategy wargame with LLM opponents — Milestone 0.1 Hello Hex World",
+  "version": "0.4.0",
+  "description": "Grand strategy wargame with LLM opponents — Milestone 0.4",
   "main": "dist/main.js",
   "scripts": {
     "build": "npm run build:main && npm run build:renderer",
@@ -12,7 +12,7 @@
     "clean:release": "node -e \"const fs=require('fs');const p=require('path').join(process.cwd(),'release');if(fs.existsSync(p)){try{fs.rmSync(p,{recursive:true,maxRetries:3,retryDelay:200});}catch(e){console.error('Release folder in use. Close the app and any tools using release/, then retry.');process.exit(1);}}\"",
     "dist": "npm run build && node node_modules/electron-builder/cli.js",
     "dist:win": "npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --win",
-    "dist:linux": "npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --linux",
+    "dist:linux": "npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --linux && node scripts/post-linux-pack.js",
     "dist:mac": "node -e \"if (process.platform !== 'darwin') { console.error('Build for macOS is supported only on macOS. Run npm run dist:mac on a Mac. See .spec/packaging.md'); process.exit(1); }\" && npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --mac"
   },
   "keywords": [],
@@ -38,6 +38,7 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",
+    "tar-fs": "^3.0.5",
     "@types/node": "^22.10.1",
     "electron": "^40.0.0",
     "electron-builder": "^25.0.0",
