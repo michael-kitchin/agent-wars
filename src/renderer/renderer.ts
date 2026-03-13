@@ -43,6 +43,53 @@ const RANGED_RANGE: Record<string, number> = {
   naval: 2,
 };
 
+/** Movement range in hexes per turn by unit type. Must match main process (gameActions). */
+const MOVEMENT_RANGE: Record<string, number> = {
+  infantry: 1,
+  armor: 2,
+  naval: 2,
+};
+
+/**
+ * Validates a movement order against the current game state snapshot. Used on double-click so invalid
+ * orders are never added. Rules match main process: unit exists and is human, destination on map,
+ * within range, terrain allows unit type (naval→water, land→land).
+ */
+function validateMovementOrder(
+  state: GameStateSnapshot,
+  unitId: string,
+  toH3Index: string
+): { valid: true } | { valid: false; reason: string } {
+  const unit = state.units.find((u) => u.id === unitId);
+  if (!unit) return { valid: false, reason: `Unit not found: ${unitId}` };
+  if (unit.player !== 'human') return { valid: false, reason: 'Only human units can receive orders' };
+
+  const mapHexSet = new Set(state.hexes.map((h) => h.h3Index));
+  if (!mapHexSet.has(toH3Index)) return { valid: false, reason: 'Destination not on map' };
+  if (!mapHexSet.has(unit.h3Index)) {
+    return { valid: false, reason: 'Unit is on an invalid or outdated hex; start a new game.' };
+  }
+
+  let dist: number;
+  try {
+    dist = gridDistance(unit.h3Index, toH3Index);
+  } catch {
+    return { valid: false, reason: 'Invalid hex or distance; try starting a new game.' };
+  }
+  const range = MOVEMENT_RANGE[unit.unitType] ?? 1;
+  if (dist > range) return { valid: false, reason: `${unit.unitType} can move at most ${range} hex(es)` };
+  if (dist < 1) return { valid: false, reason: 'Destination must be different from current hex' };
+
+  const destHex = state.hexes.find((h) => h.h3Index === toH3Index);
+  const terrain = destHex?.terrain ?? 'land';
+  if (unit.unitType === 'naval' && terrain !== 'water') return { valid: false, reason: 'Naval units must move to water' };
+  if ((unit.unitType === 'infantry' || unit.unitType === 'armor') && terrain !== 'land') {
+    return { valid: false, reason: 'Land units must move to land' };
+  }
+
+  return { valid: true };
+}
+
 /** Unit snapshot at death for resolution-phase display (same shape as game units). */
 interface RemovedUnitSnapshot {
   id: string;
@@ -245,6 +292,10 @@ const view: ViewState = {
 
 let selectedHexIndex: string | null = null;
 let selectedUnitId: string | null = null;
+/** Unit selected at mousedown; used so double-click can issue move to an occupied hex without reselecting. */
+let selectedUnitIdAtMouseDown: string | null = null;
+/** Timeout for deferred single-click selection so double-click can issue move before selection runs. */
+let pendingSelectTimeout: ReturnType<typeof setTimeout> | null = null;
 let pendingOrders: { unitId: string; toH3Index: string }[] = [];
 let pendingRangedAttacks: RangedAttackOrder[] = [];
 /** When true, next hex click sets ranged attack target for selected unit (if valid). */
@@ -1279,6 +1330,7 @@ function init(): void {
 
   canvas.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
+    selectedUnitIdAtMouseDown = selectedUnitId;
     isDragging = true;
     dragDistanceSq = 0;
     dragStartX = e.clientX;
@@ -1375,22 +1427,78 @@ function init(): void {
     if (hit) {
       const unit = getUnitAtHex(hit);
       if (unit?.player === 'human') {
-        selectedUnitId = unit.id;
+        if (pendingSelectTimeout !== null) {
+          clearTimeout(pendingSelectTimeout);
+          pendingSelectTimeout = null;
+          /* Second click of a double-click; do not select so dblclick can issue move to this hex. */
+        } else {
+          const unitIdToSelect = unit.id;
+          pendingSelectTimeout = setTimeout(() => {
+            selectedUnitId = unitIdToSelect;
+            pendingSelectTimeout = null;
+            updateSidebar();
+            updateRangedSidebar();
+            redraw();
+          }, 250);
+        }
       } else if (selectedUnitId && hit !== gameState?.units.find((u) => u.id === selectedUnitId)?.h3Index) {
-        const idx = pendingOrders.findIndex((o) => o.unitId === selectedUnitId);
-        const newOrder = { unitId: selectedUnitId, toH3Index: hit };
-        if (idx >= 0) pendingOrders[idx] = newOrder;
-        else pendingOrders.push(newOrder);
-        updatePendingOrdersSidebar();
+        /* Movement orders are issued on double-click so the player can move to an occupied hex. */
+        if (pendingSelectTimeout !== null) {
+          clearTimeout(pendingSelectTimeout);
+          pendingSelectTimeout = null;
+        }
       } else {
+        if (pendingSelectTimeout !== null) {
+          clearTimeout(pendingSelectTimeout);
+          pendingSelectTimeout = null;
+        }
         selectedUnitId = null;
       }
     } else {
+      if (pendingSelectTimeout !== null) {
+        clearTimeout(pendingSelectTimeout);
+        pendingSelectTimeout = null;
+      }
       selectedUnitId = null;
     }
 
     updateSidebar();
     updateRangedSidebar();
+    redraw();
+  });
+
+  canvas.addEventListener('dblclick', (e) => {
+    if (pendingSelectTimeout !== null) {
+      clearTimeout(pendingSelectTimeout);
+      pendingSelectTimeout = null;
+    }
+    if (dragDistanceSq > DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) return;
+    const info = getCanvasAndSize();
+    if (!info || !gameState) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const hexList = gameState.hexes?.map((h) => h.h3Index);
+    const hit = hitTest(x, y, view, info.width, info.height, hexList ?? []);
+    if (!hit || !selectedUnitIdAtMouseDown) return;
+
+    const unit = gameState.units.find((u) => u.id === selectedUnitIdAtMouseDown);
+    if (!unit || unit.player !== 'human' || unit.h3Index === hit) return;
+
+    const validation = validateMovementOrder(gameState, selectedUnitIdAtMouseDown, hit);
+    if (!validation.valid) {
+      showMapToast(validation.reason, { isError: true });
+      return;
+    }
+
+    const idx = pendingOrders.findIndex((o) => o.unitId === selectedUnitIdAtMouseDown);
+    const newOrder = { unitId: selectedUnitIdAtMouseDown, toH3Index: hit };
+    if (idx >= 0) pendingOrders[idx] = newOrder;
+    else pendingOrders.push(newOrder);
+    updatePendingOrdersSidebar();
+    updateSidebar();
     redraw();
   });
 

@@ -14277,6 +14277,37 @@
     armor: 1,
     naval: 2
   };
+  var MOVEMENT_RANGE = {
+    infantry: 1,
+    armor: 2,
+    naval: 2
+  };
+  function validateMovementOrder(state, unitId, toH3Index) {
+    const unit = state.units.find((u) => u.id === unitId);
+    if (!unit) return { valid: false, reason: `Unit not found: ${unitId}` };
+    if (unit.player !== "human") return { valid: false, reason: "Only human units can receive orders" };
+    const mapHexSet = new Set(state.hexes.map((h) => h.h3Index));
+    if (!mapHexSet.has(toH3Index)) return { valid: false, reason: "Destination not on map" };
+    if (!mapHexSet.has(unit.h3Index)) {
+      return { valid: false, reason: "Unit is on an invalid or outdated hex; start a new game." };
+    }
+    let dist;
+    try {
+      dist = gridDistance(unit.h3Index, toH3Index);
+    } catch {
+      return { valid: false, reason: "Invalid hex or distance; try starting a new game." };
+    }
+    const range = MOVEMENT_RANGE[unit.unitType] ?? 1;
+    if (dist > range) return { valid: false, reason: `${unit.unitType} can move at most ${range} hex(es)` };
+    if (dist < 1) return { valid: false, reason: "Destination must be different from current hex" };
+    const destHex = state.hexes.find((h) => h.h3Index === toH3Index);
+    const terrain = destHex?.terrain ?? "land";
+    if (unit.unitType === "naval" && terrain !== "water") return { valid: false, reason: "Naval units must move to water" };
+    if ((unit.unitType === "infantry" || unit.unitType === "armor") && terrain !== "land") {
+      return { valid: false, reason: "Land units must move to land" };
+    }
+    return { valid: true };
+  }
   var BACKGROUND_COLOR = "#e0dcd4";
   var UNIT_RADIUS = 22;
   var PLAYER_COLORS = {
@@ -14374,6 +14405,8 @@
   };
   var selectedHexIndex = null;
   var selectedUnitId = null;
+  var selectedUnitIdAtMouseDown = null;
+  var pendingSelectTimeout = null;
   var pendingOrders = [];
   var pendingRangedAttacks = [];
   var rangedModeActive = false;
@@ -15196,6 +15229,7 @@
     }, { passive: false });
     canvas.addEventListener("mousedown", (e) => {
       if (e.button !== 0) return;
+      selectedUnitIdAtMouseDown = selectedUnitId;
       isDragging = true;
       dragDistanceSq = 0;
       dragStartX = e.clientX;
@@ -15283,21 +15317,69 @@
       if (hit) {
         const unit = getUnitAtHex(hit);
         if (unit?.player === "human") {
-          selectedUnitId = unit.id;
+          if (pendingSelectTimeout !== null) {
+            clearTimeout(pendingSelectTimeout);
+            pendingSelectTimeout = null;
+          } else {
+            const unitIdToSelect = unit.id;
+            pendingSelectTimeout = setTimeout(() => {
+              selectedUnitId = unitIdToSelect;
+              pendingSelectTimeout = null;
+              updateSidebar();
+              updateRangedSidebar();
+              redraw();
+            }, 250);
+          }
         } else if (selectedUnitId && hit !== gameState?.units.find((u) => u.id === selectedUnitId)?.h3Index) {
-          const idx = pendingOrders.findIndex((o) => o.unitId === selectedUnitId);
-          const newOrder = { unitId: selectedUnitId, toH3Index: hit };
-          if (idx >= 0) pendingOrders[idx] = newOrder;
-          else pendingOrders.push(newOrder);
-          updatePendingOrdersSidebar();
+          if (pendingSelectTimeout !== null) {
+            clearTimeout(pendingSelectTimeout);
+            pendingSelectTimeout = null;
+          }
         } else {
+          if (pendingSelectTimeout !== null) {
+            clearTimeout(pendingSelectTimeout);
+            pendingSelectTimeout = null;
+          }
           selectedUnitId = null;
         }
       } else {
+        if (pendingSelectTimeout !== null) {
+          clearTimeout(pendingSelectTimeout);
+          pendingSelectTimeout = null;
+        }
         selectedUnitId = null;
       }
       updateSidebar();
       updateRangedSidebar();
+      redraw();
+    });
+    canvas.addEventListener("dblclick", (e) => {
+      if (pendingSelectTimeout !== null) {
+        clearTimeout(pendingSelectTimeout);
+        pendingSelectTimeout = null;
+      }
+      if (dragDistanceSq > DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) return;
+      const info = getCanvasAndSize();
+      if (!info || !gameState) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const hexList = gameState.hexes?.map((h) => h.h3Index);
+      const hit = hitTest(x, y, view, info.width, info.height, hexList ?? []);
+      if (!hit || !selectedUnitIdAtMouseDown) return;
+      const unit = gameState.units.find((u) => u.id === selectedUnitIdAtMouseDown);
+      if (!unit || unit.player !== "human" || unit.h3Index === hit) return;
+      const validation = validateMovementOrder(gameState, selectedUnitIdAtMouseDown, hit);
+      if (!validation.valid) {
+        showMapToast(validation.reason, { isError: true });
+        return;
+      }
+      const idx = pendingOrders.findIndex((o) => o.unitId === selectedUnitIdAtMouseDown);
+      const newOrder = { unitId: selectedUnitIdAtMouseDown, toH3Index: hit };
+      if (idx >= 0) pendingOrders[idx] = newOrder;
+      else pendingOrders.push(newOrder);
+      updatePendingOrdersSidebar();
+      updateSidebar();
       redraw();
     });
     const readyBtn = document.getElementById("ready-btn");
