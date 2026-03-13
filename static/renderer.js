@@ -14309,7 +14309,7 @@
     return { valid: true };
   }
   var BACKGROUND_COLOR = "#e0dcd4";
-  var UNIT_RADIUS = 22;
+  var UNIT_RADIUS = 20;
   var PLAYER_COLORS = {
     human: "#2e5a7b",
     opponent: "#7b4a2e"
@@ -14588,9 +14588,9 @@
       }
     }
   }
-  var STACK_OFFSET_X = 8;
-  var STACK_OFFSET_Y = -5;
-  var COUNT_BADGE_OFFSET = 20;
+  var STACK_OFFSET_X = 7;
+  var STACK_OFFSET_Y = -4;
+  var COUNT_BADGE_OFFSET = 18;
   var MULTI_PLAYER_FILL = "#b0b0b0";
   var MULTI_PLAYER_STROKE = "#000";
   function drawOneUnitMarker(ctx, x, y, color, label, strokeColor = "#fff") {
@@ -14602,7 +14602,7 @@
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 20px system-ui, sans-serif";
+    ctx.font = "bold 18px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(label, x, y);
@@ -14631,7 +14631,7 @@
         drawOneUnitMarker(ctx, x + STACK_OFFSET_X, y + STACK_OFFSET_Y, fillColor, label, strokeColor);
         const badgeX = x + COUNT_BADGE_OFFSET;
         const badgeY = y + COUNT_BADGE_OFFSET;
-        ctx.font = "bold 14px system-ui, sans-serif";
+        ctx.font = "bold 13px system-ui, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.strokeStyle = "#fff";

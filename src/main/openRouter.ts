@@ -10,7 +10,7 @@ import { gridDistance } from 'h3-js';
 import { getAttack, getDefense, getRange } from './combatConstants';
 import { logDebug, logError } from './logger';
 import type { GameStateSnapshot } from './gameDb';
-import { buildAxialCoordinateMap } from './mapData';
+import { buildLatLngCoordinateMap } from './mapData';
 
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -278,43 +278,43 @@ function validateAiRangedOrder(
   return { valid: true };
 }
 
-/** Preamble for [x, y] axial coordinates: origin, neighbors, distance, and axis direction for LLM-friendly reasoning. */
-const XY_PREAMBLE = `Positions use [x, y] coordinates. [0, 0] is the map center. x increases to the right, y increases toward the top-right.
-Neighbors: from [x, y] you can move to [x±1, y], [x, y±1], [x±1, y∓1] — six hexes.
-Distance: hex distance between [x1, y1] and [x2, y2] is max(|x2−x1|, |y2−y1|). Use only [x, y] from the unit and target lists below; do not invent coordinates.
+/** Preamble for [lat, lng] coordinates: use only positions from the lists; distances in hexes are given where needed. */
+const LATLNG_PREAMBLE = `Positions use [lat, lng] coordinates (latitude, longitude; floating point is fine). Use only coordinates from the unit and target lists below; do not invent coordinates. Hex distances are given in the prompt where relevant.
 
-Response format: You must reply with movementOrders and rangedAttacks using only toXY and targetXY. Each is an array of two integers [x, y]. Do not use toH3Index, targetH3Index, or any hex/string IDs — only [x, y] arrays.`;
+Response format: Reply with movementOrders and rangedAttacks using toXY and targetXY. Each is an array of two numbers [lat, lng]. Do not use toH3Index, targetH3Index, or any hex/string IDs.`;
+
+/** Formats [lat, lng] for the prompt (a few decimal places). */
+function formatLatLng(ll: [number, number]): string {
+  return `[${ll[0].toFixed(6)}, ${ll[1].toFixed(6)}]`;
+}
 
 /**
- * Builds the system prompt using [x, y] axial coordinates. Origin [0,0] at map center; neighbors and distance rules in preamble.
- * Only includes hexes that have [x, y] in the axial map so the prompt never contains H3 indices.
+ * Builds the system prompt using [lat, lng] for every game hex so all opponent units, moves, and ranged options are listed.
  */
-function buildSystemPromptXY(
+function buildSystemPromptLatLng(
   state: GameStateSnapshot,
-  xyMap: { xyByH3: Map<string, [number, number]>; formatXY: (h3: string) => string }
+  coordMap: { latLngByH3: Map<string, [number, number]>; format: (h3: string) => string }
 ): string {
-  const { xyByH3 } = xyMap;
-  const fmt = xyMap.formatXY;
-  const opponentUnits = state.units
-    .filter((u) => u.player === 'opponent' && xyByH3.has(u.h3Index));
-  const humanUnits = state.units
-    .filter((u) => u.player === 'human' && xyByH3.has(u.h3Index));
+  const { latLngByH3, format } = coordMap;
+  const opponentUnits = state.units.filter((u) => u.player === 'opponent');
+  const humanUnits = state.units.filter((u) => u.player === 'human');
 
   const unitLines = opponentUnits.map((u) => {
-    const dests = getValidDestinations(u, state).filter((h) => xyByH3.has(h));
-    const destStr = dests.length ? dests.map((h) => fmt(h)).join(', ') : 'none (no valid hex)';
-    const base = `${u.id} (${u.unitType}) at ${fmt(u.h3Index)} can move to: ${destStr}`;
+    if (!latLngByH3.has(u.h3Index)) return `${u.id} (${u.unitType}) at (unknown hex) — not on map`;
+    const dests = getValidDestinations(u, state);
+    const destStr = dests.length ? dests.map((h) => format(h)).join(', ') : 'none (no valid hex)';
+    const base = `${u.id} (${u.unitType}) at ${format(u.h3Index)} can move to: ${destStr}`;
     const pursuit = getPursuitSuggestion(u, state);
-    if (pursuit && xyByH3.has(pursuit.toH3Index)) {
-      return `${base}. Pursuit: move to ${fmt(pursuit.toH3Index)} to close on ${pursuit.nearestHumanId} (${pursuit.distanceHexes} hexes away).`;
+    if (pursuit) {
+      return `${base}. Pursuit: move to ${format(pursuit.toH3Index)} to close on ${pursuit.nearestHumanId} (${pursuit.distanceHexes} hexes away).`;
     }
     return base;
   });
   const rangedLines = opponentUnits
     .filter((u) => getRange(u.unitType) >= 1)
     .map((u) => {
-      const targets = getValidRangedTargets(u, state).filter((h) => xyByH3.has(h));
-      const targetStr = targets.length ? targets.map((h) => fmt(h)).join(', ') : 'none';
+      const targets = getValidRangedTargets(u, state);
+      const targetStr = targets.length ? targets.map((h) => format(h)).join(', ') : 'none';
       return `${u.id} (${u.unitType}, range ${getRange(u.unitType)}) can ranged-attack: ${targetStr}`;
     });
   const rangedBlock =
@@ -330,20 +330,23 @@ function buildSystemPromptXY(
     )
     .join('; ');
 
-  const humanList = humanUnits.map((u) => `${u.id} at ${fmt(u.h3Index)}`).join('; ');
+  const humanList = humanUnits
+    .filter((u) => latLngByH3.has(u.h3Index))
+    .map((u) => `${u.id} at ${format(u.h3Index)}`)
+    .join('; ');
 
   return `You are the opponent in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}. Your objective is to destroy all human units. Move toward human units to get in ranged or melee range; do not stay passive. When a "Pursuit" suggestion is given, prefer that move to close on the enemy unless you have a better strategic or tactical reason (e.g. already in range to fire).
 
-${XY_PREAMBLE}
+${LATLNG_PREAMBLE}
 
 Combat: each unit rolls d6 when attacking (hit if roll ≤ attack) or when defending (hit if roll ≤ defender's defense). Higher values are better. Unit stats — ${combatSummary}.
 
-Here are your units, their positions as [x, y], and the positions they can move to (Pursuit = suggested hex to close on a human unit):
+Here are your units, their positions as [lat, lng], and the positions they can move to (Pursuit = suggested hex to close on a human unit):
 ${unitLines.join('\n')}
 ${rangedBlock}
 Human units: ${humanList || 'none'}.
 
-Respond with a JSON object: { "strategy": "<one-line explanation>", "movementOrders": [ { "unitId": "<id>", "toXY": [x, y] }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetXY": [x, y] }, ... ] }. Use only toXY and targetXY — each must be an array of exactly two integers [x, y]. Do not use toH3Index or targetH3Index or any string hex IDs. Include "strategy". movementOrders: issue one order for each of your units that has valid moves (so multiple units move each turn). rangedAttacks: one per unit with range if it has a valid target. Example: {"strategy":"Advancing toward human units.","movementOrders":[{"unitId":"opponent-armor-1","toXY":[1,0]},{"unitId":"opponent-infantry-1","toXY":[0,1]}],"rangedAttacks":[]}.`;
+Respond with a JSON object: { "strategy": "<one-line explanation>", "movementOrders": [ { "unitId": "<id>", "toXY": [lat, lng] }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetXY": [lat, lng] }, ... ] }. Use only toXY and targetXY — each is an array of two numbers [lat, lng]. Do not use toH3Index or targetH3Index. Include "strategy". movementOrders: issue one order for each of your units that has valid moves (move all your units that can move). rangedAttacks: one per unit with range if it has a valid target. Example: {"strategy":"Advancing toward human units.","movementOrders":[{"unitId":"opponent-armor-1","toXY":[0.001,0.002]},{"unitId":"opponent-infantry-1","toXY":[0,0]}],"rangedAttacks":[]}.`;
 }
 
 export interface RequestOrdersResult {
@@ -379,18 +382,18 @@ export async function requestOrders(
     return { success: false, error: 'No model selected' };
   }
 
-  const { xyByH3, h3ByXY } = buildAxialCoordinateMap();
-  const formatXY = (h3: string): string => {
-    const xy = xyByH3.get(h3);
-    return xy ? `[${xy[0]}, ${xy[1]}]` : h3;
+  const hexList = state.hexes.map((h) => h.h3Index);
+  const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
+  const coordMap = {
+    latLngByH3,
+    format: (h3: string) => {
+      const ll = latLngByH3.get(h3);
+      return ll ? formatLatLng(ll) : h3;
+    },
   };
-  const xyMap = { xyByH3, formatXY };
-  if (state.hexes.length > 0 && !state.hexes.every((h) => xyByH3.has(h.h3Index))) {
-    logDebug('openRouter requestOrders: some hexes missing from axial map; listing only hexes with [x,y]');
-  }
 
-  const systemPrompt = buildSystemPromptXY(state, xyMap);
-  const userMessage = `Return JSON with "strategy", "movementOrders" (array of { unitId, toXY: [x, y] }), and optional "rangedAttacks". Use only [x, y] arrays for toXY and targetXY. Issue one movement order per unit that has valid moves (move all your units that can move). Only [x, y] from the lists above.`;
+  const systemPrompt = buildSystemPromptLatLng(state, coordMap);
+  const userMessage = `Return JSON with "strategy", "movementOrders" (array of { unitId, toXY: [lat, lng] }), and optional "rangedAttacks". Use only [lat, lng] arrays for toXY and targetXY (numbers can be floating point). Issue one movement order per unit that has valid moves (move all your units that can move). Use only coordinates from the lists above.`;
 
   console.log('[LLM prompt (system)]', systemPrompt);
   console.log('[LLM prompt (user)]', userMessage);
@@ -426,7 +429,7 @@ export async function requestOrders(
     }
     console.log('[LLM response]', content);
 
-    const parsed = parseOrdersResponse(content, h3ByXY);
+    const parsed = parseOrdersResponse(content, resolveToH3);
     if (!parsed) {
       logError('openRouter requestOrders: failed to parse JSON', content.slice(0, 300));
       return { success: false, error: 'Invalid response: could not parse orders' };
@@ -489,11 +492,11 @@ export async function requestOrders(
 
 /**
  * Parses the LLM response into movement orders and optional ranged attacks.
- * Expects toXY: [x, y] and targetXY: [x, y]; resolves to H3 via h3ByXY.
+ * Expects toXY and targetXY as [lat, lng] (numbers, may be floating point); resolves to H3 via resolveToH3.
  */
 function parseOrdersResponse(
   content: string,
-  h3ByXY: Map<string, string>
+  resolveToH3: (lat: number, lng: number) => string | undefined
 ): {
   movementOrders: { unitId: string; toH3Index: string }[];
   rangedAttacks: { unitId: string; targetH3Index: string }[];
@@ -515,13 +518,13 @@ function parseOrdersResponse(
   try {
     const parsed = JSON.parse(jsonStr) as unknown;
     if (Array.isArray(parsed)) {
-      const movementOrders = parseOrdersArray(parsed, h3ByXY);
+      const movementOrders = parseOrdersArray(parsed, resolveToH3);
       return { movementOrders, rangedAttacks: [] };
     }
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       const obj = parsed as { movementOrders?: unknown; rangedAttacks?: unknown; strategy?: unknown };
-      const movementOrders = Array.isArray(obj.movementOrders) ? parseOrdersArray(obj.movementOrders, h3ByXY) : [];
-      const rangedAttacks = Array.isArray(obj.rangedAttacks) ? parseRangedArray(obj.rangedAttacks, h3ByXY) : [];
+      const movementOrders = Array.isArray(obj.movementOrders) ? parseOrdersArray(obj.movementOrders, resolveToH3) : [];
+      const rangedAttacks = Array.isArray(obj.rangedAttacks) ? parseRangedArray(obj.rangedAttacks, resolveToH3) : [];
       const strategy = typeof obj.strategy === 'string' && obj.strategy.trim() ? obj.strategy.trim() : undefined;
       return { movementOrders, rangedAttacks, strategy };
     }
@@ -531,11 +534,10 @@ function parseOrdersResponse(
   }
 }
 
-function xyKeyFromArr(arr: number[]): string {
-  return arr.length >= 2 && arr.every((n) => typeof n === 'number') ? `${arr[0]},${arr[1]}` : '';
-}
-
-function parseOrdersArray(arr: unknown[], h3ByXY: Map<string, string>): { unitId: string; toH3Index: string }[] {
+function parseOrdersArray(
+  arr: unknown[],
+  resolveToH3: (lat: number, lng: number) => string | undefined
+): { unitId: string; toH3Index: string }[] {
   const orders: { unitId: string; toH3Index: string }[] = [];
   for (const item of arr) {
     if (!item || typeof item !== 'object' || typeof (item as { unitId?: unknown }).unitId !== 'string') continue;
@@ -543,15 +545,17 @@ function parseOrdersArray(arr: unknown[], h3ByXY: Map<string, string>): { unitId
     if (o.toH3Index != null) continue;
     let toH3Index: string | undefined;
     if (Array.isArray(o.toXY) && o.toXY.length >= 2 && o.toXY.every((n) => typeof n === 'number')) {
-      const key = xyKeyFromArr(o.toXY);
-      if (key) toH3Index = h3ByXY.get(key);
+      toH3Index = resolveToH3(Number(o.toXY[0]), Number(o.toXY[1]));
     }
     if (toH3Index) orders.push({ unitId: o.unitId, toH3Index });
   }
   return orders;
 }
 
-function parseRangedArray(arr: unknown[], h3ByXY: Map<string, string>): { unitId: string; targetH3Index: string }[] {
+function parseRangedArray(
+  arr: unknown[],
+  resolveToH3: (lat: number, lng: number) => string | undefined
+): { unitId: string; targetH3Index: string }[] {
   const orders: { unitId: string; targetH3Index: string }[] = [];
   for (const item of arr) {
     if (!item || typeof item !== 'object' || typeof (item as { unitId?: unknown }).unitId !== 'string') continue;
@@ -559,8 +563,7 @@ function parseRangedArray(arr: unknown[], h3ByXY: Map<string, string>): { unitId
     if (o.targetH3Index != null) continue;
     let targetH3Index: string | undefined;
     if (Array.isArray(o.targetXY) && o.targetXY.length >= 2 && o.targetXY.every((n) => typeof n === 'number')) {
-      const key = xyKeyFromArr(o.targetXY);
-      if (key) targetH3Index = h3ByXY.get(key);
+      targetH3Index = resolveToH3(Number(o.targetXY[0]), Number(o.targetXY[1]));
     }
     if (targetH3Index) orders.push({ unitId: o.unitId, targetH3Index });
   }

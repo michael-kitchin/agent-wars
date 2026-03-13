@@ -139,7 +139,7 @@ declare global {
 /** Map background (style guide: neutral, recedes). */
 const BACKGROUND_COLOR = '#e0dcd4';
 
-const UNIT_RADIUS = 22;
+const UNIT_RADIUS = 20;
 /** Player accents (style guide: P1 #2e5a7b, P2 #7b4a2e). */
 const PLAYER_COLORS: Record<string, string> = {
   human: '#2e5a7b',
@@ -520,9 +520,9 @@ function resizeAndRedraw(): void {
   }
 }
 
-const STACK_OFFSET_X = 8;
-const STACK_OFFSET_Y = -5;
-const COUNT_BADGE_OFFSET = 20;
+const STACK_OFFSET_X = 7;
+const STACK_OFFSET_Y = -4;
+const COUNT_BADGE_OFFSET = 18;
 const MULTI_PLAYER_FILL = '#b0b0b0';
 const MULTI_PLAYER_STROKE = '#000';
 
@@ -545,7 +545,7 @@ function drawOneUnitMarker(
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.fillStyle = '#fff';
-  ctx.font = 'bold 20px system-ui, sans-serif';
+  ctx.font = 'bold 18px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, x, y);
@@ -589,7 +589,7 @@ function drawUnits(
       drawOneUnitMarker(ctx, x + STACK_OFFSET_X, y + STACK_OFFSET_Y, fillColor, label, strokeColor);
       const badgeX = x + COUNT_BADGE_OFFSET;
       const badgeY = y + COUNT_BADGE_OFFSET;
-      ctx.font = 'bold 14px system-ui, sans-serif';
+      ctx.font = 'bold 13px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.strokeStyle = '#fff';
