@@ -44,16 +44,28 @@ try {
   console.warn('post-linux-pack: could not chmod executable (may be Windows):', e.message);
 }
 
-// Create TGZ with executable mode set in the archive so extraction on Linux preserves +x.
+// Create TGZ with explicit Unix modes so extraction on Linux works. On Windows,
+// stat.mode is unreliable (often 0), which causes "Permission denied" and the
+// extracted top-level directory to lose its execute bit.
 const archiveName = `${executableName}-${version}-linux-x64.tar.gz`;
 const archivePath = path.join(releaseDir, archiveName);
 
 const tarFs = require('tar-fs');
+const DIR_MODE = 0o755;
+const FILE_MODE = 0o644;
+const EXEC_MODE = 0o755;
+
 const pack = tarFs.pack(linuxUnpacked, {
   map: (header) => {
+    const isDir = header.type === 'directory' || header.type === 'Directory' || header.type === 5;
     const base = path.basename(header.name);
-    if (base === executableName) {
-      header.mode = 0o755;
+    const isMainBinary = base === executableName;
+    if (isDir) {
+      header.mode = DIR_MODE;
+    } else if (isMainBinary) {
+      header.mode = EXEC_MODE;
+    } else {
+      header.mode = FILE_MODE;
     }
     return header;
   },
