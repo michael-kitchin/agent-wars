@@ -247,13 +247,16 @@ export function ready(
     }));
 
     const humanRanged = dbGetAll<{ unit_id: string; target_h3_index: string }>(
-      'SELECT unit_id, target_h3_index FROM pending_ranged_orders'
+      'SELECT unit_id, target_h3_index FROM pending_ranged_orders ORDER BY unit_id, target_h3_index'
     ).map((r) => ({ unitId: r.unit_id, targetH3Index: r.target_h3_index }));
     const allRanged = [...humanRanged, ...aiRangedOrders];
 
     const turnNumber = turnRow?.turn_number ?? 1;
-    const seed = (getGameSeed() + turnNumber * 7919) >>> 0;
+    const gameSeed = getGameSeed();
+    // Per-turn seed so the same two units get different dice outcomes each turn; replay stays deterministic for same orders.
+    const seed = (gameSeed + turnNumber * 7919) >>> 0;
     const next = createCombatRng(seed);
+    logDebug('ready: combat resolution', { turnNumber, gameSeed, combatSeed: seed });
 
     const rangedResult = runRangedPhase(combatUnitsBefore, hexList, allRanged, next);
     for (const id of rangedResult.removedUnitIds) {

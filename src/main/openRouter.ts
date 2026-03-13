@@ -346,7 +346,7 @@ ${unitLines.join('\n')}
 ${rangedBlock}
 Human units: ${humanList || 'none'}.
 
-Respond with a JSON object: { "strategy": "<one-line explanation>", "movementOrders": [ { "unitId": "<id>", "toXY": [lat, lng] }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetXY": [lat, lng] }, ... ] }. Use only toXY and targetXY — each is an array of two numbers [lat, lng]. Do not use toH3Index or targetH3Index. Include "strategy". movementOrders: issue one order for each of your units that has valid moves (move all your units that can move). rangedAttacks: one per unit with range if it has a valid target. Example: {"strategy":"Advancing toward human units.","movementOrders":[{"unitId":"opponent-armor-1","toXY":[0.001,0.002]},{"unitId":"opponent-infantry-1","toXY":[0,0]}],"rangedAttacks":[]}.`;
+Respond with a JSON object only (valid JSON, no comments — do not use // or /* */). Format: { "strategy": "<one-line explanation>", "movementOrders": [ { "unitId": "<id>", "toXY": [lat, lng] }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetXY": [lat, lng] }, ... ] }. Use only toXY and targetXY — each is an array of two numbers [lat, lng]. Do not use toH3Index or targetH3Index. Include "strategy". movementOrders: issue one order for each of your units that has valid moves (move all your units that can move). rangedAttacks: one per unit with range if it has a valid target. Example: {"strategy":"Advancing toward human units.","movementOrders":[{"unitId":"opponent-armor-1","toXY":[0.001,0.002]},{"unitId":"opponent-infantry-1","toXY":[0,0]}],"rangedAttacks":[]}.`;
 }
 
 export interface RequestOrdersResult {
@@ -393,7 +393,7 @@ export async function requestOrders(
   };
 
   const systemPrompt = buildSystemPromptLatLng(state, coordMap);
-  const userMessage = `Return JSON with "strategy", "movementOrders" (array of { unitId, toXY: [lat, lng] }), and optional "rangedAttacks". Use only [lat, lng] arrays for toXY and targetXY (numbers can be floating point). Issue one movement order per unit that has valid moves (move all your units that can move). Use only coordinates from the lists above.`;
+  const userMessage = `Return valid JSON only (no comments: do not use // or /* */). Include "strategy", "movementOrders" (array of { "unitId", "toXY": [lat, lng] }), and optional "rangedAttacks". Use only [lat, lng] arrays for toXY and targetXY (numbers can be floating point). Issue one movement order per unit that has valid moves (move all your units that can move). Use only coordinates from the lists above.`;
 
   console.log('[LLM prompt (system)]', systemPrompt);
   console.log('[LLM prompt (user)]', userMessage);
@@ -491,6 +491,112 @@ export async function requestOrders(
 }
 
 /**
+ * Strips JavaScript-style line (//) and block (slash-star to star-slash) comments
+ * from a string so that JSON-like output from an LLM can be parsed. Does not
+ * remove comment sequences that appear inside string literals.
+ */
+function stripJsonLikeComments(s: string): string {
+  let out = '';
+  let i = 0;
+  const n = s.length;
+  let inDouble = false;
+  let inSingle = false;
+  let escape = false;
+  let inLineComment = false;
+  let inBlockComment = false;
+
+  while (i < n) {
+    const c = s[i];
+    const next = i + 1 < n ? s[i + 1] : '';
+
+    if (inLineComment) {
+      if (c === '\n') {
+        inLineComment = false;
+        out += c;
+      }
+      i++;
+      continue;
+    }
+    if (inBlockComment) {
+      if (c === '*' && next === '/') {
+        inBlockComment = false;
+        i += 2;
+        continue;
+      }
+      i++;
+      continue;
+    }
+    if (escape) {
+      out += c;
+      escape = false;
+      i++;
+      continue;
+    }
+    if (inDouble) {
+      if (c === '\\') {
+        out += c;
+        escape = true;
+        i++;
+        continue;
+      }
+      if (c === '"') {
+        inDouble = false;
+        out += c;
+        i++;
+        continue;
+      }
+      out += c;
+      i++;
+      continue;
+    }
+    if (inSingle) {
+      if (c === '\\') {
+        out += c;
+        escape = true;
+        i++;
+        continue;
+      }
+      if (c === "'") {
+        inSingle = false;
+        out += c;
+        i++;
+        continue;
+      }
+      out += c;
+      i++;
+      continue;
+    }
+
+    if (c === '"') {
+      inDouble = true;
+      out += c;
+      i++;
+      continue;
+    }
+    if (c === "'") {
+      inSingle = true;
+      out += c;
+      i++;
+      continue;
+    }
+    if (c === '/' && next === '/') {
+      inLineComment = true;
+      i += 2;
+      continue;
+    }
+    if (c === '/' && next === '*') {
+      inBlockComment = true;
+      i += 2;
+      continue;
+    }
+
+    out += c;
+    i++;
+  }
+  return out;
+}
+
+/**
  * Parses the LLM response into movement orders and optional ranged attacks.
  * Expects toXY and targetXY as [lat, lng] (numbers, may be floating point); resolves to H3 via resolveToH3.
  */
@@ -515,6 +621,7 @@ function parseOrdersResponse(
     const arrayMatch = jsonStr.slice(firstBracket).match(/\[[\s\S]*\]/);
     if (arrayMatch) jsonStr = arrayMatch[0];
   }
+  jsonStr = stripJsonLikeComments(jsonStr);
   try {
     const parsed = JSON.parse(jsonStr) as unknown;
     if (Array.isArray(parsed)) {
