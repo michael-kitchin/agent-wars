@@ -275,6 +275,7 @@ function showStackCallout(
 
   calloutEl.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
   calloutEl.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
+  calloutEl.setAttribute('aria-label', formatStackTooltip(units));
   calloutEl.classList.remove('hidden');
 }
 

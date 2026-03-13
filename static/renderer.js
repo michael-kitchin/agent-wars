@@ -14354,6 +14354,14 @@
     if (!gameState) return [];
     return gameState.units.filter((u) => u.h3Index === h3Index);
   }
+  function formatStackTooltip(units) {
+    const byKey = /* @__PURE__ */ new Map();
+    for (const u of units) {
+      const key = `${u.player} ${u.unitType}`;
+      byKey.set(key, (byKey.get(key) ?? 0) + 1);
+    }
+    return Array.from(byKey.entries()).map(([key, n]) => `${n} ${key}`).sort().join(", ");
+  }
   function hideStackCallout() {
     const el = document.getElementById("stack-callout");
     if (el) el.classList.add("hidden");
@@ -14392,6 +14400,7 @@
     }
     calloutEl.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
     calloutEl.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
+    calloutEl.setAttribute("aria-label", formatStackTooltip(units));
     calloutEl.classList.remove("hidden");
   }
   var TOOLTIP_OFFSET_PX = 12;

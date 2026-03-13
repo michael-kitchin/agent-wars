@@ -28,6 +28,13 @@ const RANGE: Record<UnitType, number> = {
   naval: 2,
 };
 
+/** Movement budget (hexes per turn). Used for pathfinding and tool responses. */
+const MOVEMENT_BUDGET: Record<UnitType, number> = {
+  infantry: 1,
+  armor: 2,
+  naval: 2,
+};
+
 /**
  * Returns the attack value for the given unit type. Used when the unit is attacking (ranged or melee).
  */
@@ -47,6 +54,13 @@ export function getDefense(unitType: string): number {
  */
 export function getRange(unitType: string): number {
   return RANGE[unitType as UnitType] ?? 0;
+}
+
+/**
+ * Returns the movement budget (hexes per turn) for the given unit type. Used by pathfinding and MCP tools.
+ */
+export function getMovementBudget(unitType: string): number {
+  return MOVEMENT_BUDGET[unitType as UnitType] ?? 1;
 }
 
 /**

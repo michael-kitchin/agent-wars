@@ -10,7 +10,9 @@ import { gridDistance } from 'h3-js';
 import { getAttack, getDefense, getRange } from './combatConstants';
 import { logDebug, logError } from './logger';
 import type { GameStateSnapshot } from './gameDb';
+import { setAiToolLimitExceededLastTurn, getAndClearAiToolLimitExceededLastTurn } from './gameDb';
 import { buildLatLngCoordinateMap } from './mapData';
+import { executeTool1 } from './tools/tool1Pathfinding';
 
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -198,62 +200,6 @@ function getValidDestinations(unit: { h3Index: string; unitType: string }, state
 }
 
 /**
- * Returns a suggested move for the unit that minimizes distance to the nearest human unit.
- * Used to give the LLM a concrete "pursuit" option so it can advance toward the player without interpreting H3 geometry.
- */
-function getPursuitSuggestion(
-  unit: { id: string; h3Index: string; unitType: string },
-  state: GameStateSnapshot
-): { toH3Index: string; nearestHumanId: string; distanceHexes: number } | null {
-  const humanUnits = state.units.filter((u) => u.player === 'human');
-  if (humanUnits.length === 0) return null;
-  const dests = getValidDestinations(unit, state);
-  if (dests.length === 0) return null;
-  let bestDest: string | null = null;
-  let bestDist = Infinity;
-  let bestHumanId = humanUnits[0]!.id;
-  for (const dest of dests) {
-    for (const h of humanUnits) {
-      try {
-        const d = gridDistance(dest, h.h3Index);
-        if (d < bestDist) {
-          bestDist = d;
-          bestDest = dest;
-          bestHumanId = h.id;
-        }
-      } catch {
-        /* skip */
-      }
-    }
-  }
-  if (bestDest == null) return null;
-  return { toH3Index: bestDest, nearestHumanId: bestHumanId, distanceHexes: bestDist };
-}
-
-/**
- * Returns H3 indices of enemy-occupied hexes within the unit's ranged attack range.
- * Used to list valid ranged targets in the AI prompt.
- */
-function getValidRangedTargets(unit: { h3Index: string; unitType: string; player: string }, state: GameStateSnapshot): string[] {
-  const range = getRange(unit.unitType);
-  if (range < 1) return [];
-  const valid: string[] = [];
-  for (const h of state.hexes) {
-    if (h.h3Index === unit.h3Index) continue;
-    const hasEnemy = state.units.some((u) => u.h3Index === h.h3Index && u.player !== unit.player);
-    if (!hasEnemy) continue;
-    let dist: number;
-    try {
-      dist = gridDistance(unit.h3Index, h.h3Index);
-    } catch {
-      continue;
-    }
-    if (dist >= 1 && dist <= range) valid.push(h.h3Index);
-  }
-  return valid;
-}
-
-/**
  * Validates a single AI ranged order against the state snapshot. Unit must be opponent-owned, have range ≥ 1, target in range, target has enemy.
  */
 function validateAiRangedOrder(
@@ -289,9 +235,11 @@ function formatLatLng(ll: [number, number]): string {
 }
 
 /**
- * Builds the system prompt using [lat, lng] for every game hex so all opponent units, moves, and ranged options are listed.
+ * Builds the system prompt for the tool-calling flow: unit roster (ID, type, position [lat, lng]) for both sides,
+ * turn number, objective, combat summary, and tool descriptions. No per-unit move lists; movement planning is done via plan_route and check_distance.
+ * Injects a one-time warning if the previous turn exceeded the tool-call limit.
  */
-function buildSystemPromptLatLng(
+function buildSystemPromptForTools(
   state: GameStateSnapshot,
   coordMap: { latLngByH3: Map<string, [number, number]>; format: (h3: string) => string }
 ): string {
@@ -299,28 +247,18 @@ function buildSystemPromptLatLng(
   const opponentUnits = state.units.filter((u) => u.player === 'opponent');
   const humanUnits = state.units.filter((u) => u.player === 'human');
 
-  const unitLines = opponentUnits.map((u) => {
-    if (!latLngByH3.has(u.h3Index)) return `${u.id} (${u.unitType}) at (unknown hex) — not on map`;
-    const dests = getValidDestinations(u, state);
-    const destStr = dests.length ? dests.map((h) => format(h)).join(', ') : 'none (no valid hex)';
-    const base = `${u.id} (${u.unitType}) at ${format(u.h3Index)} can move to: ${destStr}`;
-    const pursuit = getPursuitSuggestion(u, state);
-    if (pursuit) {
-      return `${base}. Pursuit: move to ${format(pursuit.toH3Index)} to close on ${pursuit.nearestHumanId} (${pursuit.distanceHexes} hexes away).`;
-    }
-    return base;
-  });
-  const rangedLines = opponentUnits
-    .filter((u) => getRange(u.unitType) >= 1)
-    .map((u) => {
-      const targets = getValidRangedTargets(u, state);
-      const targetStr = targets.length ? targets.map((h) => format(h)).join(', ') : 'none';
-      return `${u.id} (${u.unitType}, range ${getRange(u.unitType)}) can ranged-attack: ${targetStr}`;
-    });
-  const rangedBlock =
-    rangedLines.length > 0
-      ? `\nRanged attacks (optional): Armor has range 1, naval has range 2. You may declare a target hex (enemy, within range) per unit. Valid targets per unit:\n${rangedLines.join('\n')}\n`
-      : '';
+  const warning = getAndClearAiToolLimitExceededLastTurn()
+    ? '\n\nWARNING: Last turn\'s planning exceeded the tool-call limit (10 rounds). You submitted no explicit orders. Ensure you submit your final orders JSON promptly after gathering the information you need.\n'
+    : '';
+
+  const opponentRoster = opponentUnits
+    .filter((u) => latLngByH3.has(u.h3Index))
+    .map((u) => `${u.id} (${u.unitType}) at ${format(u.h3Index)}`)
+    .join('; ');
+  const humanRoster = humanUnits
+    .filter((u) => latLngByH3.has(u.h3Index))
+    .map((u) => `${u.id} (${u.unitType}) at ${format(u.h3Index)}`)
+    .join('; ');
 
   const unitTypes: Array<'infantry' | 'armor' | 'naval'> = ['infantry', 'armor', 'naval'];
   const combatSummary = unitTypes
@@ -330,23 +268,21 @@ function buildSystemPromptLatLng(
     )
     .join('; ');
 
-  const humanList = humanUnits
-    .filter((u) => latLngByH3.has(u.h3Index))
-    .map((u) => `${u.id} at ${format(u.h3Index)}`)
-    .join('; ');
-
-  return `You are the opponent in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}. Your objective is to destroy all human units. Move toward human units to get in ranged or melee range; do not stay passive. When a "Pursuit" suggestion is given, prefer that move to close on the enemy unless you have a better strategic or tactical reason (e.g. already in range to fire).
-
+  return `You are the opponent in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}. Your objective is to destroy all human units. Move toward human units to get in ranged or melee range; do not stay passive.
+${warning}
 ${LATLNG_PREAMBLE}
 
-Combat: each unit rolls d6 when attacking (hit if roll ≤ attack) or when defending (hit if roll ≤ defender's defense). Higher values are better. Unit stats — ${combatSummary}.
+Combat: each unit rolls d6 when attacking (hit if roll ≤ attack) or when defending (hit if roll ≤ defender's defense). Unit stats — ${combatSummary}. Ranged attacks are resolved using each unit's current position (before movement). Only issue a ranged attack if that unit is already within range of the target hex this turn; do not assume movement happens first. Naval units can attack land units (they have range 2 and can target coastal or nearby hexes). To use naval fire effectively, get your naval units as close as possible to enemy land units, as soon as possible. Naval units move only on water. To move a naval unit toward a land target, call plan_route with that land unit's position as the destination; the tool will route to the nearest water hex to that position.
 
-Here are your units, their positions as [lat, lng], and the positions they can move to (Pursuit = suggested hex to close on a human unit):
-${unitLines.join('\n')}
-${rangedBlock}
-Human units: ${humanList || 'none'}.
+=== AVAILABLE TOOLS ===
+Use these tools for movement planning before submitting orders.
+1. plan_route(unitId, destination, options?) — Compute the optimal path for a unit to a destination hex. Returns multi-turn route and orderToXY: the exact [lat, lng] for this turn's movement order (copy this into toXY for that unit). For naval units, you may pass a land unit's [lat, lng] as destination; the route will be to the nearest water hex to that position so the naval can get in range.
+2. check_distance(from, to, unitType) — Quick distance and turn estimate between two hexes. Use to compare options before requesting full routes.
 
-Respond with a JSON object only (valid JSON, no comments — do not use // or /* */). Format: { "strategy": "<one-line explanation>", "movementOrders": [ { "unitId": "<id>", "toXY": [lat, lng] }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetXY": [lat, lng] }, ... ] }. Use only toXY and targetXY — each is an array of two numbers [lat, lng]. Do not use toH3Index or targetH3Index. Include "strategy". movementOrders: issue one order for each of your units that has valid moves (move all your units that can move). rangedAttacks: one per unit with range if it has a valid target. Example: {"strategy":"Advancing toward human units.","movementOrders":[{"unitId":"opponent-armor-1","toXY":[0.001,0.002]},{"unitId":"opponent-infantry-1","toXY":[0,0]}],"rangedAttacks":[]}.`;
+Your units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}
+Human units: ${humanRoster || 'none'}
+
+Submit your final orders as a JSON object only (valid JSON, no comments): { "strategy": "<one-line explanation>", "movementOrders": [ { "unitId": "<id>", "toXY": [lat, lng] }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetXY": [lat, lng] }, ... ] }. Use only toXY and targetXY as [lat, lng] arrays. Include "strategy". For each movement order: use the exact orderToXY from that unit's plan_route result as toXY — copy the two numbers exactly; do not round, interpolate, or invent coordinates or the order will be rejected.`;
 }
 
 export interface RequestOrdersResult {
@@ -362,10 +298,73 @@ export interface RequestOrdersError {
   error: string;
 }
 
+/** OpenAI-compatible tool definition for OpenRouter. */
+interface ToolDef {
+  type: 'function';
+  function: { name: string; description: string; parameters: { type: 'object'; properties: Record<string, unknown>; required?: string[] } };
+}
+
 /**
- * Requests movement orders from the LLM for the opponent. Validates each order;
- * drops invalid ones and applies the rest. Logs the decision and any dropped orders.
- * Returns validated orders or an error. Never logs the API key.
+ * Returns the Tool 1 (pathfinding) tool definitions for the OpenRouter request.
+ * Used so the model can call plan_route and check_distance before submitting orders.
+ */
+function buildToolDefinitions(): ToolDef[] {
+  return [
+    {
+      type: 'function',
+      function: {
+        name: 'plan_route',
+        description: 'Compute the optimal path for a unit to a destination hex. Returns the full multi-turn route with per-turn waypoints. Use to understand how long moves take before committing.',
+        parameters: {
+          type: 'object',
+          properties: {
+            unitId: { type: 'string', description: 'ID of the unit to route (e.g. opponent-armor-1)' },
+            destination: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Target hex as [lat, lng]' },
+            options: {
+              type: 'object',
+              properties: {
+                avoidEnemies: { type: 'boolean', description: 'Route around known enemy positions (default true)' },
+                maxTurns: { type: 'number', description: 'Stop if route exceeds this many turns' },
+              },
+            },
+          },
+          required: ['unitId', 'destination'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'check_distance',
+        description: 'Quick distance and turn estimate between two hexes for a unit type. Use to compare options before requesting full routes.',
+        parameters: {
+          type: 'object',
+          properties: {
+            from: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Origin hex [lat, lng]' },
+            to: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Destination hex [lat, lng]' },
+            unitType: { type: 'string', enum: ['infantry', 'armor', 'naval'], description: 'Unit type for movement budget' },
+          },
+          required: ['from', 'to', 'unitType'],
+        },
+      },
+    },
+  ];
+}
+
+/** Message type for the chat API (system, user, assistant, or tool). */
+type ChatMessage =
+  | { role: 'system'; content: string }
+  | { role: 'user'; content: string }
+  | { role: 'assistant'; content: string | null; tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }> }
+  | { role: 'tool'; tool_call_id: string; content: string };
+
+const MAX_TOOL_ITERATIONS = 10;
+
+/**
+ * Requests movement orders from the LLM for the opponent. Uses the tool-calling loop:
+ * send prompt and tool definitions; if the model returns tool_calls, execute tools locally,
+ * append results, and resend until the model returns final order JSON or the iteration limit (10) is reached.
+ * Validates and drops invalid orders. Never logs the API key.
  */
 export async function requestOrders(
   state: GameStateSnapshot,
@@ -392,97 +391,169 @@ export async function requestOrders(
     },
   };
 
-  const systemPrompt = buildSystemPromptLatLng(state, coordMap);
-  const userMessage = `Return valid JSON only (no comments: do not use // or /* */). Include "strategy", "movementOrders" (array of { "unitId", "toXY": [lat, lng] }), and optional "rangedAttacks". Use only [lat, lng] arrays for toXY and targetXY (numbers can be floating point). Issue one movement order per unit that has valid moves (move all your units that can move). Use only coordinates from the lists above.`;
+  const systemPrompt = buildSystemPromptForTools(state, coordMap);
+  const userMessage = `Use the tools as needed to plan movement, then submit your final orders as a single JSON object: { "strategy": "...", "movementOrders": [...], "rangedAttacks": [...] }. For each movement order, set toXY to the exact orderToXY from that unit's plan_route result (copy the numbers exactly).`;
 
-  console.log('[LLM prompt (system)]', systemPrompt);
-  console.log('[LLM prompt (user)]', userMessage);
+  const tools = buildToolDefinitions();
+  const messages: ChatMessage[] = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userMessage },
+  ];
+
+  logDebug('openRouter requestOrders: system prompt', systemPrompt);
+  logDebug('openRouter requestOrders: user message', userMessage);
+  logDebug('openRouter requestOrders: starting tool loop', { turnNumber: state.turnNumber });
 
   try {
-    const res = await fetch(OPENROUTER_CHAT_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
+    let iteration = 0;
+    while (iteration < MAX_TOOL_ITERATIONS) {
+      iteration++;
+      const body: Record<string, unknown> = {
         model: modelId,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage },
-        ],
+        messages,
         max_tokens: 2048,
-      }),
-    });
+        tools,
+        tool_choice: 'auto',
+      };
 
-    if (!res.ok) {
-      const text = await res.text();
-      logError('openRouter requestOrders: API error', res.status, text.slice(0, 200));
-      return { success: false, error: res.status === 401 ? 'Invalid API key' : `API error: ${res.status}` };
-    }
-
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const content = json.choices?.[0]?.message?.content;
-    if (typeof content !== 'string') {
-      logError('openRouter requestOrders: no content in response');
-      return { success: false, error: 'Invalid response: no content' };
-    }
-    console.log('[LLM response]', content);
-
-    const parsed = parseOrdersResponse(content, resolveToH3);
-    if (!parsed) {
-      logError('openRouter requestOrders: failed to parse JSON', content.slice(0, 300));
-      return { success: false, error: 'Invalid response: could not parse orders' };
-    }
-
-    const validated: { unitId: string; toH3Index: string }[] = [];
-    const dropReasons: string[] = [];
-    const seenUnits = new Set<string>();
-
-    for (const order of parsed.movementOrders) {
-      if (seenUnits.has(order.unitId)) {
-        dropReasons.push(`Duplicate order for ${order.unitId}`);
-        continue;
-      }
-      const result = validateAiOrder(order, state);
-      if (result.valid) {
-        validated.push(order);
-        seenUnits.add(order.unitId);
-      } else {
-        dropReasons.push(`${order.unitId} → ${order.toH3Index}: ${result.reason}`);
-      }
-    }
-
-    const validatedRanged: { unitId: string; targetH3Index: string }[] = [];
-    const seenRanged = new Set<string>();
-    for (const r of parsed.rangedAttacks) {
-      if (seenRanged.has(r.unitId)) {
-        dropReasons.push(`Duplicate ranged for ${r.unitId}`);
-        continue;
-      }
-      const result = validateAiRangedOrder(r, state);
-      if (result.valid) {
-        validatedRanged.push(r);
-        seenRanged.add(r.unitId);
-      } else {
-        dropReasons.push(`Ranged ${r.unitId} → ${r.targetH3Index}: ${result.reason}`);
-      }
-    }
-
-    if (dropReasons.length > 0) {
-      logDebug('openRouter requestOrders: dropped invalid orders', {
-        dropped: dropReasons.length,
-        reasons: dropReasons,
+      const res = await fetch(OPENROUTER_CHAT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${key}`,
+        },
+        body: JSON.stringify(body),
       });
+
+      if (!res.ok) {
+        const text = await res.text();
+        logError('openRouter requestOrders: API error', res.status, text.slice(0, 200));
+        return { success: false, error: res.status === 401 ? 'Invalid API key' : `API error: ${res.status}` };
+      }
+
+      const json = (await res.json()) as {
+        choices?: Array<{
+          message?: {
+            content?: string | null;
+            tool_calls?: Array<{ id: string; type: string; function: { name: string; arguments: string } }>;
+          };
+        }>;
+      };
+      const assistantMessage = json.choices?.[0]?.message;
+      if (!assistantMessage) {
+        logError('openRouter requestOrders: no message in response');
+        return { success: false, error: 'Invalid response: no message' };
+      }
+
+      const toolCalls = assistantMessage.tool_calls;
+      if (toolCalls && toolCalls.length > 0) {
+        const assistantContent = assistantMessage.content ?? null;
+        logDebug('openRouter requestOrders: assistant response (tool round)', typeof assistantContent === 'string' ? assistantContent : '(none)');
+        logDebug('openRouter requestOrders: tool_calls', {
+          turnNumber: state.turnNumber,
+          playerId: 'opponent',
+          iteration,
+          count: toolCalls.length,
+          names: toolCalls.map((tc) => tc.function?.name),
+        });
+        messages.push({
+          role: 'assistant',
+          content: assistantMessage.content ?? null,
+          tool_calls: toolCalls.map((tc) => ({ id: tc.id, type: 'function' as const, function: { name: tc.function.name, arguments: tc.function.arguments } })),
+        });
+
+        for (const tc of toolCalls) {
+          let args: unknown;
+          try {
+            args = JSON.parse(tc.function.arguments || '{}');
+          } catch (err) {
+            logError('openRouter requestOrders: tool arguments parse error', tc.function.name, err);
+            args = {};
+          }
+          const result = executeTool1(tc.function.name, args, state, latLngByH3, resolveToH3);
+          const resultStr = JSON.stringify(result);
+          logDebug('openRouter requestOrders: tool result', {
+            turnNumber: state.turnNumber,
+            playerId: 'opponent',
+            tool: tc.function.name,
+            status: (result as { status?: string }).status,
+            error: (result as { error?: string }).error ?? null,
+          });
+          messages.push({ role: 'tool', tool_call_id: tc.id, content: resultStr });
+        }
+        continue;
+      }
+
+      const content = assistantMessage.content;
+      if (typeof content !== 'string' || !content.trim()) {
+        logError('openRouter requestOrders: no content in final response');
+        return { success: false, error: 'Invalid response: no content' };
+      }
+
+      logDebug('openRouter requestOrders: assistant response (final)', content);
+      const parsed = parseOrdersResponse(content, resolveToH3);
+      if (!parsed) {
+        logError('openRouter requestOrders: failed to parse JSON', content.slice(0, 300));
+        return { success: false, error: 'Invalid response: could not parse orders' };
+      }
+
+      const validated: { unitId: string; toH3Index: string }[] = [];
+      const dropReasons: string[] = [];
+      const seenUnits = new Set<string>();
+
+      for (const order of parsed.movementOrders) {
+        if (seenUnits.has(order.unitId)) {
+          dropReasons.push(`Duplicate order for ${order.unitId}`);
+          continue;
+        }
+        const result = validateAiOrder(order, state);
+        if (result.valid) {
+          validated.push(order);
+          seenUnits.add(order.unitId);
+        } else {
+          dropReasons.push(`${order.unitId} → ${order.toH3Index}: ${result.reason}`);
+        }
+      }
+
+      const validatedRanged: { unitId: string; targetH3Index: string }[] = [];
+      const seenRanged = new Set<string>();
+      for (const r of parsed.rangedAttacks) {
+        if (seenRanged.has(r.unitId)) {
+          dropReasons.push(`Duplicate ranged for ${r.unitId}`);
+          continue;
+        }
+        const result = validateAiRangedOrder(r, state);
+        if (result.valid) {
+          validatedRanged.push(r);
+          seenRanged.add(r.unitId);
+        } else {
+          dropReasons.push(`Ranged ${r.unitId} → ${r.targetH3Index}: ${result.reason}`);
+        }
+      }
+
+      if (dropReasons.length > 0) {
+        logDebug('openRouter requestOrders: dropped invalid orders', {
+          dropped: dropReasons.length,
+          reasons: dropReasons,
+        });
+      }
+
+      return {
+        success: true,
+        orders: validated,
+        rangedAttacks: validatedRanged.length > 0 ? validatedRanged : undefined,
+        strategy: parsed.strategy,
+        dropped: dropReasons.length,
+        dropReasons: dropReasons.length > 0 ? dropReasons : undefined,
+      };
     }
 
+    logError('openRouter requestOrders: exceeded tool-call limit', MAX_TOOL_ITERATIONS, state.turnNumber);
+    setAiToolLimitExceededLastTurn();
     return {
       success: true,
-      orders: validated,
-      rangedAttacks: validatedRanged.length > 0 ? validatedRanged : undefined,
-      strategy: parsed.strategy,
-      dropped: dropReasons.length,
-      dropReasons: dropReasons.length > 0 ? dropReasons : undefined,
+      orders: [],
+      dropped: 0,
     };
   } catch (err) {
     logError('openRouter requestOrders: exception', err);

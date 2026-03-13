@@ -1,6 +1,12 @@
 # Agent Wars
 
-Grand strategy wargame with LLM opponents. This repo implements milestones through **Milestone 0.4 — Combat and Victory**.
+Grand strategy wargame with LLM opponents. This repo implements milestones through **Milestone 0.5 (first MCP tool)** — Combat and Victory plus an MCP-style tool layer for the AI.
+
+## What Milestone 0.5 (first MCP tool) adds
+
+- **Tool-calling AI:** The opponent uses OpenRouter’s native tool-calling API. It can call **plan_route** (optimal path for a unit to a destination) and **check_distance** (distance and turn estimate between two hexes) before submitting orders. Movement planning is done via tools; the prompt no longer lists per-unit move options.
+- **Only tool-capable models:** Use a model that supports tools (e.g. filter by “tools” on OpenRouter). If the model does not support tools, the request may fail or return no orders.
+- **Tool-call limit:** Planning is capped at **10 round-trips**. If the model has not submitted final order JSON after 10 iterations, the turn ends with no explicit AI orders and a warning is shown in the next turn’s prompt.
 
 ## What Milestone 0.4 adds
 

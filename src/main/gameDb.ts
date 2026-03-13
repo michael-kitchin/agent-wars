@@ -354,6 +354,28 @@ export function clearGameOver(): void {
   run("DELETE FROM game_config WHERE key IN ('game_over', 'winner')");
 }
 
+const AI_TOOL_LIMIT_EXCEEDED_KEY = 'ai_tool_limit_exceeded_last_turn';
+
+/**
+ * Sets the flag that the previous AI turn hit the tool-call iteration limit (10).
+ * The next turn's system prompt should include a warning and then clear the flag.
+ */
+export function setAiToolLimitExceededLastTurn(): void {
+  if (!db) return;
+  run("INSERT OR REPLACE INTO game_config (key, value) VALUES (?, '1')", [AI_TOOL_LIMIT_EXCEEDED_KEY]);
+}
+
+/**
+ * Returns true if the AI tool limit was exceeded last turn, and clears the flag.
+ * Call when building the system prompt so the warning is injected at most once.
+ */
+export function getAndClearAiToolLimitExceededLastTurn(): boolean {
+  if (!db) return false;
+  const row = getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [AI_TOOL_LIMIT_EXCEEDED_KEY]);
+  run('DELETE FROM game_config WHERE key = ?', [AI_TOOL_LIMIT_EXCEEDED_KEY]);
+  return row?.value === '1';
+}
+
 /**
  * Re-initializes the game for a new match: deletes all units, generates a new seed, re-seeds hexes and units,
  * clears game_over/winner, resets turn and phase, clears pending orders. Call from newGame() IPC.
@@ -370,5 +392,6 @@ export function resetGameForNewMatch(): void {
   run('DELETE FROM pending_ranged_orders');
   run('UPDATE turn_state SET phase = ?, turn_number = 1 WHERE id = 1', ['planning']);
   clearGameOver();
+  run('DELETE FROM game_config WHERE key = ?', [AI_TOOL_LIMIT_EXCEEDED_KEY]);
   saveDatabase();
 }
