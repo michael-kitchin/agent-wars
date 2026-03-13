@@ -1,7 +1,7 @@
 # MCP Tool Services Design Specification — Milestone 0.5
 
 *For: Agent Wars — WEGO Hex Wargame*
-*Version: 4.0 — March 2026*
+*Version: 6.0 — March 2026*
 
 ---
 
@@ -15,7 +15,7 @@ This document specifies five MCP-style tool services that the LLM opponent calls
 
 **Perfect information (current implementation).** The game does not currently implement fog of war. All tools operate on the complete, ground-truth game state — both the AI's own units and all human units are fully visible. The tool interfaces are designed so that a fog-of-war filtering layer can be inserted later (milestone 1.3) without changing the tool schemas. When fog of war is added, every tool response will be filtered through the calling player's subjective view, and response schemas include fields like `confidence` and `lastSeen` that are currently always `"current"` and `currentTurn` respectively. The coding agent should implement these fields now with their constant values so that the fog-of-war layer can populate them meaningfully later.
 
-**Coordinate system.** All tool interfaces use the axial `[x, y]` coordinate system established in the prompt layer. Tools accept and return `[x, y]` pairs. Internal implementation may use H3 indexes for computation but must convert to axial coordinates at the interface boundary.
+**Coordinate system.** All tool interfaces use `[lat, lng]` coordinates (latitude, longitude) as established in the prompt layer. These are the center points of H3 hexes at the game's resolution level. Tools accept and return `[lat, lng]` pairs. Internal implementation uses H3 indexes for computation (pathfinding, distance, adjacency) and converts to `[lat, lng]` at the interface boundary. When a tool receives a `[lat, lng]` pair that doesn't exactly match an H3 hex center, it should snap to the nearest hex at the game's resolution level before processing.
 
 **Stateless per call, stateful per game.** Each tool call is a pure function of (request parameters + current game state). The one exception is Tool 4 (Strategic Memory), which reads and writes a persistent store. All other tools have no side effects on game state.
 
@@ -69,7 +69,7 @@ Only models that support native tool use are supported for now. A JSON-in-prompt
 
 **Token budget awareness.** Tool responses should be concise. Avoid returning data the AI didn't ask for. Prefer structured arrays over prose. The AI's player is paying per token through their OpenRouter key, and bloated tool responses consume context window and API budget.
 
-**Prompt format change from milestone 0.4.** The current 0.4 prompt includes a per-unit list of valid move destinations (e.g., `"opponent-armor-1 (armor) at [-2, -6] can move to: [0, -6], [-1, -6], ..."`). With tools available, this list should be **removed** from the base prompt. The AI should use `plan_route` and `check_distance` for movement planning instead. Retaining both the raw move list and the tools wastes tokens, bloats the prompt, and risks the AI ignoring the tools in favor of the simpler list (defeating the purpose of building tools). The base prompt should include only: the unit roster (ID, type, position) for both sides, the current turn number, and the game objective. All tactical analysis and movement planning flows through the tools.
+**Prompt format change from milestone 0.4.** The current 0.4 prompt includes a per-unit list of valid move destinations (e.g., `"opponent-armor-1 (armor) at [16.196, 16.574] can move to: [11.444, 14.946], ..."`). With tools available, this list should be **removed** from the base prompt. The AI should use `plan_route` and `check_distance` for movement planning instead. Retaining both the raw move list and the tools wastes tokens, bloats the prompt, and risks the AI ignoring the tools in favor of the simpler list (defeating the purpose of building tools). The base prompt should include only: the unit roster (ID, type, position as `[lat, lng]`) for both sides, the current turn number, and the game objective. All tactical analysis and movement planning flows through the tools.
 
 ---
 
@@ -89,7 +89,7 @@ Because all land hexes have uniform movement cost and all water hexes have unifo
 tool: plan_route
 parameters:
   unitId: string          # ID of the unit to route (used to determine domain: land or water)
-  destination: [x, y]     # target hex in axial coordinates
+  destination: [lat, lng]  # target hex in lat/lng coordinates
   options?:
     avoidEnemies: boolean  # default true — route around known enemy positions
     maxTurns: number       # optional — stop computing if route exceeds this many turns
@@ -102,24 +102,24 @@ parameters:
   "status": "ok",
   "unitId": "opponent-armor-1",
   "unitType": "armor",
-  "origin": [0, -6],
-  "destination": [-2, 2],
+  "origin": [16.196350, 16.574284],
+  "destination": [2.097908, 0.499473],
   "hexDistance": 10,
   "turnsRequired": 5,
   "path": [
     {
       "turn": 1,
-      "hexes": [[0, -6], [-1, -5], [-1, -4]],
+      "hexes": [[16.196350, 16.574284], [14.271977, 14.275271], [12.378869, 12.076128]],
       "movementSpent": 2,
       "movementBudget": 2,
-      "endHex": [-1, -4]
+      "endHex": [12.378869, 12.076128]
     },
     {
       "turn": 2,
-      "hexes": [[-1, -4], [-1, -3], [-2, -2]],
+      "hexes": [[12.378869, 12.076128], [10.478920, 9.877000], [8.571234, 7.678000]],
       "movementSpent": 2,
       "movementBudget": 2,
-      "endHex": [-2, -2]
+      "endHex": [8.571234, 7.678000]
     }
   ],
   "warnings": []
@@ -151,23 +151,23 @@ A lightweight variant that returns distance and travel time without computing th
 ```
 tool: check_distance
 parameters:
-  from: [x, y]       # origin hex
-  to: [x, y]         # destination hex
+  from: [lat, lng]    # origin hex
+  to: [lat, lng]      # destination hex
   unitType: string    # "infantry", "armor", or "naval"
 ```
 
 ```json
 {
   "status": "ok",
-  "from": [-2, -6],
-  "to": [0, 1],
+  "from": [16.196350, 16.574284],
+  "to": [2.097908, 0.499473],
   "hexDistance": 9,
   "estimatedTurns": 5,
   "reachable": true
 }
 ```
 
-`hexDistance` is the raw hex-grid distance (number of hexes in the shortest path, accounting for domain passability). `estimatedTurns` is `ceil(hexDistance / movementBudget)` for the given unit type. `reachable` is false if no valid path exists between the two hexes for the given unit type.
+`hexDistance` is the H3 grid distance (number of hexes in the shortest path, accounting for domain passability — computed via H3's `gridDistance` function on the internal hex indexes). `estimatedTurns` is `ceil(hexDistance / movementBudget)` for the given unit type. `reachable` is false if no valid path exists between the two hexes for the given unit type.
 
 ---
 
@@ -194,7 +194,7 @@ parameters:
   "unit": {
     "unitId": "opponent-armor-1",
     "type": "armor",
-    "position": [0, -6],
+    "position": [16.196350, 16.574284],
     "terrain": "land",
     "movementBudget": 2,
     "currentStandingOrder": null
@@ -203,7 +203,7 @@ parameters:
     {
       "unitId": "human-infantry-2",
       "type": "infantry",
-      "position": [1, -2],
+      "position": [2.097908, 0.499473],
       "hexDistance": 5,
       "estimatedTurnsToReach": 3,
       "inRangedRange": false,
@@ -216,7 +216,7 @@ parameters:
     {
       "unitId": "opponent-infantry-1",
       "type": "infantry",
-      "position": [-6, -2],
+      "position": [4.019553, 21.453605],
       "hexDistance": 7,
       "estimatedTurnsToReach": 7
     }
@@ -243,7 +243,7 @@ parameters:
 ```
 tool: assess_hex
 parameters:
-  position: [x, y]     # the hex to assess
+  position: [lat, lng]  # the hex to assess
   forUnitType?: string  # optional — assess from this unit type's perspective
 ```
 
@@ -252,7 +252,7 @@ parameters:
 ```json
 {
   "status": "ok",
-  "position": [-2, 2],
+  "position": [-3.079545, 0.569734],
   "terrain": "land",
   "passableBy": ["infantry", "armor"],
   "unitsAtHex": [],
@@ -261,7 +261,7 @@ parameters:
       {
         "unitId": "human-armor-2",
         "type": "armor",
-        "position": [-1, 2],
+        "position": [-1.474674, 2.658173],
         "hexDistance": 1,
         "confidence": "current",
         "lastSeen": 1
@@ -294,7 +294,7 @@ parameters:
 
 **`unitsInRange` for `assess_hex`.** This field answers the question "if I move a unit here, who can shoot at it?" It lists enemy units that can attack the assessed hex from their current positions. `rangedRange1` includes enemies at distance 1 whose range stat is ≥ 1. `rangedRange2` includes enemies at distance 2 whose range stat is ≥ 2. `meleeRange` includes enemies at distance 0 (same hex). This is the inbound threat perspective, not the outbound attack perspective.
 
-**`currentStandingOrder` field in unit assessment.** This is `null` until Tool 5 (Standing Orders) is implemented. Once Tool 5 exists, this field should display the unit's current standing order type and status (e.g., `{ "type": "march", "destination": [-2, 2], "status": "en_route" }`). The coding agent should implement this as a constant `null` for now and wire it up when Tool 5 is built.
+**`currentStandingOrder` field in unit assessment.** This is `null` until Tool 5 (Standing Orders) is implemented. Once Tool 5 exists, this field should display the unit's current standing order type and status (e.g., `{ "type": "march", "destination": [2.097, 0.499], "status": "en_route" }`). The coding agent should implement this as a constant `null` for now and wire it up when Tool 5 is built.
 
 **Edge cases:**
 - Unit not found: `status: "error"`, `error: "Unit not found: {unitId}"`.
@@ -325,7 +325,7 @@ parameters:
     assumed: [               # hypothetical attackers (for what-if analysis)
       { type: string, count: number }
     ]
-  targetHex: [x, y]         # the hex being attacked
+  targetHex: [lat, lng]     # the hex being attacked
   defenders?:
     units: string[]          # specific defender unit IDs (overrides auto-detection)
     # OR
@@ -342,10 +342,10 @@ If `defenders` is omitted, the tool auto-detects enemy units currently at `targe
 {
   "status": "ok",
   "engagementType": "ranged",
-  "targetHex": [-1, 0],
+  "targetHex": [-1.474674, 2.658173],
   "attackerSummary": {
     "units": [
-      { "unitId": "opponent-armor-1", "type": "armor", "attackValue": 3, "position": [0, -1] }
+      { "unitId": "opponent-armor-1", "type": "armor", "attackValue": 3, "position": [-3.079545, 0.569734] }
     ],
     "totalUnits": 1
   },
@@ -414,7 +414,17 @@ The tool needs the attacker's position (looked up from the unit ID) to determine
 
 ### Purpose
 
-Provides the AI with persistent memory across turns. The LLM can store observations, plans, and reminders that are injected into its context at the start of future turns. This compensates for the fundamental limitation that each turn's LLM call is stateless.
+Provides the AI with persistent memory across turns. The LLM can store observations, plans, and reminders that survive between turns, compensating for the fundamental limitation that each turn's LLM call is stateless.
+
+### Two-Tier Design
+
+Memory is divided into two tiers that trade off token cost against always-available context.
+
+**Persistent tier (limit: 5 memories).** These memories are injected into the system prompt every turn automatically. The AI sees them without calling any tool. Use this tier for the AI's current strategic plan, standing threat assessments, and any context it needs to reference on every decision. Because they consume tokens every turn, the limit is tight — 5 memories forces the AI to be selective about what stays in its active working context.
+
+**Stored tier (limit: 15 memories).** These memories are NOT injected into the prompt. They live in the database and are accessible only through `memory_read` (by key or tag query) or through scheduled reminders. Use this tier for observations, historical notes, situational details, and anything the AI might need later but doesn't need to see every turn. Stored memories cost zero tokens on turns where they aren't retrieved.
+
+The total budget is 20 memories (5 persistent + 15 stored). Each tier enforces its own limit independently — when a tier is full, writes to that tier return an error. The AI must delete an existing memory from the same tier before adding a new one.
 
 ### Function Schema — Write
 
@@ -423,13 +433,13 @@ tool: memory_write
 parameters:
   key: string              # unique identifier (e.g., "southern_front_plan")
   content: string          # the text to remember (max 500 characters)
+  tier: "persistent" | "stored"  # default: "stored"
   options?:
     expiresOnTurn?: number  # auto-delete after this turn number
     recurring?:
       intervalTurns: number # remind every N turns
       nextTurn?: number     # first turn to trigger (default: current turn + intervalTurns)
     tags?: string[]         # categorization tags (e.g., ["threat", "south"])
-    priority?: "high" | "normal" | "low"  # controls injection order (default: "normal")
 ```
 
 ### Function Schema — Read
@@ -439,6 +449,7 @@ tool: memory_read
 parameters:
   key?: string             # read a specific memory by key
   tags?: string[]          # read all memories matching any of these tags
+  tier?: "persistent" | "stored"  # filter by tier (default: both tiers)
   all?: boolean            # read all active memories (default false)
 ```
 
@@ -456,13 +467,16 @@ parameters:
 {
   "status": "ok",
   "key": "southern_front_plan",
+  "tier": "persistent",
   "action": "created",
-  "activeMemoryCount": 7,
-  "memoryBudget": 20
+  "persistentCount": 3,
+  "persistentLimit": 5,
+  "storedCount": 8,
+  "storedLimit": 15
 }
 ```
 
-If the key already exists, this is an upsert: the content, options, tags, and priority are all replaced. The response `action` field is `"updated"` instead of `"created"`.
+If the key already exists, this is an upsert: the content, tier, and options are all replaced. The response `action` field is `"updated"` instead of `"created"`. If the tier changes on upsert (e.g., promoting a stored memory to persistent), the counts adjust accordingly — this is valid as long as the destination tier has room.
 
 ### Response Schema — Read
 
@@ -473,19 +487,19 @@ If the key already exists, this is an upsert: the content, options, tags, and pr
     {
       "key": "southern_front_plan",
       "content": "Committed armor-1 and infantry-2 to southern push. ETA 3 turns from turn 5.",
+      "tier": "persistent",
       "createdOnTurn": 5,
       "lastTriggered": null,
-      "tags": ["plan", "south"],
-      "priority": "high"
+      "tags": ["plan", "south"]
     },
     {
       "key": "scout_north",
-      "content": "No visibility north of [-6, 4] since turn 2. Send a unit to check.",
+      "content": "No visibility north of [4.020, 21.454] since turn 2. Send a unit to check.",
+      "tier": "stored",
       "createdOnTurn": 3,
       "recurring": { "intervalTurns": 3, "nextTurn": 9 },
       "lastTriggered": 6,
-      "tags": ["scouting"],
-      "priority": "normal"
+      "tags": ["scouting"]
     }
   ]
 }
@@ -503,26 +517,26 @@ If the key already exists, this is an upsert: the content, options, tags, and pr
 
 ### Context Injection
 
-At the start of each AI turn, before the LLM receives the game state and tool definitions, the memory system injects a dedicated section into the system prompt. This happens automatically — the AI does not need to call `memory_read` to see its memories; they are pre-loaded. The AI calls `memory_read` only if it needs to query by tag or retrieve a specific memory it doesn't see in the injection (e.g., low-priority memories that were trimmed for token budget).
+At the start of each AI turn, the memory system injects a section into the system prompt containing only two things: all persistent-tier memories (full content) and any reminders triggered this turn from either tier (key + content summary). Stored-tier memories that are not triggered this turn are never injected — the AI retrieves them via `memory_read` when needed.
 
 Injection format:
 
 ```
 === YOUR STRATEGIC MEMORY (Turn 8) ===
 
-[HIGH PRIORITY]
+[PERSISTENT — your active strategic context]
 • southern_front_plan (set turn 5): "Committed armor-1 and infantry-2 to southern push. ETA 3 turns from turn 5."
+• naval_doctrine (set turn 1): "Keep naval-1 in a support role — do not advance unsupported."
+• current_objective (set turn 6): "Priority target is human-armor-2. Concentrate forces south."
 
 [REMINDERS TRIGGERED THIS TURN]
-• scout_north (recurring every 3 turns): "No visibility north of [-6, 4] since turn 2. Send a unit to check."
+• scout_north (stored, recurring every 3 turns): "No visibility north of [4.020, 21.454] since turn 2. Send a unit to check."
 
-[NORMAL PRIORITY]
-• enemy_naval_pattern (set turn 4): "Human tends to keep naval-1 near [0, 0]."
-
-You have 7 of 20 memory slots used. Use memory_write to store or update. Use memory_delete to clean up.
+Persistent: 3 of 5 slots used. Stored: 8 of 15 slots used.
+Use memory_write to store or update. Use memory_read to retrieve stored memories by key or tag. Use memory_delete to free slots.
 ```
 
-Injection ordering: high-priority memories first, then triggered reminders, then normal-priority, then low-priority. If the total injection would exceed a configurable token limit (recommend starting at 800 tokens), truncate from the bottom (low-priority first, then normal). Truncated memories are still accessible via `memory_read` — they just aren't pre-loaded.
+The `[REMINDERS TRIGGERED THIS TURN]` section includes triggered reminders from both tiers. For persistent memories that are also recurring, they appear in both the persistent section (as always) and the reminders section (marked with `⚡` to draw the AI's attention to the fact that this is a scheduled trigger, not just background context). For stored memories, the triggered reminder is the only time their content appears in the injection — if the AI needs more detail, it calls `memory_read`.
 
 ### Implementation Notes
 
@@ -533,28 +547,35 @@ CREATE TABLE ai_memory (
   player_id TEXT NOT NULL,
   key TEXT NOT NULL,
   content TEXT NOT NULL,         -- max 500 characters, enforced at the tool layer
+  tier TEXT NOT NULL DEFAULT 'stored',  -- "persistent" or "stored"
   created_turn INTEGER NOT NULL,
   expires_turn INTEGER,          -- null = no expiration
   recurring_interval INTEGER,    -- null = not recurring
   next_trigger_turn INTEGER,     -- null = not scheduled
   last_triggered_turn INTEGER,   -- null = never triggered
   tags TEXT NOT NULL DEFAULT '[]', -- JSON array of strings
-  priority TEXT NOT NULL DEFAULT 'normal', -- "high", "normal", or "low"
   PRIMARY KEY (player_id, key)
 );
 ```
 
-**Memory budget.** Hard cap of 20 active memories per AI player. When the AI attempts to write a 21st memory, return `status: "error"`, `error: "Memory full (20/20). Delete an existing memory before adding a new one."` The budget is communicated to the AI in both the system prompt tool description and the injection footer.
+**Memory budget.** Two independent hard caps: 5 persistent, 15 stored. When a tier is full:
+- Persistent full: `status: "error"`, `error: "Persistent memory full (5/5). Delete a persistent memory or use tier 'stored' instead."`
+- Stored full: `status: "error"`, `error: "Stored memory full (15/15). Delete a stored memory or promote an important one to 'persistent' tier."`
+
+The budget is communicated to the AI in the system prompt tool description and the injection footer.
 
 **Content size limit.** 500 characters per memory. Enforced at the tool layer. If exceeded: `status: "error"`, `error: "Content exceeds 500 character limit ({n} characters provided)"`.
 
-**Recurring reminders.** At the start of each AI turn, before context injection, query for memories where `next_trigger_turn <= currentTurn AND recurring_interval IS NOT NULL`. These appear in the `[REMINDERS TRIGGERED THIS TURN]` section. After triggering, set `last_triggered_turn = currentTurn` and `next_trigger_turn = currentTurn + recurring_interval`.
+**Recurring reminders.** At the start of each AI turn, before context injection, query for memories where `next_trigger_turn <= currentTurn AND recurring_interval IS NOT NULL`. These appear in the `[REMINDERS TRIGGERED THIS TURN]` section regardless of tier. After triggering, set `last_triggered_turn = currentTurn` and `next_trigger_turn = currentTurn + recurring_interval`.
 
 **Expiration.** At the start of each AI turn, delete all memories where `expires_turn <= currentTurn`. This happens before context injection, so expired memories never appear in the prompt.
+
+**Tier promotion and demotion.** When an existing key is upserted with a different `tier` value, the memory moves between tiers. The engine must check that the destination tier has room before completing the move. If not, return the appropriate tier-full error. A common pattern: the AI has a stored observation and decides it's strategically important enough to keep in active context — it calls `memory_write` with the same key and `tier: "persistent"` to promote it.
 
 **Edge cases:**
 - `memory_read` with a key that doesn't exist: `status: "error"`, `error: "Memory not found: {key}"`.
 - `memory_read` with tags that match nothing: `status: "ok"`, `memories: []` (empty array, not an error).
+- `memory_read` with `tier` filter: return only memories in the specified tier. Combinable with `tags`.
 - `memory_delete` with a key that doesn't exist: `status: "error"`, `error: "Memory not found: {key}"`.
 - `memory_write` with empty content: `status: "error"`, `error: "Content cannot be empty"`.
 - `memory_write` with a key containing whitespace or special characters: `status: "error"`, `error: "Key must be alphanumeric with underscores and hyphens only"`. Enforce pattern: `/^[a-zA-Z0-9_-]+$/`, max 64 characters.
@@ -591,11 +612,11 @@ parameters:
     type: "defend" | "march" | "pursue" | "patrol" | "hold_fire"
 
     # --- defend ---
-    defendHex?: [x, y]          # hex to hold (default: unit's current position)
+    defendHex?: [lat, lng]       # hex to hold (default: unit's current position)
     engageRange?: number         # max hex distance to generate attack orders (default: unit's range stat)
 
     # --- march ---
-    destination?: [x, y]        # final destination
+    destination?: [lat, lng]     # final destination
     avoidEnemies?: boolean       # route around known threats (default: true)
     engageEnRoute?: boolean      # generate attack orders against enemies adjacent to the route (default: false)
 
@@ -604,7 +625,7 @@ parameters:
     maxDistance?: number         # max hex distance from the unit's position at time of order (default: unlimited)
 
     # --- patrol ---
-    waypoints?: [x, y][]        # cycle through these hexes in order (minimum 2)
+    waypoints?: [lat, lng][]     # cycle through these hexes in order (minimum 2)
 
     # --- hold_fire ---
     # no additional parameters
@@ -635,11 +656,11 @@ parameters:
   "unitId": "opponent-armor-1",
   "order": {
     "type": "march",
-    "destination": [-2, 2],
+    "destination": [2.097908, 0.499473],
     "computedRoute": {
       "turnsRemaining": 5,
-      "nextMoveHex": [-1, -5],
-      "totalPath": [[-1, -5], [-1, -4], [-1, -3], [-2, -2], [-2, -1], [-2, 0], [-2, 1], [-2, 2]]
+      "nextMoveHex": [14.271977, 14.275271],
+      "totalPath": [[14.271977, 14.275271], [12.378869, 12.076128], [10.478920, 9.877000], [8.571234, 7.678000], [6.663548, 5.479000], [4.755862, 3.280000], [2.097908, 0.499473]]
     },
     "avoidEnemies": true,
     "engageEnRoute": false
@@ -659,15 +680,15 @@ If the unit previously had a standing order, `replacedOrder` contains the previo
     {
       "unitId": "opponent-armor-1",
       "type": "march",
-      "destination": [-2, 2],
+      "destination": [2.097908, 0.499473],
       "turnsRemaining": 3,
-      "nextMoveHex": [-1, -3],
+      "nextMoveHex": [10.478920, 9.877000],
       "status": "en_route"
     },
     {
       "unitId": "opponent-infantry-1",
       "type": "defend",
-      "defendHex": [-6, -2],
+      "defendHex": [4.019553, 21.453605],
       "engageRange": 0,
       "status": "holding"
     }
@@ -682,7 +703,7 @@ If the unit previously had a standing order, `replacedOrder` contains the previo
   "status": "ok",
   "unitId": "opponent-armor-1",
   "cancelled": true,
-  "previousOrder": { "type": "march", "destination": [-2, 2] }
+  "previousOrder": { "type": "march", "destination": [2.097908, 0.499473] }
 }
 ```
 
@@ -706,10 +727,10 @@ At the start of each AI turn, the standing order status is injected into the sys
 
 ```
 === STANDING ORDER STATUS (Turn 8) ===
-• opponent-armor-1: MARCH to [-2, 2] — en_route, 3 turns remaining, next move to [-1, -3]
-• opponent-infantry-1: DEFEND [-6, -2] — holding, no enemy contacts within range
-• opponent-naval-1: PURSUE human-armor-2 — closing, distance 3, next move to [-4, 7]
-⚠ opponent-infantry-2: MARCH to [3, -5] — BLOCKED (no passable path from current position)
+• opponent-armor-1: MARCH to [2.097, 0.499] — en_route, 3 turns remaining, next move to [10.479, 9.877]
+• opponent-infantry-1: DEFEND [4.020, 21.454] — holding, no enemy contacts within range
+• opponent-naval-1: PURSUE human-armor-2 — closing, distance 3, next move to [-9.042, -14.238]
+⚠ opponent-infantry-2: MARCH to [-19.459, 5.396] — BLOCKED (no passable path from current position)
 
 Units without standing orders: opponent-armor-2
 ```
@@ -731,7 +752,7 @@ CREATE TABLE standing_orders (
   computed_route TEXT,           -- JSON: current computed path for march/pursue/patrol (null for defend/hold_fire)
   status TEXT NOT NULL,          -- "en_route", "holding", "closing", "patrolling", "arrived", "blocked", etc.
   created_turn INTEGER NOT NULL,
-  origin_hex TEXT NOT NULL,      -- JSON [x, y]: unit's position when order was assigned (for maxDistance calc)
+  origin_hex TEXT NOT NULL,      -- JSON [lat, lng]: unit's position when order was assigned (for maxDistance calc)
   PRIMARY KEY (player_id, unit_id)
 );
 ```
@@ -779,9 +800,9 @@ COMBAT:
 5. estimate_combat(engagementType, attackers, targetHex, defenders?) — Predict the outcome of a ranged or melee engagement. Returns win probability, expected casualties, and a tactical assessment. Always check before committing to an attack.
 
 MEMORY:
-6. memory_write(key, content, options?) — Store a note, plan, or reminder. Persists across turns. You have 20 slots, 500 chars each.
-7. memory_read(key?, tags?, all?) — Query stored memories by key or tag.
-8. memory_delete(key) — Delete an obsolete memory.
+6. memory_write(key, content, tier?, options?) — Store a note, plan, or reminder. Two tiers: "persistent" (always shown in your briefing, limit 5 — use for your active strategic plan and key assessments) and "stored" (default, retrieved on demand via memory_read, limit 15 — use for observations, details, and situational notes). 500 chars each.
+7. memory_read(key?, tags?, tier?, all?) — Retrieve memories by key, tag, or tier. Essential for accessing your stored-tier memories — they are NOT shown in your briefing automatically.
+8. memory_delete(key) — Delete a memory to free a slot in its tier.
 
 STANDING ORDERS:
 9. assign_order(unitId, order) — Give a unit a persistent mission: defend, march, pursue, patrol, or hold_fire. The engine executes it each turn automatically. NOTE: New standing orders take effect NEXT turn. If you want the unit to act THIS turn, also issue an explicit movement or attack order.
@@ -789,11 +810,12 @@ STANDING ORDERS:
 11. cancel_order(unitId) — Cancel a standing order.
 
 HOW TO USE THESE TOOLS EFFECTIVELY:
-- Start by reviewing your standing order statuses and strategic memory (both are shown above).
+- Start by reviewing your standing order statuses and persistent strategic memory (both are shown above).
 - Use assess_unit on units near the enemy to understand the tactical picture.
 - Use estimate_combat before any attack. Do not guess at combat odds.
 - Use plan_route to understand multi-turn moves before issuing march orders.
-- Use memory_write to record your plans and observations for future turns.
+- Use memory_write with tier "persistent" for your active strategic plan and key threat assessments (limit 5). Use tier "stored" for observations and details you may need later (limit 15).
+- Use memory_read to retrieve stored memories by key or tag when you need situational detail.
 - Units with standing orders do not need explicit orders from you unless you want to override their current mission this turn.
 - Submit your final orders as: { "strategy": "...", "movementOrders": [...], "rangedAttacks": [...] }
 ```
@@ -832,7 +854,7 @@ Tool 5 (Standing Orders) ← depends on Tool 1 for route computation
 - Tool 1: Known map layouts with known shortest paths. Verify BFS produces correct routes and multi-turn partitioning is correct for each unit type's movement budget. Test land-unit-on-water and naval-on-land rejection.
 - Tool 2: Known unit placements with known distances. Verify threat classification (critical/moderate/low) matches expected values. Verify `canAttackThisTurn` correctly evaluates range.
 - Tool 3: Known force compositions with analytically computable probabilities. Example: 1 armor (attack 3) vs 1 infantry (defense 2) in melee. P(attacker hits) = 3/6 = 0.5. P(defender hits) = 2/6 = 0.33. Verify Monte Carlo converges to these values within tolerance.
-- Tool 4: Full CRUD lifecycle. Write, read-back, overwrite, expire, recurring trigger, delete. Verify context injection format.
+- Tool 4: Full CRUD lifecycle. Write to both tiers, read-back by key/tag/tier, overwrite, tier promotion/demotion, expire, recurring trigger from both tiers, delete. Verify context injection includes only persistent memories and triggered reminders. Verify tier-full errors fire independently.
 - Tool 5: Multi-turn march execution. Pursue with moving target. Defend with enemy in range vs. out of range. Patrol cycle. Explicit order override.
 
 **Integration playtesting.** After each tool is deployed, play a complete game and evaluate:
