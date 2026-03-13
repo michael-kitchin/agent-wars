@@ -433,7 +433,7 @@ tool: memory_write
 parameters:
   key: string              # unique identifier (e.g., "southern_front_plan")
   content: string          # the text to remember (max 500 characters)
-  tier: "persistent" | "stored"  # default: "stored"
+  tier?: "persistent" | "stored"  # default: "stored"
   options?:
     expiresOnTurn?: number  # auto-delete after this turn number
     recurring?:
@@ -531,12 +531,13 @@ Injection format:
 
 [REMINDERS TRIGGERED THIS TURN]
 • scout_north (stored, recurring every 3 turns): "No visibility north of [4.020, 21.454] since turn 2. Send a unit to check."
+• current_objective (also persistent, recurring every 5 turns): "Priority target is human-armor-2. Concentrate forces south."
 
 Persistent: 3 of 5 slots used. Stored: 8 of 15 slots used.
 Use memory_write to store or update. Use memory_read to retrieve stored memories by key or tag. Use memory_delete to free slots.
 ```
 
-The `[REMINDERS TRIGGERED THIS TURN]` section includes triggered reminders from both tiers. For persistent memories that are also recurring, they appear in both the persistent section (as always) and the reminders section (marked with `⚡` to draw the AI's attention to the fact that this is a scheduled trigger, not just background context). For stored memories, the triggered reminder is the only time their content appears in the injection — if the AI needs more detail, it calls `memory_read`.
+The `[REMINDERS TRIGGERED THIS TURN]` section includes triggered reminders from both tiers. For persistent memories that are also recurring, they appear in both the persistent section (as always) and the reminders section (marked with `(also persistent)` so the AI knows this isn't new information — it's a scheduled trigger for something already in its active context). For stored memories, the triggered reminder is the only time their content appears in the injection — if the AI needs more detail, it calls `memory_read`.
 
 ### Implementation Notes
 
