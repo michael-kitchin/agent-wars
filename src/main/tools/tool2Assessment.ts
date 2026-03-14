@@ -9,6 +9,7 @@ import type { GameStateSnapshot } from '../gameDb';
 import { getDistanceAndTurns, getMovementBudgetForUnit } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
 import { getRange } from '../combatConstants';
+import { getStandingOrderForUnit } from './tool5StandingOrders';
 import { logDebug, logError, logTrace } from '../logger';
 
 /** Coordinate pair [lat, lng] at the tool boundary. */
@@ -265,6 +266,8 @@ function executeAssessUnit(
   nearbyEnemies.sort((a, b) => a.hexDistance - b.hexDistance);
   nearbyFriendlies.sort((a, b) => a.hexDistance - b.hexDistance);
 
+  const currentStandingOrder = getStandingOrderForUnit('opponent', unit.id);
+
   return {
     status: 'ok',
     error: null,
@@ -274,7 +277,7 @@ function executeAssessUnit(
       position: unitPosition,
       terrain,
       movementBudget,
-      currentStandingOrder: null,
+      currentStandingOrder,
     },
     nearbyEnemies,
     nearbyFriendlies,

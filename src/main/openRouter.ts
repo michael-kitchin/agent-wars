@@ -15,6 +15,13 @@ import { buildLatLngCoordinateMap, LATLNG_DECIMAL_PLACES } from './mapData';
 import { executeTool1, TOOL1_NAMES } from './tools/tool1Pathfinding';
 import { executeTool2, TOOL2_NAMES } from './tools/tool2Assessment';
 import { executeTool3, TOOL3_NAMES } from './tools/tool3CombatEstimation';
+import { executeTool4, getInjectionText, TOOL4_NAMES } from './tools/tool4Memory';
+import {
+  executeTool5,
+  getInjectionText as getStandingOrderInjectionText,
+  generateOrdersForStandingOrders,
+  TOOL5_NAMES,
+} from './tools/tool5StandingOrders';
 
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -108,6 +115,8 @@ export const TOOL_GROUP_REGISTRY: ToolGroupEntry[] = [
   { id: 'planning', label: 'Planning', toolNames: TOOL1_NAMES },
   { id: 'assessment', label: 'Assessment', toolNames: TOOL2_NAMES },
   { id: 'estimation', label: 'Estimation', toolNames: TOOL3_NAMES },
+  { id: 'memory', label: 'Memory', toolNames: TOOL4_NAMES },
+  { id: 'orders', label: 'Orders', toolNames: TOOL5_NAMES },
 ];
 
 /**
@@ -148,6 +157,46 @@ const TOOL_NAME_TO_GROUP_ID = (() => {
 export function getGroupIdForToolName(toolName: string): string | undefined {
   logTrace('openRouter getGroupIdForToolName', { toolName });
   return TOOL_NAME_TO_GROUP_ID.get(toolName);
+}
+
+/**
+ * Which tool groups are enabled for this request. Single source of truth for prompt conditionals.
+ * When enabledToolNames is undefined, all tools are considered enabled.
+ */
+export interface ToolFlags {
+  planningEnabled: boolean;
+  assessmentEnabled: boolean;
+  estimationEnabled: boolean;
+  ordersEnabled: boolean;
+  memoryEnabled: boolean;
+  /** True when neither Planning nor Orders is enabled; one-step move fallback is then used. */
+  fallbackMovementEnabled: boolean;
+}
+
+/**
+ * Derives which tool groups are enabled from the list of enabled API tool names.
+ * Use when building system prompt and user message so both use the same logic.
+ */
+export function getToolFlags(enabledToolNames: string[] | undefined): ToolFlags {
+  logTrace('openRouter getToolFlags', { hasList: enabledToolNames !== undefined, count: enabledToolNames?.length ?? 0 });
+  const set =
+    enabledToolNames === undefined
+      ? new Set(TOOL_GROUP_REGISTRY.flatMap((g) => [...g.toolNames]))
+      : new Set(enabledToolNames);
+  const has = (names: readonly string[]) => names.some((n) => set.has(n));
+  const planningEnabled = has(TOOL1_NAMES);
+  const assessmentEnabled = has(TOOL2_NAMES);
+  const estimationEnabled = has(TOOL3_NAMES);
+  const ordersEnabled = has(TOOL5_NAMES);
+  const memoryEnabled = has(TOOL4_NAMES);
+  return {
+    planningEnabled,
+    assessmentEnabled,
+    estimationEnabled,
+    ordersEnabled,
+    memoryEnabled,
+    fallbackMovementEnabled: !planningEnabled && !ordersEnabled,
+  };
 }
 
 export interface ModelItem {
@@ -234,6 +283,7 @@ function validateAiOrder(
 /**
  * Returns H3 indices that are valid move destinations for the given unit (within range, correct terrain).
  * Skips hexes where gridDistance throws (e.g. invalid or mismatched resolution).
+ * Does not exclude occupied hexes; use getValidDestinationsUnoccupied when building the fallback list.
  */
 function getValidDestinations(unit: { h3Index: string; unitType: string }, state: GameStateSnapshot): string[] {
   const range = MOVEMENT_RANGE[unit.unitType] ?? 1;
@@ -253,6 +303,16 @@ function getValidDestinations(unit: { h3Index: string; unitType: string }, state
     valid.push(h.h3Index);
   }
   return valid;
+}
+
+/**
+ * Returns valid one-step move destinations for a unit, excluding hexes occupied by any unit.
+ * Used to build the adjacent-cells fallback list when Planning and Orders tools are disabled.
+ */
+function getValidDestinationsUnoccupied(unit: { h3Index: string; unitType: string }, state: GameStateSnapshot): string[] {
+  logTrace('openRouter getValidDestinationsUnoccupied', { h3Index: unit.h3Index, unitType: unit.unitType });
+  const occupied = new Set(state.units.map((u) => u.h3Index));
+  return getValidDestinations(unit, state).filter((h3) => !occupied.has(h3));
 }
 
 /**
@@ -290,10 +350,103 @@ function formatLatLng(ll: [number, number]): string {
   return `[${ll[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${ll[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
 }
 
+/** Optional suffix for movement instruction when Memory tools are enabled. */
+const MOVEMENT_INSTRUCTION_MEMORY_SUFFIX =
+  ' You may use the memory tools to store or recall strategic context across turns.';
+
+/**
+ * Builds the "Adjacent cells (fallback)" block when Planning and Orders are both disabled.
+ * Lists per-unit valid one-step destinations so the model can issue cell-to-cell moves without tools.
+ */
+function buildAdjacentCellsFallbackBlock(
+  state: GameStateSnapshot,
+  opponentUnits: { id: string; h3Index: string; unitType: string }[],
+  coordMap: { latLngByH3: Map<string, [number, number]>; format: (h3: string) => string }
+): string {
+  const { latLngByH3, format } = coordMap;
+  const lines: string[] = [];
+  for (const u of opponentUnits.filter((unit) => latLngByH3.has(unit.h3Index))) {
+    const current = format(u.h3Index);
+    const dests = getValidDestinationsUnoccupied(u, state)
+      .filter((h3) => latLngByH3.has(h3))
+      .map((h3) => format(h3));
+    const cells = dests.length ? `${current} (hold), or move to: ${dests.join(', ')}` : `${current} (hold only; no empty adjacent cells)`;
+    lines.push(`${u.id}: ${cells}`);
+  }
+  if (lines.length === 0) return '';
+  return `\nAdjacent cells (fallback for one-step moves when no planning/orders tools are available; prefer plan_route or standing orders when enabled):\n${lines.join('\n')}\n`;
+}
+
+/**
+ * Returns the movement-order instruction fragment for the system prompt.
+ * Branch order: Planning → Orders (no planning) → Fallback (no planning, no orders) → None.
+ */
+function getMovementOrderInstruction(flags: ToolFlags): string {
+  const memorySuffix = flags.memoryEnabled ? MOVEMENT_INSTRUCTION_MEMORY_SUFFIX : '';
+  if (flags.planningEnabled) {
+    return ' For each movement order: use the exact orderToXY from that unit\'s plan_route result as toXY (copy the two numbers exactly); do not round, interpolate, or invent coordinates or the order will be rejected.';
+  }
+  if (flags.ordersEnabled) {
+    return (
+      ' You do not have movement planning tools. Without them you cannot compute valid one-step moves (each unit has a strict movement budget per turn). You must submit empty movementOrders: [] and empty rangedAttacks: []. Do not put distant coordinates (e.g. enemy positions) in movementOrders - they will all be rejected. Use the tools above to assign standing orders (e.g. march, defend, pursue) so your units receive movement on future turns.' +
+      memorySuffix
+    );
+  }
+  if (flags.fallbackMovementEnabled) {
+    const memoryHint = flags.memoryEnabled
+      ? ' You may use memory tools and then submit your orders in the same turn, or submit orders without using memory; both are fine. '
+      : '';
+    return (
+      memoryHint +
+      'You do not have planning or standing-orders tools. You may still issue one-step moves using the "Adjacent cells (fallback)" list below: for each unit, set toXY to that unit\'s current position (hold) or to one of its listed adjacent cells. This is a fallback; when plan_route or standing orders are available, prefer those. Use only coordinates from that list - do not invent coordinates or orders will be rejected.' +
+      memorySuffix
+    );
+  }
+  return (
+    ' You do not have movement planning tools. Without them you cannot compute valid one-step moves (each unit has a strict movement budget per turn). You must submit empty movementOrders: [] and empty rangedAttacks: []. Do not put distant coordinates (e.g. enemy positions) in movementOrders - they will all be rejected.' +
+    memorySuffix
+  );
+}
+
+/**
+ * Returns the initial user message for the tool-calling flow.
+ * Branch order: Planning → Orders+Memory → Orders only → Fallback (one-step moves) → Memory only → None.
+ */
+function getInitialUserMessage(flags: ToolFlags): string {
+  if (flags.planningEnabled) {
+    return `Use the tools as needed to plan movement, then submit your final orders as a single JSON object: { "strategy": "...", "movementOrders": [...], "rangedAttacks": [...] }. For each movement order, set toXY to the exact orderToXY from that unit's plan_route result (copy the numbers exactly).`;
+  }
+
+  const submitEmpty = ` Then submit your final JSON with "strategy": "<one-line>", "movementOrders": [], "rangedAttacks": [].`;
+  if (flags.ordersEnabled && flags.memoryEnabled) {
+    return `You have no movement planning tools, so you cannot issue movement or ranged orders this turn. Use the available tools to assign standing orders (e.g. march toward an enemy, defend a hex) and optionally to store or recall strategic context (memory).${submitEmpty}`;
+  }
+  if (flags.ordersEnabled) {
+    return `You have no movement planning tools, so you cannot issue movement or ranged orders this turn. Use the available tools to assign standing orders (e.g. march toward an enemy, defend a hex) so your units will move on future turns.${submitEmpty}`;
+  }
+  if (flags.fallbackMovementEnabled) {
+    const memoryNudge = flags.memoryEnabled
+      ? ' If you have a need to remember something across turns, use memory tools; you may use memory and then submit orders in the same turn, or submit orders without using memory. '
+      : '';
+    return `${memoryNudge}You may issue one-step moves using the "Adjacent cells (fallback)" list in the system prompt. Submit your final JSON with "strategy": "<one-line>", "movementOrders": [...] (use only coordinates from that list), "rangedAttacks": [...] as appropriate.`;
+  }
+  if (flags.memoryEnabled) {
+    return `You have no movement planning tools, so you cannot issue movement or ranged orders this turn. Use the available tools to store or recall strategic context (e.g. memory_write your plan, memory_read on later turns) if useful.${submitEmpty}`;
+  }
+
+  return `You have no movement planning tools. Submit a JSON object with "strategy": "<one-line>", "movementOrders": [], "rangedAttacks": [].`;
+}
+
 /**
  * Builds the system prompt for the tool-calling flow: unit roster, combat summary, and tool descriptions.
  * When enabledToolNames is provided, the "AVAILABLE TOOLS" section includes only those tools (numbered 1..N).
  * When omitted, all tools are included. Injects a one-time warning if the previous turn exceeded the tool-call limit.
+ *
+ * Prompt conditionals (single source: getToolFlags):
+ * - Planning enabled → use plan_route orderToXY for movement.
+ * - Orders enabled, Planning disabled → submit empty movementOrders; use standing orders for future moves.
+ * - Fallback (neither Planning nor Orders) → show adjacent-cells list; model may issue one-step moves from that list.
+ * - Combat hints (naval plan, assess, estimate) and memory/standing-order blocks depend on their respective flags.
  */
 function buildSystemPromptForTools(
   state: GameStateSnapshot,
@@ -303,9 +456,12 @@ function buildSystemPromptForTools(
   const { latLngByH3, format } = coordMap;
   const opponentUnits = state.units.filter((u) => u.player === 'opponent');
   const humanUnits = state.units.filter((u) => u.player === 'human');
+  const flags = getToolFlags(enabledToolNames);
 
-  const warning = getAndClearAiToolLimitExceededLastTurn()
-    ? '\n\nWARNING: Last turn\'s planning exceeded the tool-call limit (10 rounds). You submitted no explicit orders. Ensure you submit your final orders JSON promptly after gathering the information you need.\n'
+  const limitExceededLastTurn = getAndClearAiToolLimitExceededLastTurn();
+  const showLimitWarning = limitExceededLastTurn && (flags.planningEnabled || flags.ordersEnabled);
+  const warning = showLimitWarning
+    ? '\n\nWARNING: Last turn\'s planning exceeded the tool-call limit (50 rounds). You submitted no explicit orders. Ensure you submit your final orders JSON promptly after gathering the information you need.\n'
     : '';
 
   const opponentRoster = opponentUnits
@@ -326,25 +482,45 @@ function buildSystemPromptForTools(
     .join('; ');
 
   const filtered = getFilteredToolMetadata(enabledToolNames);
+  const toolsIntro =
+    flags.planningEnabled || flags.assessmentEnabled
+      ? 'Use these tools for movement planning before submitting orders. You may use multiple rounds of tool calls and mix tool types if that helps.'
+      : 'Use only the tools listed below. Do not call tools that are not in the list.';
   const toolsSection =
     filtered.length === 0
       ? '=== AVAILABLE TOOLS ===\nNo tools available.'
       : `=== AVAILABLE TOOLS ===
-Use these tools for movement planning before submitting orders. You may use multiple rounds of tool calls and mix tool types (e.g. assess one unit, then plan_route for it, then assess another) if that helps.
+${toolsIntro}
 ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}`;
+
+  const memoryBlock = flags.memoryEnabled ? getInjectionText('opponent', state.turnNumber) + '\n\n' : '';
+  const standingOrderBlock = flags.ordersEnabled ? getStandingOrderInjectionText('opponent', state) + '\n\n' : '';
+
+  const combatTargetHint = flags.estimationEnabled ? ' (e.g. use estimate_combat to pick the best).' : '.';
+  const combatNavalPlan = flags.planningEnabled
+    ? ' To move a naval unit toward a land target, call plan_route with that land unit\'s position as the destination; the tool will route to the nearest water hex to that position.'
+    : '';
+  const combatAssessHint = flags.assessmentEnabled
+    ? ' When assess_unit reports canAttackThisTurn with attackType "ranged" for an enemy, issue a rangedAttack using that enemy\'s position as targetXY so your unit fires this turn.'
+    : '';
+
+  const adjacentCellsBlock = flags.fallbackMovementEnabled
+    ? buildAdjacentCellsFallbackBlock(state, opponentUnits, coordMap)
+    : '';
+  const movementOrderInstruction = getMovementOrderInstruction(flags);
 
   return `You are the opponent in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}. Your objective is to destroy all human units. Move toward human units to get in ranged or melee range; do not stay passive.
 ${warning}
 ${LATLNG_PREAMBLE}
 
-Combat: each unit rolls d6 when attacking (hit if roll <= attack) or when defending (hit if roll <= defender's defense). Unit stats: ${combatSummary}. Ranged attacks are resolved using each unit's current position (before movement). Only issue a ranged attack if that unit is already within range of the target hex at the start of this turn; do not assume movement happens first. If a unit is moving this turn and would only be in range after the move, do not add a ranged attack for it this turn (it can fire next turn from its new position). Each unit may declare at most one ranged attack per turn: include each attacking unit at most once in rangedAttacks; if a unit can attack multiple enemies, choose one target (e.g. use estimate_combat to pick the best). Naval units can attack land units (they have range 2 and can target coastal or nearby hexes). To use naval fire effectively, get your naval units as close as possible to enemy land units, as soon as possible. Naval units move only on water. To move a naval unit toward a land target, call plan_route with that land unit's position as the destination; the tool will route to the nearest water hex to that position. When assess_unit reports canAttackThisTurn with attackType "ranged" for an enemy, issue a rangedAttack using that enemy's position as targetXY so your unit fires this turn.
+Combat: each unit rolls d6 when attacking (hit if roll <= attack) or when defending (hit if roll <= defender's defense). Unit stats: ${combatSummary}. Ranged attacks are resolved using each unit's current position (before movement). Only issue a ranged attack if that unit is already within range of the target hex at the start of this turn; do not assume movement happens first. If a unit is moving this turn and would only be in range after the move, do not add a ranged attack for it this turn (it can fire next turn from its new position). Each unit may declare at most one ranged attack per turn: include each attacking unit at most once in rangedAttacks; if a unit can attack multiple enemies, choose one target${combatTargetHint} Naval units can attack land units (they have range 2 and can target coastal or nearby hexes). To use naval fire effectively, get your naval units as close as possible to enemy land units, as soon as possible. Naval units move only on water.${combatNavalPlan}${combatAssessHint}
 
-${toolsSection}
+${memoryBlock}${standingOrderBlock}${toolsSection}
 
 Your units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}
-Human units: ${humanRoster || 'none'}
+Human units: ${humanRoster || 'none'}${adjacentCellsBlock}
 
-Submit your final orders as a JSON object only (valid JSON, no comments): { "strategy": "<one-line explanation>", "movementOrders": [ { "unitId": "<id>", "toXY": [lat, lng] }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetXY": [lat, lng] }, ... ] }. Use only toXY and targetXY as [lat, lng] arrays. Include "strategy". For each movement order: use the exact orderToXY from that unit's plan_route result as toXY (copy the two numbers exactly); do not round, interpolate, or invent coordinates or the order will be rejected. In rangedAttacks, list each unit at most once (one ranged attack per unit per turn); duplicate unitIds are dropped.`;
+Submit your final orders as a JSON object only (valid JSON, no comments): { "strategy": "<one-line explanation>", "movementOrders": [ { "unitId": "<id>", "toXY": [lat, lng] }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetXY": [lat, lng] }, ... ] }. Use only toXY and targetXY as [lat, lng] arrays. Include "strategy".${movementOrderInstruction} In rangedAttacks, list each unit at most once (one ranged attack per unit per turn); duplicate unitIds are dropped.`;
 }
 
 export interface RequestOrdersResult {
@@ -476,6 +652,113 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
     },
     promptLine: 'estimate_combat(engagementType, attackers, targetHex, defenders?) - Predict the outcome of a ranged or melee engagement. Returns win probability, expected casualties, and a tactical assessment. Always check before committing to an attack.',
   },
+  {
+    name: 'memory_write',
+    description: 'Store a note, plan, or reminder. Two tiers: persistent (always in your briefing, limit 5) and stored (retrieved on demand, limit 15). 500 chars each.',
+    parameters: {
+      type: 'object',
+      properties: {
+        key: { type: 'string', description: 'Unique identifier (e.g. southern_front_plan)' },
+        content: { type: 'string', description: 'Text to remember (max 500 characters)' },
+        tier: { type: 'string', enum: ['persistent', 'stored'], description: 'Default: stored' },
+        options: {
+          type: 'object',
+          properties: {
+            expiresOnTurn: { type: 'number', description: 'Auto-delete after this turn' },
+            recurring: {
+              type: 'object',
+              properties: {
+                intervalTurns: { type: 'number', description: 'Remind every N turns' },
+                nextTurn: { type: 'number', description: 'First turn to trigger (default: current + interval)' },
+              },
+              required: ['intervalTurns'],
+            },
+            tags: { type: 'array', items: { type: 'string' }, description: 'Tags for retrieval (e.g. threat, south)' },
+          },
+        },
+      },
+      required: ['key', 'content'],
+    },
+    promptLine: 'memory_write(key, content, tier?, options?) - Store or update a memory. Use tier "persistent" for active plan (limit 5), "stored" for details (limit 15).',
+  },
+  {
+    name: 'memory_read',
+    description: 'Retrieve memories by key, tag, or tier. Use to access stored-tier memories.',
+    parameters: {
+      type: 'object',
+      properties: {
+        key: { type: 'string', description: 'Read a specific memory by key' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Memories matching any of these tags' },
+        tier: { type: 'string', enum: ['persistent', 'stored'], description: 'Filter by tier' },
+        all: { type: 'boolean', description: 'Read all active memories (default false)' },
+      },
+    },
+    promptLine: 'memory_read(key?, tags?, tier?, all?) - Retrieve memories by key, tag, or tier.',
+  },
+  {
+    name: 'memory_delete',
+    description: 'Delete a memory to free a slot in its tier.',
+    parameters: {
+      type: 'object',
+      properties: {
+        key: { type: 'string', description: 'Key of the memory to delete' },
+      },
+      required: ['key'],
+    },
+    promptLine: 'memory_delete(key) - Delete a memory to free a slot.',
+  },
+  {
+    name: 'assign_order',
+    description:
+      'Give a unit a persistent mission: defend, march, pursue, patrol, or hold_fire. The engine executes it each turn automatically. NOTE: New standing orders take effect NEXT turn. If you want the unit to act THIS turn, also issue an explicit movement or attack order.',
+    parameters: {
+      type: 'object',
+      properties: {
+        unitId: { type: 'string', description: 'ID of the unit (e.g. opponent-armor-1)' },
+        order: {
+          type: 'object',
+          properties: {
+            type: { type: 'string', enum: ['defend', 'march', 'pursue', 'patrol', 'hold_fire'], description: 'Order type' },
+            defendHex: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Hex to hold (defend)' },
+            engageRange: { type: 'number', description: 'Max hex distance to engage (defend)' },
+            destination: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Destination [lat, lng] (march)' },
+            avoidEnemies: { type: 'boolean', description: 'Route around enemies (march, default true)' },
+            engageEnRoute: { type: 'boolean', description: 'Attack enemies adjacent to route (march)' },
+            targetUnitId: { type: 'string', description: 'Enemy unit to chase (pursue)' },
+            maxDistance: { type: 'number', description: 'Max hex distance from order origin (pursue)' },
+            waypoints: { type: 'array', items: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 }, description: 'Cycle through these hexes (patrol, min 2)' },
+          },
+          required: ['type'],
+        },
+      },
+      required: ['unitId', 'order'],
+    },
+    promptLine: 'assign_order(unitId, order) - Give a unit a persistent mission: defend, march, pursue, patrol, or hold_fire. New standing orders take effect NEXT turn; issue an explicit order too if you want action this turn.',
+  },
+  {
+    name: 'query_orders',
+    description: 'Check standing order statuses for a unit or all units.',
+    parameters: {
+      type: 'object',
+      properties: {
+        unitId: { type: 'string', description: 'Query a specific unit\'s standing order' },
+        all: { type: 'boolean', description: 'Query all standing orders (default false)' },
+      },
+    },
+    promptLine: 'query_orders(unitId?, all?) - Check standing order statuses.',
+  },
+  {
+    name: 'cancel_order',
+    description: 'Cancel a unit\'s standing order.',
+    parameters: {
+      type: 'object',
+      properties: {
+        unitId: { type: 'string', description: 'Unit whose standing order to cancel' },
+      },
+      required: ['unitId'],
+    },
+    promptLine: 'cancel_order(unitId) - Cancel a standing order.',
+  },
 ];
 
 /**
@@ -506,7 +789,7 @@ type ChatMessage =
   | { role: 'assistant'; content: string | null; tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }> }
   | { role: 'tool'; tool_call_id: string; content: string };
 
-const MAX_TOOL_ITERATIONS = 10;
+const MAX_TOOL_ITERATIONS = 50;
 
 export interface RequestOrdersOptions {
   /** When provided, only these tool names are included in the request and prompt. When omitted, all tools are used. */
@@ -560,13 +843,23 @@ export async function requestOrders(
     },
   };
 
-  const enabledSet =
+  const flags = getToolFlags(enabledToolNames);
+  const enabledToolNameSet =
     enabledToolNames === undefined
-      ? new Set(ALL_TOOL_METADATA.map((m) => m.name))
+      ? new Set(TOOL_GROUP_REGISTRY.flatMap((g) => [...g.toolNames]))
       : new Set(enabledToolNames);
+  const { movementOrders: standingOrderMovement, rangedAttacks: standingOrderRanged } = flags.ordersEnabled
+    ? generateOrdersForStandingOrders('opponent', state, latLngByH3, resolveToH3)
+    : { movementOrders: [] as { unitId: string; toH3Index: string }[], rangedAttacks: [] as { unitId: string; targetH3Index: string }[] };
+
+  if (flags.ordersEnabled && !flags.planningEnabled) {
+    logDebug(
+      'openRouter requestOrders: Orders enabled but Planning disabled; AI may be unable to produce movement orders. Enable Planning alongside Orders.'
+    );
+  }
 
   const systemPrompt = buildSystemPromptForTools(state, coordMap, enabledToolNames);
-  const userMessage = `Use the tools as needed to plan movement, then submit your final orders as a single JSON object: { "strategy": "...", "movementOrders": [...], "rangedAttacks": [...] }. For each movement order, set toXY to the exact orderToXY from that unit's plan_route result (copy the numbers exactly).`;
+  const userMessage = getInitialUserMessage(flags);
 
   const tools = buildToolDefinitions(enabledToolNames);
   const toolInvocationCounts: Record<string, number> = {};
@@ -649,7 +942,7 @@ export async function requestOrders(
 
         for (const tc of toolCalls) {
           const toolName = tc.function.name;
-          if (!enabledSet.has(toolName)) {
+          if (!enabledToolNameSet.has(toolName)) {
             logDebug('openRouter requestOrders: tool call skipped (disabled)', { tool: toolName });
             messages.push({
               role: 'tool',
@@ -665,11 +958,15 @@ export async function requestOrders(
             logError('openRouter requestOrders: tool arguments parse error', toolName, err);
             args = {};
           }
-          const result = (TOOL3_NAMES as readonly string[]).includes(toolName)
-            ? executeTool3(toolName, args, state, latLngByH3, resolveToH3)
-            : (TOOL2_NAMES as readonly string[]).includes(toolName)
-              ? executeTool2(toolName, args, state, latLngByH3, resolveToH3)
-              : executeTool1(toolName, args, state, latLngByH3, resolveToH3);
+          const result = (TOOL5_NAMES as readonly string[]).includes(toolName)
+            ? executeTool5(toolName, args, state, latLngByH3, resolveToH3)
+            : (TOOL4_NAMES as readonly string[]).includes(toolName)
+              ? executeTool4(toolName, args, state, latLngByH3, resolveToH3)
+              : (TOOL3_NAMES as readonly string[]).includes(toolName)
+                ? executeTool3(toolName, args, state, latLngByH3, resolveToH3)
+                : (TOOL2_NAMES as readonly string[]).includes(toolName)
+                  ? executeTool2(toolName, args, state, latLngByH3, resolveToH3)
+                  : executeTool1(toolName, args, state, latLngByH3, resolveToH3);
           const resultStr = JSON.stringify(result);
           logDebug('openRouter requestOrders: tool result (full payload sent to LLM)', {
             turnNumber: state.turnNumber,
@@ -699,11 +996,22 @@ export async function requestOrders(
         return { success: false, error: 'Invalid response: could not parse orders' };
       }
 
+      const llmMovementUnitIds = new Set((parsed.movementOrders ?? []).map((o) => o.unitId));
+      const mergedMovement = [
+        ...standingOrderMovement.filter((o) => !llmMovementUnitIds.has(o.unitId)),
+        ...(parsed.movementOrders ?? []),
+      ];
+      const llmRangedUnitIds = new Set((parsed.rangedAttacks ?? []).map((r) => r.unitId));
+      const mergedRanged = [
+        ...standingOrderRanged.filter((o) => !llmRangedUnitIds.has(o.unitId)),
+        ...(parsed.rangedAttacks ?? []),
+      ];
+
       const validated: { unitId: string; toH3Index: string }[] = [];
       const dropReasons: string[] = [];
       const seenUnits = new Set<string>();
 
-      for (const order of parsed.movementOrders) {
+      for (const order of mergedMovement) {
         if (seenUnits.has(order.unitId)) {
           dropReasons.push(`Duplicate order for ${order.unitId}`);
           continue;
@@ -713,13 +1021,13 @@ export async function requestOrders(
           validated.push(order);
           seenUnits.add(order.unitId);
         } else {
-          dropReasons.push(`${order.unitId} → ${order.toH3Index}: ${result.reason}`);
+          dropReasons.push(`${order.unitId} -> ${order.toH3Index}: ${result.reason}`);
         }
       }
 
       const validatedRanged: { unitId: string; targetH3Index: string }[] = [];
       const seenRanged = new Set<string>();
-      for (const r of parsed.rangedAttacks) {
+      for (const r of mergedRanged) {
         if (seenRanged.has(r.unitId)) {
           dropReasons.push(`Duplicate ranged for ${r.unitId}`);
           continue;
@@ -729,7 +1037,22 @@ export async function requestOrders(
           validatedRanged.push(r);
           seenRanged.add(r.unitId);
         } else {
-          dropReasons.push(`Ranged ${r.unitId} → ${r.targetH3Index}: ${result.reason}`);
+          dropReasons.push(`Ranged ${r.unitId} -> ${r.targetH3Index}: ${result.reason}`);
+        }
+      }
+
+      const validatedUnitIds = new Set(validated.map((o) => o.unitId));
+      for (const o of standingOrderMovement) {
+        if (!validatedUnitIds.has(o.unitId)) {
+          validated.push(o);
+          validatedUnitIds.add(o.unitId);
+        }
+      }
+      const validatedRangedUnitIds = new Set(validatedRanged.map((r) => r.unitId));
+      for (const r of standingOrderRanged) {
+        if (!validatedRangedUnitIds.has(r.unitId)) {
+          validatedRanged.push(r);
+          validatedRangedUnitIds.add(r.unitId);
         }
       }
 
@@ -938,8 +1261,18 @@ function parseOrdersArray(
     const o = item as { unitId: string; toXY?: unknown; toH3Index?: unknown };
     if (o.toH3Index != null) continue;
     let toH3Index: string | undefined;
-    if (Array.isArray(o.toXY) && o.toXY.length >= 2 && o.toXY.every((n) => typeof n === 'number')) {
-      toH3Index = resolveToH3(Number(o.toXY[0]), Number(o.toXY[1]));
+    if (Array.isArray(o.toXY) && o.toXY.length >= 2) {
+      const lat = Number(o.toXY[0]);
+      const lng = Number(o.toXY[1]);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        toH3Index = resolveToH3(lat, lng);
+        if (!toH3Index) {
+          logDebug('openRouter parseOrdersArray: coordinates did not resolve to hex, order skipped', {
+            unitId: o.unitId,
+            toXY: [lat, lng],
+          });
+        }
+      }
     }
     if (toH3Index) orders.push({ unitId: o.unitId, toH3Index });
   }
@@ -956,8 +1289,10 @@ function parseRangedArray(
     const o = item as { unitId: string; targetXY?: unknown; targetH3Index?: unknown };
     if (o.targetH3Index != null) continue;
     let targetH3Index: string | undefined;
-    if (Array.isArray(o.targetXY) && o.targetXY.length >= 2 && o.targetXY.every((n) => typeof n === 'number')) {
-      targetH3Index = resolveToH3(Number(o.targetXY[0]), Number(o.targetXY[1]));
+    if (Array.isArray(o.targetXY) && o.targetXY.length >= 2) {
+      const lat = Number(o.targetXY[0]);
+      const lng = Number(o.targetXY[1]);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) targetH3Index = resolveToH3(lat, lng);
     }
     if (targetH3Index) orders.push({ unitId: o.unitId, targetH3Index });
   }

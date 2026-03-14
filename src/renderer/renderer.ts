@@ -347,6 +347,8 @@ const OPENROUTER_TOOL_GROUPS: { id: string; label: string }[] = [
   { id: 'planning', label: 'Planning' },
   { id: 'assessment', label: 'Assessment' },
   { id: 'estimation', label: 'Estimation' },
+  { id: 'memory', label: 'Memory' },
+  { id: 'orders', label: 'Orders' },
 ];
 
 /** Current tool groups shown in the Tools tab (from main registry or fallback). */
@@ -1207,8 +1209,27 @@ function updateGameStateSidebar(state: GameStateSnapshot | null): void {
 }
 
 /**
+ * Enables or disables all main UI (canvas container content except overlay, and sidebar) when the new-game overlay is visible.
+ * Uses pointer-events so only the overlay (size selector, Start/New game button) is interactive.
+ */
+function setMainUIControlsEnabled(enabled: boolean): void {
+  const container = document.getElementById('canvas-container');
+  if (container) {
+    for (const child of container.children) {
+      if ((child as HTMLElement).id === 'game-over-overlay') continue;
+      (child as HTMLElement).style.pointerEvents = enabled ? '' : 'none';
+    }
+  }
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) {
+    (sidebar as HTMLElement).style.pointerEvents = enabled ? '' : 'none';
+    sidebar.classList.toggle('main-ui-disabled', !enabled);
+  }
+}
+
+/**
  * Shows the new-game overlay when there is no game yet (empty hexes) or when the game is over.
- * Sets message and button label accordingly; caller ensures size selector is visible in both cases.
+ * Sets message and button label accordingly; disables all other UI controls while overlay is visible.
  */
 function updateGameOverUI(state: GameStateSnapshot | null): void {
   const overlay = document.getElementById('game-over-overlay');
@@ -1222,12 +1243,14 @@ function updateGameOverUI(state: GameStateSnapshot | null): void {
 
   if (!showOverlay) {
     overlay?.classList.add('hidden');
+    setMainUIControlsEnabled(true);
     if (rangedBtn) rangedBtn.disabled = false;
     updateReadyButtonState();
     return;
   }
 
   overlay?.classList.remove('hidden');
+  setMainUIControlsEnabled(false);
   if (messageEl) {
     if (gameOver) {
       messageEl.textContent = state!.winner === 'human' ? 'You win!' : 'You lose.';

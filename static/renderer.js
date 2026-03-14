@@ -14432,7 +14432,9 @@
   var OPENROUTER_TOOL_GROUPS = [
     { id: "planning", label: "Planning" },
     { id: "assessment", label: "Assessment" },
-    { id: "estimation", label: "Estimation" }
+    { id: "estimation", label: "Estimation" },
+    { id: "memory", label: "Memory" },
+    { id: "orders", label: "Orders" }
   ];
   var openRouterToolGroups = [...OPENROUTER_TOOL_GROUPS];
   var enabledToolGroups = new Set(OPENROUTER_TOOL_GROUPS.map((g) => g.id));
@@ -15087,6 +15089,20 @@
     if (phaseEl) phaseEl.textContent = state ? `Phase: ${state.phase}` : "\u2014";
     if (turnEl) turnEl.textContent = state ? `Turn: ${state.turnNumber}` : "\u2014";
   }
+  function setMainUIControlsEnabled(enabled) {
+    const container = document.getElementById("canvas-container");
+    if (container) {
+      for (const child of container.children) {
+        if (child.id === "game-over-overlay") continue;
+        child.style.pointerEvents = enabled ? "" : "none";
+      }
+    }
+    const sidebar = document.getElementById("sidebar");
+    if (sidebar) {
+      sidebar.style.pointerEvents = enabled ? "" : "none";
+      sidebar.classList.toggle("main-ui-disabled", !enabled);
+    }
+  }
   function updateGameOverUI(state) {
     const overlay = document.getElementById("game-over-overlay");
     const messageEl = document.getElementById("game-over-message");
@@ -15097,11 +15113,13 @@
     const showOverlay = noGame || gameOver;
     if (!showOverlay) {
       overlay?.classList.add("hidden");
+      setMainUIControlsEnabled(true);
       if (rangedBtn) rangedBtn.disabled = false;
       updateReadyButtonState();
       return;
     }
     overlay?.classList.remove("hidden");
+    setMainUIControlsEnabled(false);
     if (messageEl) {
       if (gameOver) {
         messageEl.textContent = state.winner === "human" ? "You win!" : "You lose.";

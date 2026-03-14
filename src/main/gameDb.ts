@@ -293,6 +293,32 @@ export async function initDatabase(): Promise<void> {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS ai_memory (
+      player_id TEXT NOT NULL,
+      key TEXT NOT NULL,
+      content TEXT NOT NULL,
+      tier TEXT NOT NULL DEFAULT 'stored',
+      created_turn INTEGER NOT NULL,
+      expires_turn INTEGER,
+      recurring_interval INTEGER,
+      next_trigger_turn INTEGER,
+      last_triggered_turn INTEGER,
+      tags TEXT NOT NULL DEFAULT '[]',
+      PRIMARY KEY (player_id, key)
+    );
+
+    CREATE TABLE IF NOT EXISTS standing_orders (
+      player_id TEXT NOT NULL,
+      unit_id TEXT NOT NULL,
+      order_type TEXT NOT NULL,
+      params TEXT NOT NULL,
+      computed_route TEXT,
+      status TEXT NOT NULL,
+      created_turn INTEGER NOT NULL,
+      origin_hex TEXT NOT NULL,
+      PRIMARY KEY (player_id, unit_id)
+    );
   `);
 
   const row = getOne('SELECT 1 FROM turn_state WHERE id = 1');
