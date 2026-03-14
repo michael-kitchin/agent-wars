@@ -4,7 +4,7 @@
  */
 
 import { gridDistance } from 'h3-js';
-import { dbGetOne, dbRun, dbGetAll, isDbReady, saveDatabase, getGameSeed, setGameOver } from './gameDb';
+import { dbGetOne, dbRun, dbGetAll, isDbReady, saveDatabase, getGameSeed, setGameOver, getMapSize, getMapHexSet } from './gameDb';
 import { getOrderedHexList } from './mapData';
 import { getRange } from './combatConstants';
 import { runRangedPhase, runMeleePhase, createCombatRng, type CombatUnit } from './combatResolution';
@@ -27,7 +27,6 @@ export interface SubmitOrdersResult {
 }
 
 const VALID_PHASE = 'planning';
-const MAP_HEXES = new Set(getOrderedHexList());
 
 /** Movement range in hexes per turn by unit type. Infantry 1, armor 2, naval 2. */
 const MOVEMENT_RANGE: Record<string, number> = {
@@ -54,8 +53,9 @@ function validateOrder(
   if (!unit) return { valid: false, reason: `Unit not found: ${unitId}` };
   if (unit.player !== 'human') return { valid: false, reason: 'Only human units can receive orders' };
 
-  if (!MAP_HEXES.has(toH3Index)) return { valid: false, reason: 'Destination not on map' };
-  if (!MAP_HEXES.has(unit.h3_index)) {
+  const mapHexes = getMapHexSet();
+  if (!mapHexes.has(toH3Index)) return { valid: false, reason: 'Destination not on map' };
+  if (!mapHexes.has(unit.h3_index)) {
     return { valid: false, reason: 'Unit is on an invalid or outdated hex; start a new game.' };
   }
 
@@ -104,7 +104,7 @@ export function validateRangedAttack(
   const range = getRange(unit.unit_type);
   if (range < 1) return { valid: false, reason: `${unit.unit_type} has no ranged attack (melee only)` };
 
-  if (!MAP_HEXES.has(targetH3Index)) return { valid: false, reason: 'Target hex not on map' };
+  if (!getMapHexSet().has(targetH3Index)) return { valid: false, reason: 'Target hex not on map' };
 
   let dist: number;
   try {
@@ -235,7 +235,7 @@ export function ready(
 
     dbRun('UPDATE turn_state SET phase = ? WHERE id = 1', ['resolution']);
 
-    const hexList = getOrderedHexList();
+    const hexList = getOrderedHexList(getMapSize());
     const unitsBeforeMove = dbGetAll<{ id: string; player: string; unit_type: string; h3_index: string }>(
       'SELECT id, player, unit_type, h3_index FROM units'
     ).map((r) => ({ id: r.id, player: r.player, unitType: r.unit_type, h3Index: r.h3_index }));

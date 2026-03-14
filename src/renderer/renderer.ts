@@ -117,20 +117,36 @@ interface ReadyResult {
   meleeCombatHexes?: string[];
   meleeCasualtyHexes?: string[];
   meleeRemovedUnits?: RemovedUnitSnapshot[];
+  /** Per-group tool invocation counts for the last AI turn. Keys are tool group ids. */
+  toolInvocationCounts?: Record<string, number>;
+  /** Cost in dollars for this turn's LLM call (when requestOrders was used). */
+  cost?: number;
 }
 
 declare global {
   interface Window {
     gameApi?: {
       getGameState: () => Promise<unknown>;
-      newGame: () => Promise<unknown>;
+      newGame: (size?: 'small' | 'medium' | 'large') => Promise<unknown>;
       submitOrders: (payload: { movementOrders: { unitId: string; toH3Index: string }[]; rangedAttacks?: RangedAttackOrder[] }) => Promise<unknown>;
-      ready: () => Promise<ReadyResult>;
+      ready: (payload?: {
+        enabledToolGroups?: string[];
+        precomputedAiOrders?: { unitId: string; toH3Index: string }[];
+        precomputedAiRangedOrders?: { unitId: string; targetH3Index: string }[];
+      }) => Promise<ReadyResult>;
+      requestAiOrders: (payload?: { enabledToolGroups?: string[] }) => Promise<
+        | { success: true; orders: { unitId: string; toH3Index: string }[]; rangedAttacks?: RangedAttackOrder[]; strategy?: string; dropped?: number; dropReasons?: string[]; toolInvocationCounts?: Record<string, number> }
+        | { success: false; error: string }
+      >;
+      cancelRequestAiOrders: () => Promise<void>;
+      registerOpenRouterLogListener?: (callback: (payload: { line: string; isError?: boolean }) => void) => void;
       openRouter?: {
         getKey: () => Promise<{ hasKey: boolean }>;
         setKey: (key: string) => Promise<void>;
         listModels: () => Promise<{ models?: { id: string; name?: string }[]; error?: string }>;
         setSelectedModel: (modelId: string) => Promise<void>;
+        getToolGroupList: () => Promise<{ id: string; label: string }[]>;
+        getSelectedModel: () => Promise<string>;
       };
     };
   }
@@ -325,6 +341,164 @@ let resolutionMoveAnimation: {
   meleeRemovedUnits?: RemovedUnitSnapshot[];
 } | null = null;
 let resolutionMoveAnimationFrameId: number | null = null;
+
+/** Tool group id and label for the Tools tab. Fallback when getToolGroupList is unavailable; order matches main registry. */
+const OPENROUTER_TOOL_GROUPS: { id: string; label: string }[] = [
+  { id: 'planning', label: 'Planning' },
+  { id: 'assessment', label: 'Assessment' },
+  { id: 'estimation', label: 'Estimation' },
+];
+
+/** Current tool groups shown in the Tools tab (from main registry or fallback). */
+let openRouterToolGroups: { id: string; label: string }[] = [...OPENROUTER_TOOL_GROUPS];
+
+/** Which tool groups are enabled for the AI. Default all enabled. */
+let enabledToolGroups: Set<string> = new Set(OPENROUTER_TOOL_GROUPS.map((g) => g.id));
+
+/** Per-group invocation counts for the most recent turn. Reset on Ready click. */
+let toolInvocationCounts: Record<string, number> = Object.fromEntries(OPENROUTER_TOOL_GROUPS.map((g) => [g.id, 0]));
+
+/** Run toggle: when true, background AI planning runs and Ready enables only when orders ready; when false, Ready stays enabled (user resolves without LLM). */
+let runButtonOn = false;
+
+/** Precomputed AI movement orders from the last background request; null until request completes. Cleared on Ready click or when Run is turned off. */
+let precomputedAiOrders: { unitId: string; toH3Index: string }[] | null = null;
+
+/** Precomputed AI ranged orders from the last background request; cleared with precomputedAiOrders. */
+let precomputedAiRangedOrders: { unitId: string; targetH3Index: string }[] | null = null;
+
+/** True while a background requestAiOrders call is in flight; used to avoid duplicate requests and to guard start. */
+let backgroundRequestInFlight = false;
+
+/** Total OpenRouter API cost in dollars for the current game session. Reset on new game. */
+let openRouterGameCost = 0;
+
+/**
+ * Starts one background AI orders request if conditions allow (planning phase, key and model set, no request in flight).
+ * Used when Run is toggled on and after new game when Run is on. On success stores orders and enables Ready; on failure shows a user-visible error.
+ */
+function startBackgroundRequestIfAllowed(): void {
+  if (backgroundRequestInFlight || !runButtonOn || gameState?.phase !== 'planning') return;
+  const keyPromise = window.gameApi?.openRouter?.getKey?.();
+  const modelPromise = window.gameApi?.openRouter?.getSelectedModel?.();
+  if (!keyPromise || !modelPromise) return;
+  backgroundRequestInFlight = true;
+  Promise.all([keyPromise, modelPromise]).then(([keyResult, modelId]) => {
+    if (!keyResult?.hasKey || !modelId?.trim()) {
+      backgroundRequestInFlight = false;
+      appendOpenRouterLog('Run is on but API key or model not set.', true);
+      updateReadyButtonState();
+      return;
+    }
+    if (!runButtonOn || !window.gameApi?.requestAiOrders) {
+      backgroundRequestInFlight = false;
+      updateReadyButtonState();
+      return;
+    }
+    const enabledToolGroupsPayload = Array.from(enabledToolGroups);
+    window.gameApi
+      .requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload })
+      .then((result) => {
+        backgroundRequestInFlight = false;
+        if (runButtonOn && result.success) {
+          precomputedAiOrders = result.orders;
+          precomputedAiRangedOrders = result.rangedAttacks ?? [];
+          if (result.toolInvocationCounts) {
+            for (const [groupId, count] of Object.entries(result.toolInvocationCounts)) {
+              toolInvocationCounts[groupId] = count;
+            }
+            updateOpenRouterToolCountLabels();
+          }
+          if (result.cost !== undefined) {
+            openRouterGameCost += result.cost;
+            updateOpenRouterCostLabel();
+          }
+        } else if (!result.success) {
+          showSidebarError(result.error ?? 'Background AI request failed');
+        }
+        updateReadyButtonState();
+      })
+      .catch((err) => {
+        backgroundRequestInFlight = false;
+        showSidebarError(String(err));
+        updateReadyButtonState();
+      });
+  });
+}
+
+/**
+ * Renders or updates the Tools tab list: 2-column grid; each cell has label and count (toggle button).
+ * Toggle click flips enabled state. Does not call main or Ready.
+ */
+function renderOpenRouterToolsList(): void {
+  const container = document.getElementById('openrouter-tools-list');
+  if (!container) return;
+  container.innerHTML = '';
+  for (const group of openRouterToolGroups) {
+    const cell = document.createElement('div');
+    cell.className = 'openrouter-tool-cell';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'openrouter-tool-toggle';
+    btn.setAttribute('data-tool-group', group.id);
+    btn.setAttribute('aria-pressed', enabledToolGroups.has(group.id) ? 'true' : 'false');
+    btn.textContent = String(toolInvocationCounts[group.id] ?? 0);
+    btn.addEventListener('click', () => {
+      if (enabledToolGroups.has(group.id)) {
+        enabledToolGroups.delete(group.id);
+      } else {
+        enabledToolGroups.add(group.id);
+      }
+      btn.setAttribute('aria-pressed', enabledToolGroups.has(group.id) ? 'true' : 'false');
+      btn.textContent = String(toolInvocationCounts[group.id] ?? 0);
+    });
+    cell.appendChild(btn);
+    const label = document.createElement('span');
+    label.className = 'openrouter-tool-label';
+    label.textContent = group.label;
+    cell.appendChild(label);
+    container.appendChild(cell);
+  }
+}
+
+/**
+ * Single source of truth for Ready button enabled state. Run off ⇒ Ready enabled (unless game over).
+ * Run on ⇒ Ready enabled only when precomputed AI orders are available. Call after load, new game,
+ * Run toggle, background result, Ready click start, and whenever game state is applied.
+ */
+function updateReadyButtonState(): void {
+  const readyBtn = document.getElementById('ready-btn') as HTMLButtonElement | null;
+  if (!readyBtn) return;
+  const gameOver = gameState?.gameOver ?? false;
+  readyBtn.disabled = gameOver || (runButtonOn && precomputedAiOrders === null);
+}
+
+/**
+ * Updates only the count labels on the tool toggles (e.g. after Ready or background result).
+ * Call after toolInvocationCounts has been updated.
+ */
+function updateOpenRouterToolCountLabels(): void {
+  for (const group of openRouterToolGroups) {
+    const btn = document.querySelector(`.openrouter-tool-toggle[data-tool-group="${group.id}"]`);
+    if (btn) btn.textContent = String(toolInvocationCounts[group.id] ?? 0);
+  }
+}
+
+/** Formats dollars for display (e.g. $0.02, $1,234.56). Supports up to $9,999.99. */
+function formatOpenRouterCost(dollars: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(dollars);
+}
+
+/** Updates the API cost label to the current game total. */
+function updateOpenRouterCostLabel(): void {
+  const el = document.getElementById('openrouter-cost');
+  if (el) el.textContent = formatOpenRouterCost(openRouterGameCost);
+}
 
 /** OpenRouter status log: append a line with optional error styling. */
 function appendOpenRouterLog(line: string, isError = false): void {
@@ -1032,32 +1206,51 @@ function updateGameStateSidebar(state: GameStateSnapshot | null): void {
   if (turnEl) turnEl.textContent = state ? `Turn: ${state.turnNumber}` : '—';
 }
 
+/**
+ * Shows the new-game overlay when there is no game yet (empty hexes) or when the game is over.
+ * Sets message and button label accordingly; caller ensures size selector is visible in both cases.
+ */
 function updateGameOverUI(state: GameStateSnapshot | null): void {
   const overlay = document.getElementById('game-over-overlay');
   const messageEl = document.getElementById('game-over-message');
-  const readyBtn = document.getElementById('ready-btn') as HTMLButtonElement | null;
+  const newGameBtn = document.getElementById('new-game-btn');
   const rangedBtn = document.getElementById('ranged-attack-btn') as HTMLButtonElement | null;
 
-  if (!state?.gameOver) {
+  const noGame = !state || state.hexes.length === 0;
+  const gameOver = !!state?.gameOver;
+  const showOverlay = noGame || gameOver;
+
+  if (!showOverlay) {
     overlay?.classList.add('hidden');
-    if (readyBtn) readyBtn.disabled = false;
     if (rangedBtn) rangedBtn.disabled = false;
+    updateReadyButtonState();
     return;
   }
 
   overlay?.classList.remove('hidden');
   if (messageEl) {
-    messageEl.textContent = state.winner === 'human' ? 'You win!' : 'You lose.';
+    if (gameOver) {
+      messageEl.textContent = state!.winner === 'human' ? 'You win!' : 'You lose.';
+      messageEl.style.display = '';
+    } else {
+      messageEl.textContent = 'Choose map size and start.';
+      messageEl.style.display = '';
+    }
   }
-  if (readyBtn) readyBtn.disabled = true;
+  if (newGameBtn) {
+    newGameBtn.textContent = noGame ? 'Start game' : 'New game';
+  }
   if (rangedBtn) rangedBtn.disabled = true;
+  updateReadyButtonState();
 }
 
 function initNewGameButton(): void {
   document.getElementById('new-game-btn')?.addEventListener('click', async () => {
     if (!window.gameApi?.newGame) return;
+    const sizeEl = document.getElementById('new-game-size') as HTMLSelectElement | null;
+    const size = (sizeEl?.value ?? 'small') as 'small' | 'medium' | 'large';
     try {
-      const state = (await window.gameApi.newGame()) as GameStateSnapshot;
+      const state = (await window.gameApi.newGame(size)) as GameStateSnapshot;
       gameState = state;
       pendingOrders = [];
       pendingRangedAttacks = [];
@@ -1065,11 +1258,18 @@ function initNewGameButton(): void {
       selectedUnitId = null;
       selectedHexIndex = null;
       hideStackCallout();
+      precomputedAiOrders = null;
+      precomputedAiRangedOrders = null;
+      backgroundRequestInFlight = false;
+      openRouterGameCost = 0;
+      updateOpenRouterCostLabel();
       updateGameStateSidebar(state);
       updatePendingOrdersSidebar();
       updateRangedSidebar();
       updateSidebar();
       updateGameOverUI(state);
+      updateReadyButtonState();
+      if (runButtonOn) startBackgroundRequestIfAllowed();
       redraw();
     } catch (err) {
       console.error('newGame failed:', err);
@@ -1210,8 +1410,51 @@ function initOpenRouterUI(): void {
   const api = window.gameApi?.openRouter;
   if (!api) return;
 
+  window.gameApi?.registerOpenRouterLogListener?.((p) => appendOpenRouterLog(p.line, p.isError ?? false));
+  updateOpenRouterCostLabel();
+
+  const tabTools = document.getElementById('openrouter-tab-tools');
+  const tabModel = document.getElementById('openrouter-tab-model');
+  const panelTools = document.getElementById('openrouter-tools-panel');
+  const panelModel = document.getElementById('openrouter-model-panel');
+
+  function setActiveTab(active: 'tools' | 'model'): void {
+    if (active === 'model') {
+      tabTools?.setAttribute('aria-selected', 'false');
+      tabModel?.setAttribute('aria-selected', 'true');
+      panelTools?.classList.remove('active');
+      panelTools?.setAttribute('hidden', '');
+      panelModel?.classList.add('active');
+      panelModel?.removeAttribute('hidden');
+    } else {
+      tabTools?.setAttribute('aria-selected', 'true');
+      tabModel?.setAttribute('aria-selected', 'false');
+      panelTools?.classList.add('active');
+      panelTools?.removeAttribute('hidden');
+      panelModel?.classList.remove('active');
+      panelModel?.setAttribute('hidden', '');
+    }
+  }
+
+  tabTools?.addEventListener('click', () => setActiveTab('tools'));
+  tabModel?.addEventListener('click', () => setActiveTab('model'));
+
+  setActiveTab('model');
+
+  (async () => {
+    try {
+      const list = await window.gameApi?.openRouter?.getToolGroupList?.();
+      if (list?.length) {
+        openRouterToolGroups = list;
+        enabledToolGroups = new Set(list.map((g) => g.id));
+        toolInvocationCounts = Object.fromEntries(list.map((g) => [g.id, 0]));
+      }
+    } finally {
+      renderOpenRouterToolsList();
+    }
+  })();
+
   const keyInput = document.getElementById('openrouter-key') as HTMLInputElement | null;
-  const keyHint = document.getElementById('openrouter-key-hint');
   const modelSelect = document.getElementById('openrouter-model') as HTMLSelectElement | null;
   const refreshBtn = document.getElementById('openrouter-refresh-models');
 
@@ -1237,16 +1480,12 @@ function initOpenRouterUI(): void {
     });
   }
 
-  api.getKey().then((r) => {
-    if (keyHint) keyHint.textContent = r.hasKey ? 'Saved' : 'Not set';
-  });
   refreshModels();
 
   if (keyInput) {
     keyInput.addEventListener('blur', () => {
       const v = keyInput.value.trim();
       api!.setKey(v).then(() => {
-        if (keyHint) keyHint.textContent = v ? 'Saved' : 'Not set';
         if (!v) hideMapToast();
       });
     });
@@ -1261,6 +1500,27 @@ function initOpenRouterUI(): void {
 
   if (refreshBtn) refreshBtn.addEventListener('click', refreshModels);
 
+  /** Run toggle: on ⇒ switch to Tools tab, clear precomputed, start background request; off ⇒ cancel in-flight, clear precomputed. */
+  const runBtn = document.getElementById('openrouter-run-btn');
+  if (runBtn) {
+    runBtn.addEventListener('click', () => {
+      runButtonOn = !runButtonOn;
+      runBtn.setAttribute('aria-pressed', runButtonOn ? 'true' : 'false');
+      if (runButtonOn) {
+        document.getElementById('openrouter-tab-tools')?.click();
+        precomputedAiOrders = null;
+        precomputedAiRangedOrders = null;
+        updateReadyButtonState();
+        startBackgroundRequestIfAllowed();
+      } else {
+        window.gameApi?.cancelRequestAiOrders?.();
+        precomputedAiOrders = null;
+        precomputedAiRangedOrders = null;
+        updateReadyButtonState();
+      }
+    });
+  }
+
   document.getElementById('map-toast-dismiss')?.addEventListener('click', hideMapToast);
   document.getElementById('ai-strategy-toast-dismiss')?.addEventListener('click', hideAiStrategyToast);
 }
@@ -1273,6 +1533,7 @@ function init(): void {
   initOpenRouterUI();
   updateRangedSidebar();
   initNewGameButton();
+  updateReadyButtonState();
 
   document.getElementById('ranged-attack-btn')?.addEventListener('click', () => {
     if (rangedModeActive) {
@@ -1296,6 +1557,7 @@ function init(): void {
         updateRangedSidebar();
         updateSidebar();
         updateGameOverUI(state);
+        updateReadyButtonState();
         redraw();
       })
       .catch((err) => console.error('getGameState failed:', err));
@@ -1509,6 +1771,7 @@ function init(): void {
       if (!window.gameApi) return;
       if (gameState?.gameOver) return;
       clearSidebarError();
+      updateReadyButtonState();
       try {
         const submitResult = (await window.gameApi.submitOrders({
           movementOrders: pendingOrders,
@@ -1516,6 +1779,7 @@ function init(): void {
         })) as { success: boolean; reason?: string };
         if (!submitResult.success) {
           showSidebarError(submitResult.reason ?? 'Submit failed');
+          updateReadyButtonState();
           return;
         }
         const humanMoves: ResolutionMove[] =
@@ -1528,11 +1792,30 @@ function init(): void {
                 })
                 .filter((m): m is ResolutionMove => m !== null)
             : [];
-        appendOpenRouterLog('Requesting AI orders…');
-        const readyResult = await window.gameApi.ready();
+        const enabledToolGroupsPayload = Array.from(enabledToolGroups);
+        const usePrecomputed = runButtonOn && precomputedAiOrders !== null;
+        const readyPayload = {
+          enabledToolGroups: enabledToolGroupsPayload,
+          precomputedAiOrders: usePrecomputed ? precomputedAiOrders! : [],
+          precomputedAiRangedOrders: usePrecomputed ? (precomputedAiRangedOrders ?? []) : [],
+        };
+        const readyResult = await window.gameApi!.ready(readyPayload);
         if (!readyResult.success) {
           showSidebarError(readyResult.reason ?? 'Ready failed');
+          updateReadyButtonState();
           return;
+        }
+        precomputedAiOrders = null;
+        precomputedAiRangedOrders = null;
+        if (readyResult.toolInvocationCounts) {
+          for (const [groupId, count] of Object.entries(readyResult.toolInvocationCounts)) {
+            toolInvocationCounts[groupId] = count;
+          }
+          updateOpenRouterToolCountLabels();
+        }
+        if (readyResult.cost !== undefined) {
+          openRouterGameCost += readyResult.cost;
+          updateOpenRouterCostLabel();
         }
         if (readyResult.aiSkipped) {
           appendOpenRouterLog(readyResult.aiSkipReason ?? 'AI skipped.', true);
@@ -1614,9 +1897,12 @@ function init(): void {
         updateRangedSidebar();
         updateSidebar();
         updateGameOverUI(state);
+        updateReadyButtonState();
+        if (runButtonOn) startBackgroundRequestIfAllowed();
         redraw();
       } catch (err) {
         showSidebarError(String(err));
+        updateReadyButtonState();
       }
     });
   }

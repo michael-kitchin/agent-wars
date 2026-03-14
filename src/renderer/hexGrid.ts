@@ -11,14 +11,15 @@ import {
   cellToLocalIj,
 } from 'h3-js';
 
-/** H3 resolution for the hex flower. Resolution 2 gives ~8700 km² per hex; good for a small demo grid. */
-const H3_RESOLUTION = 2;
+/** H3 resolution for the hex flower. Resolution 3 = ~1230 km² per hex; must match mapData. */
+const H3_RESOLUTION = 3;
 
 /**
- * Latitude/longitude of the grid center. (0, 0) gives a symmetric flower over the Gulf of Guinea.
+ * Latitude/longitude of the grid center. Must match mapData. Uses H3 face 8 center (~4.53°S, 42.02°W)
+ * so the grid is centered on an icosahedron face (all hexagons), minimizing distortion.
  */
-const GRID_CENTER_LAT = 0;
-const GRID_CENTER_LNG = 0;
+const GRID_CENTER_LAT = -4.5302;
+const GRID_CENTER_LNG = -42.0224;
 
 /** Ordered list of 19 H3 indices: center first, then ring 1 (6), then ring 2 (12). */
 let hexCells: string[] | null = null;

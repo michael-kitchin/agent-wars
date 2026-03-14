@@ -14,7 +14,19 @@ import {
   requestOrders,
   setSelectedModel,
   getSelectedModel,
+  getToolNamesForEnabledGroups,
+  getToolGroupList,
+  TOOL_GROUP_REGISTRY,
 } from './openRouter';
+import { logDebug } from './logger';
+import {
+  handleRequestAiOrders,
+  cancelRequestAiOrders,
+  handleGameReady,
+} from './gameIpcHandlers';
+
+/** Ref for the in-flight requestAiOrders AbortController; used by handlers and cancel. */
+const requestAiOrdersControllerRef: { current: AbortController | null } = { current: null };
 
 /** Single application window; created on ready, closed when all windows close. */
 let mainWindow: BrowserWindow | null = null;
@@ -98,12 +110,28 @@ export interface ReadyResult {
   meleeRemovedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
   kills?: { victimId: string; killerIds: string[] }[];
   aiStrategy?: string;
+  /** Per-group tool invocation counts for the last AI turn. Keys are tool group ids. */
+  toolInvocationCounts?: Record<string, number>;
+  /** Cost in dollars for this turn's LLM call (when requestOrders was used). */
+  cost?: number;
+}
+
+/** Wraps requestOrders with an onLog sink that forwards to the renderer status list. */
+function requestOrdersWithLog(
+  state: Parameters<typeof requestOrders>[0],
+  modelId: string,
+  options?: Parameters<typeof requestOrders>[2]
+): ReturnType<typeof requestOrders> {
+  const onLog = (line: string, isError?: boolean) => {
+    mainWindow?.webContents?.send('openRouter:log', { line, isError: !!isError });
+  };
+  return requestOrders(state, modelId, { ...options, onLog });
 }
 
 function registerIpcHandlers(): void {
   ipcMain.handle('game:getState', () => getGameState());
-  ipcMain.handle('game:newGame', () => {
-    resetGameForNewMatch();
+  ipcMain.handle('game:newGame', (_event, size?: 'small' | 'medium' | 'large') => {
+    resetGameForNewMatch(size ?? 'small');
     return getGameState();
   });
   ipcMain.handle('game:submitOrders', (_event, payload: SubmitOrdersPayload | { unitId: string; toH3Index: string }[]) => {
@@ -115,89 +143,58 @@ function registerIpcHandlers(): void {
         };
     return submitOrders(normalized);
   });
-  ipcMain.handle('game:ready', async (): Promise<ReadyResult> => {
-    const state = getGameState();
-    const modelId = getSelectedModel();
-    let aiOrders: { unitId: string; toH3Index: string }[] = [];
-    let aiRangedOrders: RangedAttackOrder[] = [];
-    let aiSkipped = false;
-    let aiDropped: number | undefined;
-    let aiDropReasons: string[] | undefined;
-
-    let aiSkipReason: string | undefined;
-    let aiStrategy: string | undefined;
-    if (modelId && hasKey()) {
-      const result = await requestOrders(state, modelId);
-      if (result.success) {
-        aiOrders = result.orders;
-        aiRangedOrders = result.rangedAttacks ?? [];
-        aiStrategy = result.strategy;
-        aiDropped = result.dropped;
-        aiDropReasons = result.dropReasons?.length ? result.dropReasons : undefined;
-      } else {
-        aiSkipped = true;
-        aiSkipReason = result.error;
+  ipcMain.handle(
+    'game:ready',
+    async (
+      _event,
+      payload?: {
+        enabledToolGroups?: string[];
+        precomputedAiOrders?: { unitId: string; toH3Index: string }[];
+        precomputedAiRangedOrders?: RangedAttackOrder[];
       }
-    } else {
-      aiSkipped = true;
-      aiSkipReason = !hasKey() ? 'Set your OpenRouter API key in the panel on the right.' : 'Select an AI model from the dropdown.';
+    ): Promise<ReadyResult> => {
+      return handleGameReady(payload, {
+        getGameState,
+        getSelectedModel,
+        hasKey,
+        getToolNamesForEnabledGroups,
+        defaultGroupIds: TOOL_GROUP_REGISTRY.map((g) => g.id),
+        requestOrders: requestOrdersWithLog,
+        ready,
+      });
     }
+  );
 
-    const aiMoves: AiMove[] =
-      aiOrders.length > 0
-        ? aiOrders
-            .map((o) => {
-              const from = state.units.find((u) => u.id === o.unitId)?.h3Index;
-              if (!from || from === o.toH3Index) return null;
-              return { unitId: o.unitId, fromH3Index: from, toH3Index: o.toH3Index };
-            })
-            .filter((m): m is AiMove => m !== null)
-        : [];
+  ipcMain.handle(
+    'game:requestAiOrders',
+    async (
+      _event,
+      payload?: { enabledToolGroups?: string[] }
+    ): Promise<{ success: true; orders: { unitId: string; toH3Index: string }[]; rangedAttacks?: RangedAttackOrder[]; strategy?: string; dropped?: number; dropReasons?: string[]; toolInvocationCounts?: Record<string, number>; cost?: number } | { success: false; error: string }> => {
+      const state = getGameState();
+      logDebug('main game:requestAiOrders', { turnNumber: state.turnNumber, phase: state.phase });
+      const result = await handleRequestAiOrders(payload, {
+        getGameState,
+        getSelectedModel,
+        hasKey,
+        getToolNamesForEnabledGroups,
+        defaultGroupIds: TOOL_GROUP_REGISTRY.map((g) => g.id),
+        requestOrders: requestOrdersWithLog,
+        controllerRef: requestAiOrdersControllerRef,
+      });
+      logDebug('main game:requestAiOrders result', { success: result.success });
+      return result;
+    }
+  );
 
-    const readyResult = ready(aiOrders, aiRangedOrders);
-    if (!readyResult.success) {
-      return {
-        success: false,
-        reason: readyResult.reason,
-      };
-    }
-    const aiRangedByType: AiRangedByType = {};
-    for (const r of aiRangedOrders) {
-      const u = state.units.find((unit) => unit.id === r.unitId);
-      if (u && (u.unitType === 'armor' || u.unitType === 'naval')) {
-        aiRangedByType[u.unitType] = (aiRangedByType[u.unitType] ?? 0) + 1;
-      }
-    }
-    const aiMovesLog =
-      aiOrders.length > 0
-        ? aiOrders.map((o) => `${o.unitId} → ${o.toH3Index}`)
-        : undefined;
-    return {
-      success: true,
-      aiSkipped: aiSkipped && aiOrders.length === 0,
-      aiSkipReason,
-      aiOrderCount: aiOrders.length,
-      aiRangedByType: Object.keys(aiRangedByType).length > 0 ? aiRangedByType : undefined,
-      aiDropped,
-      aiDropReasons,
-      aiMovesLog,
-      aiMoves: aiMoves.length > 0 ? aiMoves : undefined,
-      combatHexes: readyResult.combatHexes,
-      removedUnitIds: readyResult.removedUnitIds,
-      casualtyHexes: readyResult.casualtyHexes,
-      removedUnits: readyResult.removedUnits,
-      rangedCombatHexes: readyResult.rangedCombatHexes,
-      rangedCasualtyHexes: readyResult.rangedCasualtyHexes,
-      rangedRemovedUnits: readyResult.rangedRemovedUnits,
-      meleeCombatHexes: readyResult.meleeCombatHexes,
-      meleeCasualtyHexes: readyResult.meleeCasualtyHexes,
-      meleeRemovedUnits: readyResult.meleeRemovedUnits,
-      kills: readyResult.kills,
-      aiStrategy,
-    };
+  ipcMain.handle('game:cancelRequestAiOrders', () => {
+    logDebug('main game:cancelRequestAiOrders');
+    cancelRequestAiOrders(requestAiOrdersControllerRef);
   });
 
+  ipcMain.handle('openRouter:getToolGroupList', () => getToolGroupList());
   ipcMain.handle('openRouter:getKey', () => ({ hasKey: hasKey() }));
+  ipcMain.handle('openRouter:getSelectedModel', () => getSelectedModel());
   ipcMain.handle('openRouter:setKey', (_event, key: string) => {
     saveKey(typeof key === 'string' ? key : '');
   });

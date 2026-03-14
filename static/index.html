@@ -42,16 +42,108 @@
       overflow: auto;
     }
     #sidebar-bottom {
-      flex: 0 0 auto;
+      flex: 0 0 33.333vh;
       min-height: 180px;
       padding: 1rem;
       border-top: 1px solid #ccc;
       background: #f0eeea;
     }
-    #sidebar-bottom h3 {
+    .openrouter-tab-bar {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid #ccc;
       margin: 0 0 0.5rem 0;
-      font-size: 0.95rem;
+    }
+    .openrouter-tab-bar button {
+      padding: 0.35rem 0.75rem;
+      font-size: 12px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      border-radius: 0;
+      margin-bottom: -1px;
+    }
+    .openrouter-tab-bar button[aria-selected="true"] {
       font-weight: 600;
+      border-bottom-color: #2e5a7b;
+      background: #e8e4e0;
+    }
+    .openrouter-tab-panel {
+      display: none;
+      margin-bottom: 0.5rem;
+    }
+    .openrouter-tab-panel.active {
+      display: block;
+    }
+    .openrouter-tools-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.35rem;
+    }
+    .openrouter-tool-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .openrouter-tool-cell .openrouter-tool-toggle {
+      flex-shrink: 0;
+    }
+    .openrouter-tool-cell .openrouter-tool-label {
+      font-size: 0.85rem;
+      color: #444;
+      margin: 0;
+      min-width: 0;
+    }
+    .openrouter-tool-toggle {
+      min-width: 2rem;
+      padding: 0.25rem 0.4rem;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid transparent;
+    }
+    /* Enabled (on): accent background so state is obvious */
+    .openrouter-tool-toggle[aria-pressed="true"] {
+      background: #2e5a7b;
+      color: #fff;
+      border-color: #244a66;
+    }
+    .openrouter-tool-toggle[aria-pressed="true"]:hover {
+      background: #3a6a8f;
+    }
+    /* Disabled (off): muted gray */
+    .openrouter-tool-toggle[aria-pressed="false"] {
+      background: #d0ccc6;
+      color: #666;
+      border-color: #bbb;
+    }
+    .openrouter-tool-toggle[aria-pressed="false"]:hover {
+      background: #c4c0ba;
+    }
+    .ready-btn {
+      min-width: 2rem;
+      padding: 0.25rem 0.4rem;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid transparent;
+    }
+    .ready-btn:not(:disabled) {
+      background: #2e5a7b;
+      color: #fff;
+      border-color: #244a66;
+    }
+    .ready-btn:not(:disabled):hover {
+      background: #3a6a8f;
+    }
+    .ready-btn:disabled {
+      background: #d0ccc6;
+      color: #666;
+      border-color: #bbb;
+      cursor: not-allowed;
+    }
+    .openrouter-status-row {
+      margin-top: 0.5rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid #ccc;
     }
     .openrouter-row {
       margin-bottom: 0.6rem;
@@ -61,6 +153,24 @@
       font-size: 0.85rem;
       color: #444;
       margin-bottom: 0.2rem;
+    }
+    .openrouter-key-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .openrouter-key-row input[type="password"] {
+      flex: 1;
+      min-width: 0;
+    }
+    .openrouter-cost {
+      margin-left: auto;
+      min-width: 3.25rem;
+      width: 3.25rem;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-size: 0.85rem;
+      color: #444;
     }
     .openrouter-row input[type="password"],
     .openrouter-row select {
@@ -78,6 +188,26 @@
     .openrouter-model-row select {
       flex: 1;
       min-width: 0;
+    }
+    .openrouter-refresh-btn {
+      flex-shrink: 0;
+      width: 2rem;
+      height: 2rem;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #e8e4e0;
+      border: 1px solid #ccc;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+    .openrouter-refresh-btn:hover { background: #ddd8d2; }
+    .openrouter-refresh-btn::before {
+      content: '';
+      width: 1rem;
+      height: 1rem;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23444' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M23 4v6h-6M1 20v-6h6'/%3E%3Cpath d='M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15'/%3E%3C/svg%3E") center/contain no-repeat;
     }
     .openrouter-log {
       font-size: 11px;
@@ -150,6 +280,9 @@
       text-align: center;
     }
     .game-over-box p { margin: 0 0 1rem 0; font-size: 1.1rem; font-weight: 600; }
+    .new-game-size-row { margin-bottom: 1rem; text-align: left; }
+    .new-game-size-row label { display: block; font-size: 0.9rem; color: #444; margin-bottom: 0.35rem; }
+    .new-game-size-row select { width: 100%; padding: 0.4rem 0.5rem; font-size: 13px; border: 1px solid #ccc; border-radius: 2px; }
     .game-over-box button { padding: 0.5rem 1rem; font-size: 14px; }
     .map-toast p { margin: 0; flex: 1; white-space: pre-line; }
     #map-toast-dismiss {
@@ -247,7 +380,15 @@
     <div id="game-over-overlay" class="game-over-overlay hidden" aria-live="polite">
       <div class="game-over-box">
         <p id="game-over-message"></p>
-        <button type="button" id="new-game-btn">New game</button>
+        <div class="new-game-size-row">
+          <label for="new-game-size">Map size</label>
+          <select id="new-game-size" aria-label="Map size">
+            <option value="small">Small</option>
+            <option value="medium">Medium</option>
+            <option value="large">Large</option>
+          </select>
+        </div>
+        <button type="button" id="new-game-btn">Start game</button>
       </div>
     </div>
     <div id="map-toast" class="map-toast hidden" aria-live="polite">
@@ -271,29 +412,40 @@
       <p><strong>Ranged attacks</strong></p>
       <div id="ranged-attacks-list"></div>
       <button type="button" id="ranged-attack-btn" style="display: none;">Ranged attack (click target hex)</button>
-      <button type="button" id="ready-btn">Ready</button>
+      <button type="button" id="ready-btn" class="ready-btn">Ready</button>
       <p id="sidebar-error" style="color: #a03030; font-size: 0.9em; display: none;"></p>
       <p style="color: #666; font-size: 0.9em;">
         <b>Click</b> a unit to select it, then <b>double-click</b> a destination hex to add a movement order.
       </p>
     </div>
     <div id="sidebar-bottom">
-      <h3>OpenRouter (AI)</h3>
-      <div class="openrouter-row">
-        <label for="openrouter-key">API key</label>
-        <input type="password" id="openrouter-key" placeholder="Set key and blur to save" autocomplete="off" />
-        <span id="openrouter-key-hint" class="hint"></span>
+      <div class="openrouter-tab-bar" role="tablist" aria-label="AI panel">
+        <button type="button" id="openrouter-tab-tools" role="tab" aria-selected="false" aria-controls="openrouter-tools-panel">Tools</button>
+        <button type="button" id="openrouter-tab-model" role="tab" aria-selected="true" aria-controls="openrouter-model-panel">Model</button>
       </div>
-      <div class="openrouter-row">
-        <label for="openrouter-model">Model</label>
-        <div class="openrouter-model-row">
-          <select id="openrouter-model">
-            <option value="">— Select model —</option>
-          </select>
-          <button type="button" id="openrouter-refresh-models">Refresh</button>
+      <div id="openrouter-tools-panel" class="openrouter-tab-panel" role="tabpanel" aria-labelledby="openrouter-tab-tools" hidden>
+        <div id="openrouter-tools-list" class="openrouter-tools-list"></div>
+      </div>
+      <div id="openrouter-model-panel" class="openrouter-tab-panel active" role="tabpanel" aria-labelledby="openrouter-tab-model">
+        <div class="openrouter-row">
+          <label for="openrouter-key">API key</label>
+          <div class="openrouter-key-row">
+            <input type="password" id="openrouter-key" placeholder="Set key and blur to save" autocomplete="off" />
+            <span id="openrouter-cost" class="openrouter-cost">$0.00</span>
+          </div>
+        </div>
+        <div class="openrouter-row">
+          <label for="openrouter-model">Model</label>
+          <div class="openrouter-model-row">
+            <select id="openrouter-model">
+              <option value="">— Select model —</option>
+            </select>
+            <button type="button" id="openrouter-refresh-models" class="openrouter-refresh-btn" title="Refresh model list" aria-label="Refresh model list"></button>
+            <button type="button" id="openrouter-run-btn" class="openrouter-tool-toggle" aria-pressed="false">Run</button>
+          </div>
         </div>
       </div>
-      <div class="openrouter-row">
+      <div class="openrouter-row openrouter-status-row">
         <label>Status (AI interactions and errors only)</label>
         <div id="openrouter-log" class="openrouter-log"></div>
       </div>

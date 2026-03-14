@@ -8,7 +8,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
 import { gridDistance } from 'h3-js';
-import { getOrderedHexList } from './mapData';
+import { getOrderedHexList, getUnitCountsForSize, type MapSize } from './mapData';
 import { createSeededRng } from './seededRng';
 import { logTrace } from './logger';
 
@@ -83,37 +83,67 @@ export function getGameSeed(): number {
   return Number.isNaN(n) ? 0 : n;
 }
 
-/** Number of water blob centers; each blob is a disk of hexes within BLOB_RADIUS. */
-const WATER_BLOB_COUNT = 5;
-/** H3 grid distance from blob center to include a hex in that water blob. */
-const WATER_BLOB_RADIUS = 2;
+/** Target fraction of map hexes that are water (1/3) for all map sizes. */
+const WATER_FRACTION = 1 / 3;
+/** Number of water blobs: min and max (inclusive). Blob count is chosen randomly in this range per game. */
+const WATER_BLOB_COUNT_MIN = 4;
+const WATER_BLOB_COUNT_MAX = 6;
 
 /**
- * Seeds the hexes table with the ordered map hexes and terrain (land/water).
- * Water is generated as blobs: seeded RNG picks blob centers; any hex within WATER_BLOB_RADIUS of a center is water. Idempotent if hexes already exist.
+ * Seeds the hexes table with the ordered map hexes and terrain (land/water) for the given map size.
+ * Water is 4–6 blobs (seeded RNG): blob centers are chosen at random; radius is increased until the
+ * union of blob disks nets out to 1/3 of total hexes. Call from resetGameForNewMatch(size) only.
  */
-function seedHexesIfEmpty(): void {
+function seedHexes(size: MapSize): void {
   if (db === null) return;
-  const count = getOne<{ c: number }>('SELECT COUNT(*) AS c FROM hexes');
-  if (count && count.c > 0) return;
-
-  const hexes = getOrderedHexList();
+  const hexes = getOrderedHexList(size);
   const seed = getGameSeed();
   const next = createSeededRng(seed);
+  const targetWaterCount = Math.round(hexes.length * WATER_FRACTION);
+  const numBlobs =
+    WATER_BLOB_COUNT_MIN +
+    Math.floor(next() * (WATER_BLOB_COUNT_MAX - WATER_BLOB_COUNT_MIN + 1));
+
   const centerIndices: number[] = [];
-  for (let k = 0; k < WATER_BLOB_COUNT; k++) {
-    centerIndices.push(Math.floor(next() * hexes.length));
+  while (centerIndices.length < numBlobs) {
+    const idx = Math.floor(next() * hexes.length);
+    if (!centerIndices.includes(idx)) centerIndices.push(idx);
   }
+  const centerH3s = centerIndices.map((i) => hexes[i]!);
+
+  let radius = 0;
+  /** Cap radius search; at res 2 a blob of radius ~30 already covers thousands of hexes. */
+  const maxRadius = 50;
+  for (; radius <= maxRadius; radius++) {
+    let waterCount = 0;
+    for (let i = 0; i < hexes.length; i++) {
+      let inBlob = false;
+      for (const ch3 of centerH3s) {
+        try {
+          if (gridDistance(hexes[i]!, ch3) <= radius) {
+            inBlob = true;
+            break;
+          }
+        } catch {
+          // ignore
+        }
+      }
+      if (inBlob) waterCount++;
+    }
+    if (waterCount >= targetWaterCount) break;
+  }
+  if (radius > maxRadius) radius = maxRadius;
+
   for (let i = 0; i < hexes.length; i++) {
     let water = false;
-    for (const c of centerIndices) {
+    for (const ch3 of centerH3s) {
       try {
-        if (gridDistance(hexes[i]!, hexes[c]!) <= WATER_BLOB_RADIUS) {
+        if (gridDistance(hexes[i]!, ch3) <= radius) {
           water = true;
           break;
         }
       } catch {
-        // ignore invalid/distance errors
+        // ignore
       }
     }
     const terrain = water ? 'water' : 'land';
@@ -122,16 +152,14 @@ function seedHexesIfEmpty(): void {
 }
 
 /**
- * Seeds the units table with 3–5 units per side (human and opponent) when empty.
- * Land units (infantry, armor) only on land hexes; naval only on water hexes, using terrain from the hexes table.
- * Idempotent.
+ * Seeds the units table for the given map size. Counts per type from getUnitCountsForSize(size).
+ * Land units (infantry, armor) only on land hexes; naval only on water hexes. Human on low indices, opponent on high.
+ * Call from resetGameForNewMatch(size) only.
  */
-function seedUnitsIfEmpty(): void {
+function seedUnits(size: MapSize): void {
   if (db === null) return;
-  const count = getOne<{ c: number }>('SELECT COUNT(*) AS c FROM units');
-  if (count && count.c > 0) return;
-
-  const hexes = getOrderedHexList();
+  const hexes = getOrderedHexList(size);
+  const counts = getUnitCountsForSize(size);
   const landIndices: number[] = [];
   const waterIndices: number[] = [];
   for (let i = 0; i < hexes.length; i++) {
@@ -142,37 +170,62 @@ function seedUnitsIfEmpty(): void {
   }
 
   /* Place human on “near” side (low indices), opponent on “far” side (high indices). */
-  if (landIndices.length < 4) return;
-  const humanLand = landIndices.slice(0, 4);
-  const opponentLand = landIndices.slice(-4);
+  const landPerSide = counts.infantry + counts.armor;
+  if (landIndices.length < landPerSide * 2) return;
+  const humanLand = landIndices.slice(0, landPerSide);
+  const opponentLand = landIndices.slice(-landPerSide);
 
-  const humanUnits: [string, string, string][] = [
-    ['human-infantry-1', 'infantry', hexes[humanLand[0]!]!],
-    ['human-armor-1', 'armor', hexes[humanLand[1]!]!],
-    ['human-infantry-2', 'infantry', hexes[humanLand[2]!]!],
-    ['human-armor-2', 'armor', hexes[humanLand[3]!]!],
-  ];
-  if (waterIndices.length > 0) {
-    const humanWater = waterIndices[0]!;
-    humanUnits.push(['human-naval-1', 'naval', hexes[humanWater]!]);
+  const humanUnits: [string, string, string][] = [];
+  let idx = 0;
+  for (let i = 0; i < counts.infantry; i++) {
+    humanUnits.push([`human-infantry-${i + 1}`, 'infantry', hexes[humanLand[idx++]!]!]);
+  }
+  for (let i = 0; i < counts.armor; i++) {
+    humanUnits.push([`human-armor-${i + 1}`, 'armor', hexes[humanLand[idx++]!]!]);
+  }
+  for (let i = 0; i < counts.naval && waterIndices.length > 0; i++) {
+    humanUnits.push([`human-naval-${i + 1}`, 'naval', hexes[waterIndices[i]!]!]);
   }
   for (const [id, unitType, h3Index] of humanUnits) {
     run('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [id, 'human', unitType, h3Index]);
   }
 
-  const opponentUnits: [string, string, string][] = [
-    ['opponent-infantry-1', 'infantry', hexes[opponentLand[0]!]!],
-    ['opponent-armor-1', 'armor', hexes[opponentLand[1]!]!],
-    ['opponent-infantry-2', 'infantry', hexes[opponentLand[2]!]!],
-    ['opponent-armor-2', 'armor', hexes[opponentLand[3]!]!],
-  ];
-  if (waterIndices.length > 0) {
-    const opponentWater = waterIndices[waterIndices.length - 1]!;
-    opponentUnits.push(['opponent-naval-1', 'naval', hexes[opponentWater]!]);
+  const opponentUnits: [string, string, string][] = [];
+  idx = 0;
+  for (let i = 0; i < counts.infantry; i++) {
+    opponentUnits.push([`opponent-infantry-${i + 1}`, 'infantry', hexes[opponentLand[idx++]!]!]);
+  }
+  for (let i = 0; i < counts.armor; i++) {
+    opponentUnits.push([`opponent-armor-${i + 1}`, 'armor', hexes[opponentLand[idx++]!]!]);
+  }
+  for (let i = 0; i < counts.naval && waterIndices.length > 0; i++) {
+    opponentUnits.push([`opponent-naval-${i + 1}`, 'naval', hexes[waterIndices[waterIndices.length - 1 - i]!]!]);
   }
   for (const [id, unitType, h3Index] of opponentUnits) {
     run('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [id, 'opponent', unitType, h3Index]);
   }
+}
+
+/**
+ * Returns the stored map size for the current game, or 'small' if none (e.g. before first new game).
+ * Used by getGameState to order hexes and by callers that need the current size.
+ */
+export function getMapSize(): MapSize {
+  logTrace('getMapSize');
+  const row = getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'map_size'");
+  if (!row || !row.value) return 'small';
+  if (row.value === 'medium' || row.value === 'large') return row.value;
+  return 'small';
+}
+
+/**
+ * Returns the set of H3 indices that are on the current map. Used for order validation in gameActions.
+ * Empty when no game has been started (hexes table empty).
+ */
+export function getMapHexSet(): Set<string> {
+  logTrace('getMapHexSet');
+  const rows = getAll<{ h3_index: string }>('SELECT h3_index FROM hexes');
+  return new Set(rows.map((r) => r.h3_index));
 }
 
 /**
@@ -248,8 +301,6 @@ export async function initDatabase(): Promise<void> {
   }
 
   seedGameSeedIfMissing();
-  seedHexesIfEmpty();
-  seedUnitsIfEmpty();
   saveDatabase();
 }
 
@@ -269,7 +320,9 @@ export function getGameState(): GameStateSnapshot {
     };
   }
 
-  const ordered = getOrderedHexList();
+  const hexCount = getOne<{ c: number }>('SELECT COUNT(*) AS c FROM hexes');
+  const hasHexes = hexCount && hexCount.c > 0;
+  const ordered = hasHexes ? getOrderedHexList(getMapSize()) : [];
   const hexRows: { h3Index: string; terrain: string }[] = ordered.map((h3Index) => {
     const row = getOne<{ terrain: string }>('SELECT terrain FROM hexes WHERE h3_index = ?', [h3Index]);
     return { h3Index, terrain: row?.terrain ?? 'land' };
@@ -377,17 +430,19 @@ export function getAndClearAiToolLimitExceededLastTurn(): boolean {
 }
 
 /**
- * Re-initializes the game for a new match: deletes all units, generates a new seed, re-seeds hexes and units,
- * clears game_over/winner, resets turn and phase, clears pending orders. Call from newGame() IPC.
+ * Re-initializes the game for a new match with the given map size: stores map_size, deletes units and hexes,
+ * generates a new seed, re-seeds hexes and units for that size, clears game_over/winner, resets turn and phase,
+ * clears pending orders. Call from newGame(size) IPC.
  */
-export function resetGameForNewMatch(): void {
+export function resetGameForNewMatch(size: MapSize = 'small'): void {
   if (!db) return;
   run('DELETE FROM units');
   run('DELETE FROM hexes');
+  run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('map_size', ?)", [size]);
   run("DELETE FROM game_config WHERE key = 'game_seed'");
   seedGameSeedIfMissing();
-  seedHexesIfEmpty();
-  seedUnitsIfEmpty();
+  seedHexes(size);
+  seedUnits(size);
   run('DELETE FROM pending_orders');
   run('DELETE FROM pending_ranged_orders');
   run('UPDATE turn_state SET phase = ?, turn_number = 1 WHERE id = 1', ['planning']);

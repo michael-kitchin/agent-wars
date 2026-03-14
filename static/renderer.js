@@ -14097,9 +14097,9 @@
   }
 
   // src/renderer/hexGrid.ts
-  var H3_RESOLUTION = 2;
-  var GRID_CENTER_LAT = 0;
-  var GRID_CENTER_LNG = 0;
+  var H3_RESOLUTION = 3;
+  var GRID_CENTER_LAT = -4.5302;
+  var GRID_CENTER_LNG = -42.0224;
   var hexCells = null;
   function getHexCells() {
     if (hexCells !== null) return hexCells;
@@ -14429,6 +14429,118 @@
   var dragDistanceSq = 0;
   var resolutionMoveAnimation = null;
   var resolutionMoveAnimationFrameId = null;
+  var OPENROUTER_TOOL_GROUPS = [
+    { id: "planning", label: "Planning" },
+    { id: "assessment", label: "Assessment" },
+    { id: "estimation", label: "Estimation" }
+  ];
+  var openRouterToolGroups = [...OPENROUTER_TOOL_GROUPS];
+  var enabledToolGroups = new Set(OPENROUTER_TOOL_GROUPS.map((g) => g.id));
+  var toolInvocationCounts = Object.fromEntries(OPENROUTER_TOOL_GROUPS.map((g) => [g.id, 0]));
+  var runButtonOn = false;
+  var precomputedAiOrders = null;
+  var precomputedAiRangedOrders = null;
+  var backgroundRequestInFlight = false;
+  var openRouterGameCost = 0;
+  function startBackgroundRequestIfAllowed() {
+    if (backgroundRequestInFlight || !runButtonOn || gameState?.phase !== "planning") return;
+    const keyPromise = window.gameApi?.openRouter?.getKey?.();
+    const modelPromise = window.gameApi?.openRouter?.getSelectedModel?.();
+    if (!keyPromise || !modelPromise) return;
+    backgroundRequestInFlight = true;
+    Promise.all([keyPromise, modelPromise]).then(([keyResult, modelId]) => {
+      if (!keyResult?.hasKey || !modelId?.trim()) {
+        backgroundRequestInFlight = false;
+        appendOpenRouterLog("Run is on but API key or model not set.", true);
+        updateReadyButtonState();
+        return;
+      }
+      if (!runButtonOn || !window.gameApi?.requestAiOrders) {
+        backgroundRequestInFlight = false;
+        updateReadyButtonState();
+        return;
+      }
+      const enabledToolGroupsPayload = Array.from(enabledToolGroups);
+      window.gameApi.requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload }).then((result) => {
+        backgroundRequestInFlight = false;
+        if (runButtonOn && result.success) {
+          precomputedAiOrders = result.orders;
+          precomputedAiRangedOrders = result.rangedAttacks ?? [];
+          if (result.toolInvocationCounts) {
+            for (const [groupId, count] of Object.entries(result.toolInvocationCounts)) {
+              toolInvocationCounts[groupId] = count;
+            }
+            updateOpenRouterToolCountLabels();
+          }
+          if (result.cost !== void 0) {
+            openRouterGameCost += result.cost;
+            updateOpenRouterCostLabel();
+          }
+        } else if (!result.success) {
+          showSidebarError(result.error ?? "Background AI request failed");
+        }
+        updateReadyButtonState();
+      }).catch((err) => {
+        backgroundRequestInFlight = false;
+        showSidebarError(String(err));
+        updateReadyButtonState();
+      });
+    });
+  }
+  function renderOpenRouterToolsList() {
+    const container = document.getElementById("openrouter-tools-list");
+    if (!container) return;
+    container.innerHTML = "";
+    for (const group of openRouterToolGroups) {
+      const cell = document.createElement("div");
+      cell.className = "openrouter-tool-cell";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "openrouter-tool-toggle";
+      btn.setAttribute("data-tool-group", group.id);
+      btn.setAttribute("aria-pressed", enabledToolGroups.has(group.id) ? "true" : "false");
+      btn.textContent = String(toolInvocationCounts[group.id] ?? 0);
+      btn.addEventListener("click", () => {
+        if (enabledToolGroups.has(group.id)) {
+          enabledToolGroups.delete(group.id);
+        } else {
+          enabledToolGroups.add(group.id);
+        }
+        btn.setAttribute("aria-pressed", enabledToolGroups.has(group.id) ? "true" : "false");
+        btn.textContent = String(toolInvocationCounts[group.id] ?? 0);
+      });
+      cell.appendChild(btn);
+      const label = document.createElement("span");
+      label.className = "openrouter-tool-label";
+      label.textContent = group.label;
+      cell.appendChild(label);
+      container.appendChild(cell);
+    }
+  }
+  function updateReadyButtonState() {
+    const readyBtn = document.getElementById("ready-btn");
+    if (!readyBtn) return;
+    const gameOver = gameState?.gameOver ?? false;
+    readyBtn.disabled = gameOver || runButtonOn && precomputedAiOrders === null;
+  }
+  function updateOpenRouterToolCountLabels() {
+    for (const group of openRouterToolGroups) {
+      const btn = document.querySelector(`.openrouter-tool-toggle[data-tool-group="${group.id}"]`);
+      if (btn) btn.textContent = String(toolInvocationCounts[group.id] ?? 0);
+    }
+  }
+  function formatOpenRouterCost(dollars) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(dollars);
+  }
+  function updateOpenRouterCostLabel() {
+    const el = document.getElementById("openrouter-cost");
+    if (el) el.textContent = formatOpenRouterCost(openRouterGameCost);
+  }
   function appendOpenRouterLog(line, isError = false) {
     const el = document.getElementById("openrouter-log");
     if (!el) return;
@@ -14978,26 +15090,40 @@
   function updateGameOverUI(state) {
     const overlay = document.getElementById("game-over-overlay");
     const messageEl = document.getElementById("game-over-message");
-    const readyBtn = document.getElementById("ready-btn");
+    const newGameBtn = document.getElementById("new-game-btn");
     const rangedBtn = document.getElementById("ranged-attack-btn");
-    if (!state?.gameOver) {
+    const noGame = !state || state.hexes.length === 0;
+    const gameOver = !!state?.gameOver;
+    const showOverlay = noGame || gameOver;
+    if (!showOverlay) {
       overlay?.classList.add("hidden");
-      if (readyBtn) readyBtn.disabled = false;
       if (rangedBtn) rangedBtn.disabled = false;
+      updateReadyButtonState();
       return;
     }
     overlay?.classList.remove("hidden");
     if (messageEl) {
-      messageEl.textContent = state.winner === "human" ? "You win!" : "You lose.";
+      if (gameOver) {
+        messageEl.textContent = state.winner === "human" ? "You win!" : "You lose.";
+        messageEl.style.display = "";
+      } else {
+        messageEl.textContent = "Choose map size and start.";
+        messageEl.style.display = "";
+      }
     }
-    if (readyBtn) readyBtn.disabled = true;
+    if (newGameBtn) {
+      newGameBtn.textContent = noGame ? "Start game" : "New game";
+    }
     if (rangedBtn) rangedBtn.disabled = true;
+    updateReadyButtonState();
   }
   function initNewGameButton() {
     document.getElementById("new-game-btn")?.addEventListener("click", async () => {
       if (!window.gameApi?.newGame) return;
+      const sizeEl = document.getElementById("new-game-size");
+      const size = sizeEl?.value ?? "small";
       try {
-        const state = await window.gameApi.newGame();
+        const state = await window.gameApi.newGame(size);
         gameState = state;
         pendingOrders = [];
         pendingRangedAttacks = [];
@@ -15005,11 +15131,18 @@
         selectedUnitId = null;
         selectedHexIndex = null;
         hideStackCallout();
+        precomputedAiOrders = null;
+        precomputedAiRangedOrders = null;
+        backgroundRequestInFlight = false;
+        openRouterGameCost = 0;
+        updateOpenRouterCostLabel();
         updateGameStateSidebar(state);
         updatePendingOrdersSidebar();
         updateRangedSidebar();
         updateSidebar();
         updateGameOverUI(state);
+        updateReadyButtonState();
+        if (runButtonOn) startBackgroundRequestIfAllowed();
         redraw();
       } catch (err) {
         console.error("newGame failed:", err);
@@ -15137,8 +15270,45 @@
   function initOpenRouterUI() {
     const api = window.gameApi?.openRouter;
     if (!api) return;
+    window.gameApi?.registerOpenRouterLogListener?.((p) => appendOpenRouterLog(p.line, p.isError ?? false));
+    updateOpenRouterCostLabel();
+    const tabTools = document.getElementById("openrouter-tab-tools");
+    const tabModel = document.getElementById("openrouter-tab-model");
+    const panelTools = document.getElementById("openrouter-tools-panel");
+    const panelModel = document.getElementById("openrouter-model-panel");
+    function setActiveTab(active) {
+      if (active === "model") {
+        tabTools?.setAttribute("aria-selected", "false");
+        tabModel?.setAttribute("aria-selected", "true");
+        panelTools?.classList.remove("active");
+        panelTools?.setAttribute("hidden", "");
+        panelModel?.classList.add("active");
+        panelModel?.removeAttribute("hidden");
+      } else {
+        tabTools?.setAttribute("aria-selected", "true");
+        tabModel?.setAttribute("aria-selected", "false");
+        panelTools?.classList.add("active");
+        panelTools?.removeAttribute("hidden");
+        panelModel?.classList.remove("active");
+        panelModel?.setAttribute("hidden", "");
+      }
+    }
+    tabTools?.addEventListener("click", () => setActiveTab("tools"));
+    tabModel?.addEventListener("click", () => setActiveTab("model"));
+    setActiveTab("model");
+    (async () => {
+      try {
+        const list = await window.gameApi?.openRouter?.getToolGroupList?.();
+        if (list?.length) {
+          openRouterToolGroups = list;
+          enabledToolGroups = new Set(list.map((g) => g.id));
+          toolInvocationCounts = Object.fromEntries(list.map((g) => [g.id, 0]));
+        }
+      } finally {
+        renderOpenRouterToolsList();
+      }
+    })();
     const keyInput = document.getElementById("openrouter-key");
-    const keyHint = document.getElementById("openrouter-key-hint");
     const modelSelect = document.getElementById("openrouter-model");
     const refreshBtn = document.getElementById("openrouter-refresh-models");
     function refreshModels() {
@@ -15162,15 +15332,11 @@
         }
       });
     }
-    api.getKey().then((r) => {
-      if (keyHint) keyHint.textContent = r.hasKey ? "Saved" : "Not set";
-    });
     refreshModels();
     if (keyInput) {
       keyInput.addEventListener("blur", () => {
         const v = keyInput.value.trim();
         api.setKey(v).then(() => {
-          if (keyHint) keyHint.textContent = v ? "Saved" : "Not set";
           if (!v) hideMapToast();
         });
       });
@@ -15182,6 +15348,25 @@
       });
     }
     if (refreshBtn) refreshBtn.addEventListener("click", refreshModels);
+    const runBtn = document.getElementById("openrouter-run-btn");
+    if (runBtn) {
+      runBtn.addEventListener("click", () => {
+        runButtonOn = !runButtonOn;
+        runBtn.setAttribute("aria-pressed", runButtonOn ? "true" : "false");
+        if (runButtonOn) {
+          document.getElementById("openrouter-tab-tools")?.click();
+          precomputedAiOrders = null;
+          precomputedAiRangedOrders = null;
+          updateReadyButtonState();
+          startBackgroundRequestIfAllowed();
+        } else {
+          window.gameApi?.cancelRequestAiOrders?.();
+          precomputedAiOrders = null;
+          precomputedAiRangedOrders = null;
+          updateReadyButtonState();
+        }
+      });
+    }
     document.getElementById("map-toast-dismiss")?.addEventListener("click", hideMapToast);
     document.getElementById("ai-strategy-toast-dismiss")?.addEventListener("click", hideAiStrategyToast);
   }
@@ -15193,6 +15378,7 @@
     initOpenRouterUI();
     updateRangedSidebar();
     initNewGameButton();
+    updateReadyButtonState();
     document.getElementById("ranged-attack-btn")?.addEventListener("click", () => {
       if (rangedModeActive) {
         rangedModeActive = false;
@@ -15212,6 +15398,7 @@
         updateRangedSidebar();
         updateSidebar();
         updateGameOverUI(state);
+        updateReadyButtonState();
         redraw();
       }).catch((err) => console.error("getGameState failed:", err));
     }
@@ -15397,6 +15584,7 @@
         if (!window.gameApi) return;
         if (gameState?.gameOver) return;
         clearSidebarError();
+        updateReadyButtonState();
         try {
           const submitResult = await window.gameApi.submitOrders({
             movementOrders: pendingOrders,
@@ -15404,6 +15592,7 @@
           });
           if (!submitResult.success) {
             showSidebarError(submitResult.reason ?? "Submit failed");
+            updateReadyButtonState();
             return;
           }
           const humanMoves = gameState && pendingOrders.length > 0 ? pendingOrders.map((o) => {
@@ -15411,11 +15600,30 @@
             if (!from || from === o.toH3Index) return null;
             return { unitId: o.unitId, fromH3Index: from, toH3Index: o.toH3Index };
           }).filter((m) => m !== null) : [];
-          appendOpenRouterLog("Requesting AI orders\u2026");
-          const readyResult = await window.gameApi.ready();
+          const enabledToolGroupsPayload = Array.from(enabledToolGroups);
+          const usePrecomputed = runButtonOn && precomputedAiOrders !== null;
+          const readyPayload = {
+            enabledToolGroups: enabledToolGroupsPayload,
+            precomputedAiOrders: usePrecomputed ? precomputedAiOrders : [],
+            precomputedAiRangedOrders: usePrecomputed ? precomputedAiRangedOrders ?? [] : []
+          };
+          const readyResult = await window.gameApi.ready(readyPayload);
           if (!readyResult.success) {
             showSidebarError(readyResult.reason ?? "Ready failed");
+            updateReadyButtonState();
             return;
+          }
+          precomputedAiOrders = null;
+          precomputedAiRangedOrders = null;
+          if (readyResult.toolInvocationCounts) {
+            for (const [groupId, count] of Object.entries(readyResult.toolInvocationCounts)) {
+              toolInvocationCounts[groupId] = count;
+            }
+            updateOpenRouterToolCountLabels();
+          }
+          if (readyResult.cost !== void 0) {
+            openRouterGameCost += readyResult.cost;
+            updateOpenRouterCostLabel();
           }
           if (readyResult.aiSkipped) {
             appendOpenRouterLog(readyResult.aiSkipReason ?? "AI skipped.", true);
@@ -15494,9 +15702,12 @@
           updateRangedSidebar();
           updateSidebar();
           updateGameOverUI(state);
+          updateReadyButtonState();
+          if (runButtonOn) startBackgroundRequestIfAllowed();
           redraw();
         } catch (err) {
           showSidebarError(String(err));
+          updateReadyButtonState();
         }
       });
     }

@@ -8,11 +8,11 @@ import * as path from 'path';
 import { app, safeStorage } from 'electron';
 import { gridDistance } from 'h3-js';
 import { getAttack, getDefense, getRange } from './combatConstants';
-import { logDebug, logError } from './logger';
+import { logDebug, logError, logTrace } from './logger';
 import type { GameStateSnapshot } from './gameDb';
 import { setAiToolLimitExceededLastTurn, getAndClearAiToolLimitExceededLastTurn } from './gameDb';
-import { buildLatLngCoordinateMap } from './mapData';
-import { executeTool1 } from './tools/tool1Pathfinding';
+import { buildLatLngCoordinateMap, LATLNG_DECIMAL_PLACES } from './mapData';
+import { executeTool1, TOOL1_NAMES } from './tools/tool1Pathfinding';
 import { executeTool2, TOOL2_NAMES } from './tools/tool2Assessment';
 import { executeTool3, TOOL3_NAMES } from './tools/tool3CombatEstimation';
 
@@ -94,6 +94,60 @@ export function setSelectedModel(modelId: string): void {
  */
 export function getSelectedModel(): string {
   return selectedModelId;
+}
+
+/** Single tool group in the registry: id, display label, and API tool names (from TOOL*_NAMES). */
+export interface ToolGroupEntry {
+  id: string;
+  label: string;
+  toolNames: readonly string[];
+}
+
+/** Ordered registry of tool groups. Single source of truth for group id, label, and which API names belong to each group. */
+export const TOOL_GROUP_REGISTRY: ToolGroupEntry[] = [
+  { id: 'planning', label: 'Planning', toolNames: TOOL1_NAMES },
+  { id: 'assessment', label: 'Assessment', toolNames: TOOL2_NAMES },
+  { id: 'estimation', label: 'Estimation', toolNames: TOOL3_NAMES },
+];
+
+/**
+ * Returns the ordered list of tool groups for the UI (id and label only).
+ * Use so the renderer can build the Tools tab from a single source of truth.
+ */
+export function getToolGroupList(): { id: string; label: string }[] {
+  logTrace('openRouter getToolGroupList');
+  return TOOL_GROUP_REGISTRY.map((g) => ({ id: g.id, label: g.label }));
+}
+
+/**
+ * Returns all API tool names for the given enabled group IDs.
+ * Use when building the OpenRouter request (tools array and prompt) from enabled groups.
+ */
+export function getToolNamesForEnabledGroups(enabledGroupIds: string[]): string[] {
+  logTrace('openRouter getToolNamesForEnabledGroups', { enabledGroupIds });
+  const set = new Set<string>(enabledGroupIds);
+  const names: string[] = [];
+  for (const g of TOOL_GROUP_REGISTRY) {
+    if (set.has(g.id)) names.push(...g.toolNames);
+  }
+  return names;
+}
+
+/** Map from API tool name to its group id. Used for per-group invocation counting. */
+const TOOL_NAME_TO_GROUP_ID = (() => {
+  const m = new Map<string, string>();
+  for (const g of TOOL_GROUP_REGISTRY) {
+    for (const name of g.toolNames) m.set(name, g.id);
+  }
+  return m;
+})();
+
+/**
+ * Returns the tool group id for an API tool name, or undefined if unknown.
+ */
+export function getGroupIdForToolName(toolName: string): string | undefined {
+  logTrace('openRouter getGroupIdForToolName', { toolName });
+  return TOOL_NAME_TO_GROUP_ID.get(toolName);
 }
 
 export interface ModelItem {
@@ -231,19 +285,20 @@ const LATLNG_PREAMBLE = `Positions use [lat, lng] coordinates (latitude, longitu
 
 Response format: Reply with movementOrders and rangedAttacks using toXY and targetXY. Each is an array of two numbers [lat, lng]. Do not use toH3Index, targetH3Index, or any hex/string IDs.`;
 
-/** Formats [lat, lng] for the prompt (a few decimal places). */
+/** Formats [lat, lng] for the prompt using LATLNG_DECIMAL_PLACES to save tokens and match resolveToH3. */
 function formatLatLng(ll: [number, number]): string {
-  return `[${ll[0].toFixed(6)}, ${ll[1].toFixed(6)}]`;
+  return `[${ll[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${ll[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
 }
 
 /**
- * Builds the system prompt for the tool-calling flow: unit roster (ID, type, position [lat, lng]) for both sides,
- * turn number, objective, combat summary, and tool descriptions. No per-unit move lists; movement planning is done via plan_route and check_distance.
- * Injects a one-time warning if the previous turn exceeded the tool-call limit.
+ * Builds the system prompt for the tool-calling flow: unit roster, combat summary, and tool descriptions.
+ * When enabledToolNames is provided, the "AVAILABLE TOOLS" section includes only those tools (numbered 1..N).
+ * When omitted, all tools are included. Injects a one-time warning if the previous turn exceeded the tool-call limit.
  */
 function buildSystemPromptForTools(
   state: GameStateSnapshot,
-  coordMap: { latLngByH3: Map<string, [number, number]>; format: (h3: string) => string }
+  coordMap: { latLngByH3: Map<string, [number, number]>; format: (h3: string) => string },
+  enabledToolNames?: string[]
 ): string {
   const { latLngByH3, format } = coordMap;
   const opponentUnits = state.units.filter((u) => u.player === 'opponent');
@@ -270,19 +325,21 @@ function buildSystemPromptForTools(
     )
     .join('; ');
 
+  const filtered = getFilteredToolMetadata(enabledToolNames);
+  const toolsSection =
+    filtered.length === 0
+      ? '=== AVAILABLE TOOLS ===\nNo tools available.'
+      : `=== AVAILABLE TOOLS ===
+Use these tools for movement planning before submitting orders. You may use multiple rounds of tool calls and mix tool types (e.g. assess one unit, then plan_route for it, then assess another) if that helps.
+${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}`;
+
   return `You are the opponent in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}. Your objective is to destroy all human units. Move toward human units to get in ranged or melee range; do not stay passive.
 ${warning}
 ${LATLNG_PREAMBLE}
 
 Combat: each unit rolls d6 when attacking (hit if roll <= attack) or when defending (hit if roll <= defender's defense). Unit stats: ${combatSummary}. Ranged attacks are resolved using each unit's current position (before movement). Only issue a ranged attack if that unit is already within range of the target hex at the start of this turn; do not assume movement happens first. If a unit is moving this turn and would only be in range after the move, do not add a ranged attack for it this turn (it can fire next turn from its new position). Each unit may declare at most one ranged attack per turn: include each attacking unit at most once in rangedAttacks; if a unit can attack multiple enemies, choose one target (e.g. use estimate_combat to pick the best). Naval units can attack land units (they have range 2 and can target coastal or nearby hexes). To use naval fire effectively, get your naval units as close as possible to enemy land units, as soon as possible. Naval units move only on water. To move a naval unit toward a land target, call plan_route with that land unit's position as the destination; the tool will route to the nearest water hex to that position. When assess_unit reports canAttackThisTurn with attackType "ranged" for an enemy, issue a rangedAttack using that enemy's position as targetXY so your unit fires this turn.
 
-=== AVAILABLE TOOLS ===
-Use these tools for movement planning before submitting orders. You may use multiple rounds of tool calls and mix tool types (e.g. assess one unit, then plan_route for it, then assess another) if that helps.
-1. plan_route(unitId, destination, options?) - Compute the optimal path for a unit to a destination hex. Returns multi-turn route and orderToXY: the exact [lat, lng] for this turn's movement order (copy this into toXY for that unit). For naval units, you may pass a land unit's [lat, lng] as destination; the route will be to the nearest water hex to that position so the naval can get in range.
-2. check_distance(from, to, unitType) - Quick distance and turn estimate between two hexes. Use to compare options before requesting full routes.
-3. assess_unit(unitId, radius?) - Tactical briefing on one of your units: nearby enemies and friendlies, threats, and what you can attack this turn.
-4. assess_hex(position, forUnitType?) - Intelligence on a hex: terrain, units present, units in range, chokepoint analysis.
-5. estimate_combat(engagementType, attackers, targetHex, defenders?) - Predict the outcome of a ranged or melee engagement. Returns win probability, expected casualties, and a tactical assessment. Always check before committing to an attack.
+${toolsSection}
 
 Your units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}
 Human units: ${humanRoster || 'none'}
@@ -297,6 +354,10 @@ export interface RequestOrdersResult {
   strategy?: string;
   dropped?: number;
   dropReasons?: string[];
+  /** Per-group invocation counts for this turn. Keys are tool group ids (e.g. planning, assessment, estimation). */
+  toolInvocationCounts?: Record<string, number>;
+  /** Total cost in dollars for this request (sum of usage.cost across all round-trips in the tool loop). */
+  cost?: number;
 }
 export interface RequestOrdersError {
   success: false;
@@ -309,120 +370,133 @@ interface ToolDef {
   function: { name: string; description: string; parameters: { type: 'object'; properties: Record<string, unknown>; required?: string[] } };
 }
 
+/** Single source for tool schema and prompt line. Used to build both OpenRouter tools array and system prompt section. */
+interface ToolMeta {
+  name: string;
+  description: string;
+  parameters: { type: 'object'; properties: Record<string, unknown>; required?: string[] };
+  promptLine: string;
+}
+
+const ALL_TOOL_METADATA: ToolMeta[] = [
+  {
+    name: 'plan_route',
+    description: 'Compute the optimal path for a unit to a destination hex. Returns the full multi-turn route with per-turn waypoints. Use to understand how long moves take before committing.',
+    parameters: {
+      type: 'object',
+      properties: {
+        unitId: { type: 'string', description: 'ID of the unit to route (e.g. opponent-armor-1)' },
+        destination: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Target hex as [lat, lng]' },
+        options: {
+          type: 'object',
+          properties: {
+            avoidEnemies: { type: 'boolean', description: 'Route around known enemy positions (default true)' },
+            maxTurns: { type: 'number', description: 'Stop if route exceeds this many turns' },
+          },
+        },
+      },
+      required: ['unitId', 'destination'],
+    },
+    promptLine: 'plan_route(unitId, destination, options?) - Compute the optimal path for a unit to a destination hex. Returns multi-turn route and orderToXY: the exact [lat, lng] for this turn\'s movement order (copy this into toXY for that unit). For naval units, you may pass a land unit\'s [lat, lng] as destination; the route will be to the nearest water hex to that position so the naval can get in range.',
+  },
+  {
+    name: 'check_distance',
+    description: 'Quick distance and turn estimate between two hexes for a unit type. Use to compare options before requesting full routes.',
+    parameters: {
+      type: 'object',
+      properties: {
+        from: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Origin hex [lat, lng]' },
+        to: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Destination hex [lat, lng]' },
+        unitType: { type: 'string', enum: ['infantry', 'armor', 'naval'], description: 'Unit type for movement budget' },
+      },
+      required: ['from', 'to', 'unitType'],
+    },
+    promptLine: 'check_distance(from, to, unitType) - Quick distance and turn estimate between two hexes. Use to compare options before requesting full routes.',
+  },
+  {
+    name: 'assess_unit',
+    description: 'Tactical briefing on one of your units: nearby enemies and friendlies, threats, and what you can attack this turn.',
+    parameters: {
+      type: 'object',
+      properties: {
+        unitId: { type: 'string', description: 'ID of the unit to assess (e.g. opponent-armor-1)' },
+        radius: { type: 'number', description: 'How far out to scan in hexes (default 4)' },
+      },
+      required: ['unitId'],
+    },
+    promptLine: 'assess_unit(unitId, radius?) - Tactical briefing on one of your units: nearby enemies and friendlies, threats, and what you can attack this turn.',
+  },
+  {
+    name: 'assess_hex',
+    description: 'Intelligence on a hex: terrain, units present, units that can attack it, chokepoint analysis.',
+    parameters: {
+      type: 'object',
+      properties: {
+        position: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Hex to assess as [lat, lng]' },
+        forUnitType: { type: 'string', enum: ['infantry', 'armor', 'naval'], description: 'Assess from this unit type perspective (for chokepoint)' },
+      },
+      required: ['position'],
+    },
+    promptLine: 'assess_hex(position, forUnitType?) - Intelligence on a hex: terrain, units present, units in range, chokepoint analysis.',
+  },
+  {
+    name: 'estimate_combat',
+    description: 'Predict the outcome of a single ranged or melee engagement. Returns win probability, expected casualties, and a tactical assessment. Always check before committing to an attack.',
+    parameters: {
+      type: 'object',
+      properties: {
+        engagementType: { type: 'string', enum: ['ranged', 'melee'], description: 'Type of engagement' },
+        attackers: {
+          type: 'object',
+          properties: {
+            units: { type: 'array', items: { type: 'string' }, description: 'Attacking unit IDs' },
+            assumed: {
+              type: 'array',
+              items: { type: 'object', properties: { type: { type: 'string' }, count: { type: 'number' } }, required: ['type', 'count'] },
+              description: 'Hypothetical attackers by type and count (for what-if)',
+            },
+          },
+          description: 'Attackers: either units (IDs) or assumed (type, count)',
+        },
+        targetHex: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Target hex [lat, lng]' },
+        defenders: {
+          type: 'object',
+          properties: {
+            units: { type: 'array', items: { type: 'string' }, description: 'Defender unit IDs (overrides auto-detect)' },
+            assumed: {
+              type: 'array',
+              items: { type: 'object', properties: { type: { type: 'string' }, count: { type: 'number' } }, required: ['type', 'count'] },
+              description: 'Hypothetical defenders by type and count',
+            },
+          },
+          description: 'Optional. If omitted, defenders at target hex are used.',
+        },
+      },
+      required: ['engagementType', 'attackers', 'targetHex'],
+    },
+    promptLine: 'estimate_combat(engagementType, attackers, targetHex, defenders?) - Predict the outcome of a ranged or melee engagement. Returns win probability, expected casualties, and a tactical assessment. Always check before committing to an attack.',
+  },
+];
+
 /**
- * Returns the Tool 1 (pathfinding) tool definitions for the OpenRouter request.
- * Used so the model can call plan_route and check_distance before submitting orders.
+ * Returns tool metadata filtered by enabled tool names. If enabledToolNames is omitted, returns all tools.
+ * Used so both buildToolDefinitions and the system prompt "AVAILABLE TOOLS" section use the same filtered list.
  */
-function buildToolDefinitions(): ToolDef[] {
-  return [
-    {
-      type: 'function',
-      function: {
-        name: 'plan_route',
-        description: 'Compute the optimal path for a unit to a destination hex. Returns the full multi-turn route with per-turn waypoints. Use to understand how long moves take before committing.',
-        parameters: {
-          type: 'object',
-          properties: {
-            unitId: { type: 'string', description: 'ID of the unit to route (e.g. opponent-armor-1)' },
-            destination: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Target hex as [lat, lng]' },
-            options: {
-              type: 'object',
-              properties: {
-                avoidEnemies: { type: 'boolean', description: 'Route around known enemy positions (default true)' },
-                maxTurns: { type: 'number', description: 'Stop if route exceeds this many turns' },
-              },
-            },
-          },
-          required: ['unitId', 'destination'],
-        },
-      },
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'check_distance',
-        description: 'Quick distance and turn estimate between two hexes for a unit type. Use to compare options before requesting full routes.',
-        parameters: {
-          type: 'object',
-          properties: {
-            from: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Origin hex [lat, lng]' },
-            to: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Destination hex [lat, lng]' },
-            unitType: { type: 'string', enum: ['infantry', 'armor', 'naval'], description: 'Unit type for movement budget' },
-          },
-          required: ['from', 'to', 'unitType'],
-        },
-      },
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'assess_unit',
-        description: 'Tactical briefing on one of your units: nearby enemies and friendlies, threats, and what you can attack this turn.',
-        parameters: {
-          type: 'object',
-          properties: {
-            unitId: { type: 'string', description: 'ID of the unit to assess (e.g. opponent-armor-1)' },
-            radius: { type: 'number', description: 'How far out to scan in hexes (default 4)' },
-          },
-          required: ['unitId'],
-        },
-      },
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'assess_hex',
-        description: 'Intelligence on a hex: terrain, units present, units that can attack it, chokepoint analysis.',
-        parameters: {
-          type: 'object',
-          properties: {
-            position: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Hex to assess as [lat, lng]' },
-            forUnitType: { type: 'string', enum: ['infantry', 'armor', 'naval'], description: 'Assess from this unit type perspective (for chokepoint)' },
-          },
-          required: ['position'],
-        },
-      },
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'estimate_combat',
-        description: 'Predict the outcome of a single ranged or melee engagement. Returns win probability, expected casualties, and a tactical assessment. Always check before committing to an attack.',
-        parameters: {
-          type: 'object',
-          properties: {
-            engagementType: { type: 'string', enum: ['ranged', 'melee'], description: 'Type of engagement' },
-            attackers: {
-              type: 'object',
-              properties: {
-                units: { type: 'array', items: { type: 'string' }, description: 'Attacking unit IDs' },
-                assumed: {
-                  type: 'array',
-                  items: { type: 'object', properties: { type: { type: 'string' }, count: { type: 'number' } }, required: ['type', 'count'] },
-                  description: 'Hypothetical attackers by type and count (for what-if)',
-                },
-              },
-              description: 'Attackers: either units (IDs) or assumed (type, count)',
-            },
-            targetHex: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Target hex [lat, lng]' },
-            defenders: {
-              type: 'object',
-              properties: {
-                units: { type: 'array', items: { type: 'string' }, description: 'Defender unit IDs (overrides auto-detect)' },
-                assumed: {
-                  type: 'array',
-                  items: { type: 'object', properties: { type: { type: 'string' }, count: { type: 'number' } }, required: ['type', 'count'] },
-                  description: 'Hypothetical defenders by type and count',
-                },
-              },
-              description: 'Optional. If omitted, defenders at target hex are used.',
-            },
-          },
-          required: ['engagementType', 'attackers', 'targetHex'],
-        },
-      },
-    },
-  ];
+function getFilteredToolMetadata(enabledToolNames?: string[]): ToolMeta[] {
+  if (enabledToolNames === undefined) return [...ALL_TOOL_METADATA];
+  const set = new Set(enabledToolNames);
+  return ALL_TOOL_METADATA.filter((m) => set.has(m.name));
+}
+
+/**
+ * Returns OpenRouter tool definitions for the given enabled tool names.
+ * When enabledToolNames is omitted, returns all tools (current behavior).
+ */
+function buildToolDefinitions(enabledToolNames?: string[]): ToolDef[] {
+  return getFilteredToolMetadata(enabledToolNames).map((m) => ({
+    type: 'function' as const,
+    function: { name: m.name, description: m.description, parameters: m.parameters },
+  }));
 }
 
 /** Message type for the chat API (system, user, assistant, or tool). */
@@ -434,24 +508,45 @@ type ChatMessage =
 
 const MAX_TOOL_ITERATIONS = 10;
 
+export interface RequestOrdersOptions {
+  /** When provided, only these tool names are included in the request and prompt. When omitted, all tools are used. */
+  enabledToolNames?: string[];
+  /** Optional AbortSignal to cancel the request (e.g. when the user toggles Run off). Passed to fetch(); when aborted, returns { success: false, error: 'Cancelled' }. */
+  signal?: AbortSignal;
+  /** Optional sink for status log lines (e.g. to show in the renderer AI panel). Called for key events only. */
+  onLog?: (line: string, isError?: boolean) => void;
+}
+
 /**
  * Requests movement orders from the LLM for the opponent. Uses the tool-calling loop:
  * send prompt and tool definitions; if the model returns tool_calls, execute tools locally,
  * append results, and resend until the model returns final order JSON or the iteration limit (10) is reached.
+ * When options.enabledToolNames is provided, only those tools are sent and executed; disabled tool calls are skipped and not counted.
  * Validates and drops invalid orders. Never logs the API key.
  */
 export async function requestOrders(
   state: GameStateSnapshot,
-  modelId: string
+  modelId: string,
+  options?: RequestOrdersOptions
 ): Promise<RequestOrdersResult | RequestOrdersError> {
-  logDebug('openRouter requestOrders', { modelId, turnNumber: state.turnNumber });
+  const enabledToolNames = options?.enabledToolNames;
+  const signal = options?.signal;
+  const onLog = options?.onLog;
+  if (onLog) onLog('Requesting AI orders…');
+  logDebug('openRouter requestOrders', {
+    modelId,
+    turnNumber: state.turnNumber,
+    enabledTools: enabledToolNames === undefined ? 'all' : enabledToolNames.length,
+  });
   const key = loadKey();
   if (!key) {
     logError('openRouter requestOrders: no API key');
+    if (onLog) onLog('No API key set.', true);
     return { success: false, error: 'No API key set' };
   }
   if (!modelId.trim()) {
     logError('openRouter requestOrders: no model selected');
+    if (onLog) onLog('No model selected.', true);
     return { success: false, error: 'No model selected' };
   }
 
@@ -465,10 +560,18 @@ export async function requestOrders(
     },
   };
 
-  const systemPrompt = buildSystemPromptForTools(state, coordMap);
+  const enabledSet =
+    enabledToolNames === undefined
+      ? new Set(ALL_TOOL_METADATA.map((m) => m.name))
+      : new Set(enabledToolNames);
+
+  const systemPrompt = buildSystemPromptForTools(state, coordMap, enabledToolNames);
   const userMessage = `Use the tools as needed to plan movement, then submit your final orders as a single JSON object: { "strategy": "...", "movementOrders": [...], "rangedAttacks": [...] }. For each movement order, set toXY to the exact orderToXY from that unit's plan_route result (copy the numbers exactly).`;
 
-  const tools = buildToolDefinitions();
+  const tools = buildToolDefinitions(enabledToolNames);
+  const toolInvocationCounts: Record<string, number> = {};
+  for (const g of TOOL_GROUP_REGISTRY) toolInvocationCounts[g.id] = 0;
+
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userMessage },
@@ -478,6 +581,7 @@ export async function requestOrders(
   logDebug('openRouter requestOrders: user message', userMessage);
   logDebug('openRouter requestOrders: starting tool loop', { turnNumber: state.turnNumber });
 
+  let requestCost = 0;
   try {
     let iteration = 0;
     while (iteration < MAX_TOOL_ITERATIONS) {
@@ -490,19 +594,23 @@ export async function requestOrders(
         tool_choice: 'auto',
       };
 
-      const res = await fetch(OPENROUTER_CHAT_URL, {
+      const fetchInit: RequestInit = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${key}`,
         },
         body: JSON.stringify(body),
-      });
+      };
+      if (signal) fetchInit.signal = signal;
+      const res = await fetch(OPENROUTER_CHAT_URL, fetchInit);
 
       if (!res.ok) {
         const text = await res.text();
         logError('openRouter requestOrders: API error', res.status, text.slice(0, 200));
-        return { success: false, error: res.status === 401 ? 'Invalid API key' : `API error: ${res.status}` };
+        const msg = res.status === 401 ? 'Invalid API key' : `API error: ${res.status}`;
+        if (onLog) onLog(msg, true);
+        return { success: false, error: msg };
       }
 
       const json = (await res.json()) as {
@@ -512,10 +620,13 @@ export async function requestOrders(
             tool_calls?: Array<{ id: string; type: string; function: { name: string; arguments: string } }>;
           };
         }>;
+        usage?: { cost?: number };
       };
+      requestCost += json.usage?.cost ?? 0;
       const assistantMessage = json.choices?.[0]?.message;
       if (!assistantMessage) {
         logError('openRouter requestOrders: no message in response');
+        if (onLog) onLog('Invalid response: no message', true);
         return { success: false, error: 'Invalid response: no message' };
       }
 
@@ -537,14 +648,23 @@ export async function requestOrders(
         });
 
         for (const tc of toolCalls) {
+          const toolName = tc.function.name;
+          if (!enabledSet.has(toolName)) {
+            logDebug('openRouter requestOrders: tool call skipped (disabled)', { tool: toolName });
+            messages.push({
+              role: 'tool',
+              tool_call_id: tc.id,
+              content: JSON.stringify({ status: 'error', error: `Tool ${toolName} is disabled.` }),
+            });
+            continue;
+          }
           let args: unknown;
           try {
             args = JSON.parse(tc.function.arguments || '{}');
           } catch (err) {
-            logError('openRouter requestOrders: tool arguments parse error', tc.function.name, err);
+            logError('openRouter requestOrders: tool arguments parse error', toolName, err);
             args = {};
           }
-          const toolName = tc.function.name;
           const result = (TOOL3_NAMES as readonly string[]).includes(toolName)
             ? executeTool3(toolName, args, state, latLngByH3, resolveToH3)
             : (TOOL2_NAMES as readonly string[]).includes(toolName)
@@ -558,6 +678,8 @@ export async function requestOrders(
             payload: resultStr,
           });
           messages.push({ role: 'tool', tool_call_id: tc.id, content: resultStr });
+          const groupId = getGroupIdForToolName(toolName);
+          if (groupId !== undefined) toolInvocationCounts[groupId] = (toolInvocationCounts[groupId] ?? 0) + 1;
         }
         continue;
       }
@@ -565,6 +687,7 @@ export async function requestOrders(
       const content = assistantMessage.content;
       if (typeof content !== 'string' || !content.trim()) {
         logError('openRouter requestOrders: no content in final response');
+        if (onLog) onLog('Invalid response: no content', true);
         return { success: false, error: 'Invalid response: no content' };
       }
 
@@ -572,6 +695,7 @@ export async function requestOrders(
       const parsed = parseOrdersResponse(content, resolveToH3);
       if (!parsed) {
         logError('openRouter requestOrders: failed to parse JSON', content.slice(0, 300));
+        if (onLog) onLog('Could not parse orders from model.', true);
         return { success: false, error: 'Invalid response: could not parse orders' };
       }
 
@@ -614,7 +738,10 @@ export async function requestOrders(
           dropped: dropReasons.length,
           reasons: dropReasons,
         });
+        if (onLog) onLog(`Dropped ${dropReasons.length} invalid order(s).`, true);
       }
+
+      if (onLog) onLog(`Orders received: ${validated.length} movement, ${validatedRanged.length} ranged.`);
 
       return {
         success: true,
@@ -623,18 +750,29 @@ export async function requestOrders(
         strategy: parsed.strategy,
         dropped: dropReasons.length,
         dropReasons: dropReasons.length > 0 ? dropReasons : undefined,
+        toolInvocationCounts,
+        cost: requestCost > 0 ? requestCost : undefined,
       };
     }
 
     logError('openRouter requestOrders: exceeded tool-call limit', MAX_TOOL_ITERATIONS, state.turnNumber);
     setAiToolLimitExceededLastTurn();
+    if (onLog) onLog('Tool limit exceeded.', true);
     return {
       success: true,
       orders: [],
       dropped: 0,
+      toolInvocationCounts,
+      cost: requestCost > 0 ? requestCost : undefined,
     };
   } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      logDebug('openRouter requestOrders: cancelled');
+      if (onLog) onLog('Cancelled.');
+      return { success: false, error: 'Cancelled' };
+    }
     logError('openRouter requestOrders: exception', err);
+    if (onLog) onLog(String(err), true);
     return { success: false, error: String(err) };
   }
 }
