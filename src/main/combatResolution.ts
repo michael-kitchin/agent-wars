@@ -19,6 +19,131 @@ export interface CombatUnit {
   h3Index: string;
 }
 
+/** Result of resolving one ranged or melee engagement (who was removed). */
+export interface OneEngagementResult {
+  attackerRemovedIds: string[];
+  defenderRemovedIds: string[];
+}
+
+/**
+ * Resolves one round of a single ranged engagement: attacker rolls, optional return fire, assign hits by casualty priority.
+ * Used by runRangedPhase (game) and by Tool 3 (estimate_combat) with a simulation RNG. Does not mutate inputs.
+ * Returns IDs of units that would be removed; caller applies to game state or aggregates for Monte Carlo.
+ */
+export function resolveOneRangedEngagement(
+  attackerUnits: CombatUnit[],
+  defenderUnits: CombatUnit[],
+  defenderHexH3: string,
+  rollD6: () => number,
+  options?: { skipReturnFire?: boolean }
+): OneEngagementResult {
+  const attackerRemovedIds: string[] = [];
+  const defenderRemovedIds: string[] = [];
+  const removedAtk = new Set<string>();
+
+  const attackerHexes = [...new Set(attackerUnits.map((u) => u.h3Index))];
+  let attackerHits = 0;
+  for (const u of attackerUnits) {
+    if (rollD6() <= getAttack(u.unitType)) attackerHits++;
+  }
+  let defenderHits = 0;
+  if (!options?.skipReturnFire) {
+    for (const u of defenderUnits) {
+      const range = getRange(u.unitType);
+      if (range < 1) continue;
+      const canReturnFire = attackerHexes.some((h) => {
+        try {
+          return gridDistance(defenderHexH3, h) <= range;
+        } catch {
+          return false;
+        }
+      });
+      if (canReturnFire && rollD6() <= getAttack(u.unitType)) defenderHits++;
+    }
+  }
+
+  const defSorted = [...defenderUnits].sort(
+    (a, b) =>
+      getDefense(a.unitType) - getDefense(b.unitType) ||
+      casualtyPriorityIndex(a.unitType) - casualtyPriorityIndex(b.unitType)
+  );
+  for (let h = 0; h < attackerHits && h < defSorted.length; h++) {
+    defenderRemovedIds.push(defSorted[h]!.id);
+  }
+
+  for (let h = 0; h < defenderHits; h++) {
+    const atkAlive = attackerUnits.filter((u) => !removedAtk.has(u.id));
+    const byHex = new Map<string, CombatUnit[]>();
+    for (const u of atkAlive) {
+      const list = byHex.get(u.h3Index) ?? [];
+      list.push(u);
+      byHex.set(u.h3Index, list);
+    }
+    let bestHex: string | null = null;
+    let bestCount = -1;
+    for (const [hex, list] of byHex) {
+      if (list.length > bestCount || (list.length === bestCount && (bestHex === null || hex < bestHex!))) {
+        bestCount = list.length;
+        bestHex = hex;
+      }
+    }
+    if (!bestHex) break;
+    const unitsAtHex = (byHex.get(bestHex) ?? []).sort(
+      (a, b) =>
+        getDefense(a.unitType) - getDefense(b.unitType) ||
+        casualtyPriorityIndex(a.unitType) - casualtyPriorityIndex(b.unitType)
+    );
+    const u = unitsAtHex.find((x) => !removedAtk.has(x.id));
+    if (u) {
+      removedAtk.add(u.id);
+      attackerRemovedIds.push(u.id);
+    }
+  }
+
+  return { attackerRemovedIds, defenderRemovedIds };
+}
+
+/**
+ * Resolves one round of a single melee engagement: attacker rolls attack, defender rolls defense, assign hits by casualty priority.
+ * Used by runMeleePhase (game) and by Tool 3 (estimate_combat) with a simulation RNG. Does not mutate inputs.
+ */
+export function resolveOneMeleeEngagement(
+  attackerUnits: CombatUnit[],
+  defenderUnits: CombatUnit[],
+  rollD6: () => number
+): OneEngagementResult {
+  const attackerRemovedIds: string[] = [];
+  const defenderRemovedIds: string[] = [];
+
+  let atkHits = 0;
+  for (const u of attackerUnits) {
+    if (rollD6() <= getAttack(u.unitType)) atkHits++;
+  }
+  let defHits = 0;
+  for (const u of defenderUnits) {
+    if (rollD6() <= getDefense(u.unitType)) defHits++;
+  }
+
+  const defSorted = [...defenderUnits].sort(
+    (a, b) =>
+      getDefense(a.unitType) - getDefense(b.unitType) ||
+      casualtyPriorityIndex(a.unitType) - casualtyPriorityIndex(b.unitType)
+  );
+  for (let i = 0; i < atkHits && i < defSorted.length; i++) {
+    defenderRemovedIds.push(defSorted[i]!.id);
+  }
+  const atkSorted = [...attackerUnits].sort(
+    (a, b) =>
+      getDefense(a.unitType) - getDefense(b.unitType) ||
+      casualtyPriorityIndex(a.unitType) - casualtyPriorityIndex(b.unitType)
+  );
+  for (let i = 0; i < defHits && i < atkSorted.length; i++) {
+    attackerRemovedIds.push(atkSorted[i]!.id);
+  }
+
+  return { attackerRemovedIds, defenderRemovedIds };
+}
+
 /** Records which unit(s) caused a casualty (for kill announcements). */
 export interface KillRecord {
   victimId: string;
@@ -57,62 +182,6 @@ export function runRangedPhase(
 
   const kills: KillRecord[] = [];
 
-  const assignAttackerHitsToDefenderHex = (
-    defenderHex: string,
-    numHits: number,
-    attackerUnitIds: string[]
-  ): void => {
-    let unitsAtD = getUnitsAtHex(defenderHex).sort(
-      (a, b) =>
-        getDefense(a.unitType) - getDefense(b.unitType) ||
-        casualtyPriorityIndex(a.unitType) - casualtyPriorityIndex(b.unitType)
-    );
-    for (let h = 0; h < numHits && unitsAtD.length > 0; h++) {
-      const u = unitsAtD[0]!;
-      removed.add(u.id);
-      removedUnits.push({ id: u.id, player: u.player, unitType: u.unitType, h3Index: u.h3Index });
-      casualtyHexSet.add(u.h3Index);
-      kills.push({ victimId: u.id, killerIds: attackerUnitIds });
-      unitsAtD = getUnitsAtHex(defenderHex).sort(
-        (a, b) =>
-          getDefense(a.unitType) - getDefense(b.unitType) ||
-          casualtyPriorityIndex(a.unitType) - casualtyPriorityIndex(b.unitType)
-      );
-    }
-  };
-
-  const assignDefenderHitsToAttackerHexes = (
-    attackerHexToCount: Map<string, number>,
-    numHits: number,
-    defenderUnitIds: string[]
-  ): void => {
-    for (let h = 0; h < numHits; h++) {
-      let bestHex: string | null = null;
-      let bestCount = -1;
-      for (const [hex] of attackerHexToCount) {
-        const alive = getUnitsAtHex(hex).length;
-        if (alive <= 0) continue;
-        if (alive > bestCount || (alive === bestCount && (bestHex === null || hex < bestHex!))) {
-          bestCount = alive;
-          bestHex = hex;
-        }
-      }
-      if (!bestHex) break;
-      const unitsAtHex = getUnitsAtHex(bestHex).sort(
-        (a, b) =>
-          getDefense(a.unitType) - getDefense(b.unitType) ||
-          casualtyPriorityIndex(a.unitType) - casualtyPriorityIndex(b.unitType)
-      );
-      if (unitsAtHex.length > 0) {
-        const u = unitsAtHex[0]!;
-        removed.add(u.id);
-        removedUnits.push({ id: u.id, player: u.player, unitType: u.unitType, h3Index: u.h3Index });
-        casualtyHexSet.add(u.h3Index);
-        kills.push({ victimId: u.id, killerIds: defenderUnitIds });
-      }
-    }
-  };
-
   const rangedByDefender = new Map<string, { attackerHex: string; unitId: string }[]>();
   for (const order of rangedOrders) {
     const unit = unitList.find((u) => u.id === order.unitId && !removed.has(u.id));
@@ -135,34 +204,33 @@ export function runRangedPhase(
     combatHexes.push(defenderHex);
     for (const ah of attackerHexes) combatHexes.push(ah);
 
-    let attackerHits = 0;
-    for (const u of attackerUnits) {
-      if (rollD6() <= getAttack(u.unitType)) attackerHits++;
-    }
-    let defenderHits = 0;
-    for (const u of defenderUnits) {
-      const range = getRange(u.unitType);
-      if (range < 1) continue;
-      const canReturnFire = attackerHexes.some((attackerHex) => {
-        try {
-          return gridDistance(defenderHex, attackerHex) <= range;
-        } catch {
-          return false;
-        }
-      });
-      if (canReturnFire && rollD6() <= getAttack(u.unitType)) defenderHits++;
-    }
-
+    const { attackerRemovedIds, defenderRemovedIds } = resolveOneRangedEngagement(
+      attackerUnits,
+      defenderUnits,
+      defenderHex,
+      rollD6,
+      {}
+    );
     const attackerUnitIds = attackerUnits.map((u) => u.id);
     const defenderUnitIds = defenderUnits.map((u) => u.id);
-    assignAttackerHitsToDefenderHex(defenderHex, attackerHits, attackerUnitIds);
-
-    const attackerHexCount = new Map<string, number>();
-    for (const u of attackerUnits) {
-      if (removed.has(u.id)) continue;
-      attackerHexCount.set(u.h3Index, (attackerHexCount.get(u.h3Index) ?? 0) + 1);
+    for (const id of defenderRemovedIds) {
+      removed.add(id);
+      const u = unitList.find((x) => x.id === id);
+      if (u) {
+        removedUnits.push({ id: u.id, player: u.player, unitType: u.unitType, h3Index: u.h3Index });
+        casualtyHexSet.add(u.h3Index);
+        kills.push({ victimId: id, killerIds: attackerUnitIds });
+      }
     }
-    assignDefenderHitsToAttackerHexes(attackerHexCount, defenderHits, defenderUnitIds);
+    for (const id of attackerRemovedIds) {
+      removed.add(id);
+      const u = unitList.find((x) => x.id === id);
+      if (u) {
+        removedUnits.push({ id: u.id, player: u.player, unitType: u.unitType, h3Index: u.h3Index });
+        casualtyHexSet.add(u.h3Index);
+        kills.push({ victimId: id, killerIds: defenderUnitIds });
+      }
+    }
   }
 
   const combatHexSet = new Set(combatHexes);
@@ -228,39 +296,30 @@ export function runMeleePhase(
       const [attackerSide, defenderSide] = sidesOrdered;
       const atkUnits = unitsHere.filter((u) => u.player === attackerSide);
       const defUnits = unitsHere.filter((u) => u.player === defenderSide);
-      let atkHits = 0;
-      for (const u of atkUnits) {
-        if (rollD6() <= getAttack(u.unitType)) atkHits++;
-      }
-      let defHits = 0;
-      for (const u of defUnits) {
-        if (rollD6() <= getDefense(u.unitType)) defHits++;
-      }
-      const defSorted = [...defUnits].sort(
-        (a, b) =>
-          getDefense(a.unitType) - getDefense(b.unitType) ||
-          casualtyPriorityIndex(a.unitType) - casualtyPriorityIndex(b.unitType)
-      );
+      const { attackerRemovedIds, defenderRemovedIds } = resolveOneMeleeEngagement(atkUnits, defUnits, rollD6);
       const atkUnitIds = atkUnits.map((u) => u.id);
       const defUnitIds = defUnits.map((u) => u.id);
-      for (let i = 0; i < atkHits && i < defSorted.length; i++) {
-        const u = defSorted[i]!;
-        removed.add(u.id);
-        removedUnits.push({ id: u.id, player: u.player, unitType: u.unitType, h3Index: hex });
+      for (const id of defenderRemovedIds) {
+        removed.add(id);
+        removedUnits.push({
+          id,
+          player: defenderSide,
+          unitType: defUnits.find((u) => u.id === id)!.unitType,
+          h3Index: hex,
+        });
         casualtyHexSet.add(hex);
-        kills.push({ victimId: u.id, killerIds: atkUnitIds });
+        kills.push({ victimId: id, killerIds: atkUnitIds });
       }
-      const atkSorted = [...atkUnits].sort(
-        (a, b) =>
-          getDefense(a.unitType) - getDefense(b.unitType) ||
-          casualtyPriorityIndex(a.unitType) - casualtyPriorityIndex(b.unitType)
-      );
-      for (let i = 0; i < defHits && i < atkSorted.length; i++) {
-        const u = atkSorted[i]!;
-        removed.add(u.id);
-        removedUnits.push({ id: u.id, player: u.player, unitType: u.unitType, h3Index: hex });
+      for (const id of attackerRemovedIds) {
+        removed.add(id);
+        removedUnits.push({
+          id,
+          player: attackerSide,
+          unitType: atkUnits.find((u) => u.id === id)!.unitType,
+          h3Index: hex,
+        });
         casualtyHexSet.add(hex);
-        kills.push({ victimId: u.id, killerIds: defUnitIds });
+        kills.push({ victimId: id, killerIds: defUnitIds });
       }
     } else {
       for (let k = 0; k < sidesOrdered.length; k++) {
@@ -269,22 +328,22 @@ export function runMeleePhase(
         const atkUnits = getUnitsAtHex(hex).filter((u) => u.player === attackerSide);
         const defUnits = getUnitsAtHex(hex).filter((u) => u.player === defenderSide);
         if (atkUnits.length === 0 || defUnits.length === 0) continue;
-        let atkHits = 0;
-        for (const u of atkUnits) {
-          if (rollD6() <= getAttack(u.unitType)) atkHits++;
-        }
-        const defSorted = [...defUnits].sort(
-          (a, b) =>
-            getDefense(a.unitType) - getDefense(b.unitType) ||
-            casualtyPriorityIndex(a.unitType) - casualtyPriorityIndex(b.unitType)
-        );
+        const { attackerRemovedIds, defenderRemovedIds } = resolveOneMeleeEngagement(atkUnits, defUnits, rollD6);
         const atkUnitIds = atkUnits.map((u) => u.id);
-        for (let i = 0; i < atkHits && i < defSorted.length; i++) {
-          const u = defSorted[i]!;
-          removed.add(u.id);
+        const defUnitIds = defUnits.map((u) => u.id);
+        for (const id of defenderRemovedIds) {
+          removed.add(id);
+          const u = defUnits.find((x) => x.id === id)!;
           removedUnits.push({ id: u.id, player: u.player, unitType: u.unitType, h3Index: hex });
           casualtyHexSet.add(hex);
-          kills.push({ victimId: u.id, killerIds: atkUnitIds });
+          kills.push({ victimId: id, killerIds: atkUnitIds });
+        }
+        for (const id of attackerRemovedIds) {
+          removed.add(id);
+          const u = atkUnits.find((x) => x.id === id)!;
+          removedUnits.push({ id: u.id, player: u.player, unitType: u.unitType, h3Index: hex });
+          casualtyHexSet.add(hex);
+          kills.push({ victimId: id, killerIds: defUnitIds });
         }
       }
     }

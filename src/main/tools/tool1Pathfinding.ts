@@ -126,6 +126,27 @@ export interface CheckDistanceError {
 }
 
 /**
+ * Returns a short hint (including a leading space) to append to the standard plan_route "no path"
+ * error when destination terrain is known. Enables the LLM to retry with a valid destination
+ * (e.g. land unit to land hex, naval to water). Returns the empty string if terrain is unknown.
+ */
+function planRouteNoPathHint(passableFor: PassableDomain, destTerrain: string): string {
+  if (passableFor === 'land' && destTerrain === 'water') {
+    return ' Destination is water; land units cannot move there. Route this unit to a land hex (e.g. an enemy land unit\'s position).';
+  }
+  if (passableFor === 'land' && destTerrain === 'land') {
+    return ' No path found (destination may be on a different land mass).';
+  }
+  if (passableFor === 'water' && destTerrain === 'land') {
+    return ' Destination is land; naval units cannot move onto land. Use a land unit\'s position as destination to get a route to the nearest water hex.';
+  }
+  if (passableFor === 'water' && destTerrain === 'water') {
+    return ' No path to that water hex (may be in a different water body).';
+  }
+  return '';
+}
+
+/**
  * Executes plan_route: returns optimal path for a unit to a destination, with per-turn segments.
  * Call with game state and coordinate map; snaps destination to nearest map hex.
  */
@@ -148,13 +169,16 @@ export function executePlanRoute(
     return { status: 'error', error: `Unit not found: ${unitId}` };
   }
   if (!hexSet.has(unit.h3Index)) {
-    logError('tool1Pathfinding executePlanRoute: unit not on map', unitId, unit.h3Index);
+    logError('tool1Pathfinding executePlanRoute: unit not on map', unitId);
     return { status: 'error', error: `Unit not found: ${unitId}` };
   }
 
   let destH3 = resolveToH3(destination[0], destination[1]);
-  if (!destH3 || !hexSet.has(destH3)) {
-    return { status: 'error', error: 'No path exists — destination is impassable for this unit type or unreachable.' };
+  if (!destH3) {
+    return { status: 'error', error: 'No path exists - destination could not be resolved to a map hex.' };
+  }
+  if (!hexSet.has(destH3)) {
+    return { status: 'error', error: 'No path exists - destination is not on the map.' };
   }
 
   const originH3 = unit.h3Index;
@@ -178,6 +202,9 @@ export function executePlanRoute(
 
   if (originH3 === destH3) {
     const originLl = h3ToLatLng(originH3, latLngByH3);
+    const warningsWhenAlreadyThere: string[] = navalRedirectedToWater
+      ? ['Unit is already at the nearest water hex to that land position; no movement this turn.']
+      : [];
     return {
       status: 'ok',
       unitId,
@@ -188,7 +215,7 @@ export function executePlanRoute(
       hexDistance: 0,
       turnsRequired: 0,
       path: [],
-      warnings: [],
+      warnings: warningsWhenAlreadyThere,
     };
   }
 
@@ -199,7 +226,7 @@ export function executePlanRoute(
   }
   if (!path && blocked) {
     path = findPath(originH3, destH3, hexSet, terrainByH3, passableFor, undefined);
-    if (path) warnings.push('Route passes through enemy-occupied hexes — avoidance was not possible.');
+    if (path) warnings.push('Route passes through enemy-occupied hexes - avoidance was not possible.');
   }
   if (!path && unit.unitType === 'naval') {
     const fallbackWater = nearestReachableWaterHexTo(originH3, destH3, hexSet, terrainByH3, blocked);
@@ -211,7 +238,9 @@ export function executePlanRoute(
     }
   }
   if (!path) {
-    return { status: 'error', error: 'No path exists — destination is impassable for this unit type or unreachable.' };
+    const destTerrainAtError = terrainByH3.get(destH3) ?? 'land';
+    const hint = planRouteNoPathHint(passableFor, destTerrainAtError);
+    return { status: 'error', error: `No path exists - destination is impassable for this unit type or unreachable.${hint}` };
   }
 
   let turnsRequired = 0;
@@ -220,7 +249,7 @@ export function executePlanRoute(
 
   const maxTurns = options?.maxTurns;
   if (maxTurns != null && turnsRequired > maxTurns) {
-    warnings.push(`Route truncated at maxTurns limit — destination not reached in ${maxTurns} turns`);
+    warnings.push(`Route truncated at maxTurns limit - destination not reached in ${maxTurns} turns`);
     const stepsAllowed = maxTurns * movementBudget;
     const truncatedPath = path.slice(0, Math.min(path.length, stepsAllowed + 1));
     const truncatedSegments = partitionPathByTurn(truncatedPath, movementBudget);

@@ -1,0 +1,378 @@
+/**
+ * MCP Tool 2: Threat and Situation Assessment (assess_unit, assess_hex).
+ * Implements the tool API per the MCP tools spec; uses pathfinding, combat constants, and game state.
+ * All hex positions in tool responses are returned as [lat, lng]; H3 indices are never exposed.
+ */
+
+import { cellToLatLng, gridDistance, gridDisk } from 'h3-js';
+import type { GameStateSnapshot } from '../gameDb';
+import { getDistanceAndTurns, getMovementBudgetForUnit } from '../pathfinding';
+import type { PassableDomain } from '../pathfinding';
+import { getRange } from '../combatConstants';
+import { logDebug, logError, logTrace } from '../logger';
+
+/** Coordinate pair [lat, lng] at the tool boundary. */
+export type LatLng = [number, number];
+
+type LatLngMap = Map<string, LatLng>;
+
+/**
+ * Converts an H3 index to [lat, lng] for tool responses. Uses the coordinate map when present;
+ * falls back to cellToLatLng so we never expose raw H3 strings to the LLM.
+ */
+function h3ToLatLng(h3: string, latLngByH3: LatLngMap): LatLng {
+  const ll = latLngByH3.get(h3);
+  if (ll) return ll;
+  const [lat, lng] = cellToLatLng(h3);
+  return [lat, lng];
+}
+
+/**
+ * Returns path distance (hex steps) and estimated turns between two hexes for a unit type, or null if unreachable.
+ * Uses pathfinding module; land/water domain is derived from unit type. Use for assess_unit radius and turns.
+ */
+function getPathDistanceAndTurns(
+  originH3: string,
+  destH3: string,
+  unitType: string,
+  hexSet: Set<string>,
+  terrainByH3: Map<string, string>,
+  blocked?: Set<string>
+): { hexDistance: number; estimatedTurns: number } | null {
+  logTrace('tool2Assessment getPathDistanceAndTurns', { unitType });
+  const passableFor: PassableDomain = unitType === 'naval' ? 'water' : 'land';
+  const movementBudget = getMovementBudgetForUnit(unitType);
+  return getDistanceAndTurns(originH3, destH3, hexSet, terrainByH3, passableFor, movementBudget, blocked);
+}
+
+/**
+ * Returns H3 grid distance between two cells. Used for range checks (ranged/melee), not path distance.
+ * Throws if indices are invalid or different resolution; caller should catch and treat as unreachable/far.
+ */
+function getGridDistance(h3A: string, h3B: string): number {
+  logTrace('tool2Assessment getGridDistance');
+  return gridDistance(h3A, h3B);
+}
+
+/**
+ * Returns true if the attacker at attackerH3 can hit targetH3 with the given range stat (ranged attack).
+ */
+function isInRangedRange(attackerH3: string, targetH3: string, attackerRange: number): boolean {
+  logTrace('tool2Assessment isInRangedRange', { attackerRange });
+  try {
+    return getGridDistance(attackerH3, targetH3) <= attackerRange;
+  } catch (err) {
+    logError('tool2Assessment isInRangedRange: getGridDistance threw', err);
+    return false;
+  }
+}
+
+/**
+ * Returns true if the two units are in the same hex (melee range).
+ */
+function isInMeleeRange(unitH3: string, otherH3: string): boolean {
+  logTrace('tool2Assessment isInMeleeRange');
+  try {
+    return getGridDistance(unitH3, otherH3) === 0;
+  } catch (err) {
+    logError('tool2Assessment isInMeleeRange: getGridDistance threw', err);
+    return false;
+  }
+}
+
+/** Tool names for Tool 2. Exported so OpenRouter can route assess_unit and assess_hex to this module. */
+export const TOOL2_NAMES = ['assess_unit', 'assess_hex'] as const;
+
+/**
+ * Dispatcher for Tool 2 (Threat and Situation Assessment). Given tool name and parsed arguments, runs assess_unit or
+ * assess_hex and returns a JSON-serializable response. Use from the OpenRouter tool-calling loop when the model
+ * requests assess_unit or assess_hex. Every response has status ("ok" or "error") and error (null when ok).
+ * Throws are caught and returned as status "error" with error message.
+ */
+export function executeTool2(
+  toolName: string,
+  args: unknown,
+  state: GameStateSnapshot,
+  latLngByH3: LatLngMap,
+  resolveToH3: (lat: number, lng: number) => string | undefined
+): { status: string; error: string | null; [k: string]: unknown } {
+  logDebug('tool2Assessment executeTool2', { toolName, stateTurn: state.turnNumber });
+  if (toolName !== 'assess_unit' && toolName !== 'assess_hex') {
+    return { status: 'error', error: `Unknown tool: ${toolName}` };
+  }
+  try {
+    if (toolName === 'assess_unit') {
+      const a = args as { unitId?: unknown; radius?: unknown };
+      const unitId = typeof a?.unitId === 'string' ? a.unitId : undefined;
+      if (!unitId) {
+        return { status: 'error', error: 'assess_unit requires unitId (string)' };
+      }
+      let radius = 4;
+      if (typeof a?.radius === 'number' && a.radius > 0 && Number.isFinite(a.radius)) {
+        radius = Math.floor(a.radius);
+      }
+      return executeAssessUnit(unitId, radius, state, latLngByH3, resolveToH3);
+    }
+    if (toolName === 'assess_hex') {
+      const a = args as { position?: unknown; forUnitType?: unknown };
+      const posArr = Array.isArray(a?.position) && a.position.length >= 2 && a.position.every((n: unknown) => typeof n === 'number')
+        ? [Number((a.position as number[])[0]), Number((a.position as number[])[1])]
+        : undefined;
+      if (!posArr) {
+        return { status: 'error', error: 'assess_hex requires position as [lat, lng]' };
+      }
+      const pos: LatLng = [posArr[0]!, posArr[1]!];
+      const forUnitType = typeof a?.forUnitType === 'string' ? a.forUnitType : undefined;
+      return executeAssessHex(pos, forUnitType, state, latLngByH3, resolveToH3);
+    }
+  } catch (err) {
+    logError('tool2Assessment executeTool2: exception', toolName, err);
+    return { status: 'error', error: String(err) };
+  }
+  return { status: 'error', error: `Unknown tool: ${toolName}` };
+}
+
+/**
+ * Executes assess_unit: returns tactical briefing for one unit (nearby enemies/friendlies, threats, canAttackThisTurn).
+ * Use when the AI needs a situational summary for a specific unit. Requires unitId and optional radius (default 4).
+ * Returns status "ok" with unit, nearbyEnemies, nearbyFriendlies, threats, canAttackThisTurn; or status "error" with
+ * error message if the unit is not found or not on the map.
+ */
+function executeAssessUnit(
+  unitId: string,
+  radius: number,
+  state: GameStateSnapshot,
+  latLngByH3: LatLngMap,
+  resolveToH3: (lat: number, lng: number) => string | undefined
+): { status: string; error: string | null; [k: string]: unknown } {
+  logDebug('tool2Assessment executeAssessUnit', { unitId, radius, stateTurn: state.turnNumber });
+  const hexList = state.hexes.map((h) => h.h3Index);
+  const hexSet = new Set(hexList);
+  const terrainByH3 = new Map(state.hexes.map((h) => [h.h3Index, h.terrain]));
+  const unit = state.units.find((u) => u.id === unitId);
+  if (!unit) {
+    logError('tool2Assessment executeAssessUnit: unit not found', unitId);
+    return { status: 'error', error: `Unit not found: ${unitId}` };
+  }
+  if (!hexSet.has(unit.h3Index)) {
+    logError('tool2Assessment executeAssessUnit: unit not on map', unitId);
+    return { status: 'error', error: `Unit not found: ${unitId}` };
+  }
+  const movementBudget = getMovementBudgetForUnit(unit.unitType);
+  const terrain = terrainByH3.get(unit.h3Index) ?? 'land';
+  const unitPosition = h3ToLatLng(unit.h3Index, latLngByH3);
+
+  const nearbyEnemies: Array<{
+    unitId: string;
+    type: string;
+    position: LatLng;
+    hexDistance: number;
+    estimatedTurnsToReach: number;
+    inRangedRange: boolean;
+    inMeleeRange: boolean;
+    inEnemyRangedRange: boolean;
+    confidence: string;
+    lastSeen: number;
+  }> = [];
+  const nearbyFriendlies: Array<{
+    unitId: string;
+    type: string;
+    position: LatLng;
+    hexDistance: number;
+    estimatedTurnsToReach: number;
+  }> = [];
+  const threats: Array<{ description: string; severity: string; sourceUnit: string }> = [];
+  const canAttackThisTurn: Array<{ unitId: string; attackType: string; reason: string }> = [];
+
+  const myRange = getRange(unit.unitType);
+  for (const other of state.units) {
+    if (other.id === unitId) continue;
+    const gridDist = (() => {
+      try {
+        return getGridDistance(unit.h3Index, other.h3Index);
+      } catch {
+        return 999;
+      }
+    })();
+    const distResult = getPathDistanceAndTurns(unit.h3Index, other.h3Index, unit.unitType, hexSet, terrainByH3);
+    const pathWithinRadius = distResult !== null && distResult.hexDistance <= radius;
+    const gridWithinRadius = gridDist <= radius;
+    if (!pathWithinRadius && !gridWithinRadius) continue;
+    const hexDistance = distResult !== null ? distResult.hexDistance : gridDist;
+    const isEnemy = other.player !== unit.player;
+    const enemyRange = getRange(other.unitType);
+    const inRangedRange = gridDist <= myRange;
+    const inMeleeRange = gridDist === 0;
+    const enemyCanShootMe = gridDist <= enemyRange;
+
+    if (isEnemy) {
+      const estimatedTurnsToReach = distResult !== null
+        ? distResult.estimatedTurns
+        : 999;
+      const enemyToMe = getPathDistanceAndTurns(other.h3Index, unit.h3Index, other.unitType, hexSet, terrainByH3);
+      const enemyTurnsToReachMe = enemyToMe ? enemyToMe.estimatedTurns : (distResult !== null ? Math.ceil(hexDistance / getMovementBudgetForUnit(other.unitType)) : 999);
+      nearbyEnemies.push({
+        unitId: other.id,
+        type: other.unitType,
+        position: h3ToLatLng(other.h3Index, latLngByH3),
+        hexDistance,
+        estimatedTurnsToReach,
+        inRangedRange,
+        inMeleeRange,
+        inEnemyRangedRange: enemyCanShootMe,
+        confidence: 'current',
+        lastSeen: state.turnNumber,
+      });
+      let severity: string;
+      if (enemyCanShootMe || inMeleeRange) {
+        severity = 'critical';
+      } else if (enemyTurnsToReachMe <= 2) {
+        severity = 'moderate';
+      } else {
+        severity = 'low';
+      }
+      threats.push({
+        description: enemyTurnsToReachMe < 999
+          ? `${other.id} (${other.unitType}) can reach your hex in ${enemyTurnsToReachMe} turns`
+          : `${other.id} (${other.unitType}) at grid distance ${gridDist} (no path; e.g. different domain)`,
+        severity,
+        sourceUnit: other.id,
+      });
+      if (gridDist <= myRange) {
+        const attackType = gridDist === 0 ? 'melee' : 'ranged';
+        canAttackThisTurn.push({ unitId: other.id, attackType, reason: '' });
+      } else {
+        canAttackThisTurn.push({
+          unitId: other.id,
+          attackType: 'none',
+          reason: `Out of range (distance ${gridDist}, ${unit.unitType} range ${myRange})`,
+        });
+      }
+    } else {
+      if (!pathWithinRadius) continue;
+      const friendlyTurns = getPathDistanceAndTurns(other.h3Index, unit.h3Index, other.unitType, hexSet, terrainByH3);
+      const estimatedTurnsToReach = friendlyTurns ? friendlyTurns.estimatedTurns : Math.ceil(hexDistance / getMovementBudgetForUnit(other.unitType));
+      nearbyFriendlies.push({
+        unitId: other.id,
+        type: other.unitType,
+        position: h3ToLatLng(other.h3Index, latLngByH3),
+        hexDistance,
+        estimatedTurnsToReach,
+      });
+    }
+  }
+
+  nearbyEnemies.sort((a, b) => a.hexDistance - b.hexDistance);
+  nearbyFriendlies.sort((a, b) => a.hexDistance - b.hexDistance);
+
+  return {
+    status: 'ok',
+    error: null,
+    unit: {
+      unitId: unit.id,
+      type: unit.unitType,
+      position: unitPosition,
+      terrain,
+      movementBudget,
+      currentStandingOrder: null,
+    },
+    nearbyEnemies,
+    nearbyFriendlies,
+    threats,
+    canAttackThisTurn,
+  };
+}
+
+/**
+ * Executes assess_hex: returns terrain, passableBy, unitsAtHex, unitsInRange, adjacentTerrain, strategicNotes.
+ * Use when the AI needs to evaluate a hex (e.g. before moving there). Requires position [lat, lng]; forUnitType is optional.
+ * Returns status "ok" with full hex briefing; or status "error" with "Invalid hex position" if off-map.
+ */
+function executeAssessHex(
+  position: LatLng,
+  forUnitType: string | undefined,
+  state: GameStateSnapshot,
+  latLngByH3: LatLngMap,
+  resolveToH3: (lat: number, lng: number) => string | undefined
+): { status: string; error: string | null; [k: string]: unknown } {
+  logDebug('tool2Assessment executeAssessHex', { position: position.join(','), forUnitType, stateTurn: state.turnNumber });
+  const hexList = state.hexes.map((h) => h.h3Index);
+  const hexSet = new Set(hexList);
+  const terrainByH3 = new Map(state.hexes.map((h) => [h.h3Index, h.terrain]));
+  const hexH3 = resolveToH3(position[0], position[1]);
+  if (!hexH3 || !hexSet.has(hexH3)) {
+    logError('tool2Assessment executeAssessHex: invalid hex', position);
+    return { status: 'error', error: 'Invalid hex position' };
+  }
+  const terrain = terrainByH3.get(hexH3) ?? 'land';
+  const passableBy = terrain === 'water' ? ['naval'] : ['infantry', 'armor'];
+  const unitsAtHex = state.units
+    .filter((u) => u.h3Index === hexH3)
+    .map((u) => ({ unitId: u.id, type: u.unitType, position: h3ToLatLng(u.h3Index, latLngByH3) as LatLng }));
+
+  const aiPlayerId = 'opponent';
+  const enemies = state.units.filter((u) => u.player !== aiPlayerId);
+  const rangedRange1: Array<{ unitId: string; type: string; position: LatLng; hexDistance: number; confidence: string; lastSeen: number }> = [];
+  const rangedRange2: Array<{ unitId: string; type: string; position: LatLng; hexDistance: number; confidence: string; lastSeen: number }> = [];
+  const meleeRange: Array<{ unitId: string; type: string; position: LatLng; hexDistance: number; confidence: string; lastSeen: number }> = [];
+  for (const e of enemies) {
+    try {
+      const d = getGridDistance(e.h3Index, hexH3);
+      const r = getRange(e.unitType);
+      const entry = {
+        unitId: e.id,
+        type: e.unitType,
+        position: h3ToLatLng(e.h3Index, latLngByH3) as LatLng,
+        hexDistance: d,
+        confidence: 'current' as const,
+        lastSeen: state.turnNumber,
+      };
+      if (d === 0) meleeRange.push(entry);
+      else if (d === 1 && r >= 1) rangedRange1.push(entry);
+      else if (d === 2 && r >= 2) rangedRange2.push(entry);
+    } catch {
+      continue;
+    }
+  }
+
+  let adjacentLand = 0;
+  let adjacentWater = 0;
+  let passableNeighbors = 0;
+  const passableFor = forUnitType != null
+    ? (forUnitType === 'naval' ? 'water' : 'land')
+    : (terrain === 'water' ? 'water' : 'land');
+  try {
+    const ring = gridDisk(hexH3, 1);
+    for (let i = 1; i < ring.length; i++) {
+      const n = ring[i]!;
+      if (!hexSet.has(n)) continue;
+      const t = terrainByH3.get(n) ?? 'land';
+      if (t === 'land') adjacentLand++;
+      else adjacentWater++;
+      if (t === passableFor) passableNeighbors++;
+    }
+  } catch (err) {
+    logError('tool2Assessment executeAssessHex: gridDisk threw', err);
+  }
+  const adjacentTerrain = { land: adjacentLand, water: adjacentWater };
+  const strategicNotes: string[] = [];
+  if (adjacentWater > 0) {
+    strategicNotes.push('Adjacent to water - exposed to naval bombardment (range 2)');
+  }
+  if (passableNeighbors <= 3) {
+    strategicNotes.push(`Chokepoint - only ${passableNeighbors} passable adjacent hexes`);
+  }
+  strategicNotes.splice(3);
+
+  return {
+    status: 'ok',
+    error: null,
+    position: h3ToLatLng(hexH3, latLngByH3),
+    terrain,
+    passableBy,
+    unitsAtHex,
+    unitsInRange: { rangedRange1, rangedRange2, meleeRange },
+    adjacentTerrain,
+    strategicNotes,
+  };
+}

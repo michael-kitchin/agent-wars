@@ -67,7 +67,7 @@ function validateOrder(
   }
   const range = MOVEMENT_RANGE[unit.unit_type] ?? 1;
   if (dist > range) return { valid: false, reason: `${unit.unit_type} can move at most ${range} hex(es)` };
-  if (dist < 1) return { valid: false, reason: 'Destination must be different from current hex' };
+  /* dist === 0 (same hex) is allowed: "hold" / no move is valid. */
 
   const destTerrain = dbGetOne<{ terrain: string }>('SELECT terrain FROM hexes WHERE h3_index = ?', [toH3Index]);
   const terrain = destTerrain?.terrain ?? 'land';

@@ -24,12 +24,7 @@ export function findPath(
   passableFor: PassableDomain,
   blocked?: Set<string>
 ): string[] | null {
-  logDebug('pathfinding findPath', {
-    originH3,
-    destinationH3,
-    passableFor,
-    blockedCount: blocked?.size ?? 0,
-  });
+  logDebug('pathfinding findPath', { passableFor, blockedCount: blocked?.size ?? 0 });
   if (originH3 === destinationH3) return [originH3];
   if (!hexSet.has(originH3) || !hexSet.has(destinationH3)) return null;
   const wantLand = passableFor === 'land';
@@ -62,7 +57,7 @@ export function findPath(
     try {
       neighbors = gridDisk(current, 1);
     } catch (err) {
-      logError('pathfinding findPath: gridDisk threw', current, err);
+      logError('pathfinding findPath: gridDisk threw', err);
       continue;
     }
     for (const n of neighbors) {
@@ -163,7 +158,7 @@ export function getDistanceAndTurns(
   movementBudget: number,
   blocked?: Set<string>
 ): { hexDistance: number; estimatedTurns: number } | null {
-  logTrace('pathfinding getDistanceAndTurns', { originH3, destinationH3, passableFor });
+  logTrace('pathfinding getDistanceAndTurns', { passableFor });
   const path = findPath(originH3, destinationH3, hexSet, terrainByH3, passableFor, blocked);
   if (!path || path.length === 0) return null;
   const hexDistance = path.length - 1; // steps between hexes

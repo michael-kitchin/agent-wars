@@ -13,6 +13,8 @@ import type { GameStateSnapshot } from './gameDb';
 import { setAiToolLimitExceededLastTurn, getAndClearAiToolLimitExceededLastTurn } from './gameDb';
 import { buildLatLngCoordinateMap } from './mapData';
 import { executeTool1 } from './tools/tool1Pathfinding';
+import { executeTool2, TOOL2_NAMES } from './tools/tool2Assessment';
+import { executeTool3, TOOL3_NAMES } from './tools/tool3CombatEstimation';
 
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -160,7 +162,7 @@ function validateAiOrder(
   if (dist !== null) {
     const range = MOVEMENT_RANGE[unit.unitType] ?? 1;
     if (dist > range) return { valid: false, reason: `${unit.unitType} can move at most ${range} hex(es)` };
-    if (dist < 1) return { valid: false, reason: 'Destination must be different from current hex' };
+    /* dist === 0 (same hex) is allowed: "hold" / no move is valid. */
   } else {
     const validDests = getValidDestinations(unit, state);
     if (!validDests.includes(order.toH3Index)) return { valid: false, reason: 'Invalid distance' };
@@ -272,17 +274,20 @@ function buildSystemPromptForTools(
 ${warning}
 ${LATLNG_PREAMBLE}
 
-Combat: each unit rolls d6 when attacking (hit if roll ≤ attack) or when defending (hit if roll ≤ defender's defense). Unit stats — ${combatSummary}. Ranged attacks are resolved using each unit's current position (before movement). Only issue a ranged attack if that unit is already within range of the target hex this turn; do not assume movement happens first. Naval units can attack land units (they have range 2 and can target coastal or nearby hexes). To use naval fire effectively, get your naval units as close as possible to enemy land units, as soon as possible. Naval units move only on water. To move a naval unit toward a land target, call plan_route with that land unit's position as the destination; the tool will route to the nearest water hex to that position.
+Combat: each unit rolls d6 when attacking (hit if roll <= attack) or when defending (hit if roll <= defender's defense). Unit stats: ${combatSummary}. Ranged attacks are resolved using each unit's current position (before movement). Only issue a ranged attack if that unit is already within range of the target hex at the start of this turn; do not assume movement happens first. If a unit is moving this turn and would only be in range after the move, do not add a ranged attack for it this turn (it can fire next turn from its new position). Each unit may declare at most one ranged attack per turn: include each attacking unit at most once in rangedAttacks; if a unit can attack multiple enemies, choose one target (e.g. use estimate_combat to pick the best). Naval units can attack land units (they have range 2 and can target coastal or nearby hexes). To use naval fire effectively, get your naval units as close as possible to enemy land units, as soon as possible. Naval units move only on water. To move a naval unit toward a land target, call plan_route with that land unit's position as the destination; the tool will route to the nearest water hex to that position. When assess_unit reports canAttackThisTurn with attackType "ranged" for an enemy, issue a rangedAttack using that enemy's position as targetXY so your unit fires this turn.
 
 === AVAILABLE TOOLS ===
-Use these tools for movement planning before submitting orders.
-1. plan_route(unitId, destination, options?) — Compute the optimal path for a unit to a destination hex. Returns multi-turn route and orderToXY: the exact [lat, lng] for this turn's movement order (copy this into toXY for that unit). For naval units, you may pass a land unit's [lat, lng] as destination; the route will be to the nearest water hex to that position so the naval can get in range.
-2. check_distance(from, to, unitType) — Quick distance and turn estimate between two hexes. Use to compare options before requesting full routes.
+Use these tools for movement planning before submitting orders. You may use multiple rounds of tool calls and mix tool types (e.g. assess one unit, then plan_route for it, then assess another) if that helps.
+1. plan_route(unitId, destination, options?) - Compute the optimal path for a unit to a destination hex. Returns multi-turn route and orderToXY: the exact [lat, lng] for this turn's movement order (copy this into toXY for that unit). For naval units, you may pass a land unit's [lat, lng] as destination; the route will be to the nearest water hex to that position so the naval can get in range.
+2. check_distance(from, to, unitType) - Quick distance and turn estimate between two hexes. Use to compare options before requesting full routes.
+3. assess_unit(unitId, radius?) - Tactical briefing on one of your units: nearby enemies and friendlies, threats, and what you can attack this turn.
+4. assess_hex(position, forUnitType?) - Intelligence on a hex: terrain, units present, units in range, chokepoint analysis.
+5. estimate_combat(engagementType, attackers, targetHex, defenders?) - Predict the outcome of a ranged or melee engagement. Returns win probability, expected casualties, and a tactical assessment. Always check before committing to an attack.
 
 Your units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}
 Human units: ${humanRoster || 'none'}
 
-Submit your final orders as a JSON object only (valid JSON, no comments): { "strategy": "<one-line explanation>", "movementOrders": [ { "unitId": "<id>", "toXY": [lat, lng] }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetXY": [lat, lng] }, ... ] }. Use only toXY and targetXY as [lat, lng] arrays. Include "strategy". For each movement order: use the exact orderToXY from that unit's plan_route result as toXY — copy the two numbers exactly; do not round, interpolate, or invent coordinates or the order will be rejected.`;
+Submit your final orders as a JSON object only (valid JSON, no comments): { "strategy": "<one-line explanation>", "movementOrders": [ { "unitId": "<id>", "toXY": [lat, lng] }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetXY": [lat, lng] }, ... ] }. Use only toXY and targetXY as [lat, lng] arrays. Include "strategy". For each movement order: use the exact orderToXY from that unit's plan_route result as toXY (copy the two numbers exactly); do not round, interpolate, or invent coordinates or the order will be rejected. In rangedAttacks, list each unit at most once (one ranged attack per unit per turn); duplicate unitIds are dropped.`;
 }
 
 export interface RequestOrdersResult {
@@ -345,6 +350,75 @@ function buildToolDefinitions(): ToolDef[] {
             unitType: { type: 'string', enum: ['infantry', 'armor', 'naval'], description: 'Unit type for movement budget' },
           },
           required: ['from', 'to', 'unitType'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'assess_unit',
+        description: 'Tactical briefing on one of your units: nearby enemies and friendlies, threats, and what you can attack this turn.',
+        parameters: {
+          type: 'object',
+          properties: {
+            unitId: { type: 'string', description: 'ID of the unit to assess (e.g. opponent-armor-1)' },
+            radius: { type: 'number', description: 'How far out to scan in hexes (default 4)' },
+          },
+          required: ['unitId'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'assess_hex',
+        description: 'Intelligence on a hex: terrain, units present, units that can attack it, chokepoint analysis.',
+        parameters: {
+          type: 'object',
+          properties: {
+            position: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Hex to assess as [lat, lng]' },
+            forUnitType: { type: 'string', enum: ['infantry', 'armor', 'naval'], description: 'Assess from this unit type perspective (for chokepoint)' },
+          },
+          required: ['position'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'estimate_combat',
+        description: 'Predict the outcome of a single ranged or melee engagement. Returns win probability, expected casualties, and a tactical assessment. Always check before committing to an attack.',
+        parameters: {
+          type: 'object',
+          properties: {
+            engagementType: { type: 'string', enum: ['ranged', 'melee'], description: 'Type of engagement' },
+            attackers: {
+              type: 'object',
+              properties: {
+                units: { type: 'array', items: { type: 'string' }, description: 'Attacking unit IDs' },
+                assumed: {
+                  type: 'array',
+                  items: { type: 'object', properties: { type: { type: 'string' }, count: { type: 'number' } }, required: ['type', 'count'] },
+                  description: 'Hypothetical attackers by type and count (for what-if)',
+                },
+              },
+              description: 'Attackers: either units (IDs) or assumed (type, count)',
+            },
+            targetHex: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Target hex [lat, lng]' },
+            defenders: {
+              type: 'object',
+              properties: {
+                units: { type: 'array', items: { type: 'string' }, description: 'Defender unit IDs (overrides auto-detect)' },
+                assumed: {
+                  type: 'array',
+                  items: { type: 'object', properties: { type: { type: 'string' }, count: { type: 'number' } }, required: ['type', 'count'] },
+                  description: 'Hypothetical defenders by type and count',
+                },
+              },
+              description: 'Optional. If omitted, defenders at target hex are used.',
+            },
+          },
+          required: ['engagementType', 'attackers', 'targetHex'],
         },
       },
     },
@@ -470,14 +544,18 @@ export async function requestOrders(
             logError('openRouter requestOrders: tool arguments parse error', tc.function.name, err);
             args = {};
           }
-          const result = executeTool1(tc.function.name, args, state, latLngByH3, resolveToH3);
+          const toolName = tc.function.name;
+          const result = (TOOL3_NAMES as readonly string[]).includes(toolName)
+            ? executeTool3(toolName, args, state, latLngByH3, resolveToH3)
+            : (TOOL2_NAMES as readonly string[]).includes(toolName)
+              ? executeTool2(toolName, args, state, latLngByH3, resolveToH3)
+              : executeTool1(toolName, args, state, latLngByH3, resolveToH3);
           const resultStr = JSON.stringify(result);
-          logDebug('openRouter requestOrders: tool result', {
+          logDebug('openRouter requestOrders: tool result (full payload sent to LLM)', {
             turnNumber: state.turnNumber,
             playerId: 'opponent',
-            tool: tc.function.name,
-            status: (result as { status?: string }).status,
-            error: (result as { error?: string }).error ?? null,
+            tool: toolName,
+            payload: resultStr,
           });
           messages.push({ role: 'tool', tool_call_id: tc.id, content: resultStr });
         }
