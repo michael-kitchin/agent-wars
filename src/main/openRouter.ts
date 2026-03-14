@@ -414,7 +414,10 @@ function getMovementOrderInstruction(flags: ToolFlags): string {
  */
 function getInitialUserMessage(flags: ToolFlags): string {
   if (flags.planningEnabled) {
-    return `Use the tools as needed to plan movement, then submit your final orders as a single JSON object: { "strategy": "...", "movementOrders": [...], "rangedAttacks": [...] }. For each movement order, set toXY to the exact orderToXY from that unit's plan_route result (copy the numbers exactly).`;
+    const memoryNote = flags.memoryEnabled
+      ? ' You may use memory_write or memory_read when it would help (e.g. to remember a multi-turn plan); if you do not need memory this turn, submit orders as usual. '
+      : '';
+    return `${memoryNote}Use the tools as needed to plan movement, then submit your final orders as a single JSON object: { "strategy": "...", "movementOrders": [...], "rangedAttacks": [...] }. For each movement order, set toXY to the exact orderToXY from that unit's plan_route result (copy the numbers exactly).`;
   }
 
   const submitEmpty = ` Then submit your final JSON with "strategy": "<one-line>", "movementOrders": [], "rangedAttacks": [].`;
