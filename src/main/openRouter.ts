@@ -415,7 +415,7 @@ function getMovementOrderInstruction(flags: ToolFlags): string {
 function getInitialUserMessage(flags: ToolFlags): string {
   if (flags.planningEnabled) {
     const memoryNote = flags.memoryEnabled
-      ? ' You may use memory_write or memory_read when it would help (e.g. to remember a multi-turn plan); if you do not need memory this turn, submit orders as usual. '
+      ? ' Memory is available: you may use memory_write or memory_read when it would help (e.g. to remember a multi-turn plan), or skip memory and plan movement only. '
       : '';
     return `${memoryNote}Use the tools as needed to plan movement, then submit your final orders as a single JSON object: { "strategy": "...", "movementOrders": [...], "rangedAttacks": [...] }. For each movement order, set toXY to the exact orderToXY from that unit's plan_route result (copy the numbers exactly).`;
   }
@@ -487,7 +487,10 @@ function buildSystemPromptForTools(
   const filtered = getFilteredToolMetadata(enabledToolNames);
   const toolsIntro =
     flags.planningEnabled || flags.assessmentEnabled
-      ? 'Use these tools for movement planning before submitting orders. You may use multiple rounds of tool calls and mix tool types if that helps.'
+      ? 'Use these tools for movement planning before submitting orders. You may use multiple rounds of tool calls and mix tool types if that helps.' +
+        (flags.memoryEnabled
+          ? ' Memory is available: you may use memory_write to store or memory_read to recall context across turns when that would help; otherwise plan movement and submit orders as usual.'
+          : '')
       : 'Use only the tools listed below. Do not call tools that are not in the list.';
   const toolsSection =
     filtered.length === 0
@@ -504,7 +507,7 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}`;
     ? ' To move a naval unit toward a land target, call plan_route with that land unit\'s position as the destination; the tool will route to the nearest water hex to that position.'
     : '';
   const combatAssessHint = flags.assessmentEnabled
-    ? ' When assess_unit reports canAttackThisTurn with attackType "ranged" for an enemy, issue a rangedAttack using that enemy\'s position as targetXY so your unit fires this turn.'
+    ? ' When assess_unit reports canAttackThisTurn with attackType "ranged" for an enemy, issue a rangedAttack using that enemy\'s position as targetXY so your unit fires this turn. Naval units have range 2: if assess_unit shows a naval unit with inRangedRange: true for an enemy (including land units at 2 hexes), add a rangedAttack for that naval unit targeting that enemy.'
     : '';
 
   const adjacentCellsBlock = flags.fallbackMovementEnabled
@@ -516,7 +519,7 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}`;
 ${warning}
 ${LATLNG_PREAMBLE}
 
-Combat: each unit rolls d6 when attacking (hit if roll <= attack) or when defending (hit if roll <= defender's defense). Unit stats: ${combatSummary}. Ranged attacks are resolved using each unit's current position (before movement). Only issue a ranged attack if that unit is already within range of the target hex at the start of this turn; do not assume movement happens first. If a unit is moving this turn and would only be in range after the move, do not add a ranged attack for it this turn (it can fire next turn from its new position). Each unit may declare at most one ranged attack per turn: include each attacking unit at most once in rangedAttacks; if a unit can attack multiple enemies, choose one target${combatTargetHint} Naval units can attack land units (they have range 2 and can target coastal or nearby hexes). To use naval fire effectively, get your naval units as close as possible to enemy land units, as soon as possible. Naval units move only on water.${combatNavalPlan}${combatAssessHint}
+Combat: each unit rolls d6 when attacking (hit if roll <= attack) or when defending (hit if roll <= defender's defense). Unit stats: ${combatSummary}. Ranged attacks are resolved using each unit's current position (before movement). Only issue a ranged attack if that unit is already within range of the target hex at the start of this turn; do not assume movement happens first. If a unit is moving this turn and would only be in range after the move, do not add a ranged attack for it this turn (it can fire next turn from its new position). Each unit may declare at most one ranged attack per turn: include each attacking unit at most once in rangedAttacks; if a unit can attack multiple enemies, choose one target${combatTargetHint} Naval units can attack land units at 1 or 2 hexes (range 2). Always add a rangedAttack when a naval unit is within 2 hexes of an enemy land or naval unit at the start of the turn. To use naval fire effectively, get your naval units close to enemy land units, then issue rangedAttacks each turn. Naval units move only on water.${combatNavalPlan}${combatAssessHint}
 
 ${memoryBlock}${standingOrderBlock}${toolsSection}
 
