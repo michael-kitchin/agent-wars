@@ -680,7 +680,8 @@ export function generateOrdersForStandingOrders(
         const toH3 = resolveToH3(endHex[0], endHex[1]);
         if (toH3) {
           movementOrders.push({ unitId: row.unit_id, toH3Index: toH3 });
-          const nextIndex = (waypointIndex + 1) % waypoints.length;
+          const arrivesThisTurn = routeResult.turnsRequired <= 1;
+          const nextIndex = arrivesThisTurn ? (waypointIndex + 1) % waypoints.length : waypointIndex;
           const turnsRemaining = Math.max(0, routeResult.turnsRequired - 1);
           dbRun(
             'UPDATE standing_orders SET computed_route = ?, status = ? WHERE player_id = ? AND unit_id = ?',
@@ -692,6 +693,17 @@ export function generateOrdersForStandingOrders(
             ]
           );
         }
+      } else {
+        const nextIndex = (waypointIndex + 1) % waypoints.length;
+        dbRun(
+          'UPDATE standing_orders SET computed_route = ?, status = ? WHERE player_id = ? AND unit_id = ?',
+          [
+            JSON.stringify({ waypointIndex: nextIndex, turnsRemaining: 0 }),
+            'patrolling',
+            playerId,
+            row.unit_id,
+          ]
+        );
       }
       const enemies = state.units.filter((u) => u.player !== playerId);
       for (const e of enemies) {
@@ -783,7 +795,7 @@ export function getInjectionText(playerId: string, state: GameStateSnapshot): st
       : null;
     const nextMove = computed?.nextMoveHex;
     const turnsRemaining = Number(computed?.turnsRemaining ?? 0);
-    let bullet = `• ${row.unit_id}: ${row.order_type.toUpperCase()}`;
+    let bullet = `- ${row.unit_id}: ${row.order_type.toUpperCase()}`;
     if (row.order_type === 'march' && params.destination) {
       const d = params.destination as [number, number];
       bullet += ` to [${d[0].toFixed(3)}, ${d[1].toFixed(3)}]`;
