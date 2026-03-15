@@ -111,7 +111,9 @@ export function getReachableHexes(
 
 /**
  * Partitions a path into per-turn segments given a movement budget per turn.
- * Each segment has hexes (including start), movementSpent, movementBudget, and endHex.
+ * Each segment starts with the unit's position at the beginning of the turn (the previous
+ * segment's endHex) and includes each hex moved through. movementSpent is the number of
+ * hexes entered (each costing 1 movement point with uniform terrain costs).
  * Used to build the plan_route response path array.
  */
 export function partitionPathByTurn(
@@ -123,22 +125,20 @@ export function partitionPathByTurn(
   const segments: { turn: number; hexes: string[]; movementSpent: number; movementBudget: number; endHex: string }[] = [];
   let turn = 1;
   let i = 0;
-  while (i < pathH3.length) {
+  while (i < pathH3.length - 1) {
     let spent = 0;
     const hexes: string[] = [pathH3[i]!];
-    i++;
-    while (i < pathH3.length && spent < movementBudget) {
+    while (i + 1 < pathH3.length && spent < movementBudget) {
+      i++;
       hexes.push(pathH3[i]!);
       spent++;
-      i++;
     }
-    const endHex = hexes[hexes.length - 1]!;
     segments.push({
       turn,
       hexes,
       movementSpent: spent,
       movementBudget: movementBudget,
-      endHex,
+      endHex: pathH3[i]!,
     });
     turn++;
   }
