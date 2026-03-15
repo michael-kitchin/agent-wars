@@ -9,7 +9,7 @@ Grand strategy wargame with LLM opponents. This repo implements milestones throu
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 24+
 - npm 10+
 
 ## Quick start
