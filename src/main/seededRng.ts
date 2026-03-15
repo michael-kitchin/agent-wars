@@ -1,6 +1,8 @@
 /**
  * Seeded pseudo-random number generator for deterministic combat and participant IDs.
  * Mulberry32: one 32-bit state, returns next() in [0, 1). Same seed yields same sequence.
+ * The two Math.imul steps provide the avalanche effect that ensures small seed differences
+ * (e.g. consecutive turn numbers) produce uncorrelated output sequences.
  */
 
 /**
@@ -12,16 +14,10 @@
 export function createSeededRng(seed: number): () => number {
   let state = seed >>> 0;
   return function next(): number {
-    state = (state + 0x6d2b79f5) >>> 0; // mulberry32
-    const t = (state ^ (state >>> 15)) >>> 0;
-    return t / 0x100000000;
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1) >>> 0;
+    t = (t ^ (t + Math.imul(t ^ (t >>> 7), t | 61))) >>> 0;
+    return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
   };
-}
-
-/**
- * Returns a random integer in [min, max] (inclusive) using the given next function.
- */
-export function nextInt(next: () => number, min: number, max: number): number {
-  const range = max - min + 1;
-  return min + Math.floor(next() * 0x100000000 * range) % range;
 }
