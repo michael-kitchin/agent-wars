@@ -19,7 +19,7 @@ export type LatLng = [number, number];
 
 type LatLngMap = Map<string, LatLng>;
 
-const DEFAULT_TRIALS = 100;
+const DEFAULT_TRIALS = 1000;
 
 /** Calling player id when not in state: AI is opponent, so enemy = human. */
 const AI_PLAYER_ID = 'opponent';
