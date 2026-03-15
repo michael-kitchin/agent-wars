@@ -187,6 +187,7 @@ export function executePlanRoute(
   let blocked: Set<string> | undefined;
   if (avoidEnemies) {
     blocked = new Set(state.units.filter((u) => u.player !== unit.player).map((u) => u.h3Index));
+    blocked.delete(originH3);
   }
   const destTerrain = terrainByH3.get(destH3) ?? 'land';
   let navalRedirectedToWater = false;
@@ -197,6 +198,7 @@ export function executePlanRoute(
       navalRedirectedToWater = true;
     }
   }
+  if (blocked) blocked.delete(destH3);
 
   const movementBudget = getMovementBudgetForUnit(unit.unitType);
 
