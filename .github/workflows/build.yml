@@ -48,6 +48,13 @@ jobs:
         if: runner.os == 'macOS'
         run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --mac -c electron-builder.ci.json
 
+      - name: Remove intermediate build outputs
+        shell: bash
+        run: |
+          rm -f release/builder-debug.yml
+          rm -rf release/linux-unpacked
+          rm -rf release/win-unpacked
+
       - name: Upload release artifacts
         uses: actions/upload-artifact@v6
         with:
