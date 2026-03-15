@@ -52,7 +52,7 @@ jobs:
         shell: bash
         run: |
           rm -f release/builder-debug.yml
-          rm -rf release/linux-unpacked
+          rm -f release/*.tar.gz
           rm -rf release/win-unpacked
 
       - name: Upload release artifacts
