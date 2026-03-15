@@ -355,6 +355,34 @@ const MOVEMENT_INSTRUCTION_MEMORY_SUFFIX =
   ' You may use the memory tools to store or recall strategic context across turns.';
 
 /**
+ * Builds the "HOW TO USE TOOLS" guidance block, conditional on which tool groups are enabled.
+ * Appended at the end of the tools section so the LLM knows the recommended workflow.
+ */
+function buildToolUsageGuidance(flags: ToolFlags): string {
+  const lines: string[] = [];
+  if (flags.ordersEnabled || flags.memoryEnabled) {
+    lines.push('- Start by reviewing your standing order statuses and persistent strategic memory (both are shown above).');
+  }
+  if (flags.assessmentEnabled) {
+    lines.push('- Use assess_unit on units near the enemy to understand the tactical picture.');
+  }
+  if (flags.estimationEnabled) {
+    lines.push('- Use estimate_combat before any attack. Do not guess at combat odds.');
+  }
+  if (flags.planningEnabled) {
+    lines.push('- Use plan_route to understand multi-turn moves before issuing orders.');
+  }
+  if (flags.memoryEnabled) {
+    lines.push('- Use memory_write with tier "persistent" for your active strategic plan and key threat assessments (limit 5). Use tier "stored" for observations and details you may need later (limit 15).');
+  }
+  if (flags.ordersEnabled) {
+    lines.push('- Units with standing orders do not need explicit orders from you unless you want to override their current mission this turn.');
+  }
+  if (lines.length === 0) return '';
+  return '\n\nHOW TO USE THESE TOOLS EFFECTIVELY:\n' + lines.join('\n');
+}
+
+/**
  * Builds the "Adjacent cells (fallback)" block when Planning and Orders are both disabled.
  * Lists per-unit valid one-step destinations so the model can issue cell-to-cell moves without tools.
  */
@@ -492,12 +520,13 @@ function buildSystemPromptForTools(
           ? ' Memory is available: you may use memory_write to store or memory_read to recall context across turns when that would help; otherwise plan movement and submit orders as usual.'
           : '')
       : 'Use only the tools listed below. Do not call tools that are not in the list.';
+  const toolGuidance = buildToolUsageGuidance(flags);
   const toolsSection =
     filtered.length === 0
       ? '=== AVAILABLE TOOLS ===\nNo tools available.'
       : `=== AVAILABLE TOOLS ===
 ${toolsIntro}
-${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}`;
+${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}`;
 
   const memoryBlock = flags.memoryEnabled ? getInjectionText('opponent', state.turnNumber) + '\n\n' : '';
   const standingOrderBlock = flags.ordersEnabled ? getStandingOrderInjectionText('opponent', state) + '\n\n' : '';
@@ -507,7 +536,7 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}`;
     ? ' To move a naval unit toward a land target, call plan_route with that land unit\'s position as the destination; the tool will route to the nearest water hex to that position.'
     : '';
   const combatAssessHint = flags.assessmentEnabled
-    ? ' When assess_unit reports canAttackThisTurn with attackType "ranged" for an enemy, issue a rangedAttack using that enemy\'s position as targetXY so your unit fires this turn. Naval units have range 2: if assess_unit shows a naval unit with inRangedRange: true for an enemy (including land units at 2 hexes), add a rangedAttack for that naval unit targeting that enemy.'
+    ? ' When assess_unit reports canAttackThisTurn with attackType "ranged" for an enemy, issue a rangedAttack using that enemy\'s position as targetXY so your unit fires this turn. Naval units have range 2: if assess_unit shows a naval unit with inRangedRange: true for an enemy (including land units at 2 hexes), add a rangedAttack for that naval unit targeting that enemy. Note: inEnemyRangedRange means that enemy can fire at YOUR unit from its current position (you are in danger); inRangedRange means YOUR unit can fire at that enemy.'
     : '';
 
   const adjacentCellsBlock = flags.fallbackMovementEnabled
