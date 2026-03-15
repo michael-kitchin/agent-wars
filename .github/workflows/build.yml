@@ -40,18 +40,18 @@ jobs:
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
-        run: npm run dist:win
+        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --win -c.build.publish=null
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
-        run: npm run dist:linux
+        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --linux -c.build.publish=null && node scripts/post-linux-pack.js
 
       - name: Build (macOS)
         if: runner.os == 'macOS'
-        run: npm run dist:mac
+        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --mac -c.build.publish=null
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release-${{ runner.os }}
+          name: agent-wars-m0.5-${{ runner.os }}
           path: release/
