@@ -168,7 +168,7 @@ function executeAssessUnit(
     type: string;
     position: LatLng;
     hexDistance: number;
-    estimatedTurnsToReach: number;
+    estimatedTurnsToReach: number | null;
     inRangedRange: boolean;
     inMeleeRange: boolean;
     inEnemyRangedRange: boolean;
@@ -209,9 +209,11 @@ function executeAssessUnit(
     if (isEnemy) {
       const estimatedTurnsToReach = distResult !== null
         ? distResult.estimatedTurns
-        : 999;
+        : null;
       const enemyToMe = getPathDistanceAndTurns(other.h3Index, unit.h3Index, other.unitType, hexSet, terrainByH3);
-      const enemyTurnsToReachMe = enemyToMe ? enemyToMe.estimatedTurns : (distResult !== null ? Math.ceil(hexDistance / getMovementBudgetForUnit(other.unitType)) : 999);
+      const enemyTurnsToReachMe: number | null = enemyToMe
+        ? enemyToMe.estimatedTurns
+        : (distResult !== null ? Math.ceil(hexDistance / getMovementBudgetForUnit(other.unitType)) : null);
       nearbyEnemies.push({
         unitId: other.id,
         type: other.unitType,
@@ -227,13 +229,13 @@ function executeAssessUnit(
       let severity: string;
       if (enemyCanShootMe || inMeleeRange) {
         severity = 'critical';
-      } else if (enemyTurnsToReachMe <= 2) {
+      } else if (enemyTurnsToReachMe !== null && enemyTurnsToReachMe <= 2) {
         severity = 'moderate';
       } else {
         severity = 'low';
       }
       threats.push({
-        description: enemyTurnsToReachMe < 999
+        description: enemyTurnsToReachMe !== null
           ? `${other.id} (${other.unitType}) can reach your hex in ${enemyTurnsToReachMe} turns`
           : `${other.id} (${other.unitType}) at grid distance ${gridDist} (no path; e.g. different domain)`,
         severity,
@@ -266,7 +268,7 @@ function executeAssessUnit(
   nearbyEnemies.sort((a, b) => a.hexDistance - b.hexDistance);
   nearbyFriendlies.sort((a, b) => a.hexDistance - b.hexDistance);
 
-  const currentStandingOrder = getStandingOrderForUnit('opponent', unit.id);
+  const currentStandingOrder = getStandingOrderForUnit(unit.player, unit.id);
 
   return {
     status: 'ok',
