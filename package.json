@@ -22,7 +22,7 @@
   "build": {
     "appId": "com.agent-wars.app",
     "productName": "Agent Wars",
-    "publish": "never",
+    "publish": [],
     "directories": {
       "output": "release"
     },
