@@ -694,6 +694,9 @@ export function generateOrdersForStandingOrders(
           );
         }
       } else {
+        logDebug('tool5StandingOrders patrol: unit at waypoint with empty path, advancing index', {
+          unitId: row.unit_id, waypointIndex, nextIndex: (waypointIndex + 1) % waypoints.length,
+        });
         const nextIndex = (waypointIndex + 1) % waypoints.length;
         dbRun(
           'UPDATE standing_orders SET computed_route = ?, status = ? WHERE player_id = ? AND unit_id = ?',
