@@ -1,3 +1,19 @@
 {
-  "publish": null
+  "appId": "com.agent-wars.app",
+  "productName": "Agent Wars",
+  "publish": null,
+  "directories": {
+    "output": "release"
+  },
+  "files": ["dist", "static", "package.json", "node_modules"],
+  "win": {
+    "target": ["nsis", "portable"]
+  },
+  "linux": {
+    "target": ["dir"]
+  },
+  "mac": {
+    "target": ["dir"],
+    "category": "public.app-category.games"
+  }
 }
