@@ -40,15 +40,15 @@ jobs:
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
-        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --win -c.build.publish=null
+        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --win -c electron-builder.ci.json
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
-        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --linux -c.build.publish=null && node scripts/post-linux-pack.js
+        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --linux -c electron-builder.ci.json && node scripts/post-linux-pack.js
 
       - name: Build (macOS)
         if: runner.os == 'macOS'
-        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --mac -c.build.publish=null
+        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --mac -c electron-builder.ci.json
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
