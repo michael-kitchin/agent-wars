@@ -374,6 +374,11 @@ let precomputedAiStrategy: string | null = null;
 /** True while a background requestAiOrders call is in flight; used to avoid duplicate requests and to guard start. */
 let backgroundRequestInFlight = false;
 
+/** When the Ready button is disabled waiting on AI, time (ms) when that state started; null otherwise. */
+let readyBtnAiWaitStartTime: number | null = null;
+/** Interval id for updating the Ready button AI wait counter; cleared when no longer waiting. */
+let readyBtnAiWaitIntervalId: ReturnType<typeof setInterval> | null = null;
+
 /** Total OpenRouter API cost in dollars for the current game session. Reset on new game. */
 let openRouterGameCost = 0;
 
@@ -473,16 +478,60 @@ function renderOpenRouterToolsList(): void {
   }
 }
 
+/** Formats elapsed milliseconds as "MM:SS" (e.g. 00:00, 01:23). */
+function formatElapsedMmSs(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+/** Sets the Ready button label to plain "Ready" (when enabled or disabled for game over). */
+function setReadyButtonLabelReady(readyBtn: HTMLButtonElement): void {
+  readyBtn.textContent = 'Ready';
+}
+
+/** Sets the Ready button label to bold "AI: " plus MM:SS counter (when disabled waiting on LLM). */
+function setReadyButtonLabelAiWait(readyBtn: HTMLButtonElement, elapsedMs: number): void {
+  readyBtn.textContent = '';
+  const strong = document.createElement('strong');
+  strong.textContent = 'AI: ';
+  readyBtn.appendChild(strong);
+  readyBtn.appendChild(document.createTextNode(formatElapsedMmSs(elapsedMs)));
+}
+
 /**
  * Single source of truth for Ready button enabled state. Run off ⇒ Ready enabled (unless game over).
- * Run on ⇒ Ready enabled only when precomputed AI orders are available. Call after load, new game,
- * Run toggle, background result, Ready click start, and whenever game state is applied.
+ * Run on ⇒ Ready enabled only when precomputed AI orders are available. When disabled waiting on
+ * the LLM, shows "AI: MM:SS" with a running counter. Call after load, new game, Run toggle,
+ * background result, Ready click start, and whenever game state is applied.
  */
 function updateReadyButtonState(): void {
   const readyBtn = document.getElementById('ready-btn') as HTMLButtonElement | null;
   if (!readyBtn) return;
   const gameOver = gameState?.gameOver ?? false;
-  readyBtn.disabled = gameOver || (runButtonOn && precomputedAiOrders === null);
+  const waitingOnAi = runButtonOn && precomputedAiOrders === null;
+  readyBtn.disabled = gameOver || waitingOnAi;
+
+  if (waitingOnAi) {
+    const now = Date.now();
+    if (readyBtnAiWaitStartTime === null) {
+      readyBtnAiWaitStartTime = now;
+      readyBtnAiWaitIntervalId = setInterval(() => {
+        if (readyBtnAiWaitStartTime === null) return;
+        const btn = document.getElementById('ready-btn') as HTMLButtonElement | null;
+        if (btn) setReadyButtonLabelAiWait(btn, Date.now() - readyBtnAiWaitStartTime);
+      }, 1000);
+    }
+    setReadyButtonLabelAiWait(readyBtn, now - (readyBtnAiWaitStartTime ?? now));
+  } else {
+    if (readyBtnAiWaitIntervalId !== null) {
+      clearInterval(readyBtnAiWaitIntervalId);
+      readyBtnAiWaitIntervalId = null;
+    }
+    readyBtnAiWaitStartTime = null;
+    setReadyButtonLabelReady(readyBtn);
+  }
 }
 
 /**

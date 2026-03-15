@@ -14419,6 +14419,8 @@
   var precomputedAiRangedOrders = null;
   var precomputedAiStrategy = null;
   var backgroundRequestInFlight = false;
+  var readyBtnAiWaitStartTime = null;
+  var readyBtnAiWaitIntervalId = null;
   var openRouterGameCost = 0;
   function startBackgroundRequestIfAllowed() {
     if (backgroundRequestInFlight || !runButtonOn || gameState?.phase !== "planning") return;
@@ -14502,11 +14504,47 @@
       container.appendChild(cell);
     }
   }
+  function formatElapsedMmSs(ms) {
+    const totalSeconds = Math.floor(ms / 1e3);
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
+  function setReadyButtonLabelReady(readyBtn) {
+    readyBtn.textContent = "Ready";
+  }
+  function setReadyButtonLabelAiWait(readyBtn, elapsedMs) {
+    readyBtn.textContent = "";
+    const strong = document.createElement("strong");
+    strong.textContent = "AI: ";
+    readyBtn.appendChild(strong);
+    readyBtn.appendChild(document.createTextNode(formatElapsedMmSs(elapsedMs)));
+  }
   function updateReadyButtonState() {
     const readyBtn = document.getElementById("ready-btn");
     if (!readyBtn) return;
     const gameOver = gameState?.gameOver ?? false;
-    readyBtn.disabled = gameOver || runButtonOn && precomputedAiOrders === null;
+    const waitingOnAi = runButtonOn && precomputedAiOrders === null;
+    readyBtn.disabled = gameOver || waitingOnAi;
+    if (waitingOnAi) {
+      const now = Date.now();
+      if (readyBtnAiWaitStartTime === null) {
+        readyBtnAiWaitStartTime = now;
+        readyBtnAiWaitIntervalId = setInterval(() => {
+          if (readyBtnAiWaitStartTime === null) return;
+          const btn = document.getElementById("ready-btn");
+          if (btn) setReadyButtonLabelAiWait(btn, Date.now() - readyBtnAiWaitStartTime);
+        }, 1e3);
+      }
+      setReadyButtonLabelAiWait(readyBtn, now - (readyBtnAiWaitStartTime ?? now));
+    } else {
+      if (readyBtnAiWaitIntervalId !== null) {
+        clearInterval(readyBtnAiWaitIntervalId);
+        readyBtnAiWaitIntervalId = null;
+      }
+      readyBtnAiWaitStartTime = null;
+      setReadyButtonLabelReady(readyBtn);
+    }
   }
   function updateOpenRouterToolCountLabels() {
     for (const group of openRouterToolGroups) {
