@@ -364,7 +364,7 @@ function buildToolUsageGuidance(flags: ToolFlags): string {
     lines.push('- Start by reviewing your standing order statuses and persistent strategic memory (both are shown above).');
   }
   if (flags.assessmentEnabled) {
-    lines.push('- Use assess_unit on units near the enemy to understand the tactical picture.');
+    lines.push('- Use assess_unit on units near the enemy to understand the tactical picture. Skip assessment for rear-echelon units far from all enemies — their situation rarely changes turn to turn.');
   }
   if (flags.estimationEnabled) {
     lines.push('- Use estimate_combat before any attack. Do not guess at combat odds.');
@@ -377,6 +377,9 @@ function buildToolUsageGuidance(flags: ToolFlags): string {
   }
   if (flags.ordersEnabled) {
     lines.push('- Units with standing orders do not need explicit orders from you unless you want to override their current mission this turn.');
+    if (flags.planningEnabled) {
+      lines.push('- For units several turns from combat, assign a march or pursue standing order instead of re-planning their route every turn. This saves tool calls and prevents changing targets between turns.');
+    }
   }
   if (lines.length === 0) return '';
   return '\n\nHOW TO USE THESE TOOLS EFFECTIVELY:\n' + lines.join('\n');
@@ -513,13 +516,17 @@ function buildSystemPromptForTools(
     .join('; ');
 
   const filtered = getFilteredToolMetadata(enabledToolNames);
-  const toolsIntro =
-    flags.planningEnabled || flags.assessmentEnabled
-      ? 'Use these tools for movement planning before submitting orders. You may use multiple rounds of tool calls and mix tool types if that helps.' +
-        (flags.memoryEnabled
-          ? ' Memory is available: you may use memory_write to store or memory_read to recall context across turns when that would help; otherwise plan movement and submit orders as usual.'
-          : '')
-      : 'Use only the tools listed below. Do not call tools that are not in the list.';
+  const toolsIntroPurpose = flags.planningEnabled
+    ? 'plan movement and assess the battlefield'
+    : flags.assessmentEnabled
+      ? 'assess the tactical situation'
+      : undefined;
+  const toolsIntro = toolsIntroPurpose
+    ? `Use these tools to ${toolsIntroPurpose} before submitting orders. You may use multiple rounds of tool calls and mix tool types if that helps.` +
+      (flags.memoryEnabled
+        ? ' Memory is available: you may use memory_write to store or memory_read to recall context across turns when that would help; otherwise submit orders as usual.'
+        : '')
+    : 'Use only the tools listed below. Do not call tools that are not in the list.';
   const toolGuidance = buildToolUsageGuidance(flags);
   const toolsSection =
     filtered.length === 0
@@ -553,7 +560,7 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
 
 ${LATLNG_PREAMBLE}
 
-Combat: each unit rolls d6 when attacking (hit if roll <= attack) or when defending (hit if roll <= defender's defense). Unit stats: ${combatSummary}. Ranged attacks are resolved using each unit's current position (before movement). Only issue a ranged attack if that unit is already within range of the target hex at the start of this turn; do not assume movement happens first. If a unit is moving this turn and would only be in range after the move, do not add a ranged attack for it this turn (it can fire next turn from its new position). Each unit may declare at most one ranged attack per turn: include each attacking unit at most once in rangedAttacks; if a unit can attack multiple enemies, choose one target${combatTargetHint}${navalCoaching}${combatAssessHint}
+Combat: each unit rolls d6 when attacking (hit if roll <= attack) or when defending (hit if roll <= defender's defense). Unit stats: ${combatSummary}. Ranged attacks are resolved using each unit's current position (before movement). Only issue a ranged attack if that unit is already within range of the target hex at the start of this turn; do not assume movement happens first. If a unit is moving this turn and would only be in range after the move, do not add a ranged attack for it this turn (it can fire next turn from its new position). Each unit may declare at most one ranged attack per turn: include each attacking unit at most once in rangedAttacks; if a unit can attack multiple enemies, choose one target${combatTargetHint} For rangedAttacks targetXY, always use the enemy's position from the "Human units" list above — never use orderToXY or plan_route coordinates, which are your own movement destinations.${navalCoaching}${combatAssessHint}
 
 ${memoryBlock}${standingOrderBlock}${toolsSection}
 
