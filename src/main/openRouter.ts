@@ -1109,28 +1109,43 @@ export async function requestOrders(
       }
 
       const validatedUnitIds = new Set(validated.map((o) => o.unitId));
+      const fallbackUnits: string[] = [];
       for (const o of standingOrderMovement) {
         if (!validatedUnitIds.has(o.unitId)) {
           const vr = validateAiOrder(o, state);
           if (vr.valid) {
             validated.push(o);
             validatedUnitIds.add(o.unitId);
+            if (llmMovementUnitIds.has(o.unitId)) {
+              fallbackUnits.push(o.unitId);
+            }
           } else {
             dropReasons.push(`Standing order ${o.unitId} -> ${o.toH3Index}: ${vr.reason}`);
           }
         }
       }
       const validatedRangedUnitIds = new Set(validatedRanged.map((r) => r.unitId));
+      const fallbackRanged: string[] = [];
       for (const r of standingOrderRanged) {
         if (!validatedRangedUnitIds.has(r.unitId)) {
           const vr = validateAiRangedOrder(r, state);
           if (vr.valid) {
             validatedRanged.push(r);
             validatedRangedUnitIds.add(r.unitId);
+            if (llmRangedUnitIds.has(r.unitId)) {
+              fallbackRanged.push(r.unitId);
+            }
           } else {
             dropReasons.push(`Standing ranged ${r.unitId} -> ${r.targetH3Index}: ${vr.reason}`);
           }
         }
+      }
+      if (fallbackUnits.length > 0 || fallbackRanged.length > 0) {
+        logDebug('openRouter requestOrders: fell back to standing orders for units with dropped LLM orders', {
+          movement: fallbackUnits,
+          ranged: fallbackRanged,
+        });
+        if (onLog) onLog(`Standing orders used as fallback for: ${[...fallbackUnits, ...fallbackRanged].join(', ')}`);
       }
 
       if (dropReasons.length > 0) {

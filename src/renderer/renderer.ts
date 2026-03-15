@@ -525,7 +525,7 @@ function appendOpenRouterLog(line: string, isError = false): void {
 }
 
 /** Toast: show message for a readable duration, then auto-hide; can dismiss early. */
-const TOAST_DURATION_MS = 8000;
+const TOAST_DURATION_MS = 12_000; // 1.5× previous 8s for better readability
 let toastHideTimer: ReturnType<typeof setTimeout> | null = null;
 let aiStrategyToastHideTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -541,7 +541,11 @@ function showMapToast(message: string, options?: { isError?: boolean }): void {
   const el = document.getElementById('map-toast');
   const textEl = document.getElementById('map-toast-text');
   if (el && textEl) {
-    textEl.textContent = message;
+    textEl.textContent = '';
+    const strong = document.createElement('strong');
+    strong.textContent = 'Update: ';
+    textEl.appendChild(strong);
+    textEl.appendChild(document.createTextNode(message));
     el.classList.toggle('toast-info', options?.isError === false);
     el.classList.remove('hidden');
   }
@@ -560,10 +564,19 @@ function hideMapToast(): void {
   if (el) el.classList.add('hidden');
 }
 
+/** Returns the display label of the currently selected OpenRouter model, or empty string if none. */
+function getSelectedModelLabel(): string {
+  const sel = document.getElementById('openrouter-model') as HTMLSelectElement | null;
+  if (!sel) return '';
+  const opt = sel.options[sel.selectedIndex];
+  return opt ? opt.text : '';
+}
+
 /**
  * Shows the AI strategy toast (upper-left). Same duration and dismiss behavior as the map toast.
+ * Prefixes with the bolded model name when provided.
  */
-function showAiStrategyToast(message: string): void {
+function showAiStrategyToast(message: string, modelName?: string): void {
   if (aiStrategyToastHideTimer !== null) {
     clearTimeout(aiStrategyToastHideTimer);
     aiStrategyToastHideTimer = null;
@@ -571,7 +584,15 @@ function showAiStrategyToast(message: string): void {
   const el = document.getElementById('ai-strategy-toast');
   const textEl = document.getElementById('ai-strategy-toast-text');
   if (el && textEl) {
-    textEl.textContent = message;
+    textEl.textContent = '';
+    if (modelName) {
+      const strong = document.createElement('strong');
+      strong.textContent = modelName;
+      textEl.appendChild(strong);
+      textEl.appendChild(document.createTextNode(': ' + message));
+    } else {
+      textEl.appendChild(document.createTextNode(message));
+    }
     el.classList.add('toast-info');
     el.classList.remove('hidden');
   }
@@ -1865,13 +1886,13 @@ function init(): void {
           }
           showMapToast(toastText, { isError: dropReasons.length > 0 });
           if (readyResult.aiStrategy) {
-            showAiStrategyToast(readyResult.aiStrategy);
+            showAiStrategyToast(readyResult.aiStrategy, getSelectedModelLabel());
           }
         } else if (readyResult.aiOrderCount === 0) {
           appendOpenRouterLog('Turn resolved (no AI orders).');
           hideMapToast();
           if (readyResult.aiStrategy) {
-            showAiStrategyToast(readyResult.aiStrategy);
+            showAiStrategyToast(readyResult.aiStrategy, getSelectedModelLabel());
           } else {
             hideAiStrategyToast();
           }

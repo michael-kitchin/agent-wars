@@ -14536,7 +14536,7 @@
     el.appendChild(span);
     el.scrollTop = el.scrollHeight;
   }
-  var TOAST_DURATION_MS = 8e3;
+  var TOAST_DURATION_MS = 12e3;
   var toastHideTimer = null;
   var aiStrategyToastHideTimer = null;
   function showMapToast(message, options) {
@@ -14547,7 +14547,11 @@
     const el = document.getElementById("map-toast");
     const textEl = document.getElementById("map-toast-text");
     if (el && textEl) {
-      textEl.textContent = message;
+      textEl.textContent = "";
+      const strong = document.createElement("strong");
+      strong.textContent = "Update: ";
+      textEl.appendChild(strong);
+      textEl.appendChild(document.createTextNode(message));
       el.classList.toggle("toast-info", options?.isError === false);
       el.classList.remove("hidden");
     }
@@ -14564,7 +14568,13 @@
     const el = document.getElementById("map-toast");
     if (el) el.classList.add("hidden");
   }
-  function showAiStrategyToast(message) {
+  function getSelectedModelLabel() {
+    const sel = document.getElementById("openrouter-model");
+    if (!sel) return "";
+    const opt = sel.options[sel.selectedIndex];
+    return opt ? opt.text : "";
+  }
+  function showAiStrategyToast(message, modelName) {
     if (aiStrategyToastHideTimer !== null) {
       clearTimeout(aiStrategyToastHideTimer);
       aiStrategyToastHideTimer = null;
@@ -14572,7 +14582,15 @@
     const el = document.getElementById("ai-strategy-toast");
     const textEl = document.getElementById("ai-strategy-toast-text");
     if (el && textEl) {
-      textEl.textContent = message;
+      textEl.textContent = "";
+      if (modelName) {
+        const strong = document.createElement("strong");
+        strong.textContent = modelName;
+        textEl.appendChild(strong);
+        textEl.appendChild(document.createTextNode(": " + message));
+      } else {
+        textEl.appendChild(document.createTextNode(message));
+      }
       el.classList.add("toast-info");
       el.classList.remove("hidden");
     }
@@ -15642,13 +15660,13 @@
             }
             showMapToast(toastText, { isError: dropReasons.length > 0 });
             if (readyResult.aiStrategy) {
-              showAiStrategyToast(readyResult.aiStrategy);
+              showAiStrategyToast(readyResult.aiStrategy, getSelectedModelLabel());
             }
           } else if (readyResult.aiOrderCount === 0) {
             appendOpenRouterLog("Turn resolved (no AI orders).");
             hideMapToast();
             if (readyResult.aiStrategy) {
-              showAiStrategyToast(readyResult.aiStrategy);
+              showAiStrategyToast(readyResult.aiStrategy, getSelectedModelLabel());
             } else {
               hideAiStrategyToast();
             }
