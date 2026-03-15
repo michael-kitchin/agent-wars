@@ -2,6 +2,24 @@
 
 Grand strategy wargame with LLM opponents. This repo implements milestones through **Milestone 0.5 (first MCP tool)** — Combat and Victory plus an MCP-style tool layer for the AI.
 
+## Repository status
+
+- Current implementation target: **Milestone 0.5**
+- CI: GitHub Actions matrix build and test on Windows/Linux/macOS
+
+## Prerequisites
+
+- Node.js 20+
+- npm 10+
+
+## Quick start
+
+```bash
+npm install
+npm run build
+npm start
+```
+
 ## What Milestone 0.5 (first MCP tool) adds
 
 - **Tool-calling AI:** The opponent uses OpenRouter’s native tool-calling API. It can call **plan_route** (optimal path for a unit to a destination) and **check_distance** (distance and turn estimate between two hexes) before submitting orders. Movement planning is done via tools; the prompt no longer lists per-unit move options.
@@ -22,13 +40,22 @@ Grand strategy wargame with LLM opponents. This repo implements milestones throu
 - **WEGO turn structure:** In the **planning phase**, click a friendly unit (blue), then click an adjacent destination hex to add a movement order. Orders are listed in the sidebar. Click **Ready** to end planning and **resolve** all movement simultaneously. Turn number and phase are shown in the sidebar.
 - **Game state** is stored in **SQLite** in the main process (file in Electron user data directory). No combat yet — units only move. The opponent’s units do not move in 0.2 (no AI).
 
-## Run the app
+## OpenRouter setup (required for AI turns)
 
-```bash
-npm install
-npm run build
-npm start
-```
+1. Launch the app (`npm start`).
+2. In the right-side OpenRouter panel, open the **Model** tab.
+3. Paste your OpenRouter API key into **API key** (`Set key and blur to save`).
+4. Click outside the field to save.
+5. Click **Refresh models** and choose a tool-capable model.
+6. Use the OpenRouter run toggle to enable background AI planning.
+
+Notes:
+
+- API keys are handled only in the Electron main process.
+- The key is stored locally in the Electron user-data directory, not in repo files.
+- If key/model is missing, the app can still run but AI turns are skipped.
+
+## Run and verify
 
 - **Build:** Compiles the main process and preload with TypeScript (`dist/`) and bundles the renderer with esbuild (`static/renderer.js`).
 - **Start:** Runs Electron; the window loads the renderer from `static/index.html`.
@@ -52,15 +79,13 @@ npm start
 
 ## UI controls summary
 
-| Action           | Control                    |
-|------------------|----------------------------|
-| Pan              | Drag with left mouse       |
-| Zoom in/out      | Mouse wheel                |
-| Select hex/unit  | Click on hex               |
-| Add move order   | Select unit, then click destination |
-| Ranged attack    | Select armor/naval, click “Ranged attack”, then click enemy hex in range |
-| Resolve turn     | Ready button               |
-| New game         | After game over, click “New game”   |
+- Pan: drag with left mouse.
+- Zoom in/out: mouse wheel.
+- Select hex/unit: click on hex.
+- Add move order: select unit, then click destination.
+- Ranged attack: select armor/naval, click “Ranged attack”, then click enemy hex in range.
+- Resolve turn: Ready button.
+- New game: after game over, click “New game”.
 
 ## Lint
 
@@ -69,3 +94,15 @@ npm run lint
 ```
 
 Runs ESLint on `src/` (main and renderer TypeScript).
+
+## Tests
+
+```bash
+npm run test
+```
+
+Runs core main-process and tool contract tests.
+
+## License
+
+ISC. See `LICENSE`.

@@ -7,7 +7,6 @@ import { gridDistance } from 'h3-js';
 import {
   drawHexes,
   hitTest,
-  cellToCube,
   getHexCanvasCenter,
   type ViewState,
 } from './hexGrid';
@@ -417,12 +416,17 @@ function startBackgroundRequestIfAllowed(): void {
           }
         } else if (!result.success) {
           showSidebarError(result.error ?? 'Background AI request failed');
+          // Allow Ready to be clicked so the turn can advance with no AI orders (e.g. after parse error).
+          precomputedAiOrders = [];
+          precomputedAiRangedOrders = [];
         }
         updateReadyButtonState();
       })
       .catch((err) => {
         backgroundRequestInFlight = false;
         showSidebarError(String(err));
+        precomputedAiOrders = [];
+        precomputedAiRangedOrders = [];
         updateReadyButtonState();
       });
   });
@@ -1160,30 +1164,11 @@ function tickResolutionMoveAnimation(): void {
   }
 }
 
-/** Updates the sidebar with the selected hex's H3 index, cube coordinates, and selected unit, or placeholders. */
+/** Updates the sidebar with the selected unit or placeholder. */
 function updateSidebar(): void {
-  const sidebar = document.getElementById('sidebar');
-  if (!sidebar) return;
-
-  const h3El = document.getElementById('sidebar-h3');
-  const cubeEl = document.getElementById('sidebar-cube');
   const selectedUnitEl = document.getElementById('sidebar-selected-unit');
-
   if (selectedUnitEl) {
     selectedUnitEl.textContent = selectedUnitId ?? '—';
-  }
-
-  if (selectedHexIndex === null) {
-    if (h3El) h3El.textContent = '—';
-    if (cubeEl) cubeEl.textContent = '—';
-    return;
-  }
-
-  if (h3El) h3El.textContent = selectedHexIndex;
-  if (cubeEl) {
-    const origin = gameState?.hexes?.[0]?.h3Index;
-    const cube = cellToCube(selectedHexIndex, origin);
-    cubeEl.textContent = `(${cube.x}, ${cube.y}, ${cube.z})`;
   }
 }
 

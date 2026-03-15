@@ -14002,12 +14002,6 @@
     }
     return out;
   }
-  function readCoordIJ(cAddress) {
-    return {
-      i: libh3.getValue(cAddress, "i32"),
-      j: libh3.getValue(cAddress + SZ_INT, "i32")
-    };
-  }
   function latLngToCell(lat, lng, res) {
     var latLng = libh3._malloc(SZ_LATLNG);
     libh3.HEAPF64.set([lat, lng].map(degsToRads), latLng / SZ_DBL);
@@ -14077,16 +14071,6 @@
       return readInt64AsDoubleFromPointer(countPtr);
     } finally {
       libh3._free(countPtr);
-    }
-  }
-  var LOCAL_IJ_DEFAULT_MODE = 0;
-  function cellToLocalIj(origin, destination) {
-    var ij = libh3._malloc(SZ_COORDIJ);
-    try {
-      throwIfError(H3.cellToLocalIj.apply(H3, h3IndexToSplitLong(origin).concat(h3IndexToSplitLong(destination), [LOCAL_IJ_DEFAULT_MODE], [ij])));
-      return readCoordIJ(ij);
-    } finally {
-      libh3._free(ij);
     }
   }
   function degsToRads(deg) {
@@ -14235,15 +14219,6 @@
       }
     }
     return inside;
-  }
-  function cellToCube(h3Index, originH3) {
-    const center = originH3 ?? getHexCells()[0];
-    try {
-      const [i, j] = cellToLocalIj(center, h3Index);
-      return { x: i, y: j, z: -i - j };
-    } catch {
-      return { x: 0, y: 0, z: 0 };
-    }
   }
   function getHexCanvasCenter(h3Index, view2, canvasWidth, canvasHeight, hexList) {
     const cells = hexList ?? getHexCells();
@@ -14480,11 +14455,15 @@
           }
         } else if (!result.success) {
           showSidebarError(result.error ?? "Background AI request failed");
+          precomputedAiOrders = [];
+          precomputedAiRangedOrders = [];
         }
         updateReadyButtonState();
       }).catch((err) => {
         backgroundRequestInFlight = false;
         showSidebarError(String(err));
+        precomputedAiOrders = [];
+        precomputedAiRangedOrders = [];
         updateReadyButtonState();
       });
     });
@@ -15054,24 +15033,9 @@
     }
   }
   function updateSidebar() {
-    const sidebar = document.getElementById("sidebar");
-    if (!sidebar) return;
-    const h3El = document.getElementById("sidebar-h3");
-    const cubeEl = document.getElementById("sidebar-cube");
     const selectedUnitEl = document.getElementById("sidebar-selected-unit");
     if (selectedUnitEl) {
       selectedUnitEl.textContent = selectedUnitId ?? "\u2014";
-    }
-    if (selectedHexIndex === null) {
-      if (h3El) h3El.textContent = "\u2014";
-      if (cubeEl) cubeEl.textContent = "\u2014";
-      return;
-    }
-    if (h3El) h3El.textContent = selectedHexIndex;
-    if (cubeEl) {
-      const origin = gameState?.hexes?.[0]?.h3Index;
-      const cube = cellToCube(selectedHexIndex, origin);
-      cubeEl.textContent = `(${cube.x}, ${cube.y}, ${cube.z})`;
     }
   }
   function getCanvasAndSize() {

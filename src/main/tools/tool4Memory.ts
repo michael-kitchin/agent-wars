@@ -106,7 +106,7 @@ export function getInjectionText(playerId: string, currentTurn: number): string 
     lines.push('(none)');
   } else {
     for (const row of persistent) {
-      lines.push(`• ${row.key} (set turn ${row.created_turn}): "${row.content}"`);
+      lines.push(`- ${row.key} (set turn ${row.created_turn}): "${row.content}"`);
     }
   }
   lines.push('');
@@ -120,7 +120,7 @@ export function getInjectionText(playerId: string, currentTurn: number): string 
         row.recurring_interval != null
           ? `, recurring every ${row.recurring_interval} turns`
           : '';
-      lines.push(`• ${row.key} (${tierLabel}${recurLabel}): "${row.content}"`);
+      lines.push(`- ${row.key} (${tierLabel}${recurLabel}): "${row.content}"`);
     }
   }
   lines.push('');
