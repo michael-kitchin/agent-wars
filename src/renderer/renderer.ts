@@ -368,6 +368,9 @@ let precomputedAiOrders: { unitId: string; toH3Index: string }[] | null = null;
 /** Precomputed AI ranged orders from the last background request; cleared with precomputedAiOrders. */
 let precomputedAiRangedOrders: { unitId: string; targetH3Index: string }[] | null = null;
 
+/** Strategy text from the last background request; shown in upper-left toast when using precomputed orders. */
+let precomputedAiStrategy: string | null = null;
+
 /** True while a background requestAiOrders call is in flight; used to avoid duplicate requests and to guard start. */
 let backgroundRequestInFlight = false;
 
@@ -404,6 +407,7 @@ function startBackgroundRequestIfAllowed(): void {
         if (runButtonOn && result.success) {
           precomputedAiOrders = result.orders;
           precomputedAiRangedOrders = result.rangedAttacks ?? [];
+          precomputedAiStrategy = result.strategy ?? null;
           if (result.toolInvocationCounts) {
             for (const [groupId, count] of Object.entries(result.toolInvocationCounts)) {
               toolInvocationCounts[groupId] = count;
@@ -419,6 +423,7 @@ function startBackgroundRequestIfAllowed(): void {
           // Allow Ready to be clicked so the turn can advance with no AI orders (e.g. after parse error).
           precomputedAiOrders = [];
           precomputedAiRangedOrders = [];
+          precomputedAiStrategy = null;
         }
         updateReadyButtonState();
       })
@@ -427,6 +432,7 @@ function startBackgroundRequestIfAllowed(): void {
         showSidebarError(String(err));
         precomputedAiOrders = [];
         precomputedAiRangedOrders = [];
+        precomputedAiStrategy = null;
         updateReadyButtonState();
       });
   });
@@ -1268,6 +1274,7 @@ function initNewGameButton(): void {
       hideStackCallout();
       precomputedAiOrders = null;
       precomputedAiRangedOrders = null;
+      precomputedAiStrategy = null;
       backgroundRequestInFlight = false;
       openRouterGameCost = 0;
       updateOpenRouterCostLabel();
@@ -1518,12 +1525,14 @@ function initOpenRouterUI(): void {
         document.getElementById('openrouter-tab-tools')?.click();
         precomputedAiOrders = null;
         precomputedAiRangedOrders = null;
+        precomputedAiStrategy = null;
         updateReadyButtonState();
         startBackgroundRequestIfAllowed();
       } else {
         window.gameApi?.cancelRequestAiOrders?.();
         precomputedAiOrders = null;
         precomputedAiRangedOrders = null;
+        precomputedAiStrategy = null;
         updateReadyButtonState();
       }
     });
@@ -1806,6 +1815,7 @@ function init(): void {
           enabledToolGroups: enabledToolGroupsPayload,
           precomputedAiOrders: usePrecomputed ? precomputedAiOrders! : [],
           precomputedAiRangedOrders: usePrecomputed ? (precomputedAiRangedOrders ?? []) : [],
+          precomputedAiStrategy: usePrecomputed ? (precomputedAiStrategy ?? undefined) : undefined,
         };
         const readyResult = await window.gameApi!.ready(readyPayload);
         if (!readyResult.success) {
@@ -1815,6 +1825,7 @@ function init(): void {
         }
         precomputedAiOrders = null;
         precomputedAiRangedOrders = null;
+        precomputedAiStrategy = null;
         if (readyResult.toolInvocationCounts) {
           for (const [groupId, count] of Object.entries(readyResult.toolInvocationCounts)) {
             toolInvocationCounts[groupId] = count;
@@ -1859,7 +1870,11 @@ function init(): void {
         } else if (readyResult.aiOrderCount === 0) {
           appendOpenRouterLog('Turn resolved (no AI orders).');
           hideMapToast();
-          hideAiStrategyToast();
+          if (readyResult.aiStrategy) {
+            showAiStrategyToast(readyResult.aiStrategy);
+          } else {
+            hideAiStrategyToast();
+          }
         } else {
           appendOpenRouterLog('Turn resolved.');
           hideMapToast();

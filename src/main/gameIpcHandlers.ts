@@ -138,6 +138,7 @@ export async function handleGameReady(
         enabledToolGroups?: string[];
         precomputedAiOrders?: { unitId: string; toH3Index: string }[];
         precomputedAiRangedOrders?: RangedAttackOrder[];
+        precomputedAiStrategy?: string;
       }
     | undefined,
   deps: ReadyDeps
@@ -165,6 +166,7 @@ export async function handleGameReady(
   if (usePrecomputed) {
     aiOrders = payload.precomputedAiOrders ?? [];
     aiRangedOrders = payload.precomputedAiRangedOrders ?? [];
+    aiStrategy = payload.precomputedAiStrategy;
   } else if (modelId && deps.hasKey()) {
     const result = await deps.requestOrders(state, modelId, { enabledToolNames });
     if (result.success) {

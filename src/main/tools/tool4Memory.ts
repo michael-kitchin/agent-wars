@@ -106,7 +106,7 @@ export function getInjectionText(playerId: string, currentTurn: number): string 
     lines.push('(none)');
   } else {
     for (const row of persistent) {
-      lines.push(`- ${row.key} (set turn ${row.created_turn}): "${row.content}"`);
+      lines.push(`- ${row.key} (updated turn ${row.created_turn}): "${row.content}"`);
     }
   }
   lines.push('');
@@ -216,8 +216,8 @@ function write(
 
   if (existing) {
     dbRun(
-      `UPDATE ai_memory SET content = ?, tier = ?, expires_turn = ?, recurring_interval = ?, next_trigger_turn = ?, tags = ? WHERE player_id = ? AND key = ?`,
-      [content, tier, expiresTurn, recurringInterval, nextTriggerTurn, tagsJson, playerId, key]
+      `UPDATE ai_memory SET content = ?, tier = ?, created_turn = ?, expires_turn = ?, recurring_interval = ?, next_trigger_turn = ?, tags = ? WHERE player_id = ? AND key = ?`,
+      [content, tier, currentTurn, expiresTurn, recurringInterval, nextTriggerTurn, tagsJson, playerId, key]
     );
     saveDatabase();
     const after = countByTier(playerId);

@@ -1,25 +1,20 @@
 /**
  * MCP Tool 3: Combat Outcome Estimation (estimate_combat).
- * Monte Carlo simulation of a single ranged or melee engagement using the game's combat resolution.
- * All hex positions in tool responses are [lat, lng]; H3 indices are internal only.
+ * Exact analytical computation of combat outcome probabilities using the Poisson-Binomial
+ * distribution over independent per-unit hit rolls. All hex positions in tool responses are
+ * [lat, lng]; H3 indices are internal only.
  */
 
 import { cellToLatLng, gridDistance } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
 import { getAttack, getDefense, getRange } from '../combatConstants';
-import {
-  resolveOneRangedEngagement,
-  resolveOneMeleeEngagement,
-  type CombatUnit,
-} from '../combatResolution';
+import { type CombatUnit } from '../combatResolution';
 import { logDebug, logError, logTrace } from '../logger';
 
 /** Coordinate pair [lat, lng] at the tool boundary. */
 export type LatLng = [number, number];
 
 type LatLngMap = Map<string, LatLng>;
-
-const DEFAULT_TRIALS = 1000;
 
 /** Calling player id when not in state: AI is opponent, so enemy = human. */
 const AI_PLAYER_ID = 'opponent';
@@ -29,6 +24,25 @@ function h3ToLatLng(h3: string, latLngByH3: LatLngMap): LatLng {
   if (ll) return ll;
   const [lat, lng] = cellToLatLng(h3);
   return [lat, lng];
+}
+
+/**
+ * Computes the exact probability mass function for total successes from independent
+ * Bernoulli trials with potentially different success probabilities (Poisson-Binomial
+ * distribution). Returns array where element k = P(exactly k successes).
+ * O(n^2) time and O(n) space; suitable for the small unit counts in this game.
+ */
+export function poissonBinomialPMF(probs: number[]): number[] {
+  let dp = [1.0];
+  for (const p of probs) {
+    const next = new Array(dp.length + 1).fill(0);
+    for (let k = 0; k < dp.length; k++) {
+      next[k] += dp[k]! * (1 - p);
+      next[k + 1] += dp[k]! * p;
+    }
+    dp = next;
+  }
+  return dp;
 }
 
 /** Tool name for Tool 3. Exported so OpenRouter can route estimate_combat to this module. */
@@ -52,8 +66,8 @@ export function getAssessmentCategory(
 }
 
 /**
- * Implements estimate_combat: parses args, resolves or builds attacker/defender lists, runs Monte Carlo
- * using combat resolution single-engagement APIs, returns spec-shaped response. Call from executeTool3.
+ * Implements estimate_combat: parses args, resolves or builds attacker/defender lists, computes exact
+ * outcome probabilities via Poisson-Binomial PMFs, returns spec-shaped response. Call from executeTool3.
  * Exported for unit tests.
  */
 export function executeEstimateCombat(
@@ -230,6 +244,7 @@ export function executeEstimateCombat(
 
   let canReturnFire = false;
   let returnFireDetails: string | null = null;
+  const defenderReturnFireProbs: number[] = [];
   if (engagementType === 'ranged') {
     if (attackerSource === 'assumed') {
       warnings.push('Using assumed attackers - return fire not evaluated (attacker position unknown)');
@@ -244,6 +259,7 @@ export function executeEstimateCombat(
         });
         if (inRange) {
           canReturnFire = true;
+          defenderReturnFireProbs.push(getAttack(u.unitType) / 6);
           try {
             const dist = attackerHexes.length ? gridDistance(targetHexH3, attackerHexes[0]!) : 0;
             whoCan.push(`${u.id} (${u.unitType}, range ${r}) can return fire - attacker at distance ${dist}, within range`);
@@ -256,49 +272,38 @@ export function executeEstimateCombat(
     }
   }
 
-  const rollD6 = () => Math.floor(Math.random() * 6) + 1;
-  const N = DEFAULT_TRIALS;
-  logDebug('tool3CombatEstimation executeEstimateCombat: running Monte Carlo', { trials: N, engagementType });
-  let attackerLossesSum = 0;
-  let defenderLossesSum = 0;
-  let defenderEliminatedCount = 0;
-  let attackerLosesUnitCount = 0;
+  const attackerHitProbs = attackerCombat.map((u) => getAttack(u.unitType) / 6);
+  const defenderHitProbs = engagementType === 'ranged'
+    ? defenderReturnFireProbs
+    : defenderCombat.map((u) => getDefense(u.unitType) / 6);
+
+  const atkPMF = poissonBinomialPMF(attackerHitProbs);
+  const defPMF = poissonBinomialPMF(defenderHitProbs);
   const defenderCount = defenderCombat.length;
   const attackerCount = attackerCombat.length;
 
-  for (let t = 0; t < N; t++) {
-    if (engagementType === 'ranged') {
-      const { attackerRemovedIds, defenderRemovedIds } = resolveOneRangedEngagement(
-        attackerCombat,
-        defenderCombat,
-        targetHexH3,
-        rollD6,
-        attackerSource === 'assumed' ? { skipReturnFire: true } : {}
-      );
-      attackerLossesSum += attackerRemovedIds.length;
-      defenderLossesSum += defenderRemovedIds.length;
-      if (defenderRemovedIds.length >= defenderCount) defenderEliminatedCount++;
-      if (attackerRemovedIds.length >= 1) attackerLosesUnitCount++;
-    } else {
-      const { attackerRemovedIds, defenderRemovedIds } = resolveOneMeleeEngagement(
-        attackerCombat,
-        defenderCombat,
-        rollD6
-      );
-      attackerLossesSum += attackerRemovedIds.length;
-      defenderLossesSum += defenderRemovedIds.length;
-      if (defenderRemovedIds.length >= defenderCount) defenderEliminatedCount++;
-      if (attackerRemovedIds.length >= 1) attackerLosesUnitCount++;
-    }
+  logTrace('tool3CombatEstimation: exact PMF computed', {
+    engagementType, attackerCount, defenderCount,
+    attackerHitProbCount: attackerHitProbs.length,
+    defenderHitProbCount: defenderHitProbs.length,
+  });
+
+  let defenderLossesExpected = 0;
+  let probabilityDefenderEliminated = 0;
+  for (let k = 0; k < atkPMF.length; k++) {
+    defenderLossesExpected += Math.min(k, defenderCount) * atkPMF[k]!;
+    if (k >= defenderCount) probabilityDefenderEliminated += atkPMF[k]!;
   }
 
-  const trials = N;
-  const attackerHitsExpected = (defenderLossesSum / N);
-  const defenderHitsExpected = (attackerLossesSum / N);
-  const attackerLossesExpected = attackerLossesSum / N;
-  const defenderLossesExpected = defenderLossesSum / N;
-  const probabilityDefenderEliminated = defenderEliminatedCount / N;
-  const probabilityAttackerLosesUnit = attackerLosesUnitCount / N;
+  let attackerLossesExpected = 0;
+  let probabilityAttackerLosesUnit = 0;
+  for (let k = 0; k < defPMF.length; k++) {
+    attackerLossesExpected += Math.min(k, attackerCount) * defPMF[k]!;
+    if (k >= 1) probabilityAttackerLosesUnit += defPMF[k]!;
+  }
+
+  const attackerHitsExpected = defenderLossesExpected;
+  const defenderHitsExpected = attackerLossesExpected;
   const assessment = getAssessmentCategory(probabilityDefenderEliminated, probabilityAttackerLosesUnit);
 
   const hitPct = attackerCount > 0
@@ -326,7 +331,6 @@ export function executeEstimateCombat(
       returnFireDetails,
     },
     prediction: {
-      trials,
       attackerHitsExpected,
       defenderHitsExpected,
       attackerLossesExpected,

@@ -186,6 +186,7 @@ function executeAssessUnit(
   const canAttackThisTurn: Array<{ unitId: string; attackType: string; reason: string }> = [];
 
   const myRange = getRange(unit.unitType);
+  let preFilteredCount = 0;
   for (const other of state.units) {
     if (other.id === unitId) continue;
     const gridDist = (() => {
@@ -195,6 +196,10 @@ function executeAssessUnit(
         return 999;
       }
     })();
+    // Grid distance is a lower bound on BFS path distance, so units beyond the
+    // radius at grid level can't be within radius by path either. 999 means the
+    // h3 gridDistance call failed (cross-pentagon), so we conservatively keep those.
+    if (gridDist > radius && gridDist !== 999) { preFilteredCount++; continue; }
     const distResult = getPathDistanceAndTurns(unit.h3Index, other.h3Index, unit.unitType, hexSet, terrainByH3);
     const pathWithinRadius = distResult !== null && distResult.hexDistance <= radius;
     const gridWithinRadius = gridDist <= radius;
@@ -267,6 +272,10 @@ function executeAssessUnit(
 
   nearbyEnemies.sort((a, b) => a.hexDistance - b.hexDistance);
   nearbyFriendlies.sort((a, b) => a.hexDistance - b.hexDistance);
+  logTrace('tool2Assessment executeAssessUnit: scan complete', {
+    unitId, totalOtherUnits: state.units.length - 1, preFiltered: preFilteredCount,
+    enemies: nearbyEnemies.length, friendlies: nearbyFriendlies.length,
+  });
 
   const currentStandingOrder = getStandingOrderForUnit(unit.player, unit.id);
 

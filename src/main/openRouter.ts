@@ -352,7 +352,7 @@ function formatLatLng(ll: [number, number]): string {
 
 /** Optional suffix for movement instruction when Memory tools are enabled. */
 const MOVEMENT_INSTRUCTION_MEMORY_SUFFIX =
-  ' You may use the memory tools to store or recall strategic context across turns.';
+  ' Use memory_write to record your strategy each turn so you can build on it next turn.';
 
 /**
  * Builds the "HOW TO USE TOOLS" guidance block, conditional on which tool groups are enabled.
@@ -364,7 +364,7 @@ function buildToolUsageGuidance(flags: ToolFlags): string {
     lines.push('- Start by reviewing your standing order statuses and persistent strategic memory (both are shown above).');
   }
   if (flags.assessmentEnabled) {
-    lines.push('- Use assess_unit on units near the enemy to understand the tactical picture. Skip assessment for rear-echelon units far from all enemies — their situation rarely changes turn to turn.');
+    lines.push('- Use assess_unit on units near the enemy to understand the tactical picture. Skip assessment for rear-echelon units far from all enemies — their situation rarely changes turn to turn. If multiple units share the same hex, assess only one — the results will be identical.');
   }
   if (flags.estimationEnabled) {
     lines.push('- Use estimate_combat before any attack. Do not guess at combat odds.');
@@ -373,13 +373,21 @@ function buildToolUsageGuidance(flags: ToolFlags): string {
     lines.push('- Use plan_route to understand multi-turn moves before issuing orders.');
   }
   if (flags.memoryEnabled) {
-    lines.push('- Use memory_write with tier "persistent" for your active strategic plan and key threat assessments (limit 5). Use tier "stored" for observations and details you may need later (limit 15).');
+    lines.push('- memory_write tiers: "persistent" entries appear in every briefing (limit 5, for active plans); "stored" entries are retrieved on demand via memory_read (limit 15, for details and observations).');
   }
   if (flags.ordersEnabled) {
     lines.push('- Units with standing orders do not need explicit orders from you unless you want to override their current mission this turn.');
     if (flags.planningEnabled) {
       lines.push('- For units several turns from combat, assign a march or pursue standing order instead of re-planning their route every turn. This saves tool calls and prevents changing targets between turns.');
     }
+  }
+  if (flags.memoryEnabled) {
+    lines.push(
+      '- BEFORE submitting your final orders: use memory_write(key: "strategy", tier: "persistent") to record your current strategic plan.' +
+      ' Good content: specific unit-to-target assignments with ETAs (e.g. "armor-1/2 → human-armor-1, ETA 1 turn; infantry marching, ETA 4 turns"), priority decisions, and key observations (e.g. "naval-1 stuck in disconnected water body — stop retrying route").' +
+      ' Do NOT store enemy positions or unit rosters — these are already in every briefing and go stale immediately.' +
+      ' Keep it concise and actionable; vague summaries like "all units moving toward enemies" waste the slot.'
+    );
   }
   if (lines.length === 0) return '';
   return '\n\nHOW TO USE THESE TOOLS EFFECTIVELY:\n' + lines.join('\n');
@@ -425,7 +433,7 @@ function getMovementOrderInstruction(flags: ToolFlags): string {
   }
   if (flags.fallbackMovementEnabled) {
     const memoryHint = flags.memoryEnabled
-      ? ' You may use memory tools and then submit your orders in the same turn, or submit orders without using memory; both are fine. '
+      ? ' After your analysis, use memory_write to record your strategy before submitting orders. '
       : '';
     return (
       memoryHint +
@@ -446,26 +454,26 @@ function getMovementOrderInstruction(flags: ToolFlags): string {
 function getInitialUserMessage(flags: ToolFlags): string {
   if (flags.planningEnabled) {
     const memoryNote = flags.memoryEnabled
-      ? ' Memory is available: you may use memory_write or memory_read when it would help (e.g. to remember a multi-turn plan), or skip memory and plan movement only. '
+      ? ' After your analysis, use memory_write to record your strategy and key observations before submitting orders. '
       : '';
-    return `${memoryNote}Use the tools as needed to plan movement, then submit your final orders as a single JSON object: { "strategy": "...", "movementOrders": [...], "rangedAttacks": [...] }. For each movement order, set toXY to the exact orderToXY from that unit's plan_route result (copy the numbers exactly).`;
+    return `Use the tools as needed to plan movement.${memoryNote} Then submit your final orders as a single JSON object: { "strategy": "...", "movementOrders": [...], "rangedAttacks": [...] }. For each movement order, set toXY to the exact orderToXY from that unit's plan_route result (copy the numbers exactly).`;
   }
 
   const submitEmpty = ` Then submit your final JSON with "strategy": "<one-line>", "movementOrders": [], "rangedAttacks": [].`;
   if (flags.ordersEnabled && flags.memoryEnabled) {
-    return `You have no movement planning tools, so you cannot issue movement or ranged orders this turn. Use the available tools to assign standing orders (e.g. march toward an enemy, defend a hex) and optionally to store or recall strategic context (memory).${submitEmpty}`;
+    return `You have no movement planning tools, so you cannot issue movement or ranged orders this turn. Use the available tools to assign standing orders (e.g. march toward an enemy, defend a hex). Before submitting, use memory_write to record your strategy and any key observations.${submitEmpty}`;
   }
   if (flags.ordersEnabled) {
     return `You have no movement planning tools, so you cannot issue movement or ranged orders this turn. Use the available tools to assign standing orders (e.g. march toward an enemy, defend a hex) so your units will move on future turns.${submitEmpty}`;
   }
   if (flags.fallbackMovementEnabled) {
     const memoryNudge = flags.memoryEnabled
-      ? ' If you have a need to remember something across turns, use memory tools; you may use memory and then submit orders in the same turn, or submit orders without using memory. '
+      ? ' After your analysis, use memory_write to record your strategy and observations before submitting orders. '
       : '';
     return `${memoryNudge}You may issue one-step moves using the "Adjacent cells (fallback)" list in the system prompt. Submit your final JSON with "strategy": "<one-line>", "movementOrders": [...] (use only coordinates from that list), "rangedAttacks": [...] as appropriate.`;
   }
   if (flags.memoryEnabled) {
-    return `You have no movement planning tools, so you cannot issue movement or ranged orders this turn. Use the available tools to store or recall strategic context (e.g. memory_write your plan, memory_read on later turns) if useful.${submitEmpty}`;
+    return `You have no movement planning tools, so you cannot issue movement or ranged orders this turn. Use memory_write to record your strategic plan and any key observations.${submitEmpty}`;
   }
 
   return `You have no movement planning tools. Submit a JSON object with "strategy": "<one-line>", "movementOrders": [], "rangedAttacks": [].`;
@@ -524,7 +532,7 @@ function buildSystemPromptForTools(
   const toolsIntro = toolsIntroPurpose
     ? `Use these tools to ${toolsIntroPurpose} before submitting orders. You may use multiple rounds of tool calls and mix tool types if that helps.` +
       (flags.memoryEnabled
-        ? ' Memory is available: you may use memory_write to store or memory_read to recall context across turns when that would help; otherwise submit orders as usual.'
+        ? ' Memory is available: use memory_write to record your strategy and observations before submitting orders each turn.'
         : '')
     : 'Use only the tools listed below. Do not call tools that are not in the list.';
   const toolGuidance = buildToolUsageGuidance(flags);
@@ -1046,7 +1054,12 @@ export async function requestOrders(
       const parsed = parseOrdersResponse(content, resolveToH3);
       if (!parsed) {
         logError('openRouter requestOrders: failed to parse JSON', content.slice(0, 300));
-        if (onLog) onLog('Could not parse orders from model.', true);
+        if (onLog) {
+          onLog('Could not parse orders from model.', true);
+          const maxLogLen = 4000;
+          const rawPreview = content.length > maxLogLen ? content.slice(0, maxLogLen) + '… (truncated)' : content;
+          onLog(rawPreview, true);
+        }
         return { success: false, error: 'Invalid response: could not parse orders' };
       }
 

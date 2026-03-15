@@ -14417,6 +14417,7 @@
   var runButtonOn = false;
   var precomputedAiOrders = null;
   var precomputedAiRangedOrders = null;
+  var precomputedAiStrategy = null;
   var backgroundRequestInFlight = false;
   var openRouterGameCost = 0;
   function startBackgroundRequestIfAllowed() {
@@ -14443,6 +14444,7 @@
         if (runButtonOn && result.success) {
           precomputedAiOrders = result.orders;
           precomputedAiRangedOrders = result.rangedAttacks ?? [];
+          precomputedAiStrategy = result.strategy ?? null;
           if (result.toolInvocationCounts) {
             for (const [groupId, count] of Object.entries(result.toolInvocationCounts)) {
               toolInvocationCounts[groupId] = count;
@@ -14457,6 +14459,7 @@
           showSidebarError(result.error ?? "Background AI request failed");
           precomputedAiOrders = [];
           precomputedAiRangedOrders = [];
+          precomputedAiStrategy = null;
         }
         updateReadyButtonState();
       }).catch((err) => {
@@ -14464,6 +14467,7 @@
         showSidebarError(String(err));
         precomputedAiOrders = [];
         precomputedAiRangedOrders = [];
+        precomputedAiStrategy = null;
         updateReadyButtonState();
       });
     });
@@ -15115,6 +15119,7 @@
         hideStackCallout();
         precomputedAiOrders = null;
         precomputedAiRangedOrders = null;
+        precomputedAiStrategy = null;
         backgroundRequestInFlight = false;
         openRouterGameCost = 0;
         updateOpenRouterCostLabel();
@@ -15339,12 +15344,14 @@
           document.getElementById("openrouter-tab-tools")?.click();
           precomputedAiOrders = null;
           precomputedAiRangedOrders = null;
+          precomputedAiStrategy = null;
           updateReadyButtonState();
           startBackgroundRequestIfAllowed();
         } else {
           window.gameApi?.cancelRequestAiOrders?.();
           precomputedAiOrders = null;
           precomputedAiRangedOrders = null;
+          precomputedAiStrategy = null;
           updateReadyButtonState();
         }
       });
@@ -15587,7 +15594,8 @@
           const readyPayload = {
             enabledToolGroups: enabledToolGroupsPayload,
             precomputedAiOrders: usePrecomputed ? precomputedAiOrders : [],
-            precomputedAiRangedOrders: usePrecomputed ? precomputedAiRangedOrders ?? [] : []
+            precomputedAiRangedOrders: usePrecomputed ? precomputedAiRangedOrders ?? [] : [],
+            precomputedAiStrategy: usePrecomputed ? precomputedAiStrategy ?? void 0 : void 0
           };
           const readyResult = await window.gameApi.ready(readyPayload);
           if (!readyResult.success) {
@@ -15597,6 +15605,7 @@
           }
           precomputedAiOrders = null;
           precomputedAiRangedOrders = null;
+          precomputedAiStrategy = null;
           if (readyResult.toolInvocationCounts) {
             for (const [groupId, count] of Object.entries(readyResult.toolInvocationCounts)) {
               toolInvocationCounts[groupId] = count;
@@ -15638,7 +15647,11 @@
           } else if (readyResult.aiOrderCount === 0) {
             appendOpenRouterLog("Turn resolved (no AI orders).");
             hideMapToast();
-            hideAiStrategyToast();
+            if (readyResult.aiStrategy) {
+              showAiStrategyToast(readyResult.aiStrategy);
+            } else {
+              hideAiStrategyToast();
+            }
           } else {
             appendOpenRouterLog("Turn resolved.");
             hideMapToast();
