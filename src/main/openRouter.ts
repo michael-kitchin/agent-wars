@@ -839,6 +839,13 @@ export async function requestOrders(
     return { success: false, error: 'No model selected' };
   }
 
+  const opponentUnits = state.units.filter((u) => u.player === 'opponent');
+  if (opponentUnits.length === 0) {
+    logDebug('openRouter requestOrders: no opponent units remain, skipping LLM call');
+    if (onLog) onLog('No opponent units remain.');
+    return { success: true, orders: [] };
+  }
+
   const hexList = state.hexes.map((h) => h.h3Index);
   const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
   const coordMap = {
