@@ -42,7 +42,7 @@ jobs:
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
-        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --linux -c electron-builder.ci.json && node scripts/post-linux-pack.js
+        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --linux -c electron-builder.ci.json
 
       - name: Build (macOS)
         if: runner.os == 'macOS'
@@ -52,8 +52,11 @@ jobs:
         shell: bash
         run: |
           rm -f release/builder-debug.yml
-          rm -f release/*.tar.gz
+          rm -f release/builder-effective-config.yaml
           rm -rf release/win-unpacked
+          rm -rf release/linux-unpacked
+          rm -rf release/mac
+          rm -rf release/mac-arm64
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v6

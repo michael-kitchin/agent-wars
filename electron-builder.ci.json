@@ -10,10 +10,10 @@
     "target": ["nsis"]
   },
   "linux": {
-    "target": ["dir"]
+    "target": ["AppImage"]
   },
   "mac": {
-    "target": ["dir"],
+    "target": ["dmg"],
     "category": "public.app-category.games"
   }
 }
