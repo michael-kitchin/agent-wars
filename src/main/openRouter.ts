@@ -22,6 +22,8 @@ import {
   generateOrdersForStandingOrders,
   TOOL5_NAMES,
 } from './tools/tool5StandingOrders';
+import { runPrecomputation } from './precomputation';
+import { formatBriefing } from './briefingFormatter';
 
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -490,10 +492,16 @@ function getInitialUserMessage(flags: ToolFlags): string {
  * - Fallback (neither Planning nor Orders) → show adjacent-cells list; model may issue one-step moves from that list.
  * - Combat hints (naval plan, assess, estimate) and memory/standing-order blocks depend on their respective flags.
  */
+/**
+ * Builds the system prompt for the tool-calling LLM. When briefingOverride is provided (0.6 pre-computation path),
+ * it replaces the usual memory + standing-order + roster block with the Commander's Briefing; combat rules,
+ * tools section, and submit instruction are unchanged. When absent, behavior matches 0.5.
+ */
 function buildSystemPromptForTools(
   state: GameStateSnapshot,
   coordMap: { latLngByH3: Map<string, [number, number]>; format: (h3: string) => string },
-  enabledToolNames?: string[]
+  enabledToolNames?: string[],
+  briefingOverride?: string
 ): string {
   const { latLngByH3, format } = coordMap;
   const opponentUnits = state.units.filter((u) => u.player === 'opponent');
@@ -564,16 +572,17 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
     : '';
   const movementOrderInstruction = getMovementOrderInstruction(flags);
 
+  const mainBlock = briefingOverride != null && briefingOverride.length > 0
+    ? `${briefingOverride}\n\n${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\nHuman units: ${humanRoster || 'none'}`
+    : `${memoryBlock}${standingOrderBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\nHuman units: ${humanRoster || 'none'}${adjacentCellsBlock}`;
+
   return `You are the opponent in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}. Your objective is to destroy all human units. Move toward human units to get in ranged or melee range; do not stay passive.${warning}
 
 ${LATLNG_PREAMBLE}
 
 Combat: each unit rolls d6 when attacking (hit if roll <= attack) or when defending (hit if roll <= defender's defense). Unit stats: ${combatSummary}. Ranged attacks can target any enemy hex within range regardless of terrain (e.g. armor on land can fire at naval on adjacent water, and vice versa). Ranged attacks are resolved using each unit's current position (before movement). Only issue a ranged attack if that unit is already within range of the target hex at the start of this turn; do not assume movement happens first. If a unit is moving this turn and would only be in range after the move, do not add a ranged attack for it this turn (it can fire next turn from its new position). Each unit may declare at most one ranged attack per turn: include each attacking unit at most once in rangedAttacks; if a unit can attack multiple enemies, choose one target${combatTargetHint} For rangedAttacks targetXY, always use the enemy's position from the "Human units" list above — never use orderToXY or plan_route coordinates, which are your own movement destinations.${navalCoaching}${combatAssessHint}
 
-${memoryBlock}${standingOrderBlock}${toolsSection}
-
-Your units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}
-Human units: ${humanRoster || 'none'}${adjacentCellsBlock}
+${mainBlock}
 
 Submit your final orders as a JSON object only (valid JSON, no comments): { "strategy": "<one-line explanation>", "movementOrders": [ { "unitId": "<id>", "toXY": [lat, lng] }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetXY": [lat, lng] }, ... ] }. Use only toXY and targetXY as [lat, lng] arrays. Include "strategy".${movementOrderInstruction} In rangedAttacks, list each unit at most once (one ranged attack per unit per turn); duplicate unitIds are dropped.`;
 }
@@ -585,10 +594,16 @@ export interface RequestOrdersResult {
   strategy?: string;
   dropped?: number;
   dropReasons?: string[];
-  /** Per-group invocation counts for this turn. Keys are tool group ids (e.g. planning, assessment, estimation). */
+  /** Per-group invocation counts for this turn (ad-hoc LLM tool calls only; pre-computation not counted). */
   toolInvocationCounts?: Record<string, number>;
   /** Total cost in dollars for this request (sum of usage.cost across all round-trips in the tool loop). */
   cost?: number;
+  /** Wall-clock time in ms for the request (from before tool loop to final response). */
+  wallClockMs?: number;
+  /** Input token count when the API supplies usage.prompt_tokens (sum across round-trips). */
+  inputTokens?: number;
+  /** Output token count when the API supplies usage.completion_tokens (sum across round-trips). */
+  outputTokens?: number;
 }
 export interface RequestOrdersError {
   success: false;
@@ -853,6 +868,8 @@ export interface RequestOrdersOptions {
   signal?: AbortSignal;
   /** Optional sink for status log lines (e.g. to show in the renderer AI panel). Called for key events only. */
   onLog?: (line: string, isError?: boolean) => void;
+  /** When true, run pre-computation (assess_unit, assess_hex, estimate_combat) and inject Commander's Briefing into the prompt (0.6 path). Default false. */
+  usePrecomputation?: boolean;
 }
 
 /**
@@ -870,11 +887,13 @@ export async function requestOrders(
   const enabledToolNames = options?.enabledToolNames;
   const signal = options?.signal;
   const onLog = options?.onLog;
+  const usePrecomputation = options?.usePrecomputation === true;
   if (onLog) onLog('Requesting AI orders…');
   logDebug('openRouter requestOrders', {
     modelId,
     turnNumber: state.turnNumber,
     enabledTools: enabledToolNames === undefined ? 'all' : enabledToolNames.length,
+    usePrecomputation,
   });
   const key = loadKey();
   if (!key) {
@@ -920,7 +939,19 @@ export async function requestOrders(
     );
   }
 
-  const systemPrompt = buildSystemPromptForTools(state, coordMap, enabledToolNames);
+  let briefingOverride: string | undefined;
+  if (usePrecomputation) {
+    const precomputed = runPrecomputation(state, { latLngByH3, resolveToH3 });
+    const standingOrderText = getStandingOrderInjectionText('opponent', state);
+    const memoryText = getInjectionText('opponent', state.turnNumber);
+    briefingOverride = formatBriefing(state, precomputed, standingOrderText, memoryText);
+    logDebug('openRouter requestOrders: pre-computation ran', {
+      briefingLength: briefingOverride.length,
+      unitAssessments: precomputed.unitAssessments.length,
+      combatEstimates: precomputed.combatEstimates.length,
+    });
+  }
+  const systemPrompt = buildSystemPromptForTools(state, coordMap, enabledToolNames, briefingOverride);
   const userMessage = getInitialUserMessage(flags);
 
   const tools = buildToolDefinitions(enabledToolNames);
@@ -936,7 +967,10 @@ export async function requestOrders(
   logDebug('openRouter requestOrders: user message', userMessage);
   logDebug('openRouter requestOrders: starting tool loop', { turnNumber: state.turnNumber });
 
+  const wallClockStart = Date.now();
   let requestCost = 0;
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
   try {
     let iteration = 0;
     while (iteration < MAX_TOOL_ITERATIONS) {
@@ -975,9 +1009,11 @@ export async function requestOrders(
             tool_calls?: Array<{ id: string; type: string; function: { name: string; arguments: string } }>;
           };
         }>;
-        usage?: { cost?: number };
+        usage?: { cost?: number; prompt_tokens?: number; completion_tokens?: number };
       };
       requestCost += json.usage?.cost ?? 0;
+      totalInputTokens += json.usage?.prompt_tokens ?? 0;
+      totalOutputTokens += json.usage?.completion_tokens ?? 0;
       const assistantMessage = json.choices?.[0]?.message;
       if (!assistantMessage) {
         logError('openRouter requestOrders: no message in response');
@@ -1167,6 +1203,9 @@ export async function requestOrders(
         dropReasons: dropReasons.length > 0 ? dropReasons : undefined,
         toolInvocationCounts,
         cost: requestCost > 0 ? requestCost : undefined,
+        wallClockMs: Date.now() - wallClockStart,
+        inputTokens: totalInputTokens > 0 ? totalInputTokens : undefined,
+        outputTokens: totalOutputTokens > 0 ? totalOutputTokens : undefined,
       };
     }
 
@@ -1179,6 +1218,9 @@ export async function requestOrders(
       dropped: 0,
       toolInvocationCounts,
       cost: requestCost > 0 ? requestCost : undefined,
+      wallClockMs: Date.now() - wallClockStart,
+      inputTokens: totalInputTokens > 0 ? totalInputTokens : undefined,
+      outputTokens: totalOutputTokens > 0 ? totalOutputTokens : undefined,
     };
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {

@@ -17,6 +17,9 @@ export type RequestAiOrdersResult =
       dropReasons?: string[];
       toolInvocationCounts?: Record<string, number>;
       cost?: number;
+      wallClockMs?: number;
+      inputTokens?: number;
+      outputTokens?: number;
     }
   | { success: false; error: string };
 
@@ -49,6 +52,10 @@ export interface ReadyResultMinimal {
   toolInvocationCounts?: Record<string, number>;
   /** Cost in dollars for this turn's LLM call (when requestOrders was used). */
   cost?: number;
+  /** Wall-clock time in ms for the AI turn (when requestOrders was used). */
+  wallClockMs?: number;
+  inputTokens?: number;
+  outputTokens?: number;
 }
 
 export interface RequestAiOrdersDeps {
@@ -60,7 +67,7 @@ export interface RequestAiOrdersDeps {
   requestOrders: (
     state: GameStateSnapshot,
     modelId: string,
-    options: { enabledToolNames: string[]; signal?: AbortSignal }
+    options: { enabledToolNames: string[]; signal?: AbortSignal; usePrecomputation?: boolean }
   ) => Promise<RequestAiOrdersResult>;
   controllerRef: { current: AbortController | null };
 }
@@ -70,7 +77,7 @@ export interface RequestAiOrdersDeps {
  * Caller must wire cancelRequestAiOrders to the same controllerRef so the user can abort in-flight requests.
  */
 export async function handleRequestAiOrders(
-  payload: { enabledToolGroups?: string[] } | undefined,
+  payload: { enabledToolGroups?: string[]; usePrecomputation?: boolean } | undefined,
   deps: RequestAiOrdersDeps
 ): Promise<RequestAiOrdersResult> {
   const state = deps.getGameState();
@@ -92,7 +99,11 @@ export async function handleRequestAiOrders(
   deps.controllerRef.current = new AbortController();
   const signal = deps.controllerRef.current.signal;
   try {
-    const result = await deps.requestOrders(state, modelId, { enabledToolNames, signal });
+    const result = await deps.requestOrders(state, modelId, {
+      enabledToolNames,
+      signal,
+      usePrecomputation: payload?.usePrecomputation === true,
+    });
     return result;
   } finally {
     if (deps.controllerRef.current?.signal === signal) {
@@ -120,7 +131,7 @@ export interface ReadyDeps {
   requestOrders: (
     state: GameStateSnapshot,
     modelId: string,
-    options: { enabledToolNames: string[] }
+    options: { enabledToolNames: string[]; usePrecomputation?: boolean }
   ) => Promise<RequestAiOrdersResult>;
   ready: (
     aiOrders: { unitId: string; toH3Index: string }[],
@@ -136,6 +147,7 @@ export async function handleGameReady(
   payload:
     | {
         enabledToolGroups?: string[];
+        usePrecomputation?: boolean;
         precomputedAiOrders?: { unitId: string; toH3Index: string }[];
         precomputedAiRangedOrders?: RangedAttackOrder[];
         precomputedAiStrategy?: string;
@@ -158,6 +170,9 @@ export async function handleGameReady(
   let aiDropReasons: string[] | undefined;
   let toolInvocationCounts: Record<string, number> | undefined;
   let turnCost: number | undefined;
+  let turnWallClockMs: number | undefined;
+  let turnInputTokens: number | undefined;
+  let turnOutputTokens: number | undefined;
   let aiSkipReason: string | undefined;
   let aiStrategy: string | undefined;
 
@@ -168,7 +183,10 @@ export async function handleGameReady(
     aiRangedOrders = payload.precomputedAiRangedOrders ?? [];
     aiStrategy = payload.precomputedAiStrategy;
   } else if (modelId && deps.hasKey()) {
-    const result = await deps.requestOrders(state, modelId, { enabledToolNames });
+    const result = await deps.requestOrders(state, modelId, {
+      enabledToolNames,
+      usePrecomputation: payload?.usePrecomputation === true,
+    });
     if (result.success) {
       aiOrders = result.orders;
       aiRangedOrders = result.rangedAttacks ?? [];
@@ -177,6 +195,9 @@ export async function handleGameReady(
       aiDropReasons = result.dropReasons?.length ? result.dropReasons : undefined;
       toolInvocationCounts = result.toolInvocationCounts;
       if (result.cost !== undefined) turnCost = result.cost;
+      turnWallClockMs = result.wallClockMs;
+      turnInputTokens = result.inputTokens;
+      turnOutputTokens = result.outputTokens;
     } else {
       aiSkipped = true;
       aiSkipReason = result.error;
@@ -238,5 +259,8 @@ export async function handleGameReady(
     aiStrategy,
     toolInvocationCounts,
     cost: turnCost,
+    wallClockMs: turnWallClockMs,
+    inputTokens: turnInputTokens,
+    outputTokens: turnOutputTokens,
   };
 }

@@ -14413,6 +14413,7 @@
   ];
   var openRouterToolGroups = [...OPENROUTER_TOOL_GROUPS];
   var enabledToolGroups = new Set(OPENROUTER_TOOL_GROUPS.map((g) => g.id));
+  var usePrecomputation = false;
   var toolInvocationCounts = Object.fromEntries(OPENROUTER_TOOL_GROUPS.map((g) => [g.id, 0]));
   var runButtonOn = false;
   var precomputedAiOrders = null;
@@ -14441,7 +14442,7 @@
         return;
       }
       const enabledToolGroupsPayload = Array.from(enabledToolGroups);
-      window.gameApi.requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload }).then((result) => {
+      window.gameApi.requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload, usePrecomputation }).then((result) => {
         backgroundRequestInFlight = false;
         if (runButtonOn && result.success) {
           precomputedAiOrders = result.orders;
@@ -15351,6 +15352,13 @@
         renderOpenRouterToolsList();
       }
     })();
+    const usePrecomputationCheckbox = document.getElementById("openrouter-use-precomputation");
+    if (usePrecomputationCheckbox) {
+      usePrecomputationCheckbox.checked = usePrecomputation;
+      usePrecomputationCheckbox.addEventListener("change", () => {
+        usePrecomputation = usePrecomputationCheckbox.checked;
+      });
+    }
     const keyInput = document.getElementById("openrouter-key");
     const modelSelect = document.getElementById("openrouter-model");
     const refreshBtn = document.getElementById("openrouter-refresh-models");
@@ -15649,6 +15657,7 @@
           const usePrecomputed = runButtonOn && precomputedAiOrders !== null;
           const readyPayload = {
             enabledToolGroups: enabledToolGroupsPayload,
+            usePrecomputation,
             precomputedAiOrders: usePrecomputed ? precomputedAiOrders : [],
             precomputedAiRangedOrders: usePrecomputed ? precomputedAiRangedOrders ?? [] : [],
             precomputedAiStrategy: usePrecomputed ? precomputedAiStrategy ?? void 0 : void 0

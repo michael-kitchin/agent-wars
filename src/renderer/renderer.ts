@@ -356,6 +356,9 @@ let openRouterToolGroups: { id: string; label: string }[] = [...OPENROUTER_TOOL_
 /** Which tool groups are enabled for the AI. Default all enabled. */
 let enabledToolGroups: Set<string> = new Set(OPENROUTER_TOOL_GROUPS.map((g) => g.id));
 
+/** When true, use pre-computation and Commander's Briefing (0.6 path). In-session only; not persisted. */
+let usePrecomputation = false;
+
 /** Per-group invocation counts for the most recent turn. Reset on Ready click. */
 let toolInvocationCounts: Record<string, number> = Object.fromEntries(OPENROUTER_TOOL_GROUPS.map((g) => [g.id, 0]));
 
@@ -406,7 +409,7 @@ function startBackgroundRequestIfAllowed(): void {
     }
     const enabledToolGroupsPayload = Array.from(enabledToolGroups);
     window.gameApi
-      .requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload })
+      .requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload, usePrecomputation })
       .then((result) => {
         backgroundRequestInFlight = false;
         if (runButtonOn && result.success) {
@@ -1539,6 +1542,14 @@ function initOpenRouterUI(): void {
     }
   })();
 
+  const usePrecomputationCheckbox = document.getElementById('openrouter-use-precomputation') as HTMLInputElement | null;
+  if (usePrecomputationCheckbox) {
+    usePrecomputationCheckbox.checked = usePrecomputation;
+    usePrecomputationCheckbox.addEventListener('change', () => {
+      usePrecomputation = usePrecomputationCheckbox.checked;
+    });
+  }
+
   const keyInput = document.getElementById('openrouter-key') as HTMLInputElement | null;
   const modelSelect = document.getElementById('openrouter-model') as HTMLSelectElement | null;
   const refreshBtn = document.getElementById('openrouter-refresh-models');
@@ -1883,6 +1894,7 @@ function init(): void {
         const usePrecomputed = runButtonOn && precomputedAiOrders !== null;
         const readyPayload = {
           enabledToolGroups: enabledToolGroupsPayload,
+          usePrecomputation,
           precomputedAiOrders: usePrecomputed ? precomputedAiOrders! : [],
           precomputedAiRangedOrders: usePrecomputed ? (precomputedAiRangedOrders ?? []) : [],
           precomputedAiStrategy: usePrecomputed ? (precomputedAiStrategy ?? undefined) : undefined,

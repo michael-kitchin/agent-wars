@@ -24,10 +24,11 @@ const gameApi = {
     ipcRenderer.invoke('game:submitOrders', payload),
   ready: (payload?: {
     enabledToolGroups?: string[];
+    usePrecomputation?: boolean;
     precomputedAiOrders?: { unitId: string; toH3Index: string }[];
     precomputedAiRangedOrders?: { unitId: string; targetH3Index: string }[];
   }) => ipcRenderer.invoke('game:ready', payload),
-  requestAiOrders: (payload?: { enabledToolGroups?: string[] }): Promise<unknown> =>
+  requestAiOrders: (payload?: { enabledToolGroups?: string[]; usePrecomputation?: boolean }): Promise<unknown> =>
     ipcRenderer.invoke('game:requestAiOrders', payload),
   cancelRequestAiOrders: (): Promise<void> =>
     ipcRenderer.invoke('game:cancelRequestAiOrders'),
