@@ -48,6 +48,8 @@ export interface ReadyResultMinimal {
   meleeCasualtyHexes?: string[];
   meleeRemovedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
   kills?: { victimId: string; killerIds: string[] }[];
+  killsByDirectFire?: { victimId: string; killerIds: string[] }[];
+  killsByReturnFire?: { victimId: string; killerIds: string[] }[];
   aiStrategy?: string;
   toolInvocationCounts?: Record<string, number>;
   /** Cost in dollars for this turn's LLM call (when requestOrders was used). */
@@ -77,7 +79,7 @@ export interface RequestAiOrdersDeps {
  * Caller must wire cancelRequestAiOrders to the same controllerRef so the user can abort in-flight requests.
  */
 export async function handleRequestAiOrders(
-  payload: { enabledToolGroups?: string[]; usePrecomputation?: boolean } | undefined,
+  payload: { enabledToolGroups?: string[] } | undefined,
   deps: RequestAiOrdersDeps
 ): Promise<RequestAiOrdersResult> {
   const state = deps.getGameState();
@@ -89,6 +91,7 @@ export async function handleRequestAiOrders(
       ? payload.enabledToolGroups
       : deps.defaultGroupIds;
   const enabledToolNames = deps.getToolNamesForEnabledGroups(enabledGroupIds);
+  const usePrecomputation = enabledGroupIds.includes('precomputation');
   const modelId = deps.getSelectedModel();
   if (!modelId?.trim() || !deps.hasKey()) {
     return { success: false, error: !deps.hasKey() ? 'No API key set' : 'No model selected' };
@@ -102,7 +105,7 @@ export async function handleRequestAiOrders(
     const result = await deps.requestOrders(state, modelId, {
       enabledToolNames,
       signal,
-      usePrecomputation: payload?.usePrecomputation === true,
+      usePrecomputation,
     });
     return result;
   } finally {
@@ -147,7 +150,6 @@ export async function handleGameReady(
   payload:
     | {
         enabledToolGroups?: string[];
-        usePrecomputation?: boolean;
         precomputedAiOrders?: { unitId: string; toH3Index: string }[];
         precomputedAiRangedOrders?: RangedAttackOrder[];
         precomputedAiStrategy?: string;
@@ -162,6 +164,7 @@ export async function handleGameReady(
       ? payload.enabledToolGroups
       : deps.defaultGroupIds;
   const enabledToolNames = deps.getToolNamesForEnabledGroups(enabledGroupIds);
+  const usePrecomputation = enabledGroupIds.includes('precomputation');
 
   let aiOrders: { unitId: string; toH3Index: string }[] = [];
   let aiRangedOrders: RangedAttackOrder[] = [];
@@ -185,7 +188,7 @@ export async function handleGameReady(
   } else if (modelId && deps.hasKey()) {
     const result = await deps.requestOrders(state, modelId, {
       enabledToolNames,
-      usePrecomputation: payload?.usePrecomputation === true,
+      usePrecomputation,
     });
     if (result.success) {
       aiOrders = result.orders;
@@ -256,6 +259,8 @@ export async function handleGameReady(
     meleeCasualtyHexes: readyResult.meleeCasualtyHexes,
     meleeRemovedUnits: readyResult.meleeRemovedUnits,
     kills: readyResult.kills,
+    killsByDirectFire: readyResult.killsByDirectFire,
+    killsByReturnFire: readyResult.killsByReturnFire,
     aiStrategy,
     toolInvocationCounts,
     cost: turnCost,

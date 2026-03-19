@@ -109,6 +109,8 @@ export interface ReadyResult {
   meleeCasualtyHexes?: string[];
   meleeRemovedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
   kills?: { victimId: string; killerIds: string[] }[];
+  killsByDirectFire?: { victimId: string; killerIds: string[] }[];
+  killsByReturnFire?: { victimId: string; killerIds: string[] }[];
   aiStrategy?: string;
   /** Per-group tool invocation counts for the last AI turn. Keys are tool group ids. */
   toolInvocationCounts?: Record<string, number>;

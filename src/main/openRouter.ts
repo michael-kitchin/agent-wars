@@ -114,6 +114,7 @@ export interface ToolGroupEntry {
 
 /** Ordered registry of tool groups. Single source of truth for group id, label, and which API names belong to each group. */
 export const TOOL_GROUP_REGISTRY: ToolGroupEntry[] = [
+  { id: 'precomputation', label: 'Precomputation', toolNames: [] },
   { id: 'planning', label: 'Planning', toolNames: TOOL1_NAMES },
   { id: 'assessment', label: 'Assessment', toolNames: TOOL2_NAMES },
   { id: 'estimation', label: 'Estimation', toolNames: TOOL3_NAMES },
@@ -358,28 +359,50 @@ const MOVEMENT_INSTRUCTION_MEMORY_SUFFIX =
 
 /**
  * Builds the "HOW TO USE TOOLS" guidance block, conditional on which tool groups are enabled.
- * Appended at the end of the tools section so the LLM knows the recommended workflow.
+ * When hasPrecomputedBriefing is true, tells the model to use the Commander's Briefing and avoid redundant
+ * assess_unit / assess_hex / estimate_combat calls so tool usage stays low.
  */
-function buildToolUsageGuidance(flags: ToolFlags): string {
+function buildToolUsageGuidance(flags: ToolFlags, hasPrecomputedBriefing = false): string {
   const lines: string[] = [];
-  if (flags.ordersEnabled || flags.memoryEnabled) {
-    lines.push('- Start by reviewing your standing order statuses and persistent strategic memory (both are shown above).');
-  }
-  if (flags.assessmentEnabled) {
-    lines.push('- Use assess_unit on units near the enemy to understand the tactical picture. Skip assessment for rear-echelon units far from all enemies — their situation rarely changes turn to turn. If multiple units share the same hex, assess only one — the results will be identical.');
-  }
-  if (flags.estimationEnabled) {
-    lines.push('- Use estimate_combat before any attack. Do not guess at combat odds.');
-  }
-  if (flags.planningEnabled) {
-    lines.push('- Use plan_route to understand multi-turn moves before issuing orders.');
+  if (hasPrecomputedBriefing) {
+    lines.push(
+      '- The COMMANDER\'S BRIEFING above already contains unit assessments, hex intelligence, and combat estimates for this turn. Do NOT call assess_unit, assess_hex, or estimate_combat — that information is already in the briefing tables. Use the briefing to decide targets and priorities.'
+    );
+    if (flags.planningEnabled) {
+      lines.push(
+        '- Use plan_route only when you need the exact orderToXY for a unit\'s move. Call it sparingly (e.g. one per unit that needs to move); the briefing already tells you nearest enemies and distances. After you have orderToXY for each unit that needs orders, submit — do not re-assess or re-route.'
+      );
+    }
+    if (flags.ordersEnabled) {
+      lines.push(
+        '- Use standing orders: for every unit listed as "Units without standing orders" in the briefing above, call `assign_order` (march/pursue for closing over multiple turns; defend when you want them to hold). Then use plan_route + movementOrders only for the units that truly need an explicit toXY this turn.'
+      );
+    }
+    if (flags.memoryEnabled) {
+      lines.push(
+        '- Use memory_write to store concise plan intent (target assignments, ETA assumptions, and route constraints) so next turn can continue without re-deriving context.'
+      );
+    }
+  } else {
+    if (flags.ordersEnabled || flags.memoryEnabled) {
+      lines.push('- Start by reviewing your standing order statuses and persistent strategic memory (both are shown above).');
+    }
+    if (flags.assessmentEnabled) {
+      lines.push('- Use assess_unit on units near the enemy to understand the tactical picture. Skip assessment for rear-echelon units far from all enemies — their situation rarely changes turn to turn. If multiple units share the same hex, assess only one — the results will be identical.');
+    }
+    if (flags.estimationEnabled) {
+      lines.push('- Use estimate_combat before any attack. Do not guess at combat odds.');
+    }
+    if (flags.planningEnabled) {
+      lines.push('- Use plan_route to understand multi-turn moves before issuing orders.');
+    }
   }
   if (flags.memoryEnabled) {
     lines.push('- memory_write tiers: "persistent" entries appear in every briefing (limit 5, for active plans); "stored" entries are retrieved on demand via memory_read (limit 15, for details and observations).');
   }
   if (flags.ordersEnabled) {
     lines.push('- Units with standing orders do not need explicit orders from you unless you want to override their current mission this turn.');
-    if (flags.planningEnabled) {
+    if (flags.planningEnabled && !hasPrecomputedBriefing) {
       lines.push('- For units several turns from combat, assign a march or pursue standing order instead of re-planning their route every turn. This saves tool calls and prevents changing targets between turns.');
     }
   }
@@ -451,13 +474,19 @@ function getMovementOrderInstruction(flags: ToolFlags): string {
 
 /**
  * Returns the initial user message for the tool-calling flow.
- * Branch order: Planning → Orders+Memory → Orders only → Fallback (one-step moves) → Memory only → None.
+ * When hasPrecomputedBriefing is true, encourages using the briefing and minimal tool calls.
  */
-function getInitialUserMessage(flags: ToolFlags): string {
+function getInitialUserMessage(flags: ToolFlags, hasPrecomputedBriefing = false): string {
   if (flags.planningEnabled) {
     const memoryNote = flags.memoryEnabled
       ? ' After your analysis, use memory_write to record your strategy and key observations before submitting orders. '
       : '';
+    if (hasPrecomputedBriefing) {
+      const ordersNudge = flags.ordersEnabled
+        ? ' For every unit listed as "Units without standing orders" in the briefing above, call assign_order once this turn (march/pursue for multi-turn closing; defend/hold when you want them to stay put). Then use plan_route + movementOrders for explicit toXY this turn only where needed. '
+        : '';
+      return `Use the COMMANDER'S BRIEFING above for unit status and combat info.${ordersNudge}Call plan_route only for each unit that needs a move this turn (to get orderToXY).${memoryNote} Then submit your final orders as a single JSON object: { "strategy": "...", "movementOrders": [...], "rangedAttacks": [...] }. For each movement order, set toXY to the exact orderToXY from that unit's plan_route result (copy the numbers exactly).`;
+    }
     return `Use the tools as needed to plan movement.${memoryNote} Then submit your final orders as a single JSON object: { "strategy": "...", "movementOrders": [...], "rangedAttacks": [...] }. For each movement order, set toXY to the exact orderToXY from that unit's plan_route result (copy the numbers exactly).`;
   }
 
@@ -537,13 +566,16 @@ function buildSystemPromptForTools(
     : flags.assessmentEnabled
       ? 'assess the tactical situation'
       : undefined;
+  const hasPrecomputedBriefing = briefingOverride != null && briefingOverride.length > 0;
   const toolsIntro = toolsIntroPurpose
-    ? `Use these tools to ${toolsIntroPurpose} before submitting orders. You may use multiple rounds of tool calls and mix tool types if that helps.` +
-      (flags.memoryEnabled
-        ? ' Memory is available: use memory_write to record your strategy and observations before submitting orders each turn.'
-        : '')
+    ? hasPrecomputedBriefing
+      ? 'Use the COMMANDER\'S BRIEFING above for assessments and combat estimates; use these tools only when you need plan_route (exact orderToXY), memory, or standing orders.'
+      : `Use these tools to ${toolsIntroPurpose} before submitting orders. You may use multiple rounds of tool calls and mix tool types if that helps.` +
+        (flags.memoryEnabled
+          ? ' Memory is available: use memory_write to record your strategy and observations before submitting orders each turn.'
+          : '')
     : 'Use only the tools listed below. Do not call tools that are not in the list.';
-  const toolGuidance = buildToolUsageGuidance(flags);
+  const toolGuidance = buildToolUsageGuidance(flags, hasPrecomputedBriefing);
   const toolsSection =
     filtered.length === 0
       ? '=== AVAILABLE TOOLS ===\nNo tools available.'
@@ -884,16 +916,25 @@ export async function requestOrders(
   modelId: string,
   options?: RequestOrdersOptions
 ): Promise<RequestOrdersResult | RequestOrdersError> {
-  const enabledToolNames = options?.enabledToolNames;
+  const requestedToolNames = options?.enabledToolNames;
   const signal = options?.signal;
   const onLog = options?.onLog;
   const usePrecomputation = options?.usePrecomputation === true;
+  const precomputationExcluded = new Set<string>([...TOOL2_NAMES, ...TOOL3_NAMES]);
+  const enabledToolNames =
+    usePrecomputation && requestedToolNames !== undefined
+      ? requestedToolNames.filter((n) => !precomputationExcluded.has(n))
+      : usePrecomputation && requestedToolNames === undefined
+        ? TOOL_GROUP_REGISTRY.flatMap((g) => [...g.toolNames]).filter((n) => !precomputationExcluded.has(n))
+        : requestedToolNames;
   if (onLog) onLog('Requesting AI orders…');
   logDebug('openRouter requestOrders', {
     modelId,
     turnNumber: state.turnNumber,
-    enabledTools: enabledToolNames === undefined ? 'all' : enabledToolNames.length,
+    enabledToolsRequested: requestedToolNames === undefined ? 'all' : requestedToolNames.length,
+    enabledToolsEffective: enabledToolNames === undefined ? 'all' : enabledToolNames.length,
     usePrecomputation,
+    filteredForPrecomputation: usePrecomputation,
   });
   const key = loadKey();
   if (!key) {
@@ -939,9 +980,16 @@ export async function requestOrders(
     );
   }
 
+  const toolInvocationCounts: Record<string, number> = {};
+  for (const g of TOOL_GROUP_REGISTRY) toolInvocationCounts[g.id] = 0;
+
   let briefingOverride: string | undefined;
   if (usePrecomputation) {
     const precomputed = runPrecomputation(state, { latLngByH3, resolveToH3 });
+    toolInvocationCounts['precomputation'] =
+      precomputed.unitAssessments.length +
+      precomputed.combatEstimates.length +
+      precomputed.hexAssessments.length;
     const standingOrderText = getStandingOrderInjectionText('opponent', state);
     const memoryText = getInjectionText('opponent', state.turnNumber);
     briefingOverride = formatBriefing(state, precomputed, standingOrderText, memoryText);
@@ -949,14 +997,13 @@ export async function requestOrders(
       briefingLength: briefingOverride.length,
       unitAssessments: precomputed.unitAssessments.length,
       combatEstimates: precomputed.combatEstimates.length,
+      precomputationCount: toolInvocationCounts['precomputation'],
     });
   }
   const systemPrompt = buildSystemPromptForTools(state, coordMap, enabledToolNames, briefingOverride);
-  const userMessage = getInitialUserMessage(flags);
+  const userMessage = getInitialUserMessage(flags, briefingOverride != null && briefingOverride.length > 0);
 
   const tools = buildToolDefinitions(enabledToolNames);
-  const toolInvocationCounts: Record<string, number> = {};
-  for (const g of TOOL_GROUP_REGISTRY) toolInvocationCounts[g.id] = 0;
 
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
@@ -1193,6 +1240,14 @@ export async function requestOrders(
       }
 
       if (onLog) onLog(`Orders received: ${validated.length} movement, ${validatedRanged.length} ranged.`);
+      logDebug('openRouter requestOrders: tool usage summary', {
+        turnNumber: state.turnNumber,
+        usePrecomputation,
+        enabledToolsRequested: requestedToolNames === undefined ? 'all' : requestedToolNames.length,
+        enabledToolsEffective: enabledToolNames === undefined ? 'all' : enabledToolNames.length,
+        toolInvocationCounts,
+        iterations: iteration,
+      });
 
       return {
         success: true,

@@ -97,7 +97,6 @@ function testFormatBriefingContainsSections(): void {
   assert.ok(out.includes('YOUR STRATEGIC MEMORY'), 'memory block');
   assert.ok(out.includes('Remember: push south.'), 'memory text');
   assert.ok(out.includes('STANDING ORDER STATUS'), 'standing order block');
-  assert.ok(out.includes('Callbacks not yet active'), 'callbacks placeholder');
   assert.ok(!out.includes('undefined'), 'no raw undefined');
 }
 

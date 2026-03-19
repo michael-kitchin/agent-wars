@@ -159,6 +159,10 @@ export interface CombatResolutionResult {
   removedUnits: CombatUnit[];
   /** Per-casualty killer attribution for announcements. */
   kills: KillRecord[];
+  /** Ranged only: defenders killed by attackers (direct fire). */
+  killsByDirectFire?: KillRecord[];
+  /** Ranged only: attackers killed by defenders (return fire). */
+  killsByReturnFire?: KillRecord[];
 }
 
 /**
@@ -181,6 +185,8 @@ export function runRangedPhase(
   const rollD6 = () => Math.floor(next() * 6) + 1;
 
   const kills: KillRecord[] = [];
+  const killsByDirectFire: KillRecord[] = [];
+  const killsByReturnFire: KillRecord[] = [];
 
   const rangedByDefender = new Map<string, { attackerHex: string; unitId: string }[]>();
   for (const order of rangedOrders) {
@@ -219,7 +225,9 @@ export function runRangedPhase(
       if (u) {
         removedUnits.push({ id: u.id, player: u.player, unitType: u.unitType, h3Index: u.h3Index });
         casualtyHexSet.add(u.h3Index);
-        kills.push({ victimId: id, killerIds: attackerUnitIds });
+        const record = { victimId: id, killerIds: attackerUnitIds };
+        kills.push(record);
+        killsByDirectFire.push(record);
       }
     }
     for (const id of attackerRemovedIds) {
@@ -228,7 +236,9 @@ export function runRangedPhase(
       if (u) {
         removedUnits.push({ id: u.id, player: u.player, unitType: u.unitType, h3Index: u.h3Index });
         casualtyHexSet.add(u.h3Index);
-        kills.push({ victimId: id, killerIds: defenderUnitIds });
+        const record = { victimId: id, killerIds: defenderUnitIds };
+        kills.push(record);
+        killsByReturnFire.push(record);
       }
     }
   }
@@ -243,6 +253,8 @@ export function runRangedPhase(
     casualtyHexes,
     removedUnits,
     kills,
+    killsByDirectFire: killsByDirectFire.length > 0 ? killsByDirectFire : undefined,
+    killsByReturnFire: killsByReturnFire.length > 0 ? killsByReturnFire : undefined,
   };
 }
 

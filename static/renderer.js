@@ -14404,7 +14404,106 @@
   var dragDistanceSq = 0;
   var resolutionMoveAnimation = null;
   var resolutionMoveAnimationFrameId = null;
+  var terrainCacheCanvas = null;
+  var terrainCacheMeta = null;
+  var redrawRafId = null;
+  function requestRedraw() {
+    if (resolutionMoveAnimation) return;
+    if (redrawRafId !== null) return;
+    redrawRafId = requestAnimationFrame(() => {
+      redrawRafId = null;
+      redraw();
+    });
+  }
+  function invalidateTerrainCache() {
+    terrainCacheCanvas = null;
+    terrainCacheMeta = null;
+  }
+  var canvasMetrics = null;
+  var moveAnimHexCenterBaseCache = null;
+  var moveAnimHexCenterBaseCacheStartTime = null;
+  var moveAnimHexCenterBaseCacheScale = null;
+  var moveAnimHexCenterBaseCacheW = null;
+  var moveAnimHexCenterBaseCacheH = null;
+  function ensureTerrainCache(w, h, dpr) {
+    if (!gameState) return;
+    const TERRAIN_CACHE_MULTIPLIER = 3;
+    const cacheW = Math.max(1, Math.floor(w * TERRAIN_CACHE_MULTIPLIER));
+    const cacheH = Math.max(1, Math.floor(h * TERRAIN_CACHE_MULTIPLIER));
+    const cells = gameState.hexes.map((hx) => hx.h3Index);
+    const needsRegen = !terrainCacheCanvas || !terrainCacheMeta || terrainCacheMeta.scale !== view.scale || terrainCacheMeta.width !== cacheW || terrainCacheMeta.height !== cacheH || terrainCacheMeta.dpr !== dpr || terrainCacheMeta.selectedHexIndex !== selectedHexIndex;
+    if (!needsRegen) return;
+    const cacheCanvas = document.createElement("canvas");
+    cacheCanvas.width = Math.max(1, Math.floor(cacheW * dpr));
+    cacheCanvas.height = Math.max(1, Math.floor(cacheH * dpr));
+    const cacheCtx = cacheCanvas.getContext("2d");
+    if (!cacheCtx) return;
+    cacheCtx.setTransform(1, 0, 0, 1, 0, 0);
+    cacheCtx.scale(dpr, dpr);
+    const fitScaleMain = getFitScale(w, h, cells);
+    const fitScaleCache = getFitScale(cacheW, cacheH, cells);
+    const scaleRatio = fitScaleCache > 0 ? fitScaleMain / fitScaleCache : 1;
+    const viewCache = {
+      scale: view.scale * scaleRatio,
+      // Keep the terrain centered within the cache canvas.
+      // We align it to the main viewport via an origin shift when drawing the cache.
+      offsetX: 0,
+      offsetY: 0
+    };
+    drawHexes(cacheCtx, viewCache, cacheW, cacheH, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
+    terrainCacheCanvas = cacheCanvas;
+    terrainCacheMeta = { scale: view.scale, width: cacheW, height: cacheH, dpr, selectedHexIndex };
+  }
+  function drawTerrainCache(ctx, w, h, offsetX, offsetY) {
+    if (!terrainCacheCanvas) return;
+    const srcDpr = terrainCacheMeta?.dpr ?? 1;
+    ctx.fillStyle = BACKGROUND_COLOR;
+    ctx.fillRect(0, 0, w, h);
+    const cacheW = terrainCacheMeta?.width ?? w;
+    const cacheH = terrainCacheMeta?.height ?? h;
+    const destOffsetX = offsetX + (w - cacheW) / 2;
+    const destOffsetY = offsetY + (h - cacheH) / 2;
+    const dx0 = Math.max(0, destOffsetX);
+    const dy0 = Math.max(0, destOffsetY);
+    const dx1 = Math.min(w, destOffsetX + cacheW);
+    const dy1 = Math.min(h, destOffsetY + cacheH);
+    if (dx1 <= dx0 || dy1 <= dy0) return;
+    const dx = dx0;
+    const dy = dy0;
+    const sw = dx1 - dx0;
+    const sh = dy1 - dy0;
+    const sx = dx0 - destOffsetX;
+    const sy = dy0 - destOffsetY;
+    ctx.drawImage(
+      terrainCacheCanvas,
+      sx * srcDpr,
+      sy * srcDpr,
+      sw * srcDpr,
+      sh * srcDpr,
+      dx,
+      dy,
+      sw,
+      sh
+    );
+  }
+  function getMoveAnimHexCenterBaseMap(anim, view2, hexes, canvasWidth, canvasHeight, hexList) {
+    if (!moveAnimHexCenterBaseCache || moveAnimHexCenterBaseCacheStartTime !== anim.startTime || moveAnimHexCenterBaseCacheScale !== view2.scale || moveAnimHexCenterBaseCacheW !== canvasWidth || moveAnimHexCenterBaseCacheH !== canvasHeight) {
+      const baseView = { scale: view2.scale, offsetX: 0, offsetY: 0 };
+      const map = /* @__PURE__ */ new Map();
+      for (const h3Index of hexes) {
+        const { x, y } = getHexCanvasCenter(h3Index, baseView, canvasWidth, canvasHeight, hexList);
+        map.set(h3Index, { x0: x, y0: y });
+      }
+      moveAnimHexCenterBaseCache = map;
+      moveAnimHexCenterBaseCacheStartTime = anim.startTime;
+      moveAnimHexCenterBaseCacheScale = view2.scale;
+      moveAnimHexCenterBaseCacheW = canvasWidth;
+      moveAnimHexCenterBaseCacheH = canvasHeight;
+    }
+    return moveAnimHexCenterBaseCache;
+  }
   var OPENROUTER_TOOL_GROUPS = [
+    { id: "precomputation", label: "Precomputation" },
     { id: "planning", label: "Planning" },
     { id: "assessment", label: "Assessment" },
     { id: "estimation", label: "Estimation" },
@@ -14413,7 +14512,6 @@
   ];
   var openRouterToolGroups = [...OPENROUTER_TOOL_GROUPS];
   var enabledToolGroups = new Set(OPENROUTER_TOOL_GROUPS.map((g) => g.id));
-  var usePrecomputation = false;
   var toolInvocationCounts = Object.fromEntries(OPENROUTER_TOOL_GROUPS.map((g) => [g.id, 0]));
   var runButtonOn = false;
   var precomputedAiOrders = null;
@@ -14442,7 +14540,7 @@
         return;
       }
       const enabledToolGroupsPayload = Array.from(enabledToolGroups);
-      window.gameApi.requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload, usePrecomputation }).then((result) => {
+      window.gameApi.requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload }).then((result) => {
         backgroundRequestInFlight = false;
         if (runButtonOn && result.success) {
           precomputedAiOrders = result.orders;
@@ -14487,6 +14585,9 @@
       btn.className = "openrouter-tool-toggle";
       btn.setAttribute("data-tool-group", group.id);
       btn.setAttribute("aria-pressed", enabledToolGroups.has(group.id) ? "true" : "false");
+      if (group.id === "precomputation") {
+        btn.title = "When on, run assess_unit, assess_hex, and estimate_combat before the LLM and inject the Commander's Briefing into the prompt.";
+      }
       btn.textContent = String(toolInvocationCounts[group.id] ?? 0);
       btn.addEventListener("click", () => {
         if (enabledToolGroups.has(group.id)) {
@@ -14654,6 +14755,7 @@
     const rect = container.getBoundingClientRect();
     const w = Math.max(1, Math.floor(rect.width));
     const h = Math.max(1, Math.floor(rect.height));
+    canvasMetrics = { w, h, dpr };
     canvas.width = w * dpr;
     canvas.height = h * dpr;
     canvas.style.width = `${w}px`;
@@ -14672,7 +14774,12 @@
       ctx.fillText("Loading\u2026", w / 2, h / 2);
       return;
     }
-    drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
+    ensureTerrainCache(w, h, dpr);
+    if (terrainCacheCanvas) {
+      drawTerrainCache(ctx, w, h, view.offsetX, view.offsetY);
+    } else {
+      drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
+    }
     const hexList = gameState.hexes.map((h2) => h2.h3Index);
     let moveProgress = 1;
     let unitsToDraw = gameState.units;
@@ -14723,7 +14830,13 @@
       drawUnits(ctx, view, w, h, unitsToDraw, hexList, movingIds);
     }
     if (anim && hexList && moveProgress < 1) {
-      drawMovingUnits(ctx, view, w, h, anim.moves, gameState.units, hexList, moveProgress);
+      const moveAnimHexList = /* @__PURE__ */ new Set();
+      for (const m of anim.moves) {
+        moveAnimHexList.add(m.fromH3Index);
+        moveAnimHexList.add(m.toH3Index);
+      }
+      const animBaseCenters = getMoveAnimHexCenterBaseMap(anim, view, moveAnimHexList, w, h, hexList);
+      drawMovingUnits(ctx, view, w, h, anim.moves, gameState.units, hexList, moveProgress, animBaseCenters);
     }
     if (anim && hexList) {
       const elapsed = Date.now() - anim.startTime;
@@ -14954,15 +15067,26 @@
     }
     ctx.restore();
   }
-  function drawMovingUnits(ctx, view2, canvasWidth, canvasHeight, moves, units, hexList, progress) {
+  function drawMovingUnits(ctx, view2, canvasWidth, canvasHeight, moves, units, hexList, progress, hexCenterBase) {
     if (moves.length === 0 || progress >= 1) return;
+    const unitsById = new Map(units.map((u) => [u.id, u]));
     for (const move of moves) {
-      const unit = units.find((u) => u.id === move.unitId);
+      const unit = unitsById.get(move.unitId);
       if (!unit) continue;
-      const from = getHexCanvasCenter(move.fromH3Index, view2, canvasWidth, canvasHeight, hexList);
-      const to = getHexCanvasCenter(move.toH3Index, view2, canvasWidth, canvasHeight, hexList);
-      const x = from.x + progress * (to.x - from.x);
-      const y = from.y + progress * (to.y - from.y);
+      let x;
+      let y;
+      if (hexCenterBase) {
+        const fromBase = hexCenterBase.get(move.fromH3Index);
+        const toBase = hexCenterBase.get(move.toH3Index);
+        if (!fromBase || !toBase) continue;
+        x = fromBase.x0 + view2.offsetX + progress * (toBase.x0 - fromBase.x0);
+        y = fromBase.y0 + view2.offsetY + progress * (toBase.y0 - fromBase.y0);
+      } else {
+        const from = getHexCanvasCenter(move.fromH3Index, view2, canvasWidth, canvasHeight, hexList);
+        const to = getHexCanvasCenter(move.toH3Index, view2, canvasWidth, canvasHeight, hexList);
+        x = from.x + progress * (to.x - from.x);
+        y = from.y + progress * (to.y - from.y);
+      }
       const color = PLAYER_COLORS[unit.player] ?? "#333";
       const label = UNIT_TYPE_LABELS[unit.unitType] ?? "?";
       drawOneUnitMarker(ctx, x, y, color, label, "#fff");
@@ -14972,12 +15096,11 @@
     const container = document.getElementById("canvas-container");
     const canvas = document.getElementById("canvas");
     if (!container || !canvas) return;
-    const rect = container.getBoundingClientRect();
-    const w = Math.max(1, Math.floor(rect.width));
-    const h = Math.max(1, Math.floor(rect.height));
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const dpr = window.devicePixelRatio ?? 1;
+    const metrics = canvasMetrics;
+    if (!metrics) return;
+    const { w, h, dpr } = metrics;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
     if (!gameState) {
@@ -14990,7 +15113,12 @@
       ctx.fillText("Loading\u2026", w / 2, h / 2);
       return;
     }
-    drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
+    ensureTerrainCache(w, h, dpr);
+    if (terrainCacheCanvas) {
+      drawTerrainCache(ctx, w, h, view.offsetX, view.offsetY);
+    } else {
+      drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
+    }
     const hexList = gameState.hexes.map((h2) => h2.h3Index);
     let moveProgress = 1;
     let unitsToDraw = gameState.units;
@@ -15168,6 +15296,7 @@
       try {
         const state = await window.gameApi.newGame(size);
         gameState = state;
+        invalidateTerrainCache();
         pendingOrders = [];
         pendingRangedAttacks = [];
         rangedModeActive = false;
@@ -15352,13 +15481,6 @@
         renderOpenRouterToolsList();
       }
     })();
-    const usePrecomputationCheckbox = document.getElementById("openrouter-use-precomputation");
-    if (usePrecomputationCheckbox) {
-      usePrecomputationCheckbox.checked = usePrecomputation;
-      usePrecomputationCheckbox.addEventListener("change", () => {
-        usePrecomputation = usePrecomputationCheckbox.checked;
-      });
-    }
     const keyInput = document.getElementById("openrouter-key");
     const modelSelect = document.getElementById("openrouter-model");
     const refreshBtn = document.getElementById("openrouter-refresh-models");
@@ -15447,6 +15569,7 @@
       window.gameApi.getGameState().then((raw) => {
         const state = raw;
         gameState = state;
+        invalidateTerrainCache();
         updateGameStateSidebar(state);
         updateRangedSidebar();
         updateSidebar();
@@ -15474,7 +15597,7 @@
       view.offsetX = mouseX - canvasCenterX - dx * newScale / view.scale;
       view.offsetY = mouseY - canvasCenterY - dy * newScale / view.scale;
       view.scale = newScale;
-      redraw();
+      requestRedraw();
     }, { passive: false });
     canvas.addEventListener("mousedown", (e) => {
       if (e.button !== 0) return;
@@ -15493,7 +15616,7 @@
       dragDistanceSq = dx * dx + dy * dy;
       view.offsetX = dragStartOffsetX + dx;
       view.offsetY = dragStartOffsetY + dy;
-      redraw();
+      requestRedraw();
     });
     canvas.addEventListener("mouseleave", () => {
       document.getElementById("hex-tooltip")?.classList.add("hidden");
@@ -15657,7 +15780,6 @@
           const usePrecomputed = runButtonOn && precomputedAiOrders !== null;
           const readyPayload = {
             enabledToolGroups: enabledToolGroupsPayload,
-            usePrecomputation,
             precomputedAiOrders: usePrecomputed ? precomputedAiOrders : [],
             precomputedAiRangedOrders: usePrecomputed ? precomputedAiRangedOrders ?? [] : [],
             precomputedAiStrategy: usePrecomputed ? precomputedAiStrategy ?? void 0 : void 0
@@ -15681,10 +15803,12 @@
             openRouterGameCost += readyResult.cost;
             updateOpenRouterCostLabel();
           }
+          let didShowMapToastForTurn = false;
           if (readyResult.aiSkipped) {
             appendOpenRouterLog(readyResult.aiSkipReason ?? "AI skipped.", true);
             hideAiStrategyToast();
             showMapToast(readyResult.aiSkipReason ?? "Set your OpenRouter API key and select a model in the panel on the right.", { isError: true });
+            didShowMapToastForTurn = true;
           } else if (readyResult.aiOrderCount !== void 0 && readyResult.aiOrderCount > 0 || readyResult.aiRangedByType && (readyResult.aiRangedByType.armor ?? 0) + (readyResult.aiRangedByType.naval ?? 0) > 0) {
             appendOpenRouterLog(`AI movements: ${readyResult.aiOrderCount ?? 0}.`);
             const ranged = readyResult.aiRangedByType;
@@ -15695,17 +15819,35 @@
               appendOpenRouterLog(`AI ranged: ${parts.join(", ")}.`);
             }
             const dropReasons = readyResult.aiDropReasons ?? [];
-            let toastText = `AI movements: ${readyResult.aiOrderCount ?? 0}.`;
+            const bullets = [];
+            bullets.push(`\u2022 AI movements: ${readyResult.aiOrderCount ?? 0}`);
             if (ranged && (ranged.armor ?? 0) + (ranged.naval ?? 0) > 0) {
               const parts = [];
               if (ranged.armor) parts.push(`${ranged.armor} armor`);
               if (ranged.naval) parts.push(`${ranged.naval} naval`);
-              toastText += ` Ranged: ${parts.join(", ")}.`;
+              bullets.push(`\u2022 Ranged: ${parts.join(", ")}`);
             }
             if (dropReasons.length > 0) {
-              toastText += "\n\nDropped: " + dropReasons.join("; ");
+              bullets.push(`\u2022 Dropped: ${dropReasons.join("; ")}`);
             }
-            showMapToast(toastText, { isError: dropReasons.length > 0 });
+            const directFire = readyResult.killsByDirectFire ?? [];
+            const returnFire = readyResult.killsByReturnFire ?? [];
+            const allKills = readyResult.kills ?? [];
+            const directSet = new Set(directFire.map((k) => k.victimId));
+            const returnSet = new Set(returnFire.map((k) => k.victimId));
+            const meleeKills = allKills.filter((k) => !directSet.has(k.victimId) && !returnSet.has(k.victimId));
+            const fmtKill = (k) => `${k.victimId} by ${k.killerIds.join(", ")}`;
+            if (directFire.length > 0) {
+              bullets.push(`\u2022 Direct fire: ${directFire.map(fmtKill).join("; ")}`);
+            }
+            if (returnFire.length > 0) {
+              bullets.push(`\u2022 Return fire: ${returnFire.map(fmtKill).join("; ")}`);
+            }
+            if (meleeKills.length > 0) {
+              bullets.push(`\u2022 Melee: ${meleeKills.map(fmtKill).join("; ")}`);
+            }
+            showMapToast(bullets.join("\n"), { isError: dropReasons.length > 0 });
+            didShowMapToastForTurn = true;
             if (readyResult.aiStrategy) {
               showAiStrategyToast(readyResult.aiStrategy, getSelectedModelLabel());
             }
@@ -15745,12 +15887,25 @@
               meleeCasualtyHexes: readyResult.meleeCasualtyHexes?.length ? readyResult.meleeCasualtyHexes : void 0,
               meleeRemovedUnits: readyResult.meleeRemovedUnits?.length ? readyResult.meleeRemovedUnits : void 0
             };
-            const kills = readyResult.kills;
-            if (kills?.length) {
-              const killLines = kills.map(
-                (k) => `${k.victimId} destroyed by ${k.killerIds.join(", ")}`
-              );
-              showMapToast(killLines.join("\n"), { isError: false });
+            const directFire = readyResult.killsByDirectFire ?? [];
+            const returnFire = readyResult.killsByReturnFire ?? [];
+            const allKills = readyResult.kills ?? [];
+            const directSet = new Set(directFire.map((k) => k.victimId));
+            const returnSet = new Set(returnFire.map((k) => k.victimId));
+            const meleeKills = allKills.filter((k) => !directSet.has(k.victimId) && !returnSet.has(k.victimId));
+            const fmt = (k) => `${k.victimId} destroyed by ${k.killerIds.join(", ")}`;
+            const bullets = [];
+            if (directFire.length > 0) {
+              bullets.push(`\u2022 Direct fire: ${directFire.map(fmt).join("; ")}`);
+            }
+            if (returnFire.length > 0) {
+              bullets.push(`\u2022 Return fire: ${returnFire.map(fmt).join("; ")}`);
+            }
+            if (meleeKills.length > 0) {
+              bullets.push(meleeKills.map(fmt).join("\n"));
+            }
+            if (bullets.length > 0 && !didShowMapToastForTurn) {
+              showMapToast(bullets.join("\n"), { isError: false });
             }
             resolutionMoveAnimationFrameId = requestAnimationFrame(tickResolutionMoveAnimation);
           }

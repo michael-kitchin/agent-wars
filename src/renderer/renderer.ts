@@ -8,6 +8,7 @@ import {
   drawHexes,
   hitTest,
   getHexCanvasCenter,
+  getFitScale,
   type ViewState,
 } from './hexGrid';
 
@@ -116,6 +117,9 @@ interface ReadyResult {
   meleeCombatHexes?: string[];
   meleeCasualtyHexes?: string[];
   meleeRemovedUnits?: RemovedUnitSnapshot[];
+  kills?: { victimId: string; killerIds: string[] }[];
+  killsByDirectFire?: { victimId: string; killerIds: string[] }[];
+  killsByReturnFire?: { victimId: string; killerIds: string[] }[];
   /** Per-group tool invocation counts for the last AI turn. Keys are tool group ids. */
   toolInvocationCounts?: Record<string, number>;
   /** Cost in dollars for this turn's LLM call (when requestOrders was used). */
@@ -341,8 +345,185 @@ let resolutionMoveAnimation: {
 } | null = null;
 let resolutionMoveAnimationFrameId: number | null = null;
 
+/** Terrain (hex grid) cache to avoid recomputing H3 geometry every redraw. */
+let terrainCacheCanvas: HTMLCanvasElement | null = null;
+let terrainCacheMeta:
+  | {
+      scale: number;
+      width: number;
+      height: number;
+      dpr: number;
+      selectedHexIndex: string | null;
+    }
+  | null = null;
+
+let redrawRafId: number | null = null;
+function requestRedraw(): void {
+  // During resolution animation, tickResolutionMoveAnimation already redraws every frame.
+  // Avoid double rendering while allowing the animation to reflect updated view offsets.
+  if (resolutionMoveAnimation) return;
+  if (redrawRafId !== null) return;
+
+  redrawRafId = requestAnimationFrame(() => {
+    redrawRafId = null;
+    redraw();
+  });
+}
+
+function invalidateTerrainCache(): void {
+  terrainCacheCanvas = null;
+  terrainCacheMeta = null;
+}
+
+/** Cached canvas size metrics to avoid getBoundingClientRect() on every redraw. */
+let canvasMetrics: { w: number; h: number; dpr: number } | null = null;
+
+/** Cached per-animation hex-center base coordinates (offsetX/offsetY = 0) for fast interpolation while panning. */
+let moveAnimHexCenterBaseCache:
+  | Map<string, { x0: number; y0: number }>
+  | null = null;
+let moveAnimHexCenterBaseCacheStartTime: number | null = null;
+let moveAnimHexCenterBaseCacheScale: number | null = null;
+let moveAnimHexCenterBaseCacheW: number | null = null;
+let moveAnimHexCenterBaseCacheH: number | null = null;
+
+function ensureTerrainCache(w: number, h: number, dpr: number): void {
+  if (!gameState) return;
+
+  // Cache padding multiplier: at higher zoom levels the terrain can extend beyond the viewport.
+  // If the cache bitmap is too close to viewport-sized, panning can request pixels that were
+  // never generated into the cache canvas (leading to "persistent" blank edges after panning back).
+  const TERRAIN_CACHE_MULTIPLIER = 3;
+  const cacheW = Math.max(1, Math.floor(w * TERRAIN_CACHE_MULTIPLIER));
+  const cacheH = Math.max(1, Math.floor(h * TERRAIN_CACHE_MULTIPLIER));
+  const cells = gameState.hexes.map((hx) => hx.h3Index);
+
+  const needsRegen =
+    !terrainCacheCanvas ||
+    !terrainCacheMeta ||
+    terrainCacheMeta.scale !== view.scale ||
+    terrainCacheMeta.width !== cacheW ||
+    terrainCacheMeta.height !== cacheH ||
+    terrainCacheMeta.dpr !== dpr ||
+    terrainCacheMeta.selectedHexIndex !== selectedHexIndex;
+
+  if (!needsRegen) return;
+
+  const cacheCanvas = document.createElement('canvas');
+  cacheCanvas.width = Math.max(1, Math.floor(cacheW * dpr));
+  cacheCanvas.height = Math.max(1, Math.floor(cacheH * dpr));
+  const cacheCtx = cacheCanvas.getContext('2d');
+  if (!cacheCtx) return;
+
+  cacheCtx.setTransform(1, 0, 0, 1, 0, 0);
+  cacheCtx.scale(dpr, dpr);
+
+  // Render a padded cache bitmap aligned so that when view.offsetX/offsetY = 0, the top-left
+  // viewport region maps 1:1 with what would have been drawn into the main canvas.
+  // We adjust viewCache.scale to preserve visual hex size between cache and viewport.
+  const fitScaleMain = getFitScale(w, h, cells);
+  const fitScaleCache = getFitScale(cacheW, cacheH, cells);
+  const scaleRatio = fitScaleCache > 0 ? fitScaleMain / fitScaleCache : 1;
+  const viewCache: ViewState = {
+    scale: view.scale * scaleRatio,
+    // Keep the terrain centered within the cache canvas.
+    // We align it to the main viewport via an origin shift when drawing the cache.
+    offsetX: 0,
+    offsetY: 0,
+  };
+
+  drawHexes(cacheCtx, viewCache, cacheW, cacheH, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
+
+  terrainCacheCanvas = cacheCanvas;
+  terrainCacheMeta = { scale: view.scale, width: cacheW, height: cacheH, dpr, selectedHexIndex };
+}
+
+function drawTerrainCache(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  offsetX: number,
+  offsetY: number
+): void {
+  if (!terrainCacheCanvas) return;
+  const srcDpr = terrainCacheMeta?.dpr ?? 1;
+
+  // Always clear first. When offsets move the cached source rectangle out of bounds,
+  // the browser can otherwise smear/stretch edge pixels into the destination.
+  ctx.fillStyle = BACKGROUND_COLOR;
+  ctx.fillRect(0, 0, w, h);
+
+  // Draw only the source/destination intersection to avoid sampling outside bounds.
+  // We draw the larger cache so that when view.offsetX/offsetY are 0, the cache is centered
+  // under the viewport (not pinned to the top-left of the viewport), preventing left/top-only
+  // "missing terrain" artifacts.
+  const cacheW = terrainCacheMeta?.width ?? w;
+  const cacheH = terrainCacheMeta?.height ?? h;
+
+  const destOffsetX = offsetX + (w - cacheW) / 2;
+  const destOffsetY = offsetY + (h - cacheH) / 2;
+
+  const dx0 = Math.max(0, destOffsetX);
+  const dy0 = Math.max(0, destOffsetY);
+  const dx1 = Math.min(w, destOffsetX + cacheW);
+  const dy1 = Math.min(h, destOffsetY + cacheH);
+
+  if (dx1 <= dx0 || dy1 <= dy0) return;
+
+  const dx = dx0;
+  const dy = dy0;
+  const sw = dx1 - dx0;
+  const sh = dy1 - dy0;
+  const sx = dx0 - destOffsetX;
+  const sy = dy0 - destOffsetY;
+
+  // Source coordinates are in the intrinsic pixel space of `terrainCacheCanvas`.
+  ctx.drawImage(
+    terrainCacheCanvas,
+    sx * srcDpr,
+    sy * srcDpr,
+    sw * srcDpr,
+    sh * srcDpr,
+    dx,
+    dy,
+    sw,
+    sh
+  );
+}
+
+function getMoveAnimHexCenterBaseMap(
+  anim: NonNullable<typeof resolutionMoveAnimation>,
+  view: ViewState,
+  hexes: Set<string>,
+  canvasWidth: number,
+  canvasHeight: number,
+  hexList: string[]
+): Map<string, { x0: number; y0: number }> {
+  if (
+    !moveAnimHexCenterBaseCache ||
+    moveAnimHexCenterBaseCacheStartTime !== anim.startTime ||
+    moveAnimHexCenterBaseCacheScale !== view.scale ||
+    moveAnimHexCenterBaseCacheW !== canvasWidth ||
+    moveAnimHexCenterBaseCacheH !== canvasHeight
+  ) {
+    const baseView: ViewState = { scale: view.scale, offsetX: 0, offsetY: 0 };
+    const map = new Map<string, { x0: number; y0: number }>();
+    for (const h3Index of hexes) {
+      const { x, y } = getHexCanvasCenter(h3Index, baseView, canvasWidth, canvasHeight, hexList);
+      map.set(h3Index, { x0: x, y0: y });
+    }
+    moveAnimHexCenterBaseCache = map;
+    moveAnimHexCenterBaseCacheStartTime = anim.startTime;
+    moveAnimHexCenterBaseCacheScale = view.scale;
+    moveAnimHexCenterBaseCacheW = canvasWidth;
+    moveAnimHexCenterBaseCacheH = canvasHeight;
+  }
+  return moveAnimHexCenterBaseCache;
+}
+
 /** Tool group id and label for the Tools tab. Fallback when getToolGroupList is unavailable; order matches main registry. */
 const OPENROUTER_TOOL_GROUPS: { id: string; label: string }[] = [
+  { id: 'precomputation', label: 'Precomputation' },
   { id: 'planning', label: 'Planning' },
   { id: 'assessment', label: 'Assessment' },
   { id: 'estimation', label: 'Estimation' },
@@ -353,13 +534,10 @@ const OPENROUTER_TOOL_GROUPS: { id: string; label: string }[] = [
 /** Current tool groups shown in the Tools tab (from main registry or fallback). */
 let openRouterToolGroups: { id: string; label: string }[] = [...OPENROUTER_TOOL_GROUPS];
 
-/** Which tool groups are enabled for the AI. Default all enabled. */
+/** Which tool groups are enabled for the AI. Default all enabled (including Precomputation). */
 let enabledToolGroups: Set<string> = new Set(OPENROUTER_TOOL_GROUPS.map((g) => g.id));
 
-/** When true, use pre-computation and Commander's Briefing (0.6 path). In-session only; not persisted. */
-let usePrecomputation = false;
-
-/** Per-group invocation counts for the most recent turn. Reset on Ready click. */
+/** Per-group invocation counts for the most recent turn. Reset on Ready click. Precomputation count = sum of tool calls during pre-computation. */
 let toolInvocationCounts: Record<string, number> = Object.fromEntries(OPENROUTER_TOOL_GROUPS.map((g) => [g.id, 0]));
 
 /** Run toggle: when true, background AI planning runs and Ready enables only when orders ready; when false, Ready stays enabled (user resolves without LLM). */
@@ -409,7 +587,7 @@ function startBackgroundRequestIfAllowed(): void {
     }
     const enabledToolGroupsPayload = Array.from(enabledToolGroups);
     window.gameApi
-      .requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload, usePrecomputation })
+      .requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload })
       .then((result) => {
         backgroundRequestInFlight = false;
         if (runButtonOn && result.success) {
@@ -462,6 +640,9 @@ function renderOpenRouterToolsList(): void {
     btn.className = 'openrouter-tool-toggle';
     btn.setAttribute('data-tool-group', group.id);
     btn.setAttribute('aria-pressed', enabledToolGroups.has(group.id) ? 'true' : 'false');
+    if (group.id === 'precomputation') {
+      btn.title = 'When on, run assess_unit, assess_hex, and estimate_combat before the LLM and inject the Commander\'s Briefing into the prompt.';
+    }
     btn.textContent = String(toolInvocationCounts[group.id] ?? 0);
     btn.addEventListener('click', () => {
       if (enabledToolGroups.has(group.id)) {
@@ -676,6 +857,8 @@ function resizeAndRedraw(): void {
   const w = Math.max(1, Math.floor(rect.width));
   const h = Math.max(1, Math.floor(rect.height));
 
+  canvasMetrics = { w, h, dpr };
+
   canvas.width = w * dpr;
   canvas.height = h * dpr;
   canvas.style.width = `${w}px`;
@@ -698,7 +881,14 @@ function resizeAndRedraw(): void {
     return;
   }
 
-  drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
+  ensureTerrainCache(w, h, dpr);
+  if (terrainCacheCanvas) {
+    // Draw cached terrain (including selection highlight) shifted by current pan offsets.
+    drawTerrainCache(ctx, w, h, view.offsetX, view.offsetY);
+  } else {
+    // Fallback: cache creation failed (e.g. offscreen ctx unavailable).
+    drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
+  }
   const hexList = gameState.hexes.map((h) => h.h3Index);
   let moveProgress = 1;
   let unitsToDraw: GameStateSnapshot['units'] = gameState.units;
@@ -751,7 +941,13 @@ function resizeAndRedraw(): void {
     drawUnits(ctx, view, w, h, unitsToDraw, hexList, movingIds);
   }
   if (anim && hexList && moveProgress < 1) {
-    drawMovingUnits(ctx, view, w, h, anim.moves, gameState.units, hexList, moveProgress);
+    const moveAnimHexList = new Set<string>();
+    for (const m of anim.moves) {
+      moveAnimHexList.add(m.fromH3Index);
+      moveAnimHexList.add(m.toH3Index);
+    }
+    const animBaseCenters = getMoveAnimHexCenterBaseMap(anim, view, moveAnimHexList, w, h, hexList);
+    drawMovingUnits(ctx, view, w, h, anim.moves, gameState.units, hexList, moveProgress, animBaseCenters);
   }
   if (anim && hexList) {
     const elapsed = Date.now() - anim.startTime;
@@ -1092,16 +1288,28 @@ function drawMovingUnits(
   moves: ResolutionMove[],
   units: GameStateSnapshot['units'],
   hexList: string[],
-  progress: number
+  progress: number,
+  hexCenterBase?: Map<string, { x0: number; y0: number }>
 ): void {
   if (moves.length === 0 || progress >= 1) return;
+  const unitsById = new Map<string, GameStateSnapshot['units'][number]>(units.map((u) => [u.id, u]));
   for (const move of moves) {
-    const unit = units.find((u) => u.id === move.unitId);
+    const unit = unitsById.get(move.unitId);
     if (!unit) continue;
-    const from = getHexCanvasCenter(move.fromH3Index, view, canvasWidth, canvasHeight, hexList);
-    const to = getHexCanvasCenter(move.toH3Index, view, canvasWidth, canvasHeight, hexList);
-    const x = from.x + progress * (to.x - from.x);
-    const y = from.y + progress * (to.y - from.y);
+    let x: number;
+    let y: number;
+    if (hexCenterBase) {
+      const fromBase = hexCenterBase.get(move.fromH3Index);
+      const toBase = hexCenterBase.get(move.toH3Index);
+      if (!fromBase || !toBase) continue;
+      x = fromBase.x0 + view.offsetX + progress * (toBase.x0 - fromBase.x0);
+      y = fromBase.y0 + view.offsetY + progress * (toBase.y0 - fromBase.y0);
+    } else {
+      const from = getHexCanvasCenter(move.fromH3Index, view, canvasWidth, canvasHeight, hexList);
+      const to = getHexCanvasCenter(move.toH3Index, view, canvasWidth, canvasHeight, hexList);
+      x = from.x + progress * (to.x - from.x);
+      y = from.y + progress * (to.y - from.y);
+    }
     const color = PLAYER_COLORS[unit.player] ?? '#333';
     const label = UNIT_TYPE_LABELS[unit.unitType] ?? '?';
     drawOneUnitMarker(ctx, x, y, color, label, '#fff');
@@ -1114,14 +1322,12 @@ function redraw(): void {
   const canvas = document.getElementById('canvas') as HTMLCanvasElement | null;
   if (!container || !canvas) return;
 
-  const rect = container.getBoundingClientRect();
-  const w = Math.max(1, Math.floor(rect.width));
-  const h = Math.max(1, Math.floor(rect.height));
-
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  const dpr = window.devicePixelRatio ?? 1;
+  const metrics = canvasMetrics;
+  if (!metrics) return;
+  const { w, h, dpr } = metrics;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.scale(dpr, dpr);
 
@@ -1136,7 +1342,14 @@ function redraw(): void {
     return;
   }
 
-  drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
+  ensureTerrainCache(w, h, dpr);
+  if (terrainCacheCanvas) {
+    // Draw cached terrain (including selection highlight) shifted by current pan offsets.
+    drawTerrainCache(ctx, w, h, view.offsetX, view.offsetY);
+  } else {
+    // Fallback: cache creation failed (e.g. offscreen ctx unavailable).
+    drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
+  }
   const hexList = gameState.hexes.map((h) => h.h3Index);
   let moveProgress = 1;
   let unitsToDraw: GameStateSnapshot['units'] = gameState.units;
@@ -1339,6 +1552,7 @@ function initNewGameButton(): void {
     try {
       const state = (await window.gameApi.newGame(size)) as GameStateSnapshot;
       gameState = state;
+      invalidateTerrainCache();
       pendingOrders = [];
       pendingRangedAttacks = [];
       rangedModeActive = false;
@@ -1542,14 +1756,6 @@ function initOpenRouterUI(): void {
     }
   })();
 
-  const usePrecomputationCheckbox = document.getElementById('openrouter-use-precomputation') as HTMLInputElement | null;
-  if (usePrecomputationCheckbox) {
-    usePrecomputationCheckbox.checked = usePrecomputation;
-    usePrecomputationCheckbox.addEventListener('change', () => {
-      usePrecomputation = usePrecomputationCheckbox.checked;
-    });
-  }
-
   const keyInput = document.getElementById('openrouter-key') as HTMLInputElement | null;
   const modelSelect = document.getElementById('openrouter-model') as HTMLSelectElement | null;
   const refreshBtn = document.getElementById('openrouter-refresh-models');
@@ -1651,6 +1857,7 @@ function init(): void {
       .then((raw) => {
         const state = raw as GameStateSnapshot;
         gameState = state;
+        invalidateTerrainCache();
         updateGameStateSidebar(state);
         updateRangedSidebar();
         updateSidebar();
@@ -1686,7 +1893,7 @@ function init(): void {
     view.offsetY = mouseY - canvasCenterY - (dy * newScale) / view.scale;
     view.scale = newScale;
 
-    redraw();
+    requestRedraw();
   }, { passive: false });
 
   canvas.addEventListener('mousedown', (e) => {
@@ -1707,7 +1914,7 @@ function init(): void {
     dragDistanceSq = dx * dx + dy * dy;
     view.offsetX = dragStartOffsetX + dx;
     view.offsetY = dragStartOffsetY + dy;
-    redraw();
+    requestRedraw();
   });
 
   canvas.addEventListener('mouseleave', () => {
@@ -1894,7 +2101,6 @@ function init(): void {
         const usePrecomputed = runButtonOn && precomputedAiOrders !== null;
         const readyPayload = {
           enabledToolGroups: enabledToolGroupsPayload,
-          usePrecomputation,
           precomputedAiOrders: usePrecomputed ? precomputedAiOrders! : [],
           precomputedAiRangedOrders: usePrecomputed ? (precomputedAiRangedOrders ?? []) : [],
           precomputedAiStrategy: usePrecomputed ? (precomputedAiStrategy ?? undefined) : undefined,
@@ -1918,10 +2124,13 @@ function init(): void {
           openRouterGameCost += readyResult.cost;
           updateOpenRouterCostLabel();
         }
+        /** True if we already showed the lower-left map toast for this turn (so we don't overwrite it with destruction-only). */
+        let didShowMapToastForTurn = false;
         if (readyResult.aiSkipped) {
           appendOpenRouterLog(readyResult.aiSkipReason ?? 'AI skipped.', true);
           hideAiStrategyToast();
           showMapToast(readyResult.aiSkipReason ?? 'Set your OpenRouter API key and select a model in the panel on the right.', { isError: true });
+          didShowMapToastForTurn = true;
         } else if (
           (readyResult.aiOrderCount !== undefined && readyResult.aiOrderCount > 0) ||
           (readyResult.aiRangedByType && ((readyResult.aiRangedByType.armor ?? 0) + (readyResult.aiRangedByType.naval ?? 0) > 0))
@@ -1935,17 +2144,35 @@ function init(): void {
             appendOpenRouterLog(`AI ranged: ${parts.join(', ')}.`);
           }
           const dropReasons = readyResult.aiDropReasons ?? [];
-          let toastText = `AI movements: ${readyResult.aiOrderCount ?? 0}.`;
+          const bullets: string[] = [];
+          bullets.push(`• AI movements: ${readyResult.aiOrderCount ?? 0}`);
           if (ranged && (ranged.armor ?? 0) + (ranged.naval ?? 0) > 0) {
             const parts: string[] = [];
             if (ranged.armor) parts.push(`${ranged.armor} armor`);
             if (ranged.naval) parts.push(`${ranged.naval} naval`);
-            toastText += ` Ranged: ${parts.join(', ')}.`;
+            bullets.push(`• Ranged: ${parts.join(', ')}`);
           }
           if (dropReasons.length > 0) {
-            toastText += '\n\nDropped: ' + dropReasons.join('; ');
+            bullets.push(`• Dropped: ${dropReasons.join('; ')}`);
           }
-          showMapToast(toastText, { isError: dropReasons.length > 0 });
+          const directFire = readyResult.killsByDirectFire ?? [];
+          const returnFire = readyResult.killsByReturnFire ?? [];
+          const allKills = readyResult.kills ?? [];
+          const directSet = new Set(directFire.map((k) => k.victimId));
+          const returnSet = new Set(returnFire.map((k) => k.victimId));
+          const meleeKills = allKills.filter((k) => !directSet.has(k.victimId) && !returnSet.has(k.victimId));
+          const fmtKill = (k: { victimId: string; killerIds: string[] }) => `${k.victimId} by ${k.killerIds.join(', ')}`;
+          if (directFire.length > 0) {
+            bullets.push(`• Direct fire: ${directFire.map(fmtKill).join('; ')}`);
+          }
+          if (returnFire.length > 0) {
+            bullets.push(`• Return fire: ${returnFire.map(fmtKill).join('; ')}`);
+          }
+          if (meleeKills.length > 0) {
+            bullets.push(`• Melee: ${meleeKills.map(fmtKill).join('; ')}`);
+          }
+          showMapToast(bullets.join('\n'), { isError: dropReasons.length > 0 });
+          didShowMapToastForTurn = true;
           if (readyResult.aiStrategy) {
             showAiStrategyToast(readyResult.aiStrategy, getSelectedModelLabel());
           }
@@ -1985,12 +2212,25 @@ function init(): void {
             meleeCasualtyHexes: readyResult.meleeCasualtyHexes?.length ? readyResult.meleeCasualtyHexes : undefined,
             meleeRemovedUnits: readyResult.meleeRemovedUnits?.length ? readyResult.meleeRemovedUnits : undefined,
           };
-          const kills = readyResult.kills;
-          if (kills?.length) {
-            const killLines = kills.map(
-              (k) => `${k.victimId} destroyed by ${k.killerIds.join(', ')}`
-            );
-            showMapToast(killLines.join('\n'), { isError: false });
+          const directFire = readyResult.killsByDirectFire ?? [];
+          const returnFire = readyResult.killsByReturnFire ?? [];
+          const allKills = readyResult.kills ?? [];
+          const directSet = new Set(directFire.map((k) => k.victimId));
+          const returnSet = new Set(returnFire.map((k) => k.victimId));
+          const meleeKills = allKills.filter((k) => !directSet.has(k.victimId) && !returnSet.has(k.victimId));
+          const fmt = (k: { victimId: string; killerIds: string[] }) => `${k.victimId} destroyed by ${k.killerIds.join(', ')}`;
+          const bullets: string[] = [];
+          if (directFire.length > 0) {
+            bullets.push(`• Direct fire: ${directFire.map(fmt).join('; ')}`);
+          }
+          if (returnFire.length > 0) {
+            bullets.push(`• Return fire: ${returnFire.map(fmt).join('; ')}`);
+          }
+          if (meleeKills.length > 0) {
+            bullets.push(meleeKills.map(fmt).join('\n'));
+          }
+          if (bullets.length > 0 && !didShowMapToastForTurn) {
+            showMapToast(bullets.join('\n'), { isError: false });
           }
           resolutionMoveAnimationFrameId = requestAnimationFrame(tickResolutionMoveAnimation);
         }

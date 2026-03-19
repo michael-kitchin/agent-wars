@@ -213,6 +213,5 @@ export function formatBriefing(
   }
   sections.push('\n\n');
   sections.push(standingOrderText || '');
-  sections.push('\n\nCallbacks not yet active (Milestone 0.7).');
   return sections.join('');
 }

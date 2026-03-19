@@ -211,6 +211,10 @@ export function ready(
   casualtyHexes?: string[];
   removedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
   kills?: { victimId: string; killerIds: string[] }[];
+  /** Ranged: defenders killed by attackers (direct fire). For status toast bullets. */
+  killsByDirectFire?: { victimId: string; killerIds: string[] }[];
+  /** Ranged: attackers killed by defenders (return fire). For status toast bullets. */
+  killsByReturnFire?: { victimId: string; killerIds: string[] }[];
   rangedCombatHexes?: string[];
   rangedCasualtyHexes?: string[];
   rangedRemovedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
@@ -316,6 +320,8 @@ export function ready(
       casualtyHexes: allCasualtyHexes.length > 0 ? allCasualtyHexes : undefined,
       removedUnits: allRemovedUnits.length > 0 ? allRemovedUnits : undefined,
       kills: allKills.length > 0 ? allKills : undefined,
+      killsByDirectFire: rangedResult.killsByDirectFire?.length ? rangedResult.killsByDirectFire : undefined,
+      killsByReturnFire: rangedResult.killsByReturnFire?.length ? rangedResult.killsByReturnFire : undefined,
       rangedCombatHexes: rangedResult.combatHexes.length > 0 ? rangedResult.combatHexes : undefined,
       rangedCasualtyHexes: rangedResult.casualtyHexes.length > 0 ? rangedResult.casualtyHexes : undefined,
       rangedRemovedUnits: rangedResult.removedUnits.length > 0 ? rangedResult.removedUnits : undefined,
