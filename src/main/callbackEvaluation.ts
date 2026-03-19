@@ -8,6 +8,8 @@ import { logDebug } from './logger';
 import { dbGetAll } from './gameDb';
 import type { GameStateSnapshot } from './gameDb';
 import type { CallbackSubscription } from './callbackSubscriptions';
+import { gridDistance } from 'h3-js';
+import { getRange } from './combatConstants';
 
 export interface ResolutionContext {
   opponentCombatParticipantUnitIds: string[];
@@ -29,6 +31,13 @@ export type MandatoryOverrideResult =
   | { type: 'unit_destroyed'; unitId: string }
   | { type: 'unordered_unit'; unitId: string }
   | { type: 'standing_order_blocked'; unitId: string }
+  | {
+      type: 'attack_mix_changed';
+      aiAttackersBefore: number;
+      aiAttackersAfter: number;
+      hittableHumansBefore: number;
+      hittableHumansAfter: number;
+    }
   | { type: 'deadman'; turnsSince: number };
 
 const WARNING_STATUSES = new Set([
@@ -41,6 +50,62 @@ const WARNING_STATUSES = new Set([
 ]);
 
 const DEADMAN_TURNS = 5;
+
+interface AttackMixSnapshot {
+  turnNumber: number;
+  aiAttackers: Set<string>;
+  hittableHumans: Set<string>;
+}
+
+let lastAttackMixSnapshot: AttackMixSnapshot | null = null;
+
+/**
+ * Returns whether an attacker can hit a target from current positions this turn.
+ * Uses ranged distance for ranged-capable units and same-hex melee for melee-only units.
+ */
+function canHitNow(
+  attacker: { unitType: string; h3Index: string },
+  target: { h3Index: string }
+): boolean {
+  try {
+    const dist = gridDistance(attacker.h3Index, target.h3Index);
+    const range = getRange(attacker.unitType as 'infantry' | 'armor' | 'naval');
+    return range > 0 ? dist <= range : dist === 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Builds the current "attack mix" derived from the same positional facts used by assessments:
+ * which opponent units can attack now, and which human units can be hit now.
+ */
+function buildAttackMixSnapshot(state: GameStateSnapshot): AttackMixSnapshot {
+  const opponents = state.units.filter((u) => u.player === 'opponent');
+  const humans = state.units.filter((u) => u.player === 'human');
+  const aiAttackers = new Set<string>();
+  const hittableHumans = new Set<string>();
+  for (const ai of opponents) {
+    for (const human of humans) {
+      if (!canHitNow(ai, human)) continue;
+      aiAttackers.add(ai.id);
+      hittableHumans.add(human.id);
+    }
+  }
+  return {
+    turnNumber: state.turnNumber,
+    aiAttackers,
+    hittableHumans,
+  };
+}
+
+function setsEqual(a: Set<string>, b: Set<string>): boolean {
+  if (a.size !== b.size) return false;
+  for (const v of a) {
+    if (!b.has(v)) return false;
+  }
+  return true;
+}
 
 /**
  * Evaluates mandatory override conditions. Returns a list of reasons that fired.
@@ -95,6 +160,29 @@ export function evaluateMandatoryOverrides(
 
   if (lastConsultationTurn > 0 && state.turnNumber - lastConsultationTurn >= DEADMAN_TURNS) {
     results.push({ type: 'deadman', turnsSince: state.turnNumber - lastConsultationTurn });
+  }
+
+  // In-memory only: consult when the attack mix changes from one turn to the next.
+  // Reset baseline naturally at game start/new game (turn 1) or non-sequential jumps.
+  const currentAttackMix = buildAttackMixSnapshot(state);
+  if (state.turnNumber <= 1) {
+    lastAttackMixSnapshot = currentAttackMix;
+  } else if (lastAttackMixSnapshot && lastAttackMixSnapshot.turnNumber === state.turnNumber - 1) {
+    if (
+      !setsEqual(lastAttackMixSnapshot.aiAttackers, currentAttackMix.aiAttackers) ||
+      !setsEqual(lastAttackMixSnapshot.hittableHumans, currentAttackMix.hittableHumans)
+    ) {
+      results.push({
+        type: 'attack_mix_changed',
+        aiAttackersBefore: lastAttackMixSnapshot.aiAttackers.size,
+        aiAttackersAfter: currentAttackMix.aiAttackers.size,
+        hittableHumansBefore: lastAttackMixSnapshot.hittableHumans.size,
+        hittableHumansAfter: currentAttackMix.hittableHumans.size,
+      });
+    }
+    lastAttackMixSnapshot = currentAttackMix;
+  } else {
+    lastAttackMixSnapshot = currentAttackMix;
   }
 
   if (results.length > 0) {

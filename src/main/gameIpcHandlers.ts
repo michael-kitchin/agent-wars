@@ -5,10 +5,18 @@
  */
 
 import type { GameStateSnapshot } from './gameDb';
-import { getAiPendingOrders, clearAiPendingOrders } from './gameDb';
+import {
+  getAiPendingOrders,
+  clearAiPendingOrders,
+  setAiLastConsultationTurn,
+  clearOpponentCombatSinceConsultation,
+} from './gameDb';
 import { buildLatLngCoordinateMap } from './mapData';
 import { generateOrdersForStandingOrders } from './tools/tool5StandingOrders';
 import { afterResolution } from './afterResolution';
+import { logError } from './logger';
+
+const POST_RESOLUTION_CONSULT_TIMEOUT_MS = 120_000;
 
 /** Result shape of requestOrders / game:requestAiOrders (success or error). */
 export type RequestAiOrdersResult =
@@ -193,25 +201,36 @@ export async function handleGameReady(
   let aiSkipReason: string | undefined;
   let aiStrategy: string | undefined;
 
-  let aiConsulted: boolean | undefined;
-  if (useEventDrivenConsultation) {
-    const pending = getAiPendingOrders('opponent');
-    if (pending) {
-      aiOrders = pending.movementOrders;
-      aiRangedOrders = pending.rangedOrders;
-      clearAiPendingOrders('opponent');
-      aiConsulted = true;
-    } else {
-      const hexList = state.hexes.map((h) => h.h3Index);
-      const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
-      const generated = generateOrdersForStandingOrders('opponent', state, latLngByH3, resolveToH3);
-      aiOrders = generated.movementOrders;
-      aiRangedOrders = generated.rangedAttacks;
-      aiConsulted = false;
-    }
-  } else {
   const usePrecomputed =
     payload?.precomputedAiOrders !== undefined && payload?.precomputedAiRangedOrders !== undefined;
+  let aiConsulted: boolean | undefined;
+  if (useEventDrivenConsultation) {
+    if (usePrecomputed) {
+      aiOrders = payload.precomputedAiOrders ?? [];
+      aiRangedOrders = payload.precomputedAiRangedOrders ?? [];
+      aiStrategy = payload.precomputedAiStrategy;
+      aiConsulted = true;
+      // Initial event-driven consultation can happen before the first Ready; record it so
+      // first_consultation does not fire again on the immediate after-resolution evaluation.
+      setAiLastConsultationTurn(state.turnNumber);
+      clearOpponentCombatSinceConsultation();
+    } else {
+      const pending = getAiPendingOrders('opponent');
+      if (pending) {
+        aiOrders = pending.movementOrders;
+        aiRangedOrders = pending.rangedOrders;
+        clearAiPendingOrders('opponent');
+        aiConsulted = true;
+      } else {
+        const hexList = state.hexes.map((h) => h.h3Index);
+        const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
+        const generated = generateOrdersForStandingOrders('opponent', state, latLngByH3, resolveToH3);
+        aiOrders = generated.movementOrders;
+        aiRangedOrders = generated.rangedAttacks;
+        aiConsulted = false;
+      }
+    }
+  } else {
   if (usePrecomputed) {
     aiOrders = payload.precomputedAiOrders ?? [];
     aiRangedOrders = payload.precomputedAiRangedOrders ?? [];
@@ -261,12 +280,31 @@ export async function handleGameReady(
   }
 
   if (useEventDrivenConsultation && readyResult.success) {
-    await afterResolution(deps.getGameState(), readyResult, {
-      modelId: modelId ?? '',
-      enabledToolNames,
-      hasKey: deps.hasKey,
-      requestOrders: deps.requestOrders,
-    });
+    try {
+      const postResolution = await Promise.race([
+        afterResolution(deps.getGameState(), readyResult, {
+          modelId: modelId ?? '',
+          enabledToolNames,
+          hasKey: deps.hasKey,
+          requestOrders: deps.requestOrders,
+        }),
+        new Promise<never>((_resolve, reject) => {
+          setTimeout(
+            () => reject(new Error(`afterResolution consultation timed out after ${POST_RESOLUTION_CONSULT_TIMEOUT_MS}ms`)),
+            POST_RESOLUTION_CONSULT_TIMEOUT_MS
+          );
+        }),
+      ]);
+      if (postResolution.strategy) {
+        aiStrategy = postResolution.strategy;
+      }
+      if (postResolution.toolInvocationCounts) {
+        toolInvocationCounts = postResolution.toolInvocationCounts;
+      }
+    } catch (err) {
+      // Do not block Ready indefinitely if post-resolution consultation hangs/fails.
+      logError('handleGameReady: afterResolution failed or timed out', err);
+    }
   }
 
   const aiRangedByType: { armor?: number; naval?: number } = {};

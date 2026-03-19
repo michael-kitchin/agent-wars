@@ -34,7 +34,19 @@ export interface AfterResolutionDeps {
     state: GameStateSnapshot,
     modelId: string,
     options: { enabledToolNames: string[]; usePrecomputation: boolean }
-  ) => Promise<{ success: true; orders: { unitId: string; toH3Index: string }[]; rangedAttacks?: { unitId: string; targetH3Index: string }[] } | { success: false; error: string }>;
+  ) => Promise<{
+    success: true;
+    orders: { unitId: string; toH3Index: string }[];
+    rangedAttacks?: { unitId: string; targetH3Index: string }[];
+    strategy?: string;
+    toolInvocationCounts?: Record<string, number>;
+  } | { success: false; error: string }>;
+}
+
+export interface AfterResolutionResult {
+  consulted: boolean;
+  strategy?: string;
+  toolInvocationCounts?: Record<string, number>;
 }
 
 /**
@@ -47,10 +59,10 @@ export async function afterResolution(
   state: GameStateSnapshot,
   resolutionResult: ReadyResultWithParticipants,
   deps: AfterResolutionDeps
-): Promise<void> {
+): Promise<AfterResolutionResult> {
   if (!resolutionResult.success || !deps.modelId?.trim() || !deps.hasKey()) {
     logDebug('afterResolution: skip (no success, no model, or no key)');
-    return;
+    return { consulted: false };
   }
 
   const opponentCombatants = resolutionResult.opponentCombatParticipantUnitIds ?? [];
@@ -91,16 +103,24 @@ export async function afterResolution(
         setAiLastConsultationTurn(state.turnNumber);
         clearOpponentCombatSinceConsultation();
         logDebug('afterResolution: consultation completed, pending orders stored', { turnNumber: state.turnNumber });
+        return {
+          consulted: true,
+          strategy: result.strategy,
+          toolInvocationCounts: result.toolInvocationCounts,
+        };
       } else {
         logDebug('afterResolution: requestOrders failed or returned no orders', result.success ? 'no orders' : (result as { error?: string }).error);
         clearAiPendingOrders('opponent');
+        return { consulted: false };
       }
     } catch (err) {
       logError('afterResolution: requestOrders exception', err);
       clearAiPendingOrders('opponent');
+      return { consulted: false };
     }
   } else {
     clearAiPendingOrders('opponent');
     logDebug('afterResolution: no event fired, pending orders cleared');
+    return { consulted: false };
   }
 }

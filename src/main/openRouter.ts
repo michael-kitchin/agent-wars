@@ -614,11 +614,11 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
 
 ${LATLNG_PREAMBLE}
 
-Combat: each unit rolls d6 when attacking (hit if roll <= attack) or when defending (hit if roll <= defender's defense). Unit stats: ${combatSummary}. Ranged attacks can target any enemy hex within range regardless of terrain (e.g. armor on land can fire at naval on adjacent water, and vice versa). Ranged attacks are resolved using each unit's current position (before movement). Only issue a ranged attack if that unit is already within range of the target hex at the start of this turn; do not assume movement happens first. If a unit is moving this turn and would only be in range after the move, do not add a ranged attack for it this turn (it can fire next turn from its new position). Each unit may declare at most one ranged attack per turn: include each attacking unit at most once in rangedAttacks; if a unit can attack multiple enemies, choose one target${combatTargetHint} For rangedAttacks targetXY, always use the enemy's position from the "Human units" list above — never use orderToXY or plan_route coordinates, which are your own movement destinations.${navalCoaching}${combatAssessHint}
+Combat: each unit rolls d6 when attacking (hit if roll <= attack) or when defending (hit if roll <= defender's defense). Unit stats: ${combatSummary}. Ranged attacks can target any enemy hex within range regardless of terrain (e.g. armor on land can fire at naval on adjacent water, and vice versa). Ranged attacks are resolved using each unit's current position (before movement). Only issue a ranged attack if that unit is already within range of the target hex at the start of this turn; do not assume movement happens first. If a unit is moving this turn and would only be in range after the move, do not add a ranged attack for it this turn (it can fire next turn from its new position). Each unit may declare at most one ranged attack per turn: include each attacking unit at most once in rangedAttacks; if a unit can attack multiple enemies, choose one target${combatTargetHint} For rangedAttacks targetXY, always use the enemy's position from the "Human units" list above — never use orderToXY or plan_route coordinates, which are your own movement destinations. Before you output each rangedAttacks entry, apply this legality checklist and omit the entry if any check fails: (1) attacker exists in "Your units" and is opponent-owned, (2) attacker unit type has range >= 1, (3) targetXY exactly matches a current enemy position from "Human units", (4) attacker-to-target hex distance is <= attacker range from the unit stats above. If the COMMANDER'S BRIEFING is present, only include ranged attacks for attacker-target pairs that the briefing explicitly indicates are in range this turn; if uncertain, omit the ranged attack. Do not "guess and let the engine validate"; self-filter invalid ranged attacks first.${navalCoaching}${combatAssessHint}
 
 ${mainBlock}
 
-Submit your final orders as a JSON object only (valid JSON, no comments): { "strategy": "<one-line explanation>", "movementOrders": [ { "unitId": "<id>", "toXY": [lat, lng] }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetXY": [lat, lng] }, ... ] }. Use only toXY and targetXY as [lat, lng] arrays. Include "strategy".${movementOrderInstruction} In rangedAttacks, list each unit at most once (one ranged attack per unit per turn); duplicate unitIds are dropped. You may include an optional "callbacks" array to subscribe to events (e.g. turns, unit_engaged, unit_destroyed, unit_arrived, threat_escalation); when an event fires, the engine will re-consult you with an updated briefing. You may include an optional "memoryUpdates" array (write/delete) in the same JSON instead of or in addition to calling memory tools.`;
+Submit your final orders as a JSON object only (valid JSON, no comments): { "strategy": "<one-line explanation>", "movementOrders": [ { "unitId": "<id>", "toXY": [lat, lng] }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetXY": [lat, lng] }, ... ] }. Use only toXY and targetXY as [lat, lng] arrays. Include "strategy".${movementOrderInstruction} In rangedAttacks, list each unit at most once (one ranged attack per unit per turn); duplicate unitIds are dropped. Include a "callbacks" array in your final JSON to plan when you should be consulted again. Treat callbacks as your re-consultation plan for the next turns, not as optional flavor text. Prefer specific triggers aligned to your plan: turns(N) for periodic refresh, unit_engaged/unit_destroyed for combat pivots, unit_arrived for timing-sensitive moves, threat_escalation for risk spikes. Only omit callbacks when the game is effectively decided or no further opponent decisions are needed. You may include an optional "memoryUpdates" array (write/delete) in the same JSON instead of or in addition to calling memory tools.`;
 }
 
 export interface RequestOrdersResult {
@@ -1023,6 +1023,7 @@ export async function requestOrders(
   let totalOutputTokens = 0;
   try {
     let iteration = 0;
+    let parseRepairAttempted = false;
     while (iteration < MAX_TOOL_ITERATIONS) {
       iteration++;
       const body: Record<string, unknown> = {
@@ -1137,7 +1138,54 @@ export async function requestOrders(
       }
 
       logDebug('openRouter requestOrders: assistant response (final)', content);
-      const parsed = parseOrdersResponse(content, resolveToH3);
+      let parsed = parseOrdersResponse(content, resolveToH3);
+      if (!parsed) {
+        if (!parseRepairAttempted) {
+          parseRepairAttempted = true;
+          if (onLog) onLog('Model response was not valid JSON; requesting strict JSON repair…', true);
+          const repairMessages: ChatMessage[] = [
+            ...messages,
+            { role: 'assistant', content },
+            {
+              role: 'user',
+              content:
+                'Your previous response was not parseable JSON. Reply now with JSON only (no prose, no markdown, no code fences) using exactly this schema: {"strategy":"...","movementOrders":[{"unitId":"...","toXY":[lat,lng]}],"rangedAttacks":[{"unitId":"...","targetXY":[lat,lng]}],"callbacks":[{"event":"...","params":{...}}],"memoryUpdates":[{"action":"write|delete","key":"...","content":"...","tier":"persistent|stored"}]}. Omit optional fields by using empty arrays when not needed.',
+            },
+          ];
+          const repairBody: Record<string, unknown> = {
+            model: modelId,
+            messages: repairMessages,
+            max_tokens: 1024,
+            tool_choice: 'none',
+          };
+          const repairFetchInit: RequestInit = {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${key}`,
+            },
+            body: JSON.stringify(repairBody),
+          };
+          if (signal) repairFetchInit.signal = signal;
+          const repairRes = await fetch(OPENROUTER_CHAT_URL, repairFetchInit);
+          if (repairRes.ok) {
+            const repairJson = (await repairRes.json()) as {
+              choices?: Array<{ message?: { content?: string | null } }>;
+              usage?: { cost?: number; prompt_tokens?: number; completion_tokens?: number };
+            };
+            requestCost += repairJson.usage?.cost ?? 0;
+            totalInputTokens += repairJson.usage?.prompt_tokens ?? 0;
+            totalOutputTokens += repairJson.usage?.completion_tokens ?? 0;
+            const repairContent = repairJson.choices?.[0]?.message?.content;
+            if (typeof repairContent === 'string' && repairContent.trim()) {
+              logDebug('openRouter requestOrders: assistant response (repair)', repairContent);
+              parsed = parseOrdersResponse(repairContent, resolveToH3);
+            }
+          } else {
+            logError('openRouter requestOrders: repair API error', repairRes.status);
+          }
+        }
+      }
       if (!parsed) {
         logError('openRouter requestOrders: failed to parse JSON', content.slice(0, 300));
         if (onLog) {
@@ -1153,6 +1201,8 @@ export async function requestOrders(
         replaceSubscriptions('opponent', parsed.callbacks, state.turnNumber);
         logDebug('openRouter requestOrders: applied callbacks from response', { count: parsed.callbacks.length });
       }
+      // UI "Events" counter: count callback entries returned by the LLM this turn.
+      toolInvocationCounts['events'] = parsed.callbacks?.length ?? 0;
       if (parsed.memoryUpdates?.length) {
         for (const upd of parsed.memoryUpdates) {
           if (upd.action === 'write') {
@@ -1438,6 +1488,58 @@ function normalizeCallbacks(raw: unknown): CallbackSubscription[] {
   if (!Array.isArray(raw)) return [];
   const out: CallbackSubscription[] = [];
   for (const item of raw) {
+    // Accept compact string callbacks (common model output), e.g.:
+    // "turns(5)", "unit_engaged(opponent-naval-1)", "unit_destroyed:human-armor-1"
+    if (typeof item === 'string') {
+      const text = item.trim();
+      if (!text) continue;
+      const parenMatch = text.match(/^([a-z_]+)\((.*)\)$/i);
+      if (parenMatch) {
+        const event = parenMatch[1]!.trim();
+        const arg = parenMatch[2]!.trim();
+        if (!CALLBACK_EVENT_VOCAB.has(event)) continue;
+        if (event === 'turns') {
+          const n = Number(arg);
+          if (Number.isFinite(n) && n > 0) out.push({ event, params: { n: Math.floor(n) } });
+          continue;
+        }
+        if (event === 'unit_destroyed') {
+          out.push({ event, params: { side: arg } });
+          continue;
+        }
+        if (event === 'unit_engaged' || event === 'unit_arrived') {
+          out.push({ event, params: { unitId: arg } });
+          continue;
+        }
+        if (event === 'threat_escalation') {
+          // Minimal compact form: threat_escalation(unitId)
+          out.push({ event, params: { unitId: arg } });
+          continue;
+        }
+        out.push({ event, params: {} });
+        continue;
+      }
+      const colonMatch = text.match(/^([a-z_]+)\s*:\s*(.+)$/i);
+      if (colonMatch) {
+        const event = colonMatch[1]!.trim();
+        const arg = colonMatch[2]!.trim();
+        if (!CALLBACK_EVENT_VOCAB.has(event)) continue;
+        if (event === 'turns') {
+          const n = Number(arg);
+          if (Number.isFinite(n) && n > 0) out.push({ event, params: { n: Math.floor(n) } });
+        } else if (event === 'unit_destroyed') {
+          out.push({ event, params: { side: arg } });
+        } else if (event === 'unit_engaged' || event === 'unit_arrived') {
+          out.push({ event, params: { unitId: arg } });
+        } else if (event === 'threat_escalation') {
+          out.push({ event, params: { unitId: arg } });
+        } else {
+          out.push({ event, params: {} });
+        }
+      }
+      continue;
+    }
+
     if (!item || typeof item !== 'object') continue;
     const o = item as { event?: unknown; params?: unknown };
     let event = typeof o.event === 'string' ? o.event.trim() : '';
@@ -1493,50 +1595,69 @@ function parseOrdersResponse(
   memoryUpdates?: MemoryUpdateItem[];
 } | null {
   const trimmed = content.trim();
-  let jsonStr = trimmed;
-  const codeBlock = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (codeBlock) jsonStr = codeBlock[1].trim();
-  const firstBrace = jsonStr.search(/\{/);
-  const firstBracket = jsonStr.search(/\[/);
-  if (firstBrace >= 0 && (firstBracket < 0 || firstBrace < firstBracket)) {
-    const objectMatch = jsonStr.slice(firstBrace).match(/\{[\s\S]*\}/);
-    if (objectMatch) jsonStr = objectMatch[0];
-  } else if (firstBracket >= 0) {
-    const arrayMatch = jsonStr.slice(firstBracket).match(/\[[\s\S]*\]/);
-    if (arrayMatch) jsonStr = arrayMatch[0];
+  const candidates: string[] = [];
+
+  // Candidate 1: whole response (covers pure-JSON responses).
+  candidates.push(trimmed);
+
+  // Candidate 2: fenced code blocks, preferring later blocks (models often append final JSON at the end).
+  const fencedMatches = Array.from(trimmed.matchAll(/```(?:json)?\s*([\s\S]*?)```/g));
+  for (let i = fencedMatches.length - 1; i >= 0; i--) {
+    const block = fencedMatches[i]?.[1]?.trim();
+    if (block) candidates.push(block);
   }
-  jsonStr = stripJsonLikeComments(jsonStr);
-  try {
-    const parsed = JSON.parse(jsonStr) as unknown;
-    if (Array.isArray(parsed)) {
-      const movementOrders = parseOrdersArray(parsed, resolveToH3);
-      return { movementOrders, rangedAttacks: [] };
+
+  // Candidate 3: last object/array by first-brace/first-bracket heuristic.
+  const lastBrace = trimmed.lastIndexOf('{');
+  const lastBracket = trimmed.lastIndexOf('[');
+  if (lastBrace >= 0) candidates.push(trimmed.slice(lastBrace).trim());
+  if (lastBracket >= 0) candidates.push(trimmed.slice(lastBracket).trim());
+
+  for (const raw of candidates) {
+    let jsonStr = raw;
+    const firstBrace = jsonStr.search(/\{/);
+    const firstBracket = jsonStr.search(/\[/);
+    if (firstBrace >= 0 && (firstBracket < 0 || firstBrace < firstBracket)) {
+      const objectMatch = jsonStr.slice(firstBrace).match(/\{[\s\S]*\}/);
+      if (objectMatch) jsonStr = objectMatch[0];
+    } else if (firstBracket >= 0) {
+      const arrayMatch = jsonStr.slice(firstBracket).match(/\[[\s\S]*\]/);
+      if (arrayMatch) jsonStr = arrayMatch[0];
     }
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      const obj = parsed as {
-        movementOrders?: unknown;
-        rangedAttacks?: unknown;
-        strategy?: unknown;
-        callbacks?: unknown;
-        memoryUpdates?: unknown;
-      };
-      const movementOrders = Array.isArray(obj.movementOrders) ? parseOrdersArray(obj.movementOrders, resolveToH3) : [];
-      const rangedAttacks = Array.isArray(obj.rangedAttacks) ? parseRangedArray(obj.rangedAttacks, resolveToH3) : [];
-      const strategy = typeof obj.strategy === 'string' && obj.strategy.trim() ? obj.strategy.trim() : undefined;
-      const callbacks = normalizeCallbacks(obj.callbacks);
-      const memoryUpdates = normalizeMemoryUpdates(obj.memoryUpdates);
-      return {
-        movementOrders,
-        rangedAttacks,
-        strategy,
-        callbacks: callbacks.length > 0 ? callbacks : undefined,
-        memoryUpdates: memoryUpdates.length > 0 ? memoryUpdates : undefined,
-      };
+
+    jsonStr = stripJsonLikeComments(jsonStr);
+    try {
+      const parsed = JSON.parse(jsonStr) as unknown;
+      if (Array.isArray(parsed)) {
+        const movementOrders = parseOrdersArray(parsed, resolveToH3);
+        return { movementOrders, rangedAttacks: [] };
+      }
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const obj = parsed as {
+          movementOrders?: unknown;
+          rangedAttacks?: unknown;
+          strategy?: unknown;
+          callbacks?: unknown;
+          memoryUpdates?: unknown;
+        };
+        const movementOrders = Array.isArray(obj.movementOrders) ? parseOrdersArray(obj.movementOrders, resolveToH3) : [];
+        const rangedAttacks = Array.isArray(obj.rangedAttacks) ? parseRangedArray(obj.rangedAttacks, resolveToH3) : [];
+        const strategy = typeof obj.strategy === 'string' && obj.strategy.trim() ? obj.strategy.trim() : undefined;
+        const callbacks = normalizeCallbacks(obj.callbacks);
+        const memoryUpdates = normalizeMemoryUpdates(obj.memoryUpdates);
+        return {
+          movementOrders,
+          rangedAttacks,
+          strategy,
+          callbacks: callbacks.length > 0 ? callbacks : undefined,
+          memoryUpdates: memoryUpdates.length > 0 ? memoryUpdates : undefined,
+        };
+      }
+    } catch {
+      // Try next candidate.
     }
-    return null;
-  } catch {
-    return null;
   }
+  return null;
 }
 
 function parseOrdersArray(

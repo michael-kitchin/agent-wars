@@ -46,11 +46,14 @@
       overflow: auto;
     }
     #sidebar-bottom {
-      flex: 0 0 33.333vh;
+      flex: 0 0 40%;
       min-height: 180px;
       padding: 1rem;
       border-top: 1px solid #ccc;
       background: #f0eeea;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
     }
     .openrouter-tab-bar {
       display: flex;
@@ -148,6 +151,10 @@
       margin-top: 0.5rem;
       padding-top: 0.5rem;
       border-top: 1px solid #ccc;
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
     }
     .openrouter-row {
       margin-bottom: 0.6rem;
@@ -215,7 +222,8 @@
     }
     .openrouter-log {
       font-size: 11px;
-      max-height: 80px;
+      flex: 1 1 auto;
+      min-height: 0;
       overflow-y: auto;
       padding: 0.3rem;
       background: #e8e4e0;
@@ -445,12 +453,6 @@
             <button type="button" id="openrouter-refresh-models" class="openrouter-refresh-btn" title="Refresh model list" aria-label="Refresh model list"></button>
             <button type="button" id="openrouter-run-btn" class="openrouter-tool-toggle" aria-pressed="false">Run</button>
           </div>
-        </div>
-        <div class="openrouter-row">
-          <label class="openrouter-checkbox-label">
-            <input type="checkbox" id="openrouter-event-driven" title="When on, AI is consulted only when callbacks fire; otherwise orders from standing orders only." />
-            Use event-driven consultation (0.7)
-          </label>
         </div>
       </div>
       <div class="openrouter-row openrouter-status-row">

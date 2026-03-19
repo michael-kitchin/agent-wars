@@ -67,12 +67,41 @@ function testNoFirstCombatWhenAlreadyInSet(): void {
   assert.ok(!results.some((r) => r.type === 'first_combat'));
 }
 
+function testAttackMixChangedFires(): void {
+  const turn1: GameStateSnapshot = {
+    ...baseState,
+    turnNumber: 1,
+    hexes: [
+      { h3Index: '822a17fffffffff', terrain: 'land' },
+      { h3Index: '822a1ffffffffff', terrain: 'land' },
+      { h3Index: '822a07fffffffff', terrain: 'land' },
+    ],
+    units: [
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: '822a17fffffffff' },
+      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: '822a1ffffffffff' },
+    ],
+  };
+  const turn2: GameStateSnapshot = {
+    ...turn1,
+    turnNumber: 2,
+    // Move human to an invalid/non-computable position so no target is hittable.
+    units: [
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: '822a17fffffffff' },
+      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: 'not-a-cell' },
+    ],
+  };
+  evaluateMandatoryOverrides(turn1, 1, [], [], []);
+  const results = evaluateMandatoryOverrides(turn2, 1, [], [], []);
+  assert.ok(results.some((r) => r.type === 'attack_mix_changed'));
+}
+
 function run(): void {
   testFirstConsultationFires();
   testFirstCombatFires();
   testUnitDestroyedFires();
   testDeadmanFires();
   testNoFirstCombatWhenAlreadyInSet();
+  testAttackMixChangedFires();
   console.log('callbackEvaluation.test.ts passed');
 }
 

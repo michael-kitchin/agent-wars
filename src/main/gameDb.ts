@@ -331,7 +331,8 @@ export async function initDatabase(): Promise<void> {
     CREATE TABLE IF NOT EXISTS ai_pending_orders (
       player_id TEXT PRIMARY KEY,
       movement_orders TEXT NOT NULL,
-      ranged_orders TEXT NOT NULL
+      ranged_orders TEXT NOT NULL,
+      strategy_text TEXT
     );
 
     CREATE TABLE IF NOT EXISTS ai_combat_since_consultation (
@@ -537,11 +538,14 @@ export function clearOpponentCombatSinceConsultation(): void {
 /**
  * Returns pending AI orders for the next turn (movement + ranged) if any. Used when event-driven consultation ran after last resolution.
  */
-export function getAiPendingOrders(playerId: string): { movementOrders: { unitId: string; toH3Index: string }[]; rangedOrders: { unitId: string; targetH3Index: string }[] } | null {
+export function getAiPendingOrders(playerId: string): {
+  movementOrders: { unitId: string; toH3Index: string }[];
+  rangedOrders: { unitId: string; targetH3Index: string }[];
+} | null {
   logTrace('gameDb getAiPendingOrders', { playerId });
   if (!db) return null;
-  const row = getOne<{ movement_orders: string; ranged_orders: string }>(
-    'SELECT movement_orders, ranged_orders FROM ai_pending_orders WHERE player_id = ?',
+  const row = getOne<{ movement_orders: string; ranged_orders: string; strategy_text: string | null }>(
+    'SELECT movement_orders, ranged_orders, strategy_text FROM ai_pending_orders WHERE player_id = ?',
     [playerId]
   );
   if (!row) return null;
@@ -563,11 +567,20 @@ export function setAiPendingOrders(
   movementOrders: { unitId: string; toH3Index: string }[],
   rangedOrders: { unitId: string; targetH3Index: string }[]
 ): void {
-  logDebug('gameDb setAiPendingOrders', { playerId, movementCount: movementOrders.length, rangedCount: rangedOrders.length });
+  logDebug('gameDb setAiPendingOrders', {
+    playerId,
+    movementCount: movementOrders.length,
+    rangedCount: rangedOrders.length,
+  });
   if (!db) return;
   run(
-    'INSERT OR REPLACE INTO ai_pending_orders (player_id, movement_orders, ranged_orders) VALUES (?, ?, ?)',
-    [playerId, JSON.stringify(movementOrders), JSON.stringify(rangedOrders)]
+    'INSERT OR REPLACE INTO ai_pending_orders (player_id, movement_orders, ranged_orders, strategy_text) VALUES (?, ?, ?, ?)',
+    [
+      playerId,
+      JSON.stringify(movementOrders),
+      JSON.stringify(rangedOrders),
+      null,
+    ]
   );
 }
 

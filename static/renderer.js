@@ -14504,6 +14504,7 @@
   }
   var OPENROUTER_TOOL_GROUPS = [
     { id: "precomputation", label: "Precomputation" },
+    { id: "events", label: "Events" },
     { id: "planning", label: "Planning" },
     { id: "assessment", label: "Assessment" },
     { id: "estimation", label: "Estimation" },
@@ -14514,17 +14515,22 @@
   var enabledToolGroups = new Set(OPENROUTER_TOOL_GROUPS.map((g) => g.id));
   var toolInvocationCounts = Object.fromEntries(OPENROUTER_TOOL_GROUPS.map((g) => [g.id, 0]));
   var runButtonOn = false;
-  var useEventDrivenConsultation = false;
+  var useEventDrivenConsultation = true;
+  var eventDrivenInitialConsultationDone = false;
+  function syncEventDrivenFromTools() {
+    useEventDrivenConsultation = enabledToolGroups.has("events");
+  }
   var precomputedAiOrders = null;
   var precomputedAiRangedOrders = null;
   var precomputedAiStrategy = null;
   var backgroundRequestInFlight = false;
+  var readyRequestInFlight = false;
   var readyBtnAiWaitStartTime = null;
   var readyBtnAiWaitIntervalId = null;
   var openRouterGameCost = 0;
   function startBackgroundRequestIfAllowed() {
     if (backgroundRequestInFlight || !runButtonOn || gameState?.phase !== "planning") return;
-    if (useEventDrivenConsultation) return;
+    if (useEventDrivenConsultation && eventDrivenInitialConsultationDone) return;
     const keyPromise = window.gameApi?.openRouter?.getKey?.();
     const modelPromise = window.gameApi?.openRouter?.getSelectedModel?.();
     if (!keyPromise || !modelPromise) return;
@@ -14541,9 +14547,12 @@
         updateReadyButtonState();
         return;
       }
-      const enabledToolGroupsPayload = Array.from(enabledToolGroups);
+      const enabledToolGroupsPayload = Array.from(enabledToolGroups).filter((id) => id !== "events");
       window.gameApi.requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload }).then((result) => {
         backgroundRequestInFlight = false;
+        if (useEventDrivenConsultation && !eventDrivenInitialConsultationDone) {
+          eventDrivenInitialConsultationDone = true;
+        }
         if (runButtonOn && result.success) {
           precomputedAiOrders = result.orders;
           precomputedAiRangedOrders = result.rangedAttacks ?? [];
@@ -14567,12 +14576,25 @@
         updateReadyButtonState();
       }).catch((err) => {
         backgroundRequestInFlight = false;
+        if (useEventDrivenConsultation && !eventDrivenInitialConsultationDone) {
+          eventDrivenInitialConsultationDone = true;
+        }
         showSidebarError(String(err));
         precomputedAiOrders = [];
         precomputedAiRangedOrders = [];
         precomputedAiStrategy = null;
         updateReadyButtonState();
       });
+    }).catch((err) => {
+      backgroundRequestInFlight = false;
+      if (useEventDrivenConsultation && !eventDrivenInitialConsultationDone) {
+        eventDrivenInitialConsultationDone = true;
+      }
+      showSidebarError(String(err));
+      precomputedAiOrders = [];
+      precomputedAiRangedOrders = [];
+      precomputedAiStrategy = null;
+      updateReadyButtonState();
     });
   }
   function renderOpenRouterToolsList() {
@@ -14589,6 +14611,8 @@
       btn.setAttribute("aria-pressed", enabledToolGroups.has(group.id) ? "true" : "false");
       if (group.id === "precomputation") {
         btn.title = "When on, run assess_unit, assess_hex, and estimate_combat before the LLM and inject the Commander's Briefing into the prompt.";
+      } else if (group.id === "events") {
+        btn.title = "When on, use event-driven consultation (pending orders or standing-order-only; no background AI request).";
       }
       btn.textContent = String(toolInvocationCounts[group.id] ?? 0);
       btn.addEventListener("click", () => {
@@ -14599,6 +14623,25 @@
         }
         btn.setAttribute("aria-pressed", enabledToolGroups.has(group.id) ? "true" : "false");
         btn.textContent = String(toolInvocationCounts[group.id] ?? 0);
+        if (group.id === "events") {
+          const wasEventDriven = useEventDrivenConsultation;
+          syncEventDrivenFromTools();
+          if (runButtonOn && useEventDrivenConsultation && !wasEventDriven) {
+            window.gameApi?.cancelRequestAiOrders?.();
+            precomputedAiOrders = null;
+            precomputedAiRangedOrders = null;
+            precomputedAiStrategy = null;
+            eventDrivenInitialConsultationDone = false;
+            startBackgroundRequestIfAllowed();
+          } else if (runButtonOn && !useEventDrivenConsultation && wasEventDriven) {
+            precomputedAiOrders = null;
+            precomputedAiRangedOrders = null;
+            precomputedAiStrategy = null;
+            eventDrivenInitialConsultationDone = false;
+            startBackgroundRequestIfAllowed();
+          }
+          updateReadyButtonState();
+        }
       });
       cell.appendChild(btn);
       const label = document.createElement("span");
@@ -14628,7 +14671,8 @@
     const readyBtn = document.getElementById("ready-btn");
     if (!readyBtn) return;
     const gameOver = gameState?.gameOver ?? false;
-    const waitingOnAi = runButtonOn && !useEventDrivenConsultation && precomputedAiOrders === null;
+    const waitingOnReadyRequest = readyRequestInFlight && runButtonOn && useEventDrivenConsultation;
+    const waitingOnAi = waitingOnReadyRequest || runButtonOn && (!useEventDrivenConsultation && precomputedAiOrders === null || useEventDrivenConsultation && !eventDrivenInitialConsultationDone && precomputedAiOrders === null);
     readyBtn.disabled = gameOver || waitingOnAi;
     if (waitingOnAi) {
       const now = Date.now();
@@ -15309,6 +15353,7 @@
         precomputedAiRangedOrders = null;
         precomputedAiStrategy = null;
         backgroundRequestInFlight = false;
+        eventDrivenInitialConsultationDone = false;
         openRouterGameCost = 0;
         updateOpenRouterCostLabel();
         updateGameStateSidebar(state);
@@ -15475,9 +15520,16 @@
       try {
         const list = await window.gameApi?.openRouter?.getToolGroupList?.();
         if (list?.length) {
-          openRouterToolGroups = list;
-          enabledToolGroups = new Set(list.map((g) => g.id));
-          toolInvocationCounts = Object.fromEntries(list.map((g) => [g.id, 0]));
+          const withEvents = [...list];
+          const precomputationIdx = withEvents.findIndex((g) => g.id === "precomputation");
+          if (!withEvents.some((g) => g.id === "events")) {
+            const insertAt = precomputationIdx >= 0 ? precomputationIdx + 1 : 1;
+            withEvents.splice(insertAt, 0, { id: "events", label: "Events" });
+          }
+          openRouterToolGroups = withEvents;
+          enabledToolGroups = new Set(withEvents.map((g) => g.id));
+          toolInvocationCounts = Object.fromEntries(withEvents.map((g) => [g.id, 0]));
+          syncEventDrivenFromTools();
         }
       } finally {
         renderOpenRouterToolsList();
@@ -15533,6 +15585,7 @@
           precomputedAiOrders = null;
           precomputedAiRangedOrders = null;
           precomputedAiStrategy = null;
+          if (useEventDrivenConsultation) eventDrivenInitialConsultationDone = false;
           updateReadyButtonState();
           startBackgroundRequestIfAllowed();
         } else {
@@ -15540,16 +15593,9 @@
           precomputedAiOrders = null;
           precomputedAiRangedOrders = null;
           precomputedAiStrategy = null;
+          eventDrivenInitialConsultationDone = false;
           updateReadyButtonState();
         }
-      });
-    }
-    const eventDrivenCheckbox = document.getElementById("openrouter-event-driven");
-    if (eventDrivenCheckbox) {
-      useEventDrivenConsultation = eventDrivenCheckbox.checked;
-      eventDrivenCheckbox.addEventListener("change", () => {
-        useEventDrivenConsultation = eventDrivenCheckbox.checked;
-        updateReadyButtonState();
       });
     }
     document.getElementById("map-toast-dismiss")?.addEventListener("click", hideMapToast);
@@ -15770,6 +15816,9 @@
         if (!window.gameApi) return;
         if (gameState?.gameOver) return;
         clearSidebarError();
+        readyRequestInFlight = true;
+        toolInvocationCounts = Object.fromEntries(openRouterToolGroups.map((g) => [g.id, 0]));
+        updateOpenRouterToolCountLabels();
         updateReadyButtonState();
         try {
           const submitResult = await window.gameApi.submitOrders({
@@ -15786,10 +15835,19 @@
             if (!from || from === o.toH3Index) return null;
             return { unitId: o.unitId, fromH3Index: from, toH3Index: o.toH3Index };
           }).filter((m) => m !== null) : [];
-          const enabledToolGroupsPayload = Array.from(enabledToolGroups);
+          const enabledToolGroupsPayload = Array.from(enabledToolGroups).filter((id) => id !== "events");
           const useEventDriven = useEventDrivenConsultation;
-          const usePrecomputed = !useEventDriven && runButtonOn && precomputedAiOrders !== null;
-          const readyPayload = useEventDriven ? { enabledToolGroups: enabledToolGroupsPayload, useEventDrivenConsultation: true } : {
+          const usePrecomputed = runButtonOn && precomputedAiOrders !== null;
+          const readyPayload = useEventDriven ? usePrecomputed ? {
+            enabledToolGroups: enabledToolGroupsPayload,
+            useEventDrivenConsultation: true,
+            precomputedAiOrders,
+            precomputedAiRangedOrders: precomputedAiRangedOrders ?? [],
+            precomputedAiStrategy: precomputedAiStrategy ?? void 0
+          } : {
+            enabledToolGroups: enabledToolGroupsPayload,
+            useEventDrivenConsultation: true
+          } : {
             enabledToolGroups: enabledToolGroupsPayload,
             precomputedAiOrders: usePrecomputed ? precomputedAiOrders : [],
             precomputedAiRangedOrders: usePrecomputed ? precomputedAiRangedOrders ?? [] : [],
@@ -15937,6 +15995,9 @@
           redraw();
         } catch (err) {
           showSidebarError(String(err));
+          updateReadyButtonState();
+        } finally {
+          readyRequestInFlight = false;
           updateReadyButtonState();
         }
       });
