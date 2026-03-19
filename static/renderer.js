@@ -14691,7 +14691,7 @@
       const strong = document.createElement("strong");
       strong.textContent = "Update: ";
       textEl.appendChild(strong);
-      textEl.appendChild(document.createTextNode(message));
+      textEl.appendChild(document.createTextNode("\n" + message));
       el.classList.toggle("toast-info", options?.isError === false);
       el.classList.remove("hidden");
     }
