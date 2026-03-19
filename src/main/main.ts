@@ -151,6 +151,7 @@ function registerIpcHandlers(): void {
       _event,
       payload?: {
         enabledToolGroups?: string[];
+        useEventDrivenConsultation?: boolean;
         precomputedAiOrders?: { unitId: string; toH3Index: string }[];
         precomputedAiRangedOrders?: RangedAttackOrder[];
       }

@@ -6,7 +6,7 @@
   "scripts": {
     "build": "npm run build:main && npm run build:renderer",
     "build:main": "tsc -p tsconfig.main.json",
-    "test": "npm run build:main && node dist/pathfinding.test.js && node dist/gameIpcHandlers.test.js && node dist/precomputation.test.js && node dist/briefingFormatter.test.js && node dist/tools/tool1Pathfinding.test.js && node dist/tools/tool3CombatEstimation.test.js && node dist/tools/tool4Memory.test.js && node dist/tools/tool5StandingOrders.test.js",
+    "test": "npm run build:main && node dist/pathfinding.test.js && node dist/gameIpcHandlers.test.js && node dist/precomputation.test.js && node dist/briefingFormatter.test.js && node dist/callbackSubscriptions.test.js && node dist/callbackEvaluation.test.js && node dist/tools/tool1Pathfinding.test.js && node dist/tools/tool3CombatEstimation.test.js && node dist/tools/tool4Memory.test.js && node dist/tools/tool5StandingOrders.test.js",
     "build:renderer": "esbuild src/renderer/renderer.ts --bundle --outfile=static/renderer.js --platform=browser --target=es2022",
     "start": "electron .",
     "lint": "eslint src",

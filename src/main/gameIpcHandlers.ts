@@ -5,6 +5,10 @@
  */
 
 import type { GameStateSnapshot } from './gameDb';
+import { getAiPendingOrders, clearAiPendingOrders } from './gameDb';
+import { buildLatLngCoordinateMap } from './mapData';
+import { generateOrdersForStandingOrders } from './tools/tool5StandingOrders';
+import { afterResolution } from './afterResolution';
 
 /** Result shape of requestOrders / game:requestAiOrders (success or error). */
 export type RequestAiOrdersResult =
@@ -58,6 +62,12 @@ export interface ReadyResultMinimal {
   wallClockMs?: number;
   inputTokens?: number;
   outputTokens?: number;
+  /** Opponent unit IDs that participated in combat this resolution (0.7 event-driven). */
+  opponentCombatParticipantUnitIds?: string[];
+  /** Opponent unit IDs removed this resolution (0.7 event-driven). */
+  removedOpponentUnitIds?: string[];
+  /** When event-driven: true if orders came from pending (consultation ran); false if standing-order-only. */
+  aiConsulted?: boolean;
 }
 
 export interface RequestAiOrdersDeps {
@@ -143,13 +153,16 @@ export interface ReadyDeps {
 }
 
 /**
- * Logic for game:ready. When both precomputedAiOrders and precomputedAiRangedOrders are present, skips requestOrders
- * and uses the provided arrays; otherwise requests orders from the LLM then resolves the turn.
+ * Logic for game:ready. When useEventDrivenConsultation is true, uses pending AI orders from DB if present,
+ * else generates orders from standing orders only (no LLM at Ready); after resolution runs afterResolution.
+ * When event-driven is false: if precomputedAiOrders and precomputedAiRangedOrders are present, uses them;
+ * otherwise requests orders from the LLM then resolves the turn.
  */
 export async function handleGameReady(
   payload:
     | {
         enabledToolGroups?: string[];
+        useEventDrivenConsultation?: boolean;
         precomputedAiOrders?: { unitId: string; toH3Index: string }[];
         precomputedAiRangedOrders?: RangedAttackOrder[];
         precomputedAiStrategy?: string;
@@ -165,6 +178,7 @@ export async function handleGameReady(
       : deps.defaultGroupIds;
   const enabledToolNames = deps.getToolNamesForEnabledGroups(enabledGroupIds);
   const usePrecomputation = enabledGroupIds.includes('precomputation');
+  const useEventDrivenConsultation = payload?.useEventDrivenConsultation === true;
 
   let aiOrders: { unitId: string; toH3Index: string }[] = [];
   let aiRangedOrders: RangedAttackOrder[] = [];
@@ -179,6 +193,23 @@ export async function handleGameReady(
   let aiSkipReason: string | undefined;
   let aiStrategy: string | undefined;
 
+  let aiConsulted: boolean | undefined;
+  if (useEventDrivenConsultation) {
+    const pending = getAiPendingOrders('opponent');
+    if (pending) {
+      aiOrders = pending.movementOrders;
+      aiRangedOrders = pending.rangedOrders;
+      clearAiPendingOrders('opponent');
+      aiConsulted = true;
+    } else {
+      const hexList = state.hexes.map((h) => h.h3Index);
+      const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
+      const generated = generateOrdersForStandingOrders('opponent', state, latLngByH3, resolveToH3);
+      aiOrders = generated.movementOrders;
+      aiRangedOrders = generated.rangedAttacks;
+      aiConsulted = false;
+    }
+  } else {
   const usePrecomputed =
     payload?.precomputedAiOrders !== undefined && payload?.precomputedAiRangedOrders !== undefined;
   if (usePrecomputed) {
@@ -211,6 +242,7 @@ export async function handleGameReady(
       ? 'Set your OpenRouter API key in the panel on the right.'
       : 'Select an AI model from the dropdown.';
   }
+  }
 
   const aiMoves =
     aiOrders.length > 0
@@ -226,6 +258,15 @@ export async function handleGameReady(
   const readyResult = deps.ready(aiOrders, aiRangedOrders);
   if (!readyResult.success) {
     return { success: false, reason: readyResult.reason };
+  }
+
+  if (useEventDrivenConsultation && readyResult.success) {
+    await afterResolution(deps.getGameState(), readyResult, {
+      modelId: modelId ?? '',
+      enabledToolNames,
+      hasKey: deps.hasKey,
+      requestOrders: deps.requestOrders,
+    });
   }
 
   const aiRangedByType: { armor?: number; naval?: number } = {};
@@ -248,6 +289,7 @@ export async function handleGameReady(
     aiDropReasons,
     aiMovesLog,
     aiMoves: aiMoves.length > 0 ? aiMoves : undefined,
+    aiConsulted: useEventDrivenConsultation ? aiConsulted : undefined,
     combatHexes: readyResult.combatHexes,
     removedUnitIds: readyResult.removedUnitIds,
     casualtyHexes: readyResult.casualtyHexes,

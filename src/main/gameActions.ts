@@ -221,6 +221,10 @@ export function ready(
   meleeCombatHexes?: string[];
   meleeCasualtyHexes?: string[];
   meleeRemovedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
+  /** Opponent unit IDs that participated in combat this resolution (for callback evaluation). */
+  opponentCombatParticipantUnitIds?: string[];
+  /** Opponent unit IDs that were removed this resolution. */
+  removedOpponentUnitIds?: string[];
 } {
   logDebug('ready', { aiOrderCount: aiOrders.length, aiRangedCount: aiRangedOrders.length });
   try {
@@ -313,6 +317,21 @@ export function ready(
     const allKills = [...rangedResult.kills, ...meleeResult.kills];
     const allCombatHexes = [...rangedResult.combatHexes, ...meleeResult.combatHexes];
     const allCasualtyHexes = [...rangedResult.casualtyHexes, ...meleeResult.casualtyHexes];
+
+    const opponentRangedAttackers = aiRangedOrders.map((o) => o.unitId);
+    const defenderHexes = new Set(allRanged.map((o) => o.targetH3Index));
+    const opponentRangedDefenders = combatUnitsBefore
+      .filter((u) => u.player === 'opponent' && defenderHexes.has(u.h3Index))
+      .map((u) => u.id);
+    const meleeHexSet = new Set(meleeResult.combatHexes);
+    const opponentMeleeParticipants = combatUnitsAfter
+      .filter((u) => u.player === 'opponent' && meleeHexSet.has(u.h3Index))
+      .map((u) => u.id);
+    const opponentCombatParticipantUnitIds = [
+      ...new Set([...opponentRangedAttackers, ...opponentRangedDefenders, ...opponentMeleeParticipants]),
+    ];
+    const removedOpponentUnitIds = allRemovedUnits.filter((u) => u.player === 'opponent').map((u) => u.id);
+
     return {
       success: true,
       combatHexes: allCombatHexes.length > 0 ? allCombatHexes : undefined,
@@ -328,6 +347,8 @@ export function ready(
       meleeCombatHexes: meleeResult.combatHexes.length > 0 ? meleeResult.combatHexes : undefined,
       meleeCasualtyHexes: meleeResult.casualtyHexes.length > 0 ? meleeResult.casualtyHexes : undefined,
       meleeRemovedUnits: meleeResult.removedUnits.length > 0 ? meleeResult.removedUnits : undefined,
+      opponentCombatParticipantUnitIds,
+      removedOpponentUnitIds,
     };
   } catch (err) {
     logError('ready: exception', err);

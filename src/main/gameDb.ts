@@ -10,7 +10,7 @@ import { app } from 'electron';
 import { gridDistance } from 'h3-js';
 import { getOrderedHexList, getUnitCountsForSize, type MapSize } from './mapData';
 import { createSeededRng } from './seededRng';
-import { logTrace } from './logger';
+import { logDebug, logError, logTrace } from './logger';
 
 import type { Database } from 'sql.js';
 
@@ -319,6 +319,26 @@ export async function initDatabase(): Promise<void> {
       origin_hex TEXT NOT NULL,
       PRIMARY KEY (player_id, unit_id)
     );
+
+    CREATE TABLE IF NOT EXISTS ai_callback_subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      player_id TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      params TEXT NOT NULL,
+      subscribed_turn INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS ai_pending_orders (
+      player_id TEXT PRIMARY KEY,
+      movement_orders TEXT NOT NULL,
+      ranged_orders TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS ai_combat_since_consultation (
+      player_id TEXT NOT NULL,
+      unit_id TEXT NOT NULL,
+      PRIMARY KEY (player_id, unit_id)
+    );
   `);
 
   const row = getOne('SELECT 1 FROM turn_state WHERE id = 1');
@@ -434,6 +454,7 @@ export function clearGameOver(): void {
 }
 
 const AI_TOOL_LIMIT_EXCEEDED_KEY = 'ai_tool_limit_exceeded_last_turn';
+const AI_LAST_CONSULTATION_TURN_KEY = 'ai_last_consultation_turn';
 
 /**
  * Sets the flag that the previous AI turn hit the tool-call iteration limit (10).
@@ -456,6 +477,110 @@ export function getAndClearAiToolLimitExceededLastTurn(): boolean {
 }
 
 /**
+ * Returns the turn number at which the LLM was last consulted for the opponent (0 if never).
+ * Used by callback evaluation for deadman and first-consultation overrides.
+ */
+export function getAiLastConsultationTurn(): number {
+  logTrace('gameDb getAiLastConsultationTurn');
+  if (!db) return 0;
+  const row = getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [AI_LAST_CONSULTATION_TURN_KEY]);
+  if (!row) return 0;
+  const n = parseInt(row.value, 10);
+  return Number.isNaN(n) ? 0 : n;
+}
+
+/**
+ * Stores the turn number at which the LLM was last consulted. Call after a successful consultation.
+ */
+export function setAiLastConsultationTurn(turn: number): void {
+  logDebug('gameDb setAiLastConsultationTurn', { turn });
+  if (!db) return;
+  run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [AI_LAST_CONSULTATION_TURN_KEY, String(turn)]);
+}
+
+const OPPONENT_ID = 'opponent';
+
+/**
+ * Returns opponent unit IDs that have participated in combat since the last consultation.
+ * Used to detect "first combat" mandatory override.
+ */
+export function getOpponentUnitsInCombatSinceConsultation(): string[] {
+  logTrace('gameDb getOpponentUnitsInCombatSinceConsultation');
+  if (!db) return [];
+  const rows = dbGetAll<{ unit_id: string }>(
+    'SELECT unit_id FROM ai_combat_since_consultation WHERE player_id = ?',
+    [OPPONENT_ID]
+  );
+  return rows.map((r) => r.unit_id);
+}
+
+/**
+ * Adds opponent unit IDs that participated in combat this resolution. Call after each resolution.
+ */
+export function addOpponentCombatParticipants(unitIds: string[]): void {
+  logDebug('gameDb addOpponentCombatParticipants', { count: unitIds.length });
+  if (!db || unitIds.length === 0) return;
+  for (const id of unitIds) {
+    run('INSERT OR IGNORE INTO ai_combat_since_consultation (player_id, unit_id) VALUES (?, ?)', [OPPONENT_ID, id]);
+  }
+}
+
+/**
+ * Clears the set of opponent units in combat since consultation. Call when a consultation runs.
+ */
+export function clearOpponentCombatSinceConsultation(): void {
+  logDebug('gameDb clearOpponentCombatSinceConsultation');
+  if (!db) return;
+  run('DELETE FROM ai_combat_since_consultation WHERE player_id = ?', [OPPONENT_ID]);
+}
+
+/**
+ * Returns pending AI orders for the next turn (movement + ranged) if any. Used when event-driven consultation ran after last resolution.
+ */
+export function getAiPendingOrders(playerId: string): { movementOrders: { unitId: string; toH3Index: string }[]; rangedOrders: { unitId: string; targetH3Index: string }[] } | null {
+  logTrace('gameDb getAiPendingOrders', { playerId });
+  if (!db) return null;
+  const row = getOne<{ movement_orders: string; ranged_orders: string }>(
+    'SELECT movement_orders, ranged_orders FROM ai_pending_orders WHERE player_id = ?',
+    [playerId]
+  );
+  if (!row) return null;
+  try {
+    const movementOrders = JSON.parse(row.movement_orders) as { unitId: string; toH3Index: string }[];
+    const rangedOrders = JSON.parse(row.ranged_orders) as { unitId: string; targetH3Index: string }[];
+    return { movementOrders, rangedOrders };
+  } catch (err) {
+    logError('gameDb getAiPendingOrders: failed to parse stored orders', err);
+    return null;
+  }
+}
+
+/**
+ * Stores pending AI orders for the next turn. Call after a successful consultation in event-driven mode.
+ */
+export function setAiPendingOrders(
+  playerId: string,
+  movementOrders: { unitId: string; toH3Index: string }[],
+  rangedOrders: { unitId: string; targetH3Index: string }[]
+): void {
+  logDebug('gameDb setAiPendingOrders', { playerId, movementCount: movementOrders.length, rangedCount: rangedOrders.length });
+  if (!db) return;
+  run(
+    'INSERT OR REPLACE INTO ai_pending_orders (player_id, movement_orders, ranged_orders) VALUES (?, ?, ?)',
+    [playerId, JSON.stringify(movementOrders), JSON.stringify(rangedOrders)]
+  );
+}
+
+/**
+ * Clears pending AI orders for a player. Call after consuming them at Ready or on new game.
+ */
+export function clearAiPendingOrders(playerId: string): void {
+  logDebug('gameDb clearAiPendingOrders', { playerId });
+  if (!db) return;
+  run('DELETE FROM ai_pending_orders WHERE player_id = ?', [playerId]);
+}
+
+/**
  * Re-initializes the game for a new match with the given map size: stores map_size, deletes units and hexes,
  * generates a new seed, re-seeds hexes and units for that size, clears game_over/winner, resets turn and phase,
  * clears pending orders. Call from newGame(size) IPC.
@@ -474,5 +599,9 @@ export function resetGameForNewMatch(size: MapSize = 'small'): void {
   run('UPDATE turn_state SET phase = ?, turn_number = 1 WHERE id = 1', ['planning']);
   clearGameOver();
   run('DELETE FROM game_config WHERE key = ?', [AI_TOOL_LIMIT_EXCEEDED_KEY]);
+  run('DELETE FROM ai_callback_subscriptions');
+  run('DELETE FROM ai_pending_orders');
+  run('DELETE FROM ai_combat_since_consultation');
+  run("DELETE FROM game_config WHERE key = 'ai_last_consultation_turn'");
   saveDatabase();
 }

@@ -14514,6 +14514,7 @@
   var enabledToolGroups = new Set(OPENROUTER_TOOL_GROUPS.map((g) => g.id));
   var toolInvocationCounts = Object.fromEntries(OPENROUTER_TOOL_GROUPS.map((g) => [g.id, 0]));
   var runButtonOn = false;
+  var useEventDrivenConsultation = false;
   var precomputedAiOrders = null;
   var precomputedAiRangedOrders = null;
   var precomputedAiStrategy = null;
@@ -14523,6 +14524,7 @@
   var openRouterGameCost = 0;
   function startBackgroundRequestIfAllowed() {
     if (backgroundRequestInFlight || !runButtonOn || gameState?.phase !== "planning") return;
+    if (useEventDrivenConsultation) return;
     const keyPromise = window.gameApi?.openRouter?.getKey?.();
     const modelPromise = window.gameApi?.openRouter?.getSelectedModel?.();
     if (!keyPromise || !modelPromise) return;
@@ -14626,7 +14628,7 @@
     const readyBtn = document.getElementById("ready-btn");
     if (!readyBtn) return;
     const gameOver = gameState?.gameOver ?? false;
-    const waitingOnAi = runButtonOn && precomputedAiOrders === null;
+    const waitingOnAi = runButtonOn && !useEventDrivenConsultation && precomputedAiOrders === null;
     readyBtn.disabled = gameOver || waitingOnAi;
     if (waitingOnAi) {
       const now = Date.now();
@@ -15542,6 +15544,14 @@
         }
       });
     }
+    const eventDrivenCheckbox = document.getElementById("openrouter-event-driven");
+    if (eventDrivenCheckbox) {
+      useEventDrivenConsultation = eventDrivenCheckbox.checked;
+      eventDrivenCheckbox.addEventListener("change", () => {
+        useEventDrivenConsultation = eventDrivenCheckbox.checked;
+        updateReadyButtonState();
+      });
+    }
     document.getElementById("map-toast-dismiss")?.addEventListener("click", hideMapToast);
     document.getElementById("ai-strategy-toast-dismiss")?.addEventListener("click", hideAiStrategyToast);
   }
@@ -15777,8 +15787,9 @@
             return { unitId: o.unitId, fromH3Index: from, toH3Index: o.toH3Index };
           }).filter((m) => m !== null) : [];
           const enabledToolGroupsPayload = Array.from(enabledToolGroups);
-          const usePrecomputed = runButtonOn && precomputedAiOrders !== null;
-          const readyPayload = {
+          const useEventDriven = useEventDrivenConsultation;
+          const usePrecomputed = !useEventDriven && runButtonOn && precomputedAiOrders !== null;
+          const readyPayload = useEventDriven ? { enabledToolGroups: enabledToolGroupsPayload, useEventDrivenConsultation: true } : {
             enabledToolGroups: enabledToolGroupsPayload,
             precomputedAiOrders: usePrecomputed ? precomputedAiOrders : [],
             precomputedAiRangedOrders: usePrecomputed ? precomputedAiRangedOrders ?? [] : [],
@@ -15851,6 +15862,10 @@
             if (readyResult.aiStrategy) {
               showAiStrategyToast(readyResult.aiStrategy, getSelectedModelLabel());
             }
+          } else if (useEventDrivenConsultation && readyResult.aiConsulted === false) {
+            appendOpenRouterLog("AI executing standing orders (no event fired).");
+            showMapToast("AI: standing orders only (no consultation).", { isError: false });
+            hideAiStrategyToast();
           } else if (readyResult.aiOrderCount === 0) {
             appendOpenRouterLog("Turn resolved (no AI orders).");
             hideMapToast();

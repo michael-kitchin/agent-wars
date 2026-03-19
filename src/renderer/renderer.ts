@@ -124,6 +124,8 @@ interface ReadyResult {
   toolInvocationCounts?: Record<string, number>;
   /** Cost in dollars for this turn's LLM call (when requestOrders was used). */
   cost?: number;
+  /** When event-driven: true if orders came from consultation; false if standing-order-only. */
+  aiConsulted?: boolean;
 }
 
 declare global {
@@ -134,6 +136,7 @@ declare global {
       submitOrders: (payload: { movementOrders: { unitId: string; toH3Index: string }[]; rangedAttacks?: RangedAttackOrder[] }) => Promise<unknown>;
       ready: (payload?: {
         enabledToolGroups?: string[];
+        useEventDrivenConsultation?: boolean;
         precomputedAiOrders?: { unitId: string; toH3Index: string }[];
         precomputedAiRangedOrders?: { unitId: string; targetH3Index: string }[];
       }) => Promise<ReadyResult>;
@@ -543,6 +546,9 @@ let toolInvocationCounts: Record<string, number> = Object.fromEntries(OPENROUTER
 /** Run toggle: when true, background AI planning runs and Ready enables only when orders ready; when false, Ready stays enabled (user resolves without LLM). */
 let runButtonOn = false;
 
+/** When true (0.7), AI orders come from main: pending orders or standing-order-only; no background requestAiOrders; afterResolution runs after Ready. */
+let useEventDrivenConsultation = false;
+
 /** Precomputed AI movement orders from the last background request; null until request completes. Cleared on Ready click or when Run is turned off. */
 let precomputedAiOrders: { unitId: string; toH3Index: string }[] | null = null;
 
@@ -569,6 +575,7 @@ let openRouterGameCost = 0;
  */
 function startBackgroundRequestIfAllowed(): void {
   if (backgroundRequestInFlight || !runButtonOn || gameState?.phase !== 'planning') return;
+  if (useEventDrivenConsultation) return;
   const keyPromise = window.gameApi?.openRouter?.getKey?.();
   const modelPromise = window.gameApi?.openRouter?.getSelectedModel?.();
   if (!keyPromise || !modelPromise) return;
@@ -694,7 +701,7 @@ function updateReadyButtonState(): void {
   const readyBtn = document.getElementById('ready-btn') as HTMLButtonElement | null;
   if (!readyBtn) return;
   const gameOver = gameState?.gameOver ?? false;
-  const waitingOnAi = runButtonOn && precomputedAiOrders === null;
+  const waitingOnAi = runButtonOn && !useEventDrivenConsultation && precomputedAiOrders === null;
   readyBtn.disabled = gameOver || waitingOnAi;
 
   if (waitingOnAi) {
@@ -1825,6 +1832,16 @@ function initOpenRouterUI(): void {
     });
   }
 
+  /** Event-driven consultation (0.7): when on, no background request; Ready uses pending or standing-order-only. */
+  const eventDrivenCheckbox = document.getElementById('openrouter-event-driven') as HTMLInputElement | null;
+  if (eventDrivenCheckbox) {
+    useEventDrivenConsultation = eventDrivenCheckbox.checked;
+    eventDrivenCheckbox.addEventListener('change', () => {
+      useEventDrivenConsultation = eventDrivenCheckbox.checked;
+      updateReadyButtonState();
+    });
+  }
+
   document.getElementById('map-toast-dismiss')?.addEventListener('click', hideMapToast);
   document.getElementById('ai-strategy-toast-dismiss')?.addEventListener('click', hideAiStrategyToast);
 }
@@ -2098,13 +2115,16 @@ function init(): void {
                 .filter((m): m is ResolutionMove => m !== null)
             : [];
         const enabledToolGroupsPayload = Array.from(enabledToolGroups);
-        const usePrecomputed = runButtonOn && precomputedAiOrders !== null;
-        const readyPayload = {
-          enabledToolGroups: enabledToolGroupsPayload,
-          precomputedAiOrders: usePrecomputed ? precomputedAiOrders! : [],
-          precomputedAiRangedOrders: usePrecomputed ? (precomputedAiRangedOrders ?? []) : [],
-          precomputedAiStrategy: usePrecomputed ? (precomputedAiStrategy ?? undefined) : undefined,
-        };
+        const useEventDriven = useEventDrivenConsultation;
+        const usePrecomputed = !useEventDriven && runButtonOn && precomputedAiOrders !== null;
+        const readyPayload = useEventDriven
+          ? { enabledToolGroups: enabledToolGroupsPayload, useEventDrivenConsultation: true }
+          : {
+              enabledToolGroups: enabledToolGroupsPayload,
+              precomputedAiOrders: usePrecomputed ? precomputedAiOrders! : [],
+              precomputedAiRangedOrders: usePrecomputed ? (precomputedAiRangedOrders ?? []) : [],
+              precomputedAiStrategy: usePrecomputed ? (precomputedAiStrategy ?? undefined) : undefined,
+            };
         const readyResult = await window.gameApi!.ready(readyPayload);
         if (!readyResult.success) {
           showSidebarError(readyResult.reason ?? 'Ready failed');
@@ -2176,6 +2196,10 @@ function init(): void {
           if (readyResult.aiStrategy) {
             showAiStrategyToast(readyResult.aiStrategy, getSelectedModelLabel());
           }
+        } else if (useEventDrivenConsultation && readyResult.aiConsulted === false) {
+          appendOpenRouterLog('AI executing standing orders (no event fired).');
+          showMapToast('AI: standing orders only (no consultation).', { isError: false });
+          hideAiStrategyToast();
         } else if (readyResult.aiOrderCount === 0) {
           appendOpenRouterLog('Turn resolved (no AI orders).');
           hideMapToast();

@@ -1,12 +1,12 @@
 /**
- * Formats the Commander's Briefing block for Milestone 0.6. Consumes pre-computed assessments and
+ * Formats the Commander's Briefing block for Milestone 0.6/0.7. Consumes pre-computed assessments and
  * builds the three-section structure (strategic narrative, unit status + combat tables, attention flags)
- * plus memory and standing-order blocks. Used when usePrecomputation is true to supply the LLM with
- * a single structured prompt instead of iterative tool calls. Callbacks are out of scope for 0.6 (placeholder for 0.7).
+ * plus memory, standing-order, and ACTIVE CALLBACKS sections.
  */
 
 import type { GameStateSnapshot } from './gameDb';
 import type { PrecomputationResult, UnitAssessmentResult, CombatEstimateEntry } from './precomputation';
+import type { CallbackSubscription } from './callbackSubscriptions';
 import { LATLNG_DECIMAL_PLACES } from './mapData';
 
 /** Standing order statuses that require immediate attention (match tool5 WARNING_STATUSES). */
@@ -186,14 +186,49 @@ function buildAttentionFlags(unitAssessments: UnitAssessmentResult[]): string {
 }
 
 /**
+ * Returns a short human-readable line for one callback subscription (e.g. "turns(3) → fires turn 14").
+ */
+function formatCallbackLine(sub: CallbackSubscription, currentTurn: number): string {
+  const n = sub.params?.n as number | undefined;
+  if (sub.event === 'turns' && typeof n === 'number' && sub.subscribedTurn != null) {
+    return `turns(${n}) → fires turn ${sub.subscribedTurn + n}`;
+  }
+  if (sub.event === 'unit_engaged' || sub.event === 'unit_destroyed' || sub.event === 'unit_arrived') {
+    const unitId = (sub.params?.unitId as string) ?? '?';
+    return `${sub.event}(${unitId})`;
+  }
+  if (sub.event === 'threat_escalation') {
+    const unitId = (sub.params?.unitId as string) ?? '?';
+    const severity = (sub.params?.severity as string) ?? '';
+    return `threat_escalation(${unitId}, ${severity})`;
+  }
+  if (sub.event === 'territory_changed') {
+    const hexId = sub.params?.hexId != null ? String(sub.params.hexId) : '';
+    return hexId ? `territory_changed(${hexId})` : 'territory_changed';
+  }
+  return `${sub.event}(${JSON.stringify(sub.params ?? {})})`;
+}
+
+/**
+ * Builds the ACTIVE CALLBACKS section: one line per subscription or "None. You may add callbacks...".
+ */
+function buildActiveCallbacksSection(subscriptions: CallbackSubscription[], currentTurn: number): string {
+  if (subscriptions.length === 0) {
+    return 'None. You may add callbacks in your response JSON to be consulted on specific events.';
+  }
+  return subscriptions.map((s) => `- ${formatCallbackLine(s, currentTurn)}`).join('\n');
+}
+
+/**
  * Produces the full Commander's Briefing string: title, Section 1, Section 2 (both tables),
- * Section 3, memory block, standing order block, and callbacks placeholder.
+ * Section 3, memory block, standing order block, and ACTIVE CALLBACKS section.
  */
 export function formatBriefing(
   state: GameStateSnapshot,
   precomputed: PrecomputationResult,
   standingOrderText: string,
-  memoryText: string
+  memoryText: string,
+  subscriptions?: CallbackSubscription[]
 ): string {
   const sections: string[] = [];
   sections.push(`=== COMMANDER'S BRIEFING (Turn ${state.turnNumber}) ===\n`);
@@ -213,5 +248,7 @@ export function formatBriefing(
   }
   sections.push('\n\n');
   sections.push(standingOrderText || '');
+  sections.push('\n\n**ACTIVE CALLBACKS**\n');
+  sections.push(buildActiveCallbacksSection(subscriptions ?? [], state.turnNumber));
   return sections.join('');
 }

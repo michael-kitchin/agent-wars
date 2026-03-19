@@ -97,7 +97,20 @@ function testFormatBriefingContainsSections(): void {
   assert.ok(out.includes('YOUR STRATEGIC MEMORY'), 'memory block');
   assert.ok(out.includes('Remember: push south.'), 'memory text');
   assert.ok(out.includes('STANDING ORDER STATUS'), 'standing order block');
+  assert.ok(out.includes('**ACTIVE CALLBACKS**'), 'ACTIVE CALLBACKS section');
+  assert.ok(out.includes('None. You may add callbacks'), 'callbacks hint when none');
   assert.ok(!out.includes('undefined'), 'no raw undefined');
+}
+
+function testFormatBriefingActiveCallbacksWithSubscriptions(): void {
+  const subs = [
+    { event: 'turns', params: { n: 3 }, subscribedTurn: 10 },
+    { event: 'unit_engaged', params: { unitId: 'opponent-armor-1' } },
+  ];
+  const out = formatBriefing(fixtureState, precomputed, '', '', subs);
+  assert.ok(out.includes('**ACTIVE CALLBACKS**'), 'ACTIVE CALLBACKS section');
+  assert.ok(out.includes('turns(3) → fires turn 13'), 'turns subscription line');
+  assert.ok(out.includes('unit_engaged(opponent-armor-1)'), 'unit_engaged subscription line');
 }
 
 function testFormatBriefingUnitTableRows(): void {
@@ -121,6 +134,7 @@ const tests = [
   { name: 'formatBriefing contains all sections', fn: testFormatBriefingContainsSections },
   { name: 'formatBriefing unit table rows', fn: testFormatBriefingUnitTableRows },
   { name: 'formatBriefing combat table', fn: testFormatBriefingCombatTable },
+  { name: 'formatBriefing ACTIVE CALLBACKS with subscriptions', fn: testFormatBriefingActiveCallbacksWithSubscriptions },
 ];
 
 function run(): void {

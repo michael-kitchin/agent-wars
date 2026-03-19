@@ -24,6 +24,8 @@ import {
 } from './tools/tool5StandingOrders';
 import { runPrecomputation } from './precomputation';
 import { formatBriefing } from './briefingFormatter';
+import { replaceSubscriptions, getSubscriptions } from './callbackSubscriptions';
+import type { CallbackSubscription } from './callbackSubscriptions';
 
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -616,7 +618,7 @@ Combat: each unit rolls d6 when attacking (hit if roll <= attack) or when defend
 
 ${mainBlock}
 
-Submit your final orders as a JSON object only (valid JSON, no comments): { "strategy": "<one-line explanation>", "movementOrders": [ { "unitId": "<id>", "toXY": [lat, lng] }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetXY": [lat, lng] }, ... ] }. Use only toXY and targetXY as [lat, lng] arrays. Include "strategy".${movementOrderInstruction} In rangedAttacks, list each unit at most once (one ranged attack per unit per turn); duplicate unitIds are dropped.`;
+Submit your final orders as a JSON object only (valid JSON, no comments): { "strategy": "<one-line explanation>", "movementOrders": [ { "unitId": "<id>", "toXY": [lat, lng] }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetXY": [lat, lng] }, ... ] }. Use only toXY and targetXY as [lat, lng] arrays. Include "strategy".${movementOrderInstruction} In rangedAttacks, list each unit at most once (one ranged attack per unit per turn); duplicate unitIds are dropped. You may include an optional "callbacks" array to subscribe to events (e.g. turns, unit_engaged, unit_destroyed, unit_arrived, threat_escalation); when an event fires, the engine will re-consult you with an updated briefing. You may include an optional "memoryUpdates" array (write/delete) in the same JSON instead of or in addition to calling memory tools.`;
 }
 
 export interface RequestOrdersResult {
@@ -992,7 +994,8 @@ export async function requestOrders(
       precomputed.hexAssessments.length;
     const standingOrderText = getStandingOrderInjectionText('opponent', state);
     const memoryText = getInjectionText('opponent', state.turnNumber);
-    briefingOverride = formatBriefing(state, precomputed, standingOrderText, memoryText);
+    const subscriptions = getSubscriptions('opponent');
+    briefingOverride = formatBriefing(state, precomputed, standingOrderText, memoryText, subscriptions);
     logDebug('openRouter requestOrders: pre-computation ran', {
       briefingLength: briefingOverride.length,
       unitAssessments: precomputed.unitAssessments.length,
@@ -1144,6 +1147,33 @@ export async function requestOrders(
           onLog(rawPreview, true);
         }
         return { success: false, error: 'Invalid response: could not parse orders' };
+      }
+
+      if (parsed.callbacks?.length) {
+        replaceSubscriptions('opponent', parsed.callbacks, state.turnNumber);
+        logDebug('openRouter requestOrders: applied callbacks from response', { count: parsed.callbacks.length });
+      }
+      if (parsed.memoryUpdates?.length) {
+        for (const upd of parsed.memoryUpdates) {
+          if (upd.action === 'write') {
+            const result = executeTool4(
+              'memory_write',
+              { key: upd.key, content: upd.content ?? '', tier: upd.tier },
+              state,
+              latLngByH3,
+              resolveToH3
+            );
+            if (result.status === 'error') {
+              logDebug('openRouter requestOrders: memoryUpdates write failed', upd.key, (result as { error?: string }).error);
+            }
+          } else {
+            const result = executeTool4('memory_delete', { key: upd.key }, state, latLngByH3, resolveToH3);
+            if (result.status === 'error') {
+              logDebug('openRouter requestOrders: memoryUpdates delete failed', upd.key, (result as { error?: string }).error);
+            }
+          }
+        }
+        logDebug('openRouter requestOrders: applied memoryUpdates from response', { count: parsed.memoryUpdates.length });
       }
 
       const llmMovementUnitIds = new Set((parsed.movementOrders ?? []).map((o) => o.unitId));
@@ -1395,9 +1425,62 @@ function stripJsonLikeComments(s: string): string {
   return out;
 }
 
+const CALLBACK_EVENT_VOCAB = new Set([
+  'turns',
+  'unit_engaged',
+  'unit_destroyed',
+  'unit_arrived',
+  'threat_escalation',
+  'territory_changed',
+]);
+
+function normalizeCallbacks(raw: unknown): CallbackSubscription[] {
+  if (!Array.isArray(raw)) return [];
+  const out: CallbackSubscription[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const o = item as { event?: unknown; params?: unknown };
+    let event = typeof o.event === 'string' ? o.event.trim() : '';
+    if (event.includes('(')) event = event.replace(/\(.*\)/, '').trim() || event;
+    if (!event || !CALLBACK_EVENT_VOCAB.has(event)) continue;
+    const params = o.params && typeof o.params === 'object' && !Array.isArray(o.params)
+      ? (o.params as Record<string, unknown>)
+      : {};
+    out.push({ event, params });
+  }
+  return out;
+}
+
+export interface MemoryUpdateItem {
+  action: 'write' | 'delete';
+  key: string;
+  content?: string;
+  tier?: 'persistent' | 'stored';
+}
+
+function normalizeMemoryUpdates(raw: unknown): MemoryUpdateItem[] {
+  if (!Array.isArray(raw)) return [];
+  const out: MemoryUpdateItem[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const o = item as { action?: unknown; key?: unknown; content?: unknown; tier?: unknown };
+    const action = o.action === 'write' || o.action === 'delete' ? o.action : undefined;
+    const key = typeof o.key === 'string' ? o.key : '';
+    if (!action || !key) continue;
+    if (action === 'write') {
+      const content = typeof o.content === 'string' ? o.content : '';
+      const tier = o.tier === 'persistent' || o.tier === 'stored' ? o.tier : undefined;
+      out.push({ action: 'write', key, content, tier });
+    } else {
+      out.push({ action: 'delete', key });
+    }
+  }
+  return out;
+}
+
 /**
- * Parses the LLM response into movement orders and optional ranged attacks.
- * Expects toXY and targetXY as [lat, lng] (numbers, may be floating point); resolves to H3 via resolveToH3.
+ * Parses the LLM response into movement orders, optional ranged attacks, optional callbacks, and optional memoryUpdates.
+ * Expects toXY and targetXY as [lat, lng]; resolves to H3 via resolveToH3.
  */
 function parseOrdersResponse(
   content: string,
@@ -1406,6 +1489,8 @@ function parseOrdersResponse(
   movementOrders: { unitId: string; toH3Index: string }[];
   rangedAttacks: { unitId: string; targetH3Index: string }[];
   strategy?: string;
+  callbacks?: CallbackSubscription[];
+  memoryUpdates?: MemoryUpdateItem[];
 } | null {
   const trimmed = content.trim();
   let jsonStr = trimmed;
@@ -1428,11 +1513,25 @@ function parseOrdersResponse(
       return { movementOrders, rangedAttacks: [] };
     }
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      const obj = parsed as { movementOrders?: unknown; rangedAttacks?: unknown; strategy?: unknown };
+      const obj = parsed as {
+        movementOrders?: unknown;
+        rangedAttacks?: unknown;
+        strategy?: unknown;
+        callbacks?: unknown;
+        memoryUpdates?: unknown;
+      };
       const movementOrders = Array.isArray(obj.movementOrders) ? parseOrdersArray(obj.movementOrders, resolveToH3) : [];
       const rangedAttacks = Array.isArray(obj.rangedAttacks) ? parseRangedArray(obj.rangedAttacks, resolveToH3) : [];
       const strategy = typeof obj.strategy === 'string' && obj.strategy.trim() ? obj.strategy.trim() : undefined;
-      return { movementOrders, rangedAttacks, strategy };
+      const callbacks = normalizeCallbacks(obj.callbacks);
+      const memoryUpdates = normalizeMemoryUpdates(obj.memoryUpdates);
+      return {
+        movementOrders,
+        rangedAttacks,
+        strategy,
+        callbacks: callbacks.length > 0 ? callbacks : undefined,
+        memoryUpdates: memoryUpdates.length > 0 ? memoryUpdates : undefined,
+      };
     }
     return null;
   } catch {
