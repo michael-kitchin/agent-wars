@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-function-type -- dynamic require + Module._load typing for Electron mock */
 /**
  * Matrix tests for requestOrders prompt/tool payload construction across all 7 UI toggles:
  * precomputation, events, planning, assessment, estimation, memory, orders.
@@ -114,7 +115,7 @@ async function run(): Promise<void> {
 
       const capturedRef: { value: CapturedPayload | null } = { value: null };
       const fakeResponse: ChatResponse = {
-        choices: [{ message: { content: '{"strategy":"hold","movementOrders":[],"rangedAttacks":[]}' } }],
+        choices: [{ message: { content: '{"strategy":"hold","orders":[]}' } }],
       };
       (globalThis as unknown as { fetch: unknown }).fetch = (async (_url: unknown, init?: unknown) => {
         const body = (init as { body?: string } | undefined)?.body ?? '{}';
@@ -138,6 +139,11 @@ async function run(): Promise<void> {
       const systemPrompt = captured.messages?.find((m: { role: string; content?: string }) => m.role === 'system')?.content ?? '';
       const payloadTools = captured.tools ?? [];
       const payloadToolNames = new Set(payloadTools.map((t: { function: { name: string } }) => t.function.name));
+
+      assert.ok(
+        systemPrompt.includes('Strict schema: top-level must be a JSON object with "strategy" (string) and "orders" (array); do not return a top-level array.'),
+        `strict-schema prompt guidance missing for mask=${mask}`
+      );
 
       for (const toolName of allApiToolNames) {
         const shouldBeEnabled = effectiveToolSet.has(toolName);
@@ -173,6 +179,23 @@ async function run(): Promise<void> {
 
       combosChecked += 1;
     }
+
+    const strictSchemaErrorResponse: ChatResponse = {
+      choices: [{ message: { content: '[{"unitId":"opponent-armor-1","action":"explicit_move","destination":[0,0]}]' } }],
+    };
+    (globalThis as unknown as { fetch: unknown }).fetch = (async () => {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => strictSchemaErrorResponse,
+        text: async () => JSON.stringify(strictSchemaErrorResponse),
+      };
+    }) as unknown;
+    const strictResult = await openRouter.requestOrders(state, 'test-model', {
+      enabledToolNames: openRouter.getToolNamesForEnabledGroups(apiToggleIds),
+      usePrecomputation: false,
+    });
+    assert.strictEqual(strictResult.success, false, 'strict schema should reject top-level array responses');
 
     console.log(`openRouter.matrix.test.ts passed (${combosChecked} combinations)`);
   } finally {

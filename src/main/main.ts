@@ -6,7 +6,7 @@
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import * as path from 'path';
 import { initDatabase, getGameState, resetGameForNewMatch } from './gameDb';
-import { submitOrders, ready, type SubmitOrdersPayload, type RangedAttackOrder } from './gameActions';
+import { submitOrders, ready } from './gameActions';
 import {
   saveKey,
   hasKey,
@@ -24,6 +24,12 @@ import {
   cancelRequestAiOrders,
   handleGameReady,
 } from './gameIpcHandlers';
+import type {
+  SubmitOrdersPayload,
+  ReadyResult,
+  GameReadyIpcPayload,
+  RequestAiOrdersResult,
+} from '../shared/ipcTypes';
 
 /** Ref for the in-flight requestAiOrders AbortController; used by handlers and cancel. */
 const requestAiOrdersControllerRef: { current: AbortController | null } = { current: null };
@@ -37,7 +43,7 @@ const MIN_WINDOW_HEIGHT = 600;
 /**
  * Creates the main browser window and loads the renderer HTML.
  * Sizes the window to 3/4 of the primary display work area, centered.
- * Called after Electron app is ready. Window loads the built renderer from dist.
+ * Called after Electron app is ready. Window loads `static/index.html` at the app root (sibling of `dist/`).
  */
 function createWindow(): void {
   const preloadPath = path.join(__dirname, 'preload.js');
@@ -65,7 +71,7 @@ function createWindow(): void {
     },
   });
 
-  const rendererPath = path.join(__dirname, '..', 'static', 'index.html');
+  const rendererPath = path.join(__dirname, '..', '..', 'static', 'index.html');
   mainWindow.loadFile(rendererPath).catch((err) => {
     console.error('Failed to load renderer:', err);
   });
@@ -73,49 +79,6 @@ function createWindow(): void {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
-}
-
-export interface AiMove {
-  unitId: string;
-  fromH3Index: string;
-  toH3Index: string;
-}
-
-/** Count of AI ranged attacks by unit type (e.g. { armor: 2, naval: 1 }). */
-export interface AiRangedByType {
-  armor?: number;
-  naval?: number;
-}
-
-export interface ReadyResult {
-  success: boolean;
-  reason?: string;
-  aiSkipped?: boolean;
-  aiSkipReason?: string;
-  aiOrderCount?: number;
-  aiRangedByType?: AiRangedByType;
-  aiDropped?: number;
-  aiDropReasons?: string[];
-  aiMovesLog?: string[];
-  aiMoves?: AiMove[];
-  combatHexes?: string[];
-  removedUnitIds?: string[];
-  casualtyHexes?: string[];
-  removedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
-  rangedCombatHexes?: string[];
-  rangedCasualtyHexes?: string[];
-  rangedRemovedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
-  meleeCombatHexes?: string[];
-  meleeCasualtyHexes?: string[];
-  meleeRemovedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
-  kills?: { victimId: string; killerIds: string[] }[];
-  killsByDirectFire?: { victimId: string; killerIds: string[] }[];
-  killsByReturnFire?: { victimId: string; killerIds: string[] }[];
-  aiStrategy?: string;
-  /** Per-group tool invocation counts for the last AI turn. Keys are tool group ids. */
-  toolInvocationCounts?: Record<string, number>;
-  /** Cost in dollars for this turn's LLM call (when requestOrders was used). */
-  cost?: number;
 }
 
 /** Wraps requestOrders with an onLog sink that forwards to the renderer status list. */
@@ -147,15 +110,7 @@ function registerIpcHandlers(): void {
   });
   ipcMain.handle(
     'game:ready',
-    async (
-      _event,
-      payload?: {
-        enabledToolGroups?: string[];
-        useEventDrivenConsultation?: boolean;
-        precomputedAiOrders?: { unitId: string; toH3Index: string }[];
-        precomputedAiRangedOrders?: RangedAttackOrder[];
-      }
-    ): Promise<ReadyResult> => {
+    async (_event, payload?: GameReadyIpcPayload): Promise<ReadyResult> => {
       return handleGameReady(payload, {
         getGameState,
         getSelectedModel,
@@ -173,7 +128,7 @@ function registerIpcHandlers(): void {
     async (
       _event,
       payload?: { enabledToolGroups?: string[] }
-    ): Promise<{ success: true; orders: { unitId: string; toH3Index: string }[]; rangedAttacks?: RangedAttackOrder[]; strategy?: string; dropped?: number; dropReasons?: string[]; toolInvocationCounts?: Record<string, number>; cost?: number } | { success: false; error: string }> => {
+    ): Promise<RequestAiOrdersResult> => {
       const state = getGameState();
       logDebug('main game:requestAiOrders', { turnNumber: state.turnNumber, phase: state.phase });
       const result = await handleRequestAiOrders(payload, {

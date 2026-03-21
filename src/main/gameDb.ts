@@ -1,264 +1,59 @@
 /**
- * Game state persistence in SQLite. Schema: hexes (with terrain), units, turn state, pending orders.
- * All access runs in the main process. Uses sql.js (WASM) so no native build is required.
- * The DB file lives in Electron userData directory; we load/save it manually.
+ * Game state persistence in SQLite via better-sqlite3 (native). Single file under Electron userData;
+ * durable across restarts (no wipe on launch). Schema: hexes, units, turn state, pending orders, AI tables.
+ *
+ * Legacy sql.js file `game.db` is not migrated; this baseline uses `game-baseline-v1.sqlite` (see GAME_DB_FILE_NAME).
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { app } from 'electron';
+import { app, dialog } from 'electron';
+import Database from 'better-sqlite3';
 import { gridDistance } from 'h3-js';
 import { getOrderedHexList, getUnitCountsForSize, type MapSize } from './mapData';
 import { createSeededRng } from './seededRng';
 import { logDebug, logError, logTrace } from './logger';
+import type { GameStateSnapshot } from '../shared/ipcTypes';
 
-import type { Database } from 'sql.js';
+export type { GameStateSnapshot } from '../shared/ipcTypes';
 
-let db: Database | null = null;
-let dbPath: string = '';
+/** Baseline schema version; bump when a future milestone adds migration chains. */
+export const EXPECTED_USER_VERSION = 1;
 
 /**
- * Runs a single SQL statement (INSERT/UPDATE/DELETE). No return value.
+ * New filename for the 1.1 baseline so old sql.js `game.db` files are left untouched (not migrated).
  */
-function run(sql: string, params: unknown[] = []): void {
-  if (!db) return;
-  db.run(sql, params);
+export const GAME_DB_FILE_NAME = 'game-baseline-v1.sqlite';
+
+let db: InstanceType<typeof Database> | null = null;
+
+const REQUIRED_TABLES = [
+  'hexes',
+  'units',
+  'turn_state',
+  'pending_orders',
+  'pending_ranged_orders',
+  'game_config',
+  'ai_memory',
+  'standing_orders',
+  'ai_callback_subscriptions',
+  'ai_pending_orders',
+  'ai_combat_since_consultation',
+] as const;
+
+/**
+ * Applies the 1.1 SQLite profile: in-memory rollback journal, foreign keys, deferred FK checks, synchronous OFF.
+ * Favors performance over power-loss durability; see milestone plan Section 4 item 7.
+ */
+export function applyGameDbPragmas(database: InstanceType<typeof Database>): void {
+  database.pragma('journal_mode = MEMORY');
+  database.pragma('foreign_keys = ON');
+  database.pragma('defer_foreign_keys = ON');
+  database.pragma('synchronous = OFF');
 }
 
-/**
- * Returns one row as a plain object, or undefined if no row.
- */
-function getOne<T extends Record<string, unknown>>(sql: string, params: unknown[] = []): T | undefined {
-  if (!db) return undefined;
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  const row = stmt.step() ? (stmt.getAsObject() as T) : undefined;
-  stmt.free();
-  return row;
-}
-
-/**
- * Returns all rows as plain objects.
- */
-function getAll<T extends Record<string, unknown>>(sql: string, params: unknown[] = []): T[] {
-  if (!db) return [];
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  const rows: T[] = [];
-  while (stmt.step()) rows.push(stmt.getAsObject() as T);
-  stmt.free();
-  return rows;
-}
-
-/**
- * Returns the path to the game database file (userData directory).
- * Call only after app is ready.
- */
-function getDbPath(): string {
-  return path.join(app.getPath('userData'), 'game.db');
-}
-
-/**
- * Seeds the game RNG seed in game_config when missing. Used for deterministic combat and participant IDs.
- * Seed is stored in game_config under key 'game_seed' as a string integer.
- */
-function seedGameSeedIfMissing(): void {
-  if (db === null) return;
-  const row = getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'game_seed'");
-  if (row) return;
-  const seed = Math.floor(Math.random() * 2 ** 31);
-  run("INSERT INTO game_config (key, value) VALUES ('game_seed', ?)", [String(seed)]);
-}
-
-/**
- * Returns the game seed for the current session. Used by combat resolution and participant ID assignment.
- * Seed is stored in game_config; same seed is used for the whole game until a new game is started.
- */
-export function getGameSeed(): number {
-  logTrace('getGameSeed');
-  if (db === null) return 0;
-  const row = getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'game_seed'");
-  if (!row) return 0;
-  const n = parseInt(row.value, 10);
-  return Number.isNaN(n) ? 0 : n;
-}
-
-/** Target fraction of map hexes that are water (1/3) for all map sizes. */
-const WATER_FRACTION = 1 / 3;
-/** Number of water blobs: min and max (inclusive). Blob count is chosen randomly in this range per game. */
-const WATER_BLOB_COUNT_MIN = 4;
-const WATER_BLOB_COUNT_MAX = 6;
-
-/**
- * Seeds the hexes table with the ordered map hexes and terrain (land/water) for the given map size.
- * Water is 4–6 blobs (seeded RNG): blob centers are chosen at random; radius is increased until the
- * union of blob disks nets out to 1/3 of total hexes. Call from resetGameForNewMatch(size) only.
- */
-function seedHexes(size: MapSize): void {
-  if (db === null) return;
-  const hexes = getOrderedHexList(size);
-  const seed = getGameSeed();
-  const next = createSeededRng(seed);
-  const targetWaterCount = Math.round(hexes.length * WATER_FRACTION);
-  const numBlobs =
-    WATER_BLOB_COUNT_MIN +
-    Math.floor(next() * (WATER_BLOB_COUNT_MAX - WATER_BLOB_COUNT_MIN + 1));
-
-  const centerIndices: number[] = [];
-  while (centerIndices.length < numBlobs) {
-    const idx = Math.floor(next() * hexes.length);
-    if (!centerIndices.includes(idx)) centerIndices.push(idx);
-  }
-  const centerH3s = centerIndices.map((i) => hexes[i]!);
-
-  let radius = 0;
-  /** Cap radius search; at res 2 a blob of radius ~30 already covers thousands of hexes. */
-  const maxRadius = 50;
-  for (; radius <= maxRadius; radius++) {
-    let waterCount = 0;
-    for (let i = 0; i < hexes.length; i++) {
-      let inBlob = false;
-      for (const ch3 of centerH3s) {
-        try {
-          if (gridDistance(hexes[i]!, ch3) <= radius) {
-            inBlob = true;
-            break;
-          }
-        } catch {
-          // ignore
-        }
-      }
-      if (inBlob) waterCount++;
-    }
-    if (waterCount >= targetWaterCount) break;
-  }
-  if (radius > maxRadius) radius = maxRadius;
-
-  for (let i = 0; i < hexes.length; i++) {
-    let water = false;
-    for (const ch3 of centerH3s) {
-      try {
-        if (gridDistance(hexes[i]!, ch3) <= radius) {
-          water = true;
-          break;
-        }
-      } catch {
-        // ignore
-      }
-    }
-    const terrain = water ? 'water' : 'land';
-    run('INSERT INTO hexes (h3_index, terrain) VALUES (?, ?)', [hexes[i], terrain]);
-  }
-}
-
-/**
- * Seeds the units table for the given map size. Counts per type from getUnitCountsForSize(size).
- * Land units (infantry, armor) only on land hexes; naval only on water hexes. Human on low indices, opponent on high.
- * Call from resetGameForNewMatch(size) only.
- */
-function seedUnits(size: MapSize): void {
-  if (db === null) return;
-  const hexes = getOrderedHexList(size);
-  const counts = getUnitCountsForSize(size);
-  const landIndices: number[] = [];
-  const waterIndices: number[] = [];
-  for (let i = 0; i < hexes.length; i++) {
-    const row = getOne<{ terrain: string }>('SELECT terrain FROM hexes WHERE h3_index = ?', [hexes[i]]);
-    const terrain = row?.terrain ?? 'land';
-    if (terrain === 'water') waterIndices.push(i);
-    else landIndices.push(i);
-  }
-
-  /* Place human on “near” side (low indices), opponent on “far” side (high indices). */
-  const landPerSide = counts.infantry + counts.armor;
-  if (landIndices.length < landPerSide * 2) return;
-  const humanLand = landIndices.slice(0, landPerSide);
-  const opponentLand = landIndices.slice(-landPerSide);
-
-  const humanUnits: [string, string, string][] = [];
-  let idx = 0;
-  for (let i = 0; i < counts.infantry; i++) {
-    humanUnits.push([`human-infantry-${i + 1}`, 'infantry', hexes[humanLand[idx++]!]!]);
-  }
-  for (let i = 0; i < counts.armor; i++) {
-    humanUnits.push([`human-armor-${i + 1}`, 'armor', hexes[humanLand[idx++]!]!]);
-  }
-  for (let i = 0; i < counts.naval && waterIndices.length > 0; i++) {
-    humanUnits.push([`human-naval-${i + 1}`, 'naval', hexes[waterIndices[i]!]!]);
-  }
-  for (const [id, unitType, h3Index] of humanUnits) {
-    run('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [id, 'human', unitType, h3Index]);
-  }
-
-  const opponentUnits: [string, string, string][] = [];
-  idx = 0;
-  for (let i = 0; i < counts.infantry; i++) {
-    opponentUnits.push([`opponent-infantry-${i + 1}`, 'infantry', hexes[opponentLand[idx++]!]!]);
-  }
-  for (let i = 0; i < counts.armor; i++) {
-    opponentUnits.push([`opponent-armor-${i + 1}`, 'armor', hexes[opponentLand[idx++]!]!]);
-  }
-  for (let i = 0; i < counts.naval && waterIndices.length > 0; i++) {
-    opponentUnits.push([`opponent-naval-${i + 1}`, 'naval', hexes[waterIndices[waterIndices.length - 1 - i]!]!]);
-  }
-  for (const [id, unitType, h3Index] of opponentUnits) {
-    run('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [id, 'opponent', unitType, h3Index]);
-  }
-}
-
-/**
- * Returns the stored map size for the current game, or 'small' if none (e.g. before first new game).
- * Used by getGameState to order hexes and by callers that need the current size.
- */
-export function getMapSize(): MapSize {
-  logTrace('getMapSize');
-  const row = getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'map_size'");
-  if (!row || !row.value) return 'small';
-  if (row.value === 'medium' || row.value === 'large') return row.value;
-  return 'small';
-}
-
-/**
- * Returns the set of H3 indices that are on the current map. Used for order validation in gameActions.
- * Empty when no game has been started (hexes table empty).
- */
-export function getMapHexSet(): Set<string> {
-  logTrace('getMapHexSet');
-  const rows = getAll<{ h3_index: string }>('SELECT h3_index FROM hexes');
-  return new Set(rows.map((r) => r.h3_index));
-}
-
-/**
- * Persists the in-memory database to the file on disk. Call after mutations so data survives app restart.
- */
-export function saveDatabase(): void {
-  if (!db || !dbPath) return;
-  try {
-    const data = db.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(dbPath, buffer);
-  } catch (err) {
-    console.error('[agent-wars] saveDatabase failed:', err);
-  }
-}
-
-/**
- * Creates a fresh game database and tables on every startup. Async because sql.js loads WASM.
- * Call once when the main process is ready (e.g. in app.whenReady()).
- */
-export async function initDatabase(): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const initSqlJs = require('sql.js');
-  const SQL = await initSqlJs();
-
-  dbPath = getDbPath();
-  if (fs.existsSync(dbPath)) {
-    fs.unlinkSync(dbPath);
-  }
-  db = new SQL.Database();
-
-  const database = db!;
-  database.run(`
+function getFullDdl(): string {
+  return `
     CREATE TABLE IF NOT EXISTS hexes (
       h3_index TEXT PRIMARY KEY,
       terrain TEXT NOT NULL CHECK (terrain IN ('land', 'water'))
@@ -340,21 +135,405 @@ export async function initDatabase(): Promise<void> {
       unit_id TEXT NOT NULL,
       PRIMARY KEY (player_id, unit_id)
     );
-  `);
+  `;
+}
 
+/**
+ * Throws if the opened database is not the expected baseline (user_version and required tables).
+ * Call after applyGameDbPragmas on an existing file.
+ */
+export function validateGameDatabaseOrThrow(database: InstanceType<typeof Database>): void {
+  const uv = database.pragma('user_version', { simple: true }) as number;
+  if (uv !== EXPECTED_USER_VERSION) {
+    throw new Error(`Invalid user_version: expected ${EXPECTED_USER_VERSION}, got ${uv}`);
+  }
+  for (const t of REQUIRED_TABLES) {
+    const row = database.prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`).get(t);
+    if (!row) throw new Error(`Missing required table: ${t}`);
+  }
+}
+
+function closeDbHandle(): void {
+  if (db) {
+    try {
+      db.close();
+    } catch (err) {
+      logError('gameDb closeDbHandle: error closing database', err);
+    }
+    db = null;
+  }
+}
+
+function run(sql: string, params: unknown[] = []): void {
+  if (!db) return;
+  db.prepare(sql).run(...(params as never[]));
+}
+
+function getOne<T extends Record<string, unknown>>(sql: string, params: unknown[] = []): T | undefined {
+  if (!db) return undefined;
+  return db.prepare(sql).get(...(params as never[])) as T | undefined;
+}
+
+function getAll<T extends Record<string, unknown>>(sql: string, params: unknown[] = []): T[] {
+  if (!db) return [];
+  return db.prepare(sql).all(...(params as never[])) as T[];
+}
+
+function getCanonicalDbPath(): string {
+  return path.join(app.getPath('userData'), GAME_DB_FILE_NAME);
+}
+
+function ensureTurnStateRow(): void {
+  if (!db) return;
   const row = getOne('SELECT 1 FROM turn_state WHERE id = 1');
   if (!row) {
     run('INSERT INTO turn_state (id, phase, turn_number) VALUES (1, ?, ?)', ['planning', 1]);
   }
-
-  seedGameSeedIfMissing();
-  saveDatabase();
 }
 
 /**
- * Returns the current game state as a plain object for IPC. Empty arrays and default phase/turn if DB not initialized.
- * Use when the renderer or another consumer needs a read-only snapshot (e.g. after resolution or on load).
+ * Creates a new database at the given path: pragmas, DDL, user_version, turn row, optional seed.
+ * Parent directories are created when missing. Caller must ensure the path is writable and not locked.
  */
+export function createFreshGameDatabaseAt(canonicalPath: string): void {
+  logDebug('gameDb createFreshGameDatabaseAt', { canonicalPath });
+  closeDbHandle();
+  const dir = path.dirname(canonicalPath);
+  fs.mkdirSync(dir, { recursive: true });
+  db = new Database(canonicalPath);
+  applyGameDbPragmas(db);
+  db.exec(getFullDdl());
+  ensureTurnStateRow();
+  db.pragma(`user_version = ${EXPECTED_USER_VERSION}`);
+  seedGameSeedIfMissing();
+}
+
+/**
+ * Opens or creates the game database at the given absolute path (tests only). Uses silent recovery on validation
+ * failure (rename corrupt set or delete, then recreate) — no dialogs. Does not use app.getPath.
+ * Call closeGameDatabaseForTests when done to reset module state.
+ */
+export function openGameDatabaseAtPathForTests(absPath: string): void {
+  logDebug('gameDb openGameDatabaseAtPathForTests', { absPath });
+  closeDbHandle();
+  const dir = path.dirname(absPath);
+  fs.mkdirSync(dir, { recursive: true });
+
+  if (!fs.existsSync(absPath)) {
+    createFreshGameDatabaseAt(absPath);
+    return;
+  }
+
+  let d: InstanceType<typeof Database> | null = null;
+  try {
+    d = new Database(absPath);
+    applyGameDbPragmas(d);
+    validateGameDatabaseOrThrow(d);
+    db = d;
+    d = null;
+  } catch (err) {
+    if (d) {
+      try {
+        d.close();
+      } catch (closeErr) {
+        logError('gameDb openGameDatabaseAtPathForTests: failed to close temp handle after validation error', closeErr);
+      }
+    }
+    logError('gameDb openGameDatabaseAtPathForTests: open/validate failed, recovering', err);
+    closeDbHandle();
+    silentRecoverCorruptDatabase(absPath);
+  }
+}
+
+/**
+ * Closes the DB and clears test mode. Use after tests that called openGameDatabaseAtPathForTests.
+ */
+export function closeGameDatabaseForTests(): void {
+  logDebug('gameDb closeGameDatabaseForTests');
+  closeDbHandle();
+}
+
+function silentRecoverCorruptDatabase(canonicalPath: string): void {
+  const renamed = tryRenameCorruptSet(canonicalPath);
+  if (!renamed) {
+    const deleted = tryDeleteCanonicalAndSidecars(canonicalPath);
+    if (!deleted) {
+      throw new Error('gameDb silentRecoverCorruptDatabase: could not rename or delete corrupt database');
+    }
+  }
+  createFreshGameDatabaseAt(canonicalPath);
+}
+
+function isoTimestampForFilename(): string {
+  return new Date().toISOString().replace(/:/g, '-');
+}
+
+function tryRenameCorruptSet(canonicalPath: string): boolean {
+  const parsed = path.parse(canonicalPath);
+  const backupMain = path.join(parsed.dir, `${parsed.name}.corrupt.${isoTimestampForFilename()}${parsed.ext}`);
+  const oldWal = `${canonicalPath}-wal`;
+  const oldShm = `${canonicalPath}-shm`;
+  const newWal = `${backupMain}-wal`;
+  const newShm = `${backupMain}-shm`;
+  try {
+    fs.renameSync(canonicalPath, backupMain);
+    if (fs.existsSync(oldWal)) fs.renameSync(oldWal, newWal);
+    if (fs.existsSync(oldShm)) fs.renameSync(oldShm, newShm);
+    logDebug('gameDb tryRenameCorruptSet: success', { backupMain });
+    return true;
+  } catch (err) {
+    logError('gameDb tryRenameCorruptSet: failed', err);
+    return false;
+  }
+}
+
+function tryDeleteCanonicalAndSidecars(canonicalPath: string): boolean {
+  const paths = [`${canonicalPath}-wal`, `${canonicalPath}-shm`, canonicalPath];
+  try {
+    for (const p of paths) {
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    }
+    logDebug('gameDb tryDeleteCanonicalAndSidecars: success');
+    return true;
+  } catch (err) {
+    logError('gameDb tryDeleteCanonicalAndSidecars: failed', err);
+    return false;
+  }
+}
+
+function recoverCorruptDatabaseUi(canonicalPath: string, cause: unknown): void {
+  closeDbHandle();
+  dialog.showErrorBox(
+    'Database problem',
+    'The game database file is invalid or incompatible with this version of Agent Wars.\n\n' +
+      'The app will try to rename the existing file (one attempt) and create a new empty database.\n' +
+      'After that, use New game from the menu to start playing.'
+  );
+  logError('gameDb recoverCorruptDatabaseUi: starting recovery', cause);
+
+  const renamed = tryRenameCorruptSet(canonicalPath);
+  if (!renamed) {
+    logError('gameDb recoverCorruptDatabaseUi: rename failed, attempting delete', cause);
+    const deleted = tryDeleteCanonicalAndSidecars(canonicalPath);
+    if (!deleted) {
+      logError('gameDb recoverCorruptDatabaseUi: delete failed, exiting', cause);
+      dialog.showErrorBox(
+        'Database recovery failed',
+        'The game could not rename or remove the damaged database file.\n\n' +
+          'Please remove or move the database file manually (and any .sqlite-wal / .sqlite-shm files next to it), then restart the application.'
+      );
+      app.exit(1);
+      return;
+    }
+    logDebug('gameDb recoverCorruptDatabaseUi: path cleared after failed rename');
+  } else {
+    logDebug('gameDb recoverCorruptDatabaseUi: corrupt file renamed; creating fresh DB');
+  }
+
+  try {
+    createFreshGameDatabaseAt(canonicalPath);
+  } catch (err) {
+    logError('gameDb recoverCorruptDatabaseUi: createFreshGameDatabaseAt failed', err);
+    dialog.showErrorBox('Database error', 'Could not create a new game database. See logs for details.');
+    app.exit(1);
+  }
+}
+
+/**
+ * Initializes the game database for the Electron app: durable file under userData, pragmas, user_version hook,
+ * and recovery UI on corrupt/incompatible files (Section 4 item 5). Call once when the app is ready.
+ */
+export async function initDatabase(): Promise<void> {
+  logDebug('gameDb initDatabase');
+  const canonicalPath = getCanonicalDbPath();
+  fs.mkdirSync(path.dirname(canonicalPath), { recursive: true });
+
+  if (!fs.existsSync(canonicalPath)) {
+    createFreshGameDatabaseAt(canonicalPath);
+    return;
+  }
+
+  let d: InstanceType<typeof Database> | null = null;
+  try {
+    d = new Database(canonicalPath);
+    applyGameDbPragmas(d);
+    validateGameDatabaseOrThrow(d);
+    db = d;
+    d = null;
+    ensureTurnStateRow();
+    seedGameSeedIfMissing();
+    logDebug('gameDb initDatabase: opened existing', { canonicalPath });
+  } catch (err) {
+    if (d) {
+      try {
+        d.close();
+      } catch (closeErr) {
+        logError('gameDb initDatabase: failed to close temp handle after validation error', closeErr);
+      }
+    }
+    logError('gameDb initDatabase: validation/open failed', err);
+    recoverCorruptDatabaseUi(canonicalPath, err);
+  }
+}
+
+function seedGameSeedIfMissing(): void {
+  if (db === null) return;
+  const row = getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'game_seed'");
+  if (row) return;
+  const seed = Math.floor(Math.random() * 2 ** 31);
+  run("INSERT INTO game_config (key, value) VALUES ('game_seed', ?)", [String(seed)]);
+}
+
+/**
+ * Returns the persisted RNG seed for map generation (game_config game_seed). Use for reproducibility and tests;
+ * returns 0 if the DB is closed or the key is missing or invalid.
+ */
+export function getGameSeed(): number {
+  logTrace('getGameSeed');
+  if (db === null) return 0;
+  const row = getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'game_seed'");
+  if (!row) return 0;
+  const n = parseInt(row.value, 10);
+  return Number.isNaN(n) ? 0 : n;
+}
+
+const WATER_FRACTION = 1 / 3;
+const WATER_BLOB_COUNT_MIN = 4;
+const WATER_BLOB_COUNT_MAX = 6;
+
+function seedHexes(size: MapSize): void {
+  if (db === null) return;
+  const hexes = getOrderedHexList(size);
+  const seed = getGameSeed();
+  const next = createSeededRng(seed);
+  const targetWaterCount = Math.round(hexes.length * WATER_FRACTION);
+  const numBlobs =
+    WATER_BLOB_COUNT_MIN + Math.floor(next() * (WATER_BLOB_COUNT_MAX - WATER_BLOB_COUNT_MIN + 1));
+
+  const centerIndices: number[] = [];
+  while (centerIndices.length < numBlobs) {
+    const idx = Math.floor(next() * hexes.length);
+    if (!centerIndices.includes(idx)) centerIndices.push(idx);
+  }
+  const centerH3s = centerIndices.map((i) => hexes[i]!);
+
+  let radius = 0;
+  const maxRadius = 50;
+  for (; radius <= maxRadius; radius++) {
+    let waterCount = 0;
+    for (let i = 0; i < hexes.length; i++) {
+      let inBlob = false;
+      for (const ch3 of centerH3s) {
+        try {
+          if (gridDistance(hexes[i]!, ch3) <= radius) {
+            inBlob = true;
+            break;
+          }
+        } catch {
+          // ignore
+        }
+      }
+      if (inBlob) waterCount++;
+    }
+    if (waterCount >= targetWaterCount) break;
+  }
+  if (radius > maxRadius) radius = maxRadius;
+
+  for (let i = 0; i < hexes.length; i++) {
+    let water = false;
+    for (const ch3 of centerH3s) {
+      try {
+        if (gridDistance(hexes[i]!, ch3) <= radius) {
+          water = true;
+          break;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    const terrain = water ? 'water' : 'land';
+    run('INSERT INTO hexes (h3_index, terrain) VALUES (?, ?)', [hexes[i], terrain]);
+  }
+}
+
+function seedUnits(size: MapSize): void {
+  if (db === null) return;
+  const hexes = getOrderedHexList(size);
+  const counts = getUnitCountsForSize(size);
+  const landIndices: number[] = [];
+  const waterIndices: number[] = [];
+  for (let i = 0; i < hexes.length; i++) {
+    const row = getOne<{ terrain: string }>('SELECT terrain FROM hexes WHERE h3_index = ?', [hexes[i]]);
+    const terrain = row?.terrain ?? 'land';
+    if (terrain === 'water') waterIndices.push(i);
+    else landIndices.push(i);
+  }
+
+  const landPerSide = counts.infantry + counts.armor;
+  if (landIndices.length < landPerSide * 2) return;
+  const humanLand = landIndices.slice(0, landPerSide);
+  const opponentLand = landIndices.slice(-landPerSide);
+
+  const humanUnits: [string, string, string][] = [];
+  let idx = 0;
+  for (let i = 0; i < counts.infantry; i++) {
+    humanUnits.push([`human-infantry-${i + 1}`, 'infantry', hexes[humanLand[idx++]!]!]);
+  }
+  for (let i = 0; i < counts.armor; i++) {
+    humanUnits.push([`human-armor-${i + 1}`, 'armor', hexes[humanLand[idx++]!]!]);
+  }
+  for (let i = 0; i < counts.naval && waterIndices.length > 0; i++) {
+    humanUnits.push([`human-naval-${i + 1}`, 'naval', hexes[waterIndices[i]!]!]);
+  }
+  for (const [id, unitType, h3Index] of humanUnits) {
+    run('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [id, 'human', unitType, h3Index]);
+  }
+
+  const opponentUnits: [string, string, string][] = [];
+  idx = 0;
+  for (let i = 0; i < counts.infantry; i++) {
+    opponentUnits.push([`opponent-infantry-${i + 1}`, 'infantry', hexes[opponentLand[idx++]!]!]);
+  }
+  for (let i = 0; i < counts.armor; i++) {
+    opponentUnits.push([`opponent-armor-${i + 1}`, 'armor', hexes[opponentLand[idx++]!]!]);
+  }
+  for (let i = 0; i < counts.naval && waterIndices.length > 0; i++) {
+    opponentUnits.push([`opponent-naval-${i + 1}`, 'naval', hexes[waterIndices[waterIndices.length - 1 - i]!]!]);
+  }
+  for (const [id, unitType, h3Index] of opponentUnits) {
+    run('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [id, 'opponent', unitType, h3Index]);
+  }
+}
+
+/**
+ * Returns the configured map size from game_config (small, medium, large). Defaults to small when unset or invalid.
+ * Use when building hex lists, seeding terrain, and any feature keyed off map dimensions.
+ */
+export function getMapSize(): MapSize {
+  logTrace('getMapSize');
+  const row = getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'map_size'");
+  if (!row || !row.value) return 'small';
+  if (row.value === 'medium' || row.value === 'large') return row.value;
+  return 'small';
+}
+
+/**
+ * Returns the set of all H3 indices present in the hexes table. Use for pathfinding domain, validation, and
+ * any "is this cell on the map?" check; empty set when the DB is empty or closed.
+ */
+export function getMapHexSet(): Set<string> {
+  logTrace('getMapHexSet');
+  const rows = getAll<{ h3_index: string }>('SELECT h3_index FROM hexes');
+  return new Set(rows.map((r) => r.h3_index));
+}
+
+/**
+ * No-op for 1.1: better-sqlite3 persists to the open file synchronously; kept so tool modules can keep calling it.
+ */
+export function saveDatabase(): void {
+  logTrace('gameDb saveDatabase (no-op; file-backed auto-persist)');
+}
+
 export function getGameState(): GameStateSnapshot {
   logTrace('getGameState');
   if (db === null) {
@@ -397,48 +576,37 @@ export function getGameState(): GameStateSnapshot {
   };
 }
 
-/** Snapshot of game state sent to the renderer (camelCase for JSON). */
-export interface GameStateSnapshot {
-  hexes: { h3Index: string; terrain: string }[];
-  units: { id: string; player: string; unitType: string; h3Index: string }[];
-  phase: string;
-  turnNumber: number;
-  pendingOrders: { unitId: string; toH3Index: string }[];
-  gameOver?: boolean;
-  winner?: string;
-}
-
 /**
- * Runs a single SQL statement. Exported for gameActions. Params as array.
+ * Runs a SQL statement with bound parameters. Use from AI/tool modules for mutations; no-ops when the DB handle is null.
  */
 export function dbRun(sql: string, params: unknown[] = []): void {
   run(sql, params);
 }
 
 /**
- * Returns one row as plain object. Exported for gameActions.
+ * Returns the first row of a SELECT as a typed object, or undefined. Use for single-row reads; returns undefined when
+ * the DB is closed or no row matches.
  */
 export function dbGetOne<T extends Record<string, unknown>>(sql: string, params: unknown[] = []): T | undefined {
   return getOne<T>(sql, params);
 }
 
 /**
- * Returns all rows as plain objects. Exported for gameActions.
+ * Returns all rows of a SELECT as typed objects. Use for list reads; returns an empty array when the DB is closed.
  */
 export function dbGetAll<T extends Record<string, unknown>>(sql: string, params: unknown[] = []): T[] {
   return getAll<T>(sql, params);
 }
 
 /**
- * Returns whether the database is initialized. Used by gameActions instead of raw getDb.
+ * True when initDatabase or test open has established a live better-sqlite3 handle. Use before operations that require persistence.
  */
 export function isDbReady(): boolean {
   return db !== null;
 }
 
 /**
- * Sets game-over state and winner. Called after combat when one side has no units left.
- * Stores in game_config: game_over=1, winner=<player id>.
+ * Marks the match ended and records the winning player id in game_config. Use when the last enemy unit is eliminated.
  */
 export function setGameOver(winner: string): void {
   if (!db) return;
@@ -447,7 +615,7 @@ export function setGameOver(winner: string): void {
 }
 
 /**
- * Clears game-over state and winner. Called when starting a new game.
+ * Removes game_over and winner keys so a new round can proceed. Use when starting a new game from the menu.
  */
 export function clearGameOver(): void {
   if (!db) return;
@@ -458,8 +626,8 @@ const AI_TOOL_LIMIT_EXCEEDED_KEY = 'ai_tool_limit_exceeded_last_turn';
 const AI_LAST_CONSULTATION_TURN_KEY = 'ai_last_consultation_turn';
 
 /**
- * Sets the flag that the previous AI turn hit the tool-call iteration limit (10).
- * The next turn's system prompt should include a warning and then clear the flag.
+ * Records that the AI exceeded the tool-call cap last turn so the next prompt can show a one-time warning. Call from
+ * the OpenRouter loop when the cap is hit.
  */
 export function setAiToolLimitExceededLastTurn(): void {
   if (!db) return;
@@ -467,8 +635,8 @@ export function setAiToolLimitExceededLastTurn(): void {
 }
 
 /**
- * Returns true if the AI tool limit was exceeded last turn, and clears the flag.
- * Call when building the system prompt so the warning is injected at most once.
+ * Returns whether the tool-limit flag was set, then deletes that flag. Call once per opponent turn when building the
+ * system prompt so the warning shows at most once.
  */
 export function getAndClearAiToolLimitExceededLastTurn(): boolean {
   if (!db) return false;
@@ -478,8 +646,8 @@ export function getAndClearAiToolLimitExceededLastTurn(): boolean {
 }
 
 /**
- * Returns the turn number at which the LLM was last consulted for the opponent (0 if never).
- * Used by callback evaluation for deadman and first-consultation overrides.
+ * Returns the turn number of the last AI consultation (event-driven flow), or 0 if unset. Use to avoid duplicate
+ * first_consultation triggers and similar turn-gated logic.
  */
 export function getAiLastConsultationTurn(): number {
   logTrace('gameDb getAiLastConsultationTurn');
@@ -491,7 +659,8 @@ export function getAiLastConsultationTurn(): number {
 }
 
 /**
- * Stores the turn number at which the LLM was last consulted. Call after a successful consultation.
+ * Persists the turn number after a consultation so later evaluation can tell whether this turn already consulted. Call
+ * when applying AI orders from LLM or pending buffer.
  */
 export function setAiLastConsultationTurn(turn: number): void {
   logDebug('gameDb setAiLastConsultationTurn', { turn });
@@ -502,8 +671,8 @@ export function setAiLastConsultationTurn(turn: number): void {
 const OPPONENT_ID = 'opponent';
 
 /**
- * Returns opponent unit IDs that have participated in combat since the last consultation.
- * Used to detect "first combat" mandatory override.
+ * Lists opponent unit ids that entered combat since the last consultation. Use to decide whether to re-prompt the AI
+ * under event-driven rules; empty when the DB is closed or the set is empty.
  */
 export function getOpponentUnitsInCombatSinceConsultation(): string[] {
   logTrace('gameDb getOpponentUnitsInCombatSinceConsultation');
@@ -516,7 +685,8 @@ export function getOpponentUnitsInCombatSinceConsultation(): string[] {
 }
 
 /**
- * Adds opponent unit IDs that participated in combat this resolution. Call after each resolution.
+ * Records opponent units involved in combat this turn for event-driven re-consultation. Call from resolution when
+ * opponent units fight; duplicates are ignored (INSERT OR IGNORE).
  */
 export function addOpponentCombatParticipants(unitIds: string[]): void {
   logDebug('gameDb addOpponentCombatParticipants', { count: unitIds.length });
@@ -527,7 +697,7 @@ export function addOpponentCombatParticipants(unitIds: string[]): void {
 }
 
 /**
- * Clears the set of opponent units in combat since consultation. Call when a consultation runs.
+ * Clears the combat-since-consultation set after a new AI consultation. Call when starting a fresh planning window.
  */
 export function clearOpponentCombatSinceConsultation(): void {
   logDebug('gameDb clearOpponentCombatSinceConsultation');
@@ -536,7 +706,8 @@ export function clearOpponentCombatSinceConsultation(): void {
 }
 
 /**
- * Returns pending AI orders for the next turn (movement + ranged) if any. Used when event-driven consultation ran after last resolution.
+ * Loads AI movement and ranged orders staged for the next apply (e.g. event-driven path). Returns null if missing,
+ * unparsable JSON, or DB closed. Does not clear the row; use clearAiPendingOrders after consumption.
  */
 export function getAiPendingOrders(playerId: string): {
   movementOrders: { unitId: string; toH3Index: string }[];
@@ -560,7 +731,8 @@ export function getAiPendingOrders(playerId: string): {
 }
 
 /**
- * Stores pending AI orders for the next turn. Call after a successful consultation in event-driven mode.
+ * Persists movement and ranged orders for a player until the game loop applies them. Use when the LLM defers orders
+ * across turns or the pipeline buffers opponent orders before Ready.
  */
 export function setAiPendingOrders(
   playerId: string,
@@ -575,17 +747,12 @@ export function setAiPendingOrders(
   if (!db) return;
   run(
     'INSERT OR REPLACE INTO ai_pending_orders (player_id, movement_orders, ranged_orders, strategy_text) VALUES (?, ?, ?, ?)',
-    [
-      playerId,
-      JSON.stringify(movementOrders),
-      JSON.stringify(rangedOrders),
-      null,
-    ]
+    [playerId, JSON.stringify(movementOrders), JSON.stringify(rangedOrders), null]
   );
 }
 
 /**
- * Clears pending AI orders for a player. Call after consuming them at Ready or on new game.
+ * Deletes staged AI orders for a player after they have been applied or superseded. Use paired with getAiPendingOrders.
  */
 export function clearAiPendingOrders(playerId: string): void {
   logDebug('gameDb clearAiPendingOrders', { playerId });
@@ -594,9 +761,8 @@ export function clearAiPendingOrders(playerId: string): void {
 }
 
 /**
- * Re-initializes the game for a new match with the given map size: stores map_size, deletes units and hexes,
- * generates a new seed, re-seeds hexes and units for that size, clears game_over/winner, resets turn and phase,
- * clears pending orders. Call from newGame(size) IPC.
+ * Re-initializes the game for a new match: map size, fresh seed, hexes/units, turn state, pending orders,
+ * callbacks, AI memory, and standing orders cleared so no prior-match AI state leaks (1.1 persistence).
  */
 export function resetGameForNewMatch(size: MapSize = 'small'): void {
   if (!db) return;
@@ -616,5 +782,7 @@ export function resetGameForNewMatch(size: MapSize = 'small'): void {
   run('DELETE FROM ai_pending_orders');
   run('DELETE FROM ai_combat_since_consultation');
   run("DELETE FROM game_config WHERE key = 'ai_last_consultation_turn'");
+  run('DELETE FROM standing_orders');
+  run('DELETE FROM ai_memory');
   saveDatabase();
 }

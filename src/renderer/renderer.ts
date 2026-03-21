@@ -11,29 +11,19 @@ import {
   getFitScale,
   type ViewState,
 } from './hexGrid';
-
-/** Game state snapshot from main process (matches IPC payload). */
-interface GameStateSnapshot {
-  hexes: { h3Index: string; terrain: string }[];
-  units: { id: string; player: string; unitType: string; h3Index: string }[];
-  phase: string;
-  turnNumber: number;
-  pendingOrders: { unitId: string; toH3Index: string }[];
-  gameOver?: boolean;
-  winner?: string;
-}
+import type {
+  GameStateSnapshot,
+  GameApi,
+  MovementOrder,
+  RangedAttackOrder,
+  RemovedUnitSnapshot,
+} from '../shared/ipcTypes';
 
 /** One executed move (human or AI) for resolution-phase fade animation. */
 interface ResolutionMove {
   unitId: string;
   fromH3Index: string;
   toH3Index: string;
-}
-
-/** Ranged attack declaration (one target per unit per turn). */
-interface RangedAttackOrder {
-  unitId: string;
-  targetH3Index: string;
 }
 
 /** Ranged range in hexes by unit type (0 = melee only). Matches combat spec. */
@@ -90,71 +80,9 @@ function validateMovementOrder(
   return { valid: true };
 }
 
-/** Unit snapshot at death for resolution-phase display (same shape as game units). */
-interface RemovedUnitSnapshot {
-  id: string;
-  player: string;
-  unitType: string;
-  h3Index: string;
-}
-
-interface ReadyResult {
-  success: boolean;
-  reason?: string;
-  aiSkipped?: boolean;
-  aiSkipReason?: string;
-  aiOrderCount?: number;
-  aiRangedByType?: { armor?: number; naval?: number };
-  aiDropped?: number;
-  aiDropReasons?: string[];
-  aiMovesLog?: string[];
-  aiMoves?: ResolutionMove[];
-  combatHexes?: string[];
-  casualtyHexes?: string[];
-  rangedCombatHexes?: string[];
-  rangedCasualtyHexes?: string[];
-  rangedRemovedUnits?: RemovedUnitSnapshot[];
-  meleeCombatHexes?: string[];
-  meleeCasualtyHexes?: string[];
-  meleeRemovedUnits?: RemovedUnitSnapshot[];
-  kills?: { victimId: string; killerIds: string[] }[];
-  killsByDirectFire?: { victimId: string; killerIds: string[] }[];
-  killsByReturnFire?: { victimId: string; killerIds: string[] }[];
-  /** Per-group tool invocation counts for the last AI turn. Keys are tool group ids. */
-  toolInvocationCounts?: Record<string, number>;
-  /** Cost in dollars for this turn's LLM call (when requestOrders was used). */
-  cost?: number;
-  /** When event-driven: true if orders came from consultation; false if standing-order-only. */
-  aiConsulted?: boolean;
-}
-
 declare global {
   interface Window {
-    gameApi?: {
-      getGameState: () => Promise<unknown>;
-      newGame: (size?: 'small' | 'medium' | 'large') => Promise<unknown>;
-      submitOrders: (payload: { movementOrders: { unitId: string; toH3Index: string }[]; rangedAttacks?: RangedAttackOrder[] }) => Promise<unknown>;
-      ready: (payload?: {
-        enabledToolGroups?: string[];
-        useEventDrivenConsultation?: boolean;
-        precomputedAiOrders?: { unitId: string; toH3Index: string }[];
-        precomputedAiRangedOrders?: { unitId: string; targetH3Index: string }[];
-      }) => Promise<ReadyResult>;
-      requestAiOrders: (payload?: { enabledToolGroups?: string[] }) => Promise<
-        | { success: true; orders: { unitId: string; toH3Index: string }[]; rangedAttacks?: RangedAttackOrder[]; strategy?: string; dropped?: number; dropReasons?: string[]; toolInvocationCounts?: Record<string, number> }
-        | { success: false; error: string }
-      >;
-      cancelRequestAiOrders: () => Promise<void>;
-      registerOpenRouterLogListener?: (callback: (payload: { line: string; isError?: boolean }) => void) => void;
-      openRouter?: {
-        getKey: () => Promise<{ hasKey: boolean }>;
-        setKey: (key: string) => Promise<void>;
-        listModels: () => Promise<{ models?: { id: string; name?: string }[]; error?: string }>;
-        setSelectedModel: (modelId: string) => Promise<void>;
-        getToolGroupList: () => Promise<{ id: string; label: string }[]>;
-        getSelectedModel: () => Promise<string>;
-      };
-    };
+    gameApi?: GameApi;
   }
 }
 
@@ -319,7 +247,7 @@ let selectedUnitId: string | null = null;
 let selectedUnitIdAtMouseDown: string | null = null;
 /** Timeout for deferred single-click selection so double-click can issue move before selection runs. */
 let pendingSelectTimeout: ReturnType<typeof setTimeout> | null = null;
-let pendingOrders: { unitId: string; toH3Index: string }[] = [];
+let pendingOrders: MovementOrder[] = [];
 let pendingRangedAttacks: RangedAttackOrder[] = [];
 /** When true, next hex click sets ranged attack target for selected unit (if valid). */
 let rangedModeActive = false;
@@ -558,13 +486,15 @@ function syncEventDrivenFromTools(): void {
 }
 
 /** Precomputed AI movement orders from the last background request; null until request completes. Cleared on Ready click or when Run is turned off. */
-let precomputedAiOrders: { unitId: string; toH3Index: string }[] | null = null;
+let precomputedAiOrders: MovementOrder[] | null = null;
 
 /** Precomputed AI ranged orders from the last background request; cleared with precomputedAiOrders. */
 let precomputedAiRangedOrders: { unitId: string; targetH3Index: string }[] | null = null;
 
 /** Strategy text from the last background request; shown in upper-left toast when using precomputed orders. */
 let precomputedAiStrategy: string | null = null;
+/** Per-group counters captured alongside precomputed orders (used when Ready path does not return counters). */
+let precomputedToolInvocationCounts: Record<string, number> | null = null;
 
 /** True while a background requestAiOrders call is in flight; used to avoid duplicate requests and to guard start. */
 let backgroundRequestInFlight = false;
@@ -615,10 +545,13 @@ function startBackgroundRequestIfAllowed(): void {
           precomputedAiRangedOrders = result.rangedAttacks ?? [];
           precomputedAiStrategy = result.strategy ?? null;
           if (result.toolInvocationCounts) {
+            precomputedToolInvocationCounts = { ...result.toolInvocationCounts };
             for (const [groupId, count] of Object.entries(result.toolInvocationCounts)) {
               toolInvocationCounts[groupId] = count;
             }
             updateOpenRouterToolCountLabels();
+          } else {
+            precomputedToolInvocationCounts = null;
           }
           if (result.cost !== undefined) {
             openRouterGameCost += result.cost;
@@ -630,6 +563,7 @@ function startBackgroundRequestIfAllowed(): void {
           precomputedAiOrders = [];
           precomputedAiRangedOrders = [];
           precomputedAiStrategy = null;
+          precomputedToolInvocationCounts = null;
         }
         updateReadyButtonState();
       })
@@ -642,6 +576,7 @@ function startBackgroundRequestIfAllowed(): void {
         precomputedAiOrders = [];
         precomputedAiRangedOrders = [];
         precomputedAiStrategy = null;
+        precomputedToolInvocationCounts = null;
         updateReadyButtonState();
       });
   }).catch((err) => {
@@ -653,6 +588,7 @@ function startBackgroundRequestIfAllowed(): void {
     precomputedAiOrders = [];
     precomputedAiRangedOrders = [];
     precomputedAiStrategy = null;
+    precomputedToolInvocationCounts = null;
     updateReadyButtonState();
   });
 }
@@ -695,12 +631,14 @@ function renderOpenRouterToolsList(): void {
           precomputedAiOrders = null;
           precomputedAiRangedOrders = null;
           precomputedAiStrategy = null;
+          precomputedToolInvocationCounts = null;
           eventDrivenInitialConsultationDone = false;
           startBackgroundRequestIfAllowed();
         } else if (runButtonOn && !useEventDrivenConsultation && wasEventDriven) {
           precomputedAiOrders = null;
           precomputedAiRangedOrders = null;
           precomputedAiStrategy = null;
+          precomputedToolInvocationCounts = null;
           eventDrivenInitialConsultationDone = false;
           startBackgroundRequestIfAllowed();
         }
@@ -1640,6 +1578,32 @@ function initNewGameButton(): void {
   });
 }
 
+/**
+ * Opens the new-game overlay from the Model tab "New" button.
+ * This does not mutate DB state until the user confirms via Start game.
+ */
+function openNewGameOverlayFromModelTab(): void {
+  window.gameApi?.cancelRequestAiOrders?.();
+  precomputedAiOrders = null;
+  precomputedAiRangedOrders = null;
+  precomputedAiStrategy = null;
+  precomputedToolInvocationCounts = null;
+  backgroundRequestInFlight = false;
+  readyRequestInFlight = false;
+  eventDrivenInitialConsultationDone = false;
+  const overlay = document.getElementById('game-over-overlay');
+  const messageEl = document.getElementById('game-over-message');
+  const newGameBtn = document.getElementById('new-game-btn');
+  if (messageEl) {
+    messageEl.textContent = 'Choose map size and start.';
+    messageEl.style.display = '';
+  }
+  if (newGameBtn) newGameBtn.textContent = 'Start game';
+  overlay?.classList.remove('hidden');
+  setMainUIControlsEnabled(false);
+  updateReadyButtonState();
+}
+
 function cancelOrderForUnit(unitId: string): void {
   pendingOrders = pendingOrders.filter((o) => o.unitId !== unitId);
   updatePendingOrdersSidebar();
@@ -1827,6 +1791,7 @@ function initOpenRouterUI(): void {
   const keyInput = document.getElementById('openrouter-key') as HTMLInputElement | null;
   const modelSelect = document.getElementById('openrouter-model') as HTMLSelectElement | null;
   const refreshBtn = document.getElementById('openrouter-refresh-models');
+  const newBtn = document.getElementById('openrouter-new-btn');
 
   function refreshModels(): void {
     api!.listModels().then((result) => {
@@ -1869,6 +1834,7 @@ function initOpenRouterUI(): void {
   }
 
   if (refreshBtn) refreshBtn.addEventListener('click', refreshModels);
+  if (newBtn) newBtn.addEventListener('click', openNewGameOverlayFromModelTab);
 
   /** Run toggle: on ⇒ switch to Tools tab, clear precomputed, start background request; off ⇒ cancel in-flight, clear precomputed. */
   const runBtn = document.getElementById('openrouter-run-btn');
@@ -2201,8 +2167,15 @@ function init(): void {
         precomputedAiOrders = null;
         precomputedAiRangedOrders = null;
         precomputedAiStrategy = null;
+        const precomputedCountsForTurn = precomputedToolInvocationCounts;
+        precomputedToolInvocationCounts = null;
         if (readyResult.toolInvocationCounts) {
           for (const [groupId, count] of Object.entries(readyResult.toolInvocationCounts)) {
+            toolInvocationCounts[groupId] = count;
+          }
+          updateOpenRouterToolCountLabels();
+        } else if (usePrecomputed && precomputedCountsForTurn) {
+          for (const [groupId, count] of Object.entries(precomputedCountsForTurn)) {
             toolInvocationCounts[groupId] = count;
           }
           updateOpenRouterToolCountLabels();

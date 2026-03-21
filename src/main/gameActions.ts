@@ -9,17 +9,9 @@ import { getOrderedHexList } from './mapData';
 import { getRange } from './combatConstants';
 import { runRangedPhase, runMeleePhase, createCombatRng, type CombatUnit } from './combatResolution';
 import { logDebug, logError } from './logger';
+import type { MovementOrder, RangedAttackOrder, SubmitOrdersPayload } from '../shared/ipcTypes';
 
-export interface MovementOrder {
-  unitId: string;
-  toH3Index: string;
-}
-
-/** Ranged attack declaration: one target hex per unit per turn. */
-export interface RangedAttackOrder {
-  unitId: string;
-  targetH3Index: string;
-}
+export type { MovementOrder, RangedAttackOrder, SubmitOrdersPayload };
 
 export interface SubmitOrdersResult {
   success: boolean;
@@ -123,12 +115,6 @@ export function validateRangedAttack(
   }
 
   return { valid: true };
-}
-
-/** Payload for submitOrders: movement and optional ranged attacks. Human batch rejected if any order is invalid. */
-export interface SubmitOrdersPayload {
-  movementOrders: MovementOrder[];
-  rangedAttacks?: RangedAttackOrder[];
 }
 
 /**

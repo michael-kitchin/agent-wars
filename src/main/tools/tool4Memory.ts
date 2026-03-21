@@ -1,5 +1,6 @@
 /**
- * MCP Tool 4: Strategic Memory (memory_write, memory_read, memory_delete).
+ * MCP Tool 4: Strategic Memory. The LLM sees only memory_read; writes and deletes are applied from final JSON
+ * memoryUpdates (host calls executeTool4 with memory_write / memory_delete internally).
  * All memory logic lives here: expire, recurring trigger, CRUD with tier limits, and injection text.
  * Uses gameDb (dbRun, dbGetOne, dbGetAll, saveDatabase) for persistence.
  */
@@ -130,7 +131,9 @@ export function getInjectionText(playerId: string, currentTurn: number): string 
   if (storedNotTriggeredSummary) {
     lines.push(storedNotTriggeredSummary);
   }
-  lines.push('Use memory_write to store or update. Use memory_read to retrieve stored memories by key or tag. Use memory_delete to free slots.');
+  lines.push(
+    'Use memory_read to retrieve stored memories by key or tag. To add, update, or remove memories, use "memoryUpdates" in your final JSON (write/delete actions); there are no memory_write or memory_delete tools.'
+  );
   return lines.join('\n');
 }
 
@@ -173,9 +176,6 @@ function write(
 
   const existing = dbGetOne<MemoryRow>('SELECT * FROM ai_memory WHERE player_id = ? AND key = ?', [playerId, key]);
   const counts = countByTier(playerId);
-
-  let targetTier = tier;
-  let oldTier: 'persistent' | 'stored' | null = existing ? (existing.tier as 'persistent' | 'stored') : null;
 
   if (existing) {
     if (existing.tier !== tier) {
@@ -363,18 +363,23 @@ function deleteByKey(
   return { status: 'ok', key, deleted: true };
 }
 
-/** Tool names for Tool 4. Exported so OpenRouter can route memory_write, memory_read, memory_delete to this module. */
-export const TOOL4_NAMES = ['memory_write', 'memory_read', 'memory_delete'] as const;
+/**
+ * API tool names exposed to the LLM for Tool 4. Only memory_read is listed; the host applies memory_write and
+ * memory_delete internally when processing memoryUpdates from the assistant's final JSON.
+ */
+export const TOOL4_NAMES = ['memory_read'] as const;
 
 /**
- * Dispatcher for Tool 4 (Strategic Memory). Same signature as Tools 1–3 for consistency (latLngByH3 and resolveToH3 are unused).
- * Parses args per spec and calls write/read/delete; returns spec-shaped response or error. Use from the OpenRouter tool-calling loop.
+ * Dispatcher for Tool 4 (Strategic Memory). Same signature as Tools 1–3 for consistency (latLngByH3 and resolveToH3 unused).
+ * Handles memory_read for the tool loop; memory_write and memory_delete are for host use when applying memoryUpdates.
  */
 export function executeTool4(
   toolName: string,
   args: unknown,
   state: { turnNumber: number },
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- signature matches other tool executors for OpenRouter dispatch
   _latLngByH3: Map<string, [number, number]>,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _resolveToH3: (lat: number, lng: number) => string | undefined
 ): Record<string, unknown> {
   logDebug('tool4Memory executeTool4', { toolName, stateTurn: state.turnNumber });

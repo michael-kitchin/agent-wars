@@ -15,27 +15,15 @@ import { buildLatLngCoordinateMap } from './mapData';
 import { generateOrdersForStandingOrders } from './tools/tool5StandingOrders';
 import { afterResolution } from './afterResolution';
 import { logError } from './logger';
+import { logHybridPipelineBoundary } from './hybridTurnPipeline';
+import type {
+  GameReadyIpcPayload,
+  RequestAiOrdersResult,
+  RangedAttackOrder,
+} from '../shared/ipcTypes';
+export type { RequestAiOrdersResult } from '../shared/ipcTypes';
 
 const POST_RESOLUTION_CONSULT_TIMEOUT_MS = 120_000;
-
-/** Result shape of requestOrders / game:requestAiOrders (success or error). */
-export type RequestAiOrdersResult =
-  | {
-      success: true;
-      orders: { unitId: string; toH3Index: string }[];
-      rangedAttacks?: { unitId: string; targetH3Index: string }[];
-      strategy?: string;
-      dropped?: number;
-      dropReasons?: string[];
-      toolInvocationCounts?: Record<string, number>;
-      cost?: number;
-      wallClockMs?: number;
-      inputTokens?: number;
-      outputTokens?: number;
-    }
-  | { success: false; error: string };
-
-export type RangedAttackOrder = { unitId: string; targetH3Index: string };
 
 /** Minimal ReadyResult shape returned by handleGameReady. */
 export interface ReadyResultMinimal {
@@ -167,18 +155,13 @@ export interface ReadyDeps {
  * otherwise requests orders from the LLM then resolves the turn.
  */
 export async function handleGameReady(
-  payload:
-    | {
-        enabledToolGroups?: string[];
-        useEventDrivenConsultation?: boolean;
-        precomputedAiOrders?: { unitId: string; toH3Index: string }[];
-        precomputedAiRangedOrders?: RangedAttackOrder[];
-        precomputedAiStrategy?: string;
-      }
-    | undefined,
+  payload: GameReadyIpcPayload | undefined,
   deps: ReadyDeps
 ): Promise<ReadyResultMinimal> {
+  // Milestone 0.7 behavior preserved here: event-driven vs every-turn toggle, precomputation groups, Ready flow,
+  // afterResolution consultation and POST_RESOLUTION_CONSULT_TIMEOUT_MS — unchanged by 1.1 DB/LLM contract work.
   const state = deps.getGameState();
+  logHybridPipelineBoundary('handleGameReady', { turnNumber: state.turnNumber, phase: state.phase });
   const modelId = deps.getSelectedModel();
   const enabledGroupIds =
     payload?.enabledToolGroups && payload.enabledToolGroups.length > 0

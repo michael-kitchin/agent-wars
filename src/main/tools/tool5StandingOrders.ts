@@ -5,7 +5,7 @@
  */
 
 import { cellToLatLng, gridDistance } from 'h3-js';
-import type { GameStateSnapshot } from '../gameDb';
+import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { dbRun, dbGetOne, dbGetAll, saveDatabase } from '../gameDb';
 import { getRange } from '../combatConstants';
 import { executePlanRoute } from './tool1Pathfinding';
@@ -465,7 +465,6 @@ export function generateOrdersForStandingOrders(
 
   const movementOrders: { unitId: string; toH3Index: string }[] = [];
   const rangedAttacks: { unitId: string; targetH3Index: string }[] = [];
-  const hexSet = new Set(state.hexes.map((h) => h.h3Index));
 
   const rows = dbGetAll<StandingOrderRow>(
     'SELECT * FROM standing_orders WHERE player_id = ? ORDER BY unit_id',
@@ -830,10 +829,11 @@ export function getInjectionText(playerId: string, state: GameStateSnapshot): st
   return lines.join('\n');
 }
 
-export const TOOL5_NAMES = ['assign_order', 'query_orders', 'cancel_order'] as const;
+/** Read-only API tool names; assign_order/cancel_order are applied via final JSON orders[] only. */
+export const TOOL5_NAMES = ['query_orders'] as const;
 
 /**
- * Dispatcher for Tool 5: assign_order, query_orders, cancel_order. Same signature as other tools for the OpenRouter loop.
+ * Dispatcher for Tool 5: query_orders for the model; assign_order/cancel_order are still invoked internally when applying final JSON orders[].
  * Returns a spec-shaped object (e.g. status/order/unitId) or { status: 'error', error: string }; exceptions are caught and returned as error.
  */
 export function executeTool5(

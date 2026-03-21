@@ -36,6 +36,9 @@ jobs:
       - name: Run tests
         run: npm run test
 
+      - name: Rebuild better-sqlite3 for Electron (packaging)
+        run: npx electron-rebuild -f -w better-sqlite3
+
       - name: Build (Windows)
         if: runner.os == 'Windows'
         run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --win -c electron-builder.ci.json
@@ -61,5 +64,5 @@ jobs:
       - name: Upload release artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: agent-wars-m0.5-${{ runner.os }}
+          name: agent-wars-1.1.0-${{ runner.os }}
           path: release/

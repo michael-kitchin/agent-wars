@@ -4,7 +4,7 @@
  * Hex count is fixed by k-ring (1 + 3*k*(k+1)); resolution only changes hex size. We use a higher
  * resolution (4) so the same number of hexes covers less area, reducing visible edge distortion when
  * rendered (more like a cartesian plane). k-ring 9 yields 271 hexes (small map). Changing H3 resolution
- * or k-ring requires deleting the DB file (see gameDb userData path) to get the new map.
+ * or k-ring requires removing the baseline DB file (`game-baseline-v1.sqlite` under Electron userData) to get the new map.
  */
 
 import { latLngToCell, gridDiskDistances, cellToLatLng } from 'h3-js';

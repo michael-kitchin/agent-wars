@@ -8,7 +8,7 @@ import { executeTool4 } from './tool4Memory';
 
 const emptyState = { turnNumber: 1 };
 const emptyMap = new Map<string, [number, number]>();
-const noopResolve = (_lat: number, _lng: number): string | undefined => undefined;
+const noopResolve = (): string | undefined => undefined;
 
 function testMemoryDeleteMissingKey(): void {
   const result = executeTool4(

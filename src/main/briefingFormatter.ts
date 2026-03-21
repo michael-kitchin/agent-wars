@@ -7,6 +7,7 @@
 import type { GameStateSnapshot } from './gameDb';
 import type { PrecomputationResult, UnitAssessmentResult, CombatEstimateEntry } from './precomputation';
 import type { CallbackSubscription } from './callbackSubscriptions';
+import { cellToLatLng } from 'h3-js';
 import { LATLNG_DECIMAL_PLACES } from './mapData';
 
 /** Standing order statuses that require immediate attention (match tool5 WARNING_STATUSES). */
@@ -21,6 +22,35 @@ const WARNING_STATUSES = new Set([
 
 function formatPos(ll: [number, number]): string {
   return `[${ll[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${ll[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
+}
+
+/**
+ * Converts territory_changed hex params to non-H3 prompt text. If the id maps to a known game hex,
+ * emits its [lat, lng] display; otherwise uses a generic label to avoid leaking raw spatial IDs.
+ */
+function formatTerritoryTarget(hexId: string, latLngByH3: Map<string, [number, number]>): string {
+  const ll = latLngByH3.get(hexId);
+  return ll ? formatPos(ll) : 'specified territory';
+}
+
+function sanitizeCallbackParamsForPrompt(
+  params: unknown,
+  latLngByH3: Map<string, [number, number]>
+): unknown {
+  if (typeof params === 'string') {
+    return latLngByH3.has(params) ? formatTerritoryTarget(params, latLngByH3) : params;
+  }
+  if (Array.isArray(params)) {
+    return params.map((x) => sanitizeCallbackParamsForPrompt(x, latLngByH3));
+  }
+  if (params && typeof params === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(params as Record<string, unknown>)) {
+      out[k] = sanitizeCallbackParamsForPrompt(v, latLngByH3);
+    }
+    return out;
+  }
+  return params;
 }
 
 /**
@@ -142,15 +172,11 @@ function buildUnitStatusTable(unitAssessments: UnitAssessmentResult[]): string {
 /**
  * Builds Section 2 Table 2: combat estimates (matchup, assessment, P(eliminate), P(lose unit), note).
  */
-function buildCombatEstimatesTable(
-  combatEstimates: CombatEstimateEntry[],
-  state: GameStateSnapshot
-): string {
+function buildCombatEstimatesTable(combatEstimates: CombatEstimateEntry[]): string {
   const header =
     '| Matchup | Assessment | P(eliminate) | P(lose unit) | Note |';
   const sep = '|---------|------------|--------------|--------------|------|';
   const rows = combatEstimates.map((ce) => {
-    const humanUnit = state.units.find((u) => u.id === ce.enemyUnitId);
     const posStr = formatPos(ce.targetHex);
     const matchup = `${ce.aiUnitId} vs ${ce.enemyUnitId} @ ${posStr}`;
     const note = (ce.note ?? '').slice(0, 80);
@@ -188,7 +214,7 @@ function buildAttentionFlags(unitAssessments: UnitAssessmentResult[]): string {
 /**
  * Returns a short human-readable line for one callback subscription (e.g. "turns(3) → fires turn 14").
  */
-function formatCallbackLine(sub: CallbackSubscription, currentTurn: number): string {
+function formatCallbackLine(sub: CallbackSubscription, latLngByH3: Map<string, [number, number]>): string {
   const n = sub.params?.n as number | undefined;
   if (sub.event === 'turns' && typeof n === 'number' && sub.subscribedTurn != null) {
     return `turns(${n}) → fires turn ${sub.subscribedTurn + n}`;
@@ -204,19 +230,23 @@ function formatCallbackLine(sub: CallbackSubscription, currentTurn: number): str
   }
   if (sub.event === 'territory_changed') {
     const hexId = sub.params?.hexId != null ? String(sub.params.hexId) : '';
-    return hexId ? `territory_changed(${hexId})` : 'territory_changed';
+    return hexId ? `territory_changed(${formatTerritoryTarget(hexId, latLngByH3)})` : 'territory_changed';
   }
-  return `${sub.event}(${JSON.stringify(sub.params ?? {})})`;
+  const sanitizedParams = sanitizeCallbackParamsForPrompt(sub.params ?? {}, latLngByH3);
+  return `${sub.event}(${JSON.stringify(sanitizedParams)})`;
 }
 
 /**
  * Builds the ACTIVE CALLBACKS section: one line per subscription or "None. You may add callbacks...".
  */
-function buildActiveCallbacksSection(subscriptions: CallbackSubscription[], currentTurn: number): string {
+function buildActiveCallbacksSection(
+  subscriptions: CallbackSubscription[],
+  latLngByH3: Map<string, [number, number]>
+): string {
   if (subscriptions.length === 0) {
     return 'None. You may add callbacks in your response JSON to be consulted on specific events.';
   }
-  return subscriptions.map((s) => `- ${formatCallbackLine(s, currentTurn)}`).join('\n');
+  return subscriptions.map((s) => `- ${formatCallbackLine(s, latLngByH3)}`).join('\n');
 }
 
 /**
@@ -230,13 +260,18 @@ export function formatBriefing(
   memoryText: string,
   subscriptions?: CallbackSubscription[]
 ): string {
+  const latLngByH3 = new Map<string, [number, number]>();
+  for (const hx of state.hexes) {
+    const [lat, lng] = cellToLatLng(hx.h3Index);
+    latLngByH3.set(hx.h3Index, [lat, lng]);
+  }
   const sections: string[] = [];
   sections.push(`=== COMMANDER'S BRIEFING (Turn ${state.turnNumber}) ===\n`);
   sections.push(buildStrategicNarrative(state, precomputed.unitAssessments));
   sections.push('\n\n**Unit status and threats**\n');
   sections.push(buildUnitStatusTable(precomputed.unitAssessments));
   sections.push('\n\n**Combat estimates (likely engagements)**\n');
-  sections.push(buildCombatEstimatesTable(precomputed.combatEstimates, state));
+  sections.push(buildCombatEstimatesTable(precomputed.combatEstimates));
   sections.push('\n\n**Attention flags**\n');
   sections.push(buildAttentionFlags(precomputed.unitAssessments));
   const hasStrategicMemoryHeader = (memoryText ?? '').includes('=== YOUR STRATEGIC MEMORY');
@@ -249,6 +284,6 @@ export function formatBriefing(
   sections.push('\n\n');
   sections.push(standingOrderText || '');
   sections.push('\n\n**ACTIVE CALLBACKS**\n');
-  sections.push(buildActiveCallbacksSection(subscriptions ?? [], state.turnNumber));
+  sections.push(buildActiveCallbacksSection(subscriptions ?? [], latLngByH3));
   return sections.join('');
 }

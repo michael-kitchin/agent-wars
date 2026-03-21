@@ -6,13 +6,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { app, safeStorage } from 'electron';
-import { gridDistance } from 'h3-js';
+import { cellToLatLng, gridDistance } from 'h3-js';
 import { getAttack, getDefense, getRange } from './combatConstants';
 import { logDebug, logError, logTrace } from './logger';
 import type { GameStateSnapshot } from './gameDb';
 import { setAiToolLimitExceededLastTurn, getAndClearAiToolLimitExceededLastTurn } from './gameDb';
 import { buildLatLngCoordinateMap, LATLNG_DECIMAL_PLACES } from './mapData';
-import { executeTool1, TOOL1_NAMES } from './tools/tool1Pathfinding';
+import { executeTool1, TOOL1_NAMES, type LatLng } from './tools/tool1Pathfinding';
 import { executeTool2, TOOL2_NAMES } from './tools/tool2Assessment';
 import { executeTool3, TOOL3_NAMES } from './tools/tool3CombatEstimation';
 import { executeTool4, getInjectionText, TOOL4_NAMES } from './tools/tool4Memory';
@@ -348,16 +348,16 @@ function validateAiRangedOrder(
 /** Preamble for [lat, lng] coordinates: use only positions from the lists; distances in hexes are given where needed. */
 const LATLNG_PREAMBLE = `Positions use [lat, lng] coordinates (latitude, longitude; floating point is fine). Use only coordinates from the unit and target lists below; do not invent coordinates. Hex distances are given in the prompt where relevant.
 
-Response format: Reply with movementOrders and rangedAttacks using toXY and targetXY. Each is an array of two numbers [lat, lng]. Do not use toH3Index, targetH3Index, or any hex/string IDs.`;
+Final JSON uses an "orders" array (see submit instruction below). Geographic targets use [lat, lng] only. Follow/pursue standing orders use enemy unit id strings only (targetUnitId). Never use raw H3 cell IDs or hex index strings.`;
 
 /** Formats [lat, lng] for the prompt using LATLNG_DECIMAL_PLACES to save tokens and match resolveToH3. */
 function formatLatLng(ll: [number, number]): string {
   return `[${ll[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${ll[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
 }
 
-/** Optional suffix for movement instruction when Memory tools are enabled. */
+/** Optional suffix when Memory is enabled: persistent strategy belongs in memoryUpdates in final JSON. */
 const MOVEMENT_INSTRUCTION_MEMORY_SUFFIX =
-  ' Use memory_write to record your strategy each turn so you can build on it next turn.';
+  ' Include a memoryUpdates entry (e.g. write key "strategy" tier "persistent") in your final JSON to record your plan.';
 
 /**
  * Builds the "HOW TO USE TOOLS" guidance block, conditional on which tool groups are enabled.
@@ -377,12 +377,12 @@ function buildToolUsageGuidance(flags: ToolFlags, hasPrecomputedBriefing = false
     }
     if (flags.ordersEnabled) {
       lines.push(
-        '- Use standing orders: for every unit listed as "Units without standing orders" in the briefing above, call `assign_order` (march/pursue for closing over multiple turns; defend when you want them to hold). Then use plan_route + movementOrders only for the units that truly need an explicit toXY this turn.'
+        '- Standing orders: for every unit listed as "Units without standing orders" in the briefing, add an orders[] entry with action assign_order (march/pursue for closing; defend to hold). Then use plan_route and explicit_move in orders[] only where you need a one-step move this turn.'
       );
     }
     if (flags.memoryEnabled) {
       lines.push(
-        '- Use memory_write to store concise plan intent (target assignments, ETA assumptions, and route constraints) so next turn can continue without re-deriving context.'
+        '- Put concise plan intent in the final JSON memoryUpdates (write) instead of ad-hoc memory_write tool calls.'
       );
     }
   } else {
@@ -400,20 +400,20 @@ function buildToolUsageGuidance(flags: ToolFlags, hasPrecomputedBriefing = false
     }
   }
   if (flags.memoryEnabled) {
-    lines.push('- memory_write tiers: "persistent" entries appear in every briefing (limit 5, for active plans); "stored" entries are retrieved on demand via memory_read (limit 15, for details and observations).');
+    lines.push(
+      '- memoryUpdates / tiers: "persistent" entries appear in every briefing (limit 5); "stored" are retrieved via memory_read (limit 15).'
+    );
   }
   if (flags.ordersEnabled) {
     lines.push('- Units with standing orders do not need explicit orders from you unless you want to override their current mission this turn.');
     if (flags.planningEnabled && !hasPrecomputedBriefing) {
-      lines.push('- For units several turns from combat, assign a march or pursue standing order instead of re-planning their route every turn. This saves tool calls and prevents changing targets between turns.');
+      lines.push('- For units several turns from combat, use assign_order (march/pursue) in final JSON instead of re-planning every turn.');
     }
   }
   if (flags.memoryEnabled) {
     lines.push(
-      '- BEFORE submitting your final orders: use memory_write(key: "strategy", tier: "persistent") to record your current strategic plan.' +
-      ' Good content: specific unit-to-target assignments with ETAs (e.g. "armor-1/2 → human-armor-1, ETA 1 turn; infantry marching, ETA 4 turns"), priority decisions, and key observations (e.g. "naval-1 stuck in disconnected water body — stop retrying route").' +
-      ' Do NOT store enemy positions or unit rosters — these are already in every briefing and go stale immediately.' +
-      ' Keep it concise and actionable; vague summaries like "all units moving toward enemies" waste the slot.'
+      '- BEFORE finishing: include memoryUpdates write key "strategy" tier "persistent" with specific unit-to-target ETAs and priorities.' +
+      ' Do NOT store enemy positions or rosters (already in the briefing). Keep it concise.'
     );
   }
   if (lines.length === 0) return '';
@@ -450,26 +450,24 @@ function buildAdjacentCellsFallbackBlock(
 function getMovementOrderInstruction(flags: ToolFlags): string {
   const memorySuffix = flags.memoryEnabled ? MOVEMENT_INSTRUCTION_MEMORY_SUFFIX : '';
   if (flags.planningEnabled) {
-    return ' For each movement order: use the exact orderToXY from that unit\'s plan_route result as toXY (copy the two numbers exactly); do not round, interpolate, or invent coordinates or the order will be rejected.';
+    return ' For each explicit_move entry: set "destination" to the exact orderToXY from that unit\'s plan_route result [lat,lng] (copy the two numbers exactly).';
   }
   if (flags.ordersEnabled) {
     return (
-      ' You do not have movement planning tools. Without them you cannot compute valid one-step moves (each unit has a strict movement budget per turn). You must submit empty movementOrders: [] and empty rangedAttacks: []. Do not put distant coordinates (e.g. enemy positions) in movementOrders - they will all be rejected. Use the tools above to assign standing orders (e.g. march, defend, pursue) so your units receive movement on future turns.' +
+      ' You have no movement planning tools: you cannot compute valid one-step explicit_move destinations yourself. Use assign_order in orders[] for standing missions; leave explicit_move / explicit_attack out unless you can copy valid [lat,lng] from the briefing only.' +
       memorySuffix
     );
   }
   if (flags.fallbackMovementEnabled) {
-    const memoryHint = flags.memoryEnabled
-      ? ' After your analysis, use memory_write to record your strategy before submitting orders. '
-      : '';
+    const memoryHint = flags.memoryEnabled ? ' After your analysis, add memoryUpdates in final JSON if needed. ' : '';
     return (
       memoryHint +
-      'You do not have planning or standing-orders tools. You may still issue one-step moves using the "Adjacent cells (fallback)" list below: for each unit, set toXY to that unit\'s current position (hold) or to one of its listed adjacent cells. This is a fallback; when plan_route or standing orders are available, prefer those. Use only coordinates from that list - do not invent coordinates or orders will be rejected.' +
+      'Without planning/standing-order tools, use explicit_move with "destination" [lat,lng] only from the "Adjacent cells (fallback)" list (current cell = hold, or an adjacent listed cell).' +
       memorySuffix
     );
   }
   return (
-    ' You do not have movement planning tools. Without them you cannot compute valid one-step moves (each unit has a strict movement budget per turn). You must submit empty movementOrders: [] and empty rangedAttacks: []. Do not put distant coordinates (e.g. enemy positions) in movementOrders - they will all be rejected.' +
+    ' You have no movement planning tools: submit orders[] without explicit_move unless coordinates are trivially valid from the briefing.' +
     memorySuffix
   );
 }
@@ -479,54 +477,52 @@ function getMovementOrderInstruction(flags: ToolFlags): string {
  * When hasPrecomputedBriefing is true, encourages using the briefing and minimal tool calls.
  */
 function getInitialUserMessage(flags: ToolFlags, hasPrecomputedBriefing = false): string {
+  const jsonOptionalTail = flags.memoryEnabled
+    ? ', optional "callbacks", optional "memoryUpdates"'
+    : ', optional "callbacks"';
   if (flags.planningEnabled) {
     const memoryNote = flags.memoryEnabled
-      ? ' After your analysis, use memory_write to record your strategy and key observations before submitting orders. '
+      ? ' After your analysis, include memoryUpdates in your final JSON for strategy notes. '
       : '';
     if (hasPrecomputedBriefing) {
       const ordersNudge = flags.ordersEnabled
-        ? ' For every unit listed as "Units without standing orders" in the briefing above, call assign_order once this turn (march/pursue for multi-turn closing; defend/hold when you want them to stay put). Then use plan_route + movementOrders for explicit toXY this turn only where needed. '
+        ? ' For units without standing orders in the briefing, include assign_order entries in orders[]. Then use plan_route and explicit_move only where needed this turn. '
         : '';
-      return `Use the COMMANDER'S BRIEFING above for unit status and combat info.${ordersNudge}Call plan_route only for each unit that needs a move this turn (to get orderToXY).${memoryNote} Then submit your final orders as a single JSON object: { "strategy": "...", "movementOrders": [...], "rangedAttacks": [...] }. For each movement order, set toXY to the exact orderToXY from that unit's plan_route result (copy the numbers exactly).`;
+      return `Use the COMMANDER'S BRIEFING above for unit status and combat info.${ordersNudge}Call plan_route for each unit that needs a move (orderToXY).${memoryNote} Then submit final JSON with "strategy", "orders" (assign_order / explicit_move / explicit_attack / cancel_order as needed)${jsonOptionalTail}.`;
     }
-    return `Use the tools as needed to plan movement.${memoryNote} Then submit your final orders as a single JSON object: { "strategy": "...", "movementOrders": [...], "rangedAttacks": [...] }. For each movement order, set toXY to the exact orderToXY from that unit's plan_route result (copy the numbers exactly).`;
+    return `Use the tools as needed to plan movement.${memoryNote} Then submit final JSON with "strategy", "orders"${jsonOptionalTail}.`;
   }
 
-  const submitEmpty = ` Then submit your final JSON with "strategy": "<one-line>", "movementOrders": [], "rangedAttacks": [].`;
+  const submitEmpty = ` Then submit final JSON with "strategy": "<one-line>", "orders": [].`;
   if (flags.ordersEnabled && flags.memoryEnabled) {
-    return `You have no movement planning tools, so you cannot issue movement or ranged orders this turn. Use the available tools to assign standing orders (e.g. march toward an enemy, defend a hex). Before submitting, use memory_write to record your strategy and any key observations.${submitEmpty}`;
+    return `You have no movement planning tools: use assign_order in orders[] and memoryUpdates for notes.${submitEmpty}`;
   }
   if (flags.ordersEnabled) {
-    return `You have no movement planning tools, so you cannot issue movement or ranged orders this turn. Use the available tools to assign standing orders (e.g. march toward an enemy, defend a hex) so your units will move on future turns.${submitEmpty}`;
+    return `You have no movement planning tools: use assign_order in orders[] for future turns.${submitEmpty}`;
   }
   if (flags.fallbackMovementEnabled) {
-    const memoryNudge = flags.memoryEnabled
-      ? ' After your analysis, use memory_write to record your strategy and observations before submitting orders. '
-      : '';
-    return `${memoryNudge}You may issue one-step moves using the "Adjacent cells (fallback)" list in the system prompt. Submit your final JSON with "strategy": "<one-line>", "movementOrders": [...] (use only coordinates from that list), "rangedAttacks": [...] as appropriate.`;
+    const memoryNudge = flags.memoryEnabled ? ' Include memoryUpdates if needed. ' : '';
+    return `${memoryNudge}Use explicit_move from the Adjacent cells list only. Submit JSON with "strategy", "orders"${jsonOptionalTail}.`;
   }
   if (flags.memoryEnabled) {
-    return `You have no movement planning tools, so you cannot issue movement or ranged orders this turn. Use memory_write to record your strategic plan and any key observations.${submitEmpty}`;
+    return `You have no movement planning tools. Use memoryUpdates in final JSON.${submitEmpty}`;
   }
 
-  return `You have no movement planning tools. Submit a JSON object with "strategy": "<one-line>", "movementOrders": [], "rangedAttacks": [].`;
+  return `You have no movement planning tools. Submit JSON with "strategy", "orders": [].`;
 }
 
 /**
- * Builds the system prompt for the tool-calling flow: unit roster, combat summary, and tool descriptions.
- * When enabledToolNames is provided, the "AVAILABLE TOOLS" section includes only those tools (numbered 1..N).
- * When omitted, all tools are included. Injects a one-time warning if the previous turn exceeded the tool-call limit.
+ * Builds the system prompt for the tool-calling LLM: roster, combat summary, and tool descriptions.
+ * When enabledToolNames is provided, "AVAILABLE TOOLS" lists only those tools (numbered 1..N); when omitted, all tools.
+ * Injects a one-time warning if the previous turn exceeded the tool-call limit.
+ * When briefingOverride is set (pre-computation path), it replaces the usual memory + standing-order + roster block
+ * with the Commander's Briefing; combat rules, tools section, and submit instruction stay the same.
  *
  * Prompt conditionals (single source: getToolFlags):
  * - Planning enabled → use plan_route orderToXY for movement.
- * - Orders enabled, Planning disabled → submit empty movementOrders; use standing orders for future moves.
+ * - Orders enabled, Planning disabled → prefer assign_order in orders[]; avoid invalid explicit_move without valid [lat,lng].
  * - Fallback (neither Planning nor Orders) → show adjacent-cells list; model may issue one-step moves from that list.
  * - Combat hints (naval plan, assess, estimate) and memory/standing-order blocks depend on their respective flags.
- */
-/**
- * Builds the system prompt for the tool-calling LLM. When briefingOverride is provided (0.6 pre-computation path),
- * it replaces the usual memory + standing-order + roster block with the Commander's Briefing; combat rules,
- * tools section, and submit instruction are unchanged. When absent, behavior matches 0.5.
  */
 function buildSystemPromptForTools(
   state: GameStateSnapshot,
@@ -571,11 +567,9 @@ function buildSystemPromptForTools(
   const hasPrecomputedBriefing = briefingOverride != null && briefingOverride.length > 0;
   const toolsIntro = toolsIntroPurpose
     ? hasPrecomputedBriefing
-      ? 'Use the COMMANDER\'S BRIEFING above for assessments and combat estimates; use these tools only when you need plan_route (exact orderToXY), memory, or standing orders.'
+      ? 'Use the COMMANDER\'S BRIEFING above for assessments and combat estimates; use these tools only when you need plan_route (exact orderToXY), memory_read, or query_orders.'
       : `Use these tools to ${toolsIntroPurpose} before submitting orders. You may use multiple rounds of tool calls and mix tool types if that helps.` +
-        (flags.memoryEnabled
-          ? ' Memory is available: use memory_write to record your strategy and observations before submitting orders each turn.'
-          : '')
+        (flags.memoryEnabled ? ' Memory: use memory_read as needed; persist notes via memoryUpdates in your final JSON.' : '')
     : 'Use only the tools listed below. Do not call tools that are not in the list.';
   const toolGuidance = buildToolUsageGuidance(flags, hasPrecomputedBriefing);
   const toolsSection =
@@ -591,20 +585,23 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
   const hasNaval = opponentUnits.some((u) => u.unitType === 'naval');
   const hasRanged = opponentUnits.some((u) => getRange(u.unitType as 'infantry' | 'armor' | 'naval') >= 1);
 
-  const combatTargetHint = flags.estimationEnabled ? ' (e.g. use estimate_combat to pick the best).' : '.';
+  const combatTargetHint = flags.estimationEnabled ? ' (e.g. use estimate_combat to pick the best)' : '';
   const navalCoaching = hasNaval
-    ? ` Naval units can attack land units at 1 or 2 hexes (range 2). Always add a rangedAttack when a naval unit is within 2 hexes of an enemy land or naval unit at the start of the turn. To use naval fire effectively, get your naval units close to enemy land units, then issue rangedAttacks each turn. Naval units move only on water.${flags.planningEnabled ? ' To move a naval unit toward a land target, call plan_route with that land unit\'s position as the destination; the tool will route to the nearest water hex to that position.' : ''}`
+    ? ` Naval units can attack land units at 1 or 2 hexes (range 2). Add explicit_attack when a naval unit is within 2 hexes of an enemy at turn start. Naval units move only on water.${flags.planningEnabled ? ' To move a naval unit toward a land target, call plan_route with that land unit\'s [lat,lng] as the destination.' : ''}`
     : '';
   const combatAssessHint = flags.assessmentEnabled && hasRanged
-    ? ' When assess_unit reports canAttackThisTurn with attackType "ranged" for an enemy, issue a rangedAttack using that enemy\'s position as targetXY so your unit fires this turn.' +
-      (hasNaval ? ' If assess_unit shows a naval unit with inRangedRange: true for an enemy (including land units at 2 hexes), add a rangedAttack for that naval unit targeting that enemy.' : '') +
-      ' Note: inEnemyRangedRange means that enemy can fire at YOUR unit from its current position (you are in danger); inRangedRange means YOUR unit can fire at that enemy.'
+    ? ' When assess_unit reports canAttackThisTurn with attackType "ranged" for an enemy, add explicit_attack with targetHex as that enemy\'s [lat,lng] (or unit id).' +
+      (hasNaval ? ' Naval inRangedRange: add explicit_attack for that naval unit.' : '') +
+      ' Note: inEnemyRangedRange = enemy can fire at you; inRangedRange = you can fire at them.'
     : '';
 
   const adjacentCellsBlock = flags.fallbackMovementEnabled
     ? buildAdjacentCellsFallbackBlock(state, opponentUnits, coordMap)
     : '';
   const movementOrderInstruction = getMovementOrderInstruction(flags);
+  const submitMemoryClause = flags.memoryEnabled
+    ? ' Use optional "memoryUpdates" for memory writes/deletes (applied from JSON only; there are no memory_write or memory_delete tools).'
+    : ' When Memory tools are not listed above, omit "memoryUpdates" or use []; any entries are ignored.';
 
   const mainBlock = briefingOverride != null && briefingOverride.length > 0
     ? `${briefingOverride}\n\n${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\nHuman units: ${humanRoster || 'none'}`
@@ -614,11 +611,11 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
 
 ${LATLNG_PREAMBLE}
 
-Combat: each unit rolls d6 when attacking (hit if roll <= attack) or when defending (hit if roll <= defender's defense). Unit stats: ${combatSummary}. Ranged attacks can target any enemy hex within range regardless of terrain (e.g. armor on land can fire at naval on adjacent water, and vice versa). Ranged attacks are resolved using each unit's current position (before movement). Only issue a ranged attack if that unit is already within range of the target hex at the start of this turn; do not assume movement happens first. If a unit is moving this turn and would only be in range after the move, do not add a ranged attack for it this turn (it can fire next turn from its new position). Each unit may declare at most one ranged attack per turn: include each attacking unit at most once in rangedAttacks; if a unit can attack multiple enemies, choose one target${combatTargetHint} For rangedAttacks targetXY, always use the enemy's position from the "Human units" list above — never use orderToXY or plan_route coordinates, which are your own movement destinations. Before you output each rangedAttacks entry, apply this legality checklist and omit the entry if any check fails: (1) attacker exists in "Your units" and is opponent-owned, (2) attacker unit type has range >= 1, (3) targetXY exactly matches a current enemy position from "Human units", (4) attacker-to-target hex distance is <= attacker range from the unit stats above. If the COMMANDER'S BRIEFING is present, only include ranged attacks for attacker-target pairs that the briefing explicitly indicates are in range this turn; if uncertain, omit the ranged attack. Do not "guess and let the engine validate"; self-filter invalid ranged attacks first.${navalCoaching}${combatAssessHint}
+Combat: each unit rolls d6 when attacking (hit if roll <= attack) or when defending (hit if roll <= defender's defense). Unit stats: ${combatSummary}. Ranged attacks use each unit's current position (before movement). Only add explicit_attack if already in range at turn start from that START position (before any explicit_move). At most one explicit_attack per unit per turn (duplicate unitIds dropped). targetHex must be enemy [lat,lng] from "Human units" or the enemy unit id string — never your own movement destination${combatTargetHint}. Self-filter illegal explicit_attack entries before submitting.${navalCoaching}${combatAssessHint}
 
 ${mainBlock}
 
-Submit your final orders as a JSON object only (valid JSON, no comments): { "strategy": "<one-line explanation>", "movementOrders": [ { "unitId": "<id>", "toXY": [lat, lng] }, ... ], "rangedAttacks": [ { "unitId": "<id>", "targetXY": [lat, lng] }, ... ] }. Use only toXY and targetXY as [lat, lng] arrays. Include "strategy".${movementOrderInstruction} In rangedAttacks, list each unit at most once (one ranged attack per unit per turn); duplicate unitIds are dropped. Include a "callbacks" array in your final JSON to plan when you should be consulted again. Treat callbacks as your re-consultation plan for the next turns, not as optional flavor text. Prefer specific triggers aligned to your plan: turns(N) for periodic refresh, unit_engaged/unit_destroyed for combat pivots, unit_arrived for timing-sensitive moves, threat_escalation for risk spikes. Only omit callbacks when the game is effectively decided or no further opponent decisions are needed. You may include an optional "memoryUpdates" array (write/delete) in the same JSON instead of or in addition to calling memory tools.`;
+Submit your final JSON only (valid JSON, no comments): { "strategy": "<one-line>", "orders": [ ... ], "callbacks": [...]${flags.memoryEnabled ? ', "memoryUpdates": [...]' : ''} }. Strict schema: top-level must be a JSON object with "strategy" (string) and "orders" (array); do not return a top-level array. The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: assign_order (include "order": { "type": "defend"|"march"|"pursue"|"patrol"|"hold_fire", ... } — pursue uses targetUnitId string for the enemy only; march/patrol/defend use [lat,lng] where a place is required), cancel_order, explicit_move (include "destination": [lat,lng] for this turn's move), explicit_attack (include "targetHex": [lat,lng] OR enemy unit id string). Do not use top-level movementOrders or rangedAttacks (legacy).${movementOrderInstruction} Include optional "callbacks" for re-consultation planning.${submitMemoryClause}`;
 }
 
 export interface RequestOrdersResult {
@@ -677,7 +674,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
       },
       required: ['unitId', 'destination'],
     },
-    promptLine: 'plan_route(unitId, destination, options?) - Compute the optimal path for a unit to a destination hex. Returns multi-turn route and orderToXY: the exact [lat, lng] for this turn\'s movement order (copy this into toXY for that unit). For naval units, you may pass a land unit\'s [lat, lng] as destination; the route will be to the nearest water hex to that position so the naval can get in range.',
+    promptLine: 'plan_route(unitId, destination, options?) - Compute the optimal path for a unit to a destination hex. Returns multi-turn route and orderToXY: the exact [lat, lng] for this turn\'s movement order (copy this into explicit_move.destination for that unit). For naval units, you may pass a land unit\'s [lat, lng] as destination; the route will be to the nearest water hex to that position so the naval can get in range.',
   },
   {
     name: 'check_distance',
@@ -757,35 +754,6 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
     promptLine: 'estimate_combat(engagementType, attackers, targetHex, defenders?) - Predict the outcome of a ranged or melee engagement. Returns win probability, expected casualties, and a tactical assessment. Always check before committing to an attack.',
   },
   {
-    name: 'memory_write',
-    description: 'Store a note, plan, or reminder. Two tiers: persistent (always in your briefing, limit 5) and stored (retrieved on demand, limit 15). 500 chars each.',
-    parameters: {
-      type: 'object',
-      properties: {
-        key: { type: 'string', description: 'Unique identifier (e.g. southern_front_plan)' },
-        content: { type: 'string', description: 'Text to remember (max 500 characters)' },
-        tier: { type: 'string', enum: ['persistent', 'stored'], description: 'Default: stored' },
-        options: {
-          type: 'object',
-          properties: {
-            expiresOnTurn: { type: 'number', description: 'Auto-delete after this turn' },
-            recurring: {
-              type: 'object',
-              properties: {
-                intervalTurns: { type: 'number', description: 'Remind every N turns' },
-                nextTurn: { type: 'number', description: 'First turn to trigger (default: current + interval)' },
-              },
-              required: ['intervalTurns'],
-            },
-            tags: { type: 'array', items: { type: 'string' }, description: 'Tags for retrieval (e.g. threat, south)' },
-          },
-        },
-      },
-      required: ['key', 'content'],
-    },
-    promptLine: 'memory_write(key, content, tier?, options?) - Store or update a memory. Use tier "persistent" for active plan (limit 5), "stored" for details (limit 15).',
-  },
-  {
     name: 'memory_read',
     description: 'Retrieve memories by key, tag, or tier. Use to access stored-tier memories.',
     parameters: {
@@ -800,46 +768,6 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
     promptLine: 'memory_read(key?, tags?, tier?, all?) - Retrieve memories by key, tag, or tier.',
   },
   {
-    name: 'memory_delete',
-    description: 'Delete a memory to free a slot in its tier.',
-    parameters: {
-      type: 'object',
-      properties: {
-        key: { type: 'string', description: 'Key of the memory to delete' },
-      },
-      required: ['key'],
-    },
-    promptLine: 'memory_delete(key) - Delete a memory to free a slot.',
-  },
-  {
-    name: 'assign_order',
-    description:
-      'Give a unit a persistent mission: defend, march, pursue, patrol, or hold_fire. The engine executes it each turn automatically. NOTE: New standing orders take effect NEXT turn. If you want the unit to act THIS turn, also issue an explicit movement or attack order.',
-    parameters: {
-      type: 'object',
-      properties: {
-        unitId: { type: 'string', description: 'ID of the unit (e.g. opponent-armor-1)' },
-        order: {
-          type: 'object',
-          properties: {
-            type: { type: 'string', enum: ['defend', 'march', 'pursue', 'patrol', 'hold_fire'], description: 'Order type' },
-            defendHex: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Hex to hold (defend)' },
-            engageRange: { type: 'number', description: 'Max hex distance to engage (defend)' },
-            destination: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Destination [lat, lng] (march)' },
-            avoidEnemies: { type: 'boolean', description: 'Route around enemies (march, default true)' },
-            engageEnRoute: { type: 'boolean', description: 'Attack enemies adjacent to route (march)' },
-            targetUnitId: { type: 'string', description: 'Enemy unit to chase (pursue)' },
-            maxDistance: { type: 'number', description: 'Max hex distance from order origin (pursue)' },
-            waypoints: { type: 'array', items: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 }, description: 'Cycle through these hexes (patrol, min 2)' },
-          },
-          required: ['type'],
-        },
-      },
-      required: ['unitId', 'order'],
-    },
-    promptLine: 'assign_order(unitId, order) - Give a unit a persistent mission: defend, march, pursue, patrol, or hold_fire. New standing orders take effect NEXT turn; issue an explicit order too if you want action this turn.',
-  },
-  {
     name: 'query_orders',
     description: 'Check standing order statuses for a unit or all units.',
     parameters: {
@@ -850,18 +778,6 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
       },
     },
     promptLine: 'query_orders(unitId?, all?) - Check standing order statuses.',
-  },
-  {
-    name: 'cancel_order',
-    description: 'Cancel a unit\'s standing order.',
-    parameters: {
-      type: 'object',
-      properties: {
-        unitId: { type: 'string', description: 'Unit whose standing order to cancel' },
-      },
-      required: ['unitId'],
-    },
-    promptLine: 'cancel_order(unitId) - Cancel a standing order.',
   },
 ];
 
@@ -909,7 +825,7 @@ export interface RequestOrdersOptions {
 /**
  * Requests movement orders from the LLM for the opponent. Uses the tool-calling loop:
  * send prompt and tool definitions; if the model returns tool_calls, execute tools locally,
- * append results, and resend until the model returns final order JSON or the iteration limit (10) is reached.
+ * append results, and resend until the model returns final order JSON or the iteration limit (50) is reached.
  * When options.enabledToolNames is provided, only those tools are sent and executed; disabled tool calls are skipped and not counted.
  * Validates and drops invalid orders. Never logs the API key.
  */
@@ -963,7 +879,9 @@ export async function requestOrders(
     latLngByH3,
     format: (h3: string) => {
       const ll = latLngByH3.get(h3);
-      return ll ? formatLatLng(ll) : h3;
+      if (ll) return formatLatLng(ll);
+      const [lat, lng] = cellToLatLng(h3);
+      return formatLatLng([lat, lng]);
     },
   };
 
@@ -972,10 +890,6 @@ export async function requestOrders(
     enabledToolNames === undefined
       ? new Set(TOOL_GROUP_REGISTRY.flatMap((g) => [...g.toolNames]))
       : new Set(enabledToolNames);
-  const { movementOrders: standingOrderMovement, rangedAttacks: standingOrderRanged } = flags.ordersEnabled
-    ? generateOrdersForStandingOrders('opponent', state, latLngByH3, resolveToH3)
-    : { movementOrders: [] as { unitId: string; toH3Index: string }[], rangedAttacks: [] as { unitId: string; targetH3Index: string }[] };
-
   if (flags.ordersEnabled && !flags.planningEnabled) {
     logDebug(
       'openRouter requestOrders: Orders enabled but Planning disabled; AI may be unable to produce movement orders. Enable Planning alongside Orders.'
@@ -1138,7 +1052,7 @@ export async function requestOrders(
       }
 
       logDebug('openRouter requestOrders: assistant response (final)', content);
-      let parsed = parseOrdersResponse(content, resolveToH3);
+      let parsed = parseOrdersResponse(content, resolveToH3, state, latLngByH3);
       if (!parsed) {
         if (!parseRepairAttempted) {
           parseRepairAttempted = true;
@@ -1149,7 +1063,7 @@ export async function requestOrders(
             {
               role: 'user',
               content:
-                'Your previous response was not parseable JSON. Reply now with JSON only (no prose, no markdown, no code fences) using exactly this schema: {"strategy":"...","movementOrders":[{"unitId":"...","toXY":[lat,lng]}],"rangedAttacks":[{"unitId":"...","targetXY":[lat,lng]}],"callbacks":[{"event":"...","params":{...}}],"memoryUpdates":[{"action":"write|delete","key":"...","content":"...","tier":"persistent|stored"}]}. Omit optional fields by using empty arrays when not needed.',
+                `Your previous response was not parseable JSON. Reply now with JSON only (no prose, no markdown, no code fences) using exactly this top-level object schema (orders[] only; no movementOrders/rangedAttacks; never a top-level array): ${JSON_ASSISTANT_REPAIR_SCHEMA}. Omit optional arrays when empty.`,
             },
           ];
           const repairBody: Record<string, unknown> = {
@@ -1179,7 +1093,7 @@ export async function requestOrders(
             const repairContent = repairJson.choices?.[0]?.message?.content;
             if (typeof repairContent === 'string' && repairContent.trim()) {
               logDebug('openRouter requestOrders: assistant response (repair)', repairContent);
-              parsed = parseOrdersResponse(repairContent, resolveToH3);
+              parsed = parseOrdersResponse(repairContent, resolveToH3, state, latLngByH3);
             }
           } else {
             logError('openRouter requestOrders: repair API error', repairRes.status);
@@ -1203,7 +1117,7 @@ export async function requestOrders(
       }
       // UI "Events" counter: count callback entries returned by the LLM this turn.
       toolInvocationCounts['events'] = parsed.callbacks?.length ?? 0;
-      if (parsed.memoryUpdates?.length) {
+      if (flags.memoryEnabled && parsed.memoryUpdates?.length) {
         for (const upd of parsed.memoryUpdates) {
           if (upd.action === 'write') {
             const result = executeTool4(
@@ -1226,6 +1140,11 @@ export async function requestOrders(
         logDebug('openRouter requestOrders: applied memoryUpdates from response', { count: parsed.memoryUpdates.length });
       }
 
+      const { movementOrders: standingOrderMovement, rangedAttacks: standingOrderRanged } = flags.ordersEnabled
+        ? generateOrdersForStandingOrders('opponent', state, latLngByH3, resolveToH3)
+        : { movementOrders: [] as { unitId: string; toH3Index: string }[], rangedAttacks: [] as { unitId: string; targetH3Index: string }[] };
+
+      const llmMovementByUnit = new Map((parsed.movementOrders ?? []).map((o) => [o.unitId, o.toH3Index]));
       const llmMovementUnitIds = new Set((parsed.movementOrders ?? []).map((o) => o.unitId));
       const mergedMovement = [
         ...standingOrderMovement.filter((o) => !llmMovementUnitIds.has(o.unitId)),
@@ -1267,6 +1186,15 @@ export async function requestOrders(
           validatedRanged.push(r);
           seenRanged.add(r.unitId);
         } else {
+          // Common model mistake: trying to explicit_move into range and also explicit_attack that destination.
+          // Ranged uses start-of-turn position, so this is invalid by design; ignore without counting as dropped noise.
+          if (result.reason === 'Target out of range') {
+            const movedTo = llmMovementByUnit.get(r.unitId);
+            if (movedTo && movedTo === r.targetH3Index) {
+              logDebug('openRouter requestOrders: ignored post-move ranged intent', { unitId: r.unitId });
+              continue;
+            }
+          }
           dropReasons.push(`Ranged ${r.unitId} -> ${r.targetH3Index}: ${result.reason}`);
         }
       }
@@ -1311,12 +1239,29 @@ export async function requestOrders(
         if (onLog) onLog(`Standing orders used as fallback for: ${[...fallbackUnits, ...fallbackRanged].join(', ')}`);
       }
 
-      if (dropReasons.length > 0) {
+      // If a unit was recovered by standing-order fallback, do not count its LLM validation failures as dropped.
+      const recoveredMovement = new Set(fallbackUnits);
+      const recoveredRanged = new Set(fallbackRanged);
+      const effectiveDropReasons = dropReasons.filter((reason) => {
+        for (const unitId of recoveredMovement) {
+          if (reason.startsWith(`${unitId} ->`) || reason.startsWith(`Duplicate order for ${unitId}`)) {
+            return false;
+          }
+        }
+        for (const unitId of recoveredRanged) {
+          if (reason.startsWith(`Ranged ${unitId} ->`) || reason.startsWith(`Duplicate ranged for ${unitId}`)) {
+            return false;
+          }
+        }
+        return true;
+      });
+
+      if (effectiveDropReasons.length > 0) {
         logDebug('openRouter requestOrders: dropped invalid orders', {
-          dropped: dropReasons.length,
-          reasons: dropReasons,
+          dropped: effectiveDropReasons.length,
+          reasons: effectiveDropReasons,
         });
-        if (onLog) onLog(`Dropped ${dropReasons.length} invalid order(s).`, true);
+        if (onLog) onLog(`Dropped ${effectiveDropReasons.length} invalid order(s).`, true);
       }
 
       if (onLog) onLog(`Orders received: ${validated.length} movement, ${validatedRanged.length} ranged.`);
@@ -1334,8 +1279,8 @@ export async function requestOrders(
         orders: validated,
         rangedAttacks: validatedRanged.length > 0 ? validatedRanged : undefined,
         strategy: parsed.strategy,
-        dropped: dropReasons.length,
-        dropReasons: dropReasons.length > 0 ? dropReasons : undefined,
+        dropped: effectiveDropReasons.length,
+        dropReasons: effectiveDropReasons.length > 0 ? effectiveDropReasons : undefined,
         toolInvocationCounts,
         cost: requestCost > 0 ? requestCost : undefined,
         wallClockMs: Date.now() - wallClockStart,
@@ -1565,12 +1510,14 @@ function normalizeMemoryUpdates(raw: unknown): MemoryUpdateItem[] {
   const out: MemoryUpdateItem[] = [];
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;
-    const o = item as { action?: unknown; key?: unknown; content?: unknown; tier?: unknown };
-    const action = o.action === 'write' || o.action === 'delete' ? o.action : undefined;
+    const o = item as { action?: unknown; key?: unknown; content?: unknown; value?: unknown; tier?: unknown };
+    const rawAction = o.action === 'write' || o.action === 'delete' ? o.action : undefined;
     const key = typeof o.key === 'string' ? o.key : '';
-    if (!action || !key) continue;
+    if (!key) continue;
+    const content = typeof o.content === 'string' ? o.content : typeof o.value === 'string' ? o.value : '';
+    const action = rawAction ?? (content ? 'write' : undefined);
+    if (!action) continue;
     if (action === 'write') {
-      const content = typeof o.content === 'string' ? o.content : '';
       const tier = o.tier === 'persistent' || o.tier === 'stored' ? o.tier : undefined;
       out.push({ action: 'write', key, content, tier });
     } else {
@@ -1580,13 +1527,107 @@ function normalizeMemoryUpdates(raw: unknown): MemoryUpdateItem[] {
   return out;
 }
 
+/** Repair-turn user hint: hard-cut v3 schema (orders[] only; no legacy movementOrders/rangedAttacks). */
+const JSON_ASSISTANT_REPAIR_SCHEMA = `{"strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":[lat,lng]}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":[lat,lng]},{"unitId":"opponent-armor-1","action":"explicit_attack","targetHex":[lat,lng]},{"unitId":"opponent-armor-1","action":"cancel_order"}],"callbacks":[],"memoryUpdates":[]}`;
+
+function hasNonEmptyLegacyTopLevel(obj: Record<string, unknown>): boolean {
+  const mo = obj.movementOrders;
+  const ra = obj.rangedAttacks;
+  return (Array.isArray(mo) && mo.length > 0) || (Array.isArray(ra) && ra.length > 0);
+}
+
 /**
- * Parses the LLM response into movement orders, optional ranged attacks, optional callbacks, and optional memoryUpdates.
- * Expects toXY and targetXY as [lat, lng]; resolves to H3 via resolveToH3.
+ * Resolves explicit_attack target from [lat,lng] or enemy unit id → H3 index.
+ * Supports both targetHex (canonical) and targetUnitId (compat alias). Never accepts raw H3 strings from the model.
+ */
+function resolveExplicitRangedTarget(
+  target: unknown,
+  state: GameStateSnapshot,
+  resolveToH3: (lat: number, lng: number) => string | undefined
+): string | undefined {
+  if (typeof target === 'string') {
+    const u = state.units.find((x) => x.id === target);
+    return u?.h3Index;
+  }
+  if (Array.isArray(target) && target.length >= 2) {
+    const lat = Number(target[0]);
+    const lng = Number(target[1]);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) return resolveToH3(lat, lng);
+  }
+  return undefined;
+}
+
+/**
+ * Walks v3 orders[] in order: applies assign_order/cancel_order via standing-order tool logic; collects explicit_move / explicit_attack.
+ * Mutates DB for assign/cancel. Returns movement and ranged lists in internal H3 form for merge/validation.
+ */
+function processV3OrdersArray(
+  entries: unknown[],
+  state: GameStateSnapshot,
+  latLngByH3: Map<string, LatLng>,
+  resolveToH3: (lat: number, lng: number) => string | undefined
+): { movementOrders: { unitId: string; toH3Index: string }[]; rangedAttacks: { unitId: string; targetH3Index: string }[] } {
+  const movementOrders: { unitId: string; toH3Index: string }[] = [];
+  const rangedAttacks: { unitId: string; targetH3Index: string }[] = [];
+  for (const raw of entries) {
+    if (!raw || typeof raw !== 'object') continue;
+    const o = raw as {
+      action?: unknown;
+      unitId?: unknown;
+      order?: unknown;
+      destination?: unknown;
+      targetHex?: unknown;
+      targetUnitId?: unknown;
+    };
+    const action = o.action;
+    const unitId = typeof o.unitId === 'string' ? o.unitId : '';
+    if (!unitId) continue;
+
+    if (action === 'assign_order') {
+      logDebug('openRouter processV3OrdersArray: assign_order', { unitId });
+      executeTool5('assign_order', { unitId, order: o.order }, state, latLngByH3, resolveToH3);
+      continue;
+    }
+    if (action === 'cancel_order') {
+      logDebug('openRouter processV3OrdersArray: cancel_order', { unitId });
+      executeTool5('cancel_order', { unitId }, state, latLngByH3, resolveToH3);
+      continue;
+    }
+    if (action === 'explicit_move') {
+      const dest = o.destination;
+      if (!Array.isArray(dest) || dest.length < 2) {
+        logDebug('openRouter processV3OrdersArray: explicit_move missing destination', { unitId });
+        continue;
+      }
+      const lat = Number(dest[0]);
+      const lng = Number(dest[1]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      const h3 = resolveToH3(lat, lng);
+      if (h3) movementOrders.push({ unitId, toH3Index: h3 });
+      else logDebug('openRouter processV3OrdersArray: explicit_move unresolved', { unitId, lat, lng });
+      continue;
+    }
+    if (action === 'explicit_attack') {
+      const attackTarget = o.targetHex ?? o.targetUnitId;
+      const targetH3 = resolveExplicitRangedTarget(attackTarget, state, resolveToH3);
+      if (targetH3) rangedAttacks.push({ unitId, targetH3Index: targetH3 });
+      else logDebug('openRouter processV3OrdersArray: explicit_attack unresolved', { unitId });
+      continue;
+    }
+    logDebug('openRouter processV3OrdersArray: skipped unknown action', { action, unitId });
+  }
+  return { movementOrders, rangedAttacks };
+}
+
+/**
+ * Parses the assistant final JSON: v3 orders[] (assign/cancel/explicit_move/explicit_attack), callbacks, memoryUpdates.
+ * Rejects non-empty legacy top-level movementOrders/rangedAttacks (hard cut). Applies assign/cancel to DB while parsing.
  */
 function parseOrdersResponse(
   content: string,
-  resolveToH3: (lat: number, lng: number) => string | undefined
+  resolveToH3: (lat: number, lng: number) => string | undefined,
+  state: GameStateSnapshot,
+  latLngByH3: Map<string, LatLng>
 ): {
   movementOrders: { unitId: string; toH3Index: string }[];
   rangedAttacks: { unitId: string; targetH3Index: string }[];
@@ -1596,53 +1637,38 @@ function parseOrdersResponse(
 } | null {
   const trimmed = content.trim();
   const candidates: string[] = [];
-
-  // Candidate 1: whole response (covers pure-JSON responses).
   candidates.push(trimmed);
-
-  // Candidate 2: fenced code blocks, preferring later blocks (models often append final JSON at the end).
   const fencedMatches = Array.from(trimmed.matchAll(/```(?:json)?\s*([\s\S]*?)```/g));
   for (let i = fencedMatches.length - 1; i >= 0; i--) {
     const block = fencedMatches[i]?.[1]?.trim();
     if (block) candidates.push(block);
   }
-
-  // Candidate 3: last object/array by first-brace/first-bracket heuristic.
   const lastBrace = trimmed.lastIndexOf('{');
-  const lastBracket = trimmed.lastIndexOf('[');
   if (lastBrace >= 0) candidates.push(trimmed.slice(lastBrace).trim());
-  if (lastBracket >= 0) candidates.push(trimmed.slice(lastBracket).trim());
 
   for (const raw of candidates) {
     let jsonStr = raw;
     const firstBrace = jsonStr.search(/\{/);
-    const firstBracket = jsonStr.search(/\[/);
-    if (firstBrace >= 0 && (firstBracket < 0 || firstBrace < firstBracket)) {
+    if (firstBrace >= 0) {
       const objectMatch = jsonStr.slice(firstBrace).match(/\{[\s\S]*\}/);
       if (objectMatch) jsonStr = objectMatch[0];
-    } else if (firstBracket >= 0) {
-      const arrayMatch = jsonStr.slice(firstBracket).match(/\[[\s\S]*\]/);
-      if (arrayMatch) jsonStr = arrayMatch[0];
     }
 
     jsonStr = stripJsonLikeComments(jsonStr);
     try {
       const parsed = JSON.parse(jsonStr) as unknown;
-      if (Array.isArray(parsed)) {
-        const movementOrders = parseOrdersArray(parsed, resolveToH3);
-        return { movementOrders, rangedAttacks: [] };
-      }
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        const obj = parsed as {
-          movementOrders?: unknown;
-          rangedAttacks?: unknown;
-          strategy?: unknown;
-          callbacks?: unknown;
-          memoryUpdates?: unknown;
-        };
-        const movementOrders = Array.isArray(obj.movementOrders) ? parseOrdersArray(obj.movementOrders, resolveToH3) : [];
-        const rangedAttacks = Array.isArray(obj.rangedAttacks) ? parseRangedArray(obj.rangedAttacks, resolveToH3) : [];
-        const strategy = typeof obj.strategy === 'string' && obj.strategy.trim() ? obj.strategy.trim() : undefined;
+        const obj = parsed as Record<string, unknown>;
+        if (typeof obj.strategy !== 'string' || !Array.isArray(obj.orders)) {
+          logDebug('openRouter parseOrdersResponse: rejected payload that does not match strict object schema');
+          return null;
+        }
+        if (hasNonEmptyLegacyTopLevel(obj)) {
+          logDebug('openRouter parseOrdersResponse: rejected non-empty legacy movementOrders/rangedAttacks');
+          return null;
+        }
+        const { movementOrders, rangedAttacks } = processV3OrdersArray(obj.orders as unknown[], state, latLngByH3, resolveToH3);
+        const strategy = obj.strategy.trim();
         const callbacks = normalizeCallbacks(obj.callbacks);
         const memoryUpdates = normalizeMemoryUpdates(obj.memoryUpdates);
         return {
@@ -1659,52 +1685,3 @@ function parseOrdersResponse(
   }
   return null;
 }
-
-function parseOrdersArray(
-  arr: unknown[],
-  resolveToH3: (lat: number, lng: number) => string | undefined
-): { unitId: string; toH3Index: string }[] {
-  const orders: { unitId: string; toH3Index: string }[] = [];
-  for (const item of arr) {
-    if (!item || typeof item !== 'object' || typeof (item as { unitId?: unknown }).unitId !== 'string') continue;
-    const o = item as { unitId: string; toXY?: unknown; toH3Index?: unknown };
-    if (o.toH3Index != null) continue;
-    let toH3Index: string | undefined;
-    if (Array.isArray(o.toXY) && o.toXY.length >= 2) {
-      const lat = Number(o.toXY[0]);
-      const lng = Number(o.toXY[1]);
-      if (Number.isFinite(lat) && Number.isFinite(lng)) {
-        toH3Index = resolveToH3(lat, lng);
-        if (!toH3Index) {
-          logDebug('openRouter parseOrdersArray: coordinates did not resolve to hex, order skipped', {
-            unitId: o.unitId,
-            toXY: [lat, lng],
-          });
-        }
-      }
-    }
-    if (toH3Index) orders.push({ unitId: o.unitId, toH3Index });
-  }
-  return orders;
-}
-
-function parseRangedArray(
-  arr: unknown[],
-  resolveToH3: (lat: number, lng: number) => string | undefined
-): { unitId: string; targetH3Index: string }[] {
-  const orders: { unitId: string; targetH3Index: string }[] = [];
-  for (const item of arr) {
-    if (!item || typeof item !== 'object' || typeof (item as { unitId?: unknown }).unitId !== 'string') continue;
-    const o = item as { unitId: string; targetXY?: unknown; targetH3Index?: unknown };
-    if (o.targetH3Index != null) continue;
-    let targetH3Index: string | undefined;
-    if (Array.isArray(o.targetXY) && o.targetXY.length >= 2) {
-      const lat = Number(o.targetXY[0]);
-      const lng = Number(o.targetXY[1]);
-      if (Number.isFinite(lat) && Number.isFinite(lng)) targetH3Index = resolveToH3(lat, lng);
-    }
-    if (targetH3Index) orders.push({ unitId: o.unitId, targetH3Index });
-  }
-  return orders;
-}
-

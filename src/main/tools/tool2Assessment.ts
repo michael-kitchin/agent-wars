@@ -55,32 +55,6 @@ function getGridDistance(h3A: string, h3B: string): number {
   return gridDistance(h3A, h3B);
 }
 
-/**
- * Returns true if the attacker at attackerH3 can hit targetH3 with the given range stat (ranged attack).
- */
-function isInRangedRange(attackerH3: string, targetH3: string, attackerRange: number): boolean {
-  logTrace('tool2Assessment isInRangedRange', { attackerRange });
-  try {
-    return getGridDistance(attackerH3, targetH3) <= attackerRange;
-  } catch (err) {
-    logError('tool2Assessment isInRangedRange: getGridDistance threw', err);
-    return false;
-  }
-}
-
-/**
- * Returns true if the two units are in the same hex (melee range).
- */
-function isInMeleeRange(unitH3: string, otherH3: string): boolean {
-  logTrace('tool2Assessment isInMeleeRange');
-  try {
-    return getGridDistance(unitH3, otherH3) === 0;
-  } catch (err) {
-    logError('tool2Assessment isInMeleeRange: getGridDistance threw', err);
-    return false;
-  }
-}
-
 /** Tool names for Tool 2. Exported so OpenRouter can route assess_unit and assess_hex to this module. */
 export const TOOL2_NAMES = ['assess_unit', 'assess_hex'] as const;
 
@@ -144,7 +118,8 @@ function executeAssessUnit(
   radius: number,
   state: GameStateSnapshot,
   latLngByH3: LatLngMap,
-  resolveToH3: (lat: number, lng: number) => string | undefined
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- signature aligned with assess_hex path
+  _resolveToH3: (lat: number, lng: number) => string | undefined
 ): { status: string; error: string | null; [k: string]: unknown } {
   logDebug('tool2Assessment executeAssessUnit', { unitId, radius, stateTurn: state.turnNumber });
   const hexList = state.hexes.map((h) => h.h3Index);

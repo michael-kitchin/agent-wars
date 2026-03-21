@@ -14,8 +14,6 @@ export interface CallbackSubscription {
   subscribedTurn?: number;
 }
 
-const TABLE = 'ai_callback_subscriptions';
-
 /**
  * Returns all callback subscriptions for a player. Use when evaluating subscription events
  * and when building the ACTIVE CALLBACKS briefing section.

@@ -14523,6 +14523,7 @@
   var precomputedAiOrders = null;
   var precomputedAiRangedOrders = null;
   var precomputedAiStrategy = null;
+  var precomputedToolInvocationCounts = null;
   var backgroundRequestInFlight = false;
   var readyRequestInFlight = false;
   var readyBtnAiWaitStartTime = null;
@@ -14558,10 +14559,13 @@
           precomputedAiRangedOrders = result.rangedAttacks ?? [];
           precomputedAiStrategy = result.strategy ?? null;
           if (result.toolInvocationCounts) {
+            precomputedToolInvocationCounts = { ...result.toolInvocationCounts };
             for (const [groupId, count] of Object.entries(result.toolInvocationCounts)) {
               toolInvocationCounts[groupId] = count;
             }
             updateOpenRouterToolCountLabels();
+          } else {
+            precomputedToolInvocationCounts = null;
           }
           if (result.cost !== void 0) {
             openRouterGameCost += result.cost;
@@ -14572,6 +14576,7 @@
           precomputedAiOrders = [];
           precomputedAiRangedOrders = [];
           precomputedAiStrategy = null;
+          precomputedToolInvocationCounts = null;
         }
         updateReadyButtonState();
       }).catch((err) => {
@@ -14583,6 +14588,7 @@
         precomputedAiOrders = [];
         precomputedAiRangedOrders = [];
         precomputedAiStrategy = null;
+        precomputedToolInvocationCounts = null;
         updateReadyButtonState();
       });
     }).catch((err) => {
@@ -14594,6 +14600,7 @@
       precomputedAiOrders = [];
       precomputedAiRangedOrders = [];
       precomputedAiStrategy = null;
+      precomputedToolInvocationCounts = null;
       updateReadyButtonState();
     });
   }
@@ -14631,12 +14638,14 @@
             precomputedAiOrders = null;
             precomputedAiRangedOrders = null;
             precomputedAiStrategy = null;
+            precomputedToolInvocationCounts = null;
             eventDrivenInitialConsultationDone = false;
             startBackgroundRequestIfAllowed();
           } else if (runButtonOn && !useEventDrivenConsultation && wasEventDriven) {
             precomputedAiOrders = null;
             precomputedAiRangedOrders = null;
             precomputedAiStrategy = null;
+            precomputedToolInvocationCounts = null;
             eventDrivenInitialConsultationDone = false;
             startBackgroundRequestIfAllowed();
           }
@@ -15369,6 +15378,27 @@
       }
     });
   }
+  function openNewGameOverlayFromModelTab() {
+    window.gameApi?.cancelRequestAiOrders?.();
+    precomputedAiOrders = null;
+    precomputedAiRangedOrders = null;
+    precomputedAiStrategy = null;
+    precomputedToolInvocationCounts = null;
+    backgroundRequestInFlight = false;
+    readyRequestInFlight = false;
+    eventDrivenInitialConsultationDone = false;
+    const overlay = document.getElementById("game-over-overlay");
+    const messageEl = document.getElementById("game-over-message");
+    const newGameBtn = document.getElementById("new-game-btn");
+    if (messageEl) {
+      messageEl.textContent = "Choose map size and start.";
+      messageEl.style.display = "";
+    }
+    if (newGameBtn) newGameBtn.textContent = "Start game";
+    overlay?.classList.remove("hidden");
+    setMainUIControlsEnabled(false);
+    updateReadyButtonState();
+  }
   function cancelOrderForUnit(unitId) {
     pendingOrders = pendingOrders.filter((o) => o.unitId !== unitId);
     updatePendingOrdersSidebar();
@@ -15538,6 +15568,7 @@
     const keyInput = document.getElementById("openrouter-key");
     const modelSelect = document.getElementById("openrouter-model");
     const refreshBtn = document.getElementById("openrouter-refresh-models");
+    const newBtn = document.getElementById("openrouter-new-btn");
     function refreshModels() {
       api.listModels().then((result) => {
         if (!modelSelect) return;
@@ -15575,6 +15606,7 @@
       });
     }
     if (refreshBtn) refreshBtn.addEventListener("click", refreshModels);
+    if (newBtn) newBtn.addEventListener("click", openNewGameOverlayFromModelTab);
     const runBtn = document.getElementById("openrouter-run-btn");
     if (runBtn) {
       runBtn.addEventListener("click", () => {
@@ -15862,8 +15894,15 @@
           precomputedAiOrders = null;
           precomputedAiRangedOrders = null;
           precomputedAiStrategy = null;
+          const precomputedCountsForTurn = precomputedToolInvocationCounts;
+          precomputedToolInvocationCounts = null;
           if (readyResult.toolInvocationCounts) {
             for (const [groupId, count] of Object.entries(readyResult.toolInvocationCounts)) {
+              toolInvocationCounts[groupId] = count;
+            }
+            updateOpenRouterToolCountLabels();
+          } else if (usePrecomputed && precomputedCountsForTurn) {
+            for (const [groupId, count] of Object.entries(precomputedCountsForTurn)) {
               toolInvocationCounts[groupId] = count;
             }
             updateOpenRouterToolCountLabels();

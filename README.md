@@ -1,10 +1,10 @@
 # Agent Wars
 
-Grand strategy wargame with LLM opponents. This repo implements milestones through **Milestone 0.5 (first MCP tool)** — Combat and Victory plus an MCP-style tool layer for the AI.
+Grand strategy wargame with LLM opponents. The codebase has grown through milestones **0.5–0.7** (tools, hybrid AI, callbacks); **package version 1.1.0** marks the **production baseline** transition (see [.spec/milestone-1.1-execution-plan.md](.spec/milestone-1.1-execution-plan.md)).
 
 ## Repository status
 
-- Current implementation target: **Milestone 0.5**
+- **Release version:** **1.1.0** (developer / side-load distribution only; no store or notarization requirements in this milestone)
 - CI: GitHub Actions matrix build and test on Windows/Linux/macOS
 
 ## Prerequisites
@@ -60,7 +60,7 @@ Notes:
 - **Build:** Compiles the main process and preload with TypeScript (`dist/`) and bundles the renderer with esbuild (`static/renderer.js`).
 - **Start:** Runs Electron; the window loads the renderer from `static/index.html`.
 
-**Note:** Game state is stored in SQLite via **sql.js** (WASM, no native build required). The database file is created in your Electron user data directory.
+**Note:** Game state is stored in SQLite via **better-sqlite3** (native module). The database file is created in your Electron user data directory.
 
 ## How to play
 

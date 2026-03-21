@@ -4,30 +4,29 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
+import type {
+  SubmitOrdersIpcPayload,
+  GameReadyIpcPayload,
+  GameStateSnapshot,
+  ReadyResult,
+  RequestAiOrdersResult,
+  OpenRouterModel,
+} from '../shared/ipcTypes';
 
 let openRouterLogListener: ((payload: { line: string; isError?: boolean }) => void) | null = null;
 ipcRenderer.on('openRouter:log', (_event, payload: { line: string; isError?: boolean }) => {
   openRouterLogListener?.(payload);
 });
 
-/** Payload for submitOrders; backward compatible: array is treated as movementOrders only. */
-type SubmitOrdersArg =
-  | { movementOrders: { unitId: string; toH3Index: string }[]; rangedAttacks?: { unitId: string; targetH3Index: string }[] }
-  | { unitId: string; toH3Index: string }[];
-
 const gameApi = {
-  getGameState: (): Promise<unknown> =>
+  getGameState: (): Promise<GameStateSnapshot> =>
     ipcRenderer.invoke('game:getState'),
-  newGame: (size?: 'small' | 'medium' | 'large'): Promise<unknown> =>
+  newGame: (size?: 'small' | 'medium' | 'large'): Promise<GameStateSnapshot> =>
     ipcRenderer.invoke('game:newGame', size ?? 'small'),
-  submitOrders: (payload: SubmitOrdersArg): Promise<unknown> =>
+  submitOrders: (payload: SubmitOrdersIpcPayload): Promise<{ success: boolean; reason?: string }> =>
     ipcRenderer.invoke('game:submitOrders', payload),
-  ready: (payload?: {
-    enabledToolGroups?: string[];
-    precomputedAiOrders?: { unitId: string; toH3Index: string }[];
-    precomputedAiRangedOrders?: { unitId: string; targetH3Index: string }[];
-  }) => ipcRenderer.invoke('game:ready', payload),
-  requestAiOrders: (payload?: { enabledToolGroups?: string[] }): Promise<unknown> =>
+  ready: (payload?: GameReadyIpcPayload): Promise<ReadyResult> => ipcRenderer.invoke('game:ready', payload),
+  requestAiOrders: (payload?: { enabledToolGroups?: string[] }): Promise<RequestAiOrdersResult> =>
     ipcRenderer.invoke('game:requestAiOrders', payload),
   cancelRequestAiOrders: (): Promise<void> =>
     ipcRenderer.invoke('game:cancelRequestAiOrders'),
@@ -42,7 +41,7 @@ const gameApi = {
       ipcRenderer.invoke('openRouter:getSelectedModel'),
     setKey: (key: string): Promise<void> =>
       ipcRenderer.invoke('openRouter:setKey', key),
-    listModels: (): Promise<unknown> =>
+    listModels: (): Promise<{ models?: OpenRouterModel[]; error?: string }> =>
       ipcRenderer.invoke('openRouter:listModels'),
     setSelectedModel: (modelId: string): Promise<void> =>
       ipcRenderer.invoke('openRouter:setSelectedModel', modelId),

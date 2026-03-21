@@ -9,7 +9,7 @@ import { executeTool5, getInjectionText } from './tool5StandingOrders';
 import type { GameStateSnapshot } from '../gameDb';
 
 const emptyMap = new Map<string, [number, number]>();
-const noopResolve = (_lat: number, _lng: number): string | undefined => undefined;
+const noopResolve = (): string | undefined => undefined;
 
 const emptyState: GameStateSnapshot = {
   turnNumber: 1,
