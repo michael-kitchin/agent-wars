@@ -1,0 +1,31 @@
+{
+  "generated_at_utc": "2026-03-24T12:33:29.923000+00:00",
+  "target_global_pct": {
+    "ocean": 71.0,
+    "arctic": 2.0,
+    "forest": 9.0,
+    "mountain": 7.0,
+    "desert": 5.0,
+    "land": 6.0
+  },
+  "best_score": 14.074109263657961,
+  "best_thresholds": {
+    "water_presence_override_min": 52.0,
+    "ocean_dominant_min": 60.0,
+    "arctic_dominant_min": 26.0,
+    "forest_dominant_min": 38.0,
+    "desert_barren_min": 28.0,
+    "mountain_tri_mean_min": 24.0,
+    "mountain_slope_mean_min": 5.0,
+    "mountain_elevation_max_min": 700.0
+  },
+  "best_distribution_pct": {
+    "ocean": 73.99049881235155,
+    "land": 7.838479809976247,
+    "forest": 9.263657957244655,
+    "mountain": 2.375296912114014,
+    "desert": 5.819477434679335,
+    "arctic": 0.7125890736342043
+  },
+  "sample_count": 25
+}

@@ -103,6 +103,24 @@ npm run test
 
 Runs core main-process and tool contract tests.
 
+## Terrain generation pipeline
+
+Use the milestone 1.2 offline EarthEnv terrain pipeline to generate:
+
+- `data/generated/terrain_res1_base.csv`
+- `data/generated/terrain_res4_exceptions.csv`
+- `data/generated/terrain_generation_metadata.json`
+
+Commands:
+
+```bash
+npm run terrain:validate
+npm run terrain:test
+npm run terrain:generate
+```
+
+Setup and troubleshooting are documented in `scripts/terrain_pipeline/README.md`.
+
 ## License
 
 ISC. See `LICENSE`.

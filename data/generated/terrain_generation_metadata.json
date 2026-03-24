@@ -1,0 +1,145 @@
+{
+  "run_id": "20260324T133701Z",
+  "generated_at_utc": "2026-03-24T13:37:01.524135+00:00",
+  "db": {
+    "host": "localhost",
+    "port": 5432,
+    "dbname": "agent_wars_1",
+    "user": "postgres",
+    "schema": "terrain_gen"
+  },
+  "config": {
+    "res_parent": 1,
+    "res_child": 4,
+    "precedence": [
+      "ocean",
+      "arctic",
+      "forest",
+      "mountain",
+      "desert",
+      "land"
+    ],
+    "nodata_fallback_terrain": "ocean",
+    "area_weighted_samples_per_cell_res1": 25,
+    "area_weighted_samples_per_cell_res4": 4,
+    "thresholds": {
+      "water_presence_override_min": 52.0,
+      "ocean_dominant_min": 60.0,
+      "arctic_dominant_min": 26.0,
+      "forest_dominant_min": 38.0,
+      "desert_barren_min": 28.0,
+      "mountain_tri_mean_min": 24.0,
+      "mountain_slope_mean_min": 5.0,
+      "mountain_elevation_max_min": 700.0
+    },
+    "aggregation_contract": "deterministic uniform-point integration over H3 cell area (area-weighted approximation)"
+  },
+  "inputs": [
+    {
+      "path": "F:\\Data\\consensus_full_class_1.tif",
+      "sha256": "52d51ccd528c6da54fea4d73b5be67c99b77da6bd0ef0061f3e79dda1bf36315"
+    },
+    {
+      "path": "F:\\Data\\consensus_full_class_2.tif",
+      "sha256": "1917bcc1e42c3aefbceaa0cee6c1a4521f346a020c6fe2732e6abd04bd16144c"
+    },
+    {
+      "path": "F:\\Data\\consensus_full_class_3.tif",
+      "sha256": "88fddd809442e005e5edfa08ff48792e6f54997b3ebd7d254461a6145d4f7779"
+    },
+    {
+      "path": "F:\\Data\\consensus_full_class_4.tif",
+      "sha256": "b5f3ad3cf9175d64bf23807710f51e6200e09e649bf357a8f28881ff46daa5aa"
+    },
+    {
+      "path": "F:\\Data\\consensus_full_class_5.tif",
+      "sha256": "4f2cc3bd82822274a1a00a81ef998db6a9f0e2d98c16bd735b6df9b79acdf0c9"
+    },
+    {
+      "path": "F:\\Data\\consensus_full_class_6.tif",
+      "sha256": "ee3be3219e13d1ad498d5d8eaa933e110facf633bb1c2801d1dfd23bdfb5d5ee"
+    },
+    {
+      "path": "F:\\Data\\consensus_full_class_7.tif",
+      "sha256": "baf0767cd8f589c66738072bc860ecc85a52dd1e035c176cbee216a512fdfb6e"
+    },
+    {
+      "path": "F:\\Data\\consensus_full_class_8.tif",
+      "sha256": "ff4fd807761e06f740efbada3007d0449705ee77bd8e27bb491246e4a7a71e39"
+    },
+    {
+      "path": "F:\\Data\\consensus_full_class_9.tif",
+      "sha256": "39acf8ab1b01c85c6b5f0d969f6e92f7cb95672728618f61ea5d9b7f0f8063ff"
+    },
+    {
+      "path": "F:\\Data\\consensus_full_class_10.tif",
+      "sha256": "35111db3eacc8fb228847c1445b596266cab3658a84093323af9882cd512ee9a"
+    },
+    {
+      "path": "F:\\Data\\consensus_full_class_11.tif",
+      "sha256": "9b9028fd5838407e124852279395e3e6d181d4fa316f7328fccb49cca0439b39"
+    },
+    {
+      "path": "F:\\Data\\consensus_full_class_12.tif",
+      "sha256": "a944780bc2fcc42bf0bf4e3cff505016e2e4801a124a27d5333cafb6a37da68c"
+    },
+    {
+      "path": "F:\\Data\\tri_5KMmn_GMTEDmd.tif",
+      "sha256": "7e1d3ba34048dee90d430ec2a404c4574bffe591537bdeb00733dfea9a74df5d"
+    },
+    {
+      "path": "F:\\Data\\tri_5KMma_GMTEDmd.tif",
+      "sha256": "7990b04f006778132807474db2d23eff543c505c6c46efe2b5c4016cbbfaf626"
+    },
+    {
+      "path": "F:\\Data\\tri_50KMmn_GMTEDmd.tif",
+      "sha256": "5bd1ccbccf4bf27874a8a31e0110c90a491c2ff357de8aa40a65bcc3a283d3d8"
+    },
+    {
+      "path": "F:\\Data\\tri_50KMma_GMTEDmd.tif",
+      "sha256": "193b2f591a1959f9944c20182667fa1ef99d201579873bb4d55427ffc15a27ad"
+    },
+    {
+      "path": "F:\\Data\\slope_5KMmn_GMTEDmd.tif",
+      "sha256": "4f3a036ed63b53a7e0e07d8c25319abaff34fe855244f7a895d828f02064ab63"
+    },
+    {
+      "path": "F:\\Data\\slope_5KMma_GMTEDmd.tif",
+      "sha256": "3e6aaf4799db4c62862ba8381be7da6aae271b0298b7b192f62663a10a9573bc"
+    },
+    {
+      "path": "F:\\Data\\slope_50KMmn_GMTEDmd.tif",
+      "sha256": "12ebfb89cd991d2452391e951ba590864a4f1e2c914686d4265ebb65bdf0e11a"
+    },
+    {
+      "path": "F:\\Data\\slope_50KMma_GMTEDmd.tif",
+      "sha256": "b9654ca8680f720de6415c2722146a1a9c04a314efc2438ef22d9b1020d19b2f"
+    },
+    {
+      "path": "F:\\Data\\elevation_5KMmn_GMTEDmn.tif",
+      "sha256": "9ea5445c19777550c9062af901a18bb2a0fdf8f1ac833c25f94b7fe44babef95"
+    },
+    {
+      "path": "F:\\Data\\elevation_5KMma_GMTEDma.tif",
+      "sha256": "0a648dd2f06e21f7bcecf921e1b932354005e3c6d6675c3519fc374b1be3b5b4"
+    },
+    {
+      "path": "F:\\Data\\elevation_50KMmn_GMTEDmn.tif",
+      "sha256": "1250fc6cd42571fc6e1515b4161d6814988a5ad05f55f33fe825d1de00790734"
+    },
+    {
+      "path": "F:\\Data\\elevation_50KMma_GMTEDma.tif",
+      "sha256": "60ee6d9764794c62bd628da97ff91a52a32da000513859481a7097a42c38aed6"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "data\\generated\\terrain_res1_base.csv",
+      "sha256": "c1e98ce7258324866e0518e76f262766bf7114f6dfa039a604f922fcf33b3763"
+    },
+    {
+      "path": "data\\generated\\terrain_res4_exceptions.csv",
+      "sha256": "c04049dd8f20f19fef97c63bbb70468f17dfd960363bbbf948dc9f559daede7a"
+    }
+  ]
+}
