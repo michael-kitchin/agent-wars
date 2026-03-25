@@ -8,6 +8,22 @@ import { PIPELINE_TERRAIN_KINDS } from '../shared/pipelineTerrain';
 const patternCache = new Map<string, CanvasPattern | null>();
 const UNKNOWN_FILL = 'rgba(140, 140, 140, 0.075)';
 
+/**
+ * Canonical hex outline for most terrain style presets; zoom scaling is applied in the renderer.
+ * Matches the former `default` preset stroke.
+ */
+const DEFAULT_HEX_STROKE_COLOR = 'rgba(36,38,42,0.4)';
+const DEFAULT_HEX_STROKE_WIDTH = 0.5;
+
+/** Wargame uses a dark basemap; light strokes read as hex boundaries (opacity tuned vs legibility). */
+const WARGAME_HEX_STROKE_COLOR = 'rgba(210, 216, 228, 0.077)';
+const WARGAME_HEX_STROKE_WIDTH = 0.72;
+
+/**
+ * Hover highlight for generic `land` cells: slightly darker than the base land fill for feedback.
+ */
+const LAND_HOVER_FILL_BASE = 'rgba(155, 168, 128, 0.42)';
+
 export type TerrainVisualStyleId = 'default' | 'atlas' | 'wargame' | 'scientific';
 
 interface HatchStyle {
@@ -19,12 +35,14 @@ interface HatchStyle {
 
 interface TerrainStylePreset {
   label: string;
-  basemapFilter: string;
-  strokeColor: string;
-  strokeWidth: number;
+  /**
+   * Raster basemap provider id (see `basemapProvider.ts`). Switched with this terrain style so the
+   * map background matches the preset; no labels / minimal political detail in chosen providers.
+   */
+  basemapId: string;
   /** Multiplier for fill alpha (0..1 more transparent, >1 less transparent). */
   fillAlphaMultiplier: number;
-  /** Multiplier for hatch alpha (0..1 more transparent, >1 less transparent). */
+  /** Multiplier for hatch line alpha. */
   hatchAlphaMultiplier: number;
   fills: Record<PipelineTerrainKind, string>;
   hatches: Partial<Record<PipelineTerrainKind, HatchStyle>>;
@@ -33,91 +51,82 @@ interface TerrainStylePreset {
 const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = {
   default: {
     label: 'Default',
-    basemapFilter: 'grayscale(0.8) saturate(0.68) contrast(0.97) brightness(1.03)',
-    strokeColor: 'rgba(36,38,42,0.4)',
-    strokeWidth: 0.5,
-    fillAlphaMultiplier: 0.75,
-    hatchAlphaMultiplier: 0.65,
+    basemapId: 'carto_light_nolabels',
+    fillAlphaMultiplier: 0.55,
+    hatchAlphaMultiplier: 0.375,
     fills: {
-      ocean: 'rgba(25, 90, 170, 0.15)',
-      coastal: 'rgba(55, 130, 140, 0.13)',
-      land: 'rgba(130, 145, 95, 0.05)',
-      forest: 'rgba(35, 110, 55, 0.09)',
-      mountain: 'rgba(110, 95, 85, 0.11)',
-      desert: 'rgba(210, 175, 95, 0.1)',
-      arctic: 'rgba(220, 235, 250, 0.14)',
+      ocean: 'rgba(35, 116, 201, 0.28)',
+      coastal: 'rgba(62, 162, 172, 0.24)',
+      land: 'rgba(198, 212, 168, 0.2)',
+      forest: 'rgba(48, 150, 82, 0.42)',
+      mountain: 'rgba(158, 129, 109, 0.45)',
+      desert: 'rgba(132, 94, 42, 0.44)',
+      arctic: 'rgba(235, 244, 255, 0.5)',
     },
     hatches: {
-      mountain: { color: 'rgba(60,45,40,0.19)', spacing: 6, lineWidth: 0.85, reverseDiagonal: true },
-      forest: { color: 'rgba(20,70,35,0.15)', spacing: 8, lineWidth: 0.75, reverseDiagonal: true },
-      coastal: { color: 'rgba(30,100,120,0.16)', spacing: 8, lineWidth: 0.6, reverseDiagonal: false },
+      mountain: { color: 'rgba(110, 22, 18, 0.413)', spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+      forest: { color: 'rgba(16, 72, 36, 0.44)', spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
+      coastal: { color: 'rgba(40, 130, 155, 0.32)', spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
     },
   },
   atlas: {
     label: 'Atlas',
-    basemapFilter: 'grayscale(0.2) saturate(1.25) contrast(1.12) brightness(1.0)',
-    strokeColor: 'rgba(24,34,48,0.52)',
-    strokeWidth: 0.3,
+    basemapId: 'carto_voyager_nolabels',
     fillAlphaMultiplier: 0.55,
-    hatchAlphaMultiplier: 0.75,
+    hatchAlphaMultiplier: 0.375,
     fills: {
       ocean: 'rgba(35, 116, 201, 0.28)',
       coastal: 'rgba(62, 162, 172, 0.24)',
-      land: 'rgba(140, 156, 100, 0)',
+      land: 'rgba(198, 212, 168, 0.2)',
       forest: 'rgba(48, 150, 82, 0.42)',
       mountain: 'rgba(158, 129, 109, 0.45)',
-      desert: 'rgba(236, 195, 98, 0.4)',
+      desert: 'rgba(132, 94, 42, 0.44)',
       arctic: 'rgba(235, 244, 255, 0.5)',
     },
     hatches: {
-      mountain: { color: 'rgba(79,60,50,0.26)', spacing: 8, lineWidth: 0.65, reverseDiagonal: true },
-      forest: { color: 'rgba(22,92,47,0.24)', spacing: 9, lineWidth: 0.62, reverseDiagonal: true },
+      mountain: { color: 'rgba(110, 22, 18, 0.413)', spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+      forest: { color: 'rgba(16, 72, 36, 0.44)', spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
+      coastal: { color: 'rgba(40, 130, 155, 0.32)', spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
     },
   },
   wargame: {
     label: 'Wargame',
-    // Keep tactical contrast, but preserve blue-water orientation cues from the raster basemap.
-    basemapFilter: 'grayscale(0.18) saturate(1.35) contrast(0.9) brightness(0.9)',
-    strokeColor: 'rgba(36,38,42,0.42)',
-    strokeWidth: 0.5,
-    fillAlphaMultiplier: 0.45,
-    hatchAlphaMultiplier: 0.5,
+    basemapId: 'carto_dark_nolabels',
+    fillAlphaMultiplier: 0.55,
+    hatchAlphaMultiplier: 0.375,
     fills: {
-      // Let raster water show through in Wargame for stronger geographic context.
-      ocean: 'rgba(56, 126, 206, 0)',
-      coastal: 'rgba(72, 153, 160, 0.21)',
-      land: 'rgba(140, 156, 100, 0.15)',
-      forest: 'rgba(54, 138, 76, 0.24)',
-      mountain: 'rgba(141, 117, 101, 0.27)',
-      desert: 'rgba(224, 188, 98, 0.23)',
-      arctic: 'rgba(226, 238, 252, 0.28)',
+      ocean: 'rgba(35, 116, 201, 0.28)',
+      coastal: 'rgba(62, 162, 172, 0.24)',
+      land: 'rgba(198, 212, 168, 0.2)',
+      forest: 'rgba(48, 150, 82, 0.42)',
+      mountain: 'rgba(158, 129, 109, 0.45)',
+      desert: 'rgba(132, 94, 42, 0.44)',
+      arctic: 'rgba(235, 244, 255, 0.5)',
     },
     hatches: {
-      mountain: { color: 'rgba(79,60,50,0.24)', spacing: 8, lineWidth: 0.78, reverseDiagonal: true },
-      forest: { color: 'rgba(22,92,47,0.22)', spacing: 9, lineWidth: 0.74, reverseDiagonal: true },
-      coastal: { color: 'rgba(40,118,130,0.2)', spacing: 9, lineWidth: 0.7, reverseDiagonal: false },
-      desert: { color: 'rgba(171,134,58,0.22)', spacing: 10, lineWidth: 0.68, reverseDiagonal: false },
+      mountain: { color: 'rgba(110, 22, 18, 0.413)', spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+      forest: { color: 'rgba(130, 245, 190, 0.58)', spacing: 7, lineWidth: 0.9, reverseDiagonal: true },
+      coastal: { color: 'rgba(110, 220, 235, 0.42)', spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
     },
   },
   scientific: {
     label: 'Scientific',
-    basemapFilter: 'grayscale(0.85) saturate(0.28) contrast(1.12) brightness(0.98)',
-    strokeColor: 'rgba(44,52,60,0.56)',
-    strokeWidth: 0.25,
-    fillAlphaMultiplier: 0.45,
-    hatchAlphaMultiplier: 0.45,
+    basemapId: 'esri_world_shaded_relief',
+    fillAlphaMultiplier: 0.55,
+    hatchAlphaMultiplier: 0.375,
     fills: {
-      ocean: 'rgba(38, 121, 187, 0.15)',
-      coastal: 'rgba(70, 165, 180, 0.11)',
-      land: 'rgba(148, 164, 106, 0)',
-      forest: 'rgba(56, 141, 83, 0.28)',
-      mountain: 'rgba(142, 120, 104, 0.3)',
-      desert: 'rgba(226, 192, 108, 0.24)',
-      arctic: 'rgba(236, 246, 255, 0.32)',
+      ocean: 'rgba(35, 116, 201, 0.28)',
+      coastal: 'rgba(62, 162, 172, 0.24)',
+      land: 'rgba(198, 212, 168, 0.2)',
+      forest: 'rgba(48, 150, 82, 0.42)',
+      mountain: 'rgba(158, 129, 109, 0.45)',
+      desert: 'rgba(132, 94, 42, 0.44)',
+      arctic: 'rgba(235, 244, 255, 0.5)',
     },
     hatches: {
-      mountain: { color: 'rgba(86,72,62,0.12)', spacing: 13, lineWidth: 0.5, reverseDiagonal: true },
-      forest: { color: 'rgba(29,93,54,0.11)', spacing: 14, lineWidth: 0.48, reverseDiagonal: true },
+      mountain: { color: 'rgba(110, 22, 18, 0.413)', spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+      forest: { color: 'rgba(16, 72, 36, 0.44)', spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
+      coastal: { color: 'rgba(40, 130, 155, 0.32)', spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
     },
   },
 };
@@ -126,7 +135,7 @@ let activeTerrainStyleId: TerrainVisualStyleId = 'default';
 
 /**
  * @param reverseDiagonal When true, hatch runs top-left → bottom-right ( / ); when false, bottom-left → top-right ( \\ ).
- *        Land biomes use the reversed direction so they read differently from coastal hatching at a glance.
+ *        Mountain and forest share one direction; coastal littoral uses the opposite for water/land texture.
  */
 function makeDiagonalHatchPattern(
   color: string,
@@ -184,15 +193,23 @@ export function getActiveTerrainStyleId(): TerrainVisualStyleId {
   return activeTerrainStyleId;
 }
 
-/** Returns a CSS filter string for the basemap under the current style. */
-export function getActiveBasemapFilter(): string {
-  return activePreset().basemapFilter;
+/**
+ * Returns which raster basemap id should be shown for the current terrain style preset.
+ * Used when initializing the map and when the legend style dropdown changes; ids match `basemapProvider`.
+ */
+export function getActiveTerrainStyleBasemapId(): string {
+  return activePreset().basemapId;
 }
 
-/** Returns style-dependent hex boundary stroke. */
+/**
+ * Hex boundary stroke for the active terrain style. Wargame uses a stronger, light-on-dark stroke;
+ * others use the default neutral stroke (zoom scaling in renderer).
+ */
 export function getActiveHexStrokeStyle(): { color: string; width: number } {
-  const p = activePreset();
-  return { color: p.strokeColor, width: p.strokeWidth };
+  if (activeTerrainStyleId === 'wargame') {
+    return { color: WARGAME_HEX_STROKE_COLOR, width: WARGAME_HEX_STROKE_WIDTH };
+  }
+  return { color: DEFAULT_HEX_STROKE_COLOR, width: DEFAULT_HEX_STROKE_WIDTH };
 }
 
 /**
@@ -214,18 +231,30 @@ export function terrainKindFillStyle(kind: string): string {
 }
 
 /**
- * Optional hatch pattern layered after fill for a subset of kinds (mountain, forest).
+ * Fill for hovered generic land hexes: darker desert-like tan, same alpha pipeline as other fills.
  */
-export function terrainKindPattern(ctx: CanvasRenderingContext2D, kind: string): CanvasPattern | null {
+function landHoverFillStyle(): string {
+  return boostRgbaAlpha(LAND_HOVER_FILL_BASE, activePreset().fillAlphaMultiplier);
+}
+
+/**
+ * Optional hatch pattern layered after fill for a subset of kinds (mountain, forest).
+ * @param fillAndHatchAlphaScale Extra multiplier on hatch line alpha (e.g. 2 on hover to match doubled fill opacity).
+ */
+export function terrainKindPattern(
+  ctx: CanvasRenderingContext2D,
+  kind: string,
+  fillAndHatchAlphaScale = 1
+): CanvasPattern | null {
   const k = kind as PipelineTerrainKind;
-  const key = `${activeTerrainStyleId}:${k}`;
+  const key = `${activeTerrainStyleId}:${k}:${fillAndHatchAlphaScale}`;
   if (patternCache.has(key)) return patternCache.get(key) ?? null;
 
   const spec = activePreset().hatches[k];
   const p = activePreset();
   const pat = spec
     ? makeDiagonalHatchPattern(
-      boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier),
+      boostRgbaAlpha(boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier), fillAndHatchAlphaScale),
       spec.spacing,
       spec.lineWidth,
       spec.reverseDiagonal
@@ -237,16 +266,27 @@ export function terrainKindPattern(ctx: CanvasRenderingContext2D, kind: string):
 
 /**
  * Fills a closed path on `ctx` using fill + optional pattern for `terrainKind`.
+ * @param options.fillAndHatchAlphaScale Multiplies fill and hatch opacity (e.g. 2 on mouseover).
+ * @param options.landHoverFill When true and `terrainKind` is `land`, use a darker desert-like fill (land is otherwise transparent).
  */
 export function fillHexTerrain(
   ctx: CanvasRenderingContext2D,
   terrainKind: string,
-  drawPath: () => void
+  drawPath: () => void,
+  options?: { fillAndHatchAlphaScale?: number; landHoverFill?: boolean }
 ): void {
+  const scale = options?.fillAndHatchAlphaScale ?? 1;
+  const k = terrainKind as PipelineTerrainKind;
+  if (options?.landHoverFill && k === 'land') {
+    drawPath();
+    ctx.fillStyle = boostRgbaAlpha(landHoverFillStyle(), scale);
+    ctx.fill();
+    return;
+  }
   drawPath();
-  ctx.fillStyle = terrainKindFillStyle(terrainKind);
+  ctx.fillStyle = boostRgbaAlpha(terrainKindFillStyle(terrainKind), scale);
   ctx.fill();
-  const pat = terrainKindPattern(ctx, terrainKind);
+  const pat = terrainKindPattern(ctx, terrainKind, scale);
   if (pat) {
     drawPath();
     ctx.fillStyle = pat;

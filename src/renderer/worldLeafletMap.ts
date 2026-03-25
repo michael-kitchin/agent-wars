@@ -3,7 +3,7 @@
  * order live in basemapProvider.ts.
  */
 
-import { getRasterBasemapChain } from './basemapProvider';
+import { getRasterBasemapChain, getRasterBasemapChainStartIndex } from './basemapProvider';
 import { WEB_MERCATOR_MAX_ABS_LAT, clampLatForWebMercatorDisplay } from './hexGrid';
 
 // Leaflet is loaded from static bundle; keep maps loosely typed for compatibility with global `L`.
@@ -15,6 +15,12 @@ let miniMap: any = null;
 let viewportRect: any = null;
 /** Invoked whenever the main map view changes; drives overlay redraw in lockstep with the basemap. */
 let onMainViewChanged: (() => void) | null = null;
+
+/** Active tile layers so we can replace the basemap when the terrain style changes. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let mainBasemapLayer: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let miniBasemapLayer: any = null;
 
 function notifyMainViewChanged(): void {
   syncMinimapViewportRect();
@@ -30,6 +36,7 @@ function getL(): any {
 
 /**
  * Attaches one raster basemap layer, advancing through the provider chain on tile errors.
+ * @param target Which map instance to update (tracked layer ref cleared before add).
  */
 function mountRasterBasemap(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37,7 +44,8 @@ function mountRasterBasemap(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   map: any,
   showAttribution: boolean,
-  chainIndex: number
+  chainIndex: number,
+  target: 'main' | 'mini'
 ): void {
   const chain = getRasterBasemapChain();
   if (chainIndex >= chain.length) {
@@ -45,15 +53,32 @@ function mountRasterBasemap(
     return;
   }
   const spec = chain[chainIndex]!;
+  if (target === 'main' && mainBasemapLayer) {
+    try {
+      map.removeLayer(mainBasemapLayer);
+    } catch {
+      /* ignore */
+    }
+    mainBasemapLayer = null;
+  }
+  if (target === 'mini' && miniBasemapLayer) {
+    try {
+      map.removeLayer(miniBasemapLayer);
+    } catch {
+      /* ignore */
+    }
+    miniBasemapLayer = null;
+  }
   let switched = false;
-  const layer = Lref
-    .tileLayer(spec.urlTemplate, {
-      attribution: showAttribution ? spec.attributionHtml : '',
-      subdomains: spec.subdomains ?? 'abc',
-      maxZoom: spec.maxZoom ?? 19,
-      minZoom: spec.minZoom ?? 0,
-    })
-    .addTo(map);
+  const layerOpts: Record<string, unknown> = {
+    attribution: showAttribution ? spec.attributionHtml : '',
+    maxZoom: spec.maxZoom ?? 19,
+    minZoom: spec.minZoom ?? 0,
+  };
+  if (spec.subdomains !== undefined) layerOpts.subdomains = spec.subdomains;
+  const layer = Lref.tileLayer(spec.urlTemplate, layerOpts).addTo(map);
+  if (target === 'main') mainBasemapLayer = layer;
+  else miniBasemapLayer = layer;
 
   const onTileError = () => {
     if (switched) return;
@@ -64,13 +89,26 @@ function mountRasterBasemap(
     } catch {
       /* ignore */
     }
+    if (target === 'main') mainBasemapLayer = null;
+    else miniBasemapLayer = null;
     console.warn('[agent-wars] Basemap tile error; trying next provider', {
       failedId: spec.id,
       nextIndex: chainIndex + 1,
     });
-    mountRasterBasemap(Lref, map, showAttribution, chainIndex + 1);
+    mountRasterBasemap(Lref, map, showAttribution, chainIndex + 1, target);
   };
   layer.on('tileerror', onTileError);
+}
+
+/**
+ * Replaces the main and minimap raster basemap to match a provider id (see `basemapProvider` / terrain styles).
+ */
+export function setMainBasemapByProviderId(providerId: string): void {
+  if (!mainMap || !miniMap) return;
+  const Lref = getL();
+  const startIdx = getRasterBasemapChainStartIndex(providerId);
+  mountRasterBasemap(Lref, mainMap, true, startIdx, 'main');
+  mountRasterBasemap(Lref, miniMap, false, startIdx, 'mini');
 }
 
 /**
@@ -81,7 +119,8 @@ function mountRasterBasemap(
 export function initWorldLeafletMaps(
   mainContainerId: string,
   minimapContainerId: string,
-  onViewChanged: () => void
+  onViewChanged: () => void,
+  initialBasemapProviderId?: string
 ): void {
   onMainViewChanged = onViewChanged;
   const Lref = getL();
@@ -119,7 +158,8 @@ export function initWorldLeafletMaps(
     inertia: false,
   });
 
-  mountRasterBasemap(Lref, mainMap, true, 0);
+  const startIdx = getRasterBasemapChainStartIndex(initialBasemapProviderId ?? 'carto_light_nolabels');
+  mountRasterBasemap(Lref, mainMap, true, startIdx, 'main');
 
   mainMap.fitBounds(worldBounds, { padding: [2, 2], animate: false });
   mainMap.doubleClickZoom.disable();
@@ -136,7 +176,7 @@ export function initWorldLeafletMaps(
     keyboard: false,
   });
 
-  mountRasterBasemap(Lref, miniMap, false, 0);
+  mountRasterBasemap(Lref, miniMap, false, startIdx, 'mini');
 
   miniMap.fitBounds(worldBounds, { padding: [1, 1], animate: false });
   miniMap.setZoom(miniMap.getZoom());
@@ -210,7 +250,8 @@ export function getMainLeafletMap(): unknown {
 }
 
 /**
- * Applies a CSS filter to the main raster basemap container.
+ * Applies a CSS filter to the Leaflet tile pane, or clears it when `filter` is empty.
+ * Basemap tiles are unfiltered in normal use (empty string).
  */
 export function setMainBasemapFilter(filter: string): void {
   // Apply at ONE layer only (tile pane) to avoid compounded filters that wash out the map.

@@ -10,12 +10,13 @@ import {
   getMainLeafletMap,
   hexCenterToOverlayPoint,
   invalidateLeafletMapSizes,
+  setMainBasemapByProviderId,
   setMainBasemapFilter,
 } from './worldLeafletMap';
 import {
   fillHexTerrain,
-  getActiveBasemapFilter,
   getActiveHexStrokeStyle,
+  getActiveTerrainStyleBasemapId,
   renderTerrainLegend,
   type TerrainVisualStyleId,
 } from './terrainVisualStyles';
@@ -201,9 +202,9 @@ function showStackCallout(
 ): void {
   const calloutEl = document.getElementById('stack-callout');
   const listEl = document.getElementById('stack-callout-list');
-  const tooltipEl = document.getElementById('hex-tooltip');
   if (!calloutEl || !listEl) return;
-  tooltipEl?.classList.add('hidden');
+  clearTerrainTooltipTimer();
+  hideTerrainTooltipVisual();
 
   const sorted = [...units].sort(
     (a, b) =>
@@ -242,10 +243,66 @@ function showStackCallout(
 
 const TOOLTIP_OFFSET_PX = 12;
 
+/** Dwell time on the same hex before showing the terrain type tooltip (pointer may move within the hex). */
+const TERRAIN_TOOLTIP_DELAY_MS = 750;
+
 /** World map H3 resolution; must match main process mapData and terrain CSV. */
 const WORLD_H3_RESOLUTION = 1;
 
+let lastPointerClientX = 0;
+let lastPointerClientY = 0;
+let terrainTooltipDelayTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearTerrainTooltipTimer(): void {
+  if (terrainTooltipDelayTimer !== null) {
+    clearTimeout(terrainTooltipDelayTimer);
+    terrainTooltipDelayTimer = null;
+  }
+}
+
+function hideTerrainTooltipVisual(): void {
+  const el = document.getElementById('hex-tooltip');
+  if (el) {
+    el.classList.add('hidden');
+    el.setAttribute('aria-hidden', 'true');
+  }
+}
+
+/**
+ * Formats a pipeline terrain kind for display (e.g. `forest` → "Forest").
+ */
+function formatTerrainKindLabel(kind: string): string {
+  if (!kind) return 'Unknown';
+  return kind.charAt(0).toUpperCase() + kind.slice(1);
+}
+
+/**
+ * Resolves the terrain label for a map hex from the current game snapshot (pipeline kind with passability fallback).
+ */
+function terrainLabelForHex(h3: string): string {
+  if (!gameState) return 'Unknown';
+  const hx = gameState.hexes.find((h) => h.h3Index === h3);
+  if (!hx) return 'Unknown';
+  const kind =
+    hx.terrainKind ??
+    (hx.terrain === 'water' ? 'ocean' : hx.terrain === 'coastal' ? 'coastal' : 'land');
+  return formatTerrainKindLabel(kind);
+}
+
+function showTerrainTooltip(clientX: number, clientY: number, text: string): void {
+  const el = document.getElementById('hex-tooltip');
+  if (!el) return;
+  el.textContent = text;
+  el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
+  el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
+  el.classList.remove('hidden');
+  el.setAttribute('aria-hidden', 'false');
+  el.setAttribute('role', 'tooltip');
+}
+
 let selectedHexIndex: string | null = null;
+/** H3 index of the hex under the pointer for hover-only terrain fill; null when not over the map or a map hex. */
+let hoveredHexH3: string | null = null;
 let selectedUnitId: string | null = null;
 /** Unit selected at mousedown; used so double-click can issue move to an occupied hex without reselecting. */
 let selectedUnitIdAtMouseDown: string | null = null;
@@ -331,7 +388,7 @@ function drawTerrainHexes(ctx: CanvasRenderingContext2D): void {
     const kind =
       hx.terrainKind ??
       (hx.terrain === 'water' ? 'ocean' : hx.terrain === 'coastal' ? 'coastal' : 'land');
-    fillHexTerrain(ctx, kind, () => {
+    const drawClosedPath = (): void => {
       ctx.beginPath();
       for (let i = 0; i < pts.length; i++) {
         const p = pts[i]!;
@@ -339,19 +396,20 @@ function drawTerrainHexes(ctx: CanvasRenderingContext2D): void {
         else ctx.lineTo(p.x, p.y);
       }
       ctx.closePath();
-    });
+    };
+    if (hoveredHexH3 === hx.h3Index) {
+      fillHexTerrain(ctx, kind, drawClosedPath, {
+        fillAndHatchAlphaScale: 2,
+        landHoverFill: kind === 'land',
+      });
+    }
     const stroke = getActiveHexStrokeStyle();
     ctx.strokeStyle = stroke.color;
     ctx.lineWidth = stroke.width * zoomStrokeScale;
+    drawClosedPath();
     ctx.stroke();
     if (selectedHexIndex === hx.h3Index) {
-      ctx.beginPath();
-      for (let i = 0; i < pts.length; i++) {
-        const p = pts[i]!;
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      }
-      ctx.closePath();
+      drawClosedPath();
       ctx.strokeStyle = '#2e5a7b';
       ctx.lineWidth = Math.max(1.8, 2.2 * zoomStrokeScale);
       ctx.stroke();
@@ -1730,13 +1788,13 @@ function initOpenRouterUI(): void {
 
 function init(): void {
   try {
-    initWorldLeafletMaps('main-map', 'minimap', () => requestRedraw());
-    setMainBasemapFilter(getActiveBasemapFilter());
+    initWorldLeafletMaps('main-map', 'minimap', () => requestRedraw(), getActiveTerrainStyleBasemapId());
+    setMainBasemapFilter('');
     const leg = document.getElementById('terrain-legend');
     if (leg) {
       renderTerrainLegend(leg, {
         onStyleChanged: (_styleId: TerrainVisualStyleId) => {
-          setMainBasemapFilter(getActiveBasemapFilter());
+          setMainBasemapByProviderId(getActiveTerrainStyleBasemapId());
           requestRedraw();
         },
       });
@@ -1799,9 +1857,47 @@ function init(): void {
     return hitTestHexAtContainerPixel(x, y, set);
   }
 
+  mainMapEl.addEventListener('pointermove', (e) => {
+    lastPointerClientX = e.clientX;
+    lastPointerClientY = e.clientY;
+    const hit = clientXYToHit(e.clientX, e.clientY);
+
+    if (hit !== hoveredHexH3) {
+      clearTerrainTooltipTimer();
+      hideTerrainTooltipVisual();
+      hoveredHexH3 = hit;
+      requestRedraw();
+      if (hit) {
+        const targetHex = hit;
+        terrainTooltipDelayTimer = setTimeout(() => {
+          terrainTooltipDelayTimer = null;
+          if (hoveredHexH3 !== targetHex || !gameState) return;
+          showTerrainTooltip(lastPointerClientX, lastPointerClientY, terrainLabelForHex(targetHex));
+        }, TERRAIN_TOOLTIP_DELAY_MS);
+      }
+      return;
+    }
+
+    const tip = document.getElementById('hex-tooltip');
+    if (tip && !tip.classList.contains('hidden')) {
+      tip.style.left = `${e.clientX + TOOLTIP_OFFSET_PX}px`;
+      tip.style.top = `${e.clientY + TOOLTIP_OFFSET_PX}px`;
+    }
+  });
+  mainMapEl.addEventListener('pointerleave', () => {
+    clearTerrainTooltipTimer();
+    hideTerrainTooltipVisual();
+    if (hoveredHexH3 !== null) {
+      hoveredHexH3 = null;
+      requestRedraw();
+    }
+  });
+
   mainMapEl.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     selectedUnitIdAtMouseDown = selectedUnitId;
+    clearTerrainTooltipTimer();
+    hideTerrainTooltipVisual();
   });
 
   mainMapEl.addEventListener('click', (e) => {

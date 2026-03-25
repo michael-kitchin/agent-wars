@@ -14076,14 +14076,40 @@
   }
 
   // src/renderer/basemapProvider.ts
-  var BASEMAP_PROVIDER_CHAIN = [
+  var RASTER_BASEMAP_ORDER = [
     {
-      id: "carto_positron_nolabels",
+      id: "carto_light_nolabels",
       displayName: "Carto Positron (no labels)",
       urlTemplate: "https://{s}.basemaps.cartocdn.com/rastertiles/light_nolabels/{z}/{x}/{y}.png",
       attributionHtml: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
       subdomains: "abcd",
       maxZoom: 20,
+      minZoom: 0
+    },
+    {
+      id: "carto_voyager_nolabels",
+      displayName: "Carto Voyager (no labels)",
+      urlTemplate: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png",
+      attributionHtml: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: "abcd",
+      maxZoom: 20,
+      minZoom: 0
+    },
+    {
+      id: "carto_dark_nolabels",
+      displayName: "Carto Dark (no labels)",
+      urlTemplate: "https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}.png",
+      attributionHtml: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: "abcd",
+      maxZoom: 20,
+      minZoom: 0
+    },
+    {
+      id: "esri_world_shaded_relief",
+      displayName: "Esri World Shaded Relief",
+      urlTemplate: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}",
+      attributionHtml: "Tiles &copy; Esri &mdash; Source: Esri, Garmin, GEBCO, NOAA NGDC, and other contributors",
+      maxZoom: 13,
       minZoom: 0
     },
     {
@@ -14097,7 +14123,11 @@
     }
   ];
   function getRasterBasemapChain() {
-    return BASEMAP_PROVIDER_CHAIN;
+    return RASTER_BASEMAP_ORDER;
+  }
+  function getRasterBasemapChainStartIndex(providerId) {
+    const i = RASTER_BASEMAP_ORDER.findIndex((d) => d.id === providerId);
+    return i >= 0 ? i : 0;
   }
 
   // src/renderer/worldLeafletMap.ts
@@ -14105,6 +14135,8 @@
   var miniMap = null;
   var viewportRect = null;
   var onMainViewChanged = null;
+  var mainBasemapLayer = null;
+  var miniBasemapLayer = null;
   function notifyMainViewChanged() {
     syncMinimapViewportRect();
     onMainViewChanged?.();
@@ -14114,20 +14146,37 @@
     if (!Lref) throw new Error("Leaflet not loaded: include static/vendor/leaflet/leaflet.js before renderer.js");
     return Lref;
   }
-  function mountRasterBasemap(Lref, map, showAttribution, chainIndex) {
+  function mountRasterBasemap(Lref, map, showAttribution, chainIndex, target) {
     const chain = getRasterBasemapChain();
     if (chainIndex >= chain.length) {
       showBasemapErrorToast();
       return;
     }
     const spec = chain[chainIndex];
+    if (target === "main" && mainBasemapLayer) {
+      try {
+        map.removeLayer(mainBasemapLayer);
+      } catch {
+      }
+      mainBasemapLayer = null;
+    }
+    if (target === "mini" && miniBasemapLayer) {
+      try {
+        map.removeLayer(miniBasemapLayer);
+      } catch {
+      }
+      miniBasemapLayer = null;
+    }
     let switched = false;
-    const layer = Lref.tileLayer(spec.urlTemplate, {
+    const layerOpts = {
       attribution: showAttribution ? spec.attributionHtml : "",
-      subdomains: spec.subdomains ?? "abc",
       maxZoom: spec.maxZoom ?? 19,
       minZoom: spec.minZoom ?? 0
-    }).addTo(map);
+    };
+    if (spec.subdomains !== void 0) layerOpts.subdomains = spec.subdomains;
+    const layer = Lref.tileLayer(spec.urlTemplate, layerOpts).addTo(map);
+    if (target === "main") mainBasemapLayer = layer;
+    else miniBasemapLayer = layer;
     const onTileError = () => {
       if (switched) return;
       switched = true;
@@ -14136,15 +14185,24 @@
         map.removeLayer(layer);
       } catch {
       }
+      if (target === "main") mainBasemapLayer = null;
+      else miniBasemapLayer = null;
       console.warn("[agent-wars] Basemap tile error; trying next provider", {
         failedId: spec.id,
         nextIndex: chainIndex + 1
       });
-      mountRasterBasemap(Lref, map, showAttribution, chainIndex + 1);
+      mountRasterBasemap(Lref, map, showAttribution, chainIndex + 1, target);
     };
     layer.on("tileerror", onTileError);
   }
-  function initWorldLeafletMaps(mainContainerId, minimapContainerId, onViewChanged) {
+  function setMainBasemapByProviderId(providerId) {
+    if (!mainMap || !miniMap) return;
+    const Lref = getL();
+    const startIdx = getRasterBasemapChainStartIndex(providerId);
+    mountRasterBasemap(Lref, mainMap, true, startIdx, "main");
+    mountRasterBasemap(Lref, miniMap, false, startIdx, "mini");
+  }
+  function initWorldLeafletMaps(mainContainerId, minimapContainerId, onViewChanged, initialBasemapProviderId) {
     onMainViewChanged = onViewChanged;
     const Lref = getL();
     const mainEl = document.getElementById(mainContainerId);
@@ -14176,7 +14234,8 @@
       fadeAnimation: false,
       inertia: false
     });
-    mountRasterBasemap(Lref, mainMap, true, 0);
+    const startIdx = getRasterBasemapChainStartIndex(initialBasemapProviderId ?? "carto_light_nolabels");
+    mountRasterBasemap(Lref, mainMap, true, startIdx, "main");
     mainMap.fitBounds(worldBounds, { padding: [2, 2], animate: false });
     mainMap.doubleClickZoom.disable();
     miniMap = Lref.map(miniEl, {
@@ -14190,7 +14249,7 @@
       boxZoom: false,
       keyboard: false
     });
-    mountRasterBasemap(Lref, miniMap, false, 0);
+    mountRasterBasemap(Lref, miniMap, false, startIdx, "mini");
     miniMap.fitBounds(worldBounds, { padding: [1, 1], animate: false });
     miniMap.setZoom(miniMap.getZoom());
     mainMap.on("move", notifyMainViewChanged);
@@ -14289,94 +14348,90 @@
   // src/renderer/terrainVisualStyles.ts
   var patternCache = /* @__PURE__ */ new Map();
   var UNKNOWN_FILL = "rgba(140, 140, 140, 0.075)";
+  var DEFAULT_HEX_STROKE_COLOR = "rgba(36,38,42,0.4)";
+  var DEFAULT_HEX_STROKE_WIDTH = 0.5;
+  var WARGAME_HEX_STROKE_COLOR = "rgba(210, 216, 228, 0.077)";
+  var WARGAME_HEX_STROKE_WIDTH = 0.72;
+  var LAND_HOVER_FILL_BASE = "rgba(155, 168, 128, 0.42)";
   var TERRAIN_STYLE_PRESETS = {
     default: {
       label: "Default",
-      basemapFilter: "grayscale(0.8) saturate(0.68) contrast(0.97) brightness(1.03)",
-      strokeColor: "rgba(36,38,42,0.4)",
-      strokeWidth: 0.5,
-      fillAlphaMultiplier: 0.75,
-      hatchAlphaMultiplier: 0.65,
+      basemapId: "carto_light_nolabels",
+      fillAlphaMultiplier: 0.55,
+      hatchAlphaMultiplier: 0.375,
       fills: {
-        ocean: "rgba(25, 90, 170, 0.15)",
-        coastal: "rgba(55, 130, 140, 0.13)",
-        land: "rgba(130, 145, 95, 0.05)",
-        forest: "rgba(35, 110, 55, 0.09)",
-        mountain: "rgba(110, 95, 85, 0.11)",
-        desert: "rgba(210, 175, 95, 0.1)",
-        arctic: "rgba(220, 235, 250, 0.14)"
+        ocean: "rgba(35, 116, 201, 0.28)",
+        coastal: "rgba(62, 162, 172, 0.24)",
+        land: "rgba(198, 212, 168, 0.2)",
+        forest: "rgba(48, 150, 82, 0.42)",
+        mountain: "rgba(158, 129, 109, 0.45)",
+        desert: "rgba(132, 94, 42, 0.44)",
+        arctic: "rgba(235, 244, 255, 0.5)"
       },
       hatches: {
-        mountain: { color: "rgba(60,45,40,0.19)", spacing: 6, lineWidth: 0.85, reverseDiagonal: true },
-        forest: { color: "rgba(20,70,35,0.15)", spacing: 8, lineWidth: 0.75, reverseDiagonal: true },
-        coastal: { color: "rgba(30,100,120,0.16)", spacing: 8, lineWidth: 0.6, reverseDiagonal: false }
+        mountain: { color: "rgba(110, 22, 18, 0.413)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+        forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
+        coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false }
       }
     },
     atlas: {
       label: "Atlas",
-      basemapFilter: "grayscale(0.2) saturate(1.25) contrast(1.12) brightness(1.0)",
-      strokeColor: "rgba(24,34,48,0.52)",
-      strokeWidth: 0.3,
+      basemapId: "carto_voyager_nolabels",
       fillAlphaMultiplier: 0.55,
-      hatchAlphaMultiplier: 0.75,
+      hatchAlphaMultiplier: 0.375,
       fills: {
         ocean: "rgba(35, 116, 201, 0.28)",
         coastal: "rgba(62, 162, 172, 0.24)",
-        land: "rgba(140, 156, 100, 0)",
+        land: "rgba(198, 212, 168, 0.2)",
         forest: "rgba(48, 150, 82, 0.42)",
         mountain: "rgba(158, 129, 109, 0.45)",
-        desert: "rgba(236, 195, 98, 0.4)",
+        desert: "rgba(132, 94, 42, 0.44)",
         arctic: "rgba(235, 244, 255, 0.5)"
       },
       hatches: {
-        mountain: { color: "rgba(79,60,50,0.26)", spacing: 8, lineWidth: 0.65, reverseDiagonal: true },
-        forest: { color: "rgba(22,92,47,0.24)", spacing: 9, lineWidth: 0.62, reverseDiagonal: true }
+        mountain: { color: "rgba(110, 22, 18, 0.413)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+        forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
+        coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false }
       }
     },
     wargame: {
       label: "Wargame",
-      // Keep tactical contrast, but preserve blue-water orientation cues from the raster basemap.
-      basemapFilter: "grayscale(0.18) saturate(1.35) contrast(0.9) brightness(0.9)",
-      strokeColor: "rgba(36,38,42,0.42)",
-      strokeWidth: 0.5,
-      fillAlphaMultiplier: 0.45,
-      hatchAlphaMultiplier: 0.5,
+      basemapId: "carto_dark_nolabels",
+      fillAlphaMultiplier: 0.55,
+      hatchAlphaMultiplier: 0.375,
       fills: {
-        // Let raster water show through in Wargame for stronger geographic context.
-        ocean: "rgba(56, 126, 206, 0)",
-        coastal: "rgba(72, 153, 160, 0.21)",
-        land: "rgba(140, 156, 100, 0.15)",
-        forest: "rgba(54, 138, 76, 0.24)",
-        mountain: "rgba(141, 117, 101, 0.27)",
-        desert: "rgba(224, 188, 98, 0.23)",
-        arctic: "rgba(226, 238, 252, 0.28)"
+        ocean: "rgba(35, 116, 201, 0.28)",
+        coastal: "rgba(62, 162, 172, 0.24)",
+        land: "rgba(198, 212, 168, 0.2)",
+        forest: "rgba(48, 150, 82, 0.42)",
+        mountain: "rgba(158, 129, 109, 0.45)",
+        desert: "rgba(132, 94, 42, 0.44)",
+        arctic: "rgba(235, 244, 255, 0.5)"
       },
       hatches: {
-        mountain: { color: "rgba(79,60,50,0.24)", spacing: 8, lineWidth: 0.78, reverseDiagonal: true },
-        forest: { color: "rgba(22,92,47,0.22)", spacing: 9, lineWidth: 0.74, reverseDiagonal: true },
-        coastal: { color: "rgba(40,118,130,0.2)", spacing: 9, lineWidth: 0.7, reverseDiagonal: false },
-        desert: { color: "rgba(171,134,58,0.22)", spacing: 10, lineWidth: 0.68, reverseDiagonal: false }
+        mountain: { color: "rgba(110, 22, 18, 0.413)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+        forest: { color: "rgba(130, 245, 190, 0.58)", spacing: 7, lineWidth: 0.9, reverseDiagonal: true },
+        coastal: { color: "rgba(110, 220, 235, 0.42)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false }
       }
     },
     scientific: {
       label: "Scientific",
-      basemapFilter: "grayscale(0.85) saturate(0.28) contrast(1.12) brightness(0.98)",
-      strokeColor: "rgba(44,52,60,0.56)",
-      strokeWidth: 0.25,
-      fillAlphaMultiplier: 0.45,
-      hatchAlphaMultiplier: 0.45,
+      basemapId: "esri_world_shaded_relief",
+      fillAlphaMultiplier: 0.55,
+      hatchAlphaMultiplier: 0.375,
       fills: {
-        ocean: "rgba(38, 121, 187, 0.15)",
-        coastal: "rgba(70, 165, 180, 0.11)",
-        land: "rgba(148, 164, 106, 0)",
-        forest: "rgba(56, 141, 83, 0.28)",
-        mountain: "rgba(142, 120, 104, 0.3)",
-        desert: "rgba(226, 192, 108, 0.24)",
-        arctic: "rgba(236, 246, 255, 0.32)"
+        ocean: "rgba(35, 116, 201, 0.28)",
+        coastal: "rgba(62, 162, 172, 0.24)",
+        land: "rgba(198, 212, 168, 0.2)",
+        forest: "rgba(48, 150, 82, 0.42)",
+        mountain: "rgba(158, 129, 109, 0.45)",
+        desert: "rgba(132, 94, 42, 0.44)",
+        arctic: "rgba(235, 244, 255, 0.5)"
       },
       hatches: {
-        mountain: { color: "rgba(86,72,62,0.12)", spacing: 13, lineWidth: 0.5, reverseDiagonal: true },
-        forest: { color: "rgba(29,93,54,0.11)", spacing: 14, lineWidth: 0.48, reverseDiagonal: true }
+        mountain: { color: "rgba(110, 22, 18, 0.413)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+        forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
+        coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false }
       }
     }
   };
@@ -14425,12 +14480,14 @@
   function getActiveTerrainStyleId() {
     return activeTerrainStyleId;
   }
-  function getActiveBasemapFilter() {
-    return activePreset().basemapFilter;
+  function getActiveTerrainStyleBasemapId() {
+    return activePreset().basemapId;
   }
   function getActiveHexStrokeStyle() {
-    const p = activePreset();
-    return { color: p.strokeColor, width: p.strokeWidth };
+    if (activeTerrainStyleId === "wargame") {
+      return { color: WARGAME_HEX_STROKE_COLOR, width: WARGAME_HEX_STROKE_WIDTH };
+    }
+    return { color: DEFAULT_HEX_STROKE_COLOR, width: DEFAULT_HEX_STROKE_WIDTH };
   }
   function setActiveTerrainStyle(id) {
     if (activeTerrainStyleId === id) return;
@@ -14442,14 +14499,17 @@
     const p = activePreset();
     return boostRgbaAlpha(p.fills[k] ?? UNKNOWN_FILL, p.fillAlphaMultiplier);
   }
-  function terrainKindPattern(ctx, kind) {
+  function landHoverFillStyle() {
+    return boostRgbaAlpha(LAND_HOVER_FILL_BASE, activePreset().fillAlphaMultiplier);
+  }
+  function terrainKindPattern(ctx, kind, fillAndHatchAlphaScale = 1) {
     const k = kind;
-    const key = `${activeTerrainStyleId}:${k}`;
+    const key = `${activeTerrainStyleId}:${k}:${fillAndHatchAlphaScale}`;
     if (patternCache.has(key)) return patternCache.get(key) ?? null;
     const spec = activePreset().hatches[k];
     const p = activePreset();
     const pat = spec ? makeDiagonalHatchPattern(
-      boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier),
+      boostRgbaAlpha(boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier), fillAndHatchAlphaScale),
       spec.spacing,
       spec.lineWidth,
       spec.reverseDiagonal
@@ -14457,11 +14517,19 @@
     patternCache.set(key, pat);
     return pat;
   }
-  function fillHexTerrain(ctx, terrainKind, drawPath) {
+  function fillHexTerrain(ctx, terrainKind, drawPath, options) {
+    const scale = options?.fillAndHatchAlphaScale ?? 1;
+    const k = terrainKind;
+    if (options?.landHoverFill && k === "land") {
+      drawPath();
+      ctx.fillStyle = boostRgbaAlpha(landHoverFillStyle(), scale);
+      ctx.fill();
+      return;
+    }
     drawPath();
-    ctx.fillStyle = terrainKindFillStyle(terrainKind);
+    ctx.fillStyle = boostRgbaAlpha(terrainKindFillStyle(terrainKind), scale);
     ctx.fill();
-    const pat = terrainKindPattern(ctx, terrainKind);
+    const pat = terrainKindPattern(ctx, terrainKind, scale);
     if (pat) {
       drawPath();
       ctx.fillStyle = pat;
@@ -14629,9 +14697,9 @@
   function showStackCallout(units, clientX, clientY) {
     const calloutEl = document.getElementById("stack-callout");
     const listEl = document.getElementById("stack-callout-list");
-    const tooltipEl = document.getElementById("hex-tooltip");
     if (!calloutEl || !listEl) return;
-    tooltipEl?.classList.add("hidden");
+    clearTerrainTooltipTimer();
+    hideTerrainTooltipVisual();
     const sorted = [...units].sort(
       (a, b) => `${a.player} ${a.unitType} ${a.id}`.localeCompare(`${b.player} ${b.unitType} ${b.id}`)
     );
@@ -14664,8 +14732,47 @@
     calloutEl.classList.remove("hidden");
   }
   var TOOLTIP_OFFSET_PX = 12;
+  var TERRAIN_TOOLTIP_DELAY_MS = 750;
   var WORLD_H3_RESOLUTION = 1;
+  var lastPointerClientX = 0;
+  var lastPointerClientY = 0;
+  var terrainTooltipDelayTimer = null;
+  function clearTerrainTooltipTimer() {
+    if (terrainTooltipDelayTimer !== null) {
+      clearTimeout(terrainTooltipDelayTimer);
+      terrainTooltipDelayTimer = null;
+    }
+  }
+  function hideTerrainTooltipVisual() {
+    const el = document.getElementById("hex-tooltip");
+    if (el) {
+      el.classList.add("hidden");
+      el.setAttribute("aria-hidden", "true");
+    }
+  }
+  function formatTerrainKindLabel(kind) {
+    if (!kind) return "Unknown";
+    return kind.charAt(0).toUpperCase() + kind.slice(1);
+  }
+  function terrainLabelForHex(h3) {
+    if (!gameState) return "Unknown";
+    const hx = gameState.hexes.find((h) => h.h3Index === h3);
+    if (!hx) return "Unknown";
+    const kind = hx.terrainKind ?? (hx.terrain === "water" ? "ocean" : hx.terrain === "coastal" ? "coastal" : "land");
+    return formatTerrainKindLabel(kind);
+  }
+  function showTerrainTooltip(clientX, clientY, text) {
+    const el = document.getElementById("hex-tooltip");
+    if (!el) return;
+    el.textContent = text;
+    el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
+    el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
+    el.classList.remove("hidden");
+    el.setAttribute("aria-hidden", "false");
+    el.setAttribute("role", "tooltip");
+  }
   var selectedHexIndex = null;
+  var hoveredHexH3 = null;
   var selectedUnitId = null;
   var selectedUnitIdAtMouseDown = null;
   var pendingSelectTimeout = null;
@@ -14719,7 +14826,7 @@
         return { x: p.x, y: p.y };
       });
       const kind = hx.terrainKind ?? (hx.terrain === "water" ? "ocean" : hx.terrain === "coastal" ? "coastal" : "land");
-      fillHexTerrain(ctx, kind, () => {
+      const drawClosedPath = () => {
         ctx.beginPath();
         for (let i = 0; i < pts.length; i++) {
           const p = pts[i];
@@ -14727,19 +14834,20 @@
           else ctx.lineTo(p.x, p.y);
         }
         ctx.closePath();
-      });
+      };
+      if (hoveredHexH3 === hx.h3Index) {
+        fillHexTerrain(ctx, kind, drawClosedPath, {
+          fillAndHatchAlphaScale: 2,
+          landHoverFill: kind === "land"
+        });
+      }
       const stroke = getActiveHexStrokeStyle();
       ctx.strokeStyle = stroke.color;
       ctx.lineWidth = stroke.width * zoomStrokeScale;
+      drawClosedPath();
       ctx.stroke();
       if (selectedHexIndex === hx.h3Index) {
-        ctx.beginPath();
-        for (let i = 0; i < pts.length; i++) {
-          const p = pts[i];
-          if (i === 0) ctx.moveTo(p.x, p.y);
-          else ctx.lineTo(p.x, p.y);
-        }
-        ctx.closePath();
+        drawClosedPath();
         ctx.strokeStyle = "#2e5a7b";
         ctx.lineWidth = Math.max(1.8, 2.2 * zoomStrokeScale);
         ctx.stroke();
@@ -15850,13 +15958,13 @@
   }
   function init() {
     try {
-      initWorldLeafletMaps("main-map", "minimap", () => requestRedraw());
-      setMainBasemapFilter(getActiveBasemapFilter());
+      initWorldLeafletMaps("main-map", "minimap", () => requestRedraw(), getActiveTerrainStyleBasemapId());
+      setMainBasemapFilter("");
       const leg = document.getElementById("terrain-legend");
       if (leg) {
         renderTerrainLegend(leg, {
           onStyleChanged: (_styleId) => {
-            setMainBasemapFilter(getActiveBasemapFilter());
+            setMainBasemapByProviderId(getActiveTerrainStyleBasemapId());
             requestRedraw();
           }
         });
@@ -15910,9 +16018,44 @@
       const set = new Set(gameState.hexes.map((h) => h.h3Index));
       return hitTestHexAtContainerPixel(x, y, set);
     }
+    mainMapEl.addEventListener("pointermove", (e) => {
+      lastPointerClientX = e.clientX;
+      lastPointerClientY = e.clientY;
+      const hit = clientXYToHit(e.clientX, e.clientY);
+      if (hit !== hoveredHexH3) {
+        clearTerrainTooltipTimer();
+        hideTerrainTooltipVisual();
+        hoveredHexH3 = hit;
+        requestRedraw();
+        if (hit) {
+          const targetHex = hit;
+          terrainTooltipDelayTimer = setTimeout(() => {
+            terrainTooltipDelayTimer = null;
+            if (hoveredHexH3 !== targetHex || !gameState) return;
+            showTerrainTooltip(lastPointerClientX, lastPointerClientY, terrainLabelForHex(targetHex));
+          }, TERRAIN_TOOLTIP_DELAY_MS);
+        }
+        return;
+      }
+      const tip = document.getElementById("hex-tooltip");
+      if (tip && !tip.classList.contains("hidden")) {
+        tip.style.left = `${e.clientX + TOOLTIP_OFFSET_PX}px`;
+        tip.style.top = `${e.clientY + TOOLTIP_OFFSET_PX}px`;
+      }
+    });
+    mainMapEl.addEventListener("pointerleave", () => {
+      clearTerrainTooltipTimer();
+      hideTerrainTooltipVisual();
+      if (hoveredHexH3 !== null) {
+        hoveredHexH3 = null;
+        requestRedraw();
+      }
+    });
     mainMapEl.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
       selectedUnitIdAtMouseDown = selectedUnitId;
+      clearTerrainTooltipTimer();
+      hideTerrainTooltipVisual();
     });
     mainMapEl.addEventListener("click", (e) => {
       const hit = clientXYToHit(e.clientX, e.clientY);
