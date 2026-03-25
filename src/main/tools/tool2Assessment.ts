@@ -6,8 +6,9 @@
 
 import { cellToLatLng, gridDistance, gridDisk } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
-import { getDistanceAndTurns, getMovementBudgetForUnit } from '../pathfinding';
+import { getDistanceAndTurns, getMovementBudgetForUnit, terrainIsPassableForDomain } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
+import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
 import { getRange } from '../combatConstants';
 import { getStandingOrderForUnit } from './tool5StandingOrders';
 import { logDebug, logError, logTrace } from '../logger';
@@ -294,7 +295,10 @@ function executeAssessHex(
     return { status: 'error', error: 'Invalid hex position' };
   }
   const terrain = terrainByH3.get(hexH3) ?? 'land';
-  const passableBy = terrain === 'water' ? ['naval'] : ['infantry', 'armor'];
+  const passableBy: string[] = [];
+  if (passabilityAllowsLandUnit(terrain)) passableBy.push('infantry', 'armor');
+  if (passabilityAllowsNavalUnit(terrain)) passableBy.push('naval');
+  if (passableBy.length === 0) passableBy.push('none');
   const unitsAtHex = state.units
     .filter((u) => u.h3Index === hexH3)
     .map((u) => ({ unitId: u.id, type: u.unitType, position: h3ToLatLng(u.h3Index, latLngByH3) as LatLng }));
@@ -327,9 +331,8 @@ function executeAssessHex(
   let adjacentLand = 0;
   let adjacentWater = 0;
   let passableNeighbors = 0;
-  const passableFor = forUnitType != null
-    ? (forUnitType === 'naval' ? 'water' : 'land')
-    : (terrain === 'water' ? 'water' : 'land');
+  const passableFor: PassableDomain =
+    forUnitType != null ? (forUnitType === 'naval' ? 'water' : 'land') : terrain === 'water' ? 'water' : 'land';
   try {
     const ring = gridDisk(hexH3, 1);
     for (let i = 1; i < ring.length; i++) {
@@ -337,8 +340,12 @@ function executeAssessHex(
       if (!hexSet.has(n)) continue;
       const t = terrainByH3.get(n) ?? 'land';
       if (t === 'land') adjacentLand++;
-      else adjacentWater++;
-      if (t === passableFor) passableNeighbors++;
+      else if (t === 'water') adjacentWater++;
+      else if (t === 'coastal') {
+        adjacentLand++;
+        adjacentWater++;
+      }
+      if (terrainIsPassableForDomain(t, passableFor)) passableNeighbors++;
     }
   } catch (err) {
     logError('tool2Assessment executeAssessHex: gridDisk threw', err);

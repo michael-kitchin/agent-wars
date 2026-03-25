@@ -1,7 +1,8 @@
 terrain,count
-arctic,6
-desert,49
-forest,78
-land,66
-mountain,20
-ocean,623
+arctic,0
+coastal,313
+desert,22
+forest,43
+land,22
+mountain,12
+ocean,430

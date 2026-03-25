@@ -11,7 +11,7 @@ import { getAttack, getDefense, getRange } from './combatConstants';
 import { logDebug, logError, logTrace } from './logger';
 import type { GameStateSnapshot } from './gameDb';
 import { setAiToolLimitExceededLastTurn, getAndClearAiToolLimitExceededLastTurn } from './gameDb';
-import { buildLatLngCoordinateMap, LATLNG_DECIMAL_PLACES } from './mapData';
+import { buildLatLngCoordinateMap, H3_RESOLUTION, LATLNG_DECIMAL_PLACES } from './mapData';
 import { executeTool1, TOOL1_NAMES, type LatLng } from './tools/tool1Pathfinding';
 import { executeTool2, TOOL2_NAMES } from './tools/tool2Assessment';
 import { executeTool3, TOOL3_NAMES } from './tools/tool3CombatEstimation';
@@ -26,6 +26,7 @@ import { runPrecomputation } from './precomputation';
 import { formatBriefing } from './briefingFormatter';
 import { replaceSubscriptions, getSubscriptions } from './callbackSubscriptions';
 import type { CallbackSubscription } from './callbackSubscriptions';
+import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
 
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -278,9 +279,11 @@ function validateAiOrder(
 
   const destHex = state.hexes.find((h) => h.h3Index === order.toH3Index);
   const terrain = destHex?.terrain ?? 'land';
-  if (unit.unitType === 'naval' && terrain !== 'water') return { valid: false, reason: 'Naval units must move to water' };
-  if ((unit.unitType === 'infantry' || unit.unitType === 'armor') && terrain !== 'land') {
-    return { valid: false, reason: 'Land units must move to land' };
+  if (unit.unitType === 'naval' && !passabilityAllowsNavalUnit(terrain)) {
+    return { valid: false, reason: 'Naval units must move to water or coastal hexes' };
+  }
+  if ((unit.unitType === 'infantry' || unit.unitType === 'armor') && !passabilityAllowsLandUnit(terrain)) {
+    return { valid: false, reason: 'Land units must move to land or coastal hexes' };
   }
   return { valid: true };
 }
@@ -303,8 +306,8 @@ function getValidDestinations(unit: { h3Index: string; unitType: string }, state
       continue;
     }
     if (dist < 1 || dist > range) continue;
-    if (unit.unitType === 'naval' && h.terrain !== 'water') continue;
-    if (wantLand && h.terrain !== 'land') continue;
+    if (unit.unitType === 'naval' && !passabilityAllowsNavalUnit(h.terrain)) continue;
+    if (wantLand && !passabilityAllowsLandUnit(h.terrain)) continue;
     valid.push(h.h3Index);
   }
   return valid;
@@ -346,7 +349,8 @@ function validateAiRangedOrder(
 }
 
 /** Preamble for [lat, lng] coordinates: use only positions from the lists; distances in hexes are given where needed. */
-const LATLNG_PREAMBLE = `Positions use [lat, lng] coordinates (latitude, longitude; floating point is fine). Use only coordinates from the unit and target lists below; do not invent coordinates. Hex distances are given in the prompt where relevant.
+const LATLNG_PREAMBLE = `Map context: global Earth map (H3 resolution ${H3_RESOLUTION}), not a local/contrived arena.
+Positions use [lat, lng] coordinates (latitude, longitude). Values in this prompt are rounded to ${LATLNG_DECIMAL_PLACES} decimal places for this map resolution; preserve that precision when you copy coordinates. Use only coordinates from the unit and target lists below; do not invent coordinates. Hex distances are given in the prompt where relevant.
 
 Final JSON uses an "orders" array (see submit instruction below). Geographic targets use [lat, lng] only. Follow/pursue standing orders use enemy unit id strings only (targetUnitId). Never use raw H3 cell IDs or hex index strings.`;
 

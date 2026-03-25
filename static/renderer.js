@@ -13930,12 +13930,6 @@
     return h3Index;
   }
   var MAX_JS_ARRAY_LENGTH = Math.pow(2, 32) - 1;
-  function validateArrayLength(length) {
-    if (length > MAX_JS_ARRAY_LENGTH) {
-      throw JSBindingError(E_ARRAY_LENGTH, length);
-    }
-    return length;
-  }
   var INVALID_HEXIDECIMAL_CHAR = /[^0-9a-fA-F]/;
   function h3IndexToSplitLong(h3Index) {
     if (Array.isArray(h3Index) && h3Index.length === 2 && Number.isInteger(h3Index[0]) && Number.isInteger(h3Index[1])) {
@@ -14014,6 +14008,18 @@
       libh3._free(latLng);
     }
   }
+  function cellToLatLng(h3Index) {
+    var latLng = libh3._malloc(SZ_LATLNG);
+    var ref = h3IndexToSplitLong(h3Index);
+    var lower = ref[0];
+    var upper = ref[1];
+    try {
+      throwIfError(H3.cellToLatLng(lower, upper, latLng));
+      return readLatLng(latLng);
+    } finally {
+      libh3._free(latLng);
+    }
+  }
   function cellToBoundary(h3Index, formatAsGeoJson) {
     var cellBoundary = libh3._malloc(SZ_CELLBOUNDARY);
     var ref = h3IndexToSplitLong(h3Index);
@@ -14024,38 +14030,6 @@
       return readCellBoundary(cellBoundary, formatAsGeoJson, formatAsGeoJson);
     } finally {
       libh3._free(cellBoundary);
-    }
-  }
-  function gridDiskDistances(h3Index, ringSize) {
-    var ref = h3IndexToSplitLong(h3Index);
-    var lower = ref[0];
-    var upper = ref[1];
-    var countPtr = libh3._malloc(SZ_INT64);
-    try {
-      throwIfError(H3.maxGridDiskSize(ringSize, countPtr));
-      var count = validateArrayLength(readInt64AsDoubleFromPointer(countPtr));
-      var kRings = libh3._calloc(count, SZ_H3INDEX);
-      var distances = libh3._calloc(count, SZ_INT);
-      try {
-        throwIfError(H3.gridDiskDistances(lower, upper, ringSize, kRings, distances));
-        var out = [];
-        for (var i = 0; i < ringSize + 1; i++) {
-          out.push([]);
-        }
-        for (var i$1 = 0; i$1 < count; i$1++) {
-          var cell = readH3IndexFromPointer(kRings, i$1);
-          var index = libh3.getValue(distances + SZ_INT * i$1, "i32");
-          if (cell !== null) {
-            out[index].push(cell);
-          }
-        }
-        return out;
-      } finally {
-        libh3._free(kRings);
-        libh3._free(distances);
-      }
-    } finally {
-      libh3._free(countPtr);
     }
   }
   function gridDistance(origin, destination) {
@@ -14081,169 +14055,478 @@
   }
 
   // src/renderer/hexGrid.ts
-  var H3_RESOLUTION = 3;
-  var GRID_CENTER_LAT = -4.5302;
-  var GRID_CENTER_LNG = -42.0224;
-  var hexCells = null;
-  function getHexCells() {
-    if (hexCells !== null) return hexCells;
-    const center = latLngToCell(GRID_CENTER_LAT, GRID_CENTER_LNG, H3_RESOLUTION);
-    const rings = gridDiskDistances(center, 2);
-    hexCells = rings.flat();
-    return hexCells;
+  var WEB_MERCATOR_MAX_ABS_LAT = 85.05112877980659;
+  function clampLatForWebMercatorDisplay(lat) {
+    if (lat > WEB_MERCATOR_MAX_ABS_LAT) return WEB_MERCATOR_MAX_ABS_LAT;
+    if (lat < -WEB_MERCATOR_MAX_ABS_LAT) return -WEB_MERCATOR_MAX_ABS_LAT;
+    return lat;
   }
-  function boundaryToCanvas(boundary, centerLng, centerLat, pixelPerDegree) {
-    return boundary.map(([lat, lng]) => {
-      const x = (lng - centerLng) * pixelPerDegree;
-      const y = -(lat - centerLat) * pixelPerDegree;
-      return { x, y };
-    });
+  function alignLngToReference(lng, refLng) {
+    let l = lng;
+    while (l - refLng > 180) l -= 360;
+    while (refLng - l > 180) l += 360;
+    return l;
   }
-  function getGridBounds(cells) {
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    const centerLat = GRID_CENTER_LAT;
-    const centerLng = GRID_CENTER_LNG;
-    const scale = 1;
-    for (const h of cells) {
-      const boundary = cellToBoundary(h);
-      const pts = boundaryToCanvas(boundary, centerLng, centerLat, scale);
-      for (const p of pts) {
-        minX = Math.min(minX, p.x);
-        minY = Math.min(minY, p.y);
-        maxX = Math.max(maxX, p.x);
-        maxY = Math.max(maxY, p.y);
-      }
-    }
-    return { minX, minY, maxX, maxY };
-  }
-  var FIT_PADDING = 20;
-  function getFitScale(canvasWidth, canvasHeight, cells) {
-    const list = cells ?? getHexCells();
-    const b = getGridBounds(list);
-    const rangeX = b.maxX - b.minX || 1;
-    const rangeY = b.maxY - b.minY || 1;
-    const fitW = canvasWidth - 2 * FIT_PADDING;
-    const fitH = canvasHeight - 2 * FIT_PADDING;
-    return Math.min(fitW / rangeX, fitH / rangeY);
-  }
-  function gridToCanvas(gridX, gridY, view2, fitScale, canvasCenterX, canvasCenterY) {
-    const s = fitScale * view2.scale;
-    return {
-      x: canvasCenterX + view2.offsetX + gridX * s,
-      y: canvasCenterY + view2.offsetY + gridY * s
-    };
-  }
-  function canvasToGrid(canvasX, canvasY, view2, fitScale, canvasCenterX, canvasCenterY) {
-    const s = fitScale * view2.scale;
-    return {
-      x: (canvasX - canvasCenterX - view2.offsetX) / s,
-      y: (canvasY - canvasCenterY - view2.offsetY) / s
-    };
-  }
-  var TERRAIN_STYLES = {
-    land: { fill: "#c4a574", stroke: "#6b5d4a" },
-    water: { fill: "#7a9eb5", stroke: "#3d5a6c" }
-  };
-  var DEFAULT_FILL = "#c4a574";
-  var DEFAULT_STROKE = "#6b5d4a";
-  var SELECTION_FILL = "#c49b2e";
-  var SELECTION_STROKE = "#8a7020";
-  function drawHexes(ctx, view2, canvasWidth, canvasHeight, backgroundColor, selectedIndex, hexesWithTerrain) {
-    const cells = hexesWithTerrain?.map((h) => h.h3Index) ?? getHexCells();
-    const centerLat = GRID_CENTER_LAT;
-    const centerLng = GRID_CENTER_LNG;
-    const fitScale = getFitScale(canvasWidth, canvasHeight, cells);
-    const canvasCenterX = canvasWidth / 2;
-    const canvasCenterY = canvasHeight / 2;
-    ctx.fillStyle = backgroundColor;
-    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-    for (let i = 0; i < cells.length; i++) {
-      const h = cells[i];
-      const boundary = cellToBoundary(h);
-      const gridPts = boundaryToCanvas(boundary, centerLng, centerLat, 1);
-      const pts = gridPts.map(
-        (p) => gridToCanvas(p.x, p.y, view2, fitScale, canvasCenterX, canvasCenterY)
-      );
-      const isSelected = selectedIndex === h;
-      const terrain = hexesWithTerrain?.[i]?.terrain;
-      const styles = terrain ? TERRAIN_STYLES[terrain] ?? { fill: DEFAULT_FILL, stroke: DEFAULT_STROKE } : { fill: DEFAULT_FILL, stroke: DEFAULT_STROKE };
-      ctx.beginPath();
-      ctx.moveTo(pts[0].x, pts[0].y);
-      for (let j = 1; j < pts.length; j++) {
-        ctx.lineTo(pts[j].x, pts[j].y);
-      }
-      ctx.closePath();
-      ctx.fillStyle = isSelected ? SELECTION_FILL : styles.fill;
-      ctx.fill();
-      ctx.strokeStyle = isSelected ? SELECTION_STROKE : styles.stroke;
-      ctx.lineWidth = isSelected ? 3 : 1;
-      ctx.stroke();
-    }
-  }
-  function hitTest(canvasX, canvasY, view2, canvasWidth, canvasHeight, hexList) {
-    const cells = hexList ?? getHexCells();
-    const centerLat = GRID_CENTER_LAT;
-    const centerLng = GRID_CENTER_LNG;
-    const fitScale = getFitScale(canvasWidth, canvasHeight, cells);
-    const canvasCenterX = canvasWidth / 2;
-    const canvasCenterY = canvasHeight / 2;
-    const grid = canvasToGrid(
-      canvasX,
-      canvasY,
-      view2,
-      fitScale,
-      canvasCenterX,
-      canvasCenterY
-    );
-    for (let i = cells.length - 1; i >= 0; i--) {
-      const h = cells[i];
-      const boundary = cellToBoundary(h);
-      const gridPts = boundaryToCanvas(boundary, centerLng, centerLat, 1);
-      if (pointInPolygon(grid.x, grid.y, gridPts)) return h;
-    }
-    return null;
-  }
-  function pointInPolygon(x, y, pts) {
-    let inside = false;
-    const n = pts.length;
-    for (let i = 0, j = n - 1; i < n; j = i++) {
-      const xi = pts[i].x;
-      const yi = pts[i].y;
-      const xj = pts[j].x;
-      const yj = pts[j].y;
-      if (yi > y !== yj > y && x < (xj - xi) * (y - yi) / (yj - yi) + xi) {
-        inside = !inside;
-      }
-    }
-    return inside;
-  }
-  function getHexCanvasCenter(h3Index, view2, canvasWidth, canvasHeight, hexList) {
-    const cells = hexList ?? getHexCells();
-    const fitScale = getFitScale(canvasWidth, canvasHeight, cells);
-    const canvasCenterX = canvasWidth / 2;
-    const canvasCenterY = canvasHeight / 2;
+  function getHexBoundaryLatLngForLeafletOverlay(h3Index) {
     const boundary = cellToBoundary(h3Index);
-    const gridPts = boundaryToCanvas(
-      boundary,
-      GRID_CENTER_LNG,
-      GRID_CENTER_LAT,
-      1
+    const [, refLng] = cellToLatLng(h3Index);
+    return boundary.map(
+      ([lat, lng]) => [clampLatForWebMercatorDisplay(lat), alignLngToReference(lng, refLng)]
     );
-    const ptsForCenter = gridPts.length > 6 ? gridPts.slice(0, -1) : gridPts;
-    const n = ptsForCenter.length;
-    const cx = n ? ptsForCenter.reduce((s, p) => s + p.x, 0) / n : 0;
-    const cy = n ? ptsForCenter.reduce((s, p) => s + p.y, 0) / n : 0;
-    return gridToCanvas(
-      cx,
-      cy,
-      view2,
-      fitScale,
-      canvasCenterX,
-      canvasCenterY
+  }
+
+  // src/renderer/basemapProvider.ts
+  var BASEMAP_PROVIDER_CHAIN = [
+    {
+      id: "carto_positron_nolabels",
+      displayName: "Carto Positron (no labels)",
+      urlTemplate: "https://{s}.basemaps.cartocdn.com/rastertiles/light_nolabels/{z}/{x}/{y}.png",
+      attributionHtml: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: "abcd",
+      maxZoom: 20,
+      minZoom: 0
+    },
+    {
+      id: "osm_mapnik",
+      displayName: "OpenStreetMap Standard",
+      urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      attributionHtml: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      subdomains: "abc",
+      maxZoom: 19,
+      minZoom: 0
+    }
+  ];
+  function getRasterBasemapChain() {
+    return BASEMAP_PROVIDER_CHAIN;
+  }
+
+  // src/renderer/worldLeafletMap.ts
+  var mainMap = null;
+  var miniMap = null;
+  var viewportRect = null;
+  var onMainViewChanged = null;
+  function notifyMainViewChanged() {
+    syncMinimapViewportRect();
+    onMainViewChanged?.();
+  }
+  function getL() {
+    const Lref = globalThis.L;
+    if (!Lref) throw new Error("Leaflet not loaded: include static/vendor/leaflet/leaflet.js before renderer.js");
+    return Lref;
+  }
+  function mountRasterBasemap(Lref, map, showAttribution, chainIndex) {
+    const chain = getRasterBasemapChain();
+    if (chainIndex >= chain.length) {
+      showBasemapErrorToast();
+      return;
+    }
+    const spec = chain[chainIndex];
+    let switched = false;
+    const layer = Lref.tileLayer(spec.urlTemplate, {
+      attribution: showAttribution ? spec.attributionHtml : "",
+      subdomains: spec.subdomains ?? "abc",
+      maxZoom: spec.maxZoom ?? 19,
+      minZoom: spec.minZoom ?? 0
+    }).addTo(map);
+    const onTileError = () => {
+      if (switched) return;
+      switched = true;
+      layer.off("tileerror", onTileError);
+      try {
+        map.removeLayer(layer);
+      } catch {
+      }
+      console.warn("[agent-wars] Basemap tile error; trying next provider", {
+        failedId: spec.id,
+        nextIndex: chainIndex + 1
+      });
+      mountRasterBasemap(Lref, map, showAttribution, chainIndex + 1);
+    };
+    layer.on("tileerror", onTileError);
+  }
+  function initWorldLeafletMaps(mainContainerId, minimapContainerId, onViewChanged) {
+    onMainViewChanged = onViewChanged;
+    const Lref = getL();
+    const mainEl = document.getElementById(mainContainerId);
+    const miniEl = document.getElementById(minimapContainerId);
+    if (!mainEl || !miniEl) {
+      console.error("[agent-wars] initWorldLeafletMaps: missing map container elements", {
+        mainContainerId,
+        minimapContainerId,
+        hasMain: !!mainEl,
+        hasMinimap: !!miniEl
+      });
+      return;
+    }
+    const worldBounds = Lref.latLngBounds(
+      Lref.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
+      Lref.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
     );
+    mainMap = Lref.map(mainEl, {
+      minZoom: 1.5,
+      maxZoom: 12,
+      zoomSnap: 0.25,
+      zoomDelta: 0.5,
+      wheelPxPerZoomLevel: 80,
+      worldCopyJump: true,
+      maxBounds: worldBounds,
+      maxBoundsViscosity: 1,
+      /* Keep raster tiles and canvas overlay in lockstep (no CSS zoom/pan lag vs hex draw). */
+      zoomAnimation: false,
+      fadeAnimation: false,
+      inertia: false
+    });
+    mountRasterBasemap(Lref, mainMap, true, 0);
+    mainMap.fitBounds(worldBounds, { padding: [2, 2], animate: false });
+    mainMap.doubleClickZoom.disable();
+    miniMap = Lref.map(miniEl, {
+      minZoom: 0,
+      maxZoom: 2,
+      zoomControl: false,
+      attributionControl: false,
+      dragging: false,
+      scrollWheelZoom: false,
+      doubleClickZoom: false,
+      boxZoom: false,
+      keyboard: false
+    });
+    mountRasterBasemap(Lref, miniMap, false, 0);
+    miniMap.fitBounds(worldBounds, { padding: [1, 1], animate: false });
+    miniMap.setZoom(miniMap.getZoom());
+    mainMap.on("move", notifyMainViewChanged);
+    mainMap.on("zoom", notifyMainViewChanged);
+    mainMap.on("moveend", notifyMainViewChanged);
+    mainMap.on("zoomend", notifyMainViewChanged);
+    syncMinimapViewportRect();
+  }
+  var basemapErrorShown = false;
+  function showBasemapErrorToast() {
+    if (basemapErrorShown) return;
+    basemapErrorShown = true;
+    const el = document.getElementById("map-toast");
+    const textEl = document.getElementById("map-toast-text");
+    if (el && textEl) {
+      textEl.textContent = "Some map tiles failed to load (network or provider). The game remains playable; try again later.";
+      el.classList.add("toast-info");
+      el.classList.remove("hidden");
+    }
+  }
+  function syncMinimapViewportRect() {
+    if (!mainMap || !miniMap) return;
+    const Lref = getL();
+    const mainBounds = mainMap.getBounds();
+    const miniBounds = miniMap.getBounds();
+    const mainSpan = Math.abs(mainBounds.getNorthEast().lat - mainBounds.getSouthWest().lat) + Math.abs(mainBounds.getNorthEast().lng - mainBounds.getSouthWest().lng);
+    const miniSpan = Math.abs(miniBounds.getNorthEast().lat - miniBounds.getSouthWest().lat) + Math.abs(miniBounds.getNorthEast().lng - miniBounds.getSouthWest().lng);
+    const zoomedIn = mainSpan < miniSpan * 0.92;
+    if (!zoomedIn) {
+      if (viewportRect) {
+        viewportRect.remove();
+        viewportRect = null;
+      }
+      return;
+    }
+    if (!viewportRect) {
+      viewportRect = Lref.rectangle(mainBounds, {
+        color: "#2e5a7b",
+        weight: 2,
+        fill: false,
+        interactive: false
+      }).addTo(miniMap);
+    } else {
+      viewportRect.setBounds(mainBounds);
+    }
+  }
+  function getMainLeafletMap() {
+    return mainMap;
+  }
+  function setMainBasemapFilter(filter) {
+    const mapEl = document.getElementById("main-map");
+    if (mapEl) mapEl.style.filter = "";
+    try {
+      const pane = mainMap?.getPanes?.()?.tilePane;
+      if (pane) {
+        const oldFiltered = pane.querySelectorAll(".leaflet-layer, .leaflet-tile");
+        for (const el of oldFiltered) el.style.filter = "";
+        pane.style.filter = filter;
+        return;
+      }
+    } catch {
+    }
+    if (mapEl) mapEl.style.filter = filter;
+  }
+  function hexCenterToOverlayPoint(h3Index, latLngFn) {
+    if (!mainMap) return { x: 0, y: 0 };
+    const Lref = getL();
+    const [lat, lng] = latLngFn(h3Index);
+    const p = mainMap.latLngToContainerPoint(Lref.latLng(clampLatForWebMercatorDisplay(lat), lng));
+    return { x: p.x, y: p.y };
+  }
+  function invalidateLeafletMapSizes() {
+    mainMap?.invalidateSize({ animate: false });
+    miniMap?.invalidateSize({ animate: false });
+    notifyMainViewChanged();
+  }
+
+  // src/shared/pipelineTerrain.ts
+  var PIPELINE_TERRAIN_KINDS = [
+    "ocean",
+    "coastal",
+    "land",
+    "forest",
+    "mountain",
+    "desert",
+    "arctic"
+  ];
+  var KIND_SET = new Set(PIPELINE_TERRAIN_KINDS);
+  function passabilityAllowsLandUnit(t) {
+    return t === "land" || t === "coastal";
+  }
+  function passabilityAllowsNavalUnit(t) {
+    return t === "water" || t === "coastal";
+  }
+
+  // src/renderer/terrainVisualStyles.ts
+  var patternCache = /* @__PURE__ */ new Map();
+  var UNKNOWN_FILL = "rgba(140, 140, 140, 0.075)";
+  var TERRAIN_STYLE_PRESETS = {
+    default: {
+      label: "Default",
+      basemapFilter: "grayscale(0.8) saturate(0.68) contrast(0.97) brightness(1.03)",
+      strokeColor: "rgba(36,38,42,0.4)",
+      strokeWidth: 0.5,
+      fillAlphaMultiplier: 0.75,
+      hatchAlphaMultiplier: 0.65,
+      fills: {
+        ocean: "rgba(25, 90, 170, 0.15)",
+        coastal: "rgba(55, 130, 140, 0.13)",
+        land: "rgba(130, 145, 95, 0.05)",
+        forest: "rgba(35, 110, 55, 0.09)",
+        mountain: "rgba(110, 95, 85, 0.11)",
+        desert: "rgba(210, 175, 95, 0.1)",
+        arctic: "rgba(220, 235, 250, 0.14)"
+      },
+      hatches: {
+        mountain: { color: "rgba(60,45,40,0.19)", spacing: 6, lineWidth: 0.85, reverseDiagonal: true },
+        forest: { color: "rgba(20,70,35,0.15)", spacing: 8, lineWidth: 0.75, reverseDiagonal: true },
+        coastal: { color: "rgba(30,100,120,0.16)", spacing: 8, lineWidth: 0.6, reverseDiagonal: false }
+      }
+    },
+    atlas: {
+      label: "Atlas",
+      basemapFilter: "grayscale(0.2) saturate(1.25) contrast(1.12) brightness(1.0)",
+      strokeColor: "rgba(24,34,48,0.52)",
+      strokeWidth: 0.3,
+      fillAlphaMultiplier: 0.55,
+      hatchAlphaMultiplier: 0.75,
+      fills: {
+        ocean: "rgba(35, 116, 201, 0.28)",
+        coastal: "rgba(62, 162, 172, 0.24)",
+        land: "rgba(140, 156, 100, 0)",
+        forest: "rgba(48, 150, 82, 0.42)",
+        mountain: "rgba(158, 129, 109, 0.45)",
+        desert: "rgba(236, 195, 98, 0.4)",
+        arctic: "rgba(235, 244, 255, 0.5)"
+      },
+      hatches: {
+        mountain: { color: "rgba(79,60,50,0.26)", spacing: 8, lineWidth: 0.65, reverseDiagonal: true },
+        forest: { color: "rgba(22,92,47,0.24)", spacing: 9, lineWidth: 0.62, reverseDiagonal: true }
+      }
+    },
+    wargame: {
+      label: "Wargame",
+      // Keep tactical contrast, but preserve blue-water orientation cues from the raster basemap.
+      basemapFilter: "grayscale(0.18) saturate(1.35) contrast(0.9) brightness(0.9)",
+      strokeColor: "rgba(36,38,42,0.42)",
+      strokeWidth: 0.5,
+      fillAlphaMultiplier: 0.45,
+      hatchAlphaMultiplier: 0.5,
+      fills: {
+        // Let raster water show through in Wargame for stronger geographic context.
+        ocean: "rgba(56, 126, 206, 0)",
+        coastal: "rgba(72, 153, 160, 0.21)",
+        land: "rgba(140, 156, 100, 0.15)",
+        forest: "rgba(54, 138, 76, 0.24)",
+        mountain: "rgba(141, 117, 101, 0.27)",
+        desert: "rgba(224, 188, 98, 0.23)",
+        arctic: "rgba(226, 238, 252, 0.28)"
+      },
+      hatches: {
+        mountain: { color: "rgba(79,60,50,0.24)", spacing: 8, lineWidth: 0.78, reverseDiagonal: true },
+        forest: { color: "rgba(22,92,47,0.22)", spacing: 9, lineWidth: 0.74, reverseDiagonal: true },
+        coastal: { color: "rgba(40,118,130,0.2)", spacing: 9, lineWidth: 0.7, reverseDiagonal: false },
+        desert: { color: "rgba(171,134,58,0.22)", spacing: 10, lineWidth: 0.68, reverseDiagonal: false }
+      }
+    },
+    scientific: {
+      label: "Scientific",
+      basemapFilter: "grayscale(0.85) saturate(0.28) contrast(1.12) brightness(0.98)",
+      strokeColor: "rgba(44,52,60,0.56)",
+      strokeWidth: 0.25,
+      fillAlphaMultiplier: 0.45,
+      hatchAlphaMultiplier: 0.45,
+      fills: {
+        ocean: "rgba(38, 121, 187, 0.15)",
+        coastal: "rgba(70, 165, 180, 0.11)",
+        land: "rgba(148, 164, 106, 0)",
+        forest: "rgba(56, 141, 83, 0.28)",
+        mountain: "rgba(142, 120, 104, 0.3)",
+        desert: "rgba(226, 192, 108, 0.24)",
+        arctic: "rgba(236, 246, 255, 0.32)"
+      },
+      hatches: {
+        mountain: { color: "rgba(86,72,62,0.12)", spacing: 13, lineWidth: 0.5, reverseDiagonal: true },
+        forest: { color: "rgba(29,93,54,0.11)", spacing: 14, lineWidth: 0.48, reverseDiagonal: true }
+      }
+    }
+  };
+  var activeTerrainStyleId = "default";
+  function makeDiagonalHatchPattern(color, spacing, lineWidth, reverseDiagonal) {
+    const c = document.createElement("canvas");
+    const s = spacing * 2;
+    c.width = s;
+    c.height = s;
+    const p = c.getContext("2d");
+    if (!p) return null;
+    p.strokeStyle = color;
+    p.lineWidth = lineWidth;
+    p.beginPath();
+    if (reverseDiagonal) {
+      p.moveTo(0, 0);
+      p.lineTo(s, s);
+    } else {
+      p.moveTo(0, s);
+      p.lineTo(s, 0);
+    }
+    p.stroke();
+    return p.createPattern(c, "repeat");
+  }
+  function boostRgbaAlpha(color, factor) {
+    const m = color.match(/^rgba\(\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^)]+)\s*\)$/i);
+    if (!m) return color;
+    const r = m[1].trim();
+    const g = m[2].trim();
+    const b = m[3].trim();
+    const a = Number(m[4].trim());
+    if (!Number.isFinite(a)) return color;
+    const boosted = Math.max(0, Math.min(1, a * factor));
+    const aStr = String(Number(boosted.toFixed(3)));
+    return `rgba(${r}, ${g}, ${b}, ${aStr})`;
+  }
+  function activePreset() {
+    return TERRAIN_STYLE_PRESETS[activeTerrainStyleId];
+  }
+  function getTerrainStyleOptions() {
+    return Object.keys(TERRAIN_STYLE_PRESETS).map((id) => ({
+      id,
+      label: TERRAIN_STYLE_PRESETS[id].label
+    }));
+  }
+  function getActiveTerrainStyleId() {
+    return activeTerrainStyleId;
+  }
+  function getActiveBasemapFilter() {
+    return activePreset().basemapFilter;
+  }
+  function getActiveHexStrokeStyle() {
+    const p = activePreset();
+    return { color: p.strokeColor, width: p.strokeWidth };
+  }
+  function setActiveTerrainStyle(id) {
+    if (activeTerrainStyleId === id) return;
+    activeTerrainStyleId = id;
+    patternCache.clear();
+  }
+  function terrainKindFillStyle(kind) {
+    const k = kind;
+    const p = activePreset();
+    return boostRgbaAlpha(p.fills[k] ?? UNKNOWN_FILL, p.fillAlphaMultiplier);
+  }
+  function terrainKindPattern(ctx, kind) {
+    const k = kind;
+    const key = `${activeTerrainStyleId}:${k}`;
+    if (patternCache.has(key)) return patternCache.get(key) ?? null;
+    const spec = activePreset().hatches[k];
+    const p = activePreset();
+    const pat = spec ? makeDiagonalHatchPattern(
+      boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier),
+      spec.spacing,
+      spec.lineWidth,
+      spec.reverseDiagonal
+    ) : null;
+    patternCache.set(key, pat);
+    return pat;
+  }
+  function fillHexTerrain(ctx, terrainKind, drawPath) {
+    drawPath();
+    ctx.fillStyle = terrainKindFillStyle(terrainKind);
+    ctx.fill();
+    const pat = terrainKindPattern(ctx, terrainKind);
+    if (pat) {
+      drawPath();
+      ctx.fillStyle = pat;
+      ctx.fill();
+    }
+  }
+  var TERRAIN_LEGEND_ORDER = [...PIPELINE_TERRAIN_KINDS];
+  function renderTerrainLegend(container, options) {
+    container.innerHTML = "";
+    container.style.fontSize = "11px";
+    container.style.lineHeight = "1.3";
+    container.style.pointerEvents = "auto";
+    const header = document.createElement("div");
+    header.style.display = "flex";
+    header.style.alignItems = "center";
+    header.style.justifyContent = "space-between";
+    header.style.gap = "8px";
+    header.style.marginBottom = "4px";
+    const title = document.createElement("div");
+    title.textContent = "Terrain";
+    title.style.fontWeight = "600";
+    title.style.color = "#333";
+    header.appendChild(title);
+    const styleSelect = document.createElement("select");
+    styleSelect.setAttribute("aria-label", "Terrain style");
+    styleSelect.style.fontSize = "11px";
+    styleSelect.style.padding = "1px 3px";
+    styleSelect.style.border = "1px solid #aaa";
+    styleSelect.style.borderRadius = "2px";
+    styleSelect.style.background = "#f6f3ee";
+    const opts = getTerrainStyleOptions();
+    for (const o of opts) {
+      const opt = document.createElement("option");
+      opt.value = o.id;
+      opt.textContent = o.label;
+      styleSelect.appendChild(opt);
+    }
+    styleSelect.value = getActiveTerrainStyleId();
+    styleSelect.addEventListener("change", () => {
+      setActiveTerrainStyle(styleSelect.value);
+      if (options?.onStyleChanged) options.onStyleChanged(getActiveTerrainStyleId());
+      renderTerrainLegend(container, options);
+    });
+    header.appendChild(styleSelect);
+    container.appendChild(header);
+    for (const kind of TERRAIN_LEGEND_ORDER) {
+      const row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.alignItems = "center";
+      row.style.gap = "6px";
+      row.style.marginBottom = "2px";
+      const sw = document.createElement("span");
+      sw.style.display = "inline-block";
+      sw.style.width = "18px";
+      sw.style.height = "12px";
+      sw.style.border = "1px solid #888";
+      sw.style.borderRadius = "2px";
+      sw.style.background = terrainKindFillStyle(kind);
+      row.appendChild(sw);
+      const lab = document.createElement("span");
+      lab.textContent = kind;
+      lab.style.color = "#444";
+      row.appendChild(lab);
+      container.appendChild(row);
+    }
   }
 
   // src/renderer/renderer.ts
@@ -14277,9 +14560,11 @@
     if (dist < 1) return { valid: false, reason: "Destination must be different from current hex" };
     const destHex = state.hexes.find((h) => h.h3Index === toH3Index);
     const terrain = destHex?.terrain ?? "land";
-    if (unit.unitType === "naval" && terrain !== "water") return { valid: false, reason: "Naval units must move to water" };
-    if ((unit.unitType === "infantry" || unit.unitType === "armor") && terrain !== "land") {
-      return { valid: false, reason: "Land units must move to land" };
+    if (unit.unitType === "naval" && !passabilityAllowsNavalUnit(terrain)) {
+      return { valid: false, reason: "Naval units must move to water or coastal hexes" };
+    }
+    if ((unit.unitType === "infantry" || unit.unitType === "armor") && !passabilityAllowsLandUnit(terrain)) {
+      return { valid: false, reason: "Land units must move to land or coastal hexes" };
     }
     return { valid: true };
   }
@@ -14379,14 +14664,7 @@
     calloutEl.classList.remove("hidden");
   }
   var TOOLTIP_OFFSET_PX = 12;
-  var MIN_SCALE = 0.2;
-  var MAX_SCALE = 5;
-  var ZOOM_FACTOR = 1.15;
-  var view = {
-    scale: 1,
-    offsetX: 0,
-    offsetY: 0
-  };
+  var WORLD_H3_RESOLUTION = 1;
   var selectedHexIndex = null;
   var selectedUnitId = null;
   var selectedUnitIdAtMouseDown = null;
@@ -14395,17 +14673,8 @@
   var pendingRangedAttacks = [];
   var rangedModeActive = false;
   var gameState = null;
-  var isDragging = false;
-  var dragStartX = 0;
-  var dragStartY = 0;
-  var dragStartOffsetX = 0;
-  var dragStartOffsetY = 0;
-  var DRAG_THRESHOLD_PX = 5;
-  var dragDistanceSq = 0;
   var resolutionMoveAnimation = null;
   var resolutionMoveAnimationFrameId = null;
-  var terrainCacheCanvas = null;
-  var terrainCacheMeta = null;
   var redrawRafId = null;
   function requestRedraw() {
     if (resolutionMoveAnimation) return;
@@ -14415,92 +14684,67 @@
       redraw();
     });
   }
-  function invalidateTerrainCache() {
-    terrainCacheCanvas = null;
-    terrainCacheMeta = null;
-  }
   var canvasMetrics = null;
-  var moveAnimHexCenterBaseCache = null;
-  var moveAnimHexCenterBaseCacheStartTime = null;
-  var moveAnimHexCenterBaseCacheScale = null;
-  var moveAnimHexCenterBaseCacheW = null;
-  var moveAnimHexCenterBaseCacheH = null;
-  function ensureTerrainCache(w, h, dpr) {
-    if (!gameState) return;
-    const TERRAIN_CACHE_MULTIPLIER = 3;
-    const cacheW = Math.max(1, Math.floor(w * TERRAIN_CACHE_MULTIPLIER));
-    const cacheH = Math.max(1, Math.floor(h * TERRAIN_CACHE_MULTIPLIER));
-    const cells = gameState.hexes.map((hx) => hx.h3Index);
-    const needsRegen = !terrainCacheCanvas || !terrainCacheMeta || terrainCacheMeta.scale !== view.scale || terrainCacheMeta.width !== cacheW || terrainCacheMeta.height !== cacheH || terrainCacheMeta.dpr !== dpr || terrainCacheMeta.selectedHexIndex !== selectedHexIndex;
-    if (!needsRegen) return;
-    const cacheCanvas = document.createElement("canvas");
-    cacheCanvas.width = Math.max(1, Math.floor(cacheW * dpr));
-    cacheCanvas.height = Math.max(1, Math.floor(cacheH * dpr));
-    const cacheCtx = cacheCanvas.getContext("2d");
-    if (!cacheCtx) return;
-    cacheCtx.setTransform(1, 0, 0, 1, 0, 0);
-    cacheCtx.scale(dpr, dpr);
-    const fitScaleMain = getFitScale(w, h, cells);
-    const fitScaleCache = getFitScale(cacheW, cacheH, cells);
-    const scaleRatio = fitScaleCache > 0 ? fitScaleMain / fitScaleCache : 1;
-    const viewCache = {
-      scale: view.scale * scaleRatio,
-      // Keep the terrain centered within the cache canvas.
-      // We align it to the main viewport via an origin shift when drawing the cache.
-      offsetX: 0,
-      offsetY: 0
-    };
-    drawHexes(cacheCtx, viewCache, cacheW, cacheH, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
-    terrainCacheCanvas = cacheCanvas;
-    terrainCacheMeta = { scale: view.scale, width: cacheW, height: cacheH, dpr, selectedHexIndex };
+  function getLeafletGlobal() {
+    return globalThis.L;
   }
-  function drawTerrainCache(ctx, w, h, offsetX, offsetY) {
-    if (!terrainCacheCanvas) return;
-    const srcDpr = terrainCacheMeta?.dpr ?? 1;
-    ctx.fillStyle = BACKGROUND_COLOR;
-    ctx.fillRect(0, 0, w, h);
-    const cacheW = terrainCacheMeta?.width ?? w;
-    const cacheH = terrainCacheMeta?.height ?? h;
-    const destOffsetX = offsetX + (w - cacheW) / 2;
-    const destOffsetY = offsetY + (h - cacheH) / 2;
-    const dx0 = Math.max(0, destOffsetX);
-    const dy0 = Math.max(0, destOffsetY);
-    const dx1 = Math.min(w, destOffsetX + cacheW);
-    const dy1 = Math.min(h, destOffsetY + cacheH);
-    if (dx1 <= dx0 || dy1 <= dy0) return;
-    const dx = dx0;
-    const dy = dy0;
-    const sw = dx1 - dx0;
-    const sh = dy1 - dy0;
-    const sx = dx0 - destOffsetX;
-    const sy = dy0 - destOffsetY;
-    ctx.drawImage(
-      terrainCacheCanvas,
-      sx * srcDpr,
-      sy * srcDpr,
-      sw * srcDpr,
-      sh * srcDpr,
-      dx,
-      dy,
-      sw,
-      sh
-    );
+  function hexCenterPx(h3Index) {
+    return hexCenterToOverlayPoint(h3Index, cellToLatLng);
   }
-  function getMoveAnimHexCenterBaseMap(anim, view2, hexes, canvasWidth, canvasHeight, hexList) {
-    if (!moveAnimHexCenterBaseCache || moveAnimHexCenterBaseCacheStartTime !== anim.startTime || moveAnimHexCenterBaseCacheScale !== view2.scale || moveAnimHexCenterBaseCacheW !== canvasWidth || moveAnimHexCenterBaseCacheH !== canvasHeight) {
-      const baseView = { scale: view2.scale, offsetX: 0, offsetY: 0 };
-      const map = /* @__PURE__ */ new Map();
-      for (const h3Index of hexes) {
-        const { x, y } = getHexCanvasCenter(h3Index, baseView, canvasWidth, canvasHeight, hexList);
-        map.set(h3Index, { x0: x, y0: y });
-      }
-      moveAnimHexCenterBaseCache = map;
-      moveAnimHexCenterBaseCacheStartTime = anim.startTime;
-      moveAnimHexCenterBaseCacheScale = view2.scale;
-      moveAnimHexCenterBaseCacheW = canvasWidth;
-      moveAnimHexCenterBaseCacheH = canvasHeight;
+  function hitTestHexAtContainerPixel(x, y, mapHexSet) {
+    const map = getMainLeafletMap();
+    if (!map) return null;
+    const L = getLeafletGlobal();
+    const latlng = map.containerPointToLatLng(L.point(x, y));
+    let cell;
+    try {
+      cell = latLngToCell(latlng.lat, latlng.lng, WORLD_H3_RESOLUTION);
+    } catch {
+      return null;
     }
-    return moveAnimHexCenterBaseCache;
+    return mapHexSet.has(cell) ? cell : null;
+  }
+  function drawTerrainHexes(ctx) {
+    if (!gameState) return;
+    const map = getMainLeafletMap();
+    if (!map) return;
+    const mapWithZoom = map;
+    const zoom = typeof mapWithZoom.getZoom === "function" ? mapWithZoom.getZoom() : 4;
+    const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
+    const L = getLeafletGlobal();
+    for (const hx of gameState.hexes) {
+      const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
+      const pts = boundary.map(([lat, lng]) => {
+        const p = map.latLngToContainerPoint(L.latLng(lat, lng));
+        return { x: p.x, y: p.y };
+      });
+      const kind = hx.terrainKind ?? (hx.terrain === "water" ? "ocean" : hx.terrain === "coastal" ? "coastal" : "land");
+      fillHexTerrain(ctx, kind, () => {
+        ctx.beginPath();
+        for (let i = 0; i < pts.length; i++) {
+          const p = pts[i];
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+      });
+      const stroke = getActiveHexStrokeStyle();
+      ctx.strokeStyle = stroke.color;
+      ctx.lineWidth = stroke.width * zoomStrokeScale;
+      ctx.stroke();
+      if (selectedHexIndex === hx.h3Index) {
+        ctx.beginPath();
+        for (let i = 0; i < pts.length; i++) {
+          const p = pts[i];
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = "#2e5a7b";
+        ctx.lineWidth = Math.max(1.8, 2.2 * zoomStrokeScale);
+        ctx.stroke();
+      }
+    }
   }
   var OPENROUTER_TOOL_GROUPS = [
     { id: "precomputation", label: "Precomputation" },
@@ -14804,8 +15048,9 @@
   }
   function resizeAndRedraw() {
     const container = document.getElementById("canvas-container");
-    const canvas = document.getElementById("canvas");
+    const canvas = document.getElementById("map-overlay");
     if (!container || !canvas) return;
+    invalidateLeafletMapSizes();
     const dpr = window.devicePixelRatio ?? 1;
     const rect = container.getBoundingClientRect();
     const w = Math.max(1, Math.floor(rect.width));
@@ -14829,12 +15074,8 @@
       ctx.fillText("Loading\u2026", w / 2, h / 2);
       return;
     }
-    ensureTerrainCache(w, h, dpr);
-    if (terrainCacheCanvas) {
-      drawTerrainCache(ctx, w, h, view.offsetX, view.offsetY);
-    } else {
-      drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
-    }
+    ctx.clearRect(0, 0, w, h);
+    drawTerrainHexes(ctx);
     const hexList = gameState.hexes.map((h2) => h2.h3Index);
     let moveProgress = 1;
     let unitsToDraw = gameState.units;
@@ -14870,28 +15111,22 @@
         movingIds = void 0;
       }
       if (elapsed >= phase.movementStart) {
-        drawResolutionMoveLines(ctx, view, w, h, anim.moves, gameState.units, hexList, 1);
+        drawResolutionMoveLines(ctx, w, h, anim.moves, gameState.units, hexList, 1);
       }
     } else {
       movingIds = void 0;
     }
     if (pendingOrders.length > 0 && gameState.units.length && hexList) {
-      drawOrderLines(ctx, view, w, h, pendingOrders, gameState.units, hexList);
+      drawOrderLines(ctx, w, h, pendingOrders, gameState.units, hexList);
     }
     if (pendingRangedAttacks.length > 0 && gameState.units.length && hexList) {
-      drawRangedAttackLines(ctx, view, w, h, pendingRangedAttacks, gameState.units, hexList);
+      drawRangedAttackLines(ctx, w, h, pendingRangedAttacks, gameState.units, hexList);
     }
     if (unitsToDraw.length) {
-      drawUnits(ctx, view, w, h, unitsToDraw, hexList, movingIds);
+      drawUnits(ctx, w, h, unitsToDraw, hexList, movingIds);
     }
     if (anim && hexList && moveProgress < 1) {
-      const moveAnimHexList = /* @__PURE__ */ new Set();
-      for (const m of anim.moves) {
-        moveAnimHexList.add(m.fromH3Index);
-        moveAnimHexList.add(m.toH3Index);
-      }
-      const animBaseCenters = getMoveAnimHexCenterBaseMap(anim, view, moveAnimHexList, w, h, hexList);
-      drawMovingUnits(ctx, view, w, h, anim.moves, gameState.units, hexList, moveProgress, animBaseCenters);
+      drawMovingUnits(ctx, w, h, anim.moves, gameState.units, hexList, moveProgress);
     }
     if (anim && hexList) {
       const elapsed = Date.now() - anim.startTime;
@@ -14909,13 +15144,13 @@
       const combatHexes = phase.inRangedLightning ? anim.rangedCombatHexes ?? anim.combatHexes : phase.inMeleeLightning ? anim.meleeCombatHexes : void 0;
       if (combatHexes?.length) {
         const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * 8e-3);
-        drawCombatLightning(ctx, view, w, h, combatHexes, hexList, pulseOpacity);
+        drawCombatLightning(ctx, w, h, combatHexes, hexList, pulseOpacity);
       }
       const casualtyHexes = phase.inRangedCasualty ? anim.rangedCasualtyHexes ?? anim.casualtyHexes : phase.inMeleeCasualty ? anim.meleeCasualtyHexes : void 0;
       if (casualtyHexes?.length) {
         const casualtyElapsed = phase.inRangedCasualty ? elapsed - (hasRangedCombat ? LIGHTNING_DURATION_MS : 0) : elapsed - (phase.movementStart + RESOLUTION_FADE_MS + (hasMeleeCombat ? LIGHTNING_DURATION_MS : 0));
         const pulseOpacity = 0.5 + 0.5 * Math.sin(casualtyElapsed * 8e-3);
-        drawCasualtyOverlay(ctx, view, w, h, casualtyHexes, hexList, pulseOpacity);
+        drawCasualtyOverlay(ctx, w, h, casualtyHexes, hexList, pulseOpacity);
       }
     }
   }
@@ -14938,7 +15173,7 @@
     ctx.textBaseline = "middle";
     ctx.fillText(label, x, y);
   }
-  function drawUnits(ctx, view2, canvasWidth, canvasHeight, units, hexList, movingUnitIds) {
+  function drawUnits(ctx, canvasWidth, canvasHeight, units, hexList, movingUnitIds) {
     if (!hexList || units.length === 0) return;
     const byHex = /* @__PURE__ */ new Map();
     for (const u of units) {
@@ -14948,7 +15183,7 @@
       byHex.set(u.h3Index, list);
     }
     for (const [h3Index, hexUnits] of byHex) {
-      const { x, y } = getHexCanvasCenter(h3Index, view2, canvasWidth, canvasHeight, hexList);
+      const { x, y } = hexCenterPx(h3Index);
       const count = hexUnits.length;
       const types = new Set(hexUnits.map((u) => u.unitType));
       const players = new Set(hexUnits.map((u) => u.player));
@@ -14974,7 +15209,7 @@
     }
   }
   var LIGHTNING_COLOR = "#f0d000";
-  function drawCombatLightning(ctx, view2, canvasWidth, canvasHeight, combatHexes, hexList, opacity) {
+  function drawCombatLightning(ctx, canvasWidth, canvasHeight, combatHexes, hexList, opacity) {
     if (combatHexes.length === 0 || opacity <= 0) return;
     ctx.save();
     ctx.globalAlpha = opacity;
@@ -14982,7 +15217,7 @@
     ctx.lineJoin = "round";
     const h = 18;
     for (const h3Index of combatHexes) {
-      const { x, y } = getHexCanvasCenter(h3Index, view2, canvasWidth, canvasHeight, hexList);
+      const { x, y } = hexCenterPx(h3Index);
       ctx.beginPath();
       ctx.moveTo(x, y - h);
       ctx.lineTo(x + 6, y - 4);
@@ -14998,14 +15233,14 @@
     ctx.restore();
   }
   var CASUALTY_X_COLOR = "#c03030";
-  function drawCasualtyOverlay(ctx, view2, canvasWidth, canvasHeight, casualtyHexes, hexList, opacity) {
+  function drawCasualtyOverlay(ctx, canvasWidth, canvasHeight, casualtyHexes, hexList, opacity) {
     if (casualtyHexes.length === 0 || opacity <= 0) return;
     ctx.save();
     ctx.globalAlpha = opacity;
     ctx.lineCap = "round";
     const size = 20;
     for (const h3Index of casualtyHexes) {
-      const { x, y } = getHexCanvasCenter(h3Index, view2, canvasWidth, canvasHeight, hexList);
+      const { x, y } = hexCenterPx(h3Index);
       ctx.beginPath();
       ctx.moveTo(x - size, y - size);
       ctx.lineTo(x + size, y + size);
@@ -15020,7 +15255,7 @@
     }
     ctx.restore();
   }
-  function drawRangedAttackLines(ctx, view2, canvasWidth, canvasHeight, ranged, units, hexList) {
+  function drawRangedAttackLines(ctx, canvasWidth, canvasHeight, ranged, units, hexList) {
     if (ranged.length === 0 || !hexList) return;
     ctx.save();
     ctx.setLineDash([6, 4]);
@@ -15031,8 +15266,8 @@
     for (const r of ranged) {
       const unit = units.find((u) => u.id === r.unitId);
       if (!unit) continue;
-      const from = getHexCanvasCenter(unit.h3Index, view2, canvasWidth, canvasHeight, hexList);
-      const to = getHexCanvasCenter(r.targetH3Index, view2, canvasWidth, canvasHeight, hexList);
+      const from = hexCenterPx(unit.h3Index);
+      const to = hexCenterPx(r.targetH3Index);
       ctx.beginPath();
       ctx.moveTo(from.x, from.y);
       ctx.lineTo(to.x, to.y);
@@ -15040,13 +15275,13 @@
     }
     ctx.restore();
   }
-  function drawOrderLines(ctx, view2, canvasWidth, canvasHeight, orders, units, hexList) {
+  function drawOrderLines(ctx, canvasWidth, canvasHeight, orders, units, hexList) {
     if (orders.length === 0 || !hexList) return;
     for (const order of orders) {
       const unit = units.find((u) => u.id === order.unitId);
       if (!unit) continue;
-      const from = getHexCanvasCenter(unit.h3Index, view2, canvasWidth, canvasHeight, hexList);
-      const to = getHexCanvasCenter(order.toH3Index, view2, canvasWidth, canvasHeight, hexList);
+      const from = hexCenterPx(unit.h3Index);
+      const to = hexCenterPx(order.toH3Index);
       const dx = to.x - from.x;
       const dy = to.y - from.y;
       const len = Math.hypot(dx, dy) || 1;
@@ -15079,7 +15314,7 @@
       ctx.stroke();
     }
   }
-  function drawResolutionMoveLines(ctx, view2, canvasWidth, canvasHeight, moves, units, hexList, opacity) {
+  function drawResolutionMoveLines(ctx, canvasWidth, canvasHeight, moves, units, hexList, opacity) {
     if (moves.length === 0 || !hexList || opacity <= 0) return;
     ctx.save();
     ctx.globalAlpha = opacity;
@@ -15087,8 +15322,8 @@
       const unit = units.find((u) => u.id === move.unitId);
       if (!unit) continue;
       const lineColor = unit.player === "human" ? ORDER_LINE_COLOR : AI_ORDER_LINE_COLOR;
-      const from = getHexCanvasCenter(move.fromH3Index, view2, canvasWidth, canvasHeight, hexList);
-      const to = getHexCanvasCenter(move.toH3Index, view2, canvasWidth, canvasHeight, hexList);
+      const from = hexCenterPx(move.fromH3Index);
+      const to = hexCenterPx(move.toH3Index);
       const dx = to.x - from.x;
       const dy = to.y - from.y;
       const len = Math.hypot(dx, dy) || 1;
@@ -15122,34 +15357,30 @@
     }
     ctx.restore();
   }
-  function drawMovingUnits(ctx, view2, canvasWidth, canvasHeight, moves, units, hexList, progress, hexCenterBase) {
+  function drawMovingUnits(ctx, canvasWidth, canvasHeight, moves, units, hexList, progress) {
     if (moves.length === 0 || progress >= 1) return;
+    void canvasWidth;
+    void hexList;
+    const map = getMainLeafletMap();
+    if (!map) return;
+    const L = getLeafletGlobal();
     const unitsById = new Map(units.map((u) => [u.id, u]));
     for (const move of moves) {
       const unit = unitsById.get(move.unitId);
       if (!unit) continue;
-      let x;
-      let y;
-      if (hexCenterBase) {
-        const fromBase = hexCenterBase.get(move.fromH3Index);
-        const toBase = hexCenterBase.get(move.toH3Index);
-        if (!fromBase || !toBase) continue;
-        x = fromBase.x0 + view2.offsetX + progress * (toBase.x0 - fromBase.x0);
-        y = fromBase.y0 + view2.offsetY + progress * (toBase.y0 - fromBase.y0);
-      } else {
-        const from = getHexCanvasCenter(move.fromH3Index, view2, canvasWidth, canvasHeight, hexList);
-        const to = getHexCanvasCenter(move.toH3Index, view2, canvasWidth, canvasHeight, hexList);
-        x = from.x + progress * (to.x - from.x);
-        y = from.y + progress * (to.y - from.y);
-      }
+      const [lat0, lng0] = cellToLatLng(move.fromH3Index);
+      const [lat1, lng1] = cellToLatLng(move.toH3Index);
+      const lat = lat0 + progress * (lat1 - lat0);
+      const lng = lng0 + progress * (lng1 - lng0);
+      const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
       const color = PLAYER_COLORS[unit.player] ?? "#333";
       const label = UNIT_TYPE_LABELS[unit.unitType] ?? "?";
-      drawOneUnitMarker(ctx, x, y, color, label, "#fff");
+      drawOneUnitMarker(ctx, p.x, p.y, color, label, "#fff");
     }
   }
   function redraw() {
     const container = document.getElementById("canvas-container");
-    const canvas = document.getElementById("canvas");
+    const canvas = document.getElementById("map-overlay");
     if (!container || !canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -15168,12 +15399,8 @@
       ctx.fillText("Loading\u2026", w / 2, h / 2);
       return;
     }
-    ensureTerrainCache(w, h, dpr);
-    if (terrainCacheCanvas) {
-      drawTerrainCache(ctx, w, h, view.offsetX, view.offsetY);
-    } else {
-      drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
-    }
+    ctx.clearRect(0, 0, w, h);
+    drawTerrainHexes(ctx);
     const hexList = gameState.hexes.map((h2) => h2.h3Index);
     let moveProgress = 1;
     let unitsToDraw = gameState.units;
@@ -15209,22 +15436,22 @@
         movingIds = void 0;
       }
       if (elapsed >= phase.movementStart) {
-        drawResolutionMoveLines(ctx, view, w, h, anim.moves, gameState.units, hexList, 1);
+        drawResolutionMoveLines(ctx, w, h, anim.moves, gameState.units, hexList, 1);
       }
     } else {
       movingIds = void 0;
     }
     if (pendingOrders.length > 0 && gameState.units.length && hexList) {
-      drawOrderLines(ctx, view, w, h, pendingOrders, gameState.units, hexList);
+      drawOrderLines(ctx, w, h, pendingOrders, gameState.units, hexList);
     }
     if (pendingRangedAttacks.length > 0 && gameState.units.length && hexList) {
-      drawRangedAttackLines(ctx, view, w, h, pendingRangedAttacks, gameState.units, hexList);
+      drawRangedAttackLines(ctx, w, h, pendingRangedAttacks, gameState.units, hexList);
     }
     if (unitsToDraw.length) {
-      drawUnits(ctx, view, w, h, unitsToDraw, hexList, movingIds);
+      drawUnits(ctx, w, h, unitsToDraw, hexList, movingIds);
     }
     if (anim && hexList && moveProgress < 1) {
-      drawMovingUnits(ctx, view, w, h, anim.moves, gameState.units, hexList, moveProgress);
+      drawMovingUnits(ctx, w, h, anim.moves, gameState.units, hexList, moveProgress);
     }
     if (anim && hexList) {
       const elapsed = Date.now() - anim.startTime;
@@ -15242,13 +15469,13 @@
       const combatHexes = phase.inRangedLightning ? anim.rangedCombatHexes ?? anim.combatHexes : phase.inMeleeLightning ? anim.meleeCombatHexes : void 0;
       if (combatHexes?.length) {
         const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * 8e-3);
-        drawCombatLightning(ctx, view, w, h, combatHexes, hexList, pulseOpacity);
+        drawCombatLightning(ctx, w, h, combatHexes, hexList, pulseOpacity);
       }
       const casualtyHexes = phase.inRangedCasualty ? anim.rangedCasualtyHexes ?? anim.casualtyHexes : phase.inMeleeCasualty ? anim.meleeCasualtyHexes : void 0;
       if (casualtyHexes?.length) {
         const casualtyElapsed = phase.inRangedCasualty ? elapsed - (hasRangedCombat ? LIGHTNING_DURATION_MS : 0) : elapsed - (phase.movementStart + RESOLUTION_FADE_MS + (hasMeleeCombat ? LIGHTNING_DURATION_MS : 0));
         const pulseOpacity = 0.5 + 0.5 * Math.sin(casualtyElapsed * 8e-3);
-        drawCasualtyOverlay(ctx, view, w, h, casualtyHexes, hexList, pulseOpacity);
+        drawCasualtyOverlay(ctx, w, h, casualtyHexes, hexList, pulseOpacity);
       }
     }
   }
@@ -15281,15 +15508,6 @@
     if (selectedUnitEl) {
       selectedUnitEl.textContent = selectedUnitId ?? "\u2014";
     }
-  }
-  function getCanvasAndSize() {
-    const container = document.getElementById("canvas-container");
-    const canvas = document.getElementById("canvas");
-    if (!container || !canvas) return null;
-    const rect = container.getBoundingClientRect();
-    const width = Math.max(1, Math.floor(rect.width));
-    const height = Math.max(1, Math.floor(rect.height));
-    return { canvas, width, height };
   }
   function updateGameStateSidebar(state) {
     const phaseEl = document.getElementById("sidebar-phase");
@@ -15333,7 +15551,7 @@
         messageEl.textContent = state.winner === "human" ? "You win!" : "You lose.";
         messageEl.style.display = "";
       } else {
-        messageEl.textContent = "Choose map size and start.";
+        messageEl.textContent = "Start the world map game when ready.";
         messageEl.style.display = "";
       }
     }
@@ -15346,12 +15564,9 @@
   function initNewGameButton() {
     document.getElementById("new-game-btn")?.addEventListener("click", async () => {
       if (!window.gameApi?.newGame) return;
-      const sizeEl = document.getElementById("new-game-size");
-      const size = sizeEl?.value ?? "small";
       try {
-        const state = await window.gameApi.newGame(size);
+        const state = await window.gameApi.newGame();
         gameState = state;
-        invalidateTerrainCache();
         pendingOrders = [];
         pendingRangedAttacks = [];
         rangedModeActive = false;
@@ -15372,7 +15587,7 @@
         updateGameOverUI(state);
         updateReadyButtonState();
         if (runButtonOn) startBackgroundRequestIfAllowed();
-        redraw();
+        resizeAndRedraw();
       } catch (err) {
         console.error("newGame failed:", err);
       }
@@ -15391,7 +15606,7 @@
     const messageEl = document.getElementById("game-over-message");
     const newGameBtn = document.getElementById("new-game-btn");
     if (messageEl) {
-      messageEl.textContent = "Choose map size and start.";
+      messageEl.textContent = "Start a new world map game when ready.";
       messageEl.style.display = "";
     }
     if (newGameBtn) newGameBtn.textContent = "Start game";
@@ -15634,6 +15849,21 @@
     document.getElementById("ai-strategy-toast-dismiss")?.addEventListener("click", hideAiStrategyToast);
   }
   function init() {
+    try {
+      initWorldLeafletMaps("main-map", "minimap", () => requestRedraw());
+      setMainBasemapFilter(getActiveBasemapFilter());
+      const leg = document.getElementById("terrain-legend");
+      if (leg) {
+        renderTerrainLegend(leg, {
+          onStyleChanged: (_styleId) => {
+            setMainBasemapFilter(getActiveBasemapFilter());
+            requestRedraw();
+          }
+        });
+      }
+    } catch (err) {
+      console.error("Map init failed:", err);
+    }
     resizeAndRedraw();
     updateSidebar();
     updateGameStateSidebar(null);
@@ -15657,7 +15887,6 @@
       window.gameApi.getGameState().then((raw) => {
         const state = raw;
         gameState = state;
-        invalidateTerrainCache();
         updateGameStateSidebar(state);
         updateRangedSidebar();
         updateSidebar();
@@ -15666,62 +15895,27 @@
         redraw();
       }).catch((err) => console.error("getGameState failed:", err));
     }
-    window.addEventListener("resize", resizeAndRedraw);
-    const canvas = document.getElementById("canvas");
-    if (!canvas) return;
-    canvas.addEventListener("wheel", (e) => {
-      e.preventDefault();
-      const info = getCanvasAndSize();
-      if (!info) return;
-      const { width, height } = info;
-      const mouseX = e.clientX - canvas.getBoundingClientRect().left;
-      const mouseY = e.clientY - canvas.getBoundingClientRect().top;
-      const canvasCenterX = width / 2;
-      const canvasCenterY = height / 2;
-      const factor = e.deltaY > 0 ? 1 / ZOOM_FACTOR : ZOOM_FACTOR;
-      const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, view.scale * factor));
-      const dx = mouseX - canvasCenterX - view.offsetX;
-      const dy = mouseY - canvasCenterY - view.offsetY;
-      view.offsetX = mouseX - canvasCenterX - dx * newScale / view.scale;
-      view.offsetY = mouseY - canvasCenterY - dy * newScale / view.scale;
-      view.scale = newScale;
-      requestRedraw();
-    }, { passive: false });
-    canvas.addEventListener("mousedown", (e) => {
+    window.addEventListener("resize", () => {
+      resizeAndRedraw();
+    });
+    const mainMapEl = document.getElementById("main-map");
+    if (!mainMapEl) return;
+    function clientXYToHit(clientX, clientY) {
+      if (!gameState) return null;
+      const map = getMainLeafletMap();
+      if (!map) return null;
+      const rect = map.getContainer().getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      const set = new Set(gameState.hexes.map((h) => h.h3Index));
+      return hitTestHexAtContainerPixel(x, y, set);
+    }
+    mainMapEl.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
       selectedUnitIdAtMouseDown = selectedUnitId;
-      isDragging = true;
-      dragDistanceSq = 0;
-      dragStartX = e.clientX;
-      dragStartY = e.clientY;
-      dragStartOffsetX = view.offsetX;
-      dragStartOffsetY = view.offsetY;
     });
-    window.addEventListener("mousemove", (e) => {
-      if (!isDragging) return;
-      const dx = e.clientX - dragStartX;
-      const dy = e.clientY - dragStartY;
-      dragDistanceSq = dx * dx + dy * dy;
-      view.offsetX = dragStartOffsetX + dx;
-      view.offsetY = dragStartOffsetY + dy;
-      requestRedraw();
-    });
-    canvas.addEventListener("mouseleave", () => {
-      document.getElementById("hex-tooltip")?.classList.add("hidden");
-    });
-    window.addEventListener("mouseup", (e) => {
-      if (e.button !== 0) return;
-      isDragging = false;
-    });
-    canvas.addEventListener("click", (e) => {
-      if (dragDistanceSq > DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) return;
-      const info = getCanvasAndSize();
-      if (!info) return;
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const hexList = gameState?.hexes?.map((h) => h.h3Index);
-      const hit = hitTest(x, y, view, info.width, info.height, hexList);
+    mainMapEl.addEventListener("click", (e) => {
+      const hit = clientXYToHit(e.clientX, e.clientY);
       selectedHexIndex = hit;
       clearSidebarError();
       if (hit && rangedModeActive && selectedUnitId && gameState) {
@@ -15813,19 +16007,13 @@
       updateRangedSidebar();
       redraw();
     });
-    canvas.addEventListener("dblclick", (e) => {
+    mainMapEl.addEventListener("dblclick", (e) => {
       if (pendingSelectTimeout !== null) {
         clearTimeout(pendingSelectTimeout);
         pendingSelectTimeout = null;
       }
-      if (dragDistanceSq > DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) return;
-      const info = getCanvasAndSize();
-      if (!info || !gameState) return;
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const hexList = gameState.hexes?.map((h) => h.h3Index);
-      const hit = hitTest(x, y, view, info.width, info.height, hexList ?? []);
+      if (!gameState) return;
+      const hit = clientXYToHit(e.clientX, e.clientY);
       if (!hit || !selectedUnitIdAtMouseDown) return;
       const unit = gameState.units.find((u) => u.id === selectedUnitIdAtMouseDown);
       if (!unit || unit.player !== "human" || unit.h3Index === hit) return;

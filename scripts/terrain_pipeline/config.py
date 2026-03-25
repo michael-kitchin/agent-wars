@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Dict, List
 
 
-TERRAIN_ENUM = ("ocean", "land", "forest", "mountain", "desert", "arctic")
+TERRAIN_ENUM = ("ocean", "coastal", "land", "forest", "mountain", "desert", "arctic")
 
 
 @dataclass(frozen=True)
@@ -45,6 +45,9 @@ class InputRasterSet:
     """
 
     root: Path = Path("F:/Data")
+    # Ocean/water polygons (e.g. bathy=0); path = root / ocean_shapefile_name. CRS may be geographic or projected;
+    # pipeline reprojects to WGS84 then tests in Web Mercator.
+    ocean_shapefile_name: str = "ne_10m_ocean.shp"
     landcover_by_class: Dict[int, str] = field(
         default_factory=lambda: {
             1: "consensus_full_class_1.tif",
@@ -87,12 +90,9 @@ class ClassifierThresholds:
     When to use:
         Terrain class decisions for both res-1 and res-4 cells.
     What to expect:
-        Liberal mountain/water settings emphasize visual prominence and water recall.
+        Ocean/coastal come from ocean shapefile vs H3 cell polygon; these fields tune interior biomes only.
     """
 
-    # Liberal inland-water override: favor recall for inland seas/lakes/rivers.
-    water_presence_override_min: float = 52.0
-    ocean_dominant_min: float = 60.0
     arctic_dominant_min: float = 26.0
     forest_dominant_min: float = 38.0
     desert_barren_min: float = 28.0
@@ -124,9 +124,9 @@ class PipelineConfig:
     res_child: int = 4
     csv_sort_key: str = "h3_index"
 
-    # Fixed precedence: ocean -> arctic -> forest -> mountain -> desert -> land
+    # Display / QA ordering (not the classify_cell decision order).
     precedence: List[str] = field(
-        default_factory=lambda: ["ocean", "arctic", "forest", "mountain", "desert", "land"]
+        default_factory=lambda: ["ocean", "coastal", "arctic", "forest", "mountain", "desert", "land"]
     )
 
     # Land-cover mapping defaults for classes not explicitly elevated by precedence.

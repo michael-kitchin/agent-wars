@@ -13,7 +13,7 @@ import {
 } from './gameIpcHandlers';
 
 const minimalPlanningState = {
-  hexes: [{ h3Index: '891f1d48b9fffff', terrain: 'land' as const }],
+  hexes: [{ h3Index: '891f1d48b9fffff', terrain: 'land' as const, terrainKind: 'land' }],
   units: [
     { id: 'human-1', player: 'human', unitType: 'infantry', h3Index: '891f1d48b9fffff' },
     { id: 'opponent-1', player: 'opponent', unitType: 'armor', h3Index: '891f1d48b9fffff' },

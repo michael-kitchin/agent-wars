@@ -10,7 +10,7 @@ import type { GameStateSnapshot } from './gameDb';
 const baseState: GameStateSnapshot = {
   turnNumber: 10,
   phase: 'planning',
-  hexes: [{ h3Index: 'a', terrain: 'land' }],
+  hexes: [{ h3Index: 'a', terrain: 'land', terrainKind: 'land' }],
   units: [
     { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: 'a' },
     { id: 'opponent-inf-1', player: 'opponent', unitType: 'infantry', h3Index: 'a' },
@@ -72,9 +72,9 @@ function testAttackMixChangedFires(): void {
     ...baseState,
     turnNumber: 1,
     hexes: [
-      { h3Index: '822a17fffffffff', terrain: 'land' },
-      { h3Index: '822a1ffffffffff', terrain: 'land' },
-      { h3Index: '822a07fffffffff', terrain: 'land' },
+      { h3Index: '822a17fffffffff', terrain: 'land', terrainKind: 'land' },
+      { h3Index: '822a1ffffffffff', terrain: 'land', terrainKind: 'land' },
+      { h3Index: '822a07fffffffff', terrain: 'land', terrainKind: 'land' },
     ],
     units: [
       { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: '822a17fffffffff' },

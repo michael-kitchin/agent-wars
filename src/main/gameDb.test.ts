@@ -8,6 +8,7 @@ import * as assert from 'assert';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { cellToLatLng } from 'h3-js';
 
 function betterSqliteNativeAvailable(): boolean {
   try {
@@ -61,7 +62,7 @@ function testResetClearsStandingOrdersAndMemory(gameDb: typeof import('./gameDb'
   const p = path.join(dir, 't.sqlite');
   try {
     gameDb.openGameDatabaseAtPathForTests(p);
-    gameDb.resetGameForNewMatch('small');
+    gameDb.resetGameForNewMatch();
     gameDb.dbRun(
       `INSERT INTO standing_orders (player_id, unit_id, order_type, params, computed_route, status, created_turn, origin_hex)
        VALUES ('opponent', 'opponent-armor-1', 'defend', '{}', NULL, 'holding', 1, '[]')`
@@ -69,7 +70,7 @@ function testResetClearsStandingOrdersAndMemory(gameDb: typeof import('./gameDb'
     gameDb.dbRun(
       `INSERT INTO ai_memory (player_id, key, content, tier, created_turn, tags) VALUES ('opponent', 'k', 'v', 'stored', 1, '[]')`
     );
-    gameDb.resetGameForNewMatch('small');
+    gameDb.resetGameForNewMatch();
     const so = gameDb.dbGetOne<{ c: number }>('SELECT COUNT(*) AS c FROM standing_orders');
     const mem = gameDb.dbGetOne<{ c: number }>('SELECT COUNT(*) AS c FROM ai_memory');
     assert.strictEqual(so?.c ?? -1, 0);
@@ -85,11 +86,29 @@ function testResetRegeneratesTerrain(gameDb: typeof import('./gameDb')): void {
   const p = path.join(dir, 't.sqlite');
   try {
     gameDb.openGameDatabaseAtPathForTests(p);
-    gameDb.resetGameForNewMatch('small');
+    gameDb.resetGameForNewMatch();
     gameDb.dbRun("UPDATE hexes SET terrain = 'land'");
-    gameDb.resetGameForNewMatch('small');
+    gameDb.resetGameForNewMatch();
     const water = gameDb.dbGetOne<{ c: number }>("SELECT COUNT(*) AS c FROM hexes WHERE terrain = 'water'");
     assert.ok((water?.c ?? 0) > 0, 'expected resetGameForNewMatch to reseed terrain with water hexes');
+  } finally {
+    gameDb.closeGameDatabaseForTests();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function testSeededUnitsStayWithinMidLatitudeBand(gameDb: typeof import('./gameDb')): void {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
+  const p = path.join(dir, 't.sqlite');
+  try {
+    gameDb.openGameDatabaseAtPathForTests(p);
+    gameDb.resetGameForNewMatch();
+    const rows = gameDb.dbGetAll<{ h3Index: string }>('SELECT h3_index AS h3Index FROM units');
+    assert.ok(rows.length > 0, 'expected resetGameForNewMatch to seed units');
+    for (const row of rows) {
+      const [lat] = cellToLatLng(row.h3Index);
+      assert.ok(lat > -60 && lat < 60, `expected unit at ${row.h3Index} to be within (-60, 60), got ${lat}`);
+    }
   } finally {
     gameDb.closeGameDatabaseForTests();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -134,6 +153,7 @@ function run(): void {
   testPersistenceTwoOpens(gameDb);
   testResetClearsStandingOrdersAndMemory(gameDb);
   testResetRegeneratesTerrain(gameDb);
+  testSeededUnitsStayWithinMidLatitudeBand(gameDb);
   testWrongUserVersionRecovers(gameDb, Database);
   console.log('gameDb.test.ts passed');
 }

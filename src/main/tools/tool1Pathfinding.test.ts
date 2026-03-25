@@ -16,8 +16,8 @@ function testPlanRouteLandUnitToWaterHexReturnsTerrainHint(): void {
   const waterH3 = '891f1d48b1fffff';
   const state: GameStateSnapshot = {
     hexes: [
-      { h3Index: landH3, terrain: 'land' },
-      { h3Index: waterH3, terrain: 'water' },
+      { h3Index: landH3, terrain: 'land', terrainKind: 'land' },
+      { h3Index: waterH3, terrain: 'water', terrainKind: 'ocean' },
     ],
     units: [
       { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: landH3 },

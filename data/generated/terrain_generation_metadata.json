@@ -1,6 +1,6 @@
 {
-  "run_id": "20260324T133701Z",
-  "generated_at_utc": "2026-03-24T13:37:01.524135+00:00",
+  "run_id": "20260325T074637Z",
+  "generated_at_utc": "2026-03-25T07:46:37.593860+00:00",
   "db": {
     "host": "localhost",
     "port": 5432,
@@ -13,6 +13,7 @@
     "res_child": 4,
     "precedence": [
       "ocean",
+      "coastal",
       "arctic",
       "forest",
       "mountain",
@@ -22,9 +23,8 @@
     "nodata_fallback_terrain": "ocean",
     "area_weighted_samples_per_cell_res1": 25,
     "area_weighted_samples_per_cell_res4": 4,
+    "ocean_shapefile": "F:\\Data\\ne_10m_ocean.shp",
     "thresholds": {
-      "water_presence_override_min": 52.0,
-      "ocean_dominant_min": 60.0,
       "arctic_dominant_min": 26.0,
       "forest_dominant_min": 38.0,
       "desert_barren_min": 28.0,
@@ -32,7 +32,7 @@
       "mountain_slope_mean_min": 5.0,
       "mountain_elevation_max_min": 700.0
     },
-    "aggregation_contract": "deterministic uniform-point integration over H3 cell area (area-weighted approximation)"
+    "aggregation_contract": "deterministic uniform-point integration over H3 cell area (area-weighted approximation); ocean/coastal from ocean polygon shapefile vs H3 cell (EPSG:3857 predicates)"
   },
   "inputs": [
     {
@@ -130,16 +130,20 @@
     {
       "path": "F:\\Data\\elevation_50KMma_GMTEDma.tif",
       "sha256": "60ee6d9764794c62bd628da97ff91a52a32da000513859481a7097a42c38aed6"
+    },
+    {
+      "path": "F:\\Data\\ne_10m_ocean.shp",
+      "sha256": "bb5ae1e0922b02e61e14f6d562fc2299db4bef5ca36c1008b1a8e7ddf9da6410"
     }
   ],
   "outputs": [
     {
       "path": "data\\generated\\terrain_res1_base.csv",
-      "sha256": "c1e98ce7258324866e0518e76f262766bf7114f6dfa039a604f922fcf33b3763"
+      "sha256": "22bc28c08910fc98cc47ab5521bfbe13b08c6d1a8e459b369507b21dc071dbfd"
     },
     {
       "path": "data\\generated\\terrain_res4_exceptions.csv",
-      "sha256": "c04049dd8f20f19fef97c63bbb70468f17dfd960363bbbf948dc9f559daede7a"
+      "sha256": "d9211e11967f75aaf084eba7cf0f89004d4363f998a637ec8e3c482289579bff"
     }
   ]
 }

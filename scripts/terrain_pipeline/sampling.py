@@ -130,18 +130,20 @@ def deterministic_points_within_polygon(poly: Polygon, count: int) -> List[LonLa
     return normalized
 
 
-def sample_raster_mean(dataset: rasterio.DatasetReader, lonlat_points: Sequence[LonLat]) -> float | None:
+def _raster_values_at_lonlat_points(
+    dataset: rasterio.DatasetReader, lonlat_points: Sequence[LonLat]
+) -> List[float]:
     """
     Why this exists:
-        Compute deterministic mean values from rasters at predefined sample points.
+        Shared point-in-raster read path for means and per-edge water fractions.
     When to use:
-        Aggregating EarthEnv class prevalence and topographic metrics for a cell.
+        Inside sample_raster_mean and edge-water sampling.
     What to expect:
-        Returns None when no valid raster samples are available at the given points.
+        List of valid sample values only (nodata and NaN skipped). May be empty.
     """
 
     if not lonlat_points:
-        return None
+        return []
 
     _ensure_proj_data_env()
 
@@ -157,7 +159,7 @@ def sample_raster_mean(dataset: rasterio.DatasetReader, lonlat_points: Sequence[
         sample_points = list(zip(xs, ys))
 
     nodata = dataset.nodata
-    values = []
+    values: List[float] = []
     for row in dataset.sample(sample_points):
         val = float(row[0])
         if nodata is not None and np.isclose(val, nodata):
@@ -165,6 +167,20 @@ def sample_raster_mean(dataset: rasterio.DatasetReader, lonlat_points: Sequence[
         if np.isnan(val):
             continue
         values.append(val)
+    return values
+
+
+def sample_raster_mean(dataset: rasterio.DatasetReader, lonlat_points: Sequence[LonLat]) -> float | None:
+    """
+    Why this exists:
+        Compute deterministic mean values from rasters at predefined sample points.
+    When to use:
+        Aggregating EarthEnv class prevalence and topographic metrics for a cell.
+    What to expect:
+        Returns None when no valid raster samples are available at the given points.
+    """
+
+    values = _raster_values_at_lonlat_points(dataset, lonlat_points)
     if not values:
         return None
     return float(np.mean(values))

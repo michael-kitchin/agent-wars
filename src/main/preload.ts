@@ -21,8 +21,7 @@ ipcRenderer.on('openRouter:log', (_event, payload: { line: string; isError?: boo
 const gameApi = {
   getGameState: (): Promise<GameStateSnapshot> =>
     ipcRenderer.invoke('game:getState'),
-  newGame: (size?: 'small' | 'medium' | 'large'): Promise<GameStateSnapshot> =>
-    ipcRenderer.invoke('game:newGame', size ?? 'small'),
+  newGame: (): Promise<GameStateSnapshot> => ipcRenderer.invoke('game:newGame'),
   submitOrders: (payload: SubmitOrdersIpcPayload): Promise<{ success: boolean; reason?: string }> =>
     ipcRenderer.invoke('game:submitOrders', payload),
   ready: (payload?: GameReadyIpcPayload): Promise<ReadyResult> => ipcRenderer.invoke('game:ready', payload),

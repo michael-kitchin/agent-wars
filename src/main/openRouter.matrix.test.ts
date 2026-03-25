@@ -49,14 +49,14 @@ function installElectronMock(userDataDir: string): () => void {
 }
 
 function buildFixtureState(hexes: string[]): {
-  hexes: { h3Index: string; terrain: string }[];
+  hexes: { h3Index: string; terrain: string; terrainKind: string }[];
   units: { id: string; player: string; unitType: string; h3Index: string }[];
   phase: 'planning';
   turnNumber: number;
   pendingOrders: { unitId: string; toH3Index: string }[];
 } {
   return {
-    hexes: hexes.map((h3Index) => ({ h3Index, terrain: 'land' })),
+    hexes: hexes.map((h3Index) => ({ h3Index, terrain: 'land', terrainKind: 'land' })),
     units: [
       { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: hexes[0]! },
       { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: hexes[1]! },
@@ -91,12 +91,16 @@ async function run(): Promise<void> {
       ) => Promise<{ success: boolean }>;
       getToolNamesForEnabledGroups: (ids: string[]) => string[];
     };
-    const mapData = require('./mapData') as { getOrderedHexList: (size: 'small' | 'medium' | 'large') => string[] };
+    const mapData = require('./mapData') as {
+      getOrderedHexList: () => string[];
+      H3_RESOLUTION: number;
+      LATLNG_DECIMAL_PLACES: number;
+    };
 
     openRouter.saveKey('test-key');
     openRouter.setSelectedModel('test-model');
 
-    const allHexes = mapData.getOrderedHexList('small').slice(0, 8);
+    const allHexes = mapData.getOrderedHexList().slice(0, 8);
     const state = buildFixtureState(allHexes);
 
     const uiToggleIds = ['precomputation', 'events', 'planning', 'assessment', 'estimation', 'memory', 'orders'] as const;
@@ -143,6 +147,14 @@ async function run(): Promise<void> {
       assert.ok(
         systemPrompt.includes('Strict schema: top-level must be a JSON object with "strategy" (string) and "orders" (array); do not return a top-level array.'),
         `strict-schema prompt guidance missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes(`Map context: global Earth map (H3 resolution ${mapData.H3_RESOLUTION}), not a local/contrived arena.`),
+        `global-map context guidance missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes(`rounded to ${mapData.LATLNG_DECIMAL_PLACES} decimal places`),
+        `lat/lng precision guidance missing for mask=${mask}`
       );
 
       for (const toolName of allApiToolNames) {

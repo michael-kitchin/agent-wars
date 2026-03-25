@@ -46,7 +46,7 @@ function testResolveOneRangedNoReturnFire(): void {
 
 function testExecuteEstimateCombatUncontested(): void {
   const state: GameStateSnapshot = {
-    hexes: [{ h3Index: '891f1d48b9fffff', terrain: 'land' }],
+    hexes: [{ h3Index: '891f1d48b9fffff', terrain: 'land', terrainKind: 'land' }],
     units: [{ id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: '891f1d48b9fffff' }],
     phase: 'planning',
     turnNumber: 1,
@@ -72,7 +72,7 @@ function testExecuteEstimateCombatUncontested(): void {
 
 function testExecuteEstimateCombatUnitNotFound(): void {
   const state: GameStateSnapshot = {
-    hexes: [{ h3Index: '891f1d48b9fffff', terrain: 'land' }],
+    hexes: [{ h3Index: '891f1d48b9fffff', terrain: 'land', terrainKind: 'land' }],
     units: [],
     phase: 'planning',
     turnNumber: 1,
@@ -145,7 +145,7 @@ function testExactCombatProbabilities(): void {
   const eps = 1e-12;
   const h3 = '891f1d48b9fffff';
   const state: GameStateSnapshot = {
-    hexes: [{ h3Index: h3, terrain: 'land' }],
+    hexes: [{ h3Index: h3, terrain: 'land', terrainKind: 'land' }],
     units: [
       { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: h3 },
     ],

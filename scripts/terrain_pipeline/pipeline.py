@@ -19,7 +19,18 @@ import rasterio
 from .classifier import CellFeatures, classify_cell
 from .config import InputRasterSet, PipelineConfig, TERRAIN_ENUM
 from .db import ensure_schema, open_connection, resolve_db_runtime_config, validate_required_extensions
-from .sampling import cell_polygon, deterministic_points_within_polygon, sample_many_rasters
+from .ocean_mask import (
+    OceanPredicateContext,
+    build_ocean_predicate_context,
+    load_ocean_union_wgs84,
+    ocean_relation_for_cell_polygons,
+)
+from .sampling import (
+    _ensure_proj_data_env,
+    cell_polygon,
+    deterministic_points_within_polygon,
+    sample_many_rasters,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -55,6 +66,7 @@ class TerrainPipeline:
         self.config = config
         self.config.output_dir.mkdir(parents=True, exist_ok=True)
         self.config.qa_dir.mkdir(parents=True, exist_ok=True)
+        self._ocean_ctx: OceanPredicateContext | None = None
 
     def validate_phase_1_environment(self) -> None:
         """
@@ -67,6 +79,9 @@ class TerrainPipeline:
         """
 
         LOGGER.debug("Starting phase 1 validation.")
+        # Prefer Rasterio's bundled PROJ database over a system/PostGIS proj.db (version mismatch warnings).
+        _ensure_proj_data_env()
+
         runtime = resolve_db_runtime_config(self.config.db)
         conn = open_connection(runtime)
         try:
@@ -75,7 +90,7 @@ class TerrainPipeline:
             conn.close()
 
         missing: List[str] = []
-        for path in self._all_input_paths():
+        for path in self._raster_input_paths():
             if not path.exists():
                 missing.append(str(path))
                 continue
@@ -90,7 +105,16 @@ class TerrainPipeline:
                 _ = ds.nodata
         if missing:
             raise RuntimeError("Missing required raster files:\n" + "\n".join(missing))
-        LOGGER.info("Phase 1 passed: DB and input rasters validated.")
+
+        ocean_path = self._ocean_input_path()
+        if not ocean_path.is_file():
+            raise RuntimeError(f"Missing ocean shapefile (expected at {ocean_path}).")
+        try:
+            _ = self._ocean_predicate_context()
+        except Exception as exc:
+            raise RuntimeError(f"Ocean shapefile failed to load: {ocean_path}") from exc
+
+        LOGGER.info("Phase 1 passed: DB, input rasters, and ocean shapefile validated.")
 
     def run_phase_2_schema_and_cells(self, max_child_cells: int | None = None) -> dict[str, List[str]]:
         """
@@ -154,7 +178,10 @@ class TerrainPipeline:
         """
 
         LOGGER.debug("Starting phase 3 classifier contract checks.")
-        if tuple(sorted(TERRAIN_ENUM)) != tuple(sorted({"ocean", "land", "forest", "mountain", "desert", "arctic"})):
+        expected = frozenset(
+            {"ocean", "coastal", "land", "forest", "mountain", "desert", "arctic"},
+        )
+        if frozenset(TERRAIN_ENUM) != expected:
             raise RuntimeError("Unexpected TERRAIN_ENUM contents.")
         if self.config.nodata_fallback_terrain not in TERRAIN_ENUM:
             raise RuntimeError("Invalid nodata fallback terrain.")
@@ -263,10 +290,11 @@ class TerrainPipeline:
                 "nodata_fallback_terrain": self.config.nodata_fallback_terrain,
                 "area_weighted_samples_per_cell_res1": self.config.area_weighted_samples_per_cell_res1,
                 "area_weighted_samples_per_cell_res4": self.config.area_weighted_samples_per_cell_res4,
+                "ocean_shapefile": str(self._ocean_input_path()),
                 "thresholds": self.config.thresholds.__dict__,
                 "aggregation_contract": (
-                    "deterministic uniform-point integration over H3 cell area "
-                    "(area-weighted approximation)"
+                    "deterministic uniform-point integration over H3 cell area (area-weighted approximation); "
+                    "ocean/coastal from ocean polygon shapefile vs H3 cell (EPSG:3857 predicates)"
                 ),
             },
             "inputs": [
@@ -299,14 +327,40 @@ class TerrainPipeline:
         self.run_phase_5_generate_res4_exceptions(cells["res4_cells"], parent_map)
         self.run_phase_6_metadata()
 
-    def _all_input_paths(self) -> List[Path]:
-        paths = []
+    def _ocean_input_path(self) -> Path:
+        r = self.config.input_rasters
+        return r.root / r.ocean_shapefile_name
+
+    def _ocean_predicate_context(self) -> OceanPredicateContext:
+        """
+        Why this exists:
+            Avoid loading and preparing the global ocean union multiple times per run (phase 1 + classification).
+        When to use:
+            Phase 1 validation and any step that classifies cells against the ocean mask.
+        What to expect:
+            First call reads the shapefile, dissolves, projects to EPSG:3857, and builds a prepared geometry;
+            later calls return the same instance.
+        """
+
+        if self._ocean_ctx is None:
+            self._ocean_ctx = build_ocean_predicate_context(
+                load_ocean_union_wgs84(self._ocean_input_path())
+            )
+        return self._ocean_ctx
+
+    def _raster_input_paths(self) -> List[Path]:
+        """GeoTIFF inputs only; shapefiles are validated with Fiona, not rasterio.open."""
+        paths: List[Path] = []
         r: InputRasterSet = self.config.input_rasters
         for _, filename in sorted(r.landcover_by_class.items()):
             paths.append(r.root / filename)
         for filename in r.topo_files:
             paths.append(r.root / filename)
         return paths
+
+    def _all_input_paths(self) -> List[Path]:
+        """Rasters plus ocean shapefile (for metadata checksums only)."""
+        return self._raster_input_paths() + [self._ocean_input_path()]
 
     def _generate_cells_for_resolution(self, resolution: int) -> List[str]:
         cells: List[str] = []
@@ -316,6 +370,7 @@ class TerrainPipeline:
         return sorted(set(cells))
 
     def _open_required_rasters(self) -> dict[str, rasterio.DatasetReader]:
+        _ensure_proj_data_env()
         datasets: dict[str, rasterio.DatasetReader] = {}
         r = self.config.input_rasters
         try:
@@ -344,16 +399,19 @@ class TerrainPipeline:
         )
         out: List[TerrainRecord] = []
 
-        # We only need classes that influence classifier decisions.
-        needed_landcover_classes = (1, 2, 3, 4, 10, 11, 12)
+        # Ocean/coastal from shapefile vs cell polygon; interior biomes use area means for classes 1–12.
+        needed_landcover_classes = tuple(range(1, 13))
         needed_keys = {f"class_{c}" for c in needed_landcover_classes}
         needed_keys.update(topo_keys)
+
+        ocean_ctx = self._ocean_predicate_context()
 
         datasets = self._open_required_rasters()
         try:
             raster_pairs = [(k, v) for k, v in datasets.items() if k in needed_keys]
             for idx, cell in enumerate(cells, start=1):
                 poly = cell_polygon(cell)
+                relation = ocean_relation_for_cell_polygons(poly, ocean_ctx)
                 points = deterministic_points_within_polygon(poly, sample_count)
                 sampled = sample_many_rasters(raster_pairs, points)
                 landcover = {cls: sampled.get(f"class_{cls}") for cls in needed_landcover_classes}
@@ -367,6 +425,7 @@ class TerrainPipeline:
                     features,
                     self.config.thresholds,
                     nodata_fallback=self.config.nodata_fallback_terrain,
+                    ocean_relation=relation,
                 )
                 out.append(TerrainRecord(h3_index=cell, terrain=terrain))
                 if idx % 10000 == 0:
@@ -436,7 +495,9 @@ class TerrainPipeline:
                 )
                 cur.execute(
                     f'CREATE TABLE "{self.config.schema_name}".terrain_res1_base ('
-                    "h3_index text PRIMARY KEY, terrain text NOT NULL)"
+                    "h3_index text PRIMARY KEY, terrain text NOT NULL CHECK (terrain IN ("
+                    "'ocean', 'coastal', 'land', 'forest', 'mountain', 'desert', 'arctic'"
+                    ")))"
                 )
                 cur.executemany(
                     f'INSERT INTO "{self.config.schema_name}".terrain_res1_base (h3_index, terrain) VALUES (%s, %s)',
@@ -457,7 +518,12 @@ class TerrainPipeline:
                 )
                 cur.execute(
                     f'CREATE TABLE "{self.config.schema_name}".terrain_res4_exceptions ('
-                    "h3_index text PRIMARY KEY, parent_h3 text NOT NULL, terrain text NOT NULL, parent_terrain text NOT NULL)"
+                    "h3_index text PRIMARY KEY, parent_h3 text NOT NULL, "
+                    "terrain text NOT NULL CHECK (terrain IN ("
+                    "'ocean', 'coastal', 'land', 'forest', 'mountain', 'desert', 'arctic'"
+                    ")), parent_terrain text NOT NULL CHECK (parent_terrain IN ("
+                    "'ocean', 'coastal', 'land', 'forest', 'mountain', 'desert', 'arctic'"
+                    ")))"
                 )
                 cur.executemany(
                     f'INSERT INTO "{self.config.schema_name}".terrain_res4_exceptions '

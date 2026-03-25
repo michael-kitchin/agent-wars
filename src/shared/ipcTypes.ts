@@ -5,7 +5,8 @@
 
 /** Snapshot of game state sent to the renderer (camelCase for JSON). */
 export interface GameStateSnapshot {
-  hexes: { h3Index: string; terrain: string }[];
+  /** `terrain`: passability `land` | `water` | `coastal`. `terrainKind`: pipeline label including `coastal`. */
+  hexes: { h3Index: string; terrain: string; terrainKind: string }[];
   units: { id: string; player: string; unitType: string; h3Index: string }[];
   phase: string;
   turnNumber: number;
@@ -112,7 +113,7 @@ export interface ReadyResult {
 /** Preload-exposed renderer bridge contract. */
 export interface GameApi {
   getGameState: () => Promise<GameStateSnapshot>;
-  newGame: (size?: 'small' | 'medium' | 'large') => Promise<GameStateSnapshot>;
+  newGame: () => Promise<GameStateSnapshot>;
   submitOrders: (payload: SubmitOrdersIpcPayload) => Promise<{ success: boolean; reason?: string }>;
   ready: (payload?: GameReadyIpcPayload) => Promise<ReadyResult>;
   requestAiOrders: (payload?: { enabledToolGroups?: string[] }) => Promise<RequestAiOrdersResult>;

@@ -2,14 +2,29 @@
 /**
  * Pathfinding over the hex map: BFS with domain (land/water) and optional blocked hexes.
  * Used by MCP Tool 1 (plan_route, check_distance). All coordinates are H3 indices internally.
+ * `coastal` hexes are passable for both land and naval domains.
  */
 
 import { gridDisk } from 'h3-js';
 import { logDebug, logError, logTrace } from './logger';
 import { getMovementBudget } from './combatConstants';
 
-/** Domain for passability: land units use land hexes, naval use water. */
+/** Domain for passability: land units use land + coastal; naval use water + coastal. */
 export type PassableDomain = 'land' | 'water';
+
+/**
+ * Why this exists:
+ *     Single rule for whether a hex `terrain` value is in the land domain (land + coastal) or water domain (water + coastal).
+ * When to use:
+ *     Pathfinding BFS, Tool 1/2/5, and any logic that must match movement domains.
+ * What to expect:
+ *     Unknown terrain defaults to `land` before evaluation; `coastal` is passable for both domains.
+ */
+export function terrainIsPassableForDomain(terrain: string | undefined, passableFor: PassableDomain): boolean {
+  const t = terrain ?? 'land';
+  if (passableFor === 'land') return t === 'land' || t === 'coastal';
+  return t === 'water' || t === 'coastal';
+}
 
 /**
  * Returns the shortest path (ordered list of H3 indices from origin to destination) or null if no path.
@@ -27,12 +42,11 @@ export function findPath(
   logDebug('pathfinding findPath', { passableFor, blockedCount: blocked?.size ?? 0 });
   if (originH3 === destinationH3) return [originH3];
   if (!hexSet.has(originH3) || !hexSet.has(destinationH3)) return null;
-  const wantLand = passableFor === 'land';
   const passable = (h3: string) => {
     if (!hexSet.has(h3)) return false;
     if (blocked?.has(h3)) return false;
     const terrain = terrainByH3.get(h3) ?? 'land';
-    return wantLand ? terrain === 'land' : terrain === 'water';
+    return terrainIsPassableForDomain(terrain, passableFor);
   };
   if (!passable(originH3) || !passable(destinationH3)) return null;
 
@@ -82,12 +96,11 @@ export function getReachableHexes(
   passableFor: PassableDomain,
   blocked?: Set<string>
 ): Set<string> {
-  const wantLand = passableFor === 'land';
   const passable = (h3: string) => {
     if (!hexSet.has(h3)) return false;
     if (blocked?.has(h3)) return false;
     const terrain = terrainByH3.get(h3) ?? 'land';
-    return wantLand ? terrain === 'land' : terrain === 'water';
+    return terrainIsPassableForDomain(terrain, passableFor);
   };
   if (!passable(originH3)) return new Set();
   const reachable = new Set<string>([originH3]);

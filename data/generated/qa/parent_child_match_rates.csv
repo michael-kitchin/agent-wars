@@ -1,6 +1,6 @@
 metric,value
 total_children,288122
-matching_parent_count,248634
-matching_parent_percent,86.294695
-exception_count,39488
-exception_percent,13.705305
+matching_parent_count,184046
+matching_parent_percent,63.877802
+exception_count,104076
+exception_percent,36.122198

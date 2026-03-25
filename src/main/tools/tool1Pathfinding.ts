@@ -6,7 +6,14 @@
 
 import { cellToLatLng, gridDistance } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
-import { findPath, getReachableHexes, partitionPathByTurn, getDistanceAndTurns, getMovementBudgetForUnit } from '../pathfinding';
+import {
+  findPath,
+  getReachableHexes,
+  partitionPathByTurn,
+  getDistanceAndTurns,
+  getMovementBudgetForUnit,
+  terrainIsPassableForDomain,
+} from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
 import { logDebug, logError } from '../logger';
 
@@ -60,7 +67,7 @@ function nearestWaterHexTo(refH3: string, hexSet: Set<string>, terrainByH3: Map<
   let best: string | undefined;
   let bestDist = Infinity;
   for (const h3 of hexSet) {
-    if (terrainByH3.get(h3) !== 'water') continue;
+    if (!terrainIsPassableForDomain(terrainByH3.get(h3), 'water')) continue;
     try {
       const d = gridDistance(refH3, h3);
       if (d < bestDist) {
@@ -132,16 +139,16 @@ export interface CheckDistanceError {
  */
 function planRouteNoPathHint(passableFor: PassableDomain, destTerrain: string): string {
   if (passableFor === 'land' && destTerrain === 'water') {
-    return ' Destination is water; land units cannot move there. Route this unit to a land hex (e.g. an enemy land unit\'s position).';
+    return ' Destination is water; land units cannot move there. Route this unit to a land or coastal hex (e.g. an enemy land unit\'s position).';
   }
-  if (passableFor === 'land' && destTerrain === 'land') {
+  if (passableFor === 'land' && terrainIsPassableForDomain(destTerrain, 'land')) {
     return ' No path found (destination may be on a different land mass).';
   }
   if (passableFor === 'water' && destTerrain === 'land') {
-    return ' Destination is land; naval units cannot move onto land. Use a land unit\'s position as destination to get a route to the nearest water hex.';
+    return ' Destination is land; naval units cannot move onto pure land. Use a land unit\'s position as destination to get a route to the nearest water or coastal hex.';
   }
-  if (passableFor === 'water' && destTerrain === 'water') {
-    return ' No path to that water hex (may be in a different water body).';
+  if (passableFor === 'water' && terrainIsPassableForDomain(destTerrain, 'water')) {
+    return ' No path to that water/coastal hex (may be in a different water body).';
   }
   return '';
 }
@@ -205,7 +212,7 @@ export function executePlanRoute(
   if (originH3 === destH3) {
     const originLl = h3ToLatLng(originH3, latLngByH3);
     const warningsWhenAlreadyThere: string[] = navalRedirectedToWater
-      ? ['Unit is already at the nearest water hex to that land position; no movement this turn.']
+      ? ['Unit is already at the nearest water/coastal hex to that land position; no movement this turn.']
       : [];
     return {
       status: 'ok',
@@ -224,7 +231,9 @@ export function executePlanRoute(
   let path = findPath(originH3, destH3, hexSet, terrainByH3, passableFor, blocked);
   const warnings: string[] = [];
   if (navalRedirectedToWater) {
-    warnings.push('Destination was land; route is to the nearest reachable water hex to that position (naval cannot move onto land).');
+    warnings.push(
+      'Destination was land; route is to the nearest reachable water/coastal hex to that position (naval cannot move onto pure land).',
+    );
   }
   if (!path && blocked) {
     path = findPath(originH3, destH3, hexSet, terrainByH3, passableFor, undefined);
@@ -236,7 +245,11 @@ export function executePlanRoute(
       destH3 = fallbackWater;
       path = findPath(originH3, destH3, hexSet, terrainByH3, passableFor, blocked);
       if (!path && blocked) path = findPath(originH3, destH3, hexSet, terrainByH3, passableFor, undefined);
-      if (path) warnings.push('Requested destination is in a different water body; route is to the nearest reachable water hex toward it.');
+      if (path) {
+        warnings.push(
+          'Requested destination is in a different water body; route is to the nearest reachable water/coastal hex toward it.',
+        );
+      }
     }
   }
   if (!path) {
@@ -332,7 +345,8 @@ export function executeCheckDistance(
 
   const passableFor: PassableDomain = unitType === 'naval' ? 'water' : 'land';
   const movementBudget = getMovementBudgetForUnit(unitType);
-  if (unitType === 'naval' && (terrainByH3.get(toH3) ?? 'land') === 'land') {
+  const toTerrain = terrainByH3.get(toH3) ?? 'land';
+  if (unitType === 'naval' && toTerrain === 'land') {
     const waterHex = nearestWaterHexTo(toH3, hexSet, terrainByH3);
     if (waterHex) toH3 = waterHex;
   }

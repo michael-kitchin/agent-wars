@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent Wars</title>
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
   <style>
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; }
@@ -17,12 +18,55 @@
       flex: 1;
       min-width: 0;
       position: relative;
+      min-height: 0;
     }
-    #canvas {
-      display: block;
+    #main-map {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
-      background: #e0dcd4;
+      z-index: 0;
+    }
+    #main-map.leaflet-container {
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    #map-overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+      display: block;
+      pointer-events: none;
+    }
+    #minimap {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      width: 200px;
+      height: 200px;
+      z-index: 3;
+      border: 1px solid #999;
+      border-radius: 2px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+      background: #e8e4e0;
+    }
+    #minimap.leaflet-container {
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    #terrain-legend {
+      position: absolute;
+      top: 220px;
+      left: 12px;
+      z-index: 3;
+      max-width: 200px;
+      padding: 6px 8px;
+      background: rgba(240, 238, 234, 0.92);
+      border: 1px solid #aaa;
+      border-radius: 2px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+      pointer-events: auto;
     }
     #sidebar {
       width: 320px;
@@ -250,7 +294,8 @@
     .map-toast {
       position: absolute;
       bottom: 12px;
-      left: 12px;
+      right: 12px;
+      left: auto;
       max-width: 360px;
       max-height: 40vh;
       overflow-y: auto;
@@ -271,8 +316,10 @@
     .map-toast.hidden { display: none; }
     .ai-strategy-toast {
       top: 12px;
-      left: 12px;
+      right: 12px;
+      left: auto;
       bottom: auto;
+      max-width: min(360px, calc(100% - 240px));
     }
     .game-over-overlay {
       position: absolute;
@@ -292,9 +339,6 @@
       text-align: center;
     }
     .game-over-box p { margin: 0 0 1rem 0; font-size: 1.1rem; font-weight: 600; }
-    .new-game-size-row { margin-bottom: 1rem; text-align: left; }
-    .new-game-size-row label { display: block; font-size: 0.9rem; color: #444; margin-bottom: 0.35rem; }
-    .new-game-size-row select { width: 100%; padding: 0.4rem 0.5rem; font-size: 13px; border: 1px solid #ccc; border-radius: 2px; }
     .game-over-box button { padding: 0.5rem 1rem; font-size: 14px; }
     .map-toast p { margin: 0; flex: 1; white-space: pre-line; }
     #map-toast-dismiss {
@@ -384,7 +428,10 @@
 </head>
 <body>
   <div id="canvas-container">
-    <canvas id="canvas"></canvas>
+    <div id="main-map" aria-label="World map"></div>
+    <canvas id="map-overlay" aria-hidden="true"></canvas>
+    <div id="minimap" aria-label="World overview"></div>
+    <div id="terrain-legend" aria-label="Terrain legend"></div>
     <div id="hex-tooltip" class="hex-tooltip hidden" aria-hidden="true"></div>
     <div id="stack-callout" class="stack-callout hidden" aria-label="Units in this hex">
       <ul id="stack-callout-list"></ul>
@@ -392,14 +439,6 @@
     <div id="game-over-overlay" class="game-over-overlay hidden" aria-live="polite">
       <div class="game-over-box">
         <p id="game-over-message"></p>
-        <div class="new-game-size-row">
-          <label for="new-game-size">Map size</label>
-          <select id="new-game-size" aria-label="Map size">
-            <option value="small">Small</option>
-            <option value="medium">Medium</option>
-            <option value="large">Large</option>
-          </select>
-        </div>
         <button type="button" id="new-game-btn">Start game</button>
       </div>
     </div>
@@ -425,7 +464,7 @@
       <button type="button" id="ready-btn" class="ready-btn">Ready</button>
       <p id="sidebar-error" style="color: #a03030; font-size: 0.9em; display: none;"></p>
       <p style="color: #666; font-size: 0.9em;">
-        <b>Click</b> a unit to select it, then <b>double-click</b> a destination hex to add a movement order.
+        <b>Pan and zoom</b> the map. <b>Click</b> a unit to select it, then <b>double-click</b> a destination hex to add a movement order.
       </p>
     </div>
     <div id="sidebar-bottom">
@@ -462,6 +501,7 @@
       </div>
     </div>
   </aside>
+  <script src="vendor/leaflet/leaflet.js"></script>
   <script type="module" src="renderer.js"></script>
 </body>
 </html>

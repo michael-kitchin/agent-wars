@@ -10,6 +10,8 @@ import { dbRun, dbGetOne, dbGetAll, saveDatabase } from '../gameDb';
 import { getRange } from '../combatConstants';
 import { executePlanRoute } from './tool1Pathfinding';
 import type { LatLng } from './tool1Pathfinding';
+import { terrainIsPassableForDomain } from '../pathfinding';
+import type { PassableDomain } from '../pathfinding';
 import { logDebug, logError, logTrace } from '../logger';
 
 const AI_PLAYER_ID = 'opponent';
@@ -84,7 +86,7 @@ function assignOrder(
     if (!Array.isArray(waypoints) || waypoints.length < 2) {
       return { status: 'error', error: 'Patrol requires at least 2 waypoints' };
     }
-    const passableTerrain = unit.unitType === 'naval' ? 'water' : 'land';
+    const domain: PassableDomain = unit.unitType === 'naval' ? 'water' : 'land';
     for (let i = 0; i < waypoints.length; i++) {
       const wp = waypoints[i];
       if (!Array.isArray(wp) || wp.length < 2) continue;
@@ -93,10 +95,7 @@ function assignOrder(
         return { status: 'error', error: `Waypoint [${wp[0]}, ${wp[1]}] is off-map` };
       }
       const terrain = terrainByH3.get(h3) ?? 'land';
-      if (passableTerrain === 'water' && terrain !== 'water') {
-        return { status: 'error', error: `Waypoint [${wp[0]}, ${wp[1]}] is impassable for ${unit.unitType}` };
-      }
-      if (passableTerrain === 'land' && terrain !== 'land') {
+      if (!terrainIsPassableForDomain(terrain, domain)) {
         return { status: 'error', error: `Waypoint [${wp[0]}, ${wp[1]}] is impassable for ${unit.unitType}` };
       }
     }

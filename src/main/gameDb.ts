@@ -2,28 +2,33 @@
  * Game state persistence in SQLite via better-sqlite3 (native). Single file under Electron userData;
  * durable across restarts (no wipe on launch). Schema: hexes, units, turn state, pending orders, AI tables.
  *
- * Legacy sql.js file `game.db` is not migrated; this baseline uses `game-baseline-v1.sqlite` (see GAME_DB_FILE_NAME).
+ * Legacy sql.js file `game.db` is not migrated; current baseline file is GAME_DB_FILE_NAME.
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
 import { app, dialog } from 'electron';
 import Database from 'better-sqlite3';
-import { gridDistance } from 'h3-js';
-import { getOrderedHexList, getUnitCountsForSize, type MapSize } from './mapData';
-import { createSeededRng } from './seededRng';
+import { cellToLatLng } from 'h3-js';
+import { getOrderedHexList, getWorldUnitCounts } from './mapData';
+import {
+  assertTerrainCsvMatchesHexList,
+  loadTerrainRes1CsvFromPath,
+  resolveTerrainRes1CsvPath,
+} from './terrainRes1Csv';
+import { pipelineTerrainToPassability } from './terrainPassability';
 import { logDebug, logError, logTrace } from './logger';
 import type { GameStateSnapshot } from '../shared/ipcTypes';
 
 export type { GameStateSnapshot } from '../shared/ipcTypes';
 
 /** Baseline schema version; bump when a future milestone adds migration chains. */
-export const EXPECTED_USER_VERSION = 1;
+export const EXPECTED_USER_VERSION = 3;
 
 /**
- * New filename for the 1.1 baseline so old sql.js `game.db` files are left untouched (not migrated).
+ * Baseline filename for world-map + terrain_kind schema (v3: coastal passability).
  */
-export const GAME_DB_FILE_NAME = 'game-baseline-v1.sqlite';
+export const GAME_DB_FILE_NAME = 'game-baseline-v3.sqlite';
 
 let db: InstanceType<typeof Database> | null = null;
 
@@ -56,7 +61,8 @@ function getFullDdl(): string {
   return `
     CREATE TABLE IF NOT EXISTS hexes (
       h3_index TEXT PRIMARY KEY,
-      terrain TEXT NOT NULL CHECK (terrain IN ('land', 'water'))
+      terrain TEXT NOT NULL CHECK (terrain IN ('land', 'water', 'coastal')),
+      terrain_kind TEXT NOT NULL CHECK (terrain_kind IN ('ocean', 'coastal', 'land', 'forest', 'mountain', 'desert', 'arctic'))
     );
 
     CREATE TABLE IF NOT EXISTS units (
@@ -397,93 +403,90 @@ export function getGameSeed(): number {
   return Number.isNaN(n) ? 0 : n;
 }
 
-const WATER_FRACTION = 1 / 3;
-const WATER_BLOB_COUNT_MIN = 4;
-const WATER_BLOB_COUNT_MAX = 6;
-
-function seedHexes(size: MapSize): void {
+/**
+ * Seeds all world hexes from `terrain_res1_base.csv`: `terrain` is passability (land / water / coastal);
+ * `terrain_kind` preserves pipeline labels for the renderer.
+ */
+function seedHexesFromTerrainCsv(): void {
+  logDebug('gameDb seedHexesFromTerrainCsv');
   if (db === null) return;
-  const hexes = getOrderedHexList(size);
-  const seed = getGameSeed();
-  const next = createSeededRng(seed);
-  const targetWaterCount = Math.round(hexes.length * WATER_FRACTION);
-  const numBlobs =
-    WATER_BLOB_COUNT_MIN + Math.floor(next() * (WATER_BLOB_COUNT_MAX - WATER_BLOB_COUNT_MIN + 1));
-
-  const centerIndices: number[] = [];
-  while (centerIndices.length < numBlobs) {
-    const idx = Math.floor(next() * hexes.length);
-    if (!centerIndices.includes(idx)) centerIndices.push(idx);
-  }
-  const centerH3s = centerIndices.map((i) => hexes[i]!);
-
-  let radius = 0;
-  const maxRadius = 50;
-  for (; radius <= maxRadius; radius++) {
-    let waterCount = 0;
-    for (let i = 0; i < hexes.length; i++) {
-      let inBlob = false;
-      for (const ch3 of centerH3s) {
-        try {
-          if (gridDistance(hexes[i]!, ch3) <= radius) {
-            inBlob = true;
-            break;
-          }
-        } catch {
-          // ignore
-        }
-      }
-      if (inBlob) waterCount++;
+  const hexes = getOrderedHexList();
+  const csvPath = resolveTerrainRes1CsvPath();
+  const byH3 = loadTerrainRes1CsvFromPath(csvPath);
+  assertTerrainCsvMatchesHexList(byH3, hexes);
+  for (const h3 of hexes) {
+    const kind = byH3.get(h3);
+    if (!kind) {
+      logError('gameDb seedHexesFromTerrainCsv: missing row', new Error(`no CSV row for ${h3}`));
+      throw new Error(`terrain CSV missing h3_index ${h3}`);
     }
-    if (waterCount >= targetWaterCount) break;
-  }
-  if (radius > maxRadius) radius = maxRadius;
-
-  for (let i = 0; i < hexes.length; i++) {
-    let water = false;
-    for (const ch3 of centerH3s) {
-      try {
-        if (gridDistance(hexes[i]!, ch3) <= radius) {
-          water = true;
-          break;
-        }
-      } catch {
-        // ignore
-      }
-    }
-    const terrain = water ? 'water' : 'land';
-    run('INSERT INTO hexes (h3_index, terrain) VALUES (?, ?)', [hexes[i], terrain]);
+    const terrain = pipelineTerrainToPassability(kind);
+    run('INSERT INTO hexes (h3_index, terrain, terrain_kind) VALUES (?, ?, ?)', [h3, terrain, kind]);
   }
 }
 
-function seedUnits(size: MapSize): void {
+function seedUnits(): void {
+  logDebug('gameDb seedUnits');
   if (db === null) return;
-  const hexes = getOrderedHexList(size);
-  const counts = getUnitCountsForSize(size);
-  const landIndices: number[] = [];
-  const waterIndices: number[] = [];
+  const hexes = getOrderedHexList();
+  const counts = getWorldUnitCounts();
+  const minSpawnLatExclusive = -60;
+  const maxSpawnLatExclusive = 60;
+  const landSpawnIndices: number[] = [];
+  const navalSpawnIndices: number[] = [];
   for (let i = 0; i < hexes.length; i++) {
-    const row = getOne<{ terrain: string }>('SELECT terrain FROM hexes WHERE h3_index = ?', [hexes[i]]);
+    const h3 = hexes[i]!;
+    const [lat] = cellToLatLng(h3);
+    if (!(lat > minSpawnLatExclusive && lat < maxSpawnLatExclusive)) continue;
+    const row = getOne<{ terrain: string }>('SELECT terrain FROM hexes WHERE h3_index = ?', [h3]);
     const terrain = row?.terrain ?? 'land';
-    if (terrain === 'water') waterIndices.push(i);
-    else landIndices.push(i);
+    if (terrain === 'land' || terrain === 'coastal') landSpawnIndices.push(i);
+    if (terrain === 'water' || terrain === 'coastal') navalSpawnIndices.push(i);
   }
 
   const landPerSide = counts.infantry + counts.armor;
-  if (landIndices.length < landPerSide * 2) return;
-  const humanLand = landIndices.slice(0, landPerSide);
-  const opponentLand = landIndices.slice(-landPerSide);
+  if (landSpawnIndices.length < landPerSide * 2) return;
+
+  const usedH3 = new Set<string>();
+  const humanLandIdx: number[] = [];
+  for (const idx of landSpawnIndices) {
+    if (humanLandIdx.length >= landPerSide) break;
+    const h = hexes[idx]!;
+    if (usedH3.has(h)) continue;
+    humanLandIdx.push(idx);
+    usedH3.add(h);
+  }
+  if (humanLandIdx.length < landPerSide) return;
+
+  const opponentLandIdx: number[] = [];
+  for (let j = landSpawnIndices.length - 1; j >= 0 && opponentLandIdx.length < landPerSide; j--) {
+    const idx = landSpawnIndices[j]!;
+    const h = hexes[idx]!;
+    if (usedH3.has(h)) continue;
+    opponentLandIdx.push(idx);
+    usedH3.add(h);
+  }
+  if (opponentLandIdx.length < landPerSide) return;
 
   const humanUnits: [string, string, string][] = [];
   let idx = 0;
   for (let i = 0; i < counts.infantry; i++) {
-    humanUnits.push([`human-infantry-${i + 1}`, 'infantry', hexes[humanLand[idx++]!]!]);
+    humanUnits.push([`human-infantry-${i + 1}`, 'infantry', hexes[humanLandIdx[idx++]!]!]);
   }
   for (let i = 0; i < counts.armor; i++) {
-    humanUnits.push([`human-armor-${i + 1}`, 'armor', hexes[humanLand[idx++]!]!]);
+    humanUnits.push([`human-armor-${i + 1}`, 'armor', hexes[humanLandIdx[idx++]!]!]);
   }
-  for (let i = 0; i < counts.naval && waterIndices.length > 0; i++) {
-    humanUnits.push([`human-naval-${i + 1}`, 'naval', hexes[waterIndices[i]!]!]);
+  for (let i = 0; i < counts.naval && navalSpawnIndices.length > 0; i++) {
+    let placed = false;
+    for (const nidx of navalSpawnIndices) {
+      const h = hexes[nidx]!;
+      if (usedH3.has(h)) continue;
+      humanUnits.push([`human-naval-${i + 1}`, 'naval', h]);
+      usedH3.add(h);
+      placed = true;
+      break;
+    }
+    if (!placed) break;
   }
   for (const [id, unitType, h3Index] of humanUnits) {
     run('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [id, 'human', unitType, h3Index]);
@@ -492,29 +495,27 @@ function seedUnits(size: MapSize): void {
   const opponentUnits: [string, string, string][] = [];
   idx = 0;
   for (let i = 0; i < counts.infantry; i++) {
-    opponentUnits.push([`opponent-infantry-${i + 1}`, 'infantry', hexes[opponentLand[idx++]!]!]);
+    opponentUnits.push([`opponent-infantry-${i + 1}`, 'infantry', hexes[opponentLandIdx[idx++]!]!]);
   }
   for (let i = 0; i < counts.armor; i++) {
-    opponentUnits.push([`opponent-armor-${i + 1}`, 'armor', hexes[opponentLand[idx++]!]!]);
+    opponentUnits.push([`opponent-armor-${i + 1}`, 'armor', hexes[opponentLandIdx[idx++]!]!]);
   }
-  for (let i = 0; i < counts.naval && waterIndices.length > 0; i++) {
-    opponentUnits.push([`opponent-naval-${i + 1}`, 'naval', hexes[waterIndices[waterIndices.length - 1 - i]!]!]);
+  for (let i = 0; i < counts.naval && navalSpawnIndices.length > 0; i++) {
+    let placed = false;
+    for (let j = navalSpawnIndices.length - 1; j >= 0; j--) {
+      const nidx = navalSpawnIndices[j]!;
+      const h = hexes[nidx]!;
+      if (usedH3.has(h)) continue;
+      opponentUnits.push([`opponent-naval-${i + 1}`, 'naval', h]);
+      usedH3.add(h);
+      placed = true;
+      break;
+    }
+    if (!placed) break;
   }
   for (const [id, unitType, h3Index] of opponentUnits) {
     run('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [id, 'opponent', unitType, h3Index]);
   }
-}
-
-/**
- * Returns the configured map size from game_config (small, medium, large). Defaults to small when unset or invalid.
- * Use when building hex lists, seeding terrain, and any feature keyed off map dimensions.
- */
-export function getMapSize(): MapSize {
-  logTrace('getMapSize');
-  const row = getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'map_size'");
-  if (!row || !row.value) return 'small';
-  if (row.value === 'medium' || row.value === 'large') return row.value;
-  return 'small';
 }
 
 /**
@@ -548,10 +549,17 @@ export function getGameState(): GameStateSnapshot {
 
   const hexCount = getOne<{ c: number }>('SELECT COUNT(*) AS c FROM hexes');
   const hasHexes = hexCount && hexCount.c > 0;
-  const ordered = hasHexes ? getOrderedHexList(getMapSize()) : [];
-  const hexRows: { h3Index: string; terrain: string }[] = ordered.map((h3Index) => {
-    const row = getOne<{ terrain: string }>('SELECT terrain FROM hexes WHERE h3_index = ?', [h3Index]);
-    return { h3Index, terrain: row?.terrain ?? 'land' };
+  const ordered = hasHexes ? getOrderedHexList() : [];
+  const hexRows: { h3Index: string; terrain: string; terrainKind: string }[] = ordered.map((h3Index) => {
+    const row = getOne<{ terrain: string; terrain_kind: string }>(
+      'SELECT terrain, terrain_kind FROM hexes WHERE h3_index = ?',
+      [h3Index]
+    );
+    return {
+      h3Index,
+      terrain: row?.terrain ?? 'land',
+      terrainKind: row?.terrain_kind ?? 'land',
+    };
   });
   const unitRows = getAll<{ id: string; player: string; unitType: string; h3Index: string }>(
     'SELECT id, player, unit_type AS unitType, h3_index AS h3Index FROM units'
@@ -761,18 +769,19 @@ export function clearAiPendingOrders(playerId: string): void {
 }
 
 /**
- * Re-initializes the game for a new match: map size, fresh seed, hexes/units, turn state, pending orders,
- * callbacks, AI memory, and standing orders cleared so no prior-match AI state leaks (1.1 persistence).
+ * Re-initializes the game for a new match: world map from terrain CSV, fresh seed, hexes/units, turn state,
+ * pending orders, callbacks, AI memory, and standing orders cleared so no prior-match AI state leaks.
  */
-export function resetGameForNewMatch(size: MapSize = 'small'): void {
+export function resetGameForNewMatch(): void {
+  logDebug('gameDb resetGameForNewMatch');
   if (!db) return;
   run('DELETE FROM units');
   run('DELETE FROM hexes');
-  run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('map_size', ?)", [size]);
+  run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('map_size', 'world')");
   run("DELETE FROM game_config WHERE key = 'game_seed'");
   seedGameSeedIfMissing();
-  seedHexes(size);
-  seedUnits(size);
+  seedHexesFromTerrainCsv();
+  seedUnits();
   run('DELETE FROM pending_orders');
   run('DELETE FROM pending_ranged_orders');
   run('UPDATE turn_state SET phase = ?, turn_number = 1 WHERE id = 1', ['planning']);

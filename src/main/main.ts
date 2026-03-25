@@ -95,8 +95,8 @@ function requestOrdersWithLog(
 
 function registerIpcHandlers(): void {
   ipcMain.handle('game:getState', () => getGameState());
-  ipcMain.handle('game:newGame', (_event, size?: 'small' | 'medium' | 'large') => {
-    resetGameForNewMatch(size ?? 'small');
+  ipcMain.handle('game:newGame', () => {
+    resetGameForNewMatch();
     return getGameState();
   });
   ipcMain.handle('game:submitOrders', (_event, payload: SubmitOrdersPayload | { unitId: string; toH3Index: string }[]) => {

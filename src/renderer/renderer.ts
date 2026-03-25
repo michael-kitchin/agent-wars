@@ -1,16 +1,24 @@
 /**
- * Renderer process entry point. Sets up the canvas, view state, hex grid,
- * pan/zoom (mouse drag + wheel), and click-to-select with sidebar.
+ * Renderer process entry point. Leaflet world basemap + overlay canvas (terrain, units, orders),
+ * minimap with viewport sync, and click / double-click interaction with the sidebar.
  */
 
-import { gridDistance } from 'h3-js';
+import { gridDistance, cellToLatLng, latLngToCell } from 'h3-js';
+import { clampLatForWebMercatorDisplay, getHexBoundaryLatLngForLeafletOverlay } from './hexGrid';
 import {
-  drawHexes,
-  hitTest,
-  getHexCanvasCenter,
-  getFitScale,
-  type ViewState,
-} from './hexGrid';
+  initWorldLeafletMaps,
+  getMainLeafletMap,
+  hexCenterToOverlayPoint,
+  invalidateLeafletMapSizes,
+  setMainBasemapFilter,
+} from './worldLeafletMap';
+import {
+  fillHexTerrain,
+  getActiveBasemapFilter,
+  getActiveHexStrokeStyle,
+  renderTerrainLegend,
+  type TerrainVisualStyleId,
+} from './terrainVisualStyles';
 import type {
   GameStateSnapshot,
   GameApi,
@@ -18,6 +26,7 @@ import type {
   RangedAttackOrder,
   RemovedUnitSnapshot,
 } from '../shared/ipcTypes';
+import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
 
 /** One executed move (human or AI) for resolution-phase fade animation. */
 interface ResolutionMove {
@@ -72,9 +81,11 @@ function validateMovementOrder(
 
   const destHex = state.hexes.find((h) => h.h3Index === toH3Index);
   const terrain = destHex?.terrain ?? 'land';
-  if (unit.unitType === 'naval' && terrain !== 'water') return { valid: false, reason: 'Naval units must move to water' };
-  if ((unit.unitType === 'infantry' || unit.unitType === 'armor') && terrain !== 'land') {
-    return { valid: false, reason: 'Land units must move to land' };
+  if (unit.unitType === 'naval' && !passabilityAllowsNavalUnit(terrain)) {
+    return { valid: false, reason: 'Naval units must move to water or coastal hexes' };
+  }
+  if ((unit.unitType === 'infantry' || unit.unitType === 'armor') && !passabilityAllowsLandUnit(terrain)) {
+    return { valid: false, reason: 'Land units must move to land or coastal hexes' };
   }
 
   return { valid: true };
@@ -231,15 +242,8 @@ function showStackCallout(
 
 const TOOLTIP_OFFSET_PX = 12;
 
-const MIN_SCALE = 0.2;
-const MAX_SCALE = 5;
-const ZOOM_FACTOR = 1.15;
-
-const view: ViewState = {
-  scale: 1,
-  offsetX: 0,
-  offsetY: 0,
-};
+/** World map H3 resolution; must match main process mapData and terrain CSV. */
+const WORLD_H3_RESOLUTION = 1;
 
 let selectedHexIndex: string | null = null;
 let selectedUnitId: string | null = null;
@@ -252,14 +256,6 @@ let pendingRangedAttacks: RangedAttackOrder[] = [];
 /** When true, next hex click sets ranged attack target for selected unit (if valid). */
 let rangedModeActive = false;
 let gameState: GameStateSnapshot | null = null;
-let isDragging = false;
-let dragStartX = 0;
-let dragStartY = 0;
-let dragStartOffsetX = 0;
-let dragStartOffsetY = 0;
-const DRAG_THRESHOLD_PX = 5;
-let dragDistanceSq = 0;
-
 /** When non-null, we are animating resolution: ranged lightning → ranged casualty → movement → melee lightning → melee casualty. */
 let resolutionMoveAnimation: {
   moves: ResolutionMove[];
@@ -276,22 +272,8 @@ let resolutionMoveAnimation: {
 } | null = null;
 let resolutionMoveAnimationFrameId: number | null = null;
 
-/** Terrain (hex grid) cache to avoid recomputing H3 geometry every redraw. */
-let terrainCacheCanvas: HTMLCanvasElement | null = null;
-let terrainCacheMeta:
-  | {
-      scale: number;
-      width: number;
-      height: number;
-      dpr: number;
-      selectedHexIndex: string | null;
-    }
-  | null = null;
-
 let redrawRafId: number | null = null;
 function requestRedraw(): void {
-  // During resolution animation, tickResolutionMoveAnimation already redraws every frame.
-  // Avoid double rendering while allowing the animation to reflect updated view offsets.
   if (resolutionMoveAnimation) return;
   if (redrawRafId !== null) return;
 
@@ -301,155 +283,80 @@ function requestRedraw(): void {
   });
 }
 
-function invalidateTerrainCache(): void {
-  terrainCacheCanvas = null;
-  terrainCacheMeta = null;
-}
-
 /** Cached canvas size metrics to avoid getBoundingClientRect() on every redraw. */
 let canvasMetrics: { w: number; h: number; dpr: number } | null = null;
 
-/** Cached per-animation hex-center base coordinates (offsetX/offsetY = 0) for fast interpolation while panning. */
-let moveAnimHexCenterBaseCache:
-  | Map<string, { x0: number; y0: number }>
-  | null = null;
-let moveAnimHexCenterBaseCacheStartTime: number | null = null;
-let moveAnimHexCenterBaseCacheScale: number | null = null;
-let moveAnimHexCenterBaseCacheW: number | null = null;
-let moveAnimHexCenterBaseCacheH: number | null = null;
-
-function ensureTerrainCache(w: number, h: number, dpr: number): void {
-  if (!gameState) return;
-
-  // Cache padding multiplier: at higher zoom levels the terrain can extend beyond the viewport.
-  // If the cache bitmap is too close to viewport-sized, panning can request pixels that were
-  // never generated into the cache canvas (leading to "persistent" blank edges after panning back).
-  const TERRAIN_CACHE_MULTIPLIER = 3;
-  const cacheW = Math.max(1, Math.floor(w * TERRAIN_CACHE_MULTIPLIER));
-  const cacheH = Math.max(1, Math.floor(h * TERRAIN_CACHE_MULTIPLIER));
-  const cells = gameState.hexes.map((hx) => hx.h3Index);
-
-  const needsRegen =
-    !terrainCacheCanvas ||
-    !terrainCacheMeta ||
-    terrainCacheMeta.scale !== view.scale ||
-    terrainCacheMeta.width !== cacheW ||
-    terrainCacheMeta.height !== cacheH ||
-    terrainCacheMeta.dpr !== dpr ||
-    terrainCacheMeta.selectedHexIndex !== selectedHexIndex;
-
-  if (!needsRegen) return;
-
-  const cacheCanvas = document.createElement('canvas');
-  cacheCanvas.width = Math.max(1, Math.floor(cacheW * dpr));
-  cacheCanvas.height = Math.max(1, Math.floor(cacheH * dpr));
-  const cacheCtx = cacheCanvas.getContext('2d');
-  if (!cacheCtx) return;
-
-  cacheCtx.setTransform(1, 0, 0, 1, 0, 0);
-  cacheCtx.scale(dpr, dpr);
-
-  // Render a padded cache bitmap aligned so that when view.offsetX/offsetY = 0, the top-left
-  // viewport region maps 1:1 with what would have been drawn into the main canvas.
-  // We adjust viewCache.scale to preserve visual hex size between cache and viewport.
-  const fitScaleMain = getFitScale(w, h, cells);
-  const fitScaleCache = getFitScale(cacheW, cacheH, cells);
-  const scaleRatio = fitScaleCache > 0 ? fitScaleMain / fitScaleCache : 1;
-  const viewCache: ViewState = {
-    scale: view.scale * scaleRatio,
-    // Keep the terrain centered within the cache canvas.
-    // We align it to the main viewport via an origin shift when drawing the cache.
-    offsetX: 0,
-    offsetY: 0,
-  };
-
-  drawHexes(cacheCtx, viewCache, cacheW, cacheH, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
-
-  terrainCacheCanvas = cacheCanvas;
-  terrainCacheMeta = { scale: view.scale, width: cacheW, height: cacheH, dpr, selectedHexIndex };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getLeafletGlobal(): any {
+  return (globalThis as unknown as { L?: unknown }).L;
 }
 
-function drawTerrainCache(
-  ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  offsetX: number,
-  offsetY: number
-): void {
-  if (!terrainCacheCanvas) return;
-  const srcDpr = terrainCacheMeta?.dpr ?? 1;
-
-  // Always clear first. When offsets move the cached source rectangle out of bounds,
-  // the browser can otherwise smear/stretch edge pixels into the destination.
-  ctx.fillStyle = BACKGROUND_COLOR;
-  ctx.fillRect(0, 0, w, h);
-
-  // Draw only the source/destination intersection to avoid sampling outside bounds.
-  // We draw the larger cache so that when view.offsetX/offsetY are 0, the cache is centered
-  // under the viewport (not pinned to the top-left of the viewport), preventing left/top-only
-  // "missing terrain" artifacts.
-  const cacheW = terrainCacheMeta?.width ?? w;
-  const cacheH = terrainCacheMeta?.height ?? h;
-
-  const destOffsetX = offsetX + (w - cacheW) / 2;
-  const destOffsetY = offsetY + (h - cacheH) / 2;
-
-  const dx0 = Math.max(0, destOffsetX);
-  const dy0 = Math.max(0, destOffsetY);
-  const dx1 = Math.min(w, destOffsetX + cacheW);
-  const dy1 = Math.min(h, destOffsetY + cacheH);
-
-  if (dx1 <= dx0 || dy1 <= dy0) return;
-
-  const dx = dx0;
-  const dy = dy0;
-  const sw = dx1 - dx0;
-  const sh = dy1 - dy0;
-  const sx = dx0 - destOffsetX;
-  const sy = dy0 - destOffsetY;
-
-  // Source coordinates are in the intrinsic pixel space of `terrainCacheCanvas`.
-  ctx.drawImage(
-    terrainCacheCanvas,
-    sx * srcDpr,
-    sy * srcDpr,
-    sw * srcDpr,
-    sh * srcDpr,
-    dx,
-    dy,
-    sw,
-    sh
-  );
+function hexCenterPx(h3Index: string): { x: number; y: number } {
+  return hexCenterToOverlayPoint(h3Index, cellToLatLng);
 }
 
-function getMoveAnimHexCenterBaseMap(
-  anim: NonNullable<typeof resolutionMoveAnimation>,
-  view: ViewState,
-  hexes: Set<string>,
-  canvasWidth: number,
-  canvasHeight: number,
-  hexList: string[]
-): Map<string, { x0: number; y0: number }> {
-  if (
-    !moveAnimHexCenterBaseCache ||
-    moveAnimHexCenterBaseCacheStartTime !== anim.startTime ||
-    moveAnimHexCenterBaseCacheScale !== view.scale ||
-    moveAnimHexCenterBaseCacheW !== canvasWidth ||
-    moveAnimHexCenterBaseCacheH !== canvasHeight
-  ) {
-    const baseView: ViewState = { scale: view.scale, offsetX: 0, offsetY: 0 };
-    const map = new Map<string, { x0: number; y0: number }>();
-    for (const h3Index of hexes) {
-      const { x, y } = getHexCanvasCenter(h3Index, baseView, canvasWidth, canvasHeight, hexList);
-      map.set(h3Index, { x0: x, y0: y });
-    }
-    moveAnimHexCenterBaseCache = map;
-    moveAnimHexCenterBaseCacheStartTime = anim.startTime;
-    moveAnimHexCenterBaseCacheScale = view.scale;
-    moveAnimHexCenterBaseCacheW = canvasWidth;
-    moveAnimHexCenterBaseCacheH = canvasHeight;
+function hitTestHexAtContainerPixel(x: number, y: number, mapHexSet: Set<string>): string | null {
+  const map = getMainLeafletMap() as
+    | { containerPointToLatLng: (pt: unknown) => { lat: number; lng: number } }
+    | null;
+  if (!map) return null;
+  const L = getLeafletGlobal();
+  const latlng = map.containerPointToLatLng(L.point(x, y));
+  let cell: string;
+  try {
+    cell = latLngToCell(latlng.lat, latlng.lng, WORLD_H3_RESOLUTION);
+  } catch {
+    return null;
   }
-  return moveAnimHexCenterBaseCache;
+  return mapHexSet.has(cell) ? cell : null;
+}
+
+function drawTerrainHexes(ctx: CanvasRenderingContext2D): void {
+  if (!gameState) return;
+  const map = getMainLeafletMap() as
+    | { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } }
+    | null;
+  if (!map) return;
+  const mapWithZoom = map as { getZoom?: () => number };
+  const zoom = typeof mapWithZoom.getZoom === 'function' ? mapWithZoom.getZoom() : 4;
+  // Thicker outlines when zoomed out, slightly thinner when zoomed in.
+  const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - ((zoom - 2) * (0.32 / 8))));
+  const L = getLeafletGlobal();
+  for (const hx of gameState.hexes) {
+    const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
+    const pts = boundary.map(([lat, lng]: [number, number]) => {
+      const p = map.latLngToContainerPoint(L.latLng(lat, lng));
+      return { x: p.x, y: p.y };
+    });
+    const kind =
+      hx.terrainKind ??
+      (hx.terrain === 'water' ? 'ocean' : hx.terrain === 'coastal' ? 'coastal' : 'land');
+    fillHexTerrain(ctx, kind, () => {
+      ctx.beginPath();
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i]!;
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.closePath();
+    });
+    const stroke = getActiveHexStrokeStyle();
+    ctx.strokeStyle = stroke.color;
+    ctx.lineWidth = stroke.width * zoomStrokeScale;
+    ctx.stroke();
+    if (selectedHexIndex === hx.h3Index) {
+      ctx.beginPath();
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i]!;
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = '#2e5a7b';
+      ctx.lineWidth = Math.max(1.8, 2.2 * zoomStrokeScale);
+      ctx.stroke();
+    }
+  }
 }
 
 /** Tool group id and label for the Tools tab. Fallback when getToolGroupList is unavailable; order matches main registry. */
@@ -843,12 +750,13 @@ function hideAiStrategyToast(): void {
 }
 
 /**
- * Resizes the canvas to match its container (including devicePixelRatio) and redraws the hex grid.
+ * Resizes the overlay canvas to match the map container (including devicePixelRatio) and redraws hexes/units.
  */
 function resizeAndRedraw(): void {
   const container = document.getElementById('canvas-container');
-  const canvas = document.getElementById('canvas') as HTMLCanvasElement | null;
+  const canvas = document.getElementById('map-overlay') as HTMLCanvasElement | null;
   if (!container || !canvas) return;
+  invalidateLeafletMapSizes();
 
   const dpr = window.devicePixelRatio ?? 1;
   const rect = container.getBoundingClientRect();
@@ -879,14 +787,8 @@ function resizeAndRedraw(): void {
     return;
   }
 
-  ensureTerrainCache(w, h, dpr);
-  if (terrainCacheCanvas) {
-    // Draw cached terrain (including selection highlight) shifted by current pan offsets.
-    drawTerrainCache(ctx, w, h, view.offsetX, view.offsetY);
-  } else {
-    // Fallback: cache creation failed (e.g. offscreen ctx unavailable).
-    drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
-  }
+  ctx.clearRect(0, 0, w, h);
+  drawTerrainHexes(ctx);
   const hexList = gameState.hexes.map((h) => h.h3Index);
   let moveProgress = 1;
   let unitsToDraw: GameStateSnapshot['units'] = gameState.units;
@@ -924,28 +826,22 @@ function resizeAndRedraw(): void {
       movingIds = undefined;
     }
     if (elapsed >= phase.movementStart) {
-      drawResolutionMoveLines(ctx, view, w, h, anim.moves, gameState.units, hexList, 1);
+      drawResolutionMoveLines(ctx, w, h, anim.moves, gameState.units, hexList, 1);
     }
   } else {
     movingIds = undefined;
   }
   if (pendingOrders.length > 0 && gameState.units.length && hexList) {
-    drawOrderLines(ctx, view, w, h, pendingOrders, gameState.units, hexList);
+    drawOrderLines(ctx, w, h, pendingOrders, gameState.units, hexList);
   }
   if (pendingRangedAttacks.length > 0 && gameState.units.length && hexList) {
-    drawRangedAttackLines(ctx, view, w, h, pendingRangedAttacks, gameState.units, hexList);
+    drawRangedAttackLines(ctx, w, h, pendingRangedAttacks, gameState.units, hexList);
   }
   if (unitsToDraw.length) {
-    drawUnits(ctx, view, w, h, unitsToDraw, hexList, movingIds);
+    drawUnits(ctx, w, h, unitsToDraw, hexList, movingIds);
   }
   if (anim && hexList && moveProgress < 1) {
-    const moveAnimHexList = new Set<string>();
-    for (const m of anim.moves) {
-      moveAnimHexList.add(m.fromH3Index);
-      moveAnimHexList.add(m.toH3Index);
-    }
-    const animBaseCenters = getMoveAnimHexCenterBaseMap(anim, view, moveAnimHexList, w, h, hexList);
-    drawMovingUnits(ctx, view, w, h, anim.moves, gameState.units, hexList, moveProgress, animBaseCenters);
+    drawMovingUnits(ctx, w, h, anim.moves, gameState.units, hexList, moveProgress);
   }
   if (anim && hexList) {
     const elapsed = Date.now() - anim.startTime;
@@ -963,13 +859,13 @@ function resizeAndRedraw(): void {
     const combatHexes = phase.inRangedLightning ? (anim.rangedCombatHexes ?? anim.combatHexes) : phase.inMeleeLightning ? anim.meleeCombatHexes : undefined;
     if (combatHexes?.length) {
       const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * 0.008);
-      drawCombatLightning(ctx, view, w, h, combatHexes, hexList, pulseOpacity);
+      drawCombatLightning(ctx, w, h, combatHexes, hexList, pulseOpacity);
     }
     const casualtyHexes = phase.inRangedCasualty ? (anim.rangedCasualtyHexes ?? anim.casualtyHexes) : phase.inMeleeCasualty ? anim.meleeCasualtyHexes : undefined;
     if (casualtyHexes?.length) {
       const casualtyElapsed = phase.inRangedCasualty ? elapsed - (hasRangedCombat ? LIGHTNING_DURATION_MS : 0) : elapsed - (phase.movementStart + RESOLUTION_FADE_MS + (hasMeleeCombat ? LIGHTNING_DURATION_MS : 0));
       const pulseOpacity = 0.5 + 0.5 * Math.sin(casualtyElapsed * 0.008);
-      drawCasualtyOverlay(ctx, view, w, h, casualtyHexes, hexList, pulseOpacity);
+      drawCasualtyOverlay(ctx, w, h, casualtyHexes, hexList, pulseOpacity);
     }
   }
 }
@@ -1012,7 +908,6 @@ function drawOneUnitMarker(
  */
 function drawUnits(
   ctx: CanvasRenderingContext2D,
-  view: ViewState,
   canvasWidth: number,
   canvasHeight: number,
   units: GameStateSnapshot['units'],
@@ -1028,7 +923,7 @@ function drawUnits(
     byHex.set(u.h3Index, list);
   }
   for (const [h3Index, hexUnits] of byHex) {
-    const { x, y } = getHexCanvasCenter(h3Index, view, canvasWidth, canvasHeight, hexList);
+    const { x, y } = hexCenterPx(h3Index);
     const count = hexUnits.length;
     const types = new Set(hexUnits.map((u) => u.unitType));
     const players = new Set(hexUnits.map((u) => u.player));
@@ -1063,7 +958,6 @@ const LIGHTNING_COLOR = '#f0d000';
  */
 function drawCombatLightning(
   ctx: CanvasRenderingContext2D,
-  view: ViewState,
   canvasWidth: number,
   canvasHeight: number,
   combatHexes: string[],
@@ -1077,7 +971,7 @@ function drawCombatLightning(
   ctx.lineJoin = 'round';
   const h = 18;
   for (const h3Index of combatHexes) {
-    const { x, y } = getHexCanvasCenter(h3Index, view, canvasWidth, canvasHeight, hexList);
+    const { x, y } = hexCenterPx(h3Index);
     ctx.beginPath();
     ctx.moveTo(x, y - h);
     ctx.lineTo(x + 6, y - 4);
@@ -1100,7 +994,6 @@ const CASUALTY_X_COLOR = '#c03030';
  */
 function drawCasualtyOverlay(
   ctx: CanvasRenderingContext2D,
-  view: ViewState,
   canvasWidth: number,
   canvasHeight: number,
   casualtyHexes: string[],
@@ -1113,7 +1006,7 @@ function drawCasualtyOverlay(
   ctx.lineCap = 'round';
   const size = 20;
   for (const h3Index of casualtyHexes) {
-    const { x, y } = getHexCanvasCenter(h3Index, view, canvasWidth, canvasHeight, hexList);
+    const { x, y } = hexCenterPx(h3Index);
     ctx.beginPath();
     ctx.moveTo(x - size, y - size);
     ctx.lineTo(x + size, y + size);
@@ -1134,7 +1027,6 @@ function drawCasualtyOverlay(
  */
 function drawRangedAttackLines(
   ctx: CanvasRenderingContext2D,
-  view: ViewState,
   canvasWidth: number,
   canvasHeight: number,
   ranged: RangedAttackOrder[],
@@ -1151,8 +1043,8 @@ function drawRangedAttackLines(
   for (const r of ranged) {
     const unit = units.find((u) => u.id === r.unitId);
     if (!unit) continue;
-    const from = getHexCanvasCenter(unit.h3Index, view, canvasWidth, canvasHeight, hexList);
-    const to = getHexCanvasCenter(r.targetH3Index, view, canvasWidth, canvasHeight, hexList);
+    const from = hexCenterPx(unit.h3Index);
+    const to = hexCenterPx(r.targetH3Index);
     ctx.beginPath();
     ctx.moveTo(from.x, from.y);
     ctx.lineTo(to.x, to.y);
@@ -1167,7 +1059,6 @@ function drawRangedAttackLines(
  */
 function drawOrderLines(
   ctx: CanvasRenderingContext2D,
-  view: ViewState,
   canvasWidth: number,
   canvasHeight: number,
   orders: { unitId: string; toH3Index: string }[],
@@ -1179,8 +1070,8 @@ function drawOrderLines(
   for (const order of orders) {
     const unit = units.find((u) => u.id === order.unitId);
     if (!unit) continue;
-    const from = getHexCanvasCenter(unit.h3Index, view, canvasWidth, canvasHeight, hexList);
-    const to = getHexCanvasCenter(order.toH3Index, view, canvasWidth, canvasHeight, hexList);
+    const from = hexCenterPx(unit.h3Index);
+    const to = hexCenterPx(order.toH3Index);
 
     const dx = to.x - from.x;
     const dy = to.y - from.y;
@@ -1223,7 +1114,6 @@ function drawOrderLines(
  */
 function drawResolutionMoveLines(
   ctx: CanvasRenderingContext2D,
-  view: ViewState,
   canvasWidth: number,
   canvasHeight: number,
   moves: ResolutionMove[],
@@ -1238,8 +1128,8 @@ function drawResolutionMoveLines(
     const unit = units.find((u) => u.id === move.unitId);
     if (!unit) continue;
     const lineColor = unit.player === 'human' ? ORDER_LINE_COLOR : AI_ORDER_LINE_COLOR;
-    const from = getHexCanvasCenter(move.fromH3Index, view, canvasWidth, canvasHeight, hexList);
-    const to = getHexCanvasCenter(move.toH3Index, view, canvasWidth, canvasHeight, hexList);
+    const from = hexCenterPx(move.fromH3Index);
+    const to = hexCenterPx(move.toH3Index);
     const dx = to.x - from.x;
     const dy = to.y - from.y;
     const len = Math.hypot(dx, dy) || 1;
@@ -1280,44 +1170,40 @@ function drawResolutionMoveLines(
  */
 function drawMovingUnits(
   ctx: CanvasRenderingContext2D,
-  view: ViewState,
   canvasWidth: number,
   canvasHeight: number,
   moves: ResolutionMove[],
   units: GameStateSnapshot['units'],
   hexList: string[],
-  progress: number,
-  hexCenterBase?: Map<string, { x0: number; y0: number }>
+  progress: number
 ): void {
   if (moves.length === 0 || progress >= 1) return;
+  void canvasWidth;
+  void hexList;
+  const map = getMainLeafletMap() as
+    | { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } }
+    | null;
+  if (!map) return;
+  const L = getLeafletGlobal();
   const unitsById = new Map<string, GameStateSnapshot['units'][number]>(units.map((u) => [u.id, u]));
   for (const move of moves) {
     const unit = unitsById.get(move.unitId);
     if (!unit) continue;
-    let x: number;
-    let y: number;
-    if (hexCenterBase) {
-      const fromBase = hexCenterBase.get(move.fromH3Index);
-      const toBase = hexCenterBase.get(move.toH3Index);
-      if (!fromBase || !toBase) continue;
-      x = fromBase.x0 + view.offsetX + progress * (toBase.x0 - fromBase.x0);
-      y = fromBase.y0 + view.offsetY + progress * (toBase.y0 - fromBase.y0);
-    } else {
-      const from = getHexCanvasCenter(move.fromH3Index, view, canvasWidth, canvasHeight, hexList);
-      const to = getHexCanvasCenter(move.toH3Index, view, canvasWidth, canvasHeight, hexList);
-      x = from.x + progress * (to.x - from.x);
-      y = from.y + progress * (to.y - from.y);
-    }
+    const [lat0, lng0] = cellToLatLng(move.fromH3Index);
+    const [lat1, lng1] = cellToLatLng(move.toH3Index);
+    const lat = lat0 + progress * (lat1 - lat0);
+    const lng = lng0 + progress * (lng1 - lng0);
+    const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
     const color = PLAYER_COLORS[unit.player] ?? '#333';
     const label = UNIT_TYPE_LABELS[unit.unitType] ?? '?';
-    drawOneUnitMarker(ctx, x, y, color, label, '#fff');
+    drawOneUnitMarker(ctx, p.x, p.y, color, label, '#fff');
   }
 }
 
-/** Redraws the hex grid without resizing the canvas. Use after pan/zoom or selection change. */
+/** Redraws the overlay without resizing. Use after pan/zoom or selection change. */
 function redraw(): void {
   const container = document.getElementById('canvas-container');
-  const canvas = document.getElementById('canvas') as HTMLCanvasElement | null;
+  const canvas = document.getElementById('map-overlay') as HTMLCanvasElement | null;
   if (!container || !canvas) return;
 
   const ctx = canvas.getContext('2d');
@@ -1340,14 +1226,8 @@ function redraw(): void {
     return;
   }
 
-  ensureTerrainCache(w, h, dpr);
-  if (terrainCacheCanvas) {
-    // Draw cached terrain (including selection highlight) shifted by current pan offsets.
-    drawTerrainCache(ctx, w, h, view.offsetX, view.offsetY);
-  } else {
-    // Fallback: cache creation failed (e.g. offscreen ctx unavailable).
-    drawHexes(ctx, view, w, h, BACKGROUND_COLOR, selectedHexIndex, gameState.hexes);
-  }
+  ctx.clearRect(0, 0, w, h);
+  drawTerrainHexes(ctx);
   const hexList = gameState.hexes.map((h) => h.h3Index);
   let moveProgress = 1;
   let unitsToDraw: GameStateSnapshot['units'] = gameState.units;
@@ -1385,22 +1265,22 @@ function redraw(): void {
       movingIds = undefined;
     }
     if (elapsed >= phase.movementStart) {
-      drawResolutionMoveLines(ctx, view, w, h, anim.moves, gameState.units, hexList, 1);
+      drawResolutionMoveLines(ctx, w, h, anim.moves, gameState.units, hexList, 1);
     }
   } else {
     movingIds = undefined;
   }
   if (pendingOrders.length > 0 && gameState.units.length && hexList) {
-    drawOrderLines(ctx, view, w, h, pendingOrders, gameState.units, hexList);
+    drawOrderLines(ctx, w, h, pendingOrders, gameState.units, hexList);
   }
   if (pendingRangedAttacks.length > 0 && gameState.units.length && hexList) {
-    drawRangedAttackLines(ctx, view, w, h, pendingRangedAttacks, gameState.units, hexList);
+    drawRangedAttackLines(ctx, w, h, pendingRangedAttacks, gameState.units, hexList);
   }
   if (unitsToDraw.length) {
-    drawUnits(ctx, view, w, h, unitsToDraw, hexList, movingIds);
+    drawUnits(ctx, w, h, unitsToDraw, hexList, movingIds);
   }
   if (anim && hexList && moveProgress < 1) {
-    drawMovingUnits(ctx, view, w, h, anim.moves, gameState.units, hexList, moveProgress);
+    drawMovingUnits(ctx, w, h, anim.moves, gameState.units, hexList, moveProgress);
   }
   if (anim && hexList) {
     const elapsed = Date.now() - anim.startTime;
@@ -1418,13 +1298,13 @@ function redraw(): void {
     const combatHexes = phase.inRangedLightning ? (anim.rangedCombatHexes ?? anim.combatHexes) : phase.inMeleeLightning ? anim.meleeCombatHexes : undefined;
     if (combatHexes?.length) {
       const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * 0.008);
-      drawCombatLightning(ctx, view, w, h, combatHexes, hexList, pulseOpacity);
+      drawCombatLightning(ctx, w, h, combatHexes, hexList, pulseOpacity);
     }
     const casualtyHexes = phase.inRangedCasualty ? (anim.rangedCasualtyHexes ?? anim.casualtyHexes) : phase.inMeleeCasualty ? anim.meleeCasualtyHexes : undefined;
     if (casualtyHexes?.length) {
       const casualtyElapsed = phase.inRangedCasualty ? elapsed - (hasRangedCombat ? LIGHTNING_DURATION_MS : 0) : elapsed - (phase.movementStart + RESOLUTION_FADE_MS + (hasMeleeCombat ? LIGHTNING_DURATION_MS : 0));
       const pulseOpacity = 0.5 + 0.5 * Math.sin(casualtyElapsed * 0.008);
-      drawCasualtyOverlay(ctx, view, w, h, casualtyHexes, hexList, pulseOpacity);
+      drawCasualtyOverlay(ctx, w, h, casualtyHexes, hexList, pulseOpacity);
     }
   }
 }
@@ -1462,20 +1342,6 @@ function updateSidebar(): void {
   }
 }
 
-function getCanvasAndSize(): {
-  canvas: HTMLCanvasElement;
-  width: number;
-  height: number;
-} | null {
-  const container = document.getElementById('canvas-container');
-  const canvas = document.getElementById('canvas') as HTMLCanvasElement | null;
-  if (!container || !canvas) return null;
-  const rect = container.getBoundingClientRect();
-  const width = Math.max(1, Math.floor(rect.width));
-  const height = Math.max(1, Math.floor(rect.height));
-  return { canvas, width, height };
-}
-
 function updateGameStateSidebar(state: GameStateSnapshot | null): void {
   const phaseEl = document.getElementById('sidebar-phase');
   const turnEl = document.getElementById('sidebar-turn');
@@ -1484,8 +1350,8 @@ function updateGameStateSidebar(state: GameStateSnapshot | null): void {
 }
 
 /**
- * Enables or disables all main UI (canvas container content except overlay, and sidebar) when the new-game overlay is visible.
- * Uses pointer-events so only the overlay (size selector, Start/New game button) is interactive.
+ * Enables or disables all main UI (map area and sidebar) when the new-game overlay is visible.
+ * Uses pointer-events so only the overlay (Start/New game button) is interactive.
  */
 function setMainUIControlsEnabled(enabled: boolean): void {
   const container = document.getElementById('canvas-container');
@@ -1531,7 +1397,7 @@ function updateGameOverUI(state: GameStateSnapshot | null): void {
       messageEl.textContent = state!.winner === 'human' ? 'You win!' : 'You lose.';
       messageEl.style.display = '';
     } else {
-      messageEl.textContent = 'Choose map size and start.';
+      messageEl.textContent = 'Start the world map game when ready.';
       messageEl.style.display = '';
     }
   }
@@ -1545,12 +1411,9 @@ function updateGameOverUI(state: GameStateSnapshot | null): void {
 function initNewGameButton(): void {
   document.getElementById('new-game-btn')?.addEventListener('click', async () => {
     if (!window.gameApi?.newGame) return;
-    const sizeEl = document.getElementById('new-game-size') as HTMLSelectElement | null;
-    const size = (sizeEl?.value ?? 'small') as 'small' | 'medium' | 'large';
     try {
-      const state = (await window.gameApi.newGame(size)) as GameStateSnapshot;
+      const state = (await window.gameApi.newGame()) as GameStateSnapshot;
       gameState = state;
-      invalidateTerrainCache();
       pendingOrders = [];
       pendingRangedAttacks = [];
       rangedModeActive = false;
@@ -1571,7 +1434,7 @@ function initNewGameButton(): void {
       updateGameOverUI(state);
       updateReadyButtonState();
       if (runButtonOn) startBackgroundRequestIfAllowed();
-      redraw();
+      resizeAndRedraw();
     } catch (err) {
       console.error('newGame failed:', err);
     }
@@ -1595,7 +1458,7 @@ function openNewGameOverlayFromModelTab(): void {
   const messageEl = document.getElementById('game-over-message');
   const newGameBtn = document.getElementById('new-game-btn');
   if (messageEl) {
-    messageEl.textContent = 'Choose map size and start.';
+    messageEl.textContent = 'Start a new world map game when ready.';
     messageEl.style.display = '';
   }
   if (newGameBtn) newGameBtn.textContent = 'Start game';
@@ -1866,6 +1729,21 @@ function initOpenRouterUI(): void {
 }
 
 function init(): void {
+  try {
+    initWorldLeafletMaps('main-map', 'minimap', () => requestRedraw());
+    setMainBasemapFilter(getActiveBasemapFilter());
+    const leg = document.getElementById('terrain-legend');
+    if (leg) {
+      renderTerrainLegend(leg, {
+        onStyleChanged: (_styleId: TerrainVisualStyleId) => {
+          setMainBasemapFilter(getActiveBasemapFilter());
+          requestRedraw();
+        },
+      });
+    }
+  } catch (err) {
+    console.error('Map init failed:', err);
+  }
   resizeAndRedraw();
   updateSidebar();
   updateGameStateSidebar(null);
@@ -1893,7 +1771,6 @@ function init(): void {
       .then((raw) => {
         const state = raw as GameStateSnapshot;
         gameState = state;
-        invalidateTerrainCache();
         updateGameStateSidebar(state);
         updateRangedSidebar();
         updateSidebar();
@@ -1904,75 +1781,31 @@ function init(): void {
       .catch((err) => console.error('getGameState failed:', err));
   }
 
-  window.addEventListener('resize', resizeAndRedraw);
+  window.addEventListener('resize', () => {
+    resizeAndRedraw();
+  });
 
-  const canvas = document.getElementById('canvas') as HTMLCanvasElement | null;
-  if (!canvas) return;
+  const mainMapEl = document.getElementById('main-map');
+  if (!mainMapEl) return;
 
-  canvas.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const info = getCanvasAndSize();
-    if (!info) return;
+  function clientXYToHit(clientX: number, clientY: number): string | null {
+    if (!gameState) return null;
+    const map = getMainLeafletMap() as { getContainer: () => HTMLElement } | null;
+    if (!map) return null;
+    const rect = map.getContainer().getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const set = new Set(gameState.hexes.map((h) => h.h3Index));
+    return hitTestHexAtContainerPixel(x, y, set);
+  }
 
-    const { width, height } = info;
-    const mouseX = e.clientX - canvas.getBoundingClientRect().left;
-    const mouseY = e.clientY - canvas.getBoundingClientRect().top;
-    const canvasCenterX = width / 2;
-    const canvasCenterY = height / 2;
-
-    const factor = e.deltaY > 0 ? 1 / ZOOM_FACTOR : ZOOM_FACTOR;
-    const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, view.scale * factor));
-
-    const dx = mouseX - canvasCenterX - view.offsetX;
-    const dy = mouseY - canvasCenterY - view.offsetY;
-    view.offsetX = mouseX - canvasCenterX - (dx * newScale) / view.scale;
-    view.offsetY = mouseY - canvasCenterY - (dy * newScale) / view.scale;
-    view.scale = newScale;
-
-    requestRedraw();
-  }, { passive: false });
-
-  canvas.addEventListener('mousedown', (e) => {
+  mainMapEl.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     selectedUnitIdAtMouseDown = selectedUnitId;
-    isDragging = true;
-    dragDistanceSq = 0;
-    dragStartX = e.clientX;
-    dragStartY = e.clientY;
-    dragStartOffsetX = view.offsetX;
-    dragStartOffsetY = view.offsetY;
   });
 
-  window.addEventListener('mousemove', (e) => {
-    if (!isDragging) return;
-    const dx = e.clientX - dragStartX;
-    const dy = e.clientY - dragStartY;
-    dragDistanceSq = dx * dx + dy * dy;
-    view.offsetX = dragStartOffsetX + dx;
-    view.offsetY = dragStartOffsetY + dy;
-    requestRedraw();
-  });
-
-  canvas.addEventListener('mouseleave', () => {
-    document.getElementById('hex-tooltip')?.classList.add('hidden');
-  });
-
-  window.addEventListener('mouseup', (e) => {
-    if (e.button !== 0) return;
-    isDragging = false;
-  });
-
-  canvas.addEventListener('click', (e) => {
-    if (dragDistanceSq > DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) return;
-    const info = getCanvasAndSize();
-    if (!info) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const hexList = gameState?.hexes?.map((h) => h.h3Index);
-    const hit = hitTest(x, y, view, info.width, info.height, hexList);
+  mainMapEl.addEventListener('click', (e) => {
+    const hit = clientXYToHit(e.clientX, e.clientY);
     selectedHexIndex = hit;
     clearSidebarError();
 
@@ -2071,21 +1904,13 @@ function init(): void {
     redraw();
   });
 
-  canvas.addEventListener('dblclick', (e) => {
+  mainMapEl.addEventListener('dblclick', (e) => {
     if (pendingSelectTimeout !== null) {
       clearTimeout(pendingSelectTimeout);
       pendingSelectTimeout = null;
     }
-    if (dragDistanceSq > DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) return;
-    const info = getCanvasAndSize();
-    if (!info || !gameState) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const hexList = gameState.hexes?.map((h) => h.h3Index);
-    const hit = hitTest(x, y, view, info.width, info.height, hexList ?? []);
+    if (!gameState) return;
+    const hit = clientXYToHit(e.clientX, e.clientY);
     if (!hit || !selectedUnitIdAtMouseDown) return;
 
     const unit = gameState.units.find((u) => u.id === selectedUnitIdAtMouseDown);

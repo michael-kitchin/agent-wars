@@ -4,12 +4,13 @@
  */
 
 import { gridDistance } from 'h3-js';
-import { dbGetOne, dbRun, dbGetAll, isDbReady, saveDatabase, getGameSeed, setGameOver, getMapSize, getMapHexSet } from './gameDb';
+import { dbGetOne, dbRun, dbGetAll, isDbReady, saveDatabase, getGameSeed, setGameOver, getMapHexSet } from './gameDb';
 import { getOrderedHexList } from './mapData';
 import { getRange } from './combatConstants';
 import { runRangedPhase, runMeleePhase, createCombatRng, type CombatUnit } from './combatResolution';
 import { logDebug, logError } from './logger';
 import type { MovementOrder, RangedAttackOrder, SubmitOrdersPayload } from '../shared/ipcTypes';
+import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
 
 export type { MovementOrder, RangedAttackOrder, SubmitOrdersPayload };
 
@@ -63,9 +64,11 @@ function validateOrder(
 
   const destTerrain = dbGetOne<{ terrain: string }>('SELECT terrain FROM hexes WHERE h3_index = ?', [toH3Index]);
   const terrain = destTerrain?.terrain ?? 'land';
-  if (unit.unit_type === 'naval' && terrain !== 'water') return { valid: false, reason: 'Naval units must move to water' };
-  if ((unit.unit_type === 'infantry' || unit.unit_type === 'armor') && terrain !== 'land') {
-    return { valid: false, reason: 'Land units must move to land' };
+  if (unit.unit_type === 'naval' && !passabilityAllowsNavalUnit(terrain)) {
+    return { valid: false, reason: 'Naval units must move to water or coastal hexes' };
+  }
+  if ((unit.unit_type === 'infantry' || unit.unit_type === 'armor') && !passabilityAllowsLandUnit(terrain)) {
+    return { valid: false, reason: 'Land units must move to land or coastal hexes' };
   }
 
   return { valid: true };
@@ -229,7 +232,7 @@ export function ready(
 
     dbRun('UPDATE turn_state SET phase = ? WHERE id = 1', ['resolution']);
 
-    const hexList = getOrderedHexList(getMapSize());
+    const hexList = getOrderedHexList();
     const unitsBeforeMove = dbGetAll<{ id: string; player: string; unit_type: string; h3_index: string }>(
       'SELECT id, player, unit_type, h3_index FROM units'
     ).map((r) => ({ id: r.id, player: r.player, unitType: r.unit_type, h3Index: r.h3_index }));
