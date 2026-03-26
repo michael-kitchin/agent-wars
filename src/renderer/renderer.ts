@@ -1134,6 +1134,30 @@ function drawArrowheadOnly(
 }
 
 /**
+ * Strokes a polyline while skipping wraparound connectors that jump across the map viewport.
+ * When a jump is detected, the line restarts at the next point so the path resumes on the opposite edge.
+ */
+function strokePolylineSkippingWrap(
+  ctx: CanvasRenderingContext2D,
+  points: Array<{ x: number; y: number }>,
+  wrapJumpThresholdPx: number
+): void {
+  if (points.length < 2) return;
+  ctx.beginPath();
+  ctx.moveTo(points[0]!.x, points[0]!.y);
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1]!;
+    const current = points[i]!;
+    if (Math.abs(current.x - prev.x) > wrapJumpThresholdPx) {
+      ctx.moveTo(current.x, current.y);
+      continue;
+    }
+    ctx.lineTo(current.x, current.y);
+  }
+  ctx.stroke();
+}
+
+/**
  * Draws committed human standing-order routed indicators (opaque): routed segments plus endpoint arrow.
  */
 function drawStandingOrderLines(
@@ -1166,14 +1190,11 @@ function drawStandingOrderLines(
         return { x: p.x, y: p.y };
       });
       ctx.setLineDash(seg.turn <= 1 ? [] : [6, 4]);
-      ctx.beginPath();
-      ctx.moveTo(points[0]!.x, points[0]!.y);
-      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i]!.x, points[i]!.y);
       ctx.strokeStyle = ORDER_LINE_COLOR;
       ctx.lineWidth = ORDER_LINE_WIDTH;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      ctx.stroke();
+      strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
       lastPenultimate = points[points.length - 2] ?? null;
       lastPoint = points[points.length - 1] ?? null;
     }
@@ -1206,14 +1227,11 @@ function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
       return { x: p.x, y: p.y };
     });
     ctx.setLineDash(seg.turn <= 1 ? [] : [6, 4]);
-    ctx.beginPath();
-    ctx.moveTo(points[0]!.x, points[0]!.y);
-    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i]!.x, points[i]!.y);
     ctx.strokeStyle = ORDER_LINE_COLOR;
     ctx.lineWidth = ORDER_LINE_WIDTH;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.stroke();
+    strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
     lastSegmentPenultimate = points[points.length - 2] ?? null;
     lastSegmentLast = points[points.length - 1] ?? null;
   }
