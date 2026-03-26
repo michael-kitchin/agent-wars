@@ -3,14 +3,22 @@
  * All logic runs in the main process and uses the game database.
  */
 
-import { gridDistance } from 'h3-js';
+import { cellToLatLng, gridDistance, gridDisk } from 'h3-js';
 import { dbGetOne, dbRun, dbGetAll, isDbReady, saveDatabase, getGameSeed, setGameOver, getMapHexSet } from './gameDb';
-import { getOrderedHexList } from './mapData';
+import { buildLatLngCoordinateMap, getOrderedHexList } from './mapData';
 import { getRange } from './combatConstants';
 import { runRangedPhase, runMeleePhase, createCombatRng, type CombatUnit } from './combatResolution';
-import { logDebug, logError } from './logger';
+import { logDebug, logError, logTrace } from './logger';
 import type { MovementOrder, RangedAttackOrder, SubmitOrdersPayload } from '../shared/ipcTypes';
 import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
+import { executePlanRoute } from './tools/tool1Pathfinding';
+import { terrainIsPassableForDomain } from './pathfinding';
+import {
+  assignHumanMarchStandingOrder,
+  cancelHumanStandingOrder,
+  generateOrdersForStandingOrders,
+  queryHumanStandingOrders,
+} from './tools/tool5StandingOrders';
 
 export type { MovementOrder, RangedAttackOrder, SubmitOrdersPayload };
 
@@ -19,7 +27,30 @@ export interface SubmitOrdersResult {
   reason?: string;
 }
 
+export interface HumanStandingOrderView {
+  unitId: string;
+  status: string;
+  destinationH3Index: string | null;
+  turnsRemaining: number;
+  nextMoveH3Index: string | null;
+  routeSegments?: { turn: number; hexes: [number, number][] }[];
+}
+
+export interface HumanOrderPreviewSegment {
+  turn: number;
+  hexes: [number, number][];
+}
+
+export interface HumanOrderPreviewResult {
+  valid: boolean;
+  showInvalidMarker: boolean;
+  invalidReason?: string;
+  arrowLatLng?: [number, number];
+  segments: HumanOrderPreviewSegment[];
+}
+
 const VALID_PHASE = 'planning';
+const HUMAN_PLAYER_ID = 'human';
 
 /** Movement range in hexes per turn by unit type. Infantry 1, armor 2, naval 2. */
 const MOVEMENT_RANGE: Record<string, number> = {
@@ -27,6 +58,22 @@ const MOVEMENT_RANGE: Record<string, number> = {
   armor: 2,
   naval: 2,
 };
+
+function dbBackedStateSnapshot() {
+  return {
+    hexes: dbGetAll<{ h3Index: string; terrain: string; terrainKind: string }>(
+      'SELECT h3_index AS h3Index, terrain, terrain_kind AS terrainKind FROM hexes'
+    ),
+    units: dbGetAll<{ id: string; player: string; unitType: string; h3Index: string }>(
+      'SELECT id, player, unit_type AS unitType, h3_index AS h3Index FROM units'
+    ),
+    phase: dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1')?.phase ?? 'planning',
+    turnNumber: dbGetOne<{ turnNumber: number }>('SELECT turn_number AS turnNumber FROM turn_state WHERE id = 1')?.turnNumber ?? 1,
+    pendingOrders: dbGetAll<{ unitId: string; toH3Index: string }>(
+      'SELECT unit_id AS unitId, to_h3_index AS toH3Index FROM pending_orders'
+    ),
+  };
+}
 
 /**
  * Validates a single movement order: unit exists and is human-owned, destination is on map,
@@ -118,6 +165,208 @@ export function validateRangedAttack(
   }
 
   return { valid: true };
+}
+
+/**
+ * Why this exists:
+ *     Supplies renderer with human standing-order rows for movement list and committed-order overlays.
+ * When to use:
+ *     Planning-phase UI refresh and after assign/cancel operations.
+ * What to expect:
+ *     Returns normalized march-only rows sorted by unitId.
+ */
+export function listHumanStandingOrders(): HumanStandingOrderView[] {
+  logTrace('gameActions listHumanStandingOrders');
+  try {
+    if (!isDbReady()) return [];
+    const state = dbBackedStateSnapshot();
+    const hexList = state.hexes.map((h) => h.h3Index);
+    const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
+    const result = queryHumanStandingOrders(state, latLngByH3, resolveToH3) as {
+      status: string;
+      orders?: Array<{
+        unitId?: string;
+        type?: string;
+        status?: string;
+        turnsRemaining?: number;
+        nextMoveHex?: [number, number];
+        destination?: [number, number];
+      }>;
+    };
+    if (result.status !== 'ok' || !Array.isArray(result.orders)) return [];
+    return result.orders
+      .filter((o) => o.type === 'march' && typeof o.unitId === 'string')
+      .map((o) => {
+        const unitId = o.unitId as string;
+        const destinationH3Index =
+          Array.isArray(o.destination) && o.destination.length >= 2
+            ? resolveToH3(Number(o.destination[0]), Number(o.destination[1])) ?? null
+            : null;
+        let routeSegments: { turn: number; hexes: [number, number][] }[] | undefined;
+        if (Array.isArray(o.destination) && o.destination.length >= 2) {
+          const planned = executePlanRoute(
+            unitId,
+            [Number(o.destination[0]), Number(o.destination[1])],
+            { avoidEnemies: true },
+            state,
+            latLngByH3,
+            resolveToH3
+          );
+          if (planned.status === 'ok') {
+            routeSegments = planned.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes }));
+          }
+        }
+        return {
+          unitId,
+          status: String(o.status ?? 'en_route'),
+          destinationH3Index,
+          turnsRemaining: Number(o.turnsRemaining ?? 0),
+          nextMoveH3Index:
+            Array.isArray(o.nextMoveHex) && o.nextMoveHex.length >= 2
+              ? resolveToH3(Number(o.nextMoveHex[0]), Number(o.nextMoveHex[1])) ?? null
+              : null,
+          routeSegments,
+        };
+      })
+      .sort((a, b) => a.unitId.localeCompare(b.unitId));
+  } catch (err) {
+    logError('listHumanStandingOrders: exception', err);
+    return [];
+  }
+}
+
+/**
+ * Why this exists:
+ *     Assigns/updates a human march standing order from renderer double-click input.
+ * When to use:
+ *     Renderer commit action for long-distance movement orders.
+ * What to expect:
+ *     Returns success false with reason on validation/persistence failures.
+ */
+export function assignHumanMarchOrder(unitId: string, destinationH3Index: string): SubmitOrdersResult {
+  logDebug('gameActions assignHumanMarchOrder', { unitId, destinationH3Index });
+  try {
+    if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
+    const state = dbBackedStateSnapshot();
+    const turnRow = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1');
+    if (turnRow?.phase !== VALID_PHASE) return { success: false, reason: 'Not in planning phase' };
+    const mapHexes = new Set(state.hexes.map((h) => h.h3Index));
+    if (!mapHexes.has(destinationH3Index)) return { success: false, reason: 'Destination not on map' };
+    const [lat, lng] = cellToLatLng(destinationH3Index);
+    const hexList = state.hexes.map((h) => h.h3Index);
+    const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
+    const result = assignHumanMarchStandingOrder(unitId, [lat, lng], state, latLngByH3, resolveToH3) as {
+      status: string;
+      error?: string;
+    };
+    if (result.status !== 'ok') return { success: false, reason: result.error ?? 'Failed to assign order' };
+    return { success: true };
+  } catch (err) {
+    logError('assignHumanMarchOrder: exception', err);
+    return { success: false, reason: String(err) };
+  }
+}
+
+/**
+ * Why this exists:
+ *     Cancels a single human standing order from sidebar cancel action.
+ * When to use:
+ *     Renderer movement-order list Cancel button.
+ * What to expect:
+ *     Removes only the provided unit order when present.
+ */
+export function cancelHumanOrder(unitId: string): SubmitOrdersResult {
+  logDebug('gameActions cancelHumanOrder', { unitId });
+  try {
+    if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
+    const state = dbBackedStateSnapshot();
+    const hexList = state.hexes.map((h) => h.h3Index);
+    const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
+    const result = cancelHumanStandingOrder(unitId, state, latLngByH3, resolveToH3) as { status: string; error?: string };
+    if (result.status !== 'ok') return { success: false, reason: result.error ?? 'Failed to cancel order' };
+    return { success: true };
+  } catch (err) {
+    logError('cancelHumanOrder: exception', err);
+    return { success: false, reason: String(err) };
+  }
+}
+
+/**
+ * Why this exists:
+ *     Produces renderer hover preview model using shared route logic and invalid-marker semantics.
+ * When to use:
+ *     Renderer pointermove when selected unit/hovered hex changes.
+ * What to expect:
+ *     Valid route segments when reachable; invalid marker with optional partial route otherwise.
+ */
+export function previewHumanMarchOrder(unitId: string, hoveredH3Index: string): HumanOrderPreviewResult {
+  logTrace('gameActions previewHumanMarchOrder', { unitId, hoveredH3Index });
+  try {
+    if (!isDbReady()) return { valid: false, showInvalidMarker: false, invalidReason: 'Database not initialized', segments: [] };
+    const state = dbBackedStateSnapshot();
+    const unit = state.units.find((u) => u.id === unitId && u.player === HUMAN_PLAYER_ID);
+    if (!unit) return { valid: false, showInvalidMarker: false, invalidReason: 'Unit not found', segments: [] };
+    const hoveredHex = state.hexes.find((h) => h.h3Index === hoveredH3Index);
+    if (!hoveredHex) return { valid: false, showInvalidMarker: false, segments: [] };
+
+    const passableFor = unit.unitType === 'naval' ? 'water' : 'land';
+    const hoveredPassable = terrainIsPassableForDomain(hoveredHex.terrain, passableFor);
+    const hexList = state.hexes.map((h) => h.h3Index);
+    const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
+    const [hoverLat, hoverLng] = cellToLatLng(hoveredH3Index);
+    const direct = executePlanRoute(unitId, [hoverLat, hoverLng], { avoidEnemies: true }, state, latLngByH3, resolveToH3);
+    if (hoveredPassable && direct.status === 'ok') {
+      return {
+        valid: true,
+        showInvalidMarker: false,
+        arrowLatLng: direct.destination,
+        segments: direct.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes })),
+      };
+    }
+
+    let partialArrow: [number, number] | undefined;
+    let partialSegments: HumanOrderPreviewSegment[] = [];
+    const hexByH3 = new Map(state.hexes.map((h) => [h.h3Index, h]));
+    const seen = new Set<string>();
+    // Expand outward from hovered destination so partial path ends on the nearest reachable passable hex.
+    for (let radius = 1; radius <= 12; radius++) {
+      let ring: string[] = [];
+      try {
+        ring = gridDisk(hoveredH3Index, radius);
+      } catch {
+        break;
+      }
+      const candidates = ring.filter((h3) => {
+        if (seen.has(h3)) return false;
+        seen.add(h3);
+        if (h3 === hoveredH3Index) return false;
+        const hx = hexByH3.get(h3);
+        return !!hx && terrainIsPassableForDomain(hx.terrain, passableFor);
+      });
+      if (candidates.length === 0) continue;
+      for (const candidateH3 of candidates) {
+        const [nearLat, nearLng] = cellToLatLng(candidateH3);
+        const partial = executePlanRoute(unitId, [nearLat, nearLng], { avoidEnemies: true }, state, latLngByH3, resolveToH3);
+        if (partial.status === 'ok') {
+          partialArrow = partial.destination;
+          partialSegments = partial.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes }));
+          break;
+        }
+      }
+      if (partialSegments.length > 0) break;
+    }
+
+    return {
+      valid: false,
+      showInvalidMarker: true,
+      invalidReason: 'Destination is invalid for this unit type or unreachable.',
+      arrowLatLng: partialArrow,
+      segments: partialSegments,
+    };
+  } catch (err) {
+    logError('previewHumanMarchOrder: exception', err);
+    return { valid: false, showInvalidMarker: false, invalidReason: String(err), segments: [] };
+  }
 }
 
 /**
@@ -214,6 +463,8 @@ export function ready(
   opponentCombatParticipantUnitIds?: string[];
   /** Opponent unit IDs that were removed this resolution. */
   removedOpponentUnitIds?: string[];
+  /** Human unit moves resolved this turn (for renderer animation). */
+  humanMoves?: { unitId: string; fromH3Index: string; toH3Index: string }[];
 } {
   logDebug('ready', { aiOrderCount: aiOrders.length, aiRangedCount: aiRangedOrders.length });
   try {
@@ -261,8 +512,22 @@ export function ready(
     }
 
     const humanOrders = dbGetAll<{ unit_id: string; to_h3_index: string }>('SELECT unit_id, to_h3_index FROM pending_orders');
+    const preMoveState = dbBackedStateSnapshot();
+    const preMoveHexList = preMoveState.hexes.map((h) => h.h3Index);
+    const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(preMoveHexList);
+    const generatedHuman = generateOrdersForStandingOrders(HUMAN_PLAYER_ID, preMoveState, latLngByH3, resolveToH3);
+    const mergedHuman = new Map<string, string>();
+    for (const o of generatedHuman.movementOrders) mergedHuman.set(o.unitId, o.toH3Index);
+    for (const o of humanOrders) mergedHuman.set(o.unit_id, o.to_h3_index);
+    const humanMoves = Array.from(mergedHuman.entries())
+      .map(([unitId, toH3Index]) => {
+        const fromH3Index = unitsBeforeMove.find((u) => u.id === unitId)?.h3Index;
+        if (!fromH3Index || fromH3Index === toH3Index) return null;
+        return { unitId, fromH3Index, toH3Index };
+      })
+      .filter((m): m is { unitId: string; fromH3Index: string; toH3Index: string } => m !== null);
     const allOrders = [
-      ...humanOrders.map((o) => ({ unitId: o.unit_id, toH3Index: o.to_h3_index })),
+      ...Array.from(mergedHuman.entries()).map(([unitId, toH3Index]) => ({ unitId, toH3Index })),
       ...aiOrders,
     ];
     for (const order of allOrders) {
@@ -336,6 +601,7 @@ export function ready(
       meleeCombatHexes: meleeResult.combatHexes.length > 0 ? meleeResult.combatHexes : undefined,
       meleeCasualtyHexes: meleeResult.casualtyHexes.length > 0 ? meleeResult.casualtyHexes : undefined,
       meleeRemovedUnits: meleeResult.removedUnits.length > 0 ? meleeResult.removedUnits : undefined,
+      humanMoves: humanMoves.length > 0 ? humanMoves : undefined,
       opponentCombatParticipantUnitIds,
       removedOpponentUnitIds,
     };

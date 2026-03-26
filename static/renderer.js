@@ -14338,12 +14338,6 @@
     "arctic"
   ];
   var KIND_SET = new Set(PIPELINE_TERRAIN_KINDS);
-  function passabilityAllowsLandUnit(t) {
-    return t === "land" || t === "coastal";
-  }
-  function passabilityAllowsNavalUnit(t) {
-    return t === "water" || t === "coastal";
-  }
 
   // src/renderer/terrainVisualStyles.ts
   var patternCache = /* @__PURE__ */ new Map();
@@ -14603,39 +14597,6 @@
     armor: 1,
     naval: 2
   };
-  var MOVEMENT_RANGE = {
-    infantry: 1,
-    armor: 2,
-    naval: 2
-  };
-  function validateMovementOrder(state, unitId, toH3Index) {
-    const unit = state.units.find((u) => u.id === unitId);
-    if (!unit) return { valid: false, reason: `Unit not found: ${unitId}` };
-    if (unit.player !== "human") return { valid: false, reason: "Only human units can receive orders" };
-    const mapHexSet = new Set(state.hexes.map((h) => h.h3Index));
-    if (!mapHexSet.has(toH3Index)) return { valid: false, reason: "Destination not on map" };
-    if (!mapHexSet.has(unit.h3Index)) {
-      return { valid: false, reason: "Unit is on an invalid or outdated hex; start a new game." };
-    }
-    let dist;
-    try {
-      dist = gridDistance(unit.h3Index, toH3Index);
-    } catch {
-      return { valid: false, reason: "Invalid hex or distance; try starting a new game." };
-    }
-    const range = MOVEMENT_RANGE[unit.unitType] ?? 1;
-    if (dist > range) return { valid: false, reason: `${unit.unitType} can move at most ${range} hex(es)` };
-    if (dist < 1) return { valid: false, reason: "Destination must be different from current hex" };
-    const destHex = state.hexes.find((h) => h.h3Index === toH3Index);
-    const terrain = destHex?.terrain ?? "land";
-    if (unit.unitType === "naval" && !passabilityAllowsNavalUnit(terrain)) {
-      return { valid: false, reason: "Naval units must move to water or coastal hexes" };
-    }
-    if ((unit.unitType === "infantry" || unit.unitType === "armor") && !passabilityAllowsLandUnit(terrain)) {
-      return { valid: false, reason: "Land units must move to land or coastal hexes" };
-    }
-    return { valid: true };
-  }
   var BACKGROUND_COLOR = "#e0dcd4";
   var UNIT_RADIUS = 20;
   var PLAYER_COLORS = {
@@ -14776,8 +14737,11 @@
   var selectedUnitId = null;
   var selectedUnitIdAtMouseDown = null;
   var pendingSelectTimeout = null;
-  var pendingOrders = [];
+  var humanStandingOrders = [];
+  var hoverRoutePreview = null;
+  var hoverPreviewRequestSeq = 0;
   var pendingRangedAttacks = [];
+  var hideCommittedOrderLinesAfterReady = false;
   var rangedModeActive = false;
   var gameState = null;
   var resolutionMoveAnimation = null;
@@ -15115,12 +15079,6 @@
     const el = document.getElementById("map-toast");
     if (el) el.classList.add("hidden");
   }
-  function getSelectedModelLabel() {
-    const sel = document.getElementById("openrouter-model");
-    if (!sel) return "";
-    const opt = sel.options[sel.selectedIndex];
-    return opt ? opt.text : "";
-  }
   function showAiStrategyToast(message, modelName) {
     if (aiStrategyToastHideTimer !== null) {
       clearTimeout(aiStrategyToastHideTimer);
@@ -15224,9 +15182,10 @@
     } else {
       movingIds = void 0;
     }
-    if (pendingOrders.length > 0 && gameState.units.length && hexList) {
-      drawOrderLines(ctx, w, h, pendingOrders, gameState.units, hexList);
+    if (!anim && !hideCommittedOrderLinesAfterReady && humanStandingOrders.length > 0 && gameState.units.length) {
+      drawStandingOrderLines(ctx, humanStandingOrders, gameState.units);
     }
+    if (!anim) drawHoverRoutePreview(ctx);
     if (pendingRangedAttacks.length > 0 && gameState.units.length && hexList) {
       drawRangedAttackLines(ctx, w, h, pendingRangedAttacks, gameState.units, hexList);
     }
@@ -15383,44 +15342,168 @@
     }
     ctx.restore();
   }
-  function drawOrderLines(ctx, canvasWidth, canvasHeight, orders, units, hexList) {
-    if (orders.length === 0 || !hexList) return;
+  function drawLineArrow(ctx, from, to, color) {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    const inset = UNIT_RADIUS + ORDER_ARROW_SIZE;
+    const endX = to.x - ux * inset;
+    const endY = to.y - uy * inset;
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(endX, endY);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = ORDER_LINE_WIDTH;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.stroke();
+    const ax = endX + ux * ORDER_ARROW_SIZE;
+    const ay = endY + uy * ORDER_ARROW_SIZE;
+    const perpX = -uy * (ORDER_ARROW_SIZE * 0.6);
+    const perpY = ux * (ORDER_ARROW_SIZE * 0.6);
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(endX - perpX, endY - perpY);
+    ctx.lineTo(endX + perpX, endY + perpY);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = ORDER_LINE_WIDTH;
+    ctx.stroke();
+  }
+  function drawArrowheadOnly(ctx, from, to, color, options) {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    const inset = options?.tipAtTargetCenter ? ORDER_ARROW_SIZE : UNIT_RADIUS + ORDER_ARROW_SIZE;
+    const endX = to.x - ux * inset;
+    const endY = to.y - uy * inset;
+    const ax = endX + ux * ORDER_ARROW_SIZE;
+    const ay = endY + uy * ORDER_ARROW_SIZE;
+    const perpX = -uy * (ORDER_ARROW_SIZE * 0.6);
+    const perpY = ux * (ORDER_ARROW_SIZE * 0.6);
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(endX - perpX, endY - perpY);
+    ctx.lineTo(endX + perpX, endY + perpY);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = ORDER_LINE_WIDTH;
+    ctx.stroke();
+  }
+  function drawStandingOrderLines(ctx, orders, units) {
+    if (orders.length === 0) return;
+    const map = getMainLeafletMap();
+    if (!map) return;
+    const L = getLeafletGlobal();
     for (const order of orders) {
-      const unit = units.find((u) => u.id === order.unitId);
+      if (selectedUnitId && order.unitId === selectedUnitId) continue;
+      const unit = units.find((u) => u.id === order.unitId && u.player === "human");
       if (!unit) continue;
-      const from = hexCenterPx(unit.h3Index);
-      const to = hexCenterPx(order.toH3Index);
-      const dx = to.x - from.x;
-      const dy = to.y - from.y;
-      const len = Math.hypot(dx, dy) || 1;
-      const ux = dx / len;
-      const uy = dy / len;
-      const inset = UNIT_RADIUS + ORDER_ARROW_SIZE;
-      const endX = to.x - ux * inset;
-      const endY = to.y - uy * inset;
+      const segments = order.routeSegments ?? [];
+      if (segments.length === 0) {
+        if (order.destinationH3Index) {
+          drawLineArrow(ctx, hexCenterPx(unit.h3Index), hexCenterPx(order.destinationH3Index), ORDER_LINE_COLOR);
+        }
+        continue;
+      }
+      let lastPenultimate = null;
+      let lastPoint = null;
+      for (const seg of segments) {
+        if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
+        const points = seg.hexes.map(([lat, lng]) => {
+          const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
+          return { x: p.x, y: p.y };
+        });
+        ctx.setLineDash(seg.turn <= 1 ? [] : [6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+        ctx.strokeStyle = ORDER_LINE_COLOR;
+        ctx.lineWidth = ORDER_LINE_WIDTH;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.stroke();
+        lastPenultimate = points[points.length - 2] ?? null;
+        lastPoint = points[points.length - 1] ?? null;
+      }
+      ctx.setLineDash([]);
+      if (lastPenultimate && lastPoint) {
+        drawArrowheadOnly(ctx, lastPenultimate, lastPoint, ORDER_LINE_COLOR, { tipAtTargetCenter: true });
+      }
+    }
+  }
+  function drawHoverRoutePreview(ctx) {
+    if (!hoverRoutePreview || !gameState) return;
+    const unit = gameState.units.find((u) => u.id === hoverRoutePreview.unitId);
+    if (!unit) return;
+    const preview = hoverRoutePreview.data;
+    const map = getMainLeafletMap();
+    if (!map) return;
+    const L = getLeafletGlobal();
+    let lastSegmentPenultimate = null;
+    let lastSegmentLast = null;
+    ctx.save();
+    ctx.globalAlpha = preview.valid ? 0.55 : 0.75;
+    for (const seg of preview.segments) {
+      if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
+      const points = seg.hexes.map(([lat, lng]) => {
+        const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
+        return { x: p.x, y: p.y };
+      });
+      ctx.setLineDash(seg.turn <= 1 ? [] : [6, 4]);
       ctx.beginPath();
-      ctx.moveTo(from.x, from.y);
-      ctx.lineTo(endX, endY);
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
       ctx.strokeStyle = ORDER_LINE_COLOR;
       ctx.lineWidth = ORDER_LINE_WIDTH;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.stroke();
-      const ax = endX + ux * ORDER_ARROW_SIZE;
-      const ay = endY + uy * ORDER_ARROW_SIZE;
-      const perpX = -uy * (ORDER_ARROW_SIZE * 0.6);
-      const perpY = ux * (ORDER_ARROW_SIZE * 0.6);
+      lastSegmentPenultimate = points[points.length - 2] ?? null;
+      lastSegmentLast = points[points.length - 1] ?? null;
+    }
+    ctx.setLineDash([]);
+    if (lastSegmentPenultimate && lastSegmentLast) {
+      drawArrowheadOnly(ctx, lastSegmentPenultimate, lastSegmentLast, ORDER_LINE_COLOR, {
+        tipAtTargetCenter: true
+      });
+    } else if (preview.arrowLatLng && preview.segments.length > 0) {
+      const firstHex = preview.segments[0]?.hexes[0];
+      if (firstHex) {
+        const fromPoint = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(firstHex[0]), firstHex[1]));
+        const toPoint = map.latLngToContainerPoint(
+          L.latLng(clampLatForWebMercatorDisplay(preview.arrowLatLng[0]), preview.arrowLatLng[1])
+        );
+        drawArrowheadOnly(
+          ctx,
+          { x: fromPoint.x, y: fromPoint.y },
+          { x: toPoint.x, y: toPoint.y },
+          ORDER_LINE_COLOR,
+          { tipAtTargetCenter: true }
+        );
+      }
+    }
+    if (preview.showInvalidMarker && hoveredHexH3) {
+      const at = hexCenterPx(hoveredHexH3);
       ctx.beginPath();
-      ctx.moveTo(ax, ay);
-      ctx.lineTo(endX - perpX, endY - perpY);
-      ctx.lineTo(endX + perpX, endY + perpY);
-      ctx.closePath();
-      ctx.fillStyle = ORDER_LINE_COLOR;
-      ctx.fill();
+      ctx.moveTo(at.x - 8, at.y - 8);
+      ctx.lineTo(at.x + 8, at.y + 8);
+      ctx.moveTo(at.x + 8, at.y - 8);
+      ctx.lineTo(at.x - 8, at.y + 8);
       ctx.strokeStyle = ORDER_LINE_COLOR;
       ctx.lineWidth = ORDER_LINE_WIDTH;
+      ctx.lineCap = "round";
       ctx.stroke();
     }
+    ctx.restore();
   }
   function drawResolutionMoveLines(ctx, canvasWidth, canvasHeight, moves, units, hexList, opacity) {
     if (moves.length === 0 || !hexList || opacity <= 0) return;
@@ -15429,6 +15512,7 @@
     for (const move of moves) {
       const unit = units.find((u) => u.id === move.unitId);
       if (!unit) continue;
+      const isHumanMove = unit.player === "human";
       const lineColor = unit.player === "human" ? ORDER_LINE_COLOR : AI_ORDER_LINE_COLOR;
       const from = hexCenterPx(move.fromH3Index);
       const to = hexCenterPx(move.toH3Index);
@@ -15437,7 +15521,7 @@
       const len = Math.hypot(dx, dy) || 1;
       const ux = dx / len;
       const uy = dy / len;
-      const inset = UNIT_RADIUS + ORDER_ARROW_SIZE;
+      const inset = isHumanMove ? 0 : UNIT_RADIUS + ORDER_ARROW_SIZE;
       const endX = to.x - ux * inset;
       const endY = to.y - uy * inset;
       ctx.beginPath();
@@ -15448,6 +15532,7 @@
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.stroke();
+      if (isHumanMove) continue;
       const ax = endX + ux * ORDER_ARROW_SIZE;
       const ay = endY + uy * ORDER_ARROW_SIZE;
       const perpX = -uy * (ORDER_ARROW_SIZE * 0.6);
@@ -15549,9 +15634,10 @@
     } else {
       movingIds = void 0;
     }
-    if (pendingOrders.length > 0 && gameState.units.length && hexList) {
-      drawOrderLines(ctx, w, h, pendingOrders, gameState.units, hexList);
+    if (humanStandingOrders.length > 0 && gameState.units.length) {
+      drawStandingOrderLines(ctx, humanStandingOrders, gameState.units);
     }
+    drawHoverRoutePreview(ctx);
     if (pendingRangedAttacks.length > 0 && gameState.units.length && hexList) {
       drawRangedAttackLines(ctx, w, h, pendingRangedAttacks, gameState.units, hexList);
     }
@@ -15675,7 +15761,8 @@
       try {
         const state = await window.gameApi.newGame();
         gameState = state;
-        pendingOrders = [];
+        humanStandingOrders = [];
+        hoverRoutePreview = null;
         pendingRangedAttacks = [];
         rangedModeActive = false;
         selectedUnitId = null;
@@ -15689,6 +15776,7 @@
         openRouterGameCost = 0;
         updateOpenRouterCostLabel();
         updateGameStateSidebar(state);
+        await refreshHumanStandingOrders();
         updatePendingOrdersSidebar();
         updateRangedSidebar();
         updateSidebar();
@@ -15722,8 +15810,24 @@
     setMainUIControlsEnabled(false);
     updateReadyButtonState();
   }
-  function cancelOrderForUnit(unitId) {
-    pendingOrders = pendingOrders.filter((o) => o.unitId !== unitId);
+  async function refreshHumanStandingOrders() {
+    if (!window.gameApi?.listHumanStandingOrders) {
+      humanStandingOrders = [];
+      return;
+    }
+    try {
+      humanStandingOrders = await window.gameApi.listHumanStandingOrders();
+    } catch {
+      humanStandingOrders = [];
+    }
+  }
+  async function cancelOrderForUnit(unitId) {
+    if (!window.gameApi?.cancelHumanStandingOrder) return;
+    const result = await window.gameApi.cancelHumanStandingOrder({ unitId });
+    if (!result.success) {
+      showMapToast(result.reason ?? "Failed to cancel order.", { isError: true });
+    }
+    await refreshHumanStandingOrders();
     updatePendingOrdersSidebar();
     redraw();
   }
@@ -15734,7 +15838,27 @@
     selectedHexIndex = unit.h3Index;
     updateSidebar();
     updateRangedSidebar();
+    void refreshHoverRoutePreview();
     redraw();
+  }
+  async function refreshHoverRoutePreview() {
+    const unitId = selectedUnitId;
+    const hoveredH3 = hoveredHexH3;
+    const seq = ++hoverPreviewRequestSeq;
+    if (!window.gameApi?.previewHumanMarchOrder || !unitId || !hoveredH3 || !gameState) {
+      hoverRoutePreview = null;
+      return;
+    }
+    const unit = gameState.units.find((u) => u.id === unitId);
+    if (!unit || unit.player !== "human") {
+      hoverRoutePreview = null;
+      return;
+    }
+    const data = await window.gameApi.previewHumanMarchOrder({ unitId, hoveredH3Index: hoveredH3 });
+    if (seq !== hoverPreviewRequestSeq) return;
+    if (selectedUnitId !== unitId || hoveredHexH3 !== hoveredH3) return;
+    hoverRoutePreview = { unitId, hoveredH3Index: hoveredH3, data };
+    requestRedraw();
   }
   function cancelRangedForUnit(unitId) {
     pendingRangedAttacks = pendingRangedAttacks.filter((r) => r.unitId !== unitId);
@@ -15797,21 +15921,21 @@
     const container = document.getElementById("pending-orders-list");
     if (!container) return;
     container.innerHTML = "";
-    if (pendingOrders.length === 0) {
+    if (humanStandingOrders.length === 0) {
       const span = document.createElement("span");
       span.textContent = "None";
       span.style.color = "#666";
       container.appendChild(span);
       return;
     }
-    for (const order of pendingOrders) {
+    for (const order of humanStandingOrders) {
       const row = document.createElement("div");
       row.style.display = "flex";
       row.style.alignItems = "center";
       row.style.gap = "0.5rem";
       row.style.marginBottom = "0.35rem";
       const label = document.createElement("span");
-      label.textContent = `${order.unitId} \u2192 ${order.toH3Index}`;
+      label.textContent = `${order.unitId} \u2192 ${order.destinationH3Index ?? "\u2014"} (${order.status})`;
       label.style.flex = "1";
       label.style.fontSize = "0.9em";
       const selectBtn = document.createElement("button");
@@ -15825,7 +15949,9 @@
       cancelBtn.textContent = "Cancel";
       cancelBtn.style.flexShrink = "0";
       cancelBtn.style.fontSize = "0.8em";
-      cancelBtn.addEventListener("click", () => cancelOrderForUnit(order.unitId));
+      cancelBtn.addEventListener("click", () => {
+        void cancelOrderForUnit(order.unitId);
+      });
       row.appendChild(label);
       row.appendChild(selectBtn);
       row.appendChild(cancelBtn);
@@ -15963,7 +16089,7 @@
       const leg = document.getElementById("terrain-legend");
       if (leg) {
         renderTerrainLegend(leg, {
-          onStyleChanged: (_styleId) => {
+          onStyleChanged: () => {
             setMainBasemapByProviderId(getActiveTerrainStyleBasemapId());
             requestRedraw();
           }
@@ -15975,6 +16101,7 @@
     resizeAndRedraw();
     updateSidebar();
     updateGameStateSidebar(null);
+    void refreshHumanStandingOrders().then(() => updatePendingOrdersSidebar());
     updatePendingOrdersSidebar();
     initOpenRouterUI();
     updateRangedSidebar();
@@ -15992,9 +16119,10 @@
       redraw();
     });
     if (window.gameApi) {
-      window.gameApi.getGameState().then((raw) => {
+      window.gameApi.getGameState().then(async (raw) => {
         const state = raw;
         gameState = state;
+        await refreshHumanStandingOrders();
         updateGameStateSidebar(state);
         updateRangedSidebar();
         updateSidebar();
@@ -16026,6 +16154,7 @@
         clearTerrainTooltipTimer();
         hideTerrainTooltipVisual();
         hoveredHexH3 = hit;
+        void refreshHoverRoutePreview();
         requestRedraw();
         if (hit) {
           const targetHex = hit;
@@ -16048,6 +16177,7 @@
       hideTerrainTooltipVisual();
       if (hoveredHexH3 !== null) {
         hoveredHexH3 = null;
+        hoverRoutePreview = null;
         requestRedraw();
       }
     });
@@ -16121,6 +16251,7 @@
             const unitIdToSelect = unit.id;
             pendingSelectTimeout = setTimeout(() => {
               selectedUnitId = unitIdToSelect;
+              void refreshHoverRoutePreview();
               pendingSelectTimeout = null;
               updateSidebar();
               updateRangedSidebar();
@@ -16138,6 +16269,7 @@
             pendingSelectTimeout = null;
           }
           selectedUnitId = null;
+          hoverRoutePreview = null;
         }
       } else {
         if (pendingSelectTimeout !== null) {
@@ -16145,12 +16277,13 @@
           pendingSelectTimeout = null;
         }
         selectedUnitId = null;
+        hoverRoutePreview = null;
       }
       updateSidebar();
       updateRangedSidebar();
       redraw();
     });
-    mainMapEl.addEventListener("dblclick", (e) => {
+    mainMapEl.addEventListener("dblclick", async (e) => {
       if (pendingSelectTimeout !== null) {
         clearTimeout(pendingSelectTimeout);
         pendingSelectTimeout = null;
@@ -16160,17 +16293,34 @@
       if (!hit || !selectedUnitIdAtMouseDown) return;
       const unit = gameState.units.find((u) => u.id === selectedUnitIdAtMouseDown);
       if (!unit || unit.player !== "human" || unit.h3Index === hit) return;
-      const validation = validateMovementOrder(gameState, selectedUnitIdAtMouseDown, hit);
-      if (!validation.valid) {
-        showMapToast(validation.reason, { isError: true });
+      if (!window.gameApi?.assignHumanMarchOrder) return;
+      const assign = await window.gameApi.assignHumanMarchOrder({
+        unitId: selectedUnitIdAtMouseDown,
+        destinationH3Index: hit
+      });
+      if (!assign.success) {
+        showMapToast(assign.reason ?? "Failed to assign movement order.", { isError: true });
         return;
       }
-      const idx = pendingOrders.findIndex((o) => o.unitId === selectedUnitIdAtMouseDown);
-      const newOrder = { unitId: selectedUnitIdAtMouseDown, toH3Index: hit };
-      if (idx >= 0) pendingOrders[idx] = newOrder;
-      else pendingOrders.push(newOrder);
+      selectedUnitId = null;
+      selectedUnitIdAtMouseDown = null;
+      selectedHexIndex = null;
+      hideCommittedOrderLinesAfterReady = false;
+      hoverRoutePreview = null;
+      await refreshHumanStandingOrders();
       updatePendingOrdersSidebar();
       updateSidebar();
+      redraw();
+    });
+    mainMapEl.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      if (!selectedUnitId && !hoverRoutePreview) return;
+      selectedUnitId = null;
+      selectedUnitIdAtMouseDown = null;
+      selectedHexIndex = null;
+      hoverRoutePreview = null;
+      updateSidebar();
+      updateRangedSidebar();
       redraw();
     });
     const readyBtn = document.getElementById("ready-btn");
@@ -16185,7 +16335,7 @@
         updateReadyButtonState();
         try {
           const submitResult = await window.gameApi.submitOrders({
-            movementOrders: pendingOrders,
+            movementOrders: [],
             rangedAttacks: pendingRangedAttacks
           });
           if (!submitResult.success) {
@@ -16193,11 +16343,6 @@
             updateReadyButtonState();
             return;
           }
-          const humanMoves = gameState && pendingOrders.length > 0 ? pendingOrders.map((o) => {
-            const from = gameState.units.find((u) => u.id === o.unitId)?.h3Index;
-            if (!from || from === o.toH3Index) return null;
-            return { unitId: o.unitId, fromH3Index: from, toH3Index: o.toH3Index };
-          }).filter((m) => m !== null) : [];
           const enabledToolGroupsPayload = Array.from(enabledToolGroups).filter((id) => id !== "events");
           const useEventDriven = useEventDrivenConsultation;
           const usePrecomputed = runButtonOn && precomputedAiOrders !== null;
@@ -16210,11 +16355,13 @@
           } : {
             enabledToolGroups: enabledToolGroupsPayload,
             useEventDrivenConsultation: true
-          } : {
+          } : usePrecomputed ? {
             enabledToolGroups: enabledToolGroupsPayload,
-            precomputedAiOrders: usePrecomputed ? precomputedAiOrders : [],
-            precomputedAiRangedOrders: usePrecomputed ? precomputedAiRangedOrders ?? [] : [],
-            precomputedAiStrategy: usePrecomputed ? precomputedAiStrategy ?? void 0 : void 0
+            precomputedAiOrders,
+            precomputedAiRangedOrders: precomputedAiRangedOrders ?? [],
+            precomputedAiStrategy: precomputedAiStrategy ?? void 0
+          } : {
+            enabledToolGroups: enabledToolGroupsPayload
           };
           const readyResult = await window.gameApi.ready(readyPayload);
           if (!readyResult.success) {
@@ -16225,93 +16372,41 @@
           precomputedAiOrders = null;
           precomputedAiRangedOrders = null;
           precomputedAiStrategy = null;
-          const precomputedCountsForTurn = precomputedToolInvocationCounts;
           precomputedToolInvocationCounts = null;
+          const humanMoves = readyResult.humanMoves ?? [];
+          const nextState = await window.gameApi.getGameState();
+          const state = nextState;
+          gameState = state;
+          const aiMoves = readyResult.aiMoves ?? [];
+          const resolutionMoves = [...humanMoves, ...aiMoves];
+          let didShowMapToastForTurn = false;
+          if ((readyResult.aiMovesLog?.length ?? 0) > 0) {
+            didShowMapToastForTurn = true;
+            showMapToast(`AI moves:
+${readyResult.aiMovesLog.join("\n")}`, { isError: false });
+          }
+          if (readyResult.aiStrategy) {
+            didShowMapToastForTurn = true;
+            showAiStrategyToast(readyResult.aiStrategy);
+          } else {
+            hideAiStrategyToast();
+          }
           if (readyResult.toolInvocationCounts) {
-            for (const [groupId, count] of Object.entries(readyResult.toolInvocationCounts)) {
-              toolInvocationCounts[groupId] = count;
-            }
+            toolInvocationCounts = readyResult.toolInvocationCounts;
             updateOpenRouterToolCountLabels();
-          } else if (usePrecomputed && precomputedCountsForTurn) {
-            for (const [groupId, count] of Object.entries(precomputedCountsForTurn)) {
-              toolInvocationCounts[groupId] = count;
-            }
+          } else if (usePrecomputed && precomputedToolInvocationCounts) {
+            toolInvocationCounts = { ...precomputedToolInvocationCounts };
             updateOpenRouterToolCountLabels();
           }
+          precomputedToolInvocationCounts = null;
           if (readyResult.cost !== void 0) {
             openRouterGameCost += readyResult.cost;
             updateOpenRouterCostLabel();
           }
-          let didShowMapToastForTurn = false;
-          if (readyResult.aiSkipped) {
-            appendOpenRouterLog(readyResult.aiSkipReason ?? "AI skipped.", true);
-            hideAiStrategyToast();
-            showMapToast(readyResult.aiSkipReason ?? "Set your OpenRouter API key and select a model in the panel on the right.", { isError: true });
-            didShowMapToastForTurn = true;
-          } else if (readyResult.aiOrderCount !== void 0 && readyResult.aiOrderCount > 0 || readyResult.aiRangedByType && (readyResult.aiRangedByType.armor ?? 0) + (readyResult.aiRangedByType.naval ?? 0) > 0) {
-            appendOpenRouterLog(`AI movements: ${readyResult.aiOrderCount ?? 0}.`);
-            const ranged = readyResult.aiRangedByType;
-            if (ranged && (ranged.armor ?? 0) + (ranged.naval ?? 0) > 0) {
-              const parts = [];
-              if (ranged.armor) parts.push(`${ranged.armor} armor`);
-              if (ranged.naval) parts.push(`${ranged.naval} naval`);
-              appendOpenRouterLog(`AI ranged: ${parts.join(", ")}.`);
-            }
-            const dropReasons = readyResult.aiDropReasons ?? [];
-            const bullets = [];
-            bullets.push(`\u2022 AI movements: ${readyResult.aiOrderCount ?? 0}`);
-            if (ranged && (ranged.armor ?? 0) + (ranged.naval ?? 0) > 0) {
-              const parts = [];
-              if (ranged.armor) parts.push(`${ranged.armor} armor`);
-              if (ranged.naval) parts.push(`${ranged.naval} naval`);
-              bullets.push(`\u2022 Ranged: ${parts.join(", ")}`);
-            }
-            if (dropReasons.length > 0) {
-              bullets.push(`\u2022 Dropped: ${dropReasons.join("; ")}`);
-            }
-            const directFire = readyResult.killsByDirectFire ?? [];
-            const returnFire = readyResult.killsByReturnFire ?? [];
-            const allKills = readyResult.kills ?? [];
-            const directSet = new Set(directFire.map((k) => k.victimId));
-            const returnSet = new Set(returnFire.map((k) => k.victimId));
-            const meleeKills = allKills.filter((k) => !directSet.has(k.victimId) && !returnSet.has(k.victimId));
-            const fmtKill = (k) => `${k.victimId} by ${k.killerIds.join(", ")}`;
-            if (directFire.length > 0) {
-              bullets.push(`\u2022 Direct fire: ${directFire.map(fmtKill).join("; ")}`);
-            }
-            if (returnFire.length > 0) {
-              bullets.push(`\u2022 Return fire: ${returnFire.map(fmtKill).join("; ")}`);
-            }
-            if (meleeKills.length > 0) {
-              bullets.push(`\u2022 Melee: ${meleeKills.map(fmtKill).join("; ")}`);
-            }
-            showMapToast(bullets.join("\n"), { isError: dropReasons.length > 0 });
-            didShowMapToastForTurn = true;
-            if (readyResult.aiStrategy) {
-              showAiStrategyToast(readyResult.aiStrategy, getSelectedModelLabel());
-            }
-          } else if (useEventDrivenConsultation && readyResult.aiConsulted === false) {
+          if (readyResult.aiConsulted === false) {
             appendOpenRouterLog("AI executing standing orders (no event fired).");
             showMapToast("AI: standing orders only (no consultation).", { isError: false });
-            hideAiStrategyToast();
-          } else if (readyResult.aiOrderCount === 0) {
-            appendOpenRouterLog("Turn resolved (no AI orders).");
-            hideMapToast();
-            if (readyResult.aiStrategy) {
-              showAiStrategyToast(readyResult.aiStrategy, getSelectedModelLabel());
-            } else {
-              hideAiStrategyToast();
-            }
-          } else {
-            appendOpenRouterLog("Turn resolved.");
-            hideMapToast();
-            hideAiStrategyToast();
           }
-          const state = await window.gameApi.getGameState();
-          gameState = state;
-          selectedUnitId = null;
-          const aiMoves = readyResult.aiMoves ?? [];
-          const resolutionMoves = [...humanMoves, ...aiMoves];
           const hasRanged = (readyResult.rangedCombatHexes?.length ?? 0) > 0 || (readyResult.rangedCasualtyHexes?.length ?? 0) > 0 || (readyResult.rangedRemovedUnits?.length ?? 0) > 0;
           const hasMelee = (readyResult.meleeCombatHexes?.length ?? 0) > 0 || (readyResult.meleeCasualtyHexes?.length ?? 0) > 0 || (readyResult.meleeRemovedUnits?.length ?? 0) > 0;
           const hasLegacy = (readyResult.combatHexes?.length ?? 0) > 0 || (readyResult.casualtyHexes?.length ?? 0) > 0;
@@ -16338,23 +16433,17 @@
             const meleeKills = allKills.filter((k) => !directSet.has(k.victimId) && !returnSet.has(k.victimId));
             const fmt = (k) => `${k.victimId} destroyed by ${k.killerIds.join(", ")}`;
             const bullets = [];
-            if (directFire.length > 0) {
-              bullets.push(`\u2022 Direct fire: ${directFire.map(fmt).join("; ")}`);
-            }
-            if (returnFire.length > 0) {
-              bullets.push(`\u2022 Return fire: ${returnFire.map(fmt).join("; ")}`);
-            }
-            if (meleeKills.length > 0) {
-              bullets.push(meleeKills.map(fmt).join("\n"));
-            }
-            if (bullets.length > 0 && !didShowMapToastForTurn) {
-              showMapToast(bullets.join("\n"), { isError: false });
-            }
+            if (directFire.length > 0) bullets.push(`\u2022 Direct fire: ${directFire.map(fmt).join("; ")}`);
+            if (returnFire.length > 0) bullets.push(`\u2022 Return fire: ${returnFire.map(fmt).join("; ")}`);
+            if (meleeKills.length > 0) bullets.push(meleeKills.map(fmt).join("\n"));
+            if (bullets.length > 0 && !didShowMapToastForTurn) showMapToast(bullets.join("\n"), { isError: false });
             resolutionMoveAnimationFrameId = requestAnimationFrame(tickResolutionMoveAnimation);
           }
-          pendingOrders = [];
+          hoverRoutePreview = null;
+          hideCommittedOrderLinesAfterReady = true;
           pendingRangedAttacks = [];
           rangedModeActive = false;
+          await refreshHumanStandingOrders();
           updateGameStateSidebar(state);
           updatePendingOrdersSidebar();
           updateRangedSidebar();

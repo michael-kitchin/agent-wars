@@ -91,6 +91,7 @@ export interface ReadyResult {
   aiDropReasons?: string[];
   aiMovesLog?: string[];
   aiMoves?: { unitId: string; fromH3Index: string; toH3Index: string }[];
+  humanMoves?: { unitId: string; fromH3Index: string; toH3Index: string }[];
   combatHexes?: string[];
   removedUnitIds?: string[];
   removedUnits?: RemovedUnitSnapshot[];
@@ -110,12 +111,41 @@ export interface ReadyResult {
   aiConsulted?: boolean;
 }
 
+/** Human standing-order row returned to renderer for movement order list and map overlays. */
+export interface HumanStandingOrderSnapshot {
+  unitId: string;
+  status: string;
+  destinationH3Index: string | null;
+  turnsRemaining: number;
+  nextMoveH3Index: string | null;
+  routeSegments?: { turn: number; hexes: [number, number][] }[];
+}
+
+/** One turn-segment of a hover route preview, expressed in [lat, lng] points. */
+export interface HumanOrderPreviewSegment {
+  turn: number;
+  hexes: [number, number][];
+}
+
+/** Result of previewing a human march order from selected unit to hovered hex. */
+export interface HumanOrderPreviewResult {
+  valid: boolean;
+  showInvalidMarker: boolean;
+  invalidReason?: string;
+  arrowLatLng?: [number, number];
+  segments: HumanOrderPreviewSegment[];
+}
+
 /** Preload-exposed renderer bridge contract. */
 export interface GameApi {
   getGameState: () => Promise<GameStateSnapshot>;
   newGame: () => Promise<GameStateSnapshot>;
   submitOrders: (payload: SubmitOrdersIpcPayload) => Promise<{ success: boolean; reason?: string }>;
   ready: (payload?: GameReadyIpcPayload) => Promise<ReadyResult>;
+  listHumanStandingOrders: () => Promise<HumanStandingOrderSnapshot[]>;
+  previewHumanMarchOrder: (payload: { unitId: string; hoveredH3Index: string }) => Promise<HumanOrderPreviewResult>;
+  assignHumanMarchOrder: (payload: { unitId: string; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
+  cancelHumanStandingOrder: (payload: { unitId: string }) => Promise<{ success: boolean; reason?: string }>;
   requestAiOrders: (payload?: { enabledToolGroups?: string[] }) => Promise<RequestAiOrdersResult>;
   cancelRequestAiOrders: () => Promise<void>;
   registerOpenRouterLogListener?: (callback: (payload: { line: string; isError?: boolean }) => void) => void;

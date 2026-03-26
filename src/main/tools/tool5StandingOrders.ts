@@ -15,6 +15,7 @@ import type { PassableDomain } from '../pathfinding';
 import { logDebug, logError, logTrace } from '../logger';
 
 const AI_PLAYER_ID = 'opponent';
+const HUMAN_PLAYER_ID = 'human';
 
 /** Status values that trigger the ⚠ warning prefix in the injection. */
 const WARNING_STATUSES = new Set([
@@ -511,7 +512,7 @@ export function generateOrdersForStandingOrders(
         );
         if (routeResult.status === 'ok' && routeResult.path.length > 0) {
           const endHex = routeResult.path[0]!.endHex;
-          const toH3 = resolveToH3(endHex[0], endHex[1]);
+          const toH3 = routeResult.orderToH3;
           if (toH3) movementOrders.push({ unitId: row.unit_id, toH3Index: toH3 });
           const turnsRemaining = Math.max(0, routeResult.turnsRequired - 1);
           dbRun(
@@ -570,7 +571,7 @@ export function generateOrdersForStandingOrders(
         continue;
       }
       const endHex = routeResult.path[0]!.endHex;
-      const toH3 = resolveToH3(endHex[0], endHex[1]);
+      const toH3 = routeResult.orderToH3;
       if (toH3) {
         movementOrders.push({ unitId: row.unit_id, toH3Index: toH3 });
         const turnsRemaining = Math.max(0, routeResult.turnsRequired - 1);
@@ -634,7 +635,7 @@ export function generateOrdersForStandingOrders(
       if (routeResult.status === 'error') continue;
       if (routeResult.path.length > 0) {
         const endHex = routeResult.path[0]!.endHex;
-        const toH3 = resolveToH3(endHex[0], endHex[1]);
+        const toH3 = routeResult.orderToH3;
         if (toH3) movementOrders.push({ unitId: row.unit_id, toH3Index: toH3 });
         const turnsRemaining = Math.max(0, routeResult.turnsRequired - 1);
         dbRun(
@@ -675,7 +676,7 @@ export function generateOrdersForStandingOrders(
       if (routeResult.status === 'error') continue;
       if (routeResult.path.length > 0) {
         const endHex = routeResult.path[0]!.endHex;
-        const toH3 = resolveToH3(endHex[0], endHex[1]);
+        const toH3 = routeResult.orderToH3;
         if (toH3) {
           movementOrders.push({ unitId: row.unit_id, toH3Index: toH3 });
           const arrivesThisTurn = routeResult.turnsRequired <= 1;
@@ -832,6 +833,118 @@ export function getInjectionText(playerId: string, state: GameStateSnapshot): st
 export const TOOL5_NAMES = ['query_orders'] as const;
 
 /**
+ * Why this exists:
+ *     Provides a player-scoped standing-order operation entrypoint so renderer-driven human orders can reuse
+ *     the same validation, routing, and persistence logic as AI orders.
+ * When to use:
+ *     Main-process IPC handlers for human order assign/query/cancel and internal AI order application paths.
+ * What to expect:
+ *     Returns spec-shaped status payloads; validation failures return `{ status: 'error', error }`.
+ */
+export function executeStandingOrderActionForPlayer(
+  playerId: string,
+  toolName: 'assign_order' | 'query_orders' | 'cancel_order',
+  args: unknown,
+  state: GameStateSnapshot,
+  latLngByH3: Map<string, LatLng>,
+  resolveToH3: (lat: number, lng: number) => string | undefined
+): Record<string, unknown> {
+  logDebug('tool5StandingOrders executeStandingOrderActionForPlayer', { playerId, toolName, stateTurn: state.turnNumber });
+  try {
+    if (toolName === 'assign_order') {
+      const a = args as { unitId?: string; order?: AssignOrderParams };
+      if (typeof a?.unitId !== 'string') {
+        return { status: 'error', error: 'assign_order requires unitId (string)' };
+      }
+      if (!a?.order || typeof a.order !== 'object') {
+        return { status: 'error', error: 'assign_order requires order (object with type)' };
+      }
+      return assignOrder(
+        playerId,
+        a.unitId,
+        a.order as AssignOrderParams,
+        state,
+        latLngByH3,
+        resolveToH3
+      );
+    }
+    if (toolName === 'query_orders') {
+      const a = args as { unitId?: string; all?: boolean };
+      return queryOrders(playerId, a?.unitId, a?.all === true);
+    }
+    const a = args as { unitId?: string };
+    if (typeof a?.unitId !== 'string') {
+      return { status: 'error', error: 'cancel_order requires unitId (string)' };
+    }
+    return cancelOrder(playerId, a.unitId);
+  } catch (err) {
+    logError('tool5StandingOrders executeStandingOrderActionForPlayer: exception', playerId, toolName, err);
+    return { status: 'error', error: String(err) };
+  }
+}
+
+/**
+ * Why this exists:
+ *     Dedicated helper for renderer-driven human march assignment without exposing player id at callsites.
+ * When to use:
+ *     IPC handlers that set human long-distance movement orders.
+ * What to expect:
+ *     Applies march standing order for `human`; returns status payload from shared standing-order logic.
+ */
+export function assignHumanMarchStandingOrder(
+  unitId: string,
+  destination: [number, number],
+  state: GameStateSnapshot,
+  latLngByH3: Map<string, LatLng>,
+  resolveToH3: (lat: number, lng: number) => string | undefined
+): Record<string, unknown> {
+  logDebug('tool5StandingOrders assignHumanMarchStandingOrder', { unitId, destination });
+  return executeStandingOrderActionForPlayer(
+    HUMAN_PLAYER_ID,
+    'assign_order',
+    { unitId, order: { type: 'march', destination } },
+    state,
+    latLngByH3,
+    resolveToH3
+  );
+}
+
+/**
+ * Why this exists:
+ *     Read-only getter for human standing orders used by renderer order list.
+ * When to use:
+ *     IPC handler that refreshes movement-order list overlays during planning.
+ * What to expect:
+ *     Returns `orders` array in the same normalized shape as query_orders.
+ */
+export function queryHumanStandingOrders(
+  state: GameStateSnapshot,
+  latLngByH3: Map<string, LatLng>,
+  resolveToH3: (lat: number, lng: number) => string | undefined
+): Record<string, unknown> {
+  logTrace('tool5StandingOrders queryHumanStandingOrders');
+  return executeStandingOrderActionForPlayer(HUMAN_PLAYER_ID, 'query_orders', { all: true }, state, latLngByH3, resolveToH3);
+}
+
+/**
+ * Why this exists:
+ *     Dedicated helper for per-unit cancel from renderer movement-order list.
+ * When to use:
+ *     IPC handler for human order cancellation.
+ * What to expect:
+ *     Returns status payload and removes only the specified human unit order when present.
+ */
+export function cancelHumanStandingOrder(
+  unitId: string,
+  state: GameStateSnapshot,
+  latLngByH3: Map<string, LatLng>,
+  resolveToH3: (lat: number, lng: number) => string | undefined
+): Record<string, unknown> {
+  logDebug('tool5StandingOrders cancelHumanStandingOrder', { unitId });
+  return executeStandingOrderActionForPlayer(HUMAN_PLAYER_ID, 'cancel_order', { unitId }, state, latLngByH3, resolveToH3);
+}
+
+/**
  * Dispatcher for Tool 5: query_orders for the model; assign_order/cancel_order are still invoked internally when applying final JSON orders[].
  * Returns a spec-shaped object (e.g. status/order/unitId) or { status: 'error', error: string }; exceptions are caught and returned as error.
  */
@@ -843,38 +956,8 @@ export function executeTool5(
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): Record<string, unknown> {
   logDebug('tool5StandingOrders executeTool5', { toolName, stateTurn: state.turnNumber });
-  try {
-    if (toolName === 'assign_order') {
-      const a = args as { unitId?: string; order?: AssignOrderParams };
-      if (typeof a?.unitId !== 'string') {
-        return { status: 'error', error: 'assign_order requires unitId (string)' };
-      }
-      if (!a?.order || typeof a.order !== 'object') {
-        return { status: 'error', error: 'assign_order requires order (object with type)' };
-      }
-      return assignOrder(
-        AI_PLAYER_ID,
-        a.unitId,
-        a.order as AssignOrderParams,
-        state,
-        latLngByH3,
-        resolveToH3
-      );
-    }
-    if (toolName === 'query_orders') {
-      const a = args as { unitId?: string; all?: boolean };
-      return queryOrders(AI_PLAYER_ID, a?.unitId, a?.all === true);
-    }
-    if (toolName === 'cancel_order') {
-      const a = args as { unitId?: string };
-      if (typeof a?.unitId !== 'string') {
-        return { status: 'error', error: 'cancel_order requires unitId (string)' };
-      }
-      return cancelOrder(AI_PLAYER_ID, a.unitId);
-    }
+  if (toolName !== 'assign_order' && toolName !== 'query_orders' && toolName !== 'cancel_order') {
     return { status: 'error', error: `Unknown tool: ${toolName}` };
-  } catch (err) {
-    logError('tool5StandingOrders executeTool5: exception', toolName, err);
-    return { status: 'error', error: String(err) };
   }
+  return executeStandingOrderActionForPlayer(AI_PLAYER_ID, toolName, args, state, latLngByH3, resolveToH3);
 }

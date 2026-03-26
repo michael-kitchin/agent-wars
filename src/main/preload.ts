@@ -11,6 +11,8 @@ import type {
   ReadyResult,
   RequestAiOrdersResult,
   OpenRouterModel,
+  HumanOrderPreviewResult,
+  HumanStandingOrderSnapshot,
 } from '../shared/ipcTypes';
 
 let openRouterLogListener: ((payload: { line: string; isError?: boolean }) => void) | null = null;
@@ -25,6 +27,14 @@ const gameApi = {
   submitOrders: (payload: SubmitOrdersIpcPayload): Promise<{ success: boolean; reason?: string }> =>
     ipcRenderer.invoke('game:submitOrders', payload),
   ready: (payload?: GameReadyIpcPayload): Promise<ReadyResult> => ipcRenderer.invoke('game:ready', payload),
+  listHumanStandingOrders: (): Promise<HumanStandingOrderSnapshot[]> =>
+    ipcRenderer.invoke('game:listHumanStandingOrders'),
+  previewHumanMarchOrder: (payload: { unitId: string; hoveredH3Index: string }): Promise<HumanOrderPreviewResult> =>
+    ipcRenderer.invoke('game:previewHumanMarchOrder', payload),
+  assignHumanMarchOrder: (payload: { unitId: string; destinationH3Index: string }): Promise<{ success: boolean; reason?: string }> =>
+    ipcRenderer.invoke('game:assignHumanMarchOrder', payload),
+  cancelHumanStandingOrder: (payload: { unitId: string }): Promise<{ success: boolean; reason?: string }> =>
+    ipcRenderer.invoke('game:cancelHumanStandingOrder', payload),
   requestAiOrders: (payload?: { enabledToolGroups?: string[] }): Promise<RequestAiOrdersResult> =>
     ipcRenderer.invoke('game:requestAiOrders', payload),
   cancelRequestAiOrders: (): Promise<void> =>

@@ -96,6 +96,8 @@ export interface PlanRouteOk {
   destination: LatLng;
   /** Exact [lat, lng] to use for this turn's movement order (path[0] end hex, or origin if already there). Copy into toXY. */
   orderToXY: LatLng;
+  /** Exact H3 index for this turn's move (path[0] end hex, or origin if already there). */
+  orderToH3: string;
   hexDistance: number;
   turnsRequired: number;
   path: {
@@ -221,6 +223,7 @@ export function executePlanRoute(
       origin: originLl,
       destination: h3ToLatLng(destH3, latLngByH3),
       orderToXY: originLl,
+      orderToH3: originH3,
       hexDistance: 0,
       turnsRequired: 0,
       path: [],
@@ -286,6 +289,7 @@ export function executePlanRoute(
       origin: originLl,
       destination: destLl,
       orderToXY,
+      orderToH3: truncatedSegments.length > 0 ? truncatedSegments[0]!.endHex : originH3,
       hexDistance: truncatedPath.length - 1,
       turnsRequired,
       path: pathForResponse,
@@ -313,6 +317,7 @@ export function executePlanRoute(
     origin: originLl,
     destination: destLl,
     orderToXY,
+    orderToH3: segments.length > 0 ? segments[0]!.endHex : originH3,
     hexDistance: path.length - 1,
     turnsRequired,
     path: pathForResponse,

@@ -6,7 +6,14 @@
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import * as path from 'path';
 import { initDatabase, getGameState, resetGameForNewMatch } from './gameDb';
-import { submitOrders, ready } from './gameActions';
+import {
+  submitOrders,
+  ready,
+  listHumanStandingOrders,
+  previewHumanMarchOrder,
+  assignHumanMarchOrder,
+  cancelHumanOrder,
+} from './gameActions';
 import {
   saveKey,
   hasKey,
@@ -107,6 +114,29 @@ function registerIpcHandlers(): void {
           rangedAttacks: payload.rangedAttacks,
         };
     return submitOrders(normalized);
+  });
+  ipcMain.handle('game:listHumanStandingOrders', () => listHumanStandingOrders());
+  ipcMain.handle(
+    'game:previewHumanMarchOrder',
+    (_event, payload: { unitId?: string; hoveredH3Index?: string }) => {
+      if (typeof payload?.unitId !== 'string' || typeof payload?.hoveredH3Index !== 'string') {
+        return { valid: false, showInvalidMarker: false, invalidReason: 'Invalid preview payload', segments: [] };
+      }
+      return previewHumanMarchOrder(payload.unitId, payload.hoveredH3Index);
+    }
+  );
+  ipcMain.handle(
+    'game:assignHumanMarchOrder',
+    (_event, payload: { unitId?: string; destinationH3Index?: string }) => {
+      if (typeof payload?.unitId !== 'string' || typeof payload?.destinationH3Index !== 'string') {
+        return { success: false, reason: 'Invalid assign payload' };
+      }
+      return assignHumanMarchOrder(payload.unitId, payload.destinationH3Index);
+    }
+  );
+  ipcMain.handle('game:cancelHumanStandingOrder', (_event, payload: { unitId?: string }) => {
+    if (typeof payload?.unitId !== 'string') return { success: false, reason: 'Invalid cancel payload' };
+    return cancelHumanOrder(payload.unitId);
   });
   ipcMain.handle(
     'game:ready',

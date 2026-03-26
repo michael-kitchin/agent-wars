@@ -37,6 +37,7 @@ export interface ReadyResultMinimal {
   aiDropReasons?: string[];
   aiMovesLog?: string[];
   aiMoves?: { unitId: string; fromH3Index: string; toH3Index: string }[];
+  humanMoves?: { unitId: string; fromH3Index: string; toH3Index: string }[];
   combatHexes?: string[];
   removedUnitIds?: string[];
   casualtyHexes?: string[];
@@ -310,6 +311,7 @@ export async function handleGameReady(
     aiDropReasons,
     aiMovesLog,
     aiMoves: aiMoves.length > 0 ? aiMoves : undefined,
+    humanMoves: readyResult.humanMoves,
     aiConsulted: useEventDrivenConsultation ? aiConsulted : undefined,
     combatHexes: readyResult.combatHexes,
     removedUnitIds: readyResult.removedUnitIds,
