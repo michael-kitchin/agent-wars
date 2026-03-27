@@ -1,6 +1,6 @@
 {
-  "run_id": "20260325T074637Z",
-  "generated_at_utc": "2026-03-25T07:46:37.593860+00:00",
+  "run_id": "20260327T052034Z",
+  "generated_at_utc": "2026-03-27T05:20:34.939225+00:00",
   "db": {
     "host": "localhost",
     "port": 5432,
@@ -24,6 +24,7 @@
     "area_weighted_samples_per_cell_res1": 25,
     "area_weighted_samples_per_cell_res4": 4,
     "ocean_shapefile": "F:\\Data\\ne_10m_ocean.shp",
+    "lake_shapefile": "F:\\Data\\ne_10m_lakes.shp",
     "thresholds": {
       "arctic_dominant_min": 26.0,
       "forest_dominant_min": 38.0,
@@ -32,7 +33,7 @@
       "mountain_slope_mean_min": 5.0,
       "mountain_elevation_max_min": 700.0
     },
-    "aggregation_contract": "deterministic uniform-point integration over H3 cell area (area-weighted approximation); ocean/coastal from ocean polygon shapefile vs H3 cell (EPSG:3857 predicates)"
+    "aggregation_contract": "deterministic uniform-point integration over H3 cell area (area-weighted approximation); res-1 ocean/coastal from ocean polygon shapefile vs H3 cell; res-4 ocean/coastal from merged ocean+lakes polygon shapefiles vs H3 cell (EPSG:3857 predicates)"
   },
   "inputs": [
     {
@@ -134,6 +135,10 @@
     {
       "path": "F:\\Data\\ne_10m_ocean.shp",
       "sha256": "bb5ae1e0922b02e61e14f6d562fc2299db4bef5ca36c1008b1a8e7ddf9da6410"
+    },
+    {
+      "path": "F:\\Data\\ne_10m_lakes.shp",
+      "sha256": "11064fa55ed91b56a0d86733643c1a5bfcc137fdf044e83f471978a5b86617e1"
     }
   ],
   "outputs": [
@@ -143,7 +148,7 @@
     },
     {
       "path": "data\\generated\\terrain_res4_exceptions.csv",
-      "sha256": "d9211e11967f75aaf084eba7cf0f89004d4363f998a637ec8e3c482289579bff"
+      "sha256": "4886769a24945b8fe103c41793928e78ff88454421da4aaf96ea8e1743d24734"
     }
   ]
 }

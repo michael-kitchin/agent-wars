@@ -14966,16 +14966,39 @@
     if (fillFraction >= RES4_SHOW_THRESHOLD_VIEW_FRACTION) res4Visible = true;
     return res4Visible;
   }
+  function projectHexBoundaryToContainerPoints(h3Index, map, L) {
+    const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
+    return boundary.map(([lat, lng]) => {
+      const p = map.latLngToContainerPoint(L.latLng(lat, lng));
+      return { x: p.x, y: p.y };
+    });
+  }
+  function projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight) {
+    if (pts.length === 0) return false;
+    let minX = pts[0].x;
+    let maxX = pts[0].x;
+    let minY = pts[0].y;
+    let maxY = pts[0].y;
+    for (const p of pts) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    return maxX >= 0 && maxY >= 0 && minX <= viewportWidth && minY <= viewportHeight;
+  }
   function drawRes4TerrainHexes(ctx) {
     if (!gameState || !shouldRenderRes4Hexes()) return;
     const map = getMainLeafletMap();
     if (!map) return;
     const L = getLeafletGlobal();
-    const bounds = map.getBounds();
+    const container = map.getContainer();
+    const viewportWidth = Math.max(1, container.clientWidth);
+    const viewportHeight = Math.max(1, container.clientHeight);
     const stroke = getActiveHexStrokeStyle();
     for (const parent of gameState.hexes) {
-      const [parentLat, parentLng] = cellToLatLng(parent.h3Index);
-      if (!bounds.contains(L.latLng(parentLat, parentLng))) continue;
+      const parentPts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
+      if (!projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight)) continue;
       const parentKind = parent.terrainKind ?? (parent.terrain === "water" ? "ocean" : parent.terrain === "coastal" ? "coastal" : "land");
       let children = res4ChildrenByParent.get(parent.h3Index);
       if (!children) {
@@ -14983,14 +15006,9 @@
         res4ChildrenByParent.set(parent.h3Index, children);
       }
       for (const child of children) {
-        const [clat, clng] = cellToLatLng(child);
-        if (!bounds.contains(L.latLng(clat, clng))) continue;
         const terrainKind = res4TerrainOverridesByH3.get(child) ?? parentKind;
-        const boundary = getHexBoundaryLatLngForLeafletOverlay(child);
-        const pts = boundary.map(([lat, lng]) => {
-          const p = map.latLngToContainerPoint(L.latLng(lat, lng));
-          return { x: p.x, y: p.y };
-        });
+        const pts = projectHexBoundaryToContainerPoints(child, map, L);
+        if (!projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight)) continue;
         const drawClosedPath = () => {
           ctx.beginPath();
           for (let i = 0; i < pts.length; i++) {
