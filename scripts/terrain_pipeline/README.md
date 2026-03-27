@@ -29,7 +29,7 @@ Offline EarthEnv-to-H3 terrain generation for milestone 1.2.
    - `postgis`
    - `h3`
 5. Source rasters in `F:\Data` (EarthEnv land-cover classes 1-12 + topography files).
-6. **Ocean shapefile** at `F:\Data\<ocean_shapefile_name>` (default **`ocean_bathy0.shp`**). Path is `InputRasterSet.root` / `InputRasterSet.ocean_shapefile_name` in `config.py`. Phase 1 validates that the file loads. Sidecar files (`.dbf`, `.shx`, `.prj`, …) must accompany the `.shp` where required by the driver.
+6. **Water shapefiles** at `F:\Data\<ocean_shapefile_name>` and `F:\Data\<lake_shapefile_name>` (defaults **`ne_10m_ocean.shp`** and **`ne_10m_lakes.shp`**). Paths are `InputRasterSet.root` / `InputRasterSet.*_shapefile_name` in `config.py`. Phase 1 validates both files load. Sidecar files (`.dbf`, `.shx`, `.prj`, …) must accompany each `.shp` where required by the driver.
 
 Phase 1 validation also requires `AGENT_WARS_DB_PASSWORD` (see [Credentials](#credentials)) so it can open a test connection to Postgres.
 
@@ -56,7 +56,7 @@ python -m scripts.terrain_pipeline.cli run --max-child-cells 5000 --verbose
 ## Classification notes
 
 - Pipeline terrain labels: `ocean|coastal|land|forest|mountain|desert|arctic`
-- **Ocean / coastal (shapefile):** Build the H3 cell polygon (WGS84), dissolve the ocean shapefile to one geometry (reproject to WGS84 if needed), then test in **EPSG:3857** (same idea as Web Mercator tiles) using Shapely:
+- **Ocean / coastal (shapefiles):** Build the H3 cell polygon (WGS84), dissolve ocean and lake shapefiles to geometries (reproject to WGS84 if needed), union them into one water mask, then test in **EPSG:3857** (same idea as Web Mercator tiles) using Shapely:
   - Ocean geometry **`covers`** the cell → **`ocean`**
   - **`intersects`** but not **`covers`** → **`coastal`**
   - No intersection → **interior** biome stack (no other coastal rule).
@@ -87,4 +87,3 @@ Override DB user only if not `postgres` (see `DbConfig.user` in `config.py`).
 - **Shapefile “not a supported format” from Rasterio**: only `.tif` inputs are opened with Rasterio; the ocean `.shp` is opened with Fiona. If you see this error, update the pipeline (older builds mistakenly passed the shapefile through `rasterio.open`).
 - **Performance concerns**: use `--max-child-cells` first to validate setup, then run full.
 - **Unexpected terrain distributions**: inspect QA CSVs and metadata threshold values.
-

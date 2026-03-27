@@ -12,6 +12,7 @@ import { executePlanRoute } from './tool1Pathfinding';
 import type { LatLng } from './tool1Pathfinding';
 import { terrainIsPassableForDomain } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
+import { LATLNG_DECIMAL_PLACES } from '../mapData';
 import { logDebug, logError, logTrace } from '../logger';
 
 const AI_PLAYER_ID = 'opponent';
@@ -800,11 +801,11 @@ export function getInjectionText(playerId: string, state: GameStateSnapshot): st
     let bullet = `- ${row.unit_id}: ${row.order_type.toUpperCase()}`;
     if (row.order_type === 'march' && params.destination) {
       const d = params.destination as [number, number];
-      bullet += ` to [${d[0].toFixed(3)}, ${d[1].toFixed(3)}]`;
+      bullet += ` to [${d[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${d[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
     }
     if (row.order_type === 'defend' && params.defendHex) {
       const d = params.defendHex as [number, number];
-      bullet += ` [${d[0].toFixed(3)}, ${d[1].toFixed(3)}]`;
+      bullet += ` [${d[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${d[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
     }
     if (row.order_type === 'pursue' && params.targetUnitId) {
       bullet += ` ${params.targetUnitId}`;
@@ -812,7 +813,7 @@ export function getInjectionText(playerId: string, state: GameStateSnapshot): st
     bullet += ` - ${row.status}`;
     if (turnsRemaining > 0 && nextMove) {
       const ll = nextMove as [number, number];
-      bullet += `, ${turnsRemaining} turns remaining, next move to [${ll[0].toFixed(3)}, ${ll[1].toFixed(3)}]`;
+      bullet += `, ${turnsRemaining} turns remaining, next move to [${ll[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${ll[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
     }
     if (WARNING_STATUSES.has(row.status)) {
       bullet = '⚠ ' + bullet;

@@ -15,6 +15,7 @@ from typing import Dict, Iterable, List, Sequence
 
 import h3
 import rasterio
+from shapely.ops import unary_union
 
 from .classifier import CellFeatures, classify_cell
 from .config import InputRasterSet, PipelineConfig, TERRAIN_ENUM
@@ -107,14 +108,19 @@ class TerrainPipeline:
             raise RuntimeError("Missing required raster files:\n" + "\n".join(missing))
 
         ocean_path = self._ocean_input_path()
+        lake_path = self._lake_input_path()
         if not ocean_path.is_file():
             raise RuntimeError(f"Missing ocean shapefile (expected at {ocean_path}).")
+        if not lake_path.is_file():
+            raise RuntimeError(f"Missing lake shapefile (expected at {lake_path}).")
         try:
             _ = self._ocean_predicate_context()
         except Exception as exc:
-            raise RuntimeError(f"Ocean shapefile failed to load: {ocean_path}") from exc
+            raise RuntimeError(
+                f"Water shapefiles failed to load (ocean: {ocean_path}; lakes: {lake_path})."
+            ) from exc
 
-        LOGGER.info("Phase 1 passed: DB, input rasters, and ocean shapefile validated.")
+        LOGGER.info("Phase 1 passed: DB, input rasters, and ocean/lake shapefiles validated.")
 
     def run_phase_2_schema_and_cells(self, max_child_cells: int | None = None) -> dict[str, List[str]]:
         """
@@ -291,10 +297,11 @@ class TerrainPipeline:
                 "area_weighted_samples_per_cell_res1": self.config.area_weighted_samples_per_cell_res1,
                 "area_weighted_samples_per_cell_res4": self.config.area_weighted_samples_per_cell_res4,
                 "ocean_shapefile": str(self._ocean_input_path()),
+                "lake_shapefile": str(self._lake_input_path()),
                 "thresholds": self.config.thresholds.__dict__,
                 "aggregation_contract": (
                     "deterministic uniform-point integration over H3 cell area (area-weighted approximation); "
-                    "ocean/coastal from ocean polygon shapefile vs H3 cell (EPSG:3857 predicates)"
+                    "ocean/coastal from merged ocean+lakes polygon shapefiles vs H3 cell (EPSG:3857 predicates)"
                 ),
             },
             "inputs": [
@@ -331,6 +338,10 @@ class TerrainPipeline:
         r = self.config.input_rasters
         return r.root / r.ocean_shapefile_name
 
+    def _lake_input_path(self) -> Path:
+        r = self.config.input_rasters
+        return r.root / r.lake_shapefile_name
+
     def _ocean_predicate_context(self) -> OceanPredicateContext:
         """
         Why this exists:
@@ -343,9 +354,9 @@ class TerrainPipeline:
         """
 
         if self._ocean_ctx is None:
-            self._ocean_ctx = build_ocean_predicate_context(
-                load_ocean_union_wgs84(self._ocean_input_path())
-            )
+            ocean_wgs84 = load_ocean_union_wgs84(self._ocean_input_path())
+            lake_wgs84 = load_ocean_union_wgs84(self._lake_input_path())
+            self._ocean_ctx = build_ocean_predicate_context(unary_union((ocean_wgs84, lake_wgs84)))
         return self._ocean_ctx
 
     def _raster_input_paths(self) -> List[Path]:
@@ -359,8 +370,8 @@ class TerrainPipeline:
         return paths
 
     def _all_input_paths(self) -> List[Path]:
-        """Rasters plus ocean shapefile (for metadata checksums only)."""
-        return self._raster_input_paths() + [self._ocean_input_path()]
+        """Rasters plus ocean/lake shapefiles (for metadata checksums only)."""
+        return self._raster_input_paths() + [self._ocean_input_path(), self._lake_input_path()]
 
     def _generate_cells_for_resolution(self, resolution: int) -> List[str]:
         cells: List[str] = []

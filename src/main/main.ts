@@ -26,6 +26,7 @@ import {
   TOOL_GROUP_REGISTRY,
 } from './openRouter';
 import { logDebug } from './logger';
+import { getRes4TerrainOverridesForRenderer } from './terrainRes4Csv';
 import {
   handleRequestAiOrders,
   cancelRequestAiOrders,
@@ -102,6 +103,7 @@ function requestOrdersWithLog(
 
 function registerIpcHandlers(): void {
   ipcMain.handle('game:getState', () => getGameState());
+  ipcMain.handle('game:getRes4TerrainOverrides', () => getRes4TerrainOverridesForRenderer());
   ipcMain.handle('game:newGame', () => {
     resetGameForNewMatch();
     return getGameState();

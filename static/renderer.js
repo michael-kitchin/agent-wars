@@ -13930,6 +13930,12 @@
     return h3Index;
   }
   var MAX_JS_ARRAY_LENGTH = Math.pow(2, 32) - 1;
+  function validateArrayLength(length) {
+    if (length > MAX_JS_ARRAY_LENGTH) {
+      throw JSBindingError(E_ARRAY_LENGTH, length);
+    }
+    return length;
+  }
   var INVALID_HEXIDECIMAL_CHAR = /[^0-9a-fA-F]/;
   function h3IndexToSplitLong(h3Index) {
     if (Array.isArray(h3Index) && h3Index.length === 2 && Number.isInteger(h3Index[0]) && Number.isInteger(h3Index[1])) {
@@ -13974,6 +13980,16 @@
   function readInt64AsDoubleFromPointer(cAddress) {
     return H3.readInt64AsDoubleFromPointer(cAddress);
   }
+  function readArrayOfH3Indexes(cAddress, maxCount) {
+    var out = [];
+    for (var i = 0; i < maxCount; i++) {
+      var h3Index = readH3IndexFromPointer(cAddress, i);
+      if (h3Index !== null) {
+        out.push(h3Index);
+      }
+    }
+    return out;
+  }
   function readSingleCoord(cAddress) {
     return radsToDegs(libh3.getValue(cAddress, "double"));
   }
@@ -13995,6 +14011,12 @@
       out.push(out[0]);
     }
     return out;
+  }
+  function isValidCell(h3Index) {
+    var ref = h3IndexToSplitLong(h3Index);
+    var lower = ref[0];
+    var upper = ref[1];
+    return Boolean(H3.isValidCell(lower, upper));
   }
   function latLngToCell(lat, lng, res) {
     var latLng = libh3._malloc(SZ_LATLNG);
@@ -14030,6 +14052,49 @@
       return readCellBoundary(cellBoundary, formatAsGeoJson, formatAsGeoJson);
     } finally {
       libh3._free(cellBoundary);
+    }
+  }
+  function cellToParent(h3Index, res) {
+    var ref = h3IndexToSplitLong(h3Index);
+    var lower = ref[0];
+    var upper = ref[1];
+    var parent = libh3._malloc(SZ_H3INDEX);
+    try {
+      throwIfError(H3.cellToParent(lower, upper, res, parent));
+      return validateH3Index(readH3IndexFromPointer(parent));
+    } finally {
+      libh3._free(parent);
+    }
+  }
+  function cellToChildren(h3Index, res) {
+    if (!isValidCell(h3Index)) {
+      return [];
+    }
+    var ref = h3IndexToSplitLong(h3Index);
+    var lower = ref[0];
+    var upper = ref[1];
+    var count = validateArrayLength(cellToChildrenSize(h3Index, res));
+    var hexagons = libh3._calloc(count, SZ_H3INDEX);
+    try {
+      throwIfError(H3.cellToChildren(lower, upper, res, hexagons));
+      return readArrayOfH3Indexes(hexagons, count);
+    } finally {
+      libh3._free(hexagons);
+    }
+  }
+  function cellToChildrenSize(h3Index, res) {
+    if (!isValidCell(h3Index)) {
+      throw H3LibraryError(E_CELL_INVALID);
+    }
+    var ref = h3IndexToSplitLong(h3Index);
+    var lower = ref[0];
+    var upper = ref[1];
+    var countPtr = libh3._malloc(SZ_INT64);
+    try {
+      throwIfError(H3.cellToChildrenSize(lower, upper, res, countPtr));
+      return readInt64AsDoubleFromPointer(countPtr);
+    } finally {
+      libh3._free(countPtr);
     }
   }
   function gridDistance(origin, destination) {
@@ -14695,6 +14760,9 @@
   var TOOLTIP_OFFSET_PX = 12;
   var TERRAIN_TOOLTIP_DELAY_MS = 750;
   var WORLD_H3_RESOLUTION = 1;
+  var DETAIL_H3_RESOLUTION = 4;
+  var RES4_SHOW_THRESHOLD_VIEW_FRACTION = 0.8;
+  var RES4_HIDE_THRESHOLD_VIEW_FRACTION = 0.7;
   var lastPointerClientX = 0;
   var lastPointerClientY = 0;
   var terrainTooltipDelayTimer = null;
@@ -14722,6 +14790,30 @@
     const kind = hx.terrainKind ?? (hx.terrain === "water" ? "ocean" : hx.terrain === "coastal" ? "coastal" : "land");
     return formatTerrainKindLabel(kind);
   }
+  function terrainKindForRes1Hex(h3) {
+    if (!gameState) return "land";
+    const hx = gameState.hexes.find((h) => h.h3Index === h3);
+    if (!hx) return "land";
+    return hx.terrainKind ?? (hx.terrain === "water" ? "ocean" : hx.terrain === "coastal" ? "coastal" : "land");
+  }
+  function terrainLabelForPointer(clientX, clientY, fallbackRes1H3) {
+    if (!gameState) return "Unknown";
+    if (!res4Visible) return fallbackRes1H3 ? terrainLabelForHex(fallbackRes1H3) : "Unknown";
+    const map = getMainLeafletMap();
+    if (!map) return fallbackRes1H3 ? terrainLabelForHex(fallbackRes1H3) : "Unknown";
+    const L = getLeafletGlobal();
+    const rect = map.getContainer().getBoundingClientRect();
+    const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
+    try {
+      const detailH3 = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
+      const parentH3 = cellToParent(detailH3, WORLD_H3_RESOLUTION);
+      const parentKind = terrainKindForRes1Hex(parentH3);
+      const detailKind = res4TerrainOverridesByH3.get(detailH3) ?? parentKind;
+      return formatTerrainKindLabel(detailKind);
+    } catch {
+      return fallbackRes1H3 ? terrainLabelForHex(fallbackRes1H3) : "Unknown";
+    }
+  }
   function showTerrainTooltip(clientX, clientY, text) {
     const el = document.getElementById("hex-tooltip");
     if (!el) return;
@@ -14744,6 +14836,9 @@
   var hideCommittedOrderLinesAfterReady = false;
   var rangedModeActive = false;
   var gameState = null;
+  var res4TerrainOverridesByH3 = /* @__PURE__ */ new Map();
+  var res4ChildrenByParent = /* @__PURE__ */ new Map();
+  var res4Visible = false;
   var resolutionMoveAnimation = null;
   var resolutionMoveAnimationFrameId = null;
   var redrawRafId = null;
@@ -14773,7 +14868,14 @@
     } catch {
       return null;
     }
-    return mapHexSet.has(cell) ? cell : null;
+    if (mapHexSet.has(cell)) return cell;
+    try {
+      const detailCell = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
+      const parent = cellToParent(detailCell, WORLD_H3_RESOLUTION);
+      return mapHexSet.has(parent) ? parent : null;
+    } catch {
+      return null;
+    }
   }
   function drawTerrainHexes(ctx) {
     if (!gameState) return;
@@ -14814,6 +14916,94 @@
         drawClosedPath();
         ctx.strokeStyle = "#2e5a7b";
         ctx.lineWidth = Math.max(1.8, 2.2 * zoomStrokeScale);
+        ctx.stroke();
+      }
+    }
+  }
+  function computeRes1HexFillFraction() {
+    if (!gameState || gameState.hexes.length === 0) return 0;
+    const map = getMainLeafletMap();
+    if (!map) return 0;
+    const L = getLeafletGlobal();
+    const container = map.getContainer();
+    const center = {
+      x: Math.max(1, container.clientWidth) * 0.5,
+      y: Math.max(1, container.clientHeight) * 0.5
+    };
+    const centerLatLng = map.containerPointToLatLng(L.point(center.x, center.y));
+    let sampleH3;
+    try {
+      sampleH3 = latLngToCell(centerLatLng.lat, centerLatLng.lng, WORLD_H3_RESOLUTION);
+    } catch {
+      sampleH3 = gameState.hexes[0].h3Index;
+    }
+    if (!gameState.hexes.some((h) => h.h3Index === sampleH3)) {
+      sampleH3 = gameState.hexes[0].h3Index;
+    }
+    const sampleBoundary = getHexBoundaryLatLngForLeafletOverlay(sampleH3);
+    const pts = sampleBoundary.map(([lat, lng]) => map.latLngToContainerPoint(L.latLng(lat, lng)));
+    if (pts.length === 0) return 0;
+    let minX = pts[0].x;
+    let maxX = pts[0].x;
+    let minY = pts[0].y;
+    let maxY = pts[0].y;
+    for (const p of pts) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const viewW = Math.max(1, container.clientWidth);
+    const viewH = Math.max(1, container.clientHeight);
+    return Math.max((maxX - minX) / viewW, (maxY - minY) / viewH);
+  }
+  function shouldRenderRes4Hexes() {
+    const fillFraction = computeRes1HexFillFraction();
+    if (res4Visible) {
+      if (fillFraction <= RES4_HIDE_THRESHOLD_VIEW_FRACTION) res4Visible = false;
+      return res4Visible;
+    }
+    if (fillFraction >= RES4_SHOW_THRESHOLD_VIEW_FRACTION) res4Visible = true;
+    return res4Visible;
+  }
+  function drawRes4TerrainHexes(ctx) {
+    if (!gameState || !shouldRenderRes4Hexes()) return;
+    const map = getMainLeafletMap();
+    if (!map) return;
+    const L = getLeafletGlobal();
+    const bounds = map.getBounds();
+    const stroke = getActiveHexStrokeStyle();
+    for (const parent of gameState.hexes) {
+      const [parentLat, parentLng] = cellToLatLng(parent.h3Index);
+      if (!bounds.contains(L.latLng(parentLat, parentLng))) continue;
+      const parentKind = parent.terrainKind ?? (parent.terrain === "water" ? "ocean" : parent.terrain === "coastal" ? "coastal" : "land");
+      let children = res4ChildrenByParent.get(parent.h3Index);
+      if (!children) {
+        children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
+        res4ChildrenByParent.set(parent.h3Index, children);
+      }
+      for (const child of children) {
+        const [clat, clng] = cellToLatLng(child);
+        if (!bounds.contains(L.latLng(clat, clng))) continue;
+        const terrainKind = res4TerrainOverridesByH3.get(child) ?? parentKind;
+        const boundary = getHexBoundaryLatLngForLeafletOverlay(child);
+        const pts = boundary.map(([lat, lng]) => {
+          const p = map.latLngToContainerPoint(L.latLng(lat, lng));
+          return { x: p.x, y: p.y };
+        });
+        const drawClosedPath = () => {
+          ctx.beginPath();
+          for (let i = 0; i < pts.length; i++) {
+            const p = pts[i];
+            if (i === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+          }
+          ctx.closePath();
+        };
+        fillHexTerrain(ctx, terrainKind, drawClosedPath);
+        ctx.strokeStyle = stroke.color;
+        ctx.lineWidth = Math.max(0.28, stroke.width * 0.62);
+        drawClosedPath();
         ctx.stroke();
       }
     }
@@ -15142,6 +15332,7 @@
     }
     ctx.clearRect(0, 0, w, h);
     drawTerrainHexes(ctx);
+    drawRes4TerrainHexes(ctx);
     const hexList = gameState.hexes.map((h2) => h2.h3Index);
     let moveProgress = 1;
     let unitsToDraw = gameState.units;
@@ -15603,6 +15794,7 @@
     }
     ctx.clearRect(0, 0, w, h);
     drawTerrainHexes(ctx);
+    drawRes4TerrainHexes(ctx);
     const hexList = gameState.hexes.map((h2) => h2.h3Index);
     let moveProgress = 1;
     let unitsToDraw = gameState.units;
@@ -16139,6 +16331,10 @@
         updateReadyButtonState();
         redraw();
       }).catch((err) => console.error("getGameState failed:", err));
+      window.gameApi.getRes4TerrainOverrides().then((rows) => {
+        res4TerrainOverridesByH3 = new Map(rows.map((r) => [r.h3Index, r.terrainKind]));
+        requestRedraw();
+      }).catch((err) => console.error("getRes4TerrainOverrides failed:", err));
     }
     window.addEventListener("resize", () => {
       resizeAndRedraw();
@@ -16170,13 +16366,18 @@
           terrainTooltipDelayTimer = setTimeout(() => {
             terrainTooltipDelayTimer = null;
             if (hoveredHexH3 !== targetHex || !gameState) return;
-            showTerrainTooltip(lastPointerClientX, lastPointerClientY, terrainLabelForHex(targetHex));
+            showTerrainTooltip(
+              lastPointerClientX,
+              lastPointerClientY,
+              terrainLabelForPointer(lastPointerClientX, lastPointerClientY, targetHex)
+            );
           }, TERRAIN_TOOLTIP_DELAY_MS);
         }
         return;
       }
       const tip = document.getElementById("hex-tooltip");
       if (tip && !tip.classList.contains("hidden")) {
+        tip.textContent = terrainLabelForPointer(e.clientX, e.clientY, hit);
         tip.style.left = `${e.clientX + TOOLTIP_OFFSET_PX}px`;
         tip.style.top = `${e.clientY + TOOLTIP_OFFSET_PX}px`;
       }

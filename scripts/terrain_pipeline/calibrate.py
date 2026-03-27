@@ -15,6 +15,7 @@ from typing import Dict, List, Tuple
 
 import h3
 import rasterio
+from shapely.ops import unary_union
 
 from .classifier import CellFeatures, OceanRelationKind, classify_cell
 from .config import ClassifierThresholds, TERRAIN_ENUM, build_default_config
@@ -60,7 +61,14 @@ def _extract_res1_features_and_ocean_relation(
     cfg = build_default_config()
     root = cfg.input_rasters.root
     ocean_path = root / cfg.input_rasters.ocean_shapefile_name
-    ocean_ctx = build_ocean_predicate_context(load_ocean_union_wgs84(ocean_path))
+    lake_path = root / cfg.input_rasters.lake_shapefile_name
+    water_union = unary_union(
+        (
+            load_ocean_union_wgs84(ocean_path),
+            load_ocean_union_wgs84(lake_path),
+        )
+    )
+    ocean_ctx = build_ocean_predicate_context(water_union)
 
     needed_classes = tuple(range(1, 13))
     files = {f"class_{c}": root / cfg.input_rasters.landcover_by_class[c] for c in needed_classes}

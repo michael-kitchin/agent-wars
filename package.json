@@ -35,7 +35,7 @@
     "directories": {
       "output": "release"
     },
-    "files": ["dist", "static", "package.json", "node_modules", "data/generated/terrain_res1_base.csv"],
+    "files": ["dist", "static", "package.json", "node_modules", "data/generated/terrain_res1_base.csv", "data/generated/terrain_res4_exceptions.csv"],
     "win": {
       "target": ["nsis"]
     },

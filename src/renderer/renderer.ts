@@ -3,7 +3,7 @@
  * minimap with viewport sync, and click / double-click interaction with the sidebar.
  */
 
-import { gridDistance, cellToLatLng, latLngToCell } from 'h3-js';
+import { cellToChildren, cellToLatLng, cellToParent, gridDistance, latLngToCell } from 'h3-js';
 import { clampLatForWebMercatorDisplay, getHexBoundaryLatLngForLeafletOverlay } from './hexGrid';
 import {
   initWorldLeafletMaps,
@@ -205,6 +205,9 @@ const TERRAIN_TOOLTIP_DELAY_MS = 750;
 
 /** World map H3 resolution; must match main process mapData and terrain CSV. */
 const WORLD_H3_RESOLUTION = 1;
+const DETAIL_H3_RESOLUTION = 4;
+const RES4_SHOW_THRESHOLD_VIEW_FRACTION = 0.8;
+const RES4_HIDE_THRESHOLD_VIEW_FRACTION = 0.7;
 
 let lastPointerClientX = 0;
 let lastPointerClientY = 0;
@@ -246,6 +249,37 @@ function terrainLabelForHex(h3: string): string {
   return formatTerrainKindLabel(kind);
 }
 
+function terrainKindForRes1Hex(h3: string): string {
+  if (!gameState) return 'land';
+  const hx = gameState.hexes.find((h) => h.h3Index === h3);
+  if (!hx) return 'land';
+  return hx.terrainKind ?? (hx.terrain === 'water' ? 'ocean' : hx.terrain === 'coastal' ? 'coastal' : 'land');
+}
+
+function terrainLabelForPointer(clientX: number, clientY: number, fallbackRes1H3: string | null): string {
+  if (!gameState) return 'Unknown';
+  if (!res4Visible) return fallbackRes1H3 ? terrainLabelForHex(fallbackRes1H3) : 'Unknown';
+  const map = getMainLeafletMap() as
+    | {
+        getContainer: () => HTMLElement;
+        containerPointToLatLng: (pt: unknown) => { lat: number; lng: number };
+      }
+    | null;
+  if (!map) return fallbackRes1H3 ? terrainLabelForHex(fallbackRes1H3) : 'Unknown';
+  const L = getLeafletGlobal();
+  const rect = map.getContainer().getBoundingClientRect();
+  const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
+  try {
+    const detailH3 = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
+    const parentH3 = cellToParent(detailH3, WORLD_H3_RESOLUTION);
+    const parentKind = terrainKindForRes1Hex(parentH3);
+    const detailKind = res4TerrainOverridesByH3.get(detailH3) ?? parentKind;
+    return formatTerrainKindLabel(detailKind);
+  } catch {
+    return fallbackRes1H3 ? terrainLabelForHex(fallbackRes1H3) : 'Unknown';
+  }
+}
+
 function showTerrainTooltip(clientX: number, clientY: number, text: string): void {
   const el = document.getElementById('hex-tooltip');
   if (!el) return;
@@ -273,6 +307,9 @@ let hideCommittedOrderLinesAfterReady = false;
 /** When true, next hex click sets ranged attack target for selected unit (if valid). */
 let rangedModeActive = false;
 let gameState: GameStateSnapshot | null = null;
+let res4TerrainOverridesByH3 = new Map<string, string>();
+const res4ChildrenByParent = new Map<string, string[]>();
+let res4Visible = false;
 /** When non-null, we are animating resolution: ranged lightning → ranged casualty → movement → melee lightning → melee casualty. */
 let resolutionMoveAnimation: {
   moves: ResolutionMove[];
@@ -325,7 +362,15 @@ function hitTestHexAtContainerPixel(x: number, y: number, mapHexSet: Set<string>
   } catch {
     return null;
   }
-  return mapHexSet.has(cell) ? cell : null;
+  if (mapHexSet.has(cell)) return cell;
+  // Keep pointer interactions anchored to gameplay hexes (res1) even when visual res4 detail is visible.
+  try {
+    const detailCell = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
+    const parent = cellToParent(detailCell, WORLD_H3_RESOLUTION);
+    return mapHexSet.has(parent) ? parent : null;
+  } catch {
+    return null;
+  }
 }
 
 function drawTerrainHexes(ctx: CanvasRenderingContext2D): void {
@@ -372,6 +417,110 @@ function drawTerrainHexes(ctx: CanvasRenderingContext2D): void {
       drawClosedPath();
       ctx.strokeStyle = '#2e5a7b';
       ctx.lineWidth = Math.max(1.8, 2.2 * zoomStrokeScale);
+      ctx.stroke();
+    }
+  }
+}
+
+function computeRes1HexFillFraction(): number {
+  if (!gameState || gameState.hexes.length === 0) return 0;
+  const map = getMainLeafletMap() as
+    | {
+        getContainer: () => HTMLElement;
+        containerPointToLatLng: (pt: unknown) => { lat: number; lng: number };
+        latLngToContainerPoint: (ll: unknown) => { x: number; y: number };
+      }
+    | null;
+  if (!map) return 0;
+  const L = getLeafletGlobal();
+  const container = map.getContainer();
+  const center = {
+    x: Math.max(1, container.clientWidth) * 0.5,
+    y: Math.max(1, container.clientHeight) * 0.5,
+  };
+  const centerLatLng = map.containerPointToLatLng(L.point(center.x, center.y));
+  let sampleH3: string;
+  try {
+    sampleH3 = latLngToCell(centerLatLng.lat, centerLatLng.lng, WORLD_H3_RESOLUTION);
+  } catch {
+    sampleH3 = gameState.hexes[0]!.h3Index;
+  }
+  if (!gameState.hexes.some((h) => h.h3Index === sampleH3)) {
+    sampleH3 = gameState.hexes[0]!.h3Index;
+  }
+  const sampleBoundary = getHexBoundaryLatLngForLeafletOverlay(sampleH3);
+  const pts = sampleBoundary.map(([lat, lng]) => map.latLngToContainerPoint(L.latLng(lat, lng)));
+  if (pts.length === 0) return 0;
+  let minX = pts[0]!.x;
+  let maxX = pts[0]!.x;
+  let minY = pts[0]!.y;
+  let maxY = pts[0]!.y;
+  for (const p of pts) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  const viewW = Math.max(1, container.clientWidth);
+  const viewH = Math.max(1, container.clientHeight);
+  return Math.max((maxX - minX) / viewW, (maxY - minY) / viewH);
+}
+
+function shouldRenderRes4Hexes(): boolean {
+  const fillFraction = computeRes1HexFillFraction();
+  if (res4Visible) {
+    if (fillFraction <= RES4_HIDE_THRESHOLD_VIEW_FRACTION) res4Visible = false;
+    return res4Visible;
+  }
+  if (fillFraction >= RES4_SHOW_THRESHOLD_VIEW_FRACTION) res4Visible = true;
+  return res4Visible;
+}
+
+function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void {
+  if (!gameState || !shouldRenderRes4Hexes()) return;
+  const map = getMainLeafletMap() as
+    | {
+        latLngToContainerPoint: (ll: unknown) => { x: number; y: number };
+        getBounds: () => { contains: (latlng: unknown) => boolean };
+      }
+    | null;
+  if (!map) return;
+  const L = getLeafletGlobal();
+  const bounds = map.getBounds();
+  const stroke = getActiveHexStrokeStyle();
+  for (const parent of gameState.hexes) {
+    const [parentLat, parentLng] = cellToLatLng(parent.h3Index);
+    if (!bounds.contains(L.latLng(parentLat, parentLng))) continue;
+    const parentKind =
+      parent.terrainKind ??
+      (parent.terrain === 'water' ? 'ocean' : parent.terrain === 'coastal' ? 'coastal' : 'land');
+    let children = res4ChildrenByParent.get(parent.h3Index);
+    if (!children) {
+      children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
+      res4ChildrenByParent.set(parent.h3Index, children);
+    }
+    for (const child of children) {
+      const [clat, clng] = cellToLatLng(child);
+      if (!bounds.contains(L.latLng(clat, clng))) continue;
+      const terrainKind = res4TerrainOverridesByH3.get(child) ?? parentKind;
+      const boundary = getHexBoundaryLatLngForLeafletOverlay(child);
+      const pts = boundary.map(([lat, lng]: [number, number]) => {
+        const p = map.latLngToContainerPoint(L.latLng(lat, lng));
+        return { x: p.x, y: p.y };
+      });
+      const drawClosedPath = (): void => {
+        ctx.beginPath();
+        for (let i = 0; i < pts.length; i++) {
+          const p = pts[i]!;
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+      };
+      fillHexTerrain(ctx, terrainKind, drawClosedPath);
+      ctx.strokeStyle = stroke.color;
+      ctx.lineWidth = Math.max(0.28, stroke.width * 0.62);
+      drawClosedPath();
       ctx.stroke();
     }
   }
@@ -799,6 +948,7 @@ function resizeAndRedraw(): void {
 
   ctx.clearRect(0, 0, w, h);
   drawTerrainHexes(ctx);
+  drawRes4TerrainHexes(ctx);
   const hexList = gameState.hexes.map((h) => h.h3Index);
   let moveProgress = 1;
   let unitsToDraw: GameStateSnapshot['units'] = gameState.units;
@@ -1394,6 +1544,7 @@ function redraw(): void {
 
   ctx.clearRect(0, 0, w, h);
   drawTerrainHexes(ctx);
+  drawRes4TerrainHexes(ctx);
   const hexList = gameState.hexes.map((h) => h.h3Index);
   let moveProgress = 1;
   let unitsToDraw: GameStateSnapshot['units'] = gameState.units;
@@ -1991,6 +2142,13 @@ function init(): void {
         redraw();
       })
       .catch((err) => console.error('getGameState failed:', err));
+    window.gameApi
+      .getRes4TerrainOverrides()
+      .then((rows) => {
+        res4TerrainOverridesByH3 = new Map(rows.map((r) => [r.h3Index, r.terrainKind]));
+        requestRedraw();
+      })
+      .catch((err) => console.error('getRes4TerrainOverrides failed:', err));
   }
 
   window.addEventListener('resize', () => {
@@ -2027,7 +2185,11 @@ function init(): void {
         terrainTooltipDelayTimer = setTimeout(() => {
           terrainTooltipDelayTimer = null;
           if (hoveredHexH3 !== targetHex || !gameState) return;
-          showTerrainTooltip(lastPointerClientX, lastPointerClientY, terrainLabelForHex(targetHex));
+          showTerrainTooltip(
+            lastPointerClientX,
+            lastPointerClientY,
+            terrainLabelForPointer(lastPointerClientX, lastPointerClientY, targetHex)
+          );
         }, TERRAIN_TOOLTIP_DELAY_MS);
       }
       return;
@@ -2035,6 +2197,7 @@ function init(): void {
 
     const tip = document.getElementById('hex-tooltip');
     if (tip && !tip.classList.contains('hidden')) {
+      tip.textContent = terrainLabelForPointer(e.clientX, e.clientY, hit);
       tip.style.left = `${e.clientX + TOOLTIP_OFFSET_PX}px`;
       tip.style.top = `${e.clientY + TOOLTIP_OFFSET_PX}px`;
     }

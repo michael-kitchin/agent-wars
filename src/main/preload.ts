@@ -23,6 +23,8 @@ ipcRenderer.on('openRouter:log', (_event, payload: { line: string; isError?: boo
 const gameApi = {
   getGameState: (): Promise<GameStateSnapshot> =>
     ipcRenderer.invoke('game:getState'),
+  getRes4TerrainOverrides: (): Promise<{ h3Index: string; terrainKind: string }[]> =>
+    ipcRenderer.invoke('game:getRes4TerrainOverrides'),
   newGame: (): Promise<GameStateSnapshot> => ipcRenderer.invoke('game:newGame'),
   submitOrders: (payload: SubmitOrdersIpcPayload): Promise<{ success: boolean; reason?: string }> =>
     ipcRenderer.invoke('game:submitOrders', payload),

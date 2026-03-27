@@ -139,6 +139,7 @@ export interface HumanOrderPreviewResult {
 /** Preload-exposed renderer bridge contract. */
 export interface GameApi {
   getGameState: () => Promise<GameStateSnapshot>;
+  getRes4TerrainOverrides: () => Promise<{ h3Index: string; terrainKind: string }[]>;
   newGame: () => Promise<GameStateSnapshot>;
   submitOrders: (payload: SubmitOrdersIpcPayload) => Promise<{ success: boolean; reason?: string }>;
   ready: (payload?: GameReadyIpcPayload) => Promise<ReadyResult>;

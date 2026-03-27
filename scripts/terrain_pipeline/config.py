@@ -48,6 +48,8 @@ class InputRasterSet:
     # Ocean/water polygons (e.g. bathy=0); path = root / ocean_shapefile_name. CRS may be geographic or projected;
     # pipeline reprojects to WGS84 then tests in Web Mercator.
     ocean_shapefile_name: str = "ne_10m_ocean.shp"
+    # Lakes polygon layer merged into the same water mask predicates as ocean.
+    lake_shapefile_name: str = "ne_10m_lakes.shp"
     landcover_by_class: Dict[int, str] = field(
         default_factory=lambda: {
             1: "consensus_full_class_1.tif",
