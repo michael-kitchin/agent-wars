@@ -19,6 +19,7 @@ function testPipelineToPassability(): void {
   assert.strictEqual(pipelineTerrainToPassability('ocean'), 'water');
   assert.strictEqual(pipelineTerrainToPassability('coastal'), 'coastal');
   assert.strictEqual(pipelineTerrainToPassability('land'), 'land');
+  assert.strictEqual(pipelineTerrainToPassability('urban'), 'land');
   assert.strictEqual(pipelineTerrainToPassability('forest'), 'land');
   assert.strictEqual(pipelineTerrainToPassability('mountain'), 'land');
   assert.strictEqual(pipelineTerrainToPassability('desert'), 'land');

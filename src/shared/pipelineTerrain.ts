@@ -10,6 +10,7 @@ export const PIPELINE_TERRAIN_KINDS = [
   'ocean',
   'coastal',
   'land',
+  'urban',
   'forest',
   'mountain',
   'desert',

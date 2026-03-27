@@ -31,6 +31,8 @@ interface HatchStyle {
   spacing: number;
   lineWidth: number;
   reverseDiagonal: boolean;
+  crosshatch?: boolean;
+  pattern?: 'diagonal' | 'dots';
 }
 
 interface TerrainStylePreset {
@@ -55,18 +57,21 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
     fillAlphaMultiplier: 0.55,
     hatchAlphaMultiplier: 0.375,
     fills: {
-      ocean: 'rgba(35, 116, 201, 0.28)',
-      coastal: 'rgba(62, 162, 172, 0.24)',
-      land: 'rgba(198, 212, 168, 0.2)',
-      forest: 'rgba(48, 150, 82, 0.42)',
-      mountain: 'rgba(158, 129, 109, 0.45)',
-      desert: 'rgba(132, 94, 42, 0.44)',
-      arctic: 'rgba(235, 244, 255, 0.5)',
+      ocean: 'rgba(42, 117, 214, 0.28)',
+      coastal: 'rgba(59, 186, 194, 0.24)',
+      land: 'rgba(186, 208, 160, 0.2)',
+      forest: 'rgba(50, 142, 74, 0.43)',
+      mountain: 'rgba(154, 77, 122, 0.54)',
+      desert: 'rgba(214, 182, 120, 0.44)',
+      arctic: 'rgba(234, 245, 255, 0.5)',
+      urban: 'rgba(137, 117, 98, 0.46)',
     },
     hatches: {
-      mountain: { color: 'rgba(110, 22, 18, 0.413)', spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+      mountain: { color: 'rgba(95, 24, 74, 0.62)', spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
       forest: { color: 'rgba(16, 72, 36, 0.44)', spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
       coastal: { color: 'rgba(40, 130, 155, 0.32)', spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
+      urban: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
+      desert: { color: 'rgba(150, 104, 43, 0.48)', spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: 'dots' },
     },
   },
   atlas: {
@@ -75,18 +80,21 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
     fillAlphaMultiplier: 0.55,
     hatchAlphaMultiplier: 0.375,
     fills: {
-      ocean: 'rgba(35, 116, 201, 0.28)',
-      coastal: 'rgba(62, 162, 172, 0.24)',
-      land: 'rgba(198, 212, 168, 0.2)',
-      forest: 'rgba(48, 150, 82, 0.42)',
-      mountain: 'rgba(158, 129, 109, 0.45)',
-      desert: 'rgba(132, 94, 42, 0.44)',
+      ocean: 'rgba(56, 128, 214, 0.28)',
+      coastal: 'rgba(76, 173, 188, 0.24)',
+      land: 'rgba(193, 211, 165, 0.2)',
+      forest: 'rgba(70, 146, 86, 0.43)',
+      mountain: 'rgba(168, 70, 96, 0.55)',
+      desert: 'rgba(220, 189, 128, 0.44)',
       arctic: 'rgba(235, 244, 255, 0.5)',
+      urban: 'rgba(141, 122, 103, 0.46)',
     },
     hatches: {
-      mountain: { color: 'rgba(110, 22, 18, 0.413)', spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+      mountain: { color: 'rgba(114, 26, 50, 0.62)', spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
       forest: { color: 'rgba(16, 72, 36, 0.44)', spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
       coastal: { color: 'rgba(40, 130, 155, 0.32)', spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
+      urban: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
+      desert: { color: 'rgba(152, 109, 47, 0.48)', spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: 'dots' },
     },
   },
   wargame: {
@@ -95,18 +103,21 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
     fillAlphaMultiplier: 0.55,
     hatchAlphaMultiplier: 0.375,
     fills: {
-      ocean: 'rgba(35, 116, 201, 0.28)',
-      coastal: 'rgba(62, 162, 172, 0.24)',
-      land: 'rgba(198, 212, 168, 0.2)',
-      forest: 'rgba(48, 150, 82, 0.42)',
-      mountain: 'rgba(158, 129, 109, 0.45)',
-      desert: 'rgba(132, 94, 42, 0.44)',
-      arctic: 'rgba(235, 244, 255, 0.5)',
+      ocean: 'rgba(38, 118, 206, 0.28)',
+      coastal: 'rgba(70, 176, 192, 0.24)',
+      land: 'rgba(170, 188, 136, 0.2)',
+      forest: 'rgba(58, 150, 86, 0.43)',
+      mountain: 'rgba(218, 76, 146, 0.5)',
+      desert: 'rgba(221, 171, 88, 0.46)',
+      arctic: 'rgba(221, 236, 255, 0.5)',
+      urban: 'rgba(132, 112, 97, 0.46)',
     },
     hatches: {
-      mountain: { color: 'rgba(110, 22, 18, 0.413)', spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+      mountain: { color: 'rgba(255, 162, 214, 0.68)', spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
       forest: { color: 'rgba(130, 245, 190, 0.58)', spacing: 7, lineWidth: 0.9, reverseDiagonal: true },
       coastal: { color: 'rgba(110, 220, 235, 0.42)', spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
+      urban: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.88, reverseDiagonal: true, crosshatch: true },
+      desert: { color: 'rgba(255, 207, 130, 0.5)', spacing: 7, lineWidth: 1.05, reverseDiagonal: false, pattern: 'dots' },
     },
   },
   scientific: {
@@ -115,18 +126,21 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
     fillAlphaMultiplier: 0.55,
     hatchAlphaMultiplier: 0.375,
     fills: {
-      ocean: 'rgba(35, 116, 201, 0.28)',
-      coastal: 'rgba(62, 162, 172, 0.24)',
-      land: 'rgba(198, 212, 168, 0.2)',
-      forest: 'rgba(48, 150, 82, 0.42)',
-      mountain: 'rgba(158, 129, 109, 0.45)',
-      desert: 'rgba(132, 94, 42, 0.44)',
-      arctic: 'rgba(235, 244, 255, 0.5)',
+      ocean: 'rgba(52, 120, 204, 0.28)',
+      coastal: 'rgba(69, 165, 186, 0.24)',
+      land: 'rgba(188, 205, 162, 0.2)',
+      forest: 'rgba(52, 136, 84, 0.43)',
+      mountain: 'rgba(127, 83, 171, 0.55)',
+      desert: 'rgba(206, 176, 118, 0.44)',
+      arctic: 'rgba(234, 244, 255, 0.5)',
+      urban: 'rgba(130, 112, 96, 0.46)',
     },
     hatches: {
-      mountain: { color: 'rgba(110, 22, 18, 0.413)', spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+      mountain: { color: 'rgba(74, 35, 116, 0.62)', spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
       forest: { color: 'rgba(16, 72, 36, 0.44)', spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
       coastal: { color: 'rgba(40, 130, 155, 0.32)', spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
+      urban: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
+      desert: { color: 'rgba(145, 104, 42, 0.48)', spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: 'dots' },
     },
   },
 };
@@ -141,7 +155,8 @@ function makeDiagonalHatchPattern(
   color: string,
   spacing: number,
   lineWidth: number,
-  reverseDiagonal: boolean
+  reverseDiagonal: boolean,
+  crosshatch = false
 ): CanvasPattern | null {
   const c = document.createElement('canvas');
   const s = spacing * 2;
@@ -159,7 +174,31 @@ function makeDiagonalHatchPattern(
     p.moveTo(0, s);
     p.lineTo(s, 0);
   }
+  if (crosshatch) {
+    if (reverseDiagonal) {
+      p.moveTo(0, s);
+      p.lineTo(s, 0);
+    } else {
+      p.moveTo(0, 0);
+      p.lineTo(s, s);
+    }
+  }
   p.stroke();
+  return p.createPattern(c, 'repeat');
+}
+
+function makeDotPattern(color: string, spacing: number, diameter: number): CanvasPattern | null {
+  const c = document.createElement('canvas');
+  const s = Math.max(2, spacing);
+  c.width = s;
+  c.height = s;
+  const p = c.getContext('2d');
+  if (!p) return null;
+  const r = Math.max(0.5, diameter * 0.5);
+  p.fillStyle = color;
+  p.beginPath();
+  p.arc(s * 0.5, s * 0.5, r, 0, Math.PI * 2);
+  p.fill();
   return p.createPattern(c, 'repeat');
 }
 
@@ -253,12 +292,19 @@ export function terrainKindPattern(
   const spec = activePreset().hatches[k];
   const p = activePreset();
   const pat = spec
-    ? makeDiagonalHatchPattern(
-      boostRgbaAlpha(boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier), fillAndHatchAlphaScale),
-      spec.spacing,
-      spec.lineWidth,
-      spec.reverseDiagonal
-    )
+    ? spec.pattern === 'dots'
+      ? makeDotPattern(
+        boostRgbaAlpha(boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier), fillAndHatchAlphaScale),
+        spec.spacing,
+        spec.lineWidth * 2
+      )
+      : makeDiagonalHatchPattern(
+        boostRgbaAlpha(boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier), fillAndHatchAlphaScale),
+        spec.spacing,
+        spec.lineWidth,
+        spec.reverseDiagonal,
+        spec.crosshatch ?? false
+      )
     : null;
   patternCache.set(key, pat);
   return pat;

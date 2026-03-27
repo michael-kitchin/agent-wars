@@ -294,6 +294,10 @@ function showTerrainTooltip(clientX: number, clientY: number, text: string): voi
 let selectedHexIndex: string | null = null;
 /** H3 index of the hex under the pointer for hover-only terrain fill; null when not over the map or a map hex. */
 let hoveredHexH3: string | null = null;
+/** H3 index of the res-4 child under pointer while detail mode is active; null otherwise. */
+let hoveredDetailHexH3: string | null = null;
+/** While held, invert default res1/res4 fill behavior for visual inspection. */
+let reverseTerrainFillWhileHeld = false;
 let selectedUnitId: string | null = null;
 /** Unit selected at mousedown; used so double-click can issue move to an occupied hex without reselecting. */
 let selectedUnitIdAtMouseDown: string | null = null;
@@ -373,8 +377,34 @@ function hitTestHexAtContainerPixel(x: number, y: number, mapHexSet: Set<string>
   }
 }
 
+function detailHitAtClientPixel(
+  clientX: number,
+  clientY: number,
+  mapHexSet: Set<string>
+): string | null {
+  if (!gameState || !shouldRenderRes4Hexes()) return null;
+  const map = getMainLeafletMap() as
+    | {
+        getContainer: () => HTMLElement;
+        containerPointToLatLng: (pt: unknown) => { lat: number; lng: number };
+      }
+    | null;
+  if (!map) return null;
+  const L = getLeafletGlobal();
+  const rect = map.getContainer().getBoundingClientRect();
+  const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
+  try {
+    const detailH3 = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
+    const parentH3 = cellToParent(detailH3, WORLD_H3_RESOLUTION);
+    return mapHexSet.has(parentH3) ? detailH3 : null;
+  } catch {
+    return null;
+  }
+}
+
 function drawTerrainHexes(ctx: CanvasRenderingContext2D): void {
   if (!gameState) return;
+  const res4Active = shouldRenderRes4Hexes();
   const map = getMainLeafletMap() as
     | { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } }
     | null;
@@ -402,7 +432,12 @@ function drawTerrainHexes(ctx: CanvasRenderingContext2D): void {
       }
       ctx.closePath();
     };
-    if (hoveredHexH3 === hx.h3Index) {
+    if (reverseTerrainFillWhileHeld) {
+      fillHexTerrain(ctx, kind, drawClosedPath, {
+        fillAndHatchAlphaScale: hoveredHexH3 === hx.h3Index ? 0.6 : 1,
+        landHoverFill: kind === 'land',
+      });
+    } else if (!res4Active && hoveredHexH3 === hx.h3Index) {
       fillHexTerrain(ctx, kind, drawClosedPath, {
         fillAndHatchAlphaScale: 2,
         landHoverFill: kind === 'land',
@@ -547,7 +582,19 @@ function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void {
         }
         ctx.closePath();
       };
-      fillHexTerrain(ctx, terrainKind, drawClosedPath);
+      if (reverseTerrainFillWhileHeld) {
+        if (hoveredDetailHexH3 === child) {
+          fillHexTerrain(ctx, terrainKind, drawClosedPath, {
+            fillAndHatchAlphaScale: 0.6,
+            landHoverFill: terrainKind === 'land',
+          });
+        }
+      } else {
+        fillHexTerrain(ctx, terrainKind, drawClosedPath, {
+          fillAndHatchAlphaScale: hoveredDetailHexH3 === child ? 2 : 1,
+          landHoverFill: hoveredDetailHexH3 === child && terrainKind === 'land',
+        });
+      }
       ctx.strokeStyle = stroke.color;
       ctx.lineWidth = Math.max(0.28, stroke.width * 0.62);
       drawClosedPath();
@@ -2184,6 +2231,22 @@ function init(): void {
   window.addEventListener('resize', () => {
     resizeAndRedraw();
   });
+  window.addEventListener('keydown', (e) => {
+    if (e.repeat) return;
+    if (e.key.toLowerCase() !== 't') return;
+    reverseTerrainFillWhileHeld = true;
+    requestRedraw();
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.key.toLowerCase() !== 't') return;
+    reverseTerrainFillWhileHeld = false;
+    requestRedraw();
+  });
+  window.addEventListener('blur', () => {
+    if (!reverseTerrainFillWhileHeld) return;
+    reverseTerrainFillWhileHeld = false;
+    requestRedraw();
+  });
 
   const mainMapEl = document.getElementById('main-map');
   if (!mainMapEl) return;
@@ -2202,12 +2265,15 @@ function init(): void {
   mainMapEl.addEventListener('pointermove', (e) => {
     lastPointerClientX = e.clientX;
     lastPointerClientY = e.clientY;
+    const mapHexSet = new Set((gameState?.hexes ?? []).map((h) => h.h3Index));
     const hit = clientXYToHit(e.clientX, e.clientY);
+    const detailHit = detailHitAtClientPixel(e.clientX, e.clientY, mapHexSet);
 
-    if (hit !== hoveredHexH3) {
+    if (hit !== hoveredHexH3 || detailHit !== hoveredDetailHexH3) {
       clearTerrainTooltipTimer();
       hideTerrainTooltipVisual();
       hoveredHexH3 = hit;
+      hoveredDetailHexH3 = detailHit;
       void refreshHoverRoutePreview();
       requestRedraw();
       if (hit) {
@@ -2235,8 +2301,9 @@ function init(): void {
   mainMapEl.addEventListener('pointerleave', () => {
     clearTerrainTooltipTimer();
     hideTerrainTooltipVisual();
-    if (hoveredHexH3 !== null) {
+    if (hoveredHexH3 !== null || hoveredDetailHexH3 !== null) {
       hoveredHexH3 = null;
+      hoveredDetailHexH3 = null;
       hoverRoutePreview = null;
       requestRedraw();
     }

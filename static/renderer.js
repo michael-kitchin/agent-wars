@@ -14303,6 +14303,14 @@
     mountRasterBasemap(Lref, mainMap, true, startIdx, "main");
     mainMap.fitBounds(worldBounds, { padding: [2, 2], animate: false });
     mainMap.doubleClickZoom.disable();
+    try {
+      Lref.control.scale({
+        metric: true,
+        imperial: true,
+        maxWidth: 120
+      }).addTo(mainMap);
+    } catch {
+    }
     miniMap = Lref.map(miniEl, {
       minZoom: 0,
       maxZoom: 2,
@@ -14397,6 +14405,7 @@
     "ocean",
     "coastal",
     "land",
+    "urban",
     "forest",
     "mountain",
     "desert",
@@ -14419,18 +14428,21 @@
       fillAlphaMultiplier: 0.55,
       hatchAlphaMultiplier: 0.375,
       fills: {
-        ocean: "rgba(35, 116, 201, 0.28)",
-        coastal: "rgba(62, 162, 172, 0.24)",
-        land: "rgba(198, 212, 168, 0.2)",
-        forest: "rgba(48, 150, 82, 0.42)",
-        mountain: "rgba(158, 129, 109, 0.45)",
-        desert: "rgba(132, 94, 42, 0.44)",
-        arctic: "rgba(235, 244, 255, 0.5)"
+        ocean: "rgba(42, 117, 214, 0.28)",
+        coastal: "rgba(59, 186, 194, 0.24)",
+        land: "rgba(186, 208, 160, 0.2)",
+        forest: "rgba(50, 142, 74, 0.43)",
+        mountain: "rgba(154, 77, 122, 0.54)",
+        desert: "rgba(214, 182, 120, 0.44)",
+        arctic: "rgba(234, 245, 255, 0.5)",
+        urban: "rgba(137, 117, 98, 0.46)"
       },
       hatches: {
-        mountain: { color: "rgba(110, 22, 18, 0.413)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+        mountain: { color: "rgba(95, 24, 74, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
         forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
-        coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false }
+        coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
+        urban: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
+        desert: { color: "rgba(150, 104, 43, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
       }
     },
     atlas: {
@@ -14439,18 +14451,21 @@
       fillAlphaMultiplier: 0.55,
       hatchAlphaMultiplier: 0.375,
       fills: {
-        ocean: "rgba(35, 116, 201, 0.28)",
-        coastal: "rgba(62, 162, 172, 0.24)",
-        land: "rgba(198, 212, 168, 0.2)",
-        forest: "rgba(48, 150, 82, 0.42)",
-        mountain: "rgba(158, 129, 109, 0.45)",
-        desert: "rgba(132, 94, 42, 0.44)",
-        arctic: "rgba(235, 244, 255, 0.5)"
+        ocean: "rgba(56, 128, 214, 0.28)",
+        coastal: "rgba(76, 173, 188, 0.24)",
+        land: "rgba(193, 211, 165, 0.2)",
+        forest: "rgba(70, 146, 86, 0.43)",
+        mountain: "rgba(168, 70, 96, 0.55)",
+        desert: "rgba(220, 189, 128, 0.44)",
+        arctic: "rgba(235, 244, 255, 0.5)",
+        urban: "rgba(141, 122, 103, 0.46)"
       },
       hatches: {
-        mountain: { color: "rgba(110, 22, 18, 0.413)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+        mountain: { color: "rgba(114, 26, 50, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
         forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
-        coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false }
+        coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
+        urban: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
+        desert: { color: "rgba(152, 109, 47, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
       }
     },
     wargame: {
@@ -14459,18 +14474,21 @@
       fillAlphaMultiplier: 0.55,
       hatchAlphaMultiplier: 0.375,
       fills: {
-        ocean: "rgba(35, 116, 201, 0.28)",
-        coastal: "rgba(62, 162, 172, 0.24)",
-        land: "rgba(198, 212, 168, 0.2)",
-        forest: "rgba(48, 150, 82, 0.42)",
-        mountain: "rgba(158, 129, 109, 0.45)",
-        desert: "rgba(132, 94, 42, 0.44)",
-        arctic: "rgba(235, 244, 255, 0.5)"
+        ocean: "rgba(38, 118, 206, 0.28)",
+        coastal: "rgba(70, 176, 192, 0.24)",
+        land: "rgba(170, 188, 136, 0.2)",
+        forest: "rgba(58, 150, 86, 0.43)",
+        mountain: "rgba(218, 76, 146, 0.5)",
+        desert: "rgba(221, 171, 88, 0.46)",
+        arctic: "rgba(221, 236, 255, 0.5)",
+        urban: "rgba(132, 112, 97, 0.46)"
       },
       hatches: {
-        mountain: { color: "rgba(110, 22, 18, 0.413)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+        mountain: { color: "rgba(255, 162, 214, 0.68)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
         forest: { color: "rgba(130, 245, 190, 0.58)", spacing: 7, lineWidth: 0.9, reverseDiagonal: true },
-        coastal: { color: "rgba(110, 220, 235, 0.42)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false }
+        coastal: { color: "rgba(110, 220, 235, 0.42)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
+        urban: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.88, reverseDiagonal: true, crosshatch: true },
+        desert: { color: "rgba(255, 207, 130, 0.5)", spacing: 7, lineWidth: 1.05, reverseDiagonal: false, pattern: "dots" }
       }
     },
     scientific: {
@@ -14479,23 +14497,26 @@
       fillAlphaMultiplier: 0.55,
       hatchAlphaMultiplier: 0.375,
       fills: {
-        ocean: "rgba(35, 116, 201, 0.28)",
-        coastal: "rgba(62, 162, 172, 0.24)",
-        land: "rgba(198, 212, 168, 0.2)",
-        forest: "rgba(48, 150, 82, 0.42)",
-        mountain: "rgba(158, 129, 109, 0.45)",
-        desert: "rgba(132, 94, 42, 0.44)",
-        arctic: "rgba(235, 244, 255, 0.5)"
+        ocean: "rgba(52, 120, 204, 0.28)",
+        coastal: "rgba(69, 165, 186, 0.24)",
+        land: "rgba(188, 205, 162, 0.2)",
+        forest: "rgba(52, 136, 84, 0.43)",
+        mountain: "rgba(127, 83, 171, 0.55)",
+        desert: "rgba(206, 176, 118, 0.44)",
+        arctic: "rgba(234, 244, 255, 0.5)",
+        urban: "rgba(130, 112, 96, 0.46)"
       },
       hatches: {
-        mountain: { color: "rgba(110, 22, 18, 0.413)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+        mountain: { color: "rgba(74, 35, 116, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
         forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
-        coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false }
+        coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
+        urban: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
+        desert: { color: "rgba(145, 104, 42, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
       }
     }
   };
   var activeTerrainStyleId = "default";
-  function makeDiagonalHatchPattern(color, spacing, lineWidth, reverseDiagonal) {
+  function makeDiagonalHatchPattern(color, spacing, lineWidth, reverseDiagonal, crosshatch = false) {
     const c = document.createElement("canvas");
     const s = spacing * 2;
     c.width = s;
@@ -14512,7 +14533,30 @@
       p.moveTo(0, s);
       p.lineTo(s, 0);
     }
+    if (crosshatch) {
+      if (reverseDiagonal) {
+        p.moveTo(0, s);
+        p.lineTo(s, 0);
+      } else {
+        p.moveTo(0, 0);
+        p.lineTo(s, s);
+      }
+    }
     p.stroke();
+    return p.createPattern(c, "repeat");
+  }
+  function makeDotPattern(color, spacing, diameter) {
+    const c = document.createElement("canvas");
+    const s = Math.max(2, spacing);
+    c.width = s;
+    c.height = s;
+    const p = c.getContext("2d");
+    if (!p) return null;
+    const r = Math.max(0.5, diameter * 0.5);
+    p.fillStyle = color;
+    p.beginPath();
+    p.arc(s * 0.5, s * 0.5, r, 0, Math.PI * 2);
+    p.fill();
     return p.createPattern(c, "repeat");
   }
   function boostRgbaAlpha(color, factor) {
@@ -14567,11 +14611,16 @@
     if (patternCache.has(key)) return patternCache.get(key) ?? null;
     const spec = activePreset().hatches[k];
     const p = activePreset();
-    const pat = spec ? makeDiagonalHatchPattern(
+    const pat = spec ? spec.pattern === "dots" ? makeDotPattern(
+      boostRgbaAlpha(boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier), fillAndHatchAlphaScale),
+      spec.spacing,
+      spec.lineWidth * 2
+    ) : makeDiagonalHatchPattern(
       boostRgbaAlpha(boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier), fillAndHatchAlphaScale),
       spec.spacing,
       spec.lineWidth,
-      spec.reverseDiagonal
+      spec.reverseDiagonal,
+      spec.crosshatch ?? false
     ) : null;
     patternCache.set(key, pat);
     return pat;
@@ -14826,6 +14875,8 @@
   }
   var selectedHexIndex = null;
   var hoveredHexH3 = null;
+  var hoveredDetailHexH3 = null;
+  var reverseTerrainFillWhileHeld = false;
   var selectedUnitId = null;
   var selectedUnitIdAtMouseDown = null;
   var pendingSelectTimeout = null;
@@ -14877,8 +14928,24 @@
       return null;
     }
   }
+  function detailHitAtClientPixel(clientX, clientY, mapHexSet) {
+    if (!gameState || !shouldRenderRes4Hexes()) return null;
+    const map = getMainLeafletMap();
+    if (!map) return null;
+    const L = getLeafletGlobal();
+    const rect = map.getContainer().getBoundingClientRect();
+    const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
+    try {
+      const detailH3 = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
+      const parentH3 = cellToParent(detailH3, WORLD_H3_RESOLUTION);
+      return mapHexSet.has(parentH3) ? detailH3 : null;
+    } catch {
+      return null;
+    }
+  }
   function drawTerrainHexes(ctx) {
     if (!gameState) return;
+    const res4Active = shouldRenderRes4Hexes();
     const map = getMainLeafletMap();
     if (!map) return;
     const mapWithZoom = map;
@@ -14901,7 +14968,12 @@
         }
         ctx.closePath();
       };
-      if (hoveredHexH3 === hx.h3Index) {
+      if (reverseTerrainFillWhileHeld) {
+        fillHexTerrain(ctx, kind, drawClosedPath, {
+          fillAndHatchAlphaScale: hoveredHexH3 === hx.h3Index ? 0.6 : 1,
+          landHoverFill: kind === "land"
+        });
+      } else if (!res4Active && hoveredHexH3 === hx.h3Index) {
         fillHexTerrain(ctx, kind, drawClosedPath, {
           fillAndHatchAlphaScale: 2,
           landHoverFill: kind === "land"
@@ -15018,7 +15090,19 @@
           }
           ctx.closePath();
         };
-        fillHexTerrain(ctx, terrainKind, drawClosedPath);
+        if (reverseTerrainFillWhileHeld) {
+          if (hoveredDetailHexH3 === child) {
+            fillHexTerrain(ctx, terrainKind, drawClosedPath, {
+              fillAndHatchAlphaScale: 0.6,
+              landHoverFill: terrainKind === "land"
+            });
+          }
+        } else {
+          fillHexTerrain(ctx, terrainKind, drawClosedPath, {
+            fillAndHatchAlphaScale: hoveredDetailHexH3 === child ? 2 : 1,
+            landHoverFill: hoveredDetailHexH3 === child && terrainKind === "land"
+          });
+        }
         ctx.strokeStyle = stroke.color;
         ctx.lineWidth = Math.max(0.28, stroke.width * 0.62);
         drawClosedPath();
@@ -16357,6 +16441,22 @@
     window.addEventListener("resize", () => {
       resizeAndRedraw();
     });
+    window.addEventListener("keydown", (e) => {
+      if (e.repeat) return;
+      if (e.key.toLowerCase() !== "t") return;
+      reverseTerrainFillWhileHeld = true;
+      requestRedraw();
+    });
+    window.addEventListener("keyup", (e) => {
+      if (e.key.toLowerCase() !== "t") return;
+      reverseTerrainFillWhileHeld = false;
+      requestRedraw();
+    });
+    window.addEventListener("blur", () => {
+      if (!reverseTerrainFillWhileHeld) return;
+      reverseTerrainFillWhileHeld = false;
+      requestRedraw();
+    });
     const mainMapEl = document.getElementById("main-map");
     if (!mainMapEl) return;
     function clientXYToHit(clientX, clientY) {
@@ -16372,11 +16472,14 @@
     mainMapEl.addEventListener("pointermove", (e) => {
       lastPointerClientX = e.clientX;
       lastPointerClientY = e.clientY;
+      const mapHexSet = new Set((gameState?.hexes ?? []).map((h) => h.h3Index));
       const hit = clientXYToHit(e.clientX, e.clientY);
-      if (hit !== hoveredHexH3) {
+      const detailHit = detailHitAtClientPixel(e.clientX, e.clientY, mapHexSet);
+      if (hit !== hoveredHexH3 || detailHit !== hoveredDetailHexH3) {
         clearTerrainTooltipTimer();
         hideTerrainTooltipVisual();
         hoveredHexH3 = hit;
+        hoveredDetailHexH3 = detailHit;
         void refreshHoverRoutePreview();
         requestRedraw();
         if (hit) {
@@ -16403,8 +16506,9 @@
     mainMapEl.addEventListener("pointerleave", () => {
       clearTerrainTooltipTimer();
       hideTerrainTooltipVisual();
-      if (hoveredHexH3 !== null) {
+      if (hoveredHexH3 !== null || hoveredDetailHexH3 !== null) {
         hoveredHexH3 = null;
+        hoveredDetailHexH3 = null;
         hoverRoutePreview = null;
         requestRedraw();
       }

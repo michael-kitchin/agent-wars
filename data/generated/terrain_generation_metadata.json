@@ -1,6 +1,6 @@
 {
-  "run_id": "20260327T052034Z",
-  "generated_at_utc": "2026-03-27T05:20:34.939225+00:00",
+  "run_id": "20260327T160724Z",
+  "generated_at_utc": "2026-03-27T16:07:24.599154+00:00",
   "db": {
     "host": "localhost",
     "port": 5432,
@@ -14,6 +14,7 @@
     "precedence": [
       "ocean",
       "coastal",
+      "urban",
       "arctic",
       "forest",
       "mountain",
@@ -25,6 +26,7 @@
     "area_weighted_samples_per_cell_res4": 4,
     "ocean_shapefile": "F:\\Data\\ne_10m_ocean.shp",
     "lake_shapefile": "F:\\Data\\ne_10m_lakes.shp",
+    "urban_shapefile": "F:\\Data\\ne_10m_urban_areas.shp",
     "thresholds": {
       "arctic_dominant_min": 26.0,
       "forest_dominant_min": 38.0,
@@ -33,7 +35,7 @@
       "mountain_slope_mean_min": 5.0,
       "mountain_elevation_max_min": 700.0
     },
-    "aggregation_contract": "deterministic uniform-point integration over H3 cell area (area-weighted approximation); res-1 ocean/coastal from ocean polygon shapefile vs H3 cell; res-4 ocean/coastal from merged ocean+lakes polygon shapefiles vs H3 cell (EPSG:3857 predicates)"
+    "aggregation_contract": "deterministic uniform-point integration over H3 cell area (area-weighted approximation); res-1 ocean/coastal from ocean polygon shapefile vs H3 cell; res-4 ocean/coastal from merged ocean+lakes polygon shapefiles vs H3 cell; res-4 urban from urban polygons intersecting land cells (EPSG:3857 predicates)"
   },
   "inputs": [
     {
@@ -139,6 +141,10 @@
     {
       "path": "F:\\Data\\ne_10m_lakes.shp",
       "sha256": "11064fa55ed91b56a0d86733643c1a5bfcc137fdf044e83f471978a5b86617e1"
+    },
+    {
+      "path": "F:\\Data\\ne_10m_urban_areas.shp",
+      "sha256": "76b8c5786af5df4fa18ae615e594347fb464525347038b15f9df15d1396cb7de"
     }
   ],
   "outputs": [
@@ -148,7 +154,7 @@
     },
     {
       "path": "data\\generated\\terrain_res4_exceptions.csv",
-      "sha256": "4886769a24945b8fe103c41793928e78ff88454421da4aaf96ea8e1743d24734"
+      "sha256": "1030433428abcb29d71b0fb0dad870a9d72d05b9d1614431ac0f1b5cc8b34122"
     }
   ]
 }

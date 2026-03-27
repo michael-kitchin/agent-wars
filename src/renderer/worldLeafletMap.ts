@@ -163,6 +163,18 @@ export function initWorldLeafletMaps(
 
   mainMap.fitBounds(worldBounds, { padding: [2, 2], animate: false });
   mainMap.doubleClickZoom.disable();
+  try {
+    // Show real-world distance context when Leaflet scale control is available.
+    Lref.control
+      .scale({
+        metric: true,
+        imperial: true,
+        maxWidth: 120,
+      })
+      .addTo(mainMap);
+  } catch {
+    /* scale control not available in some Leaflet builds */
+  }
 
   miniMap = Lref.map(miniEl, {
     minZoom: 0,

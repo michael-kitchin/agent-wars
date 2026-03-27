@@ -62,7 +62,7 @@ function getFullDdl(): string {
     CREATE TABLE IF NOT EXISTS hexes (
       h3_index TEXT PRIMARY KEY,
       terrain TEXT NOT NULL CHECK (terrain IN ('land', 'water', 'coastal')),
-      terrain_kind TEXT NOT NULL CHECK (terrain_kind IN ('ocean', 'coastal', 'land', 'forest', 'mountain', 'desert', 'arctic'))
+      terrain_kind TEXT NOT NULL CHECK (terrain_kind IN ('ocean', 'coastal', 'land', 'urban', 'forest', 'mountain', 'desert', 'arctic'))
     );
 
     CREATE TABLE IF NOT EXISTS units (

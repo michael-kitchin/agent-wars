@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Dict, List
 
 
-TERRAIN_ENUM = ("ocean", "coastal", "land", "forest", "mountain", "desert", "arctic")
+TERRAIN_ENUM = ("ocean", "coastal", "land", "urban", "forest", "mountain", "desert", "arctic")
 
 
 @dataclass(frozen=True)
@@ -50,6 +50,8 @@ class InputRasterSet:
     ocean_shapefile_name: str = "ne_10m_ocean.shp"
     # Lakes polygons; merged with ocean for res-4 water predicates only (res-1 uses ocean shapefile alone).
     lake_shapefile_name: str = "ne_10m_lakes.shp"
+    # Urban polygons; used only for res-4 urban overrides after base terrain classification.
+    urban_shapefile_name: str = "ne_10m_urban_areas.shp"
     landcover_by_class: Dict[int, str] = field(
         default_factory=lambda: {
             1: "consensus_full_class_1.tif",
@@ -129,7 +131,7 @@ class PipelineConfig:
 
     # Display / QA ordering (not the classify_cell decision order).
     precedence: List[str] = field(
-        default_factory=lambda: ["ocean", "coastal", "arctic", "forest", "mountain", "desert", "land"]
+        default_factory=lambda: ["ocean", "coastal", "urban", "arctic", "forest", "mountain", "desert", "land"]
     )
 
     # Land-cover mapping defaults for classes not explicitly elevated by precedence.
