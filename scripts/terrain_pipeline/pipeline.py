@@ -67,7 +67,8 @@ class TerrainPipeline:
         self.config = config
         self.config.output_dir.mkdir(parents=True, exist_ok=True)
         self.config.qa_dir.mkdir(parents=True, exist_ok=True)
-        self._ocean_ctx: OceanPredicateContext | None = None
+        self._ocean_only_ctx: OceanPredicateContext | None = None
+        self._ocean_and_lakes_ctx: OceanPredicateContext | None = None
 
     def validate_phase_1_environment(self) -> None:
         """
@@ -115,6 +116,7 @@ class TerrainPipeline:
             raise RuntimeError(f"Missing lake shapefile (expected at {lake_path}).")
         try:
             _ = self._ocean_predicate_context()
+            _ = self._res4_water_predicate_context()
         except Exception as exc:
             raise RuntimeError(
                 f"Water shapefiles failed to load (ocean: {ocean_path}; lakes: {lake_path})."
@@ -301,7 +303,8 @@ class TerrainPipeline:
                 "thresholds": self.config.thresholds.__dict__,
                 "aggregation_contract": (
                     "deterministic uniform-point integration over H3 cell area (area-weighted approximation); "
-                    "ocean/coastal from merged ocean+lakes polygon shapefiles vs H3 cell (EPSG:3857 predicates)"
+                    "res-1 ocean/coastal from ocean polygon shapefile vs H3 cell; res-4 ocean/coastal from "
+                    "merged ocean+lakes polygon shapefiles vs H3 cell (EPSG:3857 predicates)"
                 ),
             },
             "inputs": [
@@ -345,19 +348,38 @@ class TerrainPipeline:
     def _ocean_predicate_context(self) -> OceanPredicateContext:
         """
         Why this exists:
-            Avoid loading and preparing the global ocean union multiple times per run (phase 1 + classification).
+            Avoid loading and preparing the global ocean union multiple times per run (phase 1 + res-1 classification).
         When to use:
-            Phase 1 validation and any step that classifies cells against the ocean mask.
+            Phase 1 validation and res-1 (parent) cell classification; lakes are not part of this mask.
         What to expect:
-            First call reads the shapefile, dissolves, projects to EPSG:3857, and builds a prepared geometry;
+            First call reads the ocean shapefile, dissolves, projects to EPSG:3857, and builds a prepared geometry;
             later calls return the same instance.
         """
 
-        if self._ocean_ctx is None:
+        if self._ocean_only_ctx is None:
+            self._ocean_only_ctx = build_ocean_predicate_context(
+                load_ocean_union_wgs84(self._ocean_input_path())
+            )
+        return self._ocean_only_ctx
+
+    def _res4_water_predicate_context(self) -> OceanPredicateContext:
+        """
+        Why this exists:
+            Reuse one prepared ocean+lakes union for all res-4 child cells (same predicate rules as ocean-only).
+        When to use:
+            Phase 1 validation and res-4 exception classification only.
+        What to expect:
+            Merges dissolved ocean and lake polygons in WGS84, then builds the same EPSG:3857 prepared index as
+            ``_ocean_predicate_context``.
+        """
+
+        if self._ocean_and_lakes_ctx is None:
             ocean_wgs84 = load_ocean_union_wgs84(self._ocean_input_path())
             lake_wgs84 = load_ocean_union_wgs84(self._lake_input_path())
-            self._ocean_ctx = build_ocean_predicate_context(unary_union((ocean_wgs84, lake_wgs84)))
-        return self._ocean_ctx
+            self._ocean_and_lakes_ctx = build_ocean_predicate_context(
+                unary_union((ocean_wgs84, lake_wgs84))
+            )
+        return self._ocean_and_lakes_ctx
 
     def _raster_input_paths(self) -> List[Path]:
         """GeoTIFF inputs only; shapefiles are validated with Fiona, not rasterio.open."""
@@ -410,19 +432,23 @@ class TerrainPipeline:
         )
         out: List[TerrainRecord] = []
 
-        # Ocean/coastal from shapefile vs cell polygon; interior biomes use area means for classes 1–12.
+        # Ocean/coastal from shapefile vs cell polygon (ocean only at res-1; ocean+lakes at res-4).
         needed_landcover_classes = tuple(range(1, 13))
         needed_keys = {f"class_{c}" for c in needed_landcover_classes}
         needed_keys.update(topo_keys)
 
-        ocean_ctx = self._ocean_predicate_context()
+        water_ctx = (
+            self._ocean_predicate_context()
+            if resolution == self.config.res_parent
+            else self._res4_water_predicate_context()
+        )
 
         datasets = self._open_required_rasters()
         try:
             raster_pairs = [(k, v) for k, v in datasets.items() if k in needed_keys]
             for idx, cell in enumerate(cells, start=1):
                 poly = cell_polygon(cell)
-                relation = ocean_relation_for_cell_polygons(poly, ocean_ctx)
+                relation = ocean_relation_for_cell_polygons(poly, water_ctx)
                 points = deterministic_points_within_polygon(poly, sample_count)
                 sampled = sample_many_rasters(raster_pairs, points)
                 landcover = {cls: sampled.get(f"class_{cls}") for cls in needed_landcover_classes}

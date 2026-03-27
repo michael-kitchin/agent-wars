@@ -48,7 +48,7 @@ class InputRasterSet:
     # Ocean/water polygons (e.g. bathy=0); path = root / ocean_shapefile_name. CRS may be geographic or projected;
     # pipeline reprojects to WGS84 then tests in Web Mercator.
     ocean_shapefile_name: str = "ne_10m_ocean.shp"
-    # Lakes polygon layer merged into the same water mask predicates as ocean.
+    # Lakes polygons; merged with ocean for res-4 water predicates only (res-1 uses ocean shapefile alone).
     lake_shapefile_name: str = "ne_10m_lakes.shp"
     landcover_by_class: Dict[int, str] = field(
         default_factory=lambda: {
@@ -92,7 +92,8 @@ class ClassifierThresholds:
     When to use:
         Terrain class decisions for both res-1 and res-4 cells.
     What to expect:
-        Ocean/coastal come from ocean shapefile vs H3 cell polygon; these fields tune interior biomes only.
+        Ocean/coastal come from the water mask vs H3 cell polygon (ocean-only at res-1; ocean+lakes at res-4);
+        these fields tune interior biomes only.
     """
 
     arctic_dominant_min: float = 26.0

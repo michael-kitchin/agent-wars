@@ -29,7 +29,7 @@ Offline EarthEnv-to-H3 terrain generation for milestone 1.2.
    - `postgis`
    - `h3`
 5. Source rasters in `F:\Data` (EarthEnv land-cover classes 1-12 + topography files).
-6. **Water shapefiles** at `F:\Data\<ocean_shapefile_name>` and `F:\Data\<lake_shapefile_name>` (defaults **`ne_10m_ocean.shp`** and **`ne_10m_lakes.shp`**). Paths are `InputRasterSet.root` / `InputRasterSet.*_shapefile_name` in `config.py`. Phase 1 validates both files load. Sidecar files (`.dbf`, `.shx`, `.prj`, …) must accompany each `.shp` where required by the driver.
+6. **Water shapefiles** at `F:\Data\<ocean_shapefile_name>` and `F:\Data\<lake_shapefile_name>` (defaults **`ne_10m_ocean.shp`** and **`ne_10m_lakes.shp`**). Ocean drives res-1 water; lakes are merged with ocean for res-4 water only. Paths are `InputRasterSet.root` / `InputRasterSet.*_shapefile_name` in `config.py`. Phase 1 validates both files load. Sidecar files (`.dbf`, `.shx`, `.prj`, …) must accompany each `.shp` where required by the driver.
 
 Phase 1 validation also requires `AGENT_WARS_DB_PASSWORD` (see [Credentials](#credentials)) so it can open a test connection to Postgres.
 
@@ -56,10 +56,10 @@ python -m scripts.terrain_pipeline.cli run --max-child-cells 5000 --verbose
 ## Classification notes
 
 - Pipeline terrain labels: `ocean|coastal|land|forest|mountain|desert|arctic`
-- **Ocean / coastal (shapefiles):** Build the H3 cell polygon (WGS84), dissolve ocean and lake shapefiles to geometries (reproject to WGS84 if needed), union them into one water mask, then test in **EPSG:3857** (same idea as Web Mercator tiles) using Shapely:
-  - Ocean geometry **`covers`** the cell → **`ocean`**
-  - **`intersects`** but not **`covers`** → **`coastal`**
-  - No intersection → **interior** biome stack (no other coastal rule).
+- **Ocean / coastal (shapefiles):** Build the H3 cell polygon (WGS84), then test in **EPSG:3857** using Shapely (same idea as Web Mercator tiles):
+  - **Res-1:** dissolved **ocean** shapefile only (reproject to WGS84 if needed).
+  - **Res-4:** dissolved **ocean ∪ lakes** union (same predicate rules as ocean-only).
+  - Water geometry **`covers`** the cell → **`ocean`**; **`intersects`** but not **`covers`** → **`coastal`**; no intersection → **interior** biome stack (no other coastal rule).
 - **Interior biomes:** area-sampled land-cover means and topography — `arctic` → `forest` → `mountain` → `desert` → `land` (`ClassifierThresholds` in `config.py`).
 - Area sample counts: `area_weighted_samples_per_cell_res1` / `area_weighted_samples_per_cell_res4` on `PipelineConfig`.
 - QA / legend ordering (config `precedence`): `ocean`, `coastal`, `arctic`, `forest`, `mountain`, `desert`, `land`.
