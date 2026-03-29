@@ -5,10 +5,10 @@ const { spawnSync } = require('child_process');
 
 const generatedDir = path.join(process.cwd(), 'data', 'generated');
 
-function ensureTarAvailable() {
-  const probe = spawnSync('tar', ['--version'], { encoding: 'utf8' });
+function ensurePythonAvailable() {
+  const probe = spawnSync('python', ['--version'], { encoding: 'utf8' });
   if (probe.error || probe.status !== 0) {
-    throw new Error('extract-generated-data: required "tar" executable is not available on PATH.');
+    throw new Error('extract-generated-data: required "python" executable is not available on PATH.');
   }
 }
 
@@ -20,12 +20,21 @@ function shouldExtract(zipPath, jsonPath) {
 }
 
 function extractZip(zipFilename, jsonFilename) {
-  const result = spawnSync('tar', ['-x', '-f', zipFilename], {
+  const py = [
+    'import pathlib, zipfile',
+    `base = pathlib.Path(r'''${generatedDir}''')`,
+    `z = base / r'''${zipFilename}'''`,
+    `out = base / r'''${jsonFilename}'''`,
+    'with zipfile.ZipFile(z, "r") as zf:',
+    `    with zf.open(r'''${jsonFilename}''') as src, out.open("wb") as dst:`,
+    '        dst.write(src.read())',
+  ].join('\n');
+  const result = spawnSync('python', ['-c', py], {
     cwd: generatedDir,
     encoding: 'utf8',
   });
   if (result.status !== 0) {
-    const detail = result.stderr || result.stdout || 'unknown tar error';
+    const detail = result.stderr || result.stdout || 'unknown extraction error';
     throw new Error(`extract-generated-data: failed to extract ${zipFilename}: ${detail}`.trim());
   }
   console.log(`extracted ${zipFilename} -> ${jsonFilename}`);
@@ -36,7 +45,7 @@ function main() {
     console.log(`extract-generated-data: ${generatedDir} does not exist; nothing to do.`);
     return;
   }
-  ensureTarAvailable();
+  ensurePythonAvailable();
   const zipFiles = fs
     .readdirSync(generatedDir)
     .filter((name) => name.endsWith('.json.zip') && fs.statSync(path.join(generatedDir, name)).isFile())
