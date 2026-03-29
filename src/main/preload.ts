@@ -15,6 +15,7 @@ import type {
   HumanStandingOrderSnapshot,
   Res4TerrainOverrideRow,
   TerrainInfrastructureHintsSnapshot,
+  HexNamingTooltipLineRequest,
 } from '../shared/ipcTypes';
 
 let openRouterLogListener: ((payload: { line: string; isError?: boolean }) => void) | null = null;
@@ -29,6 +30,8 @@ const gameApi = {
     ipcRenderer.invoke('game:getRes4TerrainOverrides'),
   getTerrainInfrastructureHints: (): Promise<TerrainInfrastructureHintsSnapshot> =>
     ipcRenderer.invoke('game:getTerrainInfrastructureHints'),
+  getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest): Promise<string | null> =>
+    ipcRenderer.invoke('game:getHexNamingTooltipLine', payload),
   newGame: (): Promise<GameStateSnapshot> => ipcRenderer.invoke('game:newGame'),
   submitOrders: (payload: SubmitOrdersIpcPayload): Promise<{ success: boolean; reason?: string }> =>
     ipcRenderer.invoke('game:submitOrders', payload),

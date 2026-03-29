@@ -24,6 +24,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      # Used by scripts/extract-generated-data.cjs (npm run build / test). Linux runners often lack `python`; setup-python provides it.
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:

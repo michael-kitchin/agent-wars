@@ -1,5 +1,5 @@
 /**
- * Resolves bundled terrain metadata JSON paths for dev (repo layout) and packaged Electron (app root / asar).
+ * Resolves bundled terrain generated JSON paths for dev (repo layout) and packaged Electron (app root / asar).
  */
 
 import * as fs from 'fs';
@@ -8,6 +8,8 @@ import { logDebug, logError } from './logger';
 
 const RES1_SEGMENTS = ['data', 'generated', 'terrain_res1_metadata.json'] as const;
 const RES4_SEGMENTS = ['data', 'generated', 'terrain_res4_metadata.json'] as const;
+const RES1_NAMING_SEGMENTS = ['data', 'generated', 'terrain_res1_naming.json'] as const;
+const RES4_NAMING_SEGMENTS = ['data', 'generated', 'terrain_res4_naming.json'] as const;
 
 /** Test-only override roots (checked before standard resolution). */
 let testOverrideRoot: string | null = null;
@@ -81,6 +83,32 @@ export function resolveTerrainRes1MetadataPath(): string {
 export function resolveTerrainRes4MetadataPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes4MetadataPath');
   return resolveFirstExisting('terrain_res4_metadata.json', [...RES4_SEGMENTS]);
+}
+
+/**
+ * Why this exists:
+ *     Locate `terrain_res1_naming.json` for hover naming overlays at resolution 1.
+ * When to use:
+ *     From terrain naming cache initialization.
+ * What to expect:
+ *     Throws if the file is missing from every candidate location.
+ */
+export function resolveTerrainRes1NamingPath(): string {
+  logDebug('terrainMetadataPaths resolveTerrainRes1NamingPath');
+  return resolveFirstExisting('terrain_res1_naming.json', [...RES1_NAMING_SEGMENTS]);
+}
+
+/**
+ * Why this exists:
+ *     Locate `terrain_res4_naming.json` for detail hover naming overlays at resolution 4.
+ * When to use:
+ *     From terrain naming cache initialization.
+ * What to expect:
+ *     Throws if the file is missing from every candidate location.
+ */
+export function resolveTerrainRes4NamingPath(): string {
+  logDebug('terrainMetadataPaths resolveTerrainRes4NamingPath');
+  return resolveFirstExisting('terrain_res4_naming.json', [...RES4_NAMING_SEGMENTS]);
 }
 
 function resolveFirstExisting(label: string, segments: readonly string[]): string {

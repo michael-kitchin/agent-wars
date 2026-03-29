@@ -21,6 +21,13 @@ import {
   recordHasMajorPort,
   type HexMetadataRecordRes4,
 } from './terrainMetadataLoad';
+import {
+  loadTerrainRes1NamingBundled,
+  loadTerrainRes4NamingBundled,
+  preferredNamingLineForRes1Record,
+  preferredNamingLineForRes4Record,
+  type TerrainNamingRecordRes4,
+} from './terrainNamingLoad';
 
 export interface TerrainInfrastructureHintsPayload {
   res1MajorAirports: string[];
@@ -34,6 +41,8 @@ export interface TerrainClassificationSnapshot {
   /** Child res-4 rows carrying either a base-kind override and/or `isUrban` overlay flag for renderer detail mode. */
   res4OverrideRows: ReadonlyArray<{ h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }>;
   infrastructureHints: TerrainInfrastructureHintsPayload;
+  namingLinesRes1ByH3: ReadonlyMap<string, string>;
+  namingLinesRes4ByH3: ReadonlyMap<string, string>;
 }
 
 let cached: TerrainClassificationSnapshot | null = null;
@@ -42,6 +51,8 @@ function buildSnapshot(): TerrainClassificationSnapshot {
   logDebug('terrainClassificationCache buildSnapshot: loading JSON');
   const res1Env = loadTerrainRes1MetadataBundled();
   const res4Env = loadTerrainRes4MetadataBundled();
+  const namingRes1Env = loadTerrainRes1NamingBundled();
+  const namingRes4Env = loadTerrainRes4NamingBundled();
   if (res1Env.resolution !== METADATA_PARENT_RESOLUTION) {
     throw new Error(
       `terrain metadata: res1 resolution ${res1Env.resolution} != expected ${METADATA_PARENT_RESOLUTION}`
@@ -55,6 +66,21 @@ function buildSnapshot(): TerrainClassificationSnapshot {
   if (res4Env.record_count <= 0) {
     throw new Error(
       'terrain metadata: terrain_res4_metadata.json has no records; regenerate with npm run terrain:generate'
+    );
+  }
+  if (namingRes1Env.resolution !== METADATA_PARENT_RESOLUTION) {
+    throw new Error(
+      `terrain naming: res1 resolution ${namingRes1Env.resolution} != expected ${METADATA_PARENT_RESOLUTION}`
+    );
+  }
+  if (namingRes4Env.resolution !== METADATA_CHILD_RESOLUTION) {
+    throw new Error(
+      `terrain naming: res4 resolution ${namingRes4Env.resolution} != expected ${METADATA_CHILD_RESOLUTION}`
+    );
+  }
+  if (namingRes4Env.record_count <= 0) {
+    throw new Error(
+      'terrain naming: terrain_res4_naming.json has no records; regenerate with naming pipeline'
     );
   }
   const nodata = DEFAULT_NODATA_FALLBACK_TERRAIN;
@@ -90,6 +116,16 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     if (recordHasMajorAirport(row)) res4MajorAirports.push(row.h3_index);
     if (recordHasMajorPort(row)) res4MajorPorts.push(row.h3_index);
   }
+  const namingLinesRes1ByH3 = new Map<string, string>();
+  for (const row of namingRes1Env.records) {
+    const line = preferredNamingLineForRes1Record(row);
+    if (line) namingLinesRes1ByH3.set(row.h3_index, line);
+  }
+  const namingLinesRes4ByH3 = new Map<string, string>();
+  for (const row of namingRes4Env.records as TerrainNamingRecordRes4[]) {
+    const line = preferredNamingLineForRes4Record(row);
+    if (line) namingLinesRes4ByH3.set(row.h3_index, line);
+  }
 
   logDebug('terrainClassificationCache buildSnapshot: done', {
     res1Count: res1KindByH3.size,
@@ -99,6 +135,8 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     res1MajorPortHexes: res1MajorPorts.length,
     res4MajorAirportHexes: res4MajorAirports.length,
     res4MajorPortHexes: res4MajorPorts.length,
+    res1NamingHexes: namingLinesRes1ByH3.size,
+    res4NamingHexes: namingLinesRes4ByH3.size,
   });
   return {
     res1KindByH3,
@@ -109,6 +147,8 @@ function buildSnapshot(): TerrainClassificationSnapshot {
       res4MajorAirports,
       res4MajorPorts,
     },
+    namingLinesRes1ByH3,
+    namingLinesRes4ByH3,
   };
 }
 
@@ -193,6 +233,29 @@ export function getTerrainInfrastructureHintsForRenderer(): TerrainInfrastructur
     res4MajorAirports: [...h.res4MajorAirports],
     res4MajorPorts: [...h.res4MajorPorts],
   };
+}
+
+/**
+ * Why this exists:
+ *     Provide hover tooltip naming headline for one hex (res-4 city/state preference, res-1 state fallback).
+ * When to use:
+ *     Renderer `game:getHexNamingTooltipLine` IPC calls on hover.
+ * What to expect:
+ *     Returns null when no naming line exists for that hex/resolution; throws if cache is not loaded.
+ */
+export function getHexNamingTooltipLineForRenderer(
+  payload: { h3Index: string; resolution: 1 | 4 }
+): string | null {
+  logTrace('terrainClassificationCache getHexNamingTooltipLineForRenderer', payload);
+  if (!cached) {
+    const err = new Error('terrainClassificationCache: load ensureTerrainClassificationCacheLoaded() first');
+    logError('terrainClassificationCache getHexNamingTooltipLineForRenderer: cache empty', err);
+    throw err;
+  }
+  if (payload.resolution === 1) {
+    return cached.namingLinesRes1ByH3.get(payload.h3Index) ?? null;
+  }
+  return cached.namingLinesRes4ByH3.get(payload.h3Index) ?? null;
 }
 
 /**

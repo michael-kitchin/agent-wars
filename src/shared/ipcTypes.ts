@@ -11,6 +11,12 @@ export interface TerrainInfrastructureHintsSnapshot {
   res4MajorPorts: string[];
 }
 
+/** One-line naming headline for hover tooltips (city/state preference by resolution). */
+export interface HexNamingTooltipLineRequest {
+  h3Index: string;
+  resolution: 1 | 4;
+}
+
 /** Res-4 terrain overlay row: base terrain kind plus optional urban variation state. */
 export interface Res4TerrainOverrideRow {
   h3Index: string;
@@ -156,6 +162,7 @@ export interface GameApi {
   getGameState: () => Promise<GameStateSnapshot>;
   getRes4TerrainOverrides: () => Promise<Res4TerrainOverrideRow[]>;
   getTerrainInfrastructureHints: () => Promise<TerrainInfrastructureHintsSnapshot>;
+  getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest) => Promise<string | null>;
   newGame: () => Promise<GameStateSnapshot>;
   submitOrders: (payload: SubmitOrdersIpcPayload) => Promise<{ success: boolean; reason?: string }>;
   ready: (payload?: GameReadyIpcPayload) => Promise<ReadyResult>;

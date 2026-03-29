@@ -2,15 +2,11 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { resolvePythonExecutable } = require('./resolve-python.cjs');
 
 const generatedDir = path.join(process.cwd(), 'data', 'generated');
 
-function ensurePythonAvailable() {
-  const probe = spawnSync('python', ['--version'], { encoding: 'utf8' });
-  if (probe.error || probe.status !== 0) {
-    throw new Error('extract-generated-data: required "python" executable is not available on PATH.');
-  }
-}
+/** Archives named `<basename>.json.zip` (e.g. terrain_res1_metadata.json.zip, terrain_res1_naming.json.zip). */
 
 function shouldExtract(zipPath, jsonPath) {
   if (!fs.existsSync(jsonPath)) return true;
@@ -19,7 +15,7 @@ function shouldExtract(zipPath, jsonPath) {
   return false;
 }
 
-function extractZip(zipFilename, jsonFilename) {
+function extractZip(pythonCmd, zipFilename, jsonFilename) {
   const py = [
     'import pathlib, zipfile',
     `base = pathlib.Path(r'''${generatedDir}''')`,
@@ -29,7 +25,7 @@ function extractZip(zipFilename, jsonFilename) {
     `    with zf.open(r'''${jsonFilename}''') as src, out.open("wb") as dst:`,
     '        dst.write(src.read())',
   ].join('\n');
-  const result = spawnSync('python', ['-c', py], {
+  const result = spawnSync(pythonCmd, ['-c', py], {
     cwd: generatedDir,
     encoding: 'utf8',
   });
@@ -45,7 +41,6 @@ function main() {
     console.log(`extract-generated-data: ${generatedDir} does not exist; nothing to do.`);
     return;
   }
-  ensurePythonAvailable();
   const zipFiles = fs
     .readdirSync(generatedDir)
     .filter((name) => name.endsWith('.json.zip') && fs.statSync(path.join(generatedDir, name)).isFile())
@@ -54,12 +49,18 @@ function main() {
     console.log('extract-generated-data: no *.json.zip files found; nothing to do.');
     return;
   }
+  const pythonCmd = resolvePythonExecutable();
+  if (!pythonCmd) {
+    throw new Error(
+      'extract-generated-data: no Python found. Install Python 3 and ensure `python3` or `python` is on PATH, or set PYTHON to the interpreter path.',
+    );
+  }
   for (const zipFilename of zipFiles) {
     const jsonFilename = zipFilename.slice(0, -4); // remove ".zip"
     const zipPath = path.join(generatedDir, zipFilename);
     const jsonPath = path.join(generatedDir, jsonFilename);
     if (!shouldExtract(zipPath, jsonPath)) continue;
-    extractZip(zipFilename, jsonFilename);
+    extractZip(pythonCmd, zipFilename, jsonFilename);
   }
 }
 

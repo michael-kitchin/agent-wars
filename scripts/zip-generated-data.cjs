@@ -2,17 +2,19 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { resolvePythonExecutable } = require('./resolve-python.cjs');
 
 const generatedDir = path.join(process.cwd(), 'data', 'generated');
 
-function ensurePythonAvailable() {
-  const probe = spawnSync('python', ['--version'], { encoding: 'utf8' });
-  if (probe.error || probe.status !== 0) {
-    throw new Error('zip-generated-data: required "python" executable is not available on PATH.');
-  }
-}
+/** JSON blobs under data/generated that we archive for git + extract at build time (see extract-generated-data.cjs). */
+const GENERATED_JSON_TO_ZIP = [
+  'terrain_res1_metadata.json',
+  'terrain_res4_metadata.json',
+  'terrain_res1_naming.json',
+  'terrain_res4_naming.json',
+];
 
-function zipJsonFile(jsonFilename) {
+function zipJsonFile(pythonCmd, jsonFilename) {
   const zipFilename = `${jsonFilename}.zip`;
   const py = [
     'import zipfile, pathlib',
@@ -22,7 +24,7 @@ function zipJsonFile(jsonFilename) {
     'with zipfile.ZipFile(dst, "w", compression=zipfile.ZIP_DEFLATED) as zf:',
     `    zf.write(src, arcname=r'''${jsonFilename}''')`,
   ].join('\n');
-  const result = spawnSync('python', ['-c', py], {
+  const result = spawnSync(pythonCmd, ['-c', py], {
     cwd: generatedDir,
     encoding: 'utf8',
   });
@@ -38,16 +40,25 @@ function main() {
     console.log(`zip-generated-data: ${generatedDir} does not exist; nothing to do.`);
     return;
   }
-  ensurePythonAvailable();
-  const files = fs
-    .readdirSync(generatedDir)
-    .filter((name) => name.endsWith('.json') && fs.statSync(path.join(generatedDir, name)).isFile())
-    .sort();
-  if (files.length === 0) {
-    console.log('zip-generated-data: no json files found; nothing to do.');
+  const present = GENERATED_JSON_TO_ZIP.filter((name) => {
+    const p = path.join(generatedDir, name);
+    return fs.existsSync(p) && fs.statSync(p).isFile();
+  });
+  const missing = GENERATED_JSON_TO_ZIP.filter((name) => !present.includes(name));
+  if (missing.length > 0) {
+    console.log(`zip-generated-data: skipping missing files (${missing.join(', ')}).`);
+  }
+  if (present.length === 0) {
+    console.log('zip-generated-data: no listed json files present; nothing to do.');
     return;
   }
-  for (const jsonFilename of files) zipJsonFile(jsonFilename);
+  const pythonCmd = resolvePythonExecutable();
+  if (!pythonCmd) {
+    throw new Error(
+      'zip-generated-data: no Python found. Install Python 3 and ensure `python3` or `python` is on PATH, or set PYTHON to the interpreter path.',
+    );
+  }
+  for (const jsonFilename of present) zipJsonFile(pythonCmd, jsonFilename);
 }
 
 try {

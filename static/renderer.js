@@ -14983,6 +14983,7 @@
     }
   }
   function hideTerrainTooltipVisual() {
+    terrainTooltipRequestSeq++;
     const el = document.getElementById("hex-tooltip");
     if (el) {
       el.classList.add("hidden");
@@ -15052,16 +15053,66 @@
       return { ...state, features: featureLabelsForRes1Hex(fallbackRes1H3) };
     }
   }
-  function formatTerrainTooltipHtml(state) {
+  function namingLookupTargetForPointer(clientX, clientY, fallbackRes1H3) {
+    const res4On = shouldRenderRes4Hexes();
+    if (!res4On) {
+      if (!fallbackRes1H3) return null;
+      return { h3Index: fallbackRes1H3, resolution: 1 };
+    }
+    const map = getMainLeafletMap();
+    if (!map) {
+      if (!fallbackRes1H3) return null;
+      return { h3Index: fallbackRes1H3, resolution: 1 };
+    }
+    const L = getLeafletGlobal();
+    const rect = map.getContainer().getBoundingClientRect();
+    const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
+    try {
+      const detailH3 = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
+      return { h3Index: detailH3, resolution: 4 };
+    } catch {
+      if (!fallbackRes1H3) return null;
+      return { h3Index: fallbackRes1H3, resolution: 1 };
+    }
+  }
+  var namingLineByLookupKey = /* @__PURE__ */ new Map();
+  var terrainTooltipRequestSeq = 0;
+  function namingLookupKey(target) {
+    if (!target) return null;
+    return `${target.resolution}:${target.h3Index}`;
+  }
+  async function getCachedNamingLineForTarget(target) {
+    const key = namingLookupKey(target);
+    if (!key || !target) return null;
+    if (namingLineByLookupKey.has(key)) return namingLineByLookupKey.get(key) ?? null;
+    if (!window.gameApi?.getHexNamingTooltipLine) return null;
+    try {
+      const line = await window.gameApi.getHexNamingTooltipLine(target);
+      namingLineByLookupKey.set(key, line ?? null);
+      return line ?? null;
+    } catch (err) {
+      console.error("getHexNamingTooltipLine failed:", err);
+      namingLineByLookupKey.set(key, null);
+      return null;
+    }
+  }
+  function escapeHtml(text) {
+    return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+  }
+  function formatTerrainTooltipHtml(state, namingLine) {
     const terrainLabel = formatTerrainKindLabel(state.terrainKind);
     const terrainLine = state.isUrban ? `<strong>Terrain:</strong> ${terrainLabel}, Urban` : `<strong>Terrain:</strong> ${terrainLabel}`;
-    if (state.features.length === 0) return terrainLine;
-    return `${terrainLine}<br/><strong>Features:</strong> ${state.features.join(", ")}`;
+    const bodyLine = state.features.length === 0 ? terrainLine : `${terrainLine}<br/><strong>Features:</strong> ${state.features.join(", ")}`;
+    if (!namingLine) return bodyLine;
+    return `<strong>${escapeHtml(namingLine)}</strong><br/>${bodyLine}`;
   }
-  function showTerrainTooltip(clientX, clientY, state) {
+  async function showTerrainTooltip(clientX, clientY, state, namingTarget) {
+    const requestSeq = ++terrainTooltipRequestSeq;
+    const namingLine = await getCachedNamingLineForTarget(namingTarget);
+    if (requestSeq !== terrainTooltipRequestSeq) return;
     const el = document.getElementById("hex-tooltip");
     if (!el) return;
-    el.innerHTML = formatTerrainTooltipHtml(state);
+    el.innerHTML = formatTerrainTooltipHtml(state, namingLine);
     el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
     el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
     el.classList.remove("hidden");
@@ -16782,20 +16833,18 @@
           terrainTooltipDelayTimer = setTimeout(() => {
             terrainTooltipDelayTimer = null;
             if (hoveredHexH3 !== targetHex || !gameState) return;
-            showTerrainTooltip(
-              lastPointerClientX,
-              lastPointerClientY,
-              terrainStateForPointer(lastPointerClientX, lastPointerClientY, targetHex)
-            );
+            const state = terrainStateForPointer(lastPointerClientX, lastPointerClientY, targetHex);
+            const namingTarget = namingLookupTargetForPointer(lastPointerClientX, lastPointerClientY, targetHex);
+            void showTerrainTooltip(lastPointerClientX, lastPointerClientY, state, namingTarget);
           }, TERRAIN_TOOLTIP_DELAY_MS);
         }
         return;
       }
       const tip = document.getElementById("hex-tooltip");
       if (tip && !tip.classList.contains("hidden")) {
-        tip.innerHTML = formatTerrainTooltipHtml(terrainStateForPointer(e.clientX, e.clientY, hit));
-        tip.style.left = `${e.clientX + TOOLTIP_OFFSET_PX}px`;
-        tip.style.top = `${e.clientY + TOOLTIP_OFFSET_PX}px`;
+        const state = terrainStateForPointer(e.clientX, e.clientY, hit);
+        const namingTarget = namingLookupTargetForPointer(e.clientX, e.clientY, hit);
+        void showTerrainTooltip(e.clientX, e.clientY, state, namingTarget);
       }
     });
     mainMapEl.addEventListener("pointerleave", () => {

@@ -28,6 +28,7 @@ import {
 import { logDebug } from './logger';
 import {
   getRes4TerrainOverridesForRenderer,
+  getHexNamingTooltipLineForRenderer,
   getTerrainInfrastructureHintsForRenderer,
 } from './terrainClassificationCache';
 import {
@@ -108,6 +109,17 @@ function registerIpcHandlers(): void {
   ipcMain.handle('game:getState', () => getGameState());
   ipcMain.handle('game:getRes4TerrainOverrides', () => getRes4TerrainOverridesForRenderer());
   ipcMain.handle('game:getTerrainInfrastructureHints', () => getTerrainInfrastructureHintsForRenderer());
+  ipcMain.handle(
+    'game:getHexNamingTooltipLine',
+    (_event, payload: { h3Index?: string; resolution?: number }) => {
+      if (typeof payload?.h3Index !== 'string') return null;
+      if (payload?.resolution !== 1 && payload?.resolution !== 4) return null;
+      return getHexNamingTooltipLineForRenderer({
+        h3Index: payload.h3Index,
+        resolution: payload.resolution,
+      });
+    }
+  );
   ipcMain.handle('game:newGame', () => {
     resetGameForNewMatch();
     return getGameState();
