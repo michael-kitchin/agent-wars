@@ -15893,6 +15893,11 @@
   var TOAST_DURATION_MS = 12e3;
   var toastHideTimer = null;
   var aiStrategyToastHideTimer = null;
+  function bulletizeToastLines(message) {
+    const lines = message.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
+    if (lines.length === 0) return "\u2022";
+    return lines.map((line) => line.startsWith("\u2022") ? line : `\u2022 ${line}`).join("\n");
+  }
   function showMapToast(message, options) {
     if (toastHideTimer !== null) {
       clearTimeout(toastHideTimer);
@@ -15905,7 +15910,7 @@
       const strong = document.createElement("strong");
       strong.textContent = "Update: ";
       textEl.appendChild(strong);
-      textEl.appendChild(document.createTextNode("\n" + message));
+      textEl.appendChild(document.createTextNode("\n" + bulletizeToastLines(message)));
       el.classList.toggle("toast-info", options?.isError === false);
       el.classList.remove("hidden");
     }
@@ -16708,8 +16713,9 @@
     const unitId = selectedUnitId;
     const hoveredH3 = hoveredHexH3;
     const seq = ++hoverPreviewRequestSeq;
-    if (!window.gameApi?.previewHumanMarchOrder || !unitId || !hoveredH3 || !gameState) {
+    if (rangedModeActive || !window.gameApi?.previewHumanMarchOrder || !unitId || !hoveredH3 || !gameState) {
       hoverRoutePreview = null;
+      requestRedraw();
       return;
     }
     const unit = gameState.units.find((u) => u.id === unitId);
@@ -16725,7 +16731,14 @@
   }
   function cancelRangedForUnit(unitId) {
     pendingRangedAttacks = pendingRangedAttacks.filter((r) => r.unitId !== unitId);
+    if (selectedUnitId === unitId) {
+      selectedUnitId = null;
+      selectedHexIndex = null;
+      hoverRoutePreview = null;
+      hoverPreviewRequestSeq++;
+    }
     rangedModeActive = false;
+    updateSidebar();
     updateRangedSidebar();
     redraw();
   }
@@ -16973,10 +16986,15 @@
     document.getElementById("ranged-attack-btn")?.addEventListener("click", () => {
       if (rangedModeActive) {
         rangedModeActive = false;
+        void refreshHoverRoutePreview();
       } else if (selectedUnitId && gameState) {
         const unit = gameState.units.find((u) => u.id === selectedUnitId);
         const range = unit ? RANGED_RANGE[unit.unitType] ?? 0 : 0;
-        if (range >= 1) rangedModeActive = true;
+        if (range >= 1) {
+          rangedModeActive = true;
+          hoverPreviewRequestSeq++;
+          hoverRoutePreview = null;
+        }
       }
       updateRangedSidebar();
       redraw();
@@ -17121,7 +17139,10 @@
             pendingRangedAttacks = pendingRangedAttacks.filter((r) => r.unitId !== selectedUnitId);
             pendingRangedAttacks.push({ unitId: selectedUnitId, targetH3Index: hit });
             rangedModeActive = false;
-            showMapToast(`Ranged attack set: ${unit.id} \u2192 ${hit}`);
+            selectedUnitId = null;
+            selectedHexIndex = null;
+            hoverRoutePreview = null;
+            hoverPreviewRequestSeq++;
             updateRangedSidebar();
           }
         }
@@ -17189,6 +17210,7 @@
         pendingSelectTimeout = null;
       }
       if (!gameState) return;
+      if (rangedModeActive) return;
       const hit = clientXYToHit(e.clientX, e.clientY);
       if (!hit || !selectedUnitIdAtMouseDown) return;
       const unit = gameState.units.find((u) => u.id === selectedUnitIdAtMouseDown);
@@ -17280,14 +17302,7 @@
           clearRes1TooltipSummaryCaches();
           const aiMoves = readyResult.aiMoves ?? [];
           const resolutionMoves = [...humanMoves, ...aiMoves];
-          let didShowMapToastForTurn = false;
-          if ((readyResult.aiMovesLog?.length ?? 0) > 0) {
-            didShowMapToastForTurn = true;
-            showMapToast(`AI moves:
-${readyResult.aiMovesLog.join("\n")}`, { isError: false });
-          }
           if (readyResult.aiStrategy) {
-            didShowMapToastForTurn = true;
             showAiStrategyToast(readyResult.aiStrategy);
           } else {
             hideAiStrategyToast();
@@ -17337,7 +17352,7 @@ ${readyResult.aiMovesLog.join("\n")}`, { isError: false });
             if (directFire.length > 0) bullets.push(`\u2022 Direct fire: ${directFire.map(fmt).join("; ")}`);
             if (returnFire.length > 0) bullets.push(`\u2022 Return fire: ${returnFire.map(fmt).join("; ")}`);
             if (meleeKills.length > 0) bullets.push(meleeKills.map(fmt).join("\n"));
-            if (bullets.length > 0 && !didShowMapToastForTurn) showMapToast(bullets.join("\n"), { isError: false });
+            if (bullets.length > 0) showMapToast(bullets.join("\n"), { isError: false });
             resolutionMoveAnimationFrameId = requestAnimationFrame(tickResolutionMoveAnimation);
           }
           hoverRoutePreview = null;

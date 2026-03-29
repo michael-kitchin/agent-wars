@@ -194,8 +194,17 @@ export function listHumanStandingOrders(): HumanStandingOrderView[] {
       }>;
     };
     if (result.status !== 'ok' || !Array.isArray(result.orders)) return [];
-    return result.orders
-      .filter((o) => o.type === 'march' && typeof o.unitId === 'string')
+    const validHumanUnitIds = new Set(state.units.filter((u) => u.player === HUMAN_PLAYER_ID).map((u) => u.id));
+    const marchOrders = result.orders.filter(
+      (o) => o.type === 'march' && typeof o.unitId === 'string' && validHumanUnitIds.has(o.unitId)
+    );
+    if (marchOrders.length !== result.orders.length) {
+      logDebug('gameActions listHumanStandingOrders: skipped stale standing orders for missing units', {
+        total: result.orders.length,
+        kept: marchOrders.length,
+      });
+    }
+    return marchOrders
       .map((o) => {
         const unitId = o.unitId as string;
         const destinationH3Index =

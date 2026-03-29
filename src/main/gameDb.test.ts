@@ -97,18 +97,66 @@ function testResetRegeneratesTerrain(gameDb: typeof import('./gameDb')): void {
   }
 }
 
-function testSeededUnitsStayWithinMidLatitudeBand(gameDb: typeof import('./gameDb')): void {
+function testSeededUnitsUseRegionalSpawnContracts(gameDb: typeof import('./gameDb')): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
   try {
     gameDb.openGameDatabaseAtPathForTests(p);
     gameDb.resetGameForNewMatch();
-    const rows = gameDb.dbGetAll<{ h3Index: string }>('SELECT h3_index AS h3Index FROM units');
+    const rows = gameDb.dbGetAll<{ h3Index: string; player: string; unitType: string; terrain: string }>(
+      `SELECT u.h3_index AS h3Index, u.player AS player, u.unit_type AS unitType, h.terrain AS terrain
+       FROM units u
+       JOIN hexes h ON h.h3_index = u.h3_index`
+    );
     assert.ok(rows.length > 0, 'expected resetGameForNewMatch to seed units');
+
+    const inNortheastAsia = (lat: number, lng: number) =>
+      (lat >= 35 && lat <= 78 && lng >= 95 && lng <= 180) ||
+      (lat >= 30 && lat <= 80 && lng >= 80 && lng <= 180) ||
+      (lat >= 20 && lat <= 82 && lng >= 60 && lng <= 180);
+    const inSouthernAfrica = (lat: number, lng: number) =>
+      (lat >= -38 && lat <= -22 && lng >= 10 && lng <= 42) ||
+      (lat >= -42 && lat <= -18 && lng >= 5 && lng <= 45) ||
+      (lat >= -45 && lat <= -12 && lng >= -5 && lng <= 50) ||
+      (lat >= -50 && lat <= -5 && lng >= -20 && lng <= 55);
+    const inPacific = (lat: number, lng: number) => lat >= -55 && lat <= 55 && (lng >= 120 || lng <= -90);
+    const inAtlantic = (lat: number, lng: number) => lat >= -55 && lat <= 60 && lng >= -75 && lng <= 20;
+    const inIndian = (lat: number, lng: number) => lat >= -50 && lat <= 30 && lng >= 20 && lng <= 120;
+    let humanLandInAsia = 0;
+    let humanLandInAfrica = 0;
+    let opponentLandInAsia = 0;
+    let opponentLandInAfrica = 0;
+
     for (const row of rows) {
-      const [lat] = cellToLatLng(row.h3Index);
-      assert.ok(lat > -60 && lat < 60, `expected unit at ${row.h3Index} to be within (-60, 60), got ${lat}`);
+      const [lat, lng] = cellToLatLng(row.h3Index);
+      if (row.unitType === 'naval') {
+        assert.ok(row.terrain === 'water', `expected naval unit ${row.h3Index} on water terrain`);
+        assert.ok(
+          inPacific(lat, lng) || inAtlantic(lat, lng) || inIndian(lat, lng),
+          `expected naval unit at ${row.h3Index} in Pacific/Atlantic/Indian ocean`
+        );
+        continue;
+      }
+      assert.strictEqual(row.terrain, 'land', `expected land unit ${row.h3Index} on land terrain`);
+      const isAsia = inNortheastAsia(lat, lng);
+      const isAfrica = inSouthernAfrica(lat, lng);
+      assert.ok(isAsia || isAfrica, `expected land unit at ${row.h3Index} in northeast Asia or southern Africa`);
+      if (row.player === 'human') {
+        if (isAsia) humanLandInAsia++;
+        if (isAfrica) humanLandInAfrica++;
+      } else {
+        if (isAsia) opponentLandInAsia++;
+        if (isAfrica) opponentLandInAfrica++;
+      }
     }
+    const humanAllInAsia = humanLandInAsia > 0 && humanLandInAfrica === 0;
+    const humanAllInAfrica = humanLandInAfrica > 0 && humanLandInAsia === 0;
+    const opponentAllInAsia = opponentLandInAsia > 0 && opponentLandInAfrica === 0;
+    const opponentAllInAfrica = opponentLandInAfrica > 0 && opponentLandInAsia === 0;
+    assert.ok(
+      (humanAllInAsia && opponentAllInAfrica) || (humanAllInAfrica && opponentAllInAsia),
+      `expected randomized side assignment (one side in Asia, other in Africa), got human asia=${humanLandInAsia} africa=${humanLandInAfrica}, opponent asia=${opponentLandInAsia} africa=${opponentLandInAfrica}`
+    );
   } finally {
     gameDb.closeGameDatabaseForTests();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -153,7 +201,7 @@ function run(): void {
   testPersistenceTwoOpens(gameDb);
   testResetClearsStandingOrdersAndMemory(gameDb);
   testResetRegeneratesTerrain(gameDb);
-  testSeededUnitsStayWithinMidLatitudeBand(gameDb);
+  testSeededUnitsUseRegionalSpawnContracts(gameDb);
   testWrongUserVersionRecovers(gameDb, Database);
   console.log('gameDb.test.ts passed');
 }

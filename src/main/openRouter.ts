@@ -826,6 +826,19 @@ export interface RequestOrdersOptions {
   usePrecomputation?: boolean;
 }
 
+function dedupeByUnitKeepLast<T extends { unitId: string }>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  const keptReversed: T[] = [];
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const row = rows[i]!;
+    if (seen.has(row.unitId)) continue;
+    seen.add(row.unitId);
+    keptReversed.push(row);
+  }
+  keptReversed.reverse();
+  return keptReversed;
+}
+
 /**
  * Requests movement orders from the LLM for the opponent. Uses the tool-calling loop:
  * send prompt and tool definitions; if the model returns tool_calls, execute tools locally,
@@ -1148,16 +1161,30 @@ export async function requestOrders(
         ? generateOrdersForStandingOrders('opponent', state, latLngByH3, resolveToH3)
         : { movementOrders: [] as { unitId: string; toH3Index: string }[], rangedAttacks: [] as { unitId: string; targetH3Index: string }[] };
 
-      const llmMovementByUnit = new Map((parsed.movementOrders ?? []).map((o) => [o.unitId, o.toH3Index]));
-      const llmMovementUnitIds = new Set((parsed.movementOrders ?? []).map((o) => o.unitId));
+      const llmMovementOrders = dedupeByUnitKeepLast(parsed.movementOrders ?? []);
+      const llmRangedOrders = dedupeByUnitKeepLast(parsed.rangedAttacks ?? []);
+      if (llmMovementOrders.length !== (parsed.movementOrders ?? []).length) {
+        logDebug('openRouter requestOrders: deduped duplicate movement intents from model', {
+          before: (parsed.movementOrders ?? []).length,
+          after: llmMovementOrders.length,
+        });
+      }
+      if (llmRangedOrders.length !== (parsed.rangedAttacks ?? []).length) {
+        logDebug('openRouter requestOrders: deduped duplicate ranged intents from model', {
+          before: (parsed.rangedAttacks ?? []).length,
+          after: llmRangedOrders.length,
+        });
+      }
+      const llmMovementByUnit = new Map(llmMovementOrders.map((o) => [o.unitId, o.toH3Index]));
+      const llmMovementUnitIds = new Set(llmMovementOrders.map((o) => o.unitId));
       const mergedMovement = [
         ...standingOrderMovement.filter((o) => !llmMovementUnitIds.has(o.unitId)),
-        ...(parsed.movementOrders ?? []),
+        ...llmMovementOrders,
       ];
-      const llmRangedUnitIds = new Set((parsed.rangedAttacks ?? []).map((r) => r.unitId));
+      const llmRangedUnitIds = new Set(llmRangedOrders.map((r) => r.unitId));
       const mergedRanged = [
         ...standingOrderRanged.filter((o) => !llmRangedUnitIds.has(o.unitId)),
-        ...(parsed.rangedAttacks ?? []),
+        ...llmRangedOrders,
       ];
 
       const validated: { unitId: string; toH3Index: string }[] = [];

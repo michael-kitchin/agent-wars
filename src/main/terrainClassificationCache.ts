@@ -86,9 +86,9 @@ function buildSnapshot(): TerrainClassificationSnapshot {
   const nodata = DEFAULT_NODATA_FALLBACK_TERRAIN;
   const t = DEFAULT_CLASSIFIER_THRESHOLDS;
 
-  const res1KindByH3 = new Map<string, PipelineTerrainKind>();
+  const res1FallbackKindByH3 = new Map<string, PipelineTerrainKind>();
   for (const row of res1Env.records) {
-    res1KindByH3.set(row.h3_index, classifyCellWithoutUrbanOverride(row, t, nodata));
+    res1FallbackKindByH3.set(row.h3_index, classifyCellWithoutUrbanOverride(row, t, nodata));
   }
 
   const res1MajorAirports: string[] = [];
@@ -99,22 +99,53 @@ function buildSnapshot(): TerrainClassificationSnapshot {
   }
   const res4MajorAirports: string[] = [];
   const res4MajorPorts: string[] = [];
-  const res4OverrideRows: { h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }[] = [];
+  const res4ClassifiedRows: Array<{ h3Index: string; parentH3: string; childKind: PipelineTerrainKind; isUrban: boolean }> = [];
+  const childKindCountsByParent = new Map<string, Map<PipelineTerrainKind, number>>();
   for (const row of res4Env.records as HexMetadataRecordRes4[]) {
     const childKind = classifyRes4TerrainKind(row, t, nodata);
     const isUrban = isRes4UrbanOverlayHex(row);
     const parentH3 = cellToParent(row.h3_index, METADATA_PARENT_RESOLUTION);
+    let parentCounts = childKindCountsByParent.get(parentH3);
+    if (!parentCounts) {
+      parentCounts = new Map<PipelineTerrainKind, number>();
+      childKindCountsByParent.set(parentH3, parentCounts);
+    }
+    parentCounts.set(childKind, (parentCounts.get(childKind) ?? 0) + 1);
+    res4ClassifiedRows.push({ h3Index: row.h3_index, parentH3, childKind, isUrban });
+    if (recordHasMajorAirport(row)) res4MajorAirports.push(row.h3_index);
+    if (recordHasMajorPort(row)) res4MajorPorts.push(row.h3_index);
+  }
+
+  const res1KindByH3 = new Map<string, PipelineTerrainKind>();
+  for (const row of res1Env.records) {
+    const counts = childKindCountsByParent.get(row.h3_index);
+    if (!counts || counts.size === 0) {
+      res1KindByH3.set(row.h3_index, res1FallbackKindByH3.get(row.h3_index) ?? nodata);
+      continue;
+    }
+    let dominantKind: PipelineTerrainKind | null = null;
+    let dominantCount = -1;
+    for (const [kind, count] of counts.entries()) {
+      if (count > dominantCount || (count === dominantCount && dominantKind !== null && kind.localeCompare(dominantKind) < 0)) {
+        dominantKind = kind;
+        dominantCount = count;
+      }
+    }
+    res1KindByH3.set(row.h3_index, dominantKind ?? (res1FallbackKindByH3.get(row.h3_index) ?? nodata));
+  }
+
+  const res4OverrideRows: { h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }[] = [];
+  for (const row of res4ClassifiedRows) {
+    const { h3Index, parentH3, childKind, isUrban } = row;
     const parentKind = res1KindByH3.get(parentH3);
     if (parentKind === undefined) {
-      const msg = `terrain metadata: res4 child ${row.h3_index} parent ${parentH3} missing from res1 map`;
+      const msg = `terrain metadata: res4 child ${h3Index} parent ${parentH3} missing from res1 map`;
       logError('terrainClassificationCache buildSnapshot: orphan res4 row', new Error(msg));
       throw new Error(msg);
     }
     if (childKind !== parentKind || isUrban) {
-      res4OverrideRows.push({ h3Index: row.h3_index, terrainKind: childKind, isUrban });
+      res4OverrideRows.push({ h3Index, terrainKind: childKind, isUrban });
     }
-    if (recordHasMajorAirport(row)) res4MajorAirports.push(row.h3_index);
-    if (recordHasMajorPort(row)) res4MajorPorts.push(row.h3_index);
   }
   const namingLinesRes1ByH3 = new Map<string, string>();
   for (const row of namingRes1Env.records) {
