@@ -256,7 +256,7 @@ function terrainStateForRes1Hex(h3: string): { terrainKind: string; isUrban: boo
   return {
     terrainKind:
     hx.terrainKind ??
-    (hx.terrain === 'water' ? 'water' : hx.terrain === 'coastal' ? 'coastal' : 'plains'),
+    (hx.terrain === 'water' ? 'water' : hx.terrain === 'coastal' ? 'coastal' : hx.terrain === 'wetlands' ? 'wetlands' : 'plains'),
     isUrban: false,
   };
 }
@@ -285,6 +285,9 @@ interface TerrainTooltipState {
   terrainKind: string;
   isUrban: boolean;
   features: string[];
+  urbanHexCount: number | null;
+  res1TerrainSummary: string | null;
+  res1FeaturesSummary: string | null;
 }
 
 interface NamingLookupTarget {
@@ -292,17 +295,177 @@ interface NamingLookupTarget {
   resolution: 1 | 4;
 }
 
+function countUrbanRes4HexesInRes1Hex(parentH3: string): number {
+  let children = res4ChildrenByParent.get(parentH3);
+  if (!children) {
+    children = cellToChildren(parentH3, DETAIL_H3_RESOLUTION);
+    res4ChildrenByParent.set(parentH3, children);
+  }
+  let count = 0;
+  for (const child of children) {
+    if (res4TerrainOverridesByH3.get(child)?.isUrban) count++;
+  }
+  return count;
+}
+
+function roundToNearestInteger(value: number): number {
+  return Math.round(value);
+}
+
+function formatPercentInteger(value: number): string {
+  return value.toLocaleString();
+}
+
+const res1DominantTerrainKindByH3 = new Map<string, string>();
+const res1TerrainSummaryByH3 = new Map<string, string>();
+const res1FeaturesSummaryByH3 = new Map<string, string | null>();
+
+function clearRes1TooltipSummaryCaches(): void {
+  res1DominantTerrainKindByH3.clear();
+  res1TerrainSummaryByH3.clear();
+  res1FeaturesSummaryByH3.clear();
+  terrainTooltipHtmlByContentKey.clear();
+}
+
+function getRes1DominantTerrainKind(h3: string, parentKind: string): string {
+  const cached = res1DominantTerrainKindByH3.get(h3);
+  if (cached !== undefined) return cached;
+  let children = res4ChildrenByParent.get(h3);
+  if (!children) {
+    children = cellToChildren(h3, DETAIL_H3_RESOLUTION);
+    res4ChildrenByParent.set(h3, children);
+  }
+  if (children.length <= 0) {
+    res1DominantTerrainKindByH3.set(h3, parentKind);
+    return parentKind;
+  }
+  const counts = new Map<string, number>();
+  for (const child of children) {
+    const kind = res4TerrainOverridesByH3.get(child)?.terrainKind ?? parentKind;
+    counts.set(kind, (counts.get(kind) ?? 0) + 1);
+  }
+  let dominantKind = parentKind;
+  let dominantCount = -1;
+  for (const [kind, count] of counts.entries()) {
+    if (count > dominantCount || (count === dominantCount && kind.localeCompare(dominantKind) < 0)) {
+      dominantKind = kind;
+      dominantCount = count;
+    }
+  }
+  res1DominantTerrainKindByH3.set(h3, dominantKind);
+  return dominantKind;
+}
+
+function getRes1TerrainSummary(h3: string, parentKind: string): string {
+  const cached = res1TerrainSummaryByH3.get(h3);
+  if (cached !== undefined) return cached;
+  let children = res4ChildrenByParent.get(h3);
+  if (!children) {
+    children = cellToChildren(h3, DETAIL_H3_RESOLUTION);
+    res4ChildrenByParent.set(h3, children);
+  }
+  const total = children.length;
+  if (total <= 0) {
+    const fallback = `${formatTerrainKindLabel(parentKind)} (100.0%)`;
+    res1TerrainSummaryByH3.set(h3, fallback);
+    return fallback;
+  }
+  const counts = new Map<string, number>();
+  for (const child of children) {
+    const kind = res4TerrainOverridesByH3.get(child)?.terrainKind ?? parentKind;
+    counts.set(kind, (counts.get(kind) ?? 0) + 1);
+  }
+  const entries = Array.from(counts.entries()).sort((a, b) => {
+    if (b[1] !== a[1]) return b[1] - a[1];
+    return a[0].localeCompare(b[0]);
+  });
+  if (entries.length <= 3) {
+    const parts = entries.map(([kind, count]) => {
+      const pct = roundToNearestInteger((count * 100) / total);
+      return `${formatTerrainKindLabel(kind)} (${formatPercentInteger(pct)}%)`;
+    });
+    const summary = parts.join(', ');
+    res1TerrainSummaryByH3.set(h3, summary);
+    return summary;
+  }
+  const topTwo = entries.slice(0, 2);
+  const topTwoCount = topTwo.reduce((sum, [, count]) => sum + count, 0);
+  const parts = topTwo.map(([kind, count]) => {
+    const pct = roundToNearestInteger((count * 100) / total);
+    return `${formatTerrainKindLabel(kind)} (${formatPercentInteger(pct)}%)`;
+  });
+  const otherPct = roundToNearestInteger(((total - topTwoCount) * 100) / total);
+  parts.push(`Other (${formatPercentInteger(otherPct)}%)`);
+  const summary = parts.join(', ');
+  res1TerrainSummaryByH3.set(h3, summary);
+  return summary;
+}
+
+function getRes1FeaturesSummary(h3: string): string | null {
+  if (res1FeaturesSummaryByH3.has(h3)) return res1FeaturesSummaryByH3.get(h3) ?? null;
+  const labels = featureLabelsForRes1Hex(h3);
+  if (labels.length === 0) {
+    res1FeaturesSummaryByH3.set(h3, null);
+    return null;
+  }
+  let children = res4ChildrenByParent.get(h3);
+  if (!children) {
+    children = cellToChildren(h3, DETAIL_H3_RESOLUTION);
+    res4ChildrenByParent.set(h3, children);
+  }
+  let airportCount = 0;
+  let portCount = 0;
+  for (const child of children) {
+    if (terrainInfraRes4Airport.has(child)) airportCount++;
+    if (terrainInfraRes4Port.has(child)) portCount++;
+  }
+  const parts: string[] = [];
+  if (labels.includes('Airports')) parts.push(`Airports (${airportCount.toLocaleString()})`);
+  if (labels.includes('Ports')) parts.push(`Ports (${portCount.toLocaleString()})`);
+  const summary = parts.length > 0 ? parts.join(', ') : null;
+  res1FeaturesSummaryByH3.set(h3, summary);
+  return summary;
+}
+
+function terrainTooltipStateForRes1Hex(h3: string): TerrainTooltipState {
+  const state = terrainStateForRes1Hex(h3);
+  return {
+    ...state,
+    features: featureLabelsForRes1Hex(h3),
+    urbanHexCount: countUrbanRes4HexesInRes1Hex(h3),
+    res1TerrainSummary: getRes1TerrainSummary(h3, state.terrainKind),
+    res1FeaturesSummary: getRes1FeaturesSummary(h3),
+  };
+}
+
 function terrainStateForPointer(
   clientX: number,
   clientY: number,
   fallbackRes1H3: string | null
 ): TerrainTooltipState {
-  if (!gameState) return { terrainKind: 'Unknown', isUrban: false, features: [] };
+  if (!gameState) {
+    return {
+      terrainKind: 'Unknown',
+      isUrban: false,
+      features: [],
+      urbanHexCount: null,
+      res1TerrainSummary: null,
+      res1FeaturesSummary: null,
+    };
+  }
   const res4On = shouldRenderRes4Hexes();
   if (!res4On) {
-    if (!fallbackRes1H3) return { terrainKind: 'Unknown', isUrban: false, features: [] };
-    const state = terrainStateForRes1Hex(fallbackRes1H3);
-    return { ...state, features: featureLabelsForRes1Hex(fallbackRes1H3) };
+    if (!fallbackRes1H3) {
+      return {
+        terrainKind: 'Unknown',
+        isUrban: false,
+        features: [],
+        urbanHexCount: null,
+        res1TerrainSummary: null,
+        res1FeaturesSummary: null,
+      };
+    }
+    return terrainTooltipStateForRes1Hex(fallbackRes1H3);
   }
   const map = getMainLeafletMap() as
     | {
@@ -311,9 +474,17 @@ function terrainStateForPointer(
       }
     | null;
   if (!map) {
-    if (!fallbackRes1H3) return { terrainKind: 'Unknown', isUrban: false, features: [] };
-    const state = terrainStateForRes1Hex(fallbackRes1H3);
-    return { ...state, features: featureLabelsForRes1Hex(fallbackRes1H3) };
+    if (!fallbackRes1H3) {
+      return {
+        terrainKind: 'Unknown',
+        isUrban: false,
+        features: [],
+        urbanHexCount: null,
+        res1TerrainSummary: null,
+        res1FeaturesSummary: null,
+      };
+    }
+    return terrainTooltipStateForRes1Hex(fallbackRes1H3);
   }
   const L = getLeafletGlobal();
   const rect = map.getContainer().getBoundingClientRect();
@@ -327,11 +498,22 @@ function terrainStateForPointer(
       terrainKind: detail?.terrainKind ?? parentKind,
       isUrban: detail?.isUrban ?? false,
       features: featureLabelsForRes4Child(parentH3, detailH3),
+      urbanHexCount: null,
+      res1TerrainSummary: null,
+      res1FeaturesSummary: null,
     };
   } catch {
-    if (!fallbackRes1H3) return { terrainKind: 'Unknown', isUrban: false, features: [] };
-    const state = terrainStateForRes1Hex(fallbackRes1H3);
-    return { ...state, features: featureLabelsForRes1Hex(fallbackRes1H3) };
+    if (!fallbackRes1H3) {
+      return {
+        terrainKind: 'Unknown',
+        isUrban: false,
+        features: [],
+        urbanHexCount: null,
+        res1TerrainSummary: null,
+        res1FeaturesSummary: null,
+      };
+    }
+    return terrainTooltipStateForRes1Hex(fallbackRes1H3);
   }
 }
 
@@ -368,6 +550,7 @@ function namingLookupTargetForPointer(
 }
 
 const namingLineByLookupKey = new Map<string, string | null>();
+const terrainTooltipHtmlByContentKey = new Map<string, string>();
 let terrainTooltipRequestSeq = 0;
 
 function namingLookupKey(target: NamingLookupTarget | null): string | null {
@@ -400,13 +583,55 @@ function escapeHtml(text: string): string {
     .replaceAll("'", '&#39;');
 }
 
+function formatGroupedNamingLineHtml(namingLine: string): string {
+  const groups = namingLine
+    .split(';')
+    .map((g) => g.trim())
+    .filter((g) => g.length > 0);
+  if (groups.length === 0) return escapeHtml(namingLine);
+  const formattedGroups = groups.map((group) => {
+    const colonIdx = group.indexOf(':');
+    if (colonIdx < 0) return escapeHtml(group);
+    const heading = group.slice(0, colonIdx).trim();
+    const remainder = group.slice(colonIdx + 1).trim();
+    if (!heading) return escapeHtml(group);
+    if (!remainder) return `<strong>${escapeHtml(heading)}:</strong>`;
+    return `<strong>${escapeHtml(heading)}:</strong> ${escapeHtml(remainder)}`;
+  });
+  return formattedGroups.join('; ');
+}
+
 function formatTerrainTooltipHtml(state: TerrainTooltipState, namingLine: string | null): string {
   const terrainLabel = formatTerrainKindLabel(state.terrainKind);
-  const terrainLine = state.isUrban ? `<strong>Terrain:</strong> ${terrainLabel}, Urban` : `<strong>Terrain:</strong> ${terrainLabel}`;
-  const bodyLine =
-    state.features.length === 0 ? terrainLine : `${terrainLine}<br/><strong>Features:</strong> ${state.features.join(', ')}`;
+  const terrainValue = state.res1TerrainSummary ?? (state.isUrban ? `${terrainLabel}, Urban` : terrainLabel);
+  const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
+  const bodyParts: string[] = [terrainLine];
+  if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
+  else if (state.features.length > 0) bodyParts.push(`<strong>Features:</strong> ${state.features.join(', ')}`);
+  if (state.urbanHexCount != null) bodyParts.push(`<strong>Urban Hexes:</strong> ${state.urbanHexCount.toLocaleString()}`);
+  const bodyLine = bodyParts.join('<br/>');
   if (!namingLine) return bodyLine;
-  return `<strong>${escapeHtml(namingLine)}</strong><br/>${bodyLine}`;
+  return `${formatGroupedNamingLineHtml(namingLine)}<br/>${bodyLine}`;
+}
+
+function terrainTooltipContentKey(state: TerrainTooltipState, namingLine: string | null): string {
+  const namingKey = namingLine ?? '';
+  const urbanKey = state.isUrban ? '1' : '0';
+  const featuresKey = state.features.join('|');
+  const urbanHexCountKey = state.urbanHexCount == null ? 'x' : String(state.urbanHexCount);
+  const res1TerrainSummaryKey = state.res1TerrainSummary ?? '';
+  const res1FeaturesSummaryKey = state.res1FeaturesSummary ?? '';
+  return `${namingKey}::${state.terrainKind}::${urbanKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}`;
+}
+
+function getCachedTerrainTooltipHtml(state: TerrainTooltipState, namingLine: string | null): string {
+  const key = terrainTooltipContentKey(state, namingLine);
+  const cachedHtml = terrainTooltipHtmlByContentKey.get(key);
+  if (cachedHtml !== undefined) return cachedHtml;
+  const html = formatTerrainTooltipHtml(state, namingLine);
+  terrainTooltipHtmlByContentKey.set(key, html);
+  if (terrainTooltipHtmlByContentKey.size > 4096) terrainTooltipHtmlByContentKey.clear();
+  return html;
 }
 
 async function showTerrainTooltip(
@@ -420,7 +645,7 @@ async function showTerrainTooltip(
   if (requestSeq !== terrainTooltipRequestSeq) return;
   const el = document.getElementById('hex-tooltip');
   if (!el) return;
-  el.innerHTML = formatTerrainTooltipHtml(state, namingLine);
+  el.innerHTML = getCachedTerrainTooltipHtml(state, namingLine);
   el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
   el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
   el.classList.remove('hidden');
@@ -569,8 +794,11 @@ function drawTerrainHexes(ctx: CanvasRenderingContext2D): void {
       return { x: p.x, y: p.y };
     });
     const kind =
-      hx.terrainKind ??
-      (hx.terrain === 'water' ? 'water' : hx.terrain === 'coastal' ? 'coastal' : 'plains');
+      getRes1DominantTerrainKind(
+        hx.h3Index,
+        hx.terrainKind ??
+          (hx.terrain === 'water' ? 'water' : hx.terrain === 'coastal' ? 'coastal' : hx.terrain === 'wetlands' ? 'wetlands' : 'plains')
+      );
     const drawClosedPath = (): void => {
       ctx.beginPath();
       for (let i = 0; i < pts.length; i++) {
@@ -713,7 +941,13 @@ function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void {
     if (!projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight)) continue;
     const parentKind =
       parent.terrainKind ??
-      (parent.terrain === 'water' ? 'water' : parent.terrain === 'coastal' ? 'coastal' : 'plains');
+      (parent.terrain === 'water'
+        ? 'water'
+        : parent.terrain === 'coastal'
+          ? 'coastal'
+          : parent.terrain === 'wetlands'
+            ? 'wetlands'
+            : 'plains');
     let children = res4ChildrenByParent.get(parent.h3Index);
     if (!children) {
       children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
@@ -2067,6 +2301,7 @@ function initNewGameButton(): void {
     try {
       const state = (await window.gameApi.newGame()) as GameStateSnapshot;
       gameState = state;
+      clearRes1TooltipSummaryCaches();
       humanStandingOrders = [];
       hoverRoutePreview = null;
       pendingRangedAttacks = [];
@@ -2468,6 +2703,7 @@ function init(): void {
       .then(async (raw) => {
         const state = raw as GameStateSnapshot;
         gameState = state;
+        clearRes1TooltipSummaryCaches();
         await refreshHumanStandingOrders();
         updateGameStateSidebar(state);
         updateRangedSidebar();
@@ -2481,6 +2717,7 @@ function init(): void {
       .getRes4TerrainOverrides()
       .then((rows) => {
         res4TerrainOverridesByH3 = new Map(rows.map((r) => [r.h3Index, { terrainKind: r.terrainKind, isUrban: !!r.isUrban }]));
+        clearRes1TooltipSummaryCaches();
         requestRedraw();
       })
       .catch((err) => console.error('getRes4TerrainOverrides failed:', err));
@@ -2491,6 +2728,7 @@ function init(): void {
         terrainInfraRes1Port = new Set(hints.res1MajorPorts);
         terrainInfraRes4Airport = new Set(hints.res4MajorAirports);
         terrainInfraRes4Port = new Set(hints.res4MajorPorts);
+        clearRes1TooltipSummaryCaches();
         requestRedraw();
       })
       .catch((err) => console.error('getTerrainInfrastructureHints failed:', err));
@@ -2792,6 +3030,7 @@ function init(): void {
         const nextState = (await window.gameApi.getGameState()) as GameStateSnapshot;
         const state = nextState;
         gameState = state;
+        clearRes1TooltipSummaryCaches();
         const aiMoves = readyResult.aiMoves ?? [];
         const resolutionMoves = [...humanMoves, ...aiMoves];
         let didShowMapToastForTurn = false;

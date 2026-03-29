@@ -11,7 +11,7 @@ import {
 } from '../shared/pipelineTerrain';
 
 /**
- * Maps a pipeline terrain kind to DB/pathfinding passability (`water` → `water`, `coastal` → `coastal`, else `land`).
+ * Maps a pipeline terrain kind to DB/pathfinding passability (`water` → `water`, `coastal/wetlands` keep dual-domain passability, else `land`).
  * Logs at trace with the kind for troubleshooting seeding and tool code paths.
  */
 export function pipelineTerrainToPassability(kind: PipelineTerrainKind): PassabilityTerrain {

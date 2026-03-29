@@ -77,7 +77,7 @@ function dbBackedStateSnapshot() {
 
 /**
  * Validates a single movement order: unit exists and is human-owned, destination is on map,
- * within unit's movement range, and terrain allows the unit type (naval→water, infantry/armor→land).
+ * within unit's movement range, and terrain allows the unit type (naval→water/coastal/wetlands, infantry/armor→land/coastal/wetlands).
  * Returns a reason string when invalid.
  */
 function validateOrder(
@@ -112,10 +112,10 @@ function validateOrder(
   const destTerrain = dbGetOne<{ terrain: string }>('SELECT terrain FROM hexes WHERE h3_index = ?', [toH3Index]);
   const terrain = destTerrain?.terrain ?? 'land';
   if (unit.unit_type === 'naval' && !passabilityAllowsNavalUnit(terrain)) {
-    return { valid: false, reason: 'Naval units must move to water or coastal hexes' };
+    return { valid: false, reason: 'Naval units must move to water, coastal, or wetlands hexes' };
   }
   if ((unit.unit_type === 'infantry' || unit.unit_type === 'armor') && !passabilityAllowsLandUnit(terrain)) {
-    return { valid: false, reason: 'Land units must move to land or coastal hexes' };
+    return { valid: false, reason: 'Land units must move to land, coastal, or wetlands hexes' };
   }
 
   return { valid: true };

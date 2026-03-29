@@ -2,13 +2,14 @@
  * Terrain labels produced by the terrain pipeline (`terrain_*_metadata.json` classification).
  * Shared between main (seeding) and renderer (styling); keep in sync with Python TERRAIN_ENUM.
  *
- * Passability (`land` | `water` | `coastal`) is what SQLite `hexes.terrain` stores; pipeline kinds
- * include `coastal` as a littoral / mixed land–water label.
+ * Passability (`land` | `water` | `coastal` | `wetlands`) is what SQLite `hexes.terrain` stores; pipeline kinds
+ * include `coastal` and `wetlands` as littoral / mixed land-water labels.
  */
 
 export const PIPELINE_TERRAIN_KINDS = [
   'water',
   'coastal',
+  'wetlands',
   'plains',
   'forest',
   'mountain',
@@ -19,7 +20,7 @@ export const PIPELINE_TERRAIN_KINDS = [
 export type PipelineTerrainKind = (typeof PIPELINE_TERRAIN_KINDS)[number];
 
 /** Stored on `hexes.terrain` for movement and pathfinding. */
-export type PassabilityTerrain = 'land' | 'water' | 'coastal';
+export type PassabilityTerrain = 'land' | 'water' | 'coastal' | 'wetlands';
 
 const KIND_SET = new Set<string>(PIPELINE_TERRAIN_KINDS);
 
@@ -33,12 +34,13 @@ export function isPipelineTerrainKind(s: string): s is PipelineTerrainKind {
 
 /**
  * Maps pipeline terrain kind to passability for SQLite and pathfinding.
- * `water` → `water`; `coastal` → `coastal` (dual-domain); all other kinds → `land`.
+ * `water` → `water`; `coastal` / `wetlands` keep dual-domain passability; all other kinds → `land`.
  * Main process seeding should call `terrainPassability.pipelineTerrainToPassability` for trace logging.
  */
 export function pipelineTerrainToPassability(kind: PipelineTerrainKind): PassabilityTerrain {
   if (kind === 'water') return 'water';
   if (kind === 'coastal') return 'coastal';
+  if (kind === 'wetlands') return 'wetlands';
   return 'land';
 }
 
@@ -46,12 +48,12 @@ export function pipelineTerrainToPassability(kind: PipelineTerrainKind): Passabi
  * Returns true if infantry/armor may enter or end movement on this passability terrain.
  */
 export function passabilityAllowsLandUnit(t: PassabilityTerrain | string): boolean {
-  return t === 'land' || t === 'coastal';
+  return t === 'land' || t === 'coastal' || t === 'wetlands';
 }
 
 /**
  * Returns true if naval units may enter or end movement on this passability terrain.
  */
 export function passabilityAllowsNavalUnit(t: PassabilityTerrain | string): boolean {
-  return t === 'water' || t === 'coastal';
+  return t === 'water' || t === 'coastal' || t === 'wetlands';
 }

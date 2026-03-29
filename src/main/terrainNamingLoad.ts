@@ -231,25 +231,157 @@ export function namesForFirstOccurringScalerankList(
   return names;
 }
 
+function firstOccurringScalerankRows<T extends { scalerank: number | null }>(rows: ReadonlyArray<T>): T[] {
+  if (rows.length === 0) return [];
+  const firstRank = rows[0]?.scalerank ?? null;
+  const out: T[] = [];
+  for (const row of rows) {
+    if ((row.scalerank ?? null) !== firstRank) continue;
+    out.push(row);
+  }
+  return out;
+}
+
+function groupedLabel<T>(
+  rows: ReadonlyArray<T>,
+  groupKey: (row: T) => string,
+  itemLabel: (row: T, groupRows: ReadonlyArray<T>) => string
+): string {
+  const groupOrder: string[] = [];
+  const grouped = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = groupKey(row);
+    let list = grouped.get(key);
+    if (!list) {
+      list = [];
+      grouped.set(key, list);
+      groupOrder.push(key);
+    }
+    list.push(row);
+  }
+  return groupOrder
+    .map((key) => {
+      const groupRows = grouped.get(key) ?? [];
+      const body = groupRows.map((row) => itemLabel(row, groupRows)).join(', ');
+      return `${key}: ${body}`;
+    })
+    .join('; ');
+}
+
+function formatGroupedCitiesForTooltip(rows: ReadonlyArray<TerrainNamingCityRow>): string {
+  const countryOrder: string[] = [];
+  const citiesByCountry = new Map<string, TerrainNamingCityRow[]>();
+  for (const row of rows) {
+    const country = row.country ?? 'Unknown Country';
+    let cityRows = citiesByCountry.get(country);
+    if (!cityRows) {
+      cityRows = [];
+      citiesByCountry.set(country, cityRows);
+      countryOrder.push(country);
+    }
+    cityRows.push(row);
+  }
+  return countryOrder
+    .map((country) => {
+      const cityRows = citiesByCountry.get(country) ?? [];
+      const stateOrder: string[] = [];
+      const citiesByState = new Map<string, string[]>();
+      for (const cityRow of cityRows) {
+        const stateKey = cityRow.state ?? '';
+        let stateCities = citiesByState.get(stateKey);
+        if (!stateCities) {
+          stateCities = [];
+          citiesByState.set(stateKey, stateCities);
+          stateOrder.push(stateKey);
+        }
+        stateCities.push(cityRow.name);
+      }
+      const groupedCityLabels = stateOrder
+        .map((stateKey) => {
+          const cityNames = citiesByState.get(stateKey) ?? [];
+          const joinedCities = cityNames.join(', ');
+          return stateKey ? `${joinedCities} (${stateKey})` : joinedCities;
+        })
+        .filter((label) => label.length > 0);
+      return `${country}: ${groupedCityLabels.join(', ')}`;
+    })
+    .join('; ');
+}
+
+function formatGroupedStatesForTooltip(rows: ReadonlyArray<TerrainNamingStateRow>): string {
+  return groupedLabel(
+    rows,
+    (row) => row.country || 'Unknown Country',
+    (row) => row.name
+  );
+}
+
+function formatGroupedCountriesForTooltip(rows: ReadonlyArray<TerrainNamingCountryRow>): string {
+  return groupedLabel(
+    rows,
+    (row) => row.continent ?? 'Unknown Continent',
+    (row) => row.name
+  );
+}
+
+function citiesCoverAllStates(
+  cityRows: ReadonlyArray<TerrainNamingCityRow>,
+  associatedStates: ReadonlyArray<TerrainNamingStateRow>
+): boolean {
+  if (associatedStates.length === 0) return true;
+  const coveredStates = new Set(
+    cityRows
+      .map((row) => row.state)
+      .filter((state): state is string => typeof state === 'string' && state.length > 0)
+  );
+  for (const stateRow of associatedStates) {
+    if (!coveredStates.has(stateRow.name)) return false;
+  }
+  return true;
+}
+
+function statesCoverAllCountries(
+  stateRows: ReadonlyArray<TerrainNamingStateRow>,
+  associatedCountries: ReadonlyArray<TerrainNamingCountryRow>
+): boolean {
+  if (associatedCountries.length === 0) return true;
+  const coveredCountries = new Set(stateRows.map((row) => row.country || 'Unknown Country'));
+  for (const countryRow of associatedCountries) {
+    if (!coveredCountries.has(countryRow.name)) return false;
+  }
+  return true;
+}
+
 /**
  * Why this exists:
  *     Resolve preferred naming headline for a res-4 hex with capped list size before escalation.
  * When to use:
  *     Build tooltip title line for detail-mode hover.
  * What to expect:
- *     Uses first-occurring-scalerank names:
- *       - cities when count is 1..TOOLTIP_NAME_LIST_MAX_ITEMS
- *       - otherwise states when count is 1..TOOLTIP_NAME_LIST_MAX_ITEMS
- *       - otherwise countries (final fallback, uncapped)
+ *     Uses first-occurring-scalerank city/state rows with coverage gates:
+ *       - cities when count is 1..TOOLTIP_NAME_LIST_MAX_ITEMS and those city state labels cover all associated states
+ *       - otherwise states when count is 1..TOOLTIP_NAME_LIST_MAX_ITEMS and those state country labels cover all associated countries
+ *       - otherwise countries (final fallback, uncapped), grouped by continent (all associated countries included)
  *     Returns null only when all levels are empty.
  */
 export function preferredNamingLineForRes4Record(record: TerrainNamingRecordRes4): string | null {
-  const cityNames = namesForFirstOccurringScalerankList(record.cities);
-  if (cityNames.length > 0 && cityNames.length <= TOOLTIP_NAME_LIST_MAX_ITEMS) return cityNames.join(', ');
-  const stateNames = namesForFirstOccurringScalerankList(record.states);
-  if (stateNames.length > 0 && stateNames.length <= TOOLTIP_NAME_LIST_MAX_ITEMS) return stateNames.join(', ');
-  const countryNames = namesForFirstOccurringScalerankList(record.countries);
-  if (countryNames.length > 0) return countryNames.join(', ');
+  const firstRankCities = firstOccurringScalerankRows(record.cities);
+  if (
+    firstRankCities.length > 0 &&
+    firstRankCities.length <= TOOLTIP_NAME_LIST_MAX_ITEMS &&
+    citiesCoverAllStates(firstRankCities, record.states)
+  ) {
+    return formatGroupedCitiesForTooltip(firstRankCities);
+  }
+  const firstRankStates = firstOccurringScalerankRows(record.states);
+  if (
+    firstRankStates.length > 0 &&
+    firstRankStates.length <= TOOLTIP_NAME_LIST_MAX_ITEMS &&
+    statesCoverAllCountries(firstRankStates, record.countries)
+  ) {
+    return formatGroupedStatesForTooltip(firstRankStates);
+  }
+  if (record.countries.length > 0) return formatGroupedCountriesForTooltip(record.countries);
   return null;
 }
 
@@ -259,16 +391,21 @@ export function preferredNamingLineForRes4Record(record: TerrainNamingRecordRes4
  * When to use:
  *     Build tooltip title line for world-map hover.
  * What to expect:
- *     Uses first-occurring-scalerank names:
- *       - states when count is 1..TOOLTIP_NAME_LIST_MAX_ITEMS
- *       - otherwise countries (final fallback, uncapped)
+ *     Uses first-occurring-scalerank states with country-coverage gate:
+ *       - states when count is 1..TOOLTIP_NAME_LIST_MAX_ITEMS and state country labels cover all associated countries
+ *       - otherwise countries (final fallback, uncapped), grouped by continent (all associated countries included)
  *     Returns null when neither states nor countries exist.
  */
 export function preferredNamingLineForRes1Record(record: TerrainNamingRecordRes1): string | null {
-  const stateNames = namesForFirstOccurringScalerankList(record.states);
-  if (stateNames.length > 0 && stateNames.length <= TOOLTIP_NAME_LIST_MAX_ITEMS) return stateNames.join(', ');
-  const countryNames = namesForFirstOccurringScalerankList(record.countries);
-  if (countryNames.length > 0) return countryNames.join(', ');
+  const firstRankStates = firstOccurringScalerankRows(record.states);
+  if (
+    firstRankStates.length > 0 &&
+    firstRankStates.length <= TOOLTIP_NAME_LIST_MAX_ITEMS &&
+    statesCoverAllCountries(firstRankStates, record.countries)
+  ) {
+    return formatGroupedStatesForTooltip(firstRankStates);
+  }
+  if (record.countries.length > 0) return formatGroupedCountriesForTooltip(record.countries);
   return null;
 }
 

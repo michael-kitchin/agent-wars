@@ -18,6 +18,7 @@ function fixturePath(name: string): string {
 function testPipelineToPassability(): void {
   assert.strictEqual(pipelineTerrainToPassability('water'), 'water');
   assert.strictEqual(pipelineTerrainToPassability('coastal'), 'coastal');
+  assert.strictEqual(pipelineTerrainToPassability('wetlands'), 'wetlands');
   assert.strictEqual(pipelineTerrainToPassability('plains'), 'land');
   assert.strictEqual(pipelineTerrainToPassability('forest'), 'land');
   assert.strictEqual(pipelineTerrainToPassability('mountain'), 'land');

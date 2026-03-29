@@ -26,7 +26,7 @@ export interface Res4TerrainOverrideRow {
 
 /** Snapshot of game state sent to the renderer (camelCase for JSON). */
 export interface GameStateSnapshot {
-  /** `terrain`: passability `land` | `water` | `coastal`. `terrainKind`: pipeline label including `coastal`. */
+  /** `terrain`: passability `land` | `water` | `coastal` | `wetlands`. `terrainKind`: pipeline label including `coastal`/`wetlands`. */
   hexes: { h3Index: string; terrain: string; terrainKind: string }[];
   units: { id: string; player: string; unitType: string; h3Index: string }[];
   phase: string;

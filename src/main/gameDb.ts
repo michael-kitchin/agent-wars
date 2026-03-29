@@ -25,12 +25,12 @@ import type { GameStateSnapshot } from '../shared/ipcTypes';
 export type { GameStateSnapshot } from '../shared/ipcTypes';
 
 /** Baseline schema version; bump when a future milestone adds migration chains. */
-export const EXPECTED_USER_VERSION = 4;
+export const EXPECTED_USER_VERSION = 5;
 
 /**
- * Baseline filename for world-map + terrain_kind schema (v4: pipeline labels water/plains).
+ * Baseline filename for world-map + terrain_kind schema (v5: adds wetlands passability + terrain kind).
  */
-export const GAME_DB_FILE_NAME = 'game-baseline-v4.sqlite';
+export const GAME_DB_FILE_NAME = 'game-baseline-v5.sqlite';
 
 let db: InstanceType<typeof Database> | null = null;
 
@@ -63,8 +63,8 @@ function getFullDdl(): string {
   return `
     CREATE TABLE IF NOT EXISTS hexes (
       h3_index TEXT PRIMARY KEY,
-      terrain TEXT NOT NULL CHECK (terrain IN ('land', 'water', 'coastal')),
-      terrain_kind TEXT NOT NULL CHECK (terrain_kind IN ('water', 'coastal', 'plains', 'forest', 'mountain', 'desert', 'arctic'))
+      terrain TEXT NOT NULL CHECK (terrain IN ('land', 'water', 'coastal', 'wetlands')),
+      terrain_kind TEXT NOT NULL CHECK (terrain_kind IN ('water', 'coastal', 'wetlands', 'plains', 'forest', 'mountain', 'desert', 'arctic'))
     );
 
     CREATE TABLE IF NOT EXISTS units (
@@ -411,7 +411,7 @@ export function getGameSeed(): number {
 
 /**
  * Seeds all world hexes from bundled `terrain_res1_metadata.json` via the in-memory classification cache:
- * `terrain` is passability (land / water / coastal); `terrain_kind` preserves pipeline labels for the renderer.
+ * `terrain` is passability (land / water / coastal / wetlands); `terrain_kind` preserves pipeline labels for the renderer.
  */
 function seedHexesFromTerrainMetadata(): void {
   logDebug('gameDb seedHexesFromTerrainMetadata');
@@ -446,8 +446,8 @@ function seedUnits(): void {
     if (!(lat > minSpawnLatExclusive && lat < maxSpawnLatExclusive)) continue;
     const row = getOne<{ terrain: string }>('SELECT terrain FROM hexes WHERE h3_index = ?', [h3]);
     const terrain = row?.terrain ?? 'land';
-    if (terrain === 'land' || terrain === 'coastal') landSpawnIndices.push(i);
-    if (terrain === 'water' || terrain === 'coastal') navalSpawnIndices.push(i);
+    if (terrain === 'land' || terrain === 'coastal' || terrain === 'wetlands') landSpawnIndices.push(i);
+    if (terrain === 'water' || terrain === 'coastal' || terrain === 'wetlands') navalSpawnIndices.push(i);
   }
 
   const landPerSide = counts.infantry + counts.armor;

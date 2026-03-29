@@ -14414,6 +14414,7 @@
   var PIPELINE_TERRAIN_KINDS = [
     "water",
     "coastal",
+    "wetlands",
     "plains",
     "forest",
     "mountain",
@@ -14439,6 +14440,7 @@
       fills: {
         water: "rgba(42, 117, 214, 0.28)",
         coastal: "rgba(59, 186, 194, 0.24)",
+        wetlands: "rgba(59, 186, 194, 0.24)",
         plains: "rgba(186, 208, 160, 0.2)",
         forest: "rgba(50, 142, 74, 0.43)",
         mountain: "rgba(154, 77, 122, 0.54)",
@@ -14449,6 +14451,7 @@
         mountain: { color: "rgba(95, 24, 74, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
         forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
         coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
+        wetlands: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: true },
         desert: { color: "rgba(150, 104, 43, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
       },
       urbanOverlayFill: "rgba(137, 117, 98, 0.46)",
@@ -14462,6 +14465,7 @@
       fills: {
         water: "rgba(56, 128, 214, 0.28)",
         coastal: "rgba(76, 173, 188, 0.24)",
+        wetlands: "rgba(76, 173, 188, 0.24)",
         plains: "rgba(193, 211, 165, 0.2)",
         forest: "rgba(70, 146, 86, 0.43)",
         mountain: "rgba(168, 70, 96, 0.55)",
@@ -14472,6 +14476,7 @@
         mountain: { color: "rgba(114, 26, 50, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
         forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
         coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
+        wetlands: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: true },
         desert: { color: "rgba(152, 109, 47, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
       },
       urbanOverlayFill: "rgba(141, 122, 103, 0.46)",
@@ -14485,6 +14490,7 @@
       fills: {
         water: "rgba(38, 118, 206, 0.28)",
         coastal: "rgba(70, 176, 192, 0.24)",
+        wetlands: "rgba(70, 176, 192, 0.24)",
         plains: "rgba(170, 188, 136, 0.2)",
         forest: "rgba(58, 150, 86, 0.43)",
         mountain: "rgba(218, 76, 146, 0.5)",
@@ -14495,6 +14501,7 @@
         mountain: { color: "rgba(255, 162, 214, 0.68)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
         forest: { color: "rgba(130, 245, 190, 0.58)", spacing: 7, lineWidth: 0.9, reverseDiagonal: true },
         coastal: { color: "rgba(110, 220, 235, 0.42)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
+        wetlands: { color: "rgba(110, 220, 235, 0.42)", spacing: 8, lineWidth: 0.72, reverseDiagonal: true },
         desert: { color: "rgba(255, 207, 130, 0.5)", spacing: 7, lineWidth: 1.05, reverseDiagonal: false, pattern: "dots" }
       },
       urbanOverlayFill: "rgba(132, 112, 97, 0.46)",
@@ -14508,6 +14515,7 @@
       fills: {
         water: "rgba(52, 120, 204, 0.28)",
         coastal: "rgba(69, 165, 186, 0.24)",
+        wetlands: "rgba(69, 165, 186, 0.24)",
         plains: "rgba(188, 205, 162, 0.2)",
         forest: "rgba(52, 136, 84, 0.43)",
         mountain: "rgba(127, 83, 171, 0.55)",
@@ -14518,6 +14526,7 @@
         mountain: { color: "rgba(74, 35, 116, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
         forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
         coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
+        wetlands: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: true },
         desert: { color: "rgba(145, 104, 42, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
       },
       urbanOverlayFill: "rgba(130, 112, 96, 0.46)",
@@ -14999,7 +15008,7 @@
     const hx = gameState.hexes.find((h) => h.h3Index === h3);
     if (!hx) return { terrainKind: "Unknown", isUrban: false };
     return {
-      terrainKind: hx.terrainKind ?? (hx.terrain === "water" ? "water" : hx.terrain === "coastal" ? "coastal" : "plains"),
+      terrainKind: hx.terrainKind ?? (hx.terrain === "water" ? "water" : hx.terrain === "coastal" ? "coastal" : hx.terrain === "wetlands" ? "wetlands" : "plains"),
       isUrban: false
     };
   }
@@ -15020,19 +15029,178 @@
     if (terrainInfraRes4Port.has(childH3)) labels.push("Port");
     return labels;
   }
+  function countUrbanRes4HexesInRes1Hex(parentH3) {
+    let children = res4ChildrenByParent.get(parentH3);
+    if (!children) {
+      children = cellToChildren(parentH3, DETAIL_H3_RESOLUTION);
+      res4ChildrenByParent.set(parentH3, children);
+    }
+    let count = 0;
+    for (const child of children) {
+      if (res4TerrainOverridesByH3.get(child)?.isUrban) count++;
+    }
+    return count;
+  }
+  function roundToNearestInteger(value) {
+    return Math.round(value);
+  }
+  function formatPercentInteger(value) {
+    return value.toLocaleString();
+  }
+  var res1DominantTerrainKindByH3 = /* @__PURE__ */ new Map();
+  var res1TerrainSummaryByH3 = /* @__PURE__ */ new Map();
+  var res1FeaturesSummaryByH3 = /* @__PURE__ */ new Map();
+  function clearRes1TooltipSummaryCaches() {
+    res1DominantTerrainKindByH3.clear();
+    res1TerrainSummaryByH3.clear();
+    res1FeaturesSummaryByH3.clear();
+    terrainTooltipHtmlByContentKey.clear();
+  }
+  function getRes1DominantTerrainKind(h3, parentKind) {
+    const cached = res1DominantTerrainKindByH3.get(h3);
+    if (cached !== void 0) return cached;
+    let children = res4ChildrenByParent.get(h3);
+    if (!children) {
+      children = cellToChildren(h3, DETAIL_H3_RESOLUTION);
+      res4ChildrenByParent.set(h3, children);
+    }
+    if (children.length <= 0) {
+      res1DominantTerrainKindByH3.set(h3, parentKind);
+      return parentKind;
+    }
+    const counts = /* @__PURE__ */ new Map();
+    for (const child of children) {
+      const kind = res4TerrainOverridesByH3.get(child)?.terrainKind ?? parentKind;
+      counts.set(kind, (counts.get(kind) ?? 0) + 1);
+    }
+    let dominantKind = parentKind;
+    let dominantCount = -1;
+    for (const [kind, count] of counts.entries()) {
+      if (count > dominantCount || count === dominantCount && kind.localeCompare(dominantKind) < 0) {
+        dominantKind = kind;
+        dominantCount = count;
+      }
+    }
+    res1DominantTerrainKindByH3.set(h3, dominantKind);
+    return dominantKind;
+  }
+  function getRes1TerrainSummary(h3, parentKind) {
+    const cached = res1TerrainSummaryByH3.get(h3);
+    if (cached !== void 0) return cached;
+    let children = res4ChildrenByParent.get(h3);
+    if (!children) {
+      children = cellToChildren(h3, DETAIL_H3_RESOLUTION);
+      res4ChildrenByParent.set(h3, children);
+    }
+    const total = children.length;
+    if (total <= 0) {
+      const fallback = `${formatTerrainKindLabel(parentKind)} (100.0%)`;
+      res1TerrainSummaryByH3.set(h3, fallback);
+      return fallback;
+    }
+    const counts = /* @__PURE__ */ new Map();
+    for (const child of children) {
+      const kind = res4TerrainOverridesByH3.get(child)?.terrainKind ?? parentKind;
+      counts.set(kind, (counts.get(kind) ?? 0) + 1);
+    }
+    const entries = Array.from(counts.entries()).sort((a, b) => {
+      if (b[1] !== a[1]) return b[1] - a[1];
+      return a[0].localeCompare(b[0]);
+    });
+    if (entries.length <= 3) {
+      const parts2 = entries.map(([kind, count]) => {
+        const pct = roundToNearestInteger(count * 100 / total);
+        return `${formatTerrainKindLabel(kind)} (${formatPercentInteger(pct)}%)`;
+      });
+      const summary2 = parts2.join(", ");
+      res1TerrainSummaryByH3.set(h3, summary2);
+      return summary2;
+    }
+    const topTwo = entries.slice(0, 2);
+    const topTwoCount = topTwo.reduce((sum, [, count]) => sum + count, 0);
+    const parts = topTwo.map(([kind, count]) => {
+      const pct = roundToNearestInteger(count * 100 / total);
+      return `${formatTerrainKindLabel(kind)} (${formatPercentInteger(pct)}%)`;
+    });
+    const otherPct = roundToNearestInteger((total - topTwoCount) * 100 / total);
+    parts.push(`Other (${formatPercentInteger(otherPct)}%)`);
+    const summary = parts.join(", ");
+    res1TerrainSummaryByH3.set(h3, summary);
+    return summary;
+  }
+  function getRes1FeaturesSummary(h3) {
+    if (res1FeaturesSummaryByH3.has(h3)) return res1FeaturesSummaryByH3.get(h3) ?? null;
+    const labels = featureLabelsForRes1Hex(h3);
+    if (labels.length === 0) {
+      res1FeaturesSummaryByH3.set(h3, null);
+      return null;
+    }
+    let children = res4ChildrenByParent.get(h3);
+    if (!children) {
+      children = cellToChildren(h3, DETAIL_H3_RESOLUTION);
+      res4ChildrenByParent.set(h3, children);
+    }
+    let airportCount = 0;
+    let portCount = 0;
+    for (const child of children) {
+      if (terrainInfraRes4Airport.has(child)) airportCount++;
+      if (terrainInfraRes4Port.has(child)) portCount++;
+    }
+    const parts = [];
+    if (labels.includes("Airports")) parts.push(`Airports (${airportCount.toLocaleString()})`);
+    if (labels.includes("Ports")) parts.push(`Ports (${portCount.toLocaleString()})`);
+    const summary = parts.length > 0 ? parts.join(", ") : null;
+    res1FeaturesSummaryByH3.set(h3, summary);
+    return summary;
+  }
+  function terrainTooltipStateForRes1Hex(h3) {
+    const state = terrainStateForRes1Hex(h3);
+    return {
+      ...state,
+      features: featureLabelsForRes1Hex(h3),
+      urbanHexCount: countUrbanRes4HexesInRes1Hex(h3),
+      res1TerrainSummary: getRes1TerrainSummary(h3, state.terrainKind),
+      res1FeaturesSummary: getRes1FeaturesSummary(h3)
+    };
+  }
   function terrainStateForPointer(clientX, clientY, fallbackRes1H3) {
-    if (!gameState) return { terrainKind: "Unknown", isUrban: false, features: [] };
+    if (!gameState) {
+      return {
+        terrainKind: "Unknown",
+        isUrban: false,
+        features: [],
+        urbanHexCount: null,
+        res1TerrainSummary: null,
+        res1FeaturesSummary: null
+      };
+    }
     const res4On = shouldRenderRes4Hexes();
     if (!res4On) {
-      if (!fallbackRes1H3) return { terrainKind: "Unknown", isUrban: false, features: [] };
-      const state = terrainStateForRes1Hex(fallbackRes1H3);
-      return { ...state, features: featureLabelsForRes1Hex(fallbackRes1H3) };
+      if (!fallbackRes1H3) {
+        return {
+          terrainKind: "Unknown",
+          isUrban: false,
+          features: [],
+          urbanHexCount: null,
+          res1TerrainSummary: null,
+          res1FeaturesSummary: null
+        };
+      }
+      return terrainTooltipStateForRes1Hex(fallbackRes1H3);
     }
     const map = getMainLeafletMap();
     if (!map) {
-      if (!fallbackRes1H3) return { terrainKind: "Unknown", isUrban: false, features: [] };
-      const state = terrainStateForRes1Hex(fallbackRes1H3);
-      return { ...state, features: featureLabelsForRes1Hex(fallbackRes1H3) };
+      if (!fallbackRes1H3) {
+        return {
+          terrainKind: "Unknown",
+          isUrban: false,
+          features: [],
+          urbanHexCount: null,
+          res1TerrainSummary: null,
+          res1FeaturesSummary: null
+        };
+      }
+      return terrainTooltipStateForRes1Hex(fallbackRes1H3);
     }
     const L = getLeafletGlobal();
     const rect = map.getContainer().getBoundingClientRect();
@@ -15045,12 +15213,23 @@
       return {
         terrainKind: detail?.terrainKind ?? parentKind,
         isUrban: detail?.isUrban ?? false,
-        features: featureLabelsForRes4Child(parentH3, detailH3)
+        features: featureLabelsForRes4Child(parentH3, detailH3),
+        urbanHexCount: null,
+        res1TerrainSummary: null,
+        res1FeaturesSummary: null
       };
     } catch {
-      if (!fallbackRes1H3) return { terrainKind: "Unknown", isUrban: false, features: [] };
-      const state = terrainStateForRes1Hex(fallbackRes1H3);
-      return { ...state, features: featureLabelsForRes1Hex(fallbackRes1H3) };
+      if (!fallbackRes1H3) {
+        return {
+          terrainKind: "Unknown",
+          isUrban: false,
+          features: [],
+          urbanHexCount: null,
+          res1TerrainSummary: null,
+          res1FeaturesSummary: null
+        };
+      }
+      return terrainTooltipStateForRes1Hex(fallbackRes1H3);
     }
   }
   function namingLookupTargetForPointer(clientX, clientY, fallbackRes1H3) {
@@ -15076,6 +15255,7 @@
     }
   }
   var namingLineByLookupKey = /* @__PURE__ */ new Map();
+  var terrainTooltipHtmlByContentKey = /* @__PURE__ */ new Map();
   var terrainTooltipRequestSeq = 0;
   function namingLookupKey(target) {
     if (!target) return null;
@@ -15099,12 +15279,49 @@
   function escapeHtml(text) {
     return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
   }
+  function formatGroupedNamingLineHtml(namingLine) {
+    const groups = namingLine.split(";").map((g) => g.trim()).filter((g) => g.length > 0);
+    if (groups.length === 0) return escapeHtml(namingLine);
+    const formattedGroups = groups.map((group) => {
+      const colonIdx = group.indexOf(":");
+      if (colonIdx < 0) return escapeHtml(group);
+      const heading = group.slice(0, colonIdx).trim();
+      const remainder = group.slice(colonIdx + 1).trim();
+      if (!heading) return escapeHtml(group);
+      if (!remainder) return `<strong>${escapeHtml(heading)}:</strong>`;
+      return `<strong>${escapeHtml(heading)}:</strong> ${escapeHtml(remainder)}`;
+    });
+    return formattedGroups.join("; ");
+  }
   function formatTerrainTooltipHtml(state, namingLine) {
     const terrainLabel = formatTerrainKindLabel(state.terrainKind);
-    const terrainLine = state.isUrban ? `<strong>Terrain:</strong> ${terrainLabel}, Urban` : `<strong>Terrain:</strong> ${terrainLabel}`;
-    const bodyLine = state.features.length === 0 ? terrainLine : `${terrainLine}<br/><strong>Features:</strong> ${state.features.join(", ")}`;
+    const terrainValue = state.res1TerrainSummary ?? (state.isUrban ? `${terrainLabel}, Urban` : terrainLabel);
+    const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
+    const bodyParts = [terrainLine];
+    if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
+    else if (state.features.length > 0) bodyParts.push(`<strong>Features:</strong> ${state.features.join(", ")}`);
+    if (state.urbanHexCount != null) bodyParts.push(`<strong>Urban Hexes:</strong> ${state.urbanHexCount.toLocaleString()}`);
+    const bodyLine = bodyParts.join("<br/>");
     if (!namingLine) return bodyLine;
-    return `<strong>${escapeHtml(namingLine)}</strong><br/>${bodyLine}`;
+    return `${formatGroupedNamingLineHtml(namingLine)}<br/>${bodyLine}`;
+  }
+  function terrainTooltipContentKey(state, namingLine) {
+    const namingKey = namingLine ?? "";
+    const urbanKey = state.isUrban ? "1" : "0";
+    const featuresKey = state.features.join("|");
+    const urbanHexCountKey = state.urbanHexCount == null ? "x" : String(state.urbanHexCount);
+    const res1TerrainSummaryKey = state.res1TerrainSummary ?? "";
+    const res1FeaturesSummaryKey = state.res1FeaturesSummary ?? "";
+    return `${namingKey}::${state.terrainKind}::${urbanKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}`;
+  }
+  function getCachedTerrainTooltipHtml(state, namingLine) {
+    const key = terrainTooltipContentKey(state, namingLine);
+    const cachedHtml = terrainTooltipHtmlByContentKey.get(key);
+    if (cachedHtml !== void 0) return cachedHtml;
+    const html = formatTerrainTooltipHtml(state, namingLine);
+    terrainTooltipHtmlByContentKey.set(key, html);
+    if (terrainTooltipHtmlByContentKey.size > 4096) terrainTooltipHtmlByContentKey.clear();
+    return html;
   }
   async function showTerrainTooltip(clientX, clientY, state, namingTarget) {
     const requestSeq = ++terrainTooltipRequestSeq;
@@ -15112,7 +15329,7 @@
     if (requestSeq !== terrainTooltipRequestSeq) return;
     const el = document.getElementById("hex-tooltip");
     if (!el) return;
-    el.innerHTML = formatTerrainTooltipHtml(state, namingLine);
+    el.innerHTML = getCachedTerrainTooltipHtml(state, namingLine);
     el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
     el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
     el.classList.remove("hidden");
@@ -15212,7 +15429,10 @@
         const p = map.latLngToContainerPoint(L.latLng(lat, lng));
         return { x: p.x, y: p.y };
       });
-      const kind = hx.terrainKind ?? (hx.terrain === "water" ? "water" : hx.terrain === "coastal" ? "coastal" : "plains");
+      const kind = getRes1DominantTerrainKind(
+        hx.h3Index,
+        hx.terrainKind ?? (hx.terrain === "water" ? "water" : hx.terrain === "coastal" ? "coastal" : hx.terrain === "wetlands" ? "wetlands" : "plains")
+      );
       const drawClosedPath = () => {
         ctx.beginPath();
         for (let i = 0; i < pts.length; i++) {
@@ -15327,7 +15547,7 @@
     for (const parent of gameState.hexes) {
       const parentPts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
       if (!projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight)) continue;
-      const parentKind = parent.terrainKind ?? (parent.terrain === "water" ? "water" : parent.terrain === "coastal" ? "coastal" : "plains");
+      const parentKind = parent.terrainKind ?? (parent.terrain === "water" ? "water" : parent.terrain === "coastal" ? "coastal" : parent.terrain === "wetlands" ? "wetlands" : "plains");
       let children = res4ChildrenByParent.get(parent.h3Index);
       if (!children) {
         children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
@@ -16403,6 +16623,7 @@
       try {
         const state = await window.gameApi.newGame();
         gameState = state;
+        clearRes1TooltipSummaryCaches();
         humanStandingOrders = [];
         hoverRoutePreview = null;
         pendingRangedAttacks = [];
@@ -16764,6 +16985,7 @@
       window.gameApi.getGameState().then(async (raw) => {
         const state = raw;
         gameState = state;
+        clearRes1TooltipSummaryCaches();
         await refreshHumanStandingOrders();
         updateGameStateSidebar(state);
         updateRangedSidebar();
@@ -16774,6 +16996,7 @@
       }).catch((err) => console.error("getGameState failed:", err));
       window.gameApi.getRes4TerrainOverrides().then((rows) => {
         res4TerrainOverridesByH3 = new Map(rows.map((r) => [r.h3Index, { terrainKind: r.terrainKind, isUrban: !!r.isUrban }]));
+        clearRes1TooltipSummaryCaches();
         requestRedraw();
       }).catch((err) => console.error("getRes4TerrainOverrides failed:", err));
       window.gameApi.getTerrainInfrastructureHints().then((hints) => {
@@ -16781,6 +17004,7 @@
         terrainInfraRes1Port = new Set(hints.res1MajorPorts);
         terrainInfraRes4Airport = new Set(hints.res4MajorAirports);
         terrainInfraRes4Port = new Set(hints.res4MajorPorts);
+        clearRes1TooltipSummaryCaches();
         requestRedraw();
       }).catch((err) => console.error("getTerrainInfrastructureHints failed:", err));
     }
@@ -17053,6 +17277,7 @@
           const nextState = await window.gameApi.getGameState();
           const state = nextState;
           gameState = state;
+          clearRes1TooltipSummaryCaches();
           const aiMoves = readyResult.aiMoves ?? [];
           const resolutionMoves = [...humanMoves, ...aiMoves];
           let didShowMapToastForTurn = false;

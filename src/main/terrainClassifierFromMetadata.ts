@@ -10,27 +10,33 @@ import {
 } from './terrainMetadataLoad';
 import type { PipelineTerrainKind } from '../shared/pipelineTerrain';
 
-export type WaterRelationKind = 'in_water' | 'coastal_band' | 'no_water';
+export type WaterRelationKind = 'in_water' | 'coastal_band' | 'wetlands_band' | 'no_water';
 
 /**
  * Why this exists:
- *     Derive the same water-mask relation string the Python pipeline passes to `classify_cell` from exported mask metrics.
+ *     Derive the water-mask relation string used by terrain classification from exported mask metrics.
  * When to use:
- *     Before interior / water / coastal classification for each hex row.
+ *     Before interior / water / coastal / wetlands classification for each hex row.
  * What to expect:
  *     `in_water` matches `MaskPolygonMetrics.all_in_mask`; `no_water` when the cell does not intersect water.
+ *     For intersecting mixed cells, classifies as `wetlands_band` when `water_edges <= 2`, otherwise `coastal_band`.
  */
-export function waterRelationFromMaskMetrics(r: Pick<HexMetadataRecordRes1, 'all_water' | 'intersects_water'>): WaterRelationKind {
+export function waterRelationFromMaskMetrics(
+  r: Pick<HexMetadataRecordRes1, 'all_water' | 'intersects_water' | 'water_edges'>
+): WaterRelationKind {
   if (r.all_water) return 'in_water';
   if (!r.intersects_water) return 'no_water';
-  return 'coastal_band';
+  return r.water_edges <= 2 ? 'wetlands_band' : 'coastal_band';
 }
 
 function landcoverDictNonEmpty(r: HexMetadataRecordRes1): boolean {
   return r.arctic_mean != null || r.forest_mean != null || r.desert_mean != null;
 }
 
-function classifyInteriorBiome(r: HexMetadataRecordRes1, t: ClassifierThresholds): Exclude<PipelineTerrainKind, 'water' | 'coastal'> {
+function classifyInteriorBiome(
+  r: HexMetadataRecordRes1,
+  t: ClassifierThresholds
+): Exclude<PipelineTerrainKind, 'water' | 'coastal' | 'wetlands'> {
   const c10 = r.arctic_mean ?? 0;
   const forest = r.forest_mean ?? 0;
   const c11 = r.desert_mean ?? 0;
@@ -60,6 +66,7 @@ export function classifyCellWithoutUrbanOverride(
   if (!landcoverDictNonEmpty(r)) return nodataFallback;
   const wr = waterRelationFromMaskMetrics(r);
   if (wr === 'in_water') return 'water';
+  if (wr === 'wetlands_band') return 'wetlands';
   if (wr === 'coastal_band') return 'coastal';
   return classifyInteriorBiome(r, t);
 }

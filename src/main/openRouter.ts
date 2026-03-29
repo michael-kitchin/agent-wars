@@ -280,10 +280,10 @@ function validateAiOrder(
   const destHex = state.hexes.find((h) => h.h3Index === order.toH3Index);
   const terrain = destHex?.terrain ?? 'land';
   if (unit.unitType === 'naval' && !passabilityAllowsNavalUnit(terrain)) {
-    return { valid: false, reason: 'Naval units must move to water or coastal hexes' };
+    return { valid: false, reason: 'Naval units must move to water, coastal, or wetlands hexes' };
   }
   if ((unit.unitType === 'infantry' || unit.unitType === 'armor') && !passabilityAllowsLandUnit(terrain)) {
-    return { valid: false, reason: 'Land units must move to land or coastal hexes' };
+    return { valid: false, reason: 'Land units must move to land, coastal, or wetlands hexes' };
   }
   return { valid: true };
 }

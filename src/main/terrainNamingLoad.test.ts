@@ -63,7 +63,7 @@ function testRes4PrefersCityLineOverStates(): void {
       },
     ],
   };
-  assert.strictEqual(preferredNamingLineForRes4Record(record), 'Bridgeport');
+  assert.strictEqual(preferredNamingLineForRes4Record(record), 'United States of America: Connecticut, New York');
 }
 
 function testRes4FallsBackToStatesWhenNoCities(): void {
@@ -91,7 +91,7 @@ function testRes4FallsBackToStatesWhenNoCities(): void {
       },
     ],
   };
-  assert.strictEqual(preferredNamingLineForRes4Record(record), 'Western Equatoria');
+  assert.strictEqual(preferredNamingLineForRes4Record(record), 'Africa: Central African Rep., S. Sudan');
 }
 
 function testRes1UsesFirstOccurringStateScalerank(): void {
@@ -106,7 +106,7 @@ function testRes1UsesFirstOccurringStateScalerank(): void {
       { name: 'Xland', continent: 'X', region: 'Y', population: 1, scalerank: 7 },
     ],
   };
-  assert.strictEqual(preferredNamingLineForRes1Record(record), 'Alpha, Beta');
+  assert.strictEqual(preferredNamingLineForRes1Record(record), 'X: Alpha, Beta');
 }
 
 function testRes4FallsBackToCountriesWhenNoCitiesOrStates(): void {
@@ -120,7 +120,10 @@ function testRes4FallsBackToCountriesWhenNoCitiesOrStates(): void {
       { name: 'Another Rank 6 Country', continent: 'Africa', region: 'Middle Africa', population: 2, scalerank: 6 },
     ],
   };
-  assert.strictEqual(preferredNamingLineForRes4Record(record), 'Central African Rep., Another Rank 6 Country');
+  assert.strictEqual(
+    preferredNamingLineForRes4Record(record),
+    'Africa: Central African Rep., Another Rank 6 Country'
+  );
 }
 
 function testRes4EscalatesCitiesToStatesWhenCityListTooLarge(): void {
@@ -140,7 +143,7 @@ function testRes4EscalatesCitiesToStatesWhenCityListTooLarge(): void {
     ],
     countries: [{ name: 'Country A', continent: 'X', region: 'Y', population: 1, scalerank: 1 }],
   };
-  assert.strictEqual(preferredNamingLineForRes4Record(record), 'State A, State B');
+  assert.strictEqual(preferredNamingLineForRes4Record(record), 'C: State A, State B');
 }
 
 function testRes4EscalatesStatesToCountriesWhenStateListTooLarge(): void {
@@ -158,7 +161,7 @@ function testRes4EscalatesStatesToCountriesWhenStateListTooLarge(): void {
       { name: 'Country B', continent: 'X', region: 'Y', population: 1, scalerank: 1 },
     ],
   };
-  assert.strictEqual(preferredNamingLineForRes4Record(record), 'Country A, Country B');
+  assert.strictEqual(preferredNamingLineForRes4Record(record), 'X: Country A, Country B');
 }
 
 function testRes1FallsBackToCountriesWhenNoStates(): void {
@@ -170,7 +173,7 @@ function testRes1FallsBackToCountriesWhenNoStates(): void {
       { name: 'Country B', continent: 'X', region: 'Y', population: 1, scalerank: 5 },
     ],
   };
-  assert.strictEqual(preferredNamingLineForRes1Record(record), 'Country A');
+  assert.strictEqual(preferredNamingLineForRes1Record(record), 'X: Country A, Country B');
 }
 
 function testRes1EscalatesStatesToCountriesWhenStateListTooLarge(): void {
@@ -187,7 +190,42 @@ function testRes1EscalatesStatesToCountriesWhenStateListTooLarge(): void {
       { name: 'Country B', continent: 'X', region: 'Y', population: 1, scalerank: 1 },
     ],
   };
-  assert.strictEqual(preferredNamingLineForRes1Record(record), 'Country A, Country B');
+  assert.strictEqual(preferredNamingLineForRes1Record(record), 'X: Country A, Country B');
+}
+
+function testRes4GroupsCitiesByCountryAndState(): void {
+  const record: TerrainNamingRecordRes4 = {
+    h3_index: '8400001ffffffff',
+    cities: [
+      { name: 'City1', state: 'State1', country: 'Country1', population: 1, scalerank: 4 },
+      { name: 'City2', state: 'State1', country: 'Country1', population: 1, scalerank: 4 },
+      { name: 'City3', state: 'State1', country: 'Country1', population: 1, scalerank: 4 },
+      { name: 'City4', state: 'State2', country: 'Country1', population: 1, scalerank: 4 },
+      { name: 'City5', state: 'State3', country: 'Country2', population: 1, scalerank: 4 },
+      { name: 'City5', state: 'State4', country: 'Country2', population: 1, scalerank: 6 },
+    ],
+    states: [],
+    countries: [],
+  };
+  assert.strictEqual(
+    preferredNamingLineForRes4Record(record),
+    'Country1: City1, City2, City3 (State1), City4 (State2); Country2: City5 (State3)'
+  );
+}
+
+function testRes4GroupsStatesByCountryWithinSameScalerank(): void {
+  const record: TerrainNamingRecordRes4 = {
+    h3_index: '8400001ffffffff',
+    cities: [],
+    states: [
+      { name: 'State1', country: 'Country1', scalerank: 2 },
+      { name: 'State2', country: 'Country1', scalerank: 2 },
+      { name: 'State3', country: 'Country2', scalerank: 2 },
+      { name: 'State4', country: 'Country2', scalerank: 4 },
+    ],
+    countries: [],
+  };
+  assert.strictEqual(preferredNamingLineForRes4Record(record), 'Country1: State1, State2; Country2: State3');
 }
 
 function testNoFirstLineWhenNoCitiesStatesOrCountries(): void {
@@ -198,6 +236,47 @@ function testNoFirstLineWhenNoCitiesStatesOrCountries(): void {
     countries: [],
   };
   assert.strictEqual(preferredNamingLineForRes4Record(record), null);
+}
+
+function testRes4FallsBackToStatesWhenCitiesMissSomeStates(): void {
+  const record: TerrainNamingRecordRes4 = {
+    h3_index: '842a109ffffffff',
+    cities: [
+      {
+        name: 'Bridgeport',
+        state: 'Connecticut',
+        country: 'United States of America',
+        population: 1018000,
+        scalerank: 4,
+      },
+    ],
+    states: [
+      { name: 'Connecticut', country: 'United States of America', scalerank: 2 },
+      { name: 'New York', country: 'United States of America', scalerank: 2 },
+    ],
+    countries: [
+      {
+        name: 'United States of America',
+        continent: 'North America',
+        region: 'Northern America',
+        population: 328239523,
+        scalerank: 0,
+      },
+    ],
+  };
+  assert.strictEqual(preferredNamingLineForRes4Record(record), 'United States of America: Connecticut, New York');
+}
+
+function testRes1FallsBackToCountriesWhenStatesMissSomeCountries(): void {
+  const record: TerrainNamingRecordRes1 = {
+    h3_index: '81003ffffffffff',
+    states: [{ name: 'State A', country: 'Country A', scalerank: 2 }],
+    countries: [
+      { name: 'Country A', continent: 'X', region: 'Y', population: 1, scalerank: 1 },
+      { name: 'Country B', continent: 'X', region: 'Y', population: 1, scalerank: 5 },
+    ],
+  };
+  assert.strictEqual(preferredNamingLineForRes1Record(record), 'X: Country A, Country B');
 }
 
 function main(): void {
@@ -211,7 +290,11 @@ function main(): void {
   testRes4EscalatesStatesToCountriesWhenStateListTooLarge();
   testRes1FallsBackToCountriesWhenNoStates();
   testRes1EscalatesStatesToCountriesWhenStateListTooLarge();
+  testRes4GroupsCitiesByCountryAndState();
+  testRes4GroupsStatesByCountryWithinSameScalerank();
   testNoFirstLineWhenNoCitiesStatesOrCountries();
+  testRes4FallsBackToStatesWhenCitiesMissSomeStates();
+  testRes1FallsBackToCountriesWhenStatesMissSomeCountries();
   console.log('terrainNamingLoad.test: ok');
 }
 

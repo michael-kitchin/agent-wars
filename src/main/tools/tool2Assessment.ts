@@ -341,7 +341,7 @@ function executeAssessHex(
       const t = terrainByH3.get(n) ?? 'land';
       if (t === 'land') adjacentLand++;
       else if (t === 'water') adjacentWater++;
-      else if (t === 'coastal') {
+      else if (t === 'coastal' || t === 'wetlands') {
         adjacentLand++;
         adjacentWater++;
       }

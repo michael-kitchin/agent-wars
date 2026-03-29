@@ -44,13 +44,14 @@ function baseRow(partial: Partial<HexMetadataRecordRes1>): HexMetadataRecordRes1
 }
 
 function testWaterRelationFromMaskMetrics(): void {
-  assert.strictEqual(waterRelationFromMaskMetrics({ all_water: true, intersects_water: true }), 'in_water');
-  assert.strictEqual(waterRelationFromMaskMetrics({ all_water: false, intersects_water: false }), 'no_water');
-  assert.strictEqual(waterRelationFromMaskMetrics({ all_water: false, intersects_water: true }), 'coastal_band');
+  assert.strictEqual(waterRelationFromMaskMetrics({ all_water: true, intersects_water: true, water_edges: 6 }), 'in_water');
+  assert.strictEqual(waterRelationFromMaskMetrics({ all_water: false, intersects_water: false, water_edges: 0 }), 'no_water');
+  assert.strictEqual(waterRelationFromMaskMetrics({ all_water: false, intersects_water: true, water_edges: 2 }), 'wetlands_band');
+  assert.strictEqual(waterRelationFromMaskMetrics({ all_water: false, intersects_water: true, water_edges: 3 }), 'coastal_band');
 }
 
 function testEmptyLandcoverIsNodataBeforeCoastal(): void {
-  const r = baseRow({ all_water: false, intersects_water: true });
+  const r = baseRow({ all_water: false, intersects_water: true, water_edges: 3 });
   assert.strictEqual(classifyCellWithoutUrbanOverride(r, t, 'desert'), 'desert');
 }
 
@@ -63,6 +64,18 @@ function testInWaterWithLandcoverIsWater(): void {
     desert_mean: 0,
   });
   assert.strictEqual(classifyCellWithoutUrbanOverride(r, t, 'water'), 'water');
+}
+
+function testWetlandsBandWithLandcoverIsWetlands(): void {
+  const r = baseRow({
+    all_water: false,
+    intersects_water: true,
+    water_edges: 2,
+    arctic_mean: 0,
+    forest_mean: 0,
+    desert_mean: 0,
+  });
+  assert.strictEqual(classifyCellWithoutUrbanOverride(r, t, 'water'), 'wetlands');
 }
 
 function testInteriorForest(): void {
@@ -156,6 +169,7 @@ function main(): void {
   testWaterRelationFromMaskMetrics();
   testEmptyLandcoverIsNodataBeforeCoastal();
   testInWaterWithLandcoverIsWater();
+  testWetlandsBandWithLandcoverIsWetlands();
   testInteriorForest();
   testRes4UrbanOverride();
   testRes4NoUrbanWhenFullyWater();
