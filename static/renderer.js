@@ -14394,6 +14394,16 @@
     const p = mainMap.latLngToContainerPoint(Lref.latLng(clampLatForWebMercatorDisplay(lat), lng));
     return { x: p.x, y: p.y };
   }
+  function hexCenterToOverlayPointWithReferenceLng(h3Index, referenceLngDegrees, latLngFn) {
+    if (!mainMap) return { x: 0, y: 0 };
+    const Lref = getL();
+    const [lat, lng] = latLngFn(h3Index);
+    const lngAligned = alignLngToReference(lng, referenceLngDegrees);
+    const p = mainMap.latLngToContainerPoint(
+      Lref.latLng(clampLatForWebMercatorDisplay(lat), lngAligned)
+    );
+    return { x: p.x, y: p.y };
+  }
   function invalidateLeafletMapSizes() {
     mainMap?.invalidateSize({ animate: false });
     miniMap?.invalidateSize({ animate: false });
@@ -15096,6 +15106,10 @@
   }
   function hexCenterPx(h3Index) {
     return hexCenterToOverlayPoint(h3Index, cellToLatLng);
+  }
+  function hexCenterPxRelativeTo(fromH3Index, toH3Index) {
+    const [, refLng] = cellToLatLng(fromH3Index);
+    return hexCenterToOverlayPointWithReferenceLng(toH3Index, refLng, cellToLatLng);
   }
   function hitTestHexAtContainerPixel(x, y, mapHexSet) {
     const map = getMainLeafletMap();
@@ -15894,7 +15908,7 @@
       const unit = units.find((u) => u.id === r.unitId);
       if (!unit) continue;
       const from = hexCenterPx(unit.h3Index);
-      const to = hexCenterPx(r.targetH3Index);
+      const to = hexCenterPxRelativeTo(unit.h3Index, r.targetH3Index);
       ctx.beginPath();
       ctx.moveTo(from.x, from.y);
       ctx.lineTo(to.x, to.y);
@@ -15985,7 +15999,12 @@
       const segments = order.routeSegments ?? [];
       if (segments.length === 0) {
         if (order.destinationH3Index) {
-          drawLineArrow(ctx, hexCenterPx(unit.h3Index), hexCenterPx(order.destinationH3Index), ORDER_LINE_COLOR);
+          drawLineArrow(
+            ctx,
+            hexCenterPx(unit.h3Index),
+            hexCenterPxRelativeTo(unit.h3Index, order.destinationH3Index),
+            ORDER_LINE_COLOR
+          );
         }
         continue;
       }
@@ -16084,7 +16103,7 @@
       const isHumanMove = unit.player === "human";
       const lineColor = unit.player === "human" ? ORDER_LINE_COLOR : AI_ORDER_LINE_COLOR;
       const from = hexCenterPx(move.fromH3Index);
-      const to = hexCenterPx(move.toH3Index);
+      const to = hexCenterPxRelativeTo(move.fromH3Index, move.toH3Index);
       const dx = to.x - from.x;
       const dy = to.y - from.y;
       const len = Math.hypot(dx, dy) || 1;
@@ -16132,8 +16151,9 @@
       if (!unit) continue;
       const [lat0, lng0] = cellToLatLng(move.fromH3Index);
       const [lat1, lng1] = cellToLatLng(move.toH3Index);
+      const lng1Aligned = alignLngToReference(lng1, lng0);
       const lat = lat0 + progress * (lat1 - lat0);
-      const lng = lng0 + progress * (lng1 - lng0);
+      const lng = lng0 + progress * (lng1Aligned - lng0);
       const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
       const color = PLAYER_COLORS[unit.player] ?? "#333";
       const label = UNIT_TYPE_LABELS[unit.unitType] ?? "?";

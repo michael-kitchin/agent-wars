@@ -4,7 +4,11 @@
  */
 
 import { getRasterBasemapChain, getRasterBasemapChainStartIndex } from './basemapProvider';
-import { WEB_MERCATOR_MAX_ABS_LAT, clampLatForWebMercatorDisplay } from './hexGrid';
+import {
+  WEB_MERCATOR_MAX_ABS_LAT,
+  alignLngToReference,
+  clampLatForWebMercatorDisplay,
+} from './hexGrid';
 
 // Leaflet is loaded from static bundle; keep maps loosely typed for compatibility with global `L`.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -296,6 +300,33 @@ export function hexCenterToOverlayPoint(
   const Lref = getL();
   const [lat, lng] = latLngFn(h3Index);
   const p = mainMap.latLngToContainerPoint(Lref.latLng(clampLatForWebMercatorDisplay(lat), lng));
+  return { x: p.x, y: p.y };
+}
+
+/**
+ * Why this exists:
+ *     Same geographic cell as `hexCenterToOverlayPoint`, but longitudes are shifted so the center lies in the
+ *     same world copy as `referenceLngDegrees` (within ±180° on the number line). Use when drawing segments
+ *     between two cells so antimeridian hops do not project to a line across the entire map.
+ * When to use:
+ *     Endpoint of a line or arrow whose start was projected with the reference hex; pass the start cell’s
+ *     center longitude as `referenceLngDegrees` (e.g. from `cellToLatLng(fromH3)[1]`).
+ * What to expect:
+ *     Container pixel coordinates consistent with a short great-circle step in the current viewport; same as
+ *     `hexCenterToOverlayPoint` when the cell already lies within 180° of the reference longitude.
+ */
+export function hexCenterToOverlayPointWithReferenceLng(
+  h3Index: string,
+  referenceLngDegrees: number,
+  latLngFn: (idx: string) => [number, number]
+): { x: number; y: number } {
+  if (!mainMap) return { x: 0, y: 0 };
+  const Lref = getL();
+  const [lat, lng] = latLngFn(h3Index);
+  const lngAligned = alignLngToReference(lng, referenceLngDegrees);
+  const p = mainMap.latLngToContainerPoint(
+    Lref.latLng(clampLatForWebMercatorDisplay(lat), lngAligned)
+  );
   return { x: p.x, y: p.y };
 }
 
