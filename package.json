@@ -61,7 +61,6 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.8.0",
-    "h3-js": "^4.4.0",
-    "leaflet": "^1.9.4"
+    "h3-js": "^4.4.0"
   }
 }
