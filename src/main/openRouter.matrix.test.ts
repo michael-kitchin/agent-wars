@@ -56,7 +56,7 @@ function buildFixtureState(hexes: string[]): {
   pendingOrders: { unitId: string; toH3Index: string }[];
 } {
   return {
-    hexes: hexes.map((h3Index) => ({ h3Index, terrain: 'land', terrainKind: 'land' })),
+    hexes: hexes.map((h3Index) => ({ h3Index, terrain: 'land', terrainKind: 'plains' })),
     units: [
       { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: hexes[0]! },
       { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: hexes[1]! },

@@ -1,5 +1,5 @@
 /**
- * Terrain labels produced by the terrain pipeline CSV (`terrain_res1_base.csv`).
+ * Terrain labels produced by the terrain pipeline (`terrain_*_metadata.json` classification).
  * Shared between main (seeding) and renderer (styling); keep in sync with Python TERRAIN_ENUM.
  *
  * Passability (`land` | `water` | `coastal`) is what SQLite `hexes.terrain` stores; pipeline kinds
@@ -7,10 +7,9 @@
  */
 
 export const PIPELINE_TERRAIN_KINDS = [
-  'ocean',
+  'water',
   'coastal',
-  'land',
-  'urban',
+  'plains',
   'forest',
   'mountain',
   'desert',
@@ -34,11 +33,11 @@ export function isPipelineTerrainKind(s: string): s is PipelineTerrainKind {
 
 /**
  * Maps pipeline terrain kind to passability for SQLite and pathfinding.
- * `ocean` → `water`; `coastal` → `coastal` (dual-domain); all other kinds → `land`.
+ * `water` → `water`; `coastal` → `coastal` (dual-domain); all other kinds → `land`.
  * Main process seeding should call `terrainPassability.pipelineTerrainToPassability` for trace logging.
  */
 export function pipelineTerrainToPassability(kind: PipelineTerrainKind): PassabilityTerrain {
-  if (kind === 'ocean') return 'water';
+  if (kind === 'water') return 'water';
   if (kind === 'coastal') return 'coastal';
   return 'land';
 }

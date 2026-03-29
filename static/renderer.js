@@ -14402,10 +14402,9 @@
 
   // src/shared/pipelineTerrain.ts
   var PIPELINE_TERRAIN_KINDS = [
-    "ocean",
+    "water",
     "coastal",
-    "land",
-    "urban",
+    "plains",
     "forest",
     "mountain",
     "desert",
@@ -14428,22 +14427,22 @@
       fillAlphaMultiplier: 0.55,
       hatchAlphaMultiplier: 0.375,
       fills: {
-        ocean: "rgba(42, 117, 214, 0.28)",
+        water: "rgba(42, 117, 214, 0.28)",
         coastal: "rgba(59, 186, 194, 0.24)",
-        land: "rgba(186, 208, 160, 0.2)",
+        plains: "rgba(186, 208, 160, 0.2)",
         forest: "rgba(50, 142, 74, 0.43)",
         mountain: "rgba(154, 77, 122, 0.54)",
         desert: "rgba(214, 182, 120, 0.44)",
-        arctic: "rgba(234, 245, 255, 0.5)",
-        urban: "rgba(137, 117, 98, 0.46)"
+        arctic: "rgba(234, 245, 255, 0.5)"
       },
       hatches: {
         mountain: { color: "rgba(95, 24, 74, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
         forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
         coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
-        urban: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
         desert: { color: "rgba(150, 104, 43, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
-      }
+      },
+      urbanOverlayFill: "rgba(137, 117, 98, 0.46)",
+      urbanOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
     },
     atlas: {
       label: "Atlas",
@@ -14451,22 +14450,22 @@
       fillAlphaMultiplier: 0.55,
       hatchAlphaMultiplier: 0.375,
       fills: {
-        ocean: "rgba(56, 128, 214, 0.28)",
+        water: "rgba(56, 128, 214, 0.28)",
         coastal: "rgba(76, 173, 188, 0.24)",
-        land: "rgba(193, 211, 165, 0.2)",
+        plains: "rgba(193, 211, 165, 0.2)",
         forest: "rgba(70, 146, 86, 0.43)",
         mountain: "rgba(168, 70, 96, 0.55)",
         desert: "rgba(220, 189, 128, 0.44)",
-        arctic: "rgba(235, 244, 255, 0.5)",
-        urban: "rgba(141, 122, 103, 0.46)"
+        arctic: "rgba(235, 244, 255, 0.5)"
       },
       hatches: {
         mountain: { color: "rgba(114, 26, 50, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
         forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
         coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
-        urban: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
         desert: { color: "rgba(152, 109, 47, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
-      }
+      },
+      urbanOverlayFill: "rgba(141, 122, 103, 0.46)",
+      urbanOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
     },
     wargame: {
       label: "Wargame",
@@ -14474,22 +14473,22 @@
       fillAlphaMultiplier: 0.55,
       hatchAlphaMultiplier: 0.375,
       fills: {
-        ocean: "rgba(38, 118, 206, 0.28)",
+        water: "rgba(38, 118, 206, 0.28)",
         coastal: "rgba(70, 176, 192, 0.24)",
-        land: "rgba(170, 188, 136, 0.2)",
+        plains: "rgba(170, 188, 136, 0.2)",
         forest: "rgba(58, 150, 86, 0.43)",
         mountain: "rgba(218, 76, 146, 0.5)",
         desert: "rgba(221, 171, 88, 0.46)",
-        arctic: "rgba(221, 236, 255, 0.5)",
-        urban: "rgba(132, 112, 97, 0.46)"
+        arctic: "rgba(221, 236, 255, 0.5)"
       },
       hatches: {
         mountain: { color: "rgba(255, 162, 214, 0.68)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
         forest: { color: "rgba(130, 245, 190, 0.58)", spacing: 7, lineWidth: 0.9, reverseDiagonal: true },
         coastal: { color: "rgba(110, 220, 235, 0.42)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
-        urban: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.88, reverseDiagonal: true, crosshatch: true },
         desert: { color: "rgba(255, 207, 130, 0.5)", spacing: 7, lineWidth: 1.05, reverseDiagonal: false, pattern: "dots" }
-      }
+      },
+      urbanOverlayFill: "rgba(132, 112, 97, 0.46)",
+      urbanOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.88, reverseDiagonal: true, crosshatch: true }
     },
     scientific: {
       label: "Scientific",
@@ -14497,22 +14496,22 @@
       fillAlphaMultiplier: 0.55,
       hatchAlphaMultiplier: 0.375,
       fills: {
-        ocean: "rgba(52, 120, 204, 0.28)",
+        water: "rgba(52, 120, 204, 0.28)",
         coastal: "rgba(69, 165, 186, 0.24)",
-        land: "rgba(188, 205, 162, 0.2)",
+        plains: "rgba(188, 205, 162, 0.2)",
         forest: "rgba(52, 136, 84, 0.43)",
         mountain: "rgba(127, 83, 171, 0.55)",
         desert: "rgba(206, 176, 118, 0.44)",
-        arctic: "rgba(234, 244, 255, 0.5)",
-        urban: "rgba(130, 112, 96, 0.46)"
+        arctic: "rgba(234, 244, 255, 0.5)"
       },
       hatches: {
         mountain: { color: "rgba(74, 35, 116, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
         forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
         coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
-        urban: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
         desert: { color: "rgba(145, 104, 42, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
-      }
+      },
+      urbanOverlayFill: "rgba(130, 112, 96, 0.46)",
+      urbanOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
     }
   };
   var activeTerrainStyleId = "default";
@@ -14597,20 +14596,21 @@
     activeTerrainStyleId = id;
     patternCache.clear();
   }
-  function terrainKindFillStyle(kind) {
+  function terrainKindFillStyle(kind, options) {
     const k = kind;
     const p = activePreset();
-    return boostRgbaAlpha(p.fills[k] ?? UNKNOWN_FILL, p.fillAlphaMultiplier);
+    const base = options?.urbanOverlay ? p.urbanOverlayFill : p.fills[k] ?? UNKNOWN_FILL;
+    return boostRgbaAlpha(base, p.fillAlphaMultiplier);
   }
   function landHoverFillStyle() {
     return boostRgbaAlpha(LAND_HOVER_FILL_BASE, activePreset().fillAlphaMultiplier);
   }
-  function terrainKindPattern(ctx, kind, fillAndHatchAlphaScale = 1) {
+  function terrainKindPattern(ctx, kind, fillAndHatchAlphaScale = 1, options) {
     const k = kind;
-    const key = `${activeTerrainStyleId}:${k}:${fillAndHatchAlphaScale}`;
+    const key = `${activeTerrainStyleId}:${k}:${fillAndHatchAlphaScale}:${options?.urbanOverlay ? "urban" : "base"}`;
     if (patternCache.has(key)) return patternCache.get(key) ?? null;
-    const spec = activePreset().hatches[k];
     const p = activePreset();
+    const spec = options?.urbanOverlay ? p.urbanOverlayHatch : p.hatches[k];
     const pat = spec ? spec.pattern === "dots" ? makeDotPattern(
       boostRgbaAlpha(boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier), fillAndHatchAlphaScale),
       spec.spacing,
@@ -14628,16 +14628,17 @@
   function fillHexTerrain(ctx, terrainKind, drawPath, options) {
     const scale = options?.fillAndHatchAlphaScale ?? 1;
     const k = terrainKind;
-    if (options?.landHoverFill && k === "land") {
+    const isUrban = options?.isUrban === true && k !== "mountain" && k !== "arctic";
+    if (!isUrban && options?.landHoverFill && k === "plains") {
       drawPath();
       ctx.fillStyle = boostRgbaAlpha(landHoverFillStyle(), scale);
       ctx.fill();
       return;
     }
     drawPath();
-    ctx.fillStyle = boostRgbaAlpha(terrainKindFillStyle(terrainKind), scale);
+    ctx.fillStyle = boostRgbaAlpha(terrainKindFillStyle(terrainKind, { urbanOverlay: isUrban }), scale);
     ctx.fill();
-    const pat = terrainKindPattern(ctx, terrainKind, scale);
+    const pat = terrainKindPattern(ctx, terrainKind, scale, { urbanOverlay: isUrban });
     if (pat) {
       drawPath();
       ctx.fillStyle = pat;
@@ -14702,6 +14703,156 @@
       lab.style.color = "#444";
       row.appendChild(lab);
       container.appendChild(row);
+    }
+  }
+
+  // src/renderer/terrainInfrastructureIconPaths.ts
+  var AIRPLANE_VIEWBOX_SIZE = 16;
+  var AIRPLANE_VIEWBOX_CENTER = { x: 8, y: 8 };
+  var ANCHOR_VIEWBOX = { x: 0, y: -960, w: 960, h: 960 };
+  var ANCHOR_VIEWBOX_CENTER = { x: 480, y: -480 };
+  var BOOTSTRAP_AIRPLANE_FILL_PATH = "M6.428 1.151C6.708.591 7.213 0 8 0s1.292.592 1.572 1.151C9.861 1.73 10 2.431 10 3v3.691l5.17 2.585a1.5 1.5 0 0 1 .83 1.342V12a.5.5 0 0 1-.582.493l-5.507-.918-.375 2.253 1.318 1.318A.5.5 0 0 1 10.5 16h-5a.5.5 0 0 1-.354-.854l1.319-1.318-.376-2.253-5.507.918A.5.5 0 0 1 0 12v-1.382a1.5 1.5 0 0 1 .83-1.342L6 6.691V3c0-.568.14-1.271.428-1.849";
+  var MATERIAL_SYMBOLS_ANCHOR_PATH = "M355-102q-64-22-116-60t-85.5-89Q120-302 120-360v-120l160 120-62 62q29 51 92 88t130 47v-357H320v-80h120v-47q-35-13-57.5-43.5T360-760q0-50 35-85t85-35q50 0 85 35t35 85q0 39-22.5 69.5T520-647v47h120v80H520v357q67-10 130-47t92-88l-62-62 160-120v120q0 58-33.5 109T721-162q-52 38-116 60T480-80q-61 0-125-22Zm125-618q17 0 28.5-11.5T520-760q0-17-11.5-28.5T480-800q-17 0-28.5 11.5T440-760q0 17 11.5 28.5T480-720Z";
+  var cachedAirplanePath = null;
+  var cachedAnchorPath = null;
+  function getAirplanePath2D() {
+    if (!cachedAirplanePath) cachedAirplanePath = new Path2D(BOOTSTRAP_AIRPLANE_FILL_PATH);
+    return cachedAirplanePath;
+  }
+  function getAnchorPath2D() {
+    if (!cachedAnchorPath) cachedAnchorPath = new Path2D(MATERIAL_SYMBOLS_ANCHOR_PATH);
+    return cachedAnchorPath;
+  }
+
+  // src/renderer/terrainInfrastructureOverlay.ts
+  function centroidAndSpan(pts) {
+    if (pts.length === 0) return { cx: 0, cy: 0, span: 1 };
+    let sx = 0;
+    let sy = 0;
+    let minX = pts[0].x;
+    let maxX = pts[0].x;
+    let minY = pts[0].y;
+    let maxY = pts[0].y;
+    for (const p of pts) {
+      sx += p.x;
+      sy += p.y;
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const w = Math.max(1e-6, maxX - minX);
+    const h = Math.max(1e-6, maxY - minY);
+    return { cx: sx / pts.length, cy: sy / pts.length, span: Math.min(w, h) };
+  }
+  function drawFilledSvgPath(ctx, path, screenCx, screenCy, pixelSize, outlineScreenPx, fillStyle, strokeStyle, viewBox) {
+    const s = pixelSize / Math.max(viewBox.width, viewBox.height);
+    ctx.save();
+    ctx.translate(screenCx, screenCy);
+    ctx.scale(s, s);
+    ctx.translate(-viewBox.originX, -viewBox.originY);
+    ctx.fillStyle = fillStyle;
+    ctx.fill(path);
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = outlineScreenPx / s;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.miterLimit = 1.6;
+    ctx.stroke(path);
+    ctx.restore();
+  }
+  var AIRPLANE_WIDTH_SCALE = 0.74;
+  var AIRPLANE_HEIGHT_SCALE = 1 - (1 - AIRPLANE_WIDTH_SCALE) / 2;
+  function drawAirplaneAt(ctx, cx, cy, pixelSize, outlineScreenPx, fillStyle, strokeStyle) {
+    const vb = Math.max(AIRPLANE_VIEWBOX_SIZE, AIRPLANE_VIEWBOX_SIZE);
+    const s = pixelSize / vb;
+    const sx = s * AIRPLANE_WIDTH_SCALE;
+    const sy = s * AIRPLANE_HEIGHT_SCALE;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(sx, sy);
+    ctx.translate(-AIRPLANE_VIEWBOX_CENTER.x, -AIRPLANE_VIEWBOX_CENTER.y);
+    const path = getAirplanePath2D();
+    ctx.fillStyle = fillStyle;
+    ctx.fill(path);
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = outlineScreenPx / Math.max(sx, sy * 0.92);
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.miterLimit = 1.6;
+    ctx.stroke(path);
+    ctx.restore();
+  }
+  function drawAnchorAt(ctx, cx, cy, pixelSize, outlineScreenPx, fillStyle, strokeStyle) {
+    drawFilledSvgPath(ctx, getAnchorPath2D(), cx, cy, pixelSize, outlineScreenPx, fillStyle, strokeStyle, {
+      width: ANCHOR_VIEWBOX.w,
+      height: ANCHOR_VIEWBOX.h,
+      originX: ANCHOR_VIEWBOX_CENTER.x,
+      originY: ANCHOR_VIEWBOX_CENTER.y
+    });
+  }
+  function drawDiagonalSlash(ctx, pts, lineWidthScreenPx, lengthLinearScale = 1) {
+    if (pts.length === 0) return;
+    let minX = pts[0].x;
+    let maxX = pts[0].x;
+    let minY = pts[0].y;
+    let maxY = pts[0].y;
+    for (const p of pts) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const dx = maxX - minX;
+    const dy = minY - maxY;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-6) return;
+    const ux = dx / len;
+    const uy = dy / len;
+    const mx = (minX + maxX) * 0.5;
+    const my = (minY + maxY) * 0.5;
+    const half = len * 0.25 * lengthLinearScale;
+    ctx.beginPath();
+    ctx.moveTo(mx - ux * half, my - uy * half);
+    ctx.lineTo(mx + ux * half, my + uy * half);
+    ctx.strokeStyle = "#0d0d0d";
+    ctx.lineWidth = lineWidthScreenPx;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.stroke();
+  }
+  var AIRPORT_FILL = "#e8eef6";
+  var AIRPORT_STROKE = "#1a1f28";
+  var PORT_FILL = "#6eb6f0";
+  var PORT_STROKE = "#0d1f35";
+  var GLYPH_OUTLINE_MULT = 1.58;
+  var SLASH_WIDTH_MULT = 2.35;
+  var GLYPH_AIR_PIXEL_FACTOR = 0.22;
+  var GLYPH_ANCHOR_TO_AIR_RATIO = 1.03;
+  var RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE = 1.2;
+  var SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE = 1.2;
+  function drawTerrainInfrastructureGlyphs(ctx, pts, options) {
+    const { showAirport, showPort, outlineScreenPx, glyphAreaScale = 1 } = options;
+    if (!showAirport && !showPort) return;
+    const lin = Math.sqrt(glyphAreaScale);
+    const glyphOutline = Math.max(0.92, outlineScreenPx * GLYPH_OUTLINE_MULT * lin);
+    const { cx, cy, span } = centroidAndSpan(pts);
+    const pxAir = span * GLYPH_AIR_PIXEL_FACTOR * lin;
+    const pxAnchor = pxAir * GLYPH_ANCHOR_TO_AIR_RATIO;
+    const both = showAirport && showPort;
+    if (both) {
+      drawDiagonalSlash(ctx, pts, Math.max(1.15, outlineScreenPx * SLASH_WIDTH_MULT * lin), lin);
+      const off = span * 0.14 * lin;
+      drawAirplaneAt(ctx, cx - off, cy - off, pxAir, glyphOutline, AIRPORT_FILL, AIRPORT_STROKE);
+      drawAnchorAt(ctx, cx + off, cy + off, pxAnchor, glyphOutline, PORT_FILL, PORT_STROKE);
+      return;
+    }
+    const soloLin = Math.sqrt(SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE);
+    const soloOutline = glyphOutline * soloLin;
+    if (showAirport) {
+      drawAirplaneAt(ctx, cx, cy, pxAir * soloLin, soloOutline, AIRPORT_FILL, AIRPORT_STROKE);
+    } else {
+      drawAnchorAt(ctx, cx, cy, pxAnchor * soloLin, soloOutline, PORT_FILL, PORT_STROKE);
     }
   }
 
@@ -14832,24 +14983,46 @@
     if (!kind) return "Unknown";
     return kind.charAt(0).toUpperCase() + kind.slice(1);
   }
-  function terrainLabelForHex(h3) {
-    if (!gameState) return "Unknown";
+  function terrainStateForRes1Hex(h3) {
+    if (!gameState) return { terrainKind: "Unknown", isUrban: false };
     const hx = gameState.hexes.find((h) => h.h3Index === h3);
-    if (!hx) return "Unknown";
-    const kind = hx.terrainKind ?? (hx.terrain === "water" ? "ocean" : hx.terrain === "coastal" ? "coastal" : "land");
-    return formatTerrainKindLabel(kind);
+    if (!hx) return { terrainKind: "Unknown", isUrban: false };
+    return {
+      terrainKind: hx.terrainKind ?? (hx.terrain === "water" ? "water" : hx.terrain === "coastal" ? "coastal" : "plains"),
+      isUrban: false
+    };
   }
   function terrainKindForRes1Hex(h3) {
-    if (!gameState) return "land";
-    const hx = gameState.hexes.find((h) => h.h3Index === h3);
-    if (!hx) return "land";
-    return hx.terrainKind ?? (hx.terrain === "water" ? "ocean" : hx.terrain === "coastal" ? "coastal" : "land");
+    return terrainStateForRes1Hex(h3).terrainKind;
   }
-  function terrainLabelForPointer(clientX, clientY, fallbackRes1H3) {
-    if (!gameState) return "Unknown";
-    if (!res4Visible) return fallbackRes1H3 ? terrainLabelForHex(fallbackRes1H3) : "Unknown";
+  function featureLabelsForRes1Hex(h3) {
+    if (!infraGlyphsAllowedForRes1Hex(h3)) return [];
+    const labels = [];
+    if (terrainInfraRes1Airport.has(h3)) labels.push("Airports");
+    if (terrainInfraRes1Port.has(h3)) labels.push("Ports");
+    return labels;
+  }
+  function featureLabelsForRes4Child(parentH3, childH3) {
+    if (!infraGlyphsAllowedForRes4Child(parentH3, childH3)) return [];
+    const labels = [];
+    if (terrainInfraRes4Airport.has(childH3)) labels.push("Airport");
+    if (terrainInfraRes4Port.has(childH3)) labels.push("Port");
+    return labels;
+  }
+  function terrainStateForPointer(clientX, clientY, fallbackRes1H3) {
+    if (!gameState) return { terrainKind: "Unknown", isUrban: false, features: [] };
+    const res4On = shouldRenderRes4Hexes();
+    if (!res4On) {
+      if (!fallbackRes1H3) return { terrainKind: "Unknown", isUrban: false, features: [] };
+      const state = terrainStateForRes1Hex(fallbackRes1H3);
+      return { ...state, features: featureLabelsForRes1Hex(fallbackRes1H3) };
+    }
     const map = getMainLeafletMap();
-    if (!map) return fallbackRes1H3 ? terrainLabelForHex(fallbackRes1H3) : "Unknown";
+    if (!map) {
+      if (!fallbackRes1H3) return { terrainKind: "Unknown", isUrban: false, features: [] };
+      const state = terrainStateForRes1Hex(fallbackRes1H3);
+      return { ...state, features: featureLabelsForRes1Hex(fallbackRes1H3) };
+    }
     const L = getLeafletGlobal();
     const rect = map.getContainer().getBoundingClientRect();
     const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
@@ -14857,16 +15030,28 @@
       const detailH3 = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
       const parentH3 = cellToParent(detailH3, WORLD_H3_RESOLUTION);
       const parentKind = terrainKindForRes1Hex(parentH3);
-      const detailKind = res4TerrainOverridesByH3.get(detailH3) ?? parentKind;
-      return formatTerrainKindLabel(detailKind);
+      const detail = res4TerrainOverridesByH3.get(detailH3);
+      return {
+        terrainKind: detail?.terrainKind ?? parentKind,
+        isUrban: detail?.isUrban ?? false,
+        features: featureLabelsForRes4Child(parentH3, detailH3)
+      };
     } catch {
-      return fallbackRes1H3 ? terrainLabelForHex(fallbackRes1H3) : "Unknown";
+      if (!fallbackRes1H3) return { terrainKind: "Unknown", isUrban: false, features: [] };
+      const state = terrainStateForRes1Hex(fallbackRes1H3);
+      return { ...state, features: featureLabelsForRes1Hex(fallbackRes1H3) };
     }
   }
-  function showTerrainTooltip(clientX, clientY, text) {
+  function formatTerrainTooltipHtml(state) {
+    const terrainLabel = formatTerrainKindLabel(state.terrainKind);
+    const terrainLine = state.isUrban ? `<strong>Terrain:</strong> ${terrainLabel}, Urban` : `<strong>Terrain:</strong> ${terrainLabel}`;
+    if (state.features.length === 0) return terrainLine;
+    return `${terrainLine}<br/><strong>Features:</strong> ${state.features.join(", ")}`;
+  }
+  function showTerrainTooltip(clientX, clientY, state) {
     const el = document.getElementById("hex-tooltip");
     if (!el) return;
-    el.textContent = text;
+    el.innerHTML = formatTerrainTooltipHtml(state);
     el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
     el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
     el.classList.remove("hidden");
@@ -14888,6 +15073,10 @@
   var rangedModeActive = false;
   var gameState = null;
   var res4TerrainOverridesByH3 = /* @__PURE__ */ new Map();
+  var terrainInfraRes1Airport = /* @__PURE__ */ new Set();
+  var terrainInfraRes1Port = /* @__PURE__ */ new Set();
+  var terrainInfraRes4Airport = /* @__PURE__ */ new Set();
+  var terrainInfraRes4Port = /* @__PURE__ */ new Set();
   var res4ChildrenByParent = /* @__PURE__ */ new Map();
   var res4Visible = false;
   var resolutionMoveAnimation = null;
@@ -14958,7 +15147,7 @@
         const p = map.latLngToContainerPoint(L.latLng(lat, lng));
         return { x: p.x, y: p.y };
       });
-      const kind = hx.terrainKind ?? (hx.terrain === "water" ? "ocean" : hx.terrain === "coastal" ? "coastal" : "land");
+      const kind = hx.terrainKind ?? (hx.terrain === "water" ? "water" : hx.terrain === "coastal" ? "coastal" : "plains");
       const drawClosedPath = () => {
         ctx.beginPath();
         for (let i = 0; i < pts.length; i++) {
@@ -14971,12 +15160,14 @@
       if (reverseTerrainFillWhileHeld) {
         fillHexTerrain(ctx, kind, drawClosedPath, {
           fillAndHatchAlphaScale: hoveredHexH3 === hx.h3Index ? 0.6 : 1,
-          landHoverFill: kind === "land"
+          landHoverFill: kind === "plains",
+          isUrban: false
         });
       } else if (!res4Active && hoveredHexH3 === hx.h3Index) {
         fillHexTerrain(ctx, kind, drawClosedPath, {
           fillAndHatchAlphaScale: 2,
-          landHoverFill: kind === "land"
+          landHoverFill: kind === "plains",
+          isUrban: false
         });
       }
       const stroke = getActiveHexStrokeStyle();
@@ -15071,14 +15262,16 @@
     for (const parent of gameState.hexes) {
       const parentPts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
       if (!projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight)) continue;
-      const parentKind = parent.terrainKind ?? (parent.terrain === "water" ? "ocean" : parent.terrain === "coastal" ? "coastal" : "land");
+      const parentKind = parent.terrainKind ?? (parent.terrain === "water" ? "water" : parent.terrain === "coastal" ? "coastal" : "plains");
       let children = res4ChildrenByParent.get(parent.h3Index);
       if (!children) {
         children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
         res4ChildrenByParent.set(parent.h3Index, children);
       }
       for (const child of children) {
-        const terrainKind = res4TerrainOverridesByH3.get(child) ?? parentKind;
+        const override = res4TerrainOverridesByH3.get(child);
+        const terrainKind = override?.terrainKind ?? parentKind;
+        const isUrban = override?.isUrban ?? false;
         const pts = projectHexBoundaryToContainerPoints(child, map, L);
         if (!projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight)) continue;
         const drawClosedPath = () => {
@@ -15094,19 +15287,92 @@
           if (hoveredDetailHexH3 === child) {
             fillHexTerrain(ctx, terrainKind, drawClosedPath, {
               fillAndHatchAlphaScale: 0.6,
-              landHoverFill: terrainKind === "land"
+              landHoverFill: terrainKind === "plains",
+              isUrban
             });
           }
         } else {
           fillHexTerrain(ctx, terrainKind, drawClosedPath, {
             fillAndHatchAlphaScale: hoveredDetailHexH3 === child ? 2 : 1,
-            landHoverFill: hoveredDetailHexH3 === child && terrainKind === "land"
+            landHoverFill: hoveredDetailHexH3 === child && terrainKind === "plains",
+            isUrban
           });
         }
         ctx.strokeStyle = stroke.color;
         ctx.lineWidth = Math.max(0.28, stroke.width * 0.62);
         drawClosedPath();
         ctx.stroke();
+      }
+    }
+  }
+  function res1HexHasUnits(h3) {
+    return !!gameState?.units.some((u) => u.h3Index === h3);
+  }
+  function infraGlyphsAllowedForRes1Hex(h3) {
+    const res4Active = shouldRenderRes4Hexes();
+    const fillShown = reverseTerrainFillWhileHeld || !res4Active && hoveredHexH3 === h3;
+    if (!fillShown) return false;
+    const hasUnits = res1HexHasUnits(h3);
+    if (hasUnits && !reverseTerrainFillWhileHeld) return false;
+    return true;
+  }
+  function infraGlyphsAllowedForRes4Child(parentH3, childH3) {
+    if (reverseTerrainFillWhileHeld) {
+      if (hoveredDetailHexH3 !== childH3) return false;
+    }
+    const hasUnits = res1HexHasUnits(parentH3);
+    if (hasUnits && !reverseTerrainFillWhileHeld) return false;
+    return true;
+  }
+  function drawTerrainInfrastructureOverlays(ctx) {
+    if (!gameState) return;
+    const map = getMainLeafletMap();
+    if (!map) return;
+    const mapWithZoom = map;
+    const zoom = typeof mapWithZoom.getZoom === "function" ? mapWithZoom.getZoom() : 4;
+    const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
+    const outlineScreenPx = Math.max(0.5, 0.58 * zoomStrokeScale);
+    const L = getLeafletGlobal();
+    const res4On = shouldRenderRes4Hexes();
+    if (!res4On) {
+      for (const hx of gameState.hexes) {
+        if (!infraGlyphsAllowedForRes1Hex(hx.h3Index)) continue;
+        const ap = terrainInfraRes1Airport.has(hx.h3Index);
+        const pt = terrainInfraRes1Port.has(hx.h3Index);
+        if (!ap && !pt) continue;
+        const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
+        const pts = boundary.map(([lat, lng]) => {
+          const p = map.latLngToContainerPoint(L.latLng(lat, lng));
+          return { x: p.x, y: p.y };
+        });
+        drawTerrainInfrastructureGlyphs(ctx, pts, { showAirport: ap, showPort: pt, outlineScreenPx });
+      }
+      return;
+    }
+    const container = map.getContainer();
+    const viewportWidth = Math.max(1, container.clientWidth);
+    const viewportHeight = Math.max(1, container.clientHeight);
+    for (const parent of gameState.hexes) {
+      let children = res4ChildrenByParent.get(parent.h3Index);
+      if (!children) {
+        children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
+        res4ChildrenByParent.set(parent.h3Index, children);
+      }
+      const parentPts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
+      if (!projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight)) continue;
+      for (const child of children) {
+        if (!infraGlyphsAllowedForRes4Child(parent.h3Index, child)) continue;
+        const ap = terrainInfraRes4Airport.has(child);
+        const pt = terrainInfraRes4Port.has(child);
+        if (!ap && !pt) continue;
+        const pts = projectHexBoundaryToContainerPoints(child, map, L);
+        if (!projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight)) continue;
+        drawTerrainInfrastructureGlyphs(ctx, pts, {
+          showAirport: ap,
+          showPort: pt,
+          outlineScreenPx,
+          glyphAreaScale: RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE
+        });
       }
     }
   }
@@ -15488,6 +15754,7 @@
     if (anim && hexList && moveProgress < 1) {
       drawMovingUnits(ctx, w, h, anim.moves, gameState.units, hexList, moveProgress);
     }
+    drawTerrainInfrastructureOverlays(ctx);
     if (anim && hexList) {
       const elapsed = Date.now() - anim.startTime;
       const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
@@ -15950,6 +16217,7 @@
     if (anim && hexList && moveProgress < 1) {
       drawMovingUnits(ctx, w, h, anim.moves, gameState.units, hexList, moveProgress);
     }
+    drawTerrainInfrastructureOverlays(ctx);
     if (anim && hexList) {
       const elapsed = Date.now() - anim.startTime;
       const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
@@ -16434,9 +16702,16 @@
         redraw();
       }).catch((err) => console.error("getGameState failed:", err));
       window.gameApi.getRes4TerrainOverrides().then((rows) => {
-        res4TerrainOverridesByH3 = new Map(rows.map((r) => [r.h3Index, r.terrainKind]));
+        res4TerrainOverridesByH3 = new Map(rows.map((r) => [r.h3Index, { terrainKind: r.terrainKind, isUrban: !!r.isUrban }]));
         requestRedraw();
       }).catch((err) => console.error("getRes4TerrainOverrides failed:", err));
+      window.gameApi.getTerrainInfrastructureHints().then((hints) => {
+        terrainInfraRes1Airport = new Set(hints.res1MajorAirports);
+        terrainInfraRes1Port = new Set(hints.res1MajorPorts);
+        terrainInfraRes4Airport = new Set(hints.res4MajorAirports);
+        terrainInfraRes4Port = new Set(hints.res4MajorPorts);
+        requestRedraw();
+      }).catch((err) => console.error("getTerrainInfrastructureHints failed:", err));
     }
     window.addEventListener("resize", () => {
       resizeAndRedraw();
@@ -16490,7 +16765,7 @@
             showTerrainTooltip(
               lastPointerClientX,
               lastPointerClientY,
-              terrainLabelForPointer(lastPointerClientX, lastPointerClientY, targetHex)
+              terrainStateForPointer(lastPointerClientX, lastPointerClientY, targetHex)
             );
           }, TERRAIN_TOOLTIP_DELAY_MS);
         }
@@ -16498,7 +16773,7 @@
       }
       const tip = document.getElementById("hex-tooltip");
       if (tip && !tip.classList.contains("hidden")) {
-        tip.textContent = terrainLabelForPointer(e.clientX, e.clientY, hit);
+        tip.innerHTML = formatTerrainTooltipHtml(terrainStateForPointer(e.clientX, e.clientY, hit));
         tip.style.left = `${e.clientX + TOOLTIP_OFFSET_PX}px`;
         tip.style.top = `${e.clientY + TOOLTIP_OFFSET_PX}px`;
       }

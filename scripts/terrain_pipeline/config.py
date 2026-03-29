@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Dict, List
 
 
-TERRAIN_ENUM = ("ocean", "coastal", "land", "urban", "forest", "mountain", "desert", "arctic")
+TERRAIN_ENUM = ("water", "coastal", "plains", "urban", "forest", "mountain", "desert", "arctic")
 
 
 @dataclass(frozen=True)
@@ -52,6 +52,8 @@ class InputRasterSet:
     lake_shapefile_name: str = "ne_10m_lakes.shp"
     # Urban polygons; used only for res-4 urban overrides after base terrain classification.
     urban_shapefile_name: str = "ne_10m_urban_areas.shp"
+    airport_shapefile_name: str = "ne_10m_airports.shp"
+    port_shapefile_name: str = "ne_10m_ports.shp"
     landcover_by_class: Dict[int, str] = field(
         default_factory=lambda: {
             1: "consensus_full_class_1.tif",
@@ -131,7 +133,7 @@ class PipelineConfig:
 
     # Display / QA ordering (not the classify_cell decision order).
     precedence: List[str] = field(
-        default_factory=lambda: ["ocean", "coastal", "urban", "arctic", "forest", "mountain", "desert", "land"]
+        default_factory=lambda: ["water", "coastal", "urban", "arctic", "forest", "mountain", "desert", "plains"]
     )
 
     # Land-cover mapping defaults for classes not explicitly elevated by precedence.
@@ -141,14 +143,14 @@ class PipelineConfig:
             2: "forest",
             3: "forest",
             4: "forest",
-            5: "land",
-            6: "land",
-            7: "land",
-            8: "land",
-            9: "land",
+            5: "plains",
+            6: "plains",
+            7: "plains",
+            8: "plains",
+            9: "plains",
             10: "arctic",
             11: "desert",
-            12: "ocean",
+            12: "water",
         }
     )
     thresholds: ClassifierThresholds = field(default_factory=ClassifierThresholds)
@@ -158,11 +160,15 @@ class PipelineConfig:
     area_weighted_samples_per_cell_res4: int = 4
 
     # Fallback for no-data cells is fixed by product decision.
-    nodata_fallback_terrain: str = "ocean"
+    nodata_fallback_terrain: str = "water"
 
     metadata_filename: str = "terrain_generation_metadata.json"
     base_csv_filename: str = "terrain_res1_base.csv"
     exceptions_csv_filename: str = "terrain_res4_exceptions.csv"
+
+    # Per-hex feature metadata (JSON) for TS / analytics; separate from terrain CSV classification outputs.
+    terrain_res1_metadata_filename: str = "terrain_res1_metadata.json"
+    terrain_res4_metadata_filename: str = "terrain_res4_metadata.json"
 
 
 def build_default_config() -> PipelineConfig:

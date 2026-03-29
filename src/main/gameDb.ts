@@ -12,10 +12,12 @@ import Database from 'better-sqlite3';
 import { cellToLatLng } from 'h3-js';
 import { getOrderedHexList, getWorldUnitCounts } from './mapData';
 import {
-  assertTerrainCsvMatchesHexList,
-  loadTerrainRes1CsvFromPath,
-  resolveTerrainRes1CsvPath,
-} from './terrainRes1Csv';
+  assertTerrainMetadataMatchesHexList,
+} from './terrainMetadataLoad';
+import {
+  ensureTerrainClassificationCacheLoaded,
+  getTerrainRes1KindsFromCache,
+} from './terrainClassificationCache';
 import { pipelineTerrainToPassability } from './terrainPassability';
 import { logDebug, logError, logTrace } from './logger';
 import type { GameStateSnapshot } from '../shared/ipcTypes';
@@ -23,12 +25,12 @@ import type { GameStateSnapshot } from '../shared/ipcTypes';
 export type { GameStateSnapshot } from '../shared/ipcTypes';
 
 /** Baseline schema version; bump when a future milestone adds migration chains. */
-export const EXPECTED_USER_VERSION = 3;
+export const EXPECTED_USER_VERSION = 4;
 
 /**
- * Baseline filename for world-map + terrain_kind schema (v3: coastal passability).
+ * Baseline filename for world-map + terrain_kind schema (v4: pipeline labels water/plains).
  */
-export const GAME_DB_FILE_NAME = 'game-baseline-v3.sqlite';
+export const GAME_DB_FILE_NAME = 'game-baseline-v4.sqlite';
 
 let db: InstanceType<typeof Database> | null = null;
 
@@ -62,7 +64,7 @@ function getFullDdl(): string {
     CREATE TABLE IF NOT EXISTS hexes (
       h3_index TEXT PRIMARY KEY,
       terrain TEXT NOT NULL CHECK (terrain IN ('land', 'water', 'coastal')),
-      terrain_kind TEXT NOT NULL CHECK (terrain_kind IN ('ocean', 'coastal', 'land', 'urban', 'forest', 'mountain', 'desert', 'arctic'))
+      terrain_kind TEXT NOT NULL CHECK (terrain_kind IN ('water', 'coastal', 'plains', 'forest', 'mountain', 'desert', 'arctic'))
     );
 
     CREATE TABLE IF NOT EXISTS units (
@@ -356,6 +358,7 @@ export async function initDatabase(): Promise<void> {
 
   if (!fs.existsSync(canonicalPath)) {
     createFreshGameDatabaseAt(canonicalPath);
+    ensureTerrainClassificationCacheLoaded();
     return;
   }
 
@@ -380,6 +383,9 @@ export async function initDatabase(): Promise<void> {
     logError('gameDb initDatabase: validation/open failed', err);
     recoverCorruptDatabaseUi(canonicalPath, err);
   }
+
+  // Keep terrain metadata failures distinct from DB recovery.
+  ensureTerrainClassificationCacheLoaded();
 }
 
 function seedGameSeedIfMissing(): void {
@@ -404,21 +410,21 @@ export function getGameSeed(): number {
 }
 
 /**
- * Seeds all world hexes from `terrain_res1_base.csv`: `terrain` is passability (land / water / coastal);
- * `terrain_kind` preserves pipeline labels for the renderer.
+ * Seeds all world hexes from bundled `terrain_res1_metadata.json` via the in-memory classification cache:
+ * `terrain` is passability (land / water / coastal); `terrain_kind` preserves pipeline labels for the renderer.
  */
-function seedHexesFromTerrainCsv(): void {
-  logDebug('gameDb seedHexesFromTerrainCsv');
+function seedHexesFromTerrainMetadata(): void {
+  logDebug('gameDb seedHexesFromTerrainMetadata');
   if (db === null) return;
+  ensureTerrainClassificationCacheLoaded();
   const hexes = getOrderedHexList();
-  const csvPath = resolveTerrainRes1CsvPath();
-  const byH3 = loadTerrainRes1CsvFromPath(csvPath);
-  assertTerrainCsvMatchesHexList(byH3, hexes);
+  const byH3 = getTerrainRes1KindsFromCache();
+  assertTerrainMetadataMatchesHexList(byH3, hexes);
   for (const h3 of hexes) {
     const kind = byH3.get(h3);
     if (!kind) {
-      logError('gameDb seedHexesFromTerrainCsv: missing row', new Error(`no CSV row for ${h3}`));
-      throw new Error(`terrain CSV missing h3_index ${h3}`);
+      logError('gameDb seedHexesFromTerrainMetadata: missing row', new Error(`no classified kind for ${h3}`));
+      throw new Error(`terrain metadata missing h3_index ${h3}`);
     }
     const terrain = pipelineTerrainToPassability(kind);
     run('INSERT INTO hexes (h3_index, terrain, terrain_kind) VALUES (?, ?, ?)', [h3, terrain, kind]);
@@ -558,7 +564,7 @@ export function getGameState(): GameStateSnapshot {
     return {
       h3Index,
       terrain: row?.terrain ?? 'land',
-      terrainKind: row?.terrain_kind ?? 'land',
+      terrainKind: row?.terrain_kind ?? 'plains',
     };
   });
   const unitRows = getAll<{ id: string; player: string; unitType: string; h3Index: string }>(
@@ -769,7 +775,7 @@ export function clearAiPendingOrders(playerId: string): void {
 }
 
 /**
- * Re-initializes the game for a new match: world map from terrain CSV, fresh seed, hexes/units, turn state,
+ * Re-initializes the game for a new match: world map from terrain metadata classification, fresh seed, hexes/units, turn state,
  * pending orders, callbacks, AI memory, and standing orders cleared so no prior-match AI state leaks.
  */
 export function resetGameForNewMatch(): void {
@@ -780,7 +786,7 @@ export function resetGameForNewMatch(): void {
   run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('map_size', 'world')");
   run("DELETE FROM game_config WHERE key = 'game_seed'");
   seedGameSeedIfMissing();
-  seedHexesFromTerrainCsv();
+  seedHexesFromTerrainMetadata();
   seedUnits();
   run('DELETE FROM pending_orders');
   run('DELETE FROM pending_ranged_orders');

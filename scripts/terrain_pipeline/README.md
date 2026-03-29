@@ -11,6 +11,25 @@ Offline EarthEnv-to-H3 terrain generation for milestone 1.2.
 - `data/generated/terrain_generation_metadata.json`
 - QA summaries in `data/generated/qa/`
 
+### Terrain feature metadata (JSON, optional)
+
+Separate entrypoint — per-hex mask and raster-derived means for **all** res-1 and res-4 cells (no terrain label, no res-4 parent filtering):
+
+- `data/generated/terrain_res1_metadata.json`
+- `data/generated/terrain_res4_metadata.json`
+
+Res-1 records include water-mask metrics, raster means, and point counts:
+
+- `airport_count_total`
+- `airport_count_by_scalerank` (sparse array; includes sentinel `-1` bucket when needed)
+- `port_count_total`
+- `port_count_by_scalerank` (sparse array; includes sentinel `-1` bucket when needed)
+
+Res-4 records include all res-1 fields plus urban metrics:
+
+- aggregate: `all_urban`, `intersects_urban`, `urban_edges`
+- per-rank: `urban_by_scalerank[]` with `scalerank`, `all_urban`, `intersects_urban`, `urban_edges`
+
 ## Prerequisites
 
 1. Python 3.13+
@@ -29,7 +48,13 @@ Offline EarthEnv-to-H3 terrain generation for milestone 1.2.
    - `postgis`
    - `h3`
 5. Source rasters in `F:\Data` (EarthEnv land-cover classes 1-12 + topography files).
-6. **Water + urban shapefiles** at `F:\Data\<ocean_shapefile_name>`, `F:\Data\<lake_shapefile_name>`, and `F:\Data\<urban_shapefile_name>` (defaults **`ne_10m_ocean.shp`**, **`ne_10m_lakes.shp`**, **`ne_10m_urban_areas.shp`**). Ocean drives res-1 water; lakes are merged with ocean for res-4 water; urban polygons are applied only to res-4 land cells. Paths are `InputRasterSet.root` / `InputRasterSet.*_shapefile_name` in `config.py`. Phase 1 validates all files load. Sidecar files (`.dbf`, `.shx`, `.prj`, …) must accompany each `.shp` where required by the driver.
+6. **Water + urban + point shapefiles** at `F:\Data\<...>`:
+   - water masks: defaults **`ne_10m_ocean.shp`**, **`ne_10m_lakes.shp`**
+   - urban polygons: default **`ne_10m_urban_areas.shp`**
+   - airports: default **`ne_10m_airports.shp`** (`featurecla == "Airport"`)
+   - ports: default **`ne_10m_ports.shp`** (`featurecla == "Port"`)
+
+   Ocean drives res-1 water; lakes are merged with ocean for res-4 water; urban polygons are applied only to res-4 cells that are not fully in water. Airport/port points are assigned to exactly one hex per resolution using `h3.latlng_to_cell(...)`. Paths are `InputRasterSet.root` / `InputRasterSet.*_shapefile_name` in `config.py`. Phase 1 validates these files are present and readable. Sidecar files (`.dbf`, `.shx`, `.prj`, …) must accompany each `.shp` where required by the driver.
 
 Phase 1 validation also requires `AGENT_WARS_DB_PASSWORD` (see [Credentials](#credentials)) so it can open a test connection to Postgres.
 
@@ -53,18 +78,38 @@ Debug dry-run with limited res-4 processing:
 python -m scripts.terrain_pipeline.cli run --max-child-cells 5000 --verbose
 ```
 
+### Metadata export (separate CLI)
+
+Validation only (same phase-1 gates as classification: DB, rasters, shapefiles):
+
+```powershell
+python -m scripts.terrain_pipeline.metadata_cli validate --verbose
+```
+
+Full metadata export (validate, then write the two metadata JSON files under `data/generated/`):
+
+```powershell
+python -m scripts.terrain_pipeline.metadata_cli run --verbose
+```
+
+Debug dry-run with limited res-4 cells:
+
+```powershell
+python -m scripts.terrain_pipeline.metadata_cli run --max-child-cells 5000 --verbose
+```
+
 ## Classification notes
 
-- Pipeline terrain labels: `ocean|coastal|land|urban|forest|mountain|desert|arctic`
+- Pipeline terrain labels (classification CSV path): `water|coastal|plains|urban|forest|mountain|desert|arctic`
 - **Ocean / coastal (shapefiles):** Build the H3 cell polygon (WGS84), then test in **EPSG:3857** using Shapely (same idea as Web Mercator tiles):
   - **Res-1:** dissolved **ocean** shapefile only (reproject to WGS84 if needed).
   - **Res-4:** dissolved **ocean ∪ lakes** union (same predicate rules as ocean-only).
-  - Water geometry **`covers`** the cell → **`ocean`**; **`intersects`** but not **`covers`** → **`coastal`**; no intersection → **interior** biome stack (no other coastal rule).
-- **Interior biomes:** area-sampled land-cover means and topography — `arctic` → `forest` → `mountain` → `desert` → `land` (`ClassifierThresholds` in `config.py`).
-- **Urban (res-4 only):** If a res-4 cell intersects the urban polygon mask and is not fully water (`in_ocean`), classify as `urban` (so urban overrides coastal, but never full ocean/lake water cells).
+  - Water geometry **`covers`** the cell → **`water`**; **`intersects`** but not **`covers`** → **`coastal`**; no intersection → **interior** biome stack (no other coastal rule).
+- **Interior biomes:** area-sampled land-cover means and topography — `arctic` → `forest` → `mountain` → `desert` → `plains` (`ClassifierThresholds` in `config.py`).
+- **Urban (res-4 only):** Metadata export records aggregate urban metrics and `urban_by_scalerank` intersection metrics; app/runtime consumers decide whether to render an urban variation from those fields.
 - Area sample counts: `area_weighted_samples_per_cell_res1` / `area_weighted_samples_per_cell_res4` on `PipelineConfig`.
-- QA / legend ordering (config `precedence`): `ocean`, `coastal`, `urban`, `arctic`, `forest`, `mountain`, `desert`, `land`.
-- The app maps pipeline kinds to passability: `ocean`→`water`, `coastal`→`coastal`, other kinds (including `urban`)→`land`.
+- QA / legend ordering (config `precedence`): `water`, `coastal`, `urban`, `arctic`, `forest`, `mountain`, `desert`, `plains`.
+- The app maps pipeline kinds to passability: `water`→`water`, `coastal`→`coastal`, other base kinds→`land`.
 
 ### PostgreSQL dev reset
 

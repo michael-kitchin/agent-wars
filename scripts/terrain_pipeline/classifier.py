@@ -20,7 +20,10 @@ from .config import ClassifierThresholds, TERRAIN_ENUM
 
 
 
-OceanRelationKind = Literal["in_ocean", "coastal_band", "land"]
+WaterRelationKind = Literal["in_water", "coastal_band", "no_water"]
+
+# Back-compat name for imports; values are water-mask relations, not terrain labels.
+OceanRelationKind = WaterRelationKind
 
 
 
@@ -136,11 +139,11 @@ def classify_interior_biome(features: CellFeatures, t: ClassifierThresholds) -> 
 
     When to use:
 
-        From classify_cell when ``ocean_relation`` is ``land``.
+        From classify_cell when ``water_relation`` is ``no_water``.
 
     What to expect:
 
-        One of ``arctic``, ``forest``, ``mountain``, ``desert``, ``land``. Caller must ensure landcover is non-empty.
+        One of ``arctic``, ``forest``, ``mountain``, ``desert``, ``plains``. Caller must ensure landcover is non-empty.
 
     """
 
@@ -186,7 +189,7 @@ def classify_interior_biome(features: CellFeatures, t: ClassifierThresholds) -> 
 
 
 
-    return "land"
+    return "plains"
 
 
 
@@ -202,7 +205,7 @@ def classify_cell(
 
     *,
 
-    ocean_relation: OceanRelationKind,
+    water_relation: WaterRelationKind,
 
 ) -> str:
 
@@ -218,9 +221,9 @@ def classify_cell(
 
     What to expect:
 
-        Ocean mask: fully inside ocean, or intersecting with **all** boundary sides fully within ocean →
+        Water mask: fully inside water, or intersecting with **all** boundary sides fully within water →
 
-        ``ocean``; intersects ocean but not those cases → ``coastal``;
+        ``water``; intersects water but not those cases → ``coastal``;
 
         no intersection → interior biomes from land-cover/topo only. Empty landcover → ``nodata_fallback``.
 
@@ -244,11 +247,11 @@ def classify_cell(
 
 
 
-    if ocean_relation == "in_ocean":
+    if water_relation == "in_water":
 
-        return "ocean"
+        return "water"
 
-    if ocean_relation == "coastal_band":
+    if water_relation == "coastal_band":
 
         return "coastal"
 

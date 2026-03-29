@@ -1,7 +1,7 @@
 """
 Threshold calibration helper for Earth-like terrain distribution.
 
-Targets are heuristic; refresh `coastal` / `ocean` from QA CSV after a full generate (see plan §2.2).
+Targets are heuristic; refresh `coastal` / `water` from QA CSV after a full generate (see plan §2.2).
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from typing import Dict, List, Tuple
 import h3
 import rasterio
 
-from .classifier import CellFeatures, OceanRelationKind, classify_cell
+from .classifier import CellFeatures, WaterRelationKind, classify_cell
 from .config import ClassifierThresholds, TERRAIN_ENUM, build_default_config
 from .ocean_mask import (
     build_ocean_predicate_context,
@@ -28,13 +28,13 @@ from .sampling import cell_polygon, deterministic_points_within_polygon, sample_
 
 # Heuristic targets (sums to 100); tune from data/generated/qa/terrain_counts_res1.csv after threshold changes.
 TARGET_GLOBAL_PCT = {
-    "ocean": 56.0,
+    "water": 56.0,
     "coastal": 14.0,
     "arctic": 2.0,
     "forest": 9.0,
     "mountain": 7.0,
     "desert": 5.0,
-    "land": 7.0,
+    "plains": 7.0,
 }
 
 
@@ -45,12 +45,12 @@ def _generate_res1_cells() -> List[str]:
     return sorted(set(cells))
 
 
-def _extract_res1_features_and_ocean_relation(
+def _extract_res1_features_and_water_relation(
     sample_count: int,
-) -> List[tuple[CellFeatures, OceanRelationKind]]:
+) -> List[tuple[CellFeatures, WaterRelationKind]]:
     """
     Why this exists:
-        Match pipeline inputs: interior land-cover/topo means plus ocean-mask relation per cell.
+        Match pipeline inputs: interior land-cover/topo means plus water-mask relation per cell.
     When to use:
         Calibration scoring over the global res-1 grid.
     What to expect:
@@ -72,7 +72,7 @@ def _extract_res1_features_and_ocean_relation(
         for k, p in files.items():
             datasets[k] = rasterio.open(p)
         raster_pairs = list(datasets.items())
-        rows: List[tuple[CellFeatures, OceanRelationKind]] = []
+        rows: List[tuple[CellFeatures, WaterRelationKind]] = []
         for cell in _generate_res1_cells():
             poly = cell_polygon(cell)
             relation = ocean_relation_for_cell_polygons(poly, ocean_ctx)
@@ -93,11 +93,11 @@ def _extract_res1_features_and_ocean_relation(
 
 
 def _distribution_from_rows(
-    rows: List[tuple[CellFeatures, OceanRelationKind]], t: ClassifierThresholds
+    rows: List[tuple[CellFeatures, WaterRelationKind]], t: ClassifierThresholds
 ) -> Dict[str, float]:
     counts = {k: 0 for k in TERRAIN_ENUM}
     for f, relation in rows:
-        terrain = classify_cell(f, t, nodata_fallback="ocean", ocean_relation=relation)
+        terrain = classify_cell(f, t, nodata_fallback="water", water_relation=relation)
         counts[terrain] += 1
     total = max(1, len(rows))
     return {k: counts[k] * 100.0 / total for k in TERRAIN_ENUM}
@@ -105,26 +105,26 @@ def _distribution_from_rows(
 
 def _score_distribution(dist: Dict[str, float]) -> float:
     weights = {
-        "ocean": 1.4,
+        "water": 1.4,
         "coastal": 1.0,
         "arctic": 1.1,
         "forest": 1.0,
         "mountain": 1.2,
         "desert": 1.0,
-        "land": 1.0,
+        "plains": 1.0,
     }
     score = 0.0
     for k, target in TARGET_GLOBAL_PCT.items():
         score += weights[k] * abs(dist[k] - target)
-    if dist["ocean"] > 75.0:
-        score += (dist["ocean"] - 75.0) * 2.0
+    if dist["water"] > 75.0:
+        score += (dist["water"] - 75.0) * 2.0
     if dist["coastal"] > 25.0:
         score += (dist["coastal"] - 25.0) * 1.5
     return score
 
 
 def calibrate(sample_count: int) -> Tuple[ClassifierThresholds, Dict[str, float], float]:
-    rows = _extract_res1_features_and_ocean_relation(sample_count=sample_count)
+    rows = _extract_res1_features_and_water_relation(sample_count=sample_count)
 
     arctic_vals = [18.0, 22.0, 26.0, 30.0]
     forest_vals = [30.0, 34.0, 38.0, 42.0]

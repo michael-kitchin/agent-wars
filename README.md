@@ -105,18 +105,34 @@ Runs core main-process and tool contract tests.
 
 ## Terrain generation pipeline
 
-Use the milestone 1.2 offline EarthEnv terrain pipeline to generate:
+**Electron runtime** loads `data/generated/terrain_res1_metadata.json` and `terrain_res4_metadata.json`, classifies hex kinds in the main process, and seeds SQLite from that cache. Packaged builds include those JSON files; regenerate them with `npm run terrain:generate` when the metadata pipeline changes. Startup fails fast if required metadata is missing or invalid (including empty res-4 metadata).
 
-- `data/generated/terrain_res1_base.csv`
-- `data/generated/terrain_res4_exceptions.csv`
-- `data/generated/terrain_generation_metadata.json`
+**Classification outputs** (res-1 base + res-4 exceptions CSVs and run metadata) are produced by the main Python CLI:
 
-Commands:
+```bash
+python -m scripts.terrain_pipeline.cli validate --verbose
+python -m scripts.terrain_pipeline.cli run --verbose
+```
+
+**Per-hex feature metadata JSON** (res-1/res-4 metadata only) uses the metadata CLI:
+
+```bash
+python -m scripts.terrain_pipeline.metadata_cli validate --verbose
+npm run terrain:generate
+```
+
+- `npm run terrain:generate` → `python -m scripts.terrain_pipeline.metadata_cli run --verbose`
+
+Shared Python tests for the terrain scripts:
+
+```bash
+npm run terrain:test
+```
+
+Classification environment check (same npm name as before):
 
 ```bash
 npm run terrain:validate
-npm run terrain:test
-npm run terrain:generate
 ```
 
 Setup and troubleshooting are documented in `scripts/terrain_pipeline/README.md`.

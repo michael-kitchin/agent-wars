@@ -4,19 +4,21 @@
   "description": "Grand strategy wargame with LLM opponents — Milestone 1.1 production baseline",
   "main": "dist/main/main.js",
   "scripts": {
-    "build": "npm run build:main && npm run build:renderer",
-    "build:main": "tsc -p tsconfig.main.json",
-    "test": "npm run rebuild:native:node && npm run build:main && node dist/main/pathfinding.test.js && node dist/main/gameIpcHandlers.test.js && node dist/main/precomputation.test.js && node dist/main/briefingFormatter.test.js && node dist/main/callbackSubscriptions.test.js && node dist/main/callbackEvaluation.test.js && node dist/main/openRouter.matrix.test.js && node dist/main/terrainRes1Csv.test.js && node dist/main/mapData.test.js && node dist/main/gameDb.test.js && node dist/main/tools/tool1Pathfinding.test.js && node dist/main/tools/tool3CombatEstimation.test.js && node dist/main/tools/tool4Memory.test.js && node dist/main/tools/tool5StandingOrders.test.js",
+    "build": "npm run generated:extract && npm run build:main && npm run build:renderer",
+    "build:main": "npm run generated:extract && tsc -p tsconfig.main.json",
+    "test": "npm run rebuild:native:node && npm run build:main && node dist/main/pathfinding.test.js && node dist/main/gameIpcHandlers.test.js && node dist/main/precomputation.test.js && node dist/main/briefingFormatter.test.js && node dist/main/callbackSubscriptions.test.js && node dist/main/callbackEvaluation.test.js && node dist/main/openRouter.matrix.test.js && node dist/main/terrainRes1Csv.test.js && node dist/main/terrainMetadataParity.test.js && node dist/main/terrainClassifierFromMetadata.test.js && node dist/main/mapData.test.js && node dist/main/gameDb.test.js && node dist/main/tools/tool1Pathfinding.test.js && node dist/main/tools/tool3CombatEstimation.test.js && node dist/main/tools/tool4Memory.test.js && node dist/main/tools/tool5StandingOrders.test.js",
     "copy:leaflet": "node scripts/copy-leaflet.cjs",
     "build:renderer": "node scripts/copy-leaflet.cjs && esbuild src/renderer/renderer.ts --bundle --outfile=static/renderer.js --platform=browser --target=es2022",
-    "start": "npm run rebuild:native:electron && electron .",
+    "start": "npm run generated:extract && npm run rebuild:native:electron && electron .",
     "rebuild:native": "npm run rebuild:native:electron",
     "rebuild:native:electron": "node scripts/rebuild-native.cjs --runtime=electron",
     "rebuild:native:node": "node scripts/rebuild-native.cjs --runtime=node",
     "postinstall": "npm run rebuild:native:electron && node scripts/copy-leaflet.cjs",
     "lint": "eslint src",
     "terrain:validate": "python -m scripts.terrain_pipeline.cli validate --verbose",
-    "terrain:generate": "python -m scripts.terrain_pipeline.cli run --verbose",
+    "terrain:generate": "python -m scripts.terrain_pipeline.metadata_cli run --verbose",
+    "generated:zip": "node scripts/zip-generated-data.cjs",
+    "generated:extract": "node scripts/extract-generated-data.cjs",
     "terrain:calibrate": "python -m scripts.terrain_pipeline.calibrate --sample-count 25",
     "terrain:test": "python -m unittest discover -s scripts/terrain_pipeline/tests -p \"test_*.py\" -v",
     "clean:release": "node -e \"const fs=require('fs');const p=require('path').join(process.cwd(),'release');if(fs.existsSync(p)){try{fs.rmSync(p,{recursive:true,maxRetries:3,retryDelay:200});}catch(e){console.error('Release folder in use. Close the app and any tools using release/, then retry.');process.exit(1);}}\"",
@@ -35,7 +37,7 @@
     "directories": {
       "output": "release"
     },
-    "files": ["dist", "static", "package.json", "node_modules", "data/generated/terrain_res1_base.csv", "data/generated/terrain_res4_exceptions.csv"],
+    "files": ["dist", "static", "package.json", "node_modules", "data/generated/terrain_res1_metadata.json", "data/generated/terrain_res4_metadata.json"],
     "win": {
       "target": ["nsis"]
     },

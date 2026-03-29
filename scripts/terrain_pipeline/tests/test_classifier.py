@@ -12,7 +12,7 @@ from scripts.terrain_pipeline.config import ClassifierThresholds
 
 
 class ClassifierTests(unittest.TestCase):
-    def test_in_ocean(self) -> None:
+    def test_in_water(self) -> None:
         t = ClassifierThresholds()
         features = CellFeatures(
             landcover={12: 90.0},
@@ -21,8 +21,8 @@ class ClassifierTests(unittest.TestCase):
             elevation_max=0.0,
         )
         self.assertEqual(
-            "ocean",
-            classify_cell(features, t, nodata_fallback="ocean", ocean_relation="in_ocean"),
+            "water",
+            classify_cell(features, t, nodata_fallback="water", water_relation="in_water"),
         )
 
     def test_coastal_band(self) -> None:
@@ -35,10 +35,10 @@ class ClassifierTests(unittest.TestCase):
         )
         self.assertEqual(
             "coastal",
-            classify_cell(features, t, nodata_fallback="ocean", ocean_relation="coastal_band"),
+            classify_cell(features, t, nodata_fallback="water", water_relation="coastal_band"),
         )
 
-    def test_land_interior_forest(self) -> None:
+    def test_plains_interior_forest(self) -> None:
         t = ClassifierThresholds()
         features = CellFeatures(
             landcover={1: 50.0, 2: 40.0},
@@ -48,7 +48,7 @@ class ClassifierTests(unittest.TestCase):
         )
         self.assertEqual(
             "forest",
-            classify_cell(features, t, nodata_fallback="ocean", ocean_relation="land"),
+            classify_cell(features, t, nodata_fallback="water", water_relation="no_water"),
         )
 
     def test_raw_sum_over_100_clamps(self) -> None:
@@ -70,15 +70,15 @@ class ClassifierTests(unittest.TestCase):
         )
         self.assertEqual(
             "mountain",
-            classify_cell(features, t, nodata_fallback="ocean", ocean_relation="land"),
+            classify_cell(features, t, nodata_fallback="water", water_relation="no_water"),
         )
 
     def test_nodata_fallback(self) -> None:
         t = ClassifierThresholds()
         features = CellFeatures(landcover={}, tri_mean=None, slope_mean=None, elevation_max=None)
         self.assertEqual(
-            "ocean",
-            classify_cell(features, t, nodata_fallback="ocean", ocean_relation="in_ocean"),
+            "water",
+            classify_cell(features, t, nodata_fallback="water", water_relation="in_water"),
         )
 
     def test_classify_interior_biome_direct(self) -> None:
@@ -89,7 +89,7 @@ class ClassifierTests(unittest.TestCase):
             slope_mean=0.0,
             elevation_max=0.0,
         )
-        self.assertEqual("land", classify_interior_biome(features, t))
+        self.assertEqual("plains", classify_interior_biome(features, t))
 
 
 if __name__ == "__main__":

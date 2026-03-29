@@ -26,6 +26,7 @@ from .ocean_mask import (
     load_ocean_union_wgs84,
     ocean_relation_for_cell_polygons,
 )
+from .point_features import validate_point_shapefile_contract
 from .sampling import (
     _ensure_proj_data_env,
     cell_polygon,
@@ -112,23 +113,47 @@ class TerrainPipeline:
         ocean_path = self._ocean_input_path()
         lake_path = self._lake_input_path()
         urban_path = self._urban_input_path()
+        airport_path = self._airport_input_path()
+        port_path = self._port_input_path()
         if not ocean_path.is_file():
             raise RuntimeError(f"Missing ocean shapefile (expected at {ocean_path}).")
         if not lake_path.is_file():
             raise RuntimeError(f"Missing lake shapefile (expected at {lake_path}).")
         if not urban_path.is_file():
             raise RuntimeError(f"Missing urban shapefile (expected at {urban_path}).")
+        if not airport_path.is_file():
+            raise RuntimeError(f"Missing airport shapefile (expected at {airport_path}).")
+        if not port_path.is_file():
+            raise RuntimeError(f"Missing port shapefile (expected at {port_path}).")
         try:
             _ = self._ocean_predicate_context()
             _ = self._res4_water_predicate_context()
             _ = self._res4_urban_predicate_context()
+            airport_count = validate_point_shapefile_contract(
+                airport_path,
+                featurecla_value="Airport",
+            )
+            port_count = validate_point_shapefile_contract(
+                port_path,
+                featurecla_value="Port",
+            )
         except Exception as exc:
+            LOGGER.error(
+                "Phase 1 shapefile validation failed.",
+                exc_info=True,
+            )
             raise RuntimeError(
                 "Terrain shapefiles failed to load "
-                f"(ocean: {ocean_path}; lakes: {lake_path}; urban: {urban_path})."
+                f"(ocean: {ocean_path}; lakes: {lake_path}; urban: {urban_path}; "
+                f"airports: {airport_path}; ports: {port_path})."
             ) from exc
 
-        LOGGER.info("Phase 1 passed: DB, input rasters, and ocean/lake/urban shapefiles validated.")
+        LOGGER.info(
+            "Phase 1 passed: DB, rasters, and shapefiles validated "
+            "(airport_features=%d, port_features=%d).",
+            airport_count,
+            port_count,
+        )
 
     def run_phase_2_schema_and_cells(self, max_child_cells: int | None = None) -> dict[str, List[str]]:
         """
@@ -193,7 +218,7 @@ class TerrainPipeline:
 
         LOGGER.debug("Starting phase 3 classifier contract checks.")
         expected = frozenset(
-            {"ocean", "coastal", "land", "urban", "forest", "mountain", "desert", "arctic"},
+            {"water", "coastal", "plains", "urban", "forest", "mountain", "desert", "arctic"},
         )
         if frozenset(TERRAIN_ENUM) != expected:
             raise RuntimeError("Unexpected TERRAIN_ENUM contents.")
@@ -310,9 +335,9 @@ class TerrainPipeline:
                 "thresholds": self.config.thresholds.__dict__,
                 "aggregation_contract": (
                     "deterministic uniform-point integration over H3 cell area (area-weighted approximation); "
-                    "res-1 ocean/coastal from ocean polygon shapefile vs H3 cell; res-4 ocean/coastal from "
-                    "merged ocean+lakes polygon shapefiles vs H3 cell; res-4 urban from urban polygons "
-                    "intersecting land cells (EPSG:3857 predicates)"
+                    "res-1 water/coastal from ocean polygon shapefile vs H3 cell; res-4 water/coastal from "
+                    "merged ocean+lakes polygon shapefiles vs H3 cell; res-4 urban override from urban polygons "
+                    "intersecting cells that are not fully in water (EPSG:3857 predicates)"
                 ),
             },
             "inputs": [
@@ -356,6 +381,14 @@ class TerrainPipeline:
     def _urban_input_path(self) -> Path:
         r = self.config.input_rasters
         return r.root / r.urban_shapefile_name
+
+    def _airport_input_path(self) -> Path:
+        r = self.config.input_rasters
+        return r.root / r.airport_shapefile_name
+
+    def _port_input_path(self) -> Path:
+        r = self.config.input_rasters
+        return r.root / r.port_shapefile_name
 
     def _ocean_predicate_context(self) -> OceanPredicateContext:
         """
@@ -425,6 +458,8 @@ class TerrainPipeline:
             self._ocean_input_path(),
             self._lake_input_path(),
             self._urban_input_path(),
+            self._airport_input_path(),
+            self._port_input_path(),
         ]
 
     def _generate_cells_for_resolution(self, resolution: int) -> List[str]:
@@ -495,11 +530,11 @@ class TerrainPipeline:
                     features,
                     self.config.thresholds,
                     nodata_fallback=self.config.nodata_fallback_terrain,
-                    ocean_relation=relation,
+                    water_relation=relation,
                 )
-                if urban_ctx is not None and relation != "in_ocean":
+                if urban_ctx is not None and relation != "in_water":
                     urban_relation = ocean_relation_for_cell_polygons(poly, urban_ctx)
-                    if urban_relation != "land":
+                    if urban_relation != "no_water":
                         terrain = "urban"
                 out.append(TerrainRecord(h3_index=cell, terrain=terrain))
                 if idx % 10000 == 0:
@@ -570,7 +605,7 @@ class TerrainPipeline:
                 cur.execute(
                     f'CREATE TABLE "{self.config.schema_name}".terrain_res1_base ('
                     "h3_index text PRIMARY KEY, terrain text NOT NULL CHECK (terrain IN ("
-                    "'ocean', 'coastal', 'land', 'urban', 'forest', 'mountain', 'desert', 'arctic'"
+                    "'water', 'coastal', 'plains', 'urban', 'forest', 'mountain', 'desert', 'arctic'"
                     ")))"
                 )
                 cur.executemany(
@@ -594,9 +629,9 @@ class TerrainPipeline:
                     f'CREATE TABLE "{self.config.schema_name}".terrain_res4_exceptions ('
                     "h3_index text PRIMARY KEY, parent_h3 text NOT NULL, "
                     "terrain text NOT NULL CHECK (terrain IN ("
-                    "'ocean', 'coastal', 'land', 'urban', 'forest', 'mountain', 'desert', 'arctic'"
+                    "'water', 'coastal', 'plains', 'urban', 'forest', 'mountain', 'desert', 'arctic'"
                     ")), parent_terrain text NOT NULL CHECK (parent_terrain IN ("
-                    "'ocean', 'coastal', 'land', 'urban', 'forest', 'mountain', 'desert', 'arctic'"
+                    "'water', 'coastal', 'plains', 'urban', 'forest', 'mountain', 'desert', 'arctic'"
                     ")))"
                 )
                 cur.executemany(

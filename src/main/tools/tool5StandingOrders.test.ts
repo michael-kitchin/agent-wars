@@ -34,7 +34,7 @@ function testAssignOrderUnitNotFound(): void {
 function testAssignOrderPursueTargetNotFound(): void {
   const stateWithUnit: GameStateSnapshot = {
     ...emptyState,
-    hexes: [{ h3Index: 'a', terrain: 'land', terrainKind: 'land' }],
+    hexes: [{ h3Index: 'a', terrain: 'land', terrainKind: 'plains' }],
     units: [{ id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: 'a' }],
   };
   const result = executeTool5(
@@ -52,8 +52,8 @@ function testAssignOrderPatrolTooFewWaypoints(): void {
   const stateWithUnit: GameStateSnapshot = {
     ...emptyState,
     hexes: [
-      { h3Index: 'a', terrain: 'land', terrainKind: 'land' },
-      { h3Index: 'b', terrain: 'land', terrainKind: 'land' },
+      { h3Index: 'a', terrain: 'land', terrainKind: 'plains' },
+      { h3Index: 'b', terrain: 'land', terrainKind: 'plains' },
     ],
     units: [{ id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: 'a' }],
   };
@@ -89,7 +89,7 @@ function testCancelOrderWhenNoOrder(): void {
 function testGetInjectionTextEmpty(): void {
   const stateWithUnits: GameStateSnapshot = {
     ...emptyState,
-    hexes: [{ h3Index: 'a', terrain: 'land', terrainKind: 'land' }],
+    hexes: [{ h3Index: 'a', terrain: 'land', terrainKind: 'plains' }],
     units: [
       { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: 'a' },
     ],

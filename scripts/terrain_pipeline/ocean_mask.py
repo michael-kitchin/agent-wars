@@ -206,21 +206,40 @@ def _count_edges_fully_covered_by_ocean(
     return covered, len(edges)
 
 
-def ocean_relation_for_cell_polygons(
-    cell_poly_wgs84: Polygon | MultiPolygon,
-    ocean_ctx: OceanPredicateContext,
-) -> OceanRelationKind:
+@dataclass(frozen=True)
+class MaskPolygonMetrics:
     """
     Why this exists:
-        Apply ocean vs land/coastal rules from the water polygon union (EPSG:3857 predicates).
+        Expose reusable boundary and coverage facts for any prepared polygon mask (ocean, lakes, urban).
     When to use:
-        For each H3 cell after building ``cell_polygon(cell)``.
+        Terrain metadata export and parity checks; also drives ``ocean_relation_for_cell_polygons``.
     What to expect:
-        ``in_ocean`` if the cell is entirely within ocean, or if it intersects ocean and **every** exterior edge
-        lies fully within the ocean union (isolated land inside the hex, e.g. a small island, while the hex
-        boundary is still all water). ``coastal_band`` if it intersects ocean but does not qualify as
-        ``in_ocean``. ``land`` if it does not intersect ocean; interior biomes then come only from land-cover/topo
-        (never coastal without an ocean intersection).
+        ``mask_edges`` counts exterior segments fully covered by the mask union; ``all_in_mask`` matches
+        the classifier's ``in_water`` rule for that mask geometry.
+    """
+
+    total_edges: int
+    mask_edges: int
+    mask_covers_cell: bool
+    intersects: bool
+
+    @property
+    def all_in_mask(self) -> bool:
+        if self.mask_covers_cell:
+            return True
+        if not self.intersects:
+            return False
+        return self.total_edges > 0 and self.mask_edges == self.total_edges
+
+
+def _cell_polygon_wgs84_to_3857(cell_poly_wgs84: Polygon | MultiPolygon) -> Polygon:
+    """
+    Why this exists:
+        Normalize H3 cell polygons to a single EPSG:3857 polygon for mask predicates.
+    When to use:
+        Shared by ``mask_metrics_for_cell_polygon`` and ``ocean_relation_for_cell_polygons``.
+    What to expect:
+        Returns a valid :class:`~shapely.geometry.Polygon`; may use convex hull for exotic multipolygon cases.
     """
 
     cell_wgs = make_valid(cell_poly_wgs84)
@@ -234,13 +253,54 @@ def ocean_relation_for_cell_polygons(
         cell_3857 = make_valid(unary_union(cell_3857))
     if not isinstance(cell_3857, Polygon):
         cell_3857 = make_valid(cell_3857.convex_hull)
+    return cell_3857
 
-    if ocean_ctx.covers(cell_3857):
-        return "in_ocean"
-    if not ocean_ctx.intersects(cell_3857):
-        return "land"
 
-    covered, n = _count_edges_fully_covered_by_ocean(cell_3857, ocean_ctx)
-    if n > 0 and covered == n:
-        return "in_ocean"
+def mask_metrics_for_cell_polygon(
+    cell_poly_wgs84: Polygon | MultiPolygon,
+    mask_ctx: OceanPredicateContext,
+) -> MaskPolygonMetrics:
+    """
+    Why this exists:
+        Compute edge counts and intersection flags for a cell against any prepared mask union.
+    When to use:
+        Metadata JSON export (water/urban) and debugging mask parity.
+    What to expect:
+        ``total_edges`` is 5 or 6 for typical H3 cells; ``mask_edges`` never exceeds ``total_edges``.
+    """
+
+    cell_3857 = _cell_polygon_wgs84_to_3857(cell_poly_wgs84)
+    covers = mask_ctx.covers(cell_3857)
+    intersects = mask_ctx.intersects(cell_3857)
+    covered, n = _count_edges_fully_covered_by_ocean(cell_3857, mask_ctx)
+    return MaskPolygonMetrics(
+        total_edges=n,
+        mask_edges=covered,
+        mask_covers_cell=covers,
+        intersects=intersects,
+    )
+
+
+def ocean_relation_for_cell_polygons(
+    cell_poly_wgs84: Polygon | MultiPolygon,
+    ocean_ctx: OceanPredicateContext,
+) -> OceanRelationKind:
+    """
+    Why this exists:
+        Apply ocean vs land/coastal rules from the water polygon union (EPSG:3857 predicates).
+    When to use:
+        For each H3 cell after building ``cell_polygon(cell)``.
+    What to expect:
+        ``in_water`` if the cell is entirely within the water union, or if it intersects water and **every**
+        exterior edge lies fully within the water union (isolated dry inside the hex while the hex boundary is
+        still all water). ``coastal_band`` if it intersects water but does not qualify as ``in_water``.
+        ``no_water`` if it does not intersect water; interior biomes then come only from land-cover/topo
+        (never coastal without a water intersection).
+    """
+
+    m = mask_metrics_for_cell_polygon(cell_poly_wgs84, ocean_ctx)
+    if m.all_in_mask:
+        return "in_water"
+    if not m.intersects:
+        return "no_water"
     return "coastal_band"

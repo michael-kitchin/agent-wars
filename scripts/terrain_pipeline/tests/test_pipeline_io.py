@@ -26,7 +26,7 @@ class PipelineIoTests(unittest.TestCase):
                     h3_index="8410001ffffffff",
                     parent_h3="81103ffffffffff",
                     terrain="forest",
-                    parent_terrain="land",
+                    parent_terrain="plains",
                 )
             ]
             pipeline._write_exceptions_csv(rows)
@@ -37,7 +37,7 @@ class PipelineIoTests(unittest.TestCase):
                 got = list(reader)
             self.assertEqual(["h3_index", "parent_h3", "terrain", "parent_terrain"], reader.fieldnames)
             self.assertEqual("forest", got[0]["terrain"])
-            self.assertEqual("land", got[0]["parent_terrain"])
+            self.assertEqual("plains", got[0]["parent_terrain"])
 
 
 if __name__ == "__main__":

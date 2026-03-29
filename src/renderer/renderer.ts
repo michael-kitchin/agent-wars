@@ -19,6 +19,10 @@ import {
   getActiveTerrainStyleBasemapId,
   renderTerrainLegend,
 } from './terrainVisualStyles';
+import {
+  drawTerrainInfrastructureGlyphs,
+  RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE,
+} from './terrainInfrastructureOverlay';
 import type {
   GameStateSnapshot,
   GameApi,
@@ -237,35 +241,69 @@ function formatTerrainKindLabel(kind: string): string {
 }
 
 /**
- * Resolves the terrain label for a map hex from the current game snapshot (pipeline kind with passability fallback).
+ * Resolves base terrain kind + urban variation state for a res-1 gameplay hex.
  */
-function terrainLabelForHex(h3: string): string {
-  if (!gameState) return 'Unknown';
+function terrainStateForRes1Hex(h3: string): { terrainKind: string; isUrban: boolean } {
+  if (!gameState) return { terrainKind: 'Unknown', isUrban: false };
   const hx = gameState.hexes.find((h) => h.h3Index === h3);
-  if (!hx) return 'Unknown';
-  const kind =
+  if (!hx) return { terrainKind: 'Unknown', isUrban: false };
+  return {
+    terrainKind:
     hx.terrainKind ??
-    (hx.terrain === 'water' ? 'ocean' : hx.terrain === 'coastal' ? 'coastal' : 'land');
-  return formatTerrainKindLabel(kind);
+    (hx.terrain === 'water' ? 'water' : hx.terrain === 'coastal' ? 'coastal' : 'plains'),
+    isUrban: false,
+  };
 }
 
 function terrainKindForRes1Hex(h3: string): string {
-  if (!gameState) return 'land';
-  const hx = gameState.hexes.find((h) => h.h3Index === h3);
-  if (!hx) return 'land';
-  return hx.terrainKind ?? (hx.terrain === 'water' ? 'ocean' : hx.terrain === 'coastal' ? 'coastal' : 'land');
+  return terrainStateForRes1Hex(h3).terrainKind;
 }
 
-function terrainLabelForPointer(clientX: number, clientY: number, fallbackRes1H3: string | null): string {
-  if (!gameState) return 'Unknown';
-  if (!res4Visible) return fallbackRes1H3 ? terrainLabelForHex(fallbackRes1H3) : 'Unknown';
+function featureLabelsForRes1Hex(h3: string): string[] {
+  if (!infraGlyphsAllowedForRes1Hex(h3)) return [];
+  const labels: string[] = [];
+  if (terrainInfraRes1Airport.has(h3)) labels.push('Airports');
+  if (terrainInfraRes1Port.has(h3)) labels.push('Ports');
+  return labels;
+}
+
+function featureLabelsForRes4Child(parentH3: string, childH3: string): string[] {
+  if (!infraGlyphsAllowedForRes4Child(parentH3, childH3)) return [];
+  const labels: string[] = [];
+  if (terrainInfraRes4Airport.has(childH3)) labels.push('Airport');
+  if (terrainInfraRes4Port.has(childH3)) labels.push('Port');
+  return labels;
+}
+
+interface TerrainTooltipState {
+  terrainKind: string;
+  isUrban: boolean;
+  features: string[];
+}
+
+function terrainStateForPointer(
+  clientX: number,
+  clientY: number,
+  fallbackRes1H3: string | null
+): TerrainTooltipState {
+  if (!gameState) return { terrainKind: 'Unknown', isUrban: false, features: [] };
+  const res4On = shouldRenderRes4Hexes();
+  if (!res4On) {
+    if (!fallbackRes1H3) return { terrainKind: 'Unknown', isUrban: false, features: [] };
+    const state = terrainStateForRes1Hex(fallbackRes1H3);
+    return { ...state, features: featureLabelsForRes1Hex(fallbackRes1H3) };
+  }
   const map = getMainLeafletMap() as
     | {
         getContainer: () => HTMLElement;
         containerPointToLatLng: (pt: unknown) => { lat: number; lng: number };
       }
     | null;
-  if (!map) return fallbackRes1H3 ? terrainLabelForHex(fallbackRes1H3) : 'Unknown';
+  if (!map) {
+    if (!fallbackRes1H3) return { terrainKind: 'Unknown', isUrban: false, features: [] };
+    const state = terrainStateForRes1Hex(fallbackRes1H3);
+    return { ...state, features: featureLabelsForRes1Hex(fallbackRes1H3) };
+  }
   const L = getLeafletGlobal();
   const rect = map.getContainer().getBoundingClientRect();
   const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
@@ -273,17 +311,30 @@ function terrainLabelForPointer(clientX: number, clientY: number, fallbackRes1H3
     const detailH3 = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
     const parentH3 = cellToParent(detailH3, WORLD_H3_RESOLUTION);
     const parentKind = terrainKindForRes1Hex(parentH3);
-    const detailKind = res4TerrainOverridesByH3.get(detailH3) ?? parentKind;
-    return formatTerrainKindLabel(detailKind);
+    const detail = res4TerrainOverridesByH3.get(detailH3);
+    return {
+      terrainKind: detail?.terrainKind ?? parentKind,
+      isUrban: detail?.isUrban ?? false,
+      features: featureLabelsForRes4Child(parentH3, detailH3),
+    };
   } catch {
-    return fallbackRes1H3 ? terrainLabelForHex(fallbackRes1H3) : 'Unknown';
+    if (!fallbackRes1H3) return { terrainKind: 'Unknown', isUrban: false, features: [] };
+    const state = terrainStateForRes1Hex(fallbackRes1H3);
+    return { ...state, features: featureLabelsForRes1Hex(fallbackRes1H3) };
   }
 }
 
-function showTerrainTooltip(clientX: number, clientY: number, text: string): void {
+function formatTerrainTooltipHtml(state: TerrainTooltipState): string {
+  const terrainLabel = formatTerrainKindLabel(state.terrainKind);
+  const terrainLine = state.isUrban ? `<strong>Terrain:</strong> ${terrainLabel}, Urban` : `<strong>Terrain:</strong> ${terrainLabel}`;
+  if (state.features.length === 0) return terrainLine;
+  return `${terrainLine}<br/><strong>Features:</strong> ${state.features.join(', ')}`;
+}
+
+function showTerrainTooltip(clientX: number, clientY: number, state: TerrainTooltipState): void {
   const el = document.getElementById('hex-tooltip');
   if (!el) return;
-  el.textContent = text;
+  el.innerHTML = formatTerrainTooltipHtml(state);
   el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
   el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
   el.classList.remove('hidden');
@@ -311,7 +362,12 @@ let hideCommittedOrderLinesAfterReady = false;
 /** When true, next hex click sets ranged attack target for selected unit (if valid). */
 let rangedModeActive = false;
 let gameState: GameStateSnapshot | null = null;
-let res4TerrainOverridesByH3 = new Map<string, string>();
+let res4TerrainOverridesByH3 = new Map<string, { terrainKind: string; isUrban: boolean }>();
+/** Major airport/port H3 from metadata (scalerank ≤ 5); populated via IPC at startup. */
+let terrainInfraRes1Airport = new Set<string>();
+let terrainInfraRes1Port = new Set<string>();
+let terrainInfraRes4Airport = new Set<string>();
+let terrainInfraRes4Port = new Set<string>();
 const res4ChildrenByParent = new Map<string, string[]>();
 let res4Visible = false;
 /** When non-null, we are animating resolution: ranged lightning → ranged casualty → movement → melee lightning → melee casualty. */
@@ -422,7 +478,7 @@ function drawTerrainHexes(ctx: CanvasRenderingContext2D): void {
     });
     const kind =
       hx.terrainKind ??
-      (hx.terrain === 'water' ? 'ocean' : hx.terrain === 'coastal' ? 'coastal' : 'land');
+      (hx.terrain === 'water' ? 'water' : hx.terrain === 'coastal' ? 'coastal' : 'plains');
     const drawClosedPath = (): void => {
       ctx.beginPath();
       for (let i = 0; i < pts.length; i++) {
@@ -435,12 +491,14 @@ function drawTerrainHexes(ctx: CanvasRenderingContext2D): void {
     if (reverseTerrainFillWhileHeld) {
       fillHexTerrain(ctx, kind, drawClosedPath, {
         fillAndHatchAlphaScale: hoveredHexH3 === hx.h3Index ? 0.6 : 1,
-        landHoverFill: kind === 'land',
+        landHoverFill: kind === 'plains',
+        isUrban: false,
       });
     } else if (!res4Active && hoveredHexH3 === hx.h3Index) {
       fillHexTerrain(ctx, kind, drawClosedPath, {
         fillAndHatchAlphaScale: 2,
-        landHoverFill: kind === 'land',
+        landHoverFill: kind === 'plains',
+        isUrban: false,
       });
     }
     const stroke = getActiveHexStrokeStyle();
@@ -563,14 +621,16 @@ function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void {
     if (!projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight)) continue;
     const parentKind =
       parent.terrainKind ??
-      (parent.terrain === 'water' ? 'ocean' : parent.terrain === 'coastal' ? 'coastal' : 'land');
+      (parent.terrain === 'water' ? 'water' : parent.terrain === 'coastal' ? 'coastal' : 'plains');
     let children = res4ChildrenByParent.get(parent.h3Index);
     if (!children) {
       children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
       res4ChildrenByParent.set(parent.h3Index, children);
     }
     for (const child of children) {
-      const terrainKind = res4TerrainOverridesByH3.get(child) ?? parentKind;
+      const override = res4TerrainOverridesByH3.get(child);
+      const terrainKind = override?.terrainKind ?? parentKind;
+      const isUrban = override?.isUrban ?? false;
       const pts = projectHexBoundaryToContainerPoints(child, map, L);
       if (!projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight)) continue;
       const drawClosedPath = (): void => {
@@ -586,19 +646,117 @@ function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void {
         if (hoveredDetailHexH3 === child) {
           fillHexTerrain(ctx, terrainKind, drawClosedPath, {
             fillAndHatchAlphaScale: 0.6,
-            landHoverFill: terrainKind === 'land',
+            landHoverFill: terrainKind === 'plains',
+            isUrban,
           });
         }
       } else {
         fillHexTerrain(ctx, terrainKind, drawClosedPath, {
           fillAndHatchAlphaScale: hoveredDetailHexH3 === child ? 2 : 1,
-          landHoverFill: hoveredDetailHexH3 === child && terrainKind === 'land',
+          landHoverFill: hoveredDetailHexH3 === child && terrainKind === 'plains',
+          isUrban,
         });
       }
       ctx.strokeStyle = stroke.color;
       ctx.lineWidth = Math.max(0.28, stroke.width * 0.62);
       drawClosedPath();
       ctx.stroke();
+    }
+  }
+}
+
+function res1HexHasUnits(h3: string): boolean {
+  return !!gameState?.units.some((u) => u.h3Index === h3);
+}
+
+/**
+ * Res-1 terrain interior fill is drawn only for the hovered hex (when res-4 is off) or for every hex while T is held.
+ * Glyphs match that visibility; if the hex has units, show glyphs only while T is held.
+ */
+function infraGlyphsAllowedForRes1Hex(h3: string): boolean {
+  const res4Active = shouldRenderRes4Hexes();
+  const fillShown =
+    reverseTerrainFillWhileHeld || (!res4Active && hoveredHexH3 === h3);
+  if (!fillShown) return false;
+  const hasUnits = res1HexHasUnits(h3);
+  if (hasUnits && !reverseTerrainFillWhileHeld) return false;
+  return true;
+}
+
+/**
+ * Res-4: without T, every child gets terrain interior fill — show infra glyphs on each child that has data.
+ * With T held, only the hovered child gets interior fill — match glyphs to that cell only.
+ * Parent hexes with units suppress glyphs unless T is held.
+ */
+function infraGlyphsAllowedForRes4Child(parentH3: string, childH3: string): boolean {
+  if (reverseTerrainFillWhileHeld) {
+    if (hoveredDetailHexH3 !== childH3) return false;
+  }
+  const hasUnits = res1HexHasUnits(parentH3);
+  if (hasUnits && !reverseTerrainFillWhileHeld) return false;
+  return true;
+}
+
+/**
+ * Draws airport / port symbols on highlighted terrain hexes after units so glyphs sit above unit markers when T is held.
+ */
+function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void {
+  if (!gameState) return;
+  const map = getMainLeafletMap() as
+    | {
+        latLngToContainerPoint: (ll: unknown) => { x: number; y: number };
+        getContainer: () => { clientWidth: number; clientHeight: number };
+        getZoom?: () => number;
+      }
+    | null;
+  if (!map) return;
+  const mapWithZoom = map as { getZoom?: () => number };
+  const zoom = typeof mapWithZoom.getZoom === 'function' ? mapWithZoom.getZoom() : 4;
+  const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - ((zoom - 2) * (0.32 / 8))));
+  const outlineScreenPx = Math.max(0.5, 0.58 * zoomStrokeScale);
+  const L = getLeafletGlobal();
+  const res4On = shouldRenderRes4Hexes();
+
+  if (!res4On) {
+    for (const hx of gameState.hexes) {
+      if (!infraGlyphsAllowedForRes1Hex(hx.h3Index)) continue;
+      const ap = terrainInfraRes1Airport.has(hx.h3Index);
+      const pt = terrainInfraRes1Port.has(hx.h3Index);
+      if (!ap && !pt) continue;
+      const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
+      const pts = boundary.map(([lat, lng]: [number, number]) => {
+        const p = map.latLngToContainerPoint(L.latLng(lat, lng));
+        return { x: p.x, y: p.y };
+      });
+      drawTerrainInfrastructureGlyphs(ctx, pts, { showAirport: ap, showPort: pt, outlineScreenPx });
+    }
+    return;
+  }
+
+  const container = map.getContainer();
+  const viewportWidth = Math.max(1, container.clientWidth);
+  const viewportHeight = Math.max(1, container.clientHeight);
+  for (const parent of gameState.hexes) {
+    let children = res4ChildrenByParent.get(parent.h3Index);
+    if (!children) {
+      children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
+      res4ChildrenByParent.set(parent.h3Index, children);
+    }
+    const parentPts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
+    if (!projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight)) continue;
+    for (const child of children) {
+      if (!infraGlyphsAllowedForRes4Child(parent.h3Index, child)) continue;
+      const ap = terrainInfraRes4Airport.has(child);
+      const pt = terrainInfraRes4Port.has(child);
+      if (!ap && !pt) continue;
+      const pts = projectHexBoundaryToContainerPoints(child, map, L);
+      if (!projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight)) continue;
+      drawTerrainInfrastructureGlyphs(ctx, pts, {
+        showAirport: ap,
+        showPort: pt,
+        outlineScreenPx,
+        glyphAreaScale: RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE,
+      });
     }
   }
 }
@@ -1081,6 +1239,7 @@ function resizeAndRedraw(): void {
   if (anim && hexList && moveProgress < 1) {
     drawMovingUnits(ctx, w, h, anim.moves, gameState.units, hexList, moveProgress);
   }
+  drawTerrainInfrastructureOverlays(ctx);
   if (anim && hexList) {
     const elapsed = Date.now() - anim.startTime;
     const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
@@ -1677,6 +1836,7 @@ function redraw(): void {
   if (anim && hexList && moveProgress < 1) {
     drawMovingUnits(ctx, w, h, anim.moves, gameState.units, hexList, moveProgress);
   }
+  drawTerrainInfrastructureOverlays(ctx);
   if (anim && hexList) {
     const elapsed = Date.now() - anim.startTime;
     const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
@@ -2222,10 +2382,20 @@ function init(): void {
     window.gameApi
       .getRes4TerrainOverrides()
       .then((rows) => {
-        res4TerrainOverridesByH3 = new Map(rows.map((r) => [r.h3Index, r.terrainKind]));
+        res4TerrainOverridesByH3 = new Map(rows.map((r) => [r.h3Index, { terrainKind: r.terrainKind, isUrban: !!r.isUrban }]));
         requestRedraw();
       })
       .catch((err) => console.error('getRes4TerrainOverrides failed:', err));
+    window.gameApi
+      .getTerrainInfrastructureHints()
+      .then((hints) => {
+        terrainInfraRes1Airport = new Set(hints.res1MajorAirports);
+        terrainInfraRes1Port = new Set(hints.res1MajorPorts);
+        terrainInfraRes4Airport = new Set(hints.res4MajorAirports);
+        terrainInfraRes4Port = new Set(hints.res4MajorPorts);
+        requestRedraw();
+      })
+      .catch((err) => console.error('getTerrainInfrastructureHints failed:', err));
   }
 
   window.addEventListener('resize', () => {
@@ -2284,7 +2454,7 @@ function init(): void {
           showTerrainTooltip(
             lastPointerClientX,
             lastPointerClientY,
-            terrainLabelForPointer(lastPointerClientX, lastPointerClientY, targetHex)
+            terrainStateForPointer(lastPointerClientX, lastPointerClientY, targetHex)
           );
         }, TERRAIN_TOOLTIP_DELAY_MS);
       }
@@ -2293,7 +2463,7 @@ function init(): void {
 
     const tip = document.getElementById('hex-tooltip');
     if (tip && !tip.classList.contains('hidden')) {
-      tip.textContent = terrainLabelForPointer(e.clientX, e.clientY, hit);
+      tip.innerHTML = formatTerrainTooltipHtml(terrainStateForPointer(e.clientX, e.clientY, hit));
       tip.style.left = `${e.clientX + TOOLTIP_OFFSET_PX}px`;
       tip.style.top = `${e.clientY + TOOLTIP_OFFSET_PX}px`;
     }

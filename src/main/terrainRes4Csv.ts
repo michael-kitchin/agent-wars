@@ -1,6 +1,6 @@
 /**
- * Loads `terrain_res4_exceptions.csv` (h3_index,parent_h3,terrain,parent_terrain) for renderer-only overlays.
- * The file only stores child cells whose terrain differs from their res1 parent terrain.
+ * Parses `terrain_res4_exceptions.csv` for parity tests against metadata-derived renderer overrides.
+ * Runtime res-4 overlays use `terrainClassificationCache` + `terrain_res4_metadata.json` instead.
  */
 
 import * as fs from 'fs';
@@ -8,15 +8,20 @@ import * as path from 'path';
 import { logDebug, logError, logTrace } from './logger';
 import { isPipelineTerrainKind, type PipelineTerrainKind } from '../shared/pipelineTerrain';
 
+type LegacyRes4CsvTerrainKind = PipelineTerrainKind | 'urban';
+
 const CSV_FILENAME = 'terrain_res4_exceptions.csv';
 const CSV_REL_SEGMENTS = ['data', 'generated', CSV_FILENAME];
 
-let cachedOverrides: Map<string, PipelineTerrainKind> | null = null;
-
 /**
- * Resolves the absolute path to the bundled res4 exceptions CSV.
+ * Why this exists:
+ *     Resolve the generated exceptions CSV for parity harnesses (same search order as former runtime loader).
+ * When to use:
+ *     Parity tests that compare TS metadata classification to pipeline CSV output.
+ * What to expect:
+ *     Throws when the file is missing from all candidate locations.
  */
-function resolveTerrainRes4ExceptionsCsvPath(): string {
+export function resolveTerrainRes4ExceptionsCsvPath(): string {
   logDebug('terrainRes4Csv resolveTerrainRes4ExceptionsCsvPath');
   const candidates: string[] = [];
   candidates.push(path.join(__dirname, '..', '..', ...CSV_REL_SEGMENTS));
@@ -38,48 +43,29 @@ function resolveTerrainRes4ExceptionsCsvPath(): string {
 }
 
 /**
- * Parses `terrain_res4_exceptions.csv` rows into a child-h3 → terrain-kind map.
+ * Why this exists:
+ *     Parse `terrain_res4_exceptions.csv` rows into a child-h3 → terrain-kind map.
+ * When to use:
+ *     From `terrainMetadataParity.test.ts` or offline QA scripts.
+ * What to expect:
+ *     Duplicate `h3_index` rows throw; invalid terrain labels throw.
  */
-function parseTerrainRes4ExceptionsCsv(fileText: string): Map<string, PipelineTerrainKind> {
-  logTrace('terrainRes4Csv parseTerrainRes4ExceptionsCsv');
+export function parseTerrainRes4ExceptionsCsvText(fileText: string): Map<string, LegacyRes4CsvTerrainKind> {
+  logTrace('terrainRes4Csv parseTerrainRes4ExceptionsCsvText');
   const lines = fileText.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  if (lines.length < 2) return new Map<string, PipelineTerrainKind>();
-  const map = new Map<string, PipelineTerrainKind>();
+  if (lines.length < 2) return new Map<string, LegacyRes4CsvTerrainKind>();
+  const map = new Map<string, LegacyRes4CsvTerrainKind>();
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i]!.split(',');
     if (cols.length < 3) throw new Error(`terrain res4 exceptions CSV: bad line ${i + 1}`);
     const h3Index = cols[0]!.trim();
     const terrainKind = cols[2]!.trim();
     if (!h3Index) throw new Error(`terrain res4 exceptions CSV: empty h3_index at line ${i + 1}`);
-    if (!isPipelineTerrainKind(terrainKind)) {
+    if (terrainKind !== 'urban' && !isPipelineTerrainKind(terrainKind)) {
       throw new Error(`terrain res4 exceptions CSV: invalid terrain "${terrainKind}" at line ${i + 1}`);
     }
     if (map.has(h3Index)) throw new Error(`terrain res4 exceptions CSV: duplicate h3_index ${h3Index}`);
     map.set(h3Index, terrainKind);
   }
   return map;
-}
-
-/**
- * Why this exists:
- *     Supplies renderer with deterministic res4 terrain override rows for fine-grained zoom overlays.
- * When to use:
- *     IPC handler for renderer startup/loading.
- * What to expect:
- *     Returns cached rows after first successful parse.
- */
-export function getRes4TerrainOverridesForRenderer(): Array<{ h3Index: string; terrainKind: PipelineTerrainKind }> {
-  logTrace('terrainRes4Csv getRes4TerrainOverridesForRenderer');
-  try {
-    if (cachedOverrides === null) {
-      const csvPath = resolveTerrainRes4ExceptionsCsvPath();
-      const text = fs.readFileSync(csvPath, 'utf8');
-      cachedOverrides = parseTerrainRes4ExceptionsCsv(text);
-      logDebug('terrainRes4Csv loaded overrides', { count: cachedOverrides.size });
-    }
-    return Array.from(cachedOverrides.entries()).map(([h3Index, terrainKind]) => ({ h3Index, terrainKind }));
-  } catch (err) {
-    logError('terrainRes4Csv getRes4TerrainOverridesForRenderer: failed', err);
-    return [];
-  }
 }

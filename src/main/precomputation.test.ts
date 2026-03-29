@@ -18,7 +18,7 @@ function buildFixtureState(
 ): { state: GameStateSnapshot; coordMap: PrecomputationCoordMap } {
   const hexList = getOrderedHexList().slice(0, hexCount);
   const state: GameStateSnapshot = {
-    hexes: hexList.map((h3Index) => ({ h3Index, terrain: 'land', terrainKind: 'land' })),
+    hexes: hexList.map((h3Index) => ({ h3Index, terrain: 'land', terrainKind: 'plains' })),
     units: [
       { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: hexList[0]! },
       { id: 'opponent-infantry-1', player: 'opponent', unitType: 'infantry', h3Index: hexList[1]! },

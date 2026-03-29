@@ -16,10 +16,9 @@ function fixturePath(name: string): string {
 }
 
 function testPipelineToPassability(): void {
-  assert.strictEqual(pipelineTerrainToPassability('ocean'), 'water');
+  assert.strictEqual(pipelineTerrainToPassability('water'), 'water');
   assert.strictEqual(pipelineTerrainToPassability('coastal'), 'coastal');
-  assert.strictEqual(pipelineTerrainToPassability('land'), 'land');
-  assert.strictEqual(pipelineTerrainToPassability('urban'), 'land');
+  assert.strictEqual(pipelineTerrainToPassability('plains'), 'land');
   assert.strictEqual(pipelineTerrainToPassability('forest'), 'land');
   assert.strictEqual(pipelineTerrainToPassability('mountain'), 'land');
   assert.strictEqual(pipelineTerrainToPassability('desert'), 'land');
@@ -31,15 +30,15 @@ function testParseSampleFixture(): void {
   const text = fs.readFileSync(p, 'utf8');
   const map = parseTerrainRes1CsvText(text);
   assert.strictEqual(map.size, 3);
-  assert.strictEqual(map.get('81003ffffffffff'), 'ocean');
+  assert.strictEqual(map.get('81003ffffffffff'), 'water');
   assert.strictEqual(map.get('8102fffffffffff'), 'desert');
   assert.strictEqual(map.get('81037ffffffffff'), 'arctic');
 }
 
 function testParseRejectsDuplicateH3(): void {
   const csv = `h3_index,terrain
-81003ffffffffff,ocean
-81003ffffffffff,land
+81003ffffffffff,water
+81003ffffffffff,plains
 `;
   assert.throws(() => parseTerrainRes1CsvText(csv), /duplicate h3_index/);
 }

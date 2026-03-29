@@ -3,6 +3,21 @@
  * Keep this module free of Node/Electron imports so it stays safe for any consumer.
  */
 
+/** Sparse H3 lists for major airports/ports (scalerank ≤ 5) from terrain metadata; used for terrain-hover glyphs. */
+export interface TerrainInfrastructureHintsSnapshot {
+  res1MajorAirports: string[];
+  res1MajorPorts: string[];
+  res4MajorAirports: string[];
+  res4MajorPorts: string[];
+}
+
+/** Res-4 terrain overlay row: base terrain kind plus optional urban variation state. */
+export interface Res4TerrainOverrideRow {
+  h3Index: string;
+  terrainKind: string;
+  isUrban: boolean;
+}
+
 /** Snapshot of game state sent to the renderer (camelCase for JSON). */
 export interface GameStateSnapshot {
   /** `terrain`: passability `land` | `water` | `coastal`. `terrainKind`: pipeline label including `coastal`. */
@@ -139,7 +154,8 @@ export interface HumanOrderPreviewResult {
 /** Preload-exposed renderer bridge contract. */
 export interface GameApi {
   getGameState: () => Promise<GameStateSnapshot>;
-  getRes4TerrainOverrides: () => Promise<{ h3Index: string; terrainKind: string }[]>;
+  getRes4TerrainOverrides: () => Promise<Res4TerrainOverrideRow[]>;
+  getTerrainInfrastructureHints: () => Promise<TerrainInfrastructureHintsSnapshot>;
   newGame: () => Promise<GameStateSnapshot>;
   submitOrders: (payload: SubmitOrdersIpcPayload) => Promise<{ success: boolean; reason?: string }>;
   ready: (payload?: GameReadyIpcPayload) => Promise<ReadyResult>;

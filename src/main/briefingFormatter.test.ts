@@ -9,7 +9,7 @@ import type { PrecomputationResult, UnitAssessmentResult, CombatEstimateEntry } 
 import { formatBriefing } from './briefingFormatter';
 
 const fixtureState: GameStateSnapshot = {
-  hexes: [{ h3Index: '891f1d48b9fffff', terrain: 'land', terrainKind: 'land' }],
+  hexes: [{ h3Index: '891f1d48b9fffff', terrain: 'land', terrainKind: 'plains' }],
   units: [
     { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: '891f1d48b9fffff' },
     { id: 'opponent-infantry-1', player: 'opponent', unitType: 'infantry', h3Index: '891f1d48b9fffff' },

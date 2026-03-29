@@ -1,0 +1,209 @@
+/**
+ * One-shot terrain classification from bundled metadata JSON: res-1 kinds for DB seeding and res-4 override rows for the renderer.
+ */
+
+import { cellToParent } from 'h3-js';
+import { logDebug, logError, logTrace } from './logger';
+import type { PipelineTerrainKind } from '../shared/pipelineTerrain';
+import {
+  classifyCellWithoutUrbanOverride,
+  classifyRes4TerrainKind,
+  isRes4UrbanOverlayHex,
+} from './terrainClassifierFromMetadata';
+import {
+  DEFAULT_CLASSIFIER_THRESHOLDS,
+  DEFAULT_NODATA_FALLBACK_TERRAIN,
+  METADATA_CHILD_RESOLUTION,
+  METADATA_PARENT_RESOLUTION,
+  loadTerrainRes1MetadataBundled,
+  loadTerrainRes4MetadataBundled,
+  recordHasMajorAirport,
+  recordHasMajorPort,
+  type HexMetadataRecordRes4,
+} from './terrainMetadataLoad';
+
+export interface TerrainInfrastructureHintsPayload {
+  res1MajorAirports: string[];
+  res1MajorPorts: string[];
+  res4MajorAirports: string[];
+  res4MajorPorts: string[];
+}
+
+export interface TerrainClassificationSnapshot {
+  res1KindByH3: ReadonlyMap<string, PipelineTerrainKind>;
+  /** Child res-4 rows carrying either a base-kind override and/or `isUrban` overlay flag for renderer detail mode. */
+  res4OverrideRows: ReadonlyArray<{ h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }>;
+  infrastructureHints: TerrainInfrastructureHintsPayload;
+}
+
+let cached: TerrainClassificationSnapshot | null = null;
+
+function buildSnapshot(): TerrainClassificationSnapshot {
+  logDebug('terrainClassificationCache buildSnapshot: loading JSON');
+  const res1Env = loadTerrainRes1MetadataBundled();
+  const res4Env = loadTerrainRes4MetadataBundled();
+  if (res1Env.resolution !== METADATA_PARENT_RESOLUTION) {
+    throw new Error(
+      `terrain metadata: res1 resolution ${res1Env.resolution} != expected ${METADATA_PARENT_RESOLUTION}`
+    );
+  }
+  if (res4Env.resolution !== METADATA_CHILD_RESOLUTION) {
+    throw new Error(
+      `terrain metadata: res4 resolution ${res4Env.resolution} != expected ${METADATA_CHILD_RESOLUTION}`
+    );
+  }
+  if (res4Env.record_count <= 0) {
+    throw new Error(
+      'terrain metadata: terrain_res4_metadata.json has no records; regenerate with npm run terrain:generate'
+    );
+  }
+  const nodata = DEFAULT_NODATA_FALLBACK_TERRAIN;
+  const t = DEFAULT_CLASSIFIER_THRESHOLDS;
+
+  const res1KindByH3 = new Map<string, PipelineTerrainKind>();
+  for (const row of res1Env.records) {
+    res1KindByH3.set(row.h3_index, classifyCellWithoutUrbanOverride(row, t, nodata));
+  }
+
+  const res1MajorAirports: string[] = [];
+  const res1MajorPorts: string[] = [];
+  for (const row of res1Env.records) {
+    if (recordHasMajorAirport(row)) res1MajorAirports.push(row.h3_index);
+    if (recordHasMajorPort(row)) res1MajorPorts.push(row.h3_index);
+  }
+  const res4MajorAirports: string[] = [];
+  const res4MajorPorts: string[] = [];
+  const res4OverrideRows: { h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }[] = [];
+  for (const row of res4Env.records as HexMetadataRecordRes4[]) {
+    const childKind = classifyRes4TerrainKind(row, t, nodata);
+    const isUrban = isRes4UrbanOverlayHex(row);
+    const parentH3 = cellToParent(row.h3_index, METADATA_PARENT_RESOLUTION);
+    const parentKind = res1KindByH3.get(parentH3);
+    if (parentKind === undefined) {
+      const msg = `terrain metadata: res4 child ${row.h3_index} parent ${parentH3} missing from res1 map`;
+      logError('terrainClassificationCache buildSnapshot: orphan res4 row', new Error(msg));
+      throw new Error(msg);
+    }
+    if (childKind !== parentKind || isUrban) {
+      res4OverrideRows.push({ h3Index: row.h3_index, terrainKind: childKind, isUrban });
+    }
+    if (recordHasMajorAirport(row)) res4MajorAirports.push(row.h3_index);
+    if (recordHasMajorPort(row)) res4MajorPorts.push(row.h3_index);
+  }
+
+  logDebug('terrainClassificationCache buildSnapshot: done', {
+    res1Count: res1KindByH3.size,
+    res4Records: res4Env.records.length,
+    res4OverrideCount: res4OverrideRows.length,
+    res1MajorAirportHexes: res1MajorAirports.length,
+    res1MajorPortHexes: res1MajorPorts.length,
+    res4MajorAirportHexes: res4MajorAirports.length,
+    res4MajorPortHexes: res4MajorPorts.length,
+  });
+  return {
+    res1KindByH3,
+    res4OverrideRows,
+    infrastructureHints: {
+      res1MajorAirports,
+      res1MajorPorts,
+      res4MajorAirports,
+      res4MajorPorts,
+    },
+  };
+}
+
+/**
+ * Why this exists:
+ *     Load metadata JSON once and memoize classified maps for fast `resetGameForNewMatch` and renderer IPC without rereading disk.
+ * When to use:
+ *     During app init after the DB is ready, and implicitly before first hex seeding.
+ * What to expect:
+ *     Throws if any metadata file is missing or invalid; safe to call repeatedly (no-op when already loaded).
+ */
+export function ensureTerrainClassificationCacheLoaded(): void {
+  logTrace('terrainClassificationCache ensureTerrainClassificationCacheLoaded');
+  if (cached) return;
+  try {
+    cached = buildSnapshot();
+  } catch (err) {
+    logError('terrainClassificationCache ensureTerrainClassificationCacheLoaded: failed', err);
+    throw err;
+  }
+}
+
+/**
+ * Why this exists:
+ *     Provide classified res-1 kinds for SQLite `hexes` seeding.
+ * When to use:
+ *     From `gameDb` hex seeding after `ensureTerrainClassificationCacheLoaded`.
+ * What to expect:
+ *     Throws if cache was never built; returns an immutable map view.
+ */
+export function getTerrainRes1KindsFromCache(): ReadonlyMap<string, PipelineTerrainKind> {
+  logTrace('terrainClassificationCache getTerrainRes1KindsFromCache');
+  if (!cached) {
+    const err = new Error('terrainClassificationCache: load ensureTerrainClassificationCacheLoaded() first');
+    logError('terrainClassificationCache getTerrainRes1KindsFromCache: cache empty', err);
+    throw err;
+  }
+  return cached.res1KindByH3;
+}
+
+/**
+ * Why this exists:
+ *     Supply res-4 renderer overlay rows (base terrain + urban state) for detail rendering.
+ * When to use:
+ *     From the `game:getRes4TerrainOverrides` IPC handler.
+ * What to expect:
+ *     Returns a new array snapshot; throws if cache was never built.
+ */
+export function getRes4TerrainOverridesForRenderer(): Array<{
+  h3Index: string;
+  terrainKind: PipelineTerrainKind;
+  isUrban: boolean;
+}> {
+  logTrace('terrainClassificationCache getRes4TerrainOverridesForRenderer');
+  if (!cached) {
+    const err = new Error('terrainClassificationCache: load ensureTerrainClassificationCacheLoaded() first');
+    logError('terrainClassificationCache getRes4TerrainOverridesForRenderer: cache empty', err);
+    throw err;
+  }
+  return [...cached.res4OverrideRows];
+}
+
+/**
+ * Why this exists:
+ *     Provide sparse H3 lists for major airports/ports (scalerank ≤ 5) so the renderer can draw terrain-hover glyphs.
+ * When to use:
+ *     From `game:getTerrainInfrastructureHints` after the classification cache is loaded.
+ * What to expect:
+ *     New object each call; throws if cache is empty.
+ */
+export function getTerrainInfrastructureHintsForRenderer(): TerrainInfrastructureHintsPayload {
+  logTrace('terrainClassificationCache getTerrainInfrastructureHintsForRenderer');
+  if (!cached) {
+    const err = new Error('terrainClassificationCache: load ensureTerrainClassificationCacheLoaded() first');
+    logError('terrainClassificationCache getTerrainInfrastructureHintsForRenderer: cache empty', err);
+    throw err;
+  }
+  const h = cached.infrastructureHints;
+  return {
+    res1MajorAirports: [...h.res1MajorAirports],
+    res1MajorPorts: [...h.res1MajorPorts],
+    res4MajorAirports: [...h.res4MajorAirports],
+    res4MajorPorts: [...h.res4MajorPorts],
+  };
+}
+
+/**
+ * Why this exists:
+ *     Reset process-level terrain cache between main-process tests that swap metadata fixtures.
+ * When to use:
+ *     Test teardown after `setTerrainMetadataPathOverrideForTests`.
+ * What to expect:
+ *     Next `ensureTerrainClassificationCacheLoaded` rebuilds from disk.
+ */
+export function clearTerrainClassificationCacheForTests(): void {
+  logDebug('terrainClassificationCache clearTerrainClassificationCacheForTests');
+  cached = null;
+}

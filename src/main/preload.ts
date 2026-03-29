@@ -13,6 +13,8 @@ import type {
   OpenRouterModel,
   HumanOrderPreviewResult,
   HumanStandingOrderSnapshot,
+  Res4TerrainOverrideRow,
+  TerrainInfrastructureHintsSnapshot,
 } from '../shared/ipcTypes';
 
 let openRouterLogListener: ((payload: { line: string; isError?: boolean }) => void) | null = null;
@@ -23,8 +25,10 @@ ipcRenderer.on('openRouter:log', (_event, payload: { line: string; isError?: boo
 const gameApi = {
   getGameState: (): Promise<GameStateSnapshot> =>
     ipcRenderer.invoke('game:getState'),
-  getRes4TerrainOverrides: (): Promise<{ h3Index: string; terrainKind: string }[]> =>
+  getRes4TerrainOverrides: (): Promise<Res4TerrainOverrideRow[]> =>
     ipcRenderer.invoke('game:getRes4TerrainOverrides'),
+  getTerrainInfrastructureHints: (): Promise<TerrainInfrastructureHintsSnapshot> =>
+    ipcRenderer.invoke('game:getTerrainInfrastructureHints'),
   newGame: (): Promise<GameStateSnapshot> => ipcRenderer.invoke('game:newGame'),
   submitOrders: (payload: SubmitOrdersIpcPayload): Promise<{ success: boolean; reason?: string }> =>
     ipcRenderer.invoke('game:submitOrders', payload),

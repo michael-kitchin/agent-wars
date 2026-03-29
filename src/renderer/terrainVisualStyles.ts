@@ -48,6 +48,8 @@ interface TerrainStylePreset {
   hatchAlphaMultiplier: number;
   fills: Record<PipelineTerrainKind, string>;
   hatches: Partial<Record<PipelineTerrainKind, HatchStyle>>;
+  urbanOverlayFill: string;
+  urbanOverlayHatch: HatchStyle;
 }
 
 const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = {
@@ -57,22 +59,22 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
     fillAlphaMultiplier: 0.55,
     hatchAlphaMultiplier: 0.375,
     fills: {
-      ocean: 'rgba(42, 117, 214, 0.28)',
+      water: 'rgba(42, 117, 214, 0.28)',
       coastal: 'rgba(59, 186, 194, 0.24)',
-      land: 'rgba(186, 208, 160, 0.2)',
+      plains: 'rgba(186, 208, 160, 0.2)',
       forest: 'rgba(50, 142, 74, 0.43)',
       mountain: 'rgba(154, 77, 122, 0.54)',
       desert: 'rgba(214, 182, 120, 0.44)',
       arctic: 'rgba(234, 245, 255, 0.5)',
-      urban: 'rgba(137, 117, 98, 0.46)',
     },
     hatches: {
       mountain: { color: 'rgba(95, 24, 74, 0.62)', spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
       forest: { color: 'rgba(16, 72, 36, 0.44)', spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
       coastal: { color: 'rgba(40, 130, 155, 0.32)', spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
-      urban: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
       desert: { color: 'rgba(150, 104, 43, 0.48)', spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: 'dots' },
     },
+    urbanOverlayFill: 'rgba(137, 117, 98, 0.46)',
+    urbanOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
   },
   atlas: {
     label: 'Atlas',
@@ -80,22 +82,22 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
     fillAlphaMultiplier: 0.55,
     hatchAlphaMultiplier: 0.375,
     fills: {
-      ocean: 'rgba(56, 128, 214, 0.28)',
+      water: 'rgba(56, 128, 214, 0.28)',
       coastal: 'rgba(76, 173, 188, 0.24)',
-      land: 'rgba(193, 211, 165, 0.2)',
+      plains: 'rgba(193, 211, 165, 0.2)',
       forest: 'rgba(70, 146, 86, 0.43)',
       mountain: 'rgba(168, 70, 96, 0.55)',
       desert: 'rgba(220, 189, 128, 0.44)',
       arctic: 'rgba(235, 244, 255, 0.5)',
-      urban: 'rgba(141, 122, 103, 0.46)',
     },
     hatches: {
       mountain: { color: 'rgba(114, 26, 50, 0.62)', spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
       forest: { color: 'rgba(16, 72, 36, 0.44)', spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
       coastal: { color: 'rgba(40, 130, 155, 0.32)', spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
-      urban: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
       desert: { color: 'rgba(152, 109, 47, 0.48)', spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: 'dots' },
     },
+    urbanOverlayFill: 'rgba(141, 122, 103, 0.46)',
+    urbanOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
   },
   wargame: {
     label: 'Wargame',
@@ -103,22 +105,22 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
     fillAlphaMultiplier: 0.55,
     hatchAlphaMultiplier: 0.375,
     fills: {
-      ocean: 'rgba(38, 118, 206, 0.28)',
+      water: 'rgba(38, 118, 206, 0.28)',
       coastal: 'rgba(70, 176, 192, 0.24)',
-      land: 'rgba(170, 188, 136, 0.2)',
+      plains: 'rgba(170, 188, 136, 0.2)',
       forest: 'rgba(58, 150, 86, 0.43)',
       mountain: 'rgba(218, 76, 146, 0.5)',
       desert: 'rgba(221, 171, 88, 0.46)',
       arctic: 'rgba(221, 236, 255, 0.5)',
-      urban: 'rgba(132, 112, 97, 0.46)',
     },
     hatches: {
       mountain: { color: 'rgba(255, 162, 214, 0.68)', spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
       forest: { color: 'rgba(130, 245, 190, 0.58)', spacing: 7, lineWidth: 0.9, reverseDiagonal: true },
       coastal: { color: 'rgba(110, 220, 235, 0.42)', spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
-      urban: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.88, reverseDiagonal: true, crosshatch: true },
       desert: { color: 'rgba(255, 207, 130, 0.5)', spacing: 7, lineWidth: 1.05, reverseDiagonal: false, pattern: 'dots' },
     },
+    urbanOverlayFill: 'rgba(132, 112, 97, 0.46)',
+    urbanOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.88, reverseDiagonal: true, crosshatch: true },
   },
   scientific: {
     label: 'Scientific',
@@ -126,22 +128,22 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
     fillAlphaMultiplier: 0.55,
     hatchAlphaMultiplier: 0.375,
     fills: {
-      ocean: 'rgba(52, 120, 204, 0.28)',
+      water: 'rgba(52, 120, 204, 0.28)',
       coastal: 'rgba(69, 165, 186, 0.24)',
-      land: 'rgba(188, 205, 162, 0.2)',
+      plains: 'rgba(188, 205, 162, 0.2)',
       forest: 'rgba(52, 136, 84, 0.43)',
       mountain: 'rgba(127, 83, 171, 0.55)',
       desert: 'rgba(206, 176, 118, 0.44)',
       arctic: 'rgba(234, 244, 255, 0.5)',
-      urban: 'rgba(130, 112, 96, 0.46)',
     },
     hatches: {
       mountain: { color: 'rgba(74, 35, 116, 0.62)', spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
       forest: { color: 'rgba(16, 72, 36, 0.44)', spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
       coastal: { color: 'rgba(40, 130, 155, 0.32)', spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
-      urban: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
       desert: { color: 'rgba(145, 104, 42, 0.48)', spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: 'dots' },
     },
+    urbanOverlayFill: 'rgba(130, 112, 96, 0.46)',
+    urbanOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
   },
 };
 
@@ -263,10 +265,11 @@ export function setActiveTerrainStyle(id: TerrainVisualStyleId): void {
 /**
  * Returns the rgba fill for a terrain kind (always applied under any pattern).
  */
-export function terrainKindFillStyle(kind: string): string {
+export function terrainKindFillStyle(kind: string, options?: { urbanOverlay?: boolean }): string {
   const k = kind as PipelineTerrainKind;
   const p = activePreset();
-  return boostRgbaAlpha(p.fills[k] ?? UNKNOWN_FILL, p.fillAlphaMultiplier);
+  const base = options?.urbanOverlay ? p.urbanOverlayFill : (p.fills[k] ?? UNKNOWN_FILL);
+  return boostRgbaAlpha(base, p.fillAlphaMultiplier);
 }
 
 /**
@@ -283,14 +286,15 @@ function landHoverFillStyle(): string {
 export function terrainKindPattern(
   ctx: CanvasRenderingContext2D,
   kind: string,
-  fillAndHatchAlphaScale = 1
+  fillAndHatchAlphaScale = 1,
+  options?: { urbanOverlay?: boolean }
 ): CanvasPattern | null {
   const k = kind as PipelineTerrainKind;
-  const key = `${activeTerrainStyleId}:${k}:${fillAndHatchAlphaScale}`;
+  const key = `${activeTerrainStyleId}:${k}:${fillAndHatchAlphaScale}:${options?.urbanOverlay ? 'urban' : 'base'}`;
   if (patternCache.has(key)) return patternCache.get(key) ?? null;
 
-  const spec = activePreset().hatches[k];
   const p = activePreset();
+  const spec = options?.urbanOverlay ? p.urbanOverlayHatch : p.hatches[k];
   const pat = spec
     ? spec.pattern === 'dots'
       ? makeDotPattern(
@@ -313,26 +317,28 @@ export function terrainKindPattern(
 /**
  * Fills a closed path on `ctx` using fill + optional pattern for `terrainKind`.
  * @param options.fillAndHatchAlphaScale Multiplies fill and hatch opacity (e.g. 2 on mouseover).
- * @param options.landHoverFill When true and `terrainKind` is `land`, use a darker desert-like fill (land is otherwise transparent).
+ * @param options.landHoverFill When true and `terrainKind` is `plains`, use a darker desert-like fill (plains is otherwise transparent).
  */
 export function fillHexTerrain(
   ctx: CanvasRenderingContext2D,
   terrainKind: string,
   drawPath: () => void,
-  options?: { fillAndHatchAlphaScale?: number; landHoverFill?: boolean }
+  options?: { fillAndHatchAlphaScale?: number; landHoverFill?: boolean; isUrban?: boolean }
 ): void {
   const scale = options?.fillAndHatchAlphaScale ?? 1;
   const k = terrainKind as PipelineTerrainKind;
-  if (options?.landHoverFill && k === 'land') {
+  // Mountains and arctic always keep their own terrain shading even when urban overlay metadata is present.
+  const isUrban = options?.isUrban === true && k !== 'mountain' && k !== 'arctic';
+  if (!isUrban && options?.landHoverFill && k === 'plains') {
     drawPath();
     ctx.fillStyle = boostRgbaAlpha(landHoverFillStyle(), scale);
     ctx.fill();
     return;
   }
   drawPath();
-  ctx.fillStyle = boostRgbaAlpha(terrainKindFillStyle(terrainKind), scale);
+  ctx.fillStyle = boostRgbaAlpha(terrainKindFillStyle(terrainKind, { urbanOverlay: isUrban }), scale);
   ctx.fill();
-  const pat = terrainKindPattern(ctx, terrainKind, scale);
+  const pat = terrainKindPattern(ctx, terrainKind, scale, { urbanOverlay: isUrban });
   if (pat) {
     drawPath();
     ctx.fillStyle = pat;

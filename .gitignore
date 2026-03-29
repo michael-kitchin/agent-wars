@@ -21,3 +21,6 @@ coverage/
 !.env.example
 __pycache__/
 *.pyc
+data/generated/**/*.json
+data/generated/**/*.csv
+!data/generated/**/*.zip
