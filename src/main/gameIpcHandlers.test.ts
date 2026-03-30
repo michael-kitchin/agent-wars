@@ -58,6 +58,7 @@ async function testRequestAiOrdersNoModel(): Promise<void> {
 async function testRequestAiOrdersNoKey(): Promise<void> {
   const deps = {
     getGameState: () => minimalPlanningState,
+    getGameStateForPlayer: () => minimalPlanningState,
     getSelectedModel: () => 'test-model',
     hasKey: () => false,
     getToolNamesForEnabledGroups: () => ['planning', 'assessment', 'estimation'],
@@ -74,6 +75,7 @@ async function testRequestAiOrdersSuccess(): Promise<void> {
   const controllerRef = { current: null as AbortController | null };
   const deps = {
     getGameState: () => minimalPlanningState,
+    getGameStateForPlayer: () => minimalPlanningState,
     getSelectedModel: () => 'test-model',
     hasKey: () => true,
     getToolNamesForEnabledGroups: () => ['planning', 'assessment', 'estimation'],
@@ -97,6 +99,7 @@ async function testRequestAiOrdersCancelled(): Promise<void> {
   let capturedSignal: AbortSignal | undefined;
   const deps = {
     getGameState: () => minimalPlanningState,
+    getGameStateForPlayer: () => minimalPlanningState,
     getSelectedModel: () => 'test-model',
     hasKey: () => true,
     getToolNamesForEnabledGroups: () => ['planning'],
@@ -131,6 +134,7 @@ async function testGameReadyPrecomputedSkipsRequestOrders(): Promise<void> {
   let requestOrdersCalled = false;
   const deps = {
     getGameState: () => minimalPlanningState,
+    getGameStateForPlayer: () => minimalPlanningState,
     getSelectedModel: () => 'test-model',
     hasKey: () => true,
     getToolNamesForEnabledGroups: () => ['planning'],
@@ -166,6 +170,7 @@ async function testGameReadyPrecomputedWithOrders(): Promise<void> {
   let requestOrdersCalled = false;
   const deps = {
     getGameState: () => minimalPlanningState,
+    getGameStateForPlayer: () => minimalPlanningState,
     getSelectedModel: () => 'test-model',
     hasKey: () => true,
     getToolNamesForEnabledGroups: () => ['planning'],

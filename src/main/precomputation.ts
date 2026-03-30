@@ -26,7 +26,14 @@ export interface UnitAssessmentResult {
   result: {
     status: 'ok';
     unit: { unitId: string; type: string; position: [number, number]; currentStandingOrder: unknown };
-    nearbyEnemies: Array<{ unitId: string; hexDistance: number; inRangedRange: boolean; inMeleeRange: boolean }>;
+    nearbyEnemies: Array<{
+      unitId: string;
+      hexDistance: number;
+      inRangedRange: boolean;
+      inMeleeRange: boolean;
+      confidence?: string;
+      lastSeen?: number;
+    }>;
     threats: Array<{ description: string; severity: string; sourceUnit: string }>;
     canAttackThisTurn: unknown[];
     [k: string]: unknown;

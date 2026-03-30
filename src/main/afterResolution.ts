@@ -11,6 +11,7 @@ import {
   getAiLastConsultationTurn,
   setAiLastConsultationTurn,
   getOpponentUnitsInCombatSinceConsultation,
+  consumeFogNewContactsForPlayer,
   addOpponentCombatParticipants,
   clearOpponentCombatSinceConsultation,
   setAiPendingOrders,
@@ -77,7 +78,8 @@ export async function afterResolution(
     lastConsultationTurn,
     combatSince,
     opponentCombatants,
-    removedOpponentUnitIds
+    removedOpponentUnitIds,
+    consumeFogNewContactsForPlayer('opponent')
   );
 
   addOpponentCombatParticipants(opponentCombatants);

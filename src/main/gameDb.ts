@@ -10,7 +10,7 @@ import * as path from 'path';
 import { app, dialog } from 'electron';
 import Database from 'better-sqlite3';
 import { cellToLatLng } from 'h3-js';
-import { getOrderedHexList, getWorldUnitCounts } from './mapData';
+import { getOrderedHexList, getWorldUnitCounts, LATLNG_DECIMAL_PLACES } from './mapData';
 import {
   assertTerrainMetadataMatchesHexList,
 } from './terrainMetadataLoad';
@@ -21,16 +21,17 @@ import {
 import { pipelineTerrainToPassability } from './terrainPassability';
 import { logDebug, logError, logTrace } from './logger';
 import type { GameStateSnapshot } from '../shared/ipcTypes';
+import { computeVisibleHexesForSide } from './visibility';
 
 export type { GameStateSnapshot } from '../shared/ipcTypes';
 
 /** Baseline schema version; bump when a future milestone adds migration chains. */
-export const EXPECTED_USER_VERSION = 5;
+export const EXPECTED_USER_VERSION = 7;
 
 /**
- * Baseline filename for world-map + terrain_kind schema (v5: adds wetlands passability + terrain kind).
+ * Baseline filename for world-map + fog-of-war intel schema (v7).
  */
-export const GAME_DB_FILE_NAME = 'game-baseline-v5.sqlite';
+export const GAME_DB_FILE_NAME = 'game-baseline-v7.sqlite';
 
 let db: InstanceType<typeof Database> | null = null;
 
@@ -46,6 +47,9 @@ const REQUIRED_TABLES = [
   'ai_callback_subscriptions',
   'ai_pending_orders',
   'ai_combat_since_consultation',
+  'ai_loss_events_since_consultation',
+  'player_hex_intel',
+  'player_unit_intel',
 ] as const;
 
 /**
@@ -142,6 +146,34 @@ function getFullDdl(): string {
       player_id TEXT NOT NULL,
       unit_id TEXT NOT NULL,
       PRIMARY KEY (player_id, unit_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS ai_loss_events_since_consultation (
+      player_id TEXT NOT NULL,
+      turn_number INTEGER NOT NULL,
+      victim_unit_id TEXT NOT NULL,
+      victim_player TEXT NOT NULL,
+      cause TEXT NOT NULL,
+      killer_ids_json TEXT NOT NULL,
+      PRIMARY KEY (player_id, turn_number, victim_unit_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS player_hex_intel (
+      player_id TEXT NOT NULL,
+      h3_index TEXT NOT NULL,
+      seen_state TEXT NOT NULL CHECK (seen_state IN ('visible', 'stale', 'unexplored')),
+      last_seen_turn INTEGER,
+      PRIMARY KEY (player_id, h3_index)
+    );
+
+    CREATE TABLE IF NOT EXISTS player_unit_intel (
+      player_id TEXT NOT NULL,
+      enemy_unit_id TEXT NOT NULL,
+      last_known_h3_index TEXT NOT NULL,
+      intel_state TEXT NOT NULL CHECK (intel_state IN ('current', 'stale')),
+      last_seen_turn INTEGER NOT NULL,
+      stale_until_turn INTEGER,
+      PRIMARY KEY (player_id, enemy_unit_id)
     );
   `;
 }
@@ -386,6 +418,7 @@ export async function initDatabase(): Promise<void> {
 
   // Keep terrain metadata failures distinct from DB recovery.
   ensureTerrainClassificationCacheLoaded();
+  refreshFogOfWarIntelFromCurrentState();
 }
 
 function seedGameSeedIfMissing(): void {
@@ -636,6 +669,163 @@ export function saveDatabase(): void {
   logTrace('gameDb saveDatabase (no-op; file-backed auto-persist)');
 }
 
+const STALE_INTEL_TURNS = 2;
+const FOG_PLAYERS = ['human', 'opponent'] as const;
+
+function getCurrentTurnNumberFromDb(): number {
+  const turnRow = getOne<{ turnNumber: number }>('SELECT turn_number AS turnNumber FROM turn_state WHERE id = 1');
+  return turnRow?.turnNumber ?? 1;
+}
+
+function refreshFogOfWarIntelForPlayer(
+  state: GameStateSnapshot,
+  playerId: string,
+  currentTurn: number,
+  traversedHexes: Set<string> | undefined
+): void {
+  logDebug('gameDb refreshFogOfWarIntelForPlayer', { playerId, currentTurn });
+  const mapHexSet = new Set(state.hexes.map((h) => h.h3Index));
+  const visibleHexes = computeVisibleHexesForSide(state, playerId, mapHexSet);
+  const ownOccupiedHexes = new Set(
+    state.units.filter((u) => u.player === playerId).map((u) => u.h3Index)
+  );
+
+  for (const h3 of ownOccupiedHexes) {
+    run(
+      `INSERT OR IGNORE INTO player_hex_intel (player_id, h3_index, seen_state, last_seen_turn) VALUES (?, ?, 'visible', ?)`,
+      [playerId, h3, currentTurn]
+    );
+  }
+  for (const h3 of traversedHexes ?? []) {
+    if (!mapHexSet.has(h3)) continue;
+    run(
+      `INSERT OR IGNORE INTO player_hex_intel (player_id, h3_index, seen_state, last_seen_turn) VALUES (?, ?, 'visible', ?)`,
+      [playerId, h3, currentTurn]
+    );
+    run(
+      `UPDATE player_hex_intel SET seen_state = 'visible', last_seen_turn = ? WHERE player_id = ? AND h3_index = ?`,
+      [currentTurn, playerId, h3]
+    );
+  }
+
+  const exploredRows = getAll<{ h3_index: string; last_seen_turn: number | null }>(
+    'SELECT h3_index, last_seen_turn FROM player_hex_intel WHERE player_id = ?',
+    [playerId]
+  );
+  for (const row of exploredRows) {
+    if (visibleHexes.has(row.h3_index)) {
+      run(
+        `UPDATE player_hex_intel SET seen_state = 'visible', last_seen_turn = ? WHERE player_id = ? AND h3_index = ?`,
+        [currentTurn, playerId, row.h3_index]
+      );
+    } else {
+      run(
+        `UPDATE player_hex_intel SET seen_state = 'stale' WHERE player_id = ? AND h3_index = ?`,
+        [playerId, row.h3_index]
+      );
+    }
+  }
+
+  const enemyUnits = state.units.filter((u) => u.player !== playerId);
+  const enemyById = new Map(enemyUnits.map((u) => [u.id, u]));
+  const existingIntelRows = getAll<{ enemy_unit_id: string }>(
+    'SELECT enemy_unit_id FROM player_unit_intel WHERE player_id = ?',
+    [playerId]
+  );
+  const existingIntelIds = new Set(existingIntelRows.map((r) => r.enemy_unit_id));
+  const newContactIds: string[] = [];
+  const currentEnemyHexes = new Set<string>();
+  for (const enemy of enemyUnits) {
+    if (!visibleHexes.has(enemy.h3Index)) continue;
+    if (!existingIntelIds.has(enemy.id)) newContactIds.push(enemy.id);
+    currentEnemyHexes.add(enemy.h3Index);
+    run(
+      `INSERT INTO player_unit_intel (player_id, enemy_unit_id, last_known_h3_index, intel_state, last_seen_turn, stale_until_turn)
+       VALUES (?, ?, ?, 'current', ?, ?)
+       ON CONFLICT(player_id, enemy_unit_id) DO UPDATE SET
+         last_known_h3_index = excluded.last_known_h3_index,
+         intel_state = 'current',
+         last_seen_turn = excluded.last_seen_turn,
+         stale_until_turn = excluded.stale_until_turn`,
+      [playerId, enemy.id, enemy.h3Index, currentTurn, currentTurn + STALE_INTEL_TURNS]
+    );
+  }
+
+  const intelRows = getAll<{
+    enemy_unit_id: string;
+    last_known_h3_index: string;
+    intel_state: 'current' | 'stale';
+    stale_until_turn: number | null;
+  }>(
+    'SELECT enemy_unit_id, last_known_h3_index, intel_state, stale_until_turn FROM player_unit_intel WHERE player_id = ?',
+    [playerId]
+  );
+  for (const row of intelRows) {
+    const enemy = enemyById.get(row.enemy_unit_id);
+    if (enemy && visibleHexes.has(enemy.h3Index)) continue;
+    if (currentEnemyHexes.has(row.last_known_h3_index)) {
+      run('DELETE FROM player_unit_intel WHERE player_id = ? AND enemy_unit_id = ?', [playerId, row.enemy_unit_id]);
+      continue;
+    }
+    if (visibleHexes.has(row.last_known_h3_index) && (!enemy || enemy.h3Index !== row.last_known_h3_index)) {
+      run('DELETE FROM player_unit_intel WHERE player_id = ? AND enemy_unit_id = ?', [playerId, row.enemy_unit_id]);
+      continue;
+    }
+    const staleUntil = row.stale_until_turn ?? Number.MIN_SAFE_INTEGER;
+    if (currentTurn > staleUntil) {
+      run('DELETE FROM player_unit_intel WHERE player_id = ? AND enemy_unit_id = ?', [playerId, row.enemy_unit_id]);
+      continue;
+    }
+    run(`UPDATE player_unit_intel SET intel_state = 'stale' WHERE player_id = ? AND enemy_unit_id = ?`, [
+      playerId,
+      row.enemy_unit_id,
+    ]);
+  }
+  run(
+    `INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)`,
+    [`fog_new_contacts_${playerId}`, JSON.stringify(newContactIds)]
+  );
+}
+
+/**
+ * Recomputes persisted fog-of-war intel rows from current board state for both sides.
+ * Use after any resolution/new-game state changes so side-subjective snapshots remain deterministic.
+ */
+export function refreshFogOfWarIntelFromCurrentState(options?: {
+  traversedHexesByPlayer?: Partial<Record<'human' | 'opponent', string[]>>;
+}): void {
+  logDebug('gameDb refreshFogOfWarIntelFromCurrentState', {
+    humanTraversed: options?.traversedHexesByPlayer?.human?.length ?? 0,
+    opponentTraversed: options?.traversedHexesByPlayer?.opponent?.length ?? 0,
+  });
+  if (!db) return;
+  const state = getGameState();
+  const currentTurn = getCurrentTurnNumberFromDb();
+  for (const playerId of FOG_PLAYERS) {
+    const traversed = new Set(options?.traversedHexesByPlayer?.[playerId] ?? []);
+    refreshFogOfWarIntelForPlayer(state, playerId, currentTurn, traversed);
+  }
+}
+
+/**
+ * Returns and clears newly discovered enemy unit ids for the given side (computed during latest fog refresh).
+ */
+export function consumeFogNewContactsForPlayer(playerId: 'human' | 'opponent'): string[] {
+  logDebug('gameDb consumeFogNewContactsForPlayer', { playerId });
+  if (!db) return [];
+  const key = `fog_new_contacts_${playerId}`;
+  const row = getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [key]);
+  run('DELETE FROM game_config WHERE key = ?', [key]);
+  if (!row?.value) return [];
+  try {
+    const parsed = JSON.parse(row.value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((x): x is string => typeof x === 'string');
+  } catch {
+    return [];
+  }
+}
+
 export function getGameState(): GameStateSnapshot {
   logTrace('getGameState');
   if (db === null) {
@@ -682,6 +872,71 @@ export function getGameState(): GameStateSnapshot {
     pendingOrders: orderRows,
     gameOver: gameOver || undefined,
     winner,
+  };
+}
+
+/**
+ * Returns a side-subjective game-state snapshot for fog of war.
+ * Own units are always visible; enemy units are included only when currently visible.
+ */
+export function getGameStateForPlayer(
+  playerId: 'human' | 'opponent',
+  options?: { maskUnexploredTerrain?: boolean }
+): GameStateSnapshot {
+  logTrace('gameDb getGameStateForPlayer', { playerId });
+  const state = getGameState();
+  if (!db) return { ...state, playerPerspective: playerId };
+
+  const mapHexSet = new Set(state.hexes.map((h) => h.h3Index));
+  const visibleHexes = computeVisibleHexesForSide(state, playerId, mapHexSet);
+  const visibleHexList = state.hexes.map((h) => h.h3Index).filter((h3) => visibleHexes.has(h3));
+  const exploredRows = getAll<{ h3_index: string }>(
+    'SELECT h3_index FROM player_hex_intel WHERE player_id = ?',
+    [playerId]
+  );
+  const exploredHexes = new Set(exploredRows.map((r) => r.h3_index));
+  const staleHexes = [...exploredHexes].filter((h3) => !visibleHexes.has(h3));
+
+  const filteredHexes = options?.maskUnexploredTerrain === false
+    ? state.hexes
+    : state.hexes.map((h) => {
+      if (exploredHexes.has(h.h3Index)) return h;
+      return { ...h, terrain: 'unknown', terrainKind: 'unknown' };
+    });
+
+  const filteredUnits = state.units.filter((u) => u.player === playerId || visibleHexes.has(u.h3Index));
+  const intelRows = getAll<{
+    enemy_unit_id: string;
+    last_known_h3_index: string;
+    intel_state: 'current' | 'stale';
+    last_seen_turn: number;
+    stale_until_turn: number;
+  }>(
+    `SELECT enemy_unit_id, last_known_h3_index, intel_state, last_seen_turn, stale_until_turn
+     FROM player_unit_intel WHERE player_id = ? ORDER BY enemy_unit_id`,
+    [playerId]
+  );
+  const enemyIntel = intelRows.map((row) => {
+    const [lat, lng] = cellToLatLng(row.last_known_h3_index);
+    return {
+      unitId: row.enemy_unit_id,
+      lastKnownH3Index: row.last_known_h3_index,
+      lastKnownLatLng: [Number(lat.toFixed(LATLNG_DECIMAL_PLACES)), Number(lng.toFixed(LATLNG_DECIMAL_PLACES))] as [number, number],
+      intelState: row.intel_state,
+      lastSeenTurn: row.last_seen_turn,
+      staleUntilTurn: row.stale_until_turn,
+    };
+  });
+
+  return {
+    ...state,
+    hexes: filteredHexes,
+    units: filteredUnits,
+    visibleHexes: visibleHexList,
+    exploredHexes: [...exploredHexes],
+    staleHexes,
+    enemyIntel,
+    playerPerspective: playerId,
   };
 }
 
@@ -772,8 +1027,13 @@ export function getAiLastConsultationTurn(): number {
  * when applying AI orders from LLM or pending buffer.
  */
 export function setAiLastConsultationTurn(turn: number): void {
-  logDebug('gameDb setAiLastConsultationTurn', { turn });
   if (!db) return;
+  const existing = getAiLastConsultationTurn();
+  if (existing === turn) {
+    logTrace('gameDb setAiLastConsultationTurn: unchanged', { turn });
+    return;
+  }
+  logDebug('gameDb setAiLastConsultationTurn', { turn });
   run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [AI_LAST_CONSULTATION_TURN_KEY, String(turn)]);
 }
 
@@ -812,6 +1072,113 @@ export function clearOpponentCombatSinceConsultation(): void {
   logDebug('gameDb clearOpponentCombatSinceConsultation');
   if (!db) return;
   run('DELETE FROM ai_combat_since_consultation WHERE player_id = ?', [OPPONENT_ID]);
+}
+
+export interface AiLossEventSinceConsultation {
+  turnNumber: number;
+  victimUnitId: string;
+  victimPlayer: string;
+  cause: 'direct_fire' | 'return_fire' | 'melee_or_other';
+  killerIds: string[];
+}
+
+/**
+ * Appends per-turn loss events that occurred this resolution for the given AI player perspective.
+ * Call after resolution so the next LLM consultation can see what was lost and when.
+ */
+export function addAiLossEventsSinceConsultation(
+  playerId: string,
+  turnNumber: number,
+  removedUnits: { id: string; player: string }[],
+  kills: { victimId: string; killerIds: string[] }[],
+  killsByDirectFire?: { victimId: string; killerIds: string[] }[],
+  killsByReturnFire?: { victimId: string; killerIds: string[] }[]
+): void {
+  if (!db) return;
+  if (removedUnits.length === 0 || kills.length === 0) {
+    logTrace('gameDb addAiLossEventsSinceConsultation: no losses to record', {
+      playerId,
+      turnNumber,
+      removedCount: removedUnits.length,
+      killCount: kills.length,
+    });
+    return;
+  }
+
+  const removedById = new Map(removedUnits.map((u) => [u.id, u]));
+  const directVictims = new Set((killsByDirectFire ?? []).map((k) => k.victimId));
+  const returnVictims = new Set((killsByReturnFire ?? []).map((k) => k.victimId));
+  let recordedCount = 0;
+  for (const kill of kills) {
+    const victim = removedById.get(kill.victimId);
+    if (!victim) continue;
+    const cause: AiLossEventSinceConsultation['cause'] = directVictims.has(kill.victimId)
+      ? 'direct_fire'
+      : returnVictims.has(kill.victimId)
+        ? 'return_fire'
+        : 'melee_or_other';
+    run(
+      `INSERT OR REPLACE INTO ai_loss_events_since_consultation
+       (player_id, turn_number, victim_unit_id, victim_player, cause, killer_ids_json)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [playerId, turnNumber, kill.victimId, victim.player, cause, JSON.stringify(kill.killerIds ?? [])]
+    );
+    recordedCount++;
+  }
+  logDebug('gameDb addAiLossEventsSinceConsultation', {
+    playerId,
+    turnNumber,
+    removedCount: removedUnits.length,
+    killCount: kills.length,
+    recordedCount,
+  });
+}
+
+/**
+ * Returns unresolved loss events captured since the last successful LLM consultation for the given player.
+ * Use this to build an explicit "losses since last call" briefing block.
+ */
+export function getAiLossEventsSinceConsultation(playerId: string): AiLossEventSinceConsultation[] {
+  logTrace('gameDb getAiLossEventsSinceConsultation', { playerId });
+  if (!db) return [];
+  const rows = getAll<{
+    turn_number: number;
+    victim_unit_id: string;
+    victim_player: string;
+    cause: AiLossEventSinceConsultation['cause'];
+    killer_ids_json: string;
+  }>(
+    `SELECT turn_number, victim_unit_id, victim_player, cause, killer_ids_json
+     FROM ai_loss_events_since_consultation
+     WHERE player_id = ?
+     ORDER BY turn_number ASC, victim_unit_id ASC`,
+    [playerId]
+  );
+  return rows.map((row) => {
+    let killerIds: string[] = [];
+    try {
+      const parsed = JSON.parse(row.killer_ids_json) as unknown;
+      if (Array.isArray(parsed)) killerIds = parsed.filter((x): x is string => typeof x === 'string');
+    } catch {
+      killerIds = [];
+    }
+    return {
+      turnNumber: row.turn_number,
+      victimUnitId: row.victim_unit_id,
+      victimPlayer: row.victim_player,
+      cause: row.cause,
+      killerIds,
+    };
+  });
+}
+
+/**
+ * Clears accumulated loss events after a successful LLM consultation so the next briefing window starts fresh.
+ */
+export function clearAiLossEventsSinceConsultation(playerId: string): void {
+  logDebug('gameDb clearAiLossEventsSinceConsultation', { playerId });
+  if (!db) return;
+  run('DELETE FROM ai_loss_events_since_consultation WHERE player_id = ?', [playerId]);
 }
 
 /**
@@ -891,8 +1258,13 @@ export function resetGameForNewMatch(): void {
   run('DELETE FROM ai_callback_subscriptions');
   run('DELETE FROM ai_pending_orders');
   run('DELETE FROM ai_combat_since_consultation');
+  run('DELETE FROM ai_loss_events_since_consultation');
   run("DELETE FROM game_config WHERE key = 'ai_last_consultation_turn'");
+  run("DELETE FROM game_config WHERE key IN ('fog_new_contacts_human', 'fog_new_contacts_opponent')");
   run('DELETE FROM standing_orders');
   run('DELETE FROM ai_memory');
+  run('DELETE FROM player_hex_intel');
+  run('DELETE FROM player_unit_intel');
+  refreshFogOfWarIntelFromCurrentState();
   saveDatabase();
 }

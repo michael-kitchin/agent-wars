@@ -98,6 +98,11 @@ export interface PlanRouteOk {
   orderToXY: LatLng;
   /** Exact H3 index for this turn's move (path[0] end hex, or origin if already there). */
   orderToH3: string;
+  /**
+   * Optional nearby alternatives when destination resolves to the current hex.
+   * Helps callers retry with coordinates that produce movement at map resolution.
+   */
+  suggestedDestinations?: LatLng[];
   hexDistance: number;
   turnsRequired: number;
   path: {
@@ -213,9 +218,14 @@ export function executePlanRoute(
 
   if (originH3 === destH3) {
     const originLl = h3ToLatLng(originH3, latLngByH3);
+    const nearbyAlternatives = Array.from(getReachableHexes(originH3, hexSet, terrainByH3, passableFor, blocked))
+      .filter((h3) => h3 !== originH3)
+      .sort((a, b) => a.localeCompare(b))
+      .slice(0, 6)
+      .map((h3) => h3ToLatLng(h3, latLngByH3));
     const warningsWhenAlreadyThere: string[] = navalRedirectedToWater
       ? ['Unit is already at the nearest water/coastal hex to that land position; no movement this turn.']
-      : [];
+      : ['Destination resolves to the unit\'s current hex at map resolution; choose a more distant coordinate to move.'];
     return {
       status: 'ok',
       unitId,
@@ -224,6 +234,7 @@ export function executePlanRoute(
       destination: h3ToLatLng(destH3, latLngByH3),
       orderToXY: originLl,
       orderToH3: originH3,
+      suggestedDestinations: nearbyAlternatives,
       hexDistance: 0,
       turnsRequired: 0,
       path: [],

@@ -28,6 +28,7 @@ export interface SubscriptionEventResult {
 export type MandatoryOverrideResult =
   | { type: 'first_consultation' }
   | { type: 'first_combat'; unitId: string }
+  | { type: 'new_contact'; unitId: string }
   | { type: 'unit_destroyed'; unitId: string }
   | { type: 'unordered_unit'; unitId: string }
   | { type: 'standing_order_blocked'; unitId: string }
@@ -122,7 +123,8 @@ export function evaluateMandatoryOverrides(
   lastConsultationTurn: number,
   opponentUnitsInCombatSinceConsultation: string[],
   thisResolutionOpponentCombatants: string[],
-  removedOpponentUnitIds: string[]
+  removedOpponentUnitIds: string[],
+  newContactUnitIds: string[]
 ): MandatoryOverrideResult[] {
   const results: MandatoryOverrideResult[] = [];
   const opponentUnitIds = state.units.filter((u) => u.player === 'opponent').map((u) => u.id);
@@ -137,6 +139,10 @@ export function evaluateMandatoryOverrides(
       results.push({ type: 'first_combat', unitId });
       break;
     }
+  }
+
+  for (const unitId of newContactUnitIds) {
+    results.push({ type: 'new_contact', unitId });
   }
 
   for (const unitId of removedOpponentUnitIds) {

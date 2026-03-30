@@ -10,7 +10,13 @@ import { cellToLatLng, gridDistance } from 'h3-js';
 import { getAttack, getDefense, getRange } from './combatConstants';
 import { logDebug, logError, logTrace } from './logger';
 import type { GameStateSnapshot } from './gameDb';
-import { setAiToolLimitExceededLastTurn, getAndClearAiToolLimitExceededLastTurn } from './gameDb';
+import {
+  setAiToolLimitExceededLastTurn,
+  getAndClearAiToolLimitExceededLastTurn,
+  getAiLossEventsSinceConsultation,
+  clearAiLossEventsSinceConsultation,
+  setAiLastConsultationTurn,
+} from './gameDb';
 import { buildLatLngCoordinateMap, H3_RESOLUTION, LATLNG_DECIMAL_PLACES } from './mapData';
 import { executeTool1, TOOL1_NAMES, type LatLng } from './tools/tool1Pathfinding';
 import { executeTool2, TOOL2_NAMES } from './tools/tool2Assessment';
@@ -813,6 +819,28 @@ type ChatMessage =
   | { role: 'assistant'; content: string | null; tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }> }
   | { role: 'tool'; tool_call_id: string; content: string };
 
+function sanitizeToolResultForModel(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((item) => sanitizeToolResultForModel(item));
+  if (value && typeof value === 'object') {
+    const inObj = value as Record<string, unknown>;
+    const outObj: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(inObj)) {
+      const normalizedKey = key.toLowerCase();
+      if (
+        normalizedKey.includes('h3') ||
+        normalizedKey.includes('hex_index') ||
+        normalizedKey.includes('toh3') ||
+        normalizedKey.includes('fromh3')
+      ) {
+        continue;
+      }
+      outObj[key] = sanitizeToolResultForModel(entry);
+    }
+    return outObj;
+  }
+  return value;
+}
+
 const MAX_TOOL_ITERATIONS = 50;
 
 export interface RequestOrdersOptions {
@@ -915,6 +943,7 @@ export async function requestOrders(
 
   const toolInvocationCounts: Record<string, number> = {};
   for (const g of TOOL_GROUP_REGISTRY) toolInvocationCounts[g.id] = 0;
+  const lossesSinceLastConsultation = getAiLossEventsSinceConsultation('opponent');
 
   let briefingOverride: string | undefined;
   if (usePrecomputation) {
@@ -926,7 +955,14 @@ export async function requestOrders(
     const standingOrderText = getStandingOrderInjectionText('opponent', state);
     const memoryText = getInjectionText('opponent', state.turnNumber);
     const subscriptions = getSubscriptions('opponent');
-    briefingOverride = formatBriefing(state, precomputed, standingOrderText, memoryText, subscriptions);
+    briefingOverride = formatBriefing(
+      state,
+      precomputed,
+      standingOrderText,
+      memoryText,
+      subscriptions,
+      lossesSinceLastConsultation
+    );
     logDebug('openRouter requestOrders: pre-computation ran', {
       briefingLength: briefingOverride.length,
       unitAssessments: precomputed.unitAssessments.length,
@@ -952,6 +988,10 @@ export async function requestOrders(
   let requestCost = 0;
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
+  const markSuccessfulConsultation = (): void => {
+    setAiLastConsultationTurn(state.turnNumber);
+    clearAiLossEventsSinceConsultation('opponent');
+  };
   try {
     let iteration = 0;
     let parseRepairAttempted = false;
@@ -1047,7 +1087,7 @@ export async function requestOrders(
                 : (TOOL2_NAMES as readonly string[]).includes(toolName)
                   ? executeTool2(toolName, args, state, latLngByH3, resolveToH3)
                   : executeTool1(toolName, args, state, latLngByH3, resolveToH3);
-          const resultStr = JSON.stringify(result);
+          const resultStr = JSON.stringify(sanitizeToolResultForModel(result));
           logDebug('openRouter requestOrders: tool result (full payload sent to LLM)', {
             turnNumber: state.turnNumber,
             playerId: 'opponent',
@@ -1305,6 +1345,7 @@ export async function requestOrders(
         iterations: iteration,
       });
 
+      markSuccessfulConsultation();
       return {
         success: true,
         orders: validated,
@@ -1323,6 +1364,7 @@ export async function requestOrders(
     logError('openRouter requestOrders: exceeded tool-call limit', MAX_TOOL_ITERATIONS, state.turnNumber);
     setAiToolLimitExceededLastTurn();
     if (onLog) onLog('Tool limit exceeded.', true);
+    markSuccessfulConsultation();
     return {
       success: true,
       orders: [],

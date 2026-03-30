@@ -233,20 +233,27 @@ function assignOrder(
     status = 'holding';
   }
 
-  dbRun(
-    `INSERT OR REPLACE INTO standing_orders (player_id, unit_id, order_type, params, computed_route, status, created_turn, origin_hex)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      playerId,
-      unitId,
-      orderType,
-      JSON.stringify(paramsObj),
-      computedRouteJson,
-      status,
-      createdTurn,
-      originHexJson,
-    ]
-  );
+  const shouldPersistStandingOrder = !(orderType === 'march' && status === 'arrived');
+  if (shouldPersistStandingOrder) {
+    dbRun(
+      `INSERT OR REPLACE INTO standing_orders (player_id, unit_id, order_type, params, computed_route, status, created_turn, origin_hex)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        playerId,
+        unitId,
+        orderType,
+        JSON.stringify(paramsObj),
+        computedRouteJson,
+        status,
+        createdTurn,
+        originHexJson,
+      ]
+    );
+  } else {
+    // March orders are one-time objectives; drop immediately if the unit is already there.
+    dbRun('DELETE FROM standing_orders WHERE player_id = ? AND unit_id = ?', [playerId, unitId]);
+    logDebug('tool5StandingOrders assignOrder: dropped arrived march order', { playerId, unitId });
+  }
   saveDatabase();
 
   const responseOrder: Record<string, unknown> = {
@@ -425,10 +432,11 @@ export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot
           }
         }
         if (destH3 && unit.h3Index === destH3) {
-          dbRun(
-            'UPDATE standing_orders SET status = ? WHERE player_id = ? AND unit_id = ?',
-            ['arrived', playerId, row.unit_id]
-          );
+          dbRun('DELETE FROM standing_orders WHERE player_id = ? AND unit_id = ?', [playerId, row.unit_id]);
+          logDebug('tool5StandingOrders expireAndUpdateStatus: removed arrived march order', {
+            playerId,
+            unitId: row.unit_id,
+          });
         }
       }
     }
@@ -565,10 +573,11 @@ export function generateOrdersForStandingOrders(
         continue;
       }
       if (routeResult.path.length === 0) {
-        dbRun(
-          'UPDATE standing_orders SET status = ?, computed_route = ? WHERE player_id = ? AND unit_id = ?',
-          ['arrived', JSON.stringify({ turnsRemaining: 0 }), playerId, row.unit_id]
-        );
+        dbRun('DELETE FROM standing_orders WHERE player_id = ? AND unit_id = ?', [playerId, row.unit_id]);
+        logDebug('tool5StandingOrders generateOrdersForStandingOrders: removed arrived march order', {
+          playerId,
+          unitId: row.unit_id,
+        });
         continue;
       }
       const endHex = routeResult.path[0]!.endHex;

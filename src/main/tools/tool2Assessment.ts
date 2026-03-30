@@ -18,6 +18,25 @@ export type LatLng = [number, number];
 
 type LatLngMap = Map<string, LatLng>;
 
+interface EnemyIntelEntry {
+  unitId: string;
+  lastKnownH3Index: string;
+  intelState: 'current' | 'stale';
+  lastSeenTurn: number;
+}
+
+function getEnemyIntelForPlayer(state: GameStateSnapshot): EnemyIntelEntry[] {
+  const rows = Array.isArray(state.enemyIntel) ? state.enemyIntel : [];
+  return rows
+    .map((r) => ({
+      unitId: r.unitId,
+      lastKnownH3Index: r.lastKnownH3Index,
+      intelState: r.intelState,
+      lastSeenTurn: r.lastSeenTurn,
+    }))
+    .filter((r) => r.intelState === 'stale');
+}
+
 /**
  * Converts an H3 index to [lat, lng] for tool responses. Uses the coordinate map when present;
  * falls back to cellToLatLng so we never expose raw H3 strings to the LLM.
@@ -246,6 +265,38 @@ function executeAssessUnit(
     }
   }
 
+  const staleIntel = getEnemyIntelForPlayer(state);
+  const currentEnemyIds = new Set(nearbyEnemies.map((e) => e.unitId));
+  for (const intel of staleIntel) {
+    if (currentEnemyIds.has(intel.unitId)) continue;
+    if (!hexSet.has(intel.lastKnownH3Index)) continue;
+    const gridDist = (() => {
+      try {
+        return getGridDistance(unit.h3Index, intel.lastKnownH3Index);
+      } catch {
+        return 999;
+      }
+    })();
+    if (gridDist > radius && gridDist !== 999) continue;
+    const distResult = getPathDistanceAndTurns(unit.h3Index, intel.lastKnownH3Index, unit.unitType, hexSet, terrainByH3);
+    const pathWithinRadius = distResult !== null && distResult.hexDistance <= radius;
+    const gridWithinRadius = gridDist <= radius;
+    if (!pathWithinRadius && !gridWithinRadius) continue;
+    const hexDistance = distResult !== null ? distResult.hexDistance : gridDist;
+    nearbyEnemies.push({
+      unitId: intel.unitId,
+      type: 'unknown',
+      position: h3ToLatLng(intel.lastKnownH3Index, latLngByH3),
+      hexDistance,
+      estimatedTurnsToReach: distResult !== null ? distResult.estimatedTurns : null,
+      inRangedRange: gridDist <= myRange,
+      inMeleeRange: gridDist === 0,
+      inEnemyRangedRange: false,
+      confidence: 'stale',
+      lastSeen: intel.lastSeenTurn,
+    });
+  }
+
   nearbyEnemies.sort((a, b) => a.hexDistance - b.hexDistance);
   nearbyFriendlies.sort((a, b) => a.hexDistance - b.hexDistance);
   logTrace('tool2Assessment executeAssessUnit: scan complete', {
@@ -323,6 +374,25 @@ function executeAssessHex(
       if (d === 0) meleeRange.push(entry);
       else if (d === 1 && r >= 1) rangedRange1.push(entry);
       else if (d === 2 && r >= 2) rangedRange2.push(entry);
+    } catch {
+      continue;
+    }
+  }
+  for (const intel of getEnemyIntelForPlayer(state)) {
+    if (!hexSet.has(intel.lastKnownH3Index)) continue;
+    try {
+      const d = getGridDistance(intel.lastKnownH3Index, hexH3);
+      const entry = {
+        unitId: intel.unitId,
+        type: 'unknown',
+        position: h3ToLatLng(intel.lastKnownH3Index, latLngByH3) as LatLng,
+        hexDistance: d,
+        confidence: 'stale' as const,
+        lastSeen: intel.lastSeenTurn,
+      };
+      if (d === 0) meleeRange.push(entry);
+      else if (d === 1) rangedRange1.push(entry);
+      else if (d === 2) rangedRange2.push(entry);
     } catch {
       continue;
     }

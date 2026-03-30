@@ -3,7 +3,7 @@
  * minimap with viewport sync, and click / double-click interaction with the sidebar.
  */
 
-import { cellToChildren, cellToLatLng, cellToParent, gridDistance, latLngToCell } from 'h3-js';
+import { cellToChildren, cellToLatLng, cellToParent, gridDisk, gridDistance, latLngToCell } from 'h3-js';
 import {
   alignLngToReference,
   clampLatForWebMercatorDisplay,
@@ -217,6 +217,7 @@ const WORLD_H3_RESOLUTION = 1;
 const DETAIL_H3_RESOLUTION = 4;
 const RES4_SHOW_THRESHOLD_VIEW_FRACTION = 0.8;
 const RES4_HIDE_THRESHOLD_VIEW_FRACTION = 0.7;
+const INITIAL_CAMERA_ZOOM_IN_LEVELS = 1;
 
 let lastPointerClientX = 0;
 let lastPointerClientY = 0;
@@ -694,10 +695,57 @@ let resolutionMoveAnimation: {
   meleeCombatHexes?: string[];
   meleeCasualtyHexes?: string[];
   meleeRemovedUnits?: RemovedUnitSnapshot[];
+  unknownCombatHexes?: string[];
+  unknownCasualtyHexes?: string[];
 } | null = null;
 let resolutionMoveAnimationFrameId: number | null = null;
+let initialCameraApplied = false;
+const clientStaleEnemyIntelByUnitId = new Map<string, {
+  unitId: string;
+  lastKnownH3Index: string;
+  lastSeenTurn: number;
+  staleUntilTurn: number;
+}>();
+const lastRenderedVisibleEnemyByUnitId = new Map<string, { h3Index: string; lastSeenTurn: number }>();
+const lastObservedEnemyByUnitId = new Map<string, { h3Index: string; lastSeenTurn: number }>();
 
 let redrawRafId: number | null = null;
+
+function getVisibleHexSet(state: GameStateSnapshot | null): Set<string> {
+  if (!state) return new Set<string>();
+  if (!Array.isArray(state.visibleHexes)) return new Set(state.hexes.map((h) => h.h3Index));
+  return new Set(state.visibleHexes);
+}
+
+function getExploredHexSet(state: GameStateSnapshot | null): Set<string> {
+  if (!state) return new Set<string>();
+  if (!Array.isArray(state.exploredHexes)) return new Set(state.hexes.map((h) => h.h3Index));
+  return new Set(state.exploredHexes);
+}
+
+function isHexExploredByPlayer(h3Index: string): boolean {
+  if (!gameState) return false;
+  const explored = getExploredHexSet(gameState);
+  return explored.has(h3Index);
+}
+
+function inferUnitTypeLabelFromId(unitId: string): string {
+  if (unitId.includes('-infantry-')) return 'I';
+  if (unitId.includes('-armor-')) return 'A';
+  if (unitId.includes('-naval-')) return 'N';
+  return '?';
+}
+
+function formatUnknownBattleAnnouncement(continentNames: string[]): string {
+  const clean = continentNames
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+    .filter((name, idx, arr) => arr.indexOf(name) === idx);
+  if (clean.length === 0) return 'Unknown battle observed in an unidentified continent.';
+  if (clean.length === 1) return `Unknown battle observed in ${clean[0]}.`;
+  if (clean.length === 2) return `Unknown battle observed in ${clean[0]} or ${clean[1]}.`;
+  return `Unknown battle observed in ${clean.slice(0, -1).join(', ')}, or ${clean[clean.length - 1]}.`;
+}
 function requestRedraw(): void {
   if (resolutionMoveAnimation) return;
   if (redrawRafId !== null) return;
@@ -706,6 +754,148 @@ function requestRedraw(): void {
     redrawRafId = null;
     redraw();
   });
+}
+
+/**
+ * Maintains the client-side stale enemy intel cache across state transitions. Call after every
+ * gameState update (ready, initial load, new game). Compares the previous and current visible enemy
+ * sets to create stale entries for enemies that just left view, and culls entries that are now
+ * contradicted (hex visible but enemy gone), expired, or re-sighted. Works alongside the persisted
+ * DB intel; the draw function merges both sources so stale markers appear even when DB rows lag.
+ */
+function updateClientStaleEnemyIntel(previousState: GameStateSnapshot | null, state: GameStateSnapshot): void {
+  const currentTurn = state.turnNumber;
+  const hasFogData = Array.isArray(state.visibleHexes);
+  const visibleHexes = hasFogData ? new Set(state.visibleHexes!) : new Set<string>();
+  const visibleEnemiesNow = state.units.filter((u) => u.player !== 'human');
+  const visibleEnemyIdsNow = new Set(visibleEnemiesNow.map((u) => u.id));
+  const visibleEnemyHexesNow = new Set(visibleEnemiesNow.map((u) => u.h3Index));
+
+  for (const enemy of visibleEnemiesNow) {
+    lastObservedEnemyByUnitId.set(enemy.id, { h3Index: enemy.h3Index, lastSeenTurn: currentTurn });
+    clientStaleEnemyIntelByUnitId.delete(enemy.id);
+  }
+
+  if (previousState) {
+    const previousVisibleEnemies = previousState.units.filter((u) => u.player !== 'human');
+    for (const enemy of previousVisibleEnemies) {
+      if (visibleEnemyIdsNow.has(enemy.id)) continue;
+      lastObservedEnemyByUnitId.set(enemy.id, {
+        h3Index: enemy.h3Index,
+        lastSeenTurn: previousState.turnNumber,
+      });
+      if (!hasFogData || !visibleHexes.has(enemy.h3Index)) {
+        clientStaleEnemyIntelByUnitId.set(enemy.id, {
+          unitId: enemy.id,
+          lastKnownH3Index: enemy.h3Index,
+          lastSeenTurn: previousState.turnNumber,
+          staleUntilTurn: previousState.turnNumber + 2,
+        });
+      }
+    }
+  }
+
+  for (const [unitId, stale] of clientStaleEnemyIntelByUnitId) {
+    const isNowVisible = visibleEnemyIdsNow.has(unitId);
+    const contradictedOnVisibleHex = hasFogData && visibleHexes.has(stale.lastKnownH3Index) && !visibleEnemyHexesNow.has(stale.lastKnownH3Index);
+    const expired = currentTurn > stale.staleUntilTurn;
+    if (isNowVisible || contradictedOnVisibleHex || expired) {
+      clientStaleEnemyIntelByUnitId.delete(unitId);
+      lastRenderedVisibleEnemyByUnitId.delete(unitId);
+    }
+  }
+}
+
+type PanDirection = 'north' | 'south' | 'west' | 'east';
+
+function shouldIgnoreGlobalKeydown(e: KeyboardEvent): boolean {
+  const target = e.target as HTMLElement | null;
+  if (!target) return false;
+  const tag = target.tagName.toLowerCase();
+  return tag === 'input' || tag === 'textarea' || tag === 'select' || !!target.isContentEditable;
+}
+
+function getNeighborForPan(centerH3: string, direction: PanDirection): string | null {
+  const [centerLat, centerLng] = cellToLatLng(centerH3);
+  const neighbors = Array.from(gridDisk(centerH3, 1)).filter((h3) => h3 !== centerH3);
+  if (neighbors.length === 0) return null;
+  let bestH3: string | null = null;
+  let bestScore = direction === 'north' || direction === 'east' ? -Infinity : Infinity;
+  for (const h3 of neighbors) {
+    const [lat, lng] = cellToLatLng(h3);
+    const alignedLng = alignLngToReference(lng, centerLng);
+    const deltaLng = alignedLng - centerLng;
+    const deltaLat = lat - centerLat;
+    const score =
+      direction === 'north'
+        ? deltaLat
+        : direction === 'south'
+          ? deltaLat
+          : direction === 'east'
+            ? deltaLng
+            : deltaLng;
+    if (direction === 'north' || direction === 'east') {
+      if (score > bestScore) {
+        bestScore = score;
+        bestH3 = h3;
+      }
+    } else if (score < bestScore) {
+      bestScore = score;
+      bestH3 = h3;
+    }
+  }
+  return bestH3;
+}
+
+function panMapOneRes1Hex(direction: PanDirection): void {
+  const map = getMainLeafletMap() as {
+    getCenter: () => { lat: number; lng: number };
+    setView: (center: unknown, zoom: number) => unknown;
+    getZoom: () => number;
+  } | null;
+  const Lref = (globalThis as unknown as { L?: { latLng: (lat: number, lng: number) => unknown } }).L;
+  if (!map || !Lref) return;
+  const center = map.getCenter();
+  let centerH3: string;
+  try {
+    centerH3 = latLngToCell(center.lat, center.lng, WORLD_H3_RESOLUTION);
+  } catch {
+    return;
+  }
+  const neighbor = getNeighborForPan(centerH3, direction);
+  if (!neighbor) return;
+  const [nextLat, nextLngRaw] = cellToLatLng(neighbor);
+  const nextLng = alignLngToReference(nextLngRaw, center.lng);
+  map.setView(Lref.latLng(clampLatForWebMercatorDisplay(nextLat), nextLng), map.getZoom());
+}
+
+function applyInitialCameraForState(state: GameStateSnapshot): void {
+  const map = getMainLeafletMap() as {
+    getZoom: () => number;
+    getMaxZoom?: () => number;
+    setView: (center: unknown, zoom: number) => unknown;
+  } | null;
+  const Lref = (globalThis as unknown as { L?: { latLng: (lat: number, lng: number) => unknown } }).L;
+  if (!map || !Lref) return;
+
+  const humanGround = state.units.filter((u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor'));
+  const anchors = humanGround.length > 0 ? humanGround : state.units.filter((u) => u.player === 'human');
+  if (anchors.length === 0) return;
+
+  const [, anchorLng] = cellToLatLng(anchors[0]!.h3Index);
+  let latSum = 0;
+  let lngSum = 0;
+  for (const unit of anchors) {
+    const [lat, lng] = cellToLatLng(unit.h3Index);
+    latSum += lat;
+    lngSum += alignLngToReference(lng, anchorLng);
+  }
+  const centerLat = latSum / anchors.length;
+  const centerLng = lngSum / anchors.length;
+  const maxZoom = typeof map.getMaxZoom === 'function' ? map.getMaxZoom() : 12;
+  const targetZoom = Math.min(maxZoom, map.getZoom() + INITIAL_CAMERA_ZOOM_IN_LEVELS);
+  map.setView(Lref.latLng(clampLatForWebMercatorDisplay(centerLat), centerLng), targetZoom);
+  initialCameraApplied = true;
 }
 
 /** Cached canvas size metrics to avoid getBoundingClientRect() on every redraw. */
@@ -756,6 +946,7 @@ function detailHitAtClientPixel(
   mapHexSet: Set<string>
 ): string | null {
   if (!gameState || !shouldRenderRes4Hexes()) return null;
+  const exploredHexes = getExploredHexSet(gameState);
   const map = getMainLeafletMap() as
     | {
         getContainer: () => HTMLElement;
@@ -769,6 +960,7 @@ function detailHitAtClientPixel(
   try {
     const detailH3 = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
     const parentH3 = cellToParent(detailH3, WORLD_H3_RESOLUTION);
+    if (!exploredHexes.has(parentH3)) return null;
     return mapHexSet.has(parentH3) ? detailH3 : null;
   } catch {
     return null;
@@ -777,6 +969,7 @@ function detailHitAtClientPixel(
 
 function drawTerrainHexes(ctx: CanvasRenderingContext2D): void {
   if (!gameState) return;
+  const exploredHexes = getExploredHexSet(gameState);
   const res4Active = shouldRenderRes4Hexes();
   const map = getMainLeafletMap() as
     | { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } }
@@ -808,13 +1001,14 @@ function drawTerrainHexes(ctx: CanvasRenderingContext2D): void {
       }
       ctx.closePath();
     };
-    if (reverseTerrainFillWhileHeld) {
+    const explored = exploredHexes.has(hx.h3Index);
+    if (explored && reverseTerrainFillWhileHeld) {
       fillHexTerrain(ctx, kind, drawClosedPath, {
         fillAndHatchAlphaScale: hoveredHexH3 === hx.h3Index ? 0.6 : 1,
         landHoverFill: kind === 'plains',
         isUrban: false,
       });
-    } else if (!res4Active && hoveredHexH3 === hx.h3Index) {
+    } else if (explored && !res4Active && hoveredHexH3 === hx.h3Index) {
       fillHexTerrain(ctx, kind, drawClosedPath, {
         fillAndHatchAlphaScale: 2,
         landHoverFill: kind === 'plains',
@@ -924,6 +1118,7 @@ function projectedPolygonOverlapsViewport(
 
 function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void {
   if (!gameState || !shouldRenderRes4Hexes()) return;
+  const exploredHexes = getExploredHexSet(gameState);
   const map = getMainLeafletMap() as
     | {
         latLngToContainerPoint: (ll: unknown) => { x: number; y: number };
@@ -937,6 +1132,7 @@ function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void {
   const viewportHeight = Math.max(1, container.clientHeight);
   const stroke = getActiveHexStrokeStyle();
   for (const parent of gameState.hexes) {
+    if (!exploredHexes.has(parent.h3Index)) continue;
     const parentPts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
     if (!projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight)) continue;
     const parentKind =
@@ -1000,6 +1196,7 @@ function res1HexHasUnits(h3: string): boolean {
  * Glyphs match that visibility; if the hex has units, show glyphs only while T is held.
  */
 function infraGlyphsAllowedForRes1Hex(h3: string): boolean {
+  if (!isHexExploredByPlayer(h3)) return false;
   const res4Active = shouldRenderRes4Hexes();
   const fillShown =
     reverseTerrainFillWhileHeld || (!res4Active && hoveredHexH3 === h3);
@@ -1015,6 +1212,7 @@ function infraGlyphsAllowedForRes1Hex(h3: string): boolean {
  * Parent hexes with units suppress glyphs unless T is held.
  */
 function infraGlyphsAllowedForRes4Child(parentH3: string, childH3: string): boolean {
+  if (!isHexExploredByPlayer(parentH3)) return false;
   if (reverseTerrainFillWhileHeld) {
     if (hoveredDetailHexH3 !== childH3) return false;
   }
@@ -1481,6 +1679,126 @@ function hideAiStrategyToast(): void {
 }
 
 /**
+ * Draws a neutral loading canvas while map/game state is still initializing.
+ */
+function drawLoadingScene(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+  ctx.fillStyle = BACKGROUND_COLOR;
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = '#666';
+  ctx.font = '14px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Loading…', width / 2, height / 2);
+}
+
+/**
+ * Draws the full tactical scene for the current frame. Use from both resize and animation redraw paths
+ * so terrain, units, stale intel, and combat overlays stay behaviorally identical.
+ */
+function drawGameScene(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  state: GameStateSnapshot
+): void {
+  ctx.clearRect(0, 0, width, height);
+  drawTerrainHexes(ctx);
+  drawRes4TerrainHexes(ctx);
+  const hexList = state.hexes.map((h) => h.h3Index);
+  let moveProgress = 1;
+  let unitsToDraw: GameStateSnapshot['units'] = state.units;
+  let movingIds: Set<string> | undefined;
+  const anim = resolutionMoveAnimation;
+  if (anim) {
+    const elapsed = Date.now() - anim.startTime;
+    const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
+    const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
+    const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0;
+    const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
+    const phase = getResolutionPhase5(
+      elapsed,
+      hasRangedCombat,
+      hasRangedCasualties,
+      hasMeleeCombat,
+      hasMeleeCasualties
+    );
+    moveProgress = phase.moveProgress;
+    const rangedRemovedIds = new Set((anim.rangedRemovedUnits ?? []).map((u) => u.id));
+    if (phase.inRangedLightning || phase.inRangedCasualty) {
+      const preMoveSurvivors = state.units
+        .filter((u) => !rangedRemovedIds.has(u.id))
+        .map((u) => {
+          const move = anim.moves.find((m) => m.unitId === u.id);
+          return move ? { ...u, h3Index: move.fromH3Index } : u;
+        });
+      unitsToDraw = [...preMoveSurvivors, ...(anim.rangedRemovedUnits ?? [])];
+      movingIds = undefined;
+    } else if (phase.inMovement) {
+      unitsToDraw = state.units;
+      movingIds = moveProgress < 1 ? new Set(anim.moves.map((m) => m.unitId)) : undefined;
+    } else if (phase.inMeleeLightning || phase.inMeleeCasualty) {
+      unitsToDraw = [...state.units, ...(anim.meleeRemovedUnits ?? [])];
+      movingIds = undefined;
+    }
+    if (elapsed >= phase.movementStart) {
+      drawResolutionMoveLines(ctx, width, height, anim.moves, state.units, hexList, 1);
+    }
+  } else {
+    movingIds = undefined;
+  }
+  if (!hideCommittedOrderLinesAfterReady && humanStandingOrders.length > 0 && state.units.length) {
+    drawStandingOrderLines(ctx, humanStandingOrders, state.units);
+  }
+  if (!anim) drawHoverRoutePreview(ctx);
+  if (pendingRangedAttacks.length > 0 && state.units.length && hexList) {
+    drawRangedAttackLines(ctx, width, height, pendingRangedAttacks, state.units, hexList);
+  }
+  if (unitsToDraw.length) {
+    drawUnits(ctx, width, height, unitsToDraw, hexList, movingIds);
+  }
+  drawStaleEnemyIntel(ctx, state);
+  if (anim && hexList && moveProgress < 1) {
+    drawMovingUnits(ctx, width, height, anim.moves, state.units, hexList, moveProgress);
+  }
+  drawTerrainInfrastructureOverlays(ctx);
+  if (anim && hexList) {
+    const elapsed = Date.now() - anim.startTime;
+    const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
+    const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
+    const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0;
+    const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
+    const phase = getResolutionPhase5(
+      elapsed,
+      hasRangedCombat,
+      hasRangedCasualties,
+      hasMeleeCombat,
+      hasMeleeCasualties
+    );
+    const combatHexes = phase.inRangedLightning ? (anim.rangedCombatHexes ?? anim.combatHexes) : phase.inMeleeLightning ? anim.meleeCombatHexes : undefined;
+    if (combatHexes?.length) {
+      const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * 0.008);
+      const unknownSet = new Set(anim.unknownCombatHexes ?? []);
+      const knownCombatHexes = combatHexes.filter((h3) => !unknownSet.has(h3));
+      const unknownCombatHexes = combatHexes.filter((h3) => unknownSet.has(h3));
+      drawCombatLightning(ctx, width, height, knownCombatHexes, hexList, pulseOpacity);
+      drawUnknownBattleMarkers(ctx, unknownCombatHexes, pulseOpacity);
+    }
+    const casualtyHexes = phase.inRangedCasualty ? (anim.rangedCasualtyHexes ?? anim.casualtyHexes) : phase.inMeleeCasualty ? anim.meleeCasualtyHexes : undefined;
+    if (casualtyHexes?.length) {
+      const casualtyElapsed = phase.inRangedCasualty
+        ? elapsed - (hasRangedCombat ? LIGHTNING_DURATION_MS : 0)
+        : elapsed - (phase.movementStart + RESOLUTION_FADE_MS + (hasMeleeCombat ? LIGHTNING_DURATION_MS : 0));
+      const pulseOpacity = 0.5 + 0.5 * Math.sin(casualtyElapsed * 0.008);
+      const unknownSet = new Set(anim.unknownCasualtyHexes ?? []);
+      const knownCasualtyHexes = casualtyHexes.filter((h3) => !unknownSet.has(h3));
+      const unknownCasualtyHexes = casualtyHexes.filter((h3) => unknownSet.has(h3));
+      drawCasualtyOverlay(ctx, width, height, knownCasualtyHexes, hexList, pulseOpacity);
+      drawUnknownBattleMarkers(ctx, unknownCasualtyHexes, pulseOpacity);
+    }
+  }
+}
+
+/**
  * Resizes the overlay canvas to match the map container (including devicePixelRatio) and redraws hexes/units.
  */
 function resizeAndRedraw(): void {
@@ -1508,100 +1826,10 @@ function resizeAndRedraw(): void {
   ctx.scale(dpr, dpr);
 
   if (!gameState) {
-    ctx.fillStyle = BACKGROUND_COLOR;
-    ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = '#666';
-    ctx.font = '14px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Loading…', w / 2, h / 2);
+    drawLoadingScene(ctx, w, h);
     return;
   }
-
-  ctx.clearRect(0, 0, w, h);
-  drawTerrainHexes(ctx);
-  drawRes4TerrainHexes(ctx);
-  const hexList = gameState.hexes.map((h) => h.h3Index);
-  let moveProgress = 1;
-  let unitsToDraw: GameStateSnapshot['units'] = gameState.units;
-  let movingIds: Set<string> | undefined;
-  const anim = resolutionMoveAnimation;
-  if (anim) {
-    const elapsed = Date.now() - anim.startTime;
-    const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
-    const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
-    const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0;
-    const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
-    const phase = getResolutionPhase5(
-      elapsed,
-      hasRangedCombat,
-      hasRangedCasualties,
-      hasMeleeCombat,
-      hasMeleeCasualties
-    );
-    moveProgress = phase.moveProgress;
-    const rangedRemovedIds = new Set((anim.rangedRemovedUnits ?? []).map((u) => u.id));
-    if (phase.inRangedLightning || phase.inRangedCasualty) {
-      const preMoveSurvivors = gameState.units
-        .filter((u) => !rangedRemovedIds.has(u.id))
-        .map((u) => {
-          const move = anim.moves.find((m) => m.unitId === u.id);
-          return move ? { ...u, h3Index: move.fromH3Index } : u;
-        });
-      unitsToDraw = [...preMoveSurvivors, ...(anim.rangedRemovedUnits ?? [])];
-      movingIds = undefined;
-    } else if (phase.inMovement) {
-      unitsToDraw = gameState.units;
-      movingIds = moveProgress < 1 ? new Set(anim.moves.map((m) => m.unitId)) : undefined;
-    } else if (phase.inMeleeLightning || phase.inMeleeCasualty) {
-      unitsToDraw = [...gameState.units, ...(anim.meleeRemovedUnits ?? [])];
-      movingIds = undefined;
-    }
-    if (elapsed >= phase.movementStart) {
-      drawResolutionMoveLines(ctx, w, h, anim.moves, gameState.units, hexList, 1);
-    }
-  } else {
-    movingIds = undefined;
-  }
-  if (!anim && !hideCommittedOrderLinesAfterReady && humanStandingOrders.length > 0 && gameState.units.length) {
-    drawStandingOrderLines(ctx, humanStandingOrders, gameState.units);
-  }
-  if (!anim) drawHoverRoutePreview(ctx);
-  if (pendingRangedAttacks.length > 0 && gameState.units.length && hexList) {
-    drawRangedAttackLines(ctx, w, h, pendingRangedAttacks, gameState.units, hexList);
-  }
-  if (unitsToDraw.length) {
-    drawUnits(ctx, w, h, unitsToDraw, hexList, movingIds);
-  }
-  if (anim && hexList && moveProgress < 1) {
-    drawMovingUnits(ctx, w, h, anim.moves, gameState.units, hexList, moveProgress);
-  }
-  drawTerrainInfrastructureOverlays(ctx);
-  if (anim && hexList) {
-    const elapsed = Date.now() - anim.startTime;
-    const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
-    const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
-    const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0;
-    const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
-    const phase = getResolutionPhase5(
-      elapsed,
-      hasRangedCombat,
-      hasRangedCasualties,
-      hasMeleeCombat,
-      hasMeleeCasualties
-    );
-    const combatHexes = phase.inRangedLightning ? (anim.rangedCombatHexes ?? anim.combatHexes) : phase.inMeleeLightning ? anim.meleeCombatHexes : undefined;
-    if (combatHexes?.length) {
-      const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * 0.008);
-      drawCombatLightning(ctx, w, h, combatHexes, hexList, pulseOpacity);
-    }
-    const casualtyHexes = phase.inRangedCasualty ? (anim.rangedCasualtyHexes ?? anim.casualtyHexes) : phase.inMeleeCasualty ? anim.meleeCasualtyHexes : undefined;
-    if (casualtyHexes?.length) {
-      const casualtyElapsed = phase.inRangedCasualty ? elapsed - (hasRangedCombat ? LIGHTNING_DURATION_MS : 0) : elapsed - (phase.movementStart + RESOLUTION_FADE_MS + (hasMeleeCombat ? LIGHTNING_DURATION_MS : 0));
-      const pulseOpacity = 0.5 + 0.5 * Math.sin(casualtyElapsed * 0.008);
-      drawCasualtyOverlay(ctx, w, h, casualtyHexes, hexList, pulseOpacity);
-    }
-  }
+  drawGameScene(ctx, w, h, gameState);
 }
 
 const STACK_OFFSET_X = 7;
@@ -1684,7 +1912,98 @@ function drawUnits(
   }
 }
 
+/** Draws stale enemy intel markers as transparent unit icons with fixed two-turn fade schedule. */
+function drawStaleEnemyIntel(ctx: CanvasRenderingContext2D, state: GameStateSnapshot): void {
+  const hasFogData = Array.isArray(state.visibleHexes);
+  const currentlyVisibleEnemies = state.units.filter((u) => u.player !== 'human');
+  const currentlyVisibleEnemyIds = new Set(currentlyVisibleEnemies.map((u) => u.id));
+  for (const [unitId, prevSeen] of lastRenderedVisibleEnemyByUnitId) {
+    if (currentlyVisibleEnemyIds.has(unitId)) continue;
+    if (!clientStaleEnemyIntelByUnitId.has(unitId)) {
+      const lastSeenTurn = Math.min(prevSeen.lastSeenTurn, Math.max(1, state.turnNumber - 1));
+      clientStaleEnemyIntelByUnitId.set(unitId, {
+        unitId,
+        lastKnownH3Index: prevSeen.h3Index,
+        lastSeenTurn,
+        staleUntilTurn: lastSeenTurn + 2,
+      });
+    }
+  }
+  lastRenderedVisibleEnemyByUnitId.clear();
+  for (const enemy of currentlyVisibleEnemies) {
+    lastRenderedVisibleEnemyByUnitId.set(enemy.id, {
+      h3Index: enemy.h3Index,
+      lastSeenTurn: state.turnNumber,
+    });
+  }
+
+  if (!hasFogData) return;
+
+  const persistedIntel = Array.isArray(state.enemyIntel) ? state.enemyIntel : [];
+  const fallbackIntel = Array.from(clientStaleEnemyIntelByUnitId.values()).map((row) => ({
+    unitId: row.unitId,
+    lastKnownH3Index: row.lastKnownH3Index,
+    intelState: 'stale' as const,
+    lastSeenTurn: row.lastSeenTurn,
+    staleUntilTurn: row.staleUntilTurn,
+  }));
+  const byUnitId = new Map<string, typeof fallbackIntel[number]>();
+  for (const row of fallbackIntel) byUnitId.set(row.unitId, row);
+  for (const row of persistedIntel) {
+    if (row.intelState !== 'stale') continue;
+    byUnitId.set(row.unitId, {
+      unitId: row.unitId,
+      lastKnownH3Index: row.lastKnownH3Index,
+      intelState: 'stale',
+      lastSeenTurn: row.lastSeenTurn,
+      staleUntilTurn: row.staleUntilTurn,
+    });
+  }
+  const intel = Array.from(byUnitId.values());
+  if (intel.length === 0) return;
+  const visibleHexes = new Set(state.visibleHexes!);
+  const stale = intel.filter((row) => row.intelState === 'stale');
+  if (stale.length === 0) return;
+  const visibleEnemyHexes = new Set(currentlyVisibleEnemies.map((u) => u.h3Index));
+  const staleByHex = new Map<string, typeof stale>();
+  for (const row of stale) {
+    if (visibleEnemyHexes.has(row.lastKnownH3Index)) continue;
+    if (visibleHexes.has(row.lastKnownH3Index)) continue;
+    const list = staleByHex.get(row.lastKnownH3Index) ?? [];
+    list.push(row);
+    staleByHex.set(row.lastKnownH3Index, list);
+  }
+
+  for (const [h3Index, rows] of staleByHex) {
+    const age = Math.max(0, state.turnNumber - rows[0]!.lastSeenTurn);
+    const alpha = age === 1 ? 0.5 : age === 2 ? 0.3 : 0;
+    if (alpha <= 0) continue;
+    const types = new Set(rows.map((r) => inferUnitTypeLabelFromId(r.unitId)));
+    const label = types.size === 1 ? [...types][0]! : '*';
+    const { x, y } = hexCenterPx(h3Index);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    drawOneUnitMarker(ctx, x, y, PLAYER_COLORS.opponent, label);
+    ctx.restore();
+  }
+}
+
 const LIGHTNING_COLOR = '#f0d000';
+
+function drawUnknownBattleMarkers(
+  ctx: CanvasRenderingContext2D,
+  hexes: string[],
+  opacity: number
+): void {
+  if (hexes.length === 0 || opacity <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  for (const h3Index of hexes) {
+    const { x, y } = hexCenterPx(h3Index);
+    drawOneUnitMarker(ctx, x, y, '#7a7a7a', '?', '#202020');
+  }
+  ctx.restore();
+}
 
 /**
  * Draws a hex-sized yellow pulsing lightning bolt at each combat hex. Call after units so it sits on top.
@@ -2111,100 +2430,10 @@ function redraw(): void {
   ctx.scale(dpr, dpr);
 
   if (!gameState) {
-    ctx.fillStyle = BACKGROUND_COLOR;
-    ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = '#666';
-    ctx.font = '14px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Loading…', w / 2, h / 2);
+    drawLoadingScene(ctx, w, h);
     return;
   }
-
-  ctx.clearRect(0, 0, w, h);
-  drawTerrainHexes(ctx);
-  drawRes4TerrainHexes(ctx);
-  const hexList = gameState.hexes.map((h) => h.h3Index);
-  let moveProgress = 1;
-  let unitsToDraw: GameStateSnapshot['units'] = gameState.units;
-  let movingIds: Set<string> | undefined;
-  const anim = resolutionMoveAnimation;
-  if (anim) {
-    const elapsed = Date.now() - anim.startTime;
-    const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
-    const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
-    const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0;
-    const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
-    const phase = getResolutionPhase5(
-      elapsed,
-      hasRangedCombat,
-      hasRangedCasualties,
-      hasMeleeCombat,
-      hasMeleeCasualties
-    );
-    moveProgress = phase.moveProgress;
-    const rangedRemovedIds = new Set((anim.rangedRemovedUnits ?? []).map((u) => u.id));
-    if (phase.inRangedLightning || phase.inRangedCasualty) {
-      const preMoveSurvivors = gameState.units
-        .filter((u) => !rangedRemovedIds.has(u.id))
-        .map((u) => {
-          const move = anim.moves.find((m) => m.unitId === u.id);
-          return move ? { ...u, h3Index: move.fromH3Index } : u;
-        });
-      unitsToDraw = [...preMoveSurvivors, ...(anim.rangedRemovedUnits ?? [])];
-      movingIds = undefined;
-    } else if (phase.inMovement) {
-      unitsToDraw = gameState.units;
-      movingIds = moveProgress < 1 ? new Set(anim.moves.map((m) => m.unitId)) : undefined;
-    } else if (phase.inMeleeLightning || phase.inMeleeCasualty) {
-      unitsToDraw = [...gameState.units, ...(anim.meleeRemovedUnits ?? [])];
-      movingIds = undefined;
-    }
-    if (elapsed >= phase.movementStart) {
-      drawResolutionMoveLines(ctx, w, h, anim.moves, gameState.units, hexList, 1);
-    }
-  } else {
-    movingIds = undefined;
-  }
-  if (humanStandingOrders.length > 0 && gameState.units.length) {
-    drawStandingOrderLines(ctx, humanStandingOrders, gameState.units);
-  }
-  drawHoverRoutePreview(ctx);
-  if (pendingRangedAttacks.length > 0 && gameState.units.length && hexList) {
-    drawRangedAttackLines(ctx, w, h, pendingRangedAttacks, gameState.units, hexList);
-  }
-  if (unitsToDraw.length) {
-    drawUnits(ctx, w, h, unitsToDraw, hexList, movingIds);
-  }
-  if (anim && hexList && moveProgress < 1) {
-    drawMovingUnits(ctx, w, h, anim.moves, gameState.units, hexList, moveProgress);
-  }
-  drawTerrainInfrastructureOverlays(ctx);
-  if (anim && hexList) {
-    const elapsed = Date.now() - anim.startTime;
-    const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
-    const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
-    const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0;
-    const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
-    const phase = getResolutionPhase5(
-      elapsed,
-      hasRangedCombat,
-      hasRangedCasualties,
-      hasMeleeCombat,
-      hasMeleeCasualties
-    );
-    const combatHexes = phase.inRangedLightning ? (anim.rangedCombatHexes ?? anim.combatHexes) : phase.inMeleeLightning ? anim.meleeCombatHexes : undefined;
-    if (combatHexes?.length) {
-      const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * 0.008);
-      drawCombatLightning(ctx, w, h, combatHexes, hexList, pulseOpacity);
-    }
-    const casualtyHexes = phase.inRangedCasualty ? (anim.rangedCasualtyHexes ?? anim.casualtyHexes) : phase.inMeleeCasualty ? anim.meleeCasualtyHexes : undefined;
-    if (casualtyHexes?.length) {
-      const casualtyElapsed = phase.inRangedCasualty ? elapsed - (hasRangedCombat ? LIGHTNING_DURATION_MS : 0) : elapsed - (phase.movementStart + RESOLUTION_FADE_MS + (hasMeleeCombat ? LIGHTNING_DURATION_MS : 0));
-      const pulseOpacity = 0.5 + 0.5 * Math.sin(casualtyElapsed * 0.008);
-      drawCasualtyOverlay(ctx, w, h, casualtyHexes, hexList, pulseOpacity);
-    }
-  }
+  drawGameScene(ctx, w, h, gameState);
 }
 
 function tickResolutionMoveAnimation(): void {
@@ -2228,6 +2457,8 @@ function tickResolutionMoveAnimation(): void {
   } else {
     resolutionMoveAnimation = null;
     resolutionMoveAnimationFrameId = null;
+    // Re-enable committed path rendering at the end of resolution playback.
+    hideCommittedOrderLinesAfterReady = false;
     redraw();
   }
 }
@@ -2312,6 +2543,14 @@ function initNewGameButton(): void {
     try {
       const state = (await window.gameApi.newGame()) as GameStateSnapshot;
       gameState = state;
+      clientStaleEnemyIntelByUnitId.clear();
+      lastObservedEnemyByUnitId.clear();
+      lastRenderedVisibleEnemyByUnitId.clear();
+      updateClientStaleEnemyIntel(null, state);
+      initialCameraApplied = false;
+      if (state.hexes.length > 0) {
+        applyInitialCameraForState(state);
+      }
       clearRes1TooltipSummaryCaches();
       humanStandingOrders = [];
       hoverRoutePreview = null;
@@ -2726,7 +2965,12 @@ function init(): void {
       .getGameState()
       .then(async (raw) => {
         const state = raw as GameStateSnapshot;
+        const previousState = gameState;
         gameState = state;
+        updateClientStaleEnemyIntel(previousState, state);
+        if (!initialCameraApplied && state.hexes.length > 0) {
+          applyInitialCameraForState(state);
+        }
         clearRes1TooltipSummaryCaches();
         await refreshHumanStandingOrders();
         updateGameStateSidebar(state);
@@ -2762,10 +3006,19 @@ function init(): void {
     resizeAndRedraw();
   });
   window.addEventListener('keydown', (e) => {
+    if (shouldIgnoreGlobalKeydown(e)) return;
     if (e.repeat) return;
-    if (e.key.toLowerCase() !== 't') return;
-    reverseTerrainFillWhileHeld = true;
-    requestRedraw();
+    const key = e.key.toLowerCase();
+    if (key === 't') {
+      reverseTerrainFillWhileHeld = true;
+      requestRedraw();
+      return;
+    }
+    if (key === 'w' || key === 'a' || key === 's' || key === 'd') {
+      const direction: PanDirection =
+        key === 'w' ? 'north' : key === 'a' ? 'west' : key === 's' ? 'south' : 'east';
+      panMapOneRes1Hex(direction);
+    }
   });
   window.addEventListener('keyup', (e) => {
     if (e.key.toLowerCase() !== 't') return;
@@ -2806,7 +3059,7 @@ function init(): void {
       hoveredDetailHexH3 = detailHit;
       void refreshHoverRoutePreview();
       requestRedraw();
-      if (hit) {
+      if (hit && isHexExploredByPlayer(hit)) {
         const targetHex = hit;
         terrainTooltipDelayTimer = setTimeout(() => {
           terrainTooltipDelayTimer = null;
@@ -2820,10 +3073,12 @@ function init(): void {
     }
 
     const tip = document.getElementById('hex-tooltip');
-    if (tip && !tip.classList.contains('hidden')) {
+    if (tip && !tip.classList.contains('hidden') && hit && isHexExploredByPlayer(hit)) {
       const state = terrainStateForPointer(e.clientX, e.clientY, hit);
       const namingTarget = namingLookupTargetForPointer(e.clientX, e.clientY, hit);
       void showTerrainTooltip(e.clientX, e.clientY, state, namingTarget);
+    } else if (tip && !tip.classList.contains('hidden') && hit && !isHexExploredByPlayer(hit)) {
+      hideTerrainTooltipVisual();
     }
   });
   mainMapEl.addEventListener('pointerleave', () => {
@@ -3057,7 +3312,9 @@ function init(): void {
         const humanMoves: ResolutionMove[] = readyResult.humanMoves ?? [];
         const nextState = (await window.gameApi.getGameState()) as GameStateSnapshot;
         const state = nextState;
+        const previousState = gameState;
         gameState = state;
+        updateClientStaleEnemyIntel(previousState, state);
         clearRes1TooltipSummaryCaches();
         const aiMoves = readyResult.aiMoves ?? [];
         const resolutionMoves = [...humanMoves, ...aiMoves];
@@ -3086,6 +3343,34 @@ function init(): void {
         const hasRanged = (readyResult.rangedCombatHexes?.length ?? 0) > 0 || (readyResult.rangedCasualtyHexes?.length ?? 0) > 0 || (readyResult.rangedRemovedUnits?.length ?? 0) > 0;
         const hasMelee = (readyResult.meleeCombatHexes?.length ?? 0) > 0 || (readyResult.meleeCasualtyHexes?.length ?? 0) > 0 || (readyResult.meleeRemovedUnits?.length ?? 0) > 0;
         const hasLegacy = (readyResult.combatHexes?.length ?? 0) > 0 || (readyResult.casualtyHexes?.length ?? 0) > 0;
+        const visibleHexes = getVisibleHexSet(state);
+        const allKills = readyResult.kills ?? [];
+        const removedById = new Map((readyResult.removedUnits ?? []).map((u) => [u.id, u]));
+        const friendlyInvolvedKillVictimIds = new Set(
+          allKills
+            .filter((k) => {
+              const victim = removedById.get(k.victimId);
+              const killerIsFriendly = k.killerIds.some((id) => id.startsWith('human-'));
+              const victimIsFriendly = victim?.player === 'human';
+              return killerIsFriendly || victimIsFriendly;
+            })
+            .map((k) => k.victimId)
+        );
+        const friendlyInvolvedCombatHexes = new Set(
+          [...friendlyInvolvedKillVictimIds]
+            .map((victimId) => removedById.get(victimId)?.h3Index ?? null)
+            .filter((h3): h3 is string => typeof h3 === 'string')
+        );
+        const unknownCombatHexes = [
+          ...(readyResult.rangedCombatHexes ?? []),
+          ...(readyResult.meleeCombatHexes ?? []),
+          ...(readyResult.combatHexes ?? []),
+        ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
+        const unknownCasualtyHexes = [
+          ...(readyResult.rangedCasualtyHexes ?? []),
+          ...(readyResult.meleeCasualtyHexes ?? []),
+          ...(readyResult.casualtyHexes ?? []),
+        ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
         const needsAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy;
         if (needsAnimation) {
           if (resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(resolutionMoveAnimationFrameId);
@@ -3100,23 +3385,57 @@ function init(): void {
             meleeCombatHexes: readyResult.meleeCombatHexes?.length ? readyResult.meleeCombatHexes : undefined,
             meleeCasualtyHexes: readyResult.meleeCasualtyHexes?.length ? readyResult.meleeCasualtyHexes : undefined,
             meleeRemovedUnits: readyResult.meleeRemovedUnits?.length ? readyResult.meleeRemovedUnits : undefined,
+            unknownCombatHexes: unknownCombatHexes.length > 0 ? unknownCombatHexes : undefined,
+            unknownCasualtyHexes: unknownCasualtyHexes.length > 0 ? unknownCasualtyHexes : undefined,
           };
           const directFire = readyResult.killsByDirectFire ?? [];
           const returnFire = readyResult.killsByReturnFire ?? [];
-          const allKills = readyResult.kills ?? [];
+          const knownVictimIds = new Set(
+            (readyResult.removedUnits ?? [])
+              .filter((u) => visibleHexes.has(u.h3Index))
+              .map((u) => u.id)
+          );
+          for (const victimId of friendlyInvolvedKillVictimIds) {
+            knownVictimIds.add(victimId);
+          }
           const directSet = new Set(directFire.map((k) => k.victimId));
           const returnSet = new Set(returnFire.map((k) => k.victimId));
           const meleeKills = allKills.filter((k) => !directSet.has(k.victimId) && !returnSet.has(k.victimId));
+          const knownDirectFire = directFire.filter((k) => knownVictimIds.has(k.victimId));
+          const knownReturnFire = returnFire.filter((k) => knownVictimIds.has(k.victimId));
+          const knownMeleeKills = meleeKills.filter((k) => knownVictimIds.has(k.victimId));
           const fmt = (k: { victimId: string; killerIds: string[] }) => `${k.victimId} destroyed by ${k.killerIds.join(', ')}`;
           const bullets: string[] = [];
-          if (directFire.length > 0) bullets.push(`• Direct fire: ${directFire.map(fmt).join('; ')}`);
-          if (returnFire.length > 0) bullets.push(`• Return fire: ${returnFire.map(fmt).join('; ')}`);
-          if (meleeKills.length > 0) bullets.push(meleeKills.map(fmt).join('\n'));
+          if (knownDirectFire.length > 0) bullets.push(`• Direct fire: ${knownDirectFire.map(fmt).join('; ')}`);
+          if (knownReturnFire.length > 0) bullets.push(`• Return fire: ${knownReturnFire.map(fmt).join('; ')}`);
+          if (knownMeleeKills.length > 0) bullets.push(knownMeleeKills.map(fmt).join('\n'));
           if (bullets.length > 0) showMapToast(bullets.join('\n'), { isError: false });
+          const unknownVictimIds = allKills
+            .map((k) => k.victimId)
+            .filter((id, idx, arr) => arr.indexOf(id) === idx)
+            .filter((id) => !friendlyInvolvedKillVictimIds.has(id))
+            .filter((id) => {
+              const removed = removedById.get(id);
+              return removed ? !visibleHexes.has(removed.h3Index) : false;
+            });
+          const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
+          if (hasUnknownBattle) {
+            const unknownContinentNames: string[] = [];
+            if (window.gameApi?.getHexContinentNames) {
+              const unknownHexes = [...unknownCombatHexes, ...unknownCasualtyHexes].filter((h3, idx, arr) => arr.indexOf(h3) === idx);
+              for (const h3 of unknownHexes) {
+                const names = await window.gameApi.getHexContinentNames({ h3Index: h3 });
+                for (const n of names) {
+                  if (!unknownContinentNames.includes(n)) unknownContinentNames.push(n);
+                }
+              }
+            }
+            showMapToast(formatUnknownBattleAnnouncement(unknownContinentNames), { isError: false });
+          }
           resolutionMoveAnimationFrameId = requestAnimationFrame(tickResolutionMoveAnimation);
         }
         hoverRoutePreview = null;
-        hideCommittedOrderLinesAfterReady = true;
+        hideCommittedOrderLinesAfterReady = false;
         pendingRangedAttacks = [];
         rangedModeActive = false;
         await refreshHumanStandingOrders();

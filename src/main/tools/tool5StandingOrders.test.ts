@@ -5,7 +5,20 @@
  */
 
 import * as assert from 'assert';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { cellToLatLng, latLngToCell } from 'h3-js';
 import { executeTool5, getInjectionText } from './tool5StandingOrders';
+import {
+  dbGetOne,
+  dbRun,
+  getGameState,
+  resetGameForNewMatch,
+  openGameDatabaseAtPathForTests,
+  closeGameDatabaseForTests,
+} from '../gameDb';
+import { executeStandingOrderActionForPlayer, generateOrdersForStandingOrders } from './tool5StandingOrders';
 import type { GameStateSnapshot } from '../gameDb';
 
 const emptyMap = new Map<string, [number, number]>();
@@ -100,6 +113,89 @@ function testGetInjectionTextEmpty(): void {
   assert.ok(text.includes('Units without standing orders: opponent-armor-1'));
 }
 
+function testAssignMarchToCurrentHexDoesNotPersistStandingOrder(): void {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-tool5-'));
+  const dbPath = path.join(tempDir, 't.sqlite');
+  try {
+    openGameDatabaseAtPathForTests(dbPath);
+    resetGameForNewMatch();
+    const state = getGameState();
+    const unit = state.units.find((u) => u.player === 'opponent');
+    assert.ok(unit, 'Expected an opponent unit in seeded test state');
+    const [lat, lng] = cellToLatLng(unit!.h3Index);
+    const latLngByH3 = new Map(state.hexes.map((h) => [h.h3Index, cellToLatLng(h.h3Index) as [number, number]]));
+    const resolveToH3 = (a: number, b: number): string | undefined => {
+      try {
+        return latLngToCell(a, b, 1);
+      } catch {
+        return undefined;
+      }
+    };
+
+    const result = executeStandingOrderActionForPlayer(
+      'opponent',
+      'assign_order',
+      { unitId: unit!.id, order: { type: 'march', destination: [lat, lng] } },
+      state,
+      latLngByH3,
+      resolveToH3
+    );
+    assert.strictEqual(result.status, 'ok');
+    const row = dbGetOne<{ c: number }>(
+      'SELECT COUNT(*) AS c FROM standing_orders WHERE player_id = ? AND unit_id = ?',
+      ['opponent', unit!.id]
+    );
+    assert.strictEqual(row?.c ?? 0, 0, 'Arrived march order should not persist');
+  } finally {
+    closeGameDatabaseForTests();
+  }
+}
+
+function testGenerateRemovesArrivedMarchOrder(): void {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-tool5-'));
+  const dbPath = path.join(tempDir, 't.sqlite');
+  try {
+    openGameDatabaseAtPathForTests(dbPath);
+    resetGameForNewMatch();
+    const state = getGameState();
+    const unit = state.units.find((u) => u.player === 'human');
+    assert.ok(unit, 'Expected a human unit in seeded test state');
+    const [lat, lng] = cellToLatLng(unit!.h3Index);
+    const latLngByH3 = new Map(state.hexes.map((h) => [h.h3Index, cellToLatLng(h.h3Index) as [number, number]]));
+    const resolveToH3 = (a: number, b: number): string | undefined => {
+      try {
+        return latLngToCell(a, b, 1);
+      } catch {
+        return undefined;
+      }
+    };
+
+    dbRun(
+      `INSERT OR REPLACE INTO standing_orders (player_id, unit_id, order_type, params, computed_route, status, created_turn, origin_hex)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        'human',
+        unit!.id,
+        'march',
+        JSON.stringify({ type: 'march', destination: [lat, lng], avoidEnemies: true, engageEnRoute: false }),
+        null,
+        'en_route',
+        state.turnNumber,
+        JSON.stringify([lat, lng]),
+      ]
+    );
+
+    generateOrdersForStandingOrders('human', state, latLngByH3, resolveToH3);
+    const row = dbGetOne<{ c: number }>(
+      'SELECT COUNT(*) AS c FROM standing_orders WHERE player_id = ? AND unit_id = ?',
+      ['human', unit!.id]
+    );
+    assert.strictEqual(row?.c ?? 0, 0, 'Arrived march order should be deleted during generation');
+  } finally {
+    closeGameDatabaseForTests();
+  }
+}
+
 function run(): void {
   testAssignOrderUnitNotFound();
   testAssignOrderPursueTargetNotFound();
@@ -107,6 +203,8 @@ function run(): void {
   testQueryOrdersRequiresUnitIdOrAll();
   testCancelOrderWhenNoOrder();
   testGetInjectionTextEmpty();
+  testAssignMarchToCurrentHexDoesNotPersistStandingOrder();
+  testGenerateRemovesArrivedMarchOrder();
   console.log('tool5StandingOrders tests passed');
 }
 

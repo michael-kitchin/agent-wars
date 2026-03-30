@@ -5,7 +5,7 @@
 
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import * as path from 'path';
-import { initDatabase, getGameState, resetGameForNewMatch } from './gameDb';
+import { initDatabase, getGameState, getGameStateForPlayer, resetGameForNewMatch } from './gameDb';
 import {
   submitOrders,
   ready,
@@ -29,6 +29,7 @@ import { logDebug } from './logger';
 import {
   getRes4TerrainOverridesForRenderer,
   getHexNamingTooltipLineForRenderer,
+  getHexContinentNamesForRenderer,
   getTerrainInfrastructureHintsForRenderer,
 } from './terrainClassificationCache';
 import {
@@ -106,7 +107,7 @@ function requestOrdersWithLog(
 }
 
 function registerIpcHandlers(): void {
-  ipcMain.handle('game:getState', () => getGameState());
+  ipcMain.handle('game:getState', () => getGameStateForPlayer('human'));
   ipcMain.handle('game:getRes4TerrainOverrides', () => getRes4TerrainOverridesForRenderer());
   ipcMain.handle('game:getTerrainInfrastructureHints', () => getTerrainInfrastructureHintsForRenderer());
   ipcMain.handle(
@@ -120,9 +121,13 @@ function registerIpcHandlers(): void {
       });
     }
   );
+  ipcMain.handle('game:getHexContinentNames', (_event, payload: { h3Index?: string }) => {
+    if (typeof payload?.h3Index !== 'string') return [];
+    return getHexContinentNamesForRenderer({ h3Index: payload.h3Index });
+  });
   ipcMain.handle('game:newGame', () => {
     resetGameForNewMatch();
-    return getGameState();
+    return getGameStateForPlayer('human');
   });
   ipcMain.handle('game:submitOrders', (_event, payload: SubmitOrdersPayload | { unitId: string; toH3Index: string }[]) => {
     const normalized: SubmitOrdersPayload = Array.isArray(payload)
@@ -161,6 +166,8 @@ function registerIpcHandlers(): void {
     async (_event, payload?: GameReadyIpcPayload): Promise<ReadyResult> => {
       return handleGameReady(payload, {
         getGameState,
+        getGameStateForPlayer: (playerId: 'human' | 'opponent') =>
+          getGameStateForPlayer(playerId, { maskUnexploredTerrain: playerId !== 'opponent' }),
         getSelectedModel,
         hasKey,
         getToolNamesForEnabledGroups,
@@ -180,7 +187,7 @@ function registerIpcHandlers(): void {
       const state = getGameState();
       logDebug('main game:requestAiOrders', { turnNumber: state.turnNumber, phase: state.phase });
       const result = await handleRequestAiOrders(payload, {
-        getGameState,
+        getGameState: () => getGameStateForPlayer('opponent', { maskUnexploredTerrain: false }),
         getSelectedModel,
         hasKey,
         getToolNamesForEnabledGroups,

@@ -3,8 +3,19 @@
  * All logic runs in the main process and uses the game database.
  */
 
-import { cellToLatLng, gridDistance, gridDisk } from 'h3-js';
-import { dbGetOne, dbRun, dbGetAll, isDbReady, saveDatabase, getGameSeed, setGameOver, getMapHexSet } from './gameDb';
+import { cellToLatLng, gridDistance, gridDisk, gridPathCells } from 'h3-js';
+import {
+  dbGetOne,
+  dbRun,
+  dbGetAll,
+  isDbReady,
+  saveDatabase,
+  getGameSeed,
+  setGameOver,
+  getMapHexSet,
+  refreshFogOfWarIntelFromCurrentState,
+  addAiLossEventsSinceConsultation,
+} from './gameDb';
 import { buildLatLngCoordinateMap, getOrderedHexList } from './mapData';
 import { getRange } from './combatConstants';
 import { runRangedPhase, runMeleePhase, createCombatRng, type CombatUnit } from './combatResolution';
@@ -58,6 +69,30 @@ const MOVEMENT_RANGE: Record<string, number> = {
   armor: 2,
   naval: 2,
 };
+
+function collectTraversedHexesByPlayer(
+  orders: Array<{ unitId: string; toH3Index: string }>,
+  unitsBeforeMove: Array<{ id: string; player: string; h3Index: string }>
+): Record<'human' | 'opponent', Set<string>> {
+  const traversed: Record<'human' | 'opponent', Set<string>> = {
+    human: new Set<string>(),
+    opponent: new Set<string>(),
+  };
+  const byId = new Map(unitsBeforeMove.map((u) => [u.id, u]));
+  for (const order of orders) {
+    const unit = byId.get(order.unitId);
+    if (!unit) continue;
+    const player = unit.player === 'opponent' ? 'opponent' : 'human';
+    try {
+      const path = gridPathCells(unit.h3Index, order.toH3Index);
+      for (const h3 of path) traversed[player].add(h3);
+    } catch {
+      traversed[player].add(unit.h3Index);
+      traversed[player].add(order.toH3Index);
+    }
+  }
+  return traversed;
+}
 
 function dbBackedStateSnapshot() {
   return {
@@ -199,9 +234,16 @@ export function listHumanStandingOrders(): HumanStandingOrderView[] {
       (o) => o.type === 'march' && typeof o.unitId === 'string' && validHumanUnitIds.has(o.unitId)
     );
     if (marchOrders.length !== result.orders.length) {
+      const staleUnitIds = result.orders
+        .map((o) => o.unitId)
+        .filter((unitId): unitId is string => typeof unitId === 'string' && !validHumanUnitIds.has(unitId));
+      for (const unitId of staleUnitIds) {
+        dbRun('DELETE FROM standing_orders WHERE player_id = ? AND unit_id = ?', [HUMAN_PLAYER_ID, unitId]);
+      }
       logDebug('gameActions listHumanStandingOrders: skipped stale standing orders for missing units', {
         total: result.orders.length,
         kept: marchOrders.length,
+        deleted: staleUnitIds.length,
       });
     }
     return marchOrders
@@ -539,6 +581,10 @@ export function ready(
       ...Array.from(mergedHuman.entries()).map(([unitId, toH3Index]) => ({ unitId, toH3Index })),
       ...aiOrders,
     ];
+    const traversedHexesByPlayer = collectTraversedHexesByPlayer(
+      allOrders,
+      preMoveState.units.map((u) => ({ id: u.id, player: u.player, h3Index: u.h3Index }))
+    );
     for (const order of allOrders) {
       dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [order.toH3Index, order.unitId]);
     }
@@ -573,6 +619,12 @@ export function ready(
       'planning',
       turnNumber + 1,
     ]);
+    refreshFogOfWarIntelFromCurrentState({
+      traversedHexesByPlayer: {
+        human: [...traversedHexesByPlayer.human],
+        opponent: [...traversedHexesByPlayer.opponent],
+      },
+    });
 
     saveDatabase();
     const allRemovedIds = [...rangedResult.removedUnitIds, ...meleeResult.removedUnitIds];
@@ -594,6 +646,14 @@ export function ready(
       ...new Set([...opponentRangedAttackers, ...opponentRangedDefenders, ...opponentMeleeParticipants]),
     ];
     const removedOpponentUnitIds = allRemovedUnits.filter((u) => u.player === 'opponent').map((u) => u.id);
+    addAiLossEventsSinceConsultation(
+      'opponent',
+      turnNumber,
+      allRemovedUnits.map((u) => ({ id: u.id, player: u.player })),
+      allKills,
+      rangedResult.killsByDirectFire,
+      rangedResult.killsByReturnFire
+    );
 
     return {
       success: true,

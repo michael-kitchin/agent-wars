@@ -231,17 +231,6 @@ export function namesForFirstOccurringScalerankList(
   return names;
 }
 
-function firstOccurringScalerankRows<T extends { scalerank: number | null }>(rows: ReadonlyArray<T>): T[] {
-  if (rows.length === 0) return [];
-  const firstRank = rows[0]?.scalerank ?? null;
-  const out: T[] = [];
-  for (const row of rows) {
-    if ((row.scalerank ?? null) !== firstRank) continue;
-    out.push(row);
-  }
-  return out;
-}
-
 function sortRowsByScalerankAscending<T extends { scalerank: number | null }>(rows: ReadonlyArray<T>): T[] {
   return rows
     .map((row, index) => ({ row, index }))

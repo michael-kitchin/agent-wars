@@ -17,6 +17,11 @@ export interface HexNamingTooltipLineRequest {
   resolution: 1 | 4;
 }
 
+/** Continent-list lookup for one res-1 hex used by unknown-battle fog announcements. */
+export interface HexContinentNamesRequest {
+  h3Index: string;
+}
+
 /** Res-4 terrain overlay row: base terrain kind plus optional urban variation state. */
 export interface Res4TerrainOverrideRow {
   h3Index: string;
@@ -29,6 +34,23 @@ export interface GameStateSnapshot {
   /** `terrain`: passability `land` | `water` | `coastal` | `wetlands`. `terrainKind`: pipeline label including `coastal`/`wetlands`. */
   hexes: { h3Index: string; terrain: string; terrainKind: string }[];
   units: { id: string; player: string; unitType: string; h3Index: string }[];
+  /** Side-specific visibility union from all alive friendly units. */
+  visibleHexes?: string[];
+  /** Hexes permanently known after friendly entry at least once. */
+  exploredHexes?: string[];
+  /** Explored but not currently visible. */
+  staleHexes?: string[];
+  /** Enemy intelligence entries from the viewer side's perspective. */
+  enemyIntel?: {
+    unitId: string;
+    lastKnownH3Index: string;
+    lastKnownLatLng: [number, number];
+    intelState: 'current' | 'stale';
+    lastSeenTurn: number;
+    staleUntilTurn: number;
+  }[];
+  /** Perspective id used to build this snapshot (human/opponent). */
+  playerPerspective?: string;
   phase: string;
   turnNumber: number;
   pendingOrders: { unitId: string; toH3Index: string }[];
@@ -123,6 +145,9 @@ export interface ReadyResult {
   meleeCombatHexes?: string[];
   meleeCasualtyHexes?: string[];
   meleeRemovedUnits?: RemovedUnitSnapshot[];
+  unknownCombatHexes?: string[];
+  unknownCasualtyHexes?: string[];
+  unknownBattleAnnouncement?: string;
   kills?: { victimId: string; killerIds: string[] }[];
   killsByDirectFire?: { victimId: string; killerIds: string[] }[];
   killsByReturnFire?: { victimId: string; killerIds: string[] }[];
@@ -163,6 +188,7 @@ export interface GameApi {
   getRes4TerrainOverrides: () => Promise<Res4TerrainOverrideRow[]>;
   getTerrainInfrastructureHints: () => Promise<TerrainInfrastructureHintsSnapshot>;
   getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest) => Promise<string | null>;
+  getHexContinentNames: (payload: HexContinentNamesRequest) => Promise<string[]>;
   newGame: () => Promise<GameStateSnapshot>;
   submitOrders: (payload: SubmitOrdersIpcPayload) => Promise<{ success: boolean; reason?: string }>;
   ready: (payload?: GameReadyIpcPayload) => Promise<ReadyResult>;

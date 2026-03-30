@@ -134,6 +134,7 @@ export function cancelRequestAiOrders(controllerRef: { current: AbortController 
 
 export interface ReadyDeps {
   getGameState: () => GameStateSnapshot;
+  getGameStateForPlayer: (playerId: 'human' | 'opponent') => GameStateSnapshot;
   getSelectedModel: () => string;
   hasKey: () => boolean;
   getToolNamesForEnabledGroups: (groupIds: string[]) => string[];
@@ -162,6 +163,7 @@ export async function handleGameReady(
   // Milestone 0.7 behavior preserved here: event-driven vs every-turn toggle, precomputation groups, Ready flow,
   // afterResolution consultation and POST_RESOLUTION_CONSULT_TIMEOUT_MS — unchanged by 1.1 DB/LLM contract work.
   const state = deps.getGameState();
+  const aiState = deps.getGameStateForPlayer('opponent');
   logHybridPipelineBoundary('handleGameReady', { turnNumber: state.turnNumber, phase: state.phase });
   const modelId = deps.getSelectedModel();
   const enabledGroupIds =
@@ -206,9 +208,9 @@ export async function handleGameReady(
         clearAiPendingOrders('opponent');
         aiConsulted = true;
       } else {
-        const hexList = state.hexes.map((h) => h.h3Index);
+        const hexList = aiState.hexes.map((h) => h.h3Index);
         const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
-        const generated = generateOrdersForStandingOrders('opponent', state, latLngByH3, resolveToH3);
+        const generated = generateOrdersForStandingOrders('opponent', aiState, latLngByH3, resolveToH3);
         aiOrders = generated.movementOrders;
         aiRangedOrders = generated.rangedAttacks;
         aiConsulted = false;
@@ -220,7 +222,7 @@ export async function handleGameReady(
     aiRangedOrders = payload.precomputedAiRangedOrders ?? [];
     aiStrategy = payload.precomputedAiStrategy;
   } else if (modelId && deps.hasKey()) {
-    const result = await deps.requestOrders(state, modelId, {
+    const result = await deps.requestOrders(aiState, modelId, {
       enabledToolNames,
       usePrecomputation,
     });
@@ -266,7 +268,7 @@ export async function handleGameReady(
   if (useEventDrivenConsultation && readyResult.success) {
     try {
       const postResolution = await Promise.race([
-        afterResolution(deps.getGameState(), readyResult, {
+        afterResolution(deps.getGameStateForPlayer('opponent'), readyResult, {
           modelId: modelId ?? '',
           enabledToolNames,
           hasKey: deps.hasKey,

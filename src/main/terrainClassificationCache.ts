@@ -26,6 +26,7 @@ import {
   loadTerrainRes4NamingBundled,
   preferredNamingLineForRes1Record,
   preferredNamingLineForRes4Record,
+  type TerrainNamingRecordRes1,
   type TerrainNamingRecordRes4,
 } from './terrainNamingLoad';
 
@@ -43,6 +44,7 @@ export interface TerrainClassificationSnapshot {
   infrastructureHints: TerrainInfrastructureHintsPayload;
   namingLinesRes1ByH3: ReadonlyMap<string, string>;
   namingLinesRes4ByH3: ReadonlyMap<string, string>;
+  continentNamesRes1ByH3: ReadonlyMap<string, string[]>;
 }
 
 let cached: TerrainClassificationSnapshot | null = null;
@@ -157,6 +159,16 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     const line = preferredNamingLineForRes4Record(row);
     if (line) namingLinesRes4ByH3.set(row.h3_index, line);
   }
+  const continentNamesRes1ByH3 = new Map<string, string[]>();
+  for (const row of namingRes1Env.records as TerrainNamingRecordRes1[]) {
+    const names: string[] = [];
+    for (const countryRow of row.countries) {
+      const candidate = (countryRow.continent ?? '').trim() || countryRow.name.trim();
+      if (!candidate) continue;
+      if (!names.includes(candidate)) names.push(candidate);
+    }
+    continentNamesRes1ByH3.set(row.h3_index, names);
+  }
 
   logDebug('terrainClassificationCache buildSnapshot: done', {
     res1Count: res1KindByH3.size,
@@ -180,6 +192,7 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     },
     namingLinesRes1ByH3,
     namingLinesRes4ByH3,
+    continentNamesRes1ByH3,
   };
 }
 
@@ -287,6 +300,24 @@ export function getHexNamingTooltipLineForRenderer(
     return cached.namingLinesRes1ByH3.get(payload.h3Index) ?? null;
   }
   return cached.namingLinesRes4ByH3.get(payload.h3Index) ?? null;
+}
+
+/**
+ * Why this exists:
+ *     Return de-duplicated continent names for one res-1 hex for unknown-battle announcements.
+ * When to use:
+ *     Renderer/main formatting of fog-of-war combat announcements without unit identity.
+ * What to expect:
+ *     Returns empty list when no naming continents exist for the hex; throws if cache is not loaded.
+ */
+export function getHexContinentNamesForRenderer(payload: { h3Index: string }): string[] {
+  logTrace('terrainClassificationCache getHexContinentNamesForRenderer', payload);
+  if (!cached) {
+    const err = new Error('terrainClassificationCache: load ensureTerrainClassificationCacheLoaded() first');
+    logError('terrainClassificationCache getHexContinentNamesForRenderer: cache empty', err);
+    throw err;
+  }
+  return [...(cached.continentNamesRes1ByH3.get(payload.h3Index) ?? [])];
 }
 
 /**

@@ -91,6 +91,8 @@ function testFormatBriefingContainsSections(): void {
   assert.ok(out.match(/\.\s+[A-Z]/), 'Section 1 has multiple sentences');
   assert.ok(out.includes('| Unit ID |'), 'unit table header');
   assert.ok(out.includes('| Matchup |'), 'combat table header');
+  assert.ok(out.includes('**Losses since last consultation**'), 'losses subsection header');
+  assert.ok(out.includes('| Turn | Victim Unit | Side | Cause | Killer IDs |'), 'losses subsection table header');
   assert.ok(out.includes('opponent-armor-1'), 'unit table has unit');
   assert.ok(out.includes('P(eliminate)'), 'combat table has P(eliminate) column');
   assert.ok(out.includes('**Attention flags**'), 'Section 3 header');
@@ -111,6 +113,34 @@ function testFormatBriefingActiveCallbacksWithSubscriptions(): void {
   assert.ok(out.includes('**ACTIVE CALLBACKS**'), 'ACTIVE CALLBACKS section');
   assert.ok(out.includes('turns(3) → fires turn 13'), 'turns subscription line');
   assert.ok(out.includes('unit_engaged(opponent-armor-1)'), 'unit_engaged subscription line');
+}
+
+function testFormatBriefingIncludesLossRowsWhenProvided(): void {
+  const out = formatBriefing(
+    fixtureState,
+    precomputed,
+    '',
+    '',
+    [],
+    [
+      {
+        turnNumber: 5,
+        victimUnitId: 'opponent-naval-1',
+        victimPlayer: 'opponent',
+        cause: 'direct_fire',
+        killerIds: ['human-armor-1'],
+      },
+      {
+        turnNumber: 6,
+        victimUnitId: 'human-infantry-1',
+        victimPlayer: 'human',
+        cause: 'melee_or_other',
+        killerIds: ['opponent-armor-1'],
+      },
+    ]
+  );
+  assert.ok(out.includes('| 5 | opponent-naval-1 | own | direct_fire | human-armor-1 |'));
+  assert.ok(out.includes('| 6 | human-infantry-1 | enemy | melee_or_other | opponent-armor-1 |'));
 }
 
 function testFormatBriefingUnitTableRows(): void {
@@ -135,6 +165,7 @@ const tests = [
   { name: 'formatBriefing unit table rows', fn: testFormatBriefingUnitTableRows },
   { name: 'formatBriefing combat table', fn: testFormatBriefingCombatTable },
   { name: 'formatBriefing ACTIVE CALLBACKS with subscriptions', fn: testFormatBriefingActiveCallbacksWithSubscriptions },
+  { name: 'formatBriefing losses table rows', fn: testFormatBriefingIncludesLossRowsWhenProvided },
 ];
 
 function run(): void {

@@ -5,6 +5,7 @@
  */
 
 import type { GameStateSnapshot } from './gameDb';
+import type { AiLossEventSinceConsultation } from './gameDb';
 import type { PrecomputationResult, UnitAssessmentResult, CombatEstimateEntry } from './precomputation';
 import type { CallbackSubscription } from './callbackSubscriptions';
 import { cellToLatLng } from 'h3-js';
@@ -147,7 +148,7 @@ function buildUnitStatusTable(unitAssessments: UnitAssessmentResult[]): string {
     const orderCell = formatOrderCell(a);
     const nearest = a.result.nearbyEnemies?.[0];
     const nearestStr = nearest
-      ? `${nearest.unitId} @ ${nearest.hexDistance}`
+      ? `${nearest.unitId} @ ${nearest.hexDistance} (${nearest.confidence ?? 'current'}${nearest.lastSeen != null ? `, seen t${nearest.lastSeen}` : ''})`
       : '—';
     const severities = (a.result.threats ?? []).map((t) => t.severity);
     const severity =
@@ -183,6 +184,25 @@ function buildCombatEstimatesTable(combatEstimates: CombatEstimateEntry[]): stri
     return `| ${matchup} | ${(ce.assessment ?? 'even').toUpperCase().replace('_', ' ')} | ${(ce.probabilityDefenderEliminated ?? 0).toFixed(2)} | ${(ce.probabilityAttackerLosesUnit ?? 0).toFixed(2)} | ${note} |`;
   });
   if (rows.length === 0) return `${header}\n${sep}\n(No pre-computed engagements)`;
+  return [header, sep, ...rows].join('\n');
+}
+
+/**
+ * Builds a compact machine-readable loss table covering all resolved losses since the last LLM consultation.
+ * Rows are sorted in chronological turn order and include side-from-opponent-perspective for downstream planning.
+ */
+function buildLossesSinceLastConsultationTable(
+  losses: AiLossEventSinceConsultation[],
+  perspectivePlayerId: string
+): string {
+  const header = '| Turn | Victim Unit | Side | Cause | Killer IDs |';
+  const sep = '|------|-------------|------|-------|------------|';
+  if (losses.length === 0) return `${header}\n${sep}\n| - | none | - | - | - |`;
+  const rows = losses.map((loss) => {
+    const side = loss.victimPlayer === perspectivePlayerId ? 'own' : 'enemy';
+    const killers = loss.killerIds.length > 0 ? loss.killerIds.join(', ') : 'unknown';
+    return `| ${loss.turnNumber} | ${loss.victimUnitId} | ${side} | ${loss.cause} | ${killers} |`;
+  });
   return [header, sep, ...rows].join('\n');
 }
 
@@ -258,7 +278,8 @@ export function formatBriefing(
   precomputed: PrecomputationResult,
   standingOrderText: string,
   memoryText: string,
-  subscriptions?: CallbackSubscription[]
+  subscriptions?: CallbackSubscription[],
+  lossesSinceLastConsultation: AiLossEventSinceConsultation[] = []
 ): string {
   const latLngByH3 = new Map<string, [number, number]>();
   for (const hx of state.hexes) {
@@ -272,6 +293,8 @@ export function formatBriefing(
   sections.push(buildUnitStatusTable(precomputed.unitAssessments));
   sections.push('\n\n**Combat estimates (likely engagements)**\n');
   sections.push(buildCombatEstimatesTable(precomputed.combatEstimates));
+  sections.push('\n\n**Losses since last consultation**\n');
+  sections.push(buildLossesSinceLastConsultationTable(lossesSinceLastConsultation, 'opponent'));
   sections.push('\n\n**Attention flags**\n');
   sections.push(buildAttentionFlags(precomputed.unitAssessments));
   const hasStrategicMemoryHeader = (memoryText ?? '').includes('=== YOUR STRATEGIC MEMORY');
