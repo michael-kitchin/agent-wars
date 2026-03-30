@@ -60,6 +60,19 @@ export interface HumanOrderPreviewResult {
   segments: HumanOrderPreviewSegment[];
 }
 
+export interface HumanOrderGroupPreviewUnitResult {
+  unitId: string;
+  preview: HumanOrderPreviewResult;
+}
+
+export interface HumanOrderGroupPreviewResult {
+  validForAll: boolean;
+  showInvalidMarker: boolean;
+  invalidReason?: string;
+  slowestMovementRange: number;
+  previews: HumanOrderGroupPreviewUnitResult[];
+}
+
 const VALID_PHASE = 'planning';
 const HUMAN_PLAYER_ID = 'human';
 
@@ -320,6 +333,39 @@ export function assignHumanMarchOrder(unitId: string, destinationH3Index: string
 
 /**
  * Why this exists:
+ *     Assigns/updates the same human march standing order destination for multiple selected units atomically.
+ * When to use:
+ *     Renderer multi-select double-click commit for grouped movement.
+ * What to expect:
+ *     Rejects the entire batch when any selected unit cannot receive the destination.
+ */
+export function assignHumanMarchOrders(unitIds: string[], destinationH3Index: string): SubmitOrdersResult {
+  logDebug('gameActions assignHumanMarchOrders', { unitCount: unitIds.length, destinationH3Index });
+  try {
+    if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
+    const uniqueUnitIds = [...new Set(unitIds.filter((id) => id.length > 0))];
+    if (uniqueUnitIds.length === 0) return { success: false, reason: 'No selected units to assign' };
+
+    const groupPreview = previewHumanMarchOrders(uniqueUnitIds, destinationH3Index);
+    if (!groupPreview.validForAll) {
+      return { success: false, reason: groupPreview.invalidReason ?? 'At least one selected unit cannot reach destination.' };
+    }
+
+    for (const unitId of uniqueUnitIds) {
+      const result = assignHumanMarchOrder(unitId, destinationH3Index);
+      if (!result.success) {
+        return { success: false, reason: result.reason ?? `Failed to assign movement order for ${unitId}` };
+      }
+    }
+    return { success: true };
+  } catch (err) {
+    logError('assignHumanMarchOrders: exception', err);
+    return { success: false, reason: String(err) };
+  }
+}
+
+/**
+ * Why this exists:
  *     Cancels a single human standing order from sidebar cancel action.
  * When to use:
  *     Renderer movement-order list Cancel button.
@@ -344,6 +390,98 @@ export function cancelHumanOrder(unitId: string): SubmitOrdersResult {
 
 /**
  * Why this exists:
+ *     Validates whether a grouped ranged target is legal for all selected human units.
+ * When to use:
+ *     Renderer grouped ranged-mode target click before enqueuing one row per selected unit.
+ * What to expect:
+ *     Returns success false with a specific reason when any selected unit fails capability/range/target checks.
+ */
+export function validateGroupRangedTarget(unitIds: string[], targetH3Index: string): SubmitOrdersResult {
+  logDebug('gameActions validateGroupRangedTarget', { unitCount: unitIds.length, targetH3Index });
+  try {
+    if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
+    const uniqueUnitIds = [...new Set(unitIds.filter((id) => id.length > 0))];
+    if (uniqueUnitIds.length === 0) return { success: false, reason: 'No selected units for ranged targeting' };
+    for (const unitId of uniqueUnitIds) {
+      const result = validateRangedAttack(unitId, targetH3Index, { allowedPlayer: HUMAN_PLAYER_ID });
+      if (!result.valid) {
+        return { success: false, reason: `${unitId}: ${result.reason}` };
+      }
+    }
+    return { success: true };
+  } catch (err) {
+    logError('validateGroupRangedTarget: exception', err);
+    return { success: false, reason: String(err) };
+  }
+}
+
+function buildHumanMarchPreviewForUnit(
+  state: ReturnType<typeof dbBackedStateSnapshot>,
+  latLngByH3: Map<string, [number, number]>,
+  resolveToH3: (lat: number, lng: number) => string | undefined,
+  unitId: string,
+  hoveredH3Index: string
+): HumanOrderPreviewResult {
+  const unit = state.units.find((u) => u.id === unitId && u.player === HUMAN_PLAYER_ID);
+  if (!unit) return { valid: false, showInvalidMarker: false, invalidReason: 'Unit not found', segments: [] };
+  const hoveredHex = state.hexes.find((h) => h.h3Index === hoveredH3Index);
+  if (!hoveredHex) return { valid: false, showInvalidMarker: false, segments: [] };
+
+  const passableFor = unit.unitType === 'naval' ? 'water' : 'land';
+  const hoveredPassable = terrainIsPassableForDomain(hoveredHex.terrain, passableFor);
+  const [hoverLat, hoverLng] = cellToLatLng(hoveredH3Index);
+  const direct = executePlanRoute(unitId, [hoverLat, hoverLng], { avoidEnemies: true }, state, latLngByH3, resolveToH3);
+  if (hoveredPassable && direct.status === 'ok') {
+    return {
+      valid: true,
+      showInvalidMarker: false,
+      arrowLatLng: direct.destination,
+      segments: direct.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes })),
+    };
+  }
+
+  let partialArrow: [number, number] | undefined;
+  let partialSegments: HumanOrderPreviewSegment[] = [];
+  const hexByH3 = new Map(state.hexes.map((h) => [h.h3Index, h]));
+  const seen = new Set<string>();
+  for (let radius = 1; radius <= 12; radius++) {
+    let ring: string[] = [];
+    try {
+      ring = gridDisk(hoveredH3Index, radius);
+    } catch {
+      break;
+    }
+    const candidates = ring.filter((h3) => {
+      if (seen.has(h3)) return false;
+      seen.add(h3);
+      if (h3 === hoveredH3Index) return false;
+      const hx = hexByH3.get(h3);
+      return !!hx && terrainIsPassableForDomain(hx.terrain, passableFor);
+    });
+    if (candidates.length === 0) continue;
+    for (const candidateH3 of candidates) {
+      const [nearLat, nearLng] = cellToLatLng(candidateH3);
+      const partial = executePlanRoute(unitId, [nearLat, nearLng], { avoidEnemies: true }, state, latLngByH3, resolveToH3);
+      if (partial.status === 'ok') {
+        partialArrow = partial.destination;
+        partialSegments = partial.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes }));
+        break;
+      }
+    }
+    if (partialSegments.length > 0) break;
+  }
+
+  return {
+    valid: false,
+    showInvalidMarker: true,
+    invalidReason: 'Destination is invalid for this unit type or unreachable.',
+    arrowLatLng: partialArrow,
+    segments: partialSegments,
+  };
+}
+
+/**
+ * Why this exists:
  *     Produces renderer hover preview model using shared route logic and invalid-marker semantics.
  * When to use:
  *     Renderer pointermove when selected unit/hovered hex changes.
@@ -355,68 +493,76 @@ export function previewHumanMarchOrder(unitId: string, hoveredH3Index: string): 
   try {
     if (!isDbReady()) return { valid: false, showInvalidMarker: false, invalidReason: 'Database not initialized', segments: [] };
     const state = dbBackedStateSnapshot();
-    const unit = state.units.find((u) => u.id === unitId && u.player === HUMAN_PLAYER_ID);
-    if (!unit) return { valid: false, showInvalidMarker: false, invalidReason: 'Unit not found', segments: [] };
-    const hoveredHex = state.hexes.find((h) => h.h3Index === hoveredH3Index);
-    if (!hoveredHex) return { valid: false, showInvalidMarker: false, segments: [] };
-
-    const passableFor = unit.unitType === 'naval' ? 'water' : 'land';
-    const hoveredPassable = terrainIsPassableForDomain(hoveredHex.terrain, passableFor);
     const hexList = state.hexes.map((h) => h.h3Index);
     const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
-    const [hoverLat, hoverLng] = cellToLatLng(hoveredH3Index);
-    const direct = executePlanRoute(unitId, [hoverLat, hoverLng], { avoidEnemies: true }, state, latLngByH3, resolveToH3);
-    if (hoveredPassable && direct.status === 'ok') {
-      return {
-        valid: true,
-        showInvalidMarker: false,
-        arrowLatLng: direct.destination,
-        segments: direct.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes })),
-      };
-    }
-
-    let partialArrow: [number, number] | undefined;
-    let partialSegments: HumanOrderPreviewSegment[] = [];
-    const hexByH3 = new Map(state.hexes.map((h) => [h.h3Index, h]));
-    const seen = new Set<string>();
-    // Expand outward from hovered destination so partial path ends on the nearest reachable passable hex.
-    for (let radius = 1; radius <= 12; radius++) {
-      let ring: string[] = [];
-      try {
-        ring = gridDisk(hoveredH3Index, radius);
-      } catch {
-        break;
-      }
-      const candidates = ring.filter((h3) => {
-        if (seen.has(h3)) return false;
-        seen.add(h3);
-        if (h3 === hoveredH3Index) return false;
-        const hx = hexByH3.get(h3);
-        return !!hx && terrainIsPassableForDomain(hx.terrain, passableFor);
-      });
-      if (candidates.length === 0) continue;
-      for (const candidateH3 of candidates) {
-        const [nearLat, nearLng] = cellToLatLng(candidateH3);
-        const partial = executePlanRoute(unitId, [nearLat, nearLng], { avoidEnemies: true }, state, latLngByH3, resolveToH3);
-        if (partial.status === 'ok') {
-          partialArrow = partial.destination;
-          partialSegments = partial.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes }));
-          break;
-        }
-      }
-      if (partialSegments.length > 0) break;
-    }
-
-    return {
-      valid: false,
-      showInvalidMarker: true,
-      invalidReason: 'Destination is invalid for this unit type or unreachable.',
-      arrowLatLng: partialArrow,
-      segments: partialSegments,
-    };
+    return buildHumanMarchPreviewForUnit(state, latLngByH3, resolveToH3, unitId, hoveredH3Index);
   } catch (err) {
     logError('previewHumanMarchOrder: exception', err);
     return { valid: false, showInvalidMarker: false, invalidReason: String(err), segments: [] };
+  }
+}
+
+/**
+ * Why this exists:
+ *     Produces grouped hover previews for multi-selected human units using shared route logic.
+ * When to use:
+ *     Renderer pointermove while multiple units are selected for grouped movement planning.
+ * What to expect:
+ *     Per-unit previews plus aggregate validity and slowest movement range cap for solid-segment rendering.
+ */
+export function previewHumanMarchOrders(unitIds: string[], hoveredH3Index: string): HumanOrderGroupPreviewResult {
+  logTrace('gameActions previewHumanMarchOrders', { unitCount: unitIds.length, hoveredH3Index });
+  try {
+    if (!isDbReady()) {
+      return {
+        validForAll: false,
+        showInvalidMarker: false,
+        invalidReason: 'Database not initialized',
+        slowestMovementRange: 0,
+        previews: [],
+      };
+    }
+    const uniqueUnitIds = [...new Set(unitIds.filter((id) => id.length > 0))];
+    if (uniqueUnitIds.length === 0) {
+      return {
+        validForAll: false,
+        showInvalidMarker: false,
+        invalidReason: 'No selected units',
+        slowestMovementRange: 0,
+        previews: [],
+      };
+    }
+    const state = dbBackedStateSnapshot();
+    const hexList = state.hexes.map((h) => h.h3Index);
+    const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
+    const previews: HumanOrderGroupPreviewUnitResult[] = uniqueUnitIds.map((unitId) => ({
+      unitId,
+      preview: buildHumanMarchPreviewForUnit(state, latLngByH3, resolveToH3, unitId, hoveredH3Index),
+    }));
+    const invalid = previews.find((entry) => !entry.preview.valid);
+    const selectedUnits = uniqueUnitIds
+      .map((unitId) => state.units.find((u) => u.id === unitId && u.player === HUMAN_PLAYER_ID))
+      .filter((unit): unit is { id: string; player: string; unitType: string; h3Index: string } => !!unit);
+    const slowestMovementRange =
+      selectedUnits.length > 0
+        ? Math.min(...selectedUnits.map((unit) => MOVEMENT_RANGE[unit.unitType] ?? 1))
+        : 0;
+    return {
+      validForAll: invalid === undefined,
+      showInvalidMarker: invalid !== undefined,
+      invalidReason: invalid?.preview.invalidReason,
+      slowestMovementRange,
+      previews,
+    };
+  } catch (err) {
+    logError('previewHumanMarchOrders: exception', err);
+    return {
+      validForAll: false,
+      showInvalidMarker: false,
+      invalidReason: String(err),
+      slowestMovementRange: 0,
+      previews: [],
+    };
   }
 }
 

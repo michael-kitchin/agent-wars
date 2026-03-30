@@ -12,6 +12,7 @@ import type {
   RequestAiOrdersResult,
   OpenRouterModel,
   HumanOrderPreviewResult,
+  HumanOrderGroupPreviewResult,
   HumanStandingOrderSnapshot,
   Res4TerrainOverrideRow,
   TerrainInfrastructureHintsSnapshot,
@@ -43,8 +44,14 @@ const gameApi = {
     ipcRenderer.invoke('game:listHumanStandingOrders'),
   previewHumanMarchOrder: (payload: { unitId: string; hoveredH3Index: string }): Promise<HumanOrderPreviewResult> =>
     ipcRenderer.invoke('game:previewHumanMarchOrder', payload),
+  previewHumanMarchOrders: (payload: { unitIds: string[]; hoveredH3Index: string }): Promise<HumanOrderGroupPreviewResult> =>
+    ipcRenderer.invoke('game:previewHumanMarchOrders', payload),
   assignHumanMarchOrder: (payload: { unitId: string; destinationH3Index: string }): Promise<{ success: boolean; reason?: string }> =>
     ipcRenderer.invoke('game:assignHumanMarchOrder', payload),
+  assignHumanMarchOrders: (payload: { unitIds: string[]; destinationH3Index: string }): Promise<{ success: boolean; reason?: string }> =>
+    ipcRenderer.invoke('game:assignHumanMarchOrders', payload),
+  validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }): Promise<{ success: boolean; reason?: string }> =>
+    ipcRenderer.invoke('game:validateGroupRangedTarget', payload),
   cancelHumanStandingOrder: (payload: { unitId: string }): Promise<{ success: boolean; reason?: string }> =>
     ipcRenderer.invoke('game:cancelHumanStandingOrder', payload),
   requestAiOrders: (payload?: { enabledToolGroups?: string[] }): Promise<RequestAiOrdersResult> =>

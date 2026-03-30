@@ -11,7 +11,10 @@ import {
   ready,
   listHumanStandingOrders,
   previewHumanMarchOrder,
+  previewHumanMarchOrders,
   assignHumanMarchOrder,
+  assignHumanMarchOrders,
+  validateGroupRangedTarget,
   cancelHumanOrder,
 } from './gameActions';
 import {
@@ -149,12 +152,48 @@ function registerIpcHandlers(): void {
     }
   );
   ipcMain.handle(
+    'game:previewHumanMarchOrders',
+    (_event, payload: { unitIds?: string[]; hoveredH3Index?: string }) => {
+      if (!Array.isArray(payload?.unitIds) || typeof payload?.hoveredH3Index !== 'string') {
+        return {
+          validForAll: false,
+          showInvalidMarker: false,
+          invalidReason: 'Invalid grouped preview payload',
+          slowestMovementRange: 0,
+          previews: [],
+        };
+      }
+      const unitIds = payload.unitIds.filter((unitId): unitId is string => typeof unitId === 'string');
+      return previewHumanMarchOrders(unitIds, payload.hoveredH3Index);
+    }
+  );
+  ipcMain.handle(
     'game:assignHumanMarchOrder',
     (_event, payload: { unitId?: string; destinationH3Index?: string }) => {
       if (typeof payload?.unitId !== 'string' || typeof payload?.destinationH3Index !== 'string') {
         return { success: false, reason: 'Invalid assign payload' };
       }
       return assignHumanMarchOrder(payload.unitId, payload.destinationH3Index);
+    }
+  );
+  ipcMain.handle(
+    'game:assignHumanMarchOrders',
+    (_event, payload: { unitIds?: string[]; destinationH3Index?: string }) => {
+      if (!Array.isArray(payload?.unitIds) || typeof payload?.destinationH3Index !== 'string') {
+        return { success: false, reason: 'Invalid grouped assign payload' };
+      }
+      const unitIds = payload.unitIds.filter((unitId): unitId is string => typeof unitId === 'string');
+      return assignHumanMarchOrders(unitIds, payload.destinationH3Index);
+    }
+  );
+  ipcMain.handle(
+    'game:validateGroupRangedTarget',
+    (_event, payload: { unitIds?: string[]; targetH3Index?: string }) => {
+      if (!Array.isArray(payload?.unitIds) || typeof payload?.targetH3Index !== 'string') {
+        return { success: false, reason: 'Invalid grouped ranged payload' };
+      }
+      const unitIds = payload.unitIds.filter((unitId): unitId is string => typeof unitId === 'string');
+      return validateGroupRangedTarget(unitIds, payload.targetH3Index);
     }
   );
   ipcMain.handle('game:cancelHumanStandingOrder', (_event, payload: { unitId?: string }) => {

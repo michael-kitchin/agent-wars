@@ -182,6 +182,22 @@ export interface HumanOrderPreviewResult {
   segments: HumanOrderPreviewSegment[];
 }
 
+/** Per-unit hover preview for grouped multi-selection planning. */
+export interface HumanOrderGroupPreviewUnitResult {
+  unitId: string;
+  preview: HumanOrderPreviewResult;
+}
+
+/** Result of previewing a grouped human march order for multiple selected units. */
+export interface HumanOrderGroupPreviewResult {
+  validForAll: boolean;
+  showInvalidMarker: boolean;
+  invalidReason?: string;
+  /** Slowest per-turn movement budget (hex edges) among selected units; used for solid-segment cap. */
+  slowestMovementRange: number;
+  previews: HumanOrderGroupPreviewUnitResult[];
+}
+
 /** Preload-exposed renderer bridge contract. */
 export interface GameApi {
   getGameState: () => Promise<GameStateSnapshot>;
@@ -194,7 +210,10 @@ export interface GameApi {
   ready: (payload?: GameReadyIpcPayload) => Promise<ReadyResult>;
   listHumanStandingOrders: () => Promise<HumanStandingOrderSnapshot[]>;
   previewHumanMarchOrder: (payload: { unitId: string; hoveredH3Index: string }) => Promise<HumanOrderPreviewResult>;
+  previewHumanMarchOrders: (payload: { unitIds: string[]; hoveredH3Index: string }) => Promise<HumanOrderGroupPreviewResult>;
   assignHumanMarchOrder: (payload: { unitId: string; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
+  assignHumanMarchOrders: (payload: { unitIds: string[]; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
+  validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
   cancelHumanStandingOrder: (payload: { unitId: string }) => Promise<{ success: boolean; reason?: string }>;
   requestAiOrders: (payload?: { enabledToolGroups?: string[] }) => Promise<RequestAiOrdersResult>;
   cancelRequestAiOrders: () => Promise<void>;
