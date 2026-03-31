@@ -48,6 +48,7 @@ import {
   type BuildUnitType,
 } from './productionRules';
 import { getRes1ProductionContext } from './terrainClassificationCache';
+import { DEPLOYMENT_CAP_TYPE_ORDER, MAX_UNITS_PER_TYPE } from './productionCaps';
 
 export type { MovementOrder, RangedAttackOrder, SubmitOrdersPayload };
 
@@ -112,6 +113,7 @@ export interface HexBuildQueueView {
 
 type DeployedUnitsByType = { armor?: number; infantry?: number; naval?: number };
 type ControlTransition = { h3Index: string; fromControllerPlayerId: string | null; toControllerPlayerId: string | null };
+type DeploymentCapReachedByPlayer = { human: BuildUnitType[]; opponent: BuildUnitType[] };
 
 const VALID_PHASE = 'planning';
 const HUMAN_PLAYER_ID = 'human';
@@ -208,13 +210,29 @@ function resolveRes1ControlAfterCombatAndMovement(
   return transitions;
 }
 
-function spawnProducedUnitsForHex(h3Index: string, controllerPlayerId: string, unitTypes: BuildUnitType[]): void {
-  if (unitTypes.length === 0) return;
+function spawnProducedUnitsForHex(
+  h3Index: string,
+  controllerPlayerId: string,
+  unitTypes: BuildUnitType[],
+  unitCountsByPlayerType: Map<string, number>,
+  capReachedByPlayer: DeploymentCapReachedByPlayer
+): BuildUnitType[] {
+  if (unitTypes.length === 0) return [];
   const turnNumber = currentPlanningTurnNumber();
   const seqRow = dbGetOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'production_unit_spawn_sequence'");
   let sequence = seqRow ? parseInt(seqRow.value, 10) : 0;
   if (!Number.isFinite(sequence)) sequence = 0;
+  const deployed: BuildUnitType[] = [];
+  const capArray = controllerPlayerId === 'opponent' ? capReachedByPlayer.opponent : capReachedByPlayer.human;
+  const capSet = new Set(capArray);
   for (const unitType of unitTypes) {
+    const key = `${controllerPlayerId}:${unitType}`;
+    const currentCount = unitCountsByPlayerType.get(key) ?? 0;
+    const maxCount = MAX_UNITS_PER_TYPE[unitType];
+    if (currentCount >= maxCount) {
+      capSet.add(unitType);
+      continue;
+    }
     sequence += 1;
     const unitId = `${controllerPlayerId}-${unitType}-prod-${turnNumber}-${sequence}`;
     dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
@@ -223,13 +241,33 @@ function spawnProducedUnitsForHex(h3Index: string, controllerPlayerId: string, u
       unitType,
       h3Index,
     ]);
+    unitCountsByPlayerType.set(key, currentCount + 1);
+    deployed.push(unitType);
   }
+  capArray.splice(0, capArray.length, ...DEPLOYMENT_CAP_TYPE_ORDER.filter((unitType) => capSet.has(unitType)));
   dbRun(`INSERT OR REPLACE INTO game_config (key, value) VALUES ('production_unit_spawn_sequence', ?)`, [String(sequence)]);
+  return deployed;
 }
 
-function processProductionAfterControlResolution(): DeployedUnitsByType {
+function processProductionAfterControlResolution(): {
+  deployedByPlayer: { human: DeployedUnitsByType; opponent: DeployedUnitsByType };
+  capReachedByPlayer: DeploymentCapReachedByPlayer;
+} {
   logDebug('gameActions processProductionAfterControlResolution');
-  const deployed: DeployedUnitsByType = {};
+  const deployedByPlayer: { human: DeployedUnitsByType; opponent: DeployedUnitsByType } = {
+    human: {},
+    opponent: {},
+  };
+  const capReachedByPlayer: DeploymentCapReachedByPlayer = { human: [], opponent: [] };
+  const unitCountsByPlayerType = new Map<string, number>();
+  const unitCountRows = dbGetAll<{ player: string; unitType: BuildUnitType; count: number }>(
+    `SELECT player, unit_type AS unitType, COUNT(*) AS count
+     FROM units
+     GROUP BY player, unit_type`
+  );
+  for (const row of unitCountRows) {
+    unitCountsByPlayerType.set(`${row.player}:${row.unitType}`, row.count);
+  }
   const controls = listAllHexControls().filter((row) => row.controllerPlayerId !== null);
   for (const control of controls) {
     const controllerPlayerId = control.controllerPlayerId;
@@ -254,9 +292,16 @@ function processProductionAfterControlResolution(): DeployedUnitsByType {
       applyResult.updatedEntries.map((entry) => ({ unitType: entry.unitType, remainingCount: entry.remainingCount }))
     );
     setBuildProgressPointsForHex(control.h3Index, applyResult.storedPoints);
-    spawnProducedUnitsForHex(control.h3Index, controllerPlayerId, applyResult.spawnedUnitTypes);
-    for (const unitType of applyResult.spawnedUnitTypes) {
-      deployed[unitType] = (deployed[unitType] ?? 0) + 1;
+    const deployedForHex = spawnProducedUnitsForHex(
+      control.h3Index,
+      controllerPlayerId,
+      applyResult.spawnedUnitTypes,
+      unitCountsByPlayerType,
+      capReachedByPlayer
+    );
+    const deployedForController = controllerPlayerId === 'opponent' ? deployedByPlayer.opponent : deployedByPlayer.human;
+    for (const unitType of deployedForHex) {
+      deployedForController[unitType] = (deployedForController[unitType] ?? 0) + 1;
     }
     logDebug('gameActions processProductionAfterControlResolution: processed hex', {
       h3Index: control.h3Index,
@@ -265,10 +310,12 @@ function processProductionAfterControlResolution(): DeployedUnitsByType {
       queueBeforeCount: queueRows.length,
       queueAfterCount: applyResult.updatedEntries.length,
       storedPointsAfter: applyResult.storedPoints,
-      spawnedCount: applyResult.spawnedUnitTypes.length,
+      spawnedCount: deployedForHex.length,
+      cappedTypesForController:
+        (controllerPlayerId === 'opponent' ? capReachedByPlayer.opponent : capReachedByPlayer.human).join(', ') || 'none',
     });
   }
-  return deployed;
+  return { deployedByPlayer, capReachedByPlayer };
 }
 
 function collectTraversedHexesByPlayer(
@@ -984,6 +1031,10 @@ export function ready(
   humanHexesLostCount?: number;
   /** Human hexes lost to opponent where no human units remain after resolution. */
   controlLossLightningHexes?: string[];
+  /** Unit types that were not spawned for human because deployment caps were already reached. */
+  humanDeploymentCapReachedUnitTypes?: BuildUnitType[];
+  /** Unit types that were not spawned for opponent because deployment caps were already reached. */
+  opponentDeploymentCapReachedUnitTypes?: BuildUnitType[];
 } {
   logDebug('ready', { aiOrderCount: aiOrders.length, aiRangedCount: aiRangedOrders.length });
   try {
@@ -1077,7 +1128,8 @@ export function ready(
     }
 
     const controlTransitions = resolveRes1ControlAfterCombatAndMovement(traversedHexesByPlayer);
-    const deployedUnitsByType = processProductionAfterControlResolution();
+    const productionSummary = processProductionAfterControlResolution();
+    const deployedUnitsByType = productionSummary.deployedByPlayer.human;
     const finalUnits = dbGetAll<{ id: string; player: string; unit_type: string; h3_index: string }>(
       'SELECT id, player, unit_type, h3_index FROM units'
     ).map((r) => ({ id: r.id, player: r.player, unitType: r.unit_type, h3Index: r.h3_index }));
@@ -1154,6 +1206,10 @@ export function ready(
       deployedUnitsByType: Object.keys(deployedUnitsByType).length > 0 ? deployedUnitsByType : undefined,
       humanHexesLostCount: humanHexesLost.length > 0 ? humanHexesLost.length : undefined,
       controlLossLightningHexes: controlLossLightningHexes.length > 0 ? controlLossLightningHexes : undefined,
+      humanDeploymentCapReachedUnitTypes:
+        productionSummary.capReachedByPlayer.human.length > 0 ? productionSummary.capReachedByPlayer.human : undefined,
+      opponentDeploymentCapReachedUnitTypes:
+        productionSummary.capReachedByPlayer.opponent.length > 0 ? productionSummary.capReachedByPlayer.opponent : undefined,
       opponentCombatParticipantUnitIds,
       removedOpponentUnitIds,
     };

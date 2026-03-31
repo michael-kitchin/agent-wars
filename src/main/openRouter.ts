@@ -37,6 +37,7 @@ import { replaceSubscriptions, getSubscriptions } from './callbackSubscriptions'
 import type { CallbackSubscription } from './callbackSubscriptions';
 import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
 import { normalizeProductionOrders } from './productionOrders';
+import { MAX_UNITS_PER_TYPE, getMaxedUnitTypesForPlayer, getPlayerUnitCountsByType } from './productionCaps';
 
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -572,9 +573,20 @@ function buildProductionBriefingBlock(
     return `=== PRODUCTION STATUS ===\nProduction status unavailable: ${snapshot.error ?? 'unknown error'}\n`;
   }
   const queues = snapshot.production?.controlledHexQueues ?? [];
+  const opponentCounts = getPlayerUnitCountsByType(state.units, 'opponent');
+  const maxedTypes = getMaxedUnitTypesForPlayer(state.units, 'opponent');
   const lines: string[] = [];
   lines.push('=== PRODUCTION STATUS ===');
   lines.push('Rules: infantry cost 10 (min urban 1), armor cost 20 (min urban 2), naval cost 50 (min urban 5 + min ports 1).');
+  lines.push(
+    `Deployment caps (per side): infantry ${MAX_UNITS_PER_TYPE.infantry}, armor ${MAX_UNITS_PER_TYPE.armor}, naval ${MAX_UNITS_PER_TYPE.naval}.`
+  );
+  lines.push(
+    `Your current unit counts: infantry ${opponentCounts.infantry}/${MAX_UNITS_PER_TYPE.infantry}, armor ${opponentCounts.armor}/${MAX_UNITS_PER_TYPE.armor}, naval ${opponentCounts.naval}/${MAX_UNITS_PER_TYPE.naval}.`
+  );
+  if (maxedTypes.length > 0) {
+    lines.push(`You are currently at maximum for: ${maxedTypes.join(', ')}.`);
+  }
   lines.push('Production progress/spawn resolves after Ready, after combat and control resolution.');
   if (queues.length === 0) {
     lines.push('No currently controlled hexes with editable production queues.');

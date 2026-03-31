@@ -20,6 +20,7 @@ import type {
   GameReadyIpcPayload,
   RequestAiOrdersResult,
   RangedAttackOrder,
+  BuildUnitType,
 } from '../shared/ipcTypes';
 export type { RequestAiOrdersResult } from '../shared/ipcTypes';
 
@@ -52,6 +53,8 @@ export interface ReadyResultMinimal {
   killsByDirectFire?: { victimId: string; killerIds: string[] }[];
   killsByReturnFire?: { victimId: string; killerIds: string[] }[];
   deployedUnitsByType?: { armor?: number; infantry?: number; naval?: number };
+  humanDeploymentCapReachedUnitTypes?: BuildUnitType[];
+  opponentDeploymentCapReachedUnitTypes?: BuildUnitType[];
   humanHexesLostCount?: number;
   controlLossLightningHexes?: string[];
   aiStrategy?: string;
@@ -332,6 +335,8 @@ export async function handleGameReady(
     killsByDirectFire: readyResult.killsByDirectFire,
     killsByReturnFire: readyResult.killsByReturnFire,
     deployedUnitsByType: readyResult.deployedUnitsByType,
+    humanDeploymentCapReachedUnitTypes: readyResult.humanDeploymentCapReachedUnitTypes,
+    opponentDeploymentCapReachedUnitTypes: readyResult.opponentDeploymentCapReachedUnitTypes,
     humanHexesLostCount: readyResult.humanHexesLostCount,
     controlLossLightningHexes: readyResult.controlLossLightningHexes,
     aiStrategy,

@@ -162,6 +162,10 @@ export interface ReadyResult {
   killsByReturnFire?: { victimId: string; killerIds: string[] }[];
   /** Newly spawned production units this turn, aggregated by unit type. */
   deployedUnitsByType?: { armor?: number; infantry?: number; naval?: number };
+  /** Unit types that hit deployment cap for human during production spawn. */
+  humanDeploymentCapReachedUnitTypes?: BuildUnitType[];
+  /** Unit types that hit deployment cap for opponent during production spawn. */
+  opponentDeploymentCapReachedUnitTypes?: BuildUnitType[];
   /** Count of human-controlled hexes lost to the opponent this turn. */
   humanHexesLostCount?: number;
   /** Hexes that should show lightning due to off-hex control loss events. */

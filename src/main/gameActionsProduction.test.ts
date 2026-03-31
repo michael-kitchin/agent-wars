@@ -188,12 +188,47 @@ function testTraversedIntermediateHexCapturesControl(): void {
   });
 }
 
+function testProductionSkipsWhenHumanUnitTypeAtCap(): void {
+  withTempDb(() => {
+    const targetHex = findBuildableHumanControlledHex();
+    const add = addHexBuildQueueEntry(targetHex, 'human');
+    assert.strictEqual(add.success, true);
+    const queue = getHexBuildQueue(targetHex, 'human');
+    const entry = queue.entries[0]!;
+    const forceInfantry = updateHexBuildQueueEntry(targetHex, entry.id, 'infantry', 1, 'human');
+    assert.strictEqual(forceInfantry.success, true);
+
+    dbRun("DELETE FROM units WHERE player = 'human' AND unit_type = 'infantry'");
+    for (let i = 0; i < 10; i++) {
+      dbRun(
+        `INSERT INTO units (id, player, unit_type, h3_index)
+         VALUES (?, 'human', 'infantry', ?)`,
+        [`human-infantry-cap-${i}`, targetHex]
+      );
+    }
+    dbRun(
+      `INSERT OR REPLACE INTO res1_build_progress (h3_index, stored_points)
+       VALUES (?, 9)`,
+      [targetHex]
+    );
+
+    const result = ready();
+    assert.strictEqual(result.success, true);
+    assert.ok(result.humanDeploymentCapReachedUnitTypes?.includes('infantry'));
+    const infantryAfter = dbGetOne<{ c: number }>(
+      "SELECT COUNT(*) AS c FROM units WHERE player = 'human' AND unit_type = 'infantry'"
+    )?.c ?? 0;
+    assert.strictEqual(infantryAfter, 10);
+  });
+}
+
 function run(): void {
   testBuildQueueMutationContracts();
   testTypeChangeAfterCountEditKeepsCount();
   testNoProductionBeforeReadyDuringPlanningEdits();
   testControlTakeoverClearsQueueAndProgress();
   testTraversedIntermediateHexCapturesControl();
+  testProductionSkipsWhenHumanUnitTypeAtCap();
   // eslint-disable-next-line no-console
   console.log('gameActionsProduction.test.ts passed');
 }

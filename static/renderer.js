@@ -14942,7 +14942,7 @@
     const header = document.createElement("div");
     header.className = "stack-callout-actions";
     header.style.display = "flex";
-    header.style.justifyContent = "flex-start";
+    header.style.justifyContent = "flex-end";
     header.style.gap = "0.4rem";
     header.style.marginBottom = "0.4rem";
     const humanIds = sorted.filter((u) => u.player === "human").map((u) => u.id);
@@ -16472,6 +16472,14 @@
     if (parts.length === 2) return `${parts[0]} and ${parts[1]} units deployed`;
     return `${parts[0]}, ${parts[1]}, and ${parts[2]} units deployed`;
   }
+  function formatDeploymentCapReachedLine(cappedTypes) {
+    if (!cappedTypes || cappedTypes.length === 0) return null;
+    const ordered = ["infantry", "armor", "naval"].filter((unitType) => cappedTypes.includes(unitType));
+    if (ordered.length === 0) return null;
+    if (ordered.length === 1) return `Maximum ${ordered[0]} units deployed.`;
+    if (ordered.length === 2) return `Maximum ${ordered[0]} and ${ordered[1]} units deployed.`;
+    return `Maximum ${ordered[0]}, ${ordered[1]}, and ${ordered[2]} units deployed.`;
+  }
   function drawLoadingScene(ctx, width, height) {
     ctx.fillStyle = BACKGROUND_COLOR;
     ctx.fillRect(0, 0, width, height);
@@ -16936,10 +16944,15 @@
         slowestMovementRangeByOriginH3.set(unit.h3Index, movementRange);
       }
     }
+    const drawnOrigins = /* @__PURE__ */ new Set();
     for (const perUnit of previewGroup.previews) {
       const preview = perUnit.preview;
       if (preview.segments.length === 0) continue;
       const previewUnit = gameState.units.find((u) => u.id === perUnit.unitId);
+      if (previewUnit) {
+        if (drawnOrigins.has(previewUnit.h3Index)) continue;
+        drawnOrigins.add(previewUnit.h3Index);
+      }
       const perStackSolidCap = previewUnit && slowestMovementRangeByOriginH3.has(previewUnit.h3Index) ? slowestMovementRangeByOriginH3.get(previewUnit.h3Index) : previewGroup.slowestMovementRange;
       let lastSegmentPenultimate = null;
       let lastSegmentLast = null;
@@ -17300,8 +17313,22 @@
     void refreshHoverRoutePreview();
     redraw();
   }
+  function getRepresentativeSelectedUnitIdsByOrigin() {
+    if (!gameState) return [...selectedUnitIds];
+    const byId = new Map(gameState.units.map((u) => [u.id, u]));
+    const seenOrigins = /* @__PURE__ */ new Set();
+    const representatives = [];
+    for (const unitId of selectedUnitIds) {
+      const unit = byId.get(unitId);
+      if (!unit || unit.player !== "human") continue;
+      if (seenOrigins.has(unit.h3Index)) continue;
+      seenOrigins.add(unit.h3Index);
+      representatives.push(unitId);
+    }
+    return representatives;
+  }
   async function refreshHoverRoutePreview() {
-    const unitIds = [...selectedUnitIds];
+    const unitIds = getRepresentativeSelectedUnitIdsByOrigin();
     const hoveredH3 = hoveredHexH3;
     const seq = ++hoverPreviewRequestSeq;
     if (rangedModeActive || !window.gameApi?.previewHumanMarchOrders || unitIds.length === 0 || !hoveredH3 || !gameState) {
@@ -17312,7 +17339,7 @@
     const data = await window.gameApi.previewHumanMarchOrders({ unitIds, hoveredH3Index: hoveredH3 });
     if (seq !== hoverPreviewRequestSeq) return;
     if (hoveredHexH3 !== hoveredH3) return;
-    const currentSelected = [...selectedUnitIds].sort().join("|");
+    const currentSelected = [...getRepresentativeSelectedUnitIdsByOrigin()].sort().join("|");
     const requestedSelected = [...unitIds].sort().join("|");
     if (currentSelected !== requestedSelected) return;
     hoverRoutePreview = { hoveredH3Index: hoveredH3, data };
@@ -18057,6 +18084,8 @@
             const bullets = [];
             const deployedLine = formatDeployedUnitsLine(readyResult.deployedUnitsByType);
             if (deployedLine) bullets.push(deployedLine);
+            const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes);
+            if (deploymentCapLine) bullets.push(deploymentCapLine);
             if ((readyResult.humanHexesLostCount ?? 0) > 0) {
               bullets.push(`${readyResult.humanHexesLostCount.toLocaleString()} hexes lost to opponent`);
             }
