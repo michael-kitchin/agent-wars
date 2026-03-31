@@ -158,9 +158,10 @@ export interface ReadyDeps {
 
 /**
  * Logic for game:ready. When useEventDrivenConsultation is true, uses pending AI orders from DB if present,
- * else generates orders from standing orders only (no LLM at Ready); after resolution runs afterResolution.
+ * else generates orders from standing orders only (no LLM at Ready); after resolution runs afterResolution
+ * only when aiPlanningRunEnabled is true.
  * When event-driven is false: if precomputedAiOrders and precomputedAiRangedOrders are present, uses them;
- * otherwise requests orders from the LLM then resolves the turn.
+ * otherwise when aiPlanningRunEnabled requests orders from the LLM; when false, opponent uses standing orders only.
  */
 export async function handleGameReady(
   payload: GameReadyIpcPayload | undefined,
@@ -179,6 +180,7 @@ export async function handleGameReady(
   const enabledToolNames = deps.getToolNamesForEnabledGroups(enabledGroupIds);
   const usePrecomputation = enabledGroupIds.includes('precomputation');
   const useEventDrivenConsultation = payload?.useEventDrivenConsultation === true;
+  const aiPlanningRunEnabled = payload?.aiPlanningRunEnabled === true;
 
   let aiOrders: { unitId: string; toH3Index: string }[] = [];
   let aiRangedOrders: RangedAttackOrder[] = [];
@@ -227,7 +229,7 @@ export async function handleGameReady(
     aiOrders = payload.precomputedAiOrders ?? [];
     aiRangedOrders = payload.precomputedAiRangedOrders ?? [];
     aiStrategy = payload.precomputedAiStrategy;
-  } else if (modelId && deps.hasKey()) {
+  } else if (aiPlanningRunEnabled && modelId && deps.hasKey()) {
     const result = await deps.requestOrders(aiState, modelId, {
       enabledToolNames,
       usePrecomputation,
@@ -248,10 +250,17 @@ export async function handleGameReady(
       aiSkipReason = result.error;
     }
   } else {
-    aiSkipped = true;
-    aiSkipReason = !deps.hasKey()
-      ? 'Set your OpenRouter API key in the panel on the right.'
-      : 'Select an AI model from the dropdown.';
+    const hexList = aiState.hexes.map((h) => h.h3Index);
+    const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
+    const generated = generateOrdersForStandingOrders('opponent', aiState, latLngByH3, resolveToH3);
+    aiOrders = generated.movementOrders;
+    aiRangedOrders = generated.rangedAttacks;
+    if (aiPlanningRunEnabled) {
+      aiSkipped = true;
+      aiSkipReason = !deps.hasKey()
+        ? 'Set your OpenRouter API key in the panel on the right.'
+        : 'Select an AI model from the dropdown.';
+    }
   }
   }
 
@@ -271,7 +280,7 @@ export async function handleGameReady(
     return { success: false, reason: readyResult.reason };
   }
 
-  if (useEventDrivenConsultation && readyResult.success) {
+  if (useEventDrivenConsultation && readyResult.success && aiPlanningRunEnabled) {
     try {
       const postResolution = await Promise.race([
         afterResolution(deps.getGameStateForPlayer('opponent'), readyResult, {

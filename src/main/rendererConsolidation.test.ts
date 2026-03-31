@@ -81,10 +81,42 @@ function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void {
   );
 }
 
+function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
+  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const source = fs.readFileSync(rendererPath, 'utf8');
+  const drawProductionFn = getFunctionSource(source, 'drawRes1ProductionOverlays');
+  const syncBuildEntryFn = getFunctionSource(source, 'syncBuildEntryButton');
+
+  assert.ok(
+    drawProductionFn.includes('if (!explored && !hideTerrainFillWhileHeld) continue;'),
+    'drawRes1ProductionOverlays should only show unexplored production labels while T is held'
+  );
+  assert.ok(
+    drawProductionFn.includes(": `${Math.max(0, capacityPerTurn).toLocaleString()}c`;"),
+    'drawRes1ProductionOverlays should show unexplored labels in N1c-only format'
+  );
+  assert.ok(
+    drawProductionFn.includes('const hasClickableBuildEntryForHex =') &&
+      drawProductionFn.includes('explored &&') &&
+      drawProductionFn.includes('if (hasClickableBuildEntryForHex) {'),
+    'drawRes1ProductionOverlays should hide non-clickable label when clickable build entry exists'
+  );
+
+  assert.ok(
+    syncBuildEntryFn.includes('if (res4On) {'),
+    'syncBuildEntryButton should suppress clickable production buttons on res4 zoom'
+  );
+  assert.ok(
+    syncBuildEntryFn.includes('if (!explored) continue;'),
+    'syncBuildEntryButton should only render clickable buttons for explored hexes'
+  );
+}
+
 function run(): void {
   testRedrawAndResizeDelegateToSharedScene();
   testSharedSceneStillRendersStaleIntel();
   testCommittedPathsRemainVisibleDuringResolutionAnimation();
+  testProductionLabelContractsForExploredVsUnexploredHexes();
   console.log('rendererConsolidation.test.ts passed');
 }
 

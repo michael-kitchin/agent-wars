@@ -900,10 +900,39 @@ export function getGameState(): GameStateSnapshot {
   const controlRows = getAll<{ h3Index: string; controllerPlayerId: string | null }>(
     'SELECT h3_index AS h3Index, controller_player_id AS controllerPlayerId FROM res1_control'
   );
-  const queueTotalRows = getAll<{ h3Index: string; queuedUnits: number }>(
-    `SELECT h3_index AS h3Index, COALESCE(SUM(remaining_count), 0) AS queuedUnits
-     FROM res1_build_queue
-     GROUP BY h3_index`
+  const queueTotalRows = getAll<{
+    h3Index: string;
+    queuedUnits: number;
+    nextUnitType: BuildUnitType | null;
+    nextRemainingCount: number | null;
+    storedPoints: number;
+  }>(
+    `SELECT q.h3_index AS h3Index,
+            COALESCE(SUM(q.remaining_count), 0) AS queuedUnits,
+            (
+              SELECT qh.unit_type
+              FROM res1_build_queue qh
+              WHERE qh.h3_index = q.h3_index
+              ORDER BY qh.queue_index ASC, qh.id ASC
+              LIMIT 1
+            ) AS nextUnitType,
+            (
+              SELECT qh.remaining_count
+              FROM res1_build_queue qh
+              WHERE qh.h3_index = q.h3_index
+              ORDER BY qh.queue_index ASC, qh.id ASC
+              LIMIT 1
+            ) AS nextRemainingCount,
+            COALESCE(
+              (
+                SELECT p.stored_points
+                FROM res1_build_progress p
+                WHERE p.h3_index = q.h3_index
+              ),
+              0
+            ) AS storedPoints
+     FROM res1_build_queue q
+     GROUP BY q.h3_index`
   );
   const gameOver = gameOverRow?.value === '1';
   const winner = winnerRow?.value ?? undefined;

@@ -56,8 +56,14 @@ export interface GameStateSnapshot {
   pendingOrders: { unitId: string; toH3Index: string }[];
   /** Res-1 control rows for overlay rendering and production UI. */
   res1Control?: { h3Index: string; controllerPlayerId: string | null }[];
-  /** Res-1 total queued unit counts (sum of remaining_count) per hex. */
-  res1BuildQueueTotals?: { h3Index: string; queuedUnits: number }[];
+  /** Res-1 queue summary per hex for production overlays (queue totals + next-enqueued metadata). */
+  res1BuildQueueTotals?: {
+    h3Index: string;
+    queuedUnits: number;
+    nextUnitType: BuildUnitType | null;
+    nextRemainingCount: number | null;
+    storedPoints: number;
+  }[];
   gameOver?: boolean;
   winner?: string;
 }
@@ -98,6 +104,8 @@ export interface GameReadyIpcPayload {
   precomputedAiOrders?: MovementOrder[];
   precomputedAiRangedOrders?: RangedAttackOrder[];
   precomputedAiStrategy?: string;
+  /** When true, Ready may invoke the LLM (non–event-driven path or afterResolution). Omitted/false ⇒ no LLM on Ready. */
+  aiPlanningRunEnabled?: boolean;
 }
 
 /** API model row shown in the renderer model dropdown. */

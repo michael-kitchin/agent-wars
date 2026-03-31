@@ -14901,10 +14901,6 @@
     if (!gameState) return null;
     return gameState.units.find((u) => u.h3Index === h3Index) ?? null;
   }
-  function getUnitsAtHex(h3Index) {
-    if (!gameState) return [];
-    return gameState.units.filter((u) => u.h3Index === h3Index);
-  }
   function formatStackTooltip(units) {
     const byKey = /* @__PURE__ */ new Map();
     for (const u of units) {
@@ -14917,18 +14913,38 @@
     const el = document.getElementById("stack-callout");
     if (el) {
       el.classList.add("hidden");
+      el.classList.remove("stack-modal");
       el.removeAttribute("data-open");
       el.removeAttribute("data-x");
       el.removeAttribute("data-y");
       el.removeAttribute("data-unit-ids");
     }
+    stackCalloutModalActive = false;
+    scheduleTerrainTooltipRestoreAfterPopoverClose();
+  }
+  var buildEntryButtonPointerInside = false;
+  function isStackOrBuildMapPopoverOpen() {
+    const stack = document.getElementById("stack-callout");
+    const build = document.getElementById("build-popup");
+    return !!stack && !stack.classList.contains("hidden") || !!build && !build.classList.contains("hidden");
+  }
+  function shouldSuppressTerrainTooltip() {
+    return isStackOrBuildMapPopoverOpen() || buildEntryButtonPointerInside;
+  }
+  function activateStackCalloutModal() {
+    stackCalloutModalActive = true;
+    const el = document.getElementById("stack-callout");
+    if (el) el.classList.add("stack-modal");
   }
   function showStackCallout(units, clientX, clientY) {
     const calloutEl = document.getElementById("stack-callout");
     const listEl = document.getElementById("stack-callout-list");
     if (!calloutEl || !listEl) return;
+    hideBuildPopup();
     clearTerrainTooltipTimer();
     hideTerrainTooltipVisual();
+    if (stackCalloutModalActive) calloutEl.classList.add("stack-modal");
+    else calloutEl.classList.remove("stack-modal");
     const sorted = [...units].sort(
       (a, b) => `${a.player} ${a.unitType} ${a.id}`.localeCompare(`${b.player} ${b.unitType} ${b.id}`)
     );
@@ -14942,18 +14958,28 @@
     const header = document.createElement("div");
     header.className = "stack-callout-actions";
     header.style.display = "flex";
-    header.style.justifyContent = "flex-end";
+    header.style.justifyContent = "flex-start";
     header.style.gap = "0.4rem";
     header.style.marginBottom = "0.4rem";
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "unit-select stack-close-btn";
+    closeBtn.textContent = "\xD7";
+    closeBtn.style.marginRight = "auto";
+    closeBtn.addEventListener("click", () => {
+      hideStackCallout();
+    });
+    header.appendChild(closeBtn);
     const humanIds = sorted.filter((u) => u.player === "human").map((u) => u.id);
     if (!ctrlKeyActive) {
       const selectAllBtn = document.createElement("button");
       selectAllBtn.type = "button";
       selectAllBtn.className = "unit-select";
-      selectAllBtn.textContent = "Select All";
+      selectAllBtn.textContent = "+All";
       selectAllBtn.addEventListener("click", () => {
+        activateStackCalloutModal();
         replaceSelection(humanIds);
-        hideStackCallout();
+        showStackCallout(units, clientX, clientY);
         updateSidebar();
         updateRangedSidebar();
         redraw();
@@ -14963,8 +14989,9 @@
       const addAllBtn = document.createElement("button");
       addAllBtn.type = "button";
       addAllBtn.className = "unit-select";
-      addAllBtn.textContent = "Add All";
+      addAllBtn.textContent = "+All";
       addAllBtn.addEventListener("click", () => {
+        activateStackCalloutModal();
         addUnitsToSelection(humanIds);
         showStackCallout(units, clientX, clientY);
         updateSidebar();
@@ -14974,8 +15001,9 @@
       const removeAllBtn = document.createElement("button");
       removeAllBtn.type = "button";
       removeAllBtn.className = "unit-select";
-      removeAllBtn.textContent = "Remove All";
+      removeAllBtn.textContent = "-All";
       removeAllBtn.addEventListener("click", () => {
+        activateStackCalloutModal();
         removeUnitsFromSelection(humanIds);
         showStackCallout(units, clientX, clientY);
         updateSidebar();
@@ -14995,17 +15023,13 @@
       if (u.player === "human") {
         const btn = document.createElement("button");
         btn.type = "button";
-        btn.className = "unit-select";
+        btn.className = "unit-select stack-unit-toggle";
         const inSelection = selectedUnitIds.includes(u.id);
-        btn.textContent = ctrlKeyActive ? inSelection ? "Remove" : "Add" : "Select";
+        btn.textContent = inSelection ? "-" : "+";
         btn.addEventListener("click", () => {
-          if (ctrlKeyActive) {
-            toggleUnitSelection(u.id);
-            showStackCallout(units, clientX, clientY);
-          } else {
-            selectUnitOnMap(u.id);
-            hideStackCallout();
-          }
+          activateStackCalloutModal();
+          toggleUnitSelection(u.id);
+          showStackCallout(units, clientX, clientY);
           updateSidebar();
           updateRangedSidebar();
           redraw();
@@ -15041,15 +15065,59 @@
     showStackCallout(units, Number(rawX), Number(rawY));
   }
   var TOOLTIP_OFFSET_PX = 12;
+  function hideBuildPopup() {
+    buildPopupHexH3 = null;
+    buildPopupRequestSeq++;
+    const el = document.getElementById("build-popup");
+    const body = document.getElementById("build-popup-body");
+    if (el) {
+      el.classList.add("hidden");
+      el.removeAttribute("data-open");
+      el.removeAttribute("data-x");
+      el.removeAttribute("data-y");
+      el.setAttribute("aria-hidden", "true");
+    }
+    if (body) body.innerHTML = "";
+    requestRedraw();
+    scheduleTerrainTooltipRestoreAfterPopoverClose();
+  }
+  function showBuildPopup(h3Index, clientX, clientY) {
+    hideStackCallout();
+    clearTerrainTooltipTimer();
+    hideTerrainTooltipVisual();
+    const el = document.getElementById("build-popup");
+    const body = document.getElementById("build-popup-body");
+    if (!el || !body) return;
+    buildPopupHexH3 = h3Index;
+    el.setAttribute("data-open", "true");
+    el.setAttribute("data-x", String(clientX));
+    el.setAttribute("data-y", String(clientY));
+    el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
+    el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
+    el.classList.remove("hidden");
+    el.setAttribute("aria-hidden", "false");
+    void renderBuildQueueIntoMount(body, h3Index);
+    requestRedraw();
+  }
+  function refreshBuildPopupIfOpen() {
+    const el = document.getElementById("build-popup");
+    const body = document.getElementById("build-popup-body");
+    if (!el || el.classList.contains("hidden") || !buildPopupHexH3 || !body) return;
+    void renderBuildQueueIntoMount(body, buildPopupHexH3);
+  }
   var TERRAIN_TOOLTIP_DELAY_MS = 750;
   var WORLD_H3_RESOLUTION = 1;
   var DETAIL_H3_RESOLUTION = 4;
   var RES4_SHOW_THRESHOLD_VIEW_FRACTION = 0.8;
   var RES4_HIDE_THRESHOLD_VIEW_FRACTION = 0.7;
+  var BUILD_ENTRY_ZOOM_STEPS_FROM_DEFAULT = 2;
+  var MAIN_MAP_WHEEL_ZOOM_STEP = 0.5;
   var INITIAL_CAMERA_ZOOM_IN_LEVELS = 1;
   var lastPointerClientX = 0;
   var lastPointerClientY = 0;
   var terrainTooltipDelayTimer = null;
+  var buildEntryDefaultMapZoom = null;
+  var lastBuildEntryLayerKey = null;
   function clearTerrainTooltipTimer() {
     if (terrainTooltipDelayTimer !== null) {
       clearTimeout(terrainTooltipDelayTimer);
@@ -15058,11 +15126,9 @@
   }
   function hideTerrainTooltipVisual() {
     terrainTooltipRequestSeq++;
-    hideBuildQueueModalState();
     const el = document.getElementById("hex-tooltip");
     if (el) {
       el.classList.add("hidden");
-      el.classList.remove("build-modal");
       el.setAttribute("aria-hidden", "true");
     }
   }
@@ -15112,9 +15178,49 @@
     const row = state.res1Control?.find((entry) => entry.h3Index === h3Index);
     return row?.controllerPlayerId ?? null;
   }
-  function getQueuedUnitsForHex(state, h3Index) {
-    const row = state.res1BuildQueueTotals?.find((entry) => entry.h3Index === h3Index);
-    return row?.queuedUnits ?? 0;
+  function getBuildQueueSummaryForHex(state, h3Index) {
+    return state.res1BuildQueueTotals?.find((entry) => entry.h3Index === h3Index) ?? null;
+  }
+  var UNIT_COST_BY_TYPE = {
+    infantry: 10,
+    armor: 20,
+    naval: 50
+  };
+  var MAX_UNITS_PER_TYPE = {
+    infantry: 10,
+    armor: 5,
+    naval: 5
+  };
+  function getHumanUnitCountsByType(state) {
+    const counts = { infantry: 0, armor: 0, naval: 0 };
+    for (const unit of state.units) {
+      if (unit.player !== "human") continue;
+      if (unit.unitType === "infantry" || unit.unitType === "armor" || unit.unitType === "naval") {
+        counts[unit.unitType] += 1;
+      }
+    }
+    return counts;
+  }
+  function formatProductionLabelForHex(state, h3Index, capacityPerTurn, controller) {
+    const capacityText = `${Math.max(0, capacityPerTurn).toLocaleString()}c`;
+    if (controller !== "human") return `${capacityText} / ?t`;
+    const queue = getBuildQueueSummaryForHex(state, h3Index);
+    const queuedUnits = queue?.queuedUnits ?? 0;
+    if (queuedUnits <= 0) return capacityText;
+    const nextUnitType = queue?.nextUnitType;
+    const nextRemainingCount = queue?.nextRemainingCount ?? null;
+    const storedPoints = Math.max(0, queue?.storedPoints ?? 0);
+    if (!nextUnitType || !nextRemainingCount || nextRemainingCount <= 0 || capacityPerTurn <= 0) {
+      return `${capacityText} / ?t`;
+    }
+    const humanCounts = getHumanUnitCountsByType(state);
+    if (humanCounts[nextUnitType] >= MAX_UNITS_PER_TYPE[nextUnitType]) {
+      return `${capacityText} / \u221Et`;
+    }
+    const pointsNeeded = nextRemainingCount * UNIT_COST_BY_TYPE[nextUnitType];
+    const deficit = Math.max(0, pointsNeeded - storedPoints);
+    const turns = Math.max(1, Math.ceil(deficit / Math.max(1, capacityPerTurn)));
+    return `${capacityText} / ${turns.toLocaleString()}t`;
   }
   function roundToNearestInteger(value) {
     return Math.round(value);
@@ -15398,23 +15504,6 @@
     if (terrainTooltipHtmlByContentKey.size > 4096) terrainTooltipHtmlByContentKey.clear();
     return html;
   }
-  function hideBuildQueueModalState() {
-    buildQueueModalActive = false;
-    buildQueueModalHexH3 = null;
-    const el = document.getElementById("hex-tooltip");
-    if (el) el.classList.remove("build-modal");
-  }
-  function activateBuildQueueModalForHex(h3Index) {
-    buildQueueModalActive = true;
-    buildQueueModalHexH3 = h3Index;
-    const el = document.getElementById("hex-tooltip");
-    if (el) el.classList.add("build-modal");
-  }
-  function closeHexTooltipFromModalAction() {
-    hideBuildQueueModalState();
-    clearTerrainTooltipTimer();
-    hideTerrainTooltipVisual();
-  }
   function sanitizeBuildCountInputText(raw) {
     const digitsOnly = raw.replaceAll(/\D/g, "").slice(0, 2);
     if (digitsOnly.length === 0) return "1";
@@ -15423,29 +15512,44 @@
     if (parsed > 99) return "99";
     return String(parsed);
   }
-  function isTooltipTargetInsideDialog(target) {
+  function isBuildQueueSelectInPopupFocused() {
+    const popup = document.getElementById("build-popup");
+    const active = document.activeElement;
+    return !!popup && active instanceof HTMLSelectElement && popup.contains(active);
+  }
+  function isBuildPopupOrEntryTarget(target) {
     if (!(target instanceof Node)) return false;
-    const tooltip = document.getElementById("hex-tooltip");
-    return !!tooltip && tooltip.contains(target);
+    const popup = document.getElementById("build-popup");
+    const layer = document.getElementById("build-entry-layer");
+    return !!(popup?.contains(target) || layer?.contains(target));
   }
-  function isPointerInsideTooltipRect(clientX, clientY) {
-    const tooltip = document.getElementById("hex-tooltip");
-    if (!tooltip || tooltip.classList.contains("hidden")) return false;
-    const rect = tooltip.getBoundingClientRect();
-    return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+  function isStackCalloutTargetInsideDialog(target) {
+    if (!(target instanceof Node)) return false;
+    const callout = document.getElementById("stack-callout");
+    return !!callout && callout.contains(target);
   }
-  async function renderBuildQueueSectionIntoTooltip(tooltipEl, h3Index) {
-    const mount = tooltipEl.querySelector("#hex-build-queue-section");
-    if (!mount || !window.gameApi?.getHexBuildQueue) return;
-    const requestSeq = ++buildQueueModalRequestSeq;
+  async function renderBuildQueueIntoMount(mount, h3Index) {
+    if (!window.gameApi?.getHexBuildQueue) return;
+    const requestSeq = ++buildPopupRequestSeq;
     let snapshot = null;
     try {
       snapshot = await window.gameApi.getHexBuildQueue({ h3Index });
     } catch (err) {
       console.error("getHexBuildQueue failed:", err);
     }
-    if (requestSeq !== buildQueueModalRequestSeq || !snapshot || buildQueueModalHexH3 !== h3Index) return;
+    if (requestSeq !== buildPopupRequestSeq || !snapshot || buildPopupHexH3 !== h3Index) return;
     mount.innerHTML = "";
+    const closeRow = document.createElement("div");
+    closeRow.className = "build-popup-close-row";
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "unit-select build-close-btn";
+    closeBtn.textContent = "\xD7";
+    closeBtn.addEventListener("click", () => {
+      hideBuildPopup();
+    });
+    closeRow.appendChild(closeBtn);
+    mount.appendChild(closeRow);
     const section = document.createElement("div");
     section.className = "build-queue-section";
     const controlLine = document.createElement("div");
@@ -15477,13 +15581,13 @@
     buildBtn.textContent = "Build";
     buildBtn.addEventListener("click", async () => {
       if (!window.gameApi?.addHexBuildQueueEntry) return;
-      activateBuildQueueModalForHex(h3Index);
       const result = await window.gameApi.addHexBuildQueueEntry({ h3Index });
       if (!result.success) {
         showMapToast(result.reason ?? "Failed to add build queue entry.", { isError: true });
         return;
       }
-      void renderBuildQueueSectionIntoTooltip(tooltipEl, h3Index);
+      const body = document.getElementById("build-popup-body");
+      if (body) void renderBuildQueueIntoMount(body, h3Index);
     });
     head.appendChild(title);
     head.appendChild(buildBtn);
@@ -15515,7 +15619,6 @@
       };
       typeSelect.addEventListener("change", async () => {
         if (!window.gameApi?.updateHexBuildQueueEntry) return;
-        activateBuildQueueModalForHex(h3Index);
         const result = await window.gameApi.updateHexBuildQueueEntry({
           h3Index,
           entryId: entry.id,
@@ -15525,7 +15628,7 @@
         if (!result.success) {
           showMapToast(result.reason ?? "Failed to update build queue entry.", { isError: true });
         }
-        void renderBuildQueueSectionIntoTooltip(tooltipEl, h3Index);
+        void renderBuildQueueIntoMount(mount, h3Index);
       });
       row.appendChild(typeSelect);
       countInput.addEventListener("keydown", (event) => {
@@ -15536,7 +15639,6 @@
       });
       countInput.addEventListener("input", async () => {
         if (!window.gameApi?.updateHexBuildQueueEntry) return;
-        activateBuildQueueModalForHex(h3Index);
         const count = readCurrentCount();
         const result = await window.gameApi.updateHexBuildQueueEntry({
           h3Index,
@@ -15555,12 +15657,11 @@
       removeBtn.textContent = "x";
       removeBtn.addEventListener("click", async () => {
         if (!window.gameApi?.removeHexBuildQueueEntry) return;
-        activateBuildQueueModalForHex(h3Index);
         const result = await window.gameApi.removeHexBuildQueueEntry({ h3Index, entryId: entry.id });
         if (!result.success) {
           showMapToast(result.reason ?? "Failed to remove build queue entry.", { isError: true });
         }
-        void renderBuildQueueSectionIntoTooltip(tooltipEl, h3Index);
+        void renderBuildQueueIntoMount(mount, h3Index);
       });
       row.appendChild(removeBtn);
       list.appendChild(row);
@@ -15568,34 +15669,56 @@
     section.appendChild(list);
     mount.appendChild(section);
   }
-  async function showTerrainTooltip(clientX, clientY, state, namingTarget, sourceRes1H3) {
-    if (buildQueueModalActive && buildQueueModalHexH3 !== sourceRes1H3) return;
+  async function showTerrainTooltip(clientX, clientY, state, namingTarget) {
+    if (shouldSuppressTerrainTooltip()) return;
     const requestSeq = ++terrainTooltipRequestSeq;
     const namingLine = await getCachedNamingLineForTarget(namingTarget);
     if (requestSeq !== terrainTooltipRequestSeq) return;
+    if (shouldSuppressTerrainTooltip()) return;
     const el = document.getElementById("hex-tooltip");
     if (!el) return;
-    const modalClose = sourceRes1H3 ? `<button type="button" class="build-modal-close" aria-label="Close build queue">\xD7</button>` : "";
-    el.innerHTML = `${modalClose}${getCachedTerrainTooltipHtml(state, namingLine)}${sourceRes1H3 ? '<div id="hex-build-queue-section"></div>' : ""}`;
-    el.style.left = `${clientX}px`;
-    el.style.top = `${clientY + 2}px`;
+    el.innerHTML = getCachedTerrainTooltipHtml(state, namingLine);
+    el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
+    el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
     el.classList.remove("hidden");
     el.setAttribute("aria-hidden", "false");
     el.setAttribute("role", "tooltip");
-    if (sourceRes1H3) {
-      buildQueueModalHexH3 = sourceRes1H3;
-      if (buildQueueModalActive) el.classList.add("build-modal");
-      else el.classList.remove("build-modal");
-      const closeBtn = el.querySelector(".build-modal-close");
-      if (closeBtn) {
-        closeBtn.addEventListener("click", () => {
-          closeHexTooltipFromModalAction();
-        });
-      }
-      void renderBuildQueueSectionIntoTooltip(el, sourceRes1H3);
-    } else {
-      hideBuildQueueModalState();
+  }
+  async function restoreTerrainTooltipAfterPopoverClose() {
+    if (!gameState) return;
+    if (buildEntryButtonPointerInside) {
+      const atPointer = document.elementFromPoint(lastPointerClientX, lastPointerClientY);
+      const stillInsideBuildEntry = atPointer instanceof Element && !!atPointer.closest(".build-entry-btn");
+      if (!stillInsideBuildEntry) buildEntryButtonPointerInside = false;
     }
+    if (shouldSuppressTerrainTooltip()) return;
+    let hoverH3 = hoveredHexH3;
+    if (!hoverH3) {
+      const map = getMainLeafletMap();
+      if (!map) return;
+      const rect = map.getContainer().getBoundingClientRect();
+      const x = lastPointerClientX - rect.left;
+      const y = lastPointerClientY - rect.top;
+      const set = new Set(gameState.hexes.map((h) => h.h3Index));
+      hoverH3 = hitTestHexAtContainerPixel(x, y, set);
+      if (!hoverH3) return;
+      hoveredHexH3 = hoverH3;
+    }
+    clearTerrainTooltipTimer();
+    const state = terrainStateForPointer(lastPointerClientX, lastPointerClientY, hoverH3);
+    const namingTarget = namingLookupTargetForPointer(lastPointerClientX, lastPointerClientY, hoverH3);
+    await showTerrainTooltip(lastPointerClientX, lastPointerClientY, state, namingTarget);
+  }
+  var terrainTooltipRestoreTimer = null;
+  function scheduleTerrainTooltipRestoreAfterPopoverClose() {
+    if (terrainTooltipRestoreTimer !== null) {
+      clearTimeout(terrainTooltipRestoreTimer);
+      terrainTooltipRestoreTimer = null;
+    }
+    terrainTooltipRestoreTimer = setTimeout(() => {
+      terrainTooltipRestoreTimer = null;
+      void restoreTerrainTooltipAfterPopoverClose();
+    }, 0);
   }
   var selectedHexIndex = null;
   var hoveredHexH3 = null;
@@ -15611,9 +15734,9 @@
   var pendingRangedAttacks = [];
   var hideCommittedOrderLinesAfterReady = false;
   var rangedModeActive = false;
-  var buildQueueModalActive = false;
-  var buildQueueModalHexH3 = null;
-  var buildQueueModalRequestSeq = 0;
+  var stackCalloutModalActive = false;
+  var buildPopupHexH3 = null;
+  var buildPopupRequestSeq = 0;
   var gameState = null;
   var res4TerrainOverridesByH3 = /* @__PURE__ */ new Map();
   var terrainInfraRes1Airport = /* @__PURE__ */ new Set();
@@ -15959,6 +16082,96 @@
     if (fillFraction >= RES4_SHOW_THRESHOLD_VIEW_FRACTION) res4Visible = true;
     return res4Visible;
   }
+  function shouldShowBuildEntryZoom() {
+    const map = getMainLeafletMap();
+    if (!map) return false;
+    const currentZoom = map.getZoom();
+    if (!Number.isFinite(currentZoom)) return false;
+    if (buildEntryDefaultMapZoom == null) {
+      buildEntryDefaultMapZoom = currentZoom;
+    }
+    const threshold = buildEntryDefaultMapZoom + BUILD_ENTRY_ZOOM_STEPS_FROM_DEFAULT * MAIN_MAP_WHEEL_ZOOM_STEP;
+    return currentZoom >= threshold;
+  }
+  function hideBuildEntryLayer(layer, clearHtml = true) {
+    layer.classList.add("hidden");
+    layer.setAttribute("aria-hidden", "true");
+    if (clearHtml) {
+      layer.innerHTML = "";
+    }
+    buildEntryButtonPointerInside = false;
+    lastBuildEntryLayerKey = null;
+  }
+  function hasVisibleRes1InfrastructureGlyphs(h3Index, res4On, unitHexes) {
+    return !res4On && infraGlyphsAllowedForRes1Hex(h3Index) && !unitHexes.has(h3Index) && (terrainInfraRes1Airport.has(h3Index) || terrainInfraRes1Port.has(h3Index));
+  }
+  function computeRes1OverlayTextY(h3Index, map, L, hasOffsetFeatures) {
+    const center = hexCenterPx(h3Index);
+    if (!hasOffsetFeatures) {
+      return center.y;
+    }
+    const pts = projectHexBoundaryToContainerPoints(h3Index, map, L);
+    return center.y + spanForProjectedHex(pts) * 0.24;
+  }
+  function syncBuildEntryButton() {
+    const layer = document.getElementById("build-entry-layer");
+    if (!layer || !gameState) {
+      if (layer) hideBuildEntryLayer(layer, false);
+      return;
+    }
+    if (!shouldShowBuildEntryZoom()) {
+      hideBuildEntryLayer(layer);
+      return;
+    }
+    const map = getMainLeafletMap();
+    if (!map) {
+      hideBuildEntryLayer(layer);
+      return;
+    }
+    const L = getLeafletGlobal();
+    const res4On = shouldRenderRes4Hexes();
+    if (res4On) {
+      hideBuildEntryLayer(layer);
+      return;
+    }
+    const visibleUnitHexes = new Set(gameState.units.map((u) => u.h3Index));
+    const rows = [];
+    for (const hx of gameState.hexes) {
+      if (hx.terrain === "water") continue;
+      const explored = isHexExploredByPlayer(hx.h3Index);
+      if (!explored) continue;
+      const controller = getControllerForHex(gameState, hx.h3Index);
+      if (controller !== "human") continue;
+      const capacityPerTurn = countUrbanRes4HexesInRes1Hex(hx.h3Index);
+      if (capacityPerTurn <= 0) continue;
+      const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs(hx.h3Index, res4On, visibleUnitHexes);
+      const hasVisibleUnits = visibleUnitHexes.has(hx.h3Index);
+      const center = hexCenterPx(hx.h3Index);
+      const textY = computeRes1OverlayTextY(hx.h3Index, map, L, hasInfraSymbols || hasVisibleUnits);
+      rows.push({
+        h3: hx.h3Index,
+        label: formatProductionLabelForHex(gameState, hx.h3Index, capacityPerTurn, "human"),
+        left: Math.round(center.x),
+        top: Math.round(textY),
+        hasCapacity: true
+      });
+    }
+    if (rows.length === 0) {
+      hideBuildEntryLayer(layer);
+      return;
+    }
+    rows.sort((a, b) => a.h3.localeCompare(b.h3));
+    const layerKey = rows.map((r) => `${r.h3}|${r.label}|${r.left}|${r.top}|${r.hasCapacity ? 1 : 0}`).join(";");
+    if (layerKey !== lastBuildEntryLayerKey) {
+      const html = rows.map(
+        (r) => `<button type="button" class="build-entry-btn${r.hasCapacity ? " has-capacity" : ""}" data-h3-index="${r.h3}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Open build queue for ${r.h3}">${r.label}</button>`
+      ).join("");
+      layer.innerHTML = html;
+      lastBuildEntryLayerKey = layerKey;
+    }
+    layer.classList.remove("hidden");
+    layer.setAttribute("aria-hidden", "false");
+  }
   function projectHexBoundaryToContainerPoints(h3Index, map, L) {
     const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
     return boundary.map(([lat, lng]) => {
@@ -16045,12 +16258,12 @@
   }
   function infraGlyphsAllowedForRes1Hex(h3) {
     if (!isHexExploredByPlayer(h3)) return false;
-    return !hideTerrainFillWhileHeld;
+    return true;
   }
   function infraGlyphsAllowedForRes4Child(parentH3, childH3) {
     if (!isHexExploredByPlayer(parentH3)) return false;
     void childH3;
-    return !hideTerrainFillWhileHeld;
+    return true;
   }
   function drawTerrainInfrastructureOverlays(ctx) {
     if (!gameState) return;
@@ -16062,8 +16275,10 @@
     const outlineScreenPx = Math.max(0.5, 0.58 * zoomStrokeScale);
     const L = getLeafletGlobal();
     const res4On = shouldRenderRes4Hexes();
+    const unitHexes = new Set(gameState.units.map((u) => u.h3Index));
     if (!res4On) {
       for (const hx of gameState.hexes) {
+        if (unitHexes.has(hx.h3Index)) continue;
         if (!infraGlyphsAllowedForRes1Hex(hx.h3Index)) continue;
         const ap = terrainInfraRes1Airport.has(hx.h3Index);
         const pt = terrainInfraRes1Port.has(hx.h3Index);
@@ -16086,6 +16301,7 @@
     const viewportWidth = Math.max(1, container.clientWidth);
     const viewportHeight = Math.max(1, container.clientHeight);
     for (const parent of gameState.hexes) {
+      if (unitHexes.has(parent.h3Index)) continue;
       let children = res4ChildrenByParent.get(parent.h3Index);
       if (!children) {
         children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
@@ -16115,26 +16331,24 @@
     if (!map) return;
     const L = getLeafletGlobal();
     const res4On = shouldRenderRes4Hexes();
+    const unitHexes = new Set(gameState.units.map((u) => u.h3Index));
     for (const hx of gameState.hexes) {
-      if (!isHexExploredByPlayer(hx.h3Index)) continue;
+      const explored = isHexExploredByPlayer(hx.h3Index);
+      if (!explored && !hideTerrainFillWhileHeld) continue;
       if (hx.terrain === "water") continue;
       const controller = getControllerForHex(gameState, hx.h3Index);
       const controlledByHuman = controller === "human";
       const capacityPerTurn = countUrbanRes4HexesInRes1Hex(hx.h3Index);
-      const queuedUnits = getQueuedUnitsForHex(gameState, hx.h3Index);
       const hasUrbanCapacity = capacityPerTurn > 0;
-      const displayCapacity = controlledByHuman ? hasUrbanCapacity ? capacityPerTurn : 0 : null;
-      const displayQueue = controlledByHuman ? hasUrbanCapacity ? queuedUnits : 0 : null;
-      const hasInfraSymbols = !res4On && infraGlyphsAllowedForRes1Hex(hx.h3Index) && (terrainInfraRes1Airport.has(hx.h3Index) || terrainInfraRes1Port.has(hx.h3Index));
-      const hasVisibleUnits = gameState.units.some((u) => u.h3Index === hx.h3Index);
-      const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
-      const pts = boundary.map(([lat, lng]) => {
-        const p = map.latLngToContainerPoint(L.latLng(lat, lng));
-        return { x: p.x, y: p.y };
-      });
+      const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs(hx.h3Index, res4On, unitHexes);
+      const hasVisibleUnits = unitHexes.has(hx.h3Index);
       const center = hexCenterPx(hx.h3Index);
-      const textY = hasInfraSymbols || hasVisibleUnits ? center.y + spanForProjectedHex(pts) * 0.24 : center.y;
-      const text = controlledByHuman ? `${displayCapacity.toLocaleString()} / ${displayQueue.toLocaleString()}` : "? / ?";
+      const textY = computeRes1OverlayTextY(hx.h3Index, map, L, hasInfraSymbols || hasVisibleUnits);
+      const text = explored ? formatProductionLabelForHex(gameState, hx.h3Index, capacityPerTurn, controller) : `${Math.max(0, capacityPerTurn).toLocaleString()}c`;
+      const hasClickableBuildEntryForHex = explored && !res4On && controlledByHuman && capacityPerTurn > 0 && shouldShowBuildEntryZoom();
+      if (hasClickableBuildEntryForHex) {
+        continue;
+      }
       const sizePx = hasInfraSymbols || hasVisibleUnits ? "10px" : "11px";
       const useBold = controlledByHuman && hasUrbanCapacity;
       ctx.font = `${useBold ? "bold " : ""}${sizePx} system-ui, sans-serif`;
@@ -16489,12 +16703,7 @@
     ctx.textBaseline = "middle";
     ctx.fillText("Loading\u2026", width / 2, height / 2);
   }
-  function drawGameScene(ctx, width, height, state) {
-    ctx.clearRect(0, 0, width, height);
-    drawTerrainHexes(ctx);
-    drawRes4TerrainHexes(ctx);
-    const hexList = state.hexes.map((h) => h.h3Index);
-    let moveProgress = 1;
+  function getUnitsForDrawWithMovingIds(state) {
     let unitsToDraw = state.units;
     let movingIds;
     const anim = resolutionMoveAnimation;
@@ -16511,7 +16720,7 @@
         hasMeleeCombat,
         hasMeleeCasualties
       );
-      moveProgress = phase.moveProgress;
+      const moveProgress = phase.moveProgress;
       const rangedRemovedIds = new Set((anim.rangedRemovedUnits ?? []).map((u) => u.id));
       if (phase.inRangedLightning || phase.inRangedCasualty) {
         const preMoveSurvivors = state.units.filter((u) => !rangedRemovedIds.has(u.id)).map((u) => {
@@ -16527,11 +16736,124 @@
         unitsToDraw = [...state.units, ...anim.meleeRemovedUnits ?? []];
         movingIds = void 0;
       }
+    } else {
+      movingIds = void 0;
+    }
+    return { unitsToDraw, movingIds };
+  }
+  var UNIT_ICON_HIT_PAD_PX = 2;
+  function containerPixelHitsDrawnUnitIcon(px, py, h3Index, unitCount) {
+    const { x, y } = hexCenterPx(h3Index);
+    const r = UNIT_RADIUS + UNIT_ICON_HIT_PAD_PX;
+    const within = (cx, cy) => {
+      const dx = px - cx;
+      const dy = py - cy;
+      return dx * dx + dy * dy <= r * r;
+    };
+    if (unitCount <= 1) return within(x, y);
+    return within(x, y) || within(x + STACK_OFFSET_X, y + STACK_OFFSET_Y);
+  }
+  var BUILD_ENTRY_HIT_PAD_PX = 2;
+  function pointInExpandedClientRect(clientX, clientY, rect, padPx) {
+    return clientX >= rect.left - padPx && clientX <= rect.right + padPx && clientY >= rect.top - padPx && clientY <= rect.bottom + padPx;
+  }
+  function tryHandleBuildEntryAtClientXY(clientX, clientY) {
+    const layer = document.getElementById("build-entry-layer");
+    if (!layer || layer.classList.contains("hidden")) return false;
+    const buttons = Array.from(layer.querySelectorAll(".build-entry-btn"));
+    for (const btn of buttons) {
+      const r = btn.getBoundingClientRect();
+      if (!pointInExpandedClientRect(clientX, clientY, r, BUILD_ENTRY_HIT_PAD_PX)) continue;
+      const h3 = btn.dataset.h3Index;
+      if (!h3) continue;
+      selectedHexIndex = h3;
+      const popup = document.getElementById("build-popup");
+      if (popup && !popup.classList.contains("hidden") && buildPopupHexH3 === h3) {
+        hideBuildPopup();
+      } else {
+        showBuildPopup(h3, clientX, clientY);
+      }
+      return true;
+    }
+    return false;
+  }
+  var lastAppliedMapInteractionCursor = "";
+  function updateMapInteractionCursor(clientX, clientY) {
+    const map = getMainLeafletMap();
+    if (!map) return;
+    const container = map.getContainer();
+    if (container.classList.contains("leaflet-dragging")) {
+      if (lastAppliedMapInteractionCursor !== "") {
+        lastAppliedMapInteractionCursor = "";
+        container.style.removeProperty("cursor");
+      }
+      return;
+    }
+    const rect = container.getBoundingClientRect();
+    const inside = clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+    if (!inside) {
+      if (lastAppliedMapInteractionCursor !== "") {
+        lastAppliedMapInteractionCursor = "";
+        container.style.removeProperty("cursor");
+      }
+      return;
+    }
+    let want = "";
+    const layer = document.getElementById("build-entry-layer");
+    if (layer && !layer.classList.contains("hidden")) {
+      const buttons = Array.from(layer.querySelectorAll(".build-entry-btn"));
+      for (const btn of buttons) {
+        const br = btn.getBoundingClientRect();
+        if (pointInExpandedClientRect(clientX, clientY, br, BUILD_ENTRY_HIT_PAD_PX)) {
+          want = "default";
+          break;
+        }
+      }
+    }
+    if (want === "" && gameState) {
+      const px = clientX - rect.left;
+      const py = clientY - rect.top;
+      const hexSet = new Set(gameState.hexes.map((h) => h.h3Index));
+      const hit = hitTestHexAtContainerPixel(px, py, hexSet);
+      if (hit) {
+        const { unitsToDraw, movingIds } = getUnitsForDrawWithMovingIds(gameState);
+        const drawnAtHit = unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id));
+        if (drawnAtHit.length > 0 && containerPixelHitsDrawnUnitIcon(px, py, hit, drawnAtHit.length)) {
+          want = "default";
+        }
+      }
+    }
+    if (want !== lastAppliedMapInteractionCursor) {
+      lastAppliedMapInteractionCursor = want;
+      if (want === "") container.style.removeProperty("cursor");
+      else container.style.cursor = want;
+    }
+  }
+  function drawGameScene(ctx, width, height, state) {
+    ctx.clearRect(0, 0, width, height);
+    drawTerrainHexes(ctx);
+    drawRes4TerrainHexes(ctx);
+    const hexList = state.hexes.map((h) => h.h3Index);
+    let moveProgress = 1;
+    const { unitsToDraw, movingIds } = getUnitsForDrawWithMovingIds(state);
+    const anim = resolutionMoveAnimation;
+    if (anim) {
+      const elapsed = Date.now() - anim.startTime;
+      const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
+      const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
+      const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0 || (anim.controlLossLightningHexes?.length ?? 0) > 0;
+      const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
+      const phase = getResolutionPhase5(
+        elapsed,
+        hasRangedCombat,
+        hasRangedCasualties,
+        hasMeleeCombat,
+        hasMeleeCasualties
+      );
+      moveProgress = phase.moveProgress;
       if (elapsed >= phase.movementStart) {
         drawResolutionMoveLines(ctx, width, height, anim.moves, state.units, hexList, 1);
       }
-    } else {
-      movingIds = void 0;
     }
     if (!hideCommittedOrderLinesAfterReady && humanStandingOrders.length > 0 && state.units.length) {
       drawStandingOrderLines(ctx, humanStandingOrders, state.units);
@@ -16607,9 +16929,11 @@
     ctx.scale(dpr, dpr);
     if (!gameState) {
       drawLoadingScene(ctx, w, h);
+      syncBuildEntryButton();
       return;
     }
     drawGameScene(ctx, w, h, gameState);
+    syncBuildEntryButton();
   }
   var STACK_OFFSET_X = 6;
   var STACK_OFFSET_Y = -3;
@@ -17121,9 +17445,11 @@
     ctx.scale(dpr, dpr);
     if (!gameState) {
       drawLoadingScene(ctx, w, h);
+      syncBuildEntryButton();
       return;
     }
     drawGameScene(ctx, w, h, gameState);
+    syncBuildEntryButton();
   }
   function tickResolutionMoveAnimation() {
     if (!resolutionMoveAnimation) return;
@@ -17313,22 +17639,8 @@
     void refreshHoverRoutePreview();
     redraw();
   }
-  function getRepresentativeSelectedUnitIdsByOrigin() {
-    if (!gameState) return [...selectedUnitIds];
-    const byId = new Map(gameState.units.map((u) => [u.id, u]));
-    const seenOrigins = /* @__PURE__ */ new Set();
-    const representatives = [];
-    for (const unitId of selectedUnitIds) {
-      const unit = byId.get(unitId);
-      if (!unit || unit.player !== "human") continue;
-      if (seenOrigins.has(unit.h3Index)) continue;
-      seenOrigins.add(unit.h3Index);
-      representatives.push(unitId);
-    }
-    return representatives;
-  }
   async function refreshHoverRoutePreview() {
-    const unitIds = getRepresentativeSelectedUnitIdsByOrigin();
+    const unitIds = [...selectedUnitIds];
     const hoveredH3 = hoveredHexH3;
     const seq = ++hoverPreviewRequestSeq;
     if (rangedModeActive || !window.gameApi?.previewHumanMarchOrders || unitIds.length === 0 || !hoveredH3 || !gameState) {
@@ -17339,7 +17651,7 @@
     const data = await window.gameApi.previewHumanMarchOrders({ unitIds, hoveredH3Index: hoveredH3 });
     if (seq !== hoverPreviewRequestSeq) return;
     if (hoveredHexH3 !== hoveredH3) return;
-    const currentSelected = [...getRepresentativeSelectedUnitIdsByOrigin()].sort().join("|");
+    const currentSelected = [...selectedUnitIds].sort().join("|");
     const requestedSelected = [...unitIds].sort().join("|");
     if (currentSelected !== requestedSelected) return;
     hoverRoutePreview = { hoveredH3Index: hoveredH3, data };
@@ -17457,6 +17769,36 @@
     const el = document.getElementById("sidebar-error");
     if (el) el.style.display = "none";
   }
+  async function syncOpenRouterRunToggleInteractable() {
+    const runBtn = document.getElementById("openrouter-run-btn");
+    const api = window.gameApi?.openRouter;
+    if (!runBtn || !api?.getKey || !api.getSelectedModel) return;
+    try {
+      const [keyResult, modelId] = await Promise.all([api.getKey(), api.getSelectedModel()]);
+      const canEnable = !!keyResult?.hasKey && !!modelId?.trim();
+      if (canEnable) {
+        runBtn.disabled = false;
+        runBtn.removeAttribute("title");
+      } else {
+        runBtn.disabled = true;
+        runBtn.title = "Set API key and model to enable";
+        if (runButtonOn) {
+          runButtonOn = false;
+          runBtn.setAttribute("aria-pressed", "false");
+          window.gameApi?.cancelRequestAiOrders?.();
+          precomputedAiOrders = null;
+          precomputedAiRangedOrders = null;
+          precomputedAiStrategy = null;
+          precomputedToolInvocationCounts = null;
+          eventDrivenInitialConsultationDone = false;
+          updateReadyButtonState();
+        }
+      }
+    } catch {
+      runBtn.disabled = true;
+      runBtn.title = "Set API key and model to enable";
+    }
+  }
   function initOpenRouterUI() {
     const api = window.gameApi?.openRouter;
     if (!api) return;
@@ -17518,6 +17860,7 @@
         modelSelect.innerHTML = '<option value="">\u2014 Select model \u2014</option>';
         if ("error" in result && result.error) {
           appendOpenRouterLog(`Models: ${result.error}`, true);
+          void syncOpenRouterRunToggleInteractable();
           return;
         }
         const models = "models" in result ? result.models ?? [] : [];
@@ -17531,6 +17874,7 @@
         if (targetModelId && Array.from(modelSelect.options).some((o) => o.value === targetModelId)) {
           modelSelect.value = targetModelId;
         }
+        void syncOpenRouterRunToggleInteractable();
       });
     }
     api.getSelectedModel().then((modelId) => {
@@ -17559,9 +17903,11 @@
           if (!value) {
             keyInput.placeholder = "";
             hideMapToast();
+            void syncOpenRouterRunToggleInteractable();
             return;
           }
           keyInput.placeholder = "Saved API key";
+          void syncOpenRouterRunToggleInteractable();
         });
       };
       keyInput.addEventListener("blur", persistApiKey);
@@ -17574,6 +17920,7 @@
       modelSelect.addEventListener("change", () => {
         api.setSelectedModel(modelSelect.value);
         if (modelSelect.value) hideMapToast();
+        void syncOpenRouterRunToggleInteractable();
       });
     }
     if (refreshBtn) refreshBtn.addEventListener("click", refreshModels);
@@ -17581,6 +17928,7 @@
     const runBtn = document.getElementById("openrouter-run-btn");
     if (runBtn) {
       runBtn.addEventListener("click", () => {
+        if (runBtn.disabled) return;
         runButtonOn = !runButtonOn;
         runBtn.setAttribute("aria-pressed", runButtonOn ? "true" : "false");
         if (runButtonOn) {
@@ -17603,6 +17951,7 @@
     }
     document.getElementById("map-toast-dismiss")?.addEventListener("click", hideMapToast);
     document.getElementById("ai-strategy-toast-dismiss")?.addEventListener("click", hideAiStrategyToast);
+    void syncOpenRouterRunToggleInteractable();
   }
   function init() {
     try {
@@ -17663,6 +18012,7 @@
         updateGameOverUI(state);
         updateReadyButtonState();
         redraw();
+        refreshBuildPopupIfOpen();
       }).catch((err) => console.error("getGameState failed:", err));
       window.gameApi.getRes4TerrainOverrides().then((rows) => {
         res4TerrainOverridesByH3 = new Map(rows.map((r) => [r.h3Index, { terrainKind: r.terrainKind, isUrban: !!r.isUrban }]));
@@ -17682,10 +18032,19 @@
       resizeAndRedraw();
     });
     window.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && buildQueueModalHexH3 !== null) {
-        e.preventDefault();
-        closeHexTooltipFromModalAction();
-        return;
+      if (e.key === "Escape") {
+        const buildPopup = document.getElementById("build-popup");
+        if (buildPopup && !buildPopup.classList.contains("hidden")) {
+          e.preventDefault();
+          hideBuildPopup();
+          return;
+        }
+        const stackCallout = document.getElementById("stack-callout");
+        if (stackCallout && !stackCallout.classList.contains("hidden")) {
+          e.preventDefault();
+          hideStackCallout();
+          return;
+        }
       }
       if (shouldIgnoreGlobalKeydown(e)) return;
       if (e.repeat) return;
@@ -17726,16 +18085,71 @@
     window.addEventListener(
       "pointerdown",
       (e) => {
-        if (!buildQueueModalActive || buildQueueModalHexH3 === null) return;
-        if (isTooltipTargetInsideDialog(e.target)) return;
-        closeHexTooltipFromModalAction();
+        const buildPopup = document.getElementById("build-popup");
+        if (!buildPopup || buildPopup.classList.contains("hidden")) return;
+        if (isBuildPopupOrEntryTarget(e.target)) return;
+        const activeEl = document.activeElement;
+        const hadSelectFocused = activeEl instanceof HTMLSelectElement && buildPopup.contains(activeEl);
+        if (hadSelectFocused) {
+          queueMicrotask(() => {
+            const p = document.getElementById("build-popup");
+            if (!p || p.classList.contains("hidden")) return;
+            if (isBuildQueueSelectInPopupFocused()) return;
+            hideBuildPopup();
+          });
+          return;
+        }
+        hideBuildPopup();
       },
       true
     );
-    const tooltipDialog = document.getElementById("hex-tooltip");
-    tooltipDialog?.addEventListener("pointerleave", () => {
-      if (!buildQueueModalActive || buildQueueModalHexH3 === null) return;
-      closeHexTooltipFromModalAction();
+    window.addEventListener(
+      "pointerdown",
+      (e) => {
+        const stackCallout = document.getElementById("stack-callout");
+        if (!stackCallout || stackCallout.classList.contains("hidden")) return;
+        if (isStackCalloutTargetInsideDialog(e.target)) return;
+        hideStackCallout();
+      },
+      true
+    );
+    const buildEntryLayer = document.getElementById("build-entry-layer");
+    buildEntryLayer?.addEventListener("pointerover", (e) => {
+      const target = e.target;
+      if (!target?.closest(".build-entry-btn")) return;
+      buildEntryButtonPointerInside = true;
+      clearTerrainTooltipTimer();
+      hideTerrainTooltipVisual();
+    });
+    buildEntryLayer?.addEventListener("pointerout", (e) => {
+      const target = e.target;
+      if (!target?.closest(".build-entry-btn")) return;
+      const next = e.relatedTarget;
+      if (next?.closest(".build-entry-btn")) return;
+      buildEntryButtonPointerInside = false;
+    });
+    buildEntryLayer?.addEventListener("click", (e) => {
+      const target = e.target;
+      const btn = target?.closest(".build-entry-btn");
+      if (!btn) return;
+      e.stopPropagation();
+      const h3 = btn.dataset.h3Index;
+      if (!h3) return;
+      selectedHexIndex = h3;
+      const popup = document.getElementById("build-popup");
+      if (popup && !popup.classList.contains("hidden") && buildPopupHexH3 === h3) {
+        hideBuildPopup();
+        return;
+      }
+      showBuildPopup(h3, e.clientX, e.clientY);
+    });
+    const canvasContainer = document.getElementById("canvas-container");
+    canvasContainer?.addEventListener("pointermove", (e) => {
+      updateMapInteractionCursor(e.clientX, e.clientY);
+    });
+    canvasContainer?.addEventListener("pointerleave", () => {
+      lastAppliedMapInteractionCursor = "";
+      getMainLeafletMap()?.getContainer()?.style.removeProperty("cursor");
     });
     const mainMapEl = document.getElementById("main-map");
     if (!mainMapEl) return;
@@ -17750,18 +18164,12 @@
       return hitTestHexAtContainerPixel(x, y, set);
     }
     mainMapEl.addEventListener("pointermove", (e) => {
-      if (!buildQueueModalActive && buildQueueModalHexH3 !== null && isPointerInsideTooltipRect(e.clientX, e.clientY)) {
-        activateBuildQueueModalForHex(buildQueueModalHexH3);
-        return;
-      }
-      if (buildQueueModalActive && buildQueueModalHexH3 !== null) {
-        if (!isTooltipTargetInsideDialog(e.target)) {
-          closeHexTooltipFromModalAction();
-        }
-        return;
-      }
       lastPointerClientX = e.clientX;
       lastPointerClientY = e.clientY;
+      if (shouldSuppressTerrainTooltip()) {
+        clearTerrainTooltipTimer();
+        hideTerrainTooltipVisual();
+      }
       const mapHexSet = new Set((gameState?.hexes ?? []).map((h) => h.h3Index));
       const hit = clientXYToHit(e.clientX, e.clientY);
       const detailHit = detailHitAtClientPixel(e.clientX, e.clientY, mapHexSet);
@@ -17772,29 +18180,35 @@
         hoveredDetailHexH3 = detailHit;
         void refreshHoverRoutePreview();
         requestRedraw();
-        if (hit && isHexExploredByPlayer(hit)) {
+        if (hit && !shouldSuppressTerrainTooltip()) {
           const targetHex = hit;
           terrainTooltipDelayTimer = setTimeout(() => {
             terrainTooltipDelayTimer = null;
             if (hoveredHexH3 !== targetHex || !gameState) return;
+            if (shouldSuppressTerrainTooltip()) return;
             const state = terrainStateForPointer(lastPointerClientX, lastPointerClientY, targetHex);
             const namingTarget = namingLookupTargetForPointer(lastPointerClientX, lastPointerClientY, targetHex);
-            void showTerrainTooltip(lastPointerClientX, lastPointerClientY, state, namingTarget, targetHex);
+            void showTerrainTooltip(lastPointerClientX, lastPointerClientY, state, namingTarget);
           }, TERRAIN_TOOLTIP_DELAY_MS);
         }
         return;
       }
-      const tip = document.getElementById("hex-tooltip");
-      if (tip && !tip.classList.contains("hidden") && hit && isHexExploredByPlayer(hit)) {
-        const state = terrainStateForPointer(e.clientX, e.clientY, hit);
-        const namingTarget = namingLookupTargetForPointer(e.clientX, e.clientY, hit);
-        void showTerrainTooltip(e.clientX, e.clientY, state, namingTarget, hit);
-      } else if (tip && !tip.classList.contains("hidden") && hit && !isHexExploredByPlayer(hit)) {
-        hideTerrainTooltipVisual();
+      const tipFollow = document.getElementById("hex-tooltip");
+      if (!shouldSuppressTerrainTooltip() && tipFollow && !tipFollow.classList.contains("hidden") && hit) {
+        const state = terrainStateForPointer(lastPointerClientX, lastPointerClientY, hit);
+        const namingTarget = namingLookupTargetForPointer(lastPointerClientX, lastPointerClientY, hit);
+        void showTerrainTooltip(lastPointerClientX, lastPointerClientY, state, namingTarget);
       }
     });
-    mainMapEl.addEventListener("pointerleave", () => {
-      if (buildQueueModalActive && buildQueueModalHexH3 !== null) return;
+    mainMapEl.addEventListener("pointerleave", (e) => {
+      const next = e.relatedTarget;
+      if (next instanceof Node) {
+        const buildEntry = document.getElementById("build-entry-layer");
+        const buildPopup = document.getElementById("build-popup");
+        if (buildEntry && buildEntry.contains(next) || buildPopup && buildPopup.contains(next)) {
+          return;
+        }
+      }
       clearTerrainTooltipTimer();
       hideTerrainTooltipVisual();
       if (hoveredHexH3 !== null || hoveredDetailHexH3 !== null) {
@@ -17836,10 +18250,22 @@
         redraw();
         return;
       }
-      const unitsAtHit = hit ? getUnitsAtHex(hit) : [];
+      const mapForClick = getMainLeafletMap();
+      const clickRect = mapForClick?.getContainer().getBoundingClientRect();
+      const px = clickRect ? e.clientX - clickRect.left : 0;
+      const py = clickRect ? e.clientY - clickRect.top : 0;
+      const { unitsToDraw, movingIds } = gameState ? getUnitsForDrawWithMovingIds(gameState) : { unitsToDraw: [], movingIds: void 0 };
+      if (tryHandleBuildEntryAtClientXY(e.clientX, e.clientY)) {
+        updateSidebar();
+        updateRangedSidebar();
+        redraw();
+        return;
+      }
+      const unitsAtHit = hit ? unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id)) : [];
       const isStack = unitsAtHit.length >= 2;
       const isLoneAi = unitsAtHit.length === 1 && unitsAtHit[0]?.player !== "human";
-      if (hit && (isStack || isLoneAi)) {
+      const stackIconHit = !!hit && unitsAtHit.length > 0 && containerPixelHitsDrawnUnitIcon(px, py, hit, unitsAtHit.length);
+      if (hit && (isStack || isLoneAi) && stackIconHit) {
         ctrlKeyActive = e.ctrlKey;
         showStackCallout(unitsAtHit, e.clientX, e.clientY);
         updateSidebar();
@@ -17850,7 +18276,9 @@
       hideStackCallout();
       if (hit) {
         const unit = getUnitAtHex(hit);
-        if (unit?.player === "human") {
+        const drawnAtHit = unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id));
+        const unitIconHit = drawnAtHit.length > 0 && containerPixelHitsDrawnUnitIcon(px, py, hit, drawnAtHit.length);
+        if (unit?.player === "human" && unitIconHit) {
           if (e.ctrlKey) {
             if (pendingSelectTimeout !== null) {
               clearTimeout(pendingSelectTimeout);
@@ -17871,6 +18299,11 @@
               updateRangedSidebar();
               redraw();
             }, 250);
+          }
+        } else if (unit?.player === "human" && !unitIconHit) {
+          if (pendingSelectTimeout !== null) {
+            clearTimeout(pendingSelectTimeout);
+            pendingSelectTimeout = null;
           }
         } else if (getPrimarySelectedUnitId() && hit !== gameState?.units.find((u) => u.id === getPrimarySelectedUnitId())?.h3Index) {
           if (pendingSelectTimeout !== null) {
@@ -17905,15 +18338,16 @@
       if (!gameState) return;
       if (rangedModeActive) return;
       const hit = clientXYToHit(e.clientX, e.clientY);
-      if (!hit || selectedUnitIdsAtMouseDown.length === 0) return;
+      const destinationH3 = selectedHexIndex ?? hoveredHexH3 ?? hit;
+      if (!destinationH3 || selectedUnitIdsAtMouseDown.length === 0) return;
       const selectedAtMouseDown = selectedUnitIdsAtMouseDown.map((id) => gameState.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human");
       if (selectedAtMouseDown.length === 0) return;
       const selectedIds = selectedAtMouseDown.map((unit) => unit.id);
-      if (selectedAtMouseDown.every((unit) => unit.h3Index === hit)) return;
+      if (selectedAtMouseDown.every((unit) => unit.h3Index === destinationH3)) return;
       if (!window.gameApi?.assignHumanMarchOrders) return;
       const assign = await window.gameApi.assignHumanMarchOrders({
         unitIds: selectedIds,
-        destinationH3Index: hit
+        destinationH3Index: destinationH3
       });
       if (!assign.success) {
         showMapToast(assign.reason ?? "Failed to assign movement order.", { isError: true });
@@ -17966,19 +18400,23 @@
           const readyPayload = useEventDriven ? usePrecomputed ? {
             enabledToolGroups: enabledToolGroupsPayload,
             useEventDrivenConsultation: true,
+            aiPlanningRunEnabled: runButtonOn,
             precomputedAiOrders,
             precomputedAiRangedOrders: precomputedAiRangedOrders ?? [],
             precomputedAiStrategy: precomputedAiStrategy ?? void 0
           } : {
             enabledToolGroups: enabledToolGroupsPayload,
-            useEventDrivenConsultation: true
+            useEventDrivenConsultation: true,
+            aiPlanningRunEnabled: runButtonOn
           } : usePrecomputed ? {
             enabledToolGroups: enabledToolGroupsPayload,
+            aiPlanningRunEnabled: runButtonOn,
             precomputedAiOrders,
             precomputedAiRangedOrders: precomputedAiRangedOrders ?? [],
             precomputedAiStrategy: precomputedAiStrategy ?? void 0
           } : {
-            enabledToolGroups: enabledToolGroupsPayload
+            enabledToolGroups: enabledToolGroupsPayload,
+            aiPlanningRunEnabled: runButtonOn
           };
           const readyResult = await window.gameApi.ready(readyPayload);
           if (!readyResult.success) {

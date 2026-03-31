@@ -39,9 +39,9 @@ import {
   queryHumanStandingOrders,
 } from './tools/tool5StandingOrders';
 import {
-  applyProduction,
   BUILD_ENTRY_MAX_COUNT,
   BUILD_ENTRY_MIN_COUNT,
+  UNIT_COST_BY_TYPE,
   getAvailableBuildUnitTypes,
   isValidBuildCount,
   NO_URBAN_BUILD_REASON,
@@ -92,6 +92,11 @@ export interface HumanOrderGroupPreviewResult {
   previews: HumanOrderGroupPreviewUnitResult[];
 }
 
+function effectiveHexPassabilityTerrain(hex: { terrain: string; terrainKind?: string }): string {
+  if (hex.terrainKind === 'coastal' || hex.terrainKind === 'wetlands') return hex.terrainKind;
+  return hex.terrain;
+}
+
 export interface HexBuildQueueEntryView {
   id: number;
   queueIndex: number;
@@ -117,6 +122,7 @@ type DeploymentCapReachedByPlayer = { human: BuildUnitType[]; opponent: BuildUni
 
 const VALID_PHASE = 'planning';
 const HUMAN_PLAYER_ID = 'human';
+const MIXED_STACK_COASTAL_ONLY_REASON = 'Mixed land/naval stacks can only move to coastal hexes.';
 
 /** Movement range in hexes per turn by unit type. Infantry 1, armor 2, naval 2. */
 const MOVEMENT_RANGE: Record<string, number> = {
@@ -124,6 +130,26 @@ const MOVEMENT_RANGE: Record<string, number> = {
   armor: 2,
   naval: 2,
 };
+
+type HumanOwnedUnit = { id: string; player: string; unitType: string; h3Index: string };
+
+function getUniqueNonEmptyIds(ids: string[]): string[] {
+  return [...new Set(ids.filter((id) => id.length > 0))];
+}
+
+function selectionHasMixedLandAndNaval(units: HumanOwnedUnit[]): boolean {
+  const hasNaval = units.some((unit) => unit.unitType === 'naval');
+  const hasLand = units.some((unit) => unit.unitType === 'infantry' || unit.unitType === 'armor');
+  return hasNaval && hasLand;
+}
+
+function hexSupportsMixedLandAndNaval(hex: { terrain: string; terrainKind?: string }): boolean {
+  const passabilityTerrain = effectiveHexPassabilityTerrain(hex);
+  return (
+    terrainIsPassableForDomain(passabilityTerrain, 'land') &&
+    terrainIsPassableForDomain(passabilityTerrain, 'water')
+  );
+}
 
 function currentPlanningTurnNumber(): number {
   return dbGetOne<{ turnNumber: number }>('SELECT turn_number AS turnNumber FROM turn_state WHERE id = 1')?.turnNumber ?? 1;
@@ -277,16 +303,55 @@ function processProductionAfterControlResolution(): {
     const { urbanHexCount } = getRes1ProductionContext({ h3Index: control.h3Index });
     if (urbanHexCount <= 0) continue;
     const storedPoints = getBuildProgressPointsForHex(control.h3Index);
-    const applyResult = applyProduction(
-      queueRows.map((row) => ({
+    const capArray = controllerPlayerId === 'opponent' ? capReachedByPlayer.opponent : capReachedByPlayer.human;
+    const capSet = new Set(capArray);
+    const queueWorking = queueRows
+      .map((row) => ({
         id: row.id,
         queueIndex: row.queueIndex,
         unitType: row.unitType,
         remainingCount: row.remainingCount,
-      })),
-      storedPoints,
-      urbanHexCount
-    );
+      }))
+      .sort((a, b) => a.queueIndex - b.queueIndex || a.id - b.id);
+    let points = Math.max(0, Math.trunc(storedPoints)) + Math.max(0, Math.trunc(urbanHexCount));
+    const simulatedCountsByType = new Map<BuildUnitType, number>();
+    for (const unitType of DEPLOYMENT_CAP_TYPE_ORDER) {
+      simulatedCountsByType.set(unitType, unitCountsByPlayerType.get(`${controllerPlayerId}:${unitType}`) ?? 0);
+    }
+    const spawnedUnitTypes: BuildUnitType[] = [];
+    let blockedByCapType: BuildUnitType | null = null;
+    let idx = 0;
+    while (idx < queueWorking.length) {
+      const entry = queueWorking[idx]!;
+      const cost = UNIT_COST_BY_TYPE[entry.unitType];
+      if (points < cost) break;
+      const currentCount = simulatedCountsByType.get(entry.unitType) ?? 0;
+      const maxCount = MAX_UNITS_PER_TYPE[entry.unitType];
+      if (currentCount >= maxCount) {
+        blockedByCapType = entry.unitType;
+        capSet.add(entry.unitType);
+        break;
+      }
+      const maxByPoints = Math.floor(points / cost);
+      const maxByCap = maxCount - currentCount;
+      const built = Math.min(entry.remainingCount, maxByPoints, maxByCap);
+      if (built <= 0) break;
+      entry.remainingCount -= built;
+      points -= built * cost;
+      simulatedCountsByType.set(entry.unitType, currentCount + built);
+      for (let n = 0; n < built; n++) spawnedUnitTypes.push(entry.unitType);
+      if (entry.remainingCount <= 0) {
+        queueWorking.splice(idx, 1);
+      }
+    }
+    for (let i = 0; i < queueWorking.length; i++) {
+      queueWorking[i]!.queueIndex = i;
+    }
+    const applyResult = {
+      updatedEntries: queueWorking,
+      storedPoints: points,
+      spawnedUnitTypes,
+    };
     replaceBuildQueueForHex(
       control.h3Index,
       applyResult.updatedEntries.map((entry) => ({ unitType: entry.unitType, remainingCount: entry.remainingCount }))
@@ -311,9 +376,11 @@ function processProductionAfterControlResolution(): {
       queueAfterCount: applyResult.updatedEntries.length,
       storedPointsAfter: applyResult.storedPoints,
       spawnedCount: deployedForHex.length,
+      blockedByCapType,
       cappedTypesForController:
-        (controllerPlayerId === 'opponent' ? capReachedByPlayer.opponent : capReachedByPlayer.human).join(', ') || 'none',
+        DEPLOYMENT_CAP_TYPE_ORDER.filter((unitType) => capSet.has(unitType)).join(', ') || 'none',
     });
+    capArray.splice(0, capArray.length, ...DEPLOYMENT_CAP_TYPE_ORDER.filter((unitType) => capSet.has(unitType)));
   }
   return { deployedByPlayer, capReachedByPlayer };
 }
@@ -551,14 +618,22 @@ export function assignHumanMarchOrder(unitId: string, destinationH3Index: string
     if (turnRow?.phase !== VALID_PHASE) return { success: false, reason: 'Not in planning phase' };
     const mapHexes = new Set(state.hexes.map((h) => h.h3Index));
     if (!mapHexes.has(destinationH3Index)) return { success: false, reason: 'Destination not on map' };
-    const [lat, lng] = cellToLatLng(destinationH3Index);
     const hexList = state.hexes.map((h) => h.h3Index);
     const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
-    const result = assignHumanMarchStandingOrder(unitId, [lat, lng], state, latLngByH3, resolveToH3) as {
+    const destinationLatLng = latLngByH3.get(destinationH3Index);
+    if (!destinationLatLng) return { success: false, reason: 'Destination not on map' };
+    const result = assignHumanMarchStandingOrder(unitId, destinationLatLng, state, latLngByH3, resolveToH3) as {
       status: string;
       error?: string;
     };
-    if (result.status !== 'ok') return { success: false, reason: result.error ?? 'Failed to assign order' };
+    if (result.status !== 'ok') {
+      logDebug('gameActions assignHumanMarchOrder: standing-order assignment rejected', {
+        unitId,
+        destinationH3Index,
+        error: result.error ?? 'Failed to assign order',
+      });
+      return { success: false, reason: result.error ?? 'Failed to assign order' };
+    }
     return { success: true };
   } catch (err) {
     logError('assignHumanMarchOrder: exception', err);
@@ -578,17 +653,46 @@ export function assignHumanMarchOrders(unitIds: string[], destinationH3Index: st
   logDebug('gameActions assignHumanMarchOrders', { unitCount: unitIds.length, destinationH3Index });
   try {
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
-    const uniqueUnitIds = [...new Set(unitIds.filter((id) => id.length > 0))];
+    const uniqueUnitIds = getUniqueNonEmptyIds(unitIds);
     if (uniqueUnitIds.length === 0) return { success: false, reason: 'No selected units to assign' };
-
-    const groupPreview = previewHumanMarchOrders(uniqueUnitIds, destinationH3Index);
-    if (!groupPreview.validForAll) {
-      return { success: false, reason: groupPreview.invalidReason ?? 'At least one selected unit cannot reach destination.' };
+    const state = dbBackedStateSnapshot();
+    const destinationHex = state.hexes.find((h) => h.h3Index === destinationH3Index);
+    if (!destinationHex) return { success: false, reason: 'Destination not on map' };
+    const selectedUnits = uniqueUnitIds
+      .map((unitId) => state.units.find((unit) => unit.id === unitId && unit.player === HUMAN_PLAYER_ID))
+      .filter((unit): unit is HumanOwnedUnit => !!unit);
+    if (selectedUnits.length !== uniqueUnitIds.length) {
+      logDebug('gameActions assignHumanMarchOrders: invalid unit selection set', {
+        requestedUnitCount: uniqueUnitIds.length,
+        validHumanUnitCount: selectedUnits.length,
+      });
+      return { success: false, reason: 'At least one selected unit is invalid or not human-controlled.' };
+    }
+    const destinationTerrain = effectiveHexPassabilityTerrain(destinationHex);
+    const sharedMixedTerrain = hexSupportsMixedLandAndNaval(destinationHex);
+    const hasMixedSelection = selectionHasMixedLandAndNaval(selectedUnits);
+    logDebug('gameActions assignHumanMarchOrders: destination terrain classification', {
+      destinationH3Index,
+      destinationTerrain,
+      destinationTerrainRaw: destinationHex.terrain,
+      destinationTerrainKind: destinationHex.terrainKind,
+      hasLand: selectedUnits.some((unit) => unit.unitType === 'infantry' || unit.unitType === 'armor'),
+      hasNaval: selectedUnits.some((unit) => unit.unitType === 'naval'),
+      sharedMixedTerrain,
+      selectedUnitTypes: selectedUnits.map((u) => u.unitType),
+    });
+    if (hasMixedSelection && !sharedMixedTerrain) {
+      return { success: false, reason: MIXED_STACK_COASTAL_ONLY_REASON };
     }
 
     for (const unitId of uniqueUnitIds) {
       const result = assignHumanMarchOrder(unitId, destinationH3Index);
       if (!result.success) {
+        logDebug('gameActions assignHumanMarchOrders: unit assignment failed', {
+          unitId,
+          destinationH3Index,
+          reason: result.reason ?? `Failed to assign movement order for ${unitId}`,
+        });
         return { success: false, reason: result.reason ?? `Failed to assign movement order for ${unitId}` };
       }
     }
@@ -635,7 +739,7 @@ export function validateGroupRangedTarget(unitIds: string[], targetH3Index: stri
   logDebug('gameActions validateGroupRangedTarget', { unitCount: unitIds.length, targetH3Index });
   try {
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
-    const uniqueUnitIds = [...new Set(unitIds.filter((id) => id.length > 0))];
+    const uniqueUnitIds = getUniqueNonEmptyIds(unitIds);
     if (uniqueUnitIds.length === 0) return { success: false, reason: 'No selected units for ranged targeting' };
     for (const unitId of uniqueUnitIds) {
       const result = validateRangedAttack(unitId, targetH3Index, { allowedPlayer: HUMAN_PLAYER_ID });
@@ -791,7 +895,8 @@ function buildHumanMarchPreviewForUnit(
   if (!hoveredHex) return { valid: false, showInvalidMarker: false, segments: [] };
 
   const passableFor = unit.unitType === 'naval' ? 'water' : 'land';
-  const hoveredPassable = terrainIsPassableForDomain(hoveredHex.terrain, passableFor);
+  const hoveredPassabilityTerrain = effectiveHexPassabilityTerrain(hoveredHex);
+  const hoveredPassable = terrainIsPassableForDomain(hoveredPassabilityTerrain, passableFor);
   const [hoverLat, hoverLng] = cellToLatLng(hoveredH3Index);
   const direct = executePlanRoute(unitId, [hoverLat, hoverLng], { avoidEnemies: true }, state, latLngByH3, resolveToH3);
   if (hoveredPassable && direct.status === 'ok') {
@@ -819,7 +924,7 @@ function buildHumanMarchPreviewForUnit(
       seen.add(h3);
       if (h3 === hoveredH3Index) return false;
       const hx = hexByH3.get(h3);
-      return !!hx && terrainIsPassableForDomain(hx.terrain, passableFor);
+      return !!hx && terrainIsPassableForDomain(effectiveHexPassabilityTerrain(hx), passableFor);
     });
     if (candidates.length === 0) continue;
     for (const candidateH3 of candidates) {
@@ -885,7 +990,7 @@ export function previewHumanMarchOrders(unitIds: string[], hoveredH3Index: strin
         previews: [],
       };
     }
-    const uniqueUnitIds = [...new Set(unitIds.filter((id) => id.length > 0))];
+    const uniqueUnitIds = getUniqueNonEmptyIds(unitIds);
     if (uniqueUnitIds.length === 0) {
       return {
         validForAll: false,
@@ -898,18 +1003,53 @@ export function previewHumanMarchOrders(unitIds: string[], hoveredH3Index: strin
     const state = dbBackedStateSnapshot();
     const hexList = state.hexes.map((h) => h.h3Index);
     const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
-    const previews: HumanOrderGroupPreviewUnitResult[] = uniqueUnitIds.map((unitId) => ({
+    const selectedUnits = uniqueUnitIds
+      .map((unitId) => state.units.find((u) => u.id === unitId && u.player === HUMAN_PLAYER_ID))
+      .filter((unit): unit is HumanOwnedUnit => !!unit);
+    if (selectedUnits.length === 0) {
+      return {
+        validForAll: false,
+        showInvalidMarker: false,
+        invalidReason: 'No valid selected units',
+        slowestMovementRange: 0,
+        previews: [],
+      };
+    }
+    const representativeUnitIdsByOrigin = new Map<string, string>();
+    for (const unit of selectedUnits) {
+      if (!representativeUnitIdsByOrigin.has(unit.h3Index)) representativeUnitIdsByOrigin.set(unit.h3Index, unit.id);
+    }
+    const previewUnitIds = Array.from(representativeUnitIdsByOrigin.values());
+    const previews: HumanOrderGroupPreviewUnitResult[] = previewUnitIds.map((unitId) => ({
       unitId,
       preview: buildHumanMarchPreviewForUnit(state, latLngByH3, resolveToH3, unitId, hoveredH3Index),
     }));
     const invalid = previews.find((entry) => !entry.preview.valid);
-    const selectedUnits = uniqueUnitIds
-      .map((unitId) => state.units.find((u) => u.id === unitId && u.player === HUMAN_PLAYER_ID))
-      .filter((unit): unit is { id: string; player: string; unitType: string; h3Index: string } => !!unit);
+    const hoveredHex = state.hexes.find((h) => h.h3Index === hoveredH3Index);
+    const hasMixedSelection = selectionHasMixedLandAndNaval(selectedUnits);
     const slowestMovementRange =
       selectedUnits.length > 0
         ? Math.min(...selectedUnits.map((unit) => MOVEMENT_RANGE[unit.unitType] ?? 1))
         : 0;
+    const sharedMixedTerrain = !!hoveredHex && hexSupportsMixedLandAndNaval(hoveredHex);
+    if (hasMixedSelection && !sharedMixedTerrain) {
+      const reason = MIXED_STACK_COASTAL_ONLY_REASON;
+      return {
+        validForAll: false,
+        showInvalidMarker: true,
+        invalidReason: reason,
+        slowestMovementRange,
+        previews: previews.map((entry) => ({
+          unitId: entry.unitId,
+          preview: {
+            valid: false,
+            showInvalidMarker: true,
+            invalidReason: reason,
+            segments: [],
+          },
+        })),
+      };
+    }
     return {
       validForAll: invalid === undefined,
       showInvalidMarker: invalid !== undefined,

@@ -188,7 +188,7 @@ function testTraversedIntermediateHexCapturesControl(): void {
   });
 }
 
-function testProductionSkipsWhenHumanUnitTypeAtCap(): void {
+function testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap(): void {
   withTempDb(() => {
     const targetHex = findBuildableHumanControlledHex();
     const add = addHexBuildQueueEntry(targetHex, 'human');
@@ -219,6 +219,15 @@ function testProductionSkipsWhenHumanUnitTypeAtCap(): void {
       "SELECT COUNT(*) AS c FROM units WHERE player = 'human' AND unit_type = 'infantry'"
     )?.c ?? 0;
     assert.strictEqual(infantryAfter, 10);
+    const queueAfter = getHexBuildQueue(targetHex, 'human');
+    assert.strictEqual(queueAfter.entries.length, 1);
+    assert.strictEqual(queueAfter.entries[0]?.unitType, 'infantry');
+    assert.strictEqual(queueAfter.entries[0]?.count, 1);
+    const progressAfter = dbGetOne<{ stored_points: number }>(
+      'SELECT stored_points FROM res1_build_progress WHERE h3_index = ?',
+      [targetHex]
+    )?.stored_points ?? 0;
+    assert.ok(progressAfter > 9, 'stored points should continue accumulating while blocked by cap');
   });
 }
 
@@ -228,7 +237,7 @@ function run(): void {
   testNoProductionBeforeReadyDuringPlanningEdits();
   testControlTakeoverClearsQueueAndProgress();
   testTraversedIntermediateHexCapturesControl();
-  testProductionSkipsWhenHumanUnitTypeAtCap();
+  testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap();
   // eslint-disable-next-line no-console
   console.log('gameActionsProduction.test.ts passed');
 }

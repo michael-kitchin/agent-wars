@@ -165,16 +165,43 @@ function hideStackCallout(): void {
   const el = document.getElementById('stack-callout');
   if (el) {
     el.classList.add('hidden');
+    el.classList.remove('stack-modal');
     el.removeAttribute('data-open');
     el.removeAttribute('data-x');
     el.removeAttribute('data-y');
     el.removeAttribute('data-unit-ids');
   }
+  stackCalloutModalActive = false;
+  scheduleTerrainTooltipRestoreAfterPopoverClose();
+}
+
+/** True while the pointer is over any build-entry control (terrain tooltip must not show). */
+let buildEntryButtonPointerInside = false;
+
+/** True while the stack callout or build-queue popup is visible; terrain hover tooltips stay suppressed. */
+function isStackOrBuildMapPopoverOpen(): boolean {
+  const stack = document.getElementById('stack-callout');
+  const build = document.getElementById('build-popup');
+  return (
+    (!!stack && !stack.classList.contains('hidden')) || (!!build && !build.classList.contains('hidden'))
+  );
+}
+
+/** True when terrain naming/hex tooltips should not show (popovers open or pointer over the build entry control). */
+function shouldSuppressTerrainTooltip(): boolean {
+  return isStackOrBuildMapPopoverOpen() || buildEntryButtonPointerInside;
+}
+
+/** Marks the stack callout as sticky after the player starts changing selection from it. */
+function activateStackCalloutModal(): void {
+  stackCalloutModalActive = true;
+  const el = document.getElementById('stack-callout');
+  if (el) el.classList.add('stack-modal');
 }
 
 /**
  * Shows the stack callout at the given screen position with an alphabetized list of units.
- * Units belonging to the human player get a "Select" button to select that unit for movement or ranged fire.
+ * Units belonging to the human player get +/- controls for adding/removing from the active selection.
  */
 function showStackCallout(
   units: GameStateSnapshot['units'],
@@ -184,8 +211,11 @@ function showStackCallout(
   const calloutEl = document.getElementById('stack-callout');
   const listEl = document.getElementById('stack-callout-list');
   if (!calloutEl || !listEl) return;
+  hideBuildPopup();
   clearTerrainTooltipTimer();
   hideTerrainTooltipVisual();
+  if (stackCalloutModalActive) calloutEl.classList.add('stack-modal');
+  else calloutEl.classList.remove('stack-modal');
 
   const sorted = [...units].sort(
     (a, b) =>
@@ -203,19 +233,29 @@ function showStackCallout(
   const header = document.createElement('div');
   header.className = 'stack-callout-actions';
   header.style.display = 'flex';
-  header.style.justifyContent = 'flex-end';
+  header.style.justifyContent = 'flex-start';
   header.style.gap = '0.4rem';
   header.style.marginBottom = '0.4rem';
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'unit-select stack-close-btn';
+  closeBtn.textContent = '×';
+  closeBtn.style.marginRight = 'auto';
+  closeBtn.addEventListener('click', () => {
+    hideStackCallout();
+  });
+  header.appendChild(closeBtn);
 
   const humanIds = sorted.filter((u) => u.player === 'human').map((u) => u.id);
   if (!ctrlKeyActive) {
     const selectAllBtn = document.createElement('button');
     selectAllBtn.type = 'button';
     selectAllBtn.className = 'unit-select';
-    selectAllBtn.textContent = 'Select All';
+    selectAllBtn.textContent = '+All';
     selectAllBtn.addEventListener('click', () => {
+      activateStackCalloutModal();
       replaceSelection(humanIds);
-      hideStackCallout();
+      showStackCallout(units, clientX, clientY);
       updateSidebar();
       updateRangedSidebar();
       redraw();
@@ -225,8 +265,9 @@ function showStackCallout(
     const addAllBtn = document.createElement('button');
     addAllBtn.type = 'button';
     addAllBtn.className = 'unit-select';
-    addAllBtn.textContent = 'Add All';
+    addAllBtn.textContent = '+All';
     addAllBtn.addEventListener('click', () => {
+      activateStackCalloutModal();
       addUnitsToSelection(humanIds);
       showStackCallout(units, clientX, clientY);
       updateSidebar();
@@ -236,8 +277,9 @@ function showStackCallout(
     const removeAllBtn = document.createElement('button');
     removeAllBtn.type = 'button';
     removeAllBtn.className = 'unit-select';
-    removeAllBtn.textContent = 'Remove All';
+    removeAllBtn.textContent = '-All';
     removeAllBtn.addEventListener('click', () => {
+      activateStackCalloutModal();
       removeUnitsFromSelection(humanIds);
       showStackCallout(units, clientX, clientY);
       updateSidebar();
@@ -257,17 +299,13 @@ function showStackCallout(
     if (u.player === 'human') {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'unit-select';
+      btn.className = 'unit-select stack-unit-toggle';
       const inSelection = selectedUnitIds.includes(u.id);
-      btn.textContent = ctrlKeyActive ? (inSelection ? 'Remove' : 'Add') : 'Select';
+      btn.textContent = inSelection ? '-' : '+';
       btn.addEventListener('click', () => {
-        if (ctrlKeyActive) {
-          toggleUnitSelection(u.id);
-          showStackCallout(units, clientX, clientY);
-        } else {
-          selectUnitOnMap(u.id);
-          hideStackCallout();
-        }
+        activateStackCalloutModal();
+        toggleUnitSelection(u.id);
+        showStackCallout(units, clientX, clientY);
         updateSidebar();
         updateRangedSidebar();
         redraw();
@@ -309,6 +347,54 @@ function refreshStackCalloutIfOpen(): void {
 
 const TOOLTIP_OFFSET_PX = 12;
 
+/** Clears the build-queue popup; stack and terrain tooltip are unaffected. */
+function hideBuildPopup(): void {
+  buildPopupHexH3 = null;
+  buildPopupRequestSeq++;
+  const el = document.getElementById('build-popup');
+  const body = document.getElementById('build-popup-body');
+  if (el) {
+    el.classList.add('hidden');
+    el.removeAttribute('data-open');
+    el.removeAttribute('data-x');
+    el.removeAttribute('data-y');
+    el.setAttribute('aria-hidden', 'true');
+  }
+  if (body) body.innerHTML = '';
+  requestRedraw();
+  scheduleTerrainTooltipRestoreAfterPopoverClose();
+}
+
+/**
+ * Opens the build-queue dialog for a res-1 hex (offset like the stack callout). Closes the stack callout
+ * and hover terrain tooltip so only one map popup is active at a time.
+ */
+function showBuildPopup(h3Index: string, clientX: number, clientY: number): void {
+  hideStackCallout();
+  clearTerrainTooltipTimer();
+  hideTerrainTooltipVisual();
+  const el = document.getElementById('build-popup');
+  const body = document.getElementById('build-popup-body');
+  if (!el || !body) return;
+  buildPopupHexH3 = h3Index;
+  el.setAttribute('data-open', 'true');
+  el.setAttribute('data-x', String(clientX));
+  el.setAttribute('data-y', String(clientY));
+  el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
+  el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
+  el.classList.remove('hidden');
+  el.setAttribute('aria-hidden', 'false');
+  void renderBuildQueueIntoMount(body, h3Index);
+  requestRedraw();
+}
+
+function refreshBuildPopupIfOpen(): void {
+  const el = document.getElementById('build-popup');
+  const body = document.getElementById('build-popup-body');
+  if (!el || el.classList.contains('hidden') || !buildPopupHexH3 || !body) return;
+  void renderBuildQueueIntoMount(body, buildPopupHexH3);
+}
+
 /** Dwell time on the same hex before showing the terrain type tooltip (pointer may move within the hex). */
 const TERRAIN_TOOLTIP_DELAY_MS = 750;
 
@@ -317,11 +403,19 @@ const WORLD_H3_RESOLUTION = 1;
 const DETAIL_H3_RESOLUTION = 4;
 const RES4_SHOW_THRESHOLD_VIEW_FRACTION = 0.8;
 const RES4_HIDE_THRESHOLD_VIEW_FRACTION = 0.7;
+/** Build entry appears after this many mouse-wheel zoom steps above the startup/default view. */
+const BUILD_ENTRY_ZOOM_STEPS_FROM_DEFAULT = 2;
+/** Must match Leaflet main map `zoomDelta` in `worldLeafletMap.ts` (one wheel step). */
+const MAIN_MAP_WHEEL_ZOOM_STEP = 0.5;
 const INITIAL_CAMERA_ZOOM_IN_LEVELS = 1;
 
 let lastPointerClientX = 0;
 let lastPointerClientY = 0;
 let terrainTooltipDelayTimer: ReturnType<typeof setTimeout> | null = null;
+/** Captured once from the first live map zoom reading; build button appears after N wheel steps above this. */
+let buildEntryDefaultMapZoom: number | null = null;
+/** Stable render signature for the build-entry layer; avoids unnecessary DOM churn on pointer move. */
+let lastBuildEntryLayerKey: string | null = null;
 
 function clearTerrainTooltipTimer(): void {
   if (terrainTooltipDelayTimer !== null) {
@@ -332,11 +426,9 @@ function clearTerrainTooltipTimer(): void {
 
 function hideTerrainTooltipVisual(): void {
   terrainTooltipRequestSeq++;
-  hideBuildQueueModalState();
   const el = document.getElementById('hex-tooltip');
   if (el) {
     el.classList.add('hidden');
-    el.classList.remove('build-modal');
     el.setAttribute('aria-hidden', 'true');
   }
 }
@@ -416,9 +508,61 @@ function getControllerForHex(state: GameStateSnapshot, h3Index: string): string 
   return row?.controllerPlayerId ?? null;
 }
 
-function getQueuedUnitsForHex(state: GameStateSnapshot, h3Index: string): number {
-  const row = state.res1BuildQueueTotals?.find((entry) => entry.h3Index === h3Index);
-  return row?.queuedUnits ?? 0;
+function getBuildQueueSummaryForHex(
+  state: GameStateSnapshot,
+  h3Index: string
+): NonNullable<GameStateSnapshot['res1BuildQueueTotals']>[number] | null {
+  return state.res1BuildQueueTotals?.find((entry) => entry.h3Index === h3Index) ?? null;
+}
+
+const UNIT_COST_BY_TYPE: Record<BuildUnitType, number> = {
+  infantry: 10,
+  armor: 20,
+  naval: 50,
+};
+
+const MAX_UNITS_PER_TYPE: Record<BuildUnitType, number> = {
+  infantry: 10,
+  armor: 5,
+  naval: 5,
+};
+
+function getHumanUnitCountsByType(state: GameStateSnapshot): Record<BuildUnitType, number> {
+  const counts: Record<BuildUnitType, number> = { infantry: 0, armor: 0, naval: 0 };
+  for (const unit of state.units) {
+    if (unit.player !== 'human') continue;
+    if (unit.unitType === 'infantry' || unit.unitType === 'armor' || unit.unitType === 'naval') {
+      counts[unit.unitType] += 1;
+    }
+  }
+  return counts;
+}
+
+function formatProductionLabelForHex(
+  state: GameStateSnapshot,
+  h3Index: string,
+  capacityPerTurn: number,
+  controller: string | null
+): string {
+  const capacityText = `${Math.max(0, capacityPerTurn).toLocaleString()}c`;
+  if (controller !== 'human') return `${capacityText} / ?t`;
+  const queue = getBuildQueueSummaryForHex(state, h3Index);
+  const queuedUnits = queue?.queuedUnits ?? 0;
+  if (queuedUnits <= 0) return capacityText;
+  const nextUnitType = queue?.nextUnitType;
+  const nextRemainingCount = queue?.nextRemainingCount ?? null;
+  const storedPoints = Math.max(0, queue?.storedPoints ?? 0);
+  if (!nextUnitType || !nextRemainingCount || nextRemainingCount <= 0 || capacityPerTurn <= 0) {
+    return `${capacityText} / ?t`;
+  }
+  const humanCounts = getHumanUnitCountsByType(state);
+  if (humanCounts[nextUnitType] >= MAX_UNITS_PER_TYPE[nextUnitType]) {
+    return `${capacityText} / ∞t`;
+  }
+  const pointsNeeded = nextRemainingCount * UNIT_COST_BY_TYPE[nextUnitType];
+  const deficit = Math.max(0, pointsNeeded - storedPoints);
+  const turns = Math.max(1, Math.ceil(deficit / Math.max(1, capacityPerTurn)));
+  return `${capacityText} / ${turns.toLocaleString()}t`;
 }
 
 function roundToNearestInteger(value: number): number {
@@ -747,26 +891,6 @@ function getCachedTerrainTooltipHtml(state: TerrainTooltipState, namingLine: str
   return html;
 }
 
-function hideBuildQueueModalState(): void {
-  buildQueueModalActive = false;
-  buildQueueModalHexH3 = null;
-  const el = document.getElementById('hex-tooltip');
-  if (el) el.classList.remove('build-modal');
-}
-
-function activateBuildQueueModalForHex(h3Index: string): void {
-  buildQueueModalActive = true;
-  buildQueueModalHexH3 = h3Index;
-  const el = document.getElementById('hex-tooltip');
-  if (el) el.classList.add('build-modal');
-}
-
-function closeHexTooltipFromModalAction(): void {
-  hideBuildQueueModalState();
-  clearTerrainTooltipTimer();
-  hideTerrainTooltipVisual();
-}
-
 function sanitizeBuildCountInputText(raw: string): string {
   const digitsOnly = raw.replaceAll(/\D/g, '').slice(0, 2);
   if (digitsOnly.length === 0) return '1';
@@ -776,32 +900,58 @@ function sanitizeBuildCountInputText(raw: string): string {
   return String(parsed);
 }
 
-function isTooltipTargetInsideDialog(target: EventTarget | null): boolean {
+/**
+ * True when a native select inside the build popup has focus.
+ * The OS dropdown is painted outside the popup DOM, so pointer events on options look "outside"
+ * the dialog; this guards close logic until the user finishes interacting with the select.
+ */
+function isBuildQueueSelectInPopupFocused(): boolean {
+  const popup = document.getElementById('build-popup');
+  const active = document.activeElement;
+  return (
+    !!popup &&
+    active instanceof HTMLSelectElement &&
+    popup.contains(active)
+  );
+}
+
+function isBuildPopupOrEntryTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Node)) return false;
-  const tooltip = document.getElementById('hex-tooltip');
-  return !!tooltip && tooltip.contains(target);
+  const popup = document.getElementById('build-popup');
+  const layer = document.getElementById('build-entry-layer');
+  return !!(popup?.contains(target) || layer?.contains(target));
 }
 
-function isPointerInsideTooltipRect(clientX: number, clientY: number): boolean {
-  const tooltip = document.getElementById('hex-tooltip');
-  if (!tooltip || tooltip.classList.contains('hidden')) return false;
-  const rect = tooltip.getBoundingClientRect();
-  return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+function isStackCalloutTargetInsideDialog(target: EventTarget | null): boolean {
+  if (!(target instanceof Node)) return false;
+  const callout = document.getElementById('stack-callout');
+  return !!callout && callout.contains(target);
 }
 
-async function renderBuildQueueSectionIntoTooltip(tooltipEl: HTMLElement, h3Index: string): Promise<void> {
-  const mount = tooltipEl.querySelector('#hex-build-queue-section') as HTMLElement | null;
-  if (!mount || !window.gameApi?.getHexBuildQueue) return;
-  const requestSeq = ++buildQueueModalRequestSeq;
+async function renderBuildQueueIntoMount(mount: HTMLElement, h3Index: string): Promise<void> {
+  if (!window.gameApi?.getHexBuildQueue) return;
+  const requestSeq = ++buildPopupRequestSeq;
   let snapshot: HexBuildQueueSnapshot | null = null;
   try {
     snapshot = await window.gameApi.getHexBuildQueue({ h3Index });
   } catch (err) {
     console.error('getHexBuildQueue failed:', err);
   }
-  if (requestSeq !== buildQueueModalRequestSeq || !snapshot || buildQueueModalHexH3 !== h3Index) return;
+  if (requestSeq !== buildPopupRequestSeq || !snapshot || buildPopupHexH3 !== h3Index) return;
 
   mount.innerHTML = '';
+  const closeRow = document.createElement('div');
+  closeRow.className = 'build-popup-close-row';
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'unit-select build-close-btn';
+  closeBtn.textContent = '×';
+  closeBtn.addEventListener('click', () => {
+    hideBuildPopup();
+  });
+  closeRow.appendChild(closeBtn);
+  mount.appendChild(closeRow);
+
   const section = document.createElement('div');
   section.className = 'build-queue-section';
   const controlLine = document.createElement('div');
@@ -836,13 +986,13 @@ async function renderBuildQueueSectionIntoTooltip(tooltipEl: HTMLElement, h3Inde
   buildBtn.textContent = 'Build';
   buildBtn.addEventListener('click', async () => {
     if (!window.gameApi?.addHexBuildQueueEntry) return;
-    activateBuildQueueModalForHex(h3Index);
     const result = await window.gameApi.addHexBuildQueueEntry({ h3Index });
     if (!result.success) {
       showMapToast(result.reason ?? 'Failed to add build queue entry.', { isError: true });
       return;
     }
-    void renderBuildQueueSectionIntoTooltip(tooltipEl, h3Index);
+    const body = document.getElementById('build-popup-body');
+    if (body) void renderBuildQueueIntoMount(body, h3Index);
   });
   head.appendChild(title);
   head.appendChild(buildBtn);
@@ -876,7 +1026,6 @@ async function renderBuildQueueSectionIntoTooltip(tooltipEl: HTMLElement, h3Inde
     };
     typeSelect.addEventListener('change', async () => {
       if (!window.gameApi?.updateHexBuildQueueEntry) return;
-      activateBuildQueueModalForHex(h3Index);
       const result = await window.gameApi.updateHexBuildQueueEntry({
         h3Index,
         entryId: entry.id,
@@ -886,7 +1035,7 @@ async function renderBuildQueueSectionIntoTooltip(tooltipEl: HTMLElement, h3Inde
       if (!result.success) {
         showMapToast(result.reason ?? 'Failed to update build queue entry.', { isError: true });
       }
-      void renderBuildQueueSectionIntoTooltip(tooltipEl, h3Index);
+      void renderBuildQueueIntoMount(mount, h3Index);
     });
     row.appendChild(typeSelect);
     countInput.addEventListener('keydown', (event) => {
@@ -897,7 +1046,6 @@ async function renderBuildQueueSectionIntoTooltip(tooltipEl: HTMLElement, h3Inde
     });
     countInput.addEventListener('input', async () => {
       if (!window.gameApi?.updateHexBuildQueueEntry) return;
-      activateBuildQueueModalForHex(h3Index);
       const count = readCurrentCount();
       const result = await window.gameApi.updateHexBuildQueueEntry({
         h3Index,
@@ -917,12 +1065,11 @@ async function renderBuildQueueSectionIntoTooltip(tooltipEl: HTMLElement, h3Inde
     removeBtn.textContent = 'x';
     removeBtn.addEventListener('click', async () => {
       if (!window.gameApi?.removeHexBuildQueueEntry) return;
-      activateBuildQueueModalForHex(h3Index);
       const result = await window.gameApi.removeHexBuildQueueEntry({ h3Index, entryId: entry.id });
       if (!result.success) {
         showMapToast(result.reason ?? 'Failed to remove build queue entry.', { isError: true });
       }
-      void renderBuildQueueSectionIntoTooltip(tooltipEl, h3Index);
+      void renderBuildQueueIntoMount(mount, h3Index);
     });
     row.appendChild(removeBtn);
     list.appendChild(row);
@@ -935,41 +1082,64 @@ async function showTerrainTooltip(
   clientX: number,
   clientY: number,
   state: TerrainTooltipState,
-  namingTarget: NamingLookupTarget | null,
-  sourceRes1H3: string | null
+  namingTarget: NamingLookupTarget | null
 ): Promise<void> {
-  if (buildQueueModalActive && buildQueueModalHexH3 !== sourceRes1H3) return;
+  if (shouldSuppressTerrainTooltip()) return;
   const requestSeq = ++terrainTooltipRequestSeq;
   const namingLine = await getCachedNamingLineForTarget(namingTarget);
   if (requestSeq !== terrainTooltipRequestSeq) return;
+  if (shouldSuppressTerrainTooltip()) return;
   const el = document.getElementById('hex-tooltip');
   if (!el) return;
-  const modalClose = sourceRes1H3
-    ? `<button type="button" class="build-modal-close" aria-label="Close build queue">×</button>`
-    : '';
-  el.innerHTML = `${modalClose}${getCachedTerrainTooltipHtml(state, namingLine)}${
-    sourceRes1H3 ? '<div id="hex-build-queue-section"></div>' : ''
-  }`;
-  // Position for easy click-to-stick: upper-left corner starts just under pointer.
-  el.style.left = `${clientX}px`;
-  el.style.top = `${clientY + 2}px`;
+  el.innerHTML = getCachedTerrainTooltipHtml(state, namingLine);
+  el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
+  el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
   el.classList.remove('hidden');
   el.setAttribute('aria-hidden', 'false');
   el.setAttribute('role', 'tooltip');
-  if (sourceRes1H3) {
-    buildQueueModalHexH3 = sourceRes1H3;
-    if (buildQueueModalActive) el.classList.add('build-modal');
-    else el.classList.remove('build-modal');
-    const closeBtn = el.querySelector('.build-modal-close') as HTMLButtonElement | null;
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        closeHexTooltipFromModalAction();
-      });
-    }
-    void renderBuildQueueSectionIntoTooltip(el, sourceRes1H3);
-  } else {
-    hideBuildQueueModalState();
+}
+
+/**
+ * Restores the terrain tooltip after stack/build popovers close, even when the pointer
+ * has not moved (the normal scheduling path runs only on pointermove/hex-change).
+ */
+async function restoreTerrainTooltipAfterPopoverClose(): Promise<void> {
+  if (!gameState) return;
+  if (buildEntryButtonPointerInside) {
+    const atPointer = document.elementFromPoint(lastPointerClientX, lastPointerClientY);
+    const stillInsideBuildEntry = atPointer instanceof Element && !!atPointer.closest('.build-entry-btn');
+    if (!stillInsideBuildEntry) buildEntryButtonPointerInside = false;
   }
+  if (shouldSuppressTerrainTooltip()) return;
+  let hoverH3 = hoveredHexH3;
+  if (!hoverH3) {
+    const map = getMainLeafletMap() as { getContainer: () => HTMLElement } | null;
+    if (!map) return;
+    const rect = map.getContainer().getBoundingClientRect();
+    const x = lastPointerClientX - rect.left;
+    const y = lastPointerClientY - rect.top;
+    const set = new Set(gameState.hexes.map((h) => h.h3Index));
+    hoverH3 = hitTestHexAtContainerPixel(x, y, set);
+    if (!hoverH3) return;
+    hoveredHexH3 = hoverH3;
+  }
+  clearTerrainTooltipTimer();
+  const state = terrainStateForPointer(lastPointerClientX, lastPointerClientY, hoverH3);
+  const namingTarget = namingLookupTargetForPointer(lastPointerClientX, lastPointerClientY, hoverH3);
+  await showTerrainTooltip(lastPointerClientX, lastPointerClientY, state, namingTarget);
+}
+
+let terrainTooltipRestoreTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleTerrainTooltipRestoreAfterPopoverClose(): void {
+  if (terrainTooltipRestoreTimer !== null) {
+    clearTimeout(terrainTooltipRestoreTimer);
+    terrainTooltipRestoreTimer = null;
+  }
+  terrainTooltipRestoreTimer = setTimeout(() => {
+    terrainTooltipRestoreTimer = null;
+    void restoreTerrainTooltipAfterPopoverClose();
+  }, 0);
 }
 
 let selectedHexIndex: string | null = null;
@@ -992,9 +1162,10 @@ let pendingRangedAttacks: RangedAttackOrder[] = [];
 let hideCommittedOrderLinesAfterReady = false;
 /** When true, next hex click sets ranged attack target for selected unit (if valid). */
 let rangedModeActive = false;
-let buildQueueModalActive = false;
-let buildQueueModalHexH3: string | null = null;
-let buildQueueModalRequestSeq = 0;
+let stackCalloutModalActive = false;
+/** Res-1 hex for the open build popup; null when the popup is hidden. */
+let buildPopupHexH3: string | null = null;
+let buildPopupRequestSeq = 0;
 let gameState: GameStateSnapshot | null = null;
 let res4TerrainOverridesByH3 = new Map<string, { terrainKind: string; isUrban: boolean }>();
 /** Major airport/port H3 from metadata (scalerank ≤ 5); populated via IPC at startup. */
@@ -1449,6 +1620,127 @@ function shouldRenderRes4Hexes(): boolean {
   return res4Visible;
 }
 
+function shouldShowBuildEntryZoom(): boolean {
+  const map = getMainLeafletMap() as { getZoom: () => number } | null;
+  if (!map) return false;
+  const currentZoom = map.getZoom();
+  if (!Number.isFinite(currentZoom)) return false;
+  if (buildEntryDefaultMapZoom == null) {
+    buildEntryDefaultMapZoom = currentZoom;
+  }
+  const threshold =
+    buildEntryDefaultMapZoom + BUILD_ENTRY_ZOOM_STEPS_FROM_DEFAULT * MAIN_MAP_WHEEL_ZOOM_STEP;
+  return currentZoom >= threshold;
+}
+
+function hideBuildEntryLayer(layer: HTMLElement, clearHtml = true): void {
+  layer.classList.add('hidden');
+  layer.setAttribute('aria-hidden', 'true');
+  if (clearHtml) {
+    layer.innerHTML = '';
+  }
+  buildEntryButtonPointerInside = false;
+  lastBuildEntryLayerKey = null;
+}
+
+function hasVisibleRes1InfrastructureGlyphs(
+  h3Index: string,
+  res4On: boolean,
+  unitHexes: Set<string>
+): boolean {
+  return (
+    !res4On &&
+    infraGlyphsAllowedForRes1Hex(h3Index) &&
+    !unitHexes.has(h3Index) &&
+    (terrainInfraRes1Airport.has(h3Index) || terrainInfraRes1Port.has(h3Index))
+  );
+}
+
+function computeRes1OverlayTextY(
+  h3Index: string,
+  map: { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } },
+  L: { latLng: (lat: number, lng: number) => unknown },
+  hasOffsetFeatures: boolean
+): number {
+  const center = hexCenterPx(h3Index);
+  if (!hasOffsetFeatures) {
+    return center.y;
+  }
+  const pts = projectHexBoundaryToContainerPoints(h3Index, map, L);
+  return center.y + spanForProjectedHex(pts) * 0.24;
+}
+
+/** Renders build-entry controls for every eligible human-controlled production hex at current zoom. */
+function syncBuildEntryButton(): void {
+  const layer = document.getElementById('build-entry-layer');
+  if (!layer || !gameState) {
+    if (layer) hideBuildEntryLayer(layer, false);
+    return;
+  }
+  if (!shouldShowBuildEntryZoom()) {
+    hideBuildEntryLayer(layer);
+    return;
+  }
+  const map = getMainLeafletMap() as
+    | {
+        latLngToContainerPoint: (ll: unknown) => { x: number; y: number };
+      }
+    | null;
+  if (!map) {
+    hideBuildEntryLayer(layer);
+    return;
+  }
+  const L = getLeafletGlobal();
+  const res4On = shouldRenderRes4Hexes();
+  if (res4On) {
+    hideBuildEntryLayer(layer);
+    return;
+  }
+  const visibleUnitHexes = new Set(gameState.units.map((u) => u.h3Index));
+  const rows: Array<{ h3: string; label: string; left: number; top: number; hasCapacity: boolean }> = [];
+  for (const hx of gameState.hexes) {
+    if (hx.terrain === 'water') continue;
+    const explored = isHexExploredByPlayer(hx.h3Index);
+    // Build-entry controls are clickable and only for explored human-controlled hexes.
+    if (!explored) continue;
+    const controller = getControllerForHex(gameState, hx.h3Index);
+    if (controller !== 'human') continue;
+    const capacityPerTurn = countUrbanRes4HexesInRes1Hex(hx.h3Index);
+    if (capacityPerTurn <= 0) continue;
+    const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs(hx.h3Index, res4On, visibleUnitHexes);
+    const hasVisibleUnits = visibleUnitHexes.has(hx.h3Index);
+    const center = hexCenterPx(hx.h3Index);
+    const textY = computeRes1OverlayTextY(hx.h3Index, map, L, hasInfraSymbols || hasVisibleUnits);
+    rows.push({
+      h3: hx.h3Index,
+      label: formatProductionLabelForHex(gameState, hx.h3Index, capacityPerTurn, 'human'),
+      left: Math.round(center.x),
+      top: Math.round(textY),
+      hasCapacity: true,
+    });
+  }
+  if (rows.length === 0) {
+    hideBuildEntryLayer(layer);
+    return;
+  }
+  rows.sort((a, b) => a.h3.localeCompare(b.h3));
+  const layerKey = rows
+    .map((r) => `${r.h3}|${r.label}|${r.left}|${r.top}|${r.hasCapacity ? 1 : 0}`)
+    .join(';');
+  if (layerKey !== lastBuildEntryLayerKey) {
+    const html = rows
+      .map(
+        (r) =>
+          `<button type="button" class="build-entry-btn${r.hasCapacity ? ' has-capacity' : ''}" data-h3-index="${r.h3}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Open build queue for ${r.h3}">${r.label}</button>`
+      )
+      .join('');
+    layer.innerHTML = html;
+    lastBuildEntryLayerKey = layerKey;
+  }
+  layer.classList.remove('hidden');
+  layer.setAttribute('aria-hidden', 'false');
+}
+
 /** Projects a hex boundary to canvas points for viewport-overlap culling and drawing. */
 function projectHexBoundaryToContainerPoints(
   h3Index: string,
@@ -1565,7 +1857,7 @@ function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void {
  */
 function infraGlyphsAllowedForRes1Hex(h3: string): boolean {
   if (!isHexExploredByPlayer(h3)) return false;
-  return !hideTerrainFillWhileHeld;
+  return true;
 }
 
 /**
@@ -1574,7 +1866,7 @@ function infraGlyphsAllowedForRes1Hex(h3: string): boolean {
 function infraGlyphsAllowedForRes4Child(parentH3: string, childH3: string): boolean {
   if (!isHexExploredByPlayer(parentH3)) return false;
   void childH3;
-  return !hideTerrainFillWhileHeld;
+  return true;
 }
 
 /**
@@ -1596,9 +1888,11 @@ function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void 
   const outlineScreenPx = Math.max(0.5, 0.58 * zoomStrokeScale);
   const L = getLeafletGlobal();
   const res4On = shouldRenderRes4Hexes();
+  const unitHexes = new Set(gameState.units.map((u) => u.h3Index));
 
   if (!res4On) {
     for (const hx of gameState.hexes) {
+      if (unitHexes.has(hx.h3Index)) continue;
       if (!infraGlyphsAllowedForRes1Hex(hx.h3Index)) continue;
       const ap = terrainInfraRes1Airport.has(hx.h3Index);
       const pt = terrainInfraRes1Port.has(hx.h3Index);
@@ -1622,6 +1916,7 @@ function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void 
   const viewportWidth = Math.max(1, container.clientWidth);
   const viewportHeight = Math.max(1, container.clientHeight);
   for (const parent of gameState.hexes) {
+    if (unitHexes.has(parent.h3Index)) continue;
     let children = res4ChildrenByParent.get(parent.h3Index);
     if (!children) {
       children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
@@ -1654,32 +1949,31 @@ function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void {
   if (!map) return;
   const L = getLeafletGlobal();
   const res4On = shouldRenderRes4Hexes();
+  const unitHexes = new Set(gameState.units.map((u) => u.h3Index));
   for (const hx of gameState.hexes) {
-    if (!isHexExploredByPlayer(hx.h3Index)) continue;
+    const explored = isHexExploredByPlayer(hx.h3Index);
+    if (!explored && !hideTerrainFillWhileHeld) continue;
     if (hx.terrain === 'water') continue;
     const controller = getControllerForHex(gameState, hx.h3Index);
     const controlledByHuman = controller === 'human';
     const capacityPerTurn = countUrbanRes4HexesInRes1Hex(hx.h3Index);
-    const queuedUnits = getQueuedUnitsForHex(gameState, hx.h3Index);
     const hasUrbanCapacity = capacityPerTurn > 0;
-    const displayCapacity = controlledByHuman ? (hasUrbanCapacity ? capacityPerTurn : 0) : null;
-    const displayQueue = controlledByHuman ? (hasUrbanCapacity ? queuedUnits : 0) : null;
-    const hasInfraSymbols =
-      !res4On &&
-      infraGlyphsAllowedForRes1Hex(hx.h3Index) &&
-      (terrainInfraRes1Airport.has(hx.h3Index) || terrainInfraRes1Port.has(hx.h3Index));
-    const hasVisibleUnits = gameState.units.some((u) => u.h3Index === hx.h3Index);
-    const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
-    const pts = boundary.map(([lat, lng]: [number, number]) => {
-      const p = map.latLngToContainerPoint(L.latLng(lat, lng));
-      return { x: p.x, y: p.y };
-    });
+    const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs(hx.h3Index, res4On, unitHexes);
+    const hasVisibleUnits = unitHexes.has(hx.h3Index);
     const center = hexCenterPx(hx.h3Index);
-    const textY = hasInfraSymbols || hasVisibleUnits ? center.y + spanForProjectedHex(pts) * 0.24 : center.y;
-    const text =
-      controlledByHuman
-        ? `${displayCapacity!.toLocaleString()} / ${displayQueue!.toLocaleString()}`
-        : '? / ?';
+    const textY = computeRes1OverlayTextY(hx.h3Index, map, L, hasInfraSymbols || hasVisibleUnits);
+    const text = explored
+      ? formatProductionLabelForHex(gameState, hx.h3Index, capacityPerTurn, controller)
+      : `${Math.max(0, capacityPerTurn).toLocaleString()}c`;
+    const hasClickableBuildEntryForHex =
+      explored &&
+      !res4On &&
+      controlledByHuman &&
+      capacityPerTurn > 0 &&
+      shouldShowBuildEntryZoom();
+    if (hasClickableBuildEntryForHex) {
+      continue;
+    }
     const sizePx = hasInfraSymbols || hasVisibleUnits ? '10px' : '11px';
     const useBold = controlledByHuman && hasUrbanCapacity;
     ctx.font = `${useBold ? 'bold ' : ''}${sizePx} system-ui, sans-serif`;
@@ -2146,20 +2440,12 @@ function drawLoadingScene(ctx: CanvasRenderingContext2D, width: number, height: 
 }
 
 /**
- * Draws the full tactical scene for the current frame. Use from both resize and animation redraw paths
- * so terrain, units, stale intel, and combat overlays stay behaviorally identical.
+ * Mirrors which units are passed to `drawUnits` (including resolution-phase substitutions and moving exclusions).
  */
-function drawGameScene(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  state: GameStateSnapshot
-): void {
-  ctx.clearRect(0, 0, width, height);
-  drawTerrainHexes(ctx);
-  drawRes4TerrainHexes(ctx);
-  const hexList = state.hexes.map((h) => h.h3Index);
-  let moveProgress = 1;
+function getUnitsForDrawWithMovingIds(state: GameStateSnapshot): {
+  unitsToDraw: GameStateSnapshot['units'];
+  movingIds: Set<string> | undefined;
+} {
   let unitsToDraw: GameStateSnapshot['units'] = state.units;
   let movingIds: Set<string> | undefined;
   const anim = resolutionMoveAnimation;
@@ -2178,7 +2464,7 @@ function drawGameScene(
       hasMeleeCombat,
       hasMeleeCasualties
     );
-    moveProgress = phase.moveProgress;
+    const moveProgress = phase.moveProgress;
     const rangedRemovedIds = new Set((anim.rangedRemovedUnits ?? []).map((u) => u.id));
     if (phase.inRangedLightning || phase.inRangedCasualty) {
       const preMoveSurvivors = state.units
@@ -2196,11 +2482,171 @@ function drawGameScene(
       unitsToDraw = [...state.units, ...(anim.meleeRemovedUnits ?? [])];
       movingIds = undefined;
     }
+  } else {
+    movingIds = undefined;
+  }
+  return { unitsToDraw, movingIds };
+}
+
+/** Padding beyond `UNIT_RADIUS` so icon hit targets match visible circles comfortably. */
+const UNIT_ICON_HIT_PAD_PX = 2;
+
+/** True if map-container pixel (px, py) lies on a drawn unit circle for this hex (same layout as `drawUnits`). */
+function containerPixelHitsDrawnUnitIcon(
+  px: number,
+  py: number,
+  h3Index: string,
+  unitCount: number
+): boolean {
+  const { x, y } = hexCenterPx(h3Index);
+  const r = UNIT_RADIUS + UNIT_ICON_HIT_PAD_PX;
+  const within = (cx: number, cy: number): boolean => {
+    const dx = px - cx;
+    const dy = py - cy;
+    return dx * dx + dy * dy <= r * r;
+  };
+  if (unitCount <= 1) return within(x, y);
+  return within(x, y) || within(x + STACK_OFFSET_X, y + STACK_OFFSET_Y);
+}
+
+/** Extra padding so build-entry hits register when clicks target `#main-map` under the transparent overlay canvas. */
+const BUILD_ENTRY_HIT_PAD_PX = 2;
+
+function pointInExpandedClientRect(
+  clientX: number,
+  clientY: number,
+  rect: DOMRectReadOnly,
+  padPx: number
+): boolean {
+  return (
+    clientX >= rect.left - padPx &&
+    clientX <= rect.right + padPx &&
+    clientY >= rect.top - padPx &&
+    clientY <= rect.bottom + padPx
+  );
+}
+
+/**
+ * Opens or toggles the build popup when the pointer is over the slim build control. Clicks often land on
+ * `#main-map` (overlay canvas uses `pointer-events: none`) instead of `#build-entry-btn`, so this mirrors the button handler.
+ */
+function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number): boolean {
+  const layer = document.getElementById('build-entry-layer');
+  if (!layer || layer.classList.contains('hidden')) return false;
+  const buttons = Array.from(layer.querySelectorAll<HTMLButtonElement>('.build-entry-btn'));
+  for (const btn of buttons) {
+    const r = btn.getBoundingClientRect();
+    if (!pointInExpandedClientRect(clientX, clientY, r, BUILD_ENTRY_HIT_PAD_PX)) continue;
+    const h3 = btn.dataset.h3Index;
+    if (!h3) continue;
+    selectedHexIndex = h3;
+    const popup = document.getElementById('build-popup');
+    if (popup && !popup.classList.contains('hidden') && buildPopupHexH3 === h3) {
+      hideBuildPopup();
+    } else {
+      showBuildPopup(h3, clientX, clientY);
+    }
+    return true;
+  }
+  return false;
+}
+
+/** Empty string = inherit Leaflet’s grab cursor; only patch when over a discrete click target. */
+let lastAppliedMapInteractionCursor = '';
+
+/** Leaflet uses a grab hand on the map; use the normal arrow over actual click targets (icons, build control). */
+function updateMapInteractionCursor(clientX: number, clientY: number): void {
+  const map = getMainLeafletMap() as { getContainer: () => HTMLElement } | null;
+  if (!map) return;
+  const container = map.getContainer();
+  if (container.classList.contains('leaflet-dragging')) {
+    if (lastAppliedMapInteractionCursor !== '') {
+      lastAppliedMapInteractionCursor = '';
+      container.style.removeProperty('cursor');
+    }
+    return;
+  }
+  const rect = container.getBoundingClientRect();
+  const inside =
+    clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+  if (!inside) {
+    if (lastAppliedMapInteractionCursor !== '') {
+      lastAppliedMapInteractionCursor = '';
+      container.style.removeProperty('cursor');
+    }
+    return;
+  }
+  let want = '';
+  const layer = document.getElementById('build-entry-layer');
+  if (layer && !layer.classList.contains('hidden')) {
+    const buttons = Array.from(layer.querySelectorAll<HTMLButtonElement>('.build-entry-btn'));
+    for (const btn of buttons) {
+      const br = btn.getBoundingClientRect();
+      if (pointInExpandedClientRect(clientX, clientY, br, BUILD_ENTRY_HIT_PAD_PX)) {
+        want = 'default';
+        break;
+      }
+    }
+  }
+  if (want === '' && gameState) {
+    const px = clientX - rect.left;
+    const py = clientY - rect.top;
+    const hexSet = new Set(gameState.hexes.map((h) => h.h3Index));
+    const hit = hitTestHexAtContainerPixel(px, py, hexSet);
+    if (hit) {
+      const { unitsToDraw, movingIds } = getUnitsForDrawWithMovingIds(gameState);
+      const drawnAtHit = unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id));
+      if (
+        drawnAtHit.length > 0 &&
+        containerPixelHitsDrawnUnitIcon(px, py, hit, drawnAtHit.length)
+      ) {
+        want = 'default';
+      }
+    }
+  }
+  if (want !== lastAppliedMapInteractionCursor) {
+    lastAppliedMapInteractionCursor = want;
+    if (want === '') container.style.removeProperty('cursor');
+    else container.style.cursor = want;
+  }
+}
+
+/**
+ * Draws the full tactical scene for the current frame. Use from both resize and animation redraw paths
+ * so terrain, units, stale intel, and combat overlays stay behaviorally identical.
+ */
+function drawGameScene(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  state: GameStateSnapshot
+): void {
+  ctx.clearRect(0, 0, width, height);
+  drawTerrainHexes(ctx);
+  drawRes4TerrainHexes(ctx);
+  const hexList = state.hexes.map((h) => h.h3Index);
+  let moveProgress = 1;
+  const { unitsToDraw, movingIds } = getUnitsForDrawWithMovingIds(state);
+  const anim = resolutionMoveAnimation;
+  if (anim) {
+    const elapsed = Date.now() - anim.startTime;
+    const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
+    const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
+    const hasMeleeCombat =
+      (anim.meleeCombatHexes?.length ?? 0) > 0 ||
+      (anim.controlLossLightningHexes?.length ?? 0) > 0;
+    const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
+    const phase = getResolutionPhase5(
+      elapsed,
+      hasRangedCombat,
+      hasRangedCasualties,
+      hasMeleeCombat,
+      hasMeleeCasualties
+    );
+    moveProgress = phase.moveProgress;
     if (elapsed >= phase.movementStart) {
       drawResolutionMoveLines(ctx, width, height, anim.moves, state.units, hexList, 1);
     }
-  } else {
-    movingIds = undefined;
   }
   if (!hideCommittedOrderLinesAfterReady && humanStandingOrders.length > 0 && state.units.length) {
     drawStandingOrderLines(ctx, humanStandingOrders, state.units);
@@ -2294,9 +2740,11 @@ function resizeAndRedraw(): void {
 
   if (!gameState) {
     drawLoadingScene(ctx, w, h);
+    syncBuildEntryButton();
     return;
   }
   drawGameScene(ctx, w, h, gameState);
+  syncBuildEntryButton();
 }
 
 const STACK_OFFSET_X = 6;
@@ -2953,9 +3401,11 @@ function redraw(): void {
 
   if (!gameState) {
     drawLoadingScene(ctx, w, h);
+    syncBuildEntryButton();
     return;
   }
   drawGameScene(ctx, w, h, gameState);
+  syncBuildEntryButton();
 }
 
 function tickResolutionMoveAnimation(): void {
@@ -3192,7 +3642,7 @@ function getRepresentativeSelectedUnitIdsByOrigin(): string[] {
 }
 
 async function refreshHoverRoutePreview(): Promise<void> {
-  const unitIds = getRepresentativeSelectedUnitIdsByOrigin();
+  const unitIds = [...selectedUnitIds];
   const hoveredH3 = hoveredHexH3;
   const seq = ++hoverPreviewRequestSeq;
   if (rangedModeActive || !window.gameApi?.previewHumanMarchOrders || unitIds.length === 0 || !hoveredH3 || !gameState) {
@@ -3204,7 +3654,7 @@ async function refreshHoverRoutePreview(): Promise<void> {
   // Ignore stale async responses so preview always matches current hovered hex.
   if (seq !== hoverPreviewRequestSeq) return;
   if (hoveredHexH3 !== hoveredH3) return;
-  const currentSelected = [...getRepresentativeSelectedUnitIdsByOrigin()].sort().join('|');
+  const currentSelected = [...selectedUnitIds].sort().join('|');
   const requestedSelected = [...unitIds].sort().join('|');
   if (currentSelected !== requestedSelected) return;
   hoverRoutePreview = { hoveredH3Index: hoveredH3, data };
@@ -3333,6 +3783,41 @@ function clearSidebarError(): void {
   if (el) el.style.display = 'none';
 }
 
+/**
+ * Enables the Run toggle only when an API key and model are configured; turns Run off and clears
+ * precomputed state if the toggle becomes unavailable (e.g. key cleared).
+ */
+async function syncOpenRouterRunToggleInteractable(): Promise<void> {
+  const runBtn = document.getElementById('openrouter-run-btn') as HTMLButtonElement | null;
+  const api = window.gameApi?.openRouter;
+  if (!runBtn || !api?.getKey || !api.getSelectedModel) return;
+  try {
+    const [keyResult, modelId] = await Promise.all([api.getKey(), api.getSelectedModel()]);
+    const canEnable = !!keyResult?.hasKey && !!modelId?.trim();
+    if (canEnable) {
+      runBtn.disabled = false;
+      runBtn.removeAttribute('title');
+    } else {
+      runBtn.disabled = true;
+      runBtn.title = 'Set API key and model to enable';
+      if (runButtonOn) {
+        runButtonOn = false;
+        runBtn.setAttribute('aria-pressed', 'false');
+        window.gameApi?.cancelRequestAiOrders?.();
+        precomputedAiOrders = null;
+        precomputedAiRangedOrders = null;
+        precomputedAiStrategy = null;
+        precomputedToolInvocationCounts = null;
+        eventDrivenInitialConsultationDone = false;
+        updateReadyButtonState();
+      }
+    }
+  } catch {
+    runBtn.disabled = true;
+    runBtn.title = 'Set API key and model to enable';
+  }
+}
+
 function initOpenRouterUI(): void {
   const api = window.gameApi?.openRouter;
   if (!api) return;
@@ -3402,6 +3887,7 @@ function initOpenRouterUI(): void {
       modelSelect.innerHTML = '<option value="">— Select model —</option>';
       if ('error' in result && result.error) {
         appendOpenRouterLog(`Models: ${result.error}`, true);
+        void syncOpenRouterRunToggleInteractable();
         return;
       }
       const models = 'models' in result ? result.models ?? [] : [];
@@ -3415,6 +3901,7 @@ function initOpenRouterUI(): void {
       if (targetModelId && Array.from(modelSelect.options).some((o) => o.value === targetModelId)) {
         modelSelect.value = targetModelId;
       }
+      void syncOpenRouterRunToggleInteractable();
     });
   }
 
@@ -3446,9 +3933,11 @@ function initOpenRouterUI(): void {
         if (!value) {
           keyInput.placeholder = '';
           hideMapToast();
+          void syncOpenRouterRunToggleInteractable();
           return;
         }
         keyInput.placeholder = 'Saved API key';
+        void syncOpenRouterRunToggleInteractable();
       });
     };
     keyInput.addEventListener('blur', persistApiKey);
@@ -3462,6 +3951,7 @@ function initOpenRouterUI(): void {
     modelSelect.addEventListener('change', () => {
       api!.setSelectedModel(modelSelect.value);
       if (modelSelect.value) hideMapToast();
+      void syncOpenRouterRunToggleInteractable();
     });
   }
 
@@ -3472,6 +3962,7 @@ function initOpenRouterUI(): void {
   const runBtn = document.getElementById('openrouter-run-btn');
   if (runBtn) {
     runBtn.addEventListener('click', () => {
+      if ((runBtn as HTMLButtonElement).disabled) return;
       runButtonOn = !runButtonOn;
       runBtn.setAttribute('aria-pressed', runButtonOn ? 'true' : 'false');
       if (runButtonOn) {
@@ -3495,6 +3986,8 @@ function initOpenRouterUI(): void {
 
   document.getElementById('map-toast-dismiss')?.addEventListener('click', hideMapToast);
   document.getElementById('ai-strategy-toast-dismiss')?.addEventListener('click', hideAiStrategyToast);
+
+  void syncOpenRouterRunToggleInteractable();
 }
 
 function init(): void {
@@ -3562,6 +4055,7 @@ function init(): void {
         updateGameOverUI(state);
         updateReadyButtonState();
         redraw();
+        refreshBuildPopupIfOpen();
       })
       .catch((err) => console.error('getGameState failed:', err));
     window.gameApi
@@ -3589,10 +4083,19 @@ function init(): void {
     resizeAndRedraw();
   });
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && buildQueueModalHexH3 !== null) {
-      e.preventDefault();
-      closeHexTooltipFromModalAction();
-      return;
+    if (e.key === 'Escape') {
+      const buildPopup = document.getElementById('build-popup');
+      if (buildPopup && !buildPopup.classList.contains('hidden')) {
+        e.preventDefault();
+        hideBuildPopup();
+        return;
+      }
+      const stackCallout = document.getElementById('stack-callout');
+      if (stackCallout && !stackCallout.classList.contains('hidden')) {
+        e.preventDefault();
+        hideStackCallout();
+        return;
+      }
     }
     if (shouldIgnoreGlobalKeydown(e)) return;
     if (e.repeat) return;
@@ -3634,16 +4137,73 @@ function init(): void {
   window.addEventListener(
     'pointerdown',
     (e) => {
-      if (!buildQueueModalActive || buildQueueModalHexH3 === null) return;
-      if (isTooltipTargetInsideDialog(e.target)) return;
-      closeHexTooltipFromModalAction();
+      const buildPopup = document.getElementById('build-popup');
+      if (!buildPopup || buildPopup.classList.contains('hidden')) return;
+      if (isBuildPopupOrEntryTarget(e.target)) return;
+      const activeEl = document.activeElement;
+      const hadSelectFocused =
+        activeEl instanceof HTMLSelectElement && buildPopup.contains(activeEl);
+      if (hadSelectFocused) {
+        queueMicrotask(() => {
+          const p = document.getElementById('build-popup');
+          if (!p || p.classList.contains('hidden')) return;
+          if (isBuildQueueSelectInPopupFocused()) return;
+          hideBuildPopup();
+        });
+        return;
+      }
+      hideBuildPopup();
     },
     true
   );
-  const tooltipDialog = document.getElementById('hex-tooltip');
-  tooltipDialog?.addEventListener('pointerleave', () => {
-    if (!buildQueueModalActive || buildQueueModalHexH3 === null) return;
-    closeHexTooltipFromModalAction();
+  window.addEventListener(
+    'pointerdown',
+    (e) => {
+      const stackCallout = document.getElementById('stack-callout');
+      if (!stackCallout || stackCallout.classList.contains('hidden')) return;
+      if (isStackCalloutTargetInsideDialog(e.target)) return;
+      hideStackCallout();
+    },
+    true
+  );
+  const buildEntryLayer = document.getElementById('build-entry-layer');
+  buildEntryLayer?.addEventListener('pointerover', (e) => {
+    const target = e.target as Element | null;
+    if (!target?.closest('.build-entry-btn')) return;
+    buildEntryButtonPointerInside = true;
+    clearTerrainTooltipTimer();
+    hideTerrainTooltipVisual();
+  });
+  buildEntryLayer?.addEventListener('pointerout', (e) => {
+    const target = e.target as Element | null;
+    if (!target?.closest('.build-entry-btn')) return;
+    const next = e.relatedTarget as Element | null;
+    if (next?.closest('.build-entry-btn')) return;
+    buildEntryButtonPointerInside = false;
+  });
+  buildEntryLayer?.addEventListener('click', (e) => {
+    const target = e.target as Element | null;
+    const btn = target?.closest('.build-entry-btn') as HTMLButtonElement | null;
+    if (!btn) return;
+    e.stopPropagation();
+    const h3 = btn.dataset.h3Index;
+    if (!h3) return;
+    selectedHexIndex = h3;
+    const popup = document.getElementById('build-popup');
+    if (popup && !popup.classList.contains('hidden') && buildPopupHexH3 === h3) {
+      hideBuildPopup();
+      return;
+    }
+    showBuildPopup(h3, e.clientX, e.clientY);
+  });
+
+  const canvasContainer = document.getElementById('canvas-container');
+  canvasContainer?.addEventListener('pointermove', (e) => {
+    updateMapInteractionCursor(e.clientX, e.clientY);
+  });
+  canvasContainer?.addEventListener('pointerleave', () => {
+    lastAppliedMapInteractionCursor = '';
+    getMainLeafletMap()?.getContainer()?.style.removeProperty('cursor');
   });
 
   const mainMapEl = document.getElementById('main-map');
@@ -3661,18 +4221,12 @@ function init(): void {
   }
 
   mainMapEl.addEventListener('pointermove', (e) => {
-    if (!buildQueueModalActive && buildQueueModalHexH3 !== null && isPointerInsideTooltipRect(e.clientX, e.clientY)) {
-      activateBuildQueueModalForHex(buildQueueModalHexH3);
-      return;
-    }
-    if (buildQueueModalActive && buildQueueModalHexH3 !== null) {
-      if (!isTooltipTargetInsideDialog(e.target)) {
-        closeHexTooltipFromModalAction();
-      }
-      return;
-    }
     lastPointerClientX = e.clientX;
     lastPointerClientY = e.clientY;
+    if (shouldSuppressTerrainTooltip()) {
+      clearTerrainTooltipTimer();
+      hideTerrainTooltipVisual();
+    }
     const mapHexSet = new Set((gameState?.hexes ?? []).map((h) => h.h3Index));
     const hit = clientXYToHit(e.clientX, e.clientY);
     const detailHit = detailHitAtClientPixel(e.clientX, e.clientY, mapHexSet);
@@ -3684,30 +4238,44 @@ function init(): void {
       hoveredDetailHexH3 = detailHit;
       void refreshHoverRoutePreview();
       requestRedraw();
-      if (hit && isHexExploredByPlayer(hit)) {
+      if (hit && !shouldSuppressTerrainTooltip()) {
         const targetHex = hit;
         terrainTooltipDelayTimer = setTimeout(() => {
           terrainTooltipDelayTimer = null;
           if (hoveredHexH3 !== targetHex || !gameState) return;
+          if (shouldSuppressTerrainTooltip()) return;
           const state = terrainStateForPointer(lastPointerClientX, lastPointerClientY, targetHex);
           const namingTarget = namingLookupTargetForPointer(lastPointerClientX, lastPointerClientY, targetHex);
-          void showTerrainTooltip(lastPointerClientX, lastPointerClientY, state, namingTarget, targetHex);
+          void showTerrainTooltip(lastPointerClientX, lastPointerClientY, state, namingTarget);
         }, TERRAIN_TOOLTIP_DELAY_MS);
       }
       return;
     }
 
-    const tip = document.getElementById('hex-tooltip');
-    if (tip && !tip.classList.contains('hidden') && hit && isHexExploredByPlayer(hit)) {
-      const state = terrainStateForPointer(e.clientX, e.clientY, hit);
-      const namingTarget = namingLookupTargetForPointer(e.clientX, e.clientY, hit);
-      void showTerrainTooltip(e.clientX, e.clientY, state, namingTarget, hit);
-    } else if (tip && !tip.classList.contains('hidden') && hit && !isHexExploredByPlayer(hit)) {
-      hideTerrainTooltipVisual();
+    const tipFollow = document.getElementById('hex-tooltip');
+    if (
+      !shouldSuppressTerrainTooltip() &&
+      tipFollow &&
+      !tipFollow.classList.contains('hidden') &&
+      hit
+    ) {
+      const state = terrainStateForPointer(lastPointerClientX, lastPointerClientY, hit);
+      const namingTarget = namingLookupTargetForPointer(lastPointerClientX, lastPointerClientY, hit);
+      void showTerrainTooltip(lastPointerClientX, lastPointerClientY, state, namingTarget);
     }
   });
-  mainMapEl.addEventListener('pointerleave', () => {
-    if (buildQueueModalActive && buildQueueModalHexH3 !== null) return;
+  mainMapEl.addEventListener('pointerleave', (e) => {
+    const next = e.relatedTarget;
+    if (next instanceof Node) {
+      const buildEntry = document.getElementById('build-entry-layer');
+      const buildPopup = document.getElementById('build-popup');
+      if (
+        (buildEntry && buildEntry.contains(next)) ||
+        (buildPopup && buildPopup.contains(next))
+      ) {
+        return;
+      }
+    }
     clearTerrainTooltipTimer();
     hideTerrainTooltipVisual();
     if (hoveredHexH3 !== null || hoveredDetailHexH3 !== null) {
@@ -3753,10 +4321,31 @@ function init(): void {
       return;
     }
 
-    const unitsAtHit = hit ? getUnitsAtHex(hit) : [];
+    const mapForClick = getMainLeafletMap() as { getContainer: () => HTMLElement } | null;
+    const clickRect = mapForClick?.getContainer().getBoundingClientRect();
+    const px = clickRect ? e.clientX - clickRect.left : 0;
+    const py = clickRect ? e.clientY - clickRect.top : 0;
+    const { unitsToDraw, movingIds } = gameState
+      ? getUnitsForDrawWithMovingIds(gameState)
+      : { unitsToDraw: [] as GameStateSnapshot['units'], movingIds: undefined as Set<string> | undefined };
+
+    if (tryHandleBuildEntryAtClientXY(e.clientX, e.clientY)) {
+      updateSidebar();
+      updateRangedSidebar();
+      redraw();
+      return;
+    }
+
+    const unitsAtHit = hit
+      ? unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id))
+      : [];
     const isStack = unitsAtHit.length >= 2;
     const isLoneAi = unitsAtHit.length === 1 && unitsAtHit[0]?.player !== 'human';
-    if (hit && (isStack || isLoneAi)) {
+    const stackIconHit =
+      !!hit &&
+      unitsAtHit.length > 0 &&
+      containerPixelHitsDrawnUnitIcon(px, py, hit, unitsAtHit.length);
+    if (hit && (isStack || isLoneAi) && stackIconHit) {
       ctrlKeyActive = e.ctrlKey;
       showStackCallout(unitsAtHit, e.clientX, e.clientY);
       updateSidebar();
@@ -3768,7 +4357,11 @@ function init(): void {
     hideStackCallout();
     if (hit) {
       const unit = getUnitAtHex(hit);
-      if (unit?.player === 'human') {
+      const drawnAtHit = unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id));
+      const unitIconHit =
+        drawnAtHit.length > 0 &&
+        containerPixelHitsDrawnUnitIcon(px, py, hit, drawnAtHit.length);
+      if (unit?.player === 'human' && unitIconHit) {
         if (e.ctrlKey) {
           if (pendingSelectTimeout !== null) {
             clearTimeout(pendingSelectTimeout);
@@ -3790,6 +4383,11 @@ function init(): void {
             updateRangedSidebar();
             redraw();
           }, 250);
+        }
+      } else if (unit?.player === 'human' && !unitIconHit) {
+        if (pendingSelectTimeout !== null) {
+          clearTimeout(pendingSelectTimeout);
+          pendingSelectTimeout = null;
         }
       } else if (getPrimarySelectedUnitId() && hit !== gameState?.units.find((u) => u.id === getPrimarySelectedUnitId())?.h3Index) {
         /* Movement orders are issued on double-click so the player can move to an occupied hex. */
@@ -3827,19 +4425,20 @@ function init(): void {
     if (!gameState) return;
     if (rangedModeActive) return;
     const hit = clientXYToHit(e.clientX, e.clientY);
-    if (!hit || selectedUnitIdsAtMouseDown.length === 0) return;
+    const destinationH3 = selectedHexIndex ?? hoveredHexH3 ?? hit;
+    if (!destinationH3 || selectedUnitIdsAtMouseDown.length === 0) return;
 
     const selectedAtMouseDown = selectedUnitIdsAtMouseDown
       .map((id) => gameState.units.find((u) => u.id === id))
       .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
     if (selectedAtMouseDown.length === 0) return;
     const selectedIds = selectedAtMouseDown.map((unit) => unit.id);
-    if (selectedAtMouseDown.every((unit) => unit.h3Index === hit)) return;
+    if (selectedAtMouseDown.every((unit) => unit.h3Index === destinationH3)) return;
 
     if (!window.gameApi?.assignHumanMarchOrders) return;
     const assign = await window.gameApi.assignHumanMarchOrders({
       unitIds: selectedIds,
-      destinationH3Index: hit,
+      destinationH3Index: destinationH3,
     });
     if (!assign.success) {
       showMapToast(assign.reason ?? 'Failed to assign movement order.', { isError: true });
@@ -3898,6 +4497,7 @@ function init(): void {
               ? {
                   enabledToolGroups: enabledToolGroupsPayload,
                   useEventDrivenConsultation: true,
+                  aiPlanningRunEnabled: runButtonOn,
                   precomputedAiOrders: precomputedAiOrders!,
                   precomputedAiRangedOrders: precomputedAiRangedOrders ?? [],
                   precomputedAiStrategy: precomputedAiStrategy ?? undefined,
@@ -3905,16 +4505,19 @@ function init(): void {
               : {
                   enabledToolGroups: enabledToolGroupsPayload,
                   useEventDrivenConsultation: true,
+                  aiPlanningRunEnabled: runButtonOn,
                 })
           : (usePrecomputed
               ? {
                   enabledToolGroups: enabledToolGroupsPayload,
+                  aiPlanningRunEnabled: runButtonOn,
                   precomputedAiOrders: precomputedAiOrders!,
                   precomputedAiRangedOrders: precomputedAiRangedOrders ?? [],
                   precomputedAiStrategy: precomputedAiStrategy ?? undefined,
                 }
               : {
                   enabledToolGroups: enabledToolGroupsPayload,
+                  aiPlanningRunEnabled: runButtonOn,
                 });
         const readyResult = await window.gameApi!.ready(readyPayload);
         if (!readyResult.success) {

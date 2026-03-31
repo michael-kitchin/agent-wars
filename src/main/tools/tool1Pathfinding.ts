@@ -17,6 +17,11 @@ import {
 import type { PassableDomain } from '../pathfinding';
 import { logDebug, logError } from '../logger';
 
+function effectiveHexPassabilityTerrain(hex: { terrain: string; terrainKind?: string }): string {
+  if (hex.terrainKind === 'coastal' || hex.terrainKind === 'wetlands') return hex.terrainKind;
+  return hex.terrain;
+}
+
 /**
  * Converts an H3 index to [lat, lng] for tool responses. Uses the coordinate map when present;
  * falls back to cellToLatLng so we never expose raw H3 strings to the LLM.
@@ -175,7 +180,7 @@ export function executePlanRoute(
   logDebug('tool1Pathfinding executePlanRoute', { unitId, destination: destination.join(','), options });
   const hexList = state.hexes.map((h) => h.h3Index);
   const hexSet = new Set(hexList);
-  const terrainByH3 = new Map(state.hexes.map((h) => [h.h3Index, h.terrain]));
+  const terrainByH3 = new Map(state.hexes.map((h) => [h.h3Index, effectiveHexPassabilityTerrain(h)]));
 
   const unit = state.units.find((u) => u.id === unitId);
   if (!unit) {

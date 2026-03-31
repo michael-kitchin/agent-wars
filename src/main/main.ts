@@ -115,7 +115,7 @@ function requestOrdersWithLog(
 }
 
 function registerIpcHandlers(): void {
-  ipcMain.handle('game:getState', () => getGameStateForPlayer('human'));
+  ipcMain.handle('game:getState', () => getGameStateForPlayer('human', { maskUnexploredTerrain: false }));
   ipcMain.handle('game:getRes4TerrainOverrides', () => getRes4TerrainOverridesForRenderer());
   ipcMain.handle('game:getTerrainInfrastructureHints', () => getTerrainInfrastructureHintsForRenderer());
   ipcMain.handle(
@@ -137,7 +137,7 @@ function registerIpcHandlers(): void {
     const fogOfWarEnabled = payload?.fogOfWarEnabled !== false;
     logDebug('main game:newGame', { fogOfWarEnabled });
     resetGameForNewMatch({ fogOfWarEnabled });
-    return getGameStateForPlayer('human');
+    return getGameStateForPlayer('human', { maskUnexploredTerrain: false });
   });
   ipcMain.handle('game:submitOrders', (_event, payload: SubmitOrdersPayload | { unitId: string; toH3Index: string }[]) => {
     const normalized: SubmitOrdersPayload = Array.isArray(payload)

@@ -164,6 +164,35 @@ async function testGameReadyPrecomputedSkipsRequestOrders(): Promise<void> {
   assert.strictEqual(result.aiOrderCount, 0);
 }
 
+async function testGameReadyRunOffSkipsRequestOrdersNonEventDriven(): Promise<void> {
+  let requestOrdersCalled = false;
+  const deps = {
+    getGameState: () => minimalPlanningState,
+    getGameStateForPlayer: () => minimalPlanningState,
+    getSelectedModel: () => 'test-model',
+    hasKey: () => true,
+    getToolNamesForEnabledGroups: () => ['planning'],
+    defaultGroupIds: ['planning'],
+    requestOrders: async (): Promise<RequestAiOrdersResult> => {
+      requestOrdersCalled = true;
+      return { success: false, error: 'should not be called' };
+    },
+    ready: (
+      _aiOrders: { unitId: string; toH3Index: string }[],
+      _aiRangedOrders: { unitId: string; targetH3Index: string }[]
+    ): ReadyResultMinimal & { success: boolean } => ({
+      success: true,
+      aiOrderCount: 0,
+    }),
+  };
+  const result = await handleGameReady(
+    { enabledToolGroups: ['planning'], aiPlanningRunEnabled: false },
+    deps
+  );
+  assert.strictEqual(requestOrdersCalled, false);
+  assert.strictEqual(result.success, true);
+}
+
 async function testGameReadyPrecomputedWithOrders(): Promise<void> {
   const precomputedOrders = [{ unitId: 'opponent-1', toH3Index: '891f1d48b9fffff' }];
   const precomputedRanged: { unitId: string; targetH3Index: string }[] = [];
@@ -209,6 +238,10 @@ async function runAll(): Promise<void> {
     { name: 'requestAiOrders success', fn: testRequestAiOrdersSuccess },
     { name: 'requestAiOrders cancelled', fn: testRequestAiOrdersCancelled },
     { name: 'game:ready precomputed skips requestOrders', fn: testGameReadyPrecomputedSkipsRequestOrders },
+    {
+      name: 'game:ready Run off skips LLM (non-event-driven)',
+      fn: testGameReadyRunOffSkipsRequestOrdersNonEventDriven,
+    },
     { name: 'game:ready precomputed with orders', fn: testGameReadyPrecomputedWithOrders },
   ];
   for (const t of tests) {
