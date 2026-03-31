@@ -88,6 +88,10 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   const syncBuildEntryFn = getFunctionSource(source, 'syncBuildEntryButton');
 
   assert.ok(
+    drawProductionFn.includes('if (shouldRenderRes4Hexes()) return'),
+    'drawRes1ProductionOverlays should draw no production labels when res4 hexes are shown'
+  );
+  assert.ok(
     drawProductionFn.includes('if (!explored && !hideTerrainFillWhileHeld) continue;'),
     'drawRes1ProductionOverlays should only show unexplored production labels while T is held'
   );
@@ -103,8 +107,8 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   );
 
   assert.ok(
-    syncBuildEntryFn.includes('if (res4On) {'),
-    'syncBuildEntryButton should suppress clickable production buttons on res4 zoom'
+    syncBuildEntryFn.includes('if (res4On) {') && syncBuildEntryFn.includes('hideBuildPopup()'),
+    'syncBuildEntryButton should suppress build UI and close build popup on res4 zoom'
   );
   assert.ok(
     syncBuildEntryFn.includes('if (!explored) continue;'),

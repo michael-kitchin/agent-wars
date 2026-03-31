@@ -370,6 +370,7 @@ function hideBuildPopup(): void {
  * and hover terrain tooltip so only one map popup is active at a time.
  */
 function showBuildPopup(h3Index: string, clientX: number, clientY: number): void {
+  if (shouldRenderRes4Hexes()) return;
   hideStackCallout();
   clearTerrainTooltipTimer();
   hideTerrainTooltipVisual();
@@ -389,6 +390,10 @@ function showBuildPopup(h3Index: string, clientX: number, clientY: number): void
 }
 
 function refreshBuildPopupIfOpen(): void {
+  if (shouldRenderRes4Hexes()) {
+    hideBuildPopup();
+    return;
+  }
   const el = document.getElementById('build-popup');
   const body = document.getElementById('build-popup-body');
   if (!el || el.classList.contains('hidden') || !buildPopupHexH3 || !body) return;
@@ -1694,6 +1699,7 @@ function syncBuildEntryButton(): void {
   const res4On = shouldRenderRes4Hexes();
   if (res4On) {
     hideBuildEntryLayer(layer);
+    hideBuildPopup();
     return;
   }
   const visibleUnitHexes = new Set(gameState.units.map((u) => u.h3Index));
@@ -1948,7 +1954,7 @@ function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void {
     | null;
   if (!map) return;
   const L = getLeafletGlobal();
-  const res4On = shouldRenderRes4Hexes();
+  if (shouldRenderRes4Hexes()) return;
   const unitHexes = new Set(gameState.units.map((u) => u.h3Index));
   for (const hx of gameState.hexes) {
     const explored = isHexExploredByPlayer(hx.h3Index);
@@ -1958,7 +1964,7 @@ function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void {
     const controlledByHuman = controller === 'human';
     const capacityPerTurn = countUrbanRes4HexesInRes1Hex(hx.h3Index);
     const hasUrbanCapacity = capacityPerTurn > 0;
-    const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs(hx.h3Index, res4On, unitHexes);
+    const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs(hx.h3Index, false, unitHexes);
     const hasVisibleUnits = unitHexes.has(hx.h3Index);
     const center = hexCenterPx(hx.h3Index);
     const textY = computeRes1OverlayTextY(hx.h3Index, map, L, hasInfraSymbols || hasVisibleUnits);
@@ -1966,11 +1972,7 @@ function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void {
       ? formatProductionLabelForHex(gameState, hx.h3Index, capacityPerTurn, controller)
       : `${Math.max(0, capacityPerTurn).toLocaleString()}c`;
     const hasClickableBuildEntryForHex =
-      explored &&
-      !res4On &&
-      controlledByHuman &&
-      capacityPerTurn > 0 &&
-      shouldShowBuildEntryZoom();
+      explored && controlledByHuman && capacityPerTurn > 0 && shouldShowBuildEntryZoom();
     if (hasClickableBuildEntryForHex) {
       continue;
     }
