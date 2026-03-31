@@ -1179,8 +1179,10 @@ export async function requestOrders(
     { role: 'user', content: userMessage },
   ];
 
-  logDebug('openRouter requestOrders: system prompt', systemPrompt);
-  logDebug('openRouter requestOrders: user message', userMessage);
+  logDebug('openRouter requestOrders: system prompt prepared', { chars: systemPrompt.length });
+  logDebug('openRouter requestOrders: user message prepared', { chars: userMessage.length });
+  logTrace('openRouter requestOrders: system prompt (full)', systemPrompt);
+  logTrace('openRouter requestOrders: user message (full)', userMessage);
   logDebug('openRouter requestOrders: starting tool loop', { turnNumber: state.turnNumber });
 
   const wallClockStart = Date.now();
@@ -1245,7 +1247,13 @@ export async function requestOrders(
       const toolCalls = assistantMessage.tool_calls;
       if (toolCalls && toolCalls.length > 0) {
         const assistantContent = assistantMessage.content ?? null;
-        logDebug('openRouter requestOrders: assistant response (tool round)', typeof assistantContent === 'string' ? assistantContent : '(none)');
+        logDebug('openRouter requestOrders: assistant response (tool round)', {
+          chars: typeof assistantContent === 'string' ? assistantContent.length : 0,
+        });
+        logTrace(
+          'openRouter requestOrders: assistant response (tool round, full)',
+          typeof assistantContent === 'string' ? assistantContent : '(none)'
+        );
         logDebug('openRouter requestOrders: tool_calls', {
           turnNumber: state.turnNumber,
           playerId: 'opponent',
@@ -1309,7 +1317,8 @@ export async function requestOrders(
         return { success: false, error: 'Invalid response: no content' };
       }
 
-      logDebug('openRouter requestOrders: assistant response (final)', content);
+      logDebug('openRouter requestOrders: assistant response (final)', { chars: content.length });
+      logTrace('openRouter requestOrders: assistant response (final, full)', content);
       let parsed = parseOrdersResponse(content, resolveToH3, state, latLngByH3, flags.productionEnabled);
       if (!parsed) {
         if (!parseRepairAttempted) {
