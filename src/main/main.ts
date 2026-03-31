@@ -16,6 +16,10 @@ import {
   assignHumanMarchOrders,
   validateGroupRangedTarget,
   cancelHumanOrder,
+  getHexBuildQueue,
+  addHexBuildQueueEntry,
+  updateHexBuildQueueEntry,
+  removeHexBuildQueueEntry,
 } from './gameActions';
 import {
   saveKey,
@@ -199,6 +203,34 @@ function registerIpcHandlers(): void {
   ipcMain.handle('game:cancelHumanStandingOrder', (_event, payload: { unitId?: string }) => {
     if (typeof payload?.unitId !== 'string') return { success: false, reason: 'Invalid cancel payload' };
     return cancelHumanOrder(payload.unitId);
+  });
+  ipcMain.handle('game:getHexBuildQueue', (_event, payload: { h3Index?: string }) => {
+    if (typeof payload?.h3Index !== 'string') return null;
+    return getHexBuildQueue(payload.h3Index, 'human');
+  });
+  ipcMain.handle('game:addHexBuildQueueEntry', (_event, payload: { h3Index?: string }) => {
+    if (typeof payload?.h3Index !== 'string') return { success: false, reason: 'Invalid build-queue payload' };
+    return addHexBuildQueueEntry(payload.h3Index, 'human');
+  });
+  ipcMain.handle(
+    'game:updateHexBuildQueueEntry',
+    (_event, payload: { h3Index?: string; entryId?: number; unitType?: 'infantry' | 'armor' | 'naval'; count?: number }) => {
+      if (
+        typeof payload?.h3Index !== 'string' ||
+        typeof payload?.entryId !== 'number' ||
+        (payload?.unitType !== 'infantry' && payload?.unitType !== 'armor' && payload?.unitType !== 'naval') ||
+        typeof payload?.count !== 'number'
+      ) {
+        return { success: false, reason: 'Invalid build-queue payload' };
+      }
+      return updateHexBuildQueueEntry(payload.h3Index, payload.entryId, payload.unitType, payload.count, 'human');
+    }
+  );
+  ipcMain.handle('game:removeHexBuildQueueEntry', (_event, payload: { h3Index?: string; entryId?: number }) => {
+    if (typeof payload?.h3Index !== 'string' || typeof payload?.entryId !== 'number') {
+      return { success: false, reason: 'Invalid build-queue payload' };
+    }
+    return removeHexBuildQueueEntry(payload.h3Index, payload.entryId, 'human');
   });
   ipcMain.handle(
     'game:ready',

@@ -18,6 +18,8 @@ import type {
   TerrainInfrastructureHintsSnapshot,
   HexNamingTooltipLineRequest,
   HexContinentNamesRequest,
+  BuildUnitType,
+  HexBuildQueueSnapshot,
 } from '../shared/ipcTypes';
 
 let openRouterLogListener: ((payload: { line: string; isError?: boolean }) => void) | null = null;
@@ -54,6 +56,20 @@ const gameApi = {
     ipcRenderer.invoke('game:validateGroupRangedTarget', payload),
   cancelHumanStandingOrder: (payload: { unitId: string }): Promise<{ success: boolean; reason?: string }> =>
     ipcRenderer.invoke('game:cancelHumanStandingOrder', payload),
+  getHexBuildQueue: (payload: { h3Index: string }): Promise<HexBuildQueueSnapshot | null> =>
+    ipcRenderer.invoke('game:getHexBuildQueue', payload),
+  addHexBuildQueueEntry: (payload: { h3Index: string }): Promise<{ success: boolean; reason?: string; queue?: HexBuildQueueSnapshot }> =>
+    ipcRenderer.invoke('game:addHexBuildQueueEntry', payload),
+  updateHexBuildQueueEntry: (payload: { h3Index: string; entryId: number; unitType: BuildUnitType; count: number }): Promise<{
+    success: boolean;
+    reason?: string;
+    queue?: HexBuildQueueSnapshot;
+  }> => ipcRenderer.invoke('game:updateHexBuildQueueEntry', payload),
+  removeHexBuildQueueEntry: (payload: { h3Index: string; entryId: number }): Promise<{
+    success: boolean;
+    reason?: string;
+    queue?: HexBuildQueueSnapshot;
+  }> => ipcRenderer.invoke('game:removeHexBuildQueueEntry', payload),
   requestAiOrders: (payload?: { enabledToolGroups?: string[] }): Promise<RequestAiOrdersResult> =>
     ipcRenderer.invoke('game:requestAiOrders', payload),
   cancelRequestAiOrders: (): Promise<void> =>

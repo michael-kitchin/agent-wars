@@ -22,16 +22,17 @@ import { pipelineTerrainToPassability } from './terrainPassability';
 import { logDebug, logError, logTrace } from './logger';
 import type { GameStateSnapshot } from '../shared/ipcTypes';
 import { computeVisibleHexesForSide } from './visibility';
+import type { BuildUnitType } from './productionRules';
 
 export type { GameStateSnapshot } from '../shared/ipcTypes';
 
 /** Baseline schema version; bump when a future milestone adds migration chains. */
-export const EXPECTED_USER_VERSION = 7;
+export const EXPECTED_USER_VERSION = 8;
 
 /**
- * Baseline filename for world-map + fog-of-war intel schema (v7).
+ * Baseline filename for world-map + fog-of-war + production schema (v8).
  */
-export const GAME_DB_FILE_NAME = 'game-baseline-v7.sqlite';
+export const GAME_DB_FILE_NAME = 'game-baseline-v8.sqlite';
 
 let db: InstanceType<typeof Database> | null = null;
 
@@ -50,6 +51,9 @@ const REQUIRED_TABLES = [
   'ai_loss_events_since_consultation',
   'player_hex_intel',
   'player_unit_intel',
+  'res1_control',
+  'res1_build_queue',
+  'res1_build_progress',
 ] as const;
 
 /**
@@ -174,6 +178,25 @@ function getFullDdl(): string {
       last_seen_turn INTEGER NOT NULL,
       stale_until_turn INTEGER,
       PRIMARY KEY (player_id, enemy_unit_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS res1_control (
+      h3_index TEXT PRIMARY KEY,
+      controller_player_id TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS res1_build_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      h3_index TEXT NOT NULL,
+      queue_index INTEGER NOT NULL,
+      unit_type TEXT NOT NULL CHECK (unit_type IN ('infantry', 'armor', 'naval')),
+      remaining_count INTEGER NOT NULL CHECK (remaining_count > 0),
+      UNIQUE (h3_index, queue_index)
+    );
+
+    CREATE TABLE IF NOT EXISTS res1_build_progress (
+      h3_index TEXT PRIMARY KEY,
+      stored_points INTEGER NOT NULL DEFAULT 0
     );
   `;
 }
@@ -962,6 +985,175 @@ export function dbGetAll<T extends Record<string, unknown>>(sql: string, params:
   return getAll<T>(sql, params);
 }
 
+export interface HexControlRow {
+  h3Index: string;
+  controllerPlayerId: string | null;
+}
+
+export interface BuildQueueRow {
+  id: number;
+  h3Index: string;
+  queueIndex: number;
+  unitType: BuildUnitType;
+  remainingCount: number;
+}
+
+/**
+ * Why this exists:
+ *     Reads the persisted controller for one res-1 hex.
+ * When to use:
+ *     Queue authorization, tooltip rendering, and control transition checks.
+ * What to expect:
+ *     Returns null when a hex is currently uncontrolled or missing a row.
+ */
+export function getHexController(h3Index: string): string | null {
+  logTrace('gameDb getHexController', { h3Index });
+  const row = getOne<{ controllerPlayerId: string | null }>(
+    'SELECT controller_player_id AS controllerPlayerId FROM res1_control WHERE h3_index = ?',
+    [h3Index]
+  );
+  return row?.controllerPlayerId ?? null;
+}
+
+/**
+ * Why this exists:
+ *     Upserts one res-1 control row as the single source of truth for ownership.
+ * When to use:
+ *     Post-combat control resolution when occupancy changes ownership.
+ * What to expect:
+ *     Persists null for uncontrolled or a player id for controlled.
+ */
+export function setHexController(h3Index: string, controllerPlayerId: string | null): void {
+  logDebug('gameDb setHexController', { h3Index, controllerPlayerId });
+  run(
+    `INSERT INTO res1_control (h3_index, controller_player_id)
+     VALUES (?, ?)
+     ON CONFLICT(h3_index) DO UPDATE SET controller_player_id = excluded.controller_player_id`,
+    [h3Index, controllerPlayerId]
+  );
+}
+
+/**
+ * Why this exists:
+ *     Returns all persisted res-1 control rows for deterministic control resolution loops.
+ * When to use:
+ *     Turn resolution and test verification.
+ * What to expect:
+ *     Sorted by h3 index for stable iteration.
+ */
+export function listAllHexControls(): HexControlRow[] {
+  logTrace('gameDb listAllHexControls');
+  const rows = getAll<{ h3Index: string; controllerPlayerId: string | null }>(
+    `SELECT h3_index AS h3Index, controller_player_id AS controllerPlayerId
+     FROM res1_control
+     ORDER BY h3_index ASC`
+  );
+  return rows.map((row) => ({ h3Index: row.h3Index, controllerPlayerId: row.controllerPlayerId }));
+}
+
+/**
+ * Why this exists:
+ *     Returns one hex build queue ordered front-to-back for deterministic processing.
+ * When to use:
+ *     Tooltip rendering and per-turn production application.
+ * What to expect:
+ *     Empty list when no queued entries exist.
+ */
+export function listBuildQueueRowsForHex(h3Index: string): BuildQueueRow[] {
+  logTrace('gameDb listBuildQueueRowsForHex', { h3Index });
+  const rows = getAll<{
+    id: number;
+    h3Index: string;
+    queueIndex: number;
+    unitType: BuildUnitType;
+    remainingCount: number;
+  }>(
+    `SELECT id, h3_index AS h3Index, queue_index AS queueIndex, unit_type AS unitType, remaining_count AS remainingCount
+     FROM res1_build_queue
+     WHERE h3_index = ?
+     ORDER BY queue_index ASC, id ASC`,
+    [h3Index]
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    h3Index: row.h3Index,
+    queueIndex: row.queueIndex,
+    unitType: row.unitType,
+    remainingCount: row.remainingCount,
+  }));
+}
+
+/**
+ * Why this exists:
+ *     Returns persisted partial production points for one hex queue head.
+ * When to use:
+ *     Per-turn production calculator input.
+ * What to expect:
+ *     Defaults to zero when no row exists.
+ */
+export function getBuildProgressPointsForHex(h3Index: string): number {
+  logTrace('gameDb getBuildProgressPointsForHex', { h3Index });
+  const row = getOne<{ storedPoints: number }>(
+    'SELECT stored_points AS storedPoints FROM res1_build_progress WHERE h3_index = ?',
+    [h3Index]
+  );
+  return Math.max(0, row?.storedPoints ?? 0);
+}
+
+/**
+ * Why this exists:
+ *     Persists queue-head partial production points after one turn of processing.
+ * When to use:
+ *     End of per-turn production for each controlled hex.
+ * What to expect:
+ *     Stores non-negative points and upserts existing row.
+ */
+export function setBuildProgressPointsForHex(h3Index: string, storedPoints: number): void {
+  const safePoints = Math.max(0, Math.trunc(storedPoints));
+  logDebug('gameDb setBuildProgressPointsForHex', { h3Index, storedPoints: safePoints });
+  run(
+    `INSERT INTO res1_build_progress (h3_index, stored_points)
+     VALUES (?, ?)
+     ON CONFLICT(h3_index) DO UPDATE SET stored_points = excluded.stored_points`,
+    [h3Index, safePoints]
+  );
+}
+
+/**
+ * Why this exists:
+ *     Clears all queue entries and partial progress for one hex.
+ * When to use:
+ *     Ownership takeover rule and explicit queue reset operations.
+ * What to expect:
+ *     Idempotent clear; safe to call when rows are already absent.
+ */
+export function clearBuildQueueAndProgressForHex(h3Index: string): void {
+  logDebug('gameDb clearBuildQueueAndProgressForHex', { h3Index });
+  run('DELETE FROM res1_build_queue WHERE h3_index = ?', [h3Index]);
+  run('DELETE FROM res1_build_progress WHERE h3_index = ?', [h3Index]);
+}
+
+/**
+ * Why this exists:
+ *     Replaces one hex queue atomically after deterministic in-memory transformations.
+ * When to use:
+ *     Production phase and queue mutation handlers that reindex rows.
+ * What to expect:
+ *     Drops old rows then writes normalized `queueIndex` order.
+ */
+export function replaceBuildQueueForHex(h3Index: string, entries: Array<{ unitType: BuildUnitType; remainingCount: number }>): void {
+  logDebug('gameDb replaceBuildQueueForHex', { h3Index, entryCount: entries.length });
+  run('DELETE FROM res1_build_queue WHERE h3_index = ?', [h3Index]);
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i]!;
+    run(
+      `INSERT INTO res1_build_queue (h3_index, queue_index, unit_type, remaining_count)
+       VALUES (?, ?, ?, ?)`,
+      [h3Index, i, entry.unitType, Math.max(1, Math.trunc(entry.remainingCount))]
+    );
+  }
+}
+
 /**
  * True when initDatabase or test open has established a live better-sqlite3 handle. Use before operations that require persistence.
  */
@@ -1236,6 +1428,24 @@ export function clearAiPendingOrders(playerId: string): void {
   run('DELETE FROM ai_pending_orders WHERE player_id = ?', [playerId]);
 }
 
+function seedInitialHexControlFromUnitOccupancy(): void {
+  logDebug('gameDb seedInitialHexControlFromUnitOccupancy');
+  if (!db) return;
+  run('DELETE FROM res1_control');
+  const rows = getAll<{ h3Index: string; distinctPlayers: number; solePlayer: string | null }>(
+    `SELECT h3_index AS h3Index,
+            COUNT(DISTINCT player) AS distinctPlayers,
+            CASE WHEN COUNT(DISTINCT player) = 1 THEN MIN(player) ELSE NULL END AS solePlayer
+     FROM units
+     GROUP BY h3_index`
+  );
+  for (const row of rows) {
+    if (row.distinctPlayers === 1 && row.solePlayer) {
+      run('INSERT INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [row.h3Index, row.solePlayer]);
+    }
+  }
+}
+
 /**
  * Re-initializes the game for a new match: world map from terrain metadata classification, fresh seed, hexes/units, turn state,
  * pending orders, callbacks, AI memory, and standing orders cleared so no prior-match AI state leaks.
@@ -1265,6 +1475,10 @@ export function resetGameForNewMatch(): void {
   run('DELETE FROM ai_memory');
   run('DELETE FROM player_hex_intel');
   run('DELETE FROM player_unit_intel');
+  run('DELETE FROM res1_control');
+  run('DELETE FROM res1_build_queue');
+  run('DELETE FROM res1_build_progress');
+  seedInitialHexControlFromUnitOccupancy();
   refreshFogOfWarIntelFromCurrentState();
   saveDatabase();
 }

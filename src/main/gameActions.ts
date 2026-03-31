@@ -15,6 +15,14 @@ import {
   getMapHexSet,
   refreshFogOfWarIntelFromCurrentState,
   addAiLossEventsSinceConsultation,
+  getHexController,
+  setHexController,
+  listAllHexControls,
+  listBuildQueueRowsForHex,
+  getBuildProgressPointsForHex,
+  setBuildProgressPointsForHex,
+  clearBuildQueueAndProgressForHex,
+  replaceBuildQueueForHex,
 } from './gameDb';
 import { buildLatLngCoordinateMap, getOrderedHexList } from './mapData';
 import { getRange } from './combatConstants';
@@ -30,6 +38,16 @@ import {
   generateOrdersForStandingOrders,
   queryHumanStandingOrders,
 } from './tools/tool5StandingOrders';
+import {
+  applyProduction,
+  BUILD_ENTRY_MAX_COUNT,
+  BUILD_ENTRY_MIN_COUNT,
+  getAvailableBuildUnitTypes,
+  isValidBuildCount,
+  NO_URBAN_BUILD_REASON,
+  type BuildUnitType,
+} from './productionRules';
+import { getRes1ProductionContext } from './terrainClassificationCache';
 
 export type { MovementOrder, RangedAttackOrder, SubmitOrdersPayload };
 
@@ -73,6 +91,25 @@ export interface HumanOrderGroupPreviewResult {
   previews: HumanOrderGroupPreviewUnitResult[];
 }
 
+export interface HexBuildQueueEntryView {
+  id: number;
+  queueIndex: number;
+  unitType: BuildUnitType;
+  count: number;
+}
+
+export interface HexBuildQueueView {
+  h3Index: string;
+  controllerPlayerId: string | null;
+  controlledByRequester: boolean;
+  urbanHexCount: number;
+  portCount: number;
+  availableUnitTypes: BuildUnitType[];
+  buildSectionVisible: boolean;
+  noBuildReason: string | null;
+  entries: HexBuildQueueEntryView[];
+}
+
 const VALID_PHASE = 'planning';
 const HUMAN_PLAYER_ID = 'human';
 
@@ -82,6 +119,129 @@ const MOVEMENT_RANGE: Record<string, number> = {
   armor: 2,
   naval: 2,
 };
+
+function currentPlanningTurnNumber(): number {
+  return dbGetOne<{ turnNumber: number }>('SELECT turn_number AS turnNumber FROM turn_state WHERE id = 1')?.turnNumber ?? 1;
+}
+
+function buildQueueViewForRequester(h3Index: string, requestingPlayerId: string): HexBuildQueueView {
+  const controllerPlayerId = getHexController(h3Index);
+  const controlledByRequester = controllerPlayerId === requestingPlayerId;
+  const { urbanHexCount, portCount } = getRes1ProductionContext({ h3Index });
+  const availableUnitTypes = getAvailableBuildUnitTypes(urbanHexCount, portCount);
+  const buildSectionVisible = urbanHexCount > 0;
+  return {
+    h3Index,
+    controllerPlayerId,
+    controlledByRequester,
+    urbanHexCount,
+    portCount,
+    availableUnitTypes,
+    buildSectionVisible,
+    noBuildReason: buildSectionVisible ? null : NO_URBAN_BUILD_REASON,
+    entries: listBuildQueueRowsForHex(h3Index).map((row) => ({
+      id: row.id,
+      queueIndex: row.queueIndex,
+      unitType: row.unitType,
+      count: row.remainingCount,
+    })),
+  };
+}
+
+function resolveRes1ControlAfterCombatAndMovement(): void {
+  logDebug('gameActions resolveRes1ControlAfterCombatAndMovement');
+  const occupantRows = dbGetAll<{ h3Index: string; distinctPlayers: number; solePlayer: string | null }>(
+    `SELECT h3_index AS h3Index,
+            COUNT(DISTINCT player) AS distinctPlayers,
+            CASE WHEN COUNT(DISTINCT player) = 1 THEN MIN(player) ELSE NULL END AS solePlayer
+     FROM units
+     GROUP BY h3_index`
+  );
+  const occupancyByHex = new Map(occupantRows.map((row) => [row.h3Index, row]));
+  const currentControlByHex = new Map(listAllHexControls().map((row) => [row.h3Index, row.controllerPlayerId]));
+  const allHexes = new Set<string>([
+    ...Array.from(occupancyByHex.keys()),
+    ...Array.from(currentControlByHex.keys()),
+  ]);
+  for (const h3Index of allHexes) {
+    const occupied = occupancyByHex.get(h3Index);
+    if (!occupied) {
+      continue;
+    }
+    if (occupied.distinctPlayers >= 2) {
+      continue;
+    }
+    if (!occupied.solePlayer) {
+      continue;
+    }
+    const currentController = currentControlByHex.get(h3Index) ?? null;
+    if (currentController === occupied.solePlayer) {
+      continue;
+    }
+    setHexController(h3Index, occupied.solePlayer);
+    if (currentController !== null && currentController !== occupied.solePlayer) {
+      clearBuildQueueAndProgressForHex(h3Index);
+    }
+  }
+}
+
+function spawnProducedUnitsForHex(h3Index: string, controllerPlayerId: string, unitTypes: BuildUnitType[]): void {
+  if (unitTypes.length === 0) return;
+  const turnNumber = currentPlanningTurnNumber();
+  const seqRow = dbGetOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'production_unit_spawn_sequence'");
+  let sequence = seqRow ? parseInt(seqRow.value, 10) : 0;
+  if (!Number.isFinite(sequence)) sequence = 0;
+  for (const unitType of unitTypes) {
+    sequence += 1;
+    const unitId = `${controllerPlayerId}-${unitType}-prod-${turnNumber}-${sequence}`;
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
+      unitId,
+      controllerPlayerId,
+      unitType,
+      h3Index,
+    ]);
+  }
+  dbRun(`INSERT OR REPLACE INTO game_config (key, value) VALUES ('production_unit_spawn_sequence', ?)`, [String(sequence)]);
+}
+
+function processProductionAfterControlResolution(): void {
+  logDebug('gameActions processProductionAfterControlResolution');
+  const controls = listAllHexControls().filter((row) => row.controllerPlayerId !== null);
+  for (const control of controls) {
+    const controllerPlayerId = control.controllerPlayerId;
+    if (!controllerPlayerId) continue;
+    const queueRows = listBuildQueueRowsForHex(control.h3Index);
+    if (queueRows.length === 0) continue;
+    const { urbanHexCount } = getRes1ProductionContext({ h3Index: control.h3Index });
+    if (urbanHexCount <= 0) continue;
+    const storedPoints = getBuildProgressPointsForHex(control.h3Index);
+    const applyResult = applyProduction(
+      queueRows.map((row) => ({
+        id: row.id,
+        queueIndex: row.queueIndex,
+        unitType: row.unitType,
+        remainingCount: row.remainingCount,
+      })),
+      storedPoints,
+      urbanHexCount
+    );
+    replaceBuildQueueForHex(
+      control.h3Index,
+      applyResult.updatedEntries.map((entry) => ({ unitType: entry.unitType, remainingCount: entry.remainingCount }))
+    );
+    setBuildProgressPointsForHex(control.h3Index, applyResult.storedPoints);
+    spawnProducedUnitsForHex(control.h3Index, controllerPlayerId, applyResult.spawnedUnitTypes);
+    logDebug('gameActions processProductionAfterControlResolution: processed hex', {
+      h3Index: control.h3Index,
+      controllerPlayerId,
+      urbanHexCount,
+      queueBeforeCount: queueRows.length,
+      queueAfterCount: applyResult.updatedEntries.length,
+      storedPointsAfter: applyResult.storedPoints,
+      spawnedCount: applyResult.spawnedUnitTypes.length,
+    });
+  }
+}
 
 function collectTraversedHexesByPlayer(
   orders: Array<{ unitId: string; toH3Index: string }>,
@@ -411,6 +571,134 @@ export function validateGroupRangedTarget(unitIds: string[], targetH3Index: stri
     return { success: true };
   } catch (err) {
     logError('validateGroupRangedTarget: exception', err);
+    return { success: false, reason: String(err) };
+  }
+}
+
+/**
+ * Why this exists:
+ *     Returns one res-1 hex build queue snapshot (control, infra gating, and queue rows) for tooltip UI.
+ * When to use:
+ *     Renderer res-1 tooltip open/refresh during planning interactions.
+ * What to expect:
+ *     Always returns a stable snapshot; queue mutation is still authorization-gated in mutator APIs.
+ */
+export function getHexBuildQueue(h3Index: string, requestingPlayerId = HUMAN_PLAYER_ID): HexBuildQueueView {
+  logTrace('gameActions getHexBuildQueue', { h3Index, requestingPlayerId });
+  return buildQueueViewForRequester(h3Index, requestingPlayerId);
+}
+
+/**
+ * Why this exists:
+ *     Appends a new editable build queue row for a controlled hex owned by the requester.
+ * When to use:
+ *     Tooltip Build button click.
+ * What to expect:
+ *     Persists immediately, defaults to count=1 and first available unit type, and returns updated queue snapshot.
+ */
+export function addHexBuildQueueEntry(h3Index: string, requestingPlayerId = HUMAN_PLAYER_ID): {
+  success: boolean;
+  reason?: string;
+  queue?: HexBuildQueueView;
+} {
+  logDebug('gameActions addHexBuildQueueEntry', { h3Index, requestingPlayerId });
+  try {
+    const phase = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1')?.phase ?? 'planning';
+    if (phase !== VALID_PHASE) return { success: false, reason: 'Build queue can only be edited during planning phase.' };
+    const queueView = buildQueueViewForRequester(h3Index, requestingPlayerId);
+    if (!queueView.controlledByRequester) {
+      return { success: false, reason: 'Only the controlling player can edit this build queue.' };
+    }
+    if (!queueView.buildSectionVisible) return { success: false, reason: queueView.noBuildReason ?? NO_URBAN_BUILD_REASON };
+    const defaultUnitType = queueView.availableUnitTypes[0];
+    if (!defaultUnitType) return { success: false, reason: 'No unit types are currently available for this hex.' };
+    const currentRows = listBuildQueueRowsForHex(h3Index);
+    dbRun(
+      `INSERT INTO res1_build_queue (h3_index, queue_index, unit_type, remaining_count)
+       VALUES (?, ?, ?, ?)`,
+      [h3Index, currentRows.length, defaultUnitType, BUILD_ENTRY_MIN_COUNT]
+    );
+    return { success: true, queue: buildQueueViewForRequester(h3Index, requestingPlayerId) };
+  } catch (err) {
+    logError('addHexBuildQueueEntry: exception', err);
+    return { success: false, reason: String(err) };
+  }
+}
+
+/**
+ * Why this exists:
+ *     Updates one queued row's type/count while preserving queue order and immediate persistence semantics.
+ * When to use:
+ *     Tooltip row edit interactions for type select and count input.
+ * What to expect:
+ *     Rejects unauthorized or invalid edits and returns updated queue snapshot on success.
+ */
+export function updateHexBuildQueueEntry(
+  h3Index: string,
+  entryId: number,
+  unitType: BuildUnitType,
+  count: number,
+  requestingPlayerId = HUMAN_PLAYER_ID
+): { success: boolean; reason?: string; queue?: HexBuildQueueView } {
+  logDebug('gameActions updateHexBuildQueueEntry', { h3Index, entryId, unitType, count, requestingPlayerId });
+  try {
+    const phase = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1')?.phase ?? 'planning';
+    if (phase !== VALID_PHASE) return { success: false, reason: 'Build queue can only be edited during planning phase.' };
+    const queueView = buildQueueViewForRequester(h3Index, requestingPlayerId);
+    if (!queueView.controlledByRequester) {
+      return { success: false, reason: 'Only the controlling player can edit this build queue.' };
+    }
+    if (!queueView.buildSectionVisible) return { success: false, reason: queueView.noBuildReason ?? NO_URBAN_BUILD_REASON };
+    if (!queueView.availableUnitTypes.includes(unitType)) {
+      return { success: false, reason: `Unit type "${unitType}" is not available for this hex.` };
+    }
+    if (!isValidBuildCount(count)) {
+      return {
+        success: false,
+        reason: `Build count must be an integer from ${BUILD_ENTRY_MIN_COUNT} to ${BUILD_ENTRY_MAX_COUNT}.`,
+      };
+    }
+    const row = dbGetOne<{ id: number }>('SELECT id FROM res1_build_queue WHERE id = ? AND h3_index = ?', [entryId, h3Index]);
+    if (!row) return { success: false, reason: 'Build queue entry not found.' };
+    dbRun('UPDATE res1_build_queue SET unit_type = ?, remaining_count = ? WHERE id = ?', [unitType, count, entryId]);
+    return { success: true, queue: buildQueueViewForRequester(h3Index, requestingPlayerId) };
+  } catch (err) {
+    logError('updateHexBuildQueueEntry: exception', err);
+    return { success: false, reason: String(err) };
+  }
+}
+
+/**
+ * Why this exists:
+ *     Removes one queue row and reindexes the remaining rows to preserve strict front-to-back order.
+ * When to use:
+ *     Tooltip row remove (`x`) interactions.
+ * What to expect:
+ *     Persists immediately and returns updated queue snapshot on success.
+ */
+export function removeHexBuildQueueEntry(
+  h3Index: string,
+  entryId: number,
+  requestingPlayerId = HUMAN_PLAYER_ID
+): { success: boolean; reason?: string; queue?: HexBuildQueueView } {
+  logDebug('gameActions removeHexBuildQueueEntry', { h3Index, entryId, requestingPlayerId });
+  try {
+    const phase = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1')?.phase ?? 'planning';
+    if (phase !== VALID_PHASE) return { success: false, reason: 'Build queue can only be edited during planning phase.' };
+    const queueView = buildQueueViewForRequester(h3Index, requestingPlayerId);
+    if (!queueView.controlledByRequester) {
+      return { success: false, reason: 'Only the controlling player can edit this build queue.' };
+    }
+    const rows = listBuildQueueRowsForHex(h3Index);
+    const filtered = rows.filter((row) => row.id !== entryId);
+    if (filtered.length === rows.length) return { success: false, reason: 'Build queue entry not found.' };
+    replaceBuildQueueForHex(
+      h3Index,
+      filtered.map((row) => ({ unitType: row.unitType, remainingCount: row.remainingCount }))
+    );
+    return { success: true, queue: buildQueueViewForRequester(h3Index, requestingPlayerId) };
+  } catch (err) {
+    logError('removeHexBuildQueueEntry: exception', err);
     return { success: false, reason: String(err) };
   }
 }
@@ -753,6 +1041,9 @@ export function ready(
     for (const id of meleeResult.removedUnitIds) {
       dbRun('DELETE FROM units WHERE id = ?', [id]);
     }
+
+    resolveRes1ControlAfterCombatAndMovement();
+    processProductionAfterControlResolution();
 
     const humanCount = dbGetAll<{ c: number }>('SELECT COUNT(*) AS c FROM units WHERE player = ?', ['human'])[0]?.c ?? 0;
     const opponentCount = dbGetAll<{ c: number }>('SELECT COUNT(*) AS c FROM units WHERE player = ?', ['opponent'])[0]?.c ?? 0;

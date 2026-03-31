@@ -198,6 +198,27 @@ export interface HumanOrderGroupPreviewResult {
   previews: HumanOrderGroupPreviewUnitResult[];
 }
 
+export type BuildUnitType = 'infantry' | 'armor' | 'naval';
+
+export interface HexBuildQueueEntrySnapshot {
+  id: number;
+  queueIndex: number;
+  unitType: BuildUnitType;
+  count: number;
+}
+
+export interface HexBuildQueueSnapshot {
+  h3Index: string;
+  controllerPlayerId: string | null;
+  controlledByRequester: boolean;
+  urbanHexCount: number;
+  portCount: number;
+  availableUnitTypes: BuildUnitType[];
+  buildSectionVisible: boolean;
+  noBuildReason: string | null;
+  entries: HexBuildQueueEntrySnapshot[];
+}
+
 /** Preload-exposed renderer bridge contract. */
 export interface GameApi {
   getGameState: () => Promise<GameStateSnapshot>;
@@ -215,6 +236,18 @@ export interface GameApi {
   assignHumanMarchOrders: (payload: { unitIds: string[]; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
   validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
   cancelHumanStandingOrder: (payload: { unitId: string }) => Promise<{ success: boolean; reason?: string }>;
+  getHexBuildQueue: (payload: { h3Index: string }) => Promise<HexBuildQueueSnapshot | null>;
+  addHexBuildQueueEntry: (payload: { h3Index: string }) => Promise<{ success: boolean; reason?: string; queue?: HexBuildQueueSnapshot }>;
+  updateHexBuildQueueEntry: (payload: { h3Index: string; entryId: number; unitType: BuildUnitType; count: number }) => Promise<{
+    success: boolean;
+    reason?: string;
+    queue?: HexBuildQueueSnapshot;
+  }>;
+  removeHexBuildQueueEntry: (payload: { h3Index: string; entryId: number }) => Promise<{
+    success: boolean;
+    reason?: string;
+    queue?: HexBuildQueueSnapshot;
+  }>;
   requestAiOrders: (payload?: { enabledToolGroups?: string[] }) => Promise<RequestAiOrdersResult>;
   cancelRequestAiOrders: () => Promise<void>;
   registerOpenRouterLogListener?: (callback: (payload: { line: string; isError?: boolean }) => void) => void;

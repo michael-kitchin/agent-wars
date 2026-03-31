@@ -15089,9 +15089,11 @@
   }
   function hideTerrainTooltipVisual() {
     terrainTooltipRequestSeq++;
+    hideBuildQueueModalState();
     const el = document.getElementById("hex-tooltip");
     if (el) {
       el.classList.add("hidden");
+      el.classList.remove("build-modal");
       el.setAttribute("aria-hidden", "true");
     }
   }
@@ -15419,18 +15421,204 @@
     if (terrainTooltipHtmlByContentKey.size > 4096) terrainTooltipHtmlByContentKey.clear();
     return html;
   }
-  async function showTerrainTooltip(clientX, clientY, state, namingTarget) {
+  function hideBuildQueueModalState() {
+    buildQueueModalActive = false;
+    buildQueueModalHexH3 = null;
+    const el = document.getElementById("hex-tooltip");
+    if (el) el.classList.remove("build-modal");
+  }
+  function activateBuildQueueModalForHex(h3Index) {
+    buildQueueModalActive = true;
+    buildQueueModalHexH3 = h3Index;
+    const el = document.getElementById("hex-tooltip");
+    if (el) el.classList.add("build-modal");
+  }
+  function closeHexTooltipFromModalAction() {
+    hideBuildQueueModalState();
+    clearTerrainTooltipTimer();
+    hideTerrainTooltipVisual();
+  }
+  function sanitizeBuildCountInputText(raw) {
+    const digitsOnly = raw.replaceAll(/\D/g, "").slice(0, 2);
+    if (digitsOnly.length === 0) return "1";
+    const parsed = parseInt(digitsOnly, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return "1";
+    if (parsed > 99) return "99";
+    return String(parsed);
+  }
+  function isTooltipTargetInsideDialog(target) {
+    if (!(target instanceof Node)) return false;
+    const tooltip = document.getElementById("hex-tooltip");
+    return !!tooltip && tooltip.contains(target);
+  }
+  function isPointerInsideTooltipRect(clientX, clientY) {
+    const tooltip = document.getElementById("hex-tooltip");
+    if (!tooltip || tooltip.classList.contains("hidden")) return false;
+    const rect = tooltip.getBoundingClientRect();
+    return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+  }
+  async function renderBuildQueueSectionIntoTooltip(tooltipEl, h3Index) {
+    const mount = tooltipEl.querySelector("#hex-build-queue-section");
+    if (!mount || !window.gameApi?.getHexBuildQueue) return;
+    const requestSeq = ++buildQueueModalRequestSeq;
+    let snapshot = null;
+    try {
+      snapshot = await window.gameApi.getHexBuildQueue({ h3Index });
+    } catch (err) {
+      console.error("getHexBuildQueue failed:", err);
+    }
+    if (requestSeq !== buildQueueModalRequestSeq || !snapshot || buildQueueModalHexH3 !== h3Index) return;
+    mount.innerHTML = "";
+    const section = document.createElement("div");
+    section.className = "build-queue-section";
+    const controlLine = document.createElement("div");
+    controlLine.innerHTML = `<strong>Control:</strong> ${snapshot.controllerPlayerId ?? "Uncontrolled"}`;
+    section.appendChild(controlLine);
+    const pointsLine = document.createElement("div");
+    pointsLine.innerHTML = `<strong>Production:</strong> ${snapshot.urbanHexCount.toLocaleString()} / turn`;
+    section.appendChild(pointsLine);
+    if (!snapshot.controlledByRequester) {
+      mount.appendChild(section);
+      return;
+    }
+    if (!snapshot.buildSectionVisible) {
+      const noUrban = document.createElement("div");
+      noUrban.className = "build-no-urban";
+      noUrban.textContent = snapshot.noBuildReason ?? "This hex cannot build units.";
+      section.appendChild(noUrban);
+      mount.appendChild(section);
+      return;
+    }
+    const head = document.createElement("div");
+    head.className = "build-queue-head";
+    const title = document.createElement("span");
+    title.className = "build-queue-title";
+    title.textContent = "Build Queue";
+    const buildBtn = document.createElement("button");
+    buildBtn.type = "button";
+    buildBtn.className = "unit-select";
+    buildBtn.textContent = "Build";
+    buildBtn.addEventListener("click", async () => {
+      if (!window.gameApi?.addHexBuildQueueEntry) return;
+      activateBuildQueueModalForHex(h3Index);
+      const result = await window.gameApi.addHexBuildQueueEntry({ h3Index });
+      if (!result.success) {
+        showMapToast(result.reason ?? "Failed to add build queue entry.", { isError: true });
+        return;
+      }
+      void renderBuildQueueSectionIntoTooltip(tooltipEl, h3Index);
+    });
+    head.appendChild(title);
+    head.appendChild(buildBtn);
+    section.appendChild(head);
+    const list = document.createElement("div");
+    list.className = "build-queue-list";
+    const options = snapshot.availableUnitTypes;
+    for (const entry of snapshot.entries) {
+      const row = document.createElement("div");
+      row.className = "build-queue-row";
+      const typeSelect = document.createElement("select");
+      for (const unitType of options) {
+        const opt = document.createElement("option");
+        opt.value = unitType;
+        opt.textContent = unitType.charAt(0).toUpperCase() + unitType.slice(1);
+        typeSelect.appendChild(opt);
+      }
+      typeSelect.value = entry.unitType;
+      const countInput = document.createElement("input");
+      countInput.type = "text";
+      countInput.className = "build-count-input";
+      countInput.maxLength = 2;
+      countInput.inputMode = "numeric";
+      countInput.value = String(entry.count);
+      const readCurrentCount = () => {
+        const raw = sanitizeBuildCountInputText(countInput.value);
+        if (countInput.value !== raw) countInput.value = raw;
+        return parseInt(raw, 10);
+      };
+      typeSelect.addEventListener("change", async () => {
+        if (!window.gameApi?.updateHexBuildQueueEntry) return;
+        activateBuildQueueModalForHex(h3Index);
+        const result = await window.gameApi.updateHexBuildQueueEntry({
+          h3Index,
+          entryId: entry.id,
+          unitType: typeSelect.value,
+          count: readCurrentCount()
+        });
+        if (!result.success) {
+          showMapToast(result.reason ?? "Failed to update build queue entry.", { isError: true });
+        }
+        void renderBuildQueueSectionIntoTooltip(tooltipEl, h3Index);
+      });
+      row.appendChild(typeSelect);
+      countInput.addEventListener("keydown", (event) => {
+        const allowed = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Home", "End", "Tab"];
+        if (allowed.includes(event.key)) return;
+        if (/^\d$/.test(event.key)) return;
+        event.preventDefault();
+      });
+      countInput.addEventListener("input", async () => {
+        if (!window.gameApi?.updateHexBuildQueueEntry) return;
+        activateBuildQueueModalForHex(h3Index);
+        const count = readCurrentCount();
+        const result = await window.gameApi.updateHexBuildQueueEntry({
+          h3Index,
+          entryId: entry.id,
+          unitType: typeSelect.value,
+          count
+        });
+        if (!result.success) {
+          showMapToast(result.reason ?? "Failed to update build count.", { isError: true });
+        }
+      });
+      row.appendChild(countInput);
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "unit-select";
+      removeBtn.textContent = "x";
+      removeBtn.addEventListener("click", async () => {
+        if (!window.gameApi?.removeHexBuildQueueEntry) return;
+        activateBuildQueueModalForHex(h3Index);
+        const result = await window.gameApi.removeHexBuildQueueEntry({ h3Index, entryId: entry.id });
+        if (!result.success) {
+          showMapToast(result.reason ?? "Failed to remove build queue entry.", { isError: true });
+        }
+        void renderBuildQueueSectionIntoTooltip(tooltipEl, h3Index);
+      });
+      row.appendChild(removeBtn);
+      list.appendChild(row);
+    }
+    section.appendChild(list);
+    mount.appendChild(section);
+  }
+  async function showTerrainTooltip(clientX, clientY, state, namingTarget, sourceRes1H3) {
+    if (buildQueueModalActive && buildQueueModalHexH3 !== sourceRes1H3) return;
     const requestSeq = ++terrainTooltipRequestSeq;
     const namingLine = await getCachedNamingLineForTarget(namingTarget);
     if (requestSeq !== terrainTooltipRequestSeq) return;
     const el = document.getElementById("hex-tooltip");
     if (!el) return;
-    el.innerHTML = getCachedTerrainTooltipHtml(state, namingLine);
-    el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
-    el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
+    const modalClose = sourceRes1H3 ? `<button type="button" class="build-modal-close" aria-label="Close build queue">\xD7</button>` : "";
+    el.innerHTML = `${modalClose}${getCachedTerrainTooltipHtml(state, namingLine)}${sourceRes1H3 ? '<div id="hex-build-queue-section"></div>' : ""}`;
+    el.style.left = `${clientX}px`;
+    el.style.top = `${clientY + 2}px`;
     el.classList.remove("hidden");
     el.setAttribute("aria-hidden", "false");
     el.setAttribute("role", "tooltip");
+    if (sourceRes1H3) {
+      buildQueueModalHexH3 = sourceRes1H3;
+      if (buildQueueModalActive) el.classList.add("build-modal");
+      else el.classList.remove("build-modal");
+      const closeBtn = el.querySelector(".build-modal-close");
+      if (closeBtn) {
+        closeBtn.addEventListener("click", () => {
+          closeHexTooltipFromModalAction();
+        });
+      }
+      void renderBuildQueueSectionIntoTooltip(el, sourceRes1H3);
+    } else {
+      hideBuildQueueModalState();
+    }
   }
   var selectedHexIndex = null;
   var hoveredHexH3 = null;
@@ -15446,6 +15634,9 @@
   var pendingRangedAttacks = [];
   var hideCommittedOrderLinesAfterReady = false;
   var rangedModeActive = false;
+  var buildQueueModalActive = false;
+  var buildQueueModalHexH3 = null;
+  var buildQueueModalRequestSeq = 0;
   var gameState = null;
   var res4TerrainOverridesByH3 = /* @__PURE__ */ new Map();
   var terrainInfraRes1Airport = /* @__PURE__ */ new Set();
@@ -17387,6 +17578,11 @@
       resizeAndRedraw();
     });
     window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && buildQueueModalHexH3 !== null) {
+        e.preventDefault();
+        closeHexTooltipFromModalAction();
+        return;
+      }
       if (shouldIgnoreGlobalKeydown(e)) return;
       if (e.repeat) return;
       if (e.key === "Control") {
@@ -17423,6 +17619,20 @@
       reverseTerrainFillWhileHeld = false;
       requestRedraw();
     });
+    window.addEventListener(
+      "pointerdown",
+      (e) => {
+        if (!buildQueueModalActive || buildQueueModalHexH3 === null) return;
+        if (isTooltipTargetInsideDialog(e.target)) return;
+        closeHexTooltipFromModalAction();
+      },
+      true
+    );
+    const tooltipDialog = document.getElementById("hex-tooltip");
+    tooltipDialog?.addEventListener("pointerleave", () => {
+      if (!buildQueueModalActive || buildQueueModalHexH3 === null) return;
+      closeHexTooltipFromModalAction();
+    });
     const mainMapEl = document.getElementById("main-map");
     if (!mainMapEl) return;
     function clientXYToHit(clientX, clientY) {
@@ -17436,6 +17646,16 @@
       return hitTestHexAtContainerPixel(x, y, set);
     }
     mainMapEl.addEventListener("pointermove", (e) => {
+      if (!buildQueueModalActive && buildQueueModalHexH3 !== null && isPointerInsideTooltipRect(e.clientX, e.clientY)) {
+        activateBuildQueueModalForHex(buildQueueModalHexH3);
+        return;
+      }
+      if (buildQueueModalActive && buildQueueModalHexH3 !== null) {
+        if (!isTooltipTargetInsideDialog(e.target)) {
+          closeHexTooltipFromModalAction();
+        }
+        return;
+      }
       lastPointerClientX = e.clientX;
       lastPointerClientY = e.clientY;
       const mapHexSet = new Set((gameState?.hexes ?? []).map((h) => h.h3Index));
@@ -17455,7 +17675,7 @@
             if (hoveredHexH3 !== targetHex || !gameState) return;
             const state = terrainStateForPointer(lastPointerClientX, lastPointerClientY, targetHex);
             const namingTarget = namingLookupTargetForPointer(lastPointerClientX, lastPointerClientY, targetHex);
-            void showTerrainTooltip(lastPointerClientX, lastPointerClientY, state, namingTarget);
+            void showTerrainTooltip(lastPointerClientX, lastPointerClientY, state, namingTarget, targetHex);
           }, TERRAIN_TOOLTIP_DELAY_MS);
         }
         return;
@@ -17464,12 +17684,13 @@
       if (tip && !tip.classList.contains("hidden") && hit && isHexExploredByPlayer(hit)) {
         const state = terrainStateForPointer(e.clientX, e.clientY, hit);
         const namingTarget = namingLookupTargetForPointer(e.clientX, e.clientY, hit);
-        void showTerrainTooltip(e.clientX, e.clientY, state, namingTarget);
+        void showTerrainTooltip(e.clientX, e.clientY, state, namingTarget, hit);
       } else if (tip && !tip.classList.contains("hidden") && hit && !isHexExploredByPlayer(hit)) {
         hideTerrainTooltipVisual();
       }
     });
     mainMapEl.addEventListener("pointerleave", () => {
+      if (buildQueueModalActive && buildQueueModalHexH3 !== null) return;
       clearTerrainTooltipTimer();
       hideTerrainTooltipVisual();
       if (hoveredHexH3 !== null || hoveredDetailHexH3 !== null) {

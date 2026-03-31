@@ -379,7 +379,78 @@
       z-index: 5;
       box-shadow: 0 1px 4px rgba(0,0,0,0.15);
     }
+    .hex-tooltip.build-modal {
+      pointer-events: auto;
+      max-width: 180px;
+      z-index: 7;
+    }
     .hex-tooltip.hidden { display: none; }
+    .hex-tooltip .build-queue-section {
+      margin-top: 0.5rem;
+      padding-top: 0.45rem;
+      border-top: 1px solid rgba(102, 102, 102, 0.35);
+    }
+    .hex-tooltip .build-queue-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.4rem;
+      margin-bottom: 0.35rem;
+    }
+    .hex-tooltip .build-queue-title {
+      font-weight: 600;
+    }
+    .hex-tooltip .build-queue-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.28rem;
+      margin-top: 0.25rem;
+    }
+    .hex-tooltip .build-queue-row {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .hex-tooltip .build-queue-row select {
+      flex: 1;
+      min-width: 0;
+      font-size: 11px;
+      padding: 0.1rem 0.2rem;
+      border: 1px solid #aaa;
+      border-radius: 2px;
+      background: #f8f6f3;
+    }
+    .hex-tooltip .build-count-input {
+      width: 2.5rem;
+      min-width: 2.5rem;
+      font-size: 11px;
+      padding: 0.08rem 0.2rem;
+      border: 1px solid #aaa;
+      border-radius: 2px;
+      text-align: center;
+      background: #f8f6f3;
+    }
+    .hex-tooltip .build-no-urban {
+      margin-top: 0.45rem;
+      color: #555;
+      font-size: 11px;
+      line-height: 1.3;
+    }
+    .hex-tooltip .build-modal-close {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      padding: 0.1rem 0.35rem;
+      font-size: 1rem;
+      line-height: 1;
+      background: transparent;
+      border: none;
+      color: #666;
+      cursor: pointer;
+    }
+    .hex-tooltip .build-modal-close:hover {
+      color: #333;
+    }
     .stack-callout {
       position: fixed;
       pointer-events: auto;
@@ -414,7 +485,8 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .stack-callout .unit-select {
+    .stack-callout .unit-select,
+    .hex-tooltip .unit-select {
       flex-shrink: 0;
       padding: 0.15rem 0.4rem;
       font-size: 11px;
@@ -424,7 +496,8 @@
       border: none;
       border-radius: 2px;
     }
-    .stack-callout .unit-select:hover {
+    .stack-callout .unit-select:hover,
+    .hex-tooltip .unit-select:hover {
       background: #3a6a8f;
     }
   </style>

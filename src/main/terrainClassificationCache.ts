@@ -45,6 +45,8 @@ export interface TerrainClassificationSnapshot {
   namingLinesRes1ByH3: ReadonlyMap<string, string>;
   namingLinesRes4ByH3: ReadonlyMap<string, string>;
   continentNamesRes1ByH3: ReadonlyMap<string, string[]>;
+  urbanHexCountByRes1H3: ReadonlyMap<string, number>;
+  portCountByRes1H3: ReadonlyMap<string, number>;
 }
 
 let cached: TerrainClassificationSnapshot | null = null;
@@ -95,13 +97,16 @@ function buildSnapshot(): TerrainClassificationSnapshot {
 
   const res1MajorAirports: string[] = [];
   const res1MajorPorts: string[] = [];
+  const portCountByRes1H3 = new Map<string, number>();
   for (const row of res1Env.records) {
     if (recordHasMajorAirport(row)) res1MajorAirports.push(row.h3_index);
     if (recordHasMajorPort(row)) res1MajorPorts.push(row.h3_index);
+    portCountByRes1H3.set(row.h3_index, Math.max(0, row.port_count_total));
   }
   const res4MajorAirports: string[] = [];
   const res4MajorPorts: string[] = [];
   const res4ClassifiedRows: Array<{ h3Index: string; parentH3: string; childKind: PipelineTerrainKind; isUrban: boolean }> = [];
+  const urbanHexCountByRes1H3 = new Map<string, number>();
   const childKindCountsByParent = new Map<string, Map<PipelineTerrainKind, number>>();
   for (const row of res4Env.records as HexMetadataRecordRes4[]) {
     const childKind = classifyRes4TerrainKind(row, t, nodata);
@@ -114,6 +119,9 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     }
     parentCounts.set(childKind, (parentCounts.get(childKind) ?? 0) + 1);
     res4ClassifiedRows.push({ h3Index: row.h3_index, parentH3, childKind, isUrban });
+    if (isUrban) {
+      urbanHexCountByRes1H3.set(parentH3, (urbanHexCountByRes1H3.get(parentH3) ?? 0) + 1);
+    }
     if (recordHasMajorAirport(row)) res4MajorAirports.push(row.h3_index);
     if (recordHasMajorPort(row)) res4MajorPorts.push(row.h3_index);
   }
@@ -193,6 +201,8 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     namingLinesRes1ByH3,
     namingLinesRes4ByH3,
     continentNamesRes1ByH3,
+    urbanHexCountByRes1H3,
+    portCountByRes1H3,
   };
 }
 
@@ -318,6 +328,27 @@ export function getHexContinentNamesForRenderer(payload: { h3Index: string }): s
     throw err;
   }
   return [...(cached.continentNamesRes1ByH3.get(payload.h3Index) ?? [])];
+}
+
+/**
+ * Why this exists:
+ *     Returns production-relevant terrain infrastructure counts for one res-1 hex.
+ * When to use:
+ *     Build queue gating and turn production calculations in main-process gameplay logic.
+ * What to expect:
+ *     Always returns non-negative counts; missing rows default to zero.
+ */
+export function getRes1ProductionContext(payload: { h3Index: string }): { urbanHexCount: number; portCount: number } {
+  logTrace('terrainClassificationCache getRes1ProductionContext', payload);
+  if (!cached) {
+    const err = new Error('terrainClassificationCache: load ensureTerrainClassificationCacheLoaded() first');
+    logError('terrainClassificationCache getRes1ProductionContext: cache empty', err);
+    throw err;
+  }
+  return {
+    urbanHexCount: Math.max(0, cached.urbanHexCountByRes1H3.get(payload.h3Index) ?? 0),
+    portCount: Math.max(0, cached.portCountByRes1H3.get(payload.h3Index) ?? 0),
+  };
 }
 
 /**
