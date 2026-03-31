@@ -119,43 +119,6 @@ function drawAnchorAt(
   });
 }
 
-/** Diagonal lower-left → upper-right; half-length scales with `lengthLinearScale` (area scale = linear²). */
-function drawDiagonalSlash(
-  ctx: CanvasRenderingContext2D,
-  pts: HexScreenPoint[],
-  lineWidthScreenPx: number,
-  lengthLinearScale = 1
-): void {
-  if (pts.length === 0) return;
-  let minX = pts[0]!.x;
-  let maxX = pts[0]!.x;
-  let minY = pts[0]!.y;
-  let maxY = pts[0]!.y;
-  for (const p of pts) {
-    if (p.x < minX) minX = p.x;
-    if (p.x > maxX) maxX = p.x;
-    if (p.y < minY) minY = p.y;
-    if (p.y > maxY) maxY = p.y;
-  }
-  const dx = maxX - minX;
-  const dy = minY - maxY;
-  const len = Math.hypot(dx, dy);
-  if (len < 1e-6) return;
-  const ux = dx / len;
-  const uy = dy / len;
-  const mx = (minX + maxX) * 0.5;
-  const my = (minY + maxY) * 0.5;
-  const half = len * 0.25 * lengthLinearScale;
-  ctx.beginPath();
-  ctx.moveTo(mx - ux * half, my - uy * half);
-  ctx.lineTo(mx + ux * half, my + uy * half);
-  ctx.strokeStyle = '#0d0d0d';
-  ctx.lineWidth = lineWidthScreenPx;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.stroke();
-}
-
 const AIRPORT_FILL = '#e8eef6';
 const AIRPORT_STROKE = '#1a1f28';
 const PORT_FILL = '#6eb6f0';
@@ -163,7 +126,6 @@ const PORT_STROKE = '#0d1f35';
 
 /** Multiply base outline from map zoom for icon strokes (both airplane and anchor). */
 const GLYPH_OUTLINE_MULT = 1.58;
-const SLASH_WIDTH_MULT = 2.35;
 
 /** Max pixel size for aircraft (matches dual-symbol layout). */
 const GLYPH_AIR_PIXEL_FACTOR = 0.22;
@@ -188,28 +150,29 @@ export const SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE = 1.2;
 export function drawTerrainInfrastructureGlyphs(
   ctx: CanvasRenderingContext2D,
   pts: HexScreenPoint[],
-  options: { showAirport: boolean; showPort: boolean; outlineScreenPx: number; glyphAreaScale?: number }
+  options: { showAirport: boolean; showPort: boolean; outlineScreenPx: number; glyphAreaScale?: number; centerYOffsetPx?: number }
 ): void {
-  const { showAirport, showPort, outlineScreenPx, glyphAreaScale = 1 } = options;
+  const { showAirport, showPort, outlineScreenPx, glyphAreaScale = 1, centerYOffsetPx = 0 } = options;
   if (!showAirport && !showPort) return;
   const lin = Math.sqrt(glyphAreaScale);
   const glyphOutline = Math.max(0.92, outlineScreenPx * GLYPH_OUTLINE_MULT * lin);
   const { cx, cy, span } = centroidAndSpan(pts);
+  const centerY = cy + centerYOffsetPx;
   const pxAir = span * GLYPH_AIR_PIXEL_FACTOR * lin;
   const pxAnchor = pxAir * GLYPH_ANCHOR_TO_AIR_RATIO;
   const both = showAirport && showPort;
   if (both) {
-    drawDiagonalSlash(ctx, pts, Math.max(1.15, outlineScreenPx * SLASH_WIDTH_MULT * lin), lin);
-    const off = span * 0.14 * lin;
-    drawAirplaneAt(ctx, cx - off, cy - off, pxAir, glyphOutline, AIRPORT_FILL, AIRPORT_STROKE);
-    drawAnchorAt(ctx, cx + off, cy + off, pxAnchor, glyphOutline, PORT_FILL, PORT_STROKE);
+    // Keep dual symbols close to preserve room for other overlays in the hex.
+    const off = span * 0.1 * lin;
+    drawAirplaneAt(ctx, cx - off, centerY - off, pxAir, glyphOutline, AIRPORT_FILL, AIRPORT_STROKE);
+    drawAnchorAt(ctx, cx + off, centerY + off, pxAnchor, glyphOutline, PORT_FILL, PORT_STROKE);
     return;
   }
   const soloLin = Math.sqrt(SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE);
   const soloOutline = glyphOutline * soloLin;
   if (showAirport) {
-    drawAirplaneAt(ctx, cx, cy, pxAir * soloLin, soloOutline, AIRPORT_FILL, AIRPORT_STROKE);
+    drawAirplaneAt(ctx, cx, centerY, pxAir * soloLin, soloOutline, AIRPORT_FILL, AIRPORT_STROKE);
   } else {
-    drawAnchorAt(ctx, cx, cy, pxAnchor * soloLin, soloOutline, PORT_FILL, PORT_STROKE);
+    drawAnchorAt(ctx, cx, centerY, pxAnchor * soloLin, soloOutline, PORT_FILL, PORT_STROKE);
   }
 }

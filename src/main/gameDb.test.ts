@@ -163,6 +163,36 @@ function testSeededUnitsUseRegionalSpawnContracts(gameDb: typeof import('./gameD
   }
 }
 
+function testFogOfWarToggleVisibilityContract(gameDb: typeof import('./gameDb')): void {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
+  const p = path.join(dir, 't.sqlite');
+  try {
+    gameDb.openGameDatabaseAtPathForTests(p);
+
+    // Fog disabled: human perspective should receive full-board visibility and full enemy roster.
+    gameDb.resetGameForNewMatch({ fogOfWarEnabled: false });
+    const fullState = gameDb.getGameState();
+    const noFogHuman = gameDb.getGameStateForPlayer('human');
+    assert.strictEqual(noFogHuman.hexes.length, fullState.hexes.length);
+    assert.strictEqual(noFogHuman.units.length, fullState.units.length);
+    assert.strictEqual(noFogHuman.visibleHexes?.length ?? -1, fullState.hexes.length);
+    assert.strictEqual(noFogHuman.exploredHexes?.length ?? -1, fullState.hexes.length);
+    assert.strictEqual(noFogHuman.staleHexes?.length ?? -1, 0);
+
+    // Fog enabled: map should still load, but human perspective should not exceed full-map visibility contract.
+    gameDb.resetGameForNewMatch({ fogOfWarEnabled: true });
+    const fogFullState = gameDb.getGameState();
+    const fogHuman = gameDb.getGameStateForPlayer('human');
+    assert.strictEqual(fogHuman.hexes.length, fogFullState.hexes.length);
+    assert.ok((fogHuman.visibleHexes?.length ?? 0) <= fogFullState.hexes.length);
+    assert.ok((fogHuman.exploredHexes?.length ?? 0) <= fogFullState.hexes.length);
+    assert.ok(fogHuman.units.length <= fogFullState.units.length);
+  } finally {
+    gameDb.closeGameDatabaseForTests();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function testWrongUserVersionRecovers(gameDb: typeof import('./gameDb'), Database: any): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
@@ -202,6 +232,7 @@ function run(): void {
   testResetClearsStandingOrdersAndMemory(gameDb);
   testResetRegeneratesTerrain(gameDb);
   testSeededUnitsUseRegionalSpawnContracts(gameDb);
+  testFogOfWarToggleVisibilityContract(gameDb);
   testWrongUserVersionRecovers(gameDb, Database);
   console.log('gameDb.test.ts passed');
 }

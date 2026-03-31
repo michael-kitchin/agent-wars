@@ -51,6 +51,9 @@ export interface ReadyResultMinimal {
   kills?: { victimId: string; killerIds: string[] }[];
   killsByDirectFire?: { victimId: string; killerIds: string[] }[];
   killsByReturnFire?: { victimId: string; killerIds: string[] }[];
+  deployedUnitsByType?: { armor?: number; infantry?: number; naval?: number };
+  humanHexesLostCount?: number;
+  controlLossLightningHexes?: string[];
   aiStrategy?: string;
   toolInvocationCounts?: Record<string, number>;
   /** Cost in dollars for this turn's LLM call (when requestOrders was used). */
@@ -328,6 +331,9 @@ export async function handleGameReady(
     kills: readyResult.kills,
     killsByDirectFire: readyResult.killsByDirectFire,
     killsByReturnFire: readyResult.killsByReturnFire,
+    deployedUnitsByType: readyResult.deployedUnitsByType,
+    humanHexesLostCount: readyResult.humanHexesLostCount,
+    controlLossLightningHexes: readyResult.controlLossLightningHexes,
     aiStrategy,
     toolInvocationCounts,
     cost: turnCost,

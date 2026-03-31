@@ -76,7 +76,7 @@ declare global {
 /** Map background (style guide: neutral, recedes). */
 const BACKGROUND_COLOR = '#e0dcd4';
 
-const UNIT_RADIUS = 20;
+const UNIT_RADIUS = 18;
 /** Player accents (style guide: P1 #2e5a7b, P2 #7b4a2e). */
 const PLAYER_COLORS: Record<string, string> = {
   human: '#2e5a7b',
@@ -203,7 +203,7 @@ function showStackCallout(
   const header = document.createElement('div');
   header.className = 'stack-callout-actions';
   header.style.display = 'flex';
-  header.style.justifyContent = 'flex-end';
+  header.style.justifyContent = 'flex-start';
   header.style.gap = '0.4rem';
   header.style.marginBottom = '0.4rem';
 
@@ -409,6 +409,16 @@ function countUrbanRes4HexesInRes1Hex(parentH3: string): number {
     if (res4TerrainOverridesByH3.get(child)?.isUrban) count++;
   }
   return count;
+}
+
+function getControllerForHex(state: GameStateSnapshot, h3Index: string): string | null {
+  const row = state.res1Control?.find((entry) => entry.h3Index === h3Index);
+  return row?.controllerPlayerId ?? null;
+}
+
+function getQueuedUnitsForHex(state: GameStateSnapshot, h3Index: string): number {
+  const row = state.res1BuildQueueTotals?.find((entry) => entry.h3Index === h3Index);
+  return row?.queuedUnits ?? 0;
 }
 
 function roundToNearestInteger(value: number): number {
@@ -967,8 +977,8 @@ let selectedHexIndex: string | null = null;
 let hoveredHexH3: string | null = null;
 /** H3 index of the res-4 child under pointer while detail mode is active; null otherwise. */
 let hoveredDetailHexH3: string | null = null;
-/** While held, invert default res1/res4 fill behavior for visual inspection. */
-let reverseTerrainFillWhileHeld = false;
+/** While held, hide default res1/res4 fill behavior for visual inspection. */
+let hideTerrainFillWhileHeld = false;
 let selectedUnitIds: string[] = [];
 /** Selection snapshot at mousedown; used so double-click can issue group move without reselecting first. */
 let selectedUnitIdsAtMouseDown: string[] = [];
@@ -1005,6 +1015,7 @@ let resolutionMoveAnimation: {
   rangedCasualtyHexes?: string[];
   rangedRemovedUnits?: RemovedUnitSnapshot[];
   meleeCombatHexes?: string[];
+  controlLossLightningHexes?: string[];
   meleeCasualtyHexes?: string[];
   meleeRemovedUnits?: RemovedUnitSnapshot[];
   unknownCombatHexes?: string[];
@@ -1363,16 +1374,10 @@ function drawTerrainHexes(ctx: CanvasRenderingContext2D): void {
       ctx.closePath();
     };
     const explored = exploredHexes.has(hx.h3Index);
-    if (explored && reverseTerrainFillWhileHeld) {
+    if (explored && !hideTerrainFillWhileHeld) {
       fillHexTerrain(ctx, kind, drawClosedPath, {
-        fillAndHatchAlphaScale: hoveredHexH3 === hx.h3Index ? 0.6 : 1,
-        landHoverFill: kind === 'plains',
-        isUrban: false,
-      });
-    } else if (explored && !res4Active && hoveredHexH3 === hx.h3Index) {
-      fillHexTerrain(ctx, kind, drawClosedPath, {
-        fillAndHatchAlphaScale: 2,
-        landHoverFill: kind === 'plains',
+        fillAndHatchAlphaScale: !res4Active && hoveredHexH3 === hx.h3Index ? 2 : 1,
+        landHoverFill: !res4Active && hoveredHexH3 === hx.h3Index && kind === 'plains',
         isUrban: false,
       });
     }
@@ -1477,6 +1482,21 @@ function projectedPolygonOverlapsViewport(
   return maxX >= 0 && maxY >= 0 && minX <= viewportWidth && minY <= viewportHeight;
 }
 
+function spanForProjectedHex(pts: { x: number; y: number }[]): number {
+  if (pts.length === 0) return 1;
+  let minX = pts[0]!.x;
+  let maxX = pts[0]!.x;
+  let minY = pts[0]!.y;
+  let maxY = pts[0]!.y;
+  for (const p of pts) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return Math.max(1, Math.min(maxX - minX, maxY - minY));
+}
+
 function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void {
   if (!gameState || !shouldRenderRes4Hexes()) return;
   const exploredHexes = getExploredHexSet(gameState);
@@ -1525,15 +1545,7 @@ function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void {
         }
         ctx.closePath();
       };
-      if (reverseTerrainFillWhileHeld) {
-        if (hoveredDetailHexH3 === child) {
-          fillHexTerrain(ctx, terrainKind, drawClosedPath, {
-            fillAndHatchAlphaScale: 0.6,
-            landHoverFill: terrainKind === 'plains',
-            isUrban,
-          });
-        }
-      } else {
+      if (!hideTerrainFillWhileHeld) {
         fillHexTerrain(ctx, terrainKind, drawClosedPath, {
           fillAndHatchAlphaScale: hoveredDetailHexH3 === child ? 2 : 1,
           landHoverFill: hoveredDetailHexH3 === child && terrainKind === 'plains',
@@ -1548,38 +1560,21 @@ function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void {
   }
 }
 
-function res1HexHasUnits(h3: string): boolean {
-  return !!gameState?.units.some((u) => u.h3Index === h3);
-}
-
 /**
- * Res-1 terrain interior fill is drawn only for the hovered hex (when res-4 is off) or for every hex while T is held.
- * Glyphs match that visibility; if the hex has units, show glyphs only while T is held.
+ * Res-1 glyphs track terrain fill visibility and are hidden while T is held.
  */
 function infraGlyphsAllowedForRes1Hex(h3: string): boolean {
   if (!isHexExploredByPlayer(h3)) return false;
-  const res4Active = shouldRenderRes4Hexes();
-  const fillShown =
-    reverseTerrainFillWhileHeld || (!res4Active && hoveredHexH3 === h3);
-  if (!fillShown) return false;
-  const hasUnits = res1HexHasUnits(h3);
-  if (hasUnits && !reverseTerrainFillWhileHeld) return false;
-  return true;
+  return !hideTerrainFillWhileHeld;
 }
 
 /**
- * Res-4: without T, every child gets terrain interior fill — show infra glyphs on each child that has data.
- * With T held, only the hovered child gets interior fill — match glyphs to that cell only.
- * Parent hexes with units suppress glyphs unless T is held.
+ * Res-4 glyphs track terrain fill visibility and are hidden while T is held.
  */
 function infraGlyphsAllowedForRes4Child(parentH3: string, childH3: string): boolean {
   if (!isHexExploredByPlayer(parentH3)) return false;
-  if (reverseTerrainFillWhileHeld) {
-    if (hoveredDetailHexH3 !== childH3) return false;
-  }
-  const hasUnits = res1HexHasUnits(parentH3);
-  if (hasUnits && !reverseTerrainFillWhileHeld) return false;
-  return true;
+  void childH3;
+  return !hideTerrainFillWhileHeld;
 }
 
 /**
@@ -1613,7 +1608,12 @@ function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void 
         const p = map.latLngToContainerPoint(L.latLng(lat, lng));
         return { x: p.x, y: p.y };
       });
-      drawTerrainInfrastructureGlyphs(ctx, pts, { showAirport: ap, showPort: pt, outlineScreenPx });
+      drawTerrainInfrastructureGlyphs(ctx, pts, {
+        showAirport: ap,
+        showPort: pt,
+        outlineScreenPx,
+        centerYOffsetPx: spanForProjectedHex(pts) * -0.14,
+      });
     }
     return;
   }
@@ -1646,6 +1646,53 @@ function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void 
   }
 }
 
+function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void {
+  if (!gameState) return;
+  const map = getMainLeafletMap() as
+    | { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } }
+    | null;
+  if (!map) return;
+  const L = getLeafletGlobal();
+  const res4On = shouldRenderRes4Hexes();
+  for (const hx of gameState.hexes) {
+    if (!isHexExploredByPlayer(hx.h3Index)) continue;
+    if (hx.terrain === 'water') continue;
+    const controller = getControllerForHex(gameState, hx.h3Index);
+    const controlledByHuman = controller === 'human';
+    const capacityPerTurn = countUrbanRes4HexesInRes1Hex(hx.h3Index);
+    const queuedUnits = getQueuedUnitsForHex(gameState, hx.h3Index);
+    const hasUrbanCapacity = capacityPerTurn > 0;
+    const displayCapacity = controlledByHuman ? (hasUrbanCapacity ? capacityPerTurn : 0) : null;
+    const displayQueue = controlledByHuman ? (hasUrbanCapacity ? queuedUnits : 0) : null;
+    const hasInfraSymbols =
+      !res4On &&
+      infraGlyphsAllowedForRes1Hex(hx.h3Index) &&
+      (terrainInfraRes1Airport.has(hx.h3Index) || terrainInfraRes1Port.has(hx.h3Index));
+    const hasVisibleUnits = gameState.units.some((u) => u.h3Index === hx.h3Index);
+    const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
+    const pts = boundary.map(([lat, lng]: [number, number]) => {
+      const p = map.latLngToContainerPoint(L.latLng(lat, lng));
+      return { x: p.x, y: p.y };
+    });
+    const center = hexCenterPx(hx.h3Index);
+    const textY = hasInfraSymbols || hasVisibleUnits ? center.y + spanForProjectedHex(pts) * 0.24 : center.y;
+    const text =
+      controlledByHuman
+        ? `${displayCapacity!.toLocaleString()} / ${displayQueue!.toLocaleString()}`
+        : '? / ?';
+    const sizePx = hasInfraSymbols || hasVisibleUnits ? '10px' : '11px';
+    const useBold = controlledByHuman && hasUrbanCapacity;
+    ctx.font = `${useBold ? 'bold ' : ''}${sizePx} system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.25;
+    ctx.strokeText(text, center.x, textY);
+    ctx.fillStyle = '#000';
+    ctx.fillText(text, center.x, textY);
+  }
+}
+
 /** Tool group id and label for the Tools tab. Fallback when getToolGroupList is unavailable; order matches main registry. */
 const OPENROUTER_TOOL_GROUPS: { id: string; label: string }[] = [
   { id: 'precomputation', label: 'Precomputation' },
@@ -1655,6 +1702,7 @@ const OPENROUTER_TOOL_GROUPS: { id: string; label: string }[] = [
   { id: 'estimation', label: 'Estimation' },
   { id: 'memory', label: 'Memory' },
   { id: 'orders', label: 'Orders' },
+  { id: 'production', label: 'Production' },
 ];
 
 /** Current tool groups shown in the Tools tab (from main registry or fallback). */
@@ -1969,6 +2017,18 @@ function bulletizeToastLines(message: string): string {
     .join('\n');
 }
 
+function showToast(
+  el: HTMLElement,
+  textEl: HTMLElement,
+  textContentBuilder: (target: HTMLElement) => void,
+  isInfo: boolean
+): void {
+  textEl.textContent = '';
+  textContentBuilder(textEl);
+  el.classList.toggle('toast-info', isInfo);
+  el.classList.remove('hidden');
+}
+
 function showMapToast(message: string, options?: { isError?: boolean }): void {
   if (toastHideTimer !== null) {
     clearTimeout(toastHideTimer);
@@ -1977,13 +2037,17 @@ function showMapToast(message: string, options?: { isError?: boolean }): void {
   const el = document.getElementById('map-toast');
   const textEl = document.getElementById('map-toast-text');
   if (el && textEl) {
-    textEl.textContent = '';
-    const strong = document.createElement('strong');
-    strong.textContent = 'Update: ';
-    textEl.appendChild(strong);
-    textEl.appendChild(document.createTextNode('\n' + bulletizeToastLines(message)));
-    el.classList.toggle('toast-info', options?.isError === false);
-    el.classList.remove('hidden');
+    showToast(
+      el,
+      textEl,
+      (target) => {
+        const strong = document.createElement('strong');
+        strong.textContent = 'Update: ';
+        target.appendChild(strong);
+        target.appendChild(document.createTextNode('\n' + bulletizeToastLines(message)));
+      },
+      options?.isError === false
+    );
   }
   toastHideTimer = setTimeout(() => {
     toastHideTimer = null;
@@ -2012,17 +2076,21 @@ function showAiStrategyToast(message: string, modelName?: string): void {
   const el = document.getElementById('ai-strategy-toast');
   const textEl = document.getElementById('ai-strategy-toast-text');
   if (el && textEl) {
-    textEl.textContent = '';
-    if (modelName) {
-      const strong = document.createElement('strong');
-      strong.textContent = modelName;
-      textEl.appendChild(strong);
-      textEl.appendChild(document.createTextNode(': ' + message));
-    } else {
-      textEl.appendChild(document.createTextNode(message));
-    }
-    el.classList.add('toast-info');
-    el.classList.remove('hidden');
+    showToast(
+      el,
+      textEl,
+      (target) => {
+        if (modelName) {
+          const strong = document.createElement('strong');
+          strong.textContent = modelName;
+          target.appendChild(strong);
+          target.appendChild(document.createTextNode(': ' + message));
+        } else {
+          target.appendChild(document.createTextNode(message));
+        }
+      },
+      true
+    );
   }
   aiStrategyToastHideTimer = setTimeout(() => {
     aiStrategyToastHideTimer = null;
@@ -2037,6 +2105,20 @@ function hideAiStrategyToast(): void {
   }
   const el = document.getElementById('ai-strategy-toast');
   if (el) el.classList.add('hidden');
+}
+
+function formatDeployedUnitsLine(
+  deployed: { armor?: number; infantry?: number; naval?: number } | undefined
+): string | null {
+  if (!deployed) return null;
+  const parts: string[] = [];
+  if ((deployed.armor ?? 0) > 0) parts.push(`${deployed.armor!.toLocaleString()} armor`);
+  if ((deployed.infantry ?? 0) > 0) parts.push(`${deployed.infantry!.toLocaleString()} infantry`);
+  if ((deployed.naval ?? 0) > 0) parts.push(`${deployed.naval!.toLocaleString()} naval`);
+  if (parts.length === 0) return null;
+  if (parts.length === 1) return `${parts[0]} units deployed`;
+  if (parts.length === 2) return `${parts[0]} and ${parts[1]} units deployed`;
+  return `${parts[0]}, ${parts[1]}, and ${parts[2]} units deployed`;
 }
 
 /**
@@ -2074,7 +2156,9 @@ function drawGameScene(
     const elapsed = Date.now() - anim.startTime;
     const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
     const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
-    const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0;
+    const hasMeleeCombat =
+      (anim.meleeCombatHexes?.length ?? 0) > 0 ||
+      (anim.controlLossLightningHexes?.length ?? 0) > 0;
     const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
     const phase = getResolutionPhase5(
       elapsed,
@@ -2114,19 +2198,22 @@ function drawGameScene(
   if (pendingRangedAttacks.length > 0 && state.units.length && hexList) {
     drawRangedAttackLines(ctx, width, height, pendingRangedAttacks, state.units, hexList);
   }
+  drawRes1ProductionOverlays(ctx);
+  drawTerrainInfrastructureOverlays(ctx);
+  drawStaleEnemyIntel(ctx, state);
   if (unitsToDraw.length) {
     drawUnits(ctx, width, height, unitsToDraw, hexList, movingIds);
   }
-  drawStaleEnemyIntel(ctx, state);
   if (anim && hexList && moveProgress < 1) {
     drawMovingUnits(ctx, width, height, anim.moves, state.units, hexList, moveProgress);
   }
-  drawTerrainInfrastructureOverlays(ctx);
   if (anim && hexList) {
     const elapsed = Date.now() - anim.startTime;
     const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
     const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
-    const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0;
+    const hasMeleeCombat =
+      (anim.meleeCombatHexes?.length ?? 0) > 0 ||
+      (anim.controlLossLightningHexes?.length ?? 0) > 0;
     const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
     const phase = getResolutionPhase5(
       elapsed,
@@ -2135,7 +2222,15 @@ function drawGameScene(
       hasMeleeCombat,
       hasMeleeCasualties
     );
-    const combatHexes = phase.inRangedLightning ? (anim.rangedCombatHexes ?? anim.combatHexes) : phase.inMeleeLightning ? anim.meleeCombatHexes : undefined;
+    const meleeCombatHexes = [
+      ...(anim.meleeCombatHexes ?? []),
+      ...(anim.controlLossLightningHexes ?? []),
+    ].filter((h3, idx, arr) => arr.indexOf(h3) === idx);
+    const combatHexes = phase.inRangedLightning
+      ? (anim.rangedCombatHexes ?? anim.combatHexes)
+      : phase.inMeleeLightning
+        ? meleeCombatHexes
+        : undefined;
     if (combatHexes?.length) {
       const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * 0.008);
       const unknownSet = new Set(anim.unknownCombatHexes ?? []);
@@ -2193,9 +2288,9 @@ function resizeAndRedraw(): void {
   drawGameScene(ctx, w, h, gameState);
 }
 
-const STACK_OFFSET_X = 7;
-const STACK_OFFSET_Y = -4;
-const COUNT_BADGE_OFFSET = 18;
+const STACK_OFFSET_X = 6;
+const STACK_OFFSET_Y = -3;
+const COUNT_BADGE_OFFSET = 16;
 const MULTI_PLAYER_FILL = '#b0b0b0';
 const MULTI_PLAYER_STROKE = '#000';
 
@@ -2260,7 +2355,7 @@ function drawUnits(
     if (count > 1) {
       drawOneUnitMarker(ctx, x + STACK_OFFSET_X, y + STACK_OFFSET_Y, fillColor, label, strokeColor);
       const badgeX = x + COUNT_BADGE_OFFSET;
-      const badgeY = y + COUNT_BADGE_OFFSET;
+      const badgeY = y - COUNT_BADGE_OFFSET;
       ctx.font = 'bold 13px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -2853,7 +2948,9 @@ function tickResolutionMoveAnimation(): void {
   const elapsed = Date.now() - anim.startTime;
   const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
   const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
-  const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0;
+  const hasMeleeCombat =
+    (anim.meleeCombatHexes?.length ?? 0) > 0 ||
+    (anim.controlLossLightningHexes?.length ?? 0) > 0;
   const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
   const { totalMs } = getResolutionPhase5(
     elapsed,
@@ -2918,6 +3015,7 @@ function updateGameOverUI(state: GameStateSnapshot | null): void {
   const overlay = document.getElementById('game-over-overlay');
   const messageEl = document.getElementById('game-over-message');
   const newGameBtn = document.getElementById('new-game-btn');
+  const fogCheckbox = document.getElementById('new-game-fog-checkbox') as HTMLInputElement | null;
   const rangedBtn = document.getElementById('ranged-attack-btn') as HTMLButtonElement | null;
 
   const noGame = !state || state.hexes.length === 0;
@@ -2933,6 +3031,7 @@ function updateGameOverUI(state: GameStateSnapshot | null): void {
   }
 
   overlay?.classList.remove('hidden');
+  if (fogCheckbox) fogCheckbox.checked = true;
   setMainUIControlsEnabled(false);
   if (messageEl) {
     if (gameOver) {
@@ -2954,7 +3053,10 @@ function initNewGameButton(): void {
   document.getElementById('new-game-btn')?.addEventListener('click', async () => {
     if (!window.gameApi?.newGame) return;
     try {
-      const state = (await window.gameApi.newGame()) as GameStateSnapshot;
+      const fogCheckbox = document.getElementById('new-game-fog-checkbox') as HTMLInputElement | null;
+      const state = (await window.gameApi.newGame({
+        fogOfWarEnabled: fogCheckbox?.checked !== false,
+      })) as GameStateSnapshot;
       gameState = state;
       reconcileSelectionToCurrentState();
       clientStaleEnemyIntelByUnitId.clear();
@@ -3012,11 +3114,13 @@ function openNewGameOverlayFromModelTab(): void {
   const overlay = document.getElementById('game-over-overlay');
   const messageEl = document.getElementById('game-over-message');
   const newGameBtn = document.getElementById('new-game-btn');
+  const fogCheckbox = document.getElementById('new-game-fog-checkbox') as HTMLInputElement | null;
   if (messageEl) {
     messageEl.textContent = 'Start a new world map game when ready.';
     messageEl.style.display = '';
   }
   if (newGameBtn) newGameBtn.textContent = 'Start game';
+  if (fogCheckbox) fogCheckbox.checked = true;
   overlay?.classList.remove('hidden');
   setMainUIControlsEnabled(false);
   updateReadyButtonState();
@@ -3257,6 +3361,8 @@ function initOpenRouterUI(): void {
   const modelSelect = document.getElementById('openrouter-model') as HTMLSelectElement | null;
   const refreshBtn = document.getElementById('openrouter-refresh-models');
   const newBtn = document.getElementById('openrouter-new-btn');
+  let persistedSelectedModelId = '';
+  let lastPersistedApiKeyValue = '';
 
   function refreshModels(): void {
     api!.listModels().then((result) => {
@@ -3274,20 +3380,50 @@ function initOpenRouterUI(): void {
         opt.textContent = m.name ?? m.id;
         modelSelect.appendChild(opt);
       }
-      if (kept && Array.from(modelSelect.options).some((o) => o.value === kept)) {
-        modelSelect.value = kept;
+      const targetModelId = kept || persistedSelectedModelId;
+      if (targetModelId && Array.from(modelSelect.options).some((o) => o.value === targetModelId)) {
+        modelSelect.value = targetModelId;
       }
     });
   }
 
-  refreshModels();
+  api!.getSelectedModel().then((modelId) => {
+    persistedSelectedModelId = modelId;
+    if (modelSelect && modelId && !Array.from(modelSelect.options).some((o) => o.value === modelId)) {
+      const opt = document.createElement('option');
+      opt.value = modelId;
+      opt.textContent = modelId;
+      modelSelect.appendChild(opt);
+      modelSelect.value = modelId;
+    }
+    refreshModels();
+  }).catch(() => refreshModels());
 
   if (keyInput) {
-    keyInput.addEventListener('blur', () => {
-      const v = keyInput.value.trim();
-      api!.setKey(v).then(() => {
-        if (!v) hideMapToast();
+    api!.getKey().then((keyResult) => {
+      if (keyResult?.hasKey && !keyInput.value.trim()) {
+        // Keep the secret hidden while still showing that a key is saved.
+        keyInput.placeholder = 'Saved API key';
+        lastPersistedApiKeyValue = '';
+      }
+    });
+    const persistApiKey = (): void => {
+      const value = keyInput.value.trim();
+      if (value === lastPersistedApiKeyValue) return;
+      lastPersistedApiKeyValue = value;
+      api!.setKey(value).then(() => {
+        if (!value) {
+          keyInput.placeholder = '';
+          hideMapToast();
+          return;
+        }
+        keyInput.placeholder = 'Saved API key';
       });
+    };
+    keyInput.addEventListener('blur', persistApiKey);
+    keyInput.addEventListener('change', persistApiKey);
+    keyInput.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') persistApiKey();
     });
   }
 
@@ -3436,7 +3572,7 @@ function init(): void {
     }
     const key = e.key.toLowerCase();
     if (key === 't') {
-      reverseTerrainFillWhileHeld = true;
+      hideTerrainFillWhileHeld = true;
       requestRedraw();
       return;
     }
@@ -3453,15 +3589,15 @@ function init(): void {
       return;
     }
     if (e.key.toLowerCase() === 't') {
-      reverseTerrainFillWhileHeld = false;
+      hideTerrainFillWhileHeld = false;
       requestRedraw();
     }
   });
   window.addEventListener('blur', () => {
     ctrlKeyActive = false;
     refreshStackCalloutIfOpen();
-    if (!reverseTerrainFillWhileHeld) return;
-    reverseTerrainFillWhileHeld = false;
+    if (!hideTerrainFillWhileHeld) return;
+    hideTerrainFillWhileHeld = false;
     requestRedraw();
   });
   window.addEventListener(
@@ -3793,7 +3929,11 @@ function init(): void {
           showMapToast('AI: standing orders only (no consultation).', { isError: false });
         }
         const hasRanged = (readyResult.rangedCombatHexes?.length ?? 0) > 0 || (readyResult.rangedCasualtyHexes?.length ?? 0) > 0 || (readyResult.rangedRemovedUnits?.length ?? 0) > 0;
-        const hasMelee = (readyResult.meleeCombatHexes?.length ?? 0) > 0 || (readyResult.meleeCasualtyHexes?.length ?? 0) > 0 || (readyResult.meleeRemovedUnits?.length ?? 0) > 0;
+        const hasMelee =
+          (readyResult.meleeCombatHexes?.length ?? 0) > 0 ||
+          (readyResult.meleeCasualtyHexes?.length ?? 0) > 0 ||
+          (readyResult.meleeRemovedUnits?.length ?? 0) > 0 ||
+          (readyResult.controlLossLightningHexes?.length ?? 0) > 0;
         const hasLegacy = (readyResult.combatHexes?.length ?? 0) > 0 || (readyResult.casualtyHexes?.length ?? 0) > 0;
         const visibleHexes = getVisibleHexSet(state);
         const allKills = readyResult.kills ?? [];
@@ -3835,6 +3975,7 @@ function init(): void {
             rangedCasualtyHexes: readyResult.rangedCasualtyHexes?.length ? readyResult.rangedCasualtyHexes : undefined,
             rangedRemovedUnits: readyResult.rangedRemovedUnits?.length ? readyResult.rangedRemovedUnits : undefined,
             meleeCombatHexes: readyResult.meleeCombatHexes?.length ? readyResult.meleeCombatHexes : undefined,
+            controlLossLightningHexes: readyResult.controlLossLightningHexes?.length ? readyResult.controlLossLightningHexes : undefined,
             meleeCasualtyHexes: readyResult.meleeCasualtyHexes?.length ? readyResult.meleeCasualtyHexes : undefined,
             meleeRemovedUnits: readyResult.meleeRemovedUnits?.length ? readyResult.meleeRemovedUnits : undefined,
             unknownCombatHexes: unknownCombatHexes.length > 0 ? unknownCombatHexes : undefined,
@@ -3858,6 +3999,11 @@ function init(): void {
           const knownMeleeKills = meleeKills.filter((k) => knownVictimIds.has(k.victimId));
           const fmt = (k: { victimId: string; killerIds: string[] }) => `${k.victimId} destroyed by ${k.killerIds.join(', ')}`;
           const bullets: string[] = [];
+          const deployedLine = formatDeployedUnitsLine(readyResult.deployedUnitsByType);
+          if (deployedLine) bullets.push(deployedLine);
+          if ((readyResult.humanHexesLostCount ?? 0) > 0) {
+            bullets.push(`${readyResult.humanHexesLostCount!.toLocaleString()} hexes lost to opponent`);
+          }
           if (knownDirectFire.length > 0) bullets.push(`• Direct fire: ${knownDirectFire.map(fmt).join('; ')}`);
           if (knownReturnFire.length > 0) bullets.push(`• Return fire: ${knownReturnFire.map(fmt).join('; ')}`);
           if (knownMeleeKills.length > 0) bullets.push(knownMeleeKills.map(fmt).join('\n'));

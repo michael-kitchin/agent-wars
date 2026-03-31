@@ -10,6 +10,7 @@ import type { PrecomputationResult, UnitAssessmentResult, CombatEstimateEntry } 
 import type { CallbackSubscription } from './callbackSubscriptions';
 import { cellToLatLng } from 'h3-js';
 import { LATLNG_DECIMAL_PLACES } from './mapData';
+import { logTrace } from './logger';
 
 /** Standing order statuses that require immediate attention (match tool5 WARNING_STATUSES). */
 const WARNING_STATUSES = new Set([
@@ -73,10 +74,12 @@ function buildStrategicNarrative(
   const critical = unitAssessments.filter((a) =>
     (a.result.threats ?? []).some((t) => t.severity === 'critical')
   ).length;
+  const observedEnemySentence =
+    humanUnits.length > 0
+      ? `Turn ${state.turnNumber}: you command ${aiUnits.length} unit(s); currently observed human units: ${humanUnits.length}.`
+      : `Turn ${state.turnNumber}: you command ${aiUnits.length} unit(s); currently observed human units: 0. Enemy forces may still be out of view, so scout and preserve contact.`;
   const sentences: string[] = [];
-  sentences.push(
-    `Turn ${state.turnNumber}: you command ${aiUnits.length} unit(s) against ${humanUnits.length} human unit(s).`
-  );
+  sentences.push(observedEnemySentence);
   if (inContact > 0) {
     sentences.push(`${inContact} of your units are in or near direct combat range.`);
   }
@@ -279,8 +282,16 @@ export function formatBriefing(
   standingOrderText: string,
   memoryText: string,
   subscriptions?: CallbackSubscription[],
-  lossesSinceLastConsultation: AiLossEventSinceConsultation[] = []
+  lossesSinceLastConsultation: AiLossEventSinceConsultation[] = [],
+  productionText = ''
 ): string {
+  logTrace('briefingFormatter formatBriefing', {
+    turnNumber: state.turnNumber,
+    unitAssessmentCount: precomputed.unitAssessments.length,
+    combatEstimateCount: precomputed.combatEstimates.length,
+    callbackCount: subscriptions?.length ?? 0,
+    hasProductionText: productionText.trim().length > 0,
+  });
   const latLngByH3 = new Map<string, [number, number]>();
   for (const hx of state.hexes) {
     const [lat, lng] = cellToLatLng(hx.h3Index);
@@ -295,6 +306,10 @@ export function formatBriefing(
   sections.push(buildCombatEstimatesTable(precomputed.combatEstimates));
   sections.push('\n\n**Losses since last consultation**\n');
   sections.push(buildLossesSinceLastConsultationTable(lossesSinceLastConsultation, 'opponent'));
+  if (productionText.trim().length > 0) {
+    sections.push('\n\n**Production status and options**\n');
+    sections.push(productionText.trim());
+  }
   sections.push('\n\n**Attention flags**\n');
   sections.push(buildAttentionFlags(precomputed.unitAssessments));
   const hasStrategicMemoryHeader = (memoryText ?? '').includes('=== YOUR STRATEGIC MEMORY');

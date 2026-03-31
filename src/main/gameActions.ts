@@ -110,6 +110,9 @@ export interface HexBuildQueueView {
   entries: HexBuildQueueEntryView[];
 }
 
+type DeployedUnitsByType = { armor?: number; infantry?: number; naval?: number };
+type ControlTransition = { h3Index: string; fromControllerPlayerId: string | null; toControllerPlayerId: string | null };
+
 const VALID_PHASE = 'planning';
 const HUMAN_PLAYER_ID = 'human';
 
@@ -148,8 +151,14 @@ function buildQueueViewForRequester(h3Index: string, requestingPlayerId: string)
   };
 }
 
-function resolveRes1ControlAfterCombatAndMovement(): void {
-  logDebug('gameActions resolveRes1ControlAfterCombatAndMovement');
+function resolveRes1ControlAfterCombatAndMovement(
+  traversedHexesByPlayer?: Record<'human' | 'opponent', Set<string>>
+): ControlTransition[] {
+  logDebug('gameActions resolveRes1ControlAfterCombatAndMovement', {
+    humanTraversedHexes: traversedHexesByPlayer?.human?.size ?? 0,
+    opponentTraversedHexes: traversedHexesByPlayer?.opponent?.size ?? 0,
+  });
+  const transitions: ControlTransition[] = [];
   const occupantRows = dbGetAll<{ h3Index: string; distinctPlayers: number; solePlayer: string | null }>(
     `SELECT h3_index AS h3Index,
             COUNT(DISTINCT player) AS distinctPlayers,
@@ -162,27 +171,41 @@ function resolveRes1ControlAfterCombatAndMovement(): void {
   const allHexes = new Set<string>([
     ...Array.from(occupancyByHex.keys()),
     ...Array.from(currentControlByHex.keys()),
+    ...(traversedHexesByPlayer ? [...traversedHexesByPlayer.human, ...traversedHexesByPlayer.opponent] : []),
   ]);
   for (const h3Index of allHexes) {
     const occupied = occupancyByHex.get(h3Index);
-    if (!occupied) {
-      continue;
-    }
-    if (occupied.distinctPlayers >= 2) {
-      continue;
-    }
-    if (!occupied.solePlayer) {
-      continue;
-    }
     const currentController = currentControlByHex.get(h3Index) ?? null;
-    if (currentController === occupied.solePlayer) {
+    let nextController: string | null = null;
+    if (occupied && occupied.distinctPlayers === 1 && occupied.solePlayer) {
+      nextController = occupied.solePlayer;
+    } else if (!occupied && traversedHexesByPlayer) {
+      const humanTraversed = traversedHexesByPlayer.human.has(h3Index);
+      const opponentTraversed = traversedHexesByPlayer.opponent.has(h3Index);
+      // Intermediate-path control only resolves on unoccupied hexes traversed by exactly one side.
+      if (humanTraversed !== opponentTraversed) {
+        nextController = humanTraversed ? 'human' : 'opponent';
+      }
+    } else {
       continue;
     }
-    setHexController(h3Index, occupied.solePlayer);
-    if (currentController !== null && currentController !== occupied.solePlayer) {
+    if (!nextController) {
+      continue;
+    }
+    if (currentController === nextController) {
+      continue;
+    }
+    setHexController(h3Index, nextController);
+    transitions.push({
+      h3Index,
+      fromControllerPlayerId: currentController,
+      toControllerPlayerId: nextController,
+    });
+    if (currentController !== null && currentController !== nextController) {
       clearBuildQueueAndProgressForHex(h3Index);
     }
   }
+  return transitions;
 }
 
 function spawnProducedUnitsForHex(h3Index: string, controllerPlayerId: string, unitTypes: BuildUnitType[]): void {
@@ -204,8 +227,9 @@ function spawnProducedUnitsForHex(h3Index: string, controllerPlayerId: string, u
   dbRun(`INSERT OR REPLACE INTO game_config (key, value) VALUES ('production_unit_spawn_sequence', ?)`, [String(sequence)]);
 }
 
-function processProductionAfterControlResolution(): void {
+function processProductionAfterControlResolution(): DeployedUnitsByType {
   logDebug('gameActions processProductionAfterControlResolution');
+  const deployed: DeployedUnitsByType = {};
   const controls = listAllHexControls().filter((row) => row.controllerPlayerId !== null);
   for (const control of controls) {
     const controllerPlayerId = control.controllerPlayerId;
@@ -231,6 +255,9 @@ function processProductionAfterControlResolution(): void {
     );
     setBuildProgressPointsForHex(control.h3Index, applyResult.storedPoints);
     spawnProducedUnitsForHex(control.h3Index, controllerPlayerId, applyResult.spawnedUnitTypes);
+    for (const unitType of applyResult.spawnedUnitTypes) {
+      deployed[unitType] = (deployed[unitType] ?? 0) + 1;
+    }
     logDebug('gameActions processProductionAfterControlResolution: processed hex', {
       h3Index: control.h3Index,
       controllerPlayerId,
@@ -241,6 +268,7 @@ function processProductionAfterControlResolution(): void {
       spawnedCount: applyResult.spawnedUnitTypes.length,
     });
   }
+  return deployed;
 }
 
 function collectTraversedHexesByPlayer(
@@ -950,6 +978,12 @@ export function ready(
   removedOpponentUnitIds?: string[];
   /** Human unit moves resolved this turn (for renderer animation). */
   humanMoves?: { unitId: string; fromH3Index: string; toH3Index: string }[];
+  /** Newly produced units spawned this turn, grouped by type. */
+  deployedUnitsByType?: DeployedUnitsByType;
+  /** Count of human-controlled hexes that changed to opponent control this turn. */
+  humanHexesLostCount?: number;
+  /** Human hexes lost to opponent where no human units remain after resolution. */
+  controlLossLightningHexes?: string[];
 } {
   logDebug('ready', { aiOrderCount: aiOrders.length, aiRangedCount: aiRangedOrders.length });
   try {
@@ -1042,8 +1076,17 @@ export function ready(
       dbRun('DELETE FROM units WHERE id = ?', [id]);
     }
 
-    resolveRes1ControlAfterCombatAndMovement();
-    processProductionAfterControlResolution();
+    const controlTransitions = resolveRes1ControlAfterCombatAndMovement(traversedHexesByPlayer);
+    const deployedUnitsByType = processProductionAfterControlResolution();
+    const finalUnits = dbGetAll<{ id: string; player: string; unit_type: string; h3_index: string }>(
+      'SELECT id, player, unit_type, h3_index FROM units'
+    ).map((r) => ({ id: r.id, player: r.player, unitType: r.unit_type, h3Index: r.h3_index }));
+    const humanHexesLost = controlTransitions.filter(
+      (t) => t.fromControllerPlayerId === 'human' && t.toControllerPlayerId === 'opponent'
+    );
+    const controlLossLightningHexes = humanHexesLost
+      .filter((t) => !finalUnits.some((u) => u.player === 'human' && u.h3Index === t.h3Index))
+      .map((t) => t.h3Index);
 
     const humanCount = dbGetAll<{ c: number }>('SELECT COUNT(*) AS c FROM units WHERE player = ?', ['human'])[0]?.c ?? 0;
     const opponentCount = dbGetAll<{ c: number }>('SELECT COUNT(*) AS c FROM units WHERE player = ?', ['opponent'])[0]?.c ?? 0;
@@ -1108,6 +1151,9 @@ export function ready(
       meleeCasualtyHexes: meleeResult.casualtyHexes.length > 0 ? meleeResult.casualtyHexes : undefined,
       meleeRemovedUnits: meleeResult.removedUnits.length > 0 ? meleeResult.removedUnits : undefined,
       humanMoves: humanMoves.length > 0 ? humanMoves : undefined,
+      deployedUnitsByType: Object.keys(deployedUnitsByType).length > 0 ? deployedUnitsByType : undefined,
+      humanHexesLostCount: humanHexesLost.length > 0 ? humanHexesLost.length : undefined,
+      controlLossLightningHexes: controlLossLightningHexes.length > 0 ? controlLossLightningHexes : undefined,
       opponentCombatParticipantUnitIds,
       removedOpponentUnitIds,
     };

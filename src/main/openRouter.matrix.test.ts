@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-function-type -- dynamic require + Module._load typing for Electron mock */
 /**
- * Matrix tests for requestOrders prompt/tool payload construction across all 7 UI toggles:
- * precomputation, events, planning, assessment, estimation, memory, orders.
+ * Matrix tests for requestOrders prompt/tool payload construction across all 8 UI toggles:
+ * precomputation, events, planning, assessment, estimation, memory, orders, production.
  *
- * Verifies for all 128 combinations:
+ * Verifies for all 256 combinations:
  * - The system prompt contains enabled tool names and omits disabled ones.
  * - The OpenRouter API payload tools[] includes only enabled API tools.
  * - Each included tool has an object-typed parameters schema (tool argument contract sent to API).
@@ -103,8 +103,8 @@ async function run(): Promise<void> {
     const allHexes = mapData.getOrderedHexList().slice(0, 8);
     const state = buildFixtureState(allHexes);
 
-    const uiToggleIds = ['precomputation', 'events', 'planning', 'assessment', 'estimation', 'memory', 'orders'] as const;
-    const apiToggleIds = ['precomputation', 'planning', 'assessment', 'estimation', 'memory', 'orders'];
+    const uiToggleIds = ['precomputation', 'events', 'planning', 'assessment', 'estimation', 'memory', 'orders', 'production'] as const;
+    const apiToggleIds = ['precomputation', 'planning', 'assessment', 'estimation', 'memory', 'orders', 'production'];
     const allApiToolNames = new Set(openRouter.getToolNamesForEnabledGroups(apiToggleIds));
 
     let combosChecked = 0;

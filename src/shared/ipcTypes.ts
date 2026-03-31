@@ -54,6 +54,10 @@ export interface GameStateSnapshot {
   phase: string;
   turnNumber: number;
   pendingOrders: { unitId: string; toH3Index: string }[];
+  /** Res-1 control rows for overlay rendering and production UI. */
+  res1Control?: { h3Index: string; controllerPlayerId: string | null }[];
+  /** Res-1 total queued unit counts (sum of remaining_count) per hex. */
+  res1BuildQueueTotals?: { h3Index: string; queuedUnits: number }[];
   gameOver?: boolean;
   winner?: string;
 }
@@ -74,6 +78,11 @@ export interface RangedAttackOrder {
 export interface SubmitOrdersPayload {
   movementOrders: MovementOrder[];
   rangedAttacks?: RangedAttackOrder[];
+}
+
+/** Optional arguments for game:newGame (currently fog-of-war toggle). */
+export interface NewGameIpcPayload {
+  fogOfWarEnabled?: boolean;
 }
 
 /**
@@ -151,6 +160,12 @@ export interface ReadyResult {
   kills?: { victimId: string; killerIds: string[] }[];
   killsByDirectFire?: { victimId: string; killerIds: string[] }[];
   killsByReturnFire?: { victimId: string; killerIds: string[] }[];
+  /** Newly spawned production units this turn, aggregated by unit type. */
+  deployedUnitsByType?: { armor?: number; infantry?: number; naval?: number };
+  /** Count of human-controlled hexes lost to the opponent this turn. */
+  humanHexesLostCount?: number;
+  /** Hexes that should show lightning due to off-hex control loss events. */
+  controlLossLightningHexes?: string[];
   aiStrategy?: string;
   toolInvocationCounts?: Record<string, number>;
   cost?: number;
@@ -226,7 +241,7 @@ export interface GameApi {
   getTerrainInfrastructureHints: () => Promise<TerrainInfrastructureHintsSnapshot>;
   getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest) => Promise<string | null>;
   getHexContinentNames: (payload: HexContinentNamesRequest) => Promise<string[]>;
-  newGame: () => Promise<GameStateSnapshot>;
+  newGame: (payload?: NewGameIpcPayload) => Promise<GameStateSnapshot>;
   submitOrders: (payload: SubmitOrdersIpcPayload) => Promise<{ success: boolean; reason?: string }>;
   ready: (payload?: GameReadyIpcPayload) => Promise<ReadyResult>;
   listHumanStandingOrders: () => Promise<HumanStandingOrderSnapshot[]>;

@@ -14814,68 +14814,37 @@
       originY: ANCHOR_VIEWBOX_CENTER.y
     });
   }
-  function drawDiagonalSlash(ctx, pts, lineWidthScreenPx, lengthLinearScale = 1) {
-    if (pts.length === 0) return;
-    let minX = pts[0].x;
-    let maxX = pts[0].x;
-    let minY = pts[0].y;
-    let maxY = pts[0].y;
-    for (const p of pts) {
-      if (p.x < minX) minX = p.x;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.y > maxY) maxY = p.y;
-    }
-    const dx = maxX - minX;
-    const dy = minY - maxY;
-    const len = Math.hypot(dx, dy);
-    if (len < 1e-6) return;
-    const ux = dx / len;
-    const uy = dy / len;
-    const mx = (minX + maxX) * 0.5;
-    const my = (minY + maxY) * 0.5;
-    const half = len * 0.25 * lengthLinearScale;
-    ctx.beginPath();
-    ctx.moveTo(mx - ux * half, my - uy * half);
-    ctx.lineTo(mx + ux * half, my + uy * half);
-    ctx.strokeStyle = "#0d0d0d";
-    ctx.lineWidth = lineWidthScreenPx;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.stroke();
-  }
   var AIRPORT_FILL = "#e8eef6";
   var AIRPORT_STROKE = "#1a1f28";
   var PORT_FILL = "#6eb6f0";
   var PORT_STROKE = "#0d1f35";
   var GLYPH_OUTLINE_MULT = 1.58;
-  var SLASH_WIDTH_MULT = 2.35;
   var GLYPH_AIR_PIXEL_FACTOR = 0.22;
   var GLYPH_ANCHOR_TO_AIR_RATIO = 1.03;
   var RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE = 1.2;
   var SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE = 1.2;
   function drawTerrainInfrastructureGlyphs(ctx, pts, options) {
-    const { showAirport, showPort, outlineScreenPx, glyphAreaScale = 1 } = options;
+    const { showAirport, showPort, outlineScreenPx, glyphAreaScale = 1, centerYOffsetPx = 0 } = options;
     if (!showAirport && !showPort) return;
     const lin = Math.sqrt(glyphAreaScale);
     const glyphOutline = Math.max(0.92, outlineScreenPx * GLYPH_OUTLINE_MULT * lin);
     const { cx, cy, span } = centroidAndSpan(pts);
+    const centerY = cy + centerYOffsetPx;
     const pxAir = span * GLYPH_AIR_PIXEL_FACTOR * lin;
     const pxAnchor = pxAir * GLYPH_ANCHOR_TO_AIR_RATIO;
     const both = showAirport && showPort;
     if (both) {
-      drawDiagonalSlash(ctx, pts, Math.max(1.15, outlineScreenPx * SLASH_WIDTH_MULT * lin), lin);
-      const off = span * 0.14 * lin;
-      drawAirplaneAt(ctx, cx - off, cy - off, pxAir, glyphOutline, AIRPORT_FILL, AIRPORT_STROKE);
-      drawAnchorAt(ctx, cx + off, cy + off, pxAnchor, glyphOutline, PORT_FILL, PORT_STROKE);
+      const off = span * 0.1 * lin;
+      drawAirplaneAt(ctx, cx - off, centerY - off, pxAir, glyphOutline, AIRPORT_FILL, AIRPORT_STROKE);
+      drawAnchorAt(ctx, cx + off, centerY + off, pxAnchor, glyphOutline, PORT_FILL, PORT_STROKE);
       return;
     }
     const soloLin = Math.sqrt(SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE);
     const soloOutline = glyphOutline * soloLin;
     if (showAirport) {
-      drawAirplaneAt(ctx, cx, cy, pxAir * soloLin, soloOutline, AIRPORT_FILL, AIRPORT_STROKE);
+      drawAirplaneAt(ctx, cx, centerY, pxAir * soloLin, soloOutline, AIRPORT_FILL, AIRPORT_STROKE);
     } else {
-      drawAnchorAt(ctx, cx, cy, pxAnchor * soloLin, soloOutline, PORT_FILL, PORT_STROKE);
+      drawAnchorAt(ctx, cx, centerY, pxAnchor * soloLin, soloOutline, PORT_FILL, PORT_STROKE);
     }
   }
 
@@ -14891,7 +14860,7 @@
     naval: 2
   };
   var BACKGROUND_COLOR = "#e0dcd4";
-  var UNIT_RADIUS = 20;
+  var UNIT_RADIUS = 18;
   var PLAYER_COLORS = {
     human: "#2e5a7b",
     opponent: "#7b4a2e"
@@ -14973,7 +14942,7 @@
     const header = document.createElement("div");
     header.className = "stack-callout-actions";
     header.style.display = "flex";
-    header.style.justifyContent = "flex-end";
+    header.style.justifyContent = "flex-start";
     header.style.gap = "0.4rem";
     header.style.marginBottom = "0.4rem";
     const humanIds = sorted.filter((u) => u.player === "human").map((u) => u.id);
@@ -15138,6 +15107,14 @@
       if (res4TerrainOverridesByH3.get(child)?.isUrban) count++;
     }
     return count;
+  }
+  function getControllerForHex(state, h3Index) {
+    const row = state.res1Control?.find((entry) => entry.h3Index === h3Index);
+    return row?.controllerPlayerId ?? null;
+  }
+  function getQueuedUnitsForHex(state, h3Index) {
+    const row = state.res1BuildQueueTotals?.find((entry) => entry.h3Index === h3Index);
+    return row?.queuedUnits ?? 0;
   }
   function roundToNearestInteger(value) {
     return Math.round(value);
@@ -15623,7 +15600,7 @@
   var selectedHexIndex = null;
   var hoveredHexH3 = null;
   var hoveredDetailHexH3 = null;
-  var reverseTerrainFillWhileHeld = false;
+  var hideTerrainFillWhileHeld = false;
   var selectedUnitIds = [];
   var selectedUnitIdsAtMouseDown = [];
   var ctrlKeyActive = false;
@@ -15916,16 +15893,10 @@
         ctx.closePath();
       };
       const explored = exploredHexes.has(hx.h3Index);
-      if (explored && reverseTerrainFillWhileHeld) {
+      if (explored && !hideTerrainFillWhileHeld) {
         fillHexTerrain(ctx, kind, drawClosedPath, {
-          fillAndHatchAlphaScale: hoveredHexH3 === hx.h3Index ? 0.6 : 1,
-          landHoverFill: kind === "plains",
-          isUrban: false
-        });
-      } else if (explored && !res4Active && hoveredHexH3 === hx.h3Index) {
-        fillHexTerrain(ctx, kind, drawClosedPath, {
-          fillAndHatchAlphaScale: 2,
-          landHoverFill: kind === "plains",
+          fillAndHatchAlphaScale: !res4Active && hoveredHexH3 === hx.h3Index ? 2 : 1,
+          landHoverFill: !res4Active && hoveredHexH3 === hx.h3Index && kind === "plains",
           isUrban: false
         });
       }
@@ -16009,6 +15980,20 @@
     }
     return maxX >= 0 && maxY >= 0 && minX <= viewportWidth && minY <= viewportHeight;
   }
+  function spanForProjectedHex(pts) {
+    if (pts.length === 0) return 1;
+    let minX = pts[0].x;
+    let maxX = pts[0].x;
+    let minY = pts[0].y;
+    let maxY = pts[0].y;
+    for (const p of pts) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    return Math.max(1, Math.min(maxX - minX, maxY - minY));
+  }
   function drawRes4TerrainHexes(ctx) {
     if (!gameState || !shouldRenderRes4Hexes()) return;
     const exploredHexes = getExploredHexSet(gameState);
@@ -16044,15 +16029,7 @@
           }
           ctx.closePath();
         };
-        if (reverseTerrainFillWhileHeld) {
-          if (hoveredDetailHexH3 === child) {
-            fillHexTerrain(ctx, terrainKind, drawClosedPath, {
-              fillAndHatchAlphaScale: 0.6,
-              landHoverFill: terrainKind === "plains",
-              isUrban
-            });
-          }
-        } else {
+        if (!hideTerrainFillWhileHeld) {
           fillHexTerrain(ctx, terrainKind, drawClosedPath, {
             fillAndHatchAlphaScale: hoveredDetailHexH3 === child ? 2 : 1,
             landHoverFill: hoveredDetailHexH3 === child && terrainKind === "plains",
@@ -16066,26 +16043,14 @@
       }
     }
   }
-  function res1HexHasUnits(h3) {
-    return !!gameState?.units.some((u) => u.h3Index === h3);
-  }
   function infraGlyphsAllowedForRes1Hex(h3) {
     if (!isHexExploredByPlayer(h3)) return false;
-    const res4Active = shouldRenderRes4Hexes();
-    const fillShown = reverseTerrainFillWhileHeld || !res4Active && hoveredHexH3 === h3;
-    if (!fillShown) return false;
-    const hasUnits = res1HexHasUnits(h3);
-    if (hasUnits && !reverseTerrainFillWhileHeld) return false;
-    return true;
+    return !hideTerrainFillWhileHeld;
   }
   function infraGlyphsAllowedForRes4Child(parentH3, childH3) {
     if (!isHexExploredByPlayer(parentH3)) return false;
-    if (reverseTerrainFillWhileHeld) {
-      if (hoveredDetailHexH3 !== childH3) return false;
-    }
-    const hasUnits = res1HexHasUnits(parentH3);
-    if (hasUnits && !reverseTerrainFillWhileHeld) return false;
-    return true;
+    void childH3;
+    return !hideTerrainFillWhileHeld;
   }
   function drawTerrainInfrastructureOverlays(ctx) {
     if (!gameState) return;
@@ -16108,7 +16073,12 @@
           const p = map.latLngToContainerPoint(L.latLng(lat, lng));
           return { x: p.x, y: p.y };
         });
-        drawTerrainInfrastructureGlyphs(ctx, pts, { showAirport: ap, showPort: pt, outlineScreenPx });
+        drawTerrainInfrastructureGlyphs(ctx, pts, {
+          showAirport: ap,
+          showPort: pt,
+          outlineScreenPx,
+          centerYOffsetPx: spanForProjectedHex(pts) * -0.14
+        });
       }
       return;
     }
@@ -16139,6 +16109,44 @@
       }
     }
   }
+  function drawRes1ProductionOverlays(ctx) {
+    if (!gameState) return;
+    const map = getMainLeafletMap();
+    if (!map) return;
+    const L = getLeafletGlobal();
+    const res4On = shouldRenderRes4Hexes();
+    for (const hx of gameState.hexes) {
+      if (!isHexExploredByPlayer(hx.h3Index)) continue;
+      if (hx.terrain === "water") continue;
+      const controller = getControllerForHex(gameState, hx.h3Index);
+      const controlledByHuman = controller === "human";
+      const capacityPerTurn = countUrbanRes4HexesInRes1Hex(hx.h3Index);
+      const queuedUnits = getQueuedUnitsForHex(gameState, hx.h3Index);
+      const hasUrbanCapacity = capacityPerTurn > 0;
+      const displayCapacity = controlledByHuman ? hasUrbanCapacity ? capacityPerTurn : 0 : null;
+      const displayQueue = controlledByHuman ? hasUrbanCapacity ? queuedUnits : 0 : null;
+      const hasInfraSymbols = !res4On && infraGlyphsAllowedForRes1Hex(hx.h3Index) && (terrainInfraRes1Airport.has(hx.h3Index) || terrainInfraRes1Port.has(hx.h3Index));
+      const hasVisibleUnits = gameState.units.some((u) => u.h3Index === hx.h3Index);
+      const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
+      const pts = boundary.map(([lat, lng]) => {
+        const p = map.latLngToContainerPoint(L.latLng(lat, lng));
+        return { x: p.x, y: p.y };
+      });
+      const center = hexCenterPx(hx.h3Index);
+      const textY = hasInfraSymbols || hasVisibleUnits ? center.y + spanForProjectedHex(pts) * 0.24 : center.y;
+      const text = controlledByHuman ? `${displayCapacity.toLocaleString()} / ${displayQueue.toLocaleString()}` : "? / ?";
+      const sizePx = hasInfraSymbols || hasVisibleUnits ? "10px" : "11px";
+      const useBold = controlledByHuman && hasUrbanCapacity;
+      ctx.font = `${useBold ? "bold " : ""}${sizePx} system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1.25;
+      ctx.strokeText(text, center.x, textY);
+      ctx.fillStyle = "#000";
+      ctx.fillText(text, center.x, textY);
+    }
+  }
   var OPENROUTER_TOOL_GROUPS = [
     { id: "precomputation", label: "Precomputation" },
     { id: "events", label: "Events" },
@@ -16146,7 +16154,8 @@
     { id: "assessment", label: "Assessment" },
     { id: "estimation", label: "Estimation" },
     { id: "memory", label: "Memory" },
-    { id: "orders", label: "Orders" }
+    { id: "orders", label: "Orders" },
+    { id: "production", label: "Production" }
   ];
   var openRouterToolGroups = [...OPENROUTER_TOOL_GROUPS];
   var enabledToolGroups = new Set(OPENROUTER_TOOL_GROUPS.map((g) => g.id));
@@ -16376,6 +16385,12 @@
     if (lines.length === 0) return "\u2022";
     return lines.map((line) => line.startsWith("\u2022") ? line : `\u2022 ${line}`).join("\n");
   }
+  function showToast(el, textEl, textContentBuilder, isInfo) {
+    textEl.textContent = "";
+    textContentBuilder(textEl);
+    el.classList.toggle("toast-info", isInfo);
+    el.classList.remove("hidden");
+  }
   function showMapToast(message, options) {
     if (toastHideTimer !== null) {
       clearTimeout(toastHideTimer);
@@ -16384,13 +16399,17 @@
     const el = document.getElementById("map-toast");
     const textEl = document.getElementById("map-toast-text");
     if (el && textEl) {
-      textEl.textContent = "";
-      const strong = document.createElement("strong");
-      strong.textContent = "Update: ";
-      textEl.appendChild(strong);
-      textEl.appendChild(document.createTextNode("\n" + bulletizeToastLines(message)));
-      el.classList.toggle("toast-info", options?.isError === false);
-      el.classList.remove("hidden");
+      showToast(
+        el,
+        textEl,
+        (target) => {
+          const strong = document.createElement("strong");
+          strong.textContent = "Update: ";
+          target.appendChild(strong);
+          target.appendChild(document.createTextNode("\n" + bulletizeToastLines(message)));
+        },
+        options?.isError === false
+      );
     }
     toastHideTimer = setTimeout(() => {
       toastHideTimer = null;
@@ -16413,17 +16432,21 @@
     const el = document.getElementById("ai-strategy-toast");
     const textEl = document.getElementById("ai-strategy-toast-text");
     if (el && textEl) {
-      textEl.textContent = "";
-      if (modelName) {
-        const strong = document.createElement("strong");
-        strong.textContent = modelName;
-        textEl.appendChild(strong);
-        textEl.appendChild(document.createTextNode(": " + message));
-      } else {
-        textEl.appendChild(document.createTextNode(message));
-      }
-      el.classList.add("toast-info");
-      el.classList.remove("hidden");
+      showToast(
+        el,
+        textEl,
+        (target) => {
+          if (modelName) {
+            const strong = document.createElement("strong");
+            strong.textContent = modelName;
+            target.appendChild(strong);
+            target.appendChild(document.createTextNode(": " + message));
+          } else {
+            target.appendChild(document.createTextNode(message));
+          }
+        },
+        true
+      );
     }
     aiStrategyToastHideTimer = setTimeout(() => {
       aiStrategyToastHideTimer = null;
@@ -16437,6 +16460,17 @@
     }
     const el = document.getElementById("ai-strategy-toast");
     if (el) el.classList.add("hidden");
+  }
+  function formatDeployedUnitsLine(deployed) {
+    if (!deployed) return null;
+    const parts = [];
+    if ((deployed.armor ?? 0) > 0) parts.push(`${deployed.armor.toLocaleString()} armor`);
+    if ((deployed.infantry ?? 0) > 0) parts.push(`${deployed.infantry.toLocaleString()} infantry`);
+    if ((deployed.naval ?? 0) > 0) parts.push(`${deployed.naval.toLocaleString()} naval`);
+    if (parts.length === 0) return null;
+    if (parts.length === 1) return `${parts[0]} units deployed`;
+    if (parts.length === 2) return `${parts[0]} and ${parts[1]} units deployed`;
+    return `${parts[0]}, ${parts[1]}, and ${parts[2]} units deployed`;
   }
   function drawLoadingScene(ctx, width, height) {
     ctx.fillStyle = BACKGROUND_COLOR;
@@ -16460,7 +16494,7 @@
       const elapsed = Date.now() - anim.startTime;
       const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
       const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
-      const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0;
+      const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0 || (anim.controlLossLightningHexes?.length ?? 0) > 0;
       const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
       const phase = getResolutionPhase5(
         elapsed,
@@ -16498,19 +16532,20 @@
     if (pendingRangedAttacks.length > 0 && state.units.length && hexList) {
       drawRangedAttackLines(ctx, width, height, pendingRangedAttacks, state.units, hexList);
     }
+    drawRes1ProductionOverlays(ctx);
+    drawTerrainInfrastructureOverlays(ctx);
+    drawStaleEnemyIntel(ctx, state);
     if (unitsToDraw.length) {
       drawUnits(ctx, width, height, unitsToDraw, hexList, movingIds);
     }
-    drawStaleEnemyIntel(ctx, state);
     if (anim && hexList && moveProgress < 1) {
       drawMovingUnits(ctx, width, height, anim.moves, state.units, hexList, moveProgress);
     }
-    drawTerrainInfrastructureOverlays(ctx);
     if (anim && hexList) {
       const elapsed = Date.now() - anim.startTime;
       const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
       const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
-      const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0;
+      const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0 || (anim.controlLossLightningHexes?.length ?? 0) > 0;
       const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
       const phase = getResolutionPhase5(
         elapsed,
@@ -16519,7 +16554,11 @@
         hasMeleeCombat,
         hasMeleeCasualties
       );
-      const combatHexes = phase.inRangedLightning ? anim.rangedCombatHexes ?? anim.combatHexes : phase.inMeleeLightning ? anim.meleeCombatHexes : void 0;
+      const meleeCombatHexes = [
+        ...anim.meleeCombatHexes ?? [],
+        ...anim.controlLossLightningHexes ?? []
+      ].filter((h3, idx, arr) => arr.indexOf(h3) === idx);
+      const combatHexes = phase.inRangedLightning ? anim.rangedCombatHexes ?? anim.combatHexes : phase.inMeleeLightning ? meleeCombatHexes : void 0;
       if (combatHexes?.length) {
         const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * 8e-3);
         const unknownSet = new Set(anim.unknownCombatHexes ?? []);
@@ -16564,9 +16603,9 @@
     }
     drawGameScene(ctx, w, h, gameState);
   }
-  var STACK_OFFSET_X = 7;
-  var STACK_OFFSET_Y = -4;
-  var COUNT_BADGE_OFFSET = 18;
+  var STACK_OFFSET_X = 6;
+  var STACK_OFFSET_Y = -3;
+  var COUNT_BADGE_OFFSET = 16;
   var MULTI_PLAYER_FILL = "#b0b0b0";
   var MULTI_PLAYER_STROKE = "#000";
   function drawOneUnitMarker(ctx, x, y, color, label, strokeColor = "#fff") {
@@ -16606,7 +16645,7 @@
       if (count > 1) {
         drawOneUnitMarker(ctx, x + STACK_OFFSET_X, y + STACK_OFFSET_Y, fillColor, label, strokeColor);
         const badgeX = x + COUNT_BADGE_OFFSET;
-        const badgeY = y + COUNT_BADGE_OFFSET;
+        const badgeY = y - COUNT_BADGE_OFFSET;
         ctx.font = "bold 13px system-ui, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -17079,7 +17118,7 @@
     const elapsed = Date.now() - anim.startTime;
     const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
     const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
-    const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0;
+    const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0 || (anim.controlLossLightningHexes?.length ?? 0) > 0;
     const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
     const { totalMs } = getResolutionPhase5(
       elapsed,
@@ -17130,6 +17169,7 @@
     const overlay = document.getElementById("game-over-overlay");
     const messageEl = document.getElementById("game-over-message");
     const newGameBtn = document.getElementById("new-game-btn");
+    const fogCheckbox = document.getElementById("new-game-fog-checkbox");
     const rangedBtn = document.getElementById("ranged-attack-btn");
     const noGame = !state || state.hexes.length === 0;
     const gameOver = !!state?.gameOver;
@@ -17142,6 +17182,7 @@
       return;
     }
     overlay?.classList.remove("hidden");
+    if (fogCheckbox) fogCheckbox.checked = true;
     setMainUIControlsEnabled(false);
     if (messageEl) {
       if (gameOver) {
@@ -17162,7 +17203,10 @@
     document.getElementById("new-game-btn")?.addEventListener("click", async () => {
       if (!window.gameApi?.newGame) return;
       try {
-        const state = await window.gameApi.newGame();
+        const fogCheckbox = document.getElementById("new-game-fog-checkbox");
+        const state = await window.gameApi.newGame({
+          fogOfWarEnabled: fogCheckbox?.checked !== false
+        });
         gameState = state;
         reconcileSelectionToCurrentState();
         clientStaleEnemyIntelByUnitId.clear();
@@ -17215,11 +17259,13 @@
     const overlay = document.getElementById("game-over-overlay");
     const messageEl = document.getElementById("game-over-message");
     const newGameBtn = document.getElementById("new-game-btn");
+    const fogCheckbox = document.getElementById("new-game-fog-checkbox");
     if (messageEl) {
       messageEl.textContent = "Start a new world map game when ready.";
       messageEl.style.display = "";
     }
     if (newGameBtn) newGameBtn.textContent = "Start game";
+    if (fogCheckbox) fogCheckbox.checked = true;
     overlay?.classList.remove("hidden");
     setMainUIControlsEnabled(false);
     updateReadyButtonState();
@@ -17436,6 +17482,8 @@
     const modelSelect = document.getElementById("openrouter-model");
     const refreshBtn = document.getElementById("openrouter-refresh-models");
     const newBtn = document.getElementById("openrouter-new-btn");
+    let persistedSelectedModelId = "";
+    let lastPersistedApiKeyValue = "";
     function refreshModels() {
       api.listModels().then((result) => {
         if (!modelSelect) return;
@@ -17452,18 +17500,47 @@
           opt.textContent = m.name ?? m.id;
           modelSelect.appendChild(opt);
         }
-        if (kept && Array.from(modelSelect.options).some((o) => o.value === kept)) {
-          modelSelect.value = kept;
+        const targetModelId = kept || persistedSelectedModelId;
+        if (targetModelId && Array.from(modelSelect.options).some((o) => o.value === targetModelId)) {
+          modelSelect.value = targetModelId;
         }
       });
     }
-    refreshModels();
+    api.getSelectedModel().then((modelId) => {
+      persistedSelectedModelId = modelId;
+      if (modelSelect && modelId && !Array.from(modelSelect.options).some((o) => o.value === modelId)) {
+        const opt = document.createElement("option");
+        opt.value = modelId;
+        opt.textContent = modelId;
+        modelSelect.appendChild(opt);
+        modelSelect.value = modelId;
+      }
+      refreshModels();
+    }).catch(() => refreshModels());
     if (keyInput) {
-      keyInput.addEventListener("blur", () => {
-        const v = keyInput.value.trim();
-        api.setKey(v).then(() => {
-          if (!v) hideMapToast();
+      api.getKey().then((keyResult) => {
+        if (keyResult?.hasKey && !keyInput.value.trim()) {
+          keyInput.placeholder = "Saved API key";
+          lastPersistedApiKeyValue = "";
+        }
+      });
+      const persistApiKey = () => {
+        const value = keyInput.value.trim();
+        if (value === lastPersistedApiKeyValue) return;
+        lastPersistedApiKeyValue = value;
+        api.setKey(value).then(() => {
+          if (!value) {
+            keyInput.placeholder = "";
+            hideMapToast();
+            return;
+          }
+          keyInput.placeholder = "Saved API key";
         });
+      };
+      keyInput.addEventListener("blur", persistApiKey);
+      keyInput.addEventListener("change", persistApiKey);
+      keyInput.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") persistApiKey();
       });
     }
     if (modelSelect) {
@@ -17592,7 +17669,7 @@
       }
       const key = e.key.toLowerCase();
       if (key === "t") {
-        reverseTerrainFillWhileHeld = true;
+        hideTerrainFillWhileHeld = true;
         requestRedraw();
         return;
       }
@@ -17608,15 +17685,15 @@
         return;
       }
       if (e.key.toLowerCase() === "t") {
-        reverseTerrainFillWhileHeld = false;
+        hideTerrainFillWhileHeld = false;
         requestRedraw();
       }
     });
     window.addEventListener("blur", () => {
       ctrlKeyActive = false;
       refreshStackCalloutIfOpen();
-      if (!reverseTerrainFillWhileHeld) return;
-      reverseTerrainFillWhileHeld = false;
+      if (!hideTerrainFillWhileHeld) return;
+      hideTerrainFillWhileHeld = false;
       requestRedraw();
     });
     window.addEventListener(
@@ -17918,7 +17995,7 @@
             showMapToast("AI: standing orders only (no consultation).", { isError: false });
           }
           const hasRanged = (readyResult.rangedCombatHexes?.length ?? 0) > 0 || (readyResult.rangedCasualtyHexes?.length ?? 0) > 0 || (readyResult.rangedRemovedUnits?.length ?? 0) > 0;
-          const hasMelee = (readyResult.meleeCombatHexes?.length ?? 0) > 0 || (readyResult.meleeCasualtyHexes?.length ?? 0) > 0 || (readyResult.meleeRemovedUnits?.length ?? 0) > 0;
+          const hasMelee = (readyResult.meleeCombatHexes?.length ?? 0) > 0 || (readyResult.meleeCasualtyHexes?.length ?? 0) > 0 || (readyResult.meleeRemovedUnits?.length ?? 0) > 0 || (readyResult.controlLossLightningHexes?.length ?? 0) > 0;
           const hasLegacy = (readyResult.combatHexes?.length ?? 0) > 0 || (readyResult.casualtyHexes?.length ?? 0) > 0;
           const visibleHexes = getVisibleHexSet(state);
           const allKills = readyResult.kills ?? [];
@@ -17956,6 +18033,7 @@
               rangedCasualtyHexes: readyResult.rangedCasualtyHexes?.length ? readyResult.rangedCasualtyHexes : void 0,
               rangedRemovedUnits: readyResult.rangedRemovedUnits?.length ? readyResult.rangedRemovedUnits : void 0,
               meleeCombatHexes: readyResult.meleeCombatHexes?.length ? readyResult.meleeCombatHexes : void 0,
+              controlLossLightningHexes: readyResult.controlLossLightningHexes?.length ? readyResult.controlLossLightningHexes : void 0,
               meleeCasualtyHexes: readyResult.meleeCasualtyHexes?.length ? readyResult.meleeCasualtyHexes : void 0,
               meleeRemovedUnits: readyResult.meleeRemovedUnits?.length ? readyResult.meleeRemovedUnits : void 0,
               unknownCombatHexes: unknownCombatHexes.length > 0 ? unknownCombatHexes : void 0,
@@ -17977,6 +18055,11 @@
             const knownMeleeKills = meleeKills.filter((k) => knownVictimIds.has(k.victimId));
             const fmt = (k) => `${k.victimId} destroyed by ${k.killerIds.join(", ")}`;
             const bullets = [];
+            const deployedLine = formatDeployedUnitsLine(readyResult.deployedUnitsByType);
+            if (deployedLine) bullets.push(deployedLine);
+            if ((readyResult.humanHexesLostCount ?? 0) > 0) {
+              bullets.push(`${readyResult.humanHexesLostCount.toLocaleString()} hexes lost to opponent`);
+            }
             if (knownDirectFire.length > 0) bullets.push(`\u2022 Direct fire: ${knownDirectFire.map(fmt).join("; ")}`);
             if (knownReturnFire.length > 0) bullets.push(`\u2022 Return fire: ${knownReturnFire.map(fmt).join("; ")}`);
             if (knownMeleeKills.length > 0) bullets.push(knownMeleeKills.map(fmt).join("\n"));

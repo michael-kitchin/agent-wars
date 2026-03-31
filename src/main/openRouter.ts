@@ -16,6 +16,8 @@ import {
   getAiLossEventsSinceConsultation,
   clearAiLossEventsSinceConsultation,
   setAiLastConsultationTurn,
+  dbGetOne,
+  dbRun,
 } from './gameDb';
 import { buildLatLngCoordinateMap, H3_RESOLUTION, LATLNG_DECIMAL_PLACES } from './mapData';
 import { executeTool1, TOOL1_NAMES, type LatLng } from './tools/tool1Pathfinding';
@@ -28,14 +30,18 @@ import {
   generateOrdersForStandingOrders,
   TOOL5_NAMES,
 } from './tools/tool5StandingOrders';
+import { executeTool6, TOOL6_NAMES } from './tools/tool6Production';
 import { runPrecomputation } from './precomputation';
 import { formatBriefing } from './briefingFormatter';
 import { replaceSubscriptions, getSubscriptions } from './callbackSubscriptions';
 import type { CallbackSubscription } from './callbackSubscriptions';
 import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
+import { normalizeProductionOrders } from './productionOrders';
 
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_KEY_DB_CONFIG_KEY = 'openrouter_api_key';
+const OPENROUTER_SELECTED_MODEL_DB_CONFIG_KEY = 'openrouter_selected_model';
 
 const MOVEMENT_RANGE: Record<string, number> = {
   infantry: 1,
@@ -48,20 +54,51 @@ function getConfigPath(): string {
   return path.join(app.getPath('userData'), 'openrouter-config.json');
 }
 
+function loadGameConfigValue(key: string): string | null {
+  const row = dbGetOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [key]);
+  return row?.value ?? null;
+}
+
+function saveGameConfigValue(key: string, value: string): void {
+  dbRun('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [key, value]);
+}
+
+function deleteGameConfigValue(key: string): void {
+  dbRun('DELETE FROM game_config WHERE key = ?', [key]);
+}
+
 /**
  * Loads the stored API key from disk. Uses safeStorage to decrypt if available.
  * Returns empty string if no key or read fails. Never logs the key.
  */
 export function loadKey(): string {
+  const fromDb = loadGameConfigValue(OPENROUTER_KEY_DB_CONFIG_KEY);
+  if (typeof fromDb === 'string' && fromDb.length > 0) {
+    try {
+      const parsed = JSON.parse(fromDb) as { key?: string; encrypted?: string };
+      if (typeof parsed.encrypted === 'string' && safeStorage.isEncryptionAvailable()) {
+        return safeStorage.decryptString(Buffer.from(parsed.encrypted, 'base64'));
+      }
+      if (typeof parsed.key === 'string') return parsed.key;
+    } catch {
+      return fromDb;
+    }
+  }
   const configPath = getConfigPath();
   if (!fs.existsSync(configPath)) return '';
   try {
     const raw = fs.readFileSync(configPath, 'utf-8');
     const data = JSON.parse(raw) as { key?: string; encrypted?: string };
+    let key = '';
     if (typeof data.encrypted === 'string' && safeStorage.isEncryptionAvailable()) {
-      return safeStorage.decryptString(Buffer.from(data.encrypted, 'base64'));
+      key = safeStorage.decryptString(Buffer.from(data.encrypted, 'base64'));
+    } else if (typeof data.key === 'string') {
+      key = data.key;
     }
-    if (typeof data.key === 'string') return data.key;
+    if (key.length > 0) {
+      saveKey(key);
+      return key;
+    }
     return '';
   } catch {
     return '';
@@ -76,6 +113,7 @@ export function saveKey(key: string): void {
   const configPath = getConfigPath();
   try {
     if (!key.trim()) {
+      deleteGameConfigValue(OPENROUTER_KEY_DB_CONFIG_KEY);
       if (fs.existsSync(configPath)) fs.unlinkSync(configPath);
       return;
     }
@@ -85,6 +123,7 @@ export function saveKey(key: string): void {
     } else {
       data.key = key;
     }
+    saveGameConfigValue(OPENROUTER_KEY_DB_CONFIG_KEY, JSON.stringify(data));
     fs.writeFileSync(configPath, JSON.stringify(data), { mode: 0o600 });
   } catch (err) {
     logError('openRouter saveKey: failed to write config', err);
@@ -105,12 +144,20 @@ let selectedModelId: string = '';
  */
 export function setSelectedModel(modelId: string): void {
   selectedModelId = modelId ?? '';
+  if (!selectedModelId.trim()) {
+    deleteGameConfigValue(OPENROUTER_SELECTED_MODEL_DB_CONFIG_KEY);
+  } else {
+    saveGameConfigValue(OPENROUTER_SELECTED_MODEL_DB_CONFIG_KEY, selectedModelId);
+  }
 }
 
 /**
  * Returns the currently selected model id for AI orders. Used by the ready flow when requesting opponent orders.
  */
 export function getSelectedModel(): string {
+  if (!selectedModelId.trim()) {
+    selectedModelId = loadGameConfigValue(OPENROUTER_SELECTED_MODEL_DB_CONFIG_KEY) ?? '';
+  }
   return selectedModelId;
 }
 
@@ -129,6 +176,7 @@ export const TOOL_GROUP_REGISTRY: ToolGroupEntry[] = [
   { id: 'estimation', label: 'Estimation', toolNames: TOOL3_NAMES },
   { id: 'memory', label: 'Memory', toolNames: TOOL4_NAMES },
   { id: 'orders', label: 'Orders', toolNames: TOOL5_NAMES },
+  { id: 'production', label: 'Production', toolNames: TOOL6_NAMES },
 ];
 
 /**
@@ -181,6 +229,7 @@ export interface ToolFlags {
   estimationEnabled: boolean;
   ordersEnabled: boolean;
   memoryEnabled: boolean;
+  productionEnabled: boolean;
   /** True when neither Planning nor Orders is enabled; one-step move fallback is then used. */
   fallbackMovementEnabled: boolean;
 }
@@ -201,12 +250,14 @@ export function getToolFlags(enabledToolNames: string[] | undefined): ToolFlags 
   const estimationEnabled = has(TOOL3_NAMES);
   const ordersEnabled = has(TOOL5_NAMES);
   const memoryEnabled = has(TOOL4_NAMES);
+  const productionEnabled = has(TOOL6_NAMES);
   return {
     planningEnabled,
     assessmentEnabled,
     estimationEnabled,
     ordersEnabled,
     memoryEnabled,
+    productionEnabled,
     fallbackMovementEnabled: !planningEnabled && !ordersEnabled,
   };
 }
@@ -280,7 +331,9 @@ function validateAiOrder(
     /* dist === 0 (same hex) is allowed: "hold" / no move is valid. */
   } else {
     const validDests = getValidDestinations(unit, state);
-    if (!validDests.includes(order.toH3Index)) return { valid: false, reason: 'Invalid distance' };
+    if (!validDests.includes(order.toH3Index)) {
+      return { valid: false, reason: 'Invalid distance' };
+    }
   }
 
   const destHex = state.hexes.find((h) => h.h3Index === order.toH3Index);
@@ -426,6 +479,11 @@ function buildToolUsageGuidance(flags: ToolFlags, hasPrecomputedBriefing = false
       ' Do NOT store enemy positions or rosters (already in the briefing). Keep it concise.'
     );
   }
+  if (flags.productionEnabled) {
+    lines.push(
+      '- Production: use query_production to inspect controlled-hex queues and constraints; use add_build_entry/update_build_entry/remove_build_entry for iterative queue edits. If skipping tools, you may include productionOrders in final JSON.'
+    );
+  }
   if (lines.length === 0) return '';
   return '\n\nHOW TO USE THESE TOOLS EFFECTIVELY:\n' + lines.join('\n');
 }
@@ -482,14 +540,77 @@ function getMovementOrderInstruction(flags: ToolFlags): string {
   );
 }
 
+function buildProductionSubmitClause(flags: ToolFlags): string {
+  if (!flags.productionEnabled) return '';
+  return (
+    ' Optional "productionOrders" entries MUST include "action" on every item. Required forms:' +
+    ' {"action":"add_build_entry","hex":[lat,lng],"unitType":"infantry|armor|naval","count":1..99};' +
+    ' {"action":"update_build_entry","hex":[lat,lng],"entryId":number,"unitType":"infantry|armor|naval","count":1..99};' +
+    ' {"action":"remove_build_entry","hex":[lat,lng],"entryId":number}.' +
+    ' Any productionOrders item missing "action" or required fields is dropped.'
+  );
+}
+
+function buildHumanUnitsPromptLine(humanRoster: string): string {
+  if (humanRoster.length > 0) return `Human units (currently observed): ${humanRoster}`;
+  return 'Human units (currently observed): none. Enemy units may be out of view; scout to reacquire contact.';
+}
+
+function buildProductionBriefingBlock(
+  flags: ToolFlags,
+  state: GameStateSnapshot,
+  latLngByH3: Map<string, [number, number]>,
+  resolveToH3: (lat: number, lng: number) => string | undefined
+): string {
+  if (!flags.productionEnabled) return '';
+  const snapshot = executeTool6('query_production', { all: true }, state, latLngByH3, resolveToH3) as {
+    status?: string;
+    production?: { controlledHexQueues?: Array<Record<string, unknown>> };
+    error?: string;
+  };
+  if (snapshot.status !== 'ok') {
+    return `=== PRODUCTION STATUS ===\nProduction status unavailable: ${snapshot.error ?? 'unknown error'}\n`;
+  }
+  const queues = snapshot.production?.controlledHexQueues ?? [];
+  const lines: string[] = [];
+  lines.push('=== PRODUCTION STATUS ===');
+  lines.push('Rules: infantry cost 10 (min urban 1), armor cost 20 (min urban 2), naval cost 50 (min urban 5 + min ports 1).');
+  lines.push('Production progress/spawn resolves after Ready, after combat and control resolution.');
+  if (queues.length === 0) {
+    lines.push('No currently controlled hexes with editable production queues.');
+    return lines.join('\n');
+  }
+  lines.push('Controlled hex queues:');
+  for (const row of queues) {
+    const hex = Array.isArray(row.hex) ? row.hex as [number, number] : null;
+    const urban = Number(row.urbanHexCount ?? 0);
+    const ports = Number(row.portCount ?? 0);
+    const available = Array.isArray(row.availableUnitTypes)
+      ? (row.availableUnitTypes as unknown[]).map((x) => String(x)).join(', ')
+      : '';
+    const entries = Array.isArray(row.entries)
+      ? (row.entries as Array<Record<string, unknown>>)
+          .map((entry) => `${entry.entryId}:${entry.unitType}x${entry.count}`)
+          .join(', ')
+      : '';
+    lines.push(
+      `- ${hex ? formatLatLng(hex) : '[unknown]'} urban=${urban} ports=${ports} available=[${available || 'none'}] queue=${entries || '(empty)'}`
+    );
+  }
+  return lines.join('\n');
+}
+
 /**
  * Returns the initial user message for the tool-calling flow.
  * When hasPrecomputedBriefing is true, encourages using the briefing and minimal tool calls.
  */
 function getInitialUserMessage(flags: ToolFlags, hasPrecomputedBriefing = false): string {
+  const productionSuffix = flags.productionEnabled
+    ? ', optional "productionOrders" (EVERY item must include action + required fields)'
+    : '';
   const jsonOptionalTail = flags.memoryEnabled
-    ? ', optional "callbacks", optional "memoryUpdates"'
-    : ', optional "callbacks"';
+    ? `, optional "callbacks", optional "memoryUpdates"${productionSuffix}`
+    : `, optional "callbacks"${productionSuffix}`;
   if (flags.planningEnabled) {
     const memoryNote = flags.memoryEnabled
       ? ' After your analysis, include memoryUpdates in your final JSON for strategy notes. '
@@ -536,11 +657,15 @@ function getInitialUserMessage(flags: ToolFlags, hasPrecomputedBriefing = false)
  */
 function buildSystemPromptForTools(
   state: GameStateSnapshot,
-  coordMap: { latLngByH3: Map<string, [number, number]>; format: (h3: string) => string },
+  coordMap: {
+    latLngByH3: Map<string, [number, number]>;
+    format: (h3: string) => string;
+    resolveToH3: (lat: number, lng: number) => string | undefined;
+  },
   enabledToolNames?: string[],
   briefingOverride?: string
 ): string {
-  const { latLngByH3, format } = coordMap;
+  const { latLngByH3, format, resolveToH3 } = coordMap;
   const opponentUnits = state.units.filter((u) => u.player === 'opponent');
   const humanUnits = state.units.filter((u) => u.player === 'human');
   const flags = getToolFlags(enabledToolNames);
@@ -591,6 +716,7 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
 
   const memoryBlock = flags.memoryEnabled ? getInjectionText('opponent', state.turnNumber) + '\n\n' : '';
   const standingOrderBlock = flags.ordersEnabled ? getStandingOrderInjectionText('opponent', state) + '\n\n' : '';
+  const productionBlock = flags.productionEnabled ? buildProductionBriefingBlock(flags, state, latLngByH3, resolveToH3) + '\n\n' : '';
 
   const hasNaval = opponentUnits.some((u) => u.unitType === 'naval');
   const hasRanged = opponentUnits.some((u) => getRange(u.unitType as 'infantry' | 'armor' | 'naval') >= 1);
@@ -613,11 +739,12 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
     ? ' Use optional "memoryUpdates" for memory writes/deletes (applied from JSON only; there are no memory_write or memory_delete tools).'
     : ' When Memory tools are not listed above, omit "memoryUpdates" or use []; any entries are ignored.';
 
+  const humanUnitsLine = buildHumanUnitsPromptLine(humanRoster);
   const mainBlock = briefingOverride != null && briefingOverride.length > 0
-    ? `${briefingOverride}\n\n${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\nHuman units: ${humanRoster || 'none'}`
-    : `${memoryBlock}${standingOrderBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\nHuman units: ${humanRoster || 'none'}${adjacentCellsBlock}`;
+    ? `${briefingOverride}\n\n${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}`
+    : `${memoryBlock}${standingOrderBlock}${productionBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}${adjacentCellsBlock}`;
 
-  return `You are the opponent in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}. Your objective is to destroy all human units. Move toward human units to get in ranged or melee range; do not stay passive.${warning}
+  const prompt = `You are the opponent in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}. Your objective is to destroy all human units. Move toward human units to get in ranged or melee range; do not stay passive.${warning}
 
 ${LATLNG_PREAMBLE}
 
@@ -625,7 +752,8 @@ Combat: each unit rolls d6 when attacking (hit if roll <= attack) or when defend
 
 ${mainBlock}
 
-Submit your final JSON only (valid JSON, no comments): { "strategy": "<one-line>", "orders": [ ... ], "callbacks": [...]${flags.memoryEnabled ? ', "memoryUpdates": [...]' : ''} }. Strict schema: top-level must be a JSON object with "strategy" (string) and "orders" (array); do not return a top-level array. The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: assign_order (include "order": { "type": "defend"|"march"|"pursue"|"patrol"|"hold_fire", ... } — pursue uses targetUnitId string for the enemy only; march/patrol/defend use [lat,lng] where a place is required), cancel_order, explicit_move (include "destination": [lat,lng] for this turn's move), explicit_attack (include "targetHex": [lat,lng] OR enemy unit id string). Do not use top-level movementOrders or rangedAttacks (legacy).${movementOrderInstruction} Include optional "callbacks" for re-consultation planning.${submitMemoryClause}`;
+Submit your final JSON only (valid JSON, no comments): { "strategy": "<one-line>", "orders": [ ... ], "callbacks": [...]${flags.memoryEnabled ? ', "memoryUpdates": [...]' : ''}${flags.productionEnabled ? ', "productionOrders": [...]' : ''} }. Strict schema: top-level must be a JSON object with "strategy" (string) and "orders" (array); do not return a top-level array. The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: assign_order (include "order": { "type": "defend"|"march"|"pursue"|"patrol"|"hold_fire", ... } — pursue uses targetUnitId string for the enemy only; march/patrol/defend use [lat,lng] where a place is required), cancel_order, explicit_move (include "destination": [lat,lng] for this turn's move), explicit_attack (include "targetHex": [lat,lng] OR enemy unit id string). Do not use top-level movementOrders or rangedAttacks (legacy).${movementOrderInstruction} Include optional "callbacks" for re-consultation planning.${submitMemoryClause} ${buildProductionSubmitClause(flags)}`;
+  return prompt;
 }
 
 export interface RequestOrdersResult {
@@ -789,6 +917,60 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
     },
     promptLine: 'query_orders(unitId?, all?) - Check standing order statuses.',
   },
+  {
+    name: 'query_production',
+    description: 'Read production queue status for one controlled hex or all controlled hexes.',
+    parameters: {
+      type: 'object',
+      properties: {
+        hex: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Optional target hex [lat, lng]' },
+        all: { type: 'boolean', description: 'When true, returns all controlled-hex production queues' },
+      },
+    },
+    promptLine: 'query_production(hex?, all?) - Read production queue status and available unit types by controlled hex.',
+  },
+  {
+    name: 'add_build_entry',
+    description: 'Append one production queue entry for a controlled hex.',
+    parameters: {
+      type: 'object',
+      properties: {
+        hex: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Controlled hex [lat, lng]' },
+        unitType: { type: 'string', enum: ['infantry', 'armor', 'naval'], description: 'Unit type for the new queue entry' },
+        count: { type: 'number', description: 'Requested build count (1..99)' },
+      },
+      required: ['hex', 'unitType', 'count'],
+    },
+    promptLine: 'add_build_entry(hex, unitType, count) - Append one production queue entry for a controlled hex.',
+  },
+  {
+    name: 'update_build_entry',
+    description: 'Update one existing production queue entry (unit type and count).',
+    parameters: {
+      type: 'object',
+      properties: {
+        hex: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Controlled hex [lat, lng]' },
+        entryId: { type: 'number', description: 'Queue entry id to edit' },
+        unitType: { type: 'string', enum: ['infantry', 'armor', 'naval'], description: 'Replacement unit type' },
+        count: { type: 'number', description: 'Replacement build count (1..99)' },
+      },
+      required: ['hex', 'entryId', 'unitType', 'count'],
+    },
+    promptLine: 'update_build_entry(hex, entryId, unitType, count) - Edit one production queue row in place.',
+  },
+  {
+    name: 'remove_build_entry',
+    description: 'Remove one production queue entry from a controlled hex.',
+    parameters: {
+      type: 'object',
+      properties: {
+        hex: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Controlled hex [lat, lng]' },
+        entryId: { type: 'number', description: 'Queue entry id to remove' },
+      },
+      required: ['hex', 'entryId'],
+    },
+    promptLine: 'remove_build_entry(hex, entryId) - Remove one production queue row by id.',
+  },
 ];
 
 /**
@@ -922,6 +1104,7 @@ export async function requestOrders(
   const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
   const coordMap = {
     latLngByH3,
+    resolveToH3,
     format: (h3: string) => {
       const ll = latLngByH3.get(h3);
       if (ll) return formatLatLng(ll);
@@ -955,13 +1138,17 @@ export async function requestOrders(
     const standingOrderText = getStandingOrderInjectionText('opponent', state);
     const memoryText = getInjectionText('opponent', state.turnNumber);
     const subscriptions = getSubscriptions('opponent');
+    const productionBriefing = getToolFlags(enabledToolNames).productionEnabled
+      ? buildProductionBriefingBlock(getToolFlags(enabledToolNames), state, latLngByH3, resolveToH3)
+      : '';
     briefingOverride = formatBriefing(
       state,
       precomputed,
       standingOrderText,
       memoryText,
       subscriptions,
-      lossesSinceLastConsultation
+      lossesSinceLastConsultation,
+      productionBriefing
     );
     logDebug('openRouter requestOrders: pre-computation ran', {
       briefingLength: briefingOverride.length,
@@ -1080,6 +1267,8 @@ export async function requestOrders(
           }
           const result = (TOOL5_NAMES as readonly string[]).includes(toolName)
             ? executeTool5(toolName, args, state, latLngByH3, resolveToH3)
+            : (TOOL6_NAMES as readonly string[]).includes(toolName)
+              ? executeTool6(toolName, args, state, latLngByH3, resolveToH3)
             : (TOOL4_NAMES as readonly string[]).includes(toolName)
               ? executeTool4(toolName, args, state, latLngByH3, resolveToH3)
               : (TOOL3_NAMES as readonly string[]).includes(toolName)
@@ -1109,7 +1298,7 @@ export async function requestOrders(
       }
 
       logDebug('openRouter requestOrders: assistant response (final)', content);
-      let parsed = parseOrdersResponse(content, resolveToH3, state, latLngByH3);
+      let parsed = parseOrdersResponse(content, resolveToH3, state, latLngByH3, flags.productionEnabled);
       if (!parsed) {
         if (!parseRepairAttempted) {
           parseRepairAttempted = true;
@@ -1120,7 +1309,7 @@ export async function requestOrders(
             {
               role: 'user',
               content:
-                `Your previous response was not parseable JSON. Reply now with JSON only (no prose, no markdown, no code fences) using exactly this top-level object schema (orders[] only; no movementOrders/rangedAttacks; never a top-level array): ${JSON_ASSISTANT_REPAIR_SCHEMA}. Omit optional arrays when empty.`,
+                `Your previous response was not parseable JSON. Reply now with JSON only (no prose, no markdown, no code fences) using exactly this top-level object schema (orders[] only; no movementOrders/rangedAttacks; never a top-level array): ${buildJsonAssistantRepairSchema(flags.productionEnabled)}. Omit optional arrays when empty.`,
             },
           ];
           const repairBody: Record<string, unknown> = {
@@ -1150,7 +1339,7 @@ export async function requestOrders(
             const repairContent = repairJson.choices?.[0]?.message?.content;
             if (typeof repairContent === 'string' && repairContent.trim()) {
               logDebug('openRouter requestOrders: assistant response (repair)', repairContent);
-              parsed = parseOrdersResponse(repairContent, resolveToH3, state, latLngByH3);
+              parsed = parseOrdersResponse(repairContent, resolveToH3, state, latLngByH3, flags.productionEnabled);
             }
           } else {
             logError('openRouter requestOrders: repair API error', repairRes.status);
@@ -1229,7 +1418,11 @@ export async function requestOrders(
 
       const validated: { unitId: string; toH3Index: string }[] = [];
       const dropReasons: string[] = [];
+      const invalidStandingMovementUnits = new Set<string>();
       const seenUnits = new Set<string>();
+      if (parsed.productionDropReasons?.length) {
+        dropReasons.push(...parsed.productionDropReasons);
+      }
 
       for (const order of mergedMovement) {
         if (seenUnits.has(order.unitId)) {
@@ -1241,7 +1434,32 @@ export async function requestOrders(
           validated.push(order);
           seenUnits.add(order.unitId);
         } else {
+          const dropUnit = state.units.find((u) => u.id === order.unitId);
+          const sourceIsLlmOverride = llmMovementUnitIds.has(order.unitId);
+          const hasStandingForUnit = standingOrderMovement.some((o) => o.unitId === order.unitId);
+          if (!sourceIsLlmOverride && hasStandingForUnit && result.reason === 'Invalid distance') {
+            invalidStandingMovementUnits.add(order.unitId);
+            logDebug('openRouter requestOrders: auto-removing invalid standing movement order', {
+              unitId: order.unitId,
+              toH3Index: order.toH3Index,
+            });
+            continue;
+          }
           dropReasons.push(`${order.unitId} -> ${order.toH3Index}: ${result.reason}`);
+        }
+      }
+      if (flags.ordersEnabled && invalidStandingMovementUnits.size > 0) {
+        for (const unitId of invalidStandingMovementUnits) {
+          const cancelResult = executeTool5('cancel_order', { unitId }, state, latLngByH3, resolveToH3) as {
+            status?: string;
+            error?: string;
+          };
+          if (cancelResult.status !== 'ok') {
+            logError('openRouter requestOrders: failed to auto-remove invalid standing movement order', {
+              unitId,
+              error: cancelResult.error ?? 'unknown',
+            });
+          }
         }
       }
 
@@ -1273,6 +1491,7 @@ export async function requestOrders(
       const validatedUnitIds = new Set(validated.map((o) => o.unitId));
       const fallbackUnits: string[] = [];
       for (const o of standingOrderMovement) {
+        if (!llmMovementUnitIds.has(o.unitId)) continue;
         if (!validatedUnitIds.has(o.unitId)) {
           const vr = validateAiOrder(o, state);
           if (vr.valid) {
@@ -1282,6 +1501,10 @@ export async function requestOrders(
               fallbackUnits.push(o.unitId);
             }
           } else {
+            const hadPrimaryDropAlready = dropReasons.some((reason) => reason.startsWith(`${o.unitId} ->`));
+            if (hadPrimaryDropAlready) {
+              continue;
+            }
             dropReasons.push(`Standing order ${o.unitId} -> ${o.toH3Index}: ${vr.reason}`);
           }
         }
@@ -1289,6 +1512,7 @@ export async function requestOrders(
       const validatedRangedUnitIds = new Set(validatedRanged.map((r) => r.unitId));
       const fallbackRanged: string[] = [];
       for (const r of standingOrderRanged) {
+        if (!llmRangedUnitIds.has(r.unitId)) continue;
         if (!validatedRangedUnitIds.has(r.unitId)) {
           const vr = validateAiRangedOrder(r, state);
           if (vr.valid) {
@@ -1335,7 +1559,15 @@ export async function requestOrders(
         if (onLog) onLog(`Dropped ${effectiveDropReasons.length} invalid order(s).`, true);
       }
 
-      if (onLog) onLog(`Orders received: ${validated.length} movement, ${validatedRanged.length} ranged.`);
+      if (onLog) {
+        const orderComponents: string[] = [];
+        if (validated.length > 0) orderComponents.push(`${validated.length} movement`);
+        if (validatedRanged.length > 0) orderComponents.push(`${validatedRanged.length} ranged`);
+        if ((parsed.productionAppliedCount ?? 0) > 0) {
+          orderComponents.push(`${parsed.productionAppliedCount} production`);
+        }
+        onLog(`Orders received: ${orderComponents.length > 0 ? orderComponents.join(', ') : 'none'}.`);
+      }
       logDebug('openRouter requestOrders: tool usage summary', {
         turnNumber: state.turnNumber,
         usePrecomputation,
@@ -1600,8 +1832,12 @@ function normalizeMemoryUpdates(raw: unknown): MemoryUpdateItem[] {
   return out;
 }
 
-/** Repair-turn user hint: hard-cut v3 schema (orders[] only; no legacy movementOrders/rangedAttacks). */
-const JSON_ASSISTANT_REPAIR_SCHEMA = `{"strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":[lat,lng]}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":[lat,lng]},{"unitId":"opponent-armor-1","action":"explicit_attack","targetHex":[lat,lng]},{"unitId":"opponent-armor-1","action":"cancel_order"}],"callbacks":[],"memoryUpdates":[]}`;
+/** Repair-turn schema hint: hard-cut v3 contract (orders[] only; no legacy movementOrders/rangedAttacks). */
+function buildJsonAssistantRepairSchema(includeProductionOrders: boolean): string {
+  return includeProductionOrders
+    ? `{"strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":[lat,lng]}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":[lat,lng]},{"unitId":"opponent-armor-1","action":"explicit_attack","targetHex":[lat,lng]},{"unitId":"opponent-armor-1","action":"cancel_order"}],"callbacks":[],"memoryUpdates":[],"productionOrders":[{"action":"add_build_entry","hex":[lat,lng],"unitType":"infantry","count":1}]}`
+    : `{"strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":[lat,lng]}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":[lat,lng]},{"unitId":"opponent-armor-1","action":"explicit_attack","targetHex":[lat,lng]},{"unitId":"opponent-armor-1","action":"cancel_order"}],"callbacks":[],"memoryUpdates":[]}`;
+}
 
 function hasNonEmptyLegacyTopLevel(obj: Record<string, unknown>): boolean {
   const mo = obj.movementOrders;
@@ -1692,6 +1928,32 @@ function processV3OrdersArray(
   return { movementOrders, rangedAttacks };
 }
 
+function processProductionOrdersArray(
+  entries: unknown,
+  state: GameStateSnapshot,
+  latLngByH3: Map<string, LatLng>,
+  resolveToH3: (lat: number, lng: number) => string | undefined
+): { appliedCount: number; droppedReasons: string[] } {
+  const normalized = normalizeProductionOrders(entries);
+  const droppedReasons = [...normalized.droppedReasons];
+  let appliedCount = 0;
+  for (const order of normalized.validOrders) {
+    const args =
+      order.action === 'add_build_entry'
+        ? { hex: order.hex, unitType: order.unitType, count: order.count }
+        : order.action === 'update_build_entry'
+          ? { hex: order.hex, entryId: order.entryId, unitType: order.unitType, count: order.count }
+          : { hex: order.hex, entryId: order.entryId };
+    const result = executeTool6(order.action, args, state, latLngByH3, resolveToH3) as { status?: string; error?: string };
+    if (result.status === 'ok') {
+      appliedCount += 1;
+      continue;
+    }
+    droppedReasons.push(`production ${order.action} @ ${formatLatLng(order.hex)}: ${result.error ?? 'failed'}`);
+  }
+  return { appliedCount, droppedReasons };
+}
+
 /**
  * Parses the assistant final JSON: v3 orders[] (assign/cancel/explicit_move/explicit_attack), callbacks, memoryUpdates.
  * Rejects non-empty legacy top-level movementOrders/rangedAttacks (hard cut). Applies assign/cancel to DB while parsing.
@@ -1700,13 +1962,16 @@ function parseOrdersResponse(
   content: string,
   resolveToH3: (lat: number, lng: number) => string | undefined,
   state: GameStateSnapshot,
-  latLngByH3: Map<string, LatLng>
+  latLngByH3: Map<string, LatLng>,
+  productionEnabled: boolean
 ): {
   movementOrders: { unitId: string; toH3Index: string }[];
   rangedAttacks: { unitId: string; targetH3Index: string }[];
   strategy?: string;
   callbacks?: CallbackSubscription[];
   memoryUpdates?: MemoryUpdateItem[];
+  productionAppliedCount?: number;
+  productionDropReasons?: string[];
 } | null {
   const trimmed = content.trim();
   const candidates: string[] = [];
@@ -1741,6 +2006,15 @@ function parseOrdersResponse(
           return null;
         }
         const { movementOrders, rangedAttacks } = processV3OrdersArray(obj.orders as unknown[], state, latLngByH3, resolveToH3);
+        let productionDropReasons: string[] = [];
+        let productionAppliedCount = 0;
+        if (productionEnabled) {
+          const productionResult = processProductionOrdersArray(obj.productionOrders, state, latLngByH3, resolveToH3);
+          productionAppliedCount = productionResult.appliedCount;
+          productionDropReasons = productionResult.droppedReasons;
+        } else if (obj.productionOrders !== undefined) {
+          productionDropReasons = ['productionOrders dropped: production tool group is disabled.'];
+        }
         const strategy = obj.strategy.trim();
         const callbacks = normalizeCallbacks(obj.callbacks);
         const memoryUpdates = normalizeMemoryUpdates(obj.memoryUpdates);
@@ -1750,6 +2024,8 @@ function parseOrdersResponse(
           strategy,
           callbacks: callbacks.length > 0 ? callbacks : undefined,
           memoryUpdates: memoryUpdates.length > 0 ? memoryUpdates : undefined,
+          productionAppliedCount: productionAppliedCount > 0 ? productionAppliedCount : undefined,
+          productionDropReasons: productionDropReasons.length > 0 ? productionDropReasons : undefined,
         };
       }
     } catch {

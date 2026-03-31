@@ -694,6 +694,13 @@ export function saveDatabase(): void {
 
 const STALE_INTEL_TURNS = 2;
 const FOG_PLAYERS = ['human', 'opponent'] as const;
+const FOG_OF_WAR_ENABLED_KEY = 'fog_of_war_enabled';
+
+function isFogOfWarEnabled(): boolean {
+  const row = getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [FOG_OF_WAR_ENABLED_KEY]);
+  if (!row?.value) return true;
+  return row.value !== '0' && row.value.toLowerCase() !== 'false';
+}
 
 function getCurrentTurnNumberFromDb(): number {
   const turnRow = getOne<{ turnNumber: number }>('SELECT turn_number AS turnNumber FROM turn_state WHERE id = 1');
@@ -822,6 +829,12 @@ export function refreshFogOfWarIntelFromCurrentState(options?: {
     opponentTraversed: options?.traversedHexesByPlayer?.opponent?.length ?? 0,
   });
   if (!db) return;
+  if (!isFogOfWarEnabled()) {
+    run('DELETE FROM player_hex_intel');
+    run('DELETE FROM player_unit_intel');
+    run("DELETE FROM game_config WHERE key IN ('fog_new_contacts_human', 'fog_new_contacts_opponent')");
+    return;
+  }
   const state = getGameState();
   const currentTurn = getCurrentTurnNumberFromDb();
   for (const playerId of FOG_PLAYERS) {
@@ -884,6 +897,14 @@ export function getGameState(): GameStateSnapshot {
   );
   const gameOverRow = getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'game_over'");
   const winnerRow = getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'winner'");
+  const controlRows = getAll<{ h3Index: string; controllerPlayerId: string | null }>(
+    'SELECT h3_index AS h3Index, controller_player_id AS controllerPlayerId FROM res1_control'
+  );
+  const queueTotalRows = getAll<{ h3Index: string; queuedUnits: number }>(
+    `SELECT h3_index AS h3Index, COALESCE(SUM(remaining_count), 0) AS queuedUnits
+     FROM res1_build_queue
+     GROUP BY h3_index`
+  );
   const gameOver = gameOverRow?.value === '1';
   const winner = winnerRow?.value ?? undefined;
 
@@ -893,14 +914,17 @@ export function getGameState(): GameStateSnapshot {
     phase: turnRow?.phase ?? 'planning',
     turnNumber: turnRow?.turnNumber ?? 1,
     pendingOrders: orderRows,
+    res1Control: controlRows,
+    res1BuildQueueTotals: queueTotalRows,
     gameOver: gameOver || undefined,
     winner,
   };
 }
 
 /**
- * Returns a side-subjective game-state snapshot for fog of war.
- * Own units are always visible; enemy units are included only when currently visible.
+ * Returns a side-subjective game-state snapshot.
+ * When fog is enabled: own units are always visible, enemies only when currently visible.
+ * When fog is disabled: all hexes and all units are visible to both sides.
  */
 export function getGameStateForPlayer(
   playerId: 'human' | 'opponent',
@@ -909,6 +933,30 @@ export function getGameStateForPlayer(
   logTrace('gameDb getGameStateForPlayer', { playerId });
   const state = getGameState();
   if (!db) return { ...state, playerPerspective: playerId };
+  if (!isFogOfWarEnabled()) {
+    const allHexes = state.hexes.map((h) => h.h3Index);
+    const enemyIntel = state.units
+      .filter((u) => u.player !== playerId)
+      .map((u) => {
+        const [lat, lng] = cellToLatLng(u.h3Index);
+        return {
+          unitId: u.id,
+          lastKnownH3Index: u.h3Index,
+          lastKnownLatLng: [Number(lat.toFixed(LATLNG_DECIMAL_PLACES)), Number(lng.toFixed(LATLNG_DECIMAL_PLACES))] as [number, number],
+          intelState: 'current' as const,
+          lastSeenTurn: state.turnNumber,
+          staleUntilTurn: state.turnNumber + STALE_INTEL_TURNS,
+        };
+      });
+    return {
+      ...state,
+      visibleHexes: allHexes,
+      exploredHexes: allHexes,
+      staleHexes: [],
+      enemyIntel,
+      playerPerspective: playerId,
+    };
+  }
 
   const mapHexSet = new Set(state.hexes.map((h) => h.h3Index));
   const visibleHexes = computeVisibleHexesForSide(state, playerId, mapHexSet);
@@ -1449,13 +1497,16 @@ function seedInitialHexControlFromUnitOccupancy(): void {
 /**
  * Re-initializes the game for a new match: world map from terrain metadata classification, fresh seed, hexes/units, turn state,
  * pending orders, callbacks, AI memory, and standing orders cleared so no prior-match AI state leaks.
+ * Optionally disables fog of war for the new match so both sides always receive full-map/full-unit snapshots.
  */
-export function resetGameForNewMatch(): void {
-  logDebug('gameDb resetGameForNewMatch');
+export function resetGameForNewMatch(options?: { fogOfWarEnabled?: boolean }): void {
+  const fogOfWarEnabled = options?.fogOfWarEnabled !== false;
+  logDebug('gameDb resetGameForNewMatch', { fogOfWarEnabled });
   if (!db) return;
   run('DELETE FROM units');
   run('DELETE FROM hexes');
   run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('map_size', 'world')");
+  run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [FOG_OF_WAR_ENABLED_KEY, fogOfWarEnabled ? '1' : '0']);
   run("DELETE FROM game_config WHERE key = 'game_seed'");
   seedGameSeedIfMissing();
   seedHexesFromTerrainMetadata();

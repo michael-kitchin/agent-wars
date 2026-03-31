@@ -20,6 +20,7 @@ import type {
   HexContinentNamesRequest,
   BuildUnitType,
   HexBuildQueueSnapshot,
+  NewGameIpcPayload,
 } from '../shared/ipcTypes';
 
 let openRouterLogListener: ((payload: { line: string; isError?: boolean }) => void) | null = null;
@@ -38,7 +39,7 @@ const gameApi = {
     ipcRenderer.invoke('game:getHexNamingTooltipLine', payload),
   getHexContinentNames: (payload: HexContinentNamesRequest): Promise<string[]> =>
     ipcRenderer.invoke('game:getHexContinentNames', payload),
-  newGame: (): Promise<GameStateSnapshot> => ipcRenderer.invoke('game:newGame'),
+  newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRenderer.invoke('game:newGame', payload),
   submitOrders: (payload: SubmitOrdersIpcPayload): Promise<{ success: boolean; reason?: string }> =>
     ipcRenderer.invoke('game:submitOrders', payload),
   ready: (payload?: GameReadyIpcPayload): Promise<ReadyResult> => ipcRenderer.invoke('game:ready', payload),

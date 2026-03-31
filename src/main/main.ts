@@ -49,6 +49,7 @@ import type {
   ReadyResult,
   GameReadyIpcPayload,
   RequestAiOrdersResult,
+  NewGameIpcPayload,
 } from '../shared/ipcTypes';
 
 /** Ref for the in-flight requestAiOrders AbortController; used by handlers and cancel. */
@@ -132,8 +133,10 @@ function registerIpcHandlers(): void {
     if (typeof payload?.h3Index !== 'string') return [];
     return getHexContinentNamesForRenderer({ h3Index: payload.h3Index });
   });
-  ipcMain.handle('game:newGame', () => {
-    resetGameForNewMatch();
+  ipcMain.handle('game:newGame', (_event, payload: NewGameIpcPayload | undefined) => {
+    const fogOfWarEnabled = payload?.fogOfWarEnabled !== false;
+    logDebug('main game:newGame', { fogOfWarEnabled });
+    resetGameForNewMatch({ fogOfWarEnabled });
     return getGameStateForPlayer('human');
   });
   ipcMain.handle('game:submitOrders', (_event, payload: SubmitOrdersPayload | { unitId: string; toH3Index: string }[]) => {

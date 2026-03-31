@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { gridDistance, gridPathCells } from 'h3-js';
 import {
   openGameDatabaseAtPathForTests,
   closeGameDatabaseForTests,
@@ -16,6 +17,7 @@ import {
   updateHexBuildQueueEntry,
   removeHexBuildQueueEntry,
   ready,
+  submitOrders,
 } from './gameActions';
 
 function withTempDb(runCase: () => void): void {
@@ -145,11 +147,53 @@ function testControlTakeoverClearsQueueAndProgress(): void {
   });
 }
 
+function testTraversedIntermediateHexCapturesControl(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const armor = state.units.find((u) => u.player === 'human' && u.unitType === 'armor');
+    assert.ok(armor, 'expected a human armor unit');
+    const destination = state.hexes.find((hx) => {
+      if (hx.h3Index === armor!.h3Index || hx.terrain === 'water') return false;
+      try {
+        return gridDistance(armor!.h3Index, hx.h3Index) === 2;
+      } catch {
+        return false;
+      }
+    });
+    assert.ok(destination, 'expected a reachable armor destination 2 hexes away');
+    let path: string[] = [];
+    try {
+      path = gridPathCells(armor!.h3Index, destination!.h3Index);
+    } catch {
+      path = [];
+    }
+    assert.ok(path.length >= 3, 'expected path with an intermediate hex');
+    const intermediateHex = path[1]!;
+    assert.notStrictEqual(intermediateHex, destination!.h3Index);
+    assert.notStrictEqual(intermediateHex, armor!.h3Index);
+
+    // Put the intermediate hex under opponent control and empty, so traversal capture is observable.
+    dbRun('UPDATE units SET h3_index = ? WHERE h3_index = ? AND id <> ?', [armor!.h3Index, intermediateHex, armor!.id]);
+    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [intermediateHex, 'opponent']);
+    dbRun('DELETE FROM units WHERE player = ?', ['opponent']);
+
+    const submit = submitOrders({
+      movementOrders: [{ unitId: armor!.id, toH3Index: destination!.h3Index }],
+    });
+    assert.strictEqual(submit.success, true);
+    const result = ready();
+    assert.strictEqual(result.success, true);
+    const postIntermediate = getHexBuildQueue(intermediateHex, 'human');
+    assert.strictEqual(postIntermediate.controllerPlayerId, 'human');
+  });
+}
+
 function run(): void {
   testBuildQueueMutationContracts();
   testTypeChangeAfterCountEditKeepsCount();
   testNoProductionBeforeReadyDuringPlanningEdits();
   testControlTakeoverClearsQueueAndProgress();
+  testTraversedIntermediateHexCapturesControl();
   // eslint-disable-next-line no-console
   console.log('gameActionsProduction.test.ts passed');
 }
