@@ -51,7 +51,7 @@ jobs:
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
-        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --win zip --publish never
+        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --win dir --publish never
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
@@ -66,11 +66,18 @@ jobs:
         run: |
           rm -f release/builder-debug.yml
           rm -f release/builder-effective-config.yaml
-          rm -rf release/win-unpacked
           rm -rf release/linux-unpacked
           rm -rf release/mac
 
-      - name: Upload release artifacts
+      - name: Upload release artifacts (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v6
+        with:
+          name: agent-wars-${{ steps.app_version.outputs.value }}-${{ runner.os }}
+          path: release/win-unpacked/*
+
+      - name: Upload release artifacts (Linux/macOS)
+        if: runner.os != 'Windows'
         uses: actions/upload-artifact@v6
         with:
           name: agent-wars-${{ steps.app_version.outputs.value }}-${{ runner.os }}
