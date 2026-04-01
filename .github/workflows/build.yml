@@ -39,6 +39,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Read app version
+        id: app_version
+        run: node -e "const fs=require('fs');const v=require('./package.json').version;fs.appendFileSync(process.env.GITHUB_OUTPUT, 'value='+v+'\\n');"
+
       - name: Run tests
         run: npm run test
 
@@ -47,15 +51,15 @@ jobs:
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
-        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --win -c electron-builder.ci.json
+        run: npm run dist:win
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
-        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --linux -c electron-builder.ci.json
+        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --linux AppImage
 
       - name: Build (macOS)
         if: runner.os == 'macOS'
-        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --mac -c electron-builder.ci.json
+        run: npm run dist:mac
 
       - name: Remove intermediate build outputs
         shell: bash
@@ -70,5 +74,5 @@ jobs:
       - name: Upload release artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: agent-wars-1.4.0-${{ runner.os }}
+          name: agent-wars-${{ steps.app_version.outputs.value }}-${{ runner.os }}
           path: release/
