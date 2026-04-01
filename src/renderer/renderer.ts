@@ -251,40 +251,34 @@ function showStackCallout(
     const selectAllBtn = document.createElement('button');
     selectAllBtn.type = 'button';
     selectAllBtn.className = 'unit-select';
-    selectAllBtn.textContent = '+All';
+    selectAllBtn.textContent = `${UNIT_SELECT_GLYPH} All`;
     selectAllBtn.addEventListener('click', () => {
       activateStackCalloutModal();
       replaceSelection(humanIds);
       showStackCallout(units, clientX, clientY);
-      updateSidebar();
-      updateRangedSidebar();
-      redraw();
+      syncUiAfterSelectionChange({ refreshHoverPreview: false });
     });
     header.appendChild(selectAllBtn);
   } else {
     const addAllBtn = document.createElement('button');
     addAllBtn.type = 'button';
     addAllBtn.className = 'unit-select';
-    addAllBtn.textContent = '+All';
+    addAllBtn.textContent = `${UNIT_SELECT_GLYPH} All`;
     addAllBtn.addEventListener('click', () => {
       activateStackCalloutModal();
       addUnitsToSelection(humanIds);
       showStackCallout(units, clientX, clientY);
-      updateSidebar();
-      updateRangedSidebar();
-      redraw();
+      syncUiAfterSelectionChange({ refreshHoverPreview: false });
     });
     const removeAllBtn = document.createElement('button');
     removeAllBtn.type = 'button';
     removeAllBtn.className = 'unit-select';
-    removeAllBtn.textContent = '-All';
+    removeAllBtn.textContent = `${UNIT_DESELECT_GLYPH} All`;
     removeAllBtn.addEventListener('click', () => {
       activateStackCalloutModal();
       removeUnitsFromSelection(humanIds);
       showStackCallout(units, clientX, clientY);
-      updateSidebar();
-      updateRangedSidebar();
-      redraw();
+      syncUiAfterSelectionChange({ refreshHoverPreview: false });
     });
     header.appendChild(addAllBtn);
     header.appendChild(removeAllBtn);
@@ -301,14 +295,12 @@ function showStackCallout(
       btn.type = 'button';
       btn.className = 'unit-select stack-unit-toggle';
       const inSelection = selectedUnitIds.includes(u.id);
-      btn.textContent = inSelection ? '-' : '+';
+      btn.textContent = inSelection ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
       btn.addEventListener('click', () => {
         activateStackCalloutModal();
         toggleUnitSelection(u.id);
         showStackCallout(units, clientX, clientY);
-        updateSidebar();
-        updateRangedSidebar();
-        redraw();
+        syncUiAfterSelectionChange({ refreshHoverPreview: false });
       });
       li.appendChild(btn);
     }
@@ -987,15 +979,16 @@ async function renderBuildQueueIntoMount(mount: HTMLElement, h3Index: string): P
   title.textContent = 'Build Queue';
   const buildBtn = document.createElement('button');
   buildBtn.type = 'button';
-  buildBtn.className = 'unit-select';
-  buildBtn.textContent = 'Build';
+  buildBtn.className = 'unit-select stack-unit-toggle';
+  buildBtn.textContent = UNIT_SELECT_GLYPH;
   buildBtn.addEventListener('click', async () => {
     if (!window.gameApi?.addHexBuildQueueEntry) return;
-    const result = await window.gameApi.addHexBuildQueueEntry({ h3Index });
-    if (!result.success) {
-      showMapToast(result.reason ?? 'Failed to add build queue entry.', { isError: true });
-      return;
-    }
+    const success = await runBuildQueueMutation({
+      mutate: () => window.gameApi!.addHexBuildQueueEntry({ h3Index }),
+      failureMessage: 'Failed to add build queue entry.',
+      refreshState: true,
+    });
+    if (!success) return;
     const body = document.getElementById('build-popup-body');
     if (body) void renderBuildQueueIntoMount(body, h3Index);
   });
@@ -1031,15 +1024,17 @@ async function renderBuildQueueIntoMount(mount: HTMLElement, h3Index: string): P
     };
     typeSelect.addEventListener('change', async () => {
       if (!window.gameApi?.updateHexBuildQueueEntry) return;
-      const result = await window.gameApi.updateHexBuildQueueEntry({
-        h3Index,
-        entryId: entry.id,
-        unitType: typeSelect.value as BuildUnitType,
-        count: readCurrentCount(),
+      await runBuildQueueMutation({
+        mutate: () =>
+          window.gameApi!.updateHexBuildQueueEntry({
+            h3Index,
+            entryId: entry.id,
+            unitType: typeSelect.value as BuildUnitType,
+            count: readCurrentCount(),
+          }),
+        failureMessage: 'Failed to update build queue entry.',
+        refreshState: true,
       });
-      if (!result.success) {
-        showMapToast(result.reason ?? 'Failed to update build queue entry.', { isError: true });
-      }
       void renderBuildQueueIntoMount(mount, h3Index);
     });
     row.appendChild(typeSelect);
@@ -1052,15 +1047,17 @@ async function renderBuildQueueIntoMount(mount: HTMLElement, h3Index: string): P
     countInput.addEventListener('input', async () => {
       if (!window.gameApi?.updateHexBuildQueueEntry) return;
       const count = readCurrentCount();
-      const result = await window.gameApi.updateHexBuildQueueEntry({
-        h3Index,
-        entryId: entry.id,
-        unitType: typeSelect.value as BuildUnitType,
-        count,
+      await runBuildQueueMutation({
+        mutate: () =>
+          window.gameApi!.updateHexBuildQueueEntry({
+            h3Index,
+            entryId: entry.id,
+            unitType: typeSelect.value as BuildUnitType,
+            count,
+          }),
+        failureMessage: 'Failed to update build count.',
+        refreshState: true,
       });
-      if (!result.success) {
-        showMapToast(result.reason ?? 'Failed to update build count.', { isError: true });
-      }
     });
     row.appendChild(countInput);
 
@@ -1070,10 +1067,11 @@ async function renderBuildQueueIntoMount(mount: HTMLElement, h3Index: string): P
     removeBtn.textContent = 'x';
     removeBtn.addEventListener('click', async () => {
       if (!window.gameApi?.removeHexBuildQueueEntry) return;
-      const result = await window.gameApi.removeHexBuildQueueEntry({ h3Index, entryId: entry.id });
-      if (!result.success) {
-        showMapToast(result.reason ?? 'Failed to remove build queue entry.', { isError: true });
-      }
+      await runBuildQueueMutation({
+        mutate: () => window.gameApi!.removeHexBuildQueueEntry({ h3Index, entryId: entry.id }),
+        failureMessage: 'Failed to remove build queue entry.',
+        refreshState: true,
+      });
       void renderBuildQueueIntoMount(mount, h3Index);
     });
     row.appendChild(removeBtn);
@@ -1081,6 +1079,80 @@ async function renderBuildQueueIntoMount(mount: HTMLElement, h3Index: string): P
   }
   section.appendChild(list);
   mount.appendChild(section);
+}
+
+/**
+ * Refreshes renderer state after a build-queue mutation so res-1 queue labels update immediately.
+ */
+async function refreshGameStateAfterBuildQueueChange(): Promise<void> {
+  if (!window.gameApi?.getGameState) return;
+  try {
+    const nextState = (await window.gameApi.getGameState()) as GameStateSnapshot;
+    await applyGameStateSnapshot(nextState, {
+      refreshStandingOrders: false,
+      updateGameStateSidebarUi: false,
+      updateSelectionUi: false,
+      updateGameOverUi: false,
+      updateReadyButton: false,
+      refreshBuildPopup: false,
+      redraw: true,
+    });
+  } catch (err) {
+    console.error('refreshGameStateAfterBuildQueueChange failed:', err);
+  }
+}
+
+async function runBuildQueueMutation(args: {
+  mutate: () => Promise<{ success: boolean; reason?: string }>;
+  failureMessage: string;
+  refreshState: boolean;
+}): Promise<boolean> {
+  try {
+    const result = await args.mutate();
+    if (!result.success) {
+      showMapToast(result.reason ?? args.failureMessage, { isError: true });
+      return false;
+    }
+    if (args.refreshState) await refreshGameStateAfterBuildQueueChange();
+    return true;
+  } catch (err) {
+    console.error('runBuildQueueMutation failed:', err);
+    showMapToast(args.failureMessage, { isError: true });
+    return false;
+  }
+}
+
+async function applyGameStateSnapshot(
+  nextState: GameStateSnapshot,
+  options: {
+    refreshStandingOrders?: boolean;
+    updateGameStateSidebarUi?: boolean;
+    updateSelectionUi?: boolean;
+    updateGameOverUi?: boolean;
+    updateReadyButton?: boolean;
+    refreshBuildPopup?: boolean;
+    redraw?: boolean;
+  } = {}
+): Promise<void> {
+  const previousState = gameState;
+  gameState = nextState;
+  reconcileSelectionToCurrentState();
+  updateClientStaleEnemyIntel(previousState, nextState);
+  if (!initialCameraApplied && nextState.hexes.length > 0) {
+    applyInitialCameraForState(nextState);
+  }
+  clearRes1TooltipSummaryCaches();
+  if (options.refreshStandingOrders) await refreshHumanStandingOrders();
+  if (options.updateGameStateSidebarUi) updateGameStateSidebar(nextState);
+  if (options.updateSelectionUi) {
+    updateRangedSidebar();
+    updateSidebar();
+    updatePendingOrdersSidebar();
+  }
+  if (options.updateGameOverUi) updateGameOverUI(nextState);
+  if (options.updateReadyButton) updateReadyButtonState();
+  if (options.redraw) redraw();
+  if (options.refreshBuildPopup) refreshBuildPopupIfOpen();
 }
 
 async function showTerrainTooltip(
@@ -2038,6 +2110,10 @@ let precomputedToolInvocationCounts: Record<string, number> | null = null;
 let backgroundRequestInFlight = false;
 /** True while a Ready click is in flight (submitOrders + ready IPC). */
 let readyRequestInFlight = false;
+/** Glyph used for unit selection controls in stack/movement/build UI. */
+const UNIT_SELECT_GLYPH = '+';
+/** Glyph used for unit deselection controls in stack/movement UI. */
+const UNIT_DESELECT_GLYPH = '-';
 
 /** When the Ready button is disabled waiting on AI, time (ms) when that state started; null otherwise. */
 let readyBtnAiWaitStartTime: number | null = null;
@@ -3606,6 +3682,91 @@ async function refreshHumanStandingOrders(): Promise<void> {
   }
 }
 
+function estimateHexesLeftForOrder(order: HumanStandingOrderSnapshot): number {
+  if (!Array.isArray(order.routeSegments) || order.routeSegments.length === 0) return 0;
+  let total = 0;
+  for (const segment of order.routeSegments) {
+    if (!Array.isArray(segment.hexes) || segment.hexes.length < 2) continue;
+    total += Math.max(0, segment.hexes.length - 1);
+  }
+  return total;
+}
+
+function isPendingMovementOrderForDisplay(order: HumanStandingOrderSnapshot): boolean {
+  return estimateHexesLeftForOrder(order) > 0;
+}
+
+function applySelectionFromSidebarUnitButton(unitId: string, event: MouseEvent): void {
+  const useMultiSelect = event.ctrlKey || ctrlKeyActive;
+  if (useMultiSelect) {
+    toggleUnitSelection(unitId);
+  } else {
+    replaceSelection([unitId]);
+  }
+  syncUiAfterSelectionChange();
+}
+
+function formatRangedTargetUnitLabel(r: RangedAttackOrder): string {
+  if (!gameState) return r.targetH3Index;
+  const attacker = gameState.units.find((u) => u.id === r.unitId);
+  const inHex = gameState.units.filter((u) => u.h3Index === r.targetH3Index);
+  if (inHex.length === 0) return r.targetH3Index;
+  const preferred = attacker ? inHex.filter((u) => u.player !== attacker.player) : inHex;
+  const candidates = (preferred.length > 0 ? preferred : inHex).sort((a, b) => a.id.localeCompare(b.id));
+  const primary = candidates[0]?.id ?? r.targetH3Index;
+  const additionalCount = Math.max(0, candidates.length - 1);
+  return additionalCount > 0 ? `${primary} (+${additionalCount})` : primary;
+}
+
+function syncUiAfterSelectionChange(options: { refreshHoverPreview?: boolean } = {}): void {
+  if (options.refreshHoverPreview !== false) {
+    void refreshHoverRoutePreview();
+  }
+  updateSidebar();
+  updatePendingOrdersSidebar();
+  updateRangedSidebar();
+  refreshStackCalloutIfOpen();
+  redraw();
+}
+
+function createSidebarOrderRow(args: {
+  labelText: string;
+  selected: boolean;
+  onToggleSelect: (event: MouseEvent) => void;
+  onCancel: () => void;
+  compactBlueButtons?: boolean;
+}): HTMLDivElement {
+  const row = document.createElement('div');
+  row.style.display = 'flex';
+  row.style.alignItems = 'center';
+  row.style.gap = '0.5rem';
+  row.style.marginBottom = '0.35rem';
+  const label = document.createElement('span');
+  label.textContent = args.labelText;
+  label.style.flex = '1';
+  label.style.fontSize = '0.9em';
+  const selectBtn = document.createElement('button');
+  selectBtn.type = 'button';
+  selectBtn.className = args.compactBlueButtons ? 'unit-select compact-blue-btn compact-square-btn' : 'unit-select';
+  selectBtn.textContent = args.selected ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
+  selectBtn.style.flexShrink = '0';
+  selectBtn.style.fontSize = '0.8em';
+  selectBtn.addEventListener('click', (event) => {
+    args.onToggleSelect(event as MouseEvent);
+  });
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = args.compactBlueButtons ? 'unit-select compact-blue-btn compact-square-btn' : 'unit-select';
+  cancelBtn.textContent = '×';
+  cancelBtn.style.flexShrink = '0';
+  cancelBtn.style.fontSize = '0.8em';
+  cancelBtn.addEventListener('click', args.onCancel);
+  row.appendChild(label);
+  row.appendChild(selectBtn);
+  row.appendChild(cancelBtn);
+  return row;
+}
+
 async function cancelOrderForUnit(unitId: string): Promise<void> {
   if (!window.gameApi?.cancelHumanStandingOrder) return;
   const result = await window.gameApi.cancelHumanStandingOrder({ unitId });
@@ -3614,17 +3775,6 @@ async function cancelOrderForUnit(unitId: string): Promise<void> {
   }
   await refreshHumanStandingOrders();
   updatePendingOrdersSidebar();
-  redraw();
-}
-
-/** Selects a unit on the map by id; replaces selection with that unit and redraws. */
-function selectUnitOnMap(unitId: string): void {
-  const unit = gameState?.units.find((u) => u.id === unitId);
-  if (!unit) return;
-  replaceSelection([unit.id]);
-  updateSidebar();
-  updateRangedSidebar();
-  void refreshHoverRoutePreview();
   redraw();
 }
 
@@ -3665,14 +3815,12 @@ async function refreshHoverRoutePreview(): Promise<void> {
 
 function cancelRangedForUnit(unitId: string): void {
   pendingRangedAttacks = pendingRangedAttacks.filter((r) => r.unitId !== unitId);
-  if (selectedUnitIds.includes(unitId)) {
-    clearSelection();
-    hoverRoutePreview = null;
-    hoverPreviewRequestSeq++;
-  }
   rangedModeActive = false;
+  void refreshHoverRoutePreview();
   updateSidebar();
+  updatePendingOrdersSidebar();
   updateRangedSidebar();
+  refreshStackCalloutIfOpen();
   redraw();
 }
 
@@ -3689,30 +3837,13 @@ function updateRangedSidebar(): void {
     listEl.appendChild(span);
   } else {
     for (const r of pendingRangedAttacks) {
-      const row = document.createElement('div');
-      row.style.display = 'flex';
-      row.style.alignItems = 'center';
-      row.style.gap = '0.5rem';
-      row.style.marginBottom = '0.35rem';
-      const label = document.createElement('span');
-      label.textContent = `${r.unitId} → ${r.targetH3Index}`;
-      label.style.flex = '1';
-      label.style.fontSize = '0.9em';
-      const selectBtn = document.createElement('button');
-      selectBtn.type = 'button';
-      selectBtn.textContent = 'Select';
-      selectBtn.style.flexShrink = '0';
-      selectBtn.style.fontSize = '0.8em';
-      selectBtn.addEventListener('click', () => selectUnitOnMap(r.unitId));
-      const cancelBtn = document.createElement('button');
-      cancelBtn.type = 'button';
-      cancelBtn.textContent = 'Cancel';
-      cancelBtn.style.flexShrink = '0';
-      cancelBtn.style.fontSize = '0.8em';
-      cancelBtn.addEventListener('click', () => cancelRangedForUnit(r.unitId));
-      row.appendChild(label);
-      row.appendChild(selectBtn);
-      row.appendChild(cancelBtn);
+      const row = createSidebarOrderRow({
+        labelText: `${r.unitId} → ${formatRangedTargetUnitLabel(r)}`,
+        selected: selectedUnitIds.includes(r.unitId),
+        onToggleSelect: (event) => applySelectionFromSidebarUnitButton(r.unitId, event),
+        onCancel: () => cancelRangedForUnit(r.unitId),
+        compactBlueButtons: true,
+      });
       listEl.appendChild(row);
     }
   }
@@ -3724,7 +3855,7 @@ function updateRangedSidebar(): void {
     const allHaveRanged = selectedUnits.length > 0 && selectedUnits.every((unit) => (RANGED_RANGE[unit.unitType] ?? 0) >= 1);
     if (allHaveRanged) {
       btnEl.style.display = 'inline-block';
-      btnEl.textContent = rangedModeActive ? 'Cancel ranged mode' : 'Ranged attack (click target hex)';
+      btnEl.textContent = rangedModeActive ? 'Cancel' : 'Ranged';
     } else {
       btnEl.style.display = 'none';
       rangedModeActive = false;
@@ -3736,40 +3867,24 @@ function updatePendingOrdersSidebar(): void {
   const container = document.getElementById('pending-orders-list');
   if (!container) return;
   container.innerHTML = '';
-  if (humanStandingOrders.length === 0) {
+  const pendingOrders = humanStandingOrders.filter((order) => isPendingMovementOrderForDisplay(order));
+  if (pendingOrders.length === 0) {
     const span = document.createElement('span');
     span.textContent = 'None';
     span.style.color = '#666';
     container.appendChild(span);
     return;
   }
-  for (const order of humanStandingOrders) {
-    const row = document.createElement('div');
-    row.style.display = 'flex';
-    row.style.alignItems = 'center';
-    row.style.gap = '0.5rem';
-    row.style.marginBottom = '0.35rem';
-    const label = document.createElement('span');
-    label.textContent = `${order.unitId} → ${order.destinationH3Index ?? '—'} (${order.status})`;
-    label.style.flex = '1';
-    label.style.fontSize = '0.9em';
-    const selectBtn = document.createElement('button');
-    selectBtn.type = 'button';
-    selectBtn.textContent = 'Select';
-    selectBtn.style.flexShrink = '0';
-    selectBtn.style.fontSize = '0.8em';
-    selectBtn.addEventListener('click', () => selectUnitOnMap(order.unitId));
-    const cancelBtn = document.createElement('button');
-    cancelBtn.type = 'button';
-    cancelBtn.textContent = 'Cancel';
-    cancelBtn.style.flexShrink = '0';
-    cancelBtn.style.fontSize = '0.8em';
-    cancelBtn.addEventListener('click', () => {
-      void cancelOrderForUnit(order.unitId);
+  for (const order of pendingOrders) {
+    const row = createSidebarOrderRow({
+      labelText: `${order.unitId} → ${estimateHexesLeftForOrder(order)}h (${order.status})`,
+      selected: selectedUnitIds.includes(order.unitId),
+      onToggleSelect: (event) => applySelectionFromSidebarUnitButton(order.unitId, event),
+      onCancel: () => {
+        void cancelOrderForUnit(order.unitId);
+      },
+      compactBlueButtons: true,
     });
-    row.appendChild(label);
-    row.appendChild(selectBtn);
-    row.appendChild(cancelBtn);
     container.appendChild(row);
   }
 }
@@ -4042,22 +4157,15 @@ function init(): void {
       .getGameState()
       .then(async (raw) => {
         const state = raw as GameStateSnapshot;
-        const previousState = gameState;
-        gameState = state;
-        reconcileSelectionToCurrentState();
-        updateClientStaleEnemyIntel(previousState, state);
-        if (!initialCameraApplied && state.hexes.length > 0) {
-          applyInitialCameraForState(state);
-        }
-        clearRes1TooltipSummaryCaches();
-        await refreshHumanStandingOrders();
-        updateGameStateSidebar(state);
-        updateRangedSidebar();
-        updateSidebar();
-        updateGameOverUI(state);
-        updateReadyButtonState();
-        redraw();
-        refreshBuildPopupIfOpen();
+        await applyGameStateSnapshot(state, {
+          refreshStandingOrders: true,
+          updateGameStateSidebarUi: true,
+          updateSelectionUi: true,
+          updateGameOverUi: true,
+          updateReadyButton: true,
+          refreshBuildPopup: true,
+          redraw: true,
+        });
       })
       .catch((err) => console.error('getGameState failed:', err));
     window.gameApi
@@ -4535,11 +4643,15 @@ function init(): void {
         const humanMoves: ResolutionMove[] = readyResult.humanMoves ?? [];
         const nextState = (await window.gameApi.getGameState()) as GameStateSnapshot;
         const state = nextState;
-        const previousState = gameState;
-        gameState = state;
-        reconcileSelectionToCurrentState();
-        updateClientStaleEnemyIntel(previousState, state);
-        clearRes1TooltipSummaryCaches();
+        await applyGameStateSnapshot(state, {
+          refreshStandingOrders: false,
+          updateGameStateSidebarUi: false,
+          updateSelectionUi: false,
+          updateGameOverUi: false,
+          updateReadyButton: false,
+          refreshBuildPopup: false,
+          redraw: false,
+        });
         const aiMoves = readyResult.aiMoves ?? [];
         const resolutionMoves = [...humanMoves, ...aiMoves];
         // Intentionally do not show per-unit AI movement lines in the turn toast.

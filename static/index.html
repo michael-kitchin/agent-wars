@@ -49,7 +49,7 @@
       left: 12px;
       width: 200px;
       height: 200px;
-      z-index: 3;
+      z-index: 6200;
       border: 1px solid #999;
       border-radius: 2px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
@@ -63,7 +63,7 @@
       position: absolute;
       top: 220px;
       left: 12px;
-      z-index: 3;
+      z-index: 6200;
       max-width: 200px;
       padding: 6px 8px;
       background: rgba(240, 238, 234, 0.92);
@@ -202,6 +202,27 @@
       border-color: #bbb;
       cursor: not-allowed;
     }
+    .ranged-btn {
+      min-width: 2rem;
+      padding: 0.25rem 0.4rem;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid transparent;
+    }
+    .ranged-btn:not(:disabled) {
+      background: #e8e4e0;
+      color: #333;
+      border-color: #ccc;
+    }
+    .ranged-btn:not(:disabled):hover {
+      background: #ddd8d2;
+    }
+    .ranged-btn:disabled {
+      background: #d0ccc6;
+      color: #666;
+      border-color: #bbb;
+      cursor: not-allowed;
+    }
     .openrouter-status-row {
       margin-top: 0.5rem;
       padding-top: 0.5rem;
@@ -320,7 +341,7 @@
       display: flex;
       align-items: flex-start;
       gap: 0.5rem;
-      z-index: 8;
+      z-index: 7000;
       box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
     .map-toast.toast-info {
@@ -342,7 +363,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 10;
+      z-index: 7002;
     }
     .game-over-overlay.hidden { display: none; }
     .game-over-box {
@@ -399,7 +420,7 @@
       white-space: normal;
       overflow-wrap: anywhere;
       line-height: 1.25;
-      z-index: 5;
+      z-index: 6400;
       box-shadow: 0 1px 4px rgba(0,0,0,0.15);
     }
     .hex-tooltip.hidden { display: none; }
@@ -447,7 +468,7 @@
       border-radius: 2px;
       font-size: 12px;
       color: #333;
-      z-index: 7;
+      z-index: 6501;
       box-shadow: 0 1px 4px rgba(0,0,0,0.15);
     }
     .build-popup.hidden { display: none; }
@@ -512,7 +533,7 @@
       border-radius: 2px;
       font-size: 12px;
       color: #333;
-      z-index: 6;
+      z-index: 6500;
       box-shadow: 0 1px 4px rgba(0,0,0,0.15);
     }
     .stack-callout.hidden { display: none; }
@@ -554,7 +575,22 @@
     .build-popup .unit-select:hover {
       background: #3a6a8f;
     }
-    .stack-callout .stack-unit-toggle {
+    .stack-callout .stack-unit-toggle,
+    .build-popup .stack-unit-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      margin-left: auto;
+      width: 1.1rem;
+      min-width: 1.1rem;
+      height: 1.1rem;
+      padding: 0;
+      line-height: 1;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .compact-blue-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -564,6 +600,23 @@
       min-width: 0;
       padding: 0.05rem 0.2rem;
       line-height: 1;
+      background: #2e5a7b;
+      color: #fff;
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+    .compact-blue-btn:hover {
+      background: #3a6a8f;
+    }
+    .compact-square-btn {
+      width: 1.1rem;
+      min-width: 1.1rem;
+      height: 1.1rem;
+      padding: 0;
+      line-height: 1;
+      font-size: 11px;
+      font-weight: 700;
     }
     .build-popup .build-popup-close-row {
       display: flex;
@@ -620,10 +673,10 @@
       <p><strong>Game state</strong><br><span id="sidebar-phase">—</span><br><span id="sidebar-turn">—</span></p>
       <p>
         <button type="button" id="ready-btn" class="ready-btn">Ready</button>
-        <button type="button" id="ranged-attack-btn" style="display: none;">Ranged attack (click target hex)</button>
+        <button type="button" id="ranged-attack-btn" class="ranged-btn" style="display: none;">Ranged</button>
       </p>
       <p><strong>Selected unit</strong><br><span id="sidebar-selected-unit">—</span></p>
-      <p><strong>Pending orders</strong></p>
+      <p><strong>Movement orders</strong></p>
       <div id="pending-orders-list"></div>
       <p><strong>Ranged attacks</strong></p>
       <div id="ranged-attacks-list"></div>
