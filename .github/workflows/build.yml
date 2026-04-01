@@ -51,15 +51,15 @@ jobs:
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
-        run: npm run dist:win
+        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --win zip --publish never
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
-        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --linux AppImage
+        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --linux AppImage --publish never
 
       - name: Build (macOS)
         if: runner.os == 'macOS'
-        run: npm run dist:mac
+        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --mac zip --publish never
 
       - name: Remove intermediate build outputs
         shell: bash
@@ -69,7 +69,6 @@ jobs:
           rm -rf release/win-unpacked
           rm -rf release/linux-unpacked
           rm -rf release/mac
-          rm -rf release/mac-arm64
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v6
