@@ -7,6 +7,7 @@ const versionForId = versionText.replace(/[^0-9A-Za-z.-]/g, '-');
 module.exports = {
   appId: `com.agent-wars.app.${versionForId}`,
   productName: `Agent Wars ${versionTag}`,
+  artifactName: '${productName}-${os}-${arch}.${ext}',
   publish: [],
   directories: {
     output: 'release',

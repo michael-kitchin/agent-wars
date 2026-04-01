@@ -50,10 +50,19 @@ function testWindowsZipTargetContract() {
   );
 }
 
+function testArtifactNameContract() {
+  assert.strictEqual(
+    buildConfig.artifactName,
+    '${productName}-${os}-${arch}.${ext}',
+    'electron-builder artifactName must avoid duplicating version while staying cross-platform explicit'
+  );
+}
+
 function main() {
   testVersionedIdentityContract();
   testGeneratedTerrainResourcesContract();
   testWindowsZipTargetContract();
+  testArtifactNameContract();
   console.log('electron-builder-config.test.cjs passed');
 }
 

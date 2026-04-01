@@ -30,7 +30,7 @@ From the project root:
 
 After `npm run dist:win`, `release/` typically contains:
 
-- `Agent Wars v<version>-<version>-win.zip` — ZIP archive with the unpacked app folder and executable
+- `Agent Wars v<version>-win-x64.zip` — ZIP archive with the unpacked app folder and executable
 
 Linux produces `release/linux-unpacked/` (main executable has +x) and `release/agent-wars-<version>-linux-x64.tar.gz` for distribution. For AppImage or .deb, run `npm run dist:linux` on a Linux machine and change the Linux target in `package.json` to `["AppImage", "deb"]`. For a signed .dmg, run `npm run dist:mac` on a Mac and change the Mac target to `["dmg"]`.
 
