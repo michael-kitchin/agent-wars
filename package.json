@@ -6,7 +6,7 @@
   "scripts": {
     "build": "npm run generated:extract && npm run build:main && npm run build:renderer",
     "build:main": "npm run generated:extract && tsc -p tsconfig.main.json",
-    "test": "npm run rebuild:native:node && npm run build:main && node dist/main/pathfinding.test.js && node dist/main/gameIpcHandlers.test.js && node dist/main/precomputation.test.js && node dist/main/briefingFormatter.test.js && node dist/main/callbackSubscriptions.test.js && node dist/main/callbackEvaluation.test.js && node dist/main/openRouter.matrix.test.js && node dist/main/terrainRes1Csv.test.js && node dist/main/terrainMetadataParity.test.js && node dist/main/terrainClassifierFromMetadata.test.js && node dist/main/terrainNamingLoad.test.js && node dist/main/mapData.test.js && node dist/main/rendererConsolidation.test.js && node dist/main/visibility.test.js && node dist/main/gameDb.test.js && node dist/main/gameActionsMultiSelect.test.js && node dist/main/productionRules.test.js && node dist/main/productionOrders.test.js && node dist/main/gameActionsProduction.test.js && node dist/main/tools/tool1Pathfinding.test.js && node dist/main/tools/tool3CombatEstimation.test.js && node dist/main/tools/tool4Memory.test.js && node dist/main/tools/tool5StandingOrders.test.js",
+    "test": "npm run rebuild:native:node && npm run build:main && node dist/main/pathfinding.test.js && node dist/main/gameIpcHandlers.test.js && node dist/main/precomputation.test.js && node dist/main/briefingFormatter.test.js && node dist/main/callbackSubscriptions.test.js && node dist/main/callbackEvaluation.test.js && node dist/main/openRouter.matrix.test.js && node dist/main/terrainRes1Csv.test.js && node dist/main/terrainMetadataParity.test.js && node dist/main/terrainClassifierFromMetadata.test.js && node dist/main/terrainNamingLoad.test.js && node dist/main/mapData.test.js && node dist/main/rendererConsolidation.test.js && node dist/main/visibility.test.js && node dist/main/gameDb.test.js && node dist/main/gameActionsMultiSelect.test.js && node dist/main/productionRules.test.js && node dist/main/productionOrders.test.js && node dist/main/gameActionsProduction.test.js && node dist/main/tools/tool1Pathfinding.test.js && node dist/main/tools/tool3CombatEstimation.test.js && node dist/main/tools/tool4Memory.test.js && node dist/main/tools/tool5StandingOrders.test.js && node scripts/electron-builder-config.test.cjs",
     "copy:leaflet": "node scripts/copy-leaflet.cjs",
     "build:renderer": "node scripts/copy-leaflet.cjs && esbuild src/renderer/renderer.ts --bundle --outfile=static/renderer.js --platform=browser --target=es2022",
     "start": "npm run generated:extract && npm run rebuild:native:electron && electron .",
@@ -22,33 +22,14 @@
     "terrain:calibrate": "python -m scripts.terrain_pipeline.calibrate --sample-count 25",
     "terrain:test": "python -m unittest discover -s scripts/terrain_pipeline/tests -p \"test_*.py\" -v",
     "clean:release": "node -e \"const fs=require('fs');const p=require('path').join(process.cwd(),'release');if(fs.existsSync(p)){try{fs.rmSync(p,{recursive:true,maxRetries:3,retryDelay:200});}catch(e){console.error('Release folder in use. Close the app and any tools using release/, then retry.');process.exit(1);}}\"",
-    "dist": "npm run build && node node_modules/electron-builder/cli.js",
-    "dist:win": "npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --win",
-    "dist:linux": "npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --linux",
-    "dist:mac": "node -e \"if (process.platform !== 'darwin') { console.error('Build for macOS is supported only on macOS. Run npm run dist:mac on a Mac. See .spec/packaging.md'); process.exit(1); }\" && npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --mac"
+    "dist": "npm run build && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs",
+    "dist:win": "npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --win",
+    "dist:linux": "npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --linux",
+    "dist:mac": "node -e \"if (process.platform !== 'darwin') { console.error('Build for macOS is supported only on macOS. Run npm run dist:mac on a Mac. See .spec/packaging.md'); process.exit(1); }\" && npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --mac"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "build": {
-    "appId": "com.agent-wars.app",
-    "productName": "Agent Wars",
-    "publish": [],
-    "directories": {
-      "output": "release"
-    },
-    "files": ["dist", "static", "package.json", "node_modules", "data/generated/terrain_res1_metadata.json", "data/generated/terrain_res4_metadata.json", "data/generated/terrain_res1_naming.json", "data/generated/terrain_res4_naming.json"],
-    "win": {
-      "target": ["nsis"]
-    },
-    "linux": {
-      "target": ["dir"]
-    },
-    "mac": {
-      "target": ["dir"],
-      "category": "public.app-category.games"
-    }
-  },
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",
     "@types/node": "^22.10.1",

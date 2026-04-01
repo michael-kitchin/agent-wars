@@ -47,6 +47,13 @@ function pathCandidates(...segments: string[]): string[] {
   if (testOverrideRoot) roots.push(testOverrideRoot);
   roots.push(path.join(__dirname, '..', '..'));
   roots.push(process.cwd());
+  const processResourcesPath =
+    typeof process !== 'undefined' && typeof process.resourcesPath === 'string' ? process.resourcesPath : null;
+  if (processResourcesPath) {
+    // Packaged app fallback: support resources/data and app.asar.unpacked roots.
+    roots.push(processResourcesPath);
+    roots.push(path.join(processResourcesPath, 'app.asar.unpacked'));
+  }
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { app } = require('electron') as { app?: { getAppPath?: () => string } };

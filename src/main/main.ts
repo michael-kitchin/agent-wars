@@ -60,6 +60,13 @@ let mainWindow: BrowserWindow | null = null;
 
 const MIN_WINDOW_WIDTH = 800;
 const MIN_WINDOW_HEIGHT = 600;
+const VERSIONED_APP_NAME_PREFIX = 'Agent Wars v';
+
+function applyVersionedAppName(): void {
+  const versionedName = `${VERSIONED_APP_NAME_PREFIX}${app.getVersion()}`;
+  app.setName(versionedName);
+  logDebug('main applyVersionedAppName', { versionedName });
+}
 
 /**
  * Creates the main browser window and loads the renderer HTML.
@@ -290,6 +297,8 @@ function registerIpcHandlers(): void {
     setSelectedModel(typeof modelId === 'string' ? modelId : '');
   });
 }
+
+applyVersionedAppName();
 
 app.whenReady().then(async () => {
   await initDatabase();
