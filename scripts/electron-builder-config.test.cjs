@@ -38,9 +38,22 @@ function testGeneratedTerrainResourcesContract() {
   }
 }
 
+function testWindowsZipTargetContract() {
+  assert.ok(buildConfig.win && Array.isArray(buildConfig.win.target), 'electron-builder win.target must be configured');
+  assert.ok(
+    buildConfig.win.target.includes('zip'),
+    'electron-builder win.target must include zip for double-click distribution'
+  );
+  assert.ok(
+    !buildConfig.win.target.includes('nsis'),
+    'electron-builder win.target must not include nsis installer'
+  );
+}
+
 function main() {
   testVersionedIdentityContract();
   testGeneratedTerrainResourcesContract();
+  testWindowsZipTargetContract();
   console.log('electron-builder-config.test.cjs passed');
 }
 

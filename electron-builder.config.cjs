@@ -34,7 +34,7 @@ module.exports = {
     },
   ],
   win: {
-    target: ['nsis'],
+    target: ['zip'],
   },
   linux: {
     target: ['dir'],

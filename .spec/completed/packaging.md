@@ -1,6 +1,6 @@
 # Building distributable versions
 
-The project uses [electron-builder](https://www.electron.build/) to produce installers and portable builds for Windows, Linux, and macOS.
+The project uses [electron-builder](https://www.electron.build/) to produce distributables for Windows, Linux, and macOS.
 
 ## Prerequisites
 
@@ -12,9 +12,9 @@ The project uses [electron-builder](https://www.electron.build/) to produce inst
 From the project root:
 
 | Command | Output |
-|--------|--------|
+| ------- | ------ |
 | `npm run dist` | Build for the **current platform** only |
-| `npm run dist:win` | Windows: NSIS installer + portable exe |
+| `npm run dist:win` | Windows: ZIP archive containing unpacked app (double-click `Agent Wars v<version>.exe`) |
 | `npm run dist:linux` | Linux: unpacked app directory + TGZ archive (executable bit set, ready to ship) |
 | `npm run dist:mac` | macOS: unpacked .app directory (zip to ship; or build on a Mac for .dmg) |
 
@@ -30,11 +30,10 @@ From the project root:
 
 After `npm run dist:win`, `release/` typically contains:
 
-- `Agent Wars Setup x.x.x.exe` — NSIS installer
-- `agent-wars x.x.x.exe` — portable (no install) executable
+- `Agent Wars v<version>-<version>-win.zip` — ZIP archive with the unpacked app folder and executable
 
 Linux produces `release/linux-unpacked/` (main executable has +x) and `release/agent-wars-<version>-linux-x64.tar.gz` for distribution. For AppImage or .deb, run `npm run dist:linux` on a Linux machine and change the Linux target in `package.json` to `["AppImage", "deb"]`. For a signed .dmg, run `npm run dist:mac` on a Mac and change the Mac target to `["dmg"]`.
 
 ## Configuration
 
-Build configuration lives under the `"build"` key in `package.json`: app id, product name, output directory, `files` to include, and per-platform targets. Adjust there if you need different installers (e.g. only portable, or zip instead of NSIS).
+Build configuration lives in `electron-builder.config.cjs`: app id, product name, output directory, `files`/`extraResources` to include, and per-platform targets. Adjust there if you need different artifact types.
