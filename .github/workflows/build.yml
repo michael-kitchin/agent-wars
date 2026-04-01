@@ -41,7 +41,7 @@ jobs:
 
       - name: Read app version
         id: app_version
-        run: node -e "const fs=require('fs');const v=require('./package.json').version;fs.appendFileSync(process.env.GITHUB_OUTPUT, 'value='+v+'\\n');"
+        run: node -e "const fs=require('fs');const v=require('./package.json').version;fs.appendFileSync(process.env.GITHUB_OUTPUT, 'value='+v+String.fromCharCode(10));"
 
       - name: Run tests
         run: npm run test
