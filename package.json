@@ -1,7 +1,7 @@
 {
   "name": "agent-wars",
-  "version": "1.1.0",
-  "description": "Grand strategy wargame with LLM opponents — Milestone 1.1 production baseline",
+  "version": "1.4.0",
+  "description": "Grand strategy wargame with LLM opponents — Milestone 1.4 production baseline",
   "main": "dist/main/main.js",
   "scripts": {
     "build": "npm run generated:extract && npm run build:main && npm run build:renderer",

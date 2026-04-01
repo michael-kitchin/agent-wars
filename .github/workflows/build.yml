@@ -70,5 +70,5 @@ jobs:
       - name: Upload release artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: agent-wars-1.1.0-${{ runner.os }}
+          name: agent-wars-1.4.0-${{ runner.os }}
           path: release/
