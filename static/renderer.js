@@ -16395,14 +16395,18 @@
     if (!map) return;
     const L = getLeafletGlobal();
     if (shouldRenderRes4Hexes()) return;
+    const productionIntelMode = hideTerrainFillWhileHeld;
     const unitHexes = new Set(gameState.units.map((u) => u.h3Index));
     for (const hx of gameState.hexes) {
       const explored = isHexExploredByPlayer(hx.h3Index);
-      if (!explored && !hideTerrainFillWhileHeld) continue;
+      if (!explored && !productionIntelMode) continue;
       if (hx.terrain === "water") continue;
       const controller = getControllerForHex(gameState, hx.h3Index);
       const controlledByHuman = controller === "human";
       const capacityPerTurn = countUrbanRes4HexesInRes1Hex(hx.h3Index);
+      if (!productionIntelMode) {
+        if (!controlledByHuman || capacityPerTurn <= 0) continue;
+      }
       const hasUrbanCapacity = capacityPerTurn > 0;
       const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs(hx.h3Index, false, unitHexes);
       const hasVisibleUnits = unitHexes.has(hx.h3Index);
