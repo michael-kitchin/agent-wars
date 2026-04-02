@@ -19,6 +19,7 @@ import {
   ready,
   submitOrders,
 } from './gameActions';
+import { MAX_UNITS_PER_TYPE } from './productionCaps';
 
 function withTempDb(runCase: () => void): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gameactions-prod-'));
@@ -199,7 +200,8 @@ function testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap(): void {
     assert.strictEqual(forceInfantry.success, true);
 
     dbRun("DELETE FROM units WHERE player = 'human' AND unit_type = 'infantry'");
-    for (let i = 0; i < 10; i++) {
+    const infantryCap = MAX_UNITS_PER_TYPE.infantry;
+    for (let i = 0; i < infantryCap; i++) {
       dbRun(
         `INSERT INTO units (id, player, unit_type, h3_index)
          VALUES (?, 'human', 'infantry', ?)`,
@@ -218,7 +220,7 @@ function testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap(): void {
     const infantryAfter = dbGetOne<{ c: number }>(
       "SELECT COUNT(*) AS c FROM units WHERE player = 'human' AND unit_type = 'infantry'"
     )?.c ?? 0;
-    assert.strictEqual(infantryAfter, 10);
+    assert.strictEqual(infantryAfter, infantryCap);
     const queueAfter = getHexBuildQueue(targetHex, 'human');
     assert.strictEqual(queueAfter.entries.length, 1);
     assert.strictEqual(queueAfter.entries[0]?.unitType, 'infantry');

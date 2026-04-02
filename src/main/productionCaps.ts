@@ -1,4 +1,5 @@
 import type { BuildUnitType } from './productionRules';
+import { MAX_UNITS_PER_TYPE as SHARED_MAX_UNITS_PER_TYPE } from '../shared/productionConfig';
 
 /**
  * Why this exists:
@@ -6,9 +7,9 @@ import type { BuildUnitType } from './productionRules';
  *     use the same limits.
  */
 export const MAX_UNITS_PER_TYPE: Record<BuildUnitType, number> = {
-  infantry: 10,
-  armor: 5,
-  naval: 5,
+  infantry: SHARED_MAX_UNITS_PER_TYPE.infantry,
+  armor: SHARED_MAX_UNITS_PER_TYPE.armor,
+  naval: SHARED_MAX_UNITS_PER_TYPE.naval,
 };
 
 /** Stable unit-type order for UI/prompt messaging about cap state. */

@@ -239,21 +239,23 @@ Render the global map with basic terrain coloring, smooth pan and zoom, and a mi
 
 ### Milestone 1.3 — Fog of War and Subjective Views
 
-**Build:** Implement per-player visibility. Each player can only see hexes within their units' visibility range. At the global level (res 1), visibility ranges need to be calibrated for the hex scale: each hex is ~440 km edge-to-edge, so a visibility range of 1 hex means a unit can see its own hex and all adjacent hexes — roughly a 900 km radius, which is plausible for a major military formation with air reconnaissance and signals intelligence. Naval formations might see 2 hexes (representing broader maritime patrol coverage). These are starting values — tune through playtesting.
+**Build:** Implement per-player visibility. Each player can only see hexes where they have units — ground units (infantry, armor) and naval units see **only the hex they occupy**, with no adjacent-hex vision. The map outside visibility is either unexplored (never seen — rendered dark) or last-known (previously seen but not currently visible — rendered dimmed, showing terrain but not current enemy units). Each player's game state in SQLite tracks their own subjective knowledge.
 
-The map outside visibility is either unexplored (never seen — rendered dark) or last-known (previously seen but not currently visible — rendered dimmed, showing terrain but not current enemy units). Each player's game state in SQLite tracks their own subjective knowledge.
+This own-hex-only model means fog of war is thick by default. Players are blind beyond their front line. Extended visibility comes exclusively from air units (added in milestone 1.5), which see a 3-hex radius around their base airport. This deliberate separation — ground units see nothing beyond their hex, air units see deep — makes air reconnaissance a transformative strategic asset rather than an incremental improvement over existing unit vision. In milestone 1.3, before air units exist, players must push units forward to discover the map, creating genuine exploration tension.
 
 **AI architecture impact:** This is where the `confidence` and `lastSeen` fields in the tool responses become meaningful. The pre-computation layer filters through the AI's subjective view — assessments can only reference enemies the AI has actually seen, with staleness information. The briefing format gains a new dimension: distinguishing between confirmed enemy positions and last-known positions. The callback event `threat_escalation` should fire when a previously unseen enemy appears in a unit's visibility range (new contact), even if the AI didn't explicitly subscribe to it — add `new_contact(unitId)` to the mandatory override list.
 
-**Playtest hypothesis:** Fog of war transforms the game from a puzzle into a contest of information. Scouting should feel valuable. You should experience genuine surprise when you discover the AI's forces. The AI's briefing should clearly distinguish confirmed vs. stale intelligence, and the AI should reason about uncertainty — sending scouts, hedging its deployments, avoiding overcommitting based on incomplete information.
+**Playtest hypothesis:** Fog of war transforms the game from a puzzle into a contest of information. With own-hex-only vision, you should feel genuinely blind about enemy movements beyond your front line. Pushing a unit forward to scout should feel risky and valuable. You should experience genuine surprise when you discover the AI's forces by moving into their hex. The AI's briefing should clearly distinguish confirmed vs. stale intelligence, and the AI should reason about uncertainty — sending scouts, hedging its deployments, avoiding overcommitting based on incomplete information. The thick fog should make milestone 1.5's air reconnaissance feel like a game-changing upgrade when it arrives.
 
 **Design note:** The subjective-view architecture is also the foundation for multiplayer. Each player's state is already isolated and independent.
 
 ### Milestone 1.4 — Economy and Production
 
-**Build:** Add the production system. The production resource is **res4 urban hex count** per territory — each res1 hex's production capacity is determined by how many res4 urban hexes it contains. Players spend urban hexes to build new units at designated production hexes. Unit costs: 5 urban hexes (infantry), 20 (armor), 50 (naval). Naval units can only be launched from hexes with ports.
+**Build:** Add the production system. The production resource is **res4 urban hex count** per territory — each res1 hex generates production points per turn equal to its res4 urban hex count. This is a production *rate*, not a consumable stockpile — the urban hex count doesn't decrease from building units, only from air strikes (milestone 1.5). Points accumulate toward the cost of the queued unit across multiple turns; when accumulated points meet or exceed the unit cost, the unit spawns. Excess production carries over to the next unit in the queue.
 
-Unit caps for the base three types: 6 infantry, 4 armor, 4 naval (14 total). Air units are not available yet — they are added in milestone 1.5. Production is local (per-hex pooling, not global). Territorial control changes when any enemy unit enters a hex.
+Unit costs: 10 (infantry), 20 (armor), 50 (naval). Excess production carries over immediately to the next unit in the queue, and a hex produces as many units per turn as its production rate and unit caps allow. Examples: a hex with 5 urban hexes produces 1 infantry every 2 turns. A hex with 15 urban hexes and a port queues a naval unit followed by an infantry: the naval unit spawns on turn 4 (15 × 4 = 60 ≥ 50) with 10 points left over, which immediately covers the infantry cost (10), so both spawn on turn 4. Naval units can only be launched from hexes with ports.
+
+Unit caps for the base three types: 10 infantry, 5 armor, 5 naval (20 total). Air units are not available yet — they are added in milestone 1.5, where caps become 10/5/5/3. Production is local (per-hex pooling, not global). Territorial control changes when any enemy unit enters a hex.
 
 Hex label format: `N1c / N2t` (urban hex count / turns to next spawn), with exceptions for unexplored (no label), lost control (`N1c / ?t`), nothing enqueued (`N1c`), and unit-capped state (∞ symbol).
 
@@ -275,7 +277,7 @@ Hex label format: `N1c / N2t` (urban hex count / turns to next spawn), with exce
 
 4. **One action per turn.** An air unit may strike or ferry, never both. This forces a meaningful choice between repositioning and attacking.
 
-5. **Ferry movement.** Air units can relocate up to 5 hexes between airports in owned hexes. If the destination airport is destroyed or captured during resolution, the ferry aborts to the origin. If the origin is also lost, the air unit is destroyed.
+5. **Ferry movement.** Air units can relocate up to 4 hexes between airports in owned hexes. Ferry range (4) is longer than strike/visibility range (3) because ferry destinations don't require reconnaissance — a player always knows where their own airports are. The constraint is ownership and an intact airport, not visibility. If the destination airport is destroyed or captured during resolution, the ferry aborts to the origin. If the origin is also lost, the air unit is destroyed. Air units cannot be intercepted in transit (see combat rules §6).
 
 6. **Fragile.** Defense 1 — the lowest in the roster. Destroyed if an enemy ground unit enters the base airport hex. No melee participation.
 
@@ -283,7 +285,7 @@ Hex label format: `N1c / N2t` (urban hex count / turns to next spawn), with exce
 
 1. **Permanent.** Destroyed urban hexes, airports, and ports do not rebuild. This is a scorched-earth system — the attacker permanently degrades the value of territory they might later want. Players may also strike their own infrastructure to deny it to an advancing enemy (see combat rules §6).
 
-2. **Urban hex strikes** reduce a territory's production capacity permanently. Low counter-fire risk (17%).
+2. **Urban hex strikes** permanently reduce a territory's per-turn production rate. Low counter-fire risk (17%). Sustained strikes can cripple or halt production entirely.
 
 3. **Airport strikes** destroy the airport and all co-located enemy air units. High counter-fire risk (33%) due to AA defenses. This is the primary air-vs-air mechanism.
 
@@ -312,7 +314,7 @@ INFRASTRUCTURE STATUS:
 **Playtest hypothesis:** Air units should create a new strategic layer that changes how the game feels. Specifically:
 
 - **Airport placement matters.** Building an air unit is only the start — where you base it determines your visibility and strike coverage. Repositioning via ferry should feel like a deliberate strategic commitment, not a routine move.
-- **The infrastructure destruction trade-off is real.** You should experience genuine hesitation before ordering an urban hex strike on a territory you plan to capture. The scorched-earth dynamic should produce moments where the AI (or you) deliberately choose not to destroy infrastructure because the long-term cost outweighs the short-term advantage.
+- **The infrastructure destruction trade-off is real.** You should experience genuine hesitation before ordering an urban hex strike on a territory you plan to capture — every urban hex you destroy permanently slows the production rate at that territory, for you too. The scorched-earth dynamic should produce moments where the AI (or you) deliberately choose not to destroy infrastructure because the long-term production cost outweighs the short-term military advantage.
 - **Air defense is a ground problem.** Keeping infantry or armor at your airports should feel essential, not optional. Losing an undefended airport to a ground incursion — and the air unit with it — should be a memorable lesson.
 - **The AI reasons about air power distinctly.** Read the AI's strategy field. Is it making deliberate choices about what to strike vs. what to preserve? Is it defending its own airports? Is it using air visibility to inform ground maneuvers?
 

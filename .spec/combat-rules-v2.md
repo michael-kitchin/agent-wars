@@ -26,11 +26,11 @@ This document describes combat execution and resolution rules for the game, usin
 
 ## 2. Unit roster (current)
 
-The game has four unit types. Unit caps per player: 10 infantry, 5 armor, 5 naval, 3 air (23 total). Fallback if playtesting shows 23 is too many for LLM briefing quality: 8 infantry, 4 armor, 4 naval, 2 air (18 total).
+The game has four unit types. Unit caps are 10 infantry, 5 armor, and 5 naval as of milestone 1.4; with air added in milestone 1.5, caps are 10 infantry, 5 armor, 5 naval, and 3 air (23 total). Fallback if playtesting shows 23 is too many for LLM briefing quality: 8 infantry, 4 armor, 4 naval, 2 air (18 total).
 
 | Unit type | Move | Attack | Defense | Range | Domain | Cost |
 |-----------|------|--------|---------|-------|--------|------|
-| **Infantry** | 1 | 1 | 2 | 0 (melee only) | Land | 5 urban hexes |
+| **Infantry** | 1 | 1 | 2 | 0 (melee only) | Land | 10 urban hexes |
 | **Armor** | 2 | 3 | 2 | 1 (adjacent hex) | Land | 20 urban hexes |
 | **Naval** | 2 | 2 | 2 | 2 hexes | Water | 50 urban hexes |
 | **Air** | 0 (ferry only) | 3 | 1 | 3 (strike radius) | Air | 30 urban hexes |
@@ -39,8 +39,12 @@ The game has four unit types. Unit caps per player: 10 infantry, 5 armor, 5 nava
 - **Range 1:** Unit can attack an enemy in any **adjacent** hex (H3 grid distance 1; includes land–water boundary; see §6 for coastal bombardment).
 - **Range 2:** Unit can attack enemies in hexes at distance 1 or 2 (e.g. naval gunfire). Range is measured by H3 grid distance (same metric as movement).
 - **Range 3 (air only):** Unit can strike any hex within 3 hexes of its base airport. Air units do not use incremental movement — they strike from their base and return in the same phase.
-- **Move 0 (air):** Air units have no incremental movement. They reposition via ferry orders (up to 5 hexes between owned airports, one action per turn — see §4.4).
-- **Cost:** Production cost in res4 urban hexes. Air unit cost (30) is a starting value subject to playtesting.
+- **Move 0 (air):** Air units have no incremental movement. They reposition via ferry orders (up to 4 hexes between owned airports, one action per turn — see §4.4). Ferry range (4) is longer than strike/visibility range (3), reflecting that a player always knows where their own airports are — ferry destinations don't require air reconnaissance, just ownership.
+- **Cost:** The cost column is the total production points required to build the unit. Each res1 hex generates production points equal to its res4 urban hex count per turn. Points accumulate toward the unit cost across multiple turns; when accumulated points meet or exceed the cost, the unit spawns and excess production carries over immediately to the next unit in the queue. If the excess is sufficient to cover the next unit's cost, that unit also spawns in the same turn — a hex produces as many units per turn as its production rate and unit caps allow.
+
+  Examples: a hex with 5 urban hexes produces 1 infantry (cost 10) every 2 turns. A hex with 15 urban hexes and a port queues a naval unit (cost 50) followed by an infantry: the naval unit spawns on turn 4 (15 × 4 = 60 ≥ 50) with 10 points left over, which immediately covers the infantry cost (10), so both units spawn on turn 4.
+
+  Air strikes that destroy urban hexes permanently reduce the production rate. Air unit cost (30) is a starting value subject to playtesting.
 
 ---
 
@@ -113,7 +117,7 @@ For each air unit with a ferry order:
    - **If origin intact:** The air unit remains at its origin airport. No movement occurs.
    - **If origin also destroyed or captured:** The air unit is destroyed.
 
-Ferry range: maximum 5 hexes (H3 grid distance) between the origin and destination airports. Both airports must be in hexes owned by the air unit's player at the time the order is issued. Destination validation occurs at resolution time (step 1 above), not at order time, to account for WEGO simultaneous resolution.
+Ferry range: maximum 4 hexes (H3 grid distance) between the origin and destination airports. Ferry range is deliberately longer than the air unit's 3-hex strike/visibility radius — a player always knows where their own airports are, so ferry destinations don't require reconnaissance, just ownership and an intact airport. Both airports must be in hexes owned by the air unit's player at the time the order is issued. Destination validation occurs at resolution time (step 1 above), not at order time, to account for WEGO simultaneous resolution.
 
 ### 4.5 Melee phase (post-move positions)
 
@@ -237,6 +241,8 @@ No player input during steps 2–9.
 - **Self-strikes (scorched earth):** A player may order an air unit to strike their own infrastructure — urban hexes, airports, or ports in hexes they control. This allows deliberate denial of infrastructure to an advancing enemy. Self-striking an airport with your own air units based there destroys those air units (including potentially the striking unit itself, depending on processing order). Counter-fire rules apply normally; the infrastructure does not distinguish between friendly and enemy strikes.
 - **Multiple strikes on same hex:** Multiple air units may strike the same target hex in the same turn. Each strike resolves independently in processing order. Two strikes targeting urban hexes at the same res1 hex destroy two res4 urban hexes. Two strikes on the same airport: the first destroys it (and any based air units); the second finds no airport and resolves as a miss (no valid infrastructure target).
 - **Air unit survival and territorial control:** The post-melee air check (step 8) uses **hex ownership**, not enemy unit presence. If an enemy ground unit enters an airport hex during movement (step 5), territorial control changes immediately per the 1.4 rules — even if that enemy unit is subsequently destroyed in melee (step 7). The airport hex remains under enemy control with no surviving units, and the based air unit is destroyed in step 8. This is intentional: recapturing an airport hex requires a separate ground action on a subsequent turn.
+- **No interception in transit:** Air units executing a ferry order cannot be attacked or intercepted during transit. They are not considered to "fly over" intermediate hexes — the ferry is an instantaneous relocation from origin airport to destination airport at resolution time. Enemy units along the path have no opportunity to engage. This is a deliberate simplification; air-to-air interception, if ever needed, is a theatre-level mechanic for Phase 3, not a global-level ferry rule.
+- **Visibility model:** Ground units (infantry, armor) see only their own hex. Naval units see only their own hex. Air units see a 3-hex radius around their base airport (§8.2). Air units are the sole source of extended visibility — there is no adjacent-hex vision for ground or naval units. This makes fog of war thick by default and air reconnaissance a critical strategic capability rather than an incremental improvement over existing unit vision. Note that the three air ranges are deliberately distinct: visibility 3, strike 3, ferry 4. Visibility and strike share the same radius; ferry extends further because it targets player-owned airports that don't require reconnaissance to locate.
 
 ---
 
@@ -271,11 +277,13 @@ An air unit with a strike order targeting an enemy-occupied hex resolves as foll
 
 Each air unit grants its owning player visibility of all hexes within 3 hexes of its base airport. This visibility includes terrain, occupying units, build queues, and infrastructure status. Visibility is continuous — it applies during the planning phase as well as resolution — and does not require the air unit to take any action. An air unit that executes a strike order or ferry order still provides visibility.
 
+Air units are the **only** source of extended visibility. Ground units (infantry, armor) and naval units see only the hex they occupy. Without air coverage, a player is blind beyond their front line. This makes air reconnaissance a transformative strategic capability — a single air unit at a well-positioned airport reveals up to 37 hexes, potentially 10–15% of all land hexes. Destroying an enemy's airports (§8.3) doesn't just eliminate their strike capability; it collapses their intelligence picture.
+
 ### 8.3 Air strike vs. infrastructure
 
 An air unit may target infrastructure at a hex within its 3-hex strike radius instead of targeting enemy units. The target hex may be enemy-controlled, neutral, or even owned by the striking player (see §6, "Self-strikes"). Three infrastructure target types exist, each with different effects and counter-fire risk.
 
-**Target: Urban hex.** The air unit rolls d6, hit if roll ≤ 3. On hit, one res4 urban hex at the target res1 hex is permanently destroyed, reducing the territory's urban hex count and therefore its production capacity. Counter-fire: roll d6 for ground defenses; the air unit is destroyed if roll ≤ 1 (17% risk). Destroying urban hexes is low-risk but strategically consequential — the production capacity is lost for all players permanently, including the attacker if they later capture the territory.
+**Target: Urban hex.** The air unit rolls d6, hit if roll ≤ 3. On hit, one res4 urban hex at the target res1 hex is permanently destroyed, reducing the territory's urban hex count and therefore its per-turn production rate (see §2). Sustained urban strikes can meaningfully slow or even halt production at a territory. Counter-fire: roll d6 for ground defenses; the air unit is destroyed if roll ≤ 1 (17% risk). Destroying urban hexes is low-risk but strategically consequential — the production rate is reduced for all players permanently, including the attacker if they later capture the territory.
 
 **Target: Airport.** The air unit rolls d6, hit if roll ≤ 3. On hit, the airport is permanently destroyed. Any air units based at the destroyed airport are also destroyed immediately (including friendly air units in the case of a self-strike — see §6). Counter-fire: roll d6 for AA defenses; the air unit is destroyed if roll ≤ 2 (33% risk). Airports are the highest-risk target due to concentrated air defenses, but destroying them eliminates based air power and its associated visibility.
 

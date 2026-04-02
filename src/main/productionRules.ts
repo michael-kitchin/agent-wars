@@ -2,6 +2,8 @@
  * Centralized constants and pure queue-production helpers for milestone 1.4.
  */
 
+import { UNIT_COST_BY_TYPE as SHARED_UNIT_COST_BY_TYPE } from '../shared/productionConfig';
+
 export type BuildUnitType = 'infantry' | 'armor' | 'naval';
 
 export interface BuildQueueEntryLike {
@@ -20,11 +22,7 @@ export const BUILD_ENTRY_MIN_COUNT = 1;
 export const BUILD_ENTRY_MAX_COUNT = 99;
 export const NO_URBAN_BUILD_REASON = 'This hex cannot build units because it has no urban hexes.';
 
-export const UNIT_COST_BY_TYPE: Readonly<Record<BuildUnitType, number>> = {
-  infantry: 10,
-  armor: 20,
-  naval: 50,
-};
+export const UNIT_COST_BY_TYPE: Readonly<Record<BuildUnitType, number>> = SHARED_UNIT_COST_BY_TYPE;
 
 export const BUILD_PREREQUISITES_BY_TYPE: Readonly<Record<BuildUnitType, BuildPrerequisite>> = {
   infantry: { minUrbanHexes: 1, minPorts: 0 },

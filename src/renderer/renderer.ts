@@ -40,6 +40,7 @@ import type {
   HumanOrderGroupPreviewResult,
   HumanStandingOrderSnapshot,
 } from '../shared/ipcTypes';
+import { estimateTurnsToNextSpawn, MAX_UNITS_PER_TYPE } from '../shared/productionConfig';
 
 /** One executed move (human or AI) for resolution-phase fade animation. */
 interface ResolutionMove {
@@ -512,18 +513,6 @@ function getBuildQueueSummaryForHex(
   return state.res1BuildQueueTotals?.find((entry) => entry.h3Index === h3Index) ?? null;
 }
 
-const UNIT_COST_BY_TYPE: Record<BuildUnitType, number> = {
-  infantry: 10,
-  armor: 20,
-  naval: 50,
-};
-
-const MAX_UNITS_PER_TYPE: Record<BuildUnitType, number> = {
-  infantry: 10,
-  armor: 5,
-  naval: 5,
-};
-
 function getHumanUnitCountsByType(state: GameStateSnapshot): Record<BuildUnitType, number> {
   const counts: Record<BuildUnitType, number> = { infantry: 0, armor: 0, naval: 0 };
   for (const unit of state.units) {
@@ -547,18 +536,16 @@ function formatProductionLabelForHex(
   const queuedUnits = queue?.queuedUnits ?? 0;
   if (queuedUnits <= 0) return capacityText;
   const nextUnitType = queue?.nextUnitType;
-  const nextRemainingCount = queue?.nextRemainingCount ?? null;
   const storedPoints = Math.max(0, queue?.storedPoints ?? 0);
-  if (!nextUnitType || !nextRemainingCount || nextRemainingCount <= 0 || capacityPerTurn <= 0) {
+  if (!nextUnitType || capacityPerTurn <= 0) {
     return `${capacityText} / ?t`;
   }
   const humanCounts = getHumanUnitCountsByType(state);
   if (humanCounts[nextUnitType] >= MAX_UNITS_PER_TYPE[nextUnitType]) {
     return `${capacityText} / ∞t`;
   }
-  const pointsNeeded = nextRemainingCount * UNIT_COST_BY_TYPE[nextUnitType];
-  const deficit = Math.max(0, pointsNeeded - storedPoints);
-  const turns = Math.max(1, Math.ceil(deficit / Math.max(1, capacityPerTurn)));
+  const turns = estimateTurnsToNextSpawn(nextUnitType, storedPoints, capacityPerTurn);
+  if (turns === null) return `${capacityText} / ?t`;
   return `${capacityText} / ${turns.toLocaleString()}t`;
 }
 

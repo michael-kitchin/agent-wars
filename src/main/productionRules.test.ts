@@ -4,6 +4,11 @@ import {
   getAvailableBuildUnitTypes,
   isValidBuildCount,
 } from './productionRules';
+import { MAX_UNITS_PER_TYPE as MAX_UNITS_PER_TYPE_MAIN } from './productionCaps';
+import {
+  estimateTurnsToNextSpawn,
+  MAX_UNITS_PER_TYPE as MAX_UNITS_PER_TYPE_SHARED,
+} from '../shared/productionConfig';
 
 function testBuildTypeAvailabilityGates(): void {
   assert.deepStrictEqual(getAvailableBuildUnitTypes(0, 0), []);
@@ -48,10 +53,30 @@ function testProductionExamplesFromSpec(): void {
   assert.strictEqual(high.updatedEntries[0]?.remainingCount, 5);
 }
 
+function testTurnsToNextSpawnEstimateUsesNextUnitOnly(): void {
+  // Queue count does not matter for "next spawn" timing. At 5c/turn and infantry cost 10, first spawn is 2 turns away.
+  assert.strictEqual(estimateTurnsToNextSpawn('infantry', 0, 5), 2);
+  // Stored overflow should allow immediate next-turn spawn.
+  assert.strictEqual(estimateTurnsToNextSpawn('infantry', 10, 5), 1);
+  // Non-positive capacity cannot produce a valid ETA.
+  assert.strictEqual(estimateTurnsToNextSpawn('armor', 0, 0), null);
+}
+
+function testDeploymentCapsMatchMilestone14Values(): void {
+  assert.deepStrictEqual(MAX_UNITS_PER_TYPE_SHARED, {
+    infantry: 6,
+    armor: 4,
+    naval: 4,
+  });
+  assert.deepStrictEqual(MAX_UNITS_PER_TYPE_MAIN, MAX_UNITS_PER_TYPE_SHARED);
+}
+
 function run(): void {
   testBuildTypeAvailabilityGates();
   testBuildCountValidationBounds();
   testProductionExamplesFromSpec();
+  testTurnsToNextSpawnEstimateUsesNextUnitOnly();
+  testDeploymentCapsMatchMilestone14Values();
   // eslint-disable-next-line no-console
   console.log('productionRules.test.ts passed');
 }

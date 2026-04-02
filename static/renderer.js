@@ -14848,6 +14848,27 @@
     }
   }
 
+  // src/shared/productionConfig.ts
+  var UNIT_COST_BY_TYPE = {
+    infantry: 10,
+    armor: 20,
+    naval: 50
+  };
+  var MAX_UNITS_PER_TYPE = {
+    infantry: 6,
+    armor: 4,
+    naval: 4
+  };
+  function estimateTurnsToNextSpawn(nextUnitType, storedPoints, capacityPerTurn) {
+    if (!nextUnitType) return null;
+    const unitCost = UNIT_COST_BY_TYPE[nextUnitType];
+    const safeCapacity = Math.max(0, Math.trunc(capacityPerTurn));
+    if (safeCapacity <= 0) return null;
+    const safeStoredPoints = Math.max(0, Math.trunc(storedPoints));
+    const deficit = Math.max(0, unitCost - safeStoredPoints);
+    return Math.max(1, Math.ceil(deficit / safeCapacity));
+  }
+
   // src/renderer/renderer.ts
   var RANGED_RANGE = {
     infantry: 0,
@@ -15178,16 +15199,6 @@
   function getBuildQueueSummaryForHex(state, h3Index) {
     return state.res1BuildQueueTotals?.find((entry) => entry.h3Index === h3Index) ?? null;
   }
-  var UNIT_COST_BY_TYPE = {
-    infantry: 10,
-    armor: 20,
-    naval: 50
-  };
-  var MAX_UNITS_PER_TYPE = {
-    infantry: 10,
-    armor: 5,
-    naval: 5
-  };
   function getHumanUnitCountsByType(state) {
     const counts = { infantry: 0, armor: 0, naval: 0 };
     for (const unit of state.units) {
@@ -15205,18 +15216,16 @@
     const queuedUnits = queue?.queuedUnits ?? 0;
     if (queuedUnits <= 0) return capacityText;
     const nextUnitType = queue?.nextUnitType;
-    const nextRemainingCount = queue?.nextRemainingCount ?? null;
     const storedPoints = Math.max(0, queue?.storedPoints ?? 0);
-    if (!nextUnitType || !nextRemainingCount || nextRemainingCount <= 0 || capacityPerTurn <= 0) {
+    if (!nextUnitType || capacityPerTurn <= 0) {
       return `${capacityText} / ?t`;
     }
     const humanCounts = getHumanUnitCountsByType(state);
     if (humanCounts[nextUnitType] >= MAX_UNITS_PER_TYPE[nextUnitType]) {
       return `${capacityText} / \u221Et`;
     }
-    const pointsNeeded = nextRemainingCount * UNIT_COST_BY_TYPE[nextUnitType];
-    const deficit = Math.max(0, pointsNeeded - storedPoints);
-    const turns = Math.max(1, Math.ceil(deficit / Math.max(1, capacityPerTurn)));
+    const turns = estimateTurnsToNextSpawn(nextUnitType, storedPoints, capacityPerTurn);
+    if (turns === null) return `${capacityText} / ?t`;
     return `${capacityText} / ${turns.toLocaleString()}t`;
   }
   function roundToNearestInteger(value) {
