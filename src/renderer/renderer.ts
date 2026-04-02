@@ -193,11 +193,67 @@ function shouldSuppressTerrainTooltip(): boolean {
   return isStackOrBuildMapPopoverOpen() || buildEntryButtonPointerInside;
 }
 
+function applyModifierDrivenPopoverCloseRules(reason: 'ctrl_pressed' | 'ctrl_released' | 'window_blur'): void {
+  if (reason === 'ctrl_pressed') {
+    hideBuildPopup();
+    refreshStackCalloutIfOpen();
+    return;
+  }
+  if (reason === 'ctrl_released') {
+    hideStackCallout();
+    return;
+  }
+  refreshStackCalloutIfOpen();
+}
+
 /** Marks the stack callout as sticky after the player starts changing selection from it. */
 function activateStackCalloutModal(): void {
   stackCalloutModalActive = true;
   const el = document.getElementById('stack-callout');
   if (el) el.classList.add('stack-modal');
+}
+
+function onStackSingleUnitToggleClick(
+  unitId: string,
+  inSelection: boolean,
+  allUnitsAtHex: GameStateSnapshot['units'],
+  clientX: number,
+  clientY: number
+): void {
+  if (!ctrlKeyActive) {
+    if (inSelection) {
+      removeUnitsFromSelection([unitId]);
+    } else {
+      replaceSelection([unitId]);
+    }
+    hideStackCallout();
+    syncUiAfterSelectionChange({ refreshHoverPreview: false });
+    return;
+  }
+  activateStackCalloutModal();
+  toggleUnitSelection(unitId);
+  showStackCallout(allUnitsAtHex, clientX, clientY);
+  syncUiAfterSelectionChange({ refreshHoverPreview: false });
+}
+
+function onStackAllActionClick(
+  action: 'selectAll' | 'addAll' | 'removeAll',
+  humanIds: string[],
+  allUnitsAtHex: GameStateSnapshot['units'],
+  clientX: number,
+  clientY: number
+): void {
+  if (action === 'selectAll') {
+    replaceSelection(humanIds);
+    hideStackCallout();
+    syncUiAfterSelectionChange({ refreshHoverPreview: false });
+    return;
+  }
+  activateStackCalloutModal();
+  if (action === 'addAll') addUnitsToSelection(humanIds);
+  else removeUnitsFromSelection(humanIds);
+  showStackCallout(allUnitsAtHex, clientX, clientY);
+  syncUiAfterSelectionChange({ refreshHoverPreview: false });
 }
 
 /**
@@ -254,10 +310,7 @@ function showStackCallout(
     selectAllBtn.className = 'unit-select';
     selectAllBtn.textContent = `${UNIT_SELECT_GLYPH} All`;
     selectAllBtn.addEventListener('click', () => {
-      activateStackCalloutModal();
-      replaceSelection(humanIds);
-      showStackCallout(units, clientX, clientY);
-      syncUiAfterSelectionChange({ refreshHoverPreview: false });
+      onStackAllActionClick('selectAll', humanIds, units, clientX, clientY);
     });
     header.appendChild(selectAllBtn);
   } else {
@@ -266,23 +319,17 @@ function showStackCallout(
     addAllBtn.className = 'unit-select';
     addAllBtn.textContent = `${UNIT_SELECT_GLYPH} All`;
     addAllBtn.addEventListener('click', () => {
-      activateStackCalloutModal();
-      addUnitsToSelection(humanIds);
-      showStackCallout(units, clientX, clientY);
-      syncUiAfterSelectionChange({ refreshHoverPreview: false });
+      onStackAllActionClick('addAll', humanIds, units, clientX, clientY);
     });
     const removeAllBtn = document.createElement('button');
     removeAllBtn.type = 'button';
     removeAllBtn.className = 'unit-select';
     removeAllBtn.textContent = `${UNIT_DESELECT_GLYPH} All`;
     removeAllBtn.addEventListener('click', () => {
-      activateStackCalloutModal();
-      removeUnitsFromSelection(humanIds);
-      showStackCallout(units, clientX, clientY);
-      syncUiAfterSelectionChange({ refreshHoverPreview: false });
+      onStackAllActionClick('removeAll', humanIds, units, clientX, clientY);
     });
-    header.appendChild(addAllBtn);
     header.appendChild(removeAllBtn);
+    header.appendChild(addAllBtn);
   }
   calloutEl.insertBefore(header, listEl);
   for (const u of sorted) {
@@ -298,10 +345,7 @@ function showStackCallout(
       const inSelection = selectedUnitIds.includes(u.id);
       btn.textContent = inSelection ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
       btn.addEventListener('click', () => {
-        activateStackCalloutModal();
-        toggleUnitSelection(u.id);
-        showStackCallout(units, clientX, clientY);
-        syncUiAfterSelectionChange({ refreshHoverPreview: false });
+        onStackSingleUnitToggleClick(u.id, inSelection, units, clientX, clientY);
       });
       li.appendChild(btn);
     }
@@ -328,8 +372,10 @@ function refreshStackCalloutIfOpen(): void {
   } catch {
     return;
   }
+  const state = gameState;
+  if (!state) return;
   const units = unitIds
-    .map((id) => gameState.units.find((u) => u.id === id))
+    .map((id) => state.units.find((u) => u.id === id))
     .filter((unit): unit is NonNullable<typeof unit> => !!unit);
   if (units.length === 0) {
     hideStackCallout();
@@ -462,7 +508,7 @@ function featureLabelsForRes1Hex(h3: string): string[] {
   if (!infraGlyphsAllowedForRes1Hex(h3)) return [];
   const labels: string[] = [];
   if (terrainInfraRes1Airport.has(h3)) labels.push('Airports');
-  if (terrainInfraRes1Port.has(h3)) labels.push('Ports');
+  if (terrainInfraRes1Seaport.has(h3)) labels.push('Seaports');
   return labels;
 }
 
@@ -470,7 +516,7 @@ function featureLabelsForRes4Child(parentH3: string, childH3: string): string[] 
   if (!infraGlyphsAllowedForRes4Child(parentH3, childH3)) return [];
   const labels: string[] = [];
   if (terrainInfraRes4Airport.has(childH3)) labels.push('Airport');
-  if (terrainInfraRes4Port.has(childH3)) labels.push('Port');
+  if (terrainInfraRes4Seaport.has(childH3)) labels.push('Seaport');
   return labels;
 }
 
@@ -506,6 +552,28 @@ function getControllerForHex(state: GameStateSnapshot, h3Index: string): string 
   return row?.controllerPlayerId ?? null;
 }
 
+/**
+ * Returns whether **T** is held for map inspection (`hideTerrainFillWhileHeld`). Terrain fills, res4 fills,
+ * and production overlays all consult this reader; only key/blur handlers assign the underlying flag.
+ */
+function isMapInspectionModeHeld(): boolean {
+  return hideTerrainFillWhileHeld;
+}
+
+/**
+ * True when this res1 hex is land, human-controlled, and has at least one urban res4 child (production
+ * capacity). Matches eligibility for build-entry buttons (plus explored) and for canvas production labels
+ * when not in map inspection mode.
+ */
+function isRes1HexHumanUrbanProduction(
+  state: GameStateSnapshot,
+  hx: GameStateSnapshot['hexes'][number]
+): boolean {
+  if (hx.terrain === 'water') return false;
+  if (getControllerForHex(state, hx.h3Index) !== 'human') return false;
+  return countUrbanRes4HexesInRes1Hex(hx.h3Index) > 0;
+}
+
 function getBuildQueueSummaryForHex(
   state: GameStateSnapshot,
   h3Index: string
@@ -513,10 +581,16 @@ function getBuildQueueSummaryForHex(
   return state.res1BuildQueueTotals?.find((entry) => entry.h3Index === h3Index) ?? null;
 }
 
-function getHumanUnitCountsByType(state: GameStateSnapshot): Record<BuildUnitType, number> {
-  const counts: Record<BuildUnitType, number> = { infantry: 0, armor: 0, naval: 0 };
+type UnitCountsByType = Record<BuildUnitType, number>;
+type UnitCountsByPlayer = Record<'human' | 'opponent', UnitCountsByType>;
+
+function getUnitCountsByTypeForPlayer(
+  state: GameStateSnapshot,
+  playerId: 'human' | 'opponent'
+): UnitCountsByType {
+  const counts: UnitCountsByType = { infantry: 0, armor: 0, naval: 0 };
   for (const unit of state.units) {
-    if (unit.player !== 'human') continue;
+    if (unit.player !== playerId) continue;
     if (unit.unitType === 'infantry' || unit.unitType === 'armor' || unit.unitType === 'naval') {
       counts[unit.unitType] += 1;
     }
@@ -524,14 +598,18 @@ function getHumanUnitCountsByType(state: GameStateSnapshot): Record<BuildUnitTyp
   return counts;
 }
 
-function formatProductionLabelForHex(
+function isFogOfWarDisabledForSnapshot(state: GameStateSnapshot): boolean {
+  return state.fogOfWarEnabled === false;
+}
+
+function formatProductionQueueAwareLabel(
   state: GameStateSnapshot,
   h3Index: string,
   capacityPerTurn: number,
-  controller: string | null
+  controller: string | null,
+  unitCountsByPlayer?: UnitCountsByPlayer
 ): string {
   const capacityText = `${Math.max(0, capacityPerTurn).toLocaleString()}c`;
-  if (controller !== 'human') return `${capacityText} / ?t`;
   const queue = getBuildQueueSummaryForHex(state, h3Index);
   const queuedUnits = queue?.queuedUnits ?? 0;
   if (queuedUnits <= 0) return capacityText;
@@ -540,13 +618,61 @@ function formatProductionLabelForHex(
   if (!nextUnitType || capacityPerTurn <= 0) {
     return `${capacityText} / ?t`;
   }
-  const humanCounts = getHumanUnitCountsByType(state);
-  if (humanCounts[nextUnitType] >= MAX_UNITS_PER_TYPE[nextUnitType]) {
-    return `${capacityText} / ∞t`;
+  if (controller === 'human' || controller === 'opponent') {
+    const countsByType =
+      controller === 'human'
+        ? (unitCountsByPlayer?.human ?? getUnitCountsByTypeForPlayer(state, 'human'))
+        : (unitCountsByPlayer?.opponent ?? getUnitCountsByTypeForPlayer(state, 'opponent'));
+    if (countsByType[nextUnitType] >= MAX_UNITS_PER_TYPE[nextUnitType]) {
+      return `${capacityText} / ∞t`;
+    }
   }
   const turns = estimateTurnsToNextSpawn(nextUnitType, storedPoints, capacityPerTurn);
   if (turns === null) return `${capacityText} / ?t`;
   return `${capacityText} / ${turns.toLocaleString()}t`;
+}
+
+function formatProductionLabelForHumanControllerOnly(
+  state: GameStateSnapshot,
+  h3Index: string,
+  capacityPerTurn: number,
+  controller: string | null
+): string {
+  if (controller !== 'human') return `${Math.max(0, capacityPerTurn).toLocaleString()}c / ?t`;
+  return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller);
+}
+
+function formatProductionLabelForAnyController(
+  state: GameStateSnapshot,
+  h3Index: string,
+  capacityPerTurn: number,
+  controller: string | null,
+  unitCountsByPlayer?: UnitCountsByPlayer
+): string {
+  return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer);
+}
+
+interface ProductionOverlayContext {
+  mapInspectionHeld: boolean;
+  revealAllControllerQueues: boolean;
+  unitHexes: Set<string>;
+  unitCountsByPlayer?: UnitCountsByPlayer;
+}
+
+function buildProductionOverlayContext(state: GameStateSnapshot): ProductionOverlayContext {
+  const mapInspectionHeld = isMapInspectionModeHeld();
+  const revealAllControllerQueues = mapInspectionHeld && isFogOfWarDisabledForSnapshot(state);
+  return {
+    mapInspectionHeld,
+    revealAllControllerQueues,
+    unitHexes: new Set(state.units.map((u) => u.h3Index)),
+    unitCountsByPlayer: revealAllControllerQueues
+      ? {
+          human: getUnitCountsByTypeForPlayer(state, 'human'),
+          opponent: getUnitCountsByTypeForPlayer(state, 'opponent'),
+        }
+      : undefined,
+  };
 }
 
 function roundToNearestInteger(value: number): number {
@@ -655,14 +781,14 @@ function getRes1FeaturesSummary(h3: string): string | null {
     res4ChildrenByParent.set(h3, children);
   }
   let airportCount = 0;
-  let portCount = 0;
+  let seaportCount = 0;
   for (const child of children) {
     if (terrainInfraRes4Airport.has(child)) airportCount++;
-    if (terrainInfraRes4Port.has(child)) portCount++;
+    if (terrainInfraRes4Seaport.has(child)) seaportCount++;
   }
   const parts: string[] = [];
   if (labels.includes('Airports')) parts.push(`Airports (${airportCount.toLocaleString()})`);
-  if (labels.includes('Ports')) parts.push(`Ports (${portCount.toLocaleString()})`);
+  if (labels.includes('Seaports')) parts.push(`Seaports (${seaportCount.toLocaleString()})`);
   const summary = parts.length > 0 ? parts.join(', ') : null;
   res1FeaturesSummaryByH3.set(h3, summary);
   return summary;
@@ -1211,7 +1337,11 @@ let selectedHexIndex: string | null = null;
 let hoveredHexH3: string | null = null;
 /** H3 index of the res-4 child under pointer while detail mode is active; null otherwise. */
 let hoveredDetailHexH3: string | null = null;
-/** While held, hide default res1/res4 fill behavior for visual inspection. */
+/**
+ * While the user holds **T**, map inspection mode is active: default res1/res4 terrain fills are hidden
+ * and res1 production overlays use full intel (all land hexes, including unexplored capacity-only hints).
+ * Release T to return to normal terrain fills and production labels only on human urban hexes.
+ */
 let hideTerrainFillWhileHeld = false;
 let selectedUnitIds: string[] = [];
 /** Selection snapshot at mousedown; used so double-click can issue group move without reselecting first. */
@@ -1232,11 +1362,11 @@ let buildPopupHexH3: string | null = null;
 let buildPopupRequestSeq = 0;
 let gameState: GameStateSnapshot | null = null;
 let res4TerrainOverridesByH3 = new Map<string, { terrainKind: string; isUrban: boolean }>();
-/** Major airport/port H3 from metadata (scalerank ≤ 5); populated via IPC at startup. */
+/** Major airport/seaport H3 from metadata (scalerank ≤ 5); populated via IPC at startup. */
 let terrainInfraRes1Airport = new Set<string>();
-let terrainInfraRes1Port = new Set<string>();
+let terrainInfraRes1Seaport = new Set<string>();
 let terrainInfraRes4Airport = new Set<string>();
-let terrainInfraRes4Port = new Set<string>();
+let terrainInfraRes4Seaport = new Set<string>();
 const res4ChildrenByParent = new Map<string, string[]>();
 let res4Visible = false;
 /** When non-null, we are animating resolution: ranged lightning → ranged casualty → movement → melee lightning → melee casualty. */
@@ -1609,7 +1739,7 @@ function drawTerrainHexes(ctx: CanvasRenderingContext2D): void {
       ctx.closePath();
     };
     const explored = exploredHexes.has(hx.h3Index);
-    if (explored && !hideTerrainFillWhileHeld) {
+    if (explored && !isMapInspectionModeHeld()) {
       fillHexTerrain(ctx, kind, drawClosedPath, {
         fillAndHatchAlphaScale: !res4Active && hoveredHexH3 === hx.h3Index ? 2 : 1,
         landHoverFill: !res4Active && hoveredHexH3 === hx.h3Index && kind === 'plains',
@@ -1716,7 +1846,7 @@ function hasVisibleRes1InfrastructureGlyphs(
     !res4On &&
     infraGlyphsAllowedForRes1Hex(h3Index) &&
     !unitHexes.has(h3Index) &&
-    (terrainInfraRes1Airport.has(h3Index) || terrainInfraRes1Port.has(h3Index))
+    (terrainInfraRes1Airport.has(h3Index) || terrainInfraRes1Seaport.has(h3Index))
   );
 }
 
@@ -1766,19 +1896,16 @@ function syncBuildEntryButton(): void {
   for (const hx of gameState.hexes) {
     if (hx.terrain === 'water') continue;
     const explored = isHexExploredByPlayer(hx.h3Index);
-    // Build-entry controls are clickable and only for explored human-controlled hexes.
     if (!explored) continue;
-    const controller = getControllerForHex(gameState, hx.h3Index);
-    if (controller !== 'human') continue;
+    if (!isRes1HexHumanUrbanProduction(gameState, hx)) continue;
     const capacityPerTurn = countUrbanRes4HexesInRes1Hex(hx.h3Index);
-    if (capacityPerTurn <= 0) continue;
     const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs(hx.h3Index, res4On, visibleUnitHexes);
     const hasVisibleUnits = visibleUnitHexes.has(hx.h3Index);
     const center = hexCenterPx(hx.h3Index);
     const textY = computeRes1OverlayTextY(hx.h3Index, map, L, hasInfraSymbols || hasVisibleUnits);
     rows.push({
       h3: hx.h3Index,
-      label: formatProductionLabelForHex(gameState, hx.h3Index, capacityPerTurn, 'human'),
+      label: formatProductionLabelForHumanControllerOnly(gameState, hx.h3Index, capacityPerTurn, 'human'),
       left: Math.round(center.x),
       top: Math.round(textY),
       hasCapacity: true,
@@ -1902,7 +2029,7 @@ function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void {
         }
         ctx.closePath();
       };
-      if (!hideTerrainFillWhileHeld) {
+      if (!isMapInspectionModeHeld()) {
         fillHexTerrain(ctx, terrainKind, drawClosedPath, {
           fillAndHatchAlphaScale: hoveredDetailHexH3 === child ? 2 : 1,
           landHoverFill: hoveredDetailHexH3 === child && terrainKind === 'plains',
@@ -1935,7 +2062,7 @@ function infraGlyphsAllowedForRes4Child(parentH3: string, childH3: string): bool
 }
 
 /**
- * Draws airport / port symbols on highlighted terrain hexes after units so glyphs sit above unit markers when T is held.
+ * Draws airport / seaport symbols on highlighted terrain hexes after units so glyphs sit above unit markers when T is held.
  */
 function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void {
   if (!gameState) return;
@@ -1960,7 +2087,7 @@ function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void 
       if (unitHexes.has(hx.h3Index)) continue;
       if (!infraGlyphsAllowedForRes1Hex(hx.h3Index)) continue;
       const ap = terrainInfraRes1Airport.has(hx.h3Index);
-      const pt = terrainInfraRes1Port.has(hx.h3Index);
+      const pt = terrainInfraRes1Seaport.has(hx.h3Index);
       if (!ap && !pt) continue;
       const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
       const pts = boundary.map(([lat, lng]: [number, number]) => {
@@ -1969,7 +2096,7 @@ function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void 
       });
       drawTerrainInfrastructureGlyphs(ctx, pts, {
         showAirport: ap,
-        showPort: pt,
+        showSeaport: pt,
         outlineScreenPx,
         centerYOffsetPx: spanForProjectedHex(pts) * -0.14,
       });
@@ -1992,13 +2119,13 @@ function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void 
     for (const child of children) {
       if (!infraGlyphsAllowedForRes4Child(parent.h3Index, child)) continue;
       const ap = terrainInfraRes4Airport.has(child);
-      const pt = terrainInfraRes4Port.has(child);
+      const pt = terrainInfraRes4Seaport.has(child);
       if (!ap && !pt) continue;
       const pts = projectHexBoundaryToContainerPoints(child, map, L);
       if (!projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight)) continue;
       drawTerrainInfrastructureGlyphs(ctx, pts, {
         showAirport: ap,
-        showPort: pt,
+        showSeaport: pt,
         outlineScreenPx,
         glyphAreaScale: RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE,
       });
@@ -2008,10 +2135,9 @@ function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void 
 
 /**
  * Draws res1 production capacity / queue hints on the map overlay canvas.
- * When `hideTerrainFillWhileHeld` is false (T not held), only human-controlled hexes with urban
- * capacity are labeled; unexplored and zero-capacity notations match the prior T-hold-only cases.
- * When T is held (same flag as terrain-fill hide), all land hexes use the existing explored vs
- * unexplored formatting. Skipped entirely while res4 child hexes are visible.
+ * Rules follow `isMapInspectionModeHeld()` and `isRes1HexHumanUrbanProduction()`; see `hideTerrainFillWhileHeld`.
+ * With fog disabled, T-hold inspection reveals full queue ETA labels for all land hexes.
+ * Skipped while res4 child hexes are visible.
  */
 function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void {
   if (!gameState) return;
@@ -2021,28 +2147,35 @@ function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void {
   if (!map) return;
   const L = getLeafletGlobal();
   if (shouldRenderRes4Hexes()) return;
-  const productionIntelMode = hideTerrainFillWhileHeld;
-  const unitHexes = new Set(gameState.units.map((u) => u.h3Index));
+  const overlayContext = buildProductionOverlayContext(gameState);
   for (const hx of gameState.hexes) {
     const explored = isHexExploredByPlayer(hx.h3Index);
-    if (!explored && !productionIntelMode) continue;
+    if (!explored && !overlayContext.mapInspectionHeld) continue;
     if (hx.terrain === 'water') continue;
     const controller = getControllerForHex(gameState, hx.h3Index);
     const controlledByHuman = controller === 'human';
     const capacityPerTurn = countUrbanRes4HexesInRes1Hex(hx.h3Index);
-    if (!productionIntelMode) {
-      if (!controlledByHuman || capacityPerTurn <= 0) continue;
+    if (!overlayContext.mapInspectionHeld) {
+      if (!isRes1HexHumanUrbanProduction(gameState, hx)) continue;
     }
     const hasUrbanCapacity = capacityPerTurn > 0;
-    const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs(hx.h3Index, false, unitHexes);
-    const hasVisibleUnits = unitHexes.has(hx.h3Index);
+    const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs(hx.h3Index, false, overlayContext.unitHexes);
+    const hasVisibleUnits = overlayContext.unitHexes.has(hx.h3Index);
     const center = hexCenterPx(hx.h3Index);
     const textY = computeRes1OverlayTextY(hx.h3Index, map, L, hasInfraSymbols || hasVisibleUnits);
-    const text = explored
-      ? formatProductionLabelForHex(gameState, hx.h3Index, capacityPerTurn, controller)
+    const text = explored || overlayContext.revealAllControllerQueues
+      ? overlayContext.revealAllControllerQueues
+        ? formatProductionLabelForAnyController(
+            gameState,
+            hx.h3Index,
+            capacityPerTurn,
+            controller,
+            overlayContext.unitCountsByPlayer
+          )
+        : formatProductionLabelForHumanControllerOnly(gameState, hx.h3Index, capacityPerTurn, controller)
       : `${Math.max(0, capacityPerTurn).toLocaleString()}c`;
     const hasClickableBuildEntryForHex =
-      explored && controlledByHuman && capacityPerTurn > 0 && shouldShowBuildEntryZoom();
+      explored && isRes1HexHumanUrbanProduction(gameState, hx) && shouldShowBuildEntryZoom();
     if (hasClickableBuildEntryForHex) {
       continue;
     }
@@ -2070,7 +2203,6 @@ const OPENROUTER_TOOL_GROUPS: { id: string; label: string }[] = [
   { id: 'orders', label: 'Orders' },
   { id: 'production', label: 'Production' },
 ];
-
 /** Current tool groups shown in the Tools tab (from main registry or fallback). */
 let openRouterToolGroups: { id: string; label: string }[] = [...OPENROUTER_TOOL_GROUPS];
 
@@ -2495,7 +2627,7 @@ function formatDeploymentCapReachedLine(
   cappedTypes: Array<'infantry' | 'armor' | 'naval'> | undefined
 ): string | null {
   if (!cappedTypes || cappedTypes.length === 0) return null;
-  const ordered = ['infantry', 'armor', 'naval'].filter((unitType) => cappedTypes.includes(unitType));
+  const ordered = (['infantry', 'armor', 'naval'] as const).filter((unitType) => cappedTypes.includes(unitType));
   if (ordered.length === 0) return null;
   if (ordered.length === 1) return `Maximum ${ordered[0]} units deployed.`;
   if (ordered.length === 2) return `Maximum ${ordered[0]} and ${ordered[1]} units deployed.`;
@@ -2724,10 +2856,13 @@ function drawGameScene(
       drawResolutionMoveLines(ctx, width, height, anim.moves, state.units, hexList, 1);
     }
   }
-  if (!hideCommittedOrderLinesAfterReady && humanStandingOrders.length > 0 && state.units.length) {
-    drawStandingOrderLines(ctx, humanStandingOrders, state.units);
+  const shouldDrawCommittedPaths = shouldDrawCommittedOrderPaths();
+  const shouldDrawPathPreview = shouldDrawHoveredPathPreview();
+  const hiddenCommittedUnitIdsWhilePreviewing = getCommittedOrderUnitsHiddenDuringPreview(shouldDrawPathPreview);
+  if (shouldDrawCommittedPaths && !hideCommittedOrderLinesAfterReady && humanStandingOrders.length > 0 && state.units.length) {
+    drawStandingOrderLines(ctx, humanStandingOrders, state.units, hiddenCommittedUnitIdsWhilePreviewing);
   }
-  if (!anim) drawHoverRoutePreview(ctx);
+  if (shouldDrawPathPreview && !anim) drawHoverRoutePreview(ctx);
   if (pendingRangedAttacks.length > 0 && state.units.length && hexList) {
     drawRangedAttackLines(ctx, width, height, pendingRangedAttacks, state.units, hexList);
   }
@@ -2785,6 +2920,21 @@ function drawGameScene(
       drawUnknownBattleMarkers(ctx, unknownCasualtyHexes, pulseOpacity);
     }
   }
+}
+
+function shouldDrawCommittedOrderPaths(): boolean {
+  return !ctrlKeyActive;
+}
+
+function shouldDrawHoveredPathPreview(): boolean {
+  return !ctrlKeyActive && selectedUnitIds.length > 0;
+}
+
+function getCommittedOrderUnitsHiddenDuringPreview(
+  shouldDrawPathPreview: boolean
+): ReadonlySet<string> | null {
+  if (!shouldDrawPathPreview || !hoverRoutePreview) return null;
+  return new Set(selectedUnitIds);
 }
 
 /**
@@ -3191,21 +3341,20 @@ function strokePolylineSkippingWrap(
 }
 
 /**
- * Draws committed human standing-order routed indicators (opaque): routed segments plus endpoint arrow.
+ * Draws committed routed indicators (opaque) for all human units with standing movement orders.
  */
 function drawStandingOrderLines(
   ctx: CanvasRenderingContext2D,
   orders: HumanStandingOrderSnapshot[],
-  units: GameStateSnapshot['units']
+  units: GameStateSnapshot['units'],
+  excludeUnitIds?: ReadonlySet<string> | null
 ): void {
   if (orders.length === 0) return;
   const map = getMainLeafletMap() as { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } } | null;
   if (!map) return;
   const L = getLeafletGlobal();
-  const selectedSet = new Set(selectedUnitIds);
   for (const order of orders) {
-    // While the player is actively re-planning a selected unit, hide that unit's committed path.
-    if (selectedSet.has(order.unitId)) continue;
+    if (excludeUnitIds?.has(order.unitId)) continue;
     const unit = units.find((u) => u.id === order.unitId && u.player === 'human');
     if (!unit) continue;
     const segments = order.routeSegments ?? [];
@@ -3248,13 +3397,15 @@ function drawStandingOrderLines(
  * Draws hover route preview for selected unit: turn-1 segment solid, future turns dashed, optional invalid X marker.
  */
 function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
+  if (!shouldDrawHoveredPathPreview()) return;
   if (!hoverRoutePreview || !gameState) return;
+  const state = gameState;
   const previewGroup = hoverRoutePreview.data;
   const map = getMainLeafletMap() as { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } } | null;
   if (!map) return;
   const L = getLeafletGlobal();
   const selectedHumanUnits = selectedUnitIds
-    .map((id) => gameState.units.find((u) => u.id === id))
+    .map((id) => state.units.find((u) => u.id === id))
     .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
   const slowestMovementRangeByOriginH3 = new Map<string, number>();
   for (const unit of selectedHumanUnits) {
@@ -3268,7 +3419,7 @@ function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
   for (const perUnit of previewGroup.previews) {
     const preview = perUnit.preview;
     if (preview.segments.length === 0) continue;
-    const previewUnit = gameState.units.find((u) => u.id === perUnit.unitId);
+    const previewUnit = state.units.find((u) => u.id === perUnit.unitId);
     if (previewUnit) {
       if (drawnOrigins.has(previewUnit.h3Index)) continue;
       drawnOrigins.add(previewUnit.h3Index);
@@ -4136,8 +4287,9 @@ function init(): void {
       rangedModeActive = false;
       void refreshHoverRoutePreview();
     } else if (selectedUnitIds.length > 0 && gameState) {
+      const state = gameState;
       const selectedUnits = selectedUnitIds
-        .map((id) => gameState.units.find((u) => u.id === id))
+        .map((id) => state.units.find((u) => u.id === id))
         .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
       const allHaveRanged = selectedUnits.length > 0 && selectedUnits.every((unit) => (RANGED_RANGE[unit.unitType] ?? 0) >= 1);
       if (allHaveRanged) {
@@ -4178,9 +4330,9 @@ function init(): void {
       .getTerrainInfrastructureHints()
       .then((hints) => {
         terrainInfraRes1Airport = new Set(hints.res1MajorAirports);
-        terrainInfraRes1Port = new Set(hints.res1MajorPorts);
+        terrainInfraRes1Seaport = new Set(hints.res1MajorSeaports);
         terrainInfraRes4Airport = new Set(hints.res4MajorAirports);
-        terrainInfraRes4Port = new Set(hints.res4MajorPorts);
+        terrainInfraRes4Seaport = new Set(hints.res4MajorSeaports);
         clearRes1TooltipSummaryCaches();
         requestRedraw();
       })
@@ -4209,7 +4361,7 @@ function init(): void {
     if (e.repeat) return;
     if (e.key === 'Control') {
       ctrlKeyActive = true;
-      refreshStackCalloutIfOpen();
+      applyModifierDrivenPopoverCloseRules('ctrl_pressed');
       return;
     }
     const key = e.key.toLowerCase();
@@ -4227,7 +4379,7 @@ function init(): void {
   window.addEventListener('keyup', (e) => {
     if (e.key === 'Control') {
       ctrlKeyActive = false;
-      refreshStackCalloutIfOpen();
+      applyModifierDrivenPopoverCloseRules('ctrl_released');
       return;
     }
     if (e.key.toLowerCase() === 't') {
@@ -4237,8 +4389,8 @@ function init(): void {
   });
   window.addEventListener('blur', () => {
     ctrlKeyActive = false;
-    refreshStackCalloutIfOpen();
-    if (!hideTerrainFillWhileHeld) return;
+    applyModifierDrivenPopoverCloseRules('window_blur');
+    if (!isMapInspectionModeHeld()) return;
     hideTerrainFillWhileHeld = false;
     requestRedraw();
   });
@@ -4311,7 +4463,8 @@ function init(): void {
   });
   canvasContainer?.addEventListener('pointerleave', () => {
     lastAppliedMapInteractionCursor = '';
-    getMainLeafletMap()?.getContainer()?.style.removeProperty('cursor');
+    const map = getMainLeafletMap() as { getContainer?: () => HTMLElement } | null;
+    map?.getContainer?.()?.style.removeProperty('cursor');
   });
 
   const mainMapEl = document.getElementById('main-map');
@@ -4531,13 +4684,14 @@ function init(): void {
       pendingSelectTimeout = null;
     }
     if (!gameState) return;
+    const state = gameState;
     if (rangedModeActive) return;
     const hit = clientXYToHit(e.clientX, e.clientY);
     const destinationH3 = selectedHexIndex ?? hoveredHexH3 ?? hit;
     if (!destinationH3 || selectedUnitIdsAtMouseDown.length === 0) return;
 
     const selectedAtMouseDown = selectedUnitIdsAtMouseDown
-      .map((id) => gameState.units.find((u) => u.id === id))
+      .map((id) => state.units.find((u) => u.id === id))
       .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
     if (selectedAtMouseDown.length === 0) return;
     const selectedIds = selectedAtMouseDown.map((unit) => unit.id);
@@ -4662,7 +4816,8 @@ function init(): void {
           toolInvocationCounts = readyResult.toolInvocationCounts;
           updateOpenRouterToolCountLabels();
         } else if (usePrecomputed && precomputedToolInvocationCounts) {
-          toolInvocationCounts = { ...precomputedToolInvocationCounts };
+          const precomputedCounts = precomputedToolInvocationCounts;
+          toolInvocationCounts = Object.assign({}, precomputedCounts ?? {});
           updateOpenRouterToolCountLabels();
         }
         precomputedToolInvocationCounts = null;

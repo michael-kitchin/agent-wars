@@ -22,8 +22,8 @@ Res-1 records include water-mask metrics, raster means, and point counts:
 
 - `airport_count_total`
 - `airport_count_by_scalerank` (sparse array; includes sentinel `-1` bucket when needed)
-- `port_count_total`
-- `port_count_by_scalerank` (sparse array; includes sentinel `-1` bucket when needed)
+- `seaport_count_total`
+- `seaport_count_by_scalerank` (sparse array; includes sentinel `-1` bucket when needed)
 
 Res-4 records include all res-1 fields plus urban metrics:
 
@@ -52,9 +52,9 @@ Res-4 records include all res-1 fields plus urban metrics:
    - water masks: defaults **`ne_10m_ocean.shp`**, **`ne_10m_lakes.shp`**
    - urban polygons: default **`ne_10m_urban_areas.shp`**
    - airports: default **`ne_10m_airports.shp`** (`featurecla == "Airport"`)
-   - ports: default **`ne_10m_ports.shp`** (`featurecla == "Port"`)
+   - seaports: default **`ne_10m_ports.shp`** (`featurecla == "Seaport"`)
 
-   Ocean drives res-1 water; lakes are merged with ocean for res-4 water; urban polygons are applied only to res-4 cells that are not fully in water. Airport/port points are assigned to exactly one hex per resolution using `h3.latlng_to_cell(...)`. Paths are `InputRasterSet.root` / `InputRasterSet.*_shapefile_name` in `config.py`. Phase 1 validates these files are present and readable. Sidecar files (`.dbf`, `.shx`, `.prj`, …) must accompany each `.shp` where required by the driver.
+   Ocean drives res-1 water; lakes are merged with ocean for res-4 water; urban polygons are applied only to res-4 cells that are not fully in water. Airport/seaport points are assigned to exactly one hex per resolution using `h3.latlng_to_cell(...)`. Paths are `InputRasterSet.root` / `InputRasterSet.*_shapefile_name` in `config.py`. Phase 1 validates these files are present and readable. Sidecar files (`.dbf`, `.shx`, `.prj`, …) must accompany each `.shp` where required by the driver.
 
 Phase 1 validation also requires `AGENT_WARS_DB_PASSWORD` (see [Credentials](#credentials)) so it can open a test connection to Postgres.
 

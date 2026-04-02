@@ -44,11 +44,12 @@ import {
   UNIT_COST_BY_TYPE,
   getAvailableBuildUnitTypes,
   isValidBuildCount,
-  NO_URBAN_BUILD_REASON,
+  NO_PRODUCTION_INFRASTRUCTURE_REASON,
   type BuildUnitType,
 } from './productionRules';
 import { getRes1ProductionContext } from './terrainClassificationCache';
 import { DEPLOYMENT_CAP_TYPE_ORDER, MAX_UNITS_PER_TYPE } from './productionCaps';
+import type { Res1ProductionContextSnapshot } from '../shared/ipcTypes';
 
 export type { MovementOrder, RangedAttackOrder, SubmitOrdersPayload };
 
@@ -109,7 +110,7 @@ export interface HexBuildQueueView {
   controllerPlayerId: string | null;
   controlledByRequester: boolean;
   urbanHexCount: number;
-  portCount: number;
+  seaportCount: number;
   availableUnitTypes: BuildUnitType[];
   buildSectionVisible: boolean;
   noBuildReason: string | null;
@@ -130,6 +131,28 @@ const MOVEMENT_RANGE: Record<string, number> = {
   armor: 2,
   naval: 2,
 };
+
+interface ProductionEligibilityView extends Res1ProductionContextSnapshot {
+  availableUnitTypes: BuildUnitType[];
+  buildSectionVisible: boolean;
+  noBuildReason: string | null;
+}
+
+function buildProductionEligibilityView(
+  productionContext: Res1ProductionContextSnapshot
+): ProductionEligibilityView {
+  const availableUnitTypes = getAvailableBuildUnitTypes(
+    productionContext.urbanHexCount,
+    productionContext.seaportCount
+  );
+  const buildSectionVisible = availableUnitTypes.length > 0;
+  return {
+    ...productionContext,
+    availableUnitTypes,
+    buildSectionVisible,
+    noBuildReason: buildSectionVisible ? null : NO_PRODUCTION_INFRASTRUCTURE_REASON,
+  };
+}
 
 type HumanOwnedUnit = { id: string; player: string; unitType: string; h3Index: string };
 
@@ -158,18 +181,16 @@ function currentPlanningTurnNumber(): number {
 function buildQueueViewForRequester(h3Index: string, requestingPlayerId: string): HexBuildQueueView {
   const controllerPlayerId = getHexController(h3Index);
   const controlledByRequester = controllerPlayerId === requestingPlayerId;
-  const { urbanHexCount, portCount } = getRes1ProductionContext({ h3Index });
-  const availableUnitTypes = getAvailableBuildUnitTypes(urbanHexCount, portCount);
-  const buildSectionVisible = urbanHexCount > 0;
+  const productionView = buildProductionEligibilityView(getRes1ProductionContext({ h3Index }));
   return {
     h3Index,
     controllerPlayerId,
     controlledByRequester,
-    urbanHexCount,
-    portCount,
-    availableUnitTypes,
-    buildSectionVisible,
-    noBuildReason: buildSectionVisible ? null : NO_URBAN_BUILD_REASON,
+    urbanHexCount: productionView.urbanHexCount,
+    seaportCount: productionView.seaportCount,
+    availableUnitTypes: productionView.availableUnitTypes,
+    buildSectionVisible: productionView.buildSectionVisible,
+    noBuildReason: productionView.noBuildReason,
     entries: listBuildQueueRowsForHex(h3Index).map((row) => ({
       id: row.id,
       queueIndex: row.queueIndex,
@@ -788,7 +809,8 @@ export function addHexBuildQueueEntry(h3Index: string, requestingPlayerId = HUMA
     if (!queueView.controlledByRequester) {
       return { success: false, reason: 'Only the controlling player can edit this build queue.' };
     }
-    if (!queueView.buildSectionVisible) return { success: false, reason: queueView.noBuildReason ?? NO_URBAN_BUILD_REASON };
+    if (!queueView.buildSectionVisible)
+      return { success: false, reason: queueView.noBuildReason ?? NO_PRODUCTION_INFRASTRUCTURE_REASON };
     const defaultUnitType = queueView.availableUnitTypes[0];
     if (!defaultUnitType) return { success: false, reason: 'No unit types are currently available for this hex.' };
     const currentRows = listBuildQueueRowsForHex(h3Index);
@@ -827,7 +849,8 @@ export function updateHexBuildQueueEntry(
     if (!queueView.controlledByRequester) {
       return { success: false, reason: 'Only the controlling player can edit this build queue.' };
     }
-    if (!queueView.buildSectionVisible) return { success: false, reason: queueView.noBuildReason ?? NO_URBAN_BUILD_REASON };
+    if (!queueView.buildSectionVisible)
+      return { success: false, reason: queueView.noBuildReason ?? NO_PRODUCTION_INFRASTRUCTURE_REASON };
     if (!queueView.availableUnitTypes.includes(unitType)) {
       return { success: false, reason: `Unit type "${unitType}" is not available for this hex.` };
     }

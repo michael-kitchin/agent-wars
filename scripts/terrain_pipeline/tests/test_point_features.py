@@ -26,7 +26,7 @@ class PointFeatureTests(unittest.TestCase):
     def test_load_filtered_points_requires_featurecla_field(self) -> None:
         schema = {"geometry": "Point", "properties": {"scalerank": "str"}}
         with tempfile.TemporaryDirectory() as td:
-            path = Path(td) / "ports.shp"
+            path = Path(td) / "seaports.shp"
             with fiona.open(path, "w", driver="ESRI Shapefile", crs="EPSG:4326", schema=schema) as dst:
                 dst.write(
                     {
@@ -35,7 +35,7 @@ class PointFeatureTests(unittest.TestCase):
                     }
                 )
             with self.assertRaises(ValueError):
-                load_filtered_points_wgs84(path, featurecla_value="Port")
+                load_filtered_points_wgs84(path, featurecla_value="Seaport")
 
     def test_load_filtered_points_invalid_scalerank_bucketed_to_sentinel(self) -> None:
         schema = {
@@ -61,7 +61,7 @@ class PointFeatureTests(unittest.TestCase):
             "properties": {"featurecla": "str", "scalerank": "str"},
         }
         with tempfile.TemporaryDirectory() as td:
-            path = Path(td) / "ports.shp"
+            path = Path(td) / "seaports.shp"
             with fiona.open(path, "w", driver="ESRI Shapefile", crs="EPSG:4326", schema=schema) as dst:
                 dst.write(
                     {
@@ -70,7 +70,7 @@ class PointFeatureTests(unittest.TestCase):
                     }
                 )
             with self.assertRaises(ValueError):
-                validate_point_shapefile_contract(path, featurecla_value="Port")
+                validate_point_shapefile_contract(path, featurecla_value="Seaport")
 
     def test_point_count_index_totals_match_sparse_rows(self) -> None:
         points = [

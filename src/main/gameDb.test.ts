@@ -173,8 +173,12 @@ function testFogOfWarToggleVisibilityContract(gameDb: typeof import('./gameDb'))
     gameDb.resetGameForNewMatch({ fogOfWarEnabled: false });
     const fullState = gameDb.getGameState();
     const noFogHuman = gameDb.getGameStateForPlayer('human');
+    const noFogOpponent = gameDb.getGameStateForPlayer('opponent');
     assert.strictEqual(noFogHuman.hexes.length, fullState.hexes.length);
     assert.strictEqual(noFogHuman.units.length, fullState.units.length);
+    assert.strictEqual(noFogOpponent.units.length, fullState.units.length);
+    assert.strictEqual(noFogHuman.fogOfWarEnabled, false);
+    assert.strictEqual(noFogOpponent.fogOfWarEnabled, false);
     assert.strictEqual(noFogHuman.visibleHexes?.length ?? -1, fullState.hexes.length);
     assert.strictEqual(noFogHuman.exploredHexes?.length ?? -1, fullState.hexes.length);
     assert.strictEqual(noFogHuman.staleHexes?.length ?? -1, 0);
@@ -183,7 +187,10 @@ function testFogOfWarToggleVisibilityContract(gameDb: typeof import('./gameDb'))
     gameDb.resetGameForNewMatch({ fogOfWarEnabled: true });
     const fogFullState = gameDb.getGameState();
     const fogHuman = gameDb.getGameStateForPlayer('human');
+    const fogOpponent = gameDb.getGameStateForPlayer('opponent');
     assert.strictEqual(fogHuman.hexes.length, fogFullState.hexes.length);
+    assert.strictEqual(fogHuman.fogOfWarEnabled, true);
+    assert.strictEqual(fogOpponent.fogOfWarEnabled, true);
     assert.ok((fogHuman.visibleHexes?.length ?? 0) <= fogFullState.hexes.length);
     assert.ok((fogHuman.exploredHexes?.length ?? 0) <= fogFullState.hexes.length);
     assert.ok(fogHuman.units.length <= fogFullState.units.length);

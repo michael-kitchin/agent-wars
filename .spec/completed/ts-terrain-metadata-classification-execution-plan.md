@@ -271,7 +271,7 @@ Each phase is independently verifiable or verifiable with previously completed p
 | Risk | Impact | Mitigation |
 |------|--------|------------|
 | Metadata schema drift | Runtime failure or silent misclassification | Strict schema validation and version checks in loader. |
-| Rule port mismatch | Broad terrain drift | Phase 4 parity harness + threshold gating before full cutover. |
+| Rule seaport mismatch | Broad terrain drift | Phase 4 parity harness + threshold gating before full cutover. |
 | Performance regression on startup/reset | UX degradation | Benchmark classification timing; cache maps or precompute where needed. |
 | Packaging path issues | Missing data in prod builds | Path-resolution tests for dev + packaged modes. |
 | Hidden dependencies on CSV artifacts | Runtime breakage | Phase 0 inventory + Phase 3 integration tests across all consumers. |

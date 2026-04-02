@@ -8,8 +8,12 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from .metadata_models import (
+    AIRPORT_COUNT_BY_SCALERANK_KEY,
+    AIRPORT_COUNT_TOTAL_KEY,
     HexMetadataRecordRes1,
     HexMetadataRecordRes4,
+    SEAPORT_COUNT_BY_SCALERANK_KEY,
+    SEAPORT_COUNT_TOTAL_KEY,
     TERRAIN_HEX_METADATA_SCHEMA_VERSION,
 )
 from .point_features import sparse_rank_counts_to_json
@@ -37,10 +41,10 @@ def record_res1_to_json_dict(record: HexMetadataRecordRes1) -> dict[str, Any]:
         "tri_mean": record.tri_mean,
         "slope_mean": record.slope_mean,
         "elevation_max": record.elevation_max,
-        "airport_count_total": record.airport_count_total,
-        "airport_count_by_scalerank": sparse_rank_counts_to_json(list(record.airport_count_by_scalerank)),
-        "port_count_total": record.port_count_total,
-        "port_count_by_scalerank": sparse_rank_counts_to_json(list(record.port_count_by_scalerank)),
+        AIRPORT_COUNT_TOTAL_KEY: record.airport_count_total,
+        AIRPORT_COUNT_BY_SCALERANK_KEY: sparse_rank_counts_to_json(list(record.airport_count_by_scalerank)),
+        SEAPORT_COUNT_TOTAL_KEY: record.seaport_count_total,
+        SEAPORT_COUNT_BY_SCALERANK_KEY: sparse_rank_counts_to_json(list(record.seaport_count_by_scalerank)),
     }
 
 

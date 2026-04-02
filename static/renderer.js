@@ -14824,15 +14824,15 @@
   var RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE = 1.2;
   var SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE = 1.2;
   function drawTerrainInfrastructureGlyphs(ctx, pts, options) {
-    const { showAirport, showPort, outlineScreenPx, glyphAreaScale = 1, centerYOffsetPx = 0 } = options;
-    if (!showAirport && !showPort) return;
+    const { showAirport, showSeaport, outlineScreenPx, glyphAreaScale = 1, centerYOffsetPx = 0 } = options;
+    if (!showAirport && !showSeaport) return;
     const lin = Math.sqrt(glyphAreaScale);
     const glyphOutline = Math.max(0.92, outlineScreenPx * GLYPH_OUTLINE_MULT * lin);
     const { cx, cy, span } = centroidAndSpan(pts);
     const centerY = cy + centerYOffsetPx;
     const pxAir = span * GLYPH_AIR_PIXEL_FACTOR * lin;
     const pxAnchor = pxAir * GLYPH_ANCHOR_TO_AIR_RATIO;
-    const both = showAirport && showPort;
+    const both = showAirport && showSeaport;
     if (both) {
       const off = span * 0.1 * lin;
       drawAirplaneAt(ctx, cx - off, centerY - off, pxAir, glyphOutline, AIRPORT_FILL, AIRPORT_STROKE);
@@ -14952,10 +14952,51 @@
   function shouldSuppressTerrainTooltip() {
     return isStackOrBuildMapPopoverOpen() || buildEntryButtonPointerInside;
   }
+  function applyModifierDrivenPopoverCloseRules(reason) {
+    if (reason === "ctrl_pressed") {
+      hideBuildPopup();
+      refreshStackCalloutIfOpen();
+      return;
+    }
+    if (reason === "ctrl_released") {
+      hideStackCallout();
+      return;
+    }
+    refreshStackCalloutIfOpen();
+  }
   function activateStackCalloutModal() {
     stackCalloutModalActive = true;
     const el = document.getElementById("stack-callout");
     if (el) el.classList.add("stack-modal");
+  }
+  function onStackSingleUnitToggleClick(unitId, inSelection, allUnitsAtHex, clientX, clientY) {
+    if (!ctrlKeyActive) {
+      if (inSelection) {
+        removeUnitsFromSelection([unitId]);
+      } else {
+        replaceSelection([unitId]);
+      }
+      hideStackCallout();
+      syncUiAfterSelectionChange({ refreshHoverPreview: false });
+      return;
+    }
+    activateStackCalloutModal();
+    toggleUnitSelection(unitId);
+    showStackCallout(allUnitsAtHex, clientX, clientY);
+    syncUiAfterSelectionChange({ refreshHoverPreview: false });
+  }
+  function onStackAllActionClick(action, humanIds, allUnitsAtHex, clientX, clientY) {
+    if (action === "selectAll") {
+      replaceSelection(humanIds);
+      hideStackCallout();
+      syncUiAfterSelectionChange({ refreshHoverPreview: false });
+      return;
+    }
+    activateStackCalloutModal();
+    if (action === "addAll") addUnitsToSelection(humanIds);
+    else removeUnitsFromSelection(humanIds);
+    showStackCallout(allUnitsAtHex, clientX, clientY);
+    syncUiAfterSelectionChange({ refreshHoverPreview: false });
   }
   function showStackCallout(units, clientX, clientY) {
     const calloutEl = document.getElementById("stack-callout");
@@ -14998,10 +15039,7 @@
       selectAllBtn.className = "unit-select";
       selectAllBtn.textContent = `${UNIT_SELECT_GLYPH} All`;
       selectAllBtn.addEventListener("click", () => {
-        activateStackCalloutModal();
-        replaceSelection(humanIds);
-        showStackCallout(units, clientX, clientY);
-        syncUiAfterSelectionChange({ refreshHoverPreview: false });
+        onStackAllActionClick("selectAll", humanIds, units, clientX, clientY);
       });
       header.appendChild(selectAllBtn);
     } else {
@@ -15010,23 +15048,17 @@
       addAllBtn.className = "unit-select";
       addAllBtn.textContent = `${UNIT_SELECT_GLYPH} All`;
       addAllBtn.addEventListener("click", () => {
-        activateStackCalloutModal();
-        addUnitsToSelection(humanIds);
-        showStackCallout(units, clientX, clientY);
-        syncUiAfterSelectionChange({ refreshHoverPreview: false });
+        onStackAllActionClick("addAll", humanIds, units, clientX, clientY);
       });
       const removeAllBtn = document.createElement("button");
       removeAllBtn.type = "button";
       removeAllBtn.className = "unit-select";
       removeAllBtn.textContent = `${UNIT_DESELECT_GLYPH} All`;
       removeAllBtn.addEventListener("click", () => {
-        activateStackCalloutModal();
-        removeUnitsFromSelection(humanIds);
-        showStackCallout(units, clientX, clientY);
-        syncUiAfterSelectionChange({ refreshHoverPreview: false });
+        onStackAllActionClick("removeAll", humanIds, units, clientX, clientY);
       });
-      header.appendChild(addAllBtn);
       header.appendChild(removeAllBtn);
+      header.appendChild(addAllBtn);
     }
     calloutEl.insertBefore(header, listEl);
     for (const u of sorted) {
@@ -15042,10 +15074,7 @@
         const inSelection = selectedUnitIds.includes(u.id);
         btn.textContent = inSelection ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
         btn.addEventListener("click", () => {
-          activateStackCalloutModal();
-          toggleUnitSelection(u.id);
-          showStackCallout(units, clientX, clientY);
-          syncUiAfterSelectionChange({ refreshHoverPreview: false });
+          onStackSingleUnitToggleClick(u.id, inSelection, units, clientX, clientY);
         });
         li.appendChild(btn);
       }
@@ -15070,7 +15099,9 @@
     } catch {
       return;
     }
-    const units = unitIds.map((id) => gameState.units.find((u) => u.id === id)).filter((unit) => !!unit);
+    const state = gameState;
+    if (!state) return;
+    const units = unitIds.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit);
     if (units.length === 0) {
       hideStackCallout();
       return;
@@ -15170,14 +15201,14 @@
     if (!infraGlyphsAllowedForRes1Hex(h3)) return [];
     const labels = [];
     if (terrainInfraRes1Airport.has(h3)) labels.push("Airports");
-    if (terrainInfraRes1Port.has(h3)) labels.push("Ports");
+    if (terrainInfraRes1Seaport.has(h3)) labels.push("Seaports");
     return labels;
   }
   function featureLabelsForRes4Child(parentH3, childH3) {
     if (!infraGlyphsAllowedForRes4Child(parentH3, childH3)) return [];
     const labels = [];
     if (terrainInfraRes4Airport.has(childH3)) labels.push("Airport");
-    if (terrainInfraRes4Port.has(childH3)) labels.push("Port");
+    if (terrainInfraRes4Seaport.has(childH3)) labels.push("Seaport");
     return labels;
   }
   function countUrbanRes4HexesInRes1Hex(parentH3) {
@@ -15196,22 +15227,32 @@
     const row = state.res1Control?.find((entry) => entry.h3Index === h3Index);
     return row?.controllerPlayerId ?? null;
   }
+  function isMapInspectionModeHeld() {
+    return hideTerrainFillWhileHeld;
+  }
+  function isRes1HexHumanUrbanProduction(state, hx) {
+    if (hx.terrain === "water") return false;
+    if (getControllerForHex(state, hx.h3Index) !== "human") return false;
+    return countUrbanRes4HexesInRes1Hex(hx.h3Index) > 0;
+  }
   function getBuildQueueSummaryForHex(state, h3Index) {
     return state.res1BuildQueueTotals?.find((entry) => entry.h3Index === h3Index) ?? null;
   }
-  function getHumanUnitCountsByType(state) {
+  function getUnitCountsByTypeForPlayer(state, playerId) {
     const counts = { infantry: 0, armor: 0, naval: 0 };
     for (const unit of state.units) {
-      if (unit.player !== "human") continue;
+      if (unit.player !== playerId) continue;
       if (unit.unitType === "infantry" || unit.unitType === "armor" || unit.unitType === "naval") {
         counts[unit.unitType] += 1;
       }
     }
     return counts;
   }
-  function formatProductionLabelForHex(state, h3Index, capacityPerTurn, controller) {
+  function isFogOfWarDisabledForSnapshot(state) {
+    return state.fogOfWarEnabled === false;
+  }
+  function formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer) {
     const capacityText = `${Math.max(0, capacityPerTurn).toLocaleString()}c`;
-    if (controller !== "human") return `${capacityText} / ?t`;
     const queue = getBuildQueueSummaryForHex(state, h3Index);
     const queuedUnits = queue?.queuedUnits ?? 0;
     if (queuedUnits <= 0) return capacityText;
@@ -15220,13 +15261,35 @@
     if (!nextUnitType || capacityPerTurn <= 0) {
       return `${capacityText} / ?t`;
     }
-    const humanCounts = getHumanUnitCountsByType(state);
-    if (humanCounts[nextUnitType] >= MAX_UNITS_PER_TYPE[nextUnitType]) {
-      return `${capacityText} / \u221Et`;
+    if (controller === "human" || controller === "opponent") {
+      const countsByType = controller === "human" ? unitCountsByPlayer?.human ?? getUnitCountsByTypeForPlayer(state, "human") : unitCountsByPlayer?.opponent ?? getUnitCountsByTypeForPlayer(state, "opponent");
+      if (countsByType[nextUnitType] >= MAX_UNITS_PER_TYPE[nextUnitType]) {
+        return `${capacityText} / \u221Et`;
+      }
     }
     const turns = estimateTurnsToNextSpawn(nextUnitType, storedPoints, capacityPerTurn);
     if (turns === null) return `${capacityText} / ?t`;
     return `${capacityText} / ${turns.toLocaleString()}t`;
+  }
+  function formatProductionLabelForHumanControllerOnly(state, h3Index, capacityPerTurn, controller) {
+    if (controller !== "human") return `${Math.max(0, capacityPerTurn).toLocaleString()}c / ?t`;
+    return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller);
+  }
+  function formatProductionLabelForAnyController(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer) {
+    return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer);
+  }
+  function buildProductionOverlayContext(state) {
+    const mapInspectionHeld = isMapInspectionModeHeld();
+    const revealAllControllerQueues = mapInspectionHeld && isFogOfWarDisabledForSnapshot(state);
+    return {
+      mapInspectionHeld,
+      revealAllControllerQueues,
+      unitHexes: new Set(state.units.map((u) => u.h3Index)),
+      unitCountsByPlayer: revealAllControllerQueues ? {
+        human: getUnitCountsByTypeForPlayer(state, "human"),
+        opponent: getUnitCountsByTypeForPlayer(state, "opponent")
+      } : void 0
+    };
   }
   function roundToNearestInteger(value) {
     return Math.round(value);
@@ -15328,14 +15391,14 @@
       res4ChildrenByParent.set(h3, children);
     }
     let airportCount = 0;
-    let portCount = 0;
+    let seaportCount = 0;
     for (const child of children) {
       if (terrainInfraRes4Airport.has(child)) airportCount++;
-      if (terrainInfraRes4Port.has(child)) portCount++;
+      if (terrainInfraRes4Seaport.has(child)) seaportCount++;
     }
     const parts = [];
     if (labels.includes("Airports")) parts.push(`Airports (${airportCount.toLocaleString()})`);
-    if (labels.includes("Ports")) parts.push(`Ports (${portCount.toLocaleString()})`);
+    if (labels.includes("Seaports")) parts.push(`Seaports (${seaportCount.toLocaleString()})`);
     const summary = parts.length > 0 ? parts.join(", ") : null;
     res1FeaturesSummaryByH3.set(h3, summary);
     return summary;
@@ -15803,9 +15866,9 @@
   var gameState = null;
   var res4TerrainOverridesByH3 = /* @__PURE__ */ new Map();
   var terrainInfraRes1Airport = /* @__PURE__ */ new Set();
-  var terrainInfraRes1Port = /* @__PURE__ */ new Set();
+  var terrainInfraRes1Seaport = /* @__PURE__ */ new Set();
   var terrainInfraRes4Airport = /* @__PURE__ */ new Set();
-  var terrainInfraRes4Port = /* @__PURE__ */ new Set();
+  var terrainInfraRes4Seaport = /* @__PURE__ */ new Set();
   var res4ChildrenByParent = /* @__PURE__ */ new Map();
   var res4Visible = false;
   var resolutionMoveAnimation = null;
@@ -16079,7 +16142,7 @@
         ctx.closePath();
       };
       const explored = exploredHexes.has(hx.h3Index);
-      if (explored && !hideTerrainFillWhileHeld) {
+      if (explored && !isMapInspectionModeHeld()) {
         fillHexTerrain(ctx, kind, drawClosedPath, {
           fillAndHatchAlphaScale: !res4Active && hoveredHexH3 === hx.h3Index ? 2 : 1,
           landHoverFill: !res4Active && hoveredHexH3 === hx.h3Index && kind === "plains",
@@ -16166,7 +16229,7 @@
     lastBuildEntryLayerKey = null;
   }
   function hasVisibleRes1InfrastructureGlyphs(h3Index, res4On, unitHexes) {
-    return !res4On && infraGlyphsAllowedForRes1Hex(h3Index) && !unitHexes.has(h3Index) && (terrainInfraRes1Airport.has(h3Index) || terrainInfraRes1Port.has(h3Index));
+    return !res4On && infraGlyphsAllowedForRes1Hex(h3Index) && !unitHexes.has(h3Index) && (terrainInfraRes1Airport.has(h3Index) || terrainInfraRes1Seaport.has(h3Index));
   }
   function computeRes1OverlayTextY(h3Index, map, L, hasOffsetFeatures) {
     const center = hexCenterPx(h3Index);
@@ -16204,17 +16267,15 @@
       if (hx.terrain === "water") continue;
       const explored = isHexExploredByPlayer(hx.h3Index);
       if (!explored) continue;
-      const controller = getControllerForHex(gameState, hx.h3Index);
-      if (controller !== "human") continue;
+      if (!isRes1HexHumanUrbanProduction(gameState, hx)) continue;
       const capacityPerTurn = countUrbanRes4HexesInRes1Hex(hx.h3Index);
-      if (capacityPerTurn <= 0) continue;
       const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs(hx.h3Index, res4On, visibleUnitHexes);
       const hasVisibleUnits = visibleUnitHexes.has(hx.h3Index);
       const center = hexCenterPx(hx.h3Index);
       const textY = computeRes1OverlayTextY(hx.h3Index, map, L, hasInfraSymbols || hasVisibleUnits);
       rows.push({
         h3: hx.h3Index,
-        label: formatProductionLabelForHex(gameState, hx.h3Index, capacityPerTurn, "human"),
+        label: formatProductionLabelForHumanControllerOnly(gameState, hx.h3Index, capacityPerTurn, "human"),
         left: Math.round(center.x),
         top: Math.round(textY),
         hasCapacity: true
@@ -16306,7 +16367,7 @@
           }
           ctx.closePath();
         };
-        if (!hideTerrainFillWhileHeld) {
+        if (!isMapInspectionModeHeld()) {
           fillHexTerrain(ctx, terrainKind, drawClosedPath, {
             fillAndHatchAlphaScale: hoveredDetailHexH3 === child ? 2 : 1,
             landHoverFill: hoveredDetailHexH3 === child && terrainKind === "plains",
@@ -16345,7 +16406,7 @@
         if (unitHexes.has(hx.h3Index)) continue;
         if (!infraGlyphsAllowedForRes1Hex(hx.h3Index)) continue;
         const ap = terrainInfraRes1Airport.has(hx.h3Index);
-        const pt = terrainInfraRes1Port.has(hx.h3Index);
+        const pt = terrainInfraRes1Seaport.has(hx.h3Index);
         if (!ap && !pt) continue;
         const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
         const pts = boundary.map(([lat, lng]) => {
@@ -16354,7 +16415,7 @@
         });
         drawTerrainInfrastructureGlyphs(ctx, pts, {
           showAirport: ap,
-          showPort: pt,
+          showSeaport: pt,
           outlineScreenPx,
           centerYOffsetPx: spanForProjectedHex(pts) * -0.14
         });
@@ -16376,13 +16437,13 @@
       for (const child of children) {
         if (!infraGlyphsAllowedForRes4Child(parent.h3Index, child)) continue;
         const ap = terrainInfraRes4Airport.has(child);
-        const pt = terrainInfraRes4Port.has(child);
+        const pt = terrainInfraRes4Seaport.has(child);
         if (!ap && !pt) continue;
         const pts = projectHexBoundaryToContainerPoints(child, map, L);
         if (!projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight)) continue;
         drawTerrainInfrastructureGlyphs(ctx, pts, {
           showAirport: ap,
-          showPort: pt,
+          showSeaport: pt,
           outlineScreenPx,
           glyphAreaScale: RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE
         });
@@ -16395,25 +16456,30 @@
     if (!map) return;
     const L = getLeafletGlobal();
     if (shouldRenderRes4Hexes()) return;
-    const productionIntelMode = hideTerrainFillWhileHeld;
-    const unitHexes = new Set(gameState.units.map((u) => u.h3Index));
+    const overlayContext = buildProductionOverlayContext(gameState);
     for (const hx of gameState.hexes) {
       const explored = isHexExploredByPlayer(hx.h3Index);
-      if (!explored && !productionIntelMode) continue;
+      if (!explored && !overlayContext.mapInspectionHeld) continue;
       if (hx.terrain === "water") continue;
       const controller = getControllerForHex(gameState, hx.h3Index);
       const controlledByHuman = controller === "human";
       const capacityPerTurn = countUrbanRes4HexesInRes1Hex(hx.h3Index);
-      if (!productionIntelMode) {
-        if (!controlledByHuman || capacityPerTurn <= 0) continue;
+      if (!overlayContext.mapInspectionHeld) {
+        if (!isRes1HexHumanUrbanProduction(gameState, hx)) continue;
       }
       const hasUrbanCapacity = capacityPerTurn > 0;
-      const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs(hx.h3Index, false, unitHexes);
-      const hasVisibleUnits = unitHexes.has(hx.h3Index);
+      const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs(hx.h3Index, false, overlayContext.unitHexes);
+      const hasVisibleUnits = overlayContext.unitHexes.has(hx.h3Index);
       const center = hexCenterPx(hx.h3Index);
       const textY = computeRes1OverlayTextY(hx.h3Index, map, L, hasInfraSymbols || hasVisibleUnits);
-      const text = explored ? formatProductionLabelForHex(gameState, hx.h3Index, capacityPerTurn, controller) : `${Math.max(0, capacityPerTurn).toLocaleString()}c`;
-      const hasClickableBuildEntryForHex = explored && controlledByHuman && capacityPerTurn > 0 && shouldShowBuildEntryZoom();
+      const text = explored || overlayContext.revealAllControllerQueues ? overlayContext.revealAllControllerQueues ? formatProductionLabelForAnyController(
+        gameState,
+        hx.h3Index,
+        capacityPerTurn,
+        controller,
+        overlayContext.unitCountsByPlayer
+      ) : formatProductionLabelForHumanControllerOnly(gameState, hx.h3Index, capacityPerTurn, controller) : `${Math.max(0, capacityPerTurn).toLocaleString()}c`;
+      const hasClickableBuildEntryForHex = explored && isRes1HexHumanUrbanProduction(gameState, hx) && shouldShowBuildEntryZoom();
       if (hasClickableBuildEntryForHex) {
         continue;
       }
@@ -16925,10 +16991,13 @@
         drawResolutionMoveLines(ctx, width, height, anim.moves, state.units, hexList, 1);
       }
     }
-    if (!hideCommittedOrderLinesAfterReady && humanStandingOrders.length > 0 && state.units.length) {
-      drawStandingOrderLines(ctx, humanStandingOrders, state.units);
+    const shouldDrawCommittedPaths = shouldDrawCommittedOrderPaths();
+    const shouldDrawPathPreview = shouldDrawHoveredPathPreview();
+    const hiddenCommittedUnitIdsWhilePreviewing = getCommittedOrderUnitsHiddenDuringPreview(shouldDrawPathPreview);
+    if (shouldDrawCommittedPaths && !hideCommittedOrderLinesAfterReady && humanStandingOrders.length > 0 && state.units.length) {
+      drawStandingOrderLines(ctx, humanStandingOrders, state.units, hiddenCommittedUnitIdsWhilePreviewing);
     }
-    if (!anim) drawHoverRoutePreview(ctx);
+    if (shouldDrawPathPreview && !anim) drawHoverRoutePreview(ctx);
     if (pendingRangedAttacks.length > 0 && state.units.length && hexList) {
       drawRangedAttackLines(ctx, width, height, pendingRangedAttacks, state.units, hexList);
     }
@@ -16978,6 +17047,16 @@
         drawUnknownBattleMarkers(ctx, unknownCasualtyHexes, pulseOpacity);
       }
     }
+  }
+  function shouldDrawCommittedOrderPaths() {
+    return !ctrlKeyActive;
+  }
+  function shouldDrawHoveredPathPreview() {
+    return !ctrlKeyActive && selectedUnitIds.length > 0;
+  }
+  function getCommittedOrderUnitsHiddenDuringPreview(shouldDrawPathPreview) {
+    if (!shouldDrawPathPreview || !hoverRoutePreview) return null;
+    return new Set(selectedUnitIds);
   }
   function resizeAndRedraw() {
     const container = document.getElementById("canvas-container");
@@ -17278,14 +17357,13 @@
     }
     ctx.stroke();
   }
-  function drawStandingOrderLines(ctx, orders, units) {
+  function drawStandingOrderLines(ctx, orders, units, excludeUnitIds) {
     if (orders.length === 0) return;
     const map = getMainLeafletMap();
     if (!map) return;
     const L = getLeafletGlobal();
-    const selectedSet = new Set(selectedUnitIds);
     for (const order of orders) {
-      if (selectedSet.has(order.unitId)) continue;
+      if (excludeUnitIds?.has(order.unitId)) continue;
       const unit = units.find((u) => u.id === order.unitId && u.player === "human");
       if (!unit) continue;
       const segments = order.routeSegments ?? [];
@@ -17324,12 +17402,14 @@
     }
   }
   function drawHoverRoutePreview(ctx) {
+    if (!shouldDrawHoveredPathPreview()) return;
     if (!hoverRoutePreview || !gameState) return;
+    const state = gameState;
     const previewGroup = hoverRoutePreview.data;
     const map = getMainLeafletMap();
     if (!map) return;
     const L = getLeafletGlobal();
-    const selectedHumanUnits = selectedUnitIds.map((id) => gameState.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human");
+    const selectedHumanUnits = selectedUnitIds.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human");
     const slowestMovementRangeByOriginH3 = /* @__PURE__ */ new Map();
     for (const unit of selectedHumanUnits) {
       const movementRange = MOVEMENT_RANGE[unit.unitType] ?? 1;
@@ -17342,7 +17422,7 @@
     for (const perUnit of previewGroup.previews) {
       const preview = perUnit.preview;
       if (preview.segments.length === 0) continue;
-      const previewUnit = gameState.units.find((u) => u.id === perUnit.unitId);
+      const previewUnit = state.units.find((u) => u.id === perUnit.unitId);
       if (previewUnit) {
         if (drawnOrigins.has(previewUnit.h3Index)) continue;
         drawnOrigins.add(previewUnit.h3Index);
@@ -18082,7 +18162,8 @@
         rangedModeActive = false;
         void refreshHoverRoutePreview();
       } else if (selectedUnitIds.length > 0 && gameState) {
-        const selectedUnits = selectedUnitIds.map((id) => gameState.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human");
+        const state = gameState;
+        const selectedUnits = selectedUnitIds.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human");
         const allHaveRanged = selectedUnits.length > 0 && selectedUnits.every((unit) => (RANGED_RANGE[unit.unitType] ?? 0) >= 1);
         if (allHaveRanged) {
           rangedModeActive = true;
@@ -18113,9 +18194,9 @@
       }).catch((err) => console.error("getRes4TerrainOverrides failed:", err));
       window.gameApi.getTerrainInfrastructureHints().then((hints) => {
         terrainInfraRes1Airport = new Set(hints.res1MajorAirports);
-        terrainInfraRes1Port = new Set(hints.res1MajorPorts);
+        terrainInfraRes1Seaport = new Set(hints.res1MajorSeaports);
         terrainInfraRes4Airport = new Set(hints.res4MajorAirports);
-        terrainInfraRes4Port = new Set(hints.res4MajorPorts);
+        terrainInfraRes4Seaport = new Set(hints.res4MajorSeaports);
         clearRes1TooltipSummaryCaches();
         requestRedraw();
       }).catch((err) => console.error("getTerrainInfrastructureHints failed:", err));
@@ -18142,7 +18223,7 @@
       if (e.repeat) return;
       if (e.key === "Control") {
         ctrlKeyActive = true;
-        refreshStackCalloutIfOpen();
+        applyModifierDrivenPopoverCloseRules("ctrl_pressed");
         return;
       }
       const key = e.key.toLowerCase();
@@ -18159,7 +18240,7 @@
     window.addEventListener("keyup", (e) => {
       if (e.key === "Control") {
         ctrlKeyActive = false;
-        refreshStackCalloutIfOpen();
+        applyModifierDrivenPopoverCloseRules("ctrl_released");
         return;
       }
       if (e.key.toLowerCase() === "t") {
@@ -18169,8 +18250,8 @@
     });
     window.addEventListener("blur", () => {
       ctrlKeyActive = false;
-      refreshStackCalloutIfOpen();
-      if (!hideTerrainFillWhileHeld) return;
+      applyModifierDrivenPopoverCloseRules("window_blur");
+      if (!isMapInspectionModeHeld()) return;
       hideTerrainFillWhileHeld = false;
       requestRedraw();
     });
@@ -18241,7 +18322,8 @@
     });
     canvasContainer?.addEventListener("pointerleave", () => {
       lastAppliedMapInteractionCursor = "";
-      getMainLeafletMap()?.getContainer()?.style.removeProperty("cursor");
+      const map = getMainLeafletMap();
+      map?.getContainer?.()?.style.removeProperty("cursor");
     });
     const mainMapEl = document.getElementById("main-map");
     if (!mainMapEl) return;
@@ -18428,11 +18510,12 @@
         pendingSelectTimeout = null;
       }
       if (!gameState) return;
+      const state = gameState;
       if (rangedModeActive) return;
       const hit = clientXYToHit(e.clientX, e.clientY);
       const destinationH3 = selectedHexIndex ?? hoveredHexH3 ?? hit;
       if (!destinationH3 || selectedUnitIdsAtMouseDown.length === 0) return;
-      const selectedAtMouseDown = selectedUnitIdsAtMouseDown.map((id) => gameState.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human");
+      const selectedAtMouseDown = selectedUnitIdsAtMouseDown.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human");
       if (selectedAtMouseDown.length === 0) return;
       const selectedIds = selectedAtMouseDown.map((unit) => unit.id);
       if (selectedAtMouseDown.every((unit) => unit.h3Index === destinationH3)) return;
@@ -18543,7 +18626,8 @@
             toolInvocationCounts = readyResult.toolInvocationCounts;
             updateOpenRouterToolCountLabels();
           } else if (usePrecomputed && precomputedToolInvocationCounts) {
-            toolInvocationCounts = { ...precomputedToolInvocationCounts };
+            const precomputedCounts = precomputedToolInvocationCounts;
+            toolInvocationCounts = Object.assign({}, precomputedCounts ?? {});
             updateOpenRouterToolCountLabels();
           }
           precomputedToolInvocationCounts = null;

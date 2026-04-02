@@ -5,6 +5,7 @@
 import { cellToParent } from 'h3-js';
 import { logDebug, logError, logTrace } from './logger';
 import type { PipelineTerrainKind } from '../shared/pipelineTerrain';
+import type { Res1ProductionContextSnapshot } from '../shared/ipcTypes';
 import {
   classifyCellWithoutUrbanOverride,
   classifyRes4TerrainKind,
@@ -18,7 +19,7 @@ import {
   loadTerrainRes1MetadataBundled,
   loadTerrainRes4MetadataBundled,
   recordHasMajorAirport,
-  recordHasMajorPort,
+  recordHasMajorSeaport,
   type HexMetadataRecordRes4,
 } from './terrainMetadataLoad';
 import {
@@ -32,9 +33,9 @@ import {
 
 export interface TerrainInfrastructureHintsPayload {
   res1MajorAirports: string[];
-  res1MajorPorts: string[];
+  res1MajorSeaports: string[];
   res4MajorAirports: string[];
-  res4MajorPorts: string[];
+  res4MajorSeaports: string[];
 }
 
 export interface TerrainClassificationSnapshot {
@@ -46,7 +47,7 @@ export interface TerrainClassificationSnapshot {
   namingLinesRes4ByH3: ReadonlyMap<string, string>;
   continentNamesRes1ByH3: ReadonlyMap<string, string[]>;
   urbanHexCountByRes1H3: ReadonlyMap<string, number>;
-  portCountByRes1H3: ReadonlyMap<string, number>;
+  seaportCountByRes1H3: ReadonlyMap<string, number>;
 }
 
 let cached: TerrainClassificationSnapshot | null = null;
@@ -96,15 +97,15 @@ function buildSnapshot(): TerrainClassificationSnapshot {
   }
 
   const res1MajorAirports: string[] = [];
-  const res1MajorPorts: string[] = [];
-  const portCountByRes1H3 = new Map<string, number>();
+  const res1MajorSeaports: string[] = [];
+  const seaportCountByRes1H3 = new Map<string, number>();
   for (const row of res1Env.records) {
     if (recordHasMajorAirport(row)) res1MajorAirports.push(row.h3_index);
-    if (recordHasMajorPort(row)) res1MajorPorts.push(row.h3_index);
-    portCountByRes1H3.set(row.h3_index, Math.max(0, row.port_count_total));
+    if (recordHasMajorSeaport(row)) res1MajorSeaports.push(row.h3_index);
+    seaportCountByRes1H3.set(row.h3_index, Math.max(0, row.seaport_count_total));
   }
   const res4MajorAirports: string[] = [];
-  const res4MajorPorts: string[] = [];
+  const res4MajorSeaports: string[] = [];
   const res4ClassifiedRows: Array<{ h3Index: string; parentH3: string; childKind: PipelineTerrainKind; isUrban: boolean }> = [];
   const urbanHexCountByRes1H3 = new Map<string, number>();
   const childKindCountsByParent = new Map<string, Map<PipelineTerrainKind, number>>();
@@ -123,7 +124,7 @@ function buildSnapshot(): TerrainClassificationSnapshot {
       urbanHexCountByRes1H3.set(parentH3, (urbanHexCountByRes1H3.get(parentH3) ?? 0) + 1);
     }
     if (recordHasMajorAirport(row)) res4MajorAirports.push(row.h3_index);
-    if (recordHasMajorPort(row)) res4MajorPorts.push(row.h3_index);
+    if (recordHasMajorSeaport(row)) res4MajorSeaports.push(row.h3_index);
   }
 
   const res1KindByH3 = new Map<string, PipelineTerrainKind>();
@@ -183,9 +184,9 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     res4Records: res4Env.records.length,
     res4OverrideCount: res4OverrideRows.length,
     res1MajorAirportHexes: res1MajorAirports.length,
-    res1MajorPortHexes: res1MajorPorts.length,
+    res1MajorSeaportHexes: res1MajorSeaports.length,
     res4MajorAirportHexes: res4MajorAirports.length,
-    res4MajorPortHexes: res4MajorPorts.length,
+    res4MajorSeaportHexes: res4MajorSeaports.length,
     res1NamingHexes: namingLinesRes1ByH3.size,
     res4NamingHexes: namingLinesRes4ByH3.size,
   });
@@ -194,15 +195,15 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     res4OverrideRows,
     infrastructureHints: {
       res1MajorAirports,
-      res1MajorPorts,
+      res1MajorSeaports,
       res4MajorAirports,
-      res4MajorPorts,
+      res4MajorSeaports,
     },
     namingLinesRes1ByH3,
     namingLinesRes4ByH3,
     continentNamesRes1ByH3,
     urbanHexCountByRes1H3,
-    portCountByRes1H3,
+    seaportCountByRes1H3,
   };
 }
 
@@ -267,7 +268,7 @@ export function getRes4TerrainOverridesForRenderer(): Array<{
 
 /**
  * Why this exists:
- *     Provide sparse H3 lists for major airports/ports (scalerank ≤ 5) so the renderer can draw terrain-hover glyphs.
+ *     Provide sparse H3 lists for major airports/seaports (scalerank ≤ 5) so the renderer can draw terrain-hover glyphs.
  * When to use:
  *     From `game:getTerrainInfrastructureHints` after the classification cache is loaded.
  * What to expect:
@@ -283,9 +284,9 @@ export function getTerrainInfrastructureHintsForRenderer(): TerrainInfrastructur
   const h = cached.infrastructureHints;
   return {
     res1MajorAirports: [...h.res1MajorAirports],
-    res1MajorPorts: [...h.res1MajorPorts],
+    res1MajorSeaports: [...h.res1MajorSeaports],
     res4MajorAirports: [...h.res4MajorAirports],
-    res4MajorPorts: [...h.res4MajorPorts],
+    res4MajorSeaports: [...h.res4MajorSeaports],
   };
 }
 
@@ -338,7 +339,7 @@ export function getHexContinentNamesForRenderer(payload: { h3Index: string }): s
  * What to expect:
  *     Always returns non-negative counts; missing rows default to zero.
  */
-export function getRes1ProductionContext(payload: { h3Index: string }): { urbanHexCount: number; portCount: number } {
+export function getRes1ProductionContext(payload: { h3Index: string }): Res1ProductionContextSnapshot {
   logTrace('terrainClassificationCache getRes1ProductionContext', payload);
   if (!cached) {
     const err = new Error('terrainClassificationCache: load ensureTerrainClassificationCacheLoaded() first');
@@ -347,7 +348,7 @@ export function getRes1ProductionContext(payload: { h3Index: string }): { urbanH
   }
   return {
     urbanHexCount: Math.max(0, cached.urbanHexCountByRes1H3.get(payload.h3Index) ?? 0),
-    portCount: Math.max(0, cached.portCountByRes1H3.get(payload.h3Index) ?? 0),
+    seaportCount: Math.max(0, cached.seaportCountByRes1H3.get(payload.h3Index) ?? 0),
   };
 }
 

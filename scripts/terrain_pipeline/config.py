@@ -23,11 +23,11 @@ class DbConfig:
     When to use:
         Build a connection string for validation and optional staging tables.
     What to expect:
-        Environment variables override defaults and can target a custom host/port/db.
+        Environment variables override defaults and can target a custom host/seaport/db.
     """
 
     host: str = "localhost"
-    port: int = 5432
+    seaport: int = 5432
     dbname: str = "agent_wars_1"
     user: str = "postgres"
     password_env_var: str = "AGENT_WARS_DB_PASSWORD"
@@ -53,7 +53,7 @@ class InputRasterSet:
     # Urban polygons; used only for res-4 urban overrides after base terrain classification.
     urban_shapefile_name: str = "ne_10m_urban_areas.shp"
     airport_shapefile_name: str = "ne_10m_airports.shp"
-    port_shapefile_name: str = "ne_10m_ports.shp"
+    seaport_shapefile_name: str = "ne_10m_ports.shp"
     landcover_by_class: Dict[int, str] = field(
         default_factory=lambda: {
             1: "consensus_full_class_1.tif",

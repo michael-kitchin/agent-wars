@@ -171,7 +171,7 @@ Apply project logging and orienting-comment rules to all new public backend surf
 
 ---
 
-## Phase 3: Hex / Unit Overlay Port to Geographic Projection
+## Phase 3: Hex / Unit Overlay Seaport to Geographic Projection
 
 ### Why
 

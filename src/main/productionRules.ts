@@ -15,19 +15,20 @@ export interface BuildQueueEntryLike {
 
 export interface BuildPrerequisite {
   minUrbanHexes: number;
-  minPorts: number;
+  minSeaports: number;
 }
 
 export const BUILD_ENTRY_MIN_COUNT = 1;
 export const BUILD_ENTRY_MAX_COUNT = 99;
-export const NO_URBAN_BUILD_REASON = 'This hex cannot build units because it has no urban hexes.';
+export const NO_PRODUCTION_INFRASTRUCTURE_REASON =
+  'This hex cannot build units because it has neither urban infrastructure nor seaports.';
 
 export const UNIT_COST_BY_TYPE: Readonly<Record<BuildUnitType, number>> = SHARED_UNIT_COST_BY_TYPE;
 
 export const BUILD_PREREQUISITES_BY_TYPE: Readonly<Record<BuildUnitType, BuildPrerequisite>> = {
-  infantry: { minUrbanHexes: 1, minPorts: 0 },
-  armor: { minUrbanHexes: 2, minPorts: 0 },
-  naval: { minUrbanHexes: 5, minPorts: 1 },
+  infantry: { minUrbanHexes: 1, minSeaports: 0 },
+  armor: { minUrbanHexes: 2, minSeaports: 0 },
+  naval: { minUrbanHexes: 0, minSeaports: 1 },
 };
 
 export interface ProductionApplyResult {
@@ -50,17 +51,17 @@ export function isValidBuildCount(value: number): boolean {
 
 /**
  * Why this exists:
- *     Computes currently allowed build unit types for a hex from urban/port context.
+ *     Computes currently allowed build unit types for a hex from urban/seaport context.
  * When to use:
  *     Renderer snapshot construction and backend mutation validation.
  * What to expect:
  *     Returns unit types in stable UI order (infantry, armor, naval).
  */
-export function getAvailableBuildUnitTypes(urbanHexCount: number, portCount: number): BuildUnitType[] {
+export function getAvailableBuildUnitTypes(urbanHexCount: number, seaportCount: number): BuildUnitType[] {
   const ordered: BuildUnitType[] = ['infantry', 'armor', 'naval'];
   return ordered.filter((unitType) => {
     const req = BUILD_PREREQUISITES_BY_TYPE[unitType];
-    return urbanHexCount >= req.minUrbanHexes && portCount >= req.minPorts;
+    return urbanHexCount >= req.minUrbanHexes && seaportCount >= req.minSeaports;
   });
 }
 

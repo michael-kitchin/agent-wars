@@ -577,7 +577,7 @@ function buildProductionBriefingBlock(
   const maxedTypes = getMaxedUnitTypesForPlayer(state.units, 'opponent');
   const lines: string[] = [];
   lines.push('=== PRODUCTION STATUS ===');
-  lines.push('Rules: infantry cost 10 (min urban 1), armor cost 20 (min urban 2), naval cost 50 (min urban 5 + min ports 1).');
+  lines.push('Rules: infantry cost 10 (min urban 1), armor cost 20 (min urban 2), naval cost 50 (min seaports 1).');
   lines.push(
     `Deployment caps (per side): infantry ${MAX_UNITS_PER_TYPE.infantry}, armor ${MAX_UNITS_PER_TYPE.armor}, naval ${MAX_UNITS_PER_TYPE.naval}.`
   );
@@ -596,7 +596,7 @@ function buildProductionBriefingBlock(
   for (const row of queues) {
     const hex = Array.isArray(row.hex) ? row.hex as [number, number] : null;
     const urban = Number(row.urbanHexCount ?? 0);
-    const ports = Number(row.portCount ?? 0);
+    const seaports = Number(row.seaportCount ?? 0);
     const available = Array.isArray(row.availableUnitTypes)
       ? (row.availableUnitTypes as unknown[]).map((x) => String(x)).join(', ')
       : '';
@@ -606,7 +606,7 @@ function buildProductionBriefingBlock(
           .join(', ')
       : '';
     lines.push(
-      `- ${hex ? formatLatLng(hex) : '[unknown]'} urban=${urban} ports=${ports} available=[${available || 'none'}] queue=${entries || '(empty)'}`
+      `- ${hex ? formatLatLng(hex) : '[unknown]'} urban=${urban} seaports=${seaports} available=[${available || 'none'}] queue=${entries || '(empty)'}`
     );
   }
   return lines.join('\n');

@@ -5,7 +5,7 @@
 import * as assert from 'assert';
 import type { ClassifierThresholds } from './terrainMetadataLoad';
 import type { HexMetadataRecordRes1, HexMetadataRecordRes4 } from './terrainMetadataLoad';
-import { recordHasMajorAirport, recordHasMajorPort } from './terrainMetadataLoad';
+import { recordHasMajorAirport, recordHasMajorSeaport } from './terrainMetadataLoad';
 import {
   classifyCellWithoutUrbanOverride,
   classifyRes4TerrainKind,
@@ -37,8 +37,8 @@ function baseRow(partial: Partial<HexMetadataRecordRes1>): HexMetadataRecordRes1
     elevation_max: null,
     airport_count_total: 0,
     airport_count_by_scalerank: [],
-    port_count_total: 0,
-    port_count_by_scalerank: [],
+    seaport_count_total: 0,
+    seaport_count_by_scalerank: [],
     ...partial,
   };
 }
@@ -161,8 +161,8 @@ function testMajorInfrastructureGates(): void {
   assert.ok(!recordHasMajorAirport(baseRow({ airport_count_by_scalerank: [{ scalerank: 8, count: 1 }] })));
   assert.ok(!recordHasMajorAirport(baseRow({ airport_count_by_scalerank: [{ scalerank: 6, count: 1 }] })));
   assert.ok(recordHasMajorAirport(baseRow({ airport_count_by_scalerank: [{ scalerank: 5, count: 1 }] })));
-  assert.ok(!recordHasMajorPort(baseRow({ port_count_by_scalerank: [{ scalerank: -1, count: 1 }] })));
-  assert.ok(recordHasMajorPort(baseRow({ port_count_by_scalerank: [{ scalerank: 5, count: 2 }, { scalerank: 9, count: 1 }] })));
+  assert.ok(!recordHasMajorSeaport(baseRow({ seaport_count_by_scalerank: [{ scalerank: -1, count: 1 }] })));
+  assert.ok(recordHasMajorSeaport(baseRow({ seaport_count_by_scalerank: [{ scalerank: 5, count: 2 }, { scalerank: 9, count: 1 }] })));
 }
 
 function main(): void {

@@ -54,7 +54,7 @@ function summarizeQueue(queue: HexBuildQueueView, latLngByH3: Map<string, LatLng
     controllerPlayerId: queue.controllerPlayerId,
     controlledByRequester: queue.controlledByRequester,
     urbanHexCount: queue.urbanHexCount,
-    portCount: queue.portCount,
+    seaportCount: queue.seaportCount,
     availableUnitTypes: queue.availableUnitTypes,
     buildSectionVisible: queue.buildSectionVisible,
     noBuildReason: queue.noBuildReason,

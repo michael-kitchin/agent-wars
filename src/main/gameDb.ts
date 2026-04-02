@@ -26,6 +26,13 @@ import type { BuildUnitType } from './productionRules';
 
 export type { GameStateSnapshot } from '../shared/ipcTypes';
 
+function withFogMetadata(snapshot: GameStateSnapshot, fogOfWarEnabled: boolean): GameStateSnapshot {
+  return {
+    ...snapshot,
+    fogOfWarEnabled,
+  };
+}
+
 /** Baseline schema version; bump when a future milestone adds migration chains. */
 export const EXPECTED_USER_VERSION = 8;
 
@@ -937,7 +944,7 @@ export function getGameState(): GameStateSnapshot {
   const gameOver = gameOverRow?.value === '1';
   const winner = winnerRow?.value ?? undefined;
 
-  return {
+  return withFogMetadata({
     hexes: hexRows,
     units: unitRows,
     phase: turnRow?.phase ?? 'planning',
@@ -947,7 +954,7 @@ export function getGameState(): GameStateSnapshot {
     res1BuildQueueTotals: queueTotalRows,
     gameOver: gameOver || undefined,
     winner,
-  };
+  }, isFogOfWarEnabled());
 }
 
 /**
@@ -961,8 +968,9 @@ export function getGameStateForPlayer(
 ): GameStateSnapshot {
   logTrace('gameDb getGameStateForPlayer', { playerId });
   const state = getGameState();
-  if (!db) return { ...state, playerPerspective: playerId };
-  if (!isFogOfWarEnabled()) {
+  const fogEnabled = isFogOfWarEnabled();
+  if (!db) return withFogMetadata({ ...state, playerPerspective: playerId }, fogEnabled);
+  if (!fogEnabled) {
     const allHexes = state.hexes.map((h) => h.h3Index);
     const enemyIntel = state.units
       .filter((u) => u.player !== playerId)
@@ -977,14 +985,14 @@ export function getGameStateForPlayer(
           staleUntilTurn: state.turnNumber + STALE_INTEL_TURNS,
         };
       });
-    return {
+    return withFogMetadata({
       ...state,
       visibleHexes: allHexes,
       exploredHexes: allHexes,
       staleHexes: [],
       enemyIntel,
       playerPerspective: playerId,
-    };
+    }, false);
   }
 
   const mapHexSet = new Set(state.hexes.map((h) => h.h3Index));
@@ -1028,7 +1036,7 @@ export function getGameStateForPlayer(
     };
   });
 
-  return {
+  return withFogMetadata({
     ...state,
     hexes: filteredHexes,
     units: filteredUnits,
@@ -1037,7 +1045,7 @@ export function getGameStateForPlayer(
     staleHexes,
     enemyIntel,
     playerPerspective: playerId,
-  };
+  }, true);
 }
 
 /**

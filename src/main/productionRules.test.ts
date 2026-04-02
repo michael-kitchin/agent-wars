@@ -15,6 +15,7 @@ function testBuildTypeAvailabilityGates(): void {
   assert.deepStrictEqual(getAvailableBuildUnitTypes(1, 0), ['infantry']);
   assert.deepStrictEqual(getAvailableBuildUnitTypes(2, 0), ['infantry', 'armor']);
   assert.deepStrictEqual(getAvailableBuildUnitTypes(5, 0), ['infantry', 'armor']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes(0, 1), ['naval']);
   assert.deepStrictEqual(getAvailableBuildUnitTypes(5, 1), ['infantry', 'armor', 'naval']);
 }
 

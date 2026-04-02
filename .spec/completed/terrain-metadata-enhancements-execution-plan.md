@@ -21,10 +21,10 @@ This document plans implementation of enhancements to the terrain metadata pipel
    - total airport count per hex
    - per-`scalerank` airport counts array
    - source: `ne_10m_airports.shp`, features with `featurecla == "Airport"`.
-3. Add port point-count metadata for both `res1` and `res4`:
-   - total port count per hex
-   - per-`scalerank` port counts array
-   - source: `ne_10m_ports.shp`, features with `featurecla == "Port"`.
+3. Add seaport point-count metadata for both `res1` and `res4`:
+   - total seaport count per hex
+   - per-`scalerank` seaport counts array
+   - source: `ne_10m_ports.shp`, features with `featurecla == "Seaport"`.
 4. Rename terrain label terminology in pipeline/output contracts:
    - `ocean` → `water`
    - `land` → `plains`
@@ -38,7 +38,7 @@ This document plans implementation of enhancements to the terrain metadata pipel
 
 ### 1.3 Definition of done
 
-1. Metadata outputs include new airport/port counts and res-4 urban-per-scalerank breakdown.
+1. Metadata outputs include new airport/seaport counts and res-4 urban-per-scalerank breakdown.
 2. Terrain label rename is consistently applied to pipeline outputs and contracts.
 3. Tests cover happy paths and essential failures for new behavior.
 4. Existing deterministic and validation behavior remains intact.
@@ -78,7 +78,7 @@ Add:
   - `intersects_urban`: boolean
   - `urban_edges`: integer
 
-## 3.2 Airport and port counts (both `res1` and `res4`)
+## 3.2 Airport and seaport counts (both `res1` and `res4`)
 
 Add:
 
@@ -86,8 +86,8 @@ Add:
 - `airport_count_by_scalerank`: array of:
   - `scalerank`: integer
   - `count`: integer
-- `port_count_total`: integer
-- `port_count_by_scalerank`: array of:
+- `seaport_count_total`: integer
+- `seaport_count_by_scalerank`: array of:
   - `scalerank`: integer
   - `count`: integer
 
@@ -106,14 +106,14 @@ Keep comparison semantics unchanged (`>=`) unless explicitly changed by owner.
 
 ## 4. Architecture approach
 
-1. Reuse current mask/raster pipeline structure and extend with point-index processing for airports/ports.
+1. Reuse current mask/raster pipeline structure and extend with point-index processing for airports/seaports.
 2. Add dedicated loaders for point shapefiles with:
    - robust field validation (`featurecla`, `scalerank`)
 3. Keep per-hex metric extraction decomposed:
    - polygon-mask metrics
    - raster means
    - point counts (total + by scalerank)
-4. Add deterministic tie-break logic for boundary-touch points so each airport/port feature contributes to exactly one hex.
+4. Add deterministic tie-break logic for boundary-touch points so each airport/seaport feature contributes to exactly one hex.
 5. Implement label renaming via centralized constants first, then propagate to serializers/semantics/outputs.
 6. Add targeted regression checks during hard-cutover rename.
 
@@ -173,30 +173,30 @@ Each phase is independently verifiable with tests and artifact inspection.
 
 ## Phase 1 — Config and input-sources extension
 
-**Objective:** Add airport/port shapefile config contracts and validation hooks.
+**Objective:** Add airport/seaport shapefile config contracts and validation hooks.
 
 **Tasks:**
 
 1. Extend input config with:
    - `airport_shapefile_name` default `ne_10m_airports.shp`
-   - `port_shapefile_name` default `ne_10m_ports.shp`
+   - `seaport_shapefile_name` default `ne_10m_ports.shp`
 2. Extend validation to require these files and verify readable features.
 3. Add reusable point-shapefile loading utilities with scalerank + featureclass extraction.
 
 **Verification:**
 
 - Unit tests for config defaults and missing-file failures.
-- Validation command fails clearly when airport/port shapefiles are absent/malformed.
+- Validation command fails clearly when airport/seaport shapefiles are absent/malformed.
 
 **Exit criteria:**
 
-- Input layer supports airports/ports with deterministic parsing.
+- Input layer supports airports/seaports with deterministic parsing.
 
 ---
 
-## Phase 2 — Point-count metric extraction (airports and ports)
+## Phase 2 — Point-count metric extraction (airports and seaports)
 
-**Objective:** Produce per-hex total and per-scalerank point counts for airports/ports.
+**Objective:** Produce per-hex total and per-scalerank point counts for airports/seaports.
 
 **Tasks:**
 
@@ -207,7 +207,7 @@ Each phase is independently verifiable with tests and artifact inspection.
    - resolve boundary-touch ties deterministically so each point has exactly one owning hex
 2. Implement per-hex counters:
    - `airport_count_total`, `airport_count_by_scalerank`
-   - `port_count_total`, `port_count_by_scalerank`
+   - `seaport_count_total`, `seaport_count_by_scalerank`
 3. Ensure deterministic scalerank-array ordering.
 4. Add invariants:
    - sum(by_scalerank.count) == total.
@@ -300,7 +300,7 @@ Each phase is independently verifiable with tests and artifact inspection.
 
 1. Run full terrain pipeline test suite (including metadata tests).
 2. Add/confirm essential failure tests:
-   - missing airport/port shapefiles
+   - missing airport/seaport shapefiles
    - malformed scalerank values (bucket to sentinel while preserving coherent totals)
    - invalid rename-dependent consumer assumptions
 3. Confirm public-method logging/orienting comments on all touched methods.
@@ -322,7 +322,7 @@ Each phase is independently verifiable with tests and artifact inspection.
 flowchart LR
   P0[Phase 0 contracts]
   P1[Phase 1 input extensions]
-  P2[Phase 2 airport/port counts]
+  P2[Phase 2 airport/seaport counts]
   P3[Phase 3 urban by scalerank]
   P4[Phase 4 water/plains rename]
   P5[Phase 5 serializers + integration]

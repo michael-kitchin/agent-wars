@@ -35,7 +35,14 @@ export const DEFAULT_NODATA_FALLBACK_TERRAIN: PipelineTerrainKind = 'water';
 export const METADATA_PARENT_RESOLUTION = 1;
 export const METADATA_CHILD_RESOLUTION = 4;
 
-/** One airport/port bucket in exported JSON (`airport_count_by_scalerank` / `port_count_by_scalerank`). */
+export const TERRAIN_METADATA_COUNT_KEYS = {
+  airport_count_total: 'airport_count_total',
+  airport_count_by_scalerank: 'airport_count_by_scalerank',
+  seaport_count_total: 'seaport_count_total',
+  seaport_count_by_scalerank: 'seaport_count_by_scalerank',
+} as const;
+
+/** One airport/seaport bucket in exported JSON (`airport_count_by_scalerank` / `seaport_count_by_scalerank`). */
 export interface ScalerankCountRow {
   scalerank: number;
   count: number;
@@ -50,7 +57,7 @@ export interface UrbanByScalerankRow {
 }
 
 /**
- * Natural Earth scalerank for airports/ports: values 0–5 (inclusive) are treated as “major” for map overlays.
+ * Natural Earth scalerank for airports/seaports: values 0–5 (inclusive) are treated as “major” for map overlays.
  * Invalid / unknown ranks use sentinel -1 in the pipeline and are ignored for this gate.
  */
 export const MAJOR_POINT_FEATURE_MAX_SCALERANK = 5;
@@ -72,8 +79,8 @@ export interface HexMetadataRecordRes1 {
   elevation_max: number | null;
   airport_count_total: number;
   airport_count_by_scalerank: ScalerankCountRow[];
-  port_count_total: number;
-  port_count_by_scalerank: ScalerankCountRow[];
+  seaport_count_total: number;
+  seaport_count_by_scalerank: ScalerankCountRow[];
 }
 
 export interface HexMetadataRecordRes4 extends HexMetadataRecordRes1 {
@@ -187,17 +194,17 @@ export function recordHasMajorAirport(
 
 /**
  * Why this exists:
- *     Gate renderer port glyph on pipeline metadata (major ports by scalerank).
+ *     Gate renderer seaport glyph on pipeline metadata (major seaports by scalerank).
  * When to use:
- *     Same as `recordHasMajorAirport` for port buckets.
+ *     Same as `recordHasMajorAirport` for seaport buckets.
  * What to expect:
  *     True when any qualifying bucket has a positive count.
  */
-export function recordHasMajorPort(
-  r: Pick<HexMetadataRecordRes1, 'port_count_by_scalerank'>,
+export function recordHasMajorSeaport(
+  r: Pick<HexMetadataRecordRes1, 'seaport_count_by_scalerank'>,
   maxRank = MAJOR_POINT_FEATURE_MAX_SCALERANK
 ): boolean {
-  for (const row of r.port_count_by_scalerank) {
+  for (const row of r.seaport_count_by_scalerank) {
     if (row.count <= 0) continue;
     if (row.scalerank >= 0 && row.scalerank <= maxRank) return true;
   }
@@ -222,10 +229,10 @@ function parseRes1Row(raw: unknown, resolution: number): HexMetadataRecordRes1 {
     tri_mean: readNum(raw, 'tri_mean'),
     slope_mean: readNum(raw, 'slope_mean'),
     elevation_max: readNum(raw, 'elevation_max'),
-    airport_count_total: readOptionalIntNonNegative(raw, 'airport_count_total', 0),
-    airport_count_by_scalerank: readScalerankCountArray(raw, 'airport_count_by_scalerank'),
-    port_count_total: readOptionalIntNonNegative(raw, 'port_count_total', 0),
-    port_count_by_scalerank: readScalerankCountArray(raw, 'port_count_by_scalerank'),
+    airport_count_total: readOptionalIntNonNegative(raw, TERRAIN_METADATA_COUNT_KEYS.airport_count_total, 0),
+    airport_count_by_scalerank: readScalerankCountArray(raw, TERRAIN_METADATA_COUNT_KEYS.airport_count_by_scalerank),
+    seaport_count_total: readOptionalIntNonNegative(raw, TERRAIN_METADATA_COUNT_KEYS.seaport_count_total, 0),
+    seaport_count_by_scalerank: readScalerankCountArray(raw, TERRAIN_METADATA_COUNT_KEYS.seaport_count_by_scalerank),
   };
 }
 

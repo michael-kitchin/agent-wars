@@ -28,9 +28,9 @@ class MetadataIoTests(unittest.TestCase):
         for k in ("all_urban", "intersects_urban", "urban_edges", "urban_by_scalerank"):
             self.assertNotIn(k, d)
         self.assertEqual(0, d["airport_count_total"])
-        self.assertEqual(0, d["port_count_total"])
+        self.assertEqual(0, d["seaport_count_total"])
         self.assertEqual([], d["airport_count_by_scalerank"])
-        self.assertEqual([], d["port_count_by_scalerank"])
+        self.assertEqual([], d["seaport_count_by_scalerank"])
 
     def test_res4_dict_includes_urban_keys(self) -> None:
         base = HexMetadataRecordRes1(

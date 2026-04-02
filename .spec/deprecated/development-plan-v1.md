@@ -82,7 +82,7 @@ The Electron-versus-Tauri decision should be made here, during the throwaway pha
 
 ### Milestone 1.1 — Clean Architecture
 
-**Build:** Set up the production project structure from scratch, informed by everything you learned in Phase 0. Establish the core patterns you'll use throughout: the game state schema in SQLite, the main-process/renderer-process communication protocol, the turn lifecycle state machine, the AI service interface, and the rendering pipeline. Port the basic hex rendering and WEGO turn loop from Phase 0, but restructured for maintainability. Set up your build pipeline, linting, and whatever CI you want.
+**Build:** Set up the production project structure from scratch, informed by everything you learned in Phase 0. Establish the core patterns you'll use throughout: the game state schema in SQLite, the main-process/renderer-process communication protocol, the turn lifecycle state machine, the AI service interface, and the rendering pipeline. Seaport the basic hex rendering and WEGO turn loop from Phase 0, but restructured for maintainability. Set up your build pipeline, linting, and whatever CI you want.
 
 **Playtest hypothesis:** None — this is infrastructure. But constrain yourself to one milestone. If you're still refactoring architecture after two weeks, you're over-engineering. Ship the same 50-hex game from Phase 0 running on the new codebase and move on.
 

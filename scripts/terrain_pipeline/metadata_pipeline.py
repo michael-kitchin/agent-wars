@@ -215,14 +215,14 @@ class TerrainMetadataExporter:
             res4_cells = res4_cells[: max(0, max_child_cells)]
 
         LOGGER.debug(
-            "Building airport/port H3 indexes for resolutions %s and %s.",
+            "Building airport/seaport H3 indexes for resolutions %s and %s.",
             cfg.res_parent,
             cfg.res_child,
         )
-        air_idx, port_idx = build_pair_indexes(
+        air_idx, seaport_idx = build_pair_indexes(
             cfg.input_rasters.root,
             cfg.input_rasters.airport_shapefile_name,
-            cfg.input_rasters.port_shapefile_name,
+            cfg.input_rasters.seaport_shapefile_name,
             (cfg.res_parent, cfg.res_child),
         )
 
@@ -232,7 +232,7 @@ class TerrainMetadataExporter:
             include_urban=False,
             out_path=cfg.output_dir / cfg.terrain_res1_metadata_filename,
             air_idx=air_idx,
-            port_idx=port_idx,
+            seaport_idx=seaport_idx,
         )
         self._export_resolution(
             cells=res4_cells,
@@ -240,7 +240,7 @@ class TerrainMetadataExporter:
             include_urban=True,
             out_path=cfg.output_dir / cfg.terrain_res4_metadata_filename,
             air_idx=air_idx,
-            port_idx=port_idx,
+            seaport_idx=seaport_idx,
         )
         LOGGER.info("Terrain metadata export complete.")
 
@@ -267,7 +267,7 @@ class TerrainMetadataExporter:
         include_urban: bool,
         out_path: Path,
         air_idx: PointCountIndex,
-        port_idx: PointCountIndex,
+        seaport_idx: PointCountIndex,
     ) -> None:
         cfg = self._config
         water_ctx = _water_context_for_resolution(cfg, resolution)
@@ -323,7 +323,7 @@ class TerrainMetadataExporter:
                     rank_entries = []
 
                 airport_total, airport_sparse = air_idx.totals_for_cell(cell, resolution)
-                port_total, port_sparse = port_idx.totals_for_cell(cell, resolution)
+                seaport_total, seaport_sparse = seaport_idx.totals_for_cell(cell, resolution)
 
                 points = deterministic_points_within_polygon(poly, sample_count)
                 sampled = sample_many_rasters(raster_pairs, points)
@@ -345,8 +345,8 @@ class TerrainMetadataExporter:
                     elevation_max=sampled.get(topo_keys[2]),
                     airport_count_total=airport_total,
                     airport_count_by_scalerank=tuple(airport_sparse),
-                    port_count_total=port_total,
-                    port_count_by_scalerank=tuple(port_sparse),
+                    seaport_count_total=seaport_total,
+                    seaport_count_by_scalerank=tuple(seaport_sparse),
                 )
                 if include_urban:
                     rec4 = HexMetadataRecordRes4(

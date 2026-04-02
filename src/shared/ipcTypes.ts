@@ -3,12 +3,12 @@
  * Keep this module free of Node/Electron imports so it stays safe for any consumer.
  */
 
-/** Sparse H3 lists for major airports/ports (scalerank ≤ 5) from terrain metadata; used for terrain-hover glyphs. */
+/** Sparse H3 lists for major airports/seaports (scalerank ≤ 5) from terrain metadata; used for terrain-hover glyphs. */
 export interface TerrainInfrastructureHintsSnapshot {
   res1MajorAirports: string[];
-  res1MajorPorts: string[];
+  res1MajorSeaports: string[];
   res4MajorAirports: string[];
-  res4MajorPorts: string[];
+  res4MajorSeaports: string[];
 }
 
 /** One-line naming headline for hover tooltips (city/state preference by resolution). */
@@ -51,6 +51,8 @@ export interface GameStateSnapshot {
   }[];
   /** Perspective id used to build this snapshot (human/opponent). */
   playerPerspective?: string;
+  /** True when fog restrictions apply to this snapshot; false means both sides have full map/unit visibility. */
+  fogOfWarEnabled?: boolean;
   phase: string;
   turnNumber: number;
   pendingOrders: { unitId: string; toH3Index: string }[];
@@ -227,6 +229,12 @@ export interface HumanOrderGroupPreviewResult {
 
 export type BuildUnitType = 'infantry' | 'armor' | 'naval';
 
+/** Shared production context for one res-1 hex used by queue validation/rendering. */
+export interface Res1ProductionContextSnapshot {
+  urbanHexCount: number;
+  seaportCount: number;
+}
+
 export interface HexBuildQueueEntrySnapshot {
   id: number;
   queueIndex: number;
@@ -238,8 +246,8 @@ export interface HexBuildQueueSnapshot {
   h3Index: string;
   controllerPlayerId: string | null;
   controlledByRequester: boolean;
-  urbanHexCount: number;
-  portCount: number;
+  urbanHexCount: Res1ProductionContextSnapshot['urbanHexCount'];
+  seaportCount: Res1ProductionContextSnapshot['seaportCount'];
   availableUnitTypes: BuildUnitType[];
   buildSectionVisible: boolean;
   noBuildReason: string | null;

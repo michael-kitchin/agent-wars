@@ -29,7 +29,7 @@ def normalize_scalerank(raw: object) -> int:
     Why this exists:
         Coerce Natural Earth scalerank values to int or sentinel ``SCALERANK_SENTINEL``.
     When to use:
-        When parsing airport/port/urban feature properties.
+        When parsing airport/seaport/urban feature properties.
     What to expect:
         Returns ``SCALERANK_SENTINEL`` for None, non-numeric, or non-finite values.
     """
@@ -49,7 +49,7 @@ class LabeledPoint:
     Why this exists:
         Hold one filtered point feature in WGS84 with normalized scalerank.
     When to use:
-        After loading airport or port shapefiles.
+        After loading airport or seaport shapefiles.
     What to expect:
         ``lat``/``lng`` in degrees; ``scalerank`` may be ``SCALERANK_SENTINEL``.
     """
@@ -82,7 +82,7 @@ def load_filtered_points_wgs84(
     Why this exists:
         Read point features where ``featurecla`` matches (case-sensitive).
     When to use:
-        Building airport/port indexes for metadata export.
+        Building airport/seaport indexes for metadata export.
     What to expect:
         Raises if the file is missing or required fields are absent; returns an empty list when no
         matching features are present.
@@ -137,7 +137,7 @@ def validate_point_shapefile_contract(
 ) -> int:
     """
     Why this exists:
-        Perform phase-1 contract validation for airport/port point sources.
+        Perform phase-1 contract validation for airport/seaport point sources.
     When to use:
         Terrain and metadata pipeline startup validation before long-running processing.
     What to expect:
@@ -161,7 +161,7 @@ def validate_point_shapefile_contract(
 class PointCountIndex:
     """
     Why this exists:
-        Map H3 cell → sparse scalerank → count for airports or ports at fixed resolutions.
+        Map H3 cell → sparse scalerank → count for airports or seaports at fixed resolutions.
     When to use:
         Built once per metadata export run, queried per cell during record assembly.
     What to expect:
@@ -179,7 +179,7 @@ class PointCountIndex:
         Why this exists:
             Assign each labeled point to one H3 cell per configured resolution and increment counts.
         When to use:
-            After loading airport or port point lists.
+            After loading airport or seaport point lists.
         What to expect:
             Mutates internal counters; idempotent only if called once per logical dataset.
         """
@@ -211,12 +211,12 @@ class PointCountIndex:
 def build_pair_indexes(
     config_root: Path,
     airport_filename: str,
-    port_filename: str,
+    seaport_filename: str,
     resolutions: Sequence[int],
 ) -> tuple[PointCountIndex, PointCountIndex]:
     """
     Why this exists:
-        Construct airport and port indexes from configured shapefiles in one call.
+        Construct airport and seaport indexes from configured shapefiles in one call.
     When to use:
         Start of ``TerrainMetadataExporter.run``.
     What to expect:
@@ -224,14 +224,14 @@ def build_pair_indexes(
     """
 
     airport_path = config_root / airport_filename
-    port_path = config_root / port_filename
+    seaport_path = config_root / seaport_filename
     airports = load_filtered_points_wgs84(airport_path, featurecla_value="Airport")
-    ports = load_filtered_points_wgs84(port_path, featurecla_value="Port")
+    seaports = load_filtered_points_wgs84(seaport_path, featurecla_value="Seaport")
     air_idx = PointCountIndex(resolutions)
-    port_idx = PointCountIndex(resolutions)
+    seaport_idx = PointCountIndex(resolutions)
     air_idx.ingest_points(airports)
-    port_idx.ingest_points(ports)
-    return air_idx, port_idx
+    seaport_idx.ingest_points(seaports)
+    return air_idx, seaport_idx
 
 
 def sparse_rank_counts_to_json(rows: List[Tuple[int, int]]) -> List[dict[str, int]]:

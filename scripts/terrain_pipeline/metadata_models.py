@@ -8,6 +8,10 @@ from dataclasses import dataclass, field
 
 # Bump when record shape or semantics change in a breaking way for consumers.
 TERRAIN_HEX_METADATA_SCHEMA_VERSION = "2.0.0"
+AIRPORT_COUNT_TOTAL_KEY = "airport_count_total"
+AIRPORT_COUNT_BY_SCALERANK_KEY = "airport_count_by_scalerank"
+SEAPORT_COUNT_TOTAL_KEY = "seaport_count_total"
+SEAPORT_COUNT_BY_SCALERANK_KEY = "seaport_count_by_scalerank"
 
 
 @dataclass(frozen=True)
@@ -36,7 +40,7 @@ class HexMetadataRecordRes1:
         Built by the metadata export pipeline before JSON serialization.
     What to expect:
         Numeric means may be ``None`` when raster sampling yields no valid values.
-        Airport/port counts use H3 ``latlng_to_cell`` assignment (one owner hex per point per resolution).
+        Airport/seaport counts use H3 ``latlng_to_cell`` assignment (one owner hex per point per resolution).
     """
 
     h3_index: str
@@ -52,8 +56,8 @@ class HexMetadataRecordRes1:
     elevation_max: float | None
     airport_count_total: int = 0
     airport_count_by_scalerank: tuple[tuple[int, int], ...] = field(default_factory=tuple)
-    port_count_total: int = 0
-    port_count_by_scalerank: tuple[tuple[int, int], ...] = field(default_factory=tuple)
+    seaport_count_total: int = 0
+    seaport_count_by_scalerank: tuple[tuple[int, int], ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)

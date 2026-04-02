@@ -8,7 +8,7 @@ This document describes combat execution and resolution rules for the game, usin
 1. **Offensive and defensive strengths and weaknesses** — §3 and §2 (unit roster) define attack/defense values, range, and roles; §3.5 summarizes cross-domain and terrain.
 2. **Ranged attack capabilities** — §2 (range 0/1/2/3), §7 (summary table): air 3 hexes (strike from base), naval 2 hexes, armor adjacent (1 hex), infantry melee only.
 3. **Zero player interaction / WEGO streamlining** — No confirmations or back-and-forth: resolution order (air strike then ranged then melee), casualty assignment (fixed priority), and attacker/defender ordering (participant IDs assigned at combat start) are all engine-defined. Single resolution phase after movement.
-4. **Infrastructure destruction** — §8 defines permanent destruction of urban hexes, airports, and ports via air strikes, with target-type-specific counter-fire risk.
+4. **Infrastructure destruction** — §8 defines permanent destruction of urban hexes, airports, and seaports via air strikes, with target-type-specific counter-fire risk.
 
 ---
 
@@ -20,7 +20,7 @@ This document describes combat execution and resolution rules for the game, usin
 - **Five-phase resolution:** Air strikes → ranged → ground/naval movement → ferry movement → melee. Each phase resolves completely before the next begins.
 - **Participant IDs:** At the start of combat resolution, each side (player) that has at least one unit in any combat is assigned a unique random integer ID by the game RNG. All ordering for that resolution phase (attacker/defender in melee, tie-breaks, multi-player melee order) uses these IDs. This supports an arbitrary number of players.
 - **RNG:** A single seed is used for the entire game so that replay is deterministic.
-- **Infrastructure destruction is permanent.** Destroyed urban hexes, airports, and ports do not rebuild. This applies to all players — the attacker cannot recover infrastructure they destroy, even if they later control the hex.
+- **Infrastructure destruction is permanent.** Destroyed urban hexes, airports, and seaports do not rebuild. This applies to all players — the attacker cannot recover infrastructure they destroy, even if they later control the hex.
 
 ---
 
@@ -42,7 +42,7 @@ The game has four unit types. Unit caps are 10 infantry, 5 armor, and 5 naval as
 - **Move 0 (air):** Air units have no incremental movement. They reposition via ferry orders (up to 4 hexes between owned airports, one action per turn — see §4.4). Ferry range (4) is longer than strike/visibility range (3), reflecting that a player always knows where their own airports are — ferry destinations don't require air reconnaissance, just ownership.
 - **Cost:** The cost column is the total production points required to build the unit. Each res1 hex generates production points equal to its res4 urban hex count per turn. Points accumulate toward the unit cost across multiple turns; when accumulated points meet or exceed the cost, the unit spawns and excess production carries over immediately to the next unit in the queue. If the excess is sufficient to cover the next unit's cost, that unit also spawns in the same turn — a hex produces as many units per turn as its production rate and unit caps allow.
 
-  Examples: a hex with 5 urban hexes produces 1 infantry (cost 10) every 2 turns. A hex with 15 urban hexes and a port queues a naval unit (cost 50) followed by an infantry: the naval unit spawns on turn 4 (15 × 4 = 60 ≥ 50) with 10 points left over, which immediately covers the infantry cost (10), so both units spawn on turn 4.
+  Examples: a hex with 5 urban hexes produces 1 infantry (cost 10) every 2 turns. A hex with 15 urban hexes and a seaport queues a naval unit (cost 50) followed by an infantry: the naval unit spawns on turn 4 (15 × 4 = 60 ≥ 50) with 10 points left over, which immediately covers the infantry cost (10), so both units spawn on turn 4.
 
   Air strikes that destroy urban hexes permanently reduce the production rate. Air unit cost (30) is a starting value subject to playtesting.
 
@@ -70,7 +70,7 @@ The game has four unit types. Unit caps are 10 infantry, 5 armor, and 5 naval as
 
 ### 3.4 Air
 
-- **Strengths:** Attack 3, range 3 — can strike any hex within 3 hexes of its base airport in a single phase with no incremental movement. Grants visibility in a 3-hex radius around its base (see §8.2). Can target enemy units **or** infrastructure (urban hexes, airports, ports). The only unit capable of destroying infrastructure.
+- **Strengths:** Attack 3, range 3 — can strike any hex within 3 hexes of its base airport in a single phase with no incremental movement. Grants visibility in a 3-hex radius around its base (see §8.2). Can target enemy units **or** infrastructure (urban hexes, airports, seaports). The only unit capable of destroying infrastructure.
 - **Weaknesses:** Defense 1 — the most fragile unit type. No incremental movement; repositioning requires a ferry order that consumes the unit's entire turn. Cannot participate in melee. Destroyed if an enemy ground unit enters its base airport hex. Requires an airport to exist; airport destruction eliminates the based air unit.
 - **Role:** Strategic reconnaissance, deep strike, infrastructure destruction, air superiority (via airport strikes that destroy enemy air units).
 
@@ -92,7 +92,7 @@ Resolution uses **current unit positions** at each step. The engine runs five ph
 ### 4.1 Air strike phase (pre-move positions)
 
 Using the **current** (pre-movement) positions:
-- Build air strikes: for each air unit with a strike order, identify the target hex and target type (units, urban hex, airport, or port).
+- Build air strikes: for each air unit with a strike order, identify the target hex and target type (units, urban hex, airport, or seaport).
 - Resolve all air strikes. Apply casualties to targets. Evaluate counter-fire against each striking air unit. Remove eliminated units and destroyed infrastructure. Process strikes in deterministic order (by striking air unit's base hex H3 index ascending).
 - Air units that are destroyed during this phase (by counter-fire from another air unit's strike on their airport, or by return fire from defending units) do not execute their own strike if they haven't been processed yet. Process order matters: lower H3 index strikes first.
 
@@ -171,7 +171,7 @@ High-level flow: **air strikes → ranged at pre-move positions → ground/naval
    For each air strike:
    a. If striking air unit was destroyed by an earlier strike this phase,
       skip.
-   b. Determine target type (units, urban hex, airport, port).
+   b. Determine target type (units, urban hex, airport, seaport).
    c. For unit targets: air unit rolls attack (hit on roll ≤ 3). If hit,
       assign casualty to target hex using casualty priority. Defending
       units with range ≥ 1 return fire (roll ≤ attack value) if the air
@@ -238,7 +238,7 @@ No player input during steps 2–9.
 - **Air unit destroyed during air strike phase:** If air unit A strikes air unit B's airport and destroys it, and air unit B has not yet resolved its own strike this phase (higher H3 index), air unit B is destroyed before it can act. Processing order within the air strike phase is consequential.
 - **Multiple air units at same airport:** Multiple air units may be based at the same airport. If the airport is destroyed (by air strike or ground capture), all co-located air units are destroyed.
 - **Ferry to occupied airport:** An air unit may ferry to an airport that already has one or more air units based there. There is no stacking limit for air units at airports.
-- **Self-strikes (scorched earth):** A player may order an air unit to strike their own infrastructure — urban hexes, airports, or ports in hexes they control. This allows deliberate denial of infrastructure to an advancing enemy. Self-striking an airport with your own air units based there destroys those air units (including potentially the striking unit itself, depending on processing order). Counter-fire rules apply normally; the infrastructure does not distinguish between friendly and enemy strikes.
+- **Self-strikes (scorched earth):** A player may order an air unit to strike their own infrastructure — urban hexes, airports, or seaports in hexes they control. This allows deliberate denial of infrastructure to an advancing enemy. Self-striking an airport with your own air units based there destroys those air units (including potentially the striking unit itself, depending on processing order). Counter-fire rules apply normally; the infrastructure does not distinguish between friendly and enemy strikes.
 - **Multiple strikes on same hex:** Multiple air units may strike the same target hex in the same turn. Each strike resolves independently in processing order. Two strikes targeting urban hexes at the same res1 hex destroy two res4 urban hexes. Two strikes on the same airport: the first destroys it (and any based air units); the second finds no airport and resolves as a miss (no valid infrastructure target).
 - **Air unit survival and territorial control:** The post-melee air check (step 8) uses **hex ownership**, not enemy unit presence. If an enemy ground unit enters an airport hex during movement (step 5), territorial control changes immediately per the 1.4 rules — even if that enemy unit is subsequently destroyed in melee (step 7). The airport hex remains under enemy control with no surviving units, and the based air unit is destroyed in step 8. This is intentional: recapturing an airport hex requires a separate ground action on a subsequent turn.
 - **No interception in transit:** Air units executing a ferry order cannot be attacked or intercepted during transit. They are not considered to "fly over" intermediate hexes — the ferry is an instantaneous relocation from origin airport to destination airport at resolution time. Enemy units along the path have no opportunity to engage. This is a deliberate simplification; air-to-air interception, if ever needed, is a theatre-level mechanic for Phase 3, not a global-level ferry rule.
@@ -287,11 +287,11 @@ An air unit may target infrastructure at a hex within its 3-hex strike radius in
 
 **Target: Airport.** The air unit rolls d6, hit if roll ≤ 3. On hit, the airport is permanently destroyed. Any air units based at the destroyed airport are also destroyed immediately (including friendly air units in the case of a self-strike — see §6). Counter-fire: roll d6 for AA defenses; the air unit is destroyed if roll ≤ 2 (33% risk). Airports are the highest-risk target due to concentrated air defenses, but destroying them eliminates based air power and its associated visibility.
 
-**Target: Port.** The air unit rolls d6, hit if roll ≤ 3. On hit, the port is permanently destroyed. No new naval units can be produced at or launched from this hex. Naval units already at sea are unaffected. Counter-fire: roll d6 for port defenses; the air unit is destroyed if roll ≤ 1 (17% risk).
+**Target: Seaport.** The air unit rolls d6, hit if roll ≤ 3. On hit, the seaport is permanently destroyed. No new naval units can be produced at or launched from this hex. Naval units already at sea are unaffected. Counter-fire: roll d6 for seaport defenses; the air unit is destroyed if roll ≤ 1 (17% risk).
 
 ### 8.4 Infrastructure destruction is permanent
 
-Destroyed urban hexes, airports, and ports do not rebuild. This is a deliberate design decision that applies globally — no player can restore destroyed infrastructure, even if they control the hex. This creates a strategic tension: destroying enemy infrastructure cripples their war effort, but also degrades the value of territory you might later capture. Air power is a scorched-earth weapon.
+Destroyed urban hexes, airports, and seaports do not rebuild. This is a deliberate design decision that applies globally — no player can restore destroyed infrastructure, even if they control the hex. This creates a strategic tension: destroying enemy infrastructure cripples their war effort, but also degrades the value of territory you might later capture. Air power is a scorched-earth weapon.
 
 ### 8.5 Counter-fire summary
 
@@ -300,7 +300,7 @@ Destroyed urban hexes, airports, and ports do not rebuild. This is a deliberate 
 | Enemy units | 3 (50%) | Return fire from units with range ≥ 1 | Defender's attack value |
 | Urban hex | 3 (50%) | Ground defenses | ≤ 1 (17%) |
 | Airport | 3 (50%) | AA defenses | ≤ 2 (33%) |
-| Port | 3 (50%) | Port defenses | ≤ 1 (17%) |
+| Seaport | 3 (50%) | Seaport defenses | ≤ 1 (17%) |
 
 Counter-fire thresholds are starting values. Tune through playtesting — if air is too dominant, increase counter-fire thresholds; if air units die too quickly to be useful, decrease them.
 
@@ -320,7 +320,7 @@ Counter-fire thresholds are starting values. Tune through playtesting — if air
 
 - **A&A-style:** One die per unit, hit when roll ≤ attack (when attacking) or ≤ defense (when defending in melee).
 - **Air strikes:** Air units strike first (range 3 from base airport), targeting units or infrastructure. Counter-fire varies by target type. One action per turn: strike or ferry.
-- **Infrastructure destruction:** Urban hexes, airports, and ports can be permanently destroyed by air strikes. No rebuilding.
+- **Infrastructure destruction:** Urban hexes, airports, and seaports can be permanently destroyed by air strikes. No rebuilding.
 - **Ranged:** Naval 2 hexes, armor 1 hex; infantry melee only. Defenders with range may return fire (attack roll) when attackers are within range.
 - **WEGO-friendly:** Five-phase resolution (air strike → ranged → ground/naval movement → ferry → melee); automatic casualty assignment by fixed priority; no player-to-player interaction or confirmations.
 
@@ -333,7 +333,7 @@ This gives a concrete, implementable combat system that matches the current four
 During the resolution phase, the client animates in seven steps so that combat and death overlays stay on the correct units:
 
 1. **Air strike indicators** — Highlight at hexes where air strikes occurred; air units shown at base airports, strike target hexes highlighted. Units drawn at **pre-move** positions.
-2. **Air strike casualties** — Red X at hexes where air strike casualties occurred (both target casualties and counter-fire losses at base airports). Infrastructure destruction indicators at hexes where urban hexes, airports, or ports were destroyed.
+2. **Air strike casualties** — Red X at hexes where air strike casualties occurred (both target casualties and counter-fire losses at base airports). Infrastructure destruction indicators at hexes where urban hexes, airports, or seaports were destroyed.
 3. **Ranged lightning** — Yellow lightning at hexes where ranged combat occurred; units drawn at **pre-move** positions (including removed ranged casualties so they remain visible).
 4. **Ranged casualties** — Red X at hexes where ranged units were removed; same pre-move positions.
 5. **Movement** — Ground and naval units interpolate from source to destination hexes. Air units executing ferry orders appear at their new airport (or show destruction animation if ferry failed and origin was lost).

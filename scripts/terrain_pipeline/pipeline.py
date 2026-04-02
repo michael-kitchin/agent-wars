@@ -114,7 +114,7 @@ class TerrainPipeline:
         lake_path = self._lake_input_path()
         urban_path = self._urban_input_path()
         airport_path = self._airport_input_path()
-        port_path = self._port_input_path()
+        seaport_path = self._seaport_input_path()
         if not ocean_path.is_file():
             raise RuntimeError(f"Missing ocean shapefile (expected at {ocean_path}).")
         if not lake_path.is_file():
@@ -123,8 +123,8 @@ class TerrainPipeline:
             raise RuntimeError(f"Missing urban shapefile (expected at {urban_path}).")
         if not airport_path.is_file():
             raise RuntimeError(f"Missing airport shapefile (expected at {airport_path}).")
-        if not port_path.is_file():
-            raise RuntimeError(f"Missing port shapefile (expected at {port_path}).")
+        if not seaport_path.is_file():
+            raise RuntimeError(f"Missing seaport shapefile (expected at {seaport_path}).")
         try:
             _ = self._ocean_predicate_context()
             _ = self._res4_water_predicate_context()
@@ -134,8 +134,8 @@ class TerrainPipeline:
                 featurecla_value="Airport",
             )
             port_count = validate_point_shapefile_contract(
-                port_path,
-                featurecla_value="Port",
+                seaport_path,
+                featurecla_value="Seaport",
             )
         except Exception as exc:
             LOGGER.error(
@@ -145,12 +145,12 @@ class TerrainPipeline:
             raise RuntimeError(
                 "Terrain shapefiles failed to load "
                 f"(ocean: {ocean_path}; lakes: {lake_path}; urban: {urban_path}; "
-                f"airports: {airport_path}; ports: {port_path})."
+                f"airports: {airport_path}; seaports: {seaport_path})."
             ) from exc
 
         LOGGER.info(
             "Phase 1 passed: DB, rasters, and shapefiles validated "
-            "(airport_features=%d, port_features=%d).",
+            "(airport_features=%d, seaport_features=%d).",
             airport_count,
             port_count,
         )
@@ -317,7 +317,7 @@ class TerrainPipeline:
             "generated_at_utc": datetime.now(UTC).isoformat(),
             "db": {
                 "host": self.config.db.host,
-                "port": self.config.db.port,
+                "seaport": self.config.db.seaport,
                 "dbname": self.config.db.dbname,
                 "user": self.config.db.user,
                 "schema": self.config.schema_name,
@@ -386,9 +386,9 @@ class TerrainPipeline:
         r = self.config.input_rasters
         return r.root / r.airport_shapefile_name
 
-    def _port_input_path(self) -> Path:
+    def _seaport_input_path(self) -> Path:
         r = self.config.input_rasters
-        return r.root / r.port_shapefile_name
+        return r.root / r.seaport_shapefile_name
 
     def _ocean_predicate_context(self) -> OceanPredicateContext:
         """
@@ -459,7 +459,7 @@ class TerrainPipeline:
             self._lake_input_path(),
             self._urban_input_path(),
             self._airport_input_path(),
-            self._port_input_path(),
+            self._seaport_input_path(),
         ]
 
     def _generate_cells_for_resolution(self, resolution: int) -> List[str]:

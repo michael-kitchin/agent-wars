@@ -76,7 +76,7 @@ Instead of being called every turn, the LLM subscribes to events from a finite, 
 | `unit_arrived(unitId)` | unitId: string | Unit's standing march order reaches destination |
 | `threat_escalation(unitId, severity)` | unitId: string, severity: "moderate" or "critical" | Unit's threat assessment worsens to specified level |
 | `territory_changed(hexId?)` | hexId: optional | Control of an objective hex changes hands |
-| `infrastructure_destroyed(type?, hexId?)` | type: "urban" or "airport" or "port", hexId: optional | Infrastructure destroyed at a hex |
+| `infrastructure_destroyed(type?, hexId?)` | type: "urban" or "airport" or "seaport", hexId: optional | Infrastructure destroyed at a hex |
 
 **Mandatory override events (always fire, regardless of LLM subscription):**
 
@@ -215,7 +215,7 @@ Play a complete game (10–20 turns) where the LLM is consulted only when events
 - The AI service interface (OpenRouter integration with ad-hoc tool support)
 - The rendering pipeline
 
-Port the basic hex rendering and WEGO turn loop from Phase 0, restructured for the hybrid architecture. Set up your build pipeline, linting, and whatever CI you want. Ship the same small-map game from Phase 0 running on the new codebase.
+Seaport the basic hex rendering and WEGO turn loop from Phase 0, restructured for the hybrid architecture. Set up your build pipeline, linting, and whatever CI you want. Ship the same small-map game from Phase 0 running on the new codebase.
 
 **Playtest hypothesis:** None — this is infrastructure. But constrain yourself to one milestone. If you're still refactoring architecture after two weeks, you're over-engineering. The game should play identically to the 0.7 prototype on the new codebase.
 
@@ -253,7 +253,7 @@ This own-hex-only model means fog of war is thick by default. Players are blind 
 
 **Build:** Add the production system. The production resource is **res4 urban hex count** per territory — each res1 hex generates production points per turn equal to its res4 urban hex count. This is a production *rate*, not a consumable stockpile — the urban hex count doesn't decrease from building units, only from air strikes (milestone 1.5). Points accumulate toward the cost of the queued unit across multiple turns; when accumulated points meet or exceed the unit cost, the unit spawns. Excess production carries over to the next unit in the queue.
 
-Unit costs: 10 (infantry), 20 (armor), 50 (naval). Excess production carries over immediately to the next unit in the queue, and a hex produces as many units per turn as its production rate and unit caps allow. Examples: a hex with 5 urban hexes produces 1 infantry every 2 turns. A hex with 15 urban hexes and a port queues a naval unit followed by an infantry: the naval unit spawns on turn 4 (15 × 4 = 60 ≥ 50) with 10 points left over, which immediately covers the infantry cost (10), so both spawn on turn 4. Naval units can only be launched from hexes with ports.
+Unit costs: 10 (infantry), 20 (armor), 50 (naval). Excess production carries over immediately to the next unit in the queue, and a hex produces as many units per turn as its production rate and unit caps allow. Examples: a hex with 5 urban hexes produces 1 infantry every 2 turns. A hex with 15 urban hexes and a seaport queues a naval unit followed by an infantry: the naval unit spawns on turn 4 (15 × 4 = 60 ≥ 50) with 10 points left over, which immediately covers the infantry cost (10), so both spawn on turn 4. Naval units can only be launched from hexes with seaports.
 
 Unit caps for the base three types: 10 infantry, 5 armor, 5 naval (20 total). Air units are not available yet — they are added in milestone 1.5, where caps become 10/5/5/3. Production is local (per-hex pooling, not global). Territorial control changes when any enemy unit enters a hex.
 
@@ -273,7 +273,7 @@ Hex label format: `N1c / N2t` (urban hex count / turns to next spawn), with exce
 
 2. **3-hex visibility.** Each air unit grants continuous visibility in a 3-hex radius around its base airport, including terrain, occupying units, build queues, and infrastructure status. This is the strongest reconnaissance asset in the game, making airport placement a critical strategic decision.
 
-3. **Strike capability.** Air units can strike any hex within their 3-hex radius during the air strike phase (before ranged, before movement). No incremental movement — they project force from their base. They can target enemy units, urban hexes, airports, or ports. Each target type has different counter-fire risk (see combat rules §8).
+3. **Strike capability.** Air units can strike any hex within their 3-hex radius during the air strike phase (before ranged, before movement). No incremental movement — they project force from their base. They can target enemy units, urban hexes, airports, or seaports. Each target type has different counter-fire risk (see combat rules §8).
 
 4. **One action per turn.** An air unit may strike or ferry, never both. This forces a meaningful choice between repositioning and attacking.
 
@@ -283,13 +283,13 @@ Hex label format: `N1c / N2t` (urban hex count / turns to next spawn), with exce
 
 **Infrastructure destruction:**
 
-1. **Permanent.** Destroyed urban hexes, airports, and ports do not rebuild. This is a scorched-earth system — the attacker permanently degrades the value of territory they might later want. Players may also strike their own infrastructure to deny it to an advancing enemy (see combat rules §6).
+1. **Permanent.** Destroyed urban hexes, airports, and seaports do not rebuild. This is a scorched-earth system — the attacker permanently degrades the value of territory they might later want. Players may also strike their own infrastructure to deny it to an advancing enemy (see combat rules §6).
 
 2. **Urban hex strikes** permanently reduce a territory's per-turn production rate. Low counter-fire risk (17%). Sustained strikes can cripple or halt production entirely.
 
 3. **Airport strikes** destroy the airport and all co-located enemy air units. High counter-fire risk (33%) due to AA defenses. This is the primary air-vs-air mechanism.
 
-4. **Port strikes** permanently prevent naval production/launch from that hex. Low counter-fire risk (17%).
+4. **Seaport strikes** permanently prevent naval production/launch from that hex. Low counter-fire risk (17%).
 
 **Resolution sequence update.** The combat resolution procedure gains two new phases. The full five-phase sequence is: air strikes (pre-move) → ranged (pre-move) → ground/naval movement → ferry movement (with abort check) → melee (post-move). See the updated combat rules document (v2.0) for full details.
 
@@ -307,8 +307,8 @@ AIR OPERATIONS:
 INFRASTRUCTURE STATUS:
 • Airport at [12.4,12.1]: intact, 2 air units based
 • Airport at [-3.1,0.6]: intact, unoccupied
-• Port at [8.2,4.3]: intact
-⚠ Enemy air unit at [human-airport] has your port at [8.2,4.3] in strike range
+• Seaport at [8.2,4.3]: intact
+⚠ Enemy air unit at [human-airport] has your seaport at [8.2,4.3] in strike range
 ```
 
 **Playtest hypothesis:** Air units should create a new strategic layer that changes how the game feels. Specifically:
@@ -332,7 +332,7 @@ INFRASTRUCTURE STATUS:
 
 ### Milestone 1.6 — Game Scenarios and Win Conditions
 
-**Build:** Create 2–3 preset scenarios on the real-Earth map: a contained regional conflict (e.g., European theatre — limit the playable area to ~50–80 global hexes), a two-front global scenario, and a free-play sandbox. Each scenario defines starting territories, forces, production centers, airport and port locations, and victory conditions. Add a scenario selection screen and a basic end-game summary showing territory control over the course of the game.
+**Build:** Create 2–3 preset scenarios on the real-Earth map: a contained regional conflict (e.g., European theatre — limit the playable area to ~50–80 global hexes), a two-front global scenario, and a free-play sandbox. Each scenario defines starting territories, forces, production centers, airport and seaport locations, and victory conditions. Add a scenario selection screen and a basic end-game summary showing territory control over the course of the game.
 
 Scenarios should vary in how much infrastructure is available at start — a scenario with few airports makes air power scarce and valuable; a scenario with many airports makes air superiority a central strategic concern. This lets you test air balance across different setups without changing the rules.
 
@@ -394,7 +394,7 @@ The possibility of AI betrayal — the LLM deciding that breaking an alliance is
 
 ### Milestone 2.5 — Save/Load and Session Management
 
-**Build:** Full save and load. Since game state is in SQLite, this is largely about serializing the complete database state — including per-player subjective views, pending orders, AI memory, standing orders, active callback subscriptions, infrastructure state (which urban hexes/airports/ports have been destroyed), and turn counter — to a save file and restoring it cleanly. Auto-save at the start of each turn. Add turn replay: step through any previous turn's resolution, including the AI's briefing and response for turns where it was consulted.
+**Build:** Full save and load. Since game state is in SQLite, this is largely about serializing the complete database state — including per-player subjective views, pending orders, AI memory, standing orders, active callback subscriptions, infrastructure state (which urban hexes/airports/seaports have been destroyed), and turn counter — to a save file and restoring it cleanly. Auto-save at the start of each turn. Add turn replay: step through any previous turn's resolution, including the AI's briefing and response for turns where it was consulted.
 
 **AI architecture impact:** The callback subscription state must be persisted and restored. On load, the engine must re-evaluate whether any callback conditions are already satisfied in the loaded game state (e.g., if the game was saved mid-crisis, the loaded state might immediately trigger a consultation). AI strategic memory (Tool 4) is already in SQLite and persists naturally.
 
@@ -572,7 +572,7 @@ These tools continue to exist with unchanged interfaces but are now called by th
 | Tool | Pre-Computation Scope | Remains Ad-Hoc? |
 |------|----------------------|-----------------|
 | `assess_unit` | All AI units (including air units — base status, visibility coverage, strike options) | Yes — for assessing enemy units or re-assessing a friendly unit with a different scan radius |
-| `assess_hex` | Contested hexes, objectives, chokepoints, airport/port hexes | Yes — for evaluating hexes the AI is considering but weren't pre-scanned |
+| `assess_hex` | Contested hexes, objectives, chokepoints, airport/seaport hexes | Yes — for evaluating hexes the AI is considering but weren't pre-scanned |
 | `estimate_combat` | All unit pairs within 2 turns of contact; all air strike options with counter-fire risk | Yes — for what-if scenarios with hypothetical force compositions |
 | `plan_route` | Route updates for all standing march/pursue orders | Yes — for exploring hypothetical new routes |
 | `check_distance` | Included in unit assessments | Yes — for quick comparisons during reasoning |

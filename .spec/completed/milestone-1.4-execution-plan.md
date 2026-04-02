@@ -33,7 +33,7 @@ Implement a reliable, understandable production system centered on res1 hex cont
 5. Build option gating is correct:
    - infantry requires >= 1 urban,
    - armor requires >= 2 urban,
-   - naval requires >= 5 urban and >= 1 port.
+   - naval requires >= 5 urban and >= 1 seaport.
 6. If urban count is 0, build section is replaced by explanatory message.
 7. Queue order is honored strictly; production spends capacity in queue order each turn.
 8. Unit costs are enforced exactly: infantry 10, armor 20, naval 50.
@@ -64,7 +64,7 @@ Implement a reliable, understandable production system centered on res1 hex cont
 6. **Build gating by terrain features:**
    - infantry option only if urban >= 1.
    - armor option only if urban >= 2.
-   - naval option only if urban >= 5 and ports >= 1.
+   - naval option only if urban >= 5 and seaports >= 1.
 7. **No-urban behavior:**
    - hide build controls and show explanatory message when urban = 0.
 8. **Production throughput:**
@@ -206,7 +206,7 @@ All mutators validate:
 **Verification**
 
 - Unit tests for add/remove/reindex behavior.
-- Unit tests for gate checks using representative urban/port combinations.
+- Unit tests for gate checks using representative urban/seaport combinations.
 - Essential failure tests:
   - non-controller mutation rejected,
   - unavailable unit type rejected,
@@ -303,7 +303,7 @@ All mutators validate:
 2. **Happy:** contested hex blocks control change.
 3. **Happy:** controller persists until valid enemy uncontested takeover.
 4. **Happy:** queue add/remove maintains stable order.
-5. **Happy:** unit type availability matches urban/port prerequisites.
+5. **Happy:** unit type availability matches urban/seaport prerequisites.
 6. **Happy:** production accumulates and spawns correct counts over turns.
 7. **Happy:** production respects queue ordering when multiple entries exist.
 8. **Happy:** takeover clears queue and progress immediately.

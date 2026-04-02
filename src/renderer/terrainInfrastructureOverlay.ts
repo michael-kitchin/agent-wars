@@ -1,5 +1,5 @@
 /**
- * Canvas glyphs for major airports and ports when terrain hexes are highlighted (hover or T-key inspection).
+ * Canvas glyphs for major airports and seaports when terrain hexes are highlighted (hover or T-key inspection).
  * Shapes come from embedded SVG path data (see `terrainInfrastructureIconPaths.ts`).
  */
 
@@ -129,7 +129,7 @@ const GLYPH_OUTLINE_MULT = 1.58;
 
 /** Max pixel size for aircraft (matches dual-symbol layout). */
 const GLYPH_AIR_PIXEL_FACTOR = 0.22;
-/** Anchor vs aircraft max dimension; slightly above 1 so the port glyph reads a bit larger. */
+/** Anchor vs aircraft max dimension; slightly above 1 so the seaport glyph reads a bit larger. */
 const GLYPH_ANCHOR_TO_AIR_RATIO = 1.03;
 
 /**
@@ -139,28 +139,28 @@ const GLYPH_ANCHOR_TO_AIR_RATIO = 1.03;
 export const RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE = 1.2;
 
 /**
- * Solo airport or solo port only: footprint area × this vs the shared dual-symbol baseline sizes.
+ * Solo airport or solo seaport only: footprint area × this vs the shared dual-symbol baseline sizes.
  */
 export const SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE = 1.2;
 
 /**
- * Draws airport and/or port glyphs inside a hex polygon (container pixel space).
+ * Draws airport and/or seaport glyphs inside a hex polygon (container pixel space).
  * @param both When true, uses diagonal offset and a separating slash. Solo-only hexes use `SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE` (area ×1.2, linear √1.2).
  */
 export function drawTerrainInfrastructureGlyphs(
   ctx: CanvasRenderingContext2D,
   pts: HexScreenPoint[],
-  options: { showAirport: boolean; showPort: boolean; outlineScreenPx: number; glyphAreaScale?: number; centerYOffsetPx?: number }
+  options: { showAirport: boolean; showSeaport: boolean; outlineScreenPx: number; glyphAreaScale?: number; centerYOffsetPx?: number }
 ): void {
-  const { showAirport, showPort, outlineScreenPx, glyphAreaScale = 1, centerYOffsetPx = 0 } = options;
-  if (!showAirport && !showPort) return;
+  const { showAirport, showSeaport, outlineScreenPx, glyphAreaScale = 1, centerYOffsetPx = 0 } = options;
+  if (!showAirport && !showSeaport) return;
   const lin = Math.sqrt(glyphAreaScale);
   const glyphOutline = Math.max(0.92, outlineScreenPx * GLYPH_OUTLINE_MULT * lin);
   const { cx, cy, span } = centroidAndSpan(pts);
   const centerY = cy + centerYOffsetPx;
   const pxAir = span * GLYPH_AIR_PIXEL_FACTOR * lin;
   const pxAnchor = pxAir * GLYPH_ANCHOR_TO_AIR_RATIO;
-  const both = showAirport && showPort;
+  const both = showAirport && showSeaport;
   if (both) {
     // Keep dual symbols close to preserve room for other overlays in the hex.
     const off = span * 0.1 * lin;
