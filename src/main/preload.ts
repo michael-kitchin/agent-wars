@@ -15,7 +15,6 @@ import type {
   HumanOrderGroupPreviewResult,
   HumanStandingOrderSnapshot,
   Res4TerrainOverrideRow,
-  TerrainInfrastructureHintsSnapshot,
   HexNamingTooltipLineRequest,
   HexContinentNamesRequest,
   BuildUnitType,
@@ -33,8 +32,6 @@ const gameApi = {
     ipcRenderer.invoke('game:getState'),
   getRes4TerrainOverrides: (): Promise<Res4TerrainOverrideRow[]> =>
     ipcRenderer.invoke('game:getRes4TerrainOverrides'),
-  getTerrainInfrastructureHints: (): Promise<TerrainInfrastructureHintsSnapshot> =>
-    ipcRenderer.invoke('game:getTerrainInfrastructureHints'),
   getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest): Promise<string | null> =>
     ipcRenderer.invoke('game:getHexNamingTooltipLine', payload),
   getHexContinentNames: (payload: HexContinentNamesRequest): Promise<string[]> =>
@@ -55,6 +52,15 @@ const gameApi = {
     ipcRenderer.invoke('game:assignHumanMarchOrders', payload),
   validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }): Promise<{ success: boolean; reason?: string }> =>
     ipcRenderer.invoke('game:validateGroupRangedTarget', payload),
+  validateGroupAirStrikeTarget: (payload: {
+    unitIds: string[];
+    targetH3Index: string;
+    targetType: 'units' | 'urban' | 'airport' | 'seaport';
+  }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke('game:validateGroupAirStrikeTarget', payload),
+  validateGroupFerryTarget: (payload: {
+    unitIds: string[];
+    destinationH3Index: string;
+  }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke('game:validateGroupFerryTarget', payload),
   cancelHumanStandingOrder: (payload: { unitId: string }): Promise<{ success: boolean; reason?: string }> =>
     ipcRenderer.invoke('game:cancelHumanStandingOrder', payload),
   getHexBuildQueue: (payload: { h3Index: string }): Promise<HexBuildQueueSnapshot | null> =>

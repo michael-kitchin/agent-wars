@@ -5,7 +5,13 @@
 
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import * as path from 'path';
-import { initDatabase, getGameState, getGameStateForPlayer, resetGameForNewMatch } from './gameDb';
+import {
+  initDatabase,
+  getGameState,
+  getGameStateForPlayer,
+  resetGameForNewMatch,
+  getRes4TerrainOverridesForRendererFromGame,
+} from './gameDb';
 import {
   submitOrders,
   ready,
@@ -15,12 +21,22 @@ import {
   assignHumanMarchOrder,
   assignHumanMarchOrders,
   validateGroupRangedTarget,
+  validateGroupAirStrikeTarget,
+  validateGroupFerryTarget,
   cancelHumanOrder,
   getHexBuildQueue,
   addHexBuildQueueEntry,
   updateHexBuildQueueEntry,
   removeHexBuildQueueEntry,
 } from './gameActions';
+import { normalizeSubmitOrdersPayload } from './submitOrdersPayload';
+import {
+  parseGroupedTargetPayload,
+  parseGroupedStrikePayload,
+  parseGroupedDestinationPayload,
+  parseBuildQueueUpdatePayload,
+  parseUnitIdList,
+} from './ipcPayloadGuards';
 import {
   saveKey,
   hasKey,
@@ -34,10 +50,8 @@ import {
 } from './openRouter';
 import { logDebug } from './logger';
 import {
-  getRes4TerrainOverridesForRenderer,
   getHexNamingTooltipLineForRenderer,
   getHexContinentNamesForRenderer,
-  getTerrainInfrastructureHintsForRenderer,
 } from './terrainClassificationCache';
 import {
   handleRequestAiOrders,
@@ -123,8 +137,7 @@ function requestOrdersWithLog(
 
 function registerIpcHandlers(): void {
   ipcMain.handle('game:getState', () => getGameStateForPlayer('human', { maskUnexploredTerrain: false }));
-  ipcMain.handle('game:getRes4TerrainOverrides', () => getRes4TerrainOverridesForRenderer());
-  ipcMain.handle('game:getTerrainInfrastructureHints', () => getTerrainInfrastructureHintsForRenderer());
+  ipcMain.handle('game:getRes4TerrainOverrides', () => getRes4TerrainOverridesForRendererFromGame());
   ipcMain.handle(
     'game:getHexNamingTooltipLine',
     (_event, payload: { h3Index?: string; resolution?: number }) => {
@@ -147,12 +160,7 @@ function registerIpcHandlers(): void {
     return getGameStateForPlayer('human', { maskUnexploredTerrain: false });
   });
   ipcMain.handle('game:submitOrders', (_event, payload: SubmitOrdersPayload | { unitId: string; toH3Index: string }[]) => {
-    const normalized: SubmitOrdersPayload = Array.isArray(payload)
-      ? { movementOrders: payload }
-      : {
-          movementOrders: payload.movementOrders ?? [],
-          rangedAttacks: payload.rangedAttacks,
-        };
+    const normalized: SubmitOrdersPayload = normalizeSubmitOrdersPayload(payload);
     return submitOrders(normalized);
   });
   ipcMain.handle('game:listHumanStandingOrders', () => listHumanStandingOrders());
@@ -177,7 +185,7 @@ function registerIpcHandlers(): void {
           previews: [],
         };
       }
-      const unitIds = payload.unitIds.filter((unitId): unitId is string => typeof unitId === 'string');
+      const unitIds = parseUnitIdList(payload.unitIds) ?? [];
       return previewHumanMarchOrders(unitIds, payload.hoveredH3Index);
     }
   );
@@ -193,21 +201,41 @@ function registerIpcHandlers(): void {
   ipcMain.handle(
     'game:assignHumanMarchOrders',
     (_event, payload: { unitIds?: string[]; destinationH3Index?: string }) => {
-      if (!Array.isArray(payload?.unitIds) || typeof payload?.destinationH3Index !== 'string') {
+      const parsed = parseGroupedDestinationPayload(payload);
+      if (!parsed) {
         return { success: false, reason: 'Invalid grouped assign payload' };
       }
-      const unitIds = payload.unitIds.filter((unitId): unitId is string => typeof unitId === 'string');
-      return assignHumanMarchOrders(unitIds, payload.destinationH3Index);
+      return assignHumanMarchOrders(parsed.unitIds, parsed.destinationH3Index);
     }
   );
   ipcMain.handle(
     'game:validateGroupRangedTarget',
     (_event, payload: { unitIds?: string[]; targetH3Index?: string }) => {
-      if (!Array.isArray(payload?.unitIds) || typeof payload?.targetH3Index !== 'string') {
+      const parsed = parseGroupedTargetPayload(payload);
+      if (!parsed) {
         return { success: false, reason: 'Invalid grouped ranged payload' };
       }
-      const unitIds = payload.unitIds.filter((unitId): unitId is string => typeof unitId === 'string');
-      return validateGroupRangedTarget(unitIds, payload.targetH3Index);
+      return validateGroupRangedTarget(parsed.unitIds, parsed.targetH3Index);
+    }
+  );
+  ipcMain.handle(
+    'game:validateGroupAirStrikeTarget',
+    (_event, payload: { unitIds?: string[]; targetH3Index?: string; targetType?: 'units' | 'urban' | 'airport' | 'seaport' }) => {
+      const parsed = parseGroupedStrikePayload(payload);
+      if (!parsed) {
+        return { success: false, reason: 'Invalid grouped strike payload' };
+      }
+      return validateGroupAirStrikeTarget(parsed.unitIds, parsed.targetH3Index, parsed.targetType);
+    }
+  );
+  ipcMain.handle(
+    'game:validateGroupFerryTarget',
+    (_event, payload: { unitIds?: string[]; destinationH3Index?: string }) => {
+      const parsed = parseGroupedDestinationPayload(payload);
+      if (!parsed) {
+        return { success: false, reason: 'Invalid grouped ferry payload' };
+      }
+      return validateGroupFerryTarget(parsed.unitIds, parsed.destinationH3Index);
     }
   );
   ipcMain.handle('game:cancelHumanStandingOrder', (_event, payload: { unitId?: string }) => {
@@ -224,16 +252,12 @@ function registerIpcHandlers(): void {
   });
   ipcMain.handle(
     'game:updateHexBuildQueueEntry',
-    (_event, payload: { h3Index?: string; entryId?: number; unitType?: 'infantry' | 'armor' | 'naval'; count?: number }) => {
-      if (
-        typeof payload?.h3Index !== 'string' ||
-        typeof payload?.entryId !== 'number' ||
-        (payload?.unitType !== 'infantry' && payload?.unitType !== 'armor' && payload?.unitType !== 'naval') ||
-        typeof payload?.count !== 'number'
-      ) {
+    (_event, payload: { h3Index?: string; entryId?: number; unitType?: 'infantry' | 'armor' | 'naval' | 'air'; count?: number }) => {
+      const parsed = parseBuildQueueUpdatePayload(payload);
+      if (!parsed) {
         return { success: false, reason: 'Invalid build-queue payload' };
       }
-      return updateHexBuildQueueEntry(payload.h3Index, payload.entryId, payload.unitType, payload.count, 'human');
+      return updateHexBuildQueueEntry(parsed.h3Index, parsed.entryId, parsed.unitType, parsed.count, 'human');
     }
   );
   ipcMain.handle('game:removeHexBuildQueueEntry', (_event, payload: { h3Index?: string; entryId?: number }) => {

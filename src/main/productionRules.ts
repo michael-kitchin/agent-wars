@@ -4,7 +4,7 @@
 
 import { UNIT_COST_BY_TYPE as SHARED_UNIT_COST_BY_TYPE } from '../shared/productionConfig';
 
-export type BuildUnitType = 'infantry' | 'armor' | 'naval';
+export type BuildUnitType = 'infantry' | 'armor' | 'naval' | 'air';
 
 export interface BuildQueueEntryLike {
   id: number;
@@ -21,14 +21,15 @@ export interface BuildPrerequisite {
 export const BUILD_ENTRY_MIN_COUNT = 1;
 export const BUILD_ENTRY_MAX_COUNT = 99;
 export const NO_PRODUCTION_INFRASTRUCTURE_REASON =
-  'This hex cannot build units because it has neither urban infrastructure nor seaports.';
+  'Cannot build here: insufficient production capacity or infrastructure.';
 
 export const UNIT_COST_BY_TYPE: Readonly<Record<BuildUnitType, number>> = SHARED_UNIT_COST_BY_TYPE;
 
 export const BUILD_PREREQUISITES_BY_TYPE: Readonly<Record<BuildUnitType, BuildPrerequisite>> = {
   infantry: { minUrbanHexes: 1, minSeaports: 0 },
   armor: { minUrbanHexes: 2, minSeaports: 0 },
-  naval: { minUrbanHexes: 0, minSeaports: 1 },
+  naval: { minUrbanHexes: 10, minSeaports: 1 },
+  air: { minUrbanHexes: 5, minSeaports: 0 },
 };
 
 export interface ProductionApplyResult {
@@ -55,13 +56,19 @@ export function isValidBuildCount(value: number): boolean {
  * When to use:
  *     Renderer snapshot construction and backend mutation validation.
  * What to expect:
- *     Returns unit types in stable UI order (infantry, armor, naval).
+ *     Returns unit types in stable UI order (infantry, armor, naval, air).
  */
-export function getAvailableBuildUnitTypes(urbanHexCount: number, seaportCount: number): BuildUnitType[] {
-  const ordered: BuildUnitType[] = ['infantry', 'armor', 'naval'];
+export function getAvailableBuildUnitTypes(
+  urbanHexCount: number,
+  seaportCount: number,
+  airportCount = 0
+): BuildUnitType[] {
+  const ordered: BuildUnitType[] = ['infantry', 'armor', 'naval', 'air'];
   return ordered.filter((unitType) => {
     const req = BUILD_PREREQUISITES_BY_TYPE[unitType];
-    return urbanHexCount >= req.minUrbanHexes && seaportCount >= req.minSeaports;
+    if (urbanHexCount < req.minUrbanHexes || seaportCount < req.minSeaports) return false;
+    if (unitType === 'air') return airportCount > 0;
+    return true;
   });
 }
 

@@ -4,8 +4,9 @@
  */
 
 import * as assert from 'assert';
-import { evaluateMandatoryOverrides } from './callbackEvaluation';
+import { evaluateMandatoryOverrides, evaluateSubscriptionEvents } from './callbackEvaluation';
 import type { GameStateSnapshot } from './gameDb';
+import type { CallbackSubscription } from './callbackSubscriptions';
 
 const baseState: GameStateSnapshot = {
   turnNumber: 10,
@@ -99,6 +100,26 @@ function testAttackMixChangedFires(): void {
   assert.ok(results.some((r) => r.type === 'attack_mix_changed'));
 }
 
+function testInfrastructureDestroyedSubscriptionEventFires(): void {
+  const subscriptions: CallbackSubscription[] = [
+    { event: 'infrastructure_destroyed', params: { targetType: 'airport' }, subscribedTurn: 9 },
+  ];
+  const fired = evaluateSubscriptionEvents(baseState, subscriptions, {
+    opponentCombatParticipantUnitIds: [],
+    removedUnitIds: [],
+    removedOpponentUnitIds: [],
+    infrastructureDestroyedEvents: [
+      {
+        h3Index: '822a17fffffffff',
+        targetType: 'airport',
+        changedRubbleCount: 1,
+        destroyedAirUnitsCount: 2,
+      },
+    ],
+  });
+  assert.ok(fired.some((r) => r.event === 'infrastructure_destroyed'));
+}
+
 function run(): void {
   testFirstConsultationFires();
   testFirstCombatFires();
@@ -106,6 +127,7 @@ function run(): void {
   testDeadmanFires();
   testNoFirstCombatWhenAlreadyInSet();
   testAttackMixChangedFires();
+  testInfrastructureDestroyedSubscriptionEventFires();
   console.log('callbackEvaluation.test.ts passed');
 }
 

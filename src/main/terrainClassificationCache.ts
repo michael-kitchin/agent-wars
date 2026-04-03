@@ -31,23 +31,24 @@ import {
   type TerrainNamingRecordRes4,
 } from './terrainNamingLoad';
 
-export interface TerrainInfrastructureHintsPayload {
-  res1MajorAirports: string[];
-  res1MajorSeaports: string[];
-  res4MajorAirports: string[];
-  res4MajorSeaports: string[];
-}
-
 export interface TerrainClassificationSnapshot {
   res1KindByH3: ReadonlyMap<string, PipelineTerrainKind>;
   /** Child res-4 rows carrying either a base-kind override and/or `isUrban` overlay flag for renderer detail mode. */
   res4OverrideRows: ReadonlyArray<{ h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }>;
-  infrastructureHints: TerrainInfrastructureHintsPayload;
   namingLinesRes1ByH3: ReadonlyMap<string, string>;
   namingLinesRes4ByH3: ReadonlyMap<string, string>;
   continentNamesRes1ByH3: ReadonlyMap<string, string[]>;
   urbanHexCountByRes1H3: ReadonlyMap<string, number>;
+  airportCountByRes1H3: ReadonlyMap<string, number>;
   seaportCountByRes1H3: ReadonlyMap<string, number>;
+  res4FeatureRows: ReadonlyArray<{
+    h3Index: string;
+    parentH3Index: string;
+    terrainKind: PipelineTerrainKind;
+    isUrban: boolean;
+    isAirport: boolean;
+    isSeaport: boolean;
+  }>;
 }
 
 let cached: TerrainClassificationSnapshot | null = null;
@@ -99,13 +100,23 @@ function buildSnapshot(): TerrainClassificationSnapshot {
   const res1MajorAirports: string[] = [];
   const res1MajorSeaports: string[] = [];
   const seaportCountByRes1H3 = new Map<string, number>();
+  const airportCountByRes1H3 = new Map<string, number>();
   for (const row of res1Env.records) {
     if (recordHasMajorAirport(row)) res1MajorAirports.push(row.h3_index);
     if (recordHasMajorSeaport(row)) res1MajorSeaports.push(row.h3_index);
+    airportCountByRes1H3.set(row.h3_index, Math.max(0, row.airport_count_total));
     seaportCountByRes1H3.set(row.h3_index, Math.max(0, row.seaport_count_total));
   }
   const res4MajorAirports: string[] = [];
   const res4MajorSeaports: string[] = [];
+  const res4FeatureRows: Array<{
+    h3Index: string;
+    parentH3Index: string;
+    terrainKind: PipelineTerrainKind;
+    isUrban: boolean;
+    isAirport: boolean;
+    isSeaport: boolean;
+  }> = [];
   const res4ClassifiedRows: Array<{ h3Index: string; parentH3: string; childKind: PipelineTerrainKind; isUrban: boolean }> = [];
   const urbanHexCountByRes1H3 = new Map<string, number>();
   const childKindCountsByParent = new Map<string, Map<PipelineTerrainKind, number>>();
@@ -113,6 +124,8 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     const childKind = classifyRes4TerrainKind(row, t, nodata);
     const isUrban = isRes4UrbanOverlayHex(row);
     const parentH3 = cellToParent(row.h3_index, METADATA_PARENT_RESOLUTION);
+    const isAirport = row.airport_count_total > 0;
+    const isSeaport = row.seaport_count_total > 0;
     let parentCounts = childKindCountsByParent.get(parentH3);
     if (!parentCounts) {
       parentCounts = new Map<PipelineTerrainKind, number>();
@@ -120,6 +133,14 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     }
     parentCounts.set(childKind, (parentCounts.get(childKind) ?? 0) + 1);
     res4ClassifiedRows.push({ h3Index: row.h3_index, parentH3, childKind, isUrban });
+    res4FeatureRows.push({
+      h3Index: row.h3_index,
+      parentH3Index: parentH3,
+      terrainKind: childKind,
+      isUrban,
+      isAirport,
+      isSeaport,
+    });
     if (isUrban) {
       urbanHexCountByRes1H3.set(parentH3, (urbanHexCountByRes1H3.get(parentH3) ?? 0) + 1);
     }
@@ -193,17 +214,13 @@ function buildSnapshot(): TerrainClassificationSnapshot {
   return {
     res1KindByH3,
     res4OverrideRows,
-    infrastructureHints: {
-      res1MajorAirports,
-      res1MajorSeaports,
-      res4MajorAirports,
-      res4MajorSeaports,
-    },
     namingLinesRes1ByH3,
     namingLinesRes4ByH3,
     continentNamesRes1ByH3,
     urbanHexCountByRes1H3,
+    airportCountByRes1H3,
     seaportCountByRes1H3,
+    res4FeatureRows,
   };
 }
 
@@ -256,6 +273,7 @@ export function getRes4TerrainOverridesForRenderer(): Array<{
   h3Index: string;
   terrainKind: PipelineTerrainKind;
   isUrban: boolean;
+  isRubble?: boolean;
 }> {
   logTrace('terrainClassificationCache getRes4TerrainOverridesForRenderer');
   if (!cached) {
@@ -263,31 +281,7 @@ export function getRes4TerrainOverridesForRenderer(): Array<{
     logError('terrainClassificationCache getRes4TerrainOverridesForRenderer: cache empty', err);
     throw err;
   }
-  return [...cached.res4OverrideRows];
-}
-
-/**
- * Why this exists:
- *     Provide sparse H3 lists for major airports/seaports (scalerank ≤ 5) so the renderer can draw terrain-hover glyphs.
- * When to use:
- *     From `game:getTerrainInfrastructureHints` after the classification cache is loaded.
- * What to expect:
- *     New object each call; throws if cache is empty.
- */
-export function getTerrainInfrastructureHintsForRenderer(): TerrainInfrastructureHintsPayload {
-  logTrace('terrainClassificationCache getTerrainInfrastructureHintsForRenderer');
-  if (!cached) {
-    const err = new Error('terrainClassificationCache: load ensureTerrainClassificationCacheLoaded() first');
-    logError('terrainClassificationCache getTerrainInfrastructureHintsForRenderer: cache empty', err);
-    throw err;
-  }
-  const h = cached.infrastructureHints;
-  return {
-    res1MajorAirports: [...h.res1MajorAirports],
-    res1MajorSeaports: [...h.res1MajorSeaports],
-    res4MajorAirports: [...h.res4MajorAirports],
-    res4MajorSeaports: [...h.res4MajorSeaports],
-  };
+  return cached.res4OverrideRows.map((row) => ({ ...row, isRubble: false }));
 }
 
 /**
@@ -348,8 +342,34 @@ export function getRes1ProductionContext(payload: { h3Index: string }): Res1Prod
   }
   return {
     urbanHexCount: Math.max(0, cached.urbanHexCountByRes1H3.get(payload.h3Index) ?? 0),
+    airportCount: Math.max(0, cached.airportCountByRes1H3.get(payload.h3Index) ?? 0),
     seaportCount: Math.max(0, cached.seaportCountByRes1H3.get(payload.h3Index) ?? 0),
   };
+}
+
+/**
+ * Why this exists:
+ *     Provides full res-4 feature rows for seeding mutable infrastructure/rubble state in SQLite.
+ * When to use:
+ *     New-match reset flow before gameplay mutations begin.
+ * What to expect:
+ *     Returns immutable row snapshots with parent mapping and feature booleans.
+ */
+export function getRes4FeatureRowsForSeeding(): ReadonlyArray<{
+  h3Index: string;
+  parentH3Index: string;
+  terrainKind: PipelineTerrainKind;
+  isUrban: boolean;
+  isAirport: boolean;
+  isSeaport: boolean;
+}> {
+  logTrace('terrainClassificationCache getRes4FeatureRowsForSeeding');
+  if (!cached) {
+    const err = new Error('terrainClassificationCache: load ensureTerrainClassificationCacheLoaded() first');
+    logError('terrainClassificationCache getRes4FeatureRowsForSeeding: cache empty', err);
+    throw err;
+  }
+  return cached.res4FeatureRows;
 }
 
 /**

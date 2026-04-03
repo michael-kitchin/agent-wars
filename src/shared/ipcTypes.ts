@@ -3,14 +3,6 @@
  * Keep this module free of Node/Electron imports so it stays safe for any consumer.
  */
 
-/** Sparse H3 lists for major airports/seaports (scalerank ≤ 5) from terrain metadata; used for terrain-hover glyphs. */
-export interface TerrainInfrastructureHintsSnapshot {
-  res1MajorAirports: string[];
-  res1MajorSeaports: string[];
-  res4MajorAirports: string[];
-  res4MajorSeaports: string[];
-}
-
 /** One-line naming headline for hover tooltips (city/state preference by resolution). */
 export interface HexNamingTooltipLineRequest {
   h3Index: string;
@@ -27,6 +19,9 @@ export interface Res4TerrainOverrideRow {
   h3Index: string;
   terrainKind: string;
   isUrban: boolean;
+  isAirport?: boolean;
+  isSeaport?: boolean;
+  isRubble?: boolean;
 }
 
 /** Snapshot of game state sent to the renderer (camelCase for JSON). */
@@ -66,6 +61,13 @@ export interface GameStateSnapshot {
     nextRemainingCount: number | null;
     storedPoints: number;
   }[];
+  /** Res-1 infrastructure snapshot used by production and air-strike planning. */
+  res1Infrastructure?: {
+    h3Index: string;
+    urbanHexCount: number;
+    airportCount: number;
+    seaportCount: number;
+  }[];
   gameOver?: boolean;
   winner?: string;
 }
@@ -82,10 +84,46 @@ export interface RangedAttackOrder {
   targetH3Index: string;
 }
 
+/** Air strike target categories from milestone 1.5. */
+export type AirStrikeTargetType = 'units' | 'urban' | 'airport' | 'seaport';
+
+/** Air strike declaration for IPC (one target hex + target type per air unit per turn). */
+export interface AirStrikeOrder {
+  unitId: string;
+  targetH3Index: string;
+  targetType: AirStrikeTargetType;
+}
+
+/** One resolved air-strike sortie path used for renderer playback (outbound and optional return). */
+export interface AirStrikeAnimationMove {
+  unitId: string;
+  player: string;
+  unitType: string;
+  fromH3Index: string;
+  targetH3Index: string;
+  returnsToBase: boolean;
+}
+
+/** Air ferry declaration for IPC (one destination airport hex per air unit per turn). */
+export interface FerryOrder {
+  unitId: string;
+  destinationH3Index: string;
+}
+
+/** One resolved ferry relocation move used for renderer playback. */
+export interface FerryAnimationMove {
+  unitId: string;
+  player: string;
+  fromH3Index: string;
+  toH3Index: string;
+}
+
 /** Payload for submitOrders: movement and optional ranged attacks. */
 export interface SubmitOrdersPayload {
   movementOrders: MovementOrder[];
   rangedAttacks?: RangedAttackOrder[];
+  airStrikes?: AirStrikeOrder[];
+  ferryOrders?: FerryOrder[];
 }
 
 /** Optional arguments for game:newGame (currently fog-of-war toggle). */
@@ -105,6 +143,8 @@ export interface GameReadyIpcPayload {
   useEventDrivenConsultation?: boolean;
   precomputedAiOrders?: MovementOrder[];
   precomputedAiRangedOrders?: RangedAttackOrder[];
+  precomputedAiAirStrikeOrders?: AirStrikeOrder[];
+  precomputedAiFerryOrders?: FerryOrder[];
   precomputedAiStrategy?: string;
   /** When true, Ready may invoke the LLM (non–event-driven path or afterResolution). Omitted/false ⇒ no LLM on Ready. */
   aiPlanningRunEnabled?: boolean;
@@ -122,6 +162,8 @@ export type RequestAiOrdersResult =
       success: true;
       orders: MovementOrder[];
       rangedAttacks?: RangedAttackOrder[];
+      airStrikes?: AirStrikeOrder[];
+      ferryOrders?: FerryOrder[];
       strategy?: string;
       dropped?: number;
       dropReasons?: string[];
@@ -142,6 +184,14 @@ export interface RemovedUnitSnapshot {
   displayOrder?: number;
 }
 
+/** Infrastructure destruction event emitted during air-strike resolution. */
+export interface InfrastructureDestroyedEvent {
+  h3Index: string;
+  targetType: 'urban' | 'airport' | 'seaport';
+  changedRubbleCount: number;
+  destroyedAirUnitsCount: number;
+}
+
 /** Shape returned by game:ready. */
 export interface ReadyResult {
   success: boolean;
@@ -149,7 +199,7 @@ export interface ReadyResult {
   aiSkipped?: boolean;
   aiSkipReason?: string;
   aiOrderCount?: number;
-  aiRangedByType?: { armor?: number; naval?: number };
+  aiRangedByType?: { armor?: number; naval?: number; air?: number };
   aiDropped?: number;
   aiDropReasons?: string[];
   aiMovesLog?: string[];
@@ -162,6 +212,17 @@ export interface ReadyResult {
   rangedCombatHexes?: string[];
   rangedCasualtyHexes?: string[];
   rangedRemovedUnits?: RemovedUnitSnapshot[];
+  airStrikeHexes?: string[];
+  airStrikeCasualtyHexes?: string[];
+  airStrikeRemovedUnits?: RemovedUnitSnapshot[];
+  airStrikeMoves?: AirStrikeAnimationMove[];
+  airStrikeAttemptCount?: number;
+  airStrikeSuccessfulCount?: number;
+  airStrikeFailedCount?: number;
+  airStrikeAttackerLossCount?: number;
+  baseInvalidAirLossCount?: number;
+  infrastructureDestroyedEvents?: InfrastructureDestroyedEvent[];
+  resolvedFerryMoves?: FerryAnimationMove[];
   meleeCombatHexes?: string[];
   meleeCasualtyHexes?: string[];
   meleeRemovedUnits?: RemovedUnitSnapshot[];
@@ -172,7 +233,7 @@ export interface ReadyResult {
   killsByDirectFire?: { victimId: string; killerIds: string[] }[];
   killsByReturnFire?: { victimId: string; killerIds: string[] }[];
   /** Newly spawned production units this turn, aggregated by unit type. */
-  deployedUnitsByType?: { armor?: number; infantry?: number; naval?: number };
+  deployedUnitsByType?: { armor?: number; infantry?: number; naval?: number; air?: number };
   /** Unit types that hit deployment cap for human during production spawn. */
   humanDeploymentCapReachedUnitTypes?: BuildUnitType[];
   /** Unit types that hit deployment cap for opponent during production spawn. */
@@ -184,6 +245,11 @@ export interface ReadyResult {
   aiStrategy?: string;
   toolInvocationCounts?: Record<string, number>;
   cost?: number;
+  wallClockMs?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  opponentCombatParticipantUnitIds?: string[];
+  removedOpponentUnitIds?: string[];
   aiConsulted?: boolean;
 }
 
@@ -228,11 +294,12 @@ export interface HumanOrderGroupPreviewResult {
   previews: HumanOrderGroupPreviewUnitResult[];
 }
 
-export type BuildUnitType = 'infantry' | 'armor' | 'naval';
+export type BuildUnitType = 'infantry' | 'armor' | 'naval' | 'air';
 
 /** Shared production context for one res-1 hex used by queue validation/rendering. */
 export interface Res1ProductionContextSnapshot {
   urbanHexCount: number;
+  airportCount: number;
   seaportCount: number;
 }
 
@@ -248,6 +315,7 @@ export interface HexBuildQueueSnapshot {
   controllerPlayerId: string | null;
   controlledByRequester: boolean;
   urbanHexCount: Res1ProductionContextSnapshot['urbanHexCount'];
+  airportCount: Res1ProductionContextSnapshot['airportCount'];
   seaportCount: Res1ProductionContextSnapshot['seaportCount'];
   availableUnitTypes: BuildUnitType[];
   buildSectionVisible: boolean;
@@ -259,7 +327,6 @@ export interface HexBuildQueueSnapshot {
 export interface GameApi {
   getGameState: () => Promise<GameStateSnapshot>;
   getRes4TerrainOverrides: () => Promise<Res4TerrainOverrideRow[]>;
-  getTerrainInfrastructureHints: () => Promise<TerrainInfrastructureHintsSnapshot>;
   getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest) => Promise<string | null>;
   getHexContinentNames: (payload: HexContinentNamesRequest) => Promise<string[]>;
   newGame: (payload?: NewGameIpcPayload) => Promise<GameStateSnapshot>;
@@ -271,6 +338,12 @@ export interface GameApi {
   assignHumanMarchOrder: (payload: { unitId: string; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
   assignHumanMarchOrders: (payload: { unitIds: string[]; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
   validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
+  validateGroupAirStrikeTarget: (payload: {
+    unitIds: string[];
+    targetH3Index: string;
+    targetType: AirStrikeTargetType;
+  }) => Promise<{ success: boolean; reason?: string }>;
+  validateGroupFerryTarget: (payload: { unitIds: string[]; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
   cancelHumanStandingOrder: (payload: { unitId: string }) => Promise<{ success: boolean; reason?: string }>;
   getHexBuildQueue: (payload: { h3Index: string }) => Promise<HexBuildQueueSnapshot | null>;
   addHexBuildQueueEntry: (payload: { h3Index: string }) => Promise<{ success: boolean; reason?: string; queue?: HexBuildQueueSnapshot }>;

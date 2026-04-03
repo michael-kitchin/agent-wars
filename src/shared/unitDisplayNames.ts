@@ -13,6 +13,7 @@ const UNIT_TYPE_NOUN_BY_TYPE: Record<string, string> = {
   infantry: 'Infantry',
   armor: 'Armored',
   naval: 'Fleet',
+  air: 'Squadron',
 };
 
 const NATURAL_ID_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
@@ -144,7 +145,7 @@ export function buildUnitDisplayNameLookup(
  * Prefers returning the original ID when type/ordinal cannot be inferred.
  */
 export function fallbackDisplayNameFromUnitId(unitId: string, locale?: Intl.LocalesArgument): string {
-  const typeMatch = unitId.match(/-(infantry|armor|naval)-/);
+  const typeMatch = unitId.match(/-(infantry|armor|naval|air)-/);
   const ordinalMatch = unitId.match(/(\d+)(?!.*\d)/);
   if (!typeMatch || !ordinalMatch) return unitId;
   const ordinalValue = Number.parseInt(ordinalMatch[1] ?? '', 10);

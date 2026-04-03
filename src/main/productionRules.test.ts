@@ -11,12 +11,19 @@ import {
 } from '../shared/productionConfig';
 
 function testBuildTypeAvailabilityGates(): void {
-  assert.deepStrictEqual(getAvailableBuildUnitTypes(0, 0), []);
-  assert.deepStrictEqual(getAvailableBuildUnitTypes(1, 0), ['infantry']);
-  assert.deepStrictEqual(getAvailableBuildUnitTypes(2, 0), ['infantry', 'armor']);
-  assert.deepStrictEqual(getAvailableBuildUnitTypes(5, 0), ['infantry', 'armor']);
-  assert.deepStrictEqual(getAvailableBuildUnitTypes(0, 1), ['naval']);
-  assert.deepStrictEqual(getAvailableBuildUnitTypes(5, 1), ['infantry', 'armor', 'naval']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes(0, 0, 0), []);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes(1, 0, 0), ['infantry']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes(2, 0, 0), ['infantry', 'armor']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes(5, 0, 0), ['infantry', 'armor']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes(0, 1, 0), []);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes(1, 1, 0), ['infantry']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes(5, 1, 0), ['infantry', 'armor']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes(10, 1, 0), ['infantry', 'armor', 'naval']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes(0, 0, 1), []);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes(1, 0, 1), ['infantry']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes(5, 0, 1), ['infantry', 'armor', 'air']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes(5, 1, 1), ['infantry', 'armor', 'air']);
+  assert.deepStrictEqual(getAvailableBuildUnitTypes(10, 1, 1), ['infantry', 'armor', 'naval', 'air']);
 }
 
 function testBuildCountValidationBounds(): void {
@@ -68,6 +75,7 @@ function testDeploymentCapsMatchMilestone14Values(): void {
     infantry: 6,
     armor: 4,
     naval: 4,
+    air: 3,
   });
   assert.deepStrictEqual(MAX_UNITS_PER_TYPE_MAIN, MAX_UNITS_PER_TYPE_SHARED);
 }

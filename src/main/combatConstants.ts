@@ -1,17 +1,18 @@
 /**
  * Combat constants per the combat spec: attack, defense, and range by unit type.
  * Single source of truth for resolution and validation. Casualty priority order
- * is infantry → armor → naval (lowest defense first, then type order for ties).
+ * is infantry → armor → naval → air (lowest defense first, then type order for ties).
  */
 
 /** Unit types that participate in combat. */
-export type UnitType = 'infantry' | 'armor' | 'naval';
+export type UnitType = 'infantry' | 'armor' | 'naval' | 'air';
 
 /** Attack value by unit type (hit on d6 when roll ≤ this value). */
 const ATTACK: Record<UnitType, number> = {
   infantry: 1,
   armor: 3,
   naval: 2,
+  air: 3,
 };
 
 /** Defense value by unit type (hit on d6 when roll ≤ this value). */
@@ -19,6 +20,7 @@ const DEFENSE: Record<UnitType, number> = {
   infantry: 2,
   armor: 2,
   naval: 2,
+  air: 1,
 };
 
 /** Ranged attack range in hexes (0 = melee only). */
@@ -26,6 +28,7 @@ const RANGE: Record<UnitType, number> = {
   infantry: 0,
   armor: 1,
   naval: 2,
+  air: 3,
 };
 
 /** Movement budget (hexes per turn). Used for pathfinding and tool responses. */
@@ -33,6 +36,7 @@ const MOVEMENT_BUDGET: Record<UnitType, number> = {
   infantry: 1,
   armor: 2,
   naval: 2,
+  air: 0,
 };
 
 /**
@@ -67,7 +71,7 @@ export function getMovementBudget(unitType: string): number {
  * Ordered list of unit types for casualty tie-break: remove infantry first, then armor, then naval.
  * Used when assigning hits so that higher-value units survive when possible.
  */
-export const CASUALTY_PRIORITY_ORDER: UnitType[] = ['infantry', 'armor', 'naval'];
+export const CASUALTY_PRIORITY_ORDER: UnitType[] = ['infantry', 'armor', 'naval', 'air'];
 
 /**
  * Returns the index of the unit type in casualty priority order (lower = removed first).

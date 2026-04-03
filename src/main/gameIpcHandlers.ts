@@ -20,58 +20,16 @@ import type {
   GameReadyIpcPayload,
   RequestAiOrdersResult,
   RangedAttackOrder,
-  BuildUnitType,
+  AirStrikeOrder,
+  FerryOrder,
+  ReadyResult,
 } from '../shared/ipcTypes';
 export type { RequestAiOrdersResult } from '../shared/ipcTypes';
 
 const POST_RESOLUTION_CONSULT_TIMEOUT_MS = 120_000;
 
-/** Minimal ReadyResult shape returned by handleGameReady. */
-export interface ReadyResultMinimal {
-  success: boolean;
-  reason?: string;
-  aiSkipped?: boolean;
-  aiSkipReason?: string;
-  aiOrderCount?: number;
-  aiRangedByType?: { armor?: number; naval?: number };
-  aiDropped?: number;
-  aiDropReasons?: string[];
-  aiMovesLog?: string[];
-  aiMoves?: { unitId: string; fromH3Index: string; toH3Index: string }[];
-  humanMoves?: { unitId: string; fromH3Index: string; toH3Index: string }[];
-  combatHexes?: string[];
-  removedUnitIds?: string[];
-  casualtyHexes?: string[];
-  removedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
-  rangedCombatHexes?: string[];
-  rangedCasualtyHexes?: string[];
-  rangedRemovedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
-  meleeCombatHexes?: string[];
-  meleeCasualtyHexes?: string[];
-  meleeRemovedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
-  kills?: { victimId: string; killerIds: string[] }[];
-  killsByDirectFire?: { victimId: string; killerIds: string[] }[];
-  killsByReturnFire?: { victimId: string; killerIds: string[] }[];
-  deployedUnitsByType?: { armor?: number; infantry?: number; naval?: number };
-  humanDeploymentCapReachedUnitTypes?: BuildUnitType[];
-  opponentDeploymentCapReachedUnitTypes?: BuildUnitType[];
-  humanHexesLostCount?: number;
-  controlLossLightningHexes?: string[];
-  aiStrategy?: string;
-  toolInvocationCounts?: Record<string, number>;
-  /** Cost in dollars for this turn's LLM call (when requestOrders was used). */
-  cost?: number;
-  /** Wall-clock time in ms for the AI turn (when requestOrders was used). */
-  wallClockMs?: number;
-  inputTokens?: number;
-  outputTokens?: number;
-  /** Opponent unit IDs that participated in combat this resolution (0.7 event-driven). */
-  opponentCombatParticipantUnitIds?: string[];
-  /** Opponent unit IDs removed this resolution (0.7 event-driven). */
-  removedOpponentUnitIds?: string[];
-  /** When event-driven: true if orders came from pending (consultation ran); false if standing-order-only. */
-  aiConsulted?: boolean;
-}
+/** IPC-level ready payload extends the shared ready result contract. */
+export type ReadyResultMinimal = ReadyResult;
 
 export interface RequestAiOrdersDeps {
   getGameState: () => GameStateSnapshot;
@@ -152,8 +110,10 @@ export interface ReadyDeps {
   ) => Promise<RequestAiOrdersResult>;
   ready: (
     aiOrders: { unitId: string; toH3Index: string }[],
-    aiRangedOrders: RangedAttackOrder[]
-  ) => ReadyResultMinimal & { success: boolean; reason?: string };
+    aiRangedOrders: RangedAttackOrder[],
+    aiAirStrikeOrders?: AirStrikeOrder[],
+    aiFerryOrders?: FerryOrder[]
+  ) => ReadyResult;
 }
 
 /**
@@ -184,6 +144,8 @@ export async function handleGameReady(
 
   let aiOrders: { unitId: string; toH3Index: string }[] = [];
   let aiRangedOrders: RangedAttackOrder[] = [];
+  let aiAirStrikeOrders: AirStrikeOrder[] = [];
+  let aiFerryOrders: FerryOrder[] = [];
   let aiSkipped = false;
   let aiDropped: number | undefined;
   let aiDropReasons: string[] | undefined;
@@ -202,6 +164,8 @@ export async function handleGameReady(
     if (usePrecomputed) {
       aiOrders = payload.precomputedAiOrders ?? [];
       aiRangedOrders = payload.precomputedAiRangedOrders ?? [];
+      aiAirStrikeOrders = payload.precomputedAiAirStrikeOrders ?? [];
+      aiFerryOrders = payload.precomputedAiFerryOrders ?? [];
       aiStrategy = payload.precomputedAiStrategy;
       aiConsulted = true;
       // Initial event-driven consultation can happen before the first Ready; record it so
@@ -213,6 +177,8 @@ export async function handleGameReady(
       if (pending) {
         aiOrders = pending.movementOrders;
         aiRangedOrders = pending.rangedOrders;
+        aiAirStrikeOrders = pending.airStrikeOrders;
+        aiFerryOrders = pending.ferryOrders;
         clearAiPendingOrders('opponent');
         aiConsulted = true;
       } else {
@@ -228,6 +194,8 @@ export async function handleGameReady(
   if (usePrecomputed) {
     aiOrders = payload.precomputedAiOrders ?? [];
     aiRangedOrders = payload.precomputedAiRangedOrders ?? [];
+    aiAirStrikeOrders = payload.precomputedAiAirStrikeOrders ?? [];
+    aiFerryOrders = payload.precomputedAiFerryOrders ?? [];
     aiStrategy = payload.precomputedAiStrategy;
   } else if (aiPlanningRunEnabled && modelId && deps.hasKey()) {
     const result = await deps.requestOrders(aiState, modelId, {
@@ -237,6 +205,8 @@ export async function handleGameReady(
     if (result.success) {
       aiOrders = result.orders;
       aiRangedOrders = result.rangedAttacks ?? [];
+      aiAirStrikeOrders = result.airStrikes ?? [];
+      aiFerryOrders = result.ferryOrders ?? [];
       aiStrategy = result.strategy;
       aiDropped = result.dropped;
       aiDropReasons = result.dropReasons?.length ? result.dropReasons : undefined;
@@ -275,10 +245,19 @@ export async function handleGameReady(
           .filter((m): m is { unitId: string; fromH3Index: string; toH3Index: string } => m !== null)
       : [];
 
-  const readyResult = deps.ready(aiOrders, aiRangedOrders);
+  const readyResult = deps.ready(aiOrders, aiRangedOrders, aiAirStrikeOrders, aiFerryOrders);
   if (!readyResult.success) {
     return { success: false, reason: readyResult.reason };
   }
+  const resolvedFerryMoves = readyResult.resolvedFerryMoves ?? [];
+  const humanFerryMoves = resolvedFerryMoves
+    .filter((move) => move.player === 'human')
+    .map((move) => ({ unitId: move.unitId, fromH3Index: move.fromH3Index, toH3Index: move.toH3Index }));
+  const opponentFerryMoves = resolvedFerryMoves
+    .filter((move) => move.player === 'opponent')
+    .map((move) => ({ unitId: move.unitId, fromH3Index: move.fromH3Index, toH3Index: move.toH3Index }));
+  const allAiMoves = [...aiMoves, ...opponentFerryMoves];
+  const allHumanMoves = [...(readyResult.humanMoves ?? []), ...humanFerryMoves];
 
   if (useEventDrivenConsultation && readyResult.success && aiPlanningRunEnabled) {
     try {
@@ -308,10 +287,10 @@ export async function handleGameReady(
     }
   }
 
-  const aiRangedByType: { armor?: number; naval?: number } = {};
+  const aiRangedByType: { armor?: number; naval?: number; air?: number } = {};
   for (const r of aiRangedOrders) {
     const u = state.units.find((unit) => unit.id === r.unitId);
-    if (u && (u.unitType === 'armor' || u.unitType === 'naval')) {
+    if (u && (u.unitType === 'armor' || u.unitType === 'naval' || u.unitType === 'air')) {
       aiRangedByType[u.unitType] = (aiRangedByType[u.unitType] ?? 0) + 1;
     }
   }
@@ -327,8 +306,8 @@ export async function handleGameReady(
     aiDropped,
     aiDropReasons,
     aiMovesLog,
-    aiMoves: aiMoves.length > 0 ? aiMoves : undefined,
-    humanMoves: readyResult.humanMoves,
+    aiMoves: allAiMoves.length > 0 ? allAiMoves : undefined,
+    humanMoves: allHumanMoves.length > 0 ? allHumanMoves : undefined,
     aiConsulted: useEventDrivenConsultation ? aiConsulted : undefined,
     combatHexes: readyResult.combatHexes,
     removedUnitIds: readyResult.removedUnitIds,
@@ -337,6 +316,17 @@ export async function handleGameReady(
     rangedCombatHexes: readyResult.rangedCombatHexes,
     rangedCasualtyHexes: readyResult.rangedCasualtyHexes,
     rangedRemovedUnits: readyResult.rangedRemovedUnits,
+    airStrikeHexes: readyResult.airStrikeHexes,
+    airStrikeCasualtyHexes: readyResult.airStrikeCasualtyHexes,
+    airStrikeRemovedUnits: readyResult.airStrikeRemovedUnits,
+    airStrikeMoves: readyResult.airStrikeMoves,
+    airStrikeAttemptCount: readyResult.airStrikeAttemptCount,
+    airStrikeSuccessfulCount: readyResult.airStrikeSuccessfulCount,
+    airStrikeFailedCount: readyResult.airStrikeFailedCount,
+    airStrikeAttackerLossCount: readyResult.airStrikeAttackerLossCount,
+    baseInvalidAirLossCount: readyResult.baseInvalidAirLossCount,
+    infrastructureDestroyedEvents: readyResult.infrastructureDestroyedEvents,
+    resolvedFerryMoves: readyResult.resolvedFerryMoves,
     meleeCombatHexes: readyResult.meleeCombatHexes,
     meleeCasualtyHexes: readyResult.meleeCasualtyHexes,
     meleeRemovedUnits: readyResult.meleeRemovedUnits,

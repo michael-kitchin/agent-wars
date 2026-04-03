@@ -5,6 +5,7 @@ export const UNIT_COST_BY_TYPE: Readonly<Record<BuildUnitType, number>> = {
   infantry: 10,
   armor: 20,
   naval: 50,
+  air: 30,
 };
 
 /** Canonical milestone-1.4 deployment caps for the three producible unit types. */
@@ -12,6 +13,7 @@ export const MAX_UNITS_PER_TYPE: Readonly<Record<BuildUnitType, number>> = {
   infantry: 6,
   armor: 4,
   naval: 4,
+  air: 3,
 };
 
 /**

@@ -25,12 +25,26 @@ import {
   replaceBuildQueueForHex,
   allocateNextUnitDisplayOrder,
   listUnitsForSnapshot,
+  getRes1InfrastructureForHex,
+  listRes4FeatureOverridesForGame,
+  updateRes4FeatureOverrideRow,
 } from './gameDb';
 import { buildLatLngCoordinateMap, getOrderedHexList } from './mapData';
-import { getRange } from './combatConstants';
+import { getRange, getAttack, getDefense, casualtyPriorityIndex } from './combatConstants';
 import { runRangedPhase, runMeleePhase, createCombatRng, type CombatUnit } from './combatResolution';
 import { logDebug, logError, logTrace } from './logger';
-import type { MovementOrder, RangedAttackOrder, SubmitOrdersPayload } from '../shared/ipcTypes';
+import type {
+  MovementOrder,
+  RangedAttackOrder,
+  SubmitOrdersPayload,
+  AirStrikeOrder,
+  FerryOrder,
+  AirStrikeTargetType,
+  ReadyResult,
+  InfrastructureDestroyedEvent,
+  AirStrikeAnimationMove,
+  FerryAnimationMove,
+} from '../shared/ipcTypes';
 import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
 import { executePlanRoute } from './tools/tool1Pathfinding';
 import { terrainIsPassableForDomain } from './pathfinding';
@@ -55,9 +69,15 @@ import {
   NO_PRODUCTION_INFRASTRUCTURE_REASON,
   type BuildUnitType,
 } from './productionRules';
-import { getRes1ProductionContext } from './terrainClassificationCache';
 import { DEPLOYMENT_CAP_TYPE_ORDER, MAX_UNITS_PER_TYPE } from './productionCaps';
 import type { Res1ProductionContextSnapshot } from '../shared/ipcTypes';
+import {
+  AIR_FERRY_RANGE_HEXES,
+  AIR_STRIKE_RANGE_HEXES,
+  MOVEMENT_RANGE_BY_UNIT_TYPE,
+  formatFerryOutOfRangeReason,
+  formatTargetOutOfRangeReason,
+} from '../shared/tacticalRanges';
 
 export type { MovementOrder, RangedAttackOrder, SubmitOrdersPayload };
 
@@ -130,26 +150,21 @@ export interface HexBuildQueueView {
   controlledByRequester: boolean;
   urbanHexCount: number;
   seaportCount: number;
+  airportCount: number;
   availableUnitTypes: BuildUnitType[];
   buildSectionVisible: boolean;
   noBuildReason: string | null;
   entries: HexBuildQueueEntryView[];
 }
 
-type DeployedUnitsByType = { armor?: number; infantry?: number; naval?: number };
+type DeployedUnitsByType = { armor?: number; infantry?: number; naval?: number; air?: number };
 type ControlTransition = { h3Index: string; fromControllerPlayerId: string | null; toControllerPlayerId: string | null };
 type DeploymentCapReachedByPlayer = { human: BuildUnitType[]; opponent: BuildUnitType[] };
 
 const VALID_PHASE = 'planning';
 const HUMAN_PLAYER_ID = 'human';
 const MIXED_STACK_COASTAL_ONLY_REASON = 'Mixed land/naval stacks can only move to coastal hexes.';
-
-/** Movement range in hexes per turn by unit type. Infantry 1, armor 2, naval 2. */
-const MOVEMENT_RANGE: Record<string, number> = {
-  infantry: 1,
-  armor: 2,
-  naval: 2,
-};
+const AIR_UNITS_CANNOT_MARCH_REASON = 'Air units cannot use march orders; use Strike or Ferry.';
 
 interface ProductionEligibilityView extends Res1ProductionContextSnapshot {
   availableUnitTypes: BuildUnitType[];
@@ -162,7 +177,8 @@ function buildProductionEligibilityView(
 ): ProductionEligibilityView {
   const availableUnitTypes = getAvailableBuildUnitTypes(
     productionContext.urbanHexCount,
-    productionContext.seaportCount
+    productionContext.seaportCount,
+    productionContext.airportCount
   );
   const buildSectionVisible = availableUnitTypes.length > 0;
   return {
@@ -200,12 +216,13 @@ function currentPlanningTurnNumber(): number {
 function buildQueueViewForRequester(h3Index: string, requestingPlayerId: string): HexBuildQueueView {
   const controllerPlayerId = getHexController(h3Index);
   const controlledByRequester = controllerPlayerId === requestingPlayerId;
-  const productionView = buildProductionEligibilityView(getRes1ProductionContext({ h3Index }));
+  const productionView = buildProductionEligibilityView(getRes1InfrastructureForHex(h3Index));
   return {
     h3Index,
     controllerPlayerId,
     controlledByRequester,
     urbanHexCount: productionView.urbanHexCount,
+    airportCount: productionView.airportCount,
     seaportCount: productionView.seaportCount,
     availableUnitTypes: productionView.availableUnitTypes,
     buildSectionVisible: productionView.buildSectionVisible,
@@ -342,7 +359,7 @@ function processProductionAfterControlResolution(): {
     if (!controllerPlayerId) continue;
     const queueRows = listBuildQueueRowsForHex(control.h3Index);
     if (queueRows.length === 0) continue;
-    const { urbanHexCount } = getRes1ProductionContext({ h3Index: control.h3Index });
+    const { urbanHexCount } = getRes1InfrastructureForHex(control.h3Index);
     if (urbanHexCount <= 0) continue;
     const storedPoints = getBuildProgressPointsForHex(control.h3Index);
     const capArray = controllerPlayerId === 'opponent' ? capReachedByPlayer.opponent : capReachedByPlayer.human;
@@ -497,7 +514,7 @@ function validateOrder(
   } catch {
     return { valid: false, reason: 'Invalid hex or distance; try starting a new game.' };
   }
-  const range = MOVEMENT_RANGE[unit.unit_type] ?? 1;
+  const range = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unit_type] ?? 1;
   if (dist > range) return { valid: false, reason: `${unit.unit_type} can move at most ${range} hex(es)` };
   /* dist === 0 (same hex) is allowed: "hold" / no move is valid. */
 
@@ -548,17 +565,13 @@ export function validateRangedAttack(
   }
 
   const range = getRange(unit.unit_type);
+  if (unit.unit_type === 'air') return { valid: false, reason: 'Air units use Strike mode, not ranged attack mode' };
   if (range < 1) return { valid: false, reason: `${unit.unit_type} has no ranged attack (melee only)` };
 
   if (!getMapHexSet().has(targetH3Index)) return { valid: false, reason: 'Target hex not on map' };
 
-  let dist: number;
-  try {
-    dist = gridDistance(unit.h3_index, targetH3Index);
-  } catch {
-    return { valid: false, reason: 'Invalid hex or distance' };
-  }
-  if (dist > range) return { valid: false, reason: `Target out of range (${unit.unit_type} range ${range})` };
+  const withinRange = isWithinGridRangeSafe(unit.h3_index, targetH3Index, range, 'validateRangedAttack');
+  if (!withinRange) return { valid: false, reason: formatTargetOutOfRangeReason(unit.unit_type, range) };
 
   const enemiesAtTarget = dbGetAll<{ player: string }>(
     'SELECT player FROM units WHERE h3_index = ? AND player != ?',
@@ -670,6 +683,9 @@ export function assignHumanMarchOrder(unitId: string, destinationH3Index: string
     const state = dbBackedStateSnapshot();
     const turnRow = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1');
     if (turnRow?.phase !== VALID_PHASE) return { success: false, reason: 'Not in planning phase' };
+    const unitRow = state.units.find((unit) => unit.id === unitId && unit.player === HUMAN_PLAYER_ID);
+    if (!unitRow) return { success: false, reason: 'Unit not found or not human-controlled' };
+    if (unitRow.unitType === 'air') return { success: false, reason: AIR_UNITS_CANNOT_MARCH_REASON };
     const mapHexes = new Set(state.hexes.map((h) => h.h3Index));
     if (!mapHexes.has(destinationH3Index)) return { success: false, reason: 'Destination not on map' };
     const hexList = state.hexes.map((h) => h.h3Index);
@@ -808,6 +824,484 @@ export function validateGroupRangedTarget(unitIds: string[], targetH3Index: stri
   }
 }
 
+function computeGridDistanceSafe(
+  originH3Index: string,
+  destinationH3Index: string,
+  context: string
+): number | null {
+  try {
+    return gridDistance(originH3Index, destinationH3Index);
+  } catch (distanceErr) {
+    logError(`${context}: gridDistance failed`, { originH3Index, destinationH3Index, distanceErr });
+  }
+  try {
+    const path = gridPathCells(originH3Index, destinationH3Index);
+    if (path.length > 0) return Math.max(0, path.length - 1);
+  } catch (pathErr) {
+    logError(`${context}: gridPathCells failed`, { originH3Index, destinationH3Index, pathErr });
+  }
+  return null;
+}
+
+function isWithinGridRangeSafe(
+  originH3Index: string,
+  destinationH3Index: string,
+  maxRange: number,
+  context: string
+): boolean {
+  const distance = computeGridDistanceSafe(originH3Index, destinationH3Index, context);
+  if (distance !== null) return distance <= maxRange;
+  try {
+    const disk = gridDisk(originH3Index, maxRange);
+    return disk.includes(destinationH3Index);
+  } catch (diskErr) {
+    logError(`${context}: gridDisk failed`, { originH3Index, destinationH3Index, maxRange, diskErr });
+  }
+  return false;
+}
+
+function validateAirStrikeOrder(
+  unitId: string,
+  targetH3Index: string,
+  targetType: AirStrikeTargetType,
+  options?: { allowedPlayer?: string }
+): { valid: true } | { valid: false; reason: string } {
+  const allowedPlayer = options?.allowedPlayer ?? HUMAN_PLAYER_ID;
+  if (!isDbReady()) return { valid: false, reason: 'Database not initialized' };
+  const unit = dbGetOne<{ player: string; unit_type: string; h3_index: string }>(
+    'SELECT player, unit_type, h3_index FROM units WHERE id = ?',
+    [unitId]
+  );
+  if (!unit) return { valid: false, reason: `Unit not found: ${unitId}` };
+  if (unit.player !== allowedPlayer) return { valid: false, reason: `Unit must belong to ${allowedPlayer}` };
+  if (unit.unit_type !== 'air') return { valid: false, reason: 'Only air units can execute strikes' };
+  if (!getMapHexSet().has(targetH3Index)) return { valid: false, reason: 'Target hex not on map' };
+
+  const withinStrikeRange = isWithinGridRangeSafe(unit.h3_index, targetH3Index, AIR_STRIKE_RANGE_HEXES, 'validateAirStrikeOrder');
+  if (!withinStrikeRange) return { valid: false, reason: formatTargetOutOfRangeReason(unit.unit_type, AIR_STRIKE_RANGE_HEXES) };
+
+  const baseInfrastructure = getRes1InfrastructureForHex(unit.h3_index);
+  if (baseInfrastructure.airportCount <= 0) {
+    return { valid: false, reason: 'Air unit must be based at an intact airport to strike' };
+  }
+
+  if (targetType === 'units') {
+    const enemiesAtTarget = dbGetAll<{ player: string }>(
+      'SELECT player FROM units WHERE h3_index = ? AND player != ?',
+      [targetH3Index, unit.player]
+    );
+    if (enemiesAtTarget.length === 0) return { valid: false, reason: 'Target hex has no enemy units' };
+    return { valid: true };
+  }
+
+  const targetInfrastructure = getRes1InfrastructureForHex(targetH3Index);
+  if (targetType === 'urban' && targetInfrastructure.urbanHexCount <= 0) {
+    return { valid: false, reason: 'Target hex has no urban infrastructure' };
+  }
+  if (targetType === 'airport' && targetInfrastructure.airportCount <= 0) {
+    return { valid: false, reason: 'Target hex has no airport' };
+  }
+  if (targetType === 'seaport' && targetInfrastructure.seaportCount <= 0) {
+    return { valid: false, reason: 'Target hex has no seaport' };
+  }
+  return { valid: true };
+}
+
+/**
+ * Why this exists:
+ *     Validates grouped strike targeting for selected air units before renderer queues one order per unit.
+ * When to use:
+ *     Renderer strike-mode target click handling.
+ * What to expect:
+ *     Returns specific first-failure reason for toast display parity with grouped ranged validation.
+ */
+export function validateGroupAirStrikeTarget(
+  unitIds: string[],
+  targetH3Index: string,
+  targetType: AirStrikeTargetType
+): SubmitOrdersResult {
+  logDebug('gameActions validateGroupAirStrikeTarget', { unitCount: unitIds.length, targetH3Index, targetType });
+  try {
+    if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
+    const uniqueUnitIds = getUniqueNonEmptyIds(unitIds);
+    if (uniqueUnitIds.length === 0) return { success: false, reason: 'No selected units for strike targeting' };
+    for (const unitId of uniqueUnitIds) {
+      const result = validateAirStrikeOrder(unitId, targetH3Index, targetType, { allowedPlayer: HUMAN_PLAYER_ID });
+      if (!result.valid) return { success: false, reason: `${unitId}: ${result.reason}` };
+    }
+    return { success: true };
+  } catch (err) {
+    logError('validateGroupAirStrikeTarget: exception', err);
+    return { success: false, reason: String(err) };
+  }
+}
+
+/**
+ * Why this exists:
+ *     Validates grouped ferry destinations for selected human air units before renderer queues ferry orders.
+ * When to use:
+ *     Renderer grouped double-click movement path for homogeneous air selections.
+ * What to expect:
+ *     Returns success false with a specific first-failure reason when any selected unit cannot legally ferry.
+ */
+export function validateGroupFerryTarget(unitIds: string[], destinationH3Index: string): SubmitOrdersResult {
+  logDebug('gameActions validateGroupFerryTarget', { unitCount: unitIds.length, destinationH3Index });
+  try {
+    if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
+    const uniqueUnitIds = getUniqueNonEmptyIds(unitIds);
+    if (uniqueUnitIds.length === 0) return { success: false, reason: 'No selected units for ferry targeting' };
+    for (const unitId of uniqueUnitIds) {
+      const result = validateFerryOrder(unitId, destinationH3Index, { allowedPlayer: HUMAN_PLAYER_ID });
+      if (!result.valid) return { success: false, reason: `${unitId}: ${result.reason}` };
+    }
+    return { success: true };
+  } catch (err) {
+    logError('validateGroupFerryTarget: exception', err);
+    return { success: false, reason: String(err) };
+  }
+}
+
+function validateFerryOrder(
+  unitId: string,
+  destinationH3Index: string,
+  options?: { allowedPlayer?: string }
+): { valid: true } | { valid: false; reason: string } {
+  const allowedPlayer = options?.allowedPlayer ?? HUMAN_PLAYER_ID;
+  if (!isDbReady()) return { valid: false, reason: 'Database not initialized' };
+  const unit = dbGetOne<{ player: string; unit_type: string; h3_index: string }>(
+    'SELECT player, unit_type, h3_index FROM units WHERE id = ?',
+    [unitId]
+  );
+  if (!unit) return { valid: false, reason: `Unit not found: ${unitId}` };
+  if (unit.player !== allowedPlayer) return { valid: false, reason: `Unit must belong to ${allowedPlayer}` };
+  if (unit.unit_type !== 'air') return { valid: false, reason: 'Only air units can ferry' };
+  if (!getMapHexSet().has(destinationH3Index)) return { valid: false, reason: 'Destination hex not on map' };
+  const withinFerryRange = isWithinGridRangeSafe(unit.h3_index, destinationH3Index, AIR_FERRY_RANGE_HEXES, 'validateFerryOrder');
+  if (!withinFerryRange) return { valid: false, reason: formatFerryOutOfRangeReason(AIR_FERRY_RANGE_HEXES) };
+  const origin = getRes1InfrastructureForHex(unit.h3_index);
+  if (origin.airportCount <= 0) return { valid: false, reason: 'Origin airport is not intact' };
+  const destination = getRes1InfrastructureForHex(destinationH3Index);
+  if (destination.airportCount <= 0) return { valid: false, reason: 'Destination airport is not intact' };
+  const controller = getHexController(destinationH3Index);
+  if (controller !== unit.player) return { valid: false, reason: 'Destination airport must be controlled by unit owner' };
+  return { valid: true };
+}
+
+function pruneBuildQueueForInfrastructureState(h3Index: string): void {
+  const infra = getRes1InfrastructureForHex(h3Index);
+  const rows = listBuildQueueRowsForHex(h3Index);
+  if (rows.length === 0) return;
+  const allowed = new Set(getAvailableBuildUnitTypes(infra.urbanHexCount, infra.seaportCount, infra.airportCount));
+  if (infra.urbanHexCount <= 0) {
+    clearBuildQueueAndProgressForHex(h3Index);
+    return;
+  }
+  const filtered = rows.filter((row) => allowed.has(row.unitType));
+  if (filtered.length === rows.length) return;
+  replaceBuildQueueForHex(
+    h3Index,
+    filtered.map((row) => ({ unitType: row.unitType, remainingCount: row.remainingCount }))
+  );
+}
+
+function replaceRandomRes4FeaturesWithRubble(
+  h3Index: string,
+  feature: 'urban' | 'airport' | 'seaport',
+  count: number,
+  next: () => number
+): number {
+  if (count <= 0) return 0;
+  const candidates = listRes4FeatureOverridesForGame().filter((row) => {
+    if (row.parentH3Index !== h3Index) return false;
+    if (row.isRubble) return false;
+    if (feature === 'urban') return row.isUrban;
+    if (feature === 'airport') return row.isAirport;
+    return row.isSeaport;
+  });
+  let changed = 0;
+  const pool = [...candidates];
+  while (pool.length > 0 && changed < count) {
+    const idx = Math.floor(next() * pool.length);
+    const row = pool.splice(idx, 1)[0]!;
+    updateRes4FeatureOverrideRow(row.h3Index, {
+      isRubble: true,
+      isUrban: feature === 'urban' ? false : row.isUrban,
+      isAirport: feature === 'airport' ? false : row.isAirport,
+      isSeaport: feature === 'seaport' ? false : row.isSeaport,
+    });
+    changed++;
+  }
+  return changed;
+}
+
+function destroyBasedAirUnitsAtHex(
+  h3Index: string
+): Array<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }> {
+  const rows = dbGetAll<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }>(
+    'SELECT id, player, unit_type, h3_index, display_order FROM units WHERE h3_index = ? AND unit_type = ?',
+    [h3Index, 'air']
+  );
+  for (const row of rows) {
+    dbRun('DELETE FROM units WHERE id = ?', [row.id]);
+  }
+  return rows;
+}
+
+function applyInfrastructureDestructionEffects(
+  h3Index: string,
+  targetType: AirStrikeTargetType,
+  next: () => number
+): {
+  destroyedAirUnits: Array<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }>;
+  changedRubbleCount: number;
+} {
+  const current = getRes1InfrastructureForHex(h3Index);
+  const result = {
+    destroyedAirUnits: [] as Array<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }>,
+    changedRubbleCount: 0,
+  };
+  if (targetType === 'urban') {
+    const destroyCount = Math.min(3, current.urbanHexCount);
+    if (destroyCount <= 0) return result;
+    result.changedRubbleCount = replaceRandomRes4FeaturesWithRubble(h3Index, 'urban', destroyCount, next);
+    if (result.changedRubbleCount > 0) pruneBuildQueueForInfrastructureState(h3Index);
+    return result;
+  }
+  if (targetType === 'airport') {
+    if (current.airportCount <= 0) return result;
+    result.changedRubbleCount = replaceRandomRes4FeaturesWithRubble(h3Index, 'airport', 1, next);
+    if (result.changedRubbleCount > 0) {
+      result.destroyedAirUnits = destroyBasedAirUnitsAtHex(h3Index);
+      pruneBuildQueueForInfrastructureState(h3Index);
+    }
+    return result;
+  }
+  if (targetType === 'seaport') {
+    if (current.seaportCount <= 0) return result;
+    result.changedRubbleCount = replaceRandomRes4FeaturesWithRubble(h3Index, 'seaport', 1, next);
+    if (result.changedRubbleCount > 0) pruneBuildQueueForInfrastructureState(h3Index);
+  }
+  return result;
+}
+
+interface AirStrikePhaseAccumulator {
+  removedSet: Set<string>;
+  removedUnitIds: string[];
+  removedUnits: CombatUnit[];
+  casualtyHexes: Set<string>;
+}
+
+function recordRemovedUnit(
+  acc: AirStrikePhaseAccumulator,
+  row: { id: string; player: string; unit_type: string; h3_index: string; display_order: number | null },
+  options?: { removedAtH3Index?: string }
+): void {
+  if (acc.removedSet.has(row.id)) return;
+  const removedAtH3Index = options?.removedAtH3Index ?? row.h3_index;
+  acc.removedSet.add(row.id);
+  acc.removedUnitIds.push(row.id);
+  acc.removedUnits.push({
+    id: row.id,
+    player: row.player,
+    unitType: row.unit_type,
+    h3Index: removedAtH3Index,
+    displayOrder: row.display_order ?? undefined,
+  });
+  acc.casualtyHexes.add(removedAtH3Index);
+}
+
+function resolveAirStrikeAgainstUnits(
+  attacker: { id: string; player: string; unit_type: string; h3_index: string; display_order: number | null },
+  targetH3Index: string,
+  attackHit: boolean,
+  rollD6: () => number,
+  acc: AirStrikePhaseAccumulator
+): { success: boolean; attackerLost: boolean } {
+  const defenders = dbGetAll<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }>(
+    'SELECT id, player, unit_type, h3_index, display_order FROM units WHERE h3_index = ? AND player != ?',
+    [targetH3Index, attacker.player]
+  );
+  let success = false;
+  let attackerLost = false;
+  if (attackHit && defenders.length > 0) {
+    const victim = defenders
+      .map((u) => ({ ...u, defense: getDefense(u.unit_type), order: casualtyPriorityIndex(u.unit_type) }))
+      .sort((a, b) => a.defense - b.defense || a.order - b.order)[0]!;
+    dbRun('DELETE FROM units WHERE id = ?', [victim.id]);
+    recordRemovedUnit(acc, victim);
+    success = true;
+  }
+
+  for (const defender of defenders) {
+    if (getRange(defender.unit_type) < 1) continue;
+    if (rollD6() > getAttack(defender.unit_type)) continue;
+    dbRun('DELETE FROM units WHERE id = ?', [attacker.id]);
+    recordRemovedUnit(acc, attacker, { removedAtH3Index: targetH3Index });
+    attackerLost = true;
+    break;
+  }
+  return { success, attackerLost };
+}
+
+function resolveAirStrikeAgainstInfrastructure(
+  attacker: { id: string; player: string; unit_type: string; h3_index: string; display_order: number | null },
+  order: { targetH3Index: string; targetType: Exclude<AirStrikeTargetType, 'units'> },
+  attackHit: boolean,
+  next: () => number,
+  rollD6: () => number,
+  acc: AirStrikePhaseAccumulator,
+  infrastructureDestroyedEvents: InfrastructureDestroyedEvent[]
+): { success: boolean; attackerLost: boolean } {
+  let success = false;
+  let attackerLost = false;
+  if (attackHit) {
+    const destruction = applyInfrastructureDestructionEffects(order.targetH3Index, order.targetType, next);
+    if (destruction.changedRubbleCount > 0 || destruction.destroyedAirUnits.length > 0) {
+      infrastructureDestroyedEvents.push({
+        h3Index: order.targetH3Index,
+        targetType: order.targetType,
+        changedRubbleCount: destruction.changedRubbleCount,
+        destroyedAirUnitsCount: destruction.destroyedAirUnits.length,
+      });
+      success = true;
+    }
+    for (const removed of destruction.destroyedAirUnits) {
+      recordRemovedUnit(acc, removed);
+    }
+  }
+
+  const counterThreshold = order.targetType === 'airport' ? 2 : 1;
+  if (rollD6() <= counterThreshold) {
+    dbRun('DELETE FROM units WHERE id = ?', [attacker.id]);
+    recordRemovedUnit(acc, attacker, { removedAtH3Index: order.targetH3Index });
+    attackerLost = true;
+  }
+  return { success, attackerLost };
+}
+
+function resolveAirStrikePhase(
+  airOrders: AirStrikeOrder[],
+  next: () => number
+): {
+  removedUnitIds: string[];
+  removedUnits: CombatUnit[];
+  casualtyHexes: string[];
+  strikeHexes: string[];
+  strikeMoves: AirStrikeAnimationMove[];
+  infrastructureDestroyedEvents: InfrastructureDestroyedEvent[];
+  attemptCount: number;
+  successfulCount: number;
+  failedCount: number;
+  attackerLossCount: number;
+} {
+  const acc: AirStrikePhaseAccumulator = {
+    removedSet: new Set<string>(),
+    removedUnitIds: [],
+    removedUnits: [],
+    casualtyHexes: new Set<string>(),
+  };
+  const strikeHexes = new Set<string>();
+  const strikeMoves: AirStrikeAnimationMove[] = [];
+  const infrastructureDestroyedEvents: InfrastructureDestroyedEvent[] = [];
+  let attemptCount = 0;
+  let successfulCount = 0;
+  let failedCount = 0;
+  let attackerLossCount = 0;
+  const sorted = [...airOrders].sort((a, b) => {
+    const aUnit = dbGetOne<{ h3_index: string }>('SELECT h3_index FROM units WHERE id = ?', [a.unitId])?.h3_index ?? '';
+    const bUnit = dbGetOne<{ h3_index: string }>('SELECT h3_index FROM units WHERE id = ?', [b.unitId])?.h3_index ?? '';
+    return aUnit.localeCompare(bUnit) || a.unitId.localeCompare(b.unitId);
+  });
+  const rollD6 = () => Math.floor(next() * 6) + 1;
+
+  for (const order of sorted) {
+    if (acc.removedSet.has(order.unitId)) continue;
+    const valid = validateAirStrikeOrder(order.unitId, order.targetH3Index, order.targetType, {
+      allowedPlayer: dbGetOne<{ player: string }>('SELECT player FROM units WHERE id = ?', [order.unitId])?.player ?? HUMAN_PLAYER_ID,
+    });
+    if (!valid.valid) continue;
+    strikeHexes.add(order.targetH3Index);
+    const attacker = dbGetOne<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }>(
+      'SELECT id, player, unit_type, h3_index, display_order FROM units WHERE id = ?',
+      [order.unitId]
+    );
+    if (!attacker) continue;
+    attemptCount += 1;
+    const attackHit = rollD6() <= getAttack('air');
+    if (order.targetType === 'units') {
+      const result = resolveAirStrikeAgainstUnits(attacker, order.targetH3Index, attackHit, rollD6, acc);
+      strikeMoves.push({
+        unitId: attacker.id,
+        player: attacker.player,
+        unitType: attacker.unit_type,
+        fromH3Index: attacker.h3_index,
+        targetH3Index: order.targetH3Index,
+        returnsToBase: !result.attackerLost,
+      });
+      if (result.success) successfulCount += 1;
+      else failedCount += 1;
+      if (result.attackerLost) attackerLossCount += 1;
+      continue;
+    }
+
+    const result = resolveAirStrikeAgainstInfrastructure(
+      attacker,
+      { targetH3Index: order.targetH3Index, targetType: order.targetType },
+      attackHit,
+      next,
+      rollD6,
+      acc,
+      infrastructureDestroyedEvents
+    );
+    strikeMoves.push({
+      unitId: attacker.id,
+      player: attacker.player,
+      unitType: attacker.unit_type,
+      fromH3Index: attacker.h3_index,
+      targetH3Index: order.targetH3Index,
+      returnsToBase: !result.attackerLost,
+    });
+    if (result.success) successfulCount += 1;
+    else failedCount += 1;
+    if (result.attackerLost) attackerLossCount += 1;
+  }
+
+  return {
+    removedUnitIds: acc.removedUnitIds,
+    removedUnits: acc.removedUnits,
+    casualtyHexes: [...acc.casualtyHexes],
+    strikeHexes: [...strikeHexes],
+    strikeMoves,
+    infrastructureDestroyedEvents,
+    attemptCount,
+    successfulCount,
+    failedCount,
+    attackerLossCount,
+  };
+}
+
+function destroyAirUnitsWithInvalidBase(): CombatUnit[] {
+  const rows = dbGetAll<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }>(
+    'SELECT id, player, unit_type, h3_index, display_order FROM units WHERE unit_type = ?',
+    ['air']
+  );
+  const removed: CombatUnit[] = [];
+  for (const row of rows) {
+    const infra = getRes1InfrastructureForHex(row.h3_index);
+    const controller = getHexController(row.h3_index);
+    if (infra.airportCount > 0 && controller === row.player) continue;
+    dbRun('DELETE FROM units WHERE id = ?', [row.id]);
+    removed.push({
+      id: row.id,
+      player: row.player,
+      unitType: row.unit_type,
+      h3Index: row.h3_index,
+      displayOrder: row.display_order ?? undefined,
+    });
+  }
+  return removed;
+}
+
 /**
  * Why this exists:
  *     Returns one res-1 hex build queue snapshot (control, infra gating, and queue rows) for tooltip UI.
@@ -819,6 +1313,25 @@ export function validateGroupRangedTarget(unitIds: string[], targetH3Index: stri
 export function getHexBuildQueue(h3Index: string, requestingPlayerId = HUMAN_PLAYER_ID): HexBuildQueueView {
   logTrace('gameActions getHexBuildQueue', { h3Index, requestingPlayerId });
   return buildQueueViewForRequester(h3Index, requestingPlayerId);
+}
+
+function validateBuildQueueMutationContext(args: {
+  h3Index: string;
+  requestingPlayerId: string;
+  requireBuildSectionVisible: boolean;
+}): { valid: true; queueView: HexBuildQueueView } | { valid: false; reason: string } {
+  const phase = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1')?.phase ?? 'planning';
+  if (phase !== VALID_PHASE) {
+    return { valid: false, reason: 'Build queue can only be edited during planning phase.' };
+  }
+  const queueView = buildQueueViewForRequester(args.h3Index, args.requestingPlayerId);
+  if (!queueView.controlledByRequester) {
+    return { valid: false, reason: 'Only the controlling player can edit this build queue.' };
+  }
+  if (args.requireBuildSectionVisible && !queueView.buildSectionVisible) {
+    return { valid: false, reason: queueView.noBuildReason ?? NO_PRODUCTION_INFRASTRUCTURE_REASON };
+  }
+  return { valid: true, queueView };
 }
 
 /**
@@ -836,14 +1349,13 @@ export function addHexBuildQueueEntry(h3Index: string, requestingPlayerId = HUMA
 } {
   logDebug('gameActions addHexBuildQueueEntry', { h3Index, requestingPlayerId });
   try {
-    const phase = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1')?.phase ?? 'planning';
-    if (phase !== VALID_PHASE) return { success: false, reason: 'Build queue can only be edited during planning phase.' };
-    const queueView = buildQueueViewForRequester(h3Index, requestingPlayerId);
-    if (!queueView.controlledByRequester) {
-      return { success: false, reason: 'Only the controlling player can edit this build queue.' };
-    }
-    if (!queueView.buildSectionVisible)
-      return { success: false, reason: queueView.noBuildReason ?? NO_PRODUCTION_INFRASTRUCTURE_REASON };
+    const context = validateBuildQueueMutationContext({
+      h3Index,
+      requestingPlayerId,
+      requireBuildSectionVisible: true,
+    });
+    if (!context.valid) return { success: false, reason: context.reason };
+    const queueView = context.queueView;
     const defaultUnitType = queueView.availableUnitTypes[0];
     if (!defaultUnitType) return { success: false, reason: 'No unit types are currently available for this hex.' };
     const currentRows = listBuildQueueRowsForHex(h3Index);
@@ -876,14 +1388,13 @@ export function updateHexBuildQueueEntry(
 ): { success: boolean; reason?: string; queue?: HexBuildQueueView } {
   logDebug('gameActions updateHexBuildQueueEntry', { h3Index, entryId, unitType, count, requestingPlayerId });
   try {
-    const phase = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1')?.phase ?? 'planning';
-    if (phase !== VALID_PHASE) return { success: false, reason: 'Build queue can only be edited during planning phase.' };
-    const queueView = buildQueueViewForRequester(h3Index, requestingPlayerId);
-    if (!queueView.controlledByRequester) {
-      return { success: false, reason: 'Only the controlling player can edit this build queue.' };
-    }
-    if (!queueView.buildSectionVisible)
-      return { success: false, reason: queueView.noBuildReason ?? NO_PRODUCTION_INFRASTRUCTURE_REASON };
+    const context = validateBuildQueueMutationContext({
+      h3Index,
+      requestingPlayerId,
+      requireBuildSectionVisible: true,
+    });
+    if (!context.valid) return { success: false, reason: context.reason };
+    const queueView = context.queueView;
     if (!queueView.availableUnitTypes.includes(unitType)) {
       return { success: false, reason: `Unit type "${unitType}" is not available for this hex.` };
     }
@@ -918,12 +1429,12 @@ export function removeHexBuildQueueEntry(
 ): { success: boolean; reason?: string; queue?: HexBuildQueueView } {
   logDebug('gameActions removeHexBuildQueueEntry', { h3Index, entryId, requestingPlayerId });
   try {
-    const phase = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1')?.phase ?? 'planning';
-    if (phase !== VALID_PHASE) return { success: false, reason: 'Build queue can only be edited during planning phase.' };
-    const queueView = buildQueueViewForRequester(h3Index, requestingPlayerId);
-    if (!queueView.controlledByRequester) {
-      return { success: false, reason: 'Only the controlling player can edit this build queue.' };
-    }
+    const context = validateBuildQueueMutationContext({
+      h3Index,
+      requestingPlayerId,
+      requireBuildSectionVisible: false,
+    });
+    if (!context.valid) return { success: false, reason: context.reason };
     const rows = listBuildQueueRowsForHex(h3Index);
     const filtered = rows.filter((row) => row.id !== entryId);
     if (filtered.length === rows.length) return { success: false, reason: 'Build queue entry not found.' };
@@ -949,6 +1460,51 @@ function buildHumanMarchPreviewForUnit(
   if (!unit) return { valid: false, showInvalidMarker: false, invalidReason: 'Unit not found', segments: [] };
   const hoveredHex = state.hexes.find((h) => h.h3Index === hoveredH3Index);
   if (!hoveredHex) return { valid: false, showInvalidMarker: false, segments: [] };
+  if (unit.unitType === 'air') {
+    const controller = getHexController(hoveredH3Index);
+    if (controller !== HUMAN_PLAYER_ID) {
+      return {
+        valid: false,
+        showInvalidMarker: true,
+        invalidReason: 'Ferry destination must be a human-controlled airport hex.',
+        segments: [],
+      };
+    }
+    const destinationInfra = getRes1InfrastructureForHex(hoveredH3Index);
+    if (destinationInfra.airportCount <= 0) {
+      return {
+        valid: false,
+        showInvalidMarker: true,
+        invalidReason: 'Ferry destination must have an intact airport.',
+        segments: [],
+      };
+    }
+    const withinFerryRange = isWithinGridRangeSafe(unit.h3Index, hoveredH3Index, AIR_FERRY_RANGE_HEXES, 'preview ferry');
+    if (!withinFerryRange) {
+      return {
+        valid: false,
+        showInvalidMarker: true,
+        invalidReason: `${formatFerryOutOfRangeReason(AIR_FERRY_RANGE_HEXES)}.`,
+        segments: [],
+      };
+    }
+    const originLatLng = latLngByH3.get(unit.h3Index) ?? cellToLatLng(unit.h3Index);
+    const destinationLatLng = latLngByH3.get(hoveredH3Index) ?? cellToLatLng(hoveredH3Index);
+    return {
+      valid: true,
+      showInvalidMarker: false,
+      arrowLatLng: [destinationLatLng[0], destinationLatLng[1]],
+      segments: [
+        {
+          turn: 1,
+          hexes: [
+            [originLatLng[0], originLatLng[1]],
+            [destinationLatLng[0], destinationLatLng[1]],
+          ],
+        },
+      ],
+    };
+  }
 
   const passableFor = unit.unitType === 'naval' ? 'water' : 'land';
   const passabilityByH3 = buildNormalizedTerrainByH3(state.hexes);
@@ -1087,7 +1643,7 @@ export function previewHumanMarchOrders(unitIds: string[], hoveredH3Index: strin
     const hasMixedSelection = selectionHasMixedLandAndNaval(selectedUnits);
     const slowestMovementRange =
       selectedUnits.length > 0
-        ? Math.min(...selectedUnits.map((unit) => MOVEMENT_RANGE[unit.unitType] ?? 1))
+        ? Math.min(...selectedUnits.map((unit) => MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1))
         : 0;
     const sharedMixedTerrain = !!hoveredHex && hexSupportsMixedLandAndNaval(hoveredHex);
     if (hasMixedSelection && !sharedMixedTerrain) {
@@ -1135,7 +1691,14 @@ export function previewHumanMarchOrders(unitIds: string[], hoveredH3Index: strin
 export function submitOrders(payload: SubmitOrdersPayload): SubmitOrdersResult {
   const orders = payload.movementOrders ?? [];
   const ranged = payload.rangedAttacks ?? [];
-  logDebug('submitOrders', { orderCount: orders.length, rangedCount: ranged.length });
+  const airStrikes = payload.airStrikes ?? [];
+  const ferryOrders = payload.ferryOrders ?? [];
+  logDebug('submitOrders', {
+    orderCount: orders.length,
+    rangedCount: ranged.length,
+    airStrikeCount: airStrikes.length,
+    ferryCount: ferryOrders.length,
+  });
   try {
     if (!isDbReady()) {
       logError('submitOrders: database not initialized');
@@ -1176,6 +1739,32 @@ export function submitOrders(payload: SubmitOrdersPayload): SubmitOrdersResult {
       }
     }
 
+    const seenAirStrike = new Set<string>();
+    for (const s of airStrikes) {
+      if (seenAirStrike.has(s.unitId)) {
+        return { success: false, reason: `Duplicate strike order for unit ${s.unitId}` };
+      }
+      seenAirStrike.add(s.unitId);
+      const result = validateAirStrikeOrder(s.unitId, s.targetH3Index, s.targetType, { allowedPlayer: HUMAN_PLAYER_ID });
+      if (!result.valid) return { success: false, reason: result.reason };
+    }
+
+    const seenFerry = new Set<string>();
+    for (const f of ferryOrders) {
+      if (seenFerry.has(f.unitId)) {
+        return { success: false, reason: `Duplicate ferry order for unit ${f.unitId}` };
+      }
+      seenFerry.add(f.unitId);
+      const result = validateFerryOrder(f.unitId, f.destinationH3Index, { allowedPlayer: HUMAN_PLAYER_ID });
+      if (!result.valid) return { success: false, reason: result.reason };
+    }
+
+    for (const unitId of seenAirStrike) {
+      if (seenFerry.has(unitId)) {
+        return { success: false, reason: `Air unit ${unitId} cannot strike and ferry in the same turn` };
+      }
+    }
+
     dbRun('DELETE FROM pending_orders');
     for (const order of orders) {
       dbRun('INSERT INTO pending_orders (unit_id, to_h3_index) VALUES (?, ?)', [order.unitId, order.toH3Index]);
@@ -1183,6 +1772,18 @@ export function submitOrders(payload: SubmitOrdersPayload): SubmitOrdersResult {
     dbRun('DELETE FROM pending_ranged_orders');
     for (const r of ranged) {
       dbRun('INSERT INTO pending_ranged_orders (unit_id, target_h3_index) VALUES (?, ?)', [r.unitId, r.targetH3Index]);
+    }
+    dbRun('DELETE FROM pending_air_orders');
+    for (const s of airStrikes) {
+      dbRun('INSERT INTO pending_air_orders (unit_id, target_h3_index, target_type) VALUES (?, ?, ?)', [
+        s.unitId,
+        s.targetH3Index,
+        s.targetType,
+      ]);
+    }
+    dbRun('DELETE FROM pending_ferry_orders');
+    for (const f of ferryOrders) {
+      dbRun('INSERT INTO pending_ferry_orders (unit_id, destination_h3_index) VALUES (?, ?)', [f.unitId, f.destinationH3Index]);
     }
     return { success: true };
   } catch (err) {
@@ -1200,41 +1801,16 @@ export function submitOrders(payload: SubmitOrdersPayload): SubmitOrdersResult {
  */
 export function ready(
   aiOrders: MovementOrder[] = [],
-  aiRangedOrders: RangedAttackOrder[] = []
-): SubmitOrdersResult & {
-  combatHexes?: string[];
-  removedUnitIds?: string[];
-  casualtyHexes?: string[];
-  removedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
-  kills?: { victimId: string; killerIds: string[] }[];
-  /** Ranged: defenders killed by attackers (direct fire). For status toast bullets. */
-  killsByDirectFire?: { victimId: string; killerIds: string[] }[];
-  /** Ranged: attackers killed by defenders (return fire). For status toast bullets. */
-  killsByReturnFire?: { victimId: string; killerIds: string[] }[];
-  rangedCombatHexes?: string[];
-  rangedCasualtyHexes?: string[];
-  rangedRemovedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
-  meleeCombatHexes?: string[];
-  meleeCasualtyHexes?: string[];
-  meleeRemovedUnits?: { id: string; player: string; unitType: string; h3Index: string }[];
-  /** Opponent unit IDs that participated in combat this resolution (for callback evaluation). */
-  opponentCombatParticipantUnitIds?: string[];
-  /** Opponent unit IDs that were removed this resolution. */
-  removedOpponentUnitIds?: string[];
-  /** Human unit moves resolved this turn (for renderer animation). */
-  humanMoves?: { unitId: string; fromH3Index: string; toH3Index: string }[];
-  /** Newly produced units spawned this turn, grouped by type. */
-  deployedUnitsByType?: DeployedUnitsByType;
-  /** Count of human-controlled hexes that changed to opponent control this turn. */
-  humanHexesLostCount?: number;
-  /** Human hexes lost to opponent where no human units remain after resolution. */
-  controlLossLightningHexes?: string[];
-  /** Unit types that were not spawned for human because deployment caps were already reached. */
-  humanDeploymentCapReachedUnitTypes?: BuildUnitType[];
-  /** Unit types that were not spawned for opponent because deployment caps were already reached. */
-  opponentDeploymentCapReachedUnitTypes?: BuildUnitType[];
-} {
-  logDebug('ready', { aiOrderCount: aiOrders.length, aiRangedCount: aiRangedOrders.length });
+  aiRangedOrders: RangedAttackOrder[] = [],
+  aiAirStrikeOrders: AirStrikeOrder[] = [],
+  aiFerryOrders: FerryOrder[] = []
+): ReadyResult {
+  logDebug('ready', {
+    aiOrderCount: aiOrders.length,
+    aiRangedCount: aiRangedOrders.length,
+    aiAirStrikeCount: aiAirStrikeOrders.length,
+    aiFerryCount: aiFerryOrders.length,
+  });
   try {
     if (!isDbReady()) {
       logError('ready: database not initialized');
@@ -1264,6 +1840,14 @@ export function ready(
     const humanRanged = dbGetAll<{ unit_id: string; target_h3_index: string }>(
       'SELECT unit_id, target_h3_index FROM pending_ranged_orders ORDER BY unit_id, target_h3_index'
     ).map((r) => ({ unitId: r.unit_id, targetH3Index: r.target_h3_index }));
+    const humanAirStrikes = dbGetAll<{ unit_id: string; target_h3_index: string; target_type: AirStrikeTargetType }>(
+      'SELECT unit_id, target_h3_index, target_type FROM pending_air_orders ORDER BY unit_id, target_h3_index'
+    ).map((r) => ({ unitId: r.unit_id, targetH3Index: r.target_h3_index, targetType: r.target_type }));
+    const humanFerryOrders = dbGetAll<{ unit_id: string; destination_h3_index: string }>(
+      'SELECT unit_id, destination_h3_index FROM pending_ferry_orders ORDER BY unit_id, destination_h3_index'
+    ).map((r) => ({ unitId: r.unit_id, destinationH3Index: r.destination_h3_index }));
+    const allAirStrikes = [...humanAirStrikes, ...aiAirStrikeOrders];
+    const allFerryOrders = [...humanFerryOrders, ...aiFerryOrders];
     const allRanged = [...humanRanged, ...aiRangedOrders];
 
     const turnNumber = turnRow?.turn_number ?? 1;
@@ -1273,7 +1857,15 @@ export function ready(
     const next = createCombatRng(seed);
     logDebug('ready: combat resolution', { turnNumber, gameSeed, combatSeed: seed });
 
-    const rangedResult = runRangedPhase(combatUnitsBefore, hexList, allRanged, next);
+    const airStrikeResult = resolveAirStrikePhase(allAirStrikes, next);
+    const rangedInputUnits = listUnitsForSnapshot().map((u) => ({
+      id: u.id,
+      player: u.player,
+      unitType: u.unitType,
+      h3Index: u.h3Index,
+      displayOrder: u.displayOrder,
+    }));
+    const rangedResult = runRangedPhase(rangedInputUnits, hexList, allRanged, next);
     for (const id of rangedResult.removedUnitIds) {
       dbRun('DELETE FROM units WHERE id = ?', [id]);
     }
@@ -1305,6 +1897,35 @@ export function ready(
       dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [order.toH3Index, order.unitId]);
     }
 
+    const resolvedFerryMoves: FerryAnimationMove[] = [];
+    for (const ferry of allFerryOrders) {
+      const unit = dbGetOne<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }>(
+        'SELECT id, player, unit_type, h3_index, display_order FROM units WHERE id = ?',
+        [ferry.unitId]
+      );
+      if (!unit || unit.unit_type !== 'air') continue;
+      const originH3Index = unit.h3_index;
+      const withinFerryRange = isWithinGridRangeSafe(originH3Index, ferry.destinationH3Index, AIR_FERRY_RANGE_HEXES, 'ready ferry');
+      if (!withinFerryRange) continue;
+      const destinationInfra = getRes1InfrastructureForHex(ferry.destinationH3Index);
+      const destinationController = getHexController(ferry.destinationH3Index);
+      if (destinationInfra.airportCount > 0 && destinationController === unit.player) {
+        dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [ferry.destinationH3Index, ferry.unitId]);
+        resolvedFerryMoves.push({
+          unitId: ferry.unitId,
+          player: unit.player,
+          fromH3Index: originH3Index,
+          toH3Index: ferry.destinationH3Index,
+        });
+        continue;
+      }
+      const originInfra = getRes1InfrastructureForHex(originH3Index);
+      const originController = getHexController(originH3Index);
+      if (!(originInfra.airportCount > 0 && originController === unit.player)) {
+        dbRun('DELETE FROM units WHERE id = ?', [ferry.unitId]);
+      }
+    }
+
     const unitsAfterMove = listUnitsForSnapshot();
     const rangedRemovedSet = new Set(rangedResult.removedUnitIds);
     // Melee must not see units removed in ranged phase; exclude them explicitly so attackers cannot engage dead defenders.
@@ -1324,6 +1945,38 @@ export function ready(
     }
 
     const controlTransitions = resolveRes1ControlAfterCombatAndMovement(traversedHexesByPlayer);
+    const baseLossRemovedAir = destroyAirUnitsWithInvalidBase();
+    const airStrikeDestroyedFeatures = { urban: 0, airport: 0, seaport: 0 };
+    let airStrikeDestroyedBasedAirUnits = 0;
+    for (const event of airStrikeResult.infrastructureDestroyedEvents) {
+      airStrikeDestroyedFeatures[event.targetType] += 1;
+      airStrikeDestroyedBasedAirUnits += event.destroyedAirUnitsCount ?? 0;
+    }
+    const airStrikeDestroyedUnitsByType = { infantry: 0, armor: 0, naval: 0, air: 0 };
+    const airStrikeLostAirUnitIds: string[] = [];
+    for (const removed of airStrikeResult.removedUnits) {
+      if (removed.unitType === 'infantry') airStrikeDestroyedUnitsByType.infantry += 1;
+      else if (removed.unitType === 'armor') airStrikeDestroyedUnitsByType.armor += 1;
+      else if (removed.unitType === 'naval') airStrikeDestroyedUnitsByType.naval += 1;
+      else if (removed.unitType === 'air') {
+        airStrikeDestroyedUnitsByType.air += 1;
+        airStrikeLostAirUnitIds.push(removed.id);
+      }
+    }
+    if (airStrikeResult.attemptCount > 0 || baseLossRemovedAir.length > 0) {
+      logDebug('ready: airStrikeSummary', {
+        attemptCount: airStrikeResult.attemptCount,
+        successfulCount: airStrikeResult.successfulCount,
+        failedCount: airStrikeResult.failedCount,
+        attackerLossCount: airStrikeResult.attackerLossCount,
+        destroyedFeatures: airStrikeDestroyedFeatures,
+        destroyedBasedAirUnits: airStrikeDestroyedBasedAirUnits,
+        destroyedUnitsByType: airStrikeDestroyedUnitsByType,
+        airLossUnitIds: [...new Set(airStrikeLostAirUnitIds)],
+        strandedAirLossCount: baseLossRemovedAir.length,
+        strandedAirLossUnitIds: baseLossRemovedAir.map((unit) => unit.id),
+      });
+    }
     const productionSummary = processProductionAfterControlResolution();
     const deployedUnitsByType = productionSummary.deployedByPlayer.human;
     const finalUnits = listUnitsForSnapshot();
@@ -1341,6 +1994,8 @@ export function ready(
 
     dbRun('DELETE FROM pending_orders');
     dbRun('DELETE FROM pending_ranged_orders');
+    dbRun('DELETE FROM pending_air_orders');
+    dbRun('DELETE FROM pending_ferry_orders');
     dbRun('UPDATE turn_state SET phase = ?, turn_number = ? WHERE id = 1', [
       'planning',
       turnNumber + 1,
@@ -1353,11 +2008,21 @@ export function ready(
     });
 
     saveDatabase();
-    const allRemovedIds = [...rangedResult.removedUnitIds, ...meleeResult.removedUnitIds];
-    const allRemovedUnits = [...rangedResult.removedUnits, ...meleeResult.removedUnits];
+    const allRemovedIds = [
+      ...airStrikeResult.removedUnitIds,
+      ...rangedResult.removedUnitIds,
+      ...meleeResult.removedUnitIds,
+      ...baseLossRemovedAir.map((u) => u.id),
+    ];
+    const allRemovedUnits = [...airStrikeResult.removedUnits, ...rangedResult.removedUnits, ...meleeResult.removedUnits, ...baseLossRemovedAir];
     const allKills = [...rangedResult.kills, ...meleeResult.kills];
     const allCombatHexes = [...rangedResult.combatHexes, ...meleeResult.combatHexes];
-    const allCasualtyHexes = [...rangedResult.casualtyHexes, ...meleeResult.casualtyHexes];
+    const allCasualtyHexes = [
+      ...airStrikeResult.casualtyHexes,
+      ...rangedResult.casualtyHexes,
+      ...meleeResult.casualtyHexes,
+      ...baseLossRemovedAir.map((u) => u.h3Index),
+    ];
 
     const opponentRangedAttackers = aiRangedOrders.map((o) => o.unitId);
     const defenderHexes = new Set(allRanged.map((o) => o.targetH3Index));
@@ -1393,6 +2058,18 @@ export function ready(
       rangedCombatHexes: rangedResult.combatHexes.length > 0 ? rangedResult.combatHexes : undefined,
       rangedCasualtyHexes: rangedResult.casualtyHexes.length > 0 ? rangedResult.casualtyHexes : undefined,
       rangedRemovedUnits: rangedResult.removedUnits.length > 0 ? rangedResult.removedUnits : undefined,
+      airStrikeHexes: airStrikeResult.strikeHexes.length > 0 ? airStrikeResult.strikeHexes : undefined,
+      airStrikeCasualtyHexes: airStrikeResult.casualtyHexes.length > 0 ? airStrikeResult.casualtyHexes : undefined,
+      airStrikeRemovedUnits: airStrikeResult.removedUnits.length > 0 ? airStrikeResult.removedUnits : undefined,
+      airStrikeMoves: airStrikeResult.strikeMoves.length > 0 ? airStrikeResult.strikeMoves : undefined,
+      airStrikeAttemptCount: airStrikeResult.attemptCount > 0 ? airStrikeResult.attemptCount : undefined,
+      airStrikeSuccessfulCount: airStrikeResult.successfulCount > 0 ? airStrikeResult.successfulCount : undefined,
+      airStrikeFailedCount: airStrikeResult.failedCount > 0 ? airStrikeResult.failedCount : undefined,
+      airStrikeAttackerLossCount: airStrikeResult.attackerLossCount > 0 ? airStrikeResult.attackerLossCount : undefined,
+      baseInvalidAirLossCount: baseLossRemovedAir.length > 0 ? baseLossRemovedAir.length : undefined,
+      infrastructureDestroyedEvents:
+        airStrikeResult.infrastructureDestroyedEvents.length > 0 ? airStrikeResult.infrastructureDestroyedEvents : undefined,
+      resolvedFerryMoves: resolvedFerryMoves.length > 0 ? resolvedFerryMoves : undefined,
       meleeCombatHexes: meleeResult.combatHexes.length > 0 ? meleeResult.combatHexes : undefined,
       meleeCasualtyHexes: meleeResult.casualtyHexes.length > 0 ? meleeResult.casualtyHexes : undefined,
       meleeRemovedUnits: meleeResult.removedUnits.length > 0 ? meleeResult.removedUnits : undefined,

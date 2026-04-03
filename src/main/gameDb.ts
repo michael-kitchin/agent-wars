@@ -17,6 +17,9 @@ import {
 import {
   ensureTerrainClassificationCacheLoaded,
   getTerrainRes1KindsFromCache,
+  getRes1ProductionContext,
+  getRes4FeatureRowsForSeeding,
+  getRes4TerrainOverridesForRenderer as getRes4TerrainOverridesFromCache,
 } from './terrainClassificationCache';
 import { pipelineTerrainToPassability } from './terrainPassability';
 import { logDebug, logError, logTrace } from './logger';
@@ -34,12 +37,12 @@ function withFogMetadata(snapshot: GameStateSnapshot, fogOfWarEnabled: boolean):
 }
 
 /** Baseline schema version; bump when a future milestone adds migration chains. */
-export const EXPECTED_USER_VERSION = 9;
+export const EXPECTED_USER_VERSION = 10;
 
 /**
  * Baseline filename for world-map + fog-of-war + production schema (v9).
  */
-export const GAME_DB_FILE_NAME = 'game-baseline-v9.sqlite';
+export const GAME_DB_FILE_NAME = 'game-baseline-v10.sqlite';
 
 let db: InstanceType<typeof Database> | null = null;
 
@@ -49,6 +52,8 @@ const REQUIRED_TABLES = [
   'turn_state',
   'pending_orders',
   'pending_ranged_orders',
+  'pending_air_orders',
+  'pending_ferry_orders',
   'game_config',
   'ai_memory',
   'standing_orders',
@@ -61,6 +66,8 @@ const REQUIRED_TABLES = [
   'res1_control',
   'res1_build_queue',
   'res1_build_progress',
+  'res1_infrastructure',
+  'res4_feature_overrides',
 ] as const;
 
 /**
@@ -85,7 +92,7 @@ function getFullDdl(): string {
     CREATE TABLE IF NOT EXISTS units (
       id TEXT PRIMARY KEY,
       player TEXT NOT NULL,
-      unit_type TEXT NOT NULL CHECK (unit_type IN ('infantry', 'armor', 'naval')),
+      unit_type TEXT NOT NULL CHECK (unit_type IN ('infantry', 'armor', 'naval', 'air')),
       display_order INTEGER,
       h3_index TEXT NOT NULL,
       FOREIGN KEY (h3_index) REFERENCES hexes(h3_index)
@@ -106,6 +113,17 @@ function getFullDdl(): string {
     CREATE TABLE IF NOT EXISTS pending_ranged_orders (
       unit_id TEXT PRIMARY KEY,
       target_h3_index TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS pending_air_orders (
+      unit_id TEXT PRIMARY KEY,
+      target_h3_index TEXT NOT NULL,
+      target_type TEXT NOT NULL CHECK (target_type IN ('units', 'urban', 'airport', 'seaport'))
+    );
+
+    CREATE TABLE IF NOT EXISTS pending_ferry_orders (
+      unit_id TEXT PRIMARY KEY,
+      destination_h3_index TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS game_config (
@@ -197,7 +215,7 @@ function getFullDdl(): string {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       h3_index TEXT NOT NULL,
       queue_index INTEGER NOT NULL,
-      unit_type TEXT NOT NULL CHECK (unit_type IN ('infantry', 'armor', 'naval')),
+      unit_type TEXT NOT NULL CHECK (unit_type IN ('infantry', 'armor', 'naval', 'air')),
       remaining_count INTEGER NOT NULL CHECK (remaining_count > 0),
       UNIQUE (h3_index, queue_index)
     );
@@ -205,6 +223,23 @@ function getFullDdl(): string {
     CREATE TABLE IF NOT EXISTS res1_build_progress (
       h3_index TEXT PRIMARY KEY,
       stored_points INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS res1_infrastructure (
+      h3_index TEXT PRIMARY KEY,
+      urban_hex_count INTEGER NOT NULL DEFAULT 0,
+      airport_count INTEGER NOT NULL DEFAULT 0,
+      seaport_count INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS res4_feature_overrides (
+      h3_index TEXT PRIMARY KEY,
+      parent_h3_index TEXT NOT NULL,
+      terrain_kind TEXT NOT NULL,
+      is_urban INTEGER NOT NULL DEFAULT 0,
+      is_airport INTEGER NOT NULL DEFAULT 0,
+      is_seaport INTEGER NOT NULL DEFAULT 0,
+      is_rubble INTEGER NOT NULL DEFAULT 0
     );
   `;
 }
@@ -452,6 +487,8 @@ export async function initDatabase(): Promise<void> {
     d = null;
     ensureTurnStateRow();
     seedGameSeedIfMissing();
+    ensureTerrainClassificationCacheLoaded();
+    backfillInfrastructureStateFromMetadataIfMissing();
     logDebug('gameDb initDatabase: opened existing', { canonicalPath });
   } catch (err) {
     if (d) {
@@ -534,6 +571,102 @@ function seedHexesFromTerrainMetadata(): void {
     const terrain = pipelineTerrainToPassability(kind);
     run('INSERT INTO hexes (h3_index, terrain, terrain_kind) VALUES (?, ?, ?)', [h3, terrain, kind]);
   }
+}
+
+function seedInfrastructureStateFromMetadata(): void {
+  logDebug('gameDb seedInfrastructureStateFromMetadata');
+  if (db === null) return;
+  run('DELETE FROM res1_infrastructure');
+  run('DELETE FROM res4_feature_overrides');
+  const { res1Rows, res4Rows } = getInfrastructureSeedRowsFromMetadata();
+  for (const row of res1Rows) {
+    insertRes1InfrastructureRow(row.h3Index, row.urbanHexCount, row.airportCount, row.seaportCount);
+  }
+  for (const row of res4Rows) {
+    insertRes4FeatureOverrideSeedRow(row);
+  }
+}
+
+function backfillInfrastructureStateFromMetadataIfMissing(): void {
+  logDebug('gameDb backfillInfrastructureStateFromMetadataIfMissing');
+  if (db === null) return;
+  const hexRows = getAll<{ h3Index: string }>('SELECT h3_index AS h3Index FROM hexes');
+  if (hexRows.length <= 0) return;
+
+  const existingInfra = new Set(
+    getAll<{ h3Index: string }>('SELECT h3_index AS h3Index FROM res1_infrastructure').map((r) => r.h3Index)
+  );
+  const existingRes4Overrides = new Set(
+    getAll<{ h3Index: string }>('SELECT h3_index AS h3Index FROM res4_feature_overrides').map((r) => r.h3Index)
+  );
+  const { res1Rows, res4Rows } = getInfrastructureSeedRowsFromMetadata();
+  let insertedInfra = 0;
+  for (const row of res1Rows) {
+    if (existingInfra.has(row.h3Index)) continue;
+    insertRes1InfrastructureRow(row.h3Index, row.urbanHexCount, row.airportCount, row.seaportCount);
+    insertedInfra += 1;
+  }
+  let insertedRes4 = 0;
+  for (const row of res4Rows) {
+    if (existingRes4Overrides.has(row.h3Index)) continue;
+    insertRes4FeatureOverrideSeedRow(row);
+    insertedRes4 += 1;
+  }
+
+  if (insertedInfra > 0 || insertedRes4 > 0) {
+    logDebug('gameDb backfillInfrastructureStateFromMetadataIfMissing: inserted missing rows', {
+      insertedInfra,
+      insertedRes4,
+    });
+  }
+}
+
+interface InfrastructureSeedRes1Row {
+  h3Index: string;
+  urbanHexCount: number;
+  airportCount: number;
+  seaportCount: number;
+}
+
+interface InfrastructureSeedRows {
+  res1Rows: InfrastructureSeedRes1Row[];
+  res4Rows: ReturnType<typeof getRes4FeatureRowsForSeeding>;
+}
+
+function getInfrastructureSeedRowsFromMetadata(): InfrastructureSeedRows {
+  const res1Rows: InfrastructureSeedRes1Row[] = getOrderedHexList().map((h3Index) => {
+    const ctx = getRes1ProductionContext({ h3Index });
+    return {
+      h3Index,
+      urbanHexCount: ctx.urbanHexCount,
+      airportCount: ctx.airportCount,
+      seaportCount: ctx.seaportCount,
+    };
+  });
+  const res4Rows = getRes4FeatureRowsForSeeding().filter((row) => row.isUrban || row.isAirport || row.isSeaport);
+  return { res1Rows, res4Rows };
+}
+
+function insertRes1InfrastructureRow(
+  h3Index: string,
+  urbanHexCount: number,
+  airportCount: number,
+  seaportCount: number
+): void {
+  run(
+    `INSERT INTO res1_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
+     VALUES (?, ?, ?, ?)`,
+    [h3Index, urbanHexCount, airportCount, seaportCount]
+  );
+}
+
+function insertRes4FeatureOverrideSeedRow(row: ReturnType<typeof getRes4FeatureRowsForSeeding>[number]): void {
+  run(
+    `INSERT INTO res4_feature_overrides (
+       h3_index, parent_h3_index, terrain_kind, is_urban, is_airport, is_seaport, is_rubble
+     ) VALUES (?, ?, ?, ?, ?, ?, 0)`,
+    [row.h3Index, row.parentH3Index, row.terrainKind, row.isUrban ? 1 : 0, row.isAirport ? 1 : 0, row.isSeaport ? 1 : 0]
+  );
 }
 
 interface SpawnCandidate {
@@ -995,6 +1128,7 @@ export function getGameState(): GameStateSnapshot {
      FROM res1_build_queue q
      GROUP BY q.h3_index`
   );
+  const infrastructureRows = listRes1InfrastructureRowsInternal();
   const gameOver = gameOverRow?.value === '1';
   const winner = winnerRow?.value ?? undefined;
 
@@ -1006,6 +1140,7 @@ export function getGameState(): GameStateSnapshot {
     pendingOrders: orderRows,
     res1Control: controlRows,
     res1BuildQueueTotals: queueTotalRows,
+    res1Infrastructure: infrastructureRows,
     gameOver: gameOver || undefined,
     winner,
   }, isFogOfWarEnabled());
@@ -1309,6 +1444,268 @@ export function replaceBuildQueueForHex(h3Index: string, entries: Array<{ unitTy
   }
 }
 
+export interface Res1InfrastructureRow {
+  h3Index: string;
+  urbanHexCount: number;
+  airportCount: number;
+  seaportCount: number;
+}
+
+interface Res1InfrastructureDbRow extends Record<string, unknown> {
+  h3Index: string;
+  urbanHexCount: number;
+  airportCount: number;
+  seaportCount: number;
+}
+
+function mapRes1InfrastructureDbRow(row: Res1InfrastructureDbRow): Res1InfrastructureRow {
+  return {
+    h3Index: row.h3Index,
+    urbanHexCount: Math.max(0, row.urbanHexCount),
+    airportCount: Math.max(0, row.airportCount),
+    seaportCount: Math.max(0, row.seaportCount),
+  };
+}
+
+function listRes1InfrastructureRowsInternal(options?: {
+  whereClause?: string;
+  params?: unknown[];
+  orderByClause?: string;
+}): Res1InfrastructureRow[] {
+  const whereClause = options?.whereClause ? ` ${options.whereClause}` : '';
+  const orderByClause = options?.orderByClause ? ` ${options.orderByClause}` : '';
+  return getAll<Res1InfrastructureDbRow>(
+    `SELECT h3_index AS h3Index,
+            urban_hex_count AS urbanHexCount,
+            airport_count AS airportCount,
+            seaport_count AS seaportCount
+     FROM res1_infrastructure${whereClause}${orderByClause}`,
+    options?.params ?? []
+  ).map(mapRes1InfrastructureDbRow);
+}
+
+/**
+ * Why this exists:
+ *     Returns production/air-target infrastructure counts for one res-1 hex from mutable game state.
+ * When to use:
+ *     Queue gating, air-strike validation, and infrastructure-destruction effects.
+ * What to expect:
+ *     Returns zeros when no row exists (defensive default).
+ */
+export function getRes1InfrastructureForHex(h3Index: string): Res1InfrastructureRow {
+  logTrace('gameDb getRes1InfrastructureForHex', { h3Index });
+  const row = listRes1InfrastructureRowsInternal({
+    whereClause: 'WHERE h3_index = ?',
+    params: [h3Index],
+  })[0];
+  return row ?? { h3Index, urbanHexCount: 0, airportCount: 0, seaportCount: 0 };
+}
+
+/**
+ * Why this exists:
+ *     Returns all mutable infrastructure rows for renderer snapshots and integration checks.
+ * When to use:
+ *     Game-state snapshot assembly and tests.
+ * What to expect:
+ *     Stable h3-sorted list.
+ */
+export function listRes1InfrastructureRows(): Res1InfrastructureRow[] {
+  logTrace('gameDb listRes1InfrastructureRows');
+  return listRes1InfrastructureRowsInternal({ orderByClause: 'ORDER BY h3_index ASC' });
+}
+
+/**
+ * Why this exists:
+ *     Persists one res-1 infrastructure row after destruction effects mutate counts.
+ * When to use:
+ *     Air-strike resolution and infrastructure synchronization flows.
+ * What to expect:
+ *     Upserts non-negative values.
+ */
+export function setRes1InfrastructureForHex(
+  h3Index: string,
+  counts: { urbanHexCount: number; airportCount: number; seaportCount: number }
+): void {
+  logDebug('gameDb setRes1InfrastructureForHex', { h3Index, ...counts });
+  run(
+    `INSERT INTO res1_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(h3_index) DO UPDATE SET
+       urban_hex_count = excluded.urban_hex_count,
+       airport_count = excluded.airport_count,
+       seaport_count = excluded.seaport_count`,
+    [
+      h3Index,
+      Math.max(0, Math.trunc(counts.urbanHexCount)),
+      Math.max(0, Math.trunc(counts.airportCount)),
+      Math.max(0, Math.trunc(counts.seaportCount)),
+    ]
+  );
+}
+
+export interface Res4FeatureOverrideRow {
+  h3Index: string;
+  parentH3Index: string;
+  terrainKind: string;
+  isUrban: boolean;
+  isAirport: boolean;
+  isSeaport: boolean;
+  isRubble: boolean;
+}
+
+/**
+ * Why this exists:
+ *     Lists mutable res-4 feature rows (urban/airport/seaport/rubble flags) for renderer overlays and random replacement.
+ * When to use:
+ *     Infrastructure destruction effects and renderer overlay IPC.
+ * What to expect:
+ *     Stable h3-sorted rows.
+ */
+export function listRes4FeatureOverridesForGame(): Res4FeatureOverrideRow[] {
+  logTrace('gameDb listRes4FeatureOverridesForGame');
+  return getAll<{
+    h3Index: string;
+    parentH3Index: string;
+    terrainKind: string;
+    isUrban: number;
+    isAirport: number;
+    isSeaport: number;
+    isRubble: number;
+  }>(
+    `SELECT h3_index AS h3Index,
+            parent_h3_index AS parentH3Index,
+            terrain_kind AS terrainKind,
+            is_urban AS isUrban,
+            is_airport AS isAirport,
+            is_seaport AS isSeaport,
+            is_rubble AS isRubble
+     FROM res4_feature_overrides
+     ORDER BY h3_index ASC`
+  ).map((row) => ({
+    h3Index: row.h3Index,
+    parentH3Index: row.parentH3Index,
+    terrainKind: row.terrainKind,
+    isUrban: row.isUrban === 1,
+    isAirport: row.isAirport === 1,
+    isSeaport: row.isSeaport === 1,
+    isRubble: row.isRubble === 1,
+  }));
+}
+
+/**
+ * Why this exists:
+ *     Updates feature flags for one res-4 row after randomized infrastructure-to-rubble replacement.
+ * When to use:
+ *     Air-strike infrastructure destruction effect application.
+ * What to expect:
+ *     No-op when row is missing.
+ */
+export function updateRes4FeatureOverrideRow(
+  h3Index: string,
+  patch: Partial<Pick<Res4FeatureOverrideRow, 'isUrban' | 'isAirport' | 'isSeaport' | 'isRubble'>>
+): void {
+  logDebug('gameDb updateRes4FeatureOverrideRow', { h3Index, patch });
+  const row = getOne<{
+    parentH3Index: string;
+    isUrban: number;
+    isAirport: number;
+    isSeaport: number;
+    isRubble: number;
+  }>(
+    `SELECT parent_h3_index AS parentH3Index,
+            is_urban AS isUrban,
+            is_airport AS isAirport,
+            is_seaport AS isSeaport,
+            is_rubble AS isRubble
+     FROM res4_feature_overrides
+     WHERE h3_index = ?`,
+    [h3Index]
+  );
+  if (!row) return;
+  run(
+    `UPDATE res4_feature_overrides
+     SET is_urban = ?, is_airport = ?, is_seaport = ?, is_rubble = ?
+     WHERE h3_index = ?`,
+    [
+      patch.isUrban === undefined ? row.isUrban : patch.isUrban ? 1 : 0,
+      patch.isAirport === undefined ? row.isAirport : patch.isAirport ? 1 : 0,
+      patch.isSeaport === undefined ? row.isSeaport : patch.isSeaport ? 1 : 0,
+      patch.isRubble === undefined ? row.isRubble : patch.isRubble ? 1 : 0,
+      h3Index,
+    ]
+  );
+  const parentCounts = getAll<{ urbanHexCount: number; airportCount: number; seaportCount: number }>(
+    `SELECT SUM(CASE WHEN is_urban = 1 THEN 1 ELSE 0 END) AS urbanHexCount,
+            SUM(CASE WHEN is_airport = 1 THEN 1 ELSE 0 END) AS airportCount,
+            SUM(CASE WHEN is_seaport = 1 THEN 1 ELSE 0 END) AS seaportCount
+     FROM res4_feature_overrides
+     WHERE parent_h3_index = ?`,
+    [row.parentH3Index]
+  )[0] ?? { urbanHexCount: 0, airportCount: 0, seaportCount: 0 };
+  setRes1InfrastructureForHex(row.parentH3Index, {
+    urbanHexCount: parentCounts.urbanHexCount,
+    airportCount: parentCounts.airportCount,
+    seaportCount: parentCounts.seaportCount,
+  });
+}
+
+/**
+ * Why this exists:
+ *     Produces renderer res-4 override rows by overlaying mutable feature/rubble state on metadata-derived terrain rows.
+ * When to use:
+ *     IPC `game:getRes4TerrainOverrides` handler.
+ * What to expect:
+ *     Returns stable row list where `isUrban` reflects live state and `isRubble` marks rubble replacements.
+ */
+export function getRes4TerrainOverridesForRendererFromGame(): Array<{
+  h3Index: string;
+  terrainKind: string;
+  isUrban: boolean;
+  isAirport?: boolean;
+  isSeaport?: boolean;
+  isRubble?: boolean;
+}> {
+  logDebug('gameDb getRes4TerrainOverridesForRendererFromGame');
+  const baseRows = getRes4TerrainOverridesFromCache();
+  const mergedByH3 = new Map(
+    baseRows.map((row) => [
+      row.h3Index,
+      {
+        h3Index: row.h3Index,
+        terrainKind: row.terrainKind,
+        isUrban: row.isUrban,
+        isAirport: false,
+        isSeaport: false,
+        isRubble: !!row.isRubble,
+      },
+    ])
+  );
+  for (const feature of listRes4FeatureOverridesForGame()) {
+    const current = mergedByH3.get(feature.h3Index);
+    mergedByH3.set(feature.h3Index, {
+      h3Index: feature.h3Index,
+      terrainKind: current?.terrainKind ?? (feature.terrainKind as (typeof baseRows)[number]['terrainKind']),
+      isUrban: feature.isUrban,
+      isAirport: feature.isAirport,
+      isSeaport: feature.isSeaport,
+      isRubble: feature.isRubble,
+    });
+  }
+  const rows = [...mergedByH3.values()].sort((a, b) => a.h3Index.localeCompare(b.h3Index));
+  let airportCount = 0;
+  let seaportCount = 0;
+  for (const row of rows) {
+    if (row.isAirport) airportCount += 1;
+    if (row.isSeaport) seaportCount += 1;
+  }
+  logDebug('gameDb getRes4TerrainOverridesForRendererFromGame: prepared rows', {
+    rowCount: rows.length,
+    airportCount,
+    seaportCount,
+  });
+  return rows;
+}
+
 /**
  * True when initDatabase or test open has established a live better-sqlite3 handle. Use before operations that require persistence.
  */
@@ -1535,6 +1932,8 @@ export function clearAiLossEventsSinceConsultation(playerId: string): void {
 export function getAiPendingOrders(playerId: string): {
   movementOrders: { unitId: string; toH3Index: string }[];
   rangedOrders: { unitId: string; targetH3Index: string }[];
+  airStrikeOrders: { unitId: string; targetH3Index: string; targetType: 'units' | 'urban' | 'airport' | 'seaport' }[];
+  ferryOrders: { unitId: string; destinationH3Index: string }[];
 } | null {
   logTrace('gameDb getAiPendingOrders', { playerId });
   if (!db) return null;
@@ -1546,11 +1945,43 @@ export function getAiPendingOrders(playerId: string): {
   try {
     const movementOrders = JSON.parse(row.movement_orders) as { unitId: string; toH3Index: string }[];
     const rangedOrders = JSON.parse(row.ranged_orders) as { unitId: string; targetH3Index: string }[];
-    return { movementOrders, rangedOrders };
+    const { airStrikeOrders, ferryOrders } = decodeAiPendingOrdersExtra(row.strategy_text);
+    return { movementOrders, rangedOrders, airStrikeOrders, ferryOrders };
   } catch (err) {
     logError('gameDb getAiPendingOrders: failed to parse stored orders', err);
     return null;
   }
+}
+
+function decodeAiPendingOrdersExtra(
+  strategyText: string | null
+): {
+  airStrikeOrders: { unitId: string; targetH3Index: string; targetType: 'units' | 'urban' | 'airport' | 'seaport' }[];
+  ferryOrders: { unitId: string; destinationH3Index: string }[];
+} {
+  if (typeof strategyText !== 'string' || strategyText.trim().length === 0) {
+    return { airStrikeOrders: [], ferryOrders: [] };
+  }
+  try {
+    const extra = JSON.parse(strategyText) as {
+      airStrikeOrders?: { unitId: string; targetH3Index: string; targetType: 'units' | 'urban' | 'airport' | 'seaport' }[];
+      ferryOrders?: { unitId: string; destinationH3Index: string }[];
+    };
+    return {
+      airStrikeOrders: Array.isArray(extra.airStrikeOrders) ? extra.airStrikeOrders : [],
+      ferryOrders: Array.isArray(extra.ferryOrders) ? extra.ferryOrders : [],
+    };
+  } catch (err) {
+    logError('gameDb decodeAiPendingOrdersExtra: failed to parse pending-order extra payload', err);
+    return { airStrikeOrders: [], ferryOrders: [] };
+  }
+}
+
+function encodeAiPendingOrdersExtra(payload: {
+  airStrikeOrders: { unitId: string; targetH3Index: string; targetType: 'units' | 'urban' | 'airport' | 'seaport' }[];
+  ferryOrders: { unitId: string; destinationH3Index: string }[];
+}): string {
+  return JSON.stringify(payload);
 }
 
 /**
@@ -1560,17 +1991,25 @@ export function getAiPendingOrders(playerId: string): {
 export function setAiPendingOrders(
   playerId: string,
   movementOrders: { unitId: string; toH3Index: string }[],
-  rangedOrders: { unitId: string; targetH3Index: string }[]
+  rangedOrders: { unitId: string; targetH3Index: string }[],
+  airStrikeOrders: { unitId: string; targetH3Index: string; targetType: 'units' | 'urban' | 'airport' | 'seaport' }[] = [],
+  ferryOrders: { unitId: string; destinationH3Index: string }[] = []
 ): void {
   logDebug('gameDb setAiPendingOrders', {
     playerId,
     movementCount: movementOrders.length,
     rangedCount: rangedOrders.length,
+    airStrikeCount: airStrikeOrders.length,
+    ferryCount: ferryOrders.length,
   });
   if (!db) return;
+  const strategyText = encodeAiPendingOrdersExtra({
+    airStrikeOrders,
+    ferryOrders,
+  });
   run(
     'INSERT OR REPLACE INTO ai_pending_orders (player_id, movement_orders, ranged_orders, strategy_text) VALUES (?, ?, ?, ?)',
-    [playerId, JSON.stringify(movementOrders), JSON.stringify(rangedOrders), null]
+    [playerId, JSON.stringify(movementOrders), JSON.stringify(rangedOrders), strategyText]
   );
 }
 
@@ -1618,9 +2057,12 @@ export function resetGameForNewMatch(options?: { fogOfWarEnabled?: boolean }): v
   run("DELETE FROM game_config WHERE key LIKE 'unit_display_sequence_%'");
   seedGameSeedIfMissing();
   seedHexesFromTerrainMetadata();
+  seedInfrastructureStateFromMetadata();
   seedUnits();
   run('DELETE FROM pending_orders');
   run('DELETE FROM pending_ranged_orders');
+  run('DELETE FROM pending_air_orders');
+  run('DELETE FROM pending_ferry_orders');
   run('UPDATE turn_state SET phase = ?, turn_number = 1 WHERE id = 1', ['planning']);
   clearGameOver();
   run('DELETE FROM game_config WHERE key = ?', [AI_TOOL_LIMIT_EXCEEDED_KEY]);

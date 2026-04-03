@@ -10,10 +10,11 @@ export const MAX_UNITS_PER_TYPE: Record<BuildUnitType, number> = {
   infantry: SHARED_MAX_UNITS_PER_TYPE.infantry,
   armor: SHARED_MAX_UNITS_PER_TYPE.armor,
   naval: SHARED_MAX_UNITS_PER_TYPE.naval,
+  air: SHARED_MAX_UNITS_PER_TYPE.air,
 };
 
 /** Stable unit-type order for UI/prompt messaging about cap state. */
-export const DEPLOYMENT_CAP_TYPE_ORDER: BuildUnitType[] = ['infantry', 'armor', 'naval'];
+export const DEPLOYMENT_CAP_TYPE_ORDER: BuildUnitType[] = ['infantry', 'armor', 'naval', 'air'];
 
 /**
  * Why this exists:
@@ -23,10 +24,10 @@ export function getPlayerUnitCountsByType(
   units: Array<{ player: string; unitType: string }>,
   playerId: string
 ): Record<BuildUnitType, number> {
-  const counts: Record<BuildUnitType, number> = { infantry: 0, armor: 0, naval: 0 };
+  const counts: Record<BuildUnitType, number> = { infantry: 0, armor: 0, naval: 0, air: 0 };
   for (const unit of units) {
     if (unit.player !== playerId) continue;
-    if (unit.unitType !== 'infantry' && unit.unitType !== 'armor' && unit.unitType !== 'naval') continue;
+    if (unit.unitType !== 'infantry' && unit.unitType !== 'armor' && unit.unitType !== 'naval' && unit.unitType !== 'air') continue;
     counts[unit.unitType] += 1;
   }
   return counts;

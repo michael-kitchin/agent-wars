@@ -1,3 +1,4 @@
+import { getRes1InfrastructureForHex } from './gameDb';
 import { getRes1ProductionContext, isTerrainClassificationCacheLoaded } from './terrainClassificationCache';
 import { logTrace } from './logger';
 
@@ -49,11 +50,13 @@ export function buildNormalizedTerrainByH3(
  * When to use:
  *     Naval movement validation and route planning when origin terrain is non-water-domain.
  * What to expect:
- *     Returns true only for land hexes with at least one seaport and a loaded terrain-classification cache.
+ *     Returns true only for land hexes with at least one intact seaport in mutable game state.
  */
 export function isLandSeaportSpawnHex(input: { h3Index: string; normalizedTerrain: string }): boolean {
   logTrace('movementTerrain isLandSeaportSpawnHex', input);
   if (input.normalizedTerrain !== 'land') return false;
+  const live = getRes1InfrastructureForHex(input.h3Index);
+  if (live.seaportCount > 0) return true;
   if (!isTerrainClassificationCacheLoaded()) return false;
   return getRes1ProductionContext({ h3Index: input.h3Index }).seaportCount > 0;
 }

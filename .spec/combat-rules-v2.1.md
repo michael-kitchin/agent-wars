@@ -5,6 +5,7 @@
 This document describes combat execution and resolution rules for the game, using **Axis & Allies 2**-style combat as a template. Rules are designed for **WEGO** turn resolution: all combat is resolved by the engine in a single resolution phase with **no player-to-player interaction or confirmations**. No retreat declarations, no casualty choices by players — the engine applies deterministic procedures and (where specified) dice rolls.
 
 **Stated needs addressed:**
+
 1. **Offensive and defensive strengths and weaknesses** — §3 and §2 (unit roster) define attack/defense values, range, and roles; §3.5 summarizes cross-domain and terrain.
 2. **Ranged attack capabilities** — §2 (range 0/1/2/3), §7 (summary table): air 3 hexes (strike from base), naval 2 hexes, armor adjacent (1 hex), infantry melee only.
 3. **Zero player interaction / WEGO streamlining** — No confirmations or back-and-forth: resolution order (air strike then ranged then melee), casualty assignment (fixed priority), and attacker/defender ordering (participant IDs assigned at combat start) are all engine-defined. Single resolution phase after movement.
@@ -28,12 +29,14 @@ This document describes combat execution and resolution rules for the game, usin
 
 The game has four unit types. Unit caps are 10 infantry, 5 armor, and 5 naval as of milestone 1.4; with air added in milestone 1.5, caps are 10 infantry, 5 armor, 5 naval, and 3 air (23 total). Fallback if playtesting shows 23 is too many for LLM briefing quality: 8 infantry, 4 armor, 4 naval, 2 air (18 total).
 
-| Unit type | Move | Attack | Defense | Range | Domain | Cost |
-|-----------|------|--------|---------|-------|--------|------|
-| **Infantry** | 1 | 1 | 2 | 0 (melee only) | Land | 10 urban hexes |
-| **Armor** | 2 | 3 | 2 | 1 (adjacent hex) | Land | 20 urban hexes |
-| **Naval** | 2 | 2 | 2 | 2 hexes | Water | 50 urban hexes |
-| **Air** | 0 (ferry only) | 3 | 1 | 3 (strike radius) | Air | 30 urban hexes |
+
+| Unit type    | Move           | Attack | Defense | Range             | Domain | Cost           |
+| ------------ | -------------- | ------ | ------- | ----------------- | ------ | -------------- |
+| **Infantry** | 1              | 1      | 2       | 0 (melee only)    | Land   | 10 urban hexes |
+| **Armor**    | 2              | 3      | 2       | 1 (adjacent hex)  | Land   | 20 urban hexes |
+| **Naval**    | 2              | 2      | 2       | 2 hexes           | Water  | 50 urban hexes |
+| **Air**      | 0 (ferry only) | 3      | 1       | 3 (strike radius) | Air    | 30 urban hexes |
+
 
 - **Range 0:** Unit only participates in same-hex (melee) combat.
 - **Range 1:** Unit can attack an enemy in any **adjacent** hex (H3 grid distance 1; includes land–water boundary; see §6 for coastal bombardment).
@@ -41,9 +44,7 @@ The game has four unit types. Unit caps are 10 infantry, 5 armor, and 5 naval as
 - **Range 3 (air only):** Unit can strike any hex within 3 hexes of its base airport. Air units do not use incremental movement — they strike from their base and return in the same phase.
 - **Move 0 (air):** Air units have no incremental movement. They reposition via ferry orders (up to 4 hexes between owned airports, one action per turn — see §4.4). Ferry range (4) is longer than strike/visibility range (3), reflecting that a player always knows where their own airports are — ferry destinations don't require air reconnaissance, just ownership.
 - **Cost:** The cost column is the total production points required to build the unit. Each res1 hex generates production points equal to its res4 urban hex count per turn. Points accumulate toward the unit cost across multiple turns; when accumulated points meet or exceed the cost, the unit spawns and excess production carries over immediately to the next unit in the queue. If the excess is sufficient to cover the next unit's cost, that unit also spawns in the same turn — a hex produces as many units per turn as its production rate and unit caps allow.
-
   Examples: a hex with 5 urban hexes produces 1 infantry (cost 10) every 2 turns. A hex with 15 urban hexes and a seaport queues a naval unit (cost 50) followed by an infantry: the naval unit spawns on turn 4 (15 × 4 = 60 ≥ 50) with 10 points left over, which immediately covers the infantry cost (10), so both units spawn on turn 4.
-
   Air strikes that destroy urban hexes (3 res4 hexes per hit) permanently reduce the production rate. Air unit cost (30) is a starting value subject to playtesting.
 
 ---
@@ -92,6 +93,7 @@ Resolution uses **current unit positions** at each step. The engine runs five ph
 ### 4.1 Air strike phase (pre-move positions)
 
 Using the **current** (pre-movement) positions:
+
 - Build air strikes: for each air unit with a strike order, identify the target hex and target type (units, urban hex, airport, or seaport).
 - Resolve all air strikes. Apply casualties to targets. Evaluate counter-fire against each striking air unit. Remove eliminated units and destroyed infrastructure. Process strikes in deterministic order (by striking air unit's base hex H3 index ascending).
 - Air units that are destroyed during this phase (by counter-fire from another air unit's strike on their airport, or by return fire from defending units) do not execute their own strike if they haven't been processed yet. Process order matters: lower H3 index strikes first.
@@ -101,6 +103,7 @@ Using the **current** (pre-movement) positions:
 ### 4.2 Ranged phase (pre-move positions)
 
 Using the **current** (pre-movement) positions, after air strike casualties are applied:
+
 - Build ranged attacks: for each unit with range ≥ 1 (armor, naval — **not** air, which resolves in §4.1), determine enemy-occupied hexes within range; each (attacker hex, defender hex) is a ranged attack.
 - Resolve all ranged engagements. Apply casualties and remove eliminated units. No melee yet.
 
@@ -111,17 +114,19 @@ Move every ground and naval unit that has a movement order to its destination. P
 ### 4.4 Ferry movement (post ground/naval movement)
 
 For each air unit with a ferry order:
+
 1. Check the destination airport: is it still owned by the air unit's player, and is the airport still intact?
 2. **If yes:** The air unit relocates to the destination airport. Ferry complete.
 3. **If no (destination destroyed or captured during this turn's resolution):** Ferry aborts. Check the origin airport: is it still owned and intact?
-   - **If origin intact:** The air unit remains at its origin airport. No movement occurs.
-   - **If origin also destroyed or captured:** The air unit is destroyed.
+  - **If origin intact:** The air unit remains at its origin airport. No movement occurs.
+  - **If origin also destroyed or captured:** The air unit is destroyed.
 
 Ferry range: maximum 4 hexes (H3 grid distance) between the origin and destination airports. Ferry range is deliberately longer than the air unit's 3-hex strike/visibility radius — a player always knows where their own airports are, so ferry destinations don't require reconnaissance, just ownership and an intact airport. Both airports must be in hexes owned by the air unit's player at the time the order is issued. Destination validation occurs at resolution time (step 1 above), not at order time, to account for WEGO simultaneous resolution.
 
 ### 4.5 Melee phase (post-move positions)
 
 Using the **post-movement** positions (after both ground/naval movement and ferry movement):
+
 - Build melee combats: each hex that has ground/naval units from two or more sides is one melee engagement. Air units do **not** participate in melee.
 - Resolve all same-hex combats in a deterministic order.
 
@@ -134,6 +139,7 @@ Within each phase, process engagements in a **deterministic order** (e.g. by att
 ### 4.7 One round per phase
 
 For simplicity, use **one round of fire per phase** per combat (or per attack):
+
 - Air strike phase: each striking air unit rolls once. Counter-fire depends on target type: for unit targets, defending units with range ≥ 1 in the target hex each roll once (attack value); for infrastructure targets, a single fixed counter-fire roll is made (see §8). Hits are applied via automatic casualty rules.
 - Ranged phase: each eligible attacker rolls once per eligible target hex. **Return fire:** defending units that have ranged capability (range ≥ 1) and for which at least one attacking unit's hex is within that defender unit type's range each roll once (**attack** value); those hits are assigned to attacker hexes. Hits are applied via automatic casualty rules.
 - Melee phase: same — one round of rolls, then apply hits.
@@ -250,12 +256,14 @@ No player input during steps 2–9.
 
 ## 7. Attack capabilities summary
 
-| Unit    | Range (hexes) | Can strike |
-|---------|---------------|------------|
-| Infantry| 0             | Same hex only (melee). |
-| Armor   | 1             | Same hex (melee) or **any adjacent hex** (land or water). |
-| Naval   | 2             | Same hex (melee) or **any hex at distance 1 or 2** (land or water). |
-| Air     | 3             | **Any hex within 3 hexes of base airport** (air strike phase only). Can target units or infrastructure. Cannot participate in melee. |
+
+| Unit     | Range (hexes) | Can strike                                                                                                                           |
+| -------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Infantry | 0             | Same hex only (melee).                                                                                                               |
+| Armor    | 1             | Same hex (melee) or **any adjacent hex** (land or water).                                                                            |
+| Naval    | 2             | Same hex (melee) or **any hex at distance 1 or 2** (land or water).                                                                  |
+| Air      | 3             | **Any hex within 3 hexes of base airport** (air strike phase only). Can target units or infrastructure. Cannot participate in melee. |
+
 
 So: **air can strike out to 3 hexes** from base (units or infrastructure). **Naval can strike out to 2 hexes** (units only). **Armor can strike adjacent hexes only** (units only). Infantry is melee-only.
 
@@ -270,10 +278,10 @@ An air unit with a strike order targeting an enemy-occupied hex resolves as foll
 1. The air unit rolls d6. Hit if roll ≤ 3 (attack value).
 2. If hit, assign one casualty to the target hex using the standard casualty priority (lowest defense first; ties: infantry → armor → naval → air).
 3. **Counter-fire:** Every defending unit in the target hex with range ≥ 1 rolls d6; hit if roll ≤ that unit's attack value. If any counter-fire roll hits, the air unit is destroyed. There is no range-to-base check — the aircraft flies to the target hex, so defenders are shooting at aircraft overhead, not at a distant airfield.
-   - Armor (range 1, attack 3): returns fire, hitting on 1–3.
-   - Naval (range 2, attack 2): returns fire, hitting on 1–2.
-   - Infantry (range 0): cannot return fire against air.
-   - Air units at the target hex: cannot return fire (air units only act during their own strike order).
+  - Armor (range 1, attack 3): returns fire, hitting on 1–3.
+  - Naval (range 2, attack 2): returns fire, hitting on 1–2.
+  - Infantry (range 0): cannot return fire against air.
+  - Air units at the target hex: cannot return fire (air units only act during their own strike order).
 
 **Target selection:** Players order air strikes against "units" as a generic target type. The player does not choose which unit type to hit — the standard casualty priority assigns the hit automatically (lowest defense first; ties: infantry → armor → naval → air).
 
@@ -299,12 +307,14 @@ Destroyed urban hexes, airports, and seaports do not rebuild. This is a delibera
 
 ### 8.5 Counter-fire summary
 
-| Target type | Air attack value | Counter-fire source | Counter-fire threshold |
-|-------------|-----------------|---------------------|----------------------|
-| Enemy units | 3 (50%) | Each defending unit with range ≥ 1 in target hex rolls independently | Defender's attack value (no range-to-base check) |
-| Urban hex | 3 (50%), destroys 3 res4 hexes | Ground defenses (fixed roll, unaffected by hex occupation) | ≤ 1 (17%) |
-| Airport | 3 (50%) | AA defenses (fixed roll, unaffected by hex occupation) | ≤ 2 (33%) |
-| Seaport | 3 (50%) | Seaport defenses (fixed roll, unaffected by hex occupation) | ≤ 1 (17%) |
+
+| Target type | Air attack value               | Counter-fire source                                                  | Counter-fire threshold                           |
+| ----------- | ------------------------------ | -------------------------------------------------------------------- | ------------------------------------------------ |
+| Enemy units | 3 (50%)                        | Each defending unit with range ≥ 1 in target hex rolls independently | Defender's attack value (no range-to-base check) |
+| Urban hex   | 3 (50%), destroys 3 res4 hexes | Ground defenses (fixed roll, unaffected by hex occupation)           | ≤ 1 (17%)                                        |
+| Airport     | 3 (50%)                        | AA defenses (fixed roll, unaffected by hex occupation)               | ≤ 2 (33%)                                        |
+| Seaport     | 3 (50%)                        | Seaport defenses (fixed roll, unaffected by hex occupation)          | ≤ 1 (17%)                                        |
+
 
 **Key distinction:** When targeting units, counter-fire comes from the defending units themselves — each eligible unit rolls independently, and any single hit destroys the air unit. When targeting infrastructure, counter-fire comes from the infrastructure's fixed defenses — a single roll at the listed threshold. Units in the hex never participate in infrastructure counter-fire.
 

@@ -15,6 +15,12 @@ export interface ResolutionContext {
   opponentCombatParticipantUnitIds: string[];
   removedUnitIds: string[];
   removedOpponentUnitIds: string[];
+  infrastructureDestroyedEvents?: Array<{
+    h3Index: string;
+    targetType: 'urban' | 'airport' | 'seaport';
+    changedRubbleCount: number;
+    destroyedAirUnitsCount: number;
+  }>;
   /** Optional: unitId -> list of threat severities (e.g. ['low','moderate']) from precomputation for threat_escalation. */
   threatSeveritiesByUnit?: Record<string, string[]>;
 }
@@ -250,6 +256,26 @@ export function evaluateSubscriptionEvents(
       const severities = ctx.threatSeveritiesByUnit?.[unitId];
       if (unitId && severity && severities?.includes(severity)) {
         fired.push({ event, params, unitId });
+      }
+    } else if (event === 'infrastructure_destroyed') {
+      const targetType = typeof params.targetType === 'string' ? params.targetType : '';
+      const h3Index = typeof params.h3Index === 'string' ? params.h3Index : '';
+      const match = (ctx.infrastructureDestroyedEvents ?? []).find((e) => {
+        const typeMatches = !targetType || e.targetType === targetType;
+        const hexMatches = !h3Index || e.h3Index === h3Index;
+        return typeMatches && hexMatches;
+      });
+      if (match) {
+        fired.push({
+          event,
+          params: {
+            ...params,
+            matchedTargetType: match.targetType,
+            matchedH3Index: match.h3Index,
+            changedRubbleCount: match.changedRubbleCount,
+            destroyedAirUnitsCount: match.destroyedAirUnitsCount,
+          },
+        });
       }
     }
     // territory_changed: no-op for 0.7

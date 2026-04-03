@@ -31,7 +31,7 @@ function toDisplayLatLng(ll: [number, number]): [number, number] {
 }
 
 function isBuildUnitType(value: unknown): value is BuildUnitType {
-  return value === 'infantry' || value === 'armor' || value === 'naval';
+  return value === 'infantry' || value === 'armor' || value === 'naval' || value === 'air';
 }
 
 function resolveHexArgument(
@@ -55,6 +55,7 @@ function summarizeQueue(queue: HexBuildQueueView, latLngByH3: Map<string, LatLng
     controllerPlayerId: queue.controllerPlayerId,
     controlledByRequester: queue.controlledByRequester,
     urbanHexCount: queue.urbanHexCount,
+    airportCount: queue.airportCount,
     seaportCount: queue.seaportCount,
     availableUnitTypes: queue.availableUnitTypes,
     buildSectionVisible: queue.buildSectionVisible,
@@ -104,7 +105,7 @@ function addBuildEntry(
   const resolved = resolveHexArgument(args, resolveToH3);
   if (!resolved.ok) return { status: 'error', error: resolved.error };
   if (!isBuildUnitType(args.unitType)) {
-    return { status: 'error', error: 'add_build_entry requires unitType (infantry|armor|naval).' };
+    return { status: 'error', error: 'add_build_entry requires unitType (infantry|armor|naval|air).' };
   }
   const count = Number(args.count);
   if (!isValidBuildCount(count)) {
@@ -141,7 +142,7 @@ function updateBuildEntry(
     return { status: 'error', error: 'update_build_entry requires positive integer entryId.' };
   }
   if (!isBuildUnitType(args.unitType)) {
-    return { status: 'error', error: 'update_build_entry requires unitType (infantry|armor|naval).' };
+    return { status: 'error', error: 'update_build_entry requires unitType (infantry|armor|naval|air).' };
   }
   const count = Number(args.count);
   if (!isValidBuildCount(count)) {

@@ -674,12 +674,21 @@
       <p>
         <button type="button" id="ready-btn" class="ready-btn">Ready</button>
         <button type="button" id="ranged-attack-btn" class="ranged-btn" style="display: none;">Ranged</button>
+        <select id="air-strike-target-type" class="ranged-btn" style="display: none;">
+          <option value="units">Enemy Units</option>
+          <option value="urban">Urban Hexes</option>
+          <option value="airport">Airports</option>
+          <option value="seaport">Seaports</option>
+        </select>
+        <button type="button" id="air-strike-cancel-btn" class="ranged-btn" style="display: none;">Cancel</button>
       </p>
       <p><strong>Selected unit</strong><br><span id="sidebar-selected-unit">—</span></p>
       <p><strong>Movement orders</strong></p>
       <div id="pending-orders-list"></div>
       <p><strong>Ranged attacks</strong></p>
       <div id="ranged-attacks-list"></div>
+      <p><strong>Air strikes</strong></p>
+      <div id="air-strikes-list"></div>
       <p id="sidebar-error" style="color: #a03030; font-size: 0.9em; display: none;"></p>
     </div>
     <div id="sidebar-bottom">

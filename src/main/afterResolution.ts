@@ -19,13 +19,12 @@ import {
 } from './gameDb';
 import { getSubscriptions } from './callbackSubscriptions';
 import { evaluateMandatoryOverrides, evaluateSubscriptionEvents, type ResolutionContext } from './callbackEvaluation';
-export interface ReadyResultWithParticipants {
-  success: boolean;
-  reason?: string;
-  removedUnitIds?: string[];
-  removedOpponentUnitIds?: string[];
-  opponentCombatParticipantUnitIds?: string[];
-}
+import type { ReadyResult, RequestAiOrdersResult } from '../shared/ipcTypes';
+
+type ReadyResultWithParticipants = Pick<
+  ReadyResult,
+  'success' | 'reason' | 'removedUnitIds' | 'removedOpponentUnitIds' | 'opponentCombatParticipantUnitIds' | 'infrastructureDestroyedEvents'
+>;
 
 export interface AfterResolutionDeps {
   modelId: string;
@@ -35,13 +34,7 @@ export interface AfterResolutionDeps {
     state: GameStateSnapshot,
     modelId: string,
     options: { enabledToolNames: string[]; usePrecomputation: boolean }
-  ) => Promise<{
-    success: true;
-    orders: { unitId: string; toH3Index: string }[];
-    rangedAttacks?: { unitId: string; targetH3Index: string }[];
-    strategy?: string;
-    toolInvocationCounts?: Record<string, number>;
-  } | { success: false; error: string }>;
+  ) => Promise<RequestAiOrdersResult>;
 }
 
 export interface AfterResolutionResult {
@@ -88,6 +81,7 @@ export async function afterResolution(
     opponentCombatParticipantUnitIds: opponentCombatants,
     removedUnitIds,
     removedOpponentUnitIds,
+    infrastructureDestroyedEvents: resolutionResult.infrastructureDestroyedEvents,
   };
   const subscriptions = getSubscriptions('opponent');
   const subscriptionFired = evaluateSubscriptionEvents(state, subscriptions, ctx);
@@ -101,7 +95,13 @@ export async function afterResolution(
         usePrecomputation: true,
       });
       if (result.success && result.orders) {
-        setAiPendingOrders('opponent', result.orders, result.rangedAttacks ?? []);
+        setAiPendingOrders(
+          'opponent',
+          result.orders,
+          result.rangedAttacks ?? [],
+          result.airStrikes ?? [],
+          result.ferryOrders ?? []
+        );
         setAiLastConsultationTurn(state.turnNumber);
         clearOpponentCombatSinceConsultation();
         logDebug('afterResolution: consultation completed, pending orders stored', { turnNumber: state.turnNumber });

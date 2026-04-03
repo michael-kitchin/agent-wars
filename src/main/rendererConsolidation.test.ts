@@ -126,6 +126,8 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   const source = fs.readFileSync(rendererPath, 'utf8');
   const drawProductionFn = getFunctionSource(source, 'drawRes1ProductionOverlays');
   const syncBuildEntryFn = getFunctionSource(source, 'syncBuildEntryButton');
+  const getUrbanProductionCapacityForHexFn = getFunctionSource(source, 'getUrbanProductionCapacityForHex');
+  const isRes1HexHumanUrbanProductionFn = getFunctionSource(source, 'isRes1HexHumanUrbanProduction');
   const drawHoverPreviewFn = getFunctionSource(source, 'drawHoverRoutePreview');
   const shouldDrawHoveredPathPreviewFn = getFunctionSource(source, 'shouldDrawHoveredPathPreview');
 
@@ -145,7 +147,16 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   assert.ok(
     drawProductionFn.includes('!overlayContext.mapInspectionHeld') &&
       drawProductionFn.includes('isRes1HexHumanUrbanProduction(gameState, hx)'),
-    'drawRes1ProductionOverlays should restrict non-inspection labels to shared human-urban production rule'
+    'drawRes1ProductionOverlays should include shared human-urban production eligibility checks'
+  );
+  assert.ok(
+    drawProductionFn.includes('const canShowLabelWithoutInspection = isRes1HexHumanUrbanProduction(gameState, hx) || controlledByHuman;'),
+    'drawRes1ProductionOverlays should keep 0c labels visible on explored human-controlled non-urban hexes'
+  );
+  assert.ok(
+    drawProductionFn.includes('const hasClickableBuildEntryForHex =') &&
+      drawProductionFn.includes('isRes1HexHumanUrbanProduction(gameState, hx)'),
+    'drawRes1ProductionOverlays should keep build-entry clickability restricted to human urban-production hexes'
   );
   assertMatches(
     drawProductionFn,
@@ -158,6 +169,10 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
       drawProductionFn.includes('isRes1HexHumanUrbanProduction(gameState, hx)') &&
       drawProductionFn.includes('if (hasClickableBuildEntryForHex) {'),
     'drawRes1ProductionOverlays should hide non-clickable label when clickable build entry exists'
+  );
+  assert.ok(
+    drawProductionFn.includes('const capacityPerTurn = getUrbanProductionCapacityForHex(hx.h3Index);'),
+    'drawRes1ProductionOverlays should derive production capacity from shared canonical urban-res4 count helper'
   );
   assert.ok(
     drawProductionFn.includes('overlayContext.revealAllControllerQueues'),
@@ -175,6 +190,14 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   assert.ok(
     syncBuildEntryFn.includes('isRes1HexHumanUrbanProduction(gameState, hx)'),
     'syncBuildEntryButton should use shared human-urban production eligibility'
+  );
+  assert.ok(
+    isRes1HexHumanUrbanProductionFn.includes('getUrbanProductionCapacityForHex(hx.h3Index) > 0'),
+    'isRes1HexHumanUrbanProduction should use canonical urban-res4 count for build eligibility'
+  );
+  assert.ok(
+    getUrbanProductionCapacityForHexFn.includes('countUrbanRes4HexesInRes1Hex(h3Index)'),
+    'getUrbanProductionCapacityForHex should compute from live urban res4-child count'
   );
   assert.ok(
     drawHoverPreviewFn.includes('if (!shouldDrawHoveredPathPreview()) return;') &&
@@ -217,6 +240,143 @@ function testModifierDrivenPopoverCloseRulesCentralized(): void {
   );
 }
 
+function testInfrastructureGlyphSetsComeFromRes4Overrides(): void {
+  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const source = fs.readFileSync(rendererPath, 'utf8');
+  const drawInfraFn = getFunctionSource(source, 'drawTerrainInfrastructureOverlays');
+  const hasVisibleRes1InfraFn = getFunctionSource(source, 'hasVisibleRes1InfrastructureGlyphs');
+
+  assert.ok(
+    source.includes('const nextState = deriveInfrastructureOverlayState(rows);') &&
+      source.includes('terrainInfraRes4Airport = nextState.terrainInfraRes4Airport;') &&
+      source.includes('terrainInfraRes4Seaport = nextState.terrainInfraRes4Seaport;'),
+    'applyRes4TerrainOverrides should use centralized derivation for res4 airport/seaport glyph sets'
+  );
+  assert.ok(
+    source.includes('terrainInfraRes1Airport = nextState.terrainInfraRes1Airport;') &&
+      source.includes('terrainInfraRes1Seaport = nextState.terrainInfraRes1Seaport;'),
+    'applyRes4TerrainOverrides should use centralized derivation for res1 airport/seaport glyph sets'
+  );
+  assert.ok(
+    !source.includes('.getTerrainInfrastructureHints()'),
+    'renderer init should not overwrite live glyph sets with major-only terrain hint snapshots'
+  );
+  assert.ok(
+    !drawInfraFn.includes('if (unitHexes.has(hx.h3Index)) continue;') &&
+      !drawInfraFn.includes('if (unitHexes.has(parent.h3Index)) continue;'),
+    'drawTerrainInfrastructureOverlays should not suppress airport/seaport glyphs on hexes that contain units'
+  );
+  assert.ok(
+    !hasVisibleRes1InfraFn.includes('!unitHexes.has(h3Index)'),
+    'hasVisibleRes1InfrastructureGlyphs should remain true for explored infra hexes even when units are present'
+  );
+}
+
+function testAirFerryDoubleClickContracts(): void {
+  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const source = fs.readFileSync(rendererPath, 'utf8');
+  const initFn = getFunctionSource(source, 'init');
+  const pendingOrdersFn = getFunctionSource(source, 'updatePendingOrdersSidebar');
+
+  assert.ok(
+    initFn.includes('const hasAirSelection = selectedAtMouseDown.some((unit) => unit.unitType === \'air\');') &&
+      initFn.includes('const hasNonAirSelection = selectedAtMouseDown.some((unit) => unit.unitType !== \'air\');') &&
+      initFn.includes('Cannot issue grouped movement for mixed air and non-air units.'),
+    'double-click movement should reject mixed air and non-air selections with a toast'
+  );
+  assert.ok(
+    initFn.includes('window.gameApi?.validateGroupFerryTarget') &&
+      initFn.includes('replacePendingFerryOrdersForSelected(selectedIds, destinationH3);'),
+    'double-click movement should validate grouped ferry destinations through main-process API and queue ferry orders for air selections'
+  );
+  assert.ok(
+    source.includes('ferryOrders: pendingFerryOrders,'),
+    'ready submit payload should include pending ferry orders'
+  );
+  assert.ok(
+    pendingOrdersFn.includes('formatPendingFerryOrderSidebarLabel(gameState, ferry)'),
+    'pending ferry sidebar rows should display via the ferry label formatter for Nh parity'
+  );
+  assert.ok(
+    source.includes('function drawPendingFerryLines(') &&
+      source.includes('drawPendingFerryLines(ctx, pendingFerryOrders, state.units, hexList);') &&
+      source.includes('drawLineArrow('),
+    'pending ferry planning should render filled map arrows like other planned movement'
+  );
+}
+
+function testAirStrikeAndAirGlyphContracts(): void {
+  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const source = fs.readFileSync(rendererPath, 'utf8');
+  const inferUnitTypeLabelFromIdFn = getFunctionSource(source, 'inferUnitTypeLabelFromId');
+
+  assert.ok(
+    source.includes("air: 'S'"),
+    'air unit type label should render as S'
+  );
+  assert.ok(
+    inferUnitTypeLabelFromIdFn.includes("if (unitId.includes('-air-')) return 'S';"),
+    'unit-id fallback label should map air units to S instead of ?'
+  );
+  assert.ok(
+    source.includes("from './turnUpdateSummary'") &&
+      source.includes('buildTurnUpdateBullets({') &&
+      source.includes('formatKillLine: killToastFormatter.formatKillLine'),
+    'ready update bullets should be delegated to shared turn update summary helpers'
+  );
+  assert.ok(
+    source.includes("btnEl.style.display = airStrikeModeActive ? 'none' : 'inline-block';"),
+    'Strike button should hide while strike planning mode is active'
+  );
+  assert.ok(
+    source.includes("from './orderLabelFormatting'") &&
+      source.includes('formatPendingRangedAttackSidebarLabel(gameState, r)') &&
+      source.includes('formatPendingAirStrikeSidebarLabel(gameState, strike)') &&
+      source.includes('formatPendingFerryOrderSidebarLabel(gameState, ferry)'),
+    'planned order list labels should use shared order label formatting helpers'
+  );
+  assert.ok(
+    source.includes('function formatTargetingValidationReason(') &&
+      source.includes("formatTargetingValidationReason(validation.reason, 'Selected air units cannot strike that target.')") &&
+      source.includes("formatTargetingValidationReason(validation.reason, 'Selected units cannot fire at that target.')"),
+    'grouped strike and ranged targeting toasts should format unit IDs as display names'
+  );
+  assert.ok(
+    source.includes('airStrikeOutboundMoves: airStrikeOutboundMoves.length > 0 ? airStrikeOutboundMoves : undefined') &&
+      source.includes('airStrikeReturnMoves: airStrikeReturnMoves.length > 0 ? airStrikeReturnMoves : undefined') &&
+      source.includes('inAirStrikeOutbound') &&
+      source.includes('inAirStrikeReturn'),
+    'resolution playback should include outbound/return air-strike movement phases'
+  );
+  assert.ok(
+    source.includes('const knownHumanAirStrikeTargetHexes = new Set(') &&
+      source.includes(".filter((move) => move.player === 'human')") &&
+      source.includes('.filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3))'),
+    'unknown battle announcements should not include known human air-strike target hexes'
+  );
+  assert.ok(
+    source.includes('phase.inAirStrikeLightning || phase.inAirStrikeCasualty') &&
+      source.includes('h3Index: move.toH3Index') &&
+      source.includes('movingIds = new Set((anim.airStrikeReturnMoves ?? []).map((move) => move.unitId));'),
+    'air strike playback should pin strikers at target during combat/casualty and hide survivors at base until return animation completes'
+  );
+  assert.ok(
+    source.includes('function buildResolutionPlaybackState(') &&
+      source.includes('const { phase } = buildResolutionPlaybackState(anim, elapsed);'),
+    'resolution playback phase derivation should be centralized for all unit/scenario animation paths'
+  );
+  assert.ok(
+    source.includes('if (!validation.success) {') &&
+      source.includes('airStrikeModeActive = false;') &&
+      source.includes('rangedModeActive = false;'),
+    'invalid ranged/strike target clicks should cancel planning mode'
+  );
+  assert.ok(
+    !source.includes('function formatAirStrikeTargetLabel(') && !source.includes('function formatRangedTargetUnitLabel('),
+    'renderer should not keep dead local strike target label helpers after formatter extraction'
+  );
+}
+
 function testKillUpdateTextOmitsPlayerSuffixes(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
@@ -228,6 +388,45 @@ function testKillUpdateTextOmitsPlayerSuffixes(): void {
   );
 }
 
+function testRes4RubbleTooltipAndTerrainVariantContracts(): void {
+  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const rendererSource = fs.readFileSync(rendererPath, 'utf8');
+  const terrainStylesPath = path.resolve(process.cwd(), 'src', 'renderer', 'terrainVisualStyles.ts');
+  const terrainStylesSource = fs.readFileSync(terrainStylesPath, 'utf8');
+  const drawTerrainHexesFn = getFunctionSource(rendererSource, 'drawTerrainHexes');
+  const featureLabelsForRes4ChildFn = getFunctionSource(rendererSource, 'featureLabelsForRes4Child');
+  const terrainStateForPointerFn = getFunctionSource(rendererSource, 'terrainStateForPointer');
+  const formatTerrainTooltipHtmlFn = getFunctionSource(rendererSource, 'formatTerrainTooltipHtml');
+
+  assert.ok(
+    drawTerrainHexesFn.includes('if (res4Active) return;'),
+    'res1 terrain fills/styles should be suppressed while res4 child hex rendering is active'
+  );
+  assert.ok(
+    featureLabelsForRes4ChildFn.includes('detail?.isRubble') &&
+      featureLabelsForRes4ChildFn.includes("labels.push('Rubble')"),
+    'res4 feature labels should include rubble when a child override marks rubble'
+  );
+  assert.ok(
+    terrainStateForPointerFn.includes('isRubble: detail?.isRubble ?? false'),
+    'res4 tooltip state should preserve rubble override flags from terrain detail state'
+  );
+  assert.ok(
+    formatTerrainTooltipHtmlFn.includes('formatTerrainVariantSuffix(state)'),
+    'terrain tooltip rendering should use shared variant suffix formatting for urban/rubble'
+  );
+  assertMatches(
+    terrainStylesSource,
+    /const isRubble = options\?\.isRubble === true;/,
+    'terrain fill logic should derive rubble variant directly from the rubble override flag'
+  );
+  assertMatches(
+    terrainStylesSource,
+    /const isUrban = !isRubble && options\?\.isUrban === true;/,
+    'terrain fill logic should derive urban variant directly from the urban override flag'
+  );
+}
+
 function run(): void {
   testRedrawAndResizeDelegateToSharedScene();
   testSharedSceneStillRendersStaleIntel();
@@ -235,7 +434,11 @@ function run(): void {
   testProductionLabelContractsForExploredVsUnexploredHexes();
   testStackCalloutSingleUnitNonCtrlClosesPopup();
   testModifierDrivenPopoverCloseRulesCentralized();
+  testInfrastructureGlyphSetsComeFromRes4Overrides();
+  testAirFerryDoubleClickContracts();
+  testAirStrikeAndAirGlyphContracts();
   testKillUpdateTextOmitsPlayerSuffixes();
+  testRes4RubbleTooltipAndTerrainVariantContracts();
   console.log('rendererConsolidation.test.ts passed');
 }
 

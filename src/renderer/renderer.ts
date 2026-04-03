@@ -28,6 +28,13 @@ import {
   drawTerrainInfrastructureGlyphs,
   RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE,
 } from './terrainInfrastructureOverlay';
+import { deriveInfrastructureOverlayState } from './infrastructureOverlayState';
+import {
+  formatPendingAirStrikeSidebarLabel,
+  formatPendingFerryOrderSidebarLabel,
+  formatPendingRangedAttackSidebarLabel,
+} from './orderLabelFormatting';
+import { buildTurnUpdateBullets } from './turnUpdateSummary';
 import type {
   GameStateSnapshot,
   GameApi,
@@ -35,6 +42,10 @@ import type {
   HexBuildQueueSnapshot,
   MovementOrder,
   RangedAttackOrder,
+  AirStrikeOrder,
+  AirStrikeAnimationMove,
+  AirStrikeTargetType,
+  FerryOrder,
   RemovedUnitSnapshot,
   HumanOrderPreviewResult,
   HumanOrderGroupPreviewResult,
@@ -45,6 +56,10 @@ import {
   buildUnitDisplayNameLookup,
   fallbackDisplayNameFromUnitId,
 } from '../shared/unitDisplayNames';
+import {
+  MOVEMENT_RANGE_BY_UNIT_TYPE,
+  RANGED_RANGE_BY_UNIT_TYPE,
+} from '../shared/tacticalRanges';
 
 /** One executed move (human or AI) for resolution-phase fade animation. */
 interface ResolutionMove {
@@ -53,24 +68,18 @@ interface ResolutionMove {
   toH3Index: string;
 }
 
+interface ResolutionPlaybackMove {
+  unitId: string;
+  player: string;
+  unitType: string;
+  fromH3Index: string;
+  toH3Index: string;
+}
+
 interface HoverRoutePreviewState {
   hoveredH3Index: string;
   data: HumanOrderGroupPreviewResult;
 }
-
-/** Ranged range in hexes by unit type (0 = melee only). Matches combat spec. */
-const RANGED_RANGE: Record<string, number> = {
-  infantry: 0,
-  armor: 1,
-  naval: 2,
-};
-
-/** Per-turn movement budget in hex edges by unit type. */
-const MOVEMENT_RANGE: Record<string, number> = {
-  infantry: 1,
-  armor: 2,
-  naval: 2,
-};
 
 declare global {
   interface Window {
@@ -91,6 +100,7 @@ const UNIT_TYPE_LABELS: Record<string, string> = {
   infantry: 'I',
   armor: 'A',
   naval: 'N',
+  air: 'S',
 };
 
 const ORDER_LINE_COLOR = '#2e5a7b';
@@ -102,17 +112,35 @@ const RESOLUTION_FADE_MS = 1000;
 /** Combat (lightning) and casualty (red X) phases each use this duration; they run before movement. */
 const LIGHTNING_DURATION_MS = 1000;
 
-/** 5-phase resolution: ranged lightning → ranged casualty → movement → melee lightning → melee casualty. */
-function getResolutionPhase5(
+/** Resolution playback phases: air-strike outbound/lightning/casualty/return, then ranged, movement, and melee. */
+function getResolutionPlaybackPhase(
   elapsed: number,
+  hasAirStrikeOutbound: boolean,
+  hasAirStrikeCombat: boolean,
+  hasAirStrikeCasualties: boolean,
+  hasAirStrikeReturn: boolean,
   hasRangedCombat: boolean,
   hasRangedCasualties: boolean,
   hasMeleeCombat: boolean,
   hasMeleeCasualties: boolean
 ): {
+  airStrikeOutboundStart: number;
+  airStrikeCombatStart: number;
+  airStrikeCasualtyStart: number;
+  airStrikeReturnStart: number;
+  rangedCombatStart: number;
+  rangedCasualtyStart: number;
   movementStart: number;
+  meleeCombatStart: number;
+  meleeCasualtyStart: number;
   totalMs: number;
+  airStrikeOutboundProgress: number;
+  airStrikeReturnProgress: number;
   moveProgress: number;
+  inAirStrikeOutbound: boolean;
+  inAirStrikeLightning: boolean;
+  inAirStrikeCasualty: boolean;
+  inAirStrikeReturn: boolean;
   inRangedLightning: boolean;
   inRangedCasualty: boolean;
   inMeleeLightning: boolean;
@@ -120,24 +148,109 @@ function getResolutionPhase5(
   inMovement: boolean;
 } {
   const L = LIGHTNING_DURATION_MS;
-  const rangedLightningEnd = hasRangedCombat ? L : 0;
-  const rangedCasualtyEnd = rangedLightningEnd + (hasRangedCasualties ? L : 0);
+  const M = RESOLUTION_FADE_MS;
+  const airStrikeOutboundStart = 0;
+  const airStrikeOutboundEnd = airStrikeOutboundStart + (hasAirStrikeOutbound ? M : 0);
+  const airStrikeCombatStart = airStrikeOutboundEnd;
+  const airStrikeCombatEnd = airStrikeCombatStart + (hasAirStrikeCombat ? L : 0);
+  const airStrikeCasualtyStart = airStrikeCombatEnd;
+  const airStrikeCasualtyEnd = airStrikeCasualtyStart + (hasAirStrikeCasualties ? L : 0);
+  const airStrikeReturnStart = airStrikeCasualtyEnd;
+  const airStrikeReturnEnd = airStrikeReturnStart + (hasAirStrikeReturn ? M : 0);
+  const rangedCombatStart = airStrikeReturnEnd;
+  const rangedLightningEnd = rangedCombatStart + (hasRangedCombat ? L : 0);
+  const rangedCasualtyStart = rangedLightningEnd;
+  const rangedCasualtyEnd = rangedCasualtyStart + (hasRangedCasualties ? L : 0);
   const movementStart = rangedCasualtyEnd;
-  const movementEnd = movementStart + RESOLUTION_FADE_MS;
-  const meleeLightningEnd = movementEnd + (hasMeleeCombat ? L : 0);
-  const meleeCasualtyEnd = meleeLightningEnd + (hasMeleeCasualties ? L : 0);
+  const movementEnd = movementStart + M;
+  const meleeCombatStart = movementEnd;
+  const meleeLightningEnd = meleeCombatStart + (hasMeleeCombat ? L : 0);
+  const meleeCasualtyStart = meleeLightningEnd;
+  const meleeCasualtyEnd = meleeCasualtyStart + (hasMeleeCasualties ? L : 0);
   const totalMs = meleeCasualtyEnd;
-  const moveProgress =
-    elapsed < movementStart ? 0 : elapsed >= movementEnd ? 1 : (elapsed - movementStart) / RESOLUTION_FADE_MS;
+  const airStrikeOutboundProgress =
+    !hasAirStrikeOutbound || elapsed < airStrikeOutboundStart
+      ? 0
+      : elapsed >= airStrikeOutboundEnd
+        ? 1
+        : (elapsed - airStrikeOutboundStart) / M;
+  const airStrikeReturnProgress =
+    !hasAirStrikeReturn || elapsed < airStrikeReturnStart
+      ? 0
+      : elapsed >= airStrikeReturnEnd
+        ? 1
+        : (elapsed - airStrikeReturnStart) / M;
+  const moveProgress = elapsed < movementStart ? 0 : elapsed >= movementEnd ? 1 : (elapsed - movementStart) / M;
   return {
+    airStrikeOutboundStart,
+    airStrikeCombatStart,
+    airStrikeCasualtyStart,
+    airStrikeReturnStart,
+    rangedCombatStart,
+    rangedCasualtyStart,
     movementStart,
+    meleeCombatStart,
+    meleeCasualtyStart,
     totalMs,
+    airStrikeOutboundProgress,
+    airStrikeReturnProgress,
     moveProgress,
-    inRangedLightning: hasRangedCombat && elapsed < rangedLightningEnd,
-    inRangedCasualty: hasRangedCasualties && elapsed >= rangedLightningEnd && elapsed < rangedCasualtyEnd,
+    inAirStrikeOutbound: hasAirStrikeOutbound && elapsed >= airStrikeOutboundStart && elapsed < airStrikeOutboundEnd,
+    inAirStrikeLightning: hasAirStrikeCombat && elapsed >= airStrikeCombatStart && elapsed < airStrikeCombatEnd,
+    inAirStrikeCasualty: hasAirStrikeCasualties && elapsed >= airStrikeCasualtyStart && elapsed < airStrikeCasualtyEnd,
+    inAirStrikeReturn: hasAirStrikeReturn && elapsed >= airStrikeReturnStart && elapsed < airStrikeReturnEnd,
+    inRangedLightning: hasRangedCombat && elapsed >= rangedCombatStart && elapsed < rangedLightningEnd,
+    inRangedCasualty: hasRangedCasualties && elapsed >= rangedCasualtyStart && elapsed < rangedCasualtyEnd,
     inMovement: elapsed >= movementStart && elapsed < movementEnd,
-    inMeleeLightning: hasMeleeCombat && elapsed >= movementEnd && elapsed < meleeLightningEnd,
-    inMeleeCasualty: hasMeleeCasualties && elapsed >= meleeLightningEnd && elapsed < meleeCasualtyEnd,
+    inMeleeLightning: hasMeleeCombat && elapsed >= meleeCombatStart && elapsed < meleeLightningEnd,
+    inMeleeCasualty: hasMeleeCasualties && elapsed >= meleeCasualtyStart && elapsed < meleeCasualtyEnd,
+  };
+}
+
+interface ResolutionPlaybackState {
+  hasAirStrikeOutbound: boolean;
+  hasAirStrikeCombat: boolean;
+  hasAirStrikeCasualties: boolean;
+  hasAirStrikeReturn: boolean;
+  hasRangedCombat: boolean;
+  hasRangedCasualties: boolean;
+  hasMeleeCombat: boolean;
+  hasMeleeCasualties: boolean;
+  phase: ReturnType<typeof getResolutionPlaybackPhase>;
+}
+
+function buildResolutionPlaybackState(
+  anim: NonNullable<typeof resolutionMoveAnimation>,
+  elapsed: number
+): ResolutionPlaybackState {
+  const hasAirStrikeOutbound = (anim.airStrikeOutboundMoves?.length ?? 0) > 0;
+  const hasAirStrikeCombat = (anim.airStrikeCombatHexes?.length ?? 0) > 0;
+  const hasAirStrikeCasualties = (anim.airStrikeCasualtyHexes?.length ?? 0) > 0;
+  const hasAirStrikeReturn = (anim.airStrikeReturnMoves?.length ?? 0) > 0;
+  const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
+  const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
+  const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0 || (anim.controlLossLightningHexes?.length ?? 0) > 0;
+  const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
+  return {
+    hasAirStrikeOutbound,
+    hasAirStrikeCombat,
+    hasAirStrikeCasualties,
+    hasAirStrikeReturn,
+    hasRangedCombat,
+    hasRangedCasualties,
+    hasMeleeCombat,
+    hasMeleeCasualties,
+    phase: getResolutionPlaybackPhase(
+      elapsed,
+      hasAirStrikeOutbound,
+      hasAirStrikeCombat,
+      hasAirStrikeCasualties,
+      hasAirStrikeReturn,
+      hasRangedCombat,
+      hasRangedCasualties,
+      hasMeleeCombat,
+      hasMeleeCasualties
+    ),
   };
 }
 
@@ -495,15 +608,16 @@ function formatTerrainKindLabel(kind: string): string {
 /**
  * Resolves base terrain kind + urban variation state for a res-1 gameplay hex.
  */
-function terrainStateForRes1Hex(h3: string): { terrainKind: string; isUrban: boolean } {
-  if (!gameState) return { terrainKind: 'Unknown', isUrban: false };
+function terrainStateForRes1Hex(h3: string): { terrainKind: string; isUrban: boolean; isRubble: boolean } {
+  if (!gameState) return { terrainKind: 'Unknown', isUrban: false, isRubble: false };
   const hx = gameState.hexes.find((h) => h.h3Index === h3);
-  if (!hx) return { terrainKind: 'Unknown', isUrban: false };
+  if (!hx) return { terrainKind: 'Unknown', isUrban: false, isRubble: false };
   return {
     terrainKind:
     hx.terrainKind ??
     (hx.terrain === 'water' ? 'water' : hx.terrain === 'coastal' ? 'coastal' : hx.terrain === 'wetlands' ? 'wetlands' : 'plains'),
     isUrban: false,
+    isRubble: false,
   };
 }
 
@@ -513,15 +627,19 @@ function terrainKindForRes1Hex(h3: string): string {
 
 function featureLabelsForRes1Hex(h3: string): string[] {
   if (!infraGlyphsAllowedForRes1Hex(h3)) return [];
+  const counts = getRes1FeatureCounts(h3);
   const labels: string[] = [];
-  if (terrainInfraRes1Airport.has(h3)) labels.push('Airports');
-  if (terrainInfraRes1Seaport.has(h3)) labels.push('Seaports');
+  if (counts.airportCount > 0) labels.push('Airports');
+  if (counts.seaportCount > 0) labels.push('Seaports');
+  if (counts.rubbleCount > 0) labels.push('Rubble');
   return labels;
 }
 
 function featureLabelsForRes4Child(parentH3: string, childH3: string): string[] {
   if (!infraGlyphsAllowedForRes4Child(parentH3, childH3)) return [];
   const labels: string[] = [];
+  const detail = res4TerrainOverridesByH3.get(childH3);
+  if (detail?.isRubble) labels.push('Rubble');
   if (terrainInfraRes4Airport.has(childH3)) labels.push('Airport');
   if (terrainInfraRes4Seaport.has(childH3)) labels.push('Seaport');
   return labels;
@@ -530,6 +648,7 @@ function featureLabelsForRes4Child(parentH3: string, childH3: string): string[] 
 interface TerrainTooltipState {
   terrainKind: string;
   isUrban: boolean;
+  isRubble: boolean;
   features: string[];
   urbanHexCount: number | null;
   res1TerrainSummary: string | null;
@@ -552,6 +671,11 @@ function countUrbanRes4HexesInRes1Hex(parentH3: string): number {
     if (res4TerrainOverridesByH3.get(child)?.isUrban) count++;
   }
   return count;
+}
+
+function getUrbanProductionCapacityForHex(h3Index: string): number {
+  // Canonical capacity is the current count of urban res4 children.
+  return countUrbanRes4HexesInRes1Hex(h3Index);
 }
 
 function getControllerForHex(state: GameStateSnapshot, h3Index: string): string | null {
@@ -578,7 +702,7 @@ function isRes1HexHumanUrbanProduction(
 ): boolean {
   if (hx.terrain === 'water') return false;
   if (getControllerForHex(state, hx.h3Index) !== 'human') return false;
-  return countUrbanRes4HexesInRes1Hex(hx.h3Index) > 0;
+  return getUrbanProductionCapacityForHex(hx.h3Index) > 0;
 }
 
 function getBuildQueueSummaryForHex(
@@ -595,10 +719,10 @@ function getUnitCountsByTypeForPlayer(
   state: GameStateSnapshot,
   playerId: 'human' | 'opponent'
 ): UnitCountsByType {
-  const counts: UnitCountsByType = { infantry: 0, armor: 0, naval: 0 };
+  const counts: UnitCountsByType = { infantry: 0, armor: 0, naval: 0, air: 0 };
   for (const unit of state.units) {
     if (unit.player !== playerId) continue;
-    if (unit.unitType === 'infantry' || unit.unitType === 'armor' || unit.unitType === 'naval') {
+    if (unit.unitType === 'infantry' || unit.unitType === 'armor' || unit.unitType === 'naval' || unit.unitType === 'air') {
       counts[unit.unitType] += 1;
     }
   }
@@ -693,12 +817,35 @@ function formatPercentInteger(value: number): string {
 const res1DominantTerrainKindByH3 = new Map<string, string>();
 const res1TerrainSummaryByH3 = new Map<string, string>();
 const res1FeaturesSummaryByH3 = new Map<string, string | null>();
+const res1FeatureCountsByH3 = new Map<string, { airportCount: number; seaportCount: number; rubbleCount: number }>();
 
 function clearRes1TooltipSummaryCaches(): void {
   res1DominantTerrainKindByH3.clear();
   res1TerrainSummaryByH3.clear();
   res1FeaturesSummaryByH3.clear();
+  res1FeatureCountsByH3.clear();
   terrainTooltipHtmlByContentKey.clear();
+}
+
+function getRes1FeatureCounts(h3: string): { airportCount: number; seaportCount: number; rubbleCount: number } {
+  const cached = res1FeatureCountsByH3.get(h3);
+  if (cached) return cached;
+  let children = res4ChildrenByParent.get(h3);
+  if (!children) {
+    children = cellToChildren(h3, DETAIL_H3_RESOLUTION);
+    res4ChildrenByParent.set(h3, children);
+  }
+  let airportCount = 0;
+  let seaportCount = 0;
+  let rubbleCount = 0;
+  for (const child of children) {
+    if (terrainInfraRes4Airport.has(child)) airportCount++;
+    if (terrainInfraRes4Seaport.has(child)) seaportCount++;
+    if (res4TerrainOverridesByH3.get(child)?.isRubble) rubbleCount++;
+  }
+  const counts = { airportCount, seaportCount, rubbleCount };
+  res1FeatureCountsByH3.set(h3, counts);
+  return counts;
 }
 
 function getRes1DominantTerrainKind(h3: string, parentKind: string): string {
@@ -777,25 +924,15 @@ function getRes1TerrainSummary(h3: string, parentKind: string): string {
 
 function getRes1FeaturesSummary(h3: string): string | null {
   if (res1FeaturesSummaryByH3.has(h3)) return res1FeaturesSummaryByH3.get(h3) ?? null;
-  const labels = featureLabelsForRes1Hex(h3);
-  if (labels.length === 0) {
+  if (!infraGlyphsAllowedForRes1Hex(h3)) {
     res1FeaturesSummaryByH3.set(h3, null);
     return null;
   }
-  let children = res4ChildrenByParent.get(h3);
-  if (!children) {
-    children = cellToChildren(h3, DETAIL_H3_RESOLUTION);
-    res4ChildrenByParent.set(h3, children);
-  }
-  let airportCount = 0;
-  let seaportCount = 0;
-  for (const child of children) {
-    if (terrainInfraRes4Airport.has(child)) airportCount++;
-    if (terrainInfraRes4Seaport.has(child)) seaportCount++;
-  }
+  const { airportCount, seaportCount, rubbleCount } = getRes1FeatureCounts(h3);
   const parts: string[] = [];
-  if (labels.includes('Airports')) parts.push(`Airports (${airportCount.toLocaleString()})`);
-  if (labels.includes('Seaports')) parts.push(`Seaports (${seaportCount.toLocaleString()})`);
+  if (airportCount > 0) parts.push(`Airports (${airportCount.toLocaleString()})`);
+  if (seaportCount > 0) parts.push(`Seaports (${seaportCount.toLocaleString()})`);
+  if (rubbleCount > 0) parts.push(`Rubble (${rubbleCount.toLocaleString()})`);
   const summary = parts.length > 0 ? parts.join(', ') : null;
   res1FeaturesSummaryByH3.set(h3, summary);
   return summary;
@@ -821,6 +958,7 @@ function terrainStateForPointer(
     return {
       terrainKind: 'Unknown',
       isUrban: false,
+      isRubble: false,
       features: [],
       urbanHexCount: null,
       res1TerrainSummary: null,
@@ -833,6 +971,7 @@ function terrainStateForPointer(
       return {
         terrainKind: 'Unknown',
         isUrban: false,
+        isRubble: false,
         features: [],
         urbanHexCount: null,
         res1TerrainSummary: null,
@@ -852,6 +991,7 @@ function terrainStateForPointer(
       return {
         terrainKind: 'Unknown',
         isUrban: false,
+        isRubble: false,
         features: [],
         urbanHexCount: null,
         res1TerrainSummary: null,
@@ -871,6 +1011,7 @@ function terrainStateForPointer(
     return {
       terrainKind: detail?.terrainKind ?? parentKind,
       isUrban: detail?.isUrban ?? false,
+      isRubble: detail?.isRubble ?? false,
       features: featureLabelsForRes4Child(parentH3, detailH3),
       urbanHexCount: null,
       res1TerrainSummary: null,
@@ -881,6 +1022,7 @@ function terrainStateForPointer(
       return {
         terrainKind: 'Unknown',
         isUrban: false,
+        isRubble: false,
         features: [],
         urbanHexCount: null,
         res1TerrainSummary: null,
@@ -975,9 +1117,16 @@ function formatGroupedNamingLineHtml(namingLine: string): string {
   return formattedGroups.join('; ');
 }
 
+function formatTerrainVariantSuffix(state: Pick<TerrainTooltipState, 'isUrban' | 'isRubble'>): string {
+  const variants: string[] = [];
+  if (state.isUrban) variants.push('Urban');
+  if (state.isRubble) variants.push('Rubble');
+  return variants.length > 0 ? `, ${variants.join(', ')}` : '';
+}
+
 function formatTerrainTooltipHtml(state: TerrainTooltipState, namingLine: string | null): string {
   const terrainLabel = formatTerrainKindLabel(state.terrainKind);
-  const terrainValue = state.res1TerrainSummary ?? (state.isUrban ? `${terrainLabel}, Urban` : terrainLabel);
+  const terrainValue = state.res1TerrainSummary ?? `${terrainLabel}${formatTerrainVariantSuffix(state)}`;
   const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
   const bodyParts: string[] = [terrainLine];
   if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
@@ -991,11 +1140,12 @@ function formatTerrainTooltipHtml(state: TerrainTooltipState, namingLine: string
 function terrainTooltipContentKey(state: TerrainTooltipState, namingLine: string | null): string {
   const namingKey = namingLine ?? '';
   const urbanKey = state.isUrban ? '1' : '0';
+  const rubbleKey = state.isRubble ? '1' : '0';
   const featuresKey = state.features.join('|');
   const urbanHexCountKey = state.urbanHexCount == null ? 'x' : String(state.urbanHexCount);
   const res1TerrainSummaryKey = state.res1TerrainSummary ?? '';
   const res1FeaturesSummaryKey = state.res1FeaturesSummary ?? '';
-  return `${namingKey}::${state.terrainKind}::${urbanKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}`;
+  return `${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}`;
 }
 
 function getCachedTerrainTooltipHtml(state: TerrainTooltipState, namingLine: string | null): string {
@@ -1361,17 +1511,23 @@ let humanStandingOrders: HumanStandingOrderSnapshot[] = [];
 let hoverRoutePreview: HoverRoutePreviewState | null = null;
 let hoverPreviewRequestSeq = 0;
 let pendingRangedAttacks: RangedAttackOrder[] = [];
+let pendingAirStrikes: AirStrikeOrder[] = [];
+let pendingFerryOrders: FerryOrder[] = [];
 let hideCommittedOrderLinesAfterReady = false;
 /** When true, next hex click sets ranged attack target for selected unit (if valid). */
 let rangedModeActive = false;
+let airStrikeModeActive = false;
+let airStrikeTargetType: AirStrikeTargetType = 'units';
 let stackCalloutModalActive = false;
 /** Res-1 hex for the open build popup; null when the popup is hidden. */
 let buildPopupHexH3: string | null = null;
 let buildPopupRequestSeq = 0;
 let gameState: GameStateSnapshot | null = null;
 let unitDisplayNameById = new Map<string, string>();
-let res4TerrainOverridesByH3 = new Map<string, { terrainKind: string; isUrban: boolean }>();
-/** Major airport/seaport H3 from metadata (scalerank ≤ 5); populated via IPC at startup. */
+let res4TerrainOverridesByH3 = new Map<
+  string,
+  { terrainKind: string; isUrban: boolean; isAirport: boolean; isSeaport: boolean; isRubble: boolean }
+>();
 let terrainInfraRes1Airport = new Set<string>();
 let terrainInfraRes1Seaport = new Set<string>();
 let terrainInfraRes4Airport = new Set<string>();
@@ -1381,6 +1537,10 @@ let res4Visible = false;
 /** When non-null, we are animating resolution: ranged lightning → ranged casualty → movement → melee lightning → melee casualty. */
 let resolutionMoveAnimation: {
   moves: ResolutionMove[];
+  airStrikeOutboundMoves?: ResolutionPlaybackMove[];
+  airStrikeReturnMoves?: ResolutionPlaybackMove[];
+  airStrikeCombatHexes?: string[];
+  airStrikeCasualtyHexes?: string[];
   startTime: number;
   /** Legacy combined (for backward compat); prefer ranged/melee split. */
   combatHexes?: string[];
@@ -1416,8 +1576,47 @@ function rebuildUnitDisplayNameLookup(state: GameStateSnapshot | null): void {
   unitDisplayNameById = state ? buildUnitDisplayNameLookup(state.units) : new Map<string, string>();
 }
 
+function applyRes4TerrainOverrides(rows: Array<{
+  h3Index: string;
+  terrainKind: string;
+  isUrban: boolean;
+  isAirport?: boolean;
+  isSeaport?: boolean;
+  isRubble?: boolean;
+}>): void {
+  const nextState = deriveInfrastructureOverlayState(rows);
+  res4TerrainOverridesByH3 = nextState.res4TerrainOverridesByH3;
+  terrainInfraRes1Airport = nextState.terrainInfraRes1Airport;
+  terrainInfraRes1Seaport = nextState.terrainInfraRes1Seaport;
+  terrainInfraRes4Airport = nextState.terrainInfraRes4Airport;
+  terrainInfraRes4Seaport = nextState.terrainInfraRes4Seaport;
+  clearRes1TooltipSummaryCaches();
+}
+
+async function refreshRes4TerrainOverridesForRenderer(): Promise<void> {
+  if (!window.gameApi?.getRes4TerrainOverrides) return;
+  try {
+    const rows = await window.gameApi.getRes4TerrainOverrides();
+    applyRes4TerrainOverrides(rows);
+    requestRedraw();
+  } catch (err) {
+    console.error('getRes4TerrainOverrides failed:', err);
+  }
+}
+
 function formatUnitDisplayName(unitId: string): string {
   return unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
+}
+
+function formatTargetingValidationReason(reason: string | undefined, fallbackMessage: string): string {
+  const trimmed = reason?.trim();
+  if (!trimmed) return fallbackMessage;
+  const prefixed = trimmed.match(/^([^:]+):\s+(.+)$/);
+  if (!prefixed) return trimmed;
+  const unitId = prefixed[1] ?? '';
+  const unitReason = prefixed[2] ?? '';
+  if (!unitId || !unitReason) return trimmed;
+  return `${formatUnitDisplayName(unitId)}: ${unitReason}`;
 }
 
 function reconcileSelectionToCurrentState(): void {
@@ -1438,6 +1637,7 @@ function replaceSelection(unitIds: string[]): void {
     hoverRoutePreview = null;
     hoverPreviewRequestSeq++;
     rangedModeActive = false;
+    airStrikeModeActive = false;
     return;
   }
   const primary = gameState?.units.find((u) => u.id === selectedUnitIds[0]);
@@ -1487,6 +1687,7 @@ function inferUnitTypeLabelFromId(unitId: string): string {
   if (unitId.includes('-infantry-')) return 'I';
   if (unitId.includes('-armor-')) return 'A';
   if (unitId.includes('-naval-')) return 'N';
+  if (unitId.includes('-air-')) return 'S';
   return '?';
 }
 
@@ -1725,6 +1926,7 @@ function drawTerrainHexes(ctx: CanvasRenderingContext2D): void {
   if (!gameState) return;
   const exploredHexes = getExploredHexSet(gameState);
   const res4Active = shouldRenderRes4Hexes();
+  if (res4Active) return;
   const map = getMainLeafletMap() as
     | { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } }
     | null;
@@ -1859,10 +2061,10 @@ function hasVisibleRes1InfrastructureGlyphs(
   res4On: boolean,
   unitHexes: Set<string>
 ): boolean {
+  void unitHexes;
   return (
     !res4On &&
     infraGlyphsAllowedForRes1Hex(h3Index) &&
-    !unitHexes.has(h3Index) &&
     (terrainInfraRes1Airport.has(h3Index) || terrainInfraRes1Seaport.has(h3Index))
   );
 }
@@ -1915,7 +2117,7 @@ function syncBuildEntryButton(): void {
     const explored = isHexExploredByPlayer(hx.h3Index);
     if (!explored) continue;
     if (!isRes1HexHumanUrbanProduction(gameState, hx)) continue;
-    const capacityPerTurn = countUrbanRes4HexesInRes1Hex(hx.h3Index);
+    const capacityPerTurn = getUrbanProductionCapacityForHex(hx.h3Index);
     const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs(hx.h3Index, res4On, visibleUnitHexes);
     const hasVisibleUnits = visibleUnitHexes.has(hx.h3Index);
     const center = hexCenterPx(hx.h3Index);
@@ -2035,6 +2237,7 @@ function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void {
       const override = res4TerrainOverridesByH3.get(child);
       const terrainKind = override?.terrainKind ?? parentKind;
       const isUrban = override?.isUrban ?? false;
+      const isRubble = override?.isRubble ?? false;
       const pts = projectHexBoundaryToContainerPoints(child, map, L);
       if (!projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight)) continue;
       const drawClosedPath = (): void => {
@@ -2051,6 +2254,7 @@ function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void {
           fillAndHatchAlphaScale: hoveredDetailHexH3 === child ? 2 : 1,
           landHoverFill: hoveredDetailHexH3 === child && terrainKind === 'plains',
           isUrban,
+          isRubble,
         });
       }
       ctx.strokeStyle = stroke.color;
@@ -2097,11 +2301,9 @@ function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void 
   const outlineScreenPx = Math.max(0.5, 0.58 * zoomStrokeScale);
   const L = getLeafletGlobal();
   const res4On = shouldRenderRes4Hexes();
-  const unitHexes = new Set(gameState.units.map((u) => u.h3Index));
 
   if (!res4On) {
     for (const hx of gameState.hexes) {
-      if (unitHexes.has(hx.h3Index)) continue;
       if (!infraGlyphsAllowedForRes1Hex(hx.h3Index)) continue;
       const ap = terrainInfraRes1Airport.has(hx.h3Index);
       const pt = terrainInfraRes1Seaport.has(hx.h3Index);
@@ -2125,7 +2327,6 @@ function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void 
   const viewportWidth = Math.max(1, container.clientWidth);
   const viewportHeight = Math.max(1, container.clientHeight);
   for (const parent of gameState.hexes) {
-    if (unitHexes.has(parent.h3Index)) continue;
     let children = res4ChildrenByParent.get(parent.h3Index);
     if (!children) {
       children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
@@ -2171,9 +2372,10 @@ function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void {
     if (hx.terrain === 'water') continue;
     const controller = getControllerForHex(gameState, hx.h3Index);
     const controlledByHuman = controller === 'human';
-    const capacityPerTurn = countUrbanRes4HexesInRes1Hex(hx.h3Index);
+    const capacityPerTurn = getUrbanProductionCapacityForHex(hx.h3Index);
     if (!overlayContext.mapInspectionHeld) {
-      if (!isRes1HexHumanUrbanProduction(gameState, hx)) continue;
+      const canShowLabelWithoutInspection = isRes1HexHumanUrbanProduction(gameState, hx) || controlledByHuman;
+      if (!canShowLabelWithoutInspection) continue;
     }
     const hasUrbanCapacity = capacityPerTurn > 0;
     const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs(hx.h3Index, false, overlayContext.unitHexes);
@@ -2639,34 +2841,6 @@ async function callReadyWithTimeout(payload: Record<string, unknown>): Promise<A
   ]);
 }
 
-function formatDeployedUnitsLine(
-  deployed: { armor?: number; infantry?: number; naval?: number } | undefined
-): string | null {
-  if (!deployed) return null;
-  const parts: string[] = [];
-  if ((deployed.armor ?? 0) > 0) parts.push(`${deployed.armor!.toLocaleString()} armor`);
-  if ((deployed.infantry ?? 0) > 0) parts.push(`${deployed.infantry!.toLocaleString()} infantry`);
-  if ((deployed.naval ?? 0) > 0) parts.push(`${deployed.naval!.toLocaleString()} naval`);
-  if (parts.length === 0) return null;
-  if (parts.length === 1) return `${parts[0]} units deployed`;
-  if (parts.length === 2) return `${parts[0]} and ${parts[1]} units deployed`;
-  return `${parts[0]}, ${parts[1]}, and ${parts[2]} units deployed`;
-}
-
-function formatDeploymentCapReachedLine(
-  cappedTypes: Array<'infantry' | 'armor' | 'naval'> | undefined,
-  player: 'human' | 'opponent'
-): string | null {
-  // Update toasts intentionally only announce the human player's deployment-cap state.
-  if (player !== 'human') return null;
-  if (!cappedTypes || cappedTypes.length === 0) return null;
-  const ordered = (['infantry', 'armor', 'naval'] as const).filter((unitType) => cappedTypes.includes(unitType));
-  if (ordered.length === 0) return null;
-  if (ordered.length === 1) return `Maximum human ${ordered[0]} units deployed.`;
-  if (ordered.length === 2) return `Maximum human ${ordered[0]} and ${ordered[1]} units deployed.`;
-  return `Maximum human ${ordered[0]}, ${ordered[1]}, and ${ordered[2]} units deployed.`;
-}
-
 /**
  * Draws a neutral loading canvas while map/game state is still initializing.
  */
@@ -2692,22 +2866,34 @@ function getUnitsForDrawWithMovingIds(state: GameStateSnapshot): {
   const anim = resolutionMoveAnimation;
   if (anim) {
     const elapsed = Date.now() - anim.startTime;
-    const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
-    const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
-    const hasMeleeCombat =
-      (anim.meleeCombatHexes?.length ?? 0) > 0 ||
-      (anim.controlLossLightningHexes?.length ?? 0) > 0;
-    const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
-    const phase = getResolutionPhase5(
-      elapsed,
-      hasRangedCombat,
-      hasRangedCasualties,
-      hasMeleeCombat,
-      hasMeleeCasualties
-    );
+    const { phase } = buildResolutionPlaybackState(anim, elapsed);
     const moveProgress = phase.moveProgress;
     const rangedRemovedIds = new Set((anim.rangedRemovedUnits ?? []).map((u) => u.id));
-    if (phase.inRangedLightning || phase.inRangedCasualty) {
+    if (phase.inAirStrikeOutbound) {
+      unitsToDraw = state.units;
+      movingIds = new Set((anim.airStrikeOutboundMoves ?? []).map((move) => move.unitId));
+    } else if (phase.inAirStrikeLightning || phase.inAirStrikeCasualty) {
+      const strikeMoves = anim.airStrikeOutboundMoves ?? [];
+      const strikeMoveById = new Map(strikeMoves.map((move) => [move.unitId, move]));
+      const staticUnits = state.units.filter((unit) => !strikeMoveById.has(unit.id));
+      const strikeUnitsAtTarget = strikeMoves.map((move) => {
+        const existing = state.units.find((unit) => unit.id === move.unitId);
+        if (existing) {
+          return { ...existing, h3Index: move.toH3Index };
+        }
+        return {
+          id: move.unitId,
+          player: move.player,
+          unitType: move.unitType,
+          h3Index: move.toH3Index,
+        };
+      });
+      unitsToDraw = [...staticUnits, ...strikeUnitsAtTarget];
+      movingIds = undefined;
+    } else if (phase.inAirStrikeReturn) {
+      unitsToDraw = state.units;
+      movingIds = new Set((anim.airStrikeReturnMoves ?? []).map((move) => move.unitId));
+    } else if (phase.inRangedLightning || phase.inRangedCasualty) {
       const preMoveSurvivors = state.units
         .filter((u) => !rangedRemovedIds.has(u.id))
         .map((u) => {
@@ -2867,26 +3053,29 @@ function drawGameScene(
   drawRes4TerrainHexes(ctx);
   const hexList = state.hexes.map((h) => h.h3Index);
   let moveProgress = 1;
-  const { unitsToDraw, movingIds } = getUnitsForDrawWithMovingIds(state);
+  let airStrikeOutboundProgress = 1;
+  let airStrikeReturnProgress = 1;
+  let playbackPhase: ReturnType<typeof getResolutionPlaybackPhase> | null = null;
   const anim = resolutionMoveAnimation;
+  const regularPlaybackMoves = buildResolutionPlaybackMoves(anim?.moves ?? [], state.units);
+  const airStrikeOutboundPlaybackMoves = anim?.airStrikeOutboundMoves ?? [];
+  const airStrikeReturnPlaybackMoves = anim?.airStrikeReturnMoves ?? [];
+  const { unitsToDraw, movingIds } = getUnitsForDrawWithMovingIds(state);
   if (anim) {
     const elapsed = Date.now() - anim.startTime;
-    const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
-    const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
-    const hasMeleeCombat =
-      (anim.meleeCombatHexes?.length ?? 0) > 0 ||
-      (anim.controlLossLightningHexes?.length ?? 0) > 0;
-    const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
-    const phase = getResolutionPhase5(
-      elapsed,
-      hasRangedCombat,
-      hasRangedCasualties,
-      hasMeleeCombat,
-      hasMeleeCasualties
-    );
+    const { phase } = buildResolutionPlaybackState(anim, elapsed);
+    playbackPhase = phase;
     moveProgress = phase.moveProgress;
+    airStrikeOutboundProgress = phase.airStrikeOutboundProgress;
+    airStrikeReturnProgress = phase.airStrikeReturnProgress;
+    if (phase.inAirStrikeOutbound) {
+      drawResolutionMoveLines(ctx, width, height, airStrikeOutboundPlaybackMoves, hexList, 1, { includeArrowForHuman: true });
+    }
+    if (phase.inAirStrikeReturn) {
+      drawResolutionMoveLines(ctx, width, height, airStrikeReturnPlaybackMoves, hexList, 1, { includeArrowForHuman: true });
+    }
     if (elapsed >= phase.movementStart) {
-      drawResolutionMoveLines(ctx, width, height, anim.moves, state.units, hexList, 1);
+      drawResolutionMoveLines(ctx, width, height, regularPlaybackMoves, hexList, 1);
     }
   }
   const shouldDrawCommittedPaths = shouldDrawCommittedOrderPaths();
@@ -2899,35 +3088,37 @@ function drawGameScene(
   if (pendingRangedAttacks.length > 0 && state.units.length && hexList) {
     drawRangedAttackLines(ctx, width, height, pendingRangedAttacks, state.units, hexList);
   }
+  if (pendingAirStrikes.length > 0 && state.units.length && hexList) {
+    drawAirStrikeLines(ctx, pendingAirStrikes, state.units, hexList);
+  }
+  if (pendingFerryOrders.length > 0 && state.units.length && hexList) {
+    drawPendingFerryLines(ctx, pendingFerryOrders, state.units, hexList);
+  }
   drawRes1ProductionOverlays(ctx);
   drawTerrainInfrastructureOverlays(ctx);
   drawStaleEnemyIntel(ctx, state);
   if (unitsToDraw.length) {
     drawUnits(ctx, width, height, unitsToDraw, hexList, movingIds);
   }
-  if (anim && hexList && moveProgress < 1) {
-    drawMovingUnits(ctx, width, height, anim.moves, state.units, hexList, moveProgress);
+  if (anim && hexList) {
+    if (playbackPhase?.inAirStrikeOutbound && airStrikeOutboundProgress < 1) {
+      drawMovingUnits(ctx, width, height, airStrikeOutboundPlaybackMoves, hexList, airStrikeOutboundProgress);
+    } else if (playbackPhase?.inAirStrikeReturn && airStrikeReturnProgress < 1) {
+      drawMovingUnits(ctx, width, height, airStrikeReturnPlaybackMoves, hexList, airStrikeReturnProgress);
+    } else if (moveProgress < 1) {
+      drawMovingUnits(ctx, width, height, regularPlaybackMoves, hexList, moveProgress);
+    }
   }
   if (anim && hexList) {
     const elapsed = Date.now() - anim.startTime;
-    const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
-    const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
-    const hasMeleeCombat =
-      (anim.meleeCombatHexes?.length ?? 0) > 0 ||
-      (anim.controlLossLightningHexes?.length ?? 0) > 0;
-    const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
-    const phase = getResolutionPhase5(
-      elapsed,
-      hasRangedCombat,
-      hasRangedCasualties,
-      hasMeleeCombat,
-      hasMeleeCasualties
-    );
+    const { phase } = buildResolutionPlaybackState(anim, elapsed);
     const meleeCombatHexes = [
       ...(anim.meleeCombatHexes ?? []),
       ...(anim.controlLossLightningHexes ?? []),
     ].filter((h3, idx, arr) => arr.indexOf(h3) === idx);
-    const combatHexes = phase.inRangedLightning
+    const combatHexes = phase.inAirStrikeLightning
+      ? anim.airStrikeCombatHexes
+      : phase.inRangedLightning
       ? (anim.rangedCombatHexes ?? anim.combatHexes)
       : phase.inMeleeLightning
         ? meleeCombatHexes
@@ -2940,11 +3131,19 @@ function drawGameScene(
       drawCombatLightning(ctx, width, height, knownCombatHexes, hexList, pulseOpacity);
       drawUnknownBattleMarkers(ctx, unknownCombatHexes, pulseOpacity);
     }
-    const casualtyHexes = phase.inRangedCasualty ? (anim.rangedCasualtyHexes ?? anim.casualtyHexes) : phase.inMeleeCasualty ? anim.meleeCasualtyHexes : undefined;
+    const casualtyHexes = phase.inAirStrikeCasualty
+      ? anim.airStrikeCasualtyHexes
+      : phase.inRangedCasualty
+        ? (anim.rangedCasualtyHexes ?? anim.casualtyHexes)
+        : phase.inMeleeCasualty
+          ? anim.meleeCasualtyHexes
+          : undefined;
     if (casualtyHexes?.length) {
-      const casualtyElapsed = phase.inRangedCasualty
-        ? elapsed - (hasRangedCombat ? LIGHTNING_DURATION_MS : 0)
-        : elapsed - (phase.movementStart + RESOLUTION_FADE_MS + (hasMeleeCombat ? LIGHTNING_DURATION_MS : 0));
+      const casualtyElapsed = phase.inAirStrikeCasualty
+        ? elapsed - phase.airStrikeCasualtyStart
+        : phase.inRangedCasualty
+          ? elapsed - phase.rangedCasualtyStart
+          : elapsed - phase.meleeCasualtyStart;
       const pulseOpacity = 0.5 + 0.5 * Math.sin(casualtyElapsed * 0.008);
       const unknownSet = new Set(anim.unknownCasualtyHexes ?? []);
       const knownCasualtyHexes = casualtyHexes.filter((h3) => !unknownSet.has(h3));
@@ -3280,6 +3479,97 @@ function drawRangedAttackLines(
   ctx.restore();
 }
 
+function drawAirStrikeLines(
+  ctx: CanvasRenderingContext2D,
+  airStrikes: AirStrikeOrder[],
+  units: GameStateSnapshot['units'],
+  hexList: string[] | undefined
+): void {
+  if (airStrikes.length === 0 || !hexList) return;
+  ctx.save();
+  ctx.setLineDash([2, 6]);
+  ctx.strokeStyle = '#7a3db5';
+  ctx.lineWidth = ORDER_LINE_WIDTH;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (const strike of airStrikes) {
+    const unit = units.find((u) => u.id === strike.unitId);
+    if (!unit) continue;
+    const from = hexCenterPx(unit.h3Index);
+    const to = hexCenterPxRelativeTo(unit.h3Index, strike.targetH3Index);
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawPendingFerryLines(
+  ctx: CanvasRenderingContext2D,
+  ferryOrders: FerryOrder[],
+  units: GameStateSnapshot['units'],
+  hexList: string[] | undefined
+): void {
+  if (ferryOrders.length === 0 || !hexList) return;
+  ctx.save();
+  for (const ferry of ferryOrders) {
+    const unit = units.find((u) => u.id === ferry.unitId);
+    if (!unit) continue;
+    drawLineArrow(
+      ctx,
+      hexCenterPx(unit.h3Index),
+      hexCenterPxRelativeTo(unit.h3Index, ferry.destinationH3Index),
+      ORDER_LINE_COLOR
+    );
+  }
+  ctx.restore();
+}
+
+function buildResolutionPlaybackMoves(
+  moves: ResolutionMove[],
+  units: GameStateSnapshot['units']
+): ResolutionPlaybackMove[] {
+  const byId = new Map(units.map((unit) => [unit.id, unit]));
+  return moves
+    .map((move) => {
+      const unit = byId.get(move.unitId);
+      if (!unit) return null;
+      return {
+        unitId: move.unitId,
+        player: unit.player,
+        unitType: unit.unitType,
+        fromH3Index: move.fromH3Index,
+        toH3Index: move.toH3Index,
+      };
+    })
+    .filter((move): move is ResolutionPlaybackMove => move !== null);
+}
+
+function buildAirStrikeOutboundPlaybackMoves(moves: AirStrikeAnimationMove[] | undefined): ResolutionPlaybackMove[] {
+  if (!moves || moves.length === 0) return [];
+  return moves.map((move) => ({
+    unitId: move.unitId,
+    player: move.player,
+    unitType: move.unitType,
+    fromH3Index: move.fromH3Index,
+    toH3Index: move.targetH3Index,
+  }));
+}
+
+function buildAirStrikeReturnPlaybackMoves(moves: AirStrikeAnimationMove[] | undefined): ResolutionPlaybackMove[] {
+  if (!moves || moves.length === 0) return [];
+  return moves
+    .filter((move) => move.returnsToBase)
+    .map((move) => ({
+      unitId: move.unitId,
+      player: move.player,
+      unitType: move.unitType,
+      fromH3Index: move.targetH3Index,
+      toH3Index: move.fromH3Index,
+    }));
+}
+
 function drawLineArrow(
   ctx: CanvasRenderingContext2D,
   from: { x: number; y: number },
@@ -3442,7 +3732,7 @@ function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
     .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
   const slowestMovementRangeByOriginH3 = new Map<string, number>();
   for (const unit of selectedHumanUnits) {
-    const movementRange = MOVEMENT_RANGE[unit.unitType] ?? 1;
+    const movementRange = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
     const prior = slowestMovementRangeByOriginH3.get(unit.h3Index);
     if (prior === undefined || movementRange < prior) {
       slowestMovementRangeByOriginH3.set(unit.h3Index, movementRange);
@@ -3557,21 +3847,24 @@ function drawResolutionMoveLines(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,
   canvasHeight: number,
-  moves: ResolutionMove[],
-  units: GameStateSnapshot['units'],
+  moves: ResolutionPlaybackMove[],
   hexList: string[] | undefined,
-  opacity: number
+  opacity: number,
+  options?: { includeArrowForHuman?: boolean }
 ): void {
   if (moves.length === 0 || !hexList || opacity <= 0) return;
   ctx.save();
   ctx.globalAlpha = opacity;
+  const includeArrowForHuman = options?.includeArrowForHuman === true;
   for (const move of moves) {
-    const unit = units.find((u) => u.id === move.unitId);
-    if (!unit) continue;
-    const isHumanMove = unit.player === 'human';
-    const lineColor = unit.player === 'human' ? ORDER_LINE_COLOR : AI_ORDER_LINE_COLOR;
+    const isHumanMove = move.player === 'human';
+    const lineColor = move.player === 'human' ? ORDER_LINE_COLOR : AI_ORDER_LINE_COLOR;
     const from = hexCenterPx(move.fromH3Index);
     const to = hexCenterPxRelativeTo(move.fromH3Index, move.toH3Index);
+    if (isHumanMove && includeArrowForHuman) {
+      drawLineArrow(ctx, from, to, lineColor);
+      continue;
+    }
     const dx = to.x - from.x;
     const dy = to.y - from.y;
     const len = Math.hypot(dx, dy) || 1;
@@ -3615,8 +3908,7 @@ function drawMovingUnits(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,
   canvasHeight: number,
-  moves: ResolutionMove[],
-  units: GameStateSnapshot['units'],
+  moves: ResolutionPlaybackMove[],
   hexList: string[],
   progress: number
 ): void {
@@ -3628,18 +3920,15 @@ function drawMovingUnits(
     | null;
   if (!map) return;
   const L = getLeafletGlobal();
-  const unitsById = new Map<string, GameStateSnapshot['units'][number]>(units.map((u) => [u.id, u]));
   for (const move of moves) {
-    const unit = unitsById.get(move.unitId);
-    if (!unit) continue;
     const [lat0, lng0] = cellToLatLng(move.fromH3Index);
     const [lat1, lng1] = cellToLatLng(move.toH3Index);
     const lng1Aligned = alignLngToReference(lng1, lng0);
     const lat = lat0 + progress * (lat1 - lat0);
     const lng = lng0 + progress * (lng1Aligned - lng0);
     const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
-    const color = PLAYER_COLORS[unit.player] ?? '#333';
-    const label = UNIT_TYPE_LABELS[unit.unitType] ?? '?';
+    const color = PLAYER_COLORS[move.player] ?? '#333';
+    const label = UNIT_TYPE_LABELS[move.unitType] ?? '?';
     drawOneUnitMarker(ctx, p.x, p.y, color, label, '#fff');
   }
 }
@@ -3672,19 +3961,8 @@ function tickResolutionMoveAnimation(): void {
   if (!resolutionMoveAnimation) return;
   const anim = resolutionMoveAnimation;
   const elapsed = Date.now() - anim.startTime;
-  const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
-  const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
-  const hasMeleeCombat =
-    (anim.meleeCombatHexes?.length ?? 0) > 0 ||
-    (anim.controlLossLightningHexes?.length ?? 0) > 0;
-  const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
-  const { totalMs } = getResolutionPhase5(
-    elapsed,
-    hasRangedCombat,
-    hasRangedCasualties,
-    hasMeleeCombat,
-    hasMeleeCasualties
-  );
+  const { phase } = buildResolutionPlaybackState(anim, elapsed);
+  const { totalMs } = phase;
   redraw();
   if (elapsed < totalMs) {
     resolutionMoveAnimationFrameId = requestAnimationFrame(tickResolutionMoveAnimation);
@@ -3783,6 +4061,7 @@ function initNewGameButton(): void {
       const state = (await window.gameApi.newGame({
         fogOfWarEnabled: fogCheckbox?.checked !== false,
       })) as GameStateSnapshot;
+      await refreshRes4TerrainOverridesForRenderer();
       gameState = state;
       rebuildUnitDisplayNameLookup(state);
       reconcileSelectionToCurrentState();
@@ -3797,8 +4076,7 @@ function initNewGameButton(): void {
       clearRes1TooltipSummaryCaches();
       humanStandingOrders = [];
       hoverRoutePreview = null;
-      pendingRangedAttacks = [];
-      rangedModeActive = false;
+      clearPendingTacticalOrders();
       selectedUnitIds = [];
       selectedUnitIdsAtMouseDown = [];
       selectedHexIndex = null;
@@ -3889,19 +4167,6 @@ function applySelectionFromSidebarUnitButton(unitId: string, event: MouseEvent):
   syncUiAfterSelectionChange();
 }
 
-function formatRangedTargetUnitLabel(r: RangedAttackOrder): string {
-  if (!gameState) return r.targetH3Index;
-  const attacker = gameState.units.find((u) => u.id === r.unitId);
-  const inHex = gameState.units.filter((u) => u.h3Index === r.targetH3Index);
-  if (inHex.length === 0) return r.targetH3Index;
-  const preferred = attacker ? inHex.filter((u) => u.player !== attacker.player) : inHex;
-  const candidates = (preferred.length > 0 ? preferred : inHex).sort((a, b) => a.id.localeCompare(b.id));
-  const primary = candidates[0]?.id ?? r.targetH3Index;
-  const additionalCount = Math.max(0, candidates.length - 1);
-  const primaryLabel = formatUnitDisplayName(primary);
-  return additionalCount > 0 ? `${primaryLabel} (+${additionalCount})` : primaryLabel;
-}
-
 function formatUnitArrowLabel(unitId: string, targetLabel: string): string {
   return `${formatUnitDisplayName(unitId)} → ${targetLabel}`;
 }
@@ -3924,6 +4189,7 @@ function buildKillToastFormatterBundle(
   removedUnits: RemovedUnitSnapshot[] | undefined
 ): {
   formatKillLine: (kill: { victimId: string; killerIds: string[] }) => string;
+  formatUnitName: (unitId: string) => string;
 } {
   const removedUnitsForDisplay = removedUnits ?? [];
   const rosterForDisplay = [
@@ -3940,7 +4206,7 @@ function buildKillToastFormatterBundle(
     displayNameById.get(unitId) ?? unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
   const formatKillLine = (kill: { victimId: string; killerIds: string[] }) =>
     formatKillToastLine(kill, formatDisplayUnitName);
-  return { formatKillLine };
+  return { formatKillLine, formatUnitName: formatDisplayUnitName };
 }
 
 function syncUiAfterSelectionChange(options: { refreshHoverPreview?: boolean } = {}): void {
@@ -4018,11 +4284,52 @@ function getRepresentativeSelectedUnitIdsByOrigin(): string[] {
   return representatives;
 }
 
+function replacePendingRangedAttacksForSelected(selectedIds: string[], targetH3Index: string): void {
+  pendingRangedAttacks = pendingRangedAttacks.filter((row) => !selectedIds.includes(row.unitId));
+  for (const unitId of selectedIds) {
+    pendingRangedAttacks.push({ unitId, targetH3Index });
+  }
+}
+
+function replacePendingAirStrikesForSelected(
+  selectedIds: string[],
+  targetH3Index: string,
+  targetType: AirStrikeTargetType
+): void {
+  pendingAirStrikes = pendingAirStrikes.filter((row) => !selectedIds.includes(row.unitId));
+  for (const unitId of selectedIds) {
+    pendingAirStrikes.push({ unitId, targetH3Index, targetType });
+  }
+}
+
+function replacePendingFerryOrdersForSelected(selectedIds: string[], destinationH3Index: string): void {
+  pendingFerryOrders = pendingFerryOrders.filter((row) => !selectedIds.includes(row.unitId));
+  for (const unitId of selectedIds) {
+    pendingFerryOrders.push({ unitId, destinationH3Index });
+  }
+}
+
+function clearPendingTacticalOrders(): void {
+  pendingRangedAttacks = [];
+  rangedModeActive = false;
+  pendingAirStrikes = [];
+  airStrikeModeActive = false;
+  pendingFerryOrders = [];
+}
+
+function clearCommittedOrderDraftState(): void {
+  clearSelection();
+  selectedUnitIdsAtMouseDown = [];
+  selectedHexIndex = null;
+  hideCommittedOrderLinesAfterReady = false;
+  hoverRoutePreview = null;
+}
+
 async function refreshHoverRoutePreview(): Promise<void> {
   const unitIds = [...selectedUnitIds];
   const hoveredH3 = hoveredHexH3;
   const seq = ++hoverPreviewRequestSeq;
-  if (rangedModeActive || !window.gameApi?.previewHumanMarchOrders || unitIds.length === 0 || !hoveredH3 || !gameState) {
+  if (rangedModeActive || airStrikeModeActive || !window.gameApi?.previewHumanMarchOrders || unitIds.length === 0 || !hoveredH3 || !gameState) {
     hoverRoutePreview = null;
     requestRedraw();
     return;
@@ -4049,9 +4356,31 @@ function cancelRangedForUnit(unitId: string): void {
   redraw();
 }
 
+function cancelAirStrikeForUnit(unitId: string): void {
+  pendingAirStrikes = pendingAirStrikes.filter((r) => r.unitId !== unitId);
+  airStrikeModeActive = false;
+  void refreshHoverRoutePreview();
+  updateSidebar();
+  updatePendingOrdersSidebar();
+  updateRangedSidebar();
+  refreshStackCalloutIfOpen();
+  redraw();
+}
+
+function cancelFerryForUnit(unitId: string): void {
+  pendingFerryOrders = pendingFerryOrders.filter((r) => r.unitId !== unitId);
+  void refreshHoverRoutePreview();
+  updateSidebar();
+  updatePendingOrdersSidebar();
+  redraw();
+}
+
 function updateRangedSidebar(): void {
   const listEl = document.getElementById('ranged-attacks-list');
+  const strikeListEl = document.getElementById('air-strikes-list');
   const btnEl = document.getElementById('ranged-attack-btn') as HTMLButtonElement | null;
+  const strikeTypeEl = document.getElementById('air-strike-target-type') as HTMLSelectElement | null;
+  const strikeCancelEl = document.getElementById('air-strike-cancel-btn') as HTMLButtonElement | null;
   if (!listEl) return;
 
   listEl.innerHTML = '';
@@ -4063,7 +4392,7 @@ function updateRangedSidebar(): void {
   } else {
     for (const r of pendingRangedAttacks) {
       const row = createSidebarOrderRow({
-        labelText: formatUnitArrowLabel(r.unitId, formatRangedTargetUnitLabel(r)),
+        labelText: formatUnitArrowLabel(r.unitId, formatPendingRangedAttackSidebarLabel(gameState, r)),
         selected: selectedUnitIds.includes(r.unitId),
         onToggleSelect: (event) => applySelectionFromSidebarUnitButton(r.unitId, event),
         onCancel: () => cancelRangedForUnit(r.unitId),
@@ -4072,18 +4401,54 @@ function updateRangedSidebar(): void {
       listEl.appendChild(row);
     }
   }
+  if (strikeListEl) {
+    strikeListEl.innerHTML = '';
+    if (pendingAirStrikes.length === 0) {
+      const span = document.createElement('span');
+      span.textContent = 'None';
+      span.style.color = '#666';
+      strikeListEl.appendChild(span);
+    } else {
+      for (const strike of pendingAirStrikes) {
+        const row = createSidebarOrderRow({
+          labelText: formatUnitArrowLabel(strike.unitId, formatPendingAirStrikeSidebarLabel(gameState, strike)),
+          selected: selectedUnitIds.includes(strike.unitId),
+          onToggleSelect: (event) => applySelectionFromSidebarUnitButton(strike.unitId, event),
+          onCancel: () => cancelAirStrikeForUnit(strike.unitId),
+          compactBlueButtons: true,
+        });
+        strikeListEl.appendChild(row);
+      }
+    }
+  }
 
   if (btnEl) {
     const selectedUnits = selectedUnitIds
       .map((id) => gameState?.units.find((u) => u.id === id))
       .filter((unit): unit is NonNullable<typeof unit> => !!unit);
-    const allHaveRanged = selectedUnits.length > 0 && selectedUnits.every((unit) => (RANGED_RANGE[unit.unitType] ?? 0) >= 1);
-    if (allHaveRanged) {
+    const allAir = selectedUnits.length > 0 && selectedUnits.every((unit) => unit.unitType === 'air');
+    const allHaveRanged = selectedUnits.length > 0 && selectedUnits.every((unit) => (RANGED_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 0) >= 1);
+    if (allAir) {
+      btnEl.textContent = 'Strike';
+      btnEl.style.display = airStrikeModeActive ? 'none' : 'inline-block';
+      if (strikeTypeEl) {
+        strikeTypeEl.style.display = airStrikeModeActive ? 'inline-block' : 'none';
+        strikeTypeEl.value = airStrikeTargetType;
+      }
+      if (strikeCancelEl) {
+        strikeCancelEl.style.display = airStrikeModeActive ? 'inline-block' : 'none';
+      }
+    } else if (allHaveRanged) {
       btnEl.style.display = 'inline-block';
       btnEl.textContent = rangedModeActive ? 'Cancel' : 'Ranged';
+      if (strikeTypeEl) strikeTypeEl.style.display = 'none';
+      if (strikeCancelEl) strikeCancelEl.style.display = 'none';
     } else {
       btnEl.style.display = 'none';
       rangedModeActive = false;
+      airStrikeModeActive = false;
+      if (strikeTypeEl) strikeTypeEl.style.display = 'none';
+      if (strikeCancelEl) strikeCancelEl.style.display = 'none';
     }
   }
 }
@@ -4093,7 +4458,7 @@ function updatePendingOrdersSidebar(): void {
   if (!container) return;
   container.innerHTML = '';
   const pendingOrders = humanStandingOrders.filter((order) => isPendingMovementOrderForDisplay(order));
-  if (pendingOrders.length === 0) {
+  if (pendingOrders.length === 0 && pendingFerryOrders.length === 0) {
     const span = document.createElement('span');
     span.textContent = 'None';
     span.style.color = '#666';
@@ -4108,6 +4473,16 @@ function updatePendingOrdersSidebar(): void {
       onCancel: () => {
         void cancelOrderForUnit(order.unitId);
       },
+      compactBlueButtons: true,
+    });
+    container.appendChild(row);
+  }
+  for (const ferry of pendingFerryOrders) {
+    const row = createSidebarOrderRow({
+      labelText: formatUnitArrowLabel(ferry.unitId, formatPendingFerryOrderSidebarLabel(gameState, ferry)),
+      selected: selectedUnitIds.includes(ferry.unitId),
+      onToggleSelect: (event) => applySelectionFromSidebarUnitButton(ferry.unitId, event),
+      onCancel: () => cancelFerryForUnit(ferry.unitId),
       compactBlueButtons: true,
     });
     container.appendChild(row);
@@ -4359,7 +4734,10 @@ function init(): void {
   updateReadyButtonState();
 
   document.getElementById('ranged-attack-btn')?.addEventListener('click', () => {
-    if (rangedModeActive) {
+    if (airStrikeModeActive) {
+      airStrikeModeActive = false;
+      void refreshHoverRoutePreview();
+    } else if (rangedModeActive) {
       rangedModeActive = false;
       void refreshHoverRoutePreview();
     } else if (selectedUnitIds.length > 0 && gameState) {
@@ -4367,13 +4745,33 @@ function init(): void {
       const selectedUnits = selectedUnitIds
         .map((id) => state.units.find((u) => u.id === id))
         .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
-      const allHaveRanged = selectedUnits.length > 0 && selectedUnits.every((unit) => (RANGED_RANGE[unit.unitType] ?? 0) >= 1);
-      if (allHaveRanged) {
+      const allAir = selectedUnits.length > 0 && selectedUnits.every((unit) => unit.unitType === 'air');
+      const allHaveRanged = selectedUnits.length > 0 && selectedUnits.every((unit) => (RANGED_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 0) >= 1);
+      if (allAir) {
+        airStrikeModeActive = true;
+        rangedModeActive = false;
+        hoverPreviewRequestSeq++;
+        hoverRoutePreview = null;
+      } else if (allHaveRanged) {
         rangedModeActive = true;
+        airStrikeModeActive = false;
         hoverPreviewRequestSeq++;
         hoverRoutePreview = null;
       }
     }
+    updateRangedSidebar();
+    redraw();
+  });
+  document.getElementById('air-strike-target-type')?.addEventListener('change', (event) => {
+    const target = event.target as HTMLSelectElement | null;
+    if (!target) return;
+    const value = target.value;
+    if (value === 'units' || value === 'urban' || value === 'airport' || value === 'seaport') {
+      airStrikeTargetType = value;
+    }
+  });
+  document.getElementById('air-strike-cancel-btn')?.addEventListener('click', () => {
+    airStrikeModeActive = false;
     updateRangedSidebar();
     redraw();
   });
@@ -4397,22 +4795,10 @@ function init(): void {
     window.gameApi
       .getRes4TerrainOverrides()
       .then((rows) => {
-        res4TerrainOverridesByH3 = new Map(rows.map((r) => [r.h3Index, { terrainKind: r.terrainKind, isUrban: !!r.isUrban }]));
-        clearRes1TooltipSummaryCaches();
+        applyRes4TerrainOverrides(rows);
         requestRedraw();
       })
       .catch((err) => console.error('getRes4TerrainOverrides failed:', err));
-    window.gameApi
-      .getTerrainInfrastructureHints()
-      .then((hints) => {
-        terrainInfraRes1Airport = new Set(hints.res1MajorAirports);
-        terrainInfraRes1Seaport = new Set(hints.res1MajorSeaports);
-        terrainInfraRes4Airport = new Set(hints.res4MajorAirports);
-        terrainInfraRes4Seaport = new Set(hints.res4MajorSeaports);
-        clearRes1TooltipSummaryCaches();
-        requestRedraw();
-      })
-      .catch((err) => console.error('getTerrainInfrastructureHints failed:', err));
   }
 
   window.addEventListener('resize', () => {
@@ -4557,6 +4943,48 @@ function init(): void {
     return hitTestHexAtContainerPixel(x, y, set);
   }
 
+  function getSelectedHumanUnitsAtMouseDown(state: GameStateSnapshot): GameStateSnapshot['units'] {
+    return selectedUnitIdsAtMouseDown
+      .map((id) => state.units.find((u) => u.id === id))
+      .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
+  }
+
+  async function commitGroupedAirFerryOrders(selectedIds: string[], destinationH3: string): Promise<boolean> {
+    if (!window.gameApi?.validateGroupFerryTarget) return false;
+    const validation = await window.gameApi.validateGroupFerryTarget({
+      unitIds: selectedIds,
+      destinationH3Index: destinationH3,
+    });
+    if (!validation.success) {
+      showMapToast(validation.reason ?? 'Selected air units cannot ferry to that destination.', { isError: true });
+      return true;
+    }
+    replacePendingFerryOrdersForSelected(selectedIds, destinationH3);
+    clearCommittedOrderDraftState();
+    updatePendingOrdersSidebar();
+    updateSidebar();
+    redraw();
+    return true;
+  }
+
+  async function commitGroupedMarchOrders(selectedIds: string[], destinationH3: string): Promise<boolean> {
+    if (!window.gameApi?.assignHumanMarchOrders) return false;
+    const assign = await window.gameApi.assignHumanMarchOrders({
+      unitIds: selectedIds,
+      destinationH3Index: destinationH3,
+    });
+    if (!assign.success) {
+      showMapToast(assign.reason ?? 'Failed to assign movement order.', { isError: true });
+      return true;
+    }
+    clearCommittedOrderDraftState();
+    await refreshHumanStandingOrders();
+    updatePendingOrdersSidebar();
+    updateSidebar();
+    redraw();
+    return true;
+  }
+
   mainMapEl.addEventListener('pointermove', (e) => {
     lastPointerClientX = e.clientX;
     lastPointerClientY = e.clientY;
@@ -4635,18 +5063,53 @@ function init(): void {
     selectedHexIndex = hit;
     clearSidebarError();
 
+    if (hit && airStrikeModeActive && selectedUnitIds.length > 0 && gameState) {
+      if (!window.gameApi?.validateGroupAirStrikeTarget) return;
+      const selectedIds = [...selectedUnitIds];
+      const validation = await window.gameApi.validateGroupAirStrikeTarget({
+        unitIds: selectedIds,
+        targetH3Index: hit,
+        targetType: airStrikeTargetType,
+      });
+      if (!validation.success) {
+        showMapToast(formatTargetingValidationReason(validation.reason, 'Selected air units cannot strike that target.'), {
+          isError: true,
+        });
+        airStrikeModeActive = false;
+        hoverRoutePreview = null;
+        hoverPreviewRequestSeq++;
+        updateRangedSidebar();
+        redraw();
+        return;
+      }
+      replacePendingAirStrikesForSelected(selectedIds, hit, airStrikeTargetType);
+      airStrikeModeActive = false;
+      clearSelection();
+      hoverRoutePreview = null;
+      hoverPreviewRequestSeq++;
+      updateRangedSidebar();
+      hideStackCallout();
+      updateSidebar();
+      redraw();
+      return;
+    }
+
     if (hit && rangedModeActive && selectedUnitIds.length > 0 && gameState) {
       if (!window.gameApi?.validateGroupRangedTarget) return;
       const selectedIds = [...selectedUnitIds];
       const validation = await window.gameApi.validateGroupRangedTarget({ unitIds: selectedIds, targetH3Index: hit });
       if (!validation.success) {
-        showMapToast(validation.reason ?? 'Selected units cannot fire at that target.', { isError: true });
+        showMapToast(formatTargetingValidationReason(validation.reason, 'Selected units cannot fire at that target.'), {
+          isError: true,
+        });
+        rangedModeActive = false;
+        hoverRoutePreview = null;
+        hoverPreviewRequestSeq++;
+        updateRangedSidebar();
+        redraw();
         return;
       }
-      pendingRangedAttacks = pendingRangedAttacks.filter((r) => !selectedIds.includes(r.unitId));
-      for (const unitId of selectedIds) {
-        pendingRangedAttacks.push({ unitId, targetH3Index: hit });
-      }
+      replacePendingRangedAttacksForSelected(selectedIds, hit);
       rangedModeActive = false;
       clearSelection();
       hoverRoutePreview = null;
@@ -4761,37 +5224,28 @@ function init(): void {
     }
     if (!gameState) return;
     const state = gameState;
-    if (rangedModeActive) return;
+    if (rangedModeActive || airStrikeModeActive) return;
     const hit = clientXYToHit(e.clientX, e.clientY);
     const destinationH3 = selectedHexIndex ?? hoveredHexH3 ?? hit;
     if (!destinationH3 || selectedUnitIdsAtMouseDown.length === 0) return;
 
-    const selectedAtMouseDown = selectedUnitIdsAtMouseDown
-      .map((id) => state.units.find((u) => u.id === id))
-      .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
+    const selectedAtMouseDown = getSelectedHumanUnitsAtMouseDown(state);
     if (selectedAtMouseDown.length === 0) return;
     const selectedIds = selectedAtMouseDown.map((unit) => unit.id);
     if (selectedAtMouseDown.every((unit) => unit.h3Index === destinationH3)) return;
-
-    if (!window.gameApi?.assignHumanMarchOrders) return;
-    const assign = await window.gameApi.assignHumanMarchOrders({
-      unitIds: selectedIds,
-      destinationH3Index: destinationH3,
-    });
-    if (!assign.success) {
-      showMapToast(assign.reason ?? 'Failed to assign movement order.', { isError: true });
+    const hasAirSelection = selectedAtMouseDown.some((unit) => unit.unitType === 'air');
+    const hasNonAirSelection = selectedAtMouseDown.some((unit) => unit.unitType !== 'air');
+    if (hasAirSelection && hasNonAirSelection) {
+      showMapToast('Cannot issue grouped movement for mixed air and non-air units.', { isError: true });
       return;
     }
-    // Commit complete: clear active selection so preview path is not left floating.
-    clearSelection();
-    selectedUnitIdsAtMouseDown = [];
-    selectedHexIndex = null;
-    hideCommittedOrderLinesAfterReady = false;
-    hoverRoutePreview = null;
-    await refreshHumanStandingOrders();
-    updatePendingOrdersSidebar();
-    updateSidebar();
-    redraw();
+
+    if (hasAirSelection) {
+      if (await commitGroupedAirFerryOrders(selectedIds, destinationH3)) return;
+      return;
+    }
+
+    await commitGroupedMarchOrders(selectedIds, destinationH3);
   });
 
   mainMapEl.addEventListener('contextmenu', (e) => {
@@ -4821,6 +5275,8 @@ function init(): void {
         const submitResult = (await window.gameApi.submitOrders({
           movementOrders: [],
           rangedAttacks: pendingRangedAttacks,
+          airStrikes: pendingAirStrikes,
+          ferryOrders: pendingFerryOrders,
         })) as { success: boolean; reason?: string };
         if (!submitResult.success) {
           showSidebarError(submitResult.reason ?? 'Submit failed');
@@ -4869,6 +5325,7 @@ function init(): void {
         precomputedAiStrategy = null;
         precomputedToolInvocationCounts = null;
         const humanMoves: ResolutionMove[] = readyResult.humanMoves ?? [];
+        await refreshRes4TerrainOverridesForRenderer();
         const nextState = (await window.gameApi.getGameState()) as GameStateSnapshot;
         const state = nextState;
         await applyGameStateSnapshot(state, {
@@ -4882,6 +5339,8 @@ function init(): void {
         });
         const aiMoves = readyResult.aiMoves ?? [];
         const resolutionMoves = [...humanMoves, ...aiMoves];
+        const airStrikeOutboundMoves = buildAirStrikeOutboundPlaybackMoves(readyResult.airStrikeMoves);
+        const airStrikeReturnMoves = buildAirStrikeReturnPlaybackMoves(readyResult.airStrikeMoves);
         // Intentionally do not show per-unit AI movement lines in the turn toast.
         if (readyResult.aiStrategy) {
           showAiStrategyToast(readyResult.aiStrategy);
@@ -4912,6 +5371,11 @@ function init(): void {
           (readyResult.meleeRemovedUnits?.length ?? 0) > 0 ||
           (readyResult.controlLossLightningHexes?.length ?? 0) > 0;
         const hasLegacy = (readyResult.combatHexes?.length ?? 0) > 0 || (readyResult.casualtyHexes?.length ?? 0) > 0;
+        const hasAirStrikeResolution =
+          (readyResult.airStrikeAttemptCount ?? 0) > 0 ||
+          (readyResult.airStrikeHexes?.length ?? 0) > 0 ||
+          (readyResult.infrastructureDestroyedEvents?.length ?? 0) > 0 ||
+          (readyResult.baseInvalidAirLossCount ?? 0) > 0;
         const visibleHexes = getVisibleHexSet(state);
         const allKills = readyResult.kills ?? [];
         const removedById = new Map((readyResult.removedUnits ?? []).map((u) => [u.id, u]));
@@ -4930,21 +5394,32 @@ function init(): void {
             .map((victimId) => removedById.get(victimId)?.h3Index ?? null)
             .filter((h3): h3 is string => typeof h3 === 'string')
         );
+        const knownHumanAirStrikeTargetHexes = new Set(
+          (readyResult.airStrikeMoves ?? [])
+            .filter((move) => move.player === 'human')
+            .map((move) => move.targetH3Index)
+        );
         const unknownCombatHexes = [
+          ...(readyResult.airStrikeHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
           ...(readyResult.rangedCombatHexes ?? []),
           ...(readyResult.meleeCombatHexes ?? []),
           ...(readyResult.combatHexes ?? []),
         ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
         const unknownCasualtyHexes = [
+          ...(readyResult.airStrikeCasualtyHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
           ...(readyResult.rangedCasualtyHexes ?? []),
           ...(readyResult.meleeCasualtyHexes ?? []),
           ...(readyResult.casualtyHexes ?? []),
         ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
-        const needsAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy;
+        const needsAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution;
         if (needsAnimation) {
           if (resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(resolutionMoveAnimationFrameId);
           resolutionMoveAnimation = {
             moves: resolutionMoves,
+            airStrikeOutboundMoves: airStrikeOutboundMoves.length > 0 ? airStrikeOutboundMoves : undefined,
+            airStrikeReturnMoves: airStrikeReturnMoves.length > 0 ? airStrikeReturnMoves : undefined,
+            airStrikeCombatHexes: readyResult.airStrikeHexes?.length ? readyResult.airStrikeHexes : undefined,
+            airStrikeCasualtyHexes: readyResult.airStrikeCasualtyHexes?.length ? readyResult.airStrikeCasualtyHexes : undefined,
             startTime: Date.now(),
             combatHexes: readyResult.combatHexes?.length ? readyResult.combatHexes : undefined,
             casualtyHexes: readyResult.casualtyHexes?.length ? readyResult.casualtyHexes : undefined,
@@ -4975,17 +5450,14 @@ function init(): void {
           const knownReturnFire = returnFire.filter((k) => knownVictimIds.has(k.victimId));
           const knownMeleeKills = meleeKills.filter((k) => knownVictimIds.has(k.victimId));
           const killToastFormatter = buildKillToastFormatterBundle(state, readyResult.removedUnits);
-          const bullets: string[] = [];
-          const deployedLine = formatDeployedUnitsLine(readyResult.deployedUnitsByType);
-          if (deployedLine) bullets.push(deployedLine);
-          const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, 'human');
-          if (deploymentCapLine) bullets.push(deploymentCapLine);
-          if ((readyResult.humanHexesLostCount ?? 0) > 0) {
-            bullets.push(`${readyResult.humanHexesLostCount!.toLocaleString()} hexes lost to opponent`);
-          }
-          if (knownDirectFire.length > 0) bullets.push(`• Direct fire: ${knownDirectFire.map(killToastFormatter.formatKillLine).join('; ')}`);
-          if (knownReturnFire.length > 0) bullets.push(`• Return fire: ${knownReturnFire.map(killToastFormatter.formatKillLine).join('; ')}`);
-          if (knownMeleeKills.length > 0) bullets.push(knownMeleeKills.map(killToastFormatter.formatKillLine).join('\n'));
+          const bullets = buildTurnUpdateBullets({
+            readyResult,
+            knownDirectFire,
+            knownReturnFire,
+            knownMeleeKills,
+            formatKillLine: killToastFormatter.formatKillLine,
+            formatUnitName: killToastFormatter.formatUnitName,
+          });
           if (bullets.length > 0) showMapToast(bullets.join('\n'), { isError: false });
           const unknownVictimIds = allKills
             .map((k) => k.victimId)
@@ -5013,8 +5485,7 @@ function init(): void {
         }
         hoverRoutePreview = null;
         hideCommittedOrderLinesAfterReady = false;
-        pendingRangedAttacks = [];
-        rangedModeActive = false;
+        clearPendingTacticalOrders();
         await refreshHumanStandingOrders();
         updateGameStateSidebar(state);
         updatePendingOrdersSidebar();

@@ -43,6 +43,17 @@ function testInfantryHasOneHexVision(): void {
   }
 }
 
+function testAirHasThreeHexVision(): void {
+  const { state, center, mapHexSet } = makeState('air', 'human-air-1');
+  const visible = computeVisibleHexesForSide(state, 'human', mapHexSet);
+  const ring3 = new Set(Array.from(gridDisk(center, 3)));
+
+  for (const h3 of mapHexSet) {
+    if (ring3.has(h3)) assert.ok(visible.has(h3), `Expected air to see <=3-hex cell ${h3}`);
+    if (!ring3.has(h3)) assert.ok(!visible.has(h3), `Expected air not to see >3-hex cell ${h3}`);
+  }
+}
+
 function testUnknownUnitTypeThrows(): void {
   const { state, mapHexSet } = makeState('unknown_type', 'human-unknown-1');
   assert.throws(
@@ -54,6 +65,7 @@ function testUnknownUnitTypeThrows(): void {
 function run(): void {
   testNavalHasTwoHexVision();
   testInfantryHasOneHexVision();
+  testAirHasThreeHexVision();
   testUnknownUnitTypeThrows();
   console.log('visibility.test.ts passed');
 }

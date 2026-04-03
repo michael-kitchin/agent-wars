@@ -4,36 +4,23 @@
  */
 
 import * as assert from 'assert';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
 import { gridDistance } from 'h3-js';
 import {
-  openGameDatabaseAtPathForTests,
-  closeGameDatabaseForTests,
-  resetGameForNewMatch,
   getGameState,
   dbRun,
 } from './gameDb';
 import {
+  assignHumanMarchOrder,
   assignHumanMarchOrders,
   previewHumanMarchOrders,
   validateGroupRangedTarget,
   submitOrders,
 } from './gameActions';
 import { getRes1ProductionContext } from './terrainClassificationCache';
+import { withTempGameDb } from './testSupport/withTempGameDb';
 
 function withTempDb(runCase: () => void): void {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gameactions-multi-'));
-  const dbPath = path.join(dir, 't.sqlite');
-  try {
-    openGameDatabaseAtPathForTests(dbPath);
-    resetGameForNewMatch();
-    runCase();
-  } finally {
-    closeGameDatabaseForTests();
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
+  withTempGameDb('aw-gameactions-multi-', runCase);
 }
 
 function findNearestLandSeaportHex(state: ReturnType<typeof getGameState>, originH3: string): string | null {
@@ -60,6 +47,23 @@ function findAdjacentNavalPassableHex(state: ReturnType<typeof getGameState>, ce
     }
   });
   return adjacentNavalHex?.h3Index ?? null;
+}
+
+function findHexByDistance(
+  state: ReturnType<typeof getGameState>,
+  originH3: string,
+  predicate: (distance: number) => boolean
+): string | null {
+  for (const hex of state.hexes) {
+    if (hex.h3Index === originH3) continue;
+    try {
+      const distance = gridDistance(originH3, hex.h3Index);
+      if (predicate(distance)) return hex.h3Index;
+    } catch {
+      // Ignore uncomputable pairs in tests and keep searching.
+    }
+  }
+  return null;
 }
 
 function testPreviewGroupedHappyPathSingleUnit(): void {
@@ -145,6 +149,75 @@ function testNavalOrdersCanEgressFromLandSeaportToAdjacentWaterOrCoastal(): void
   });
 }
 
+function testPreviewGroupedRejectsAirUnitsForMarchPlanning(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const human = state.units.find((u) => u.player === 'human');
+    assert.ok(human, 'expected seeded human unit');
+    const airUnitId = 'human-air-preview-test-1';
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
+      airUnitId,
+      'human',
+      'air',
+      human!.h3Index,
+    ]);
+    dbRun('UPDATE res1_infrastructure SET airport_count = 1 WHERE h3_index = ?', [human!.h3Index]);
+    const hovered = findHexByDistance(state, human!.h3Index, (distance) => distance > 4);
+    assert.ok(hovered, 'expected at least one destination beyond ferry range');
+
+    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [hovered!, 'human']);
+    dbRun('UPDATE res1_infrastructure SET airport_count = 1 WHERE h3_index = ?', [hovered!]);
+    const result = previewHumanMarchOrders([airUnitId], hovered!);
+    const outOfRangeReason = result.invalidReason ?? null;
+    const hasExpectedOutOfRangeReason =
+      outOfRangeReason?.includes('out of range') || outOfRangeReason?.includes('out of ferry range');
+    assert.ok(hasExpectedOutOfRangeReason, `expected out-of-range ferry reason, got: ${outOfRangeReason}`);
+  });
+}
+
+function testPreviewGroupedAcceptsAirFerryDestinationWithinRange(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const human = state.units.find((u) => u.player === 'human');
+    assert.ok(human, 'expected seeded human unit');
+    const hovered = findHexByDistance(state, human!.h3Index, (distance) => distance >= 1 && distance <= 4);
+    assert.ok(hovered, 'expected a destination within ferry range');
+    const airUnitId = 'human-air-preview-test-2';
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
+      airUnitId,
+      'human',
+      'air',
+      human!.h3Index,
+    ]);
+    dbRun('UPDATE res1_infrastructure SET airport_count = 1 WHERE h3_index = ?', [human!.h3Index]);
+    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [hovered!, 'human']);
+    dbRun('UPDATE res1_infrastructure SET airport_count = 1 WHERE h3_index = ?', [hovered!]);
+    const result = previewHumanMarchOrders([airUnitId], hovered!);
+    assert.strictEqual(result.validForAll, true);
+    assert.strictEqual(result.previews.length, 1);
+    assert.strictEqual(result.previews[0]?.preview.valid, true);
+  });
+}
+
+function testAssignMarchRejectsAirUnits(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const human = state.units.find((u) => u.player === 'human');
+    assert.ok(human, 'expected seeded human unit');
+    const destination = state.hexes[0]?.h3Index ?? '';
+    const airUnitId = 'human-air-assign-test-1';
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
+      airUnitId,
+      'human',
+      'air',
+      human!.h3Index,
+    ]);
+    const result = assignHumanMarchOrder(airUnitId, destination);
+    assert.strictEqual(result.success, false);
+    assert.ok(result.reason?.includes('Air units cannot use march orders'));
+  });
+}
+
 function run(): void {
   testPreviewGroupedHappyPathSingleUnit();
   testPreviewGroupedFailsForUnknownUnit();
@@ -152,6 +225,9 @@ function run(): void {
   testAssignGroupedHappyPathSingleUnit();
   testValidateGroupedRangedRejectsMeleeUnit();
   testNavalOrdersCanEgressFromLandSeaportToAdjacentWaterOrCoastal();
+  testPreviewGroupedRejectsAirUnitsForMarchPlanning();
+  testPreviewGroupedAcceptsAirFerryDestinationWithinRange();
+  testAssignMarchRejectsAirUnits();
   console.log('gameActionsMultiSelect.test.ts passed');
 }
 

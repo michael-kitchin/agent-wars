@@ -32,7 +32,7 @@ interface HatchStyle {
   lineWidth: number;
   reverseDiagonal: boolean;
   crosshatch?: boolean;
-  pattern?: 'diagonal' | 'dots';
+  pattern?: 'diagonal' | 'dots' | 'orthogonal';
 }
 
 interface TerrainStylePreset {
@@ -50,6 +50,8 @@ interface TerrainStylePreset {
   hatches: Partial<Record<PipelineTerrainKind, HatchStyle>>;
   urbanOverlayFill: string;
   urbanOverlayHatch: HatchStyle;
+  rubbleOverlayFill: string;
+  rubbleOverlayHatch: HatchStyle;
 }
 
 const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = {
@@ -76,7 +78,9 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
       desert: { color: 'rgba(150, 104, 43, 0.48)', spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: 'dots' },
     },
     urbanOverlayFill: 'rgba(137, 117, 98, 0.46)',
-    urbanOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
+    urbanOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: false, pattern: 'orthogonal' },
+    rubbleOverlayFill: 'rgba(137, 117, 98, 0.46)',
+    rubbleOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
   },
   atlas: {
     label: 'Atlas',
@@ -101,7 +105,9 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
       desert: { color: 'rgba(152, 109, 47, 0.48)', spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: 'dots' },
     },
     urbanOverlayFill: 'rgba(141, 122, 103, 0.46)',
-    urbanOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
+    urbanOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: false, pattern: 'orthogonal' },
+    rubbleOverlayFill: 'rgba(141, 122, 103, 0.46)',
+    rubbleOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
   },
   wargame: {
     label: 'Wargame',
@@ -126,7 +132,9 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
       desert: { color: 'rgba(255, 207, 130, 0.5)', spacing: 7, lineWidth: 1.05, reverseDiagonal: false, pattern: 'dots' },
     },
     urbanOverlayFill: 'rgba(132, 112, 97, 0.46)',
-    urbanOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.88, reverseDiagonal: true, crosshatch: true },
+    urbanOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.88, reverseDiagonal: false, pattern: 'orthogonal' },
+    rubbleOverlayFill: 'rgba(132, 112, 97, 0.46)',
+    rubbleOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.88, reverseDiagonal: true, crosshatch: true },
   },
   scientific: {
     label: 'Scientific',
@@ -151,7 +159,9 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
       desert: { color: 'rgba(145, 104, 42, 0.48)', spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: 'dots' },
     },
     urbanOverlayFill: 'rgba(130, 112, 96, 0.46)',
-    urbanOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
+    urbanOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: false, pattern: 'orthogonal' },
+    rubbleOverlayFill: 'rgba(130, 112, 96, 0.46)',
+    rubbleOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
   },
 };
 
@@ -209,6 +219,24 @@ function makeDotPattern(color: string, spacing: number, diameter: number): Canva
   p.beginPath();
   p.arc(s * 0.5, s * 0.5, r, 0, Math.PI * 2);
   p.fill();
+  return p.createPattern(c, 'repeat');
+}
+
+function makeOrthogonalHatchPattern(color: string, spacing: number, lineWidth: number): CanvasPattern | null {
+  const c = document.createElement('canvas');
+  const s = spacing * 2;
+  c.width = s;
+  c.height = s;
+  const p = c.getContext('2d');
+  if (!p) return null;
+  p.strokeStyle = color;
+  p.lineWidth = lineWidth;
+  p.beginPath();
+  p.moveTo(0, s * 0.5);
+  p.lineTo(s, s * 0.5);
+  p.moveTo(s * 0.5, 0);
+  p.lineTo(s * 0.5, s);
+  p.stroke();
   return p.createPattern(c, 'repeat');
 }
 
@@ -295,14 +323,15 @@ export function terrainKindPattern(
   ctx: CanvasRenderingContext2D,
   kind: string,
   fillAndHatchAlphaScale = 1,
-  options?: { urbanOverlay?: boolean }
+  options?: { urbanOverlay?: boolean; rubbleOverlay?: boolean }
 ): CanvasPattern | null {
   const k = kind as PipelineTerrainKind;
-  const key = `${activeTerrainStyleId}:${k}:${fillAndHatchAlphaScale}:${options?.urbanOverlay ? 'urban' : 'base'}`;
+  const overlayKey = options?.rubbleOverlay ? 'rubble' : options?.urbanOverlay ? 'urban' : 'base';
+  const key = `${activeTerrainStyleId}:${k}:${fillAndHatchAlphaScale}:${overlayKey}`;
   if (patternCache.has(key)) return patternCache.get(key) ?? null;
 
   const p = activePreset();
-  const spec = options?.urbanOverlay ? p.urbanOverlayHatch : p.hatches[k];
+  const spec = options?.rubbleOverlay ? p.rubbleOverlayHatch : options?.urbanOverlay ? p.urbanOverlayHatch : p.hatches[k];
   const pat = spec
     ? spec.pattern === 'dots'
       ? makeDotPattern(
@@ -310,13 +339,19 @@ export function terrainKindPattern(
         spec.spacing,
         spec.lineWidth * 2
       )
-      : makeDiagonalHatchPattern(
-        boostRgbaAlpha(boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier), fillAndHatchAlphaScale),
-        spec.spacing,
-        spec.lineWidth,
-        spec.reverseDiagonal,
-        spec.crosshatch ?? false
-      )
+      : spec.pattern === 'orthogonal'
+        ? makeOrthogonalHatchPattern(
+          boostRgbaAlpha(boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier), fillAndHatchAlphaScale),
+          spec.spacing,
+          spec.lineWidth
+        )
+        : makeDiagonalHatchPattern(
+          boostRgbaAlpha(boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier), fillAndHatchAlphaScale),
+          spec.spacing,
+          spec.lineWidth,
+          spec.reverseDiagonal,
+          spec.crosshatch ?? false
+        )
     : null;
   patternCache.set(key, pat);
   return pat;
@@ -331,12 +366,13 @@ export function fillHexTerrain(
   ctx: CanvasRenderingContext2D,
   terrainKind: string,
   drawPath: () => void,
-  options?: { fillAndHatchAlphaScale?: number; landHoverFill?: boolean; isUrban?: boolean }
+  options?: { fillAndHatchAlphaScale?: number; landHoverFill?: boolean; isUrban?: boolean; isRubble?: boolean }
 ): void {
   const scale = options?.fillAndHatchAlphaScale ?? 1;
   const k = terrainKind as PipelineTerrainKind;
-  // Mountains and arctic always keep their own terrain shading even when urban overlay metadata is present.
-  const isUrban = options?.isUrban === true && k !== 'mountain' && k !== 'arctic';
+  // Urban/rubble variants override base terrain styling for this cell.
+  const isRubble = options?.isRubble === true;
+  const isUrban = !isRubble && options?.isUrban === true;
   if (!isUrban && options?.landHoverFill && k === 'plains') {
     drawPath();
     ctx.fillStyle = boostRgbaAlpha(landHoverFillStyle(), scale);
@@ -344,9 +380,12 @@ export function fillHexTerrain(
     return;
   }
   drawPath();
-  ctx.fillStyle = boostRgbaAlpha(terrainKindFillStyle(terrainKind, { urbanOverlay: isUrban }), scale);
+  const fillBase = isRubble
+    ? boostRgbaAlpha(activePreset().rubbleOverlayFill, activePreset().fillAlphaMultiplier)
+    : terrainKindFillStyle(terrainKind, { urbanOverlay: isUrban });
+  ctx.fillStyle = boostRgbaAlpha(fillBase, scale);
   ctx.fill();
-  const pat = terrainKindPattern(ctx, terrainKind, scale, { urbanOverlay: isUrban });
+  const pat = terrainKindPattern(ctx, terrainKind, scale, { urbanOverlay: isUrban, rubbleOverlay: isRubble });
   if (pat) {
     drawPath();
     ctx.fillStyle = pat;

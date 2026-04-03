@@ -12,6 +12,7 @@ export const VISION_RANGE_BY_UNIT_TYPE: Record<string, number> = {
   infantry: 1,
   armor: 2,
   naval: 2,
+  air: 3,
 };
 
 /** Locked 1.3 stale-icon opacity by stale age in turns. */

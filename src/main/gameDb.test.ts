@@ -97,6 +97,39 @@ function testResetRegeneratesTerrain(gameDb: typeof import('./gameDb')): void {
   }
 }
 
+function testResetSeedsInfrastructureState(gameDb: typeof import('./gameDb')): void {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
+  const p = path.join(dir, 't.sqlite');
+  try {
+    gameDb.openGameDatabaseAtPathForTests(p);
+    gameDb.resetGameForNewMatch();
+    const infraRows = gameDb.dbGetOne<{ c: number }>('SELECT COUNT(*) AS c FROM res1_infrastructure');
+    const featureRows = gameDb.dbGetOne<{ c: number }>('SELECT COUNT(*) AS c FROM res4_feature_overrides');
+    assert.ok((infraRows?.c ?? 0) > 0, 'expected resetGameForNewMatch to seed res1 infrastructure rows');
+    assert.ok((featureRows?.c ?? 0) > 0, 'expected resetGameForNewMatch to seed res4 feature rows');
+  } finally {
+    gameDb.closeGameDatabaseForTests();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function testRendererRes4OverridesIncludeInfrastructureFeatureRows(gameDb: typeof import('./gameDb')): void {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
+  const p = path.join(dir, 't.sqlite');
+  try {
+    gameDb.openGameDatabaseAtPathForTests(p);
+    gameDb.resetGameForNewMatch();
+    const rows = gameDb.getRes4TerrainOverridesForRendererFromGame();
+    const airportRows = rows.filter((row) => row.isAirport === true).length;
+    const seaportRows = rows.filter((row) => row.isSeaport === true).length;
+    assert.ok(airportRows > 0, 'expected renderer override payload to include airport feature rows');
+    assert.ok(seaportRows > 0, 'expected renderer override payload to include seaport feature rows');
+  } finally {
+    gameDb.closeGameDatabaseForTests();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 function testSeededUnitsUseRegionalSpawnContracts(gameDb: typeof import('./gameDb')): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
@@ -224,6 +257,7 @@ function testWrongUserVersionRecovers(gameDb: typeof import('./gameDb'), Databas
   }
 }
 
+
 function run(): void {
   if (!betterSqliteNativeAvailable()) {
     throw new Error(
@@ -238,6 +272,8 @@ function run(): void {
   testPersistenceTwoOpens(gameDb);
   testResetClearsStandingOrdersAndMemory(gameDb);
   testResetRegeneratesTerrain(gameDb);
+  testResetSeedsInfrastructureState(gameDb);
+  testRendererRes4OverridesIncludeInfrastructureFeatureRows(gameDb);
   testSeededUnitsUseRegionalSpawnContracts(gameDb);
   testFogOfWarToggleVisibilityContract(gameDb);
   testWrongUserVersionRecovers(gameDb, Database);

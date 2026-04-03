@@ -1,15 +1,10 @@
 import * as assert from 'assert';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
 import { gridDistance, gridPathCells } from 'h3-js';
 import {
-  openGameDatabaseAtPathForTests,
-  closeGameDatabaseForTests,
-  resetGameForNewMatch,
   dbRun,
   dbGetOne,
   getGameState,
+  setRes1InfrastructureForHex,
 } from './gameDb';
 import {
   getHexBuildQueue,
@@ -20,18 +15,10 @@ import {
   submitOrders,
 } from './gameActions';
 import { MAX_UNITS_PER_TYPE } from './productionCaps';
+import { withTempGameDb } from './testSupport/withTempGameDb';
 
 function withTempDb(runCase: () => void): void {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gameactions-prod-'));
-  const dbPath = path.join(dir, 't.sqlite');
-  try {
-    openGameDatabaseAtPathForTests(dbPath);
-    resetGameForNewMatch();
-    runCase();
-  } finally {
-    closeGameDatabaseForTests();
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
+  withTempGameDb('aw-gameactions-prod-', runCase);
 }
 
 function findBuildableHumanControlledHex(): string {
@@ -40,6 +27,15 @@ function findBuildableHumanControlledHex(): string {
     const queue = getHexBuildQueue(hx.h3Index, 'human');
     if (queue.controllerPlayerId === 'human' && queue.buildSectionVisible && queue.availableUnitTypes.length > 0) {
       return hx.h3Index;
+    }
+  }
+  // Stabilize production contract tests by provisioning one controlled hex with minimal infrastructure.
+  const fallbackHex = state.hexes.find((hx) => getHexBuildQueue(hx.h3Index, 'human').controllerPlayerId === 'human');
+  if (fallbackHex) {
+    setRes1InfrastructureForHex(fallbackHex.h3Index, { urbanHexCount: 1, airportCount: 0, seaportCount: 0 });
+    const queue = getHexBuildQueue(fallbackHex.h3Index, 'human');
+    if (queue.buildSectionVisible && queue.availableUnitTypes.length > 0) {
+      return fallbackHex.h3Index;
     }
   }
   throw new Error('Expected at least one buildable human-controlled hex in seeded world.');
@@ -233,6 +229,66 @@ function testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap(): void {
   });
 }
 
+function testAirBuildRequiresAirportInfrastructure(): void {
+  withTempDb(() => {
+    const targetHex = findBuildableHumanControlledHex();
+    setRes1InfrastructureForHex(targetHex, { urbanHexCount: 4, airportCount: 1, seaportCount: 0 });
+    const queueWithoutUrban = getHexBuildQueue(targetHex, 'human');
+    assert.ok(
+      !queueWithoutUrban.availableUnitTypes.includes('air'),
+      'expected air unit type to be unavailable without minimum urban production capacity'
+    );
+
+    setRes1InfrastructureForHex(targetHex, { urbanHexCount: 5, airportCount: 0, seaportCount: 0 });
+    const queueWithoutAirport = getHexBuildQueue(targetHex, 'human');
+    assert.ok(
+      !queueWithoutAirport.availableUnitTypes.includes('air'),
+      'expected air unit type to be unavailable without an airport'
+    );
+
+    const add = addHexBuildQueueEntry(targetHex, 'human');
+    assert.strictEqual(add.success, true);
+    const entry = getHexBuildQueue(targetHex, 'human').entries[0]!;
+    const forceAirWithoutAirport = updateHexBuildQueueEntry(targetHex, entry.id, 'air', entry.count, 'human');
+    assert.strictEqual(forceAirWithoutAirport.success, false);
+
+    setRes1InfrastructureForHex(targetHex, { urbanHexCount: 5, airportCount: 1, seaportCount: 0 });
+    const queueWithAirport = getHexBuildQueue(targetHex, 'human');
+    assert.ok(
+      queueWithAirport.availableUnitTypes.includes('air'),
+      'expected air unit type to be available with an airport'
+    );
+    const forceAirWithAirport = updateHexBuildQueueEntry(targetHex, entry.id, 'air', entry.count, 'human');
+    assert.strictEqual(forceAirWithAirport.success, true);
+  });
+}
+
+function testNavalBuildRequiresSeaportAndUrbanInfrastructure(): void {
+  withTempDb(() => {
+    const targetHex = findBuildableHumanControlledHex();
+    setRes1InfrastructureForHex(targetHex, { urbanHexCount: 9, airportCount: 0, seaportCount: 1 });
+    const queueWithoutUrban = getHexBuildQueue(targetHex, 'human');
+    assert.ok(
+      !queueWithoutUrban.availableUnitTypes.includes('naval'),
+      'expected naval unit type to be unavailable without minimum urban production capacity'
+    );
+
+    setRes1InfrastructureForHex(targetHex, { urbanHexCount: 1, airportCount: 0, seaportCount: 0 });
+    const queueWithoutSeaport = getHexBuildQueue(targetHex, 'human');
+    assert.ok(
+      !queueWithoutSeaport.availableUnitTypes.includes('naval'),
+      'expected naval unit type to be unavailable without a seaport'
+    );
+
+    setRes1InfrastructureForHex(targetHex, { urbanHexCount: 10, airportCount: 0, seaportCount: 1 });
+    const queueWithSeaport = getHexBuildQueue(targetHex, 'human');
+    assert.ok(
+      queueWithSeaport.availableUnitTypes.includes('naval'),
+      'expected naval unit type to be available with seaport and minimum urban production capacity'
+    );
+  });
+}
+
 function run(): void {
   testBuildQueueMutationContracts();
   testTypeChangeAfterCountEditKeepsCount();
@@ -240,6 +296,8 @@ function run(): void {
   testControlTakeoverClearsQueueAndProgress();
   testTraversedIntermediateHexCapturesControl();
   testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap();
+  testAirBuildRequiresAirportInfrastructure();
+  testNavalBuildRequiresSeaportAndUrbanInfrastructure();
   // eslint-disable-next-line no-console
   console.log('gameActionsProduction.test.ts passed');
 }
