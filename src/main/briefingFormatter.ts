@@ -26,6 +26,10 @@ function formatPos(ll: [number, number]): string {
   return `[${ll[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${ll[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
 }
 
+function formatUnitDisplayRef(unitId: string): string {
+  return unitId;
+}
+
 /**
  * Converts territory_changed hex params to non-H3 prompt text. If the id maps to a known game hex,
  * emits its [lat, lng] display; otherwise uses a generic label to avoid leaking raw spatial IDs.
@@ -139,7 +143,9 @@ function formatOrderCell(assessment: UnitAssessmentResult): string {
 /**
  * Builds Section 2 Table 1: unit status (one row per AI unit with spatial decay for quiet units).
  */
-function buildUnitStatusTable(unitAssessments: UnitAssessmentResult[]): string {
+function buildUnitStatusTable(
+  unitAssessments: UnitAssessmentResult[]
+): string {
   const header =
     '| Unit ID | Position | Standing order + status | Nearest enemy + distance | Threat severity | Action needed |';
   const sep = '|---------|----------|------------------------|---------------------------|-----------------|---------------|';
@@ -151,7 +157,7 @@ function buildUnitStatusTable(unitAssessments: UnitAssessmentResult[]): string {
     const orderCell = formatOrderCell(a);
     const nearest = a.result.nearbyEnemies?.[0];
     const nearestStr = nearest
-      ? `${nearest.unitId} @ ${nearest.hexDistance} (${nearest.confidence ?? 'current'}${nearest.lastSeen != null ? `, seen t${nearest.lastSeen}` : ''})`
+      ? `${formatUnitDisplayRef(nearest.unitId)} @ ${nearest.hexDistance} (${nearest.confidence ?? 'current'}${nearest.lastSeen != null ? `, seen t${nearest.lastSeen}` : ''})`
       : '—';
     const severities = (a.result.threats ?? []).map((t) => t.severity);
     const severity =
@@ -163,10 +169,11 @@ function buildUnitStatusTable(unitAssessments: UnitAssessmentResult[]): string {
             ? 'moderate'
             : 'low';
     const action = needsAction(a) ? 'yes' : 'no';
+    const selfLabel = formatUnitDisplayRef(a.unitId);
     if (isQuiet(a)) {
-      rows.push(`| ${a.unitId} | ${pos} | ${orderCell} | ${nearestStr} | ${severity} | ${action} (quiet) |`);
+      rows.push(`| ${selfLabel} | ${pos} | ${orderCell} | ${nearestStr} | ${severity} | ${action} (quiet) |`);
     } else {
-      rows.push(`| ${a.unitId} | ${pos} | ${orderCell} | ${nearestStr} | ${severity} | ${action} |`);
+      rows.push(`| ${selfLabel} | ${pos} | ${orderCell} | ${nearestStr} | ${severity} | ${action} |`);
     }
   }
   if (rows.length === 0) return `${header}\n${sep}\n(No AI units)`;
@@ -176,13 +183,15 @@ function buildUnitStatusTable(unitAssessments: UnitAssessmentResult[]): string {
 /**
  * Builds Section 2 Table 2: combat estimates (matchup, assessment, P(eliminate), P(lose unit), note).
  */
-function buildCombatEstimatesTable(combatEstimates: CombatEstimateEntry[]): string {
+function buildCombatEstimatesTable(
+  combatEstimates: CombatEstimateEntry[]
+): string {
   const header =
     '| Matchup | Assessment | P(eliminate) | P(lose unit) | Note |';
   const sep = '|---------|------------|--------------|--------------|------|';
   const rows = combatEstimates.map((ce) => {
     const posStr = formatPos(ce.targetHex);
-    const matchup = `${ce.aiUnitId} vs ${ce.enemyUnitId} @ ${posStr}`;
+    const matchup = `${formatUnitDisplayRef(ce.aiUnitId)} vs ${formatUnitDisplayRef(ce.enemyUnitId)} @ ${posStr}`;
     const note = (ce.note ?? '').slice(0, 80);
     return `| ${matchup} | ${(ce.assessment ?? 'even').toUpperCase().replace('_', ' ')} | ${(ce.probabilityDefenderEliminated ?? 0).toFixed(2)} | ${(ce.probabilityAttackerLosesUnit ?? 0).toFixed(2)} | ${note} |`;
   });
@@ -203,8 +212,10 @@ function buildLossesSinceLastConsultationTable(
   if (losses.length === 0) return `${header}\n${sep}\n| - | none | - | - | - |`;
   const rows = losses.map((loss) => {
     const side = loss.victimPlayer === perspectivePlayerId ? 'own' : 'enemy';
-    const killers = loss.killerIds.length > 0 ? loss.killerIds.join(', ') : 'unknown';
-    return `| ${loss.turnNumber} | ${loss.victimUnitId} | ${side} | ${loss.cause} | ${killers} |`;
+    const killers = loss.killerIds.length > 0
+      ? loss.killerIds.map((killerId) => formatUnitDisplayRef(killerId)).join(', ')
+      : 'unknown';
+    return `| ${loss.turnNumber} | ${formatUnitDisplayRef(loss.victimUnitId)} | ${side} | ${loss.cause} | ${killers} |`;
   });
   return [header, sep, ...rows].join('\n');
 }
@@ -212,7 +223,9 @@ function buildLossesSinceLastConsultationTable(
 /**
  * Builds Section 3: 2–3 attention flags as bulleted imperatives from units needing action.
  */
-function buildAttentionFlags(unitAssessments: UnitAssessmentResult[]): string {
+function buildAttentionFlags(
+  unitAssessments: UnitAssessmentResult[]
+): string {
   const bullets: string[] = [];
   for (const a of unitAssessments) {
     if (!needsAction(a)) continue;
@@ -222,11 +235,11 @@ function buildAttentionFlags(unitAssessments: UnitAssessmentResult[]): string {
     if (!order && threats.length > 0 && nearest) {
       const sev = threats.some((t) => t.severity === 'critical') ? 'critical' : 'moderate';
       bullets.push(
-        `${a.unitId} has no standing order and faces a ${sev} threat (nearest enemy: ${nearest.unitId}, distance ${nearest.hexDistance}).`
+        `${formatUnitDisplayRef(a.unitId)} has no standing order and faces a ${sev} threat (nearest enemy: ${formatUnitDisplayRef(nearest.unitId)}, distance ${nearest.hexDistance}).`
       );
     } else if (order?.status && WARNING_STATUSES.has(order.status)) {
       bullets.push(
-        `${a.unitId} standing order is in warning state (${order.status}) — decide follow-on orders.`
+        `${formatUnitDisplayRef(a.unitId)} standing order is in warning state (${order.status}) — decide follow-on orders.`
       );
     }
   }

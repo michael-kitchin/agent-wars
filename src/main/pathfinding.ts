@@ -2,28 +2,28 @@
 /**
  * Pathfinding over the hex map: BFS with domain (land/water) and optional blocked hexes.
  * Used by MCP Tool 1 (plan_route, check_distance). All coordinates are H3 indices internally.
- * `coastal` and `wetlands` hexes are passable for both land and naval domains.
+ * `coastal` hexes are passable for both land and naval domains.
  */
 
 import { gridDisk } from 'h3-js';
 import { logDebug, logError, logTrace } from './logger';
 import { getMovementBudget } from './combatConstants';
 
-/** Domain for passability: land units use land + coastal/wetlands; naval use water + coastal/wetlands. */
+/** Domain for passability: land units use land + coastal/wetlands; naval use water + coastal. */
 export type PassableDomain = 'land' | 'water';
 
 /**
  * Why this exists:
- *     Single rule for whether a hex `terrain` value is in the land domain (land + coastal/wetlands) or water domain (water + coastal/wetlands).
+ *     Single rule for whether a hex `terrain` value is in the land domain (land + coastal/wetlands) or water domain (water + coastal).
  * When to use:
  *     Pathfinding BFS, Tool 1/2/5, and any logic that must match movement domains.
  * What to expect:
- *     Unknown terrain defaults to `land` before evaluation; `coastal` and `wetlands` are passable for both domains.
+ *     Unknown terrain defaults to `land` before evaluation; `coastal` is passable for both domains.
  */
 export function terrainIsPassableForDomain(terrain: string | undefined, passableFor: PassableDomain): boolean {
   const t = terrain ?? 'land';
   if (passableFor === 'land') return t === 'land' || t === 'coastal' || t === 'wetlands';
-  return t === 'water' || t === 'coastal' || t === 'wetlands';
+  return t === 'water' || t === 'coastal';
 }
 
 /**

@@ -4,7 +4,7 @@
  * All hex positions in tool responses are returned as [lat, lng]; H3 indices are never exposed.
  */
 
-import { cellToLatLng, gridDistance } from 'h3-js';
+import { cellToLatLng, gridDistance, gridDisk } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
 import {
   findPath,
@@ -16,11 +16,17 @@ import {
 } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
 import { logDebug, logError } from '../logger';
-
-function effectiveHexPassabilityTerrain(hex: { terrain: string; terrainKind?: string }): string {
-  if (hex.terrainKind === 'coastal' || hex.terrainKind === 'wetlands') return hex.terrainKind;
-  return hex.terrain;
-}
+import { buildNormalizedTerrainByH3, isLandSeaportSpawnHex } from '../movementTerrain';
+import {
+  PLAN_ROUTE_ERR_NAVAL_START,
+  PLAN_ROUTE_ERR_SEAPORT_EGRESS,
+  PLAN_ROUTE_HINT_DESTINATION_LAND,
+  PLAN_ROUTE_HINT_NO_PATH_WATER_COASTAL,
+  PLAN_ROUTE_WARNING_ALREADY_AT_REDIRECTED_HEX,
+  PLAN_ROUTE_WARNING_LAND_REDIRECT,
+  PLAN_ROUTE_WARNING_SEAPORT_EGRESS,
+  PLAN_ROUTE_WARNING_WATER_BODY_FALLBACK,
+} from '../navalMovementMessages';
 
 /**
  * Converts an H3 index to [lat, lng] for tool responses. Uses the coordinate map when present;
@@ -36,6 +42,25 @@ function h3ToLatLng(h3: string, latLngByH3: Map<string, LatLng>): LatLng {
 /** Coordinate pair [lat, lng] at the tool boundary. */
 export type LatLng = [number, number];
 
+interface GridDistanceFailureSample {
+  candidateH3: string;
+  error: string;
+}
+
+function logGridDistanceFailureSummary(payload: {
+  context: string;
+  referenceH3: string;
+  failureCount: number;
+  samples: GridDistanceFailureSample[];
+}): void {
+  if (payload.failureCount <= 0) return;
+  logError(`${payload.context}: gridDistance threw for candidate set`, {
+    referenceH3: payload.referenceH3,
+    failureCount: payload.failureCount,
+    sampleFailures: payload.samples,
+  });
+}
+
 /**
  * Returns the water hex reachable from originH3 that is closest to refLandH3 (by grid distance), or undefined if none.
  * Used so naval plan_route can redirect a land destination to the nearest reachable water for approach.
@@ -50,6 +75,8 @@ function nearestReachableWaterHexTo(
   const reachableWater = getReachableHexes(originH3, hexSet, terrainByH3, 'water', blocked);
   let best: string | undefined;
   let bestDist = Infinity;
+  let failureCount = 0;
+  const failureSamples: GridDistanceFailureSample[] = [];
   for (const h3 of reachableWater) {
     try {
       const d = gridDistance(refLandH3, h3);
@@ -57,10 +84,20 @@ function nearestReachableWaterHexTo(
         bestDist = d;
         best = h3;
       }
-    } catch {
+    } catch (err) {
+      failureCount += 1;
+      if (failureSamples.length < 5) {
+        failureSamples.push({ candidateH3: h3, error: String(err) });
+      }
       continue;
     }
   }
+  logGridDistanceFailureSummary({
+    context: 'tool1Pathfinding nearestReachableWaterHexTo',
+    referenceH3: refLandH3,
+    failureCount,
+    samples: failureSamples,
+  });
   return best;
 }
 
@@ -71,6 +108,8 @@ function nearestReachableWaterHexTo(
 function nearestWaterHexTo(refH3: string, hexSet: Set<string>, terrainByH3: Map<string, string>): string | undefined {
   let best: string | undefined;
   let bestDist = Infinity;
+  let failureCount = 0;
+  const failureSamples: GridDistanceFailureSample[] = [];
   for (const h3 of hexSet) {
     if (!terrainIsPassableForDomain(terrainByH3.get(h3), 'water')) continue;
     try {
@@ -79,11 +118,238 @@ function nearestWaterHexTo(refH3: string, hexSet: Set<string>, terrainByH3: Map<
         bestDist = d;
         best = h3;
       }
-    } catch {
+    } catch (err) {
+      failureCount += 1;
+      if (failureSamples.length < 5) {
+        failureSamples.push({ candidateH3: h3, error: String(err) });
+      }
+      continue;
+    }
+  }
+  logGridDistanceFailureSummary({
+    context: 'tool1Pathfinding nearestWaterHexTo',
+    referenceH3: refH3,
+    failureCount,
+    samples: failureSamples,
+  });
+  return best;
+}
+
+function nearestAdjacentWaterOrCoastalHex(
+  originH3: string,
+  refTargetH3: string,
+  hexSet: Set<string>,
+  terrainByH3: Map<string, string>,
+  blocked?: Set<string>
+): string | undefined {
+  let best: string | undefined;
+  let bestDistance = Infinity;
+  let neighbors: string[] = [];
+  try {
+    neighbors = gridDisk(originH3, 1);
+  } catch (err) {
+    logError('tool1Pathfinding nearestAdjacentWaterOrCoastalHex: gridDisk threw', {
+      originH3,
+      error: String(err),
+    });
+    neighbors = [];
+  }
+  for (const candidate of neighbors) {
+    if (candidate === originH3) continue;
+    if (!hexSet.has(candidate)) continue;
+    if (blocked?.has(candidate)) continue;
+    const terrain = terrainByH3.get(candidate) ?? 'land';
+    if (!terrainIsPassableForDomain(terrain, 'water')) continue;
+    try {
+      const d = gridDistance(refTargetH3, candidate);
+      if (d < bestDistance) {
+        bestDistance = d;
+        best = candidate;
+      }
+    } catch (err) {
+      logError('tool1Pathfinding nearestAdjacentWaterOrCoastalHex: gridDistance threw', {
+        refTargetH3,
+        candidateH3: candidate,
+        error: String(err),
+      });
       continue;
     }
   }
   return best;
+}
+
+function prependSeaportEgressStep(path: string[] | null, originH3: string, seaportEgressHex?: string): string[] | null {
+  if (!path) return null;
+  if (!seaportEgressHex || path[0] !== seaportEgressHex) return path;
+  return [originH3, ...path];
+}
+
+function findPathWithOptionalAvoidanceRetry(payload: {
+  routeOriginH3: string;
+  destinationH3: string;
+  hexSet: Set<string>;
+  terrainByH3: Map<string, string>;
+  passableFor: PassableDomain;
+  blocked?: Set<string>;
+  originH3: string;
+  seaportEgressHex?: string;
+  warnings?: string[];
+  blockedRetryWarning?: string;
+}): string[] | null {
+  const first = prependSeaportEgressStep(
+    findPath(
+      payload.routeOriginH3,
+      payload.destinationH3,
+      payload.hexSet,
+      payload.terrainByH3,
+      payload.passableFor,
+      payload.blocked
+    ),
+    payload.originH3,
+    payload.seaportEgressHex
+  );
+  if (first || !payload.blocked) return first;
+  const retried = prependSeaportEgressStep(
+    findPath(
+      payload.routeOriginH3,
+      payload.destinationH3,
+      payload.hexSet,
+      payload.terrainByH3,
+      payload.passableFor,
+      undefined
+    ),
+    payload.originH3,
+    payload.seaportEgressHex
+  );
+  if (retried && payload.blockedRetryWarning && payload.warnings) {
+    payload.warnings.push(payload.blockedRetryWarning);
+  }
+  return retried;
+}
+
+function resolveNavalOriginForRouting(payload: {
+  unitType: string;
+  originH3: string;
+  destinationH3: string;
+  hexSet: Set<string>;
+  terrainByH3: Map<string, string>;
+  blocked?: Set<string>;
+}): { reachableOriginH3: string; seaportEgressHex?: string } | PlanRouteError {
+  if (payload.unitType !== 'naval') return { reachableOriginH3: payload.originH3 };
+  const originTerrain = payload.terrainByH3.get(payload.originH3) ?? 'land';
+  if (terrainIsPassableForDomain(originTerrain, 'water')) return { reachableOriginH3: payload.originH3 };
+
+  const seaportSpawnHex = isLandSeaportSpawnHex({
+    h3Index: payload.originH3,
+    normalizedTerrain: originTerrain,
+  });
+  if (!seaportSpawnHex) return { status: 'error', error: PLAN_ROUTE_ERR_NAVAL_START };
+
+  let seaportEgressHex = nearestAdjacentWaterOrCoastalHex(
+    payload.originH3,
+    payload.destinationH3,
+    payload.hexSet,
+    payload.terrainByH3,
+    payload.blocked
+  );
+  if (!seaportEgressHex && payload.blocked) {
+    seaportEgressHex = nearestAdjacentWaterOrCoastalHex(
+      payload.originH3,
+      payload.destinationH3,
+      payload.hexSet,
+      payload.terrainByH3,
+      undefined
+    );
+  }
+  if (!seaportEgressHex) return { status: 'error', error: PLAN_ROUTE_ERR_SEAPORT_EGRESS };
+  return { reachableOriginH3: seaportEgressHex, seaportEgressHex };
+}
+
+function resolveRoutePathForUnit(payload: {
+  unitType: string;
+  originH3: string;
+  destinationH3: string;
+  hexSet: Set<string>;
+  terrainByH3: Map<string, string>;
+  blocked?: Set<string>;
+}):
+  | {
+      passableFor: PassableDomain;
+      destinationH3: string;
+      path: string[] | null;
+      movementBudget: number;
+      warnings: string[];
+    }
+  | PlanRouteError {
+  const passableFor: PassableDomain = payload.unitType === 'naval' ? 'water' : 'land';
+  const navalOriginResolution = resolveNavalOriginForRouting({
+    unitType: payload.unitType,
+    originH3: payload.originH3,
+    destinationH3: payload.destinationH3,
+    hexSet: payload.hexSet,
+    terrainByH3: payload.terrainByH3,
+    blocked: payload.blocked,
+  });
+  if ('status' in navalOriginResolution) return navalOriginResolution;
+  const { reachableOriginH3: navalReachableOrigin, seaportEgressHex } = navalOriginResolution;
+  const warnings: string[] = [];
+  let destinationH3 = payload.destinationH3;
+  let navalRedirectedToWater = false;
+  const destinationTerrain = payload.terrainByH3.get(destinationH3) ?? 'land';
+  if (payload.unitType === 'naval' && destinationTerrain === 'land') {
+    const waterHex = nearestReachableWaterHexTo(
+      navalReachableOrigin,
+      destinationH3,
+      payload.hexSet,
+      payload.terrainByH3,
+      payload.blocked
+    );
+    if (waterHex) {
+      destinationH3 = waterHex;
+      navalRedirectedToWater = true;
+    }
+  }
+  if (payload.blocked) payload.blocked.delete(destinationH3);
+
+  const movementBudget = seaportEgressHex ? 1 : getMovementBudgetForUnit(payload.unitType);
+  let path = findPathWithOptionalAvoidanceRetry({
+    routeOriginH3: navalReachableOrigin,
+    destinationH3,
+    hexSet: payload.hexSet,
+    terrainByH3: payload.terrainByH3,
+    passableFor,
+    blocked: payload.blocked,
+    originH3: payload.originH3,
+    seaportEgressHex,
+    warnings,
+    blockedRetryWarning: 'Route passes through enemy-occupied hexes - avoidance was not possible.',
+  });
+  if (seaportEgressHex) warnings.push(PLAN_ROUTE_WARNING_SEAPORT_EGRESS);
+  if (navalRedirectedToWater) warnings.push(PLAN_ROUTE_WARNING_LAND_REDIRECT);
+  if (!path && payload.unitType === 'naval') {
+    const fallbackWater = nearestReachableWaterHexTo(
+      navalReachableOrigin,
+      destinationH3,
+      payload.hexSet,
+      payload.terrainByH3,
+      payload.blocked
+    );
+    if (fallbackWater && fallbackWater !== destinationH3) {
+      destinationH3 = fallbackWater;
+      path = findPathWithOptionalAvoidanceRetry({
+        routeOriginH3: navalReachableOrigin,
+        destinationH3,
+        hexSet: payload.hexSet,
+        terrainByH3: payload.terrainByH3,
+        passableFor,
+        blocked: payload.blocked,
+        originH3: payload.originH3,
+        seaportEgressHex,
+      });
+      if (path) warnings.push(PLAN_ROUTE_WARNING_WATER_BODY_FALLBACK);
+    }
+  }
+  return { passableFor, destinationH3, path, movementBudget, warnings };
 }
 
 /** Options for plan_route. */
@@ -157,10 +423,10 @@ function planRouteNoPathHint(passableFor: PassableDomain, destTerrain: string): 
     return ' No path found (destination may be on a different land mass).';
   }
   if (passableFor === 'water' && destTerrain === 'land') {
-    return ' Destination is land; naval units cannot move onto pure land. Use a land unit\'s position as destination to get a route to the nearest water or coastal hex.';
+    return PLAN_ROUTE_HINT_DESTINATION_LAND;
   }
   if (passableFor === 'water' && terrainIsPassableForDomain(destTerrain, 'water')) {
-    return ' No path to that water/coastal hex (may be in a different water body).';
+    return PLAN_ROUTE_HINT_NO_PATH_WATER_COASTAL;
   }
   return '';
 }
@@ -180,7 +446,7 @@ export function executePlanRoute(
   logDebug('tool1Pathfinding executePlanRoute', { unitId, destination: destination.join(','), options });
   const hexList = state.hexes.map((h) => h.h3Index);
   const hexSet = new Set(hexList);
-  const terrainByH3 = new Map(state.hexes.map((h) => [h.h3Index, effectiveHexPassabilityTerrain(h)]));
+  const terrainByH3 = buildNormalizedTerrainByH3(state.hexes);
 
   const unit = state.units.find((u) => u.id === unitId);
   if (!unit) {
@@ -201,25 +467,23 @@ export function executePlanRoute(
   }
 
   const originH3 = unit.h3Index;
-  const passableFor: PassableDomain = unit.unitType === 'naval' ? 'water' : 'land';
   const avoidEnemies = options?.avoidEnemies !== false;
   let blocked: Set<string> | undefined;
   if (avoidEnemies) {
     blocked = new Set(state.units.filter((u) => u.player !== unit.player).map((u) => u.h3Index));
     blocked.delete(originH3);
   }
-  const destTerrain = terrainByH3.get(destH3) ?? 'land';
-  let navalRedirectedToWater = false;
-  if (unit.unitType === 'naval' && destTerrain === 'land') {
-    const waterHex = nearestReachableWaterHexTo(originH3, destH3, hexSet, terrainByH3, blocked);
-    if (waterHex) {
-      destH3 = waterHex;
-      navalRedirectedToWater = true;
-    }
-  }
-  if (blocked) blocked.delete(destH3);
-
-  const movementBudget = getMovementBudgetForUnit(unit.unitType);
+  const routeResolution = resolveRoutePathForUnit({
+    unitType: unit.unitType,
+    originH3,
+    destinationH3: destH3,
+    hexSet,
+    terrainByH3,
+    blocked,
+  });
+  if ('status' in routeResolution) return routeResolution;
+  const { passableFor, destinationH3, path, movementBudget, warnings } = routeResolution;
+  destH3 = destinationH3;
 
   if (originH3 === destH3) {
     const originLl = h3ToLatLng(originH3, latLngByH3);
@@ -228,8 +492,8 @@ export function executePlanRoute(
       .sort((a, b) => a.localeCompare(b))
       .slice(0, 6)
       .map((h3) => h3ToLatLng(h3, latLngByH3));
-    const warningsWhenAlreadyThere: string[] = navalRedirectedToWater
-      ? ['Unit is already at the nearest water/coastal hex to that land position; no movement this turn.']
+    const warningsWhenAlreadyThere: string[] = warnings.includes(PLAN_ROUTE_WARNING_LAND_REDIRECT)
+      ? [PLAN_ROUTE_WARNING_ALREADY_AT_REDIRECTED_HEX]
       : ['Destination resolves to the unit\'s current hex at map resolution; choose a more distant coordinate to move.'];
     return {
       status: 'ok',
@@ -247,30 +511,6 @@ export function executePlanRoute(
     };
   }
 
-  let path = findPath(originH3, destH3, hexSet, terrainByH3, passableFor, blocked);
-  const warnings: string[] = [];
-  if (navalRedirectedToWater) {
-    warnings.push(
-      'Destination was land; route is to the nearest reachable water/coastal hex to that position (naval cannot move onto pure land).',
-    );
-  }
-  if (!path && blocked) {
-    path = findPath(originH3, destH3, hexSet, terrainByH3, passableFor, undefined);
-    if (path) warnings.push('Route passes through enemy-occupied hexes - avoidance was not possible.');
-  }
-  if (!path && unit.unitType === 'naval') {
-    const fallbackWater = nearestReachableWaterHexTo(originH3, destH3, hexSet, terrainByH3, blocked);
-    if (fallbackWater && fallbackWater !== destH3) {
-      destH3 = fallbackWater;
-      path = findPath(originH3, destH3, hexSet, terrainByH3, passableFor, blocked);
-      if (!path && blocked) path = findPath(originH3, destH3, hexSet, terrainByH3, passableFor, undefined);
-      if (path) {
-        warnings.push(
-          'Requested destination is in a different water body; route is to the nearest reachable water/coastal hex toward it.',
-        );
-      }
-    }
-  }
   if (!path) {
     const destTerrainAtError = terrainByH3.get(destH3) ?? 'land';
     const hint = planRouteNoPathHint(passableFor, destTerrainAtError);
@@ -356,7 +596,7 @@ export function executeCheckDistance(
   logDebug('tool1Pathfinding executeCheckDistance', { from: from.join(','), to: to.join(','), unitType });
   const hexList = state.hexes.map((h) => h.h3Index);
   const hexSet = new Set(hexList);
-  const terrainByH3 = new Map(state.hexes.map((h) => [h.h3Index, h.terrain]));
+  const terrainByH3 = buildNormalizedTerrainByH3(state.hexes);
 
   const fromH3 = resolveToH3(from[0], from[1]);
   let toH3 = resolveToH3(to[0], to[1]);

@@ -41,6 +41,10 @@ import type {
   HumanStandingOrderSnapshot,
 } from '../shared/ipcTypes';
 import { estimateTurnsToNextSpawn, MAX_UNITS_PER_TYPE } from '../shared/productionConfig';
+import {
+  buildUnitDisplayNameLookup,
+  fallbackDisplayNameFromUnitId,
+} from '../shared/unitDisplayNames';
 
 /** One executed move (human or AI) for resolution-phase fade animation. */
 interface ResolutionMove {
@@ -243,6 +247,7 @@ function onStackAllActionClick(
   clientX: number,
   clientY: number
 ): void {
+  if (humanIds.length === 0) return;
   if (action === 'selectAll') {
     replaceSelection(humanIds);
     hideStackCallout();
@@ -276,7 +281,9 @@ function showStackCallout(
 
   const sorted = [...units].sort(
     (a, b) =>
-      `${a.player} ${a.unitType} ${a.id}`.localeCompare(`${b.player} ${b.unitType} ${b.id}`)
+      `${a.player} ${a.unitType} ${formatUnitDisplayName(a.id)}`.localeCompare(
+        `${b.player} ${b.unitType} ${formatUnitDisplayName(b.id)}`
+      )
   );
 
   calloutEl.setAttribute('data-open', 'true');
@@ -304,7 +311,7 @@ function showStackCallout(
   header.appendChild(closeBtn);
 
   const humanIds = sorted.filter((u) => u.player === 'human').map((u) => u.id);
-  if (!ctrlKeyActive) {
+  if (humanIds.length > 0 && !ctrlKeyActive) {
     const selectAllBtn = document.createElement('button');
     selectAllBtn.type = 'button';
     selectAllBtn.className = 'unit-select';
@@ -313,7 +320,7 @@ function showStackCallout(
       onStackAllActionClick('selectAll', humanIds, units, clientX, clientY);
     });
     header.appendChild(selectAllBtn);
-  } else {
+  } else if (humanIds.length > 0) {
     const addAllBtn = document.createElement('button');
     addAllBtn.type = 'button';
     addAllBtn.className = 'unit-select';
@@ -336,7 +343,7 @@ function showStackCallout(
     const li = document.createElement('li');
     const label = document.createElement('span');
     label.className = 'unit-label';
-    label.textContent = u.id;
+    label.textContent = formatUnitDisplayName(u.id);
     li.appendChild(label);
     if (u.player === 'human') {
       const btn = document.createElement('button');
@@ -1249,6 +1256,7 @@ async function applyGameStateSnapshot(
 ): Promise<void> {
   const previousState = gameState;
   gameState = nextState;
+  rebuildUnitDisplayNameLookup(nextState);
   reconcileSelectionToCurrentState();
   updateClientStaleEnemyIntel(previousState, nextState);
   if (!initialCameraApplied && nextState.hexes.length > 0) {
@@ -1361,6 +1369,7 @@ let stackCalloutModalActive = false;
 let buildPopupHexH3: string | null = null;
 let buildPopupRequestSeq = 0;
 let gameState: GameStateSnapshot | null = null;
+let unitDisplayNameById = new Map<string, string>();
 let res4TerrainOverridesByH3 = new Map<string, { terrainKind: string; isUrban: boolean }>();
 /** Major airport/seaport H3 from metadata (scalerank ≤ 5); populated via IPC at startup. */
 let terrainInfraRes1Airport = new Set<string>();
@@ -1401,6 +1410,14 @@ let redrawRafId: number | null = null;
 
 function getPrimarySelectedUnitId(): string | null {
   return selectedUnitIds[0] ?? null;
+}
+
+function rebuildUnitDisplayNameLookup(state: GameStateSnapshot | null): void {
+  unitDisplayNameById = state ? buildUnitDisplayNameLookup(state.units) : new Map<string, string>();
+}
+
+function formatUnitDisplayName(unitId: string): string {
+  return unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
 }
 
 function reconcileSelectionToCurrentState(): void {
@@ -2501,6 +2518,7 @@ function appendOpenRouterLog(line: string, isError = false): void {
 
 /** Toast: show message for a readable duration, then auto-hide; can dismiss early. */
 const TOAST_DURATION_MS = 12_000; // 1.5× previous 8s for better readability
+const READY_REQUEST_TIMEOUT_MS = 120_000;
 let toastHideTimer: ReturnType<typeof setTimeout> | null = null;
 let aiStrategyToastHideTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -2609,6 +2627,18 @@ function hideAiStrategyToast(): void {
   if (el) el.classList.add('hidden');
 }
 
+async function callReadyWithTimeout(payload: Record<string, unknown>): Promise<Awaited<ReturnType<NonNullable<GameApi['ready']>>>> {
+  if (!window.gameApi?.ready) {
+    throw new Error('Ready action unavailable.');
+  }
+  return Promise.race([
+    window.gameApi.ready(payload as never),
+    new Promise<never>((_resolve, reject) => {
+      setTimeout(() => reject(new Error(`Ready request timed out after ${READY_REQUEST_TIMEOUT_MS}ms`)), READY_REQUEST_TIMEOUT_MS);
+    }),
+  ]);
+}
+
 function formatDeployedUnitsLine(
   deployed: { armor?: number; infantry?: number; naval?: number } | undefined
 ): string | null {
@@ -2624,14 +2654,17 @@ function formatDeployedUnitsLine(
 }
 
 function formatDeploymentCapReachedLine(
-  cappedTypes: Array<'infantry' | 'armor' | 'naval'> | undefined
+  cappedTypes: Array<'infantry' | 'armor' | 'naval'> | undefined,
+  player: 'human' | 'opponent'
 ): string | null {
+  // Update toasts intentionally only announce the human player's deployment-cap state.
+  if (player !== 'human') return null;
   if (!cappedTypes || cappedTypes.length === 0) return null;
   const ordered = (['infantry', 'armor', 'naval'] as const).filter((unitType) => cappedTypes.includes(unitType));
   if (ordered.length === 0) return null;
-  if (ordered.length === 1) return `Maximum ${ordered[0]} units deployed.`;
-  if (ordered.length === 2) return `Maximum ${ordered[0]} and ${ordered[1]} units deployed.`;
-  return `Maximum ${ordered[0]}, ${ordered[1]}, and ${ordered[2]} units deployed.`;
+  if (ordered.length === 1) return `Maximum human ${ordered[0]} units deployed.`;
+  if (ordered.length === 2) return `Maximum human ${ordered[0]} and ${ordered[1]} units deployed.`;
+  return `Maximum human ${ordered[0]}, ${ordered[1]}, and ${ordered[2]} units deployed.`;
 }
 
 /**
@@ -3669,8 +3702,8 @@ function updateSidebar(): void {
   const selectedUnitEl = document.getElementById('sidebar-selected-unit');
   if (selectedUnitEl) {
     const primary = getPrimarySelectedUnitId();
-    if (selectedUnitIds.length <= 1) selectedUnitEl.textContent = primary ?? '—';
-    else selectedUnitEl.textContent = `${primary} (+${selectedUnitIds.length - 1})`;
+    if (selectedUnitIds.length <= 1) selectedUnitEl.textContent = primary ? formatUnitDisplayName(primary) : '—';
+    else selectedUnitEl.textContent = `${primary ? formatUnitDisplayName(primary) : '—'} (+${selectedUnitIds.length - 1})`;
   }
 }
 
@@ -3751,6 +3784,7 @@ function initNewGameButton(): void {
         fogOfWarEnabled: fogCheckbox?.checked !== false,
       })) as GameStateSnapshot;
       gameState = state;
+      rebuildUnitDisplayNameLookup(state);
       reconcileSelectionToCurrentState();
       clientStaleEnemyIntelByUnitId.clear();
       lastObservedEnemyByUnitId.clear();
@@ -3864,7 +3898,59 @@ function formatRangedTargetUnitLabel(r: RangedAttackOrder): string {
   const candidates = (preferred.length > 0 ? preferred : inHex).sort((a, b) => a.id.localeCompare(b.id));
   const primary = candidates[0]?.id ?? r.targetH3Index;
   const additionalCount = Math.max(0, candidates.length - 1);
-  return additionalCount > 0 ? `${primary} (+${additionalCount})` : primary;
+  const primaryLabel = formatUnitDisplayName(primary);
+  return additionalCount > 0 ? `${primaryLabel} (+${additionalCount})` : primaryLabel;
+}
+
+function formatUnitArrowLabel(unitId: string, targetLabel: string): string {
+  return `${formatUnitDisplayName(unitId)} → ${targetLabel}`;
+}
+
+function formatPendingOrderSidebarLabel(order: HumanStandingOrderSnapshot): string {
+  return formatUnitArrowLabel(order.unitId, `${estimateHexesLeftForOrder(order)}h (${order.status})`);
+}
+
+function formatKillToastLine(
+  kill: { victimId: string; killerIds: string[] },
+  nameFormatter: (unitId: string) => string,
+  playerFormatter: (unitId: string) => string
+): string {
+  const victimLabel = `${nameFormatter(kill.victimId)}${playerFormatter(kill.victimId)}`;
+  const killerLabels = kill.killerIds.map((killerId) => `${nameFormatter(killerId)}${playerFormatter(killerId)}`).join(', ');
+  return `${victimLabel} destroyed by ${killerLabels}`;
+}
+
+function buildKillToastFormatterBundle(
+  state: GameStateSnapshot,
+  removedUnits: RemovedUnitSnapshot[] | undefined
+): {
+  formatKillLine: (kill: { victimId: string; killerIds: string[] }) => string;
+} {
+  const removedUnitsForDisplay = removedUnits ?? [];
+  const rosterForDisplay = [
+    ...(state.units ?? []),
+    ...removedUnitsForDisplay.map((u) => ({
+      id: u.id,
+      player: u.player,
+      unitType: u.unitType,
+      displayOrder: u.displayOrder,
+    })),
+  ];
+  const displayNameById = buildUnitDisplayNameLookup(rosterForDisplay);
+  const playerById = new Map(rosterForDisplay.map((u) => [u.id, u.player]));
+  const formatDisplayPlayerSuffix = (unitId: string): string => {
+    const player = playerById.get(unitId);
+    if (player === 'human') return ' (human)';
+    if (player === 'opponent') return ' (AI)';
+    if (unitId.startsWith('human-')) return ' (human)';
+    if (unitId.startsWith('opponent-')) return ' (AI)';
+    return '';
+  };
+  const formatDisplayUnitName = (unitId: string) =>
+    displayNameById.get(unitId) ?? unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
+  const formatKillLine = (kill: { victimId: string; killerIds: string[] }) =>
+    formatKillToastLine(kill, formatDisplayUnitName, formatDisplayPlayerSuffix);
+  return { formatKillLine };
 }
 
 function syncUiAfterSelectionChange(options: { refreshHoverPreview?: boolean } = {}): void {
@@ -3987,7 +4073,7 @@ function updateRangedSidebar(): void {
   } else {
     for (const r of pendingRangedAttacks) {
       const row = createSidebarOrderRow({
-        labelText: `${r.unitId} → ${formatRangedTargetUnitLabel(r)}`,
+        labelText: formatUnitArrowLabel(r.unitId, formatRangedTargetUnitLabel(r)),
         selected: selectedUnitIds.includes(r.unitId),
         onToggleSelect: (event) => applySelectionFromSidebarUnitButton(r.unitId, event),
         onCancel: () => cancelRangedForUnit(r.unitId),
@@ -4026,7 +4112,7 @@ function updatePendingOrdersSidebar(): void {
   }
   for (const order of pendingOrders) {
     const row = createSidebarOrderRow({
-      labelText: `${order.unitId} → ${estimateHexesLeftForOrder(order)}h (${order.status})`,
+      labelText: formatPendingOrderSidebarLabel(order),
       selected: selectedUnitIds.includes(order.unitId),
       onToggleSelect: (event) => applySelectionFromSidebarUnitButton(order.unitId, event),
       onCancel: () => {
@@ -4781,7 +4867,7 @@ function init(): void {
                   enabledToolGroups: enabledToolGroupsPayload,
                   aiPlanningRunEnabled: runButtonOn,
                 });
-        const readyResult = await window.gameApi!.ready(readyPayload);
+        const readyResult = await callReadyWithTimeout(readyPayload as Record<string, unknown>);
         if (!readyResult.success) {
           showSidebarError(readyResult.reason ?? 'Ready failed');
           updateReadyButtonState();
@@ -4898,18 +4984,18 @@ function init(): void {
           const knownDirectFire = directFire.filter((k) => knownVictimIds.has(k.victimId));
           const knownReturnFire = returnFire.filter((k) => knownVictimIds.has(k.victimId));
           const knownMeleeKills = meleeKills.filter((k) => knownVictimIds.has(k.victimId));
-          const fmt = (k: { victimId: string; killerIds: string[] }) => `${k.victimId} destroyed by ${k.killerIds.join(', ')}`;
+          const killToastFormatter = buildKillToastFormatterBundle(state, readyResult.removedUnits);
           const bullets: string[] = [];
           const deployedLine = formatDeployedUnitsLine(readyResult.deployedUnitsByType);
           if (deployedLine) bullets.push(deployedLine);
-          const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes);
+          const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, 'human');
           if (deploymentCapLine) bullets.push(deploymentCapLine);
           if ((readyResult.humanHexesLostCount ?? 0) > 0) {
             bullets.push(`${readyResult.humanHexesLostCount!.toLocaleString()} hexes lost to opponent`);
           }
-          if (knownDirectFire.length > 0) bullets.push(`• Direct fire: ${knownDirectFire.map(fmt).join('; ')}`);
-          if (knownReturnFire.length > 0) bullets.push(`• Return fire: ${knownReturnFire.map(fmt).join('; ')}`);
-          if (knownMeleeKills.length > 0) bullets.push(knownMeleeKills.map(fmt).join('\n'));
+          if (knownDirectFire.length > 0) bullets.push(`• Direct fire: ${knownDirectFire.map(killToastFormatter.formatKillLine).join('; ')}`);
+          if (knownReturnFire.length > 0) bullets.push(`• Return fire: ${knownReturnFire.map(killToastFormatter.formatKillLine).join('; ')}`);
+          if (knownMeleeKills.length > 0) bullets.push(knownMeleeKills.map(killToastFormatter.formatKillLine).join('\n'));
           if (bullets.length > 0) showMapToast(bullets.join('\n'), { isError: false });
           const unknownVictimIds = allKills
             .map((k) => k.victimId)

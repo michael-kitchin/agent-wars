@@ -354,6 +354,19 @@ export function getRes1ProductionContext(payload: { h3Index: string }): Res1Prod
 
 /**
  * Why this exists:
+ *     Lets consumers decide whether production-context reads are safe without forcing cache initialization.
+ * When to use:
+ *     Movement/pathing helpers that should opportunistically use terrain metadata when available.
+ * What to expect:
+ *     Returns true only after `ensureTerrainClassificationCacheLoaded` has successfully built the cache.
+ */
+export function isTerrainClassificationCacheLoaded(): boolean {
+  logTrace('terrainClassificationCache isTerrainClassificationCacheLoaded');
+  return cached !== null;
+}
+
+/**
+ * Why this exists:
  *     Reset process-level terrain cache between main-process tests that swap metadata fixtures.
  * When to use:
  *     Test teardown after `setTerrainMetadataPathOverrideForTests`.

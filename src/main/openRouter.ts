@@ -38,6 +38,12 @@ import type { CallbackSubscription } from './callbackSubscriptions';
 import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
 import { normalizeProductionOrders } from './productionOrders';
 import { MAX_UNITS_PER_TYPE, getMaxedUnitTypesForPlayer, getPlayerUnitCountsByType } from './productionCaps';
+import {
+  NAVAL_DESTINATION_MUST_BE_WATER_COASTAL,
+  NAVAL_MOVEMENT_PROMPT_RULE,
+  NAVAL_PLAN_ROUTE_LAND_TARGET_HINT,
+  NAVAL_PLAN_ROUTE_PROMPT_SUFFIX,
+} from './navalMovementMessages';
 
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -340,7 +346,7 @@ function validateAiOrder(
   const destHex = state.hexes.find((h) => h.h3Index === order.toH3Index);
   const terrain = destHex?.terrain ?? 'land';
   if (unit.unitType === 'naval' && !passabilityAllowsNavalUnit(terrain)) {
-    return { valid: false, reason: 'Naval units must move to water, coastal, or wetlands hexes' };
+    return { valid: false, reason: NAVAL_DESTINATION_MUST_BE_WATER_COASTAL };
   }
   if ((unit.unitType === 'infantry' || unit.unitType === 'armor') && !passabilityAllowsLandUnit(terrain)) {
     return { valid: false, reason: 'Land units must move to land, coastal, or wetlands hexes' };
@@ -423,6 +429,12 @@ function formatLatLng(ll: [number, number]): string {
 const MOVEMENT_INSTRUCTION_MEMORY_SUFFIX =
   ' Include a memoryUpdates entry (e.g. write key "strategy" tier "persistent") in your final JSON to record your plan.';
 
+const PRODUCTION_REQUIREMENT_BASE = 'when at least one controlled hex has availableUnitTypes and an empty queue';
+const PRODUCTION_REQUIREMENT_PRIORITY =
+  'Choose the unit types you expect to need, and prioritize what you will need first by putting those entries first in queue order.';
+const PRODUCTION_REQUIREMENT_PRIORITY_INITIAL =
+  'Build the unit types you think you need, and prioritize what you think you will need first.';
+
 /**
  * Builds the "HOW TO USE TOOLS" guidance block, conditional on which tool groups are enabled.
  * When hasPrecomputedBriefing is true, tells the model to use the Commander's Briefing and avoid redundant
@@ -477,12 +489,15 @@ function buildToolUsageGuidance(flags: ToolFlags, hasPrecomputedBriefing = false
   if (flags.memoryEnabled) {
     lines.push(
       '- BEFORE finishing: include memoryUpdates write key "strategy" tier "persistent" with specific unit-to-target ETAs and priorities.' +
-      ' Do NOT store enemy positions or rosters (already in the briefing). Keep it concise.'
+      ' Do NOT store enemy positions or rosters (already in the briefing). Do not claim "no observed human units" when the briefing lists observed human units. Keep it concise.'
     );
   }
   if (flags.productionEnabled) {
     lines.push(
       '- Production: use query_production to inspect controlled-hex queues and constraints; use add_build_entry/update_build_entry/remove_build_entry for iterative queue edits. If skipping tools, you may include productionOrders in final JSON.'
+    );
+    lines.push(
+      `- Production requirement: ${PRODUCTION_REQUIREMENT_BASE}, queue at least one build this turn (via tools or productionOrders). ${PRODUCTION_REQUIREMENT_PRIORITY}`
     );
   }
   if (lines.length === 0) return '';
@@ -544,11 +559,13 @@ function getMovementOrderInstruction(flags: ToolFlags): string {
 function buildProductionSubmitClause(flags: ToolFlags): string {
   if (!flags.productionEnabled) return '';
   return (
-    ' Optional "productionOrders" entries MUST include "action" on every item. Required forms:' +
+    ' "productionOrders" entries MUST include "action" on every item. Required forms:' +
     ' {"action":"add_build_entry","hex":[lat,lng],"unitType":"infantry|armor|naval","count":1..99};' +
     ' {"action":"update_build_entry","hex":[lat,lng],"entryId":number,"unitType":"infantry|armor|naval","count":1..99};' +
     ' {"action":"remove_build_entry","hex":[lat,lng],"entryId":number}.' +
-    ' Any productionOrders item missing "action" or required fields is dropped.'
+    ' Any productionOrders item missing "action" or required fields is dropped.' +
+    ` ${PRODUCTION_REQUIREMENT_BASE}, include at least one add_build_entry this turn.` +
+    ' Select the unit types you think you will need, and prioritize what you will need first in queue order.'
   );
 }
 
@@ -627,13 +644,16 @@ function getInitialUserMessage(flags: ToolFlags, hasPrecomputedBriefing = false)
     const memoryNote = flags.memoryEnabled
       ? ' After your analysis, include memoryUpdates in your final JSON for strategy notes. '
       : '';
+    const productionNote = flags.productionEnabled
+      ? ` Also ensure production is actively queued when viable: ${PRODUCTION_REQUIREMENT_BASE}, include at least one production action. ${PRODUCTION_REQUIREMENT_PRIORITY_INITIAL} `
+      : '';
     if (hasPrecomputedBriefing) {
       const ordersNudge = flags.ordersEnabled
         ? ' For units without standing orders in the briefing, include assign_order entries in orders[]. Then use plan_route and explicit_move only where needed this turn. '
         : '';
-      return `Use the COMMANDER'S BRIEFING above for unit status and combat info.${ordersNudge}Call plan_route for each unit that needs a move (orderToXY).${memoryNote} Then submit final JSON with "strategy", "orders" (assign_order / explicit_move / explicit_attack / cancel_order as needed)${jsonOptionalTail}.`;
+      return `Use the COMMANDER'S BRIEFING above for unit status and combat info.${ordersNudge}Call plan_route for each unit that needs a move (orderToXY).${memoryNote}${productionNote} Then submit final JSON with "strategy", "orders" (assign_order / explicit_move / explicit_attack / cancel_order as needed)${jsonOptionalTail}.`;
     }
-    return `Use the tools as needed to plan movement.${memoryNote} Then submit final JSON with "strategy", "orders"${jsonOptionalTail}.`;
+    return `Use the tools as needed to plan movement.${memoryNote}${productionNote} Then submit final JSON with "strategy", "orders"${jsonOptionalTail}.`;
   }
 
   const submitEmpty = ` Then submit final JSON with "strategy": "<one-line>", "orders": [].`;
@@ -735,7 +755,7 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
 
   const combatTargetHint = flags.estimationEnabled ? ' (e.g. use estimate_combat to pick the best)' : '';
   const navalCoaching = hasNaval
-    ? ` Naval units can attack land units at 1 or 2 hexes (range 2). Add explicit_attack when a naval unit is within 2 hexes of an enemy at turn start. Naval units move only on water.${flags.planningEnabled ? ' To move a naval unit toward a land target, call plan_route with that land unit\'s [lat,lng] as the destination.' : ''}`
+    ? ` Naval units can attack land units at 1 or 2 hexes (range 2). Add explicit_attack when a naval unit is within 2 hexes of an enemy at turn start. ${NAVAL_MOVEMENT_PROMPT_RULE}${flags.planningEnabled ? NAVAL_PLAN_ROUTE_LAND_TARGET_HINT : ''}`
     : '';
   const combatAssessHint = flags.assessmentEnabled && hasRanged
     ? ' When assess_unit reports canAttackThisTurn with attackType "ranged" for an enemy, add explicit_attack with targetHex as that enemy\'s [lat,lng] (or unit id).' +
@@ -824,7 +844,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
       },
       required: ['unitId', 'destination'],
     },
-    promptLine: 'plan_route(unitId, destination, options?) - Compute the optimal path for a unit to a destination hex. Returns multi-turn route and orderToXY: the exact [lat, lng] for this turn\'s movement order (copy this into explicit_move.destination for that unit). For naval units, you may pass a land unit\'s [lat, lng] as destination; the route will be to the nearest water hex to that position so the naval can get in range.',
+    promptLine: `plan_route(unitId, destination, options?) - Compute the optimal path for a unit to a destination hex. Returns multi-turn route and orderToXY: the exact [lat, lng] for this turn's movement order (copy this into explicit_move.destination for that unit).${NAVAL_PLAN_ROUTE_PROMPT_SUFFIX}`,
   },
   {
     name: 'check_distance',
@@ -1036,6 +1056,95 @@ function sanitizeToolResultForModel(value: unknown): unknown {
 }
 
 const MAX_TOOL_ITERATIONS = 50;
+const OPENROUTER_REQUEST_TIMEOUT_MS = 45_000;
+const OPENROUTER_REQUEST_RETRY_COUNT = 1;
+
+function isRetryableStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+function getRetryDelayMs(): number {
+  return 300 + Math.floor(Math.random() * 700);
+}
+
+function delayMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function postOpenRouterChatWithTimeoutAndRetry(payload: {
+  key: string;
+  body: Record<string, unknown>;
+  signal?: AbortSignal;
+  onLog?: (line: string, isError?: boolean) => void;
+  requestLabel: string;
+}): Promise<{ ok: true; response: Response } | { ok: false; error: string }> {
+  let lastError = `${payload.requestLabel} failed.`;
+  for (let attempt = 0; attempt <= OPENROUTER_REQUEST_RETRY_COUNT; attempt++) {
+    const controller = new AbortController();
+    const parentSignal = payload.signal;
+    const onParentAbort = () => controller.abort();
+    if (parentSignal) {
+      if (parentSignal.aborted) controller.abort();
+      else parentSignal.addEventListener('abort', onParentAbort, { once: true });
+    }
+    const timeoutId = setTimeout(() => controller.abort(), OPENROUTER_REQUEST_TIMEOUT_MS);
+    try {
+      const res = await fetch(OPENROUTER_CHAT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${payload.key}`,
+        },
+        body: JSON.stringify(payload.body),
+        signal: controller.signal,
+      });
+      if (res.ok) return { ok: true, response: res };
+      const text = await res.text();
+      lastError = res.status === 401 ? 'Invalid API key' : `API error: ${res.status}`;
+      logError(`openRouter ${payload.requestLabel}: API error`, res.status, text.slice(0, 200));
+      if (res.status === 401) return { ok: false, error: lastError };
+      if (attempt < OPENROUTER_REQUEST_RETRY_COUNT && isRetryableStatus(res.status)) {
+        const waitMs = getRetryDelayMs();
+        logDebug(`openRouter ${payload.requestLabel}: retrying after API error`, {
+          attempt: attempt + 1,
+          status: res.status,
+          retryInMs: waitMs,
+        });
+        await delayMs(waitMs);
+        continue;
+      }
+      return { ok: false, error: lastError };
+    } catch (err) {
+      if (parentSignal?.aborted) return { ok: false, error: 'Cancelled' };
+      const timeoutLike = controller.signal.aborted;
+      if (timeoutLike) {
+        lastError = 'AI request timed out. Please try again.';
+        if (payload.onLog) payload.onLog(lastError, true);
+        logError(`openRouter ${payload.requestLabel}: timeout`, {
+          timeoutMs: OPENROUTER_REQUEST_TIMEOUT_MS,
+          attempt: attempt + 1,
+        });
+      } else {
+        lastError = `Network error while requesting AI orders: ${String(err)}`;
+        logError(`openRouter ${payload.requestLabel}: fetch exception`, err);
+      }
+      if (attempt < OPENROUTER_REQUEST_RETRY_COUNT) {
+        const waitMs = getRetryDelayMs();
+        logDebug(`openRouter ${payload.requestLabel}: retrying after exception`, {
+          attempt: attempt + 1,
+          retryInMs: waitMs,
+        });
+        await delayMs(waitMs);
+        continue;
+      }
+      return { ok: false, error: lastError };
+    } finally {
+      clearTimeout(timeoutId);
+      if (parentSignal) parentSignal.removeEventListener('abort', onParentAbort);
+    }
+  }
+  return { ok: false, error: lastError };
+}
 
 export interface RequestOrdersOptions {
   /** When provided, only these tool names are included in the request and prompt. When omitted, all tools are used. */
@@ -1181,8 +1290,8 @@ export async function requestOrders(
 
   logDebug('openRouter requestOrders: system prompt prepared', { chars: systemPrompt.length });
   logDebug('openRouter requestOrders: user message prepared', { chars: userMessage.length });
-  logTrace('openRouter requestOrders: system prompt (full)', systemPrompt);
-  logTrace('openRouter requestOrders: user message (full)', userMessage);
+  logDebug('openRouter requestOrders: system prompt (full)', systemPrompt);
+  logDebug('openRouter requestOrders: user message (full)', userMessage);
   logDebug('openRouter requestOrders: starting tool loop', { turnNumber: state.turnNumber });
 
   const wallClockStart = Date.now();
@@ -1206,24 +1315,18 @@ export async function requestOrders(
         tool_choice: 'auto',
       };
 
-      const fetchInit: RequestInit = {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${key}`,
-        },
-        body: JSON.stringify(body),
-      };
-      if (signal) fetchInit.signal = signal;
-      const res = await fetch(OPENROUTER_CHAT_URL, fetchInit);
-
-      if (!res.ok) {
-        const text = await res.text();
-        logError('openRouter requestOrders: API error', res.status, text.slice(0, 200));
-        const msg = res.status === 401 ? 'Invalid API key' : `API error: ${res.status}`;
-        if (onLog) onLog(msg, true);
-        return { success: false, error: msg };
+      const chatResponse = await postOpenRouterChatWithTimeoutAndRetry({
+        key,
+        body,
+        signal,
+        onLog,
+        requestLabel: 'requestOrders',
+      });
+      if (!chatResponse.ok) {
+        if (onLog && chatResponse.error !== 'Cancelled') onLog(chatResponse.error, true);
+        return { success: false, error: chatResponse.error };
       }
+      const res = chatResponse.response;
 
       const json = (await res.json()) as {
         choices?: Array<{
@@ -1339,17 +1442,15 @@ export async function requestOrders(
             max_tokens: 1024,
             tool_choice: 'none',
           };
-          const repairFetchInit: RequestInit = {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${key}`,
-            },
-            body: JSON.stringify(repairBody),
-          };
-          if (signal) repairFetchInit.signal = signal;
-          const repairRes = await fetch(OPENROUTER_CHAT_URL, repairFetchInit);
-          if (repairRes.ok) {
+          const repairResponse = await postOpenRouterChatWithTimeoutAndRetry({
+            key,
+            body: repairBody,
+            signal,
+            onLog,
+            requestLabel: 'requestOrders repair',
+          });
+          if (repairResponse.ok) {
+            const repairRes = repairResponse.response;
             const repairJson = (await repairRes.json()) as {
               choices?: Array<{ message?: { content?: string | null } }>;
               usage?: { cost?: number; prompt_tokens?: number; completion_tokens?: number };
@@ -1363,7 +1464,7 @@ export async function requestOrders(
               parsed = parseOrdersResponse(repairContent, resolveToH3, state, latLngByH3, flags.productionEnabled);
             }
           } else {
-            logError('openRouter requestOrders: repair API error', repairRes.status);
+            logError('openRouter requestOrders: repair API error', repairResponse.error);
           }
         }
       }

@@ -14869,6 +14869,68 @@
     return Math.max(1, Math.ceil(deficit / safeCapacity));
   }
 
+  // src/shared/unitDisplayNames.ts
+  var UNIT_TYPE_NOUN_BY_TYPE = {
+    infantry: "Infantry",
+    armor: "Armored",
+    naval: "Fleet"
+  };
+  var NATURAL_ID_COLLATOR = new Intl.Collator(void 0, { numeric: true, sensitivity: "base" });
+  function capitalizeWord(s) {
+    if (!s) return s;
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+  function ordinalSuffix(value) {
+    const abs = Math.abs(Math.trunc(value));
+    const mod100 = abs % 100;
+    if (mod100 >= 11 && mod100 <= 13) return "th";
+    const mod10 = abs % 10;
+    if (mod10 === 1) return "st";
+    if (mod10 === 2) return "nd";
+    if (mod10 === 3) return "rd";
+    return "th";
+  }
+  function formatOrdinalLabel(value, locale) {
+    const normalized = Math.max(1, Math.trunc(value));
+    const numberText = new Intl.NumberFormat(locale).format(normalized);
+    return `${numberText}${ordinalSuffix(normalized)}`;
+  }
+  function getUnitDisplayNoun(unitType) {
+    return UNIT_TYPE_NOUN_BY_TYPE[unitType] ?? capitalizeWord(unitType || "Unit");
+  }
+  function buildUnitDisplayNameLookup(units, locale) {
+    const byGroup = /* @__PURE__ */ new Map();
+    for (const unit of units) {
+      const key = unit.unitType;
+      const existing = byGroup.get(key);
+      if (existing) existing.push(unit);
+      else byGroup.set(key, [unit]);
+    }
+    const result = /* @__PURE__ */ new Map();
+    for (const [unitType, group] of byGroup.entries()) {
+      const withPersisted = group.filter((u) => typeof u.displayOrder === "number" && u.displayOrder > 0).sort((a, b) => a.displayOrder - b.displayOrder || NATURAL_ID_COLLATOR.compare(a.id, b.id));
+      const withoutPersisted = group.filter((u) => !(typeof u.displayOrder === "number" && u.displayOrder > 0)).sort((a, b) => NATURAL_ID_COLLATOR.compare(a.id, b.id));
+      const noun = getUnitDisplayNoun(unitType);
+      for (const unit of withPersisted) {
+        result.set(unit.id, `${formatOrdinalLabel(unit.displayOrder, locale)} ${noun}`);
+      }
+      let fallbackOrdinal = withPersisted.reduce((max, u) => Math.max(max, u.displayOrder), 0);
+      for (const unit of withoutPersisted) {
+        fallbackOrdinal += 1;
+        result.set(unit.id, `${formatOrdinalLabel(fallbackOrdinal, locale)} ${noun}`);
+      }
+    }
+    return result;
+  }
+  function fallbackDisplayNameFromUnitId(unitId, locale) {
+    const typeMatch = unitId.match(/-(infantry|armor|naval)-/);
+    const ordinalMatch = unitId.match(/(\d+)(?!.*\d)/);
+    if (!typeMatch || !ordinalMatch) return unitId;
+    const ordinalValue = Number.parseInt(ordinalMatch[1] ?? "", 10);
+    if (!Number.isFinite(ordinalValue) || ordinalValue <= 0) return unitId;
+    return `${formatOrdinalLabel(ordinalValue, locale)} ${getUnitDisplayNoun(typeMatch[1] ?? "")}`;
+  }
+
   // src/renderer/renderer.ts
   var RANGED_RANGE = {
     infantry: 0,
@@ -14986,6 +15048,7 @@
     syncUiAfterSelectionChange({ refreshHoverPreview: false });
   }
   function onStackAllActionClick(action, humanIds, allUnitsAtHex, clientX, clientY) {
+    if (humanIds.length === 0) return;
     if (action === "selectAll") {
       replaceSelection(humanIds);
       hideStackCallout();
@@ -15008,7 +15071,9 @@
     if (stackCalloutModalActive) calloutEl.classList.add("stack-modal");
     else calloutEl.classList.remove("stack-modal");
     const sorted = [...units].sort(
-      (a, b) => `${a.player} ${a.unitType} ${a.id}`.localeCompare(`${b.player} ${b.unitType} ${b.id}`)
+      (a, b) => `${a.player} ${a.unitType} ${formatUnitDisplayName(a.id)}`.localeCompare(
+        `${b.player} ${b.unitType} ${formatUnitDisplayName(b.id)}`
+      )
     );
     calloutEl.setAttribute("data-open", "true");
     calloutEl.setAttribute("data-x", String(clientX));
@@ -15033,7 +15098,7 @@
     });
     header.appendChild(closeBtn);
     const humanIds = sorted.filter((u) => u.player === "human").map((u) => u.id);
-    if (!ctrlKeyActive) {
+    if (humanIds.length > 0 && !ctrlKeyActive) {
       const selectAllBtn = document.createElement("button");
       selectAllBtn.type = "button";
       selectAllBtn.className = "unit-select";
@@ -15042,7 +15107,7 @@
         onStackAllActionClick("selectAll", humanIds, units, clientX, clientY);
       });
       header.appendChild(selectAllBtn);
-    } else {
+    } else if (humanIds.length > 0) {
       const addAllBtn = document.createElement("button");
       addAllBtn.type = "button";
       addAllBtn.className = "unit-select";
@@ -15065,7 +15130,7 @@
       const li = document.createElement("li");
       const label = document.createElement("span");
       label.className = "unit-label";
-      label.textContent = u.id;
+      label.textContent = formatUnitDisplayName(u.id);
       li.appendChild(label);
       if (u.player === "human") {
         const btn = document.createElement("button");
@@ -15777,6 +15842,7 @@
   async function applyGameStateSnapshot(nextState, options = {}) {
     const previousState = gameState;
     gameState = nextState;
+    rebuildUnitDisplayNameLookup(nextState);
     reconcileSelectionToCurrentState();
     updateClientStaleEnemyIntel(previousState, nextState);
     if (!initialCameraApplied && nextState.hexes.length > 0) {
@@ -15864,6 +15930,7 @@
   var buildPopupHexH3 = null;
   var buildPopupRequestSeq = 0;
   var gameState = null;
+  var unitDisplayNameById = /* @__PURE__ */ new Map();
   var res4TerrainOverridesByH3 = /* @__PURE__ */ new Map();
   var terrainInfraRes1Airport = /* @__PURE__ */ new Set();
   var terrainInfraRes1Seaport = /* @__PURE__ */ new Set();
@@ -15880,6 +15947,12 @@
   var redrawRafId = null;
   function getPrimarySelectedUnitId() {
     return selectedUnitIds[0] ?? null;
+  }
+  function rebuildUnitDisplayNameLookup(state) {
+    unitDisplayNameById = state ? buildUnitDisplayNameLookup(state.units) : /* @__PURE__ */ new Map();
+  }
+  function formatUnitDisplayName(unitId) {
+    return unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
   }
   function reconcileSelectionToCurrentState() {
     if (!gameState) {
@@ -16728,6 +16801,7 @@
     el.scrollTop = el.scrollHeight;
   }
   var TOAST_DURATION_MS = 12e3;
+  var READY_REQUEST_TIMEOUT_MS = 12e4;
   var toastHideTimer = null;
   var aiStrategyToastHideTimer = null;
   function bulletizeToastLines(message) {
@@ -16811,6 +16885,17 @@
     const el = document.getElementById("ai-strategy-toast");
     if (el) el.classList.add("hidden");
   }
+  async function callReadyWithTimeout(payload) {
+    if (!window.gameApi?.ready) {
+      throw new Error("Ready action unavailable.");
+    }
+    return Promise.race([
+      window.gameApi.ready(payload),
+      new Promise((_resolve, reject) => {
+        setTimeout(() => reject(new Error(`Ready request timed out after ${READY_REQUEST_TIMEOUT_MS}ms`)), READY_REQUEST_TIMEOUT_MS);
+      })
+    ]);
+  }
   function formatDeployedUnitsLine(deployed) {
     if (!deployed) return null;
     const parts = [];
@@ -16822,13 +16907,14 @@
     if (parts.length === 2) return `${parts[0]} and ${parts[1]} units deployed`;
     return `${parts[0]}, ${parts[1]}, and ${parts[2]} units deployed`;
   }
-  function formatDeploymentCapReachedLine(cappedTypes) {
+  function formatDeploymentCapReachedLine(cappedTypes, player) {
+    if (player !== "human") return null;
     if (!cappedTypes || cappedTypes.length === 0) return null;
     const ordered = ["infantry", "armor", "naval"].filter((unitType) => cappedTypes.includes(unitType));
     if (ordered.length === 0) return null;
-    if (ordered.length === 1) return `Maximum ${ordered[0]} units deployed.`;
-    if (ordered.length === 2) return `Maximum ${ordered[0]} and ${ordered[1]} units deployed.`;
-    return `Maximum ${ordered[0]}, ${ordered[1]}, and ${ordered[2]} units deployed.`;
+    if (ordered.length === 1) return `Maximum human ${ordered[0]} units deployed.`;
+    if (ordered.length === 2) return `Maximum human ${ordered[0]} and ${ordered[1]} units deployed.`;
+    return `Maximum human ${ordered[0]}, ${ordered[1]}, and ${ordered[2]} units deployed.`;
   }
   function drawLoadingScene(ctx, width, height) {
     ctx.fillStyle = BACKGROUND_COLOR;
@@ -17630,8 +17716,8 @@
     const selectedUnitEl = document.getElementById("sidebar-selected-unit");
     if (selectedUnitEl) {
       const primary = getPrimarySelectedUnitId();
-      if (selectedUnitIds.length <= 1) selectedUnitEl.textContent = primary ?? "\u2014";
-      else selectedUnitEl.textContent = `${primary} (+${selectedUnitIds.length - 1})`;
+      if (selectedUnitIds.length <= 1) selectedUnitEl.textContent = primary ? formatUnitDisplayName(primary) : "\u2014";
+      else selectedUnitEl.textContent = `${primary ? formatUnitDisplayName(primary) : "\u2014"} (+${selectedUnitIds.length - 1})`;
     }
   }
   function updateGameStateSidebar(state) {
@@ -17697,6 +17783,7 @@
           fogOfWarEnabled: fogCheckbox?.checked !== false
         });
         gameState = state;
+        rebuildUnitDisplayNameLookup(state);
         reconcileSelectionToCurrentState();
         clientStaleEnemyIntelByUnitId.clear();
         lastObservedEnemyByUnitId.clear();
@@ -17800,7 +17887,44 @@
     const candidates = (preferred.length > 0 ? preferred : inHex).sort((a, b) => a.id.localeCompare(b.id));
     const primary = candidates[0]?.id ?? r.targetH3Index;
     const additionalCount = Math.max(0, candidates.length - 1);
-    return additionalCount > 0 ? `${primary} (+${additionalCount})` : primary;
+    const primaryLabel = formatUnitDisplayName(primary);
+    return additionalCount > 0 ? `${primaryLabel} (+${additionalCount})` : primaryLabel;
+  }
+  function formatUnitArrowLabel(unitId, targetLabel) {
+    return `${formatUnitDisplayName(unitId)} \u2192 ${targetLabel}`;
+  }
+  function formatPendingOrderSidebarLabel(order) {
+    return formatUnitArrowLabel(order.unitId, `${estimateHexesLeftForOrder(order)}h (${order.status})`);
+  }
+  function formatKillToastLine(kill, nameFormatter, playerFormatter) {
+    const victimLabel = `${nameFormatter(kill.victimId)}${playerFormatter(kill.victimId)}`;
+    const killerLabels = kill.killerIds.map((killerId) => `${nameFormatter(killerId)}${playerFormatter(killerId)}`).join(", ");
+    return `${victimLabel} destroyed by ${killerLabels}`;
+  }
+  function buildKillToastFormatterBundle(state, removedUnits) {
+    const removedUnitsForDisplay = removedUnits ?? [];
+    const rosterForDisplay = [
+      ...state.units ?? [],
+      ...removedUnitsForDisplay.map((u) => ({
+        id: u.id,
+        player: u.player,
+        unitType: u.unitType,
+        displayOrder: u.displayOrder
+      }))
+    ];
+    const displayNameById = buildUnitDisplayNameLookup(rosterForDisplay);
+    const playerById = new Map(rosterForDisplay.map((u) => [u.id, u.player]));
+    const formatDisplayPlayerSuffix = (unitId) => {
+      const player = playerById.get(unitId);
+      if (player === "human") return " (human)";
+      if (player === "opponent") return " (AI)";
+      if (unitId.startsWith("human-")) return " (human)";
+      if (unitId.startsWith("opponent-")) return " (AI)";
+      return "";
+    };
+    const formatDisplayUnitName = (unitId) => displayNameById.get(unitId) ?? unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
+    const formatKillLine = (kill) => formatKillToastLine(kill, formatDisplayUnitName, formatDisplayPlayerSuffix);
+    return { formatKillLine };
   }
   function syncUiAfterSelectionChange(options = {}) {
     if (options.refreshHoverPreview !== false) {
@@ -17894,7 +18018,7 @@
     } else {
       for (const r of pendingRangedAttacks) {
         const row = createSidebarOrderRow({
-          labelText: `${r.unitId} \u2192 ${formatRangedTargetUnitLabel(r)}`,
+          labelText: formatUnitArrowLabel(r.unitId, formatRangedTargetUnitLabel(r)),
           selected: selectedUnitIds.includes(r.unitId),
           onToggleSelect: (event) => applySelectionFromSidebarUnitButton(r.unitId, event),
           onCancel: () => cancelRangedForUnit(r.unitId),
@@ -17929,7 +18053,7 @@
     }
     for (const order of pendingOrders) {
       const row = createSidebarOrderRow({
-        labelText: `${order.unitId} \u2192 ${estimateHexesLeftForOrder(order)}h (${order.status})`,
+        labelText: formatPendingOrderSidebarLabel(order),
         selected: selectedUnitIds.includes(order.unitId),
         onToggleSelect: (event) => applySelectionFromSidebarUnitButton(order.unitId, event),
         onCancel: () => {
@@ -18593,7 +18717,7 @@
             enabledToolGroups: enabledToolGroupsPayload,
             aiPlanningRunEnabled: runButtonOn
           };
-          const readyResult = await window.gameApi.ready(readyPayload);
+          const readyResult = await callReadyWithTimeout(readyPayload);
           if (!readyResult.success) {
             showSidebarError(readyResult.reason ?? "Ready failed");
             updateReadyButtonState();
@@ -18698,18 +18822,18 @@
             const knownDirectFire = directFire.filter((k) => knownVictimIds.has(k.victimId));
             const knownReturnFire = returnFire.filter((k) => knownVictimIds.has(k.victimId));
             const knownMeleeKills = meleeKills.filter((k) => knownVictimIds.has(k.victimId));
-            const fmt = (k) => `${k.victimId} destroyed by ${k.killerIds.join(", ")}`;
+            const killToastFormatter = buildKillToastFormatterBundle(state, readyResult.removedUnits);
             const bullets = [];
             const deployedLine = formatDeployedUnitsLine(readyResult.deployedUnitsByType);
             if (deployedLine) bullets.push(deployedLine);
-            const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes);
+            const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, "human");
             if (deploymentCapLine) bullets.push(deploymentCapLine);
             if ((readyResult.humanHexesLostCount ?? 0) > 0) {
               bullets.push(`${readyResult.humanHexesLostCount.toLocaleString()} hexes lost to opponent`);
             }
-            if (knownDirectFire.length > 0) bullets.push(`\u2022 Direct fire: ${knownDirectFire.map(fmt).join("; ")}`);
-            if (knownReturnFire.length > 0) bullets.push(`\u2022 Return fire: ${knownReturnFire.map(fmt).join("; ")}`);
-            if (knownMeleeKills.length > 0) bullets.push(knownMeleeKills.map(fmt).join("\n"));
+            if (knownDirectFire.length > 0) bullets.push(`\u2022 Direct fire: ${knownDirectFire.map(killToastFormatter.formatKillLine).join("; ")}`);
+            if (knownReturnFire.length > 0) bullets.push(`\u2022 Return fire: ${knownReturnFire.map(killToastFormatter.formatKillLine).join("; ")}`);
+            if (knownMeleeKills.length > 0) bullets.push(knownMeleeKills.map(killToastFormatter.formatKillLine).join("\n"));
             if (bullets.length > 0) showMapToast(bullets.join("\n"), { isError: false });
             const unknownVictimIds = allKills.map((k) => k.victimId).filter((id, idx, arr) => arr.indexOf(id) === idx).filter((id) => !friendlyInvolvedKillVictimIds.has(id)).filter((id) => {
               const removed = removedById.get(id);

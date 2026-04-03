@@ -34,12 +34,12 @@ function withFogMetadata(snapshot: GameStateSnapshot, fogOfWarEnabled: boolean):
 }
 
 /** Baseline schema version; bump when a future milestone adds migration chains. */
-export const EXPECTED_USER_VERSION = 8;
+export const EXPECTED_USER_VERSION = 9;
 
 /**
- * Baseline filename for world-map + fog-of-war + production schema (v8).
+ * Baseline filename for world-map + fog-of-war + production schema (v9).
  */
-export const GAME_DB_FILE_NAME = 'game-baseline-v8.sqlite';
+export const GAME_DB_FILE_NAME = 'game-baseline-v9.sqlite';
 
 let db: InstanceType<typeof Database> | null = null;
 
@@ -86,6 +86,7 @@ function getFullDdl(): string {
       id TEXT PRIMARY KEY,
       player TEXT NOT NULL,
       unit_type TEXT NOT NULL CHECK (unit_type IN ('infantry', 'armor', 'naval')),
+      display_order INTEGER,
       h3_index TEXT NOT NULL,
       FOREIGN KEY (h3_index) REFERENCES hexes(h3_index)
     );
@@ -247,6 +248,24 @@ function getOne<T extends Record<string, unknown>>(sql: string, params: unknown[
 function getAll<T extends Record<string, unknown>>(sql: string, params: unknown[] = []): T[] {
   if (!db) return [];
   return db.prepare(sql).all(...(params as never[])) as T[];
+}
+
+interface DbUnitSnapshotRow extends Record<string, unknown> {
+  id: string;
+  player: string;
+  unit_type: string;
+  h3_index: string;
+  display_order: number | null;
+}
+
+function mapDbUnitSnapshotRow(row: DbUnitSnapshotRow): GameStateSnapshot['units'][number] {
+  return {
+    id: row.id,
+    player: row.player,
+    unitType: row.unit_type,
+    h3Index: row.h3_index,
+    displayOrder: typeof row.display_order === 'number' ? row.display_order : undefined,
+  };
 }
 
 function getCanonicalDbPath(): string {
@@ -459,6 +478,29 @@ function seedGameSeedIfMissing(): void {
   run("INSERT INTO game_config (key, value) VALUES ('game_seed', ?)", [String(seed)]);
 }
 
+function unitDisplaySequenceKey(unitType: BuildUnitType): string {
+  return `unit_display_sequence_${unitType}`;
+}
+
+/**
+ * Why this exists:
+ *     Allocates the next non-repeating display number for one unit type within the current match.
+ * When to use:
+ *     Whenever a new unit row is inserted (initial seeding and production spawns).
+ * What to expect:
+ *     Returns 1-based sequence values that increase monotonically per unit type until next match reset.
+ */
+export function allocateNextUnitDisplayOrder(unitType: BuildUnitType): number {
+  logDebug('gameDb allocateNextUnitDisplayOrder', { unitType });
+  if (!db) return 1;
+  const key = unitDisplaySequenceKey(unitType);
+  const row = getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [key]);
+  const current = row ? Number.parseInt(row.value, 10) : 0;
+  const next = Number.isFinite(current) && current > 0 ? current + 1 : 1;
+  run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [key, String(next)]);
+  return next;
+}
+
 /**
  * Returns the persisted RNG seed for map generation (game_config game_seed). Use for reproducibility and tests;
  * returns 0 if the DB is closed or the key is missing or invalid.
@@ -628,7 +670,7 @@ function seedUnits(): void {
     throw new Error('Could not allocate required regional land spawn hexes');
   }
 
-  const humanUnits: [string, string, string][] = [];
+  const humanUnits: [string, BuildUnitType, string][] = [];
   let idx = 0;
   for (let i = 0; i < counts.infantry; i++) {
     humanUnits.push([`human-infantry-${i + 1}`, 'infantry', humanLand[idx++]!.h3]);
@@ -653,10 +695,17 @@ function seedUnits(): void {
     humanUnits.push([`human-naval-${i + 1}`, 'naval', spawn.h3]);
   }
   for (const [id, unitType, h3Index] of humanUnits) {
-    run('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [id, 'human', unitType, h3Index]);
+    const displayOrder = allocateNextUnitDisplayOrder(unitType);
+    run('INSERT INTO units (id, player, unit_type, display_order, h3_index) VALUES (?, ?, ?, ?, ?)', [
+      id,
+      'human',
+      unitType,
+      displayOrder,
+      h3Index,
+    ]);
   }
 
-  const opponentUnits: [string, string, string][] = [];
+  const opponentUnits: [string, BuildUnitType, string][] = [];
   idx = 0;
   for (let i = 0; i < counts.infantry; i++) {
     opponentUnits.push([`opponent-infantry-${i + 1}`, 'infantry', opponentLand[idx++]!.h3]);
@@ -678,7 +727,14 @@ function seedUnits(): void {
     opponentUnits.push([`opponent-naval-${i + 1}`, 'naval', spawn.h3]);
   }
   for (const [id, unitType, h3Index] of opponentUnits) {
-    run('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [id, 'opponent', unitType, h3Index]);
+    const displayOrder = allocateNextUnitDisplayOrder(unitType);
+    run('INSERT INTO units (id, player, unit_type, display_order, h3_index) VALUES (?, ?, ?, ?, ?)', [
+      id,
+      'opponent',
+      unitType,
+      displayOrder,
+      h3Index,
+    ]);
   }
 }
 
@@ -895,9 +951,7 @@ export function getGameState(): GameStateSnapshot {
       terrainKind: row?.terrain_kind ?? 'plains',
     };
   });
-  const unitRows = getAll<{ id: string; player: string; unitType: string; h3Index: string }>(
-    'SELECT id, player, unit_type AS unitType, h3_index AS h3Index FROM units'
-  );
+  const unitRows = listUnitsForSnapshot();
   const turnRow = getOne<{ phase: string; turnNumber: number }>('SELECT phase, turn_number AS turnNumber FROM turn_state WHERE id = 1');
   const orderRows = getAll<{ unitId: string; toH3Index: string }>(
     'SELECT unit_id AS unitId, to_h3_index AS toH3Index FROM pending_orders'
@@ -1068,6 +1122,22 @@ export function dbGetOne<T extends Record<string, unknown>>(sql: string, params:
  */
 export function dbGetAll<T extends Record<string, unknown>>(sql: string, params: unknown[] = []): T[] {
   return getAll<T>(sql, params);
+}
+
+/**
+ * Why this exists:
+ *     Centralizes unit-row projection for gameplay snapshots so all callers receive identical unit fields.
+ * When to use:
+ *     Any main-process read path that needs current units in `GameStateSnapshot` shape.
+ * What to expect:
+ *     Returns one row per unit including optional `displayOrder` for stable player-facing naming.
+ */
+export function listUnitsForSnapshot(): GameStateSnapshot['units'] {
+  logTrace('gameDb listUnitsForSnapshot');
+  const rows = getAll<DbUnitSnapshotRow>(
+    'SELECT id, player, unit_type, h3_index, display_order FROM units'
+  );
+  return rows.map(mapDbUnitSnapshotRow);
 }
 
 export interface HexControlRow {
@@ -1545,6 +1615,7 @@ export function resetGameForNewMatch(options?: { fogOfWarEnabled?: boolean }): v
   run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('map_size', 'world')");
   run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [FOG_OF_WAR_ENABLED_KEY, fogOfWarEnabled ? '1' : '0']);
   run("DELETE FROM game_config WHERE key = 'game_seed'");
+  run("DELETE FROM game_config WHERE key LIKE 'unit_display_sequence_%'");
   seedGameSeedIfMissing();
   seedHexesFromTerrainMetadata();
   seedUnits();

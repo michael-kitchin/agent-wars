@@ -17,6 +17,7 @@ export interface CombatUnit {
   player: string;
   unitType: string;
   h3Index: string;
+  displayOrder?: number;
 }
 
 /** Result of resolving one ranged or melee engagement (who was removed). */
@@ -165,6 +166,27 @@ export interface CombatResolutionResult {
   killsByReturnFire?: KillRecord[];
 }
 
+function recordRemovedUnit(payload: {
+  removed: Set<string>;
+  removedUnits: CombatUnit[];
+  casualtyHexSet: Set<string>;
+  kills: KillRecord[];
+  victim: CombatUnit;
+  casualtyHex: string;
+  killerIds: string[];
+}): void {
+  payload.removed.add(payload.victim.id);
+  payload.removedUnits.push({
+    id: payload.victim.id,
+    player: payload.victim.player,
+    unitType: payload.victim.unitType,
+    h3Index: payload.casualtyHex,
+    displayOrder: payload.victim.displayOrder,
+  });
+  payload.casualtyHexSet.add(payload.casualtyHex);
+  payload.kills.push({ victimId: payload.victim.id, killerIds: payload.killerIds });
+}
+
 /**
  * Runs only the ranged phase: declared attacks at current positions, return fire, casualties.
  * Call before movement. Caller must delete returned removedUnitIds from DB.
@@ -220,25 +242,33 @@ export function runRangedPhase(
     const attackerUnitIds = attackerUnits.map((u) => u.id);
     const defenderUnitIds = defenderUnits.map((u) => u.id);
     for (const id of defenderRemovedIds) {
-      removed.add(id);
       const u = unitList.find((x) => x.id === id);
       if (u) {
-        removedUnits.push({ id: u.id, player: u.player, unitType: u.unitType, h3Index: u.h3Index });
-        casualtyHexSet.add(u.h3Index);
-        const record = { victimId: id, killerIds: attackerUnitIds };
-        kills.push(record);
-        killsByDirectFire.push(record);
+        recordRemovedUnit({
+          removed,
+          removedUnits,
+          casualtyHexSet,
+          kills,
+          victim: u,
+          casualtyHex: u.h3Index,
+          killerIds: attackerUnitIds,
+        });
+        killsByDirectFire.push({ victimId: id, killerIds: attackerUnitIds });
       }
     }
     for (const id of attackerRemovedIds) {
-      removed.add(id);
       const u = unitList.find((x) => x.id === id);
       if (u) {
-        removedUnits.push({ id: u.id, player: u.player, unitType: u.unitType, h3Index: u.h3Index });
-        casualtyHexSet.add(u.h3Index);
-        const record = { victimId: id, killerIds: defenderUnitIds };
-        kills.push(record);
-        killsByReturnFire.push(record);
+        recordRemovedUnit({
+          removed,
+          removedUnits,
+          casualtyHexSet,
+          kills,
+          victim: u,
+          casualtyHex: u.h3Index,
+          killerIds: defenderUnitIds,
+        });
+        killsByReturnFire.push({ victimId: id, killerIds: defenderUnitIds });
       }
     }
   }
@@ -312,26 +342,28 @@ export function runMeleePhase(
       const atkUnitIds = atkUnits.map((u) => u.id);
       const defUnitIds = defUnits.map((u) => u.id);
       for (const id of defenderRemovedIds) {
-        removed.add(id);
-        removedUnits.push({
-          id,
-          player: defenderSide,
-          unitType: defUnits.find((u) => u.id === id)!.unitType,
-          h3Index: hex,
+        const removedUnit = defUnits.find((u) => u.id === id)!;
+        recordRemovedUnit({
+          removed,
+          removedUnits,
+          casualtyHexSet,
+          kills,
+          victim: removedUnit,
+          casualtyHex: hex,
+          killerIds: atkUnitIds,
         });
-        casualtyHexSet.add(hex);
-        kills.push({ victimId: id, killerIds: atkUnitIds });
       }
       for (const id of attackerRemovedIds) {
-        removed.add(id);
-        removedUnits.push({
-          id,
-          player: attackerSide,
-          unitType: atkUnits.find((u) => u.id === id)!.unitType,
-          h3Index: hex,
+        const removedUnit = atkUnits.find((u) => u.id === id)!;
+        recordRemovedUnit({
+          removed,
+          removedUnits,
+          casualtyHexSet,
+          kills,
+          victim: removedUnit,
+          casualtyHex: hex,
+          killerIds: defUnitIds,
         });
-        casualtyHexSet.add(hex);
-        kills.push({ victimId: id, killerIds: defUnitIds });
       }
     } else {
       for (let k = 0; k < sidesOrdered.length; k++) {
@@ -344,18 +376,28 @@ export function runMeleePhase(
         const atkUnitIds = atkUnits.map((u) => u.id);
         const defUnitIds = defUnits.map((u) => u.id);
         for (const id of defenderRemovedIds) {
-          removed.add(id);
           const u = defUnits.find((x) => x.id === id)!;
-          removedUnits.push({ id: u.id, player: u.player, unitType: u.unitType, h3Index: hex });
-          casualtyHexSet.add(hex);
-          kills.push({ victimId: id, killerIds: atkUnitIds });
+          recordRemovedUnit({
+            removed,
+            removedUnits,
+            casualtyHexSet,
+            kills,
+            victim: u,
+            casualtyHex: hex,
+            killerIds: atkUnitIds,
+          });
         }
         for (const id of attackerRemovedIds) {
-          removed.add(id);
           const u = atkUnits.find((x) => x.id === id)!;
-          removedUnits.push({ id: u.id, player: u.player, unitType: u.unitType, h3Index: hex });
-          casualtyHexSet.add(hex);
-          kills.push({ victimId: id, killerIds: defUnitIds });
+          recordRemovedUnit({
+            removed,
+            removedUnits,
+            casualtyHexSet,
+            kills,
+            victim: u,
+            casualtyHex: hex,
+            killerIds: defUnitIds,
+          });
         }
       }
     }

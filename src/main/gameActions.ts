@@ -23,6 +23,8 @@ import {
   setBuildProgressPointsForHex,
   clearBuildQueueAndProgressForHex,
   replaceBuildQueueForHex,
+  allocateNextUnitDisplayOrder,
+  listUnitsForSnapshot,
 } from './gameDb';
 import { buildLatLngCoordinateMap, getOrderedHexList } from './mapData';
 import { getRange } from './combatConstants';
@@ -32,6 +34,12 @@ import type { MovementOrder, RangedAttackOrder, SubmitOrdersPayload } from '../s
 import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
 import { executePlanRoute } from './tools/tool1Pathfinding';
 import { terrainIsPassableForDomain } from './pathfinding';
+import { buildNormalizedTerrainByH3, normalizeMovementTerrain, isLandSeaportSpawnHex } from './movementTerrain';
+import {
+  NAVAL_DESTINATION_MUST_BE_WATER_COASTAL,
+  NAVAL_SEAPORT_EGRESS_REQUIRED,
+  NAVAL_START_MUST_BE_WATER_COASTAL,
+} from './navalMovementMessages';
 import {
   assignHumanMarchStandingOrder,
   cancelHumanStandingOrder,
@@ -93,9 +101,20 @@ export interface HumanOrderGroupPreviewResult {
   previews: HumanOrderGroupPreviewUnitResult[];
 }
 
-function effectiveHexPassabilityTerrain(hex: { terrain: string; terrainKind?: string }): string {
-  if (hex.terrainKind === 'coastal' || hex.terrainKind === 'wetlands') return hex.terrainKind;
-  return hex.terrain;
+function effectiveHexPassabilityTerrain(hex: { h3Index: string; terrain: string; terrainKind?: string }): string {
+  return normalizeMovementTerrain({ h3Index: hex.h3Index, terrain: hex.terrain, terrainKind: hex.terrainKind });
+}
+
+function getMovementTerrainForH3(h3Index: string): string {
+  const terrainRow = dbGetOne<{ terrain: string; terrainKind: string }>(
+    'SELECT terrain, terrain_kind AS terrainKind FROM hexes WHERE h3_index = ?',
+    [h3Index]
+  );
+  return effectiveHexPassabilityTerrain({
+    h3Index,
+    terrain: terrainRow?.terrain ?? 'land',
+    terrainKind: terrainRow?.terrainKind,
+  });
 }
 
 export interface HexBuildQueueEntryView {
@@ -166,7 +185,7 @@ function selectionHasMixedLandAndNaval(units: HumanOwnedUnit[]): boolean {
   return hasNaval && hasLand;
 }
 
-function hexSupportsMixedLandAndNaval(hex: { terrain: string; terrainKind?: string }): boolean {
+function hexSupportsMixedLandAndNaval(hex: { h3Index: string; terrain: string; terrainKind?: string }): boolean {
   const passabilityTerrain = effectiveHexPassabilityTerrain(hex);
   return (
     terrainIsPassableForDomain(passabilityTerrain, 'land') &&
@@ -282,10 +301,12 @@ function spawnProducedUnitsForHex(
     }
     sequence += 1;
     const unitId = `${controllerPlayerId}-${unitType}-prod-${turnNumber}-${sequence}`;
-    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
+    const displayOrder = allocateNextUnitDisplayOrder(unitType);
+    dbRun('INSERT INTO units (id, player, unit_type, display_order, h3_index) VALUES (?, ?, ?, ?, ?)', [
       unitId,
       controllerPlayerId,
       unitType,
+      displayOrder,
       h3Index,
     ]);
     unitCountsByPlayerType.set(key, currentCount + 1);
@@ -448,7 +469,7 @@ function dbBackedStateSnapshot() {
 
 /**
  * Validates a single movement order: unit exists and is human-owned, destination is on map,
- * within unit's movement range, and terrain allows the unit type (naval→water/coastal/wetlands, infantry/armor→land/coastal/wetlands).
+ * within unit's movement range, and terrain allows the unit type (naval→water/coastal, infantry/armor→land/coastal/wetlands).
  * Returns a reason string when invalid.
  */
 function validateOrder(
@@ -480,12 +501,24 @@ function validateOrder(
   if (dist > range) return { valid: false, reason: `${unit.unit_type} can move at most ${range} hex(es)` };
   /* dist === 0 (same hex) is allowed: "hold" / no move is valid. */
 
-  const destTerrain = dbGetOne<{ terrain: string }>('SELECT terrain FROM hexes WHERE h3_index = ?', [toH3Index]);
-  const terrain = destTerrain?.terrain ?? 'land';
-  if (unit.unit_type === 'naval' && !passabilityAllowsNavalUnit(terrain)) {
-    return { valid: false, reason: 'Naval units must move to water, coastal, or wetlands hexes' };
+  const originTerrain = getMovementTerrainForH3(unit.h3_index);
+  const destinationTerrain = getMovementTerrainForH3(toH3Index);
+  if (unit.unit_type === 'naval' && !passabilityAllowsNavalUnit(destinationTerrain)) {
+    return { valid: false, reason: NAVAL_DESTINATION_MUST_BE_WATER_COASTAL };
   }
-  if ((unit.unit_type === 'infantry' || unit.unit_type === 'armor') && !passabilityAllowsLandUnit(terrain)) {
+  if (unit.unit_type === 'naval' && !passabilityAllowsNavalUnit(originTerrain)) {
+    const seaportSpawnHex = isLandSeaportSpawnHex({
+      h3Index: unit.h3_index,
+      normalizedTerrain: originTerrain,
+    });
+    if (!seaportSpawnHex) {
+      return { valid: false, reason: NAVAL_START_MUST_BE_WATER_COASTAL };
+    }
+    if (dist !== 1 || !passabilityAllowsNavalUnit(destinationTerrain)) {
+      return { valid: false, reason: NAVAL_SEAPORT_EGRESS_REQUIRED };
+    }
+  }
+  if ((unit.unit_type === 'infantry' || unit.unit_type === 'armor') && !passabilityAllowsLandUnit(destinationTerrain)) {
     return { valid: false, reason: 'Land units must move to land, coastal, or wetlands hexes' };
   }
 
@@ -918,7 +951,8 @@ function buildHumanMarchPreviewForUnit(
   if (!hoveredHex) return { valid: false, showInvalidMarker: false, segments: [] };
 
   const passableFor = unit.unitType === 'naval' ? 'water' : 'land';
-  const hoveredPassabilityTerrain = effectiveHexPassabilityTerrain(hoveredHex);
+  const passabilityByH3 = buildNormalizedTerrainByH3(state.hexes);
+  const hoveredPassabilityTerrain = passabilityByH3.get(hoveredHex.h3Index) ?? 'land';
   const hoveredPassable = terrainIsPassableForDomain(hoveredPassabilityTerrain, passableFor);
   const [hoverLat, hoverLng] = cellToLatLng(hoveredH3Index);
   const direct = executePlanRoute(unitId, [hoverLat, hoverLng], { avoidEnemies: true }, state, latLngByH3, resolveToH3);
@@ -947,7 +981,8 @@ function buildHumanMarchPreviewForUnit(
       seen.add(h3);
       if (h3 === hoveredH3Index) return false;
       const hx = hexByH3.get(h3);
-      return !!hx && terrainIsPassableForDomain(effectiveHexPassabilityTerrain(hx), passableFor);
+      if (!hx) return false;
+      return terrainIsPassableForDomain(passabilityByH3.get(h3) ?? 'land', passableFor);
     });
     if (candidates.length === 0) continue;
     for (const candidateH3 of candidates) {
@@ -1217,14 +1252,13 @@ export function ready(
     dbRun('UPDATE turn_state SET phase = ? WHERE id = 1', ['resolution']);
 
     const hexList = getOrderedHexList();
-    const unitsBeforeMove = dbGetAll<{ id: string; player: string; unit_type: string; h3_index: string }>(
-      'SELECT id, player, unit_type, h3_index FROM units'
-    ).map((r) => ({ id: r.id, player: r.player, unitType: r.unit_type, h3Index: r.h3_index }));
+    const unitsBeforeMove = listUnitsForSnapshot();
     const combatUnitsBefore: CombatUnit[] = unitsBeforeMove.map((u) => ({
       id: u.id,
       player: u.player,
       unitType: u.unitType,
       h3Index: u.h3Index,
+      displayOrder: u.displayOrder,
     }));
 
     const humanRanged = dbGetAll<{ unit_id: string; target_h3_index: string }>(
@@ -1271,9 +1305,7 @@ export function ready(
       dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [order.toH3Index, order.unitId]);
     }
 
-    const unitsAfterMove = dbGetAll<{ id: string; player: string; unit_type: string; h3_index: string }>(
-      'SELECT id, player, unit_type, h3_index FROM units'
-    ).map((r) => ({ id: r.id, player: r.player, unitType: r.unit_type, h3Index: r.h3_index }));
+    const unitsAfterMove = listUnitsForSnapshot();
     const rangedRemovedSet = new Set(rangedResult.removedUnitIds);
     // Melee must not see units removed in ranged phase; exclude them explicitly so attackers cannot engage dead defenders.
     const combatUnitsAfter: CombatUnit[] = unitsAfterMove
@@ -1283,6 +1315,7 @@ export function ready(
         player: u.player,
         unitType: u.unitType,
         h3Index: u.h3Index,
+        displayOrder: u.displayOrder,
       }));
 
     const meleeResult = runMeleePhase(combatUnitsAfter, hexList, next);
@@ -1293,9 +1326,7 @@ export function ready(
     const controlTransitions = resolveRes1ControlAfterCombatAndMovement(traversedHexesByPlayer);
     const productionSummary = processProductionAfterControlResolution();
     const deployedUnitsByType = productionSummary.deployedByPlayer.human;
-    const finalUnits = dbGetAll<{ id: string; player: string; unit_type: string; h3_index: string }>(
-      'SELECT id, player, unit_type, h3_index FROM units'
-    ).map((r) => ({ id: r.id, player: r.player, unitType: r.unit_type, h3Index: r.h3_index }));
+    const finalUnits = listUnitsForSnapshot();
     const humanHexesLost = controlTransitions.filter(
       (t) => t.fromControllerPlayerId === 'human' && t.toControllerPlayerId === 'opponent'
     );

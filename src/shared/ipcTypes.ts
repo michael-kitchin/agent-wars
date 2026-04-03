@@ -33,7 +33,7 @@ export interface Res4TerrainOverrideRow {
 export interface GameStateSnapshot {
   /** `terrain`: passability `land` | `water` | `coastal` | `wetlands`. `terrainKind`: pipeline label including `coastal`/`wetlands`. */
   hexes: { h3Index: string; terrain: string; terrainKind: string }[];
-  units: { id: string; player: string; unitType: string; h3Index: string }[];
+  units: { id: string; player: string; unitType: string; h3Index: string; displayOrder?: number }[];
   /** Side-specific visibility union from all alive friendly units. */
   visibleHexes?: string[];
   /** Hexes permanently known after friendly entry at least once. */
@@ -139,6 +139,7 @@ export interface RemovedUnitSnapshot {
   player: string;
   unitType: string;
   h3Index: string;
+  displayOrder?: number;
 }
 
 /** Shape returned by game:ready. */

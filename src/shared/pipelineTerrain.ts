@@ -55,5 +55,5 @@ export function passabilityAllowsLandUnit(t: PassabilityTerrain | string): boole
  * Returns true if naval units may enter or end movement on this passability terrain.
  */
 export function passabilityAllowsNavalUnit(t: PassabilityTerrain | string): boolean {
-  return t === 'water' || t === 'coastal' || t === 'wetlands';
+  return t === 'water' || t === 'coastal';
 }
