@@ -166,6 +166,12 @@ export interface CombatResolutionResult {
   killsByReturnFire?: KillRecord[];
 }
 
+interface RangedEngagementGroup {
+  defenderHex: string;
+  attackerPlayer: string;
+  attackerUnitIds: string[];
+}
+
 function recordRemovedUnit(payload: {
   removed: Set<string>;
   removedUnits: CombatUnit[];
@@ -187,6 +193,33 @@ function recordRemovedUnit(payload: {
   payload.kills.push({ victimId: payload.victim.id, killerIds: payload.killerIds });
 }
 
+function buildRangedEngagementGroups(
+  rangedOrders: RangedAttackOrder[],
+  unitById: ReadonlyMap<string, CombatUnit>,
+  removed: ReadonlySet<string>
+): RangedEngagementGroup[] {
+  const grouped = new Map<string, { defenderHex: string; attackerPlayer: string; attackerUnitIds: Set<string> }>();
+  for (const order of rangedOrders) {
+    const unit = unitById.get(order.unitId);
+    if (!unit || removed.has(unit.id)) continue;
+    const key = `${order.targetH3Index}::${unit.player}`;
+    const group = grouped.get(key) ?? {
+      defenderHex: order.targetH3Index,
+      attackerPlayer: unit.player,
+      attackerUnitIds: new Set<string>(),
+    };
+    group.attackerUnitIds.add(unit.id);
+    grouped.set(key, group);
+  }
+  return Array.from(grouped.values())
+    .map((g) => ({
+      defenderHex: g.defenderHex,
+      attackerPlayer: g.attackerPlayer,
+      attackerUnitIds: Array.from(g.attackerUnitIds),
+    }))
+    .sort((a, b) => a.defenderHex.localeCompare(b.defenderHex) || a.attackerPlayer.localeCompare(b.attackerPlayer));
+}
+
 /**
  * Runs only the ranged phase: declared attacks at current positions, return fire, casualties.
  * Call before movement. Caller must delete returned removedUnitIds from DB.
@@ -203,6 +236,7 @@ export function runRangedPhase(
   const casualtyHexSet = new Set<string>();
   const combatHexes: string[] = [];
   const unitList = units.filter((u) => !removed.has(u.id));
+  const unitById = new Map(unitList.map((u) => [u.id, u] as const));
   const getUnitsAtHex = (h3: string) => unitList.filter((u) => !removed.has(u.id) && u.h3Index === h3);
   const rollD6 = () => Math.floor(next() * 6) + 1;
 
@@ -210,39 +244,30 @@ export function runRangedPhase(
   const killsByDirectFire: KillRecord[] = [];
   const killsByReturnFire: KillRecord[] = [];
 
-  const rangedByDefender = new Map<string, { attackerHex: string; unitId: string }[]>();
-  for (const order of rangedOrders) {
-    const unit = unitList.find((u) => u.id === order.unitId && !removed.has(u.id));
-    if (!unit) continue;
-    const list = rangedByDefender.get(order.targetH3Index) ?? [];
-    list.push({ attackerHex: unit.h3Index, unitId: unit.id });
-    rangedByDefender.set(order.targetH3Index, list);
-  }
-
-  const sortedDefenderHexes = hexList.filter((h) => rangedByDefender.has(h));
-  for (const defenderHex of sortedDefenderHexes) {
-    const attackers = rangedByDefender.get(defenderHex)!;
-    const attackerUnits = attackers
-      .map((a) => unitList.find((u) => u.id === a.unitId))
+  const engagementGroups = buildRangedEngagementGroups(rangedOrders, unitById, removed);
+  for (const group of engagementGroups) {
+    const attackerUnits = group.attackerUnitIds
+      .map((unitId) => unitById.get(unitId))
       .filter((u): u is CombatUnit => u != null && !removed.has(u.id));
-    const defenderUnits = getUnitsAtHex(defenderHex);
+    // Ranged engagements are side-vs-side: only enemy units in the target hex can be hit or return fire.
+    const defenderUnits = getUnitsAtHex(group.defenderHex).filter((u) => u.player !== group.attackerPlayer);
     if (attackerUnits.length === 0 || defenderUnits.length === 0) continue;
 
     const attackerHexes = [...new Set(attackerUnits.map((u) => u.h3Index))];
-    combatHexes.push(defenderHex);
+    combatHexes.push(group.defenderHex);
     for (const ah of attackerHexes) combatHexes.push(ah);
 
     const { attackerRemovedIds, defenderRemovedIds } = resolveOneRangedEngagement(
       attackerUnits,
       defenderUnits,
-      defenderHex,
+      group.defenderHex,
       rollD6,
       {}
     );
     const attackerUnitIds = attackerUnits.map((u) => u.id);
     const defenderUnitIds = defenderUnits.map((u) => u.id);
     for (const id of defenderRemovedIds) {
-      const u = unitList.find((x) => x.id === id);
+      const u = unitById.get(id);
       if (u) {
         recordRemovedUnit({
           removed,
@@ -257,7 +282,7 @@ export function runRangedPhase(
       }
     }
     for (const id of attackerRemovedIds) {
-      const u = unitList.find((x) => x.id === id);
+      const u = unitById.get(id);
       if (u) {
         recordRemovedUnit({
           removed,

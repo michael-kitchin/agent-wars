@@ -76,6 +76,17 @@ type CapturedPayload = {
   }>;
 };
 
+function assertPromptAvoidsPlayerFacingUnitLabels(systemPrompt: string, mask: number): void {
+  assert.ok(
+    !systemPrompt.includes('(AI)') && !systemPrompt.includes('(human)'),
+    `system prompt should avoid player-facing AI/human suffixes, mask=${mask}`
+  );
+  assert.ok(
+    !systemPrompt.includes('I Infantry') && !systemPrompt.includes('II Infantry') && !systemPrompt.includes('1st Infantry'),
+    `system prompt should avoid player-facing unit display labels, mask=${mask}`
+  );
+}
+
 async function run(): Promise<void> {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-wars-openrouter-test-'));
   const restoreElectron = installElectronMock(userDataDir);
@@ -156,6 +167,7 @@ async function run(): Promise<void> {
         systemPrompt.includes(`rounded to ${mapData.LATLNG_DECIMAL_PLACES} decimal places`),
         `lat/lng precision guidance missing for mask=${mask}`
       );
+      assertPromptAvoidsPlayerFacingUnitLabels(systemPrompt, mask);
 
       for (const toolName of allApiToolNames) {
         const shouldBeEnabled = effectiveToolSet.has(toolName);

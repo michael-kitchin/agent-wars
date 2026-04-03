@@ -33,6 +33,41 @@ function ordinalSuffix(value: number): string {
   return 'th';
 }
 
+function toRomanNumeral(value: number): string {
+  let remaining = Math.max(1, Math.trunc(value));
+  const numerals: Array<[number, string]> = [
+    [1000, 'M'],
+    [900, 'CM'],
+    [500, 'D'],
+    [400, 'CD'],
+    [100, 'C'],
+    [90, 'XC'],
+    [50, 'L'],
+    [40, 'XL'],
+    [10, 'X'],
+    [9, 'IX'],
+    [5, 'V'],
+    [4, 'IV'],
+    [1, 'I'],
+  ];
+  let out = '';
+  for (const [unit, symbol] of numerals) {
+    while (remaining >= unit) {
+      out += symbol;
+      remaining -= unit;
+    }
+  }
+  return out;
+}
+
+function formatUnitNumberLabel(
+  unitId: string,
+  value: number,
+  locale?: Intl.LocalesArgument
+): string {
+  return unitId.startsWith('opponent-') ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
+}
+
 /**
  * Why this exists:
  *     Builds ordinal labels with locale-aware grouped numbers while keeping English ordinal suffix rules.
@@ -66,6 +101,7 @@ export function getUnitDisplayNoun(unitType: string): string {
  *     Build a lookup for any player-facing panel/toast/list that prints unit names.
  * What to expect:
  *     Numbering starts at 1 per unit type and should use persisted displayOrder when provided.
+ *     Human units use locale-aware ordinal labels (1st, 2nd...), while AI units use Roman numerals (I, II...).
  */
 export function buildUnitDisplayNameLookup(
   units: readonly UnitDisplayIdentity[],
@@ -89,12 +125,15 @@ export function buildUnitDisplayNameLookup(
       .sort((a, b) => NATURAL_ID_COLLATOR.compare(a.id, b.id));
     const noun = getUnitDisplayNoun(unitType);
     for (const unit of withPersisted) {
-      result.set(unit.id, `${formatOrdinalLabel(unit.displayOrder as number, locale)} ${noun}`);
+      const ordinal = unit.displayOrder as number;
+      const numberLabel = formatUnitNumberLabel(unit.id, ordinal, locale);
+      result.set(unit.id, `${numberLabel} ${noun}`);
     }
     let fallbackOrdinal = withPersisted.reduce((max, u) => Math.max(max, u.displayOrder as number), 0);
     for (const unit of withoutPersisted) {
       fallbackOrdinal += 1;
-      result.set(unit.id, `${formatOrdinalLabel(fallbackOrdinal, locale)} ${noun}`);
+      const numberLabel = formatUnitNumberLabel(unit.id, fallbackOrdinal, locale);
+      result.set(unit.id, `${numberLabel} ${noun}`);
     }
   }
   return result;
@@ -110,5 +149,6 @@ export function fallbackDisplayNameFromUnitId(unitId: string, locale?: Intl.Loca
   if (!typeMatch || !ordinalMatch) return unitId;
   const ordinalValue = Number.parseInt(ordinalMatch[1] ?? '', 10);
   if (!Number.isFinite(ordinalValue) || ordinalValue <= 0) return unitId;
-  return `${formatOrdinalLabel(ordinalValue, locale)} ${getUnitDisplayNoun(typeMatch[1] ?? '')}`;
+  const numberLabel = formatUnitNumberLabel(unitId, ordinalValue, locale);
+  return `${numberLabel} ${getUnitDisplayNoun(typeMatch[1] ?? '')}`;
 }

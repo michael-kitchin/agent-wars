@@ -14890,6 +14890,35 @@
     if (mod10 === 3) return "rd";
     return "th";
   }
+  function toRomanNumeral(value) {
+    let remaining = Math.max(1, Math.trunc(value));
+    const numerals = [
+      [1e3, "M"],
+      [900, "CM"],
+      [500, "D"],
+      [400, "CD"],
+      [100, "C"],
+      [90, "XC"],
+      [50, "L"],
+      [40, "XL"],
+      [10, "X"],
+      [9, "IX"],
+      [5, "V"],
+      [4, "IV"],
+      [1, "I"]
+    ];
+    let out = "";
+    for (const [unit, symbol] of numerals) {
+      while (remaining >= unit) {
+        out += symbol;
+        remaining -= unit;
+      }
+    }
+    return out;
+  }
+  function formatUnitNumberLabel(unitId, value, locale) {
+    return unitId.startsWith("opponent-") ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
+  }
   function formatOrdinalLabel(value, locale) {
     const normalized = Math.max(1, Math.trunc(value));
     const numberText = new Intl.NumberFormat(locale).format(normalized);
@@ -14912,12 +14941,15 @@
       const withoutPersisted = group.filter((u) => !(typeof u.displayOrder === "number" && u.displayOrder > 0)).sort((a, b) => NATURAL_ID_COLLATOR.compare(a.id, b.id));
       const noun = getUnitDisplayNoun(unitType);
       for (const unit of withPersisted) {
-        result.set(unit.id, `${formatOrdinalLabel(unit.displayOrder, locale)} ${noun}`);
+        const ordinal = unit.displayOrder;
+        const numberLabel = formatUnitNumberLabel(unit.id, ordinal, locale);
+        result.set(unit.id, `${numberLabel} ${noun}`);
       }
       let fallbackOrdinal = withPersisted.reduce((max, u) => Math.max(max, u.displayOrder), 0);
       for (const unit of withoutPersisted) {
         fallbackOrdinal += 1;
-        result.set(unit.id, `${formatOrdinalLabel(fallbackOrdinal, locale)} ${noun}`);
+        const numberLabel = formatUnitNumberLabel(unit.id, fallbackOrdinal, locale);
+        result.set(unit.id, `${numberLabel} ${noun}`);
       }
     }
     return result;
@@ -14928,7 +14960,8 @@
     if (!typeMatch || !ordinalMatch) return unitId;
     const ordinalValue = Number.parseInt(ordinalMatch[1] ?? "", 10);
     if (!Number.isFinite(ordinalValue) || ordinalValue <= 0) return unitId;
-    return `${formatOrdinalLabel(ordinalValue, locale)} ${getUnitDisplayNoun(typeMatch[1] ?? "")}`;
+    const numberLabel = formatUnitNumberLabel(unitId, ordinalValue, locale);
+    return `${numberLabel} ${getUnitDisplayNoun(typeMatch[1] ?? "")}`;
   }
 
   // src/renderer/renderer.ts
@@ -17896,9 +17929,9 @@
   function formatPendingOrderSidebarLabel(order) {
     return formatUnitArrowLabel(order.unitId, `${estimateHexesLeftForOrder(order)}h (${order.status})`);
   }
-  function formatKillToastLine(kill, nameFormatter, playerFormatter) {
-    const victimLabel = `${nameFormatter(kill.victimId)}${playerFormatter(kill.victimId)}`;
-    const killerLabels = kill.killerIds.map((killerId) => `${nameFormatter(killerId)}${playerFormatter(killerId)}`).join(", ");
+  function formatKillToastLine(kill, nameFormatter) {
+    const victimLabel = nameFormatter(kill.victimId);
+    const killerLabels = kill.killerIds.map((killerId) => nameFormatter(killerId)).join(", ");
     return `${victimLabel} destroyed by ${killerLabels}`;
   }
   function buildKillToastFormatterBundle(state, removedUnits) {
@@ -17913,17 +17946,8 @@
       }))
     ];
     const displayNameById = buildUnitDisplayNameLookup(rosterForDisplay);
-    const playerById = new Map(rosterForDisplay.map((u) => [u.id, u.player]));
-    const formatDisplayPlayerSuffix = (unitId) => {
-      const player = playerById.get(unitId);
-      if (player === "human") return " (human)";
-      if (player === "opponent") return " (AI)";
-      if (unitId.startsWith("human-")) return " (human)";
-      if (unitId.startsWith("opponent-")) return " (AI)";
-      return "";
-    };
     const formatDisplayUnitName = (unitId) => displayNameById.get(unitId) ?? unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
-    const formatKillLine = (kill) => formatKillToastLine(kill, formatDisplayUnitName, formatDisplayPlayerSuffix);
+    const formatKillLine = (kill) => formatKillToastLine(kill, formatDisplayUnitName);
     return { formatKillLine };
   }
   function syncUiAfterSelectionChange(options = {}) {

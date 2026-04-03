@@ -217,6 +217,17 @@ function testModifierDrivenPopoverCloseRulesCentralized(): void {
   );
 }
 
+function testKillUpdateTextOmitsPlayerSuffixes(): void {
+  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const source = fs.readFileSync(rendererPath, 'utf8');
+  const buildKillToastFormatterBundleFn = getFunctionSource(source, 'buildKillToastFormatterBundle');
+
+  assert.ok(
+    !buildKillToastFormatterBundleFn.includes("' (AI)'") && !buildKillToastFormatterBundleFn.includes("' (human)'"),
+    'kill/update formatter should not append AI/human suffixes'
+  );
+}
+
 function run(): void {
   testRedrawAndResizeDelegateToSharedScene();
   testSharedSceneStillRendersStaleIntel();
@@ -224,6 +235,7 @@ function run(): void {
   testProductionLabelContractsForExploredVsUnexploredHexes();
   testStackCalloutSingleUnitNonCtrlClosesPopup();
   testModifierDrivenPopoverCloseRulesCentralized();
+  testKillUpdateTextOmitsPlayerSuffixes();
   console.log('rendererConsolidation.test.ts passed');
 }
 

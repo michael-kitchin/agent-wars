@@ -3912,11 +3912,10 @@ function formatPendingOrderSidebarLabel(order: HumanStandingOrderSnapshot): stri
 
 function formatKillToastLine(
   kill: { victimId: string; killerIds: string[] },
-  nameFormatter: (unitId: string) => string,
-  playerFormatter: (unitId: string) => string
+  nameFormatter: (unitId: string) => string
 ): string {
-  const victimLabel = `${nameFormatter(kill.victimId)}${playerFormatter(kill.victimId)}`;
-  const killerLabels = kill.killerIds.map((killerId) => `${nameFormatter(killerId)}${playerFormatter(killerId)}`).join(', ');
+  const victimLabel = nameFormatter(kill.victimId);
+  const killerLabels = kill.killerIds.map((killerId) => nameFormatter(killerId)).join(', ');
   return `${victimLabel} destroyed by ${killerLabels}`;
 }
 
@@ -3937,19 +3936,10 @@ function buildKillToastFormatterBundle(
     })),
   ];
   const displayNameById = buildUnitDisplayNameLookup(rosterForDisplay);
-  const playerById = new Map(rosterForDisplay.map((u) => [u.id, u.player]));
-  const formatDisplayPlayerSuffix = (unitId: string): string => {
-    const player = playerById.get(unitId);
-    if (player === 'human') return ' (human)';
-    if (player === 'opponent') return ' (AI)';
-    if (unitId.startsWith('human-')) return ' (human)';
-    if (unitId.startsWith('opponent-')) return ' (AI)';
-    return '';
-  };
   const formatDisplayUnitName = (unitId: string) =>
     displayNameById.get(unitId) ?? unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
   const formatKillLine = (kill: { victimId: string; killerIds: string[] }) =>
-    formatKillToastLine(kill, formatDisplayUnitName, formatDisplayPlayerSuffix);
+    formatKillToastLine(kill, formatDisplayUnitName);
   return { formatKillLine };
 }
 

@@ -285,13 +285,13 @@ Hex label format: `N1c / N2t` (urban hex count / turns to next spawn), with exce
 
 1. **Permanent.** Destroyed urban hexes, airports, and seaports do not rebuild. This is a scorched-earth system — the attacker permanently degrades the value of territory they might later want. Players may also strike their own infrastructure to deny it to an advancing enemy (see combat rules §6).
 
-2. **Urban hex strikes** permanently reduce a territory's per-turn production rate. Low counter-fire risk (17%). Sustained strikes can cripple or halt production entirely.
+2. **Urban hex strikes** destroy 3 res4 urban hexes per hit (capped at remaining), permanently reducing a territory's per-turn production rate. Low counter-fire risk (17%). Sustained strikes can cripple or halt production entirely.
 
 3. **Airport strikes** destroy the airport and all co-located enemy air units. High counter-fire risk (33%) due to AA defenses. This is the primary air-vs-air mechanism.
 
 4. **Seaport strikes** permanently prevent naval production/launch from that hex. Low counter-fire risk (17%).
 
-**Resolution sequence update.** The combat resolution procedure gains two new phases. The full five-phase sequence is: air strikes (pre-move) → ranged (pre-move) → ground/naval movement → ferry movement (with abort check) → melee (post-move). See the updated combat rules document (v2.0) for full details.
+**Resolution sequence update.** The combat resolution procedure gains two new phases. The full five-phase sequence is: air strikes (pre-move) → ranged (pre-move) → ground/naval movement → ferry movement (with abort check) → melee (post-move). See the updated combat rules document (v2.1) for full details.
 
 **AI architecture impact:** The pre-computation layer adds air-specific assessments to the briefing: air unit visibility coverage, available strike targets within range (units and infrastructure) with counter-fire risk estimates, ferry options, and airport vulnerability status. The LLM issues air orders through the response JSON: `{ "action": "air_strike", "targetHex": [...], "targetType": "airport" }` or `{ "action": "ferry", "destinationAirport": [...] }`. The `infrastructure_destroyed` callback event fires when any infrastructure is destroyed, giving the AI awareness of the scorched-earth landscape even on turns it wasn't consulted.
 
@@ -301,7 +301,7 @@ The briefing format gains an air operations section:
 AIR OPERATIONS:
 | Air Unit | Base Airport | Visibility Coverage | Strike Targets in Range |
 |----------|-------------|--------------------|-----------------------|
-| air-1 | [12.4,12.1] | 37 hexes | human-inf-2 (units, 50%hit/17%risk), airport at [10.5,9.9] (50%hit/33%risk) |
+| air-1 | [12.4,12.1] | 37 hexes | [2.1,0.5] units (2×inf+1×armor, 50%hit, counter-fire: armor@att3), airport at [10.5,9.9] (50%hit/33%risk) |
 | air-2 | [4.0,21.5] | 37 hexes | No targets in range |
 
 INFRASTRUCTURE STATUS:
@@ -324,7 +324,7 @@ INFRASTRUCTURE STATUS:
 
 **Upgrade Tool 1 (conditional on terrain modifiers):** If terrain modifiers are introduced, BFS upgrades to A* with terrain-weighted movement costs. Tool 2 gains terrain modifier information. Tool 3 applies terrain combat modifiers. These changes are internal — the tool interfaces don't change, and the briefing format absorbs the new data naturally. Tool 3 also gains air strike estimation (target type selection with counter-fire risk) regardless of terrain modifiers.
 
-**Update the combat rules document.** The combat rules document has been updated to v2.0 to reflect the four-unit roster, five-phase resolution sequence, infrastructure destruction system, and air operation rules.
+**Update the combat rules document.** The combat rules document has been updated to v2.1 to reflect the four-unit roster, five-phase resolution sequence, infrastructure destruction system, and air operation rules.
 
 **Update the MCP tools spec.** Tool 2 (assess_unit and assess_hex) gains air-specific fields: visibility coverage, strike range, based-at-airport status. Tool 3 (estimate_combat) gains air strike estimation with target type and counter-fire risk. Tool 5 (standing orders) does not apply to air units — air actions are per-turn decisions, not persistent orders, because the one-action-per-turn constraint makes standing orders less useful (you can't set "always strike hex X" without also committing the unit to never ferry).
 
