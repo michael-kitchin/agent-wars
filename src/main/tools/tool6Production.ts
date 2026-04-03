@@ -15,6 +15,7 @@ import {
 } from '../gameActions';
 import type { LatLng } from './tool1Pathfinding';
 import { logDebug, logError, logTrace } from '../logger';
+import { isTerrainClassificationCacheLoaded } from '../terrainClassificationCache';
 
 const AI_PLAYER_ID = 'opponent';
 
@@ -74,6 +75,14 @@ function queryProduction(
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): Record<string, unknown> {
   logTrace('tool6Production queryProduction', { hasHex: args.hex !== undefined, all: args.all === true });
+  if (!isTerrainClassificationCacheLoaded()) {
+    logDebug('tool6Production queryProduction: terrain cache unavailable', { stateTurn: state.turnNumber });
+    return {
+      status: 'ok',
+      production: { controlledHexQueues: [] as unknown[] },
+      unavailableReason: 'terrain classification cache not loaded',
+    };
+  }
   if (args.hex !== undefined) {
     const resolved = resolveHexArgument(args, resolveToH3);
     if (!resolved.ok) return { status: 'error', error: resolved.error };

@@ -47,12 +47,47 @@ interface GridDistanceFailureSample {
   error: string;
 }
 
+function approximateDistanceKm(fromH3: string, toH3: string): number {
+  const [fromLat, fromLng] = cellToLatLng(fromH3);
+  const [toLat, toLng] = cellToLatLng(toH3);
+  const toRad = Math.PI / 180;
+  const dLat = (toLat - fromLat) * toRad;
+  const dLng = (toLng - fromLng) * toRad;
+  const lat1 = fromLat * toRad;
+  const lat2 = toLat * toRad;
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLng = Math.sin(dLng / 2);
+  const a = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const EARTH_RADIUS_KM = 6371;
+  return EARTH_RADIUS_KM * c;
+}
+
+function tryDistanceWithFallback(referenceH3: string, candidateH3: string): { ok: true; distance: number; usedFallback: boolean } | { ok: false; error: string } {
+  try {
+    return { ok: true, distance: gridDistance(referenceH3, candidateH3), usedFallback: false };
+  } catch (gridErr) {
+    try {
+      return { ok: true, distance: approximateDistanceKm(referenceH3, candidateH3), usedFallback: true };
+    } catch (fallbackErr) {
+      return { ok: false, error: `${String(gridErr)} | fallback failed: ${String(fallbackErr)}` };
+    }
+  }
+}
+
 function logGridDistanceFailureSummary(payload: {
   context: string;
   referenceH3: string;
   failureCount: number;
+  fallbackCount?: number;
   samples: GridDistanceFailureSample[];
 }): void {
+  if ((payload.fallbackCount ?? 0) > 0) {
+    logDebug(`${payload.context}: used coordinate-distance fallback`, {
+      referenceH3: payload.referenceH3,
+      fallbackCount: payload.fallbackCount,
+    });
+  }
   if (payload.failureCount <= 0) return;
   logError(`${payload.context}: gridDistance threw for candidate set`, {
     referenceH3: payload.referenceH3,
@@ -76,26 +111,28 @@ function nearestReachableWaterHexTo(
   let best: string | undefined;
   let bestDist = Infinity;
   let failureCount = 0;
+  let fallbackCount = 0;
   const failureSamples: GridDistanceFailureSample[] = [];
   for (const h3 of reachableWater) {
-    try {
-      const d = gridDistance(refLandH3, h3);
-      if (d < bestDist) {
-        bestDist = d;
-        best = h3;
-      }
-    } catch (err) {
+    const distance = tryDistanceWithFallback(refLandH3, h3);
+    if (!distance.ok) {
       failureCount += 1;
       if (failureSamples.length < 5) {
-        failureSamples.push({ candidateH3: h3, error: String(err) });
+        failureSamples.push({ candidateH3: h3, error: distance.error });
       }
       continue;
+    }
+    if (distance.usedFallback) fallbackCount += 1;
+    if (distance.distance < bestDist) {
+      bestDist = distance.distance;
+      best = h3;
     }
   }
   logGridDistanceFailureSummary({
     context: 'tool1Pathfinding nearestReachableWaterHexTo',
     referenceH3: refLandH3,
     failureCount,
+    fallbackCount,
     samples: failureSamples,
   });
   return best;
@@ -109,27 +146,29 @@ function nearestWaterHexTo(refH3: string, hexSet: Set<string>, terrainByH3: Map<
   let best: string | undefined;
   let bestDist = Infinity;
   let failureCount = 0;
+  let fallbackCount = 0;
   const failureSamples: GridDistanceFailureSample[] = [];
   for (const h3 of hexSet) {
     if (!terrainIsPassableForDomain(terrainByH3.get(h3), 'water')) continue;
-    try {
-      const d = gridDistance(refH3, h3);
-      if (d < bestDist) {
-        bestDist = d;
-        best = h3;
-      }
-    } catch (err) {
+    const distance = tryDistanceWithFallback(refH3, h3);
+    if (!distance.ok) {
       failureCount += 1;
       if (failureSamples.length < 5) {
-        failureSamples.push({ candidateH3: h3, error: String(err) });
+        failureSamples.push({ candidateH3: h3, error: distance.error });
       }
       continue;
+    }
+    if (distance.usedFallback) fallbackCount += 1;
+    if (distance.distance < bestDist) {
+      bestDist = distance.distance;
+      best = h3;
     }
   }
   logGridDistanceFailureSummary({
     context: 'tool1Pathfinding nearestWaterHexTo',
     referenceH3: refH3,
     failureCount,
+    fallbackCount,
     samples: failureSamples,
   });
   return best;
@@ -145,6 +184,9 @@ function nearestAdjacentWaterOrCoastalHex(
   let best: string | undefined;
   let bestDistance = Infinity;
   let neighbors: string[] = [];
+  let failureCount = 0;
+  let fallbackCount = 0;
+  const failureSamples: GridDistanceFailureSample[] = [];
   try {
     neighbors = gridDisk(originH3, 1);
   } catch (err) {
@@ -160,21 +202,27 @@ function nearestAdjacentWaterOrCoastalHex(
     if (blocked?.has(candidate)) continue;
     const terrain = terrainByH3.get(candidate) ?? 'land';
     if (!terrainIsPassableForDomain(terrain, 'water')) continue;
-    try {
-      const d = gridDistance(refTargetH3, candidate);
-      if (d < bestDistance) {
-        bestDistance = d;
-        best = candidate;
+    const distance = tryDistanceWithFallback(refTargetH3, candidate);
+    if (!distance.ok) {
+      failureCount += 1;
+      if (failureSamples.length < 5) {
+        failureSamples.push({ candidateH3: candidate, error: distance.error });
       }
-    } catch (err) {
-      logError('tool1Pathfinding nearestAdjacentWaterOrCoastalHex: gridDistance threw', {
-        refTargetH3,
-        candidateH3: candidate,
-        error: String(err),
-      });
       continue;
     }
+    if (distance.usedFallback) fallbackCount += 1;
+    if (distance.distance < bestDistance) {
+      bestDistance = distance.distance;
+      best = candidate;
+    }
   }
+  logGridDistanceFailureSummary({
+    context: 'tool1Pathfinding nearestAdjacentWaterOrCoastalHex',
+    referenceH3: refTargetH3,
+    failureCount,
+    fallbackCount,
+    samples: failureSamples,
+  });
   return best;
 }
 

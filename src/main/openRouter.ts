@@ -585,9 +585,13 @@ function buildProductionBriefingBlock(
     status?: string;
     production?: { controlledHexQueues?: Array<Record<string, unknown>> };
     error?: string;
+    unavailableReason?: string;
   };
   if (snapshot.status !== 'ok') {
     return `=== PRODUCTION STATUS ===\nProduction status unavailable: ${snapshot.error ?? 'unknown error'}\n`;
+  }
+  if (typeof snapshot.unavailableReason === 'string' && snapshot.unavailableReason.trim().length > 0) {
+    return `=== PRODUCTION STATUS ===\nProduction status temporarily unavailable: ${snapshot.unavailableReason}\n`;
   }
   const queues = snapshot.production?.controlledHexQueues ?? [];
   const opponentCounts = getPlayerUnitCountsByType(state.units, 'opponent');
