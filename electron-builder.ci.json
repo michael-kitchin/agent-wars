@@ -1,6 +1,6 @@
 {
-  "appId": "com.agent-wars.app",
-  "productName": "Agent Wars",
+  "appId": "com.agent-wars.app.1.5.0",
+  "productName": "Agent Wars v1.5.0",
   "publish": null,
   "directories": {
     "output": "release"

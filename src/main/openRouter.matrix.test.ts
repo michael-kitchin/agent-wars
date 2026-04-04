@@ -99,7 +99,11 @@ async function run(): Promise<void> {
         state: unknown,
         modelId: string,
         options: { enabledToolNames: string[]; usePrecomputation: boolean }
-      ) => Promise<{ success: boolean }>;
+      ) => Promise<{
+        success: boolean;
+        airStrikes?: { unitId: string; targetH3Index: string; targetType: 'units' | 'urban' | 'airport' | 'seaport' }[];
+        ferryOrders?: { unitId: string; destinationH3Index: string }[];
+      }>;
       getToolNamesForEnabledGroups: (ids: string[]) => string[];
     };
     const mapData = require('./mapData') as {
@@ -158,6 +162,19 @@ async function run(): Promise<void> {
       assert.ok(
         systemPrompt.includes('Strict schema: top-level must be a JSON object with "strategy" (string) and "orders" (array); do not return a top-level array.'),
         `strict-schema prompt guidance missing for mask=${mask}`
+      );
+      assert.ok(systemPrompt.includes('=== AIR OPERATIONS STATUS ==='), `air-ops status guidance missing for mask=${mask}`);
+      assert.ok(
+        systemPrompt.includes('Air rules: strike range 3 from base, ferry range 4 airport-to-airport, one air action per unit per turn.'),
+        `air-ops rules guidance missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('Optional top-level air actions: airStrikes[] entries use'),
+        `air-strike JSON contract guidance missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('ferryOrders[] entries use { "unitId": "...", "destination": [lat,lng] }'),
+        `ferry JSON contract guidance missing for mask=${mask}`
       );
       assert.ok(
         systemPrompt.includes(`Map context: global Earth map (H3 resolution ${mapData.H3_RESOLUTION}), not a local/contrived arena.`),
@@ -220,6 +237,40 @@ async function run(): Promise<void> {
       usePrecomputation: false,
     });
     assert.strictEqual(strictResult.success, false, 'strict schema should reject top-level array responses');
+
+    const airOrdersResponse: ChatResponse = {
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              strategy: 'air pressure',
+              orders: [],
+              airStrikes: [
+                { unitId: 'opponent-air-1', targetHex: [83.66, -7.32], targetType: 'units' },
+              ],
+              ferryOrders: [
+                { unitId: 'opponent-air-2', destination: [79.24, 38.02] },
+              ],
+            }),
+          },
+        },
+      ],
+    };
+    (globalThis as unknown as { fetch: unknown }).fetch = (async () => {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => airOrdersResponse,
+        text: async () => JSON.stringify(airOrdersResponse),
+      };
+    }) as unknown;
+    const airResult = await openRouter.requestOrders(state, 'test-model', {
+      enabledToolNames: openRouter.getToolNamesForEnabledGroups(apiToggleIds),
+      usePrecomputation: false,
+    });
+    assert.strictEqual(airResult.success, true, 'valid air action JSON should parse successfully');
+    assert.strictEqual(airResult.airStrikes?.length ?? 0, 1, 'air strike entries should carry through model JSON parsing');
+    assert.strictEqual(airResult.ferryOrders?.length ?? 0, 1, 'ferry entries should carry through model JSON parsing');
 
     console.log(`openRouter.matrix.test.ts passed (${combosChecked} combinations)`);
   } finally {
