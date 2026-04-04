@@ -1,6 +1,6 @@
 # Strategic Development Plan: Grand Strategy Wargame with LLM Opponents
 
-*Version 3.1 — April 2026*
+*Version 3.2 — April 2026*
 
 ---
 
@@ -77,6 +77,7 @@ Instead of being called every turn, the LLM subscribes to events from a finite, 
 | `threat_escalation(unitId, severity)` | unitId: string, severity: "moderate" or "critical" | Unit's threat assessment worsens to specified level |
 | `territory_changed(hexId?)` | hexId: optional | Control of an objective hex changes hands |
 | `infrastructure_destroyed(type?, hexId?)` | type: "urban" or "airport" or "seaport", hexId: optional | Infrastructure destroyed at a hex |
+| `transport_arrived(unitId)` | unitId: string | A naval transport stack arrives at its destination coastal hex |
 
 **Mandatory override events (always fire, regardless of LLM subscription):**
 
@@ -85,6 +86,7 @@ Instead of being called every turn, the LLM subscribes to events from a finite, 
 - Any AI unit without a standing order exists (newly spawned, order completed, order cancelled by engine)
 - An AI unit's standing order enters a blocked or error state
 - An AI air unit's base airport is destroyed or captured
+- An embarked AI land unit loses its transport (naval unit destroyed while carrying land units on a water hex)
 - No LLM consultation has occurred for 5 turns (deadman timer)
 
 When no events fire, standing orders execute, the pre-computation layer runs (to update the briefing for the next consultation), and the LLM is not invoked. The AI's per-turn cost drops to zero on quiet turns.
@@ -103,13 +105,16 @@ When consulted, the LLM responds with:
     { "unitId": "...", "action": "explicit_attack", "targetHex": [...] },
     { "unitId": "...", "action": "air_strike", "targetHex": [...], "targetType": "units" },
     { "unitId": "...", "action": "ferry", "destinationAirport": [...] },
-    { "unitId": "...", "action": "build", "unitType": "armor", "productionHex": [...] }
+    { "unitId": "...", "action": "build", "unitType": "armor", "productionHex": [...] },
+    { "unitId": "...", "action": "transport_move", "navalUnitId": "...", "destination": [...] },
+    { "unitId": "...", "action": "disembark", "destination": [...] }
   ],
   "callbacks": [
     { "event": "turns", "params": { "n": 3 } },
     { "event": "unit_arrived", "params": { "unitId": "opponent-armor-1" } },
     { "event": "threat_escalation", "params": { "unitId": "opponent-infantry-2", "severity": "critical" } },
-    { "event": "infrastructure_destroyed", "params": { "type": "airport" } }
+    { "event": "infrastructure_destroyed", "params": { "type": "airport" } },
+    { "event": "transport_arrived", "params": { "unitId": "naval-2" } }
   ],
   "memoryUpdates": [
     { "action": "write", "key": "...", "content": "...", "tier": "persistent" },
@@ -118,7 +123,7 @@ When consulted, the LLM responds with:
 }
 ```
 
-Standing orders remain the primary output mechanism. Explicit per-turn movement, ranged attack, air strike, and ferry orders are available for one-off tactical actions. The `callbacks` array replaces the implicit "call me every turn" contract. Memory updates can be bundled into the response rather than requiring separate tool calls, further reducing round-trips.
+Standing orders remain the primary output mechanism. Explicit per-turn movement, ranged attack, air strike, ferry, and transport orders are available for one-off tactical actions. The `callbacks` array replaces the implicit "call me every turn" contract. Memory updates can be bundled into the response rather than requiring separate tool calls, further reducing round-trips.
 
 The LLM can still use ad-hoc tools during its reasoning if needed — the response format doesn't prevent tool calls. But the design encourages single-pass responses by front-loading all the information the LLM typically requests.
 
@@ -194,11 +199,11 @@ Play a complete game (10–20 turns) where the LLM is consulted only when events
 
 ---
 
-## Phase 1: The Real Game (Milestones 1.1–1.6)
+## Phase 1: The Real Game (Milestones 1.1–1.7)
 
-**Goal:** Transform the validated prototype into a real, replayable game on a real-Earth global map with fog of war, a functional economy, four unit types with distinct roles, and enough depth to sustain multiple playthroughs. This is where you stop writing throwaway code and start building the actual codebase. The hybrid AI architecture is foundational — it's not bolted on later, it's built into the production architecture from the start.
+**Goal:** Transform the validated prototype into a real, replayable game on a real-Earth global map with fog of war, a functional economy, four unit types with distinct roles, naval transport for cross-ocean force projection, and enough depth to sustain multiple playthroughs. This is where you stop writing throwaway code and start building the actual codebase. The hybrid AI architecture is foundational — it's not bolted on later, it's built into the production architecture from the start.
 
-**What you'll have at the end of Phase 1:** A complete single-player game at the global zoom level (H3 res 1, ~842 hexes) against an LLM opponent on a real-Earth map, with fog of war, a functional economy, and four unit types (infantry, armor, naval, air) creating layered strategic choices. Playable from start to finish in 1–3 hours. The AI is consulted on events, not every turn, keeping per-game costs under $0.20 with mid-tier models.
+**What you'll have at the end of Phase 1:** A complete single-player game at the global zoom level (H3 res 1, ~842 hexes) against an LLM opponent on a real-Earth map, with fog of war, a functional economy, four unit types (infantry, armor, naval, air) with naval transport capability, creating layered strategic choices. Playable from start to finish in 1–3 hours. The AI is consulted on events, not every turn, keeping per-game costs under $0.20 with mid-tier models.
 
 **Critical decision before starting Phase 1:** How much code from Phase 0 do you carry forward? The honest answer is the architectural lessons, the tool service logic, and the prompt format patterns — but mostly rewritten code. Phase 0 was learning and validation. Phase 1 is building a codebase you'll maintain for years.
 
@@ -223,7 +228,7 @@ Seaport the basic hex rendering and WEGO turn loop from Phase 0, restructured fo
 
 ### Milestone 1.2 — The Real Map (Global Level)
 
-**Build:** Generate a global hex map of the entire Earth from Natural Earth data, preprocessed through PostGIS into H3 cells at resolution 1 (~842 hexes, ~610,000 km² each). Each hex is tagged with a dominant terrain type derived from Natural Earth: ocean, land (plains), forest, mountain, desert, arctic. Store the terrain data in SQLite — ocean hexes don't need per-cell storage, continental interiors can be stored as ranges.
+**Build:** Generate a global hex map of the entire Earth from Natural Earth data, preprocessed through PostGIS into H3 cells at resolution 1 (~842 hexes, ~610,000 km² each). Each hex is tagged with a terrain type derived from Natural Earth: plains, forests, mountains, desert, wetlands, arctic, coastal (15–85% land area, passable by both land and naval units), or water. Each hex is also tagged with features where applicable: urban (res4 urban hex count for production), airports, and seaports. Store the terrain data and features in SQLite — water hexes don't need per-cell storage, continental interiors can be stored as ranges. See the combat rules document (§1.1) for terrain type and feature definitions.
 
 Also generate the res 4 terrain data (~1,770 km² per hex) in the same pipeline and store it, even though the game doesn't use it yet. This avoids re-running the GIS pipeline in Phase 3 and validates that the res 1 → res 4 parent-child mapping works correctly. The res 4 data sits in the database unused until Phase 3.
 
@@ -330,15 +335,70 @@ INFRASTRUCTURE STATUS:
 
 **External playtesting:** Get your first external playtester. Watch them play without helping. Take notes on confusion, boredom, and engagement. Pay particular attention to: whether air power feels overpowered or underpowered, whether the infrastructure destruction trade-off creates interesting decisions, and whether the global hex scale feels too abstract — if players want to zoom in, that's signal that Phase 3 is high priority.
 
-### Milestone 1.6 — Game Scenarios and Win Conditions
+### Milestone 1.6 — Naval Transport (Sealift)
+
+**Build:** Add **naval transport** — the ability for land units to travel across oceans aboard naval units. Without sealift, land power is permanently continent-locked, and global scenarios devolve into separate continental wars connected only by air and naval forces. This mechanic is prerequisite to meaningful scenario design in milestone 1.7.
+
+**Naval transport mechanics:**
+
+1. **Embarkation.** Land units embark by moving to a coastal hex with a seaport where naval units are present, using their normal movement action. The land units must be co-located with the naval units at the **start** of a turn for the stack to move together — embarkation and sailing cannot occur in the same turn.
+
+2. **Capacity.** Each naval unit can carry **1 armor or 2 infantry**. The engine validates capacity on entry to a water hex: total land unit "weight" (armor = 2, infantry = 1) must not exceed total naval capacity (2 per naval unit). Orders that would violate capacity are rejected.
+
+3. **Stack movement.** On water hexes, land and naval units move as a mixed stack using the naval unit's movement (2 hexes/turn). The entire stack must be selected and moved together — partial stack movement on water hexes is rejected. Land units in the stack do not consume their own movement action; they are passengers.
+
+4. **Disembarkation.** When a stack reaches any **coastal hex** (no seaport required), land units may disembark. Disembarkation occurs during the ground/naval movement phase — the land units appear on the coastal hex as part of the stack's movement. Land units that disembark cannot move further that turn, but **can participate in melee** (phase 5) if enemies are present. This enables opposed amphibious landings.
+
+5. **Implicit embarked state.** There is no formal "embarked" flag on land units. Co-location of land and naval units on a water hex is the embarked state. The engine enforces capacity constraints at hex boundaries, not through per-unit status tracking.
+
+6. **Vulnerability at sea.** Land units on water hexes **cannot** use melee or ranged attacks. They also **cannot** return counter-fire against air strikes. They are fully dependent on their naval escorts for protection. Land units on coastal hexes (after disembarkation or before embarkation) fight normally.
+
+7. **Transport loss.** If a naval unit is destroyed on a water hex and the remaining naval capacity is insufficient for the land units present, excess land units are randomly destroyed. Casualty priority does not apply — the loss is random, representing the chaos of a transport sinking.
+
+**Turn count examples:**
+
+- **Inland-to-inland (minimum 3 turns):** Turn 1: land units move to a coastal port hex with naval units. Turn 2: the stack sails across water. Turn 3: stack arrives at a coastal hex, land units disembark and move inland.
+- **Port-to-coast amphibious assault (minimum 2 turns):** Turn 1: land units are already at the port with naval units. Turn 2: stack sails to target coastal hex, land units disembark and fight in melee if enemies are present.
+- **Long-distance sealift:** Multiple turns of sailing at naval move speed (2 hexes/turn). The stack is vulnerable to air strikes and naval engagements throughout.
+
+**AI architecture impact:** The pre-computation layer adds transport-specific data to the briefing: naval units with available capacity, coastal ports accessible for embarkation, estimated transit times to key coastal targets, and current transport stacks at sea with their vulnerability status. The LLM issues transport orders through the response JSON: `{ "action": "transport_move", "navalUnitId": "naval-2", "destination": [...] }` for stack movement and `{ "action": "disembark", "destination": [...] }` for landing.
+
+The briefing format gains a sealift section:
+
+```
+NAVAL TRANSPORT:
+| Naval Unit | Position | Capacity | Carrying | Status |
+|------------|----------|----------|----------|--------|
+| naval-1 | [8.2,4.3] | 2/2 free | — | at port, available for transport |
+| naval-2 | [-15.3,22.1] | 0/2 free | inf-3, inf-5 | at sea, 2 turns from [target] |
+
+EMBARKATION OPTIONS:
+• Seaport at [8.2,4.3]: naval-1 available, inf-1 and armor-2 within 1 turn
+• Seaport at [12.4,12.1]: no naval units present
+
+⚠ Transport stack naval-2 is in range of enemy air unit at [human-airport]
+```
+
+**Update the combat rules document** to v2.2 to cover naval transport mechanics, capacity rules, transport loss, and amphibious landing interactions with the melee phase.
+
+**Update the MCP tools spec.** Tool 2 (assess_unit) gains transport-specific fields for naval units: current cargo, available capacity, estimated transit times. Tool 3 (estimate_combat) gains transport vulnerability estimation — combat estimates for naval units should flag when they are carrying land units and note the cascading loss risk.
+
+**Playtest hypothesis:** Naval transport should make global scenarios feel genuinely global — land armies should be able to project force across oceans, but at meaningful cost and risk. Specifically:
+
+- **Sealift should feel like a commitment.** Loading armies onto ships and sailing across open water should create genuine tension — the vulnerability window is real, and losing a loaded transport stack should be devastating.
+- **Amphibious landings should be dramatic.** Sailing a transport stack into a defended coast and fighting in melee on arrival should feel like a high-stakes gamble, not a routine operation.
+- **Port denial is a defensive strategy.** Destroying your own seaports to prevent enemy embarkation (using air strikes from milestone 1.5) should emerge as a viable defensive tactic. The AI should reason about port vulnerability and consider preemptive port denial.
+- **The AI plans multi-turn transport operations.** Read the AI's strategy field — is it staging units at ports, planning sealift routes that avoid enemy air coverage, and timing landings to coincide with other offensives? Multi-turn planning is the LLM comprehension test for this mechanic.
+
+### Milestone 1.7 — Game Scenarios and Win Conditions
 
 **Build:** Create 2–3 preset scenarios on the real-Earth map: a contained regional conflict (e.g., European theatre — limit the playable area to ~50–80 global hexes), a two-front global scenario, and a free-play sandbox. Each scenario defines starting territories, forces, production centers, airport and seaport locations, and victory conditions. Add a scenario selection screen and a basic end-game summary showing territory control over the course of the game.
 
-Scenarios should vary in how much infrastructure is available at start — a scenario with few airports makes air power scarce and valuable; a scenario with many airports makes air superiority a central strategic concern. This lets you test air balance across different setups without changing the rules.
+Scenarios should vary in how much infrastructure is available at start — a scenario with few airports makes air power scarce and valuable; a scenario with many airports makes air superiority a central strategic concern. At least one scenario should feature separated landmasses requiring naval transport for cross-ocean force projection — this validates the sealift mechanics from milestone 1.6 in a scenario context. This lets you test air balance and sealift balance across different setups without changing the rules.
 
 **AI architecture impact:** Different scenarios may warrant different callback sensitivities. A fast-paced regional conflict might need more frequent LLM consultation than a sprawling global scenario where fronts are stable for many turns. Consider making the deadman timer (currently 5 turns) scenario-configurable. The end-game summary should include AI consultation statistics — how many times the AI was consulted, what events triggered consultations, total API cost for the game, and infrastructure destroyed by each side. This is interesting data for the player and essential data for you.
 
-**Playtest hypothesis:** At least one scenario produces a consistently engaging 60–90 minute game experience with a beginning, middle, and end. When you finish a game, you want to play again with a different strategy. The scorched-earth dynamic should produce noticeably different end-game maps across playthroughs — some games end with infrastructure mostly intact (careful players), others with devastated territories (aggressive air campaigns).
+**Playtest hypothesis:** At least one scenario produces a consistently engaging 60–90 minute game experience with a beginning, middle, and end. When you finish a game, you want to play again with a different strategy. The scorched-earth dynamic should produce noticeably different end-game maps across playthroughs — some games end with infrastructure mostly intact (careful players), others with devastated territories (aggressive air campaigns). Scenarios with cross-ocean sealift requirements should produce games that feel meaningfully different from continent-only scenarios.
 
 **This is your vertical-slice milestone** — the point where you have a genuinely shippable game. Everything from here forward is expansion and polish.
 
@@ -364,9 +424,9 @@ Scenarios should vary in how much infrastructure is available at start — a sce
 
 **Build:** Implement AI personality differentiation through system prompt engineering and callback configuration. Create at least three distinct AI profiles: cautious/defensive, balanced, and aggressive. Each profile configures:
 
-- **System prompt personality** — strategic doctrine, risk tolerance, aggression level, air power doctrine (aggressive profiles favor infrastructure destruction; cautious profiles preserve infrastructure for potential capture)
+- **System prompt personality** — strategic doctrine, risk tolerance, aggression level, air power doctrine (aggressive profiles favor infrastructure destruction; cautious profiles preserve infrastructure for potential capture), sealift doctrine (aggressive profiles launch amphibious operations; cautious profiles use naval transport only for reinforcement)
 - **Callback sensitivity** — aggressive AI subscribes to more frequent `turns(N)` with lower N and lower `threat_escalation` thresholds; cautious AI uses longer intervals and reacts mainly to direct contact
-- **Briefing emphasis** — aggressive AI's briefing highlights offensive opportunities and air strike targets; cautious AI's briefing emphasizes defensive vulnerabilities and airport protection
+- **Briefing emphasis** — aggressive AI's briefing highlights offensive opportunities, air strike targets, and amphibious assault options; cautious AI's briefing emphasizes defensive vulnerabilities, airport protection, and transport escort requirements
 
 Difficulty scaling works through two levers: the model tier (player selects via their OpenRouter key) and information accuracy (on lower difficulty, combat estimates and threat assessments include a small error margin, simulating worse intelligence).
 
@@ -374,7 +434,7 @@ Difficulty scaling works through two levers: the model tier (player selects via 
 
 **Tiered model routing (optional, scope-dependent):** If the callback system is working well and consultations are infrequent enough, this may not be needed yet. But if cost or latency on larger maps still exceeds targets, implement a simple router: use the player's selected model for event-triggered consultations (the important decisions) and a cheaper model for the deadman-timer consultations (routine check-ins). This is a natural extension of the callback architecture — the event type determines the model tier.
 
-**Playtest hypothesis:** Playing against the aggressive AI should feel noticeably different from playing against the cautious AI — not just in outcomes, but in pacing and texture. An aggressive AI should conduct scorched-earth air campaigns; a cautious AI should preserve infrastructure and use air primarily for reconnaissance. The AI Observatory should be fascinating to read after a game.
+**Playtest hypothesis:** Playing against the aggressive AI should feel noticeably different from playing against the cautious AI — not just in outcomes, but in pacing and texture. An aggressive AI should conduct scorched-earth air campaigns and launch daring amphibious assaults; a cautious AI should preserve infrastructure, use air primarily for reconnaissance, and use naval transport conservatively. The AI Observatory should be fascinating to read after a game.
 
 ### Milestone 2.3 — Diplomacy and Alliances
 
@@ -388,13 +448,13 @@ The possibility of AI betrayal — the LLM deciding that breaking an alliance is
 
 ### Milestone 2.4 — Sound Design and Game Feel
 
-**Build:** Add audio: ambient music (1–3 tracks, licensed or AI-generated with commercial rights), UI feedback sounds, notification sounds. Add visual juice to the resolution phase: brief combat animations, smooth unit movement interpolation, camera auto-pan to significant engagements. Air strike animations should be distinctive — visually and aurally different from ranged combat to reinforce the five-phase resolution sequence.
+**Build:** Add audio: ambient music (1–3 tracks, licensed or AI-generated with commercial rights), UI feedback sounds, notification sounds. Add visual juice to the resolution phase: brief combat animations, smooth unit movement interpolation, camera auto-pan to significant engagements. Air strike animations should be distinctive — visually and aurally different from ranged combat to reinforce the five-phase resolution sequence. Naval transport stacks should render distinctively — land units visually "aboard" naval units during water movement.
 
-**Playtest hypothesis:** The resolution phase should feel like watching a story unfold. Sound and animation should make combat outcomes feel impactful — losing a unit should sting, destroying an enemy should satisfy. Infrastructure destruction should feel consequential — not just a stat change, but a visible scar on the map.
+**Playtest hypothesis:** The resolution phase should feel like watching a story unfold. Sound and animation should make combat outcomes feel impactful — losing a unit should sting, destroying an enemy should satisfy. Infrastructure destruction should feel consequential — not just a stat change, but a visible scar on the map. A loaded transport sinking should feel like a disaster.
 
 ### Milestone 2.5 — Save/Load and Session Management
 
-**Build:** Full save and load. Since game state is in SQLite, this is largely about serializing the complete database state — including per-player subjective views, pending orders, AI memory, standing orders, active callback subscriptions, infrastructure state (which urban hexes/airports/seaports have been destroyed), and turn counter — to a save file and restoring it cleanly. Auto-save at the start of each turn. Add turn replay: step through any previous turn's resolution, including the AI's briefing and response for turns where it was consulted.
+**Build:** Full save and load. Since game state is in SQLite, this is largely about serializing the complete database state — including per-player subjective views, pending orders, AI memory, standing orders, active callback subscriptions, infrastructure state (which urban hexes/airports/seaports have been destroyed), transport stack positions, and turn counter — to a save file and restoring it cleanly. Auto-save at the start of each turn. Add turn replay: step through any previous turn's resolution, including the AI's briefing and response for turns where it was consulted.
 
 **AI architecture impact:** The callback subscription state must be persisted and restored. On load, the engine must re-evaluate whether any callback conditions are already satisfied in the loaded game state (e.g., if the game was saved mid-crisis, the loaded state might immediately trigger a consultation). AI strategic memory (Tool 4) is already in SQLite and persists naturally.
 
@@ -444,9 +504,9 @@ Do not design the theatre-level unit roster in this milestone. Use placeholder t
 
 1. **Anchor to the hex scale.** At ~42 km per hex, infantry move 1 = a day's march for a WW2-era division. Armor move 2 = a fast mechanized exploitation (~84 km). These are the ground-truth rates the roster is built around.
 
-2. **Start with the roles that matter at this scale.** The theatre level is where terrain interactions, combined arms, and rock-paper-scissors dynamics have the most impact. Start with 5–6 types: infantry, armor, artillery (ranged, can't move and fire same turn), naval surface, submarine (invisible until adjacent), and transport (carries land units across water). Add mechanized infantry and tactical aircraft only if playtesting reveals the gap. Note: global-level air units provide strategic air power; theatre-level aircraft (if added) would represent tactical air support with shorter range and different mechanics.
+2. **Start with the roles that matter at this scale.** The theatre level is where terrain interactions, combined arms, and rock-paper-scissors dynamics have the most impact. Start with 5–6 types: infantry, armor, artillery (ranged, can't move and fire same turn), naval surface, submarine (invisible until adjacent), and transport (carries land units across water). Add mechanized infantry and tactical aircraft only if playtesting reveals the gap. Note: global-level air units provide strategic air power; theatre-level aircraft (if added) would represent tactical air support with shorter range and different mechanics. The global-level naval transport mechanic (milestone 1.6) operates at a different scale — theatre-level transport is a dedicated unit type for tactical amphibious operations within a single global hex's children.
 
-3. **Design the terrain interaction matrix.** At res 4, terrain should meaningfully shape tactics: armor strong on plains, penalized in mountains/forest; infantry defends well in forest and mountains; artillery range extends over flat terrain; naval restricted to ocean hexes. Build this matrix before assigning stats.
+3. **Design the terrain interaction matrix.** At res 4, terrain should meaningfully shape tactics: armor strong on plains, penalized in mountains/forest; infantry defends well in forest and mountains; artillery range extends over flat terrain; naval restricted to water and coastal hexes. Build this matrix before assigning stats.
 
 4. **Test LLM comprehension at this scale.** The AI must reason about theatre-level units distinctly from global-level units. The system prompt must clearly distinguish the two command levels and the unit types available at each.
 
@@ -472,7 +532,7 @@ Add the post-turn attention visualization: a display showing where the AI focuse
 
 ### Milestone 3.5 — Theatre Zoom Integration and Balance
 
-**Build:** Full integration pass. Theatre-level combat, production, fog of war, and economy all function correctly within the zoomed view. Scenarios from milestone 1.6 work with both zoom levels active. Balance pass on theatre-level unit stats, terrain modifiers, and attention budget constraints. Ensure the AI plays coherently across both levels — making sensible attention allocation decisions and issuing appropriate orders at whichever level it's focused on.
+**Build:** Full integration pass. Theatre-level combat, production, fog of war, and economy all function correctly within the zoomed view. Scenarios from milestone 1.7 work with both zoom levels active. Balance pass on theatre-level unit stats, terrain modifiers, and attention budget constraints. Ensure the AI plays coherently across both levels — making sensible attention allocation decisions and issuing appropriate orders at whichever level it's focused on.
 
 **Playtest hypothesis:** A complete game using both zoom levels should feel richer than the global-only experience, not more tedious. The theatre zoom should be something you want to use, not something you feel obligated to use. If the global-only game is still the preferred experience after this milestone, the attention mechanic or the theatre-level gameplay needs further tuning — but that's a balance problem, not an architectural one.
 
@@ -484,7 +544,7 @@ Add the post-turn attention visualization: a display showing where the AI focuse
 
 ### Milestone 4.1 — Onboarding and Tutorial
 
-**Build:** A tutorial scenario teaching core mechanics through guided play — one concept per turn. Start at the global level; introduce air power after the player is comfortable with ground and naval operations; introduce the theatre zoom once the player is comfortable with all global-level mechanics. Also write a comprehensive reference manual as a searchable HTML document bundled with the game. Include a section explaining the AI system: how LLM opponents work, what the "bring your own API key" model means, how the AI Observatory works, and what the cost expectations are at different model tiers.
+**Build:** A tutorial scenario teaching core mechanics through guided play — one concept per turn. Start at the global level; introduce air power after the player is comfortable with ground and naval operations; introduce naval transport after the player has seen the need to move armies across water; introduce the theatre zoom once the player is comfortable with all global-level mechanics. Also write a comprehensive reference manual as a searchable HTML document bundled with the game. Include a section explaining the AI system: how LLM opponents work, what the "bring your own API key" model means, how the AI Observatory works, and what the cost expectations are at different model tiers.
 
 **Playtest hypothesis:** A strategy game player who has never seen your game should complete the tutorial and start a real scenario without asking questions.
 
@@ -496,9 +556,9 @@ Add the post-turn attention visualization: a display showing where the AI focuse
 
 ### Milestone 4.3 — Community Beta
 
-**Build:** Release to your Discord community and content creators. Instrument opt-in analytics: turn time, AI consultation frequency, AI model choices, callback trigger distribution, game length, cost per game, crash reports, zoom usage patterns (how often players use theatre zoom, which theatres they zoom into), air unit usage (strike target distribution, ferry frequency, infrastructure destroyed per game). Run a structured feedback cycle with specific questions.
+**Build:** Release to your Discord community and content creators. Instrument opt-in analytics: turn time, AI consultation frequency, AI model choices, callback trigger distribution, game length, cost per game, crash reports, zoom usage patterns (how often players use theatre zoom, which theatres they zoom into), air unit usage (strike target distribution, ferry frequency, infrastructure destroyed per game), naval transport usage (sealift operations per game, amphibious assault frequency, transport losses). Run a structured feedback cycle with specific questions.
 
-**AI-specific analytics to capture:** Average consultations per game by scenario size. Most common callback triggers. Average cost per game by model tier and scenario. Distribution of ad-hoc tool calls during consultations (are players' AIs still needing ad-hoc tools, or does pre-computation cover everything?). Theatre zoom usage: do players engage with it, or do they stay at global level? Air power analytics: what percentage of AI consultations involve air strike decisions? How often does the AI destroy its own future territory's infrastructure? These metrics will tell you whether the hybrid architecture, the two-level design, and the scorched-earth mechanic are working as intended in the wild.
+**AI-specific analytics to capture:** Average consultations per game by scenario size. Most common callback triggers. Average cost per game by model tier and scenario. Distribution of ad-hoc tool calls during consultations (are players' AIs still needing ad-hoc tools, or does pre-computation cover everything?). Theatre zoom usage: do players engage with it, or do they stay at global level? Air power analytics: what percentage of AI consultations involve air strike decisions? How often does the AI destroy its own future territory's infrastructure? Sealift analytics: does the AI successfully plan and execute multi-turn transport operations? How often does it attempt amphibious assaults vs. defensive reinforcement sealifts? These metrics will tell you whether the hybrid architecture, the two-level design, the scorched-earth mechanic, and naval transport are working as intended in the wild.
 
 **Playtest hypothesis:** At least some beta players complete multiple full games voluntarily. Per-game AI cost with mid-tier models should be under $0.25 on standard scenarios.
 
@@ -518,11 +578,11 @@ Add the post-turn attention visualization: a display showing where the AI focuse
 
 **Source control** uses GitHub from day one. Private repo, issues for tracking work.
 
-**AI prompt engineering** is ongoing from 0.6 onward, but the nature of the work shifts. In the iterative tool-calling architecture, prompt engineering was about teaching the LLM to use tools effectively. In the hybrid architecture, it's about two different things: designing briefings that give the LLM the right information to make strategic decisions, and designing callback criteria descriptions that help the LLM set appropriate triggers. The air unit's decision space (four target types, ferry timing, base defense) is the most complex briefing challenge — invest time in formatting this section clearly. Keep a log of prompt iterations and their effects.
+**AI prompt engineering** is ongoing from 0.6 onward, but the nature of the work shifts. In the iterative tool-calling architecture, prompt engineering was about teaching the LLM to use tools effectively. In the hybrid architecture, it's about two different things: designing briefings that give the LLM the right information to make strategic decisions, and designing callback criteria descriptions that help the LLM set appropriate triggers. The air unit's decision space (four target types, ferry timing, base defense) is the most complex briefing challenge — invest time in formatting this section clearly. Naval transport adds multi-turn planning complexity to the briefing; the AI must reason about embarkation staging, transit vulnerability, and landing timing as a coordinated sequence, not isolated decisions. Keep a log of prompt iterations and their effects.
 
 **Cost and latency monitoring** is a new cross-cutting concern. From 0.6 onward, every AI consultation should log: trigger event, pre-computation time, prompt token count, completion token count, ad-hoc tool calls, total wall-clock time, and estimated cost. This data is essential for tuning the system and is the foundation for the in-game cost display that BYOK players will expect.
 
-**Unit roster iteration** is a cross-cutting design concern from 1.5 onward. The global roster (infantry/armor/naval from 1.4, air added in 1.5) and the theatre roster (designed in 3.3) must both follow the same validation process: start minimal, expand only through playtesting, test LLM comprehension, and ensure asymmetric matchups. Resist the urge to design the theatre roster before Phase 3 — you'll know more about what the game needs after 6+ months of playing the global-level game.
+**Unit roster iteration** is a cross-cutting design concern from 1.5 onward. The global roster (infantry/armor/naval from 1.4, air added in 1.5, naval transport capability added in 1.6) and the theatre roster (designed in 3.3) must both follow the same validation process: start minimal, expand only through playtesting, test LLM comprehension, and ensure asymmetric matchups. Resist the urge to design the theatre roster before Phase 3 — you'll know more about what the game needs after 6+ months of playing the global-level game.
 
 ---
 
@@ -533,14 +593,14 @@ Assuming 2-week milestones at 10–15 hours per week:
 | Phase | Milestones | Calendar Time |
 |-------|-----------|---------------|
 | Phase 0 (continued): Hybrid Validation | 0.6–0.7 | 3–5 weeks |
-| Phase 1: The Real Game | 1.1–1.6 | 10–14 weeks |
+| Phase 1: The Real Game | 1.1–1.7 | 12–16 weeks |
 | Phase 2: Polish and Depth | 2.1–2.6 | 10–14 weeks |
 | Phase 3: Theatre Zoom | 3.1–3.5 | 8–12 weeks |
 | Phase 4: Ship It | 4.1–4.4 | 6–10 weeks |
 
-**Total estimated range from current position: 9–14 months to launch.**
+**Total estimated range from current position: 10–15 months to launch.**
 
-Phase 3 (theatre zoom) remains deferrable to post-launch if the global-level game is strong enough on its own. Without Phase 3, the range compresses to 7–11 months. That's a legitimate shipping strategy — launch the game that works, expand it once it has an audience. The unit relationship question (milestone 3.2) is the highest-risk element in Phase 3 — if it takes longer than two weeks, that's a signal to simplify rather than extend.
+Phase 3 (theatre zoom) remains deferrable to post-launch if the global-level game is strong enough on its own. Without Phase 3, the range compresses to 7–12 months. That's a legitimate shipping strategy — launch the game that works, expand it once it has an audience. The unit relationship question (milestone 3.2) is the highest-risk element in Phase 3 — if it takes longer than two weeks, that's a signal to simplify rather than extend.
 
 **The next critical checkpoint is after Milestone 0.7.** If the hybrid architecture validates, you proceed with confidence that the game can scale to real-world map sizes without prohibitive cost or latency. If it doesn't, you still have a viable game on small maps with the current architecture — the scope of Phase 1's map ambitions adjusts downward, but the game concept remains sound.
 
@@ -571,10 +631,10 @@ These tools continue to exist with unchanged interfaces but are now called by th
 
 | Tool | Pre-Computation Scope | Remains Ad-Hoc? |
 |------|----------------------|-----------------|
-| `assess_unit` | All AI units (including air units — base status, visibility coverage, strike options) | Yes — for assessing enemy units or re-assessing a friendly unit with a different scan radius |
-| `assess_hex` | Contested hexes, objectives, chokepoints, airport/seaport hexes | Yes — for evaluating hexes the AI is considering but weren't pre-scanned |
-| `estimate_combat` | All unit pairs within 2 turns of contact; all air strike options with counter-fire risk | Yes — for what-if scenarios with hypothetical force compositions |
-| `plan_route` | Route updates for all standing march/pursue orders | Yes — for exploring hypothetical new routes |
+| `assess_unit` | All AI units (including air units — base status, visibility coverage, strike options; naval units — transport capacity, cargo status) | Yes — for assessing enemy units or re-assessing a friendly unit with a different scan radius |
+| `assess_hex` | Contested hexes, objectives, chokepoints, airport/seaport hexes, coastal hexes relevant to transport operations | Yes — for evaluating hexes the AI is considering but weren't pre-scanned |
+| `estimate_combat` | All unit pairs within 2 turns of contact; all air strike options with counter-fire risk; transport vulnerability estimates for loaded naval stacks | Yes — for what-if scenarios with hypothetical force compositions |
+| `plan_route` | Route updates for all standing march/pursue orders; transport route estimates for sealift planning | Yes — for exploring hypothetical new routes |
 | `check_distance` | Included in unit assessments | Yes — for quick comparisons during reasoning |
 
 ### Tools That Become Response-JSON-Only (write operations)
@@ -589,6 +649,8 @@ These tools are no longer available as ad-hoc tool calls. Their operations are i
 | `memory_delete` | `memoryUpdates` array with `"action": "delete"` |
 | *(new)* air strike | `orders` array with `"action": "air_strike"` |
 | *(new)* ferry | `orders` array with `"action": "ferry"` |
+| *(new)* transport move | `orders` array with `"action": "transport_move"` |
+| *(new)* disembark | `orders` array with `"action": "disembark"` |
 
 ### Tools That Remain Ad-Hoc Only (read operations)
 
@@ -599,7 +661,7 @@ These tools are no longer available as ad-hoc tool calls. Their operations are i
 
 ### New System: Callback Event Engine
 
-Not a tool the LLM calls, but a new output the LLM produces. The LLM includes callback subscriptions in its response. The engine evaluates them each turn. This replaces the implicit "call me every turn" contract. The `infrastructure_destroyed` event type enables the AI to react to scorched-earth actions even on turns it wasn't consulted.
+Not a tool the LLM calls, but a new output the LLM produces. The LLM includes callback subscriptions in its response. The engine evaluates them each turn. This replaces the implicit "call me every turn" contract. The `infrastructure_destroyed` event type enables the AI to react to scorched-earth actions even on turns it wasn't consulted. The `transport_arrived` event enables the AI to coordinate landing operations with broader strategic timing.
 
 ### Integration Architecture Change
 
