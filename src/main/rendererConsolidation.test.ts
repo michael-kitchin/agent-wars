@@ -277,6 +277,12 @@ function testAirFerryDoubleClickContracts(): void {
   const source = fs.readFileSync(rendererPath, 'utf8');
   const initFn = getFunctionSource(source, 'init');
   const pendingOrdersFn = getFunctionSource(source, 'updatePendingOrdersSidebar');
+  const orderLabelFormattingPath = path.resolve(process.cwd(), 'src', 'renderer', 'orderLabelFormatting.ts');
+  const orderLabelFormattingSource = fs.readFileSync(orderLabelFormattingPath, 'utf8');
+  const formatPendingFerryOrderSidebarLabelFn = getFunctionSource(
+    orderLabelFormattingSource,
+    'formatPendingFerryOrderSidebarLabel'
+  );
 
   assert.ok(
     initFn.includes('const hasAirSelection = selectedAtMouseDown.some((unit) => unit.unitType === \'air\');') &&
@@ -296,6 +302,11 @@ function testAirFerryDoubleClickContracts(): void {
   assert.ok(
     pendingOrdersFn.includes('formatPendingFerryOrderSidebarLabel(gameState, ferry)'),
     'pending ferry sidebar rows should display via the ferry label formatter for Nh parity'
+  );
+  assert.ok(
+    formatPendingFerryOrderSidebarLabelFn.includes('?h (ferry)') &&
+      !formatPendingFerryOrderSidebarLabelFn.includes('destinationH3Index} (ferry)'),
+    'ferry sidebar labels should avoid raw H3 fallback and stay in Nh notation'
   );
   assert.ok(
     source.includes('function drawPendingFerryLines(') &&

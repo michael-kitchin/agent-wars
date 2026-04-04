@@ -3,10 +3,14 @@ const assert = require('assert');
 
 const packageJson = require('../package.json');
 const buildConfig = require('../electron-builder.config.cjs');
+const ciBuildConfig = require('../electron-builder.ci.cjs');
+const { getBuildIdentity } = require('./buildIdentity.cjs');
 
 function testVersionedIdentityContract() {
   const versionText = String(packageJson.version || '0.0.0');
   const versionForId = versionText.replace(/[^0-9A-Za-z.-]/g, '-');
+  const buildIdentity = getBuildIdentity();
+  assert.strictEqual(buildIdentity.versionText, versionText, 'build identity should read package version');
   assert.strictEqual(
     buildConfig.productName,
     `Agent Wars v${versionText}`,
@@ -17,6 +21,8 @@ function testVersionedIdentityContract() {
     `com.agent-wars.app.${versionForId}`,
     'electron-builder appId must include package version for side-by-side installs'
   );
+  assert.strictEqual(ciBuildConfig.productName, buildConfig.productName, 'CI and default builder configs should share product name');
+  assert.strictEqual(ciBuildConfig.appId, buildConfig.appId, 'CI and default builder configs should share app id');
 }
 
 function testGeneratedTerrainResourcesContract() {

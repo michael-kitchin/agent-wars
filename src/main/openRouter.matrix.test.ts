@@ -15,6 +15,8 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import Module = require('module');
+import type { AirStrikeOrder, FerryOrder } from '../shared/ipcTypes';
+import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../shared/tacticalRanges';
 
 type ChatResponse = {
   id?: string;
@@ -101,8 +103,8 @@ async function run(): Promise<void> {
         options: { enabledToolNames: string[]; usePrecomputation: boolean }
       ) => Promise<{
         success: boolean;
-        airStrikes?: { unitId: string; targetH3Index: string; targetType: 'units' | 'urban' | 'airport' | 'seaport' }[];
-        ferryOrders?: { unitId: string; destinationH3Index: string }[];
+        airStrikes?: AirStrikeOrder[];
+        ferryOrders?: FerryOrder[];
       }>;
       getToolNamesForEnabledGroups: (ids: string[]) => string[];
     };
@@ -165,7 +167,9 @@ async function run(): Promise<void> {
       );
       assert.ok(systemPrompt.includes('=== AIR OPERATIONS STATUS ==='), `air-ops status guidance missing for mask=${mask}`);
       assert.ok(
-        systemPrompt.includes('Air rules: strike range 3 from base, ferry range 4 airport-to-airport, one air action per unit per turn.'),
+        systemPrompt.includes(
+          `Air rules: strike range ${AIR_STRIKE_RANGE_HEXES} from base, ferry range ${AIR_FERRY_RANGE_HEXES} airport-to-airport, one air action per unit per turn.`
+        ),
         `air-ops rules guidance missing for mask=${mask}`
       );
       assert.ok(

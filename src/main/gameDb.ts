@@ -23,11 +23,16 @@ import {
 } from './terrainClassificationCache';
 import { pipelineTerrainToPassability } from './terrainPassability';
 import { logDebug, logError, logTrace } from './logger';
-import type { GameStateSnapshot } from '../shared/ipcTypes';
+import type { AirStrikeOrder, FerryOrder, GameStateSnapshot, MovementOrder, RangedAttackOrder } from '../shared/ipcTypes';
 import { computeVisibleHexesForSide } from './visibility';
 import type { BuildUnitType } from './productionRules';
 
 export type { GameStateSnapshot } from '../shared/ipcTypes';
+
+interface AiPendingOrdersExtraPayload {
+  airStrikeOrders: AirStrikeOrder[];
+  ferryOrders: FerryOrder[];
+}
 
 function withFogMetadata(snapshot: GameStateSnapshot, fogOfWarEnabled: boolean): GameStateSnapshot {
   return {
@@ -1930,10 +1935,10 @@ export function clearAiLossEventsSinceConsultation(playerId: string): void {
  * unparsable JSON, or DB closed. Does not clear the row; use clearAiPendingOrders after consumption.
  */
 export function getAiPendingOrders(playerId: string): {
-  movementOrders: { unitId: string; toH3Index: string }[];
-  rangedOrders: { unitId: string; targetH3Index: string }[];
-  airStrikeOrders: { unitId: string; targetH3Index: string; targetType: 'units' | 'urban' | 'airport' | 'seaport' }[];
-  ferryOrders: { unitId: string; destinationH3Index: string }[];
+  movementOrders: MovementOrder[];
+  rangedOrders: RangedAttackOrder[];
+  airStrikeOrders: AirStrikeOrder[];
+  ferryOrders: FerryOrder[];
 } | null {
   logTrace('gameDb getAiPendingOrders', { playerId });
   if (!db) return null;
@@ -1943,8 +1948,8 @@ export function getAiPendingOrders(playerId: string): {
   );
   if (!row) return null;
   try {
-    const movementOrders = JSON.parse(row.movement_orders) as { unitId: string; toH3Index: string }[];
-    const rangedOrders = JSON.parse(row.ranged_orders) as { unitId: string; targetH3Index: string }[];
+    const movementOrders = JSON.parse(row.movement_orders) as MovementOrder[];
+    const rangedOrders = JSON.parse(row.ranged_orders) as RangedAttackOrder[];
     const { airStrikeOrders, ferryOrders } = decodeAiPendingOrdersExtra(row.strategy_text);
     return { movementOrders, rangedOrders, airStrikeOrders, ferryOrders };
   } catch (err) {
@@ -1953,34 +1958,28 @@ export function getAiPendingOrders(playerId: string): {
   }
 }
 
+function coerceAiPendingOrdersExtraPayload(value: unknown): AiPendingOrdersExtraPayload {
+  const payload = value as { airStrikeOrders?: unknown; ferryOrders?: unknown } | null;
+  const airStrikeOrders = Array.isArray(payload?.airStrikeOrders) ? (payload.airStrikeOrders as AirStrikeOrder[]) : [];
+  const ferryOrders = Array.isArray(payload?.ferryOrders) ? (payload.ferryOrders as FerryOrder[]) : [];
+  return { airStrikeOrders, ferryOrders };
+}
+
 function decodeAiPendingOrdersExtra(
   strategyText: string | null
-): {
-  airStrikeOrders: { unitId: string; targetH3Index: string; targetType: 'units' | 'urban' | 'airport' | 'seaport' }[];
-  ferryOrders: { unitId: string; destinationH3Index: string }[];
-} {
+): AiPendingOrdersExtraPayload {
   if (typeof strategyText !== 'string' || strategyText.trim().length === 0) {
     return { airStrikeOrders: [], ferryOrders: [] };
   }
   try {
-    const extra = JSON.parse(strategyText) as {
-      airStrikeOrders?: { unitId: string; targetH3Index: string; targetType: 'units' | 'urban' | 'airport' | 'seaport' }[];
-      ferryOrders?: { unitId: string; destinationH3Index: string }[];
-    };
-    return {
-      airStrikeOrders: Array.isArray(extra.airStrikeOrders) ? extra.airStrikeOrders : [],
-      ferryOrders: Array.isArray(extra.ferryOrders) ? extra.ferryOrders : [],
-    };
+    return coerceAiPendingOrdersExtraPayload(JSON.parse(strategyText));
   } catch (err) {
     logError('gameDb decodeAiPendingOrdersExtra: failed to parse pending-order extra payload', err);
     return { airStrikeOrders: [], ferryOrders: [] };
   }
 }
 
-function encodeAiPendingOrdersExtra(payload: {
-  airStrikeOrders: { unitId: string; targetH3Index: string; targetType: 'units' | 'urban' | 'airport' | 'seaport' }[];
-  ferryOrders: { unitId: string; destinationH3Index: string }[];
-}): string {
+function encodeAiPendingOrdersExtra(payload: AiPendingOrdersExtraPayload): string {
   return JSON.stringify(payload);
 }
 
@@ -1990,10 +1989,10 @@ function encodeAiPendingOrdersExtra(payload: {
  */
 export function setAiPendingOrders(
   playerId: string,
-  movementOrders: { unitId: string; toH3Index: string }[],
-  rangedOrders: { unitId: string; targetH3Index: string }[],
-  airStrikeOrders: { unitId: string; targetH3Index: string; targetType: 'units' | 'urban' | 'airport' | 'seaport' }[] = [],
-  ferryOrders: { unitId: string; destinationH3Index: string }[] = []
+  movementOrders: MovementOrder[],
+  rangedOrders: RangedAttackOrder[],
+  airStrikeOrders: AirStrikeOrder[] = [],
+  ferryOrders: FerryOrder[] = []
 ): void {
   logDebug('gameDb setAiPendingOrders', {
     playerId,

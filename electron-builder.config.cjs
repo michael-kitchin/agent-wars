@@ -1,17 +1,8 @@
-const packageJson = require('./package.json');
+const { buildElectronBuilderConfig } = require('./scripts/electronBuilderBaseConfig.cjs');
 
-const versionText = String(packageJson.version || '0.0.0');
-const versionTag = `v${versionText}`;
-const versionForId = versionText.replace(/[^0-9A-Za-z.-]/g, '-');
-
-module.exports = {
-  appId: `com.agent-wars.app.${versionForId}`,
-  productName: `Agent Wars ${versionTag}`,
-  artifactName: '${productName}-${os}-${arch}.${ext}',
+module.exports = buildElectronBuilderConfig({
   publish: [],
-  directories: {
-    output: 'release',
-  },
+  artifactName: '${productName}-${os}-${arch}.${ext}',
   files: [
     'dist',
     'static',
@@ -34,14 +25,7 @@ module.exports = {
       ],
     },
   ],
-  win: {
-    target: ['zip'],
-  },
-  linux: {
-    target: ['dir'],
-  },
-  mac: {
-    target: ['dir'],
-    category: 'public.app-category.games',
-  },
-};
+  winTarget: ['zip'],
+  linuxTarget: ['dir'],
+  macTarget: ['dir'],
+});

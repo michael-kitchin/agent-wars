@@ -14930,15 +14930,27 @@
   }
 
   // src/renderer/orderLabelFormatting.ts
+  function computeGridDistanceForLabel(originH3, targetH3) {
+    try {
+      return Math.max(0, gridDistance(originH3, targetH3));
+    } catch {
+      for (let radius = 0; radius <= 12; radius++) {
+        try {
+          const ring = gridDisk(originH3, radius);
+          if (ring.includes(targetH3)) return radius;
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    }
+  }
   function formatDistanceLabelForPlannedAttack(state, unitId, targetH3Index) {
     if (!state) return "?h";
     const attacker = state.units.find((u) => u.id === unitId);
     if (!attacker) return "?h";
-    try {
-      return `${Math.max(0, gridDistance(attacker.h3Index, targetH3Index))}h`;
-    } catch {
-      return "?h";
-    }
+    const distance = computeGridDistanceForLabel(attacker.h3Index, targetH3Index);
+    return distance == null ? "?h" : `${distance}h`;
   }
   function formatPendingRangedAttackSidebarLabel(state, order) {
     return formatDistanceLabelForPlannedAttack(state, order.unitId, order.targetH3Index);
@@ -14948,16 +14960,11 @@
     return `${formatDistanceLabelForPlannedAttack(state, order.unitId, order.targetH3Index)} (${targetTypeLabel})`;
   }
   function formatPendingFerryOrderSidebarLabel(state, order) {
-    if (!state) return `${order.destinationH3Index} (ferry)`;
+    if (!state) return "?h (ferry)";
     const unit = state.units.find((u) => u.id === order.unitId);
-    if (!unit) return `${order.destinationH3Index} (ferry)`;
-    let ferryDistance = 0;
-    try {
-      ferryDistance = gridDistance(unit.h3Index, order.destinationH3Index);
-    } catch {
-      return `${order.destinationH3Index} (ferry)`;
-    }
-    return `${Math.max(0, ferryDistance)}h (ferry)`;
+    if (!unit) return "?h (ferry)";
+    const ferryDistance = computeGridDistanceForLabel(unit.h3Index, order.destinationH3Index);
+    return `${ferryDistance == null ? "?" : ferryDistance}h (ferry)`;
   }
 
   // src/renderer/turnUpdateSummary.ts
@@ -18653,13 +18660,31 @@
     const newBtn = document.getElementById("openrouter-new-btn");
     let persistedSelectedModelId = "";
     let lastPersistedApiKeyValue = "";
-    function refreshModels() {
+    let modelRefreshInFlight = false;
+    let startupModelRetryTimer = null;
+    function clearStartupModelRetryTimer() {
+      if (startupModelRetryTimer !== null) {
+        clearTimeout(startupModelRetryTimer);
+        startupModelRetryTimer = null;
+      }
+    }
+    function scheduleStartupModelRetry() {
+      if (startupModelRetryTimer !== null) return;
+      startupModelRetryTimer = setTimeout(() => {
+        startupModelRetryTimer = null;
+        refreshModels(true);
+      }, 2e3);
+    }
+    function refreshModels(retryOnFailure = false) {
+      if (modelRefreshInFlight) return;
+      modelRefreshInFlight = true;
       api.listModels().then((result) => {
         if (!modelSelect) return;
         const kept = modelSelect.value;
         modelSelect.innerHTML = '<option value="">\u2014 Select model \u2014</option>';
         if ("error" in result && result.error) {
           appendOpenRouterLog(`Models: ${result.error}`, true);
+          if (retryOnFailure) scheduleStartupModelRetry();
           void syncOpenRouterRunToggleInteractable();
           return;
         }
@@ -18674,7 +18699,14 @@
         if (targetModelId && Array.from(modelSelect.options).some((o) => o.value === targetModelId)) {
           modelSelect.value = targetModelId;
         }
+        clearStartupModelRetryTimer();
         void syncOpenRouterRunToggleInteractable();
+      }).catch((err) => {
+        appendOpenRouterLog(`Models: ${String(err)}`, true);
+        if (retryOnFailure) scheduleStartupModelRetry();
+        void syncOpenRouterRunToggleInteractable();
+      }).finally(() => {
+        modelRefreshInFlight = false;
       });
     }
     api.getSelectedModel().then((modelId) => {
@@ -18686,13 +18718,14 @@
         modelSelect.appendChild(opt);
         modelSelect.value = modelId;
       }
-      refreshModels();
-    }).catch(() => refreshModels());
+      refreshModels(true);
+    }).catch(() => refreshModels(true));
     if (keyInput) {
       api.getKey().then((keyResult) => {
         if (keyResult?.hasKey && !keyInput.value.trim()) {
           keyInput.placeholder = "Saved API key";
           lastPersistedApiKeyValue = "";
+          refreshModels(true);
         }
       });
       const persistApiKey = () => {
@@ -18707,6 +18740,7 @@
             return;
           }
           keyInput.placeholder = "Saved API key";
+          refreshModels(true);
           void syncOpenRouterRunToggleInteractable();
         });
       };
@@ -18723,7 +18757,7 @@
         void syncOpenRouterRunToggleInteractable();
       });
     }
-    if (refreshBtn) refreshBtn.addEventListener("click", refreshModels);
+    if (refreshBtn) refreshBtn.addEventListener("click", () => refreshModels(false));
     if (newBtn) newBtn.addEventListener("click", openNewGameOverlayFromModelTab);
     const runBtn = document.getElementById("openrouter-run-btn");
     if (runBtn) {

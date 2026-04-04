@@ -36,15 +36,17 @@ import { formatBriefing } from './briefingFormatter';
 import { replaceSubscriptions, getSubscriptions } from './callbackSubscriptions';
 import type { CallbackSubscription } from './callbackSubscriptions';
 import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
-import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../shared/tacticalRanges';
+import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES, MOVEMENT_RANGE_BY_UNIT_TYPE } from '../shared/tacticalRanges';
 import { normalizeProductionOrders } from './productionOrders';
 import { MAX_UNITS_PER_TYPE, getMaxedUnitTypesForPlayer, getPlayerUnitCountsByType } from './productionCaps';
+import { buildFinalJsonContractInstruction } from './openRouterPromptContracts';
 import {
   NAVAL_DESTINATION_MUST_BE_WATER_COASTAL,
   NAVAL_MOVEMENT_PROMPT_RULE,
   NAVAL_PLAN_ROUTE_LAND_TARGET_HINT,
   NAVAL_PLAN_ROUTE_PROMPT_SUFFIX,
 } from './navalMovementMessages';
+import type { AirStrikeOrder, AirStrikeTargetType, FerryOrder } from '../shared/ipcTypes';
 
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -566,7 +568,7 @@ function buildProductionSubmitClause(flags: ToolFlags): string {
 
 function buildHumanUnitsPromptLine(humanRoster: string): string {
   if (humanRoster.length > 0) return `Human units (currently observed): ${humanRoster}`;
-  return 'Human units (currently observed): none. Enemy units may be out of view; scout to reacquire contact.';
+  return 'Human units (currently observed): none. Enemy units may be out of view; actively scout to reacquire contact.';
 }
 
 function buildProductionBriefingBlock(
@@ -681,7 +683,9 @@ function buildAirOperationsBriefingBlock(
 
   const lines: string[] = [];
   lines.push('=== AIR OPERATIONS STATUS ===');
-  lines.push(`Air rules: strike range 3 from base, ferry range 4 airport-to-airport, one air action per unit per turn.`);
+  lines.push(
+    `Air rules: strike range ${AIR_STRIKE_RANGE_HEXES} from base, ferry range ${AIR_FERRY_RANGE_HEXES} airport-to-airport, one air action per unit per turn.`
+  );
   lines.push(`Air units: yours=${opponentAir.length}, enemy=${humanAir.length}.`);
 
   if (opponentAir.length === 0) {
@@ -873,7 +877,17 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
     ? `${briefingOverride}\n\n${airOpsBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}`
     : `${memoryBlock}${standingOrderBlock}${productionBlock}${airOpsBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}${adjacentCellsBlock}`;
 
-  const prompt = `You are the opponent in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}. Your objective is to destroy all human units. Move toward human units to get in ranged or melee range; do not stay passive.${warning}
+  const finalJsonContract = buildFinalJsonContractInstruction({
+    includeMemoryUpdates: flags.memoryEnabled,
+    includeProductionOrders: flags.productionEnabled,
+    movementOrderInstruction,
+    submitMemoryClause,
+    productionSubmitClause: buildProductionSubmitClause(flags),
+  });
+  const scoutingDirective = humanRoster.length === 0
+    ? ' No human units are currently observed: prioritize scouting this turn by moving units along plausible approach routes to reveal enemy positions; do not remain static unless required for immediate defense.'
+    : '';
+  const prompt = `You are the opponent in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}. Your objective is to destroy all human units. Move toward human units to get in ranged or melee range; do not stay passive.${scoutingDirective}${warning}
 
 ${LATLNG_PREAMBLE}
 
@@ -881,7 +895,7 @@ Combat: each unit rolls d6 when attacking (hit if roll <= attack) or when defend
 
 ${mainBlock}
 
-Submit your final JSON only (valid JSON, no comments): { "strategy": "<one-line>", "orders": [ ... ], "airStrikes": [ ... ], "ferryOrders": [ ... ], "callbacks": [...]${flags.memoryEnabled ? ', "memoryUpdates": [...]' : ''}${flags.productionEnabled ? ', "productionOrders": [...]' : ''} }. Strict schema: top-level must be a JSON object with "strategy" (string) and "orders" (array); do not return a top-level array. The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: assign_order (include "order": { "type": "defend"|"march"|"pursue"|"patrol"|"hold_fire", ... } — pursue uses targetUnitId string for the enemy only; march/patrol/defend use [lat,lng] where a place is required), cancel_order, explicit_move (include "destination": [lat,lng] for this turn's move), explicit_attack (include "targetHex": [lat,lng] OR enemy unit id string). Optional top-level air actions: airStrikes[] entries use { "unitId": "...", "targetHex": [lat,lng], "targetType": "units"|"urban"|"airport"|"seaport" }, ferryOrders[] entries use { "unitId": "...", "destination": [lat,lng] }. Do not use top-level movementOrders or rangedAttacks (legacy).${movementOrderInstruction} Include optional "callbacks" for re-consultation planning.${submitMemoryClause} ${buildProductionSubmitClause(flags)}`;
+${finalJsonContract}`;
   return prompt;
 }
 
@@ -889,8 +903,8 @@ export interface RequestOrdersResult {
   success: true;
   orders: { unitId: string; toH3Index: string }[];
   rangedAttacks?: { unitId: string; targetH3Index: string }[];
-  airStrikes?: { unitId: string; targetH3Index: string; targetType: 'units' | 'urban' | 'airport' | 'seaport' }[];
-  ferryOrders?: { unitId: string; destinationH3Index: string }[];
+  airStrikes?: AirStrikeOrder[];
+  ferryOrders?: FerryOrder[];
   strategy?: string;
   dropped?: number;
   dropReasons?: string[];
@@ -1655,8 +1669,8 @@ export async function requestOrders(
       const dropReasons: string[] = [];
       const invalidStandingMovementUnits = new Set<string>();
       const seenUnits = new Set<string>();
-      if (parsed.productionDropReasons?.length) {
-        dropReasons.push(...parsed.productionDropReasons);
+      if (parsed.dropReasons?.length) {
+        dropReasons.push(...parsed.dropReasons);
       }
 
       for (const order of mergedMovement) {
@@ -2114,57 +2128,69 @@ function resolveLatLngToH3(
   return resolveToH3(lat, lng);
 }
 
+function normalizeOrderEntries<T>(
+  entries: unknown,
+  options: {
+    expectedObjectDropReason: string;
+    missingFieldsDropReason: string;
+    normalizeOne: (raw: Record<string, unknown>) => T | null;
+  }
+): { items: T[]; dropReasons: string[] } {
+  const items: T[] = [];
+  const dropReasons: string[] = [];
+  if (!Array.isArray(entries)) return { items, dropReasons };
+  for (const raw of entries) {
+    if (!raw || typeof raw !== 'object') {
+      dropReasons.push(options.expectedObjectDropReason);
+      continue;
+    }
+    const normalized = options.normalizeOne(raw as Record<string, unknown>);
+    if (!normalized) {
+      dropReasons.push(options.missingFieldsDropReason);
+      continue;
+    }
+    items.push(normalized);
+  }
+  return { items, dropReasons };
+}
+
 function normalizeAirStrikeOrders(
   entries: unknown,
   resolveToH3: (lat: number, lng: number) => string | undefined
-): { airStrikes: { unitId: string; targetH3Index: string; targetType: 'units' | 'urban' | 'airport' | 'seaport' }[]; dropReasons: string[] } {
-  const airStrikes: { unitId: string; targetH3Index: string; targetType: 'units' | 'urban' | 'airport' | 'seaport' }[] = [];
-  const dropReasons: string[] = [];
-  if (!Array.isArray(entries)) return { airStrikes, dropReasons };
-  for (const raw of entries) {
-    if (!raw || typeof raw !== 'object') {
-      dropReasons.push('airStrikes entry dropped: expected object.');
-      continue;
-    }
-    const unitId = typeof (raw as { unitId?: unknown }).unitId === 'string' ? (raw as { unitId: string }).unitId.trim() : '';
-    const targetTypeRaw =
-      typeof (raw as { targetType?: unknown }).targetType === 'string'
-        ? (raw as { targetType: string }).targetType.trim().toLowerCase()
-        : '';
-    const targetType = targetTypeRaw === 'units' || targetTypeRaw === 'urban' || targetTypeRaw === 'airport' || targetTypeRaw === 'seaport'
-      ? targetTypeRaw
-      : undefined;
-    const targetH3Index = resolveLatLngToH3((raw as { targetHex?: unknown }).targetHex, resolveToH3);
-    if (!unitId || !targetType || !targetH3Index) {
-      dropReasons.push('airStrikes entry dropped: requires unitId, targetType, and valid targetHex [lat,lng].');
-      continue;
-    }
-    airStrikes.push({ unitId, targetH3Index, targetType });
-  }
-  return { airStrikes, dropReasons };
+): { airStrikes: AirStrikeOrder[]; dropReasons: string[] } {
+  const normalized = normalizeOrderEntries<AirStrikeOrder>(entries, {
+    expectedObjectDropReason: 'airStrikes entry dropped: expected object.',
+    missingFieldsDropReason: 'airStrikes entry dropped: requires unitId, targetType, and valid targetHex [lat,lng].',
+    normalizeOne: (raw) => {
+      const unitId = typeof raw.unitId === 'string' ? raw.unitId.trim() : '';
+      const targetTypeRaw = typeof raw.targetType === 'string' ? raw.targetType.trim().toLowerCase() : '';
+      const targetType: AirStrikeTargetType | undefined =
+        targetTypeRaw === 'units' || targetTypeRaw === 'urban' || targetTypeRaw === 'airport' || targetTypeRaw === 'seaport'
+          ? targetTypeRaw
+          : undefined;
+      const targetH3Index = resolveLatLngToH3(raw.targetHex, resolveToH3);
+      if (!unitId || !targetType || !targetH3Index) return null;
+      return { unitId, targetH3Index, targetType };
+    },
+  });
+  return { airStrikes: normalized.items, dropReasons: normalized.dropReasons };
 }
 
 function normalizeFerryOrders(
   entries: unknown,
   resolveToH3: (lat: number, lng: number) => string | undefined
-): { ferryOrders: { unitId: string; destinationH3Index: string }[]; dropReasons: string[] } {
-  const ferryOrders: { unitId: string; destinationH3Index: string }[] = [];
-  const dropReasons: string[] = [];
-  if (!Array.isArray(entries)) return { ferryOrders, dropReasons };
-  for (const raw of entries) {
-    if (!raw || typeof raw !== 'object') {
-      dropReasons.push('ferryOrders entry dropped: expected object.');
-      continue;
-    }
-    const unitId = typeof (raw as { unitId?: unknown }).unitId === 'string' ? (raw as { unitId: string }).unitId.trim() : '';
-    const destinationH3Index = resolveLatLngToH3((raw as { destination?: unknown }).destination, resolveToH3);
-    if (!unitId || !destinationH3Index) {
-      dropReasons.push('ferryOrders entry dropped: requires unitId and valid destination [lat,lng].');
-      continue;
-    }
-    ferryOrders.push({ unitId, destinationH3Index });
-  }
-  return { ferryOrders, dropReasons };
+): { ferryOrders: FerryOrder[]; dropReasons: string[] } {
+  const normalized = normalizeOrderEntries<FerryOrder>(entries, {
+    expectedObjectDropReason: 'ferryOrders entry dropped: expected object.',
+    missingFieldsDropReason: 'ferryOrders entry dropped: requires unitId and valid destination [lat,lng].',
+    normalizeOne: (raw) => {
+      const unitId = typeof raw.unitId === 'string' ? raw.unitId.trim() : '';
+      const destinationH3Index = resolveLatLngToH3(raw.destination, resolveToH3);
+      if (!unitId || !destinationH3Index) return null;
+      return { unitId, destinationH3Index };
+    },
+  });
+  return { ferryOrders: normalized.items, dropReasons: normalized.dropReasons };
 }
 
 /**
@@ -2268,13 +2294,13 @@ function parseOrdersResponse(
 ): {
   movementOrders: { unitId: string; toH3Index: string }[];
   rangedAttacks: { unitId: string; targetH3Index: string }[];
-  airStrikes: { unitId: string; targetH3Index: string; targetType: 'units' | 'urban' | 'airport' | 'seaport' }[];
-  ferryOrders: { unitId: string; destinationH3Index: string }[];
+  airStrikes: AirStrikeOrder[];
+  ferryOrders: FerryOrder[];
   strategy?: string;
   callbacks?: CallbackSubscription[];
   memoryUpdates?: MemoryUpdateItem[];
   productionAppliedCount?: number;
-  productionDropReasons?: string[];
+  dropReasons?: string[];
 } | null {
   const trimmed = content.trim();
   const candidates: string[] = [];
@@ -2323,6 +2349,11 @@ function parseOrdersResponse(
         const strategy = obj.strategy.trim();
         const callbacks = normalizeCallbacks(obj.callbacks);
         const memoryUpdates = normalizeMemoryUpdates(obj.memoryUpdates);
+        const dropReasons = [
+          ...productionDropReasons,
+          ...normalizedAirStrikes.dropReasons,
+          ...normalizedFerryOrders.dropReasons,
+        ];
         return {
           movementOrders,
           rangedAttacks,
@@ -2332,18 +2363,7 @@ function parseOrdersResponse(
           callbacks: callbacks.length > 0 ? callbacks : undefined,
           memoryUpdates: memoryUpdates.length > 0 ? memoryUpdates : undefined,
           productionAppliedCount: productionAppliedCount > 0 ? productionAppliedCount : undefined,
-          productionDropReasons:
-            [
-              ...productionDropReasons,
-              ...normalizedAirStrikes.dropReasons,
-              ...normalizedFerryOrders.dropReasons,
-            ].length > 0
-              ? [
-                  ...productionDropReasons,
-                  ...normalizedAirStrikes.dropReasons,
-                  ...normalizedFerryOrders.dropReasons,
-                ]
-              : undefined,
+          dropReasons: dropReasons.length > 0 ? dropReasons : undefined,
         };
       }
     } catch {

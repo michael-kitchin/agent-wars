@@ -4596,14 +4596,34 @@ function initOpenRouterUI(): void {
   const newBtn = document.getElementById('openrouter-new-btn');
   let persistedSelectedModelId = '';
   let lastPersistedApiKeyValue = '';
+  let modelRefreshInFlight = false;
+  let startupModelRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
-  function refreshModels(): void {
+  function clearStartupModelRetryTimer(): void {
+    if (startupModelRetryTimer !== null) {
+      clearTimeout(startupModelRetryTimer);
+      startupModelRetryTimer = null;
+    }
+  }
+
+  function scheduleStartupModelRetry(): void {
+    if (startupModelRetryTimer !== null) return;
+    startupModelRetryTimer = setTimeout(() => {
+      startupModelRetryTimer = null;
+      refreshModels(true);
+    }, 2000);
+  }
+
+  function refreshModels(retryOnFailure = false): void {
+    if (modelRefreshInFlight) return;
+    modelRefreshInFlight = true;
     api!.listModels().then((result) => {
       if (!modelSelect) return;
       const kept = modelSelect.value;
       modelSelect.innerHTML = '<option value="">— Select model —</option>';
       if ('error' in result && result.error) {
         appendOpenRouterLog(`Models: ${result.error}`, true);
+        if (retryOnFailure) scheduleStartupModelRetry();
         void syncOpenRouterRunToggleInteractable();
         return;
       }
@@ -4618,7 +4638,14 @@ function initOpenRouterUI(): void {
       if (targetModelId && Array.from(modelSelect.options).some((o) => o.value === targetModelId)) {
         modelSelect.value = targetModelId;
       }
+      clearStartupModelRetryTimer();
       void syncOpenRouterRunToggleInteractable();
+    }).catch((err) => {
+      appendOpenRouterLog(`Models: ${String(err)}`, true);
+      if (retryOnFailure) scheduleStartupModelRetry();
+      void syncOpenRouterRunToggleInteractable();
+    }).finally(() => {
+      modelRefreshInFlight = false;
     });
   }
 
@@ -4631,8 +4658,8 @@ function initOpenRouterUI(): void {
       modelSelect.appendChild(opt);
       modelSelect.value = modelId;
     }
-    refreshModels();
-  }).catch(() => refreshModels());
+    refreshModels(true);
+  }).catch(() => refreshModels(true));
 
   if (keyInput) {
     api!.getKey().then((keyResult) => {
@@ -4640,6 +4667,8 @@ function initOpenRouterUI(): void {
         // Keep the secret hidden while still showing that a key is saved.
         keyInput.placeholder = 'Saved API key';
         lastPersistedApiKeyValue = '';
+        // Saved keys should trigger immediate startup model refresh.
+        refreshModels(true);
       }
     });
     const persistApiKey = (): void => {
@@ -4654,6 +4683,7 @@ function initOpenRouterUI(): void {
           return;
         }
         keyInput.placeholder = 'Saved API key';
+        refreshModels(true);
         void syncOpenRouterRunToggleInteractable();
       });
     };
@@ -4672,7 +4702,7 @@ function initOpenRouterUI(): void {
     });
   }
 
-  if (refreshBtn) refreshBtn.addEventListener('click', refreshModels);
+  if (refreshBtn) refreshBtn.addEventListener('click', () => refreshModels(false));
   if (newBtn) newBtn.addEventListener('click', openNewGameOverlayFromModelTab);
 
   /** Run toggle: on ⇒ switch to Tools tab, clear precomputed, start background request; off ⇒ cancel in-flight, clear precomputed. */

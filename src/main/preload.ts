@@ -18,6 +18,7 @@ import type {
   HexNamingTooltipLineRequest,
   HexContinentNamesRequest,
   BuildUnitType,
+  AirStrikeTargetType,
   HexBuildQueueSnapshot,
   NewGameIpcPayload,
 } from '../shared/ipcTypes';
@@ -55,7 +56,7 @@ const gameApi = {
   validateGroupAirStrikeTarget: (payload: {
     unitIds: string[];
     targetH3Index: string;
-    targetType: 'units' | 'urban' | 'airport' | 'seaport';
+    targetType: AirStrikeTargetType;
   }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke('game:validateGroupAirStrikeTarget', payload),
   validateGroupFerryTarget: (payload: {
     unitIds: string[];

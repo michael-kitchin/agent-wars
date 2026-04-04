@@ -832,13 +832,13 @@ function computeGridDistanceSafe(
   try {
     return gridDistance(originH3Index, destinationH3Index);
   } catch (distanceErr) {
-    logError(`${context}: gridDistance failed`, { originH3Index, destinationH3Index, distanceErr });
+    logTrace(`${context}: gridDistance failed (falling back)`, { originH3Index, destinationH3Index, distanceErr });
   }
   try {
     const path = gridPathCells(originH3Index, destinationH3Index);
     if (path.length > 0) return Math.max(0, path.length - 1);
   } catch (pathErr) {
-    logError(`${context}: gridPathCells failed`, { originH3Index, destinationH3Index, pathErr });
+    logTrace(`${context}: gridPathCells failed (falling back)`, { originH3Index, destinationH3Index, pathErr });
   }
   return null;
 }
@@ -855,6 +855,7 @@ function isWithinGridRangeSafe(
     const disk = gridDisk(originH3Index, maxRange);
     return disk.includes(destinationH3Index);
   } catch (diskErr) {
+    // Terminal failure: both exact-distance methods and range-disk fallback failed.
     logError(`${context}: gridDisk failed`, { originH3Index, destinationH3Index, maxRange, diskErr });
   }
   return false;

@@ -11,6 +11,7 @@ import {
   type RequestAiOrdersResult,
   type ReadyResultMinimal,
 } from './gameIpcHandlers';
+import type { AirStrikeOrder, FerryOrder } from '../shared/ipcTypes';
 
 const minimalPlanningState = {
   hexes: [{ h3Index: '891f1d48b9fffff', terrain: 'land' as const, terrainKind: 'plains' }],
@@ -249,8 +250,8 @@ async function testGameReadyForwardsAiAirStrikeAndFerryOrders(): Promise<void> {
     ready: (
       aiOrders: { unitId: string; toH3Index: string }[],
       aiRangedOrders: { unitId: string; targetH3Index: string }[],
-      aiAirStrikeOrders?: { unitId: string; targetH3Index: string; targetType: 'units' | 'urban' | 'airport' | 'seaport' }[],
-      aiFerryOrders?: { unitId: string; destinationH3Index: string }[]
+      aiAirStrikeOrders?: AirStrikeOrder[],
+      aiFerryOrders?: FerryOrder[]
     ): ReadyResultMinimal & { success: boolean } => {
       assert.strictEqual(aiOrders.length, 0);
       assert.strictEqual(aiRangedOrders.length, 0);
