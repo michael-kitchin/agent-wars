@@ -86,7 +86,7 @@ Instead of being called every turn, the LLM subscribes to events from a finite, 
 - Any AI unit without a standing order exists (newly spawned, order completed, order cancelled by engine)
 - An AI unit's standing order enters a blocked or error state
 - An AI air unit's base airport is destroyed or captured
-- An embarked AI land unit loses its transport (naval unit destroyed while carrying land units on a water hex)
+- An embarked AI land unit's assigned naval unit is destroyed on a water hex (cargo lost at sea)
 - No LLM consultation has occurred for 5 turns (deadman timer)
 
 When no events fire, standing orders execute, the pre-computation layer runs (to update the briefing for the next consultation), and the LLM is not invoked. The AI's per-turn cost drops to zero on quiet turns.
@@ -106,6 +106,7 @@ When consulted, the LLM responds with:
     { "unitId": "...", "action": "air_strike", "targetHex": [...], "targetType": "units" },
     { "unitId": "...", "action": "ferry", "destinationAirport": [...] },
     { "unitId": "...", "action": "build", "unitType": "armor", "productionHex": [...] },
+    { "unitId": "...", "action": "embark", "navalUnitId": "..." },
     { "unitId": "...", "action": "transport_move", "navalUnitId": "...", "destination": [...] },
     { "unitId": "...", "action": "disembark", "destination": [...] }
   ],
@@ -341,34 +342,34 @@ INFRASTRUCTURE STATUS:
 
 **Naval transport mechanics:**
 
-1. **Embarkation.** Land units embark by moving to a coastal hex with a seaport where naval units are present, using their normal movement action. The land units must be co-located with the naval units at the **start** of a turn for the stack to move together — embarkation and sailing cannot occur in the same turn.
+1. **Embarkation.** Land units embark at a coastal hex with a seaport where naval units are present. The player issues an embark order assigning each land unit to a specific naval unit via a per-unit `embarkedOn` field (e.g., `embarkedOn: "naval-2"`). Embarkation and sailing cannot occur in the same turn — the land units must be assigned to ships before the stack can move.
 
-2. **Capacity.** Each naval unit can carry **1 armor or 2 infantry**. The engine validates capacity on entry to a water hex: total land unit "weight" (armor = 2, infantry = 1) must not exceed total naval capacity (2 per naval unit). Orders that would violate capacity are rejected.
+2. **Cargo assignment and UX.** The engine auto-assigns land units to available naval units on embark: armor first (to avoid splitting a heavy unit across ships), then infantry, filling ships in order. The player can reassign cargo via the stack popup — the existing multi-unit stack popup is expanded to show cargo controls when naval units are part of the stack. Symbology: "/" for embarked, "\" for not embarked. The LLM specifies assignments explicitly: `{ "action": "embark", "unitId": "inf-3", "navalUnitId": "naval-2" }`.
 
-3. **Stack movement.** On water hexes, land and naval units move as a mixed stack using the naval unit's movement (2 hexes/turn). The entire stack must be selected and moved together — partial stack movement on water hexes is rejected. Land units in the stack do not consume their own movement action; they are passengers.
+3. **Capacity.** Each naval unit can carry **1 armor or 2 infantry** (capacity 2; armor weight 2, infantry weight 1). Capacity is enforced per naval unit via the cargo assignment. Orders that would violate a ship's capacity are rejected.
 
-4. **Disembarkation.** When a stack reaches any **coastal hex** (no seaport required), land units may disembark. Disembarkation occurs during the ground/naval movement phase — the land units appear on the coastal hex as part of the stack's movement. Land units that disembark cannot move further that turn, but **can participate in melee** (phase 5) if enemies are present. This enables opposed amphibious landings.
+4. **Stack movement.** On water hexes, naval units and their assigned cargo move as a transport stack using the naval unit's movement (2 hexes/turn). The entire stack must be selected and moved together. Splitting a stack on water hexes is permitted only if each sub-stack has sufficient naval capacity for its assigned cargo. Land units in the stack are passengers — they do not consume their own movement action.
 
-5. **Implicit embarked state.** There is no formal "embarked" flag on land units. Co-location of land and naval units on a water hex is the embarked state. The engine enforces capacity constraints at hex boundaries, not through per-unit status tracking.
+5. **Combat restrictions while embarked.** Embarked land units **cannot** use ranged attacks or return counter-fire against air strikes on any hex type. On water hexes, embarked units also cannot participate in melee — they are fully dependent on their naval escorts. On coastal hexes, embarked units **can** participate in melee at their full attack and defense values, enabling amphibious landings. This means armor must disembark before it can use its range-1 attack, creating a natural beachhead phase where the first turn on a contested coast is melee-only.
 
-6. **Vulnerability at sea.** Land units on water hexes **cannot** use melee or ranged attacks. They also **cannot** return counter-fire against air strikes. They are fully dependent on their naval escorts for protection. Land units on coastal hexes (after disembarkation or before embarkation) fight normally.
+6. **Transport loss.** The coastal-vs-water distinction drives transport loss: on **water hexes**, if a naval unit is destroyed, all land units assigned to that specific ship are destroyed (the per-ship assignment makes this deterministic — no random selection). On **coastal hexes**, if a naval unit is destroyed, its assigned cargo is automatically disembarked (assignment cleared, units remain on the hex). This applies uniformly across all combat phases.
 
-7. **Transport loss.** If a naval unit is destroyed on a water hex and the remaining naval capacity is insufficient for the land units present, excess land units are randomly destroyed. Casualty priority does not apply — the loss is random, representing the chaos of a transport sinking.
+7. **Disembarkation.** When a transport stack arrives at a coastal hex, embarked units remain embarked (and can melee if enemies are present). On a subsequent turn, if the player gives the land units independent movement orders, the engine auto-disembarks them (clears the `embarkedOn` assignment) before executing movement. This also handles the "drop off and go" pattern — the player orders land units to march inland and the naval unit to sail away, and both execute in the same movement phase. No seaport is required for disembarkation — land units can land at any coastal hex.
 
 **Turn count examples:**
 
-- **Inland-to-inland (minimum 3 turns):** Turn 1: land units move to a coastal port hex with naval units. Turn 2: the stack sails across water. Turn 3: stack arrives at a coastal hex, land units disembark and move inland.
-- **Port-to-coast amphibious assault (minimum 2 turns):** Turn 1: land units are already at the port with naval units. Turn 2: stack sails to target coastal hex, land units disembark and fight in melee if enemies are present.
+- **Inland-to-inland (minimum 3 turns):** Turn 1: land units move to a coastal port hex with naval units; embark order assigns them. Turn 2: the stack sails across water. Turn 3: stack arrives at a coastal hex; on a subsequent turn the player orders land units inland (auto-disembark triggers).
+- **Port-to-coast amphibious assault (minimum 2 turns):** Turn 1: land units are already at the port with naval units; embark order issued. Turn 2: stack sails to target coastal hex; embarked land units fight in melee if enemies are present, still aboard their ships.
 - **Long-distance sealift:** Multiple turns of sailing at naval move speed (2 hexes/turn). The stack is vulnerable to air strikes and naval engagements throughout.
 
-**AI architecture impact:** The pre-computation layer adds transport-specific data to the briefing: naval units with available capacity, coastal ports accessible for embarkation, estimated transit times to key coastal targets, and current transport stacks at sea with their vulnerability status. The LLM issues transport orders through the response JSON: `{ "action": "transport_move", "navalUnitId": "naval-2", "destination": [...] }` for stack movement and `{ "action": "disembark", "destination": [...] }` for landing.
+**AI architecture impact:** The pre-computation layer adds transport-specific data to the briefing: naval units with available capacity and current cargo assignments, coastal ports accessible for embarkation, estimated transit times to key coastal targets, and current transport stacks at sea with their vulnerability status. The LLM issues transport orders through the response JSON: `{ "action": "embark", "unitId": "inf-3", "navalUnitId": "naval-2" }` for embarkation, `{ "action": "transport_move", "navalUnitId": "naval-2", "destination": [...] }` for stack movement, and `{ "action": "disembark", "unitId": "inf-3", "destination": [...] }` for landing.
 
 The briefing format gains a sealift section:
 
 ```
 NAVAL TRANSPORT:
-| Naval Unit | Position | Capacity | Carrying | Status |
-|------------|----------|----------|----------|--------|
+| Naval Unit | Position | Capacity | Cargo | Status |
+|------------|----------|----------|-------|--------|
 | naval-1 | [8.2,4.3] | 2/2 free | — | at port, available for transport |
 | naval-2 | [-15.3,22.1] | 0/2 free | inf-3, inf-5 | at sea, 2 turns from [target] |
 
@@ -379,16 +380,17 @@ EMBARKATION OPTIONS:
 ⚠ Transport stack naval-2 is in range of enemy air unit at [human-airport]
 ```
 
-**Update the combat rules document** to v2.2 to cover naval transport mechanics, capacity rules, transport loss, and amphibious landing interactions with the melee phase.
+**Update the combat rules document** to v2.2 to cover naval transport mechanics: per-ship cargo assignment, capacity rules, embarked combat restrictions (no ranged on any hex, melee on coastal only), transport loss (fatal on water, incidental on coast), auto-disembark pre-step, and amphibious landing interactions with the melee phase.
 
-**Update the MCP tools spec.** Tool 2 (assess_unit) gains transport-specific fields for naval units: current cargo, available capacity, estimated transit times. Tool 3 (estimate_combat) gains transport vulnerability estimation — combat estimates for naval units should flag when they are carrying land units and note the cascading loss risk.
+**Update the MCP tools spec.** Tool 2 (assess_unit) gains transport-specific fields for naval units: current cargo assignments, available capacity, estimated transit times. Tool 3 (estimate_combat) gains transport vulnerability estimation — combat estimates for naval units should flag when they are carrying land units and distinguish water-hex (fatal) from coastal-hex (incidental) transport loss scenarios.
 
 **Playtest hypothesis:** Naval transport should make global scenarios feel genuinely global — land armies should be able to project force across oceans, but at meaningful cost and risk. Specifically:
 
-- **Sealift should feel like a commitment.** Loading armies onto ships and sailing across open water should create genuine tension — the vulnerability window is real, and losing a loaded transport stack should be devastating.
-- **Amphibious landings should be dramatic.** Sailing a transport stack into a defended coast and fighting in melee on arrival should feel like a high-stakes gamble, not a routine operation.
+- **Sealift should feel like a commitment.** Loading armies onto ships and sailing across open water should create genuine tension — the vulnerability window is real, and losing a loaded transport stack at sea should be devastating (all assigned cargo destroyed).
+- **Amphibious landings should be dramatic.** Sailing a transport stack into a defended coast and fighting in melee on arrival — without ranged support from embarked armor — should feel like a high-stakes gamble, not a routine operation. The beachhead phase (melee-only until disembarkation) creates a natural tension point.
 - **Port denial is a defensive strategy.** Destroying your own seaports to prevent enemy embarkation (using air strikes from milestone 1.5) should emerge as a viable defensive tactic. The AI should reason about port vulnerability and consider preemptive port denial.
 - **The AI plans multi-turn transport operations.** Read the AI's strategy field — is it staging units at ports, planning sealift routes that avoid enemy air coverage, and timing landings to coincide with other offensives? Multi-turn planning is the LLM comprehension test for this mechanic.
+- **Cargo assignment feels natural.** The auto-assign on embark should handle the common case; the stack popup should handle edge cases. Neither should feel tedious.
 
 ### Milestone 1.7 — Game Scenarios and Win Conditions
 
@@ -454,7 +456,7 @@ The possibility of AI betrayal — the LLM deciding that breaking an alliance is
 
 ### Milestone 2.5 — Save/Load and Session Management
 
-**Build:** Full save and load. Since game state is in SQLite, this is largely about serializing the complete database state — including per-player subjective views, pending orders, AI memory, standing orders, active callback subscriptions, infrastructure state (which urban hexes/airports/seaports have been destroyed), transport stack positions, and turn counter — to a save file and restoring it cleanly. Auto-save at the start of each turn. Add turn replay: step through any previous turn's resolution, including the AI's briefing and response for turns where it was consulted.
+**Build:** Full save and load. Since game state is in SQLite, this is largely about serializing the complete database state — including per-player subjective views, pending orders, AI memory, standing orders, active callback subscriptions, infrastructure state (which urban hexes/airports/seaports have been destroyed), cargo assignments (embarkedOn state for all units), and turn counter — to a save file and restoring it cleanly. Auto-save at the start of each turn. Add turn replay: step through any previous turn's resolution, including the AI's briefing and response for turns where it was consulted.
 
 **AI architecture impact:** The callback subscription state must be persisted and restored. On load, the engine must re-evaluate whether any callback conditions are already satisfied in the loaded game state (e.g., if the game was saved mid-crisis, the loaded state might immediately trigger a consultation). AI strategic memory (Tool 4) is already in SQLite and persists naturally.
 
@@ -631,9 +633,9 @@ These tools continue to exist with unchanged interfaces but are now called by th
 
 | Tool | Pre-Computation Scope | Remains Ad-Hoc? |
 |------|----------------------|-----------------|
-| `assess_unit` | All AI units (including air units — base status, visibility coverage, strike options; naval units — transport capacity, cargo status) | Yes — for assessing enemy units or re-assessing a friendly unit with a different scan radius |
+| `assess_unit` | All AI units (including air units — base status, visibility coverage, strike options; naval units — cargo assignments, available capacity) | Yes — for assessing enemy units or re-assessing a friendly unit with a different scan radius |
 | `assess_hex` | Contested hexes, objectives, chokepoints, airport/seaport hexes, coastal hexes relevant to transport operations | Yes — for evaluating hexes the AI is considering but weren't pre-scanned |
-| `estimate_combat` | All unit pairs within 2 turns of contact; all air strike options with counter-fire risk; transport vulnerability estimates for loaded naval stacks | Yes — for what-if scenarios with hypothetical force compositions |
+| `estimate_combat` | All unit pairs within 2 turns of contact; all air strike options with counter-fire risk; transport vulnerability estimates for loaded naval stacks (distinguishing water-hex fatal from coastal-hex incidental loss) | Yes — for what-if scenarios with hypothetical force compositions |
 | `plan_route` | Route updates for all standing march/pursue orders; transport route estimates for sealift planning | Yes — for exploring hypothetical new routes |
 | `check_distance` | Included in unit assessments | Yes — for quick comparisons during reasoning |
 
@@ -649,6 +651,7 @@ These tools are no longer available as ad-hoc tool calls. Their operations are i
 | `memory_delete` | `memoryUpdates` array with `"action": "delete"` |
 | *(new)* air strike | `orders` array with `"action": "air_strike"` |
 | *(new)* ferry | `orders` array with `"action": "ferry"` |
+| *(new)* embark | `orders` array with `"action": "embark"` |
 | *(new)* transport move | `orders` array with `"action": "transport_move"` |
 | *(new)* disembark | `orders` array with `"action": "disembark"` |
 

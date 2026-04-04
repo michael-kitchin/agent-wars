@@ -9,7 +9,7 @@ This document describes combat execution and resolution rules for the game, usin
 2. **Ranged attack capabilities** — §2 (range 0/1/2/3), §7 (summary table): air 3 hexes (strike from base), naval 2 hexes, armor adjacent (1 hex), infantry melee only.
 3. **Zero player interaction / WEGO streamlining** — No confirmations or back-and-forth: resolution order (air strike then ranged then melee), casualty assignment (fixed priority), and attacker/defender ordering (participant IDs assigned at combat start) are all engine-defined. Single resolution phase after movement.
 4. **Infrastructure destruction** — §8 defines permanent destruction of urban hexes, airports, and seaports via air strikes, with target-type-specific counter-fire risk.
-5. **Naval transport** — §9 defines sealift mechanics: embarkation at seaports, stack movement on water, disembarkation at any coastal hex, capacity constraints, and transport loss rules.
+5. **Naval transport** — §9 defines sealift mechanics: embarkation at seaports with per-ship cargo assignment, stack movement on water, disembarkation at any coastal hex, capacity constraints, and transport loss rules (fatal on water, incidental on coast).
 
 ---
 
@@ -36,7 +36,7 @@ Each res1 hex has a **terrain type** that determines which unit domains can ente
 | **Wetlands** | Yes | No | No combat modifiers in initial implementation (see §10). |
 | **Arctic** | Yes | No | No combat modifiers in initial implementation (see §10). |
 | **Coastal** | Yes | Yes | 15–85% land area. Passable by both land and naval units. Required for embarkation (with seaport) and disembarkation (see §9). Enables cross-domain interactions: naval bombardment of land units, armor firing on adjacent naval units. |
-| **Water** | No (unless transported) | Yes | Land units may only be present on water hexes while in a naval transport stack (see §9). |
+| **Water** | No (unless transported) | Yes | Land units may only be present on water hexes while embarked on a naval unit (see §9). |
 
 Terrain combat modifiers (e.g., armor penalty in mountains, infantry defensive bonus in forests) are not implemented in the initial combat system. See §10 for planned extensions.
 
@@ -75,7 +75,7 @@ The game has four unit types. Unit caps are 10 infantry, 5 armor, and 5 naval as
 
   Air strikes that destroy urban hexes (3 res4 hexes per hit) permanently reduce the production rate. Air unit cost (30) is a starting value subject to playtesting.
 
-- **Transport weight and capacity:** Each naval unit has a transport capacity of 2. Infantry has a transport weight of 1; armor has a transport weight of 2. A naval unit can carry 2 infantry, or 1 armor, or 1 infantry (with 1 capacity unused). See §9 for full naval transport rules.
+- **Transport weight and capacity:** Each naval unit has a transport capacity of 2. Infantry has a transport weight of 1; armor has a transport weight of 2. A naval unit can carry 2 infantry, or 1 armor, or 1 infantry (with 1 capacity unused). Embarked state is tracked via a per-unit assignment field (`embarkedOn: "naval-2"`) — see §9.2. See §9 for full naval transport rules.
 
 ---
 
@@ -96,7 +96,7 @@ The game has four unit types. Unit caps are 10 infantry, 5 armor, and 5 naval as
 ### 3.3 Naval
 
 - **Strengths:** Move 2, ranged 2 — can strike enemies up to 2 hexes away (e.g. shore bombardment or sea combat). Attack 2, defense 2. Can transport land units across water (capacity 2; see §9).
-- **Weaknesses:** Restricted to water; cannot enter land hexes. No melee in land hexes; only contributes from water via ranged attack.
+- **Weaknesses:** Restricted to water and coastal hexes; cannot enter non-coastal land hexes. No melee in land hexes; only contributes from water via ranged attack.
 - **Role:** Naval control, coastal bombardment, striking land or sea targets from distance, transporting land units across oceans.
 
 ### 3.4 Air
@@ -112,7 +112,7 @@ The game has four unit types. Unit caps are 10 infantry, 5 armor, and 5 naval as
 - **Naval vs. land:** Naval can use range 2 to hit land units in hexes within 2 of the naval unit (e.g. coastal hexes). Armor in a land hex may attack naval in an adjacent water hex; infantry may not. See §6 (Coastal bombardment).
 - **Air vs. ground/naval:** Air units strike during the air strike phase (before ranged). When targeting units, defending ground/naval units with range ≥ 1 in the target hex may return fire at their attack value — no range-to-base check; the aircraft flies to the target, so defenders are shooting at aircraft overhead. Infantry (range 0) cannot return fire against air strikes. When targeting infrastructure, only the infrastructure's fixed counter-fire roll applies — units in the hex do not participate, regardless of hex occupation status. See §4.1 and §8 for full air strike and infrastructure strike rules.
 - **Ground vs. air (base attack):** Air units do not participate in melee. If an enemy ground unit enters a hex containing an airport with a based air unit, the air unit is destroyed (see §6).
-- **Naval transport:** Land units on water hexes cannot attack or defend — they are passengers. Land units on coastal hexes fight normally. See §9 for full transport rules.
+- **Naval transport:** Embarked land units (see §9) cannot use ranged attacks or return counter-fire on any hex type. On water hexes, embarked units cannot participate in melee either — they are fully dependent on their naval escorts. On coastal hexes, embarked units **can** participate in melee at their full attack and defense values, enabling amphibious landings. See §9 for full transport rules.
 - **Terrain modifiers (optional / future):** Not required for first implementation. Later, armor could suffer a penalty in certain terrain (e.g. forest/mountain); infantry could get a defensive bonus in forest. Left out of the core resolution below for simplicity.
 
 ---
@@ -130,7 +130,7 @@ Using the **current** (pre-movement) positions:
 
 **One action per turn:** An air unit may either strike or ferry in a given turn, never both. An air unit with a ferry order does not participate in the air strike phase.
 
-**Air strikes against transport stacks:** Air strikes on water hexes containing transport stacks (naval units carrying land units) resolve normally against the naval units. Embarked land units on water hexes **cannot** return counter-fire (see §9.4). If a naval unit is destroyed by an air strike and remaining naval capacity is insufficient for embarked land units, excess land units are destroyed per §9.5.
+**Air strikes against hexes with embarked units:** Embarked land units **cannot** return counter-fire against air strikes, regardless of hex type (they cannot use ranged attacks while embarked — see §9.4). Only non-embarked units with range ≥ 1 and naval units return counter-fire. If an air strike destroys a naval unit, apply transport loss rules per §9.5: on water hexes, the assigned cargo is destroyed; on coastal hexes, the assigned cargo is automatically disembarked.
 
 ### 4.2 Ranged phase (pre-move positions)
 
@@ -138,13 +138,17 @@ Using the **current** (pre-movement) positions, after air strike casualties are 
 - Build ranged attacks: for each unit with range ≥ 1 (armor, naval — **not** air, which resolves in §4.1), determine enemy-occupied hexes within range; each (attacker hex, defender hex) is a ranged attack.
 - Resolve all ranged engagements. Apply casualties and remove eliminated units. No melee yet.
 
-**Ranged attacks against transport stacks:** Naval units in a transport stack on water hexes participate normally in ranged combat (attacking and defending). Embarked land units on water hexes **cannot** participate in ranged combat — they cannot attack and cannot return fire (see §9.4). If a naval unit in a transport stack is destroyed during ranged combat, apply transport loss rules per §9.5.
+**Embarked land units cannot participate in ranged combat** — they cannot attack and cannot return fire, regardless of hex type (see §9.4). If a naval unit with assigned cargo is destroyed during ranged combat, apply transport loss rules per §9.5.
 
 ### 4.3 Apply ground and naval movement
 
-Move every ground and naval unit that has a movement order to its destination. This includes transport stack movement — naval units carrying land units move together as a group. Land units disembarking at coastal hexes appear at the coastal hex during this phase. Positions are now final for ground and naval units.
+This phase has two sub-steps:
 
-**Capacity validation:** When a transport stack enters a water hex, the engine validates that total land unit transport weight does not exceed total naval transport capacity. Orders that would violate capacity are rejected before resolution. When a naval unit moves out of a water hex independently (not as part of a stack), the engine validates that remaining naval capacity is sufficient for any land units remaining on the water hex; if not, the order is rejected.
+**Sub-step 4.3a — Auto-disembark.** Before executing movement orders, the engine scans for embarked land units on coastal hexes that have **independent movement orders** (i.e., orders to move to a different hex, not orders to move as part of their transport stack). These units are automatically disembarked: their `embarkedOn` assignment is cleared, and they are no longer cargo. They then execute their movement orders normally in sub-step 4.3b. This enables "drop off and go" in a single turn — the player can order the land units to march inland and the naval unit to sail away, and both execute in the same movement phase.
+
+**Sub-step 4.3b — Execute movement.** Move every ground and naval unit that has a movement order to its destination. This includes transport stack movement — naval units carrying embarked land units move together as a group; embarked units move with their assigned naval unit. Positions are now final for ground and naval units.
+
+**Capacity validation:** When a transport stack enters a water hex, the engine validates that total embarked land unit transport weight does not exceed total naval transport capacity. Orders that would violate capacity are rejected before resolution.
 
 ### 4.4 Ferry movement (post ground/naval movement)
 
@@ -163,7 +167,7 @@ Using the **post-movement** positions (after both ground/naval movement and ferr
 - Build melee combats: each hex that has ground/naval units from two or more sides is one melee engagement. Air units do **not** participate in melee.
 - Resolve all same-hex combats in a deterministic order.
 
-**Amphibious landings:** Land units that disembarked at a coastal hex during phase 4.3 **participate in melee** if enemies are present at that hex. This enables opposed amphibious landings — a transport stack can sail to a defended coast and the land units fight upon arrival. This is intentional: the five-phase sequence (movement in phase 3, melee in phase 5) naturally permits same-turn landing combat.
+**Embarked units in melee:** Embarked land units on **coastal hexes** participate in melee at their full attack and defense values. Embarked land units on **water hexes** do not participate in melee. This enables opposed amphibious landings — a transport stack can sail to a defended coastal hex and the embarked land units fight upon arrival in the melee phase. This is intentional: the five-phase sequence (movement in phase 3, melee in phase 5) naturally permits same-turn landing combat.
 
 ### 4.6 Resolution ordering and determinism
 
@@ -174,9 +178,9 @@ Within each phase, process engagements in a **deterministic order** (e.g. by att
 ### 4.7 One round per phase
 
 For simplicity, use **one round of fire per phase** per combat (or per attack):
-- Air strike phase: each striking air unit rolls once. Counter-fire depends on target type: for unit targets, defending units with range ≥ 1 in the target hex each roll once (attack value); for infrastructure targets, a single fixed counter-fire roll is made (see §8). Hits are applied via automatic casualty rules. Embarked land units on water hexes cannot return counter-fire.
-- Ranged phase: each eligible attacker rolls once per eligible target hex. **Return fire:** defending units that have ranged capability (range ≥ 1) and for which at least one attacking unit's hex is within that defender unit type's range each roll once (**attack** value); those hits are assigned to attacker hexes. Hits are applied via automatic casualty rules. Embarked land units on water hexes cannot participate.
-- Melee phase: same — one round of rolls, then apply hits. Disembarked land units at coastal hexes participate normally.
+- Air strike phase: each striking air unit rolls once. Counter-fire depends on target type: for unit targets, non-embarked defending units with range ≥ 1 in the target hex each roll once (attack value); for infrastructure targets, a single fixed counter-fire roll is made (see §8). Hits are applied via automatic casualty rules. Embarked land units cannot return counter-fire (any hex type).
+- Ranged phase: each eligible non-embarked attacker rolls once per eligible target hex. **Return fire:** non-embarked defending units that have ranged capability (range ≥ 1) and for which at least one attacking unit's hex is within that defender unit type's range each roll once (**attack** value); those hits are assigned to attacker hexes. Hits are applied via automatic casualty rules. Embarked land units cannot participate in ranged combat (any hex type).
+- Melee phase: same — one round of rolls, then apply hits. Embarked land units on coastal hexes participate normally; embarked land units on water hexes do not.
 
 No "continue or retreat" — no player choices. If both sides remain in the same hex after melee, they will fight again in the **next turn's** resolution (no multi-round within the same resolution).
 
@@ -184,13 +188,13 @@ No "continue or retreat" — no player choices. If both sides remain in the same
 
 - **Roll:** One die per unit (d6, result 1–6).
 - **Hit:** For **attack** (including return fire), hit if `roll ≤ attack value`. For **defense** (melee only), hit if `roll ≤ defense value`.
-- **Return fire (ranged phase):** Only defending units with range ≥ 1 may return fire. A defending unit returns fire only if at least one attacker hex is within that unit type's range (H3 grid distance). Each such defender rolls once (attack value); hits are assigned to attacker hexes. Infantry (range 0) does not return fire at range.
+- **Return fire (ranged phase):** Only non-embarked defending units with range ≥ 1 may return fire. A defending unit returns fire only if at least one attacker hex is within that unit type's range (H3 grid distance). Each such defender rolls once (attack value); hits are assigned to attacker hexes. Infantry (range 0) does not return fire at range.
 - **Counter-fire against air (air strike phase):** See §8.1 for unit targets and §8.3 for infrastructure targets. Counter-fire mechanics vary by target type.
 - **Casualty assignment (automatic):** When a side receives N hits, remove N of its units in that combat using a **fixed priority** so no player chooses. Remove units in order of **lowest defense value first** (so high-value units survive when possible). Ties: use unit-type order **infantry → armor → naval → air**. If the combat is ranged and the "defender" is a hex with mixed unit types, apply the same priority to that hex's stack.
 
 ### 4.9 Elimination
 
-When a unit is chosen as a casualty (one hit = one unit removed), it is removed from the map. No capture, no retreat step — just removal. If the eliminated unit is a naval unit carrying land units on a water hex, apply transport loss rules per §9.5.
+When a unit is chosen as a casualty (one hit = one unit removed), it is removed from the map. No capture, no retreat step — just removal. If the eliminated unit is a naval unit with assigned cargo, apply transport loss rules per §9.5: on water hexes, the cargo is destroyed; on coastal hexes, the cargo is automatically disembarked.
 
 This gives a single, predictable resolution pass: air strikes first, then ranged, then movement, then ferry, then melee — one round each, with deterministic casualty assignment.
 
@@ -198,7 +202,7 @@ This gives a single, predictable resolution pass: air strikes first, then ranged
 
 ## 5. Detailed resolution flow (single resolution phase)
 
-High-level flow: **air strikes → ranged at pre-move positions → ground/naval movement → ferry movement → melee at post-move positions**.
+High-level flow: **air strikes → ranged at pre-move positions → auto-disembark → ground/naval movement → ferry movement → melee at post-move positions**.
 
 ```
 1. Set phase to resolution (existing behavior).
@@ -213,41 +217,48 @@ High-level flow: **air strikes → ranged at pre-move positions → ground/naval
       skip.
    b. Determine target type (units, urban hex, airport, seaport).
    c. For unit targets: air unit rolls attack (hit on roll ≤ 3). If hit,
-      assign casualty to target hex using casualty priority. Defending
-      units with range ≥ 1 in the target hex return fire (roll ≤ attack
-      value); no range-to-base check — defenders shoot at aircraft
-      overhead. Any hit destroys the air unit. NOTE: embarked land units
-      on water hexes cannot return counter-fire against air strikes.
+      assign casualty to target hex using casualty priority. Non-embarked
+      defending units with range ≥ 1 in the target hex return fire
+      (roll ≤ attack value); no range-to-base check — defenders shoot
+      at aircraft overhead. Any hit destroys the air unit. NOTE: embarked
+      land units cannot return counter-fire (any hex type).
    d. For infrastructure targets: see §8.3. Air unit rolls attack; on hit,
       infrastructure is destroyed. Infrastructure counter-fire roll
       determines risk to air unit. Units in the hex do not participate in
       counter-fire against infrastructure strikes.
    e. Apply all casualties and infrastructure destruction immediately.
-      If a naval unit on a water hex is destroyed, check transport
-      capacity vs. embarked land units; destroy excess per §9.5.
+      If a naval unit is destroyed:
+      - On a water hex: all land units assigned to it are destroyed.
+      - On a coastal hex: all land units assigned to it are automatically
+        disembarked (embarkedOn cleared, units remain on the hex).
 4. Ranged phase (pre-move positions, post-air-strike casualties):
    Build ranged attacks from declared orders and current positions (armor
    range 1, naval range 2 — air units do not participate, embarked land
-   units on water hexes do not participate). Group by defender hex; process
-   in deterministic order (defender hex H3 index ascending).
+   units do not participate regardless of hex type). Group by defender hex;
+   process in deterministic order (defender hex H3 index ascending).
    For each ranged engagement (one defender hex D, set of attacker hexes):
-   - All units in attacker hexes that have D in range each roll once.
-     Attacker hits = sum of hits (roll ≤ attack).
-   - Return fire: defending units in D with range ≥ 1 roll once (attack
-     value) if an attacker hex is in range. Defender return-fire hits =
-     sum of those hits. Embarked land units on water hexes do not
-     return fire.
+   - All eligible (non-embarked) units in attacker hexes that have D in
+     range each roll once. Attacker hits = sum of hits (roll ≤ attack).
+   - Return fire: non-embarked defending units in D with range ≥ 1 roll
+     once (attack value) if an attacker hex is in range. Defender
+     return-fire hits = sum of those hits.
    - Assign attacker hits to D using casualty priority; remove casualties
-     from DB. If a naval unit on a water hex is destroyed, check transport
-     capacity vs. embarked land units; destroy excess per §9.5.
+     from DB. If a naval unit with cargo is destroyed:
+     - On water: assigned cargo destroyed.
+     - On coast: assigned cargo auto-disembarked.
    - Assign defender return-fire hits to attacker hexes (most units
      remaining, then lowest H3 index); apply casualty priority; remove
      casualties.
-5. Apply ground and naval movement orders: update every ground/naval unit
+5a. Auto-disembark: scan for embarked land units on coastal hexes that have
+   independent movement orders (orders to move to a different hex, not
+   orders to travel with their assigned naval unit). Clear their
+   embarkedOn assignment. These units are now disembarked and will execute
+   their movement orders in step 5b.
+5b. Apply ground and naval movement orders: update every ground/naval unit
    that has an order to its destination hex. This includes transport stack
-   movement (naval + land units moving together on water) and disembarkation
-   (land units leaving a transport stack at a coastal hex). Validate
-   transport capacity constraints before applying movement.
+   movement (naval units + their assigned embarked cargo moving together)
+   and newly disembarked units moving independently. Validate transport
+   capacity constraints before applying movement.
 6. Apply ferry movement orders:
    For each air unit with a ferry order (process in deterministic order by
    origin hex H3 index ascending):
@@ -258,47 +269,48 @@ High-level flow: **air strikes → ranged at pre-move positions → ground/naval
        - No: air unit destroyed.
 7. Get unit positions after all movement. Melee phase (post-move positions):
    Build melee combats: hexes that have ground/naval units from two or more
-   sides. Air units do not participate in melee. Land units that disembarked
-   at a coastal hex in step 5 DO participate in melee. Process hexes in
+   sides. Air units do not participate in melee. Embarked land units on
+   coastal hexes DO participate in melee at full attack/defense values.
+   Embarked land units on water hexes do NOT participate. Process hexes in
    deterministic order (H3 index ascending).
    For each melee hex: order sides by participant ID; resolve one round
    (attacker rolls attack, defender rolls defense); assign hits by casualty
    priority; remove casualties from DB.
+   If a naval unit with cargo is destroyed during melee:
+   - On water: assigned cargo destroyed.
+   - On coast: assigned cargo auto-disembarked.
 8. Post-melee air unit check: for each air unit, verify its base airport hex
    is still owned by the air unit's player. If an enemy unit entered the
-   airport hex during melee (or via movement in step 5), the air unit is
+   airport hex during melee (or via movement in step 5b), the air unit is
    destroyed.
-9. Post-melee transport check: for each water hex, verify naval capacity
-   is sufficient for embarked land units. If a naval unit was destroyed
-   during melee (naval units in water hexes adjacent to contested coastal
-   hexes can participate via ranged, and may take casualties), apply
-   transport loss rules per §9.5.
-10. Game-over check, clear pending orders, advance turn, set phase back to
+9. Game-over check, clear pending orders, advance turn, set phase back to
    planning, save (existing behavior).
 ```
 
-No player input during steps 2–10.
+No player input during steps 2–9.
 
 ---
 
 ## 6. Edge cases and clarifications
 
 - **Stacking:** If multiple friendly units are in one hex, they all defend together in melee. When they attack (ranged or melee), each unit rolls. No stacking limit is assumed unless specified elsewhere.
-- **Ranged vs. same hex:** A unit with range 1 or 2 can still participate in melee if it is in the same hex as the enemy. So armor in a hex with enemy infantry both (a) can be resolved in ranged phase as attacker against **other** hexes, and (b) participates in melee in its own hex. No double-counting: each unit rolls once per phase (e.g. once in ranged for its chosen target or none, once in melee if in a contested hex).
+- **Ranged vs. same hex:** A unit with range 1 or 2 can still participate in melee if it is in the same hex as the enemy. So armor in a hex with enemy infantry both (a) can be resolved in ranged phase as attacker against **other** hexes, and (b) participates in melee in its own hex. No double-counting: each unit rolls once per phase (e.g. once in ranged for its chosen target or none, once in melee if in a contested hex). Note: embarked armor cannot participate in ranged (see §9.4).
 - **Coastal bombardment:** Naval at range 2 can target land units in hexes within 2 (typically coastal). **Rule:** Armor in a land hex may attack naval units in an adjacent water hex (range 1). Infantry (range 0) cannot attack naval.
 - **Multiple attackers on one hex:** When several hexes attack the same defender hex, resolve as one combined engagement (see §5 step 4). Assign defender return-fire hits to attacker hexes one at a time: choose the attacker hex with the most units remaining (ties: lowest H3 index); within that hex apply casualty priority.
 - **Arbitrary number of players:** Participant IDs are assigned once per side at the start of combat; melee with three or more sides in one hex uses the round-robin sub-engagement order. Ranged engagements are unchanged (attacker hexes vs defender hex; a defender hex may contain units from multiple sides; casualty priority applies to the stack).
 - **Line of sight / blocking:** Ranged and air strikes are not blocked by terrain or intervening units. Any enemy-occupied hex within the attacker's range (H3 grid distance ≤ range) is a valid target. Implementations need not model line of sight for the initial combat system.
 - **Reproducibility:** Use a single RNG seed for the entire game so that replay is deterministic (same orders and same seed produce the same outcome). Optional: support a "deterministic" mode (e.g. average or fixed roll) for testing.
-- **Air unit base capture:** If an enemy ground unit enters a hex containing an airport with a based air unit (whether via movement in step 5 or after melee in step 7), the air unit is destroyed during the post-melee check (step 8). The air unit does not fight in melee — it is simply lost. This makes ground defense of airports critical.
+- **Air unit base capture:** If an enemy ground unit enters a hex containing an airport with a based air unit (whether via movement in step 5b or after melee in step 7), the air unit is destroyed during the post-melee check (step 8). The air unit does not fight in melee — it is simply lost. This makes ground defense of airports critical.
 - **Air unit destroyed during air strike phase:** If air unit A strikes air unit B's airport and destroys it, and air unit B has not yet resolved its own strike this phase (higher H3 index), air unit B is destroyed before it can act. Processing order within the air strike phase is consequential.
 - **Multiple air units at same airport:** Multiple air units may be based at the same airport. If the airport is destroyed (by air strike or ground capture), all co-located air units are destroyed.
 - **Ferry to occupied airport:** An air unit may ferry to an airport that already has one or more air units based there. There is no stacking limit for air units at airports.
 - **Self-strikes (scorched earth):** A player may order an air unit to strike their own infrastructure — urban hexes, airports, or seaports in hexes they control. This allows deliberate denial of infrastructure to an advancing enemy. Self-striking an airport with your own air units based there destroys those air units (including potentially the striking unit itself, depending on processing order). Counter-fire rules apply normally; the infrastructure does not distinguish between friendly and enemy strikes. Self-striking a seaport denies it as an embarkation point for enemy sealift operations (see §9).
 - **Multiple strikes on same hex:** Multiple air units may strike the same target hex in the same turn. Each strike resolves independently in processing order. Two strikes targeting urban hexes at the same res1 hex destroy up to 6 res4 urban hexes (3 per hit, capped at remaining). Two strikes on the same airport: the first destroys it (and any based air units); the second finds no airport and resolves as a miss (no valid infrastructure target).
-- **Air unit survival and territorial control:** The post-melee air check (step 8) uses **hex ownership**, not enemy unit presence. If an enemy ground unit enters an airport hex during movement (step 5), territorial control changes immediately per the 1.4 rules — even if that enemy unit is subsequently destroyed in melee (step 7). The airport hex remains under enemy control with no surviving units, and the based air unit is destroyed in step 8. This is intentional: recapturing an airport hex requires a separate ground action on a subsequent turn.
+- **Air unit survival and territorial control:** The post-melee air check (step 8) uses **hex ownership**, not enemy unit presence. If an enemy ground unit enters an airport hex during movement (step 5b), territorial control changes immediately per the 1.4 rules — even if that enemy unit is subsequently destroyed in melee (step 7). The airport hex remains under enemy control with no surviving units, and the based air unit is destroyed in step 8. This is intentional: recapturing an airport hex requires a separate ground action on a subsequent turn.
 - **No interception in transit:** Air units executing a ferry order cannot be attacked or intercepted during transit. They are not considered to "fly over" intermediate hexes — the ferry is an instantaneous relocation from origin airport to destination airport at resolution time. Enemy units along the path have no opportunity to engage. This is a deliberate simplification; air-to-air interception, if ever needed, is a theatre-level mechanic for Phase 3, not a global-level ferry rule.
 - **Visibility model:** Ground units (infantry, armor) see only their own hex. Naval units see only their own hex. Air units see a 3-hex radius around their base airport (§8.2). Air units are the sole source of extended visibility — there is no adjacent-hex vision for ground or naval units. This makes fog of war thick by default and air reconnaissance a critical strategic capability rather than an incremental improvement over existing unit vision. Note that the three air ranges are deliberately distinct: visibility 3, strike 3, ferry 4. Visibility and strike share the same radius; ferry extends further because it targets player-owned airports that don't require reconnaissance to locate.
+- **Simultaneous embark and sail:** A land unit cannot embark and sail in the same turn. The unit must first move to the coastal port hex and be assigned to a naval unit (embark). On the following turn, the naval unit can sail with its assigned cargo. This ensures a minimum 2-turn sequence for the shortest sealift operation (see §9.7).
+- **Conflicting orders on coastal hexes:** If a player gives both the embarked land units and their assigned naval unit independent orders on the same turn at a coastal hex (e.g., orders the infantry to march inland and the naval unit to sail east), the auto-disembark pre-step (§4.3a) clears the land units' assignments before movement executes. Both the land units and the naval unit then move independently. This is a valid "drop off and go" pattern.
 
 ---
 
@@ -306,12 +318,12 @@ No player input during steps 2–10.
 
 | Unit    | Range (hexes) | Can strike |
 |---------|---------------|------------|
-| Infantry| 0             | Same hex only (melee). **Cannot attack while on a water hex (embarked).** |
-| Armor   | 1             | Same hex (melee) or **any adjacent hex** (land or water). **Cannot attack while on a water hex (embarked).** |
+| Infantry| 0             | Same hex only (melee). **Cannot attack while embarked, except melee on coastal hexes.** |
+| Armor   | 1             | Same hex (melee) or **any adjacent hex** (land or water). **Cannot use ranged attack while embarked. Can melee on coastal hexes while embarked.** |
 | Naval   | 2             | Same hex (melee) or **any hex at distance 1 or 2** (land or water). |
 | Air     | 3             | **Any hex within 3 hexes of base airport** (air strike phase only). Can target units or infrastructure. Cannot participate in melee. |
 
-So: **air can strike out to 3 hexes** from base (units or infrastructure). **Naval can strike out to 2 hexes** (units only). **Armor can strike adjacent hexes only** (units only). Infantry is melee-only. Land units on water hexes are passengers and cannot attack or defend.
+So: **air can strike out to 3 hexes** from base (units or infrastructure). **Naval can strike out to 2 hexes** (units only). **Armor can strike adjacent hexes only** (units only; not while embarked). Infantry is melee-only (not while embarked on water). Embarked land units can melee on coastal hexes but never use ranged attacks.
 
 ---
 
@@ -323,12 +335,12 @@ An air unit with a strike order targeting an enemy-occupied hex resolves as foll
 
 1. The air unit rolls d6. Hit if roll ≤ 3 (attack value).
 2. If hit, assign one casualty to the target hex using the standard casualty priority (lowest defense first; ties: infantry → armor → naval → air).
-3. **Counter-fire:** Every defending unit in the target hex with range ≥ 1 rolls d6; hit if roll ≤ that unit's attack value. If any counter-fire roll hits, the air unit is destroyed. There is no range-to-base check — the aircraft flies to the target hex, so defenders are shooting at aircraft overhead, not at a distant airfield.
-   - Armor (range 1, attack 3): returns fire, hitting on 1–3.
+3. **Counter-fire:** Every **non-embarked** defending unit in the target hex with range ≥ 1 rolls d6; hit if roll ≤ that unit's attack value. If any counter-fire roll hits, the air unit is destroyed. There is no range-to-base check — the aircraft flies to the target hex, so defenders are shooting at aircraft overhead, not at a distant airfield.
+   - Armor (range 1, attack 3): returns fire, hitting on 1–3. **Not if embarked.**
    - Naval (range 2, attack 2): returns fire, hitting on 1–2.
    - Infantry (range 0): cannot return fire against air.
    - Air units at the target hex: cannot return fire (air units only act during their own strike order).
-   - **Embarked land units on water hexes: cannot return fire** (see §9.4). Only naval units in the hex return counter-fire.
+   - **Embarked land units: cannot return fire** (see §9.4), regardless of hex type.
 
 **Target selection:** Players order air strikes against "units" as a generic target type. The player does not choose which unit type to hit — the standard casualty priority assigns the hit automatically (lowest defense first; ties: infantry → armor → naval → air).
 
@@ -356,12 +368,12 @@ Destroyed urban hexes, airports, and seaports do not rebuild. This is a delibera
 
 | Target type | Air attack value | Counter-fire source | Counter-fire threshold |
 |-------------|-----------------|---------------------|----------------------|
-| Enemy units | 3 (50%) | Each defending unit with range ≥ 1 in target hex rolls independently (embarked land units on water hexes excluded) | Defender's attack value (no range-to-base check) |
+| Enemy units | 3 (50%) | Each non-embarked defending unit with range ≥ 1 in target hex rolls independently | Defender's attack value (no range-to-base check) |
 | Urban hex | 3 (50%), destroys 3 res4 hexes | Ground defenses (fixed roll, unaffected by hex occupation) | ≤ 1 (17%) |
 | Airport | 3 (50%) | AA defenses (fixed roll, unaffected by hex occupation) | ≤ 2 (33%) |
 | Seaport | 3 (50%) | Seaport defenses (fixed roll, unaffected by hex occupation) | ≤ 1 (17%) |
 
-**Key distinction:** When targeting units, counter-fire comes from the defending units themselves — each eligible unit rolls independently, and any single hit destroys the air unit. When targeting infrastructure, counter-fire comes from the infrastructure's fixed defenses — a single roll at the listed threshold. Units in the hex never participate in infrastructure counter-fire.
+**Key distinction:** When targeting units, counter-fire comes from the defending units themselves — each eligible non-embarked unit rolls independently, and any single hit destroys the air unit. When targeting infrastructure, counter-fire comes from the infrastructure's fixed defenses — a single roll at the listed threshold. Units in the hex never participate in infrastructure counter-fire.
 
 Counter-fire thresholds are starting values. Tune through playtesting — if air is too dominant, increase counter-fire thresholds; if air units die too quickly to be useful, decrease them.
 
@@ -373,67 +385,89 @@ Naval units can transport land units across water hexes, enabling cross-ocean fo
 
 ### 9.1 Embarkation
 
-Land units embark by moving to a hex with **coastal terrain** (see §1.1) that has a **seaport feature** where naval units are present, using their normal movement action. The land units must be co-located with the naval units at the **start of a turn** for the transport stack to move together — embarkation and sailing cannot occur in the same turn.
+Land units embark at a hex with **coastal terrain** (see §1.1) that has a **seaport feature** where naval units are present. The player issues an embark order assigning each land unit to a specific naval unit. The land units must be co-located with the naval units at the **start of a turn** for the transport stack to move together — embarkation and sailing cannot occur in the same turn.
 
 A seaport is required for embarkation. If a seaport is destroyed (by air strike, see §8.3), the hex can no longer serve as an embarkation point. This makes seaport denial — including self-strikes on your own seaports — a viable defensive strategy against enemy sealift.
 
-### 9.2 Capacity
+### 9.2 Cargo assignment
 
-Each naval unit has a transport capacity of **2**. Land units have transport weights: infantry = 1, armor = 2. The engine validates capacity when a transport stack enters a water hex:
+Embarked state is tracked as a **per-unit assignment field**: each embarked land unit stores a reference to its assigned naval unit (e.g., `embarkedOn: "naval-2"`). This establishes which land units are cargo on which ship.
+
+**Human player UX:** When the player embarks land units, the engine auto-assigns them to available naval units: armor first (to avoid splitting a heavy unit across ships), then infantry, filling ships in order. The player can reassign cargo via the stack popup UI — the existing multi-unit stack popup is expanded to show cargo controls when naval units are part of the stack. The symbology uses "/" for embarked and "\" for not embarked.
+
+**LLM player:** The AI specifies assignments explicitly in its orders: `{ "action": "embark", "unitId": "inf-3", "navalUnitId": "naval-2" }`.
+
+The assignment field is cleared when a unit disembarks (see §9.6) or when its assigned naval unit is destroyed on a coastal hex (see §9.5).
+
+### 9.3 Capacity
+
+Each naval unit has a transport capacity of **2**. Land units have transport weights: infantry = 1, armor = 2. Capacity is enforced per naval unit via the cargo assignment:
 
 - 1 naval unit can carry: 2 infantry (weight 2), or 1 armor (weight 2), or 1 infantry (weight 1, with 1 capacity unused).
-- 2 naval units can carry: up to 4 infantry, or 2 armor, or 1 armor + 2 infantry, or other combinations not exceeding total capacity of 4.
+- 2 naval units can carry: up to 4 infantry, or 2 armor, or 1 armor + 2 infantry, or other combinations not exceeding each ship's capacity of 2.
 
-Orders that would violate capacity are rejected before resolution.
-
-### 9.3 Stack movement
-
-On water hexes, land and naval units move as a **mixed stack** using the naval unit's movement speed (2 hexes/turn). The entire stack must be selected and moved together — partial stack movement on water hexes (e.g., moving one naval unit and leaving another with the land units) is permitted only if remaining naval capacity is sufficient for the land units that stay. If a route change occurs on a water hex, the entire stack must be re-selected and moved, or the order is rejected.
-
-Land units in a transport stack do not consume their own movement action — they are passengers. Their movement for the turn is determined entirely by the naval unit's movement.
+Orders that would violate a naval unit's capacity are rejected before resolution.
 
 ### 9.4 Combat restrictions while embarked
 
-Land units on **water hexes** (i.e., being transported at sea):
-- **Cannot** use melee attacks.
-- **Cannot** use ranged attacks.
+Embarked land units — regardless of whether they are on a water hex or a coastal hex:
+- **Cannot** use ranged attacks (including armor's range-1 attack).
 - **Cannot** return counter-fire against air strikes (see §8.1).
-- Are fully dependent on their naval escorts for defense.
 
-Land units on **coastal hexes** (whether pre-embarkation, post-disembarkation, or simply present) fight normally with their full attack, defense, and range capabilities. The combat restriction applies exclusively to water hexes.
+Additionally, embarked land units on **water hexes**:
+- **Cannot** participate in melee.
+- Are fully dependent on their naval escorts for all defense.
+
+Embarked land units on **coastal hexes**:
+- **Can** participate in melee at their full attack and defense values.
+- This enables amphibious landings (see §9.6) and allows embarked units to defend a beachhead while still aboard their ships.
+
+The restriction on ranged attacks while embarked means that armor must disembark before it can use its range-1 attack capability. This creates an extra turn of exposure during amphibious operations where, effectively, the beachhead must be secured through melee before the full force capability is available.
 
 ### 9.5 Transport loss
 
-If a naval unit is destroyed on a water hex (by air strike, ranged combat, or melee with adjacent naval forces) and the remaining naval transport capacity is **insufficient** for the land units present:
+Transport loss rules depend on hex type:
 
-1. Calculate excess: total land unit transport weight minus remaining naval capacity.
-2. **Randomly** destroy land units until the remaining weight fits within capacity. Standard casualty priority does not apply — the destruction is random, representing the chaos of a transport sinking at sea.
+**On water hexes (fatal):** If a naval unit is destroyed on a water hex, **all land units assigned to that specific naval unit are destroyed**. The per-ship cargo assignment determines exactly which units are lost — no random selection needed. If all naval units on a water hex are destroyed, all embarked land units are destroyed. There is no survival at sea without transport.
 
-Example: 2 naval units carrying 3 infantry (weight 3). One naval unit is destroyed, leaving capacity 2. Excess weight = 1. One infantry is randomly destroyed. The remaining 2 infantry continue aboard the surviving naval unit.
+**On coastal hexes (incidental):** If a naval unit is destroyed on a coastal hex, all land units assigned to that naval unit are **automatically disembarked** — their `embarkedOn` assignment is cleared and they remain on the coastal hex as independent units. This reflects the difference between sinking at sea and losing a ship at a shore where troops can reach land.
 
-If **all** naval units on a water hex are destroyed, **all** embarked land units are destroyed — there is no survival at sea without transport.
+This distinction applies uniformly across all resolution phases — air strikes, ranged combat, and melee. The engine checks the hex terrain type when a naval unit is eliminated and applies the appropriate rule.
 
 ### 9.6 Disembarkation
 
-When a transport stack reaches any hex with **coastal terrain** (see §1.1) — no seaport required — land units may disembark. Disembarkation occurs during the ground/naval movement phase (§4.3) — the land units appear on the coastal hex as part of the stack's movement. Land units that disembark cannot move further that turn (the naval unit's movement determines their position for the turn), but they **participate in melee** (phase 5) if enemies are present at the coastal hex.
+Disembarkation can occur in two ways:
 
-This enables **opposed amphibious landings**: a transport stack sails to a defended coastal hex, land units disembark during movement, and the disembarked units fight in melee at the end of the same turn. Amphibious assaults are high-risk — the land units arrive without the opportunity for ranged softening (ranged phase is pre-move), and the attacker must commit to the landing hex before knowing the melee outcome.
+**Automatic disembarkation (during movement phase, §4.3a):** When an embarked land unit on a coastal hex has an independent movement order (i.e., an order to move to a different hex, not an order to travel with its assigned naval unit), the engine automatically clears its `embarkedOn` assignment before executing movement. The unit then moves normally. This also handles the "drop off and go" pattern — the player can order the land units to march inland and the naval unit to sail away, and both execute in the same movement phase.
+
+**Arrival at a coastal hex:** When a transport stack moves from a water hex to a coastal hex during the movement phase (§4.3b), the embarked land units arrive on the coastal hex still embarked. They **participate in melee** (phase 5) if enemies are present, fighting at full attack and defense values while still assigned to their naval unit. They remain embarked until the player explicitly orders them to move independently on a subsequent turn (triggering auto-disembark) or until their naval unit is destroyed on the coastal hex (triggering incidental disembarkation per §9.5).
 
 A seaport is **not** required for disembarkation. Land units can land at any coastal hex. This asymmetry (seaport required to embark, any coast to disembark) enables amphibious operations against coastlines without port infrastructure, while still making seaports strategically valuable as the only embarkation points.
 
 ### 9.7 Turn count examples
 
-- **Inland-to-inland (minimum 3 turns):** Turn 1: land units move to a coastal port hex where naval units are present. Turn 2: the stack sails across water. Turn 3: stack arrives at a coastal hex, land units disembark and move inland.
-- **Port-to-coast amphibious assault (minimum 2 turns):** Turn 1: land units are already co-located with naval units at a seaport. Turn 2: stack sails to the target coastal hex, land units disembark and fight in melee if enemies are present.
+- **Inland-to-inland (minimum 3 turns):** Turn 1: land units move to a coastal port hex where naval units are present; embark order assigns them to ships. Turn 2: the stack sails across water. Turn 3: stack arrives at a coastal hex; on a subsequent turn the player orders land units to move inland (auto-disembark triggers, then movement executes).
+- **Port-to-coast amphibious assault (minimum 2 turns):** Turn 1: land units are already co-located with naval units at a seaport; embark order issued. Turn 2: stack sails to the target coastal hex; embarked land units fight in melee if enemies are present, still aboard their ships.
 - **Long-distance sealift:** Multiple turns of sailing at naval movement speed (2 water hexes/turn). The stack is vulnerable to air strikes and naval engagements throughout the transit.
 
-### 9.8 Strategic implications
+Note: the inland-to-inland example is effectively 3+ turns because the land units need an additional turn to move inland after arriving at the coast. The 3-turn minimum assumes the embark order is issued on the same turn the land units arrive at the port (which is valid — embark is a planning-phase action, not a movement-phase action).
+
+### 9.8 Stack movement
+
+On water hexes, naval units and their assigned embarked land units move as a **transport stack** using the naval unit's movement speed (2 hexes/turn). The entire stack must be selected and moved together. When multiple naval units with cargo are on the same hex, the player moves them as a combined stack; splitting the stack on water hexes is permitted only if each resulting sub-stack has sufficient naval capacity for its assigned cargo.
+
+Land units in a transport stack do not consume their own movement action — they are passengers. Their movement for the turn is determined entirely by the naval unit's movement.
+
+On coastal hexes, naval units and their cargo can move together to water hexes (sailing out) or to other coastal hexes, following the same stack rules. The auto-disembark pre-step (§4.3a) only fires for embarked land units that have independent movement orders — embarked units without orders, or with orders to move as part of their stack, remain embarked.
+
+### 9.9 Strategic implications
 
 Naval transport creates several emergent strategic dynamics:
 
 - **Port denial:** Destroying enemy seaports (via air strikes, §8.3) prevents embarkation, potentially stranding land forces on a continent. Self-striking your own seaports denies them to an advancing enemy.
-- **Escort requirements:** Transport stacks at sea are high-value targets — carrying land units that cannot defend themselves. Escorting transports with additional naval units (providing ranged defense) or timing sealift to avoid enemy air coverage are meaningful decisions.
+- **Escort requirements:** Transport stacks at sea are high-value targets — carrying land units that cannot defend themselves. Escorting transports with additional naval units (providing ranged defense) or timing sealift to avoid enemy air coverage are meaningful decisions. Per-ship cargo assignment means losing one escort ship in a multi-ship convoy destroys exactly the units on that ship.
 - **Amphibious threat:** The ability to land on any coastal hex (not just ports) means defenders must guard their entire coastline, not just port cities. Air reconnaissance (§8.2) becomes critical for detecting incoming transport stacks.
+- **Beachhead dynamics:** Embarked land units can melee on coastal hexes but cannot use ranged attacks until disembarked. This creates a natural beachhead phase: the first turn at a contested coast is melee-only; ranged capability (especially armor's range-1 attack) becomes available only after disembarkation on a subsequent turn. Defenders who survive the initial melee have a window to counterattack before the attacker's full force capability is online.
 - **Force composition trade-offs:** Infantry (weight 1) is twice as transport-efficient as armor (weight 2). An invasion force of infantry is cheaper and more transportable; an armor-heavy invasion requires more naval assets. This creates meaningful force composition decisions for sealift operations.
 
 ---
@@ -451,11 +485,11 @@ Naval transport creates several emergent strategic dynamics:
 ## 11. Summary
 
 - **A&A-style:** One die per unit, hit when roll ≤ attack (when attacking) or ≤ defense (when defending in melee).
-- **Air strikes:** Air units strike first (range 3 from base airport), targeting units or infrastructure. Players choose one of four target types: units, urban hexes, airports, or seaports. When targeting units, counter-fire comes from defending units with range ≥ 1 (no range-to-base check; embarked land units on water hexes excluded). When targeting infrastructure, a fixed counter-fire roll applies regardless of hex occupation. Urban hex strikes destroy 3 res4 hexes per hit. One action per turn: strike or ferry.
+- **Air strikes:** Air units strike first (range 3 from base airport), targeting units or infrastructure. Players choose one of four target types: units, urban hexes, airports, or seaports. When targeting units, counter-fire comes from non-embarked defending units with range ≥ 1 (no range-to-base check). When targeting infrastructure, a fixed counter-fire roll applies regardless of hex occupation. Urban hex strikes destroy 3 res4 hexes per hit. One action per turn: strike or ferry.
 - **Infrastructure destruction:** Urban hexes, airports, and seaports can be permanently destroyed by air strikes. No rebuilding. Infrastructure counter-fire is independent of hex occupation. Seaport destruction denies embarkation for naval transport.
-- **Naval transport:** Naval units carry land units across water (capacity 2 per naval; infantry weight 1, armor weight 2). Embark at seaports, disembark at any coastal hex. Land units cannot fight on water hexes. Transport loss destroys excess land units randomly. Disembarked units participate in same-turn melee, enabling amphibious landings.
-- **Ranged:** Naval 2 hexes, armor 1 hex; infantry melee only. Defenders with range may return fire (attack roll) when attackers are within range.
-- **WEGO-friendly:** Five-phase resolution (air strike → ranged → ground/naval movement → ferry → melee); automatic casualty assignment by fixed priority; no player-to-player interaction or confirmations.
+- **Naval transport:** Naval units carry land units across water (capacity 2 per naval; infantry weight 1, armor weight 2). Per-unit cargo assignment (`embarkedOn`) tracks which units are on which ship. Embark at seaports with cargo assignment, disembark at any coastal hex via auto-disembark on independent movement orders. Embarked units can melee on coastal hexes but cannot use ranged attacks. Transport loss on water hexes destroys assigned cargo; on coastal hexes, cargo is automatically disembarked.
+- **Ranged:** Naval 2 hexes, armor 1 hex (not while embarked); infantry melee only. Defenders with range may return fire (attack roll) when attackers are within range.
+- **WEGO-friendly:** Five-phase resolution (air strike → ranged → auto-disembark + ground/naval movement → ferry → melee); automatic casualty assignment by fixed priority; no player-to-player interaction or confirmations.
 
 This gives a concrete, implementable combat system that matches the current four-unit roster with naval transport capability, and can be extended to a fuller roster in later milestones.
 
@@ -465,12 +499,12 @@ This gives a concrete, implementable combat system that matches the current four
 
 During the resolution phase, the client animates in seven steps so that combat and death overlays stay on the correct units:
 
-1. **Air strike indicators** — Highlight at hexes where air strikes occurred; air units shown at base airports, strike target hexes highlighted. Units drawn at **pre-move** positions. Transport stacks on water hexes render with their embarked land units visible.
-2. **Air strike casualties** — Red X at hexes where air strike casualties occurred (both target casualties and counter-fire losses at base airports). Infrastructure destruction indicators at hexes where urban hexes, airports, or seaports were destroyed. Transport loss indicators at water hexes where embarked land units were destroyed due to naval unit loss.
+1. **Air strike indicators** — Highlight at hexes where air strikes occurred; air units shown at base airports, strike target hexes highlighted. Units drawn at **pre-move** positions. Transport stacks render with their embarked land units visually attached to their assigned naval units.
+2. **Air strike casualties** — Red X at hexes where air strike casualties occurred (both target casualties and counter-fire losses at base airports). Infrastructure destruction indicators at hexes where urban hexes, airports, or seaports were destroyed. On water hexes, transport loss shows embarked units destroyed with their ship. On coastal hexes, transport loss shows embarked units transitioning to disembarked state.
 3. **Ranged lightning** — Yellow lightning at hexes where ranged combat occurred; units drawn at **pre-move** positions (including removed ranged casualties so they remain visible).
-4. **Ranged casualties** — Red X at hexes where ranged units were removed; same pre-move positions. Transport loss indicators if naval units in transport stacks were destroyed.
-5. **Movement** — Ground and naval units interpolate from source to destination hexes. Transport stacks animate as a group — naval and land units moving together on water. Disembarking land units animate from the transport stack to the coastal hex. Air units executing ferry orders appear at their new airport (or show destruction animation if ferry failed and origin was lost).
-6. **Melee lightning** — Yellow lightning at hexes where melee combat occurred; units drawn at **post-move** positions (including removed melee casualties). Amphibious landing melee at coastal hexes should be visually distinctive.
-7. **Melee casualties** — Red X at hexes where melee units were removed; same post-move positions. Air units destroyed by base capture show destruction at their airport hex.
+4. **Ranged casualties** — Red X at hexes where ranged units were removed; same pre-move positions. Transport loss animations as in step 2 (water = destroyed, coast = disembarked).
+5. **Movement** — Ground and naval units interpolate from source to destination hexes. Auto-disembarked units animate separation from their naval unit before moving independently. Transport stacks animate as a group — naval units and their assigned cargo moving together on water. Air units executing ferry orders appear at their new airport (or show destruction animation if ferry failed and origin was lost).
+6. **Melee lightning** — Yellow lightning at hexes where melee combat occurred; units drawn at **post-move** positions (including removed melee casualties). Embarked units fighting on coastal hexes should be visually distinctive from disembarked units.
+7. **Melee casualties** — Red X at hexes where melee units were removed; same post-move positions. Air units destroyed by base capture show destruction at their airport hex. Coastal transport loss (naval unit destroyed in melee) shows cargo transitioning to disembarked.
 
 Air strike overlays appear first and complete before ranged overlays begin. Ranged overlays never "chase" moved units; melee overlays appear only after movement is complete.
