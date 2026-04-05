@@ -41,11 +41,11 @@ function testRedrawAndResizeDelegateToSharedScene(): void {
   const redrawFn = getFunctionSource(source, 'redraw');
 
   assert.ok(
-    resizeFn.includes('drawGameScene(ctx, w, h, gameState);'),
+    resizeFn.includes('drawGameScene(ctx, w, h, S.gameState);'),
     'resizeAndRedraw should delegate to drawGameScene'
   );
   assert.ok(
-    redrawFn.includes('drawGameScene(ctx, w, h, gameState);'),
+    redrawFn.includes('drawGameScene(ctx, w, h, S.gameState);'),
     'redraw should delegate to drawGameScene'
   );
 
@@ -59,7 +59,7 @@ function testSharedSceneStillRendersStaleIntel(): void {
   const drawSceneFn = getFunctionSource(source, 'drawGameScene');
 
   assert.ok(
-    drawSceneFn.includes('drawStaleEnemyIntel(ctx, state);'),
+    drawSceneFn.includes('drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId);'),
     'drawGameScene should render stale enemy intel markers'
   );
 }
@@ -77,11 +77,13 @@ function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void {
     'drawGameScene should use shared committed-path visibility policy helper'
   );
   assert.ok(
-    shouldDrawCommittedOrderPathsFn.includes('return !ctrlKeyActive;'),
+    shouldDrawCommittedOrderPathsFn.includes('return !S.ctrlKeyActive;'),
     'shouldDrawCommittedOrderPaths should hide committed paths while ctrl is held for stack selection'
   );
   assert.ok(
-    drawSceneFn.includes('if (shouldDrawCommittedPaths && !hideCommittedOrderLinesAfterReady && humanStandingOrders.length > 0 && state.units.length)'),
+    drawSceneFn.includes(
+      'if (shouldDrawCommittedPaths && !S.hideCommittedOrderLinesAfterReady && S.humanStandingOrders.length > 0 && state.units.length)'
+    ),
     'drawGameScene should keep committed paths visible once planned when ctrl is not held'
   );
   assert.ok(
@@ -89,7 +91,7 @@ function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void {
     'drawGameScene should use shared hover-preview visibility policy helper'
   );
   assert.ok(
-    shouldDrawHoveredPathPreviewFn.includes('return !ctrlKeyActive && selectedUnitIds.length > 0;'),
+    shouldDrawHoveredPathPreviewFn.includes('return !S.ctrlKeyActive && S.selectedUnitIds.length > 0;'),
     'shouldDrawHoveredPathPreview should gate hover path preview by ctrl and active selection'
   );
   assert.ok(
@@ -103,12 +105,14 @@ function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void {
     'drawGameScene should use helper to compute committed-path exclusions while previewing'
   );
   assert.ok(
-    hiddenDuringPreviewFn.includes('if (!shouldDrawPathPreview || !hoverRoutePreview) return null;') &&
-      hiddenDuringPreviewFn.includes('return new Set(selectedUnitIds);'),
+    hiddenDuringPreviewFn.includes('if (!shouldDrawPathPreview || !S.hoverRoutePreview) return null;') &&
+      hiddenDuringPreviewFn.includes('return new Set(S.selectedUnitIds);'),
     'getCommittedOrderUnitsHiddenDuringPreview should hide committed paths for units being replanned while preview is visible'
   );
   assert.ok(
-    drawSceneFn.includes('drawStandingOrderLines(ctx, humanStandingOrders, state.units, hiddenCommittedUnitIdsWhilePreviewing);'),
+    drawSceneFn.includes(
+      'drawStandingOrderLines(ctx, S.humanStandingOrders, state.units, hiddenCommittedUnitIdsWhilePreviewing);'
+    ),
     'drawGameScene should pass preview exclusion set into committed-path rendering'
   );
   assert.ok(
@@ -116,7 +120,7 @@ function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void {
     'drawGameScene should not suppress committed paths while animation is active'
   );
   assert.ok(
-    !source.includes('hideCommittedOrderLinesAfterReady = true;'),
+    !source.includes('S.hideCommittedOrderLinesAfterReady = true;'),
     'renderer should not force-hide committed paths after ready'
   );
 }
@@ -136,7 +140,7 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
     'drawRes1ProductionOverlays should draw no production labels when res4 hexes are shown'
   );
   assert.ok(
-    drawProductionFn.includes('const overlayContext = buildProductionOverlayContext(gameState);'),
+    drawProductionFn.includes('const overlayContext = buildProductionOverlayContext(S.gameState);'),
     'drawRes1ProductionOverlays should build a shared overlay context once per draw'
   );
   assertMatches(
@@ -146,16 +150,18 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   );
   assert.ok(
     drawProductionFn.includes('!overlayContext.mapInspectionHeld') &&
-      drawProductionFn.includes('isRes1HexHumanUrbanProduction(gameState, hx)'),
+      drawProductionFn.includes('isRes1HexHumanUrbanProduction(S.gameState, hx)'),
     'drawRes1ProductionOverlays should include shared human-urban production eligibility checks'
   );
   assert.ok(
-    drawProductionFn.includes('const canShowLabelWithoutInspection = isRes1HexHumanUrbanProduction(gameState, hx) || controlledByHuman;'),
+    drawProductionFn.includes(
+      'const canShowLabelWithoutInspection = isRes1HexHumanUrbanProduction(S.gameState, hx) || controlledByHuman;'
+    ),
     'drawRes1ProductionOverlays should keep 0c labels visible on explored human-controlled non-urban hexes'
   );
   assert.ok(
     drawProductionFn.includes('const hasClickableBuildEntryForHex =') &&
-      drawProductionFn.includes('isRes1HexHumanUrbanProduction(gameState, hx)'),
+      drawProductionFn.includes('isRes1HexHumanUrbanProduction(S.gameState, hx)'),
     'drawRes1ProductionOverlays should keep build-entry clickability restricted to human urban-production hexes'
   );
   assertMatches(
@@ -166,7 +172,7 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   assert.ok(
     drawProductionFn.includes('const hasClickableBuildEntryForHex =') &&
       drawProductionFn.includes('explored &&') &&
-      drawProductionFn.includes('isRes1HexHumanUrbanProduction(gameState, hx)') &&
+      drawProductionFn.includes('isRes1HexHumanUrbanProduction(S.gameState, hx)') &&
       drawProductionFn.includes('if (hasClickableBuildEntryForHex) {'),
     'drawRes1ProductionOverlays should hide non-clickable label when clickable build entry exists'
   );
@@ -188,7 +194,7 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
     'syncBuildEntryButton should only render clickable buttons for explored hexes'
   );
   assert.ok(
-    syncBuildEntryFn.includes('isRes1HexHumanUrbanProduction(gameState, hx)'),
+    syncBuildEntryFn.includes('isRes1HexHumanUrbanProduction(S.gameState, hx)'),
     'syncBuildEntryButton should use shared human-urban production eligibility'
   );
   assert.ok(
@@ -201,7 +207,7 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   );
   assert.ok(
     drawHoverPreviewFn.includes('if (!shouldDrawHoveredPathPreview()) return;') &&
-      shouldDrawHoveredPathPreviewFn.includes('return !ctrlKeyActive && selectedUnitIds.length > 0;'),
+      shouldDrawHoveredPathPreviewFn.includes('return !S.ctrlKeyActive && S.selectedUnitIds.length > 0;'),
     'drawHoverRoutePreview should use shared policy to suppress path-plan preview while ctrl is held and when nothing is selected'
   );
 }
@@ -214,7 +220,7 @@ function testStackCalloutSingleUnitNonCtrlClosesPopup(): void {
 
   assert.ok(
     showStackCalloutFn.includes('onStackSingleUnitToggleClick(') &&
-      stackSingleUnitHandlerFn.includes('if (!ctrlKeyActive) {') &&
+      stackSingleUnitHandlerFn.includes('if (!S.ctrlKeyActive) {') &&
       stackSingleUnitHandlerFn.includes('hideStackCallout();'),
     'stack single-unit handler should close popup after non-ctrl unit button clicks'
   );
@@ -274,10 +280,12 @@ function testInfrastructureGlyphSetsComeFromRes4Overrides(): void {
 
 function testAirFerryDoubleClickContracts(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const orderDrawingPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'orderDrawing.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
+  const orderDrawingSource = fs.readFileSync(orderDrawingPath, 'utf8');
   const initFn = getFunctionSource(source, 'init');
   const pendingOrdersFn = getFunctionSource(source, 'updatePendingOrdersSidebar');
-  const orderLabelFormattingPath = path.resolve(process.cwd(), 'src', 'renderer', 'orderLabelFormatting.ts');
+  const orderLabelFormattingPath = path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'orderLabelFormatting.ts');
   const orderLabelFormattingSource = fs.readFileSync(orderLabelFormattingPath, 'utf8');
   const formatPendingFerryOrderSidebarLabelFn = getFunctionSource(
     orderLabelFormattingSource,
@@ -296,11 +304,11 @@ function testAirFerryDoubleClickContracts(): void {
     'double-click movement should validate grouped ferry destinations through main-process API and queue ferry orders for air selections'
   );
   assert.ok(
-    source.includes('ferryOrders: pendingFerryOrders,'),
+    source.includes('ferryOrders: S.pendingFerryOrders,'),
     'ready submit payload should include pending ferry orders'
   );
   assert.ok(
-    pendingOrdersFn.includes('formatPendingFerryOrderSidebarLabel(gameState, ferry)'),
+    pendingOrdersFn.includes('formatPendingFerryOrderSidebarLabel(S.gameState, ferry)'),
     'pending ferry sidebar rows should display via the ferry label formatter for Nh parity'
   );
   assert.ok(
@@ -309,20 +317,23 @@ function testAirFerryDoubleClickContracts(): void {
     'ferry sidebar labels should avoid raw H3 fallback and stay in Nh notation'
   );
   assert.ok(
-    source.includes('function drawPendingFerryLines(') &&
-      source.includes('drawPendingFerryLines(ctx, pendingFerryOrders, state.units, hexList);') &&
-      source.includes('drawLineArrow('),
+    source.includes("from './rendering/orderDrawing'") &&
+      source.includes('drawPendingFerryLines(ctx, S.pendingFerryOrders, state.units, hexList, drawLineArrow);') &&
+      orderDrawingSource.includes('function drawPendingFerryLines(') &&
+      orderDrawingSource.includes('drawLineArrow('),
     'pending ferry planning should render filled map arrows like other planned movement'
   );
 }
 
 function testAirStrikeAndAirGlyphContracts(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const rendererConstantsPath = path.resolve(process.cwd(), 'src', 'renderer', 'core', 'constants.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
+  const rendererConstantsSource = fs.readFileSync(rendererConstantsPath, 'utf8');
   const inferUnitTypeLabelFromIdFn = getFunctionSource(source, 'inferUnitTypeLabelFromId');
 
   assert.ok(
-    source.includes("air: 'S'"),
+    rendererConstantsSource.includes("air: 'S'") && source.includes("from './core/constants'"),
     'air unit type label should render as S'
   );
   assert.ok(
@@ -330,20 +341,20 @@ function testAirStrikeAndAirGlyphContracts(): void {
     'unit-id fallback label should map air units to S instead of ?'
   );
   assert.ok(
-    source.includes("from './turnUpdateSummary'") &&
+    source.includes("from './gameplay/turnUpdateSummary'") &&
       source.includes('buildTurnUpdateBullets({') &&
       source.includes('formatKillLine: killToastFormatter.formatKillLine'),
     'ready update bullets should be delegated to shared turn update summary helpers'
   );
   assert.ok(
-    source.includes("btnEl.style.display = airStrikeModeActive ? 'none' : 'inline-block';"),
+    source.includes("btnEl.style.display = S.airStrikeModeActive ? 'none' : 'inline-block';"),
     'Strike button should hide while strike planning mode is active'
   );
   assert.ok(
-    source.includes("from './orderLabelFormatting'") &&
-      source.includes('formatPendingRangedAttackSidebarLabel(gameState, r)') &&
-      source.includes('formatPendingAirStrikeSidebarLabel(gameState, strike)') &&
-      source.includes('formatPendingFerryOrderSidebarLabel(gameState, ferry)'),
+    source.includes("from './gameplay/orderLabelFormatting'") &&
+      source.includes('formatPendingRangedAttackSidebarLabel(S.gameState, r)') &&
+      source.includes('formatPendingAirStrikeSidebarLabel(S.gameState, strike)') &&
+      source.includes('formatPendingFerryOrderSidebarLabel(S.gameState, ferry)'),
     'planned order list labels should use shared order label formatting helpers'
   );
   assert.ok(
@@ -402,7 +413,7 @@ function testKillUpdateTextOmitsPlayerSuffixes(): void {
 function testRes4RubbleTooltipAndTerrainVariantContracts(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const rendererSource = fs.readFileSync(rendererPath, 'utf8');
-  const terrainStylesPath = path.resolve(process.cwd(), 'src', 'renderer', 'terrainVisualStyles.ts');
+  const terrainStylesPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'terrainVisualStyles.ts');
   const terrainStylesSource = fs.readFileSync(terrainStylesPath, 'utf8');
   const drawTerrainHexesFn = getFunctionSource(rendererSource, 'drawTerrainHexes');
   const featureLabelsForRes4ChildFn = getFunctionSource(rendererSource, 'featureLabelsForRes4Child');

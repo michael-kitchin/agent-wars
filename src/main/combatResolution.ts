@@ -10,15 +10,9 @@ import { getAttack, getDefense, getRange, casualtyPriorityIndex } from './combat
 import { createSeededRng } from './seededRng';
 import { logDebug } from './logger';
 import type { RangedAttackOrder } from './gameActions';
+import type { CombatUnit } from './combatUnitTypes';
 
-/** Minimal unit snapshot for resolution (positions are post-movement). */
-export interface CombatUnit {
-  id: string;
-  player: string;
-  unitType: string;
-  h3Index: string;
-  displayOrder?: number;
-}
+export type { CombatUnit } from './combatUnitTypes';
 
 /** Result of resolving one ranged or melee engagement (who was removed). */
 export interface OneEngagementResult {

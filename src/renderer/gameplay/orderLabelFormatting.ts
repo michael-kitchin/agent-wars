@@ -4,7 +4,7 @@ import type {
   FerryOrder,
   GameStateSnapshot,
   RangedAttackOrder,
-} from '../shared/ipcTypes';
+} from '../../shared/ipcTypes';
 
 function computeGridDistanceForLabel(originH3: string, targetH3: string): number | null {
   try {

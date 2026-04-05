@@ -2,8 +2,8 @@
  * Canvas fill (and optional hatch) per pipeline terrain_kind. Ocean vs land legibility is the priority.
  */
 
-import type { PipelineTerrainKind } from '../shared/pipelineTerrain';
-import { PIPELINE_TERRAIN_KINDS } from '../shared/pipelineTerrain';
+import type { PipelineTerrainKind } from '../../shared/pipelineTerrain';
+import { PIPELINE_TERRAIN_KINDS } from '../../shared/pipelineTerrain';
 
 const patternCache = new Map<string, CanvasPattern | null>();
 const UNKNOWN_FILL = 'rgba(140, 140, 140, 0.075)';

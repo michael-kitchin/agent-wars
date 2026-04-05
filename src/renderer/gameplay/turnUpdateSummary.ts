@@ -1,4 +1,4 @@
-import type { BuildUnitType, ReadyResult } from '../shared/ipcTypes';
+import type { BuildUnitType, ReadyResult } from '../../shared/ipcTypes';
 
 type Kill = { victimId: string; killerIds: string[] };
 

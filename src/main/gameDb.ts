@@ -9,8 +9,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { app, dialog } from 'electron';
 import Database from 'better-sqlite3';
-import { cellToLatLng } from 'h3-js';
-import { getOrderedHexList, getWorldUnitCounts, LATLNG_DECIMAL_PLACES } from './mapData';
+import { getOrderedHexList } from './mapData';
 import {
   assertTerrainMetadataMatchesHexList,
 } from './terrainMetadataLoad';
@@ -24,22 +23,60 @@ import {
 import { pipelineTerrainToPassability } from './terrainPassability';
 import { logDebug, logError, logTrace } from './logger';
 import type { AirStrikeOrder, FerryOrder, GameStateSnapshot, MovementOrder, RangedAttackOrder } from '../shared/ipcTypes';
-import { computeVisibleHexesForSide } from './visibility';
 import type { BuildUnitType } from './productionRules';
+import { seedUnits as seedUnitsFromModule } from './game-db/seeding/seedUnits';
+import {
+  recoverCorruptDatabaseUi as recoverCorruptDatabaseUiWithFs,
+  silentRecoverCorruptDatabase as silentRecoverCorruptDatabaseWithFs,
+} from './game-db/recovery/corruptRecovery';
+import { getFullDdl } from './game-db/schema';
+import {
+  clearBuildQueueAndProgressForHex as clearBuildQueueAndProgressForHexFromModule,
+  getBuildProgressPointsForHex as getBuildProgressPointsForHexFromModule,
+  getHexController as getHexControllerFromModule,
+  getRes1InfrastructureForHex as getRes1InfrastructureForHexFromModule,
+  getRes4TerrainOverridesForRendererFromGame as getRes4TerrainOverridesForRendererFromGameFromModule,
+  listAllHexControls as listAllHexControlsFromModule,
+  listBuildQueueRowsForHex as listBuildQueueRowsForHexFromModule,
+  listRes1InfrastructureRows as listRes1InfrastructureRowsFromModule,
+  listRes4FeatureOverridesForGame as listRes4FeatureOverridesForGameFromModule,
+  replaceBuildQueueForHex as replaceBuildQueueForHexFromModule,
+  setBuildProgressPointsForHex as setBuildProgressPointsForHexFromModule,
+  setHexController as setHexControllerFromModule,
+  setRes1InfrastructureForHex as setRes1InfrastructureForHexFromModule,
+  updateRes4FeatureOverrideRow as updateRes4FeatureOverrideRowFromModule,
+  type BuildQueueRow,
+  type HexControlRow,
+  type Res1InfrastructureRow,
+  type Res4FeatureOverrideRow,
+} from './game-db/controlInfrastructure';
+import {
+  addAiLossEventsSinceConsultation as addAiLossEventsSinceConsultationFromModule,
+  addOpponentCombatParticipants as addOpponentCombatParticipantsFromModule,
+  clearAiLossEventsSinceConsultation as clearAiLossEventsSinceConsultationFromModule,
+  clearAiPendingOrders as clearAiPendingOrdersFromModule,
+  clearOpponentCombatSinceConsultation as clearOpponentCombatSinceConsultationFromModule,
+  getAiLastConsultationTurn as getAiLastConsultationTurnFromModule,
+  getAiLossEventsSinceConsultation as getAiLossEventsSinceConsultationFromModule,
+  getAiPendingOrders as getAiPendingOrdersFromModule,
+  getAndClearAiToolLimitExceededLastTurn as getAndClearAiToolLimitExceededLastTurnFromModule,
+  getOpponentUnitsInCombatSinceConsultation as getOpponentUnitsInCombatSinceConsultationFromModule,
+  setAiLastConsultationTurn as setAiLastConsultationTurnFromModule,
+  setAiPendingOrders as setAiPendingOrdersFromModule,
+  setAiToolLimitExceededLastTurn as setAiToolLimitExceededLastTurnFromModule,
+  type AiLossEventSinceConsultation,
+} from './game-db/aiState';
+import {
+  consumeFogNewContactsForPlayer as consumeFogNewContactsForPlayerFromModule,
+  getGameStateSnapshot as getGameStateSnapshotFromModule,
+  getGameStateForPlayer as getGameStateForPlayerFromModule,
+  refreshFogOfWarIntelFromCurrentState as refreshFogOfWarIntelFromCurrentStateFromModule,
+} from './game-db/fogState';
+import { resetGameForNewMatch as resetGameForNewMatchFromModule } from './game-db/resetGame';
 
 export type { GameStateSnapshot } from '../shared/ipcTypes';
-
-interface AiPendingOrdersExtraPayload {
-  airStrikeOrders: AirStrikeOrder[];
-  ferryOrders: FerryOrder[];
-}
-
-function withFogMetadata(snapshot: GameStateSnapshot, fogOfWarEnabled: boolean): GameStateSnapshot {
-  return {
-    ...snapshot,
-    fogOfWarEnabled,
-  };
-}
+export type { AiLossEventSinceConsultation } from './game-db/aiState';
+export type { BuildQueueRow, HexControlRow, Res1InfrastructureRow, Res4FeatureOverrideRow } from './game-db/controlInfrastructure';
 
 /** Baseline schema version; bump when a future milestone adds migration chains. */
 export const EXPECTED_USER_VERSION = 10;
@@ -84,169 +121,6 @@ export function applyGameDbPragmas(database: InstanceType<typeof Database>): voi
   database.pragma('foreign_keys = ON');
   database.pragma('defer_foreign_keys = ON');
   database.pragma('synchronous = OFF');
-}
-
-function getFullDdl(): string {
-  return `
-    CREATE TABLE IF NOT EXISTS hexes (
-      h3_index TEXT PRIMARY KEY,
-      terrain TEXT NOT NULL CHECK (terrain IN ('land', 'water', 'coastal', 'wetlands')),
-      terrain_kind TEXT NOT NULL CHECK (terrain_kind IN ('water', 'coastal', 'wetlands', 'plains', 'forest', 'mountain', 'desert', 'arctic'))
-    );
-
-    CREATE TABLE IF NOT EXISTS units (
-      id TEXT PRIMARY KEY,
-      player TEXT NOT NULL,
-      unit_type TEXT NOT NULL CHECK (unit_type IN ('infantry', 'armor', 'naval', 'air')),
-      display_order INTEGER,
-      h3_index TEXT NOT NULL,
-      FOREIGN KEY (h3_index) REFERENCES hexes(h3_index)
-    );
-
-    CREATE TABLE IF NOT EXISTS turn_state (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      phase TEXT NOT NULL CHECK (phase IN ('planning', 'resolution')),
-      turn_number INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS pending_orders (
-      unit_id TEXT NOT NULL,
-      to_h3_index TEXT NOT NULL,
-      PRIMARY KEY (unit_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS pending_ranged_orders (
-      unit_id TEXT PRIMARY KEY,
-      target_h3_index TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS pending_air_orders (
-      unit_id TEXT PRIMARY KEY,
-      target_h3_index TEXT NOT NULL,
-      target_type TEXT NOT NULL CHECK (target_type IN ('units', 'urban', 'airport', 'seaport'))
-    );
-
-    CREATE TABLE IF NOT EXISTS pending_ferry_orders (
-      unit_id TEXT PRIMARY KEY,
-      destination_h3_index TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS game_config (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS ai_memory (
-      player_id TEXT NOT NULL,
-      key TEXT NOT NULL,
-      content TEXT NOT NULL,
-      tier TEXT NOT NULL DEFAULT 'stored',
-      created_turn INTEGER NOT NULL,
-      expires_turn INTEGER,
-      recurring_interval INTEGER,
-      next_trigger_turn INTEGER,
-      last_triggered_turn INTEGER,
-      tags TEXT NOT NULL DEFAULT '[]',
-      PRIMARY KEY (player_id, key)
-    );
-
-    CREATE TABLE IF NOT EXISTS standing_orders (
-      player_id TEXT NOT NULL,
-      unit_id TEXT NOT NULL,
-      order_type TEXT NOT NULL,
-      params TEXT NOT NULL,
-      computed_route TEXT,
-      status TEXT NOT NULL,
-      created_turn INTEGER NOT NULL,
-      origin_hex TEXT NOT NULL,
-      PRIMARY KEY (player_id, unit_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS ai_callback_subscriptions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      player_id TEXT NOT NULL,
-      event_type TEXT NOT NULL,
-      params TEXT NOT NULL,
-      subscribed_turn INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS ai_pending_orders (
-      player_id TEXT PRIMARY KEY,
-      movement_orders TEXT NOT NULL,
-      ranged_orders TEXT NOT NULL,
-      strategy_text TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS ai_combat_since_consultation (
-      player_id TEXT NOT NULL,
-      unit_id TEXT NOT NULL,
-      PRIMARY KEY (player_id, unit_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS ai_loss_events_since_consultation (
-      player_id TEXT NOT NULL,
-      turn_number INTEGER NOT NULL,
-      victim_unit_id TEXT NOT NULL,
-      victim_player TEXT NOT NULL,
-      cause TEXT NOT NULL,
-      killer_ids_json TEXT NOT NULL,
-      PRIMARY KEY (player_id, turn_number, victim_unit_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS player_hex_intel (
-      player_id TEXT NOT NULL,
-      h3_index TEXT NOT NULL,
-      seen_state TEXT NOT NULL CHECK (seen_state IN ('visible', 'stale', 'unexplored')),
-      last_seen_turn INTEGER,
-      PRIMARY KEY (player_id, h3_index)
-    );
-
-    CREATE TABLE IF NOT EXISTS player_unit_intel (
-      player_id TEXT NOT NULL,
-      enemy_unit_id TEXT NOT NULL,
-      last_known_h3_index TEXT NOT NULL,
-      intel_state TEXT NOT NULL CHECK (intel_state IN ('current', 'stale')),
-      last_seen_turn INTEGER NOT NULL,
-      stale_until_turn INTEGER,
-      PRIMARY KEY (player_id, enemy_unit_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS res1_control (
-      h3_index TEXT PRIMARY KEY,
-      controller_player_id TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS res1_build_queue (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      h3_index TEXT NOT NULL,
-      queue_index INTEGER NOT NULL,
-      unit_type TEXT NOT NULL CHECK (unit_type IN ('infantry', 'armor', 'naval', 'air')),
-      remaining_count INTEGER NOT NULL CHECK (remaining_count > 0),
-      UNIQUE (h3_index, queue_index)
-    );
-
-    CREATE TABLE IF NOT EXISTS res1_build_progress (
-      h3_index TEXT PRIMARY KEY,
-      stored_points INTEGER NOT NULL DEFAULT 0
-    );
-
-    CREATE TABLE IF NOT EXISTS res1_infrastructure (
-      h3_index TEXT PRIMARY KEY,
-      urban_hex_count INTEGER NOT NULL DEFAULT 0,
-      airport_count INTEGER NOT NULL DEFAULT 0,
-      seaport_count INTEGER NOT NULL DEFAULT 0
-    );
-
-    CREATE TABLE IF NOT EXISTS res4_feature_overrides (
-      h3_index TEXT PRIMARY KEY,
-      parent_h3_index TEXT NOT NULL,
-      terrain_kind TEXT NOT NULL,
-      is_urban INTEGER NOT NULL DEFAULT 0,
-      is_airport INTEGER NOT NULL DEFAULT 0,
-      is_seaport INTEGER NOT NULL DEFAULT 0,
-      is_rubble INTEGER NOT NULL DEFAULT 0
-    );
-  `;
 }
 
 /**
@@ -383,89 +257,7 @@ export function closeGameDatabaseForTests(): void {
 }
 
 function silentRecoverCorruptDatabase(canonicalPath: string): void {
-  const renamed = tryRenameCorruptSet(canonicalPath);
-  if (!renamed) {
-    const deleted = tryDeleteCanonicalAndSidecars(canonicalPath);
-    if (!deleted) {
-      throw new Error('gameDb silentRecoverCorruptDatabase: could not rename or delete corrupt database');
-    }
-  }
-  createFreshGameDatabaseAt(canonicalPath);
-}
-
-function isoTimestampForFilename(): string {
-  return new Date().toISOString().replace(/:/g, '-');
-}
-
-function tryRenameCorruptSet(canonicalPath: string): boolean {
-  const parsed = path.parse(canonicalPath);
-  const backupMain = path.join(parsed.dir, `${parsed.name}.corrupt.${isoTimestampForFilename()}${parsed.ext}`);
-  const oldWal = `${canonicalPath}-wal`;
-  const oldShm = `${canonicalPath}-shm`;
-  const newWal = `${backupMain}-wal`;
-  const newShm = `${backupMain}-shm`;
-  try {
-    fs.renameSync(canonicalPath, backupMain);
-    if (fs.existsSync(oldWal)) fs.renameSync(oldWal, newWal);
-    if (fs.existsSync(oldShm)) fs.renameSync(oldShm, newShm);
-    logDebug('gameDb tryRenameCorruptSet: success', { backupMain });
-    return true;
-  } catch (err) {
-    logError('gameDb tryRenameCorruptSet: failed', err);
-    return false;
-  }
-}
-
-function tryDeleteCanonicalAndSidecars(canonicalPath: string): boolean {
-  const paths = [`${canonicalPath}-wal`, `${canonicalPath}-shm`, canonicalPath];
-  try {
-    for (const p of paths) {
-      if (fs.existsSync(p)) fs.unlinkSync(p);
-    }
-    logDebug('gameDb tryDeleteCanonicalAndSidecars: success');
-    return true;
-  } catch (err) {
-    logError('gameDb tryDeleteCanonicalAndSidecars: failed', err);
-    return false;
-  }
-}
-
-function recoverCorruptDatabaseUi(canonicalPath: string, cause: unknown): void {
-  closeDbHandle();
-  dialog.showErrorBox(
-    'Database problem',
-    'The game database file is invalid or incompatible with this version of Agent Wars.\n\n' +
-      'The app will try to rename the existing file (one attempt) and create a new empty database.\n' +
-      'After that, use New game from the menu to start playing.'
-  );
-  logError('gameDb recoverCorruptDatabaseUi: starting recovery', cause);
-
-  const renamed = tryRenameCorruptSet(canonicalPath);
-  if (!renamed) {
-    logError('gameDb recoverCorruptDatabaseUi: rename failed, attempting delete', cause);
-    const deleted = tryDeleteCanonicalAndSidecars(canonicalPath);
-    if (!deleted) {
-      logError('gameDb recoverCorruptDatabaseUi: delete failed, exiting', cause);
-      dialog.showErrorBox(
-        'Database recovery failed',
-        'The game could not rename or remove the damaged database file.\n\n' +
-          'Please remove or move the database file manually (and any .sqlite-wal / .sqlite-shm files next to it), then restart the application.'
-      );
-      app.exit(1);
-      return;
-    }
-    logDebug('gameDb recoverCorruptDatabaseUi: path cleared after failed rename');
-  } else {
-    logDebug('gameDb recoverCorruptDatabaseUi: corrupt file renamed; creating fresh DB');
-  }
-
-  try {
-    createFreshGameDatabaseAt(canonicalPath);
-  } catch (err) {
-    logError('gameDb recoverCorruptDatabaseUi: createFreshGameDatabaseAt failed', err);
-    dialog.showErrorBox('Database error', 'Could not create a new game database. See logs for details.');
-    app.exit(1);
-  }
+  return silentRecoverCorruptDatabaseWithFs(canonicalPath, createFreshGameDatabaseAt);
 }
 
 /**
@@ -504,7 +296,10 @@ export async function initDatabase(): Promise<void> {
       }
     }
     logError('gameDb initDatabase: validation/open failed', err);
-    recoverCorruptDatabaseUi(canonicalPath, err);
+    recoverCorruptDatabaseUiWithFs(canonicalPath, err, {
+      closeDbHandle,
+      createFreshDatabaseAt: createFreshGameDatabaseAt,
+    });
   }
 
   // Keep terrain metadata failures distinct from DB recovery.
@@ -674,206 +469,13 @@ function insertRes4FeatureOverrideSeedRow(row: ReturnType<typeof getRes4FeatureR
   );
 }
 
-interface SpawnCandidate {
-  h3: string;
-  lat: number;
-  lng: number;
-  terrain: string;
-}
-
-function lngDistanceDegrees(a: number, b: number): number {
-  const d = Math.abs(a - b);
-  return d > 180 ? 360 - d : d;
-}
-
-function squaredGeoDistance(aLat: number, aLng: number, bLat: number, bLng: number): number {
-  const dLat = aLat - bLat;
-  const dLng = lngDistanceDegrees(aLng, bLng);
-  return dLat * dLat + dLng * dLng;
-}
-
-function northeastAsiaLandRegionStages(): Array<(c: SpawnCandidate) => boolean> {
-  return [
-    (c) => c.terrain === 'land' && c.lat >= 35 && c.lat <= 78 && c.lng >= 95 && c.lng <= 180,
-    (c) => c.terrain === 'land' && c.lat >= 30 && c.lat <= 80 && c.lng >= 80 && c.lng <= 180,
-    (c) => c.terrain === 'land' && c.lat >= 20 && c.lat <= 82 && c.lng >= 60 && c.lng <= 180,
-  ];
-}
-
-function southernAfricaLandRegionStages(): Array<(c: SpawnCandidate) => boolean> {
-  return [
-    (c) => c.terrain === 'land' && c.lat >= -38 && c.lat <= -22 && c.lng >= 10 && c.lng <= 42,
-    (c) => c.terrain === 'land' && c.lat >= -42 && c.lat <= -18 && c.lng >= 5 && c.lng <= 45,
-    (c) => c.terrain === 'land' && c.lat >= -45 && c.lat <= -12 && c.lng >= -5 && c.lng <= 50,
-    (c) => c.terrain === 'land' && c.lat >= -50 && c.lat <= -5 && c.lng >= -20 && c.lng <= 55,
-  ];
-}
-
-function isPacificOceanHex(c: SpawnCandidate): boolean {
-  return c.terrain === 'water' && c.lat >= -55 && c.lat <= 55 && (c.lng >= 120 || c.lng <= -90);
-}
-
-function isAtlanticOceanHex(c: SpawnCandidate): boolean {
-  return c.terrain === 'water' && c.lat >= -55 && c.lat <= 60 && c.lng >= -75 && c.lng <= 20;
-}
-
-function isIndianOceanHex(c: SpawnCandidate): boolean {
-  return c.terrain === 'water' && c.lat >= -50 && c.lat <= 30 && c.lng >= 20 && c.lng <= 120;
-}
-
-function pickClosestSpawnCandidates(
-  candidates: ReadonlyArray<SpawnCandidate>,
-  count: number,
-  usedH3: Set<string>,
-  targetLat: number,
-  targetLng: number
-): SpawnCandidate[] {
-  const ranked = candidates
-    .filter((c) => !usedH3.has(c.h3))
-    .map((c) => ({ c, d2: squaredGeoDistance(c.lat, c.lng, targetLat, targetLng) }))
-    .sort((a, b) => a.d2 - b.d2);
-  const picked: SpawnCandidate[] = [];
-  for (const item of ranked) {
-    if (picked.length >= count) break;
-    if (usedH3.has(item.c.h3)) continue;
-    picked.push(item.c);
-    usedH3.add(item.c.h3);
-  }
-  return picked;
-}
-
-function selectRegionalLandCandidates(
-  allCandidates: ReadonlyArray<SpawnCandidate>,
-  requiredCount: number,
-  regionName: string,
-  stages: Array<(c: SpawnCandidate) => boolean>
-): SpawnCandidate[] {
-  let last: SpawnCandidate[] = [];
-  for (let i = 0; i < stages.length; i++) {
-    const stageCandidates = allCandidates.filter(stages[i]!);
-    if (stageCandidates.length >= requiredCount) {
-      if (i > 0) {
-        logDebug('gameDb seedUnits: expanded regional land spawn search', {
-          regionName,
-          stage: i + 1,
-          candidateCount: stageCandidates.length,
-          requiredCount,
-        });
-      }
-      return stageCandidates;
-    }
-    last = stageCandidates;
-  }
-  logError(
-    'gameDb seedUnits: insufficient regional land spawn hexes after staged expansion',
-    new Error(`${regionName}: required ${requiredCount}, got ${last.length}`)
-  );
-  throw new Error(`Could not find required ${regionName} land spawn hexes`);
-}
-
 function seedUnits(): void {
-  logDebug('gameDb seedUnits');
-  if (db === null) return;
-  const hexes = getOrderedHexList();
-  const counts = getWorldUnitCounts();
-  const terrainRows = getAll<{ h3_index: string; terrain: string }>('SELECT h3_index, terrain FROM hexes');
-  const terrainByH3 = new Map(terrainRows.map((r) => [r.h3_index, r.terrain]));
-  const candidates: SpawnCandidate[] = hexes.map((h3) => {
-    const [lat, lng] = cellToLatLng(h3);
-    return { h3, lat, lng, terrain: terrainByH3.get(h3) ?? 'land' };
+  seedUnitsFromModule({
+    run,
+    getAll,
+    allocateNextUnitDisplayOrder,
+    hasDb: () => db !== null,
   });
-  const landPerSide = counts.infantry + counts.armor;
-  const usedH3 = new Set<string>();
-  const asiaLandCandidates = selectRegionalLandCandidates(
-    candidates,
-    landPerSide,
-    'northeast Asia',
-    northeastAsiaLandRegionStages()
-  );
-  const africaLandCandidates = selectRegionalLandCandidates(
-    candidates,
-    landPerSide,
-    'southern Africa',
-    southernAfricaLandRegionStages()
-  );
-  const humanStartsInAsia = Math.random() < 0.5;
-  logDebug('gameDb seedUnits: randomized land spawn region assignment', { humanStartsInAsia });
-  const humanLand = humanStartsInAsia
-    ? pickClosestSpawnCandidates(asiaLandCandidates, landPerSide, usedH3, 62, 145)
-    : pickClosestSpawnCandidates(africaLandCandidates, landPerSide, usedH3, -34, 24);
-  const opponentLand = humanStartsInAsia
-    ? pickClosestSpawnCandidates(africaLandCandidates, landPerSide, usedH3, -34, 24)
-    : pickClosestSpawnCandidates(asiaLandCandidates, landPerSide, usedH3, 62, 145);
-  if (humanLand.length < landPerSide || opponentLand.length < landPerSide) {
-    throw new Error('Could not allocate required regional land spawn hexes');
-  }
-
-  const humanUnits: [string, BuildUnitType, string][] = [];
-  let idx = 0;
-  for (let i = 0; i < counts.infantry; i++) {
-    humanUnits.push([`human-infantry-${i + 1}`, 'infantry', humanLand[idx++]!.h3]);
-  }
-  for (let i = 0; i < counts.armor; i++) {
-    humanUnits.push([`human-armor-${i + 1}`, 'armor', humanLand[idx++]!.h3]);
-  }
-  const pacificCandidates = candidates.filter(isPacificOceanHex);
-  const atlanticCandidates = candidates.filter(isAtlanticOceanHex);
-  const indianCandidates = candidates.filter(isIndianOceanHex);
-  const humanNavalPools = [pacificCandidates, indianCandidates, atlanticCandidates];
-  for (let i = 0; i < counts.naval; i++) {
-    let spawn: SpawnCandidate | null = null;
-    for (const pool of humanNavalPools) {
-      const picked = pickClosestSpawnCandidates(pool, 1, usedH3, 10, -150);
-      if (picked.length > 0) {
-        spawn = picked[0]!;
-        break;
-      }
-    }
-    if (!spawn) throw new Error('Could not allocate required human naval spawn hex');
-    humanUnits.push([`human-naval-${i + 1}`, 'naval', spawn.h3]);
-  }
-  for (const [id, unitType, h3Index] of humanUnits) {
-    const displayOrder = allocateNextUnitDisplayOrder(unitType);
-    run('INSERT INTO units (id, player, unit_type, display_order, h3_index) VALUES (?, ?, ?, ?, ?)', [
-      id,
-      'human',
-      unitType,
-      displayOrder,
-      h3Index,
-    ]);
-  }
-
-  const opponentUnits: [string, BuildUnitType, string][] = [];
-  idx = 0;
-  for (let i = 0; i < counts.infantry; i++) {
-    opponentUnits.push([`opponent-infantry-${i + 1}`, 'infantry', opponentLand[idx++]!.h3]);
-  }
-  for (let i = 0; i < counts.armor; i++) {
-    opponentUnits.push([`opponent-armor-${i + 1}`, 'armor', opponentLand[idx++]!.h3]);
-  }
-  const opponentNavalPools = [atlanticCandidates, indianCandidates, pacificCandidates];
-  for (let i = 0; i < counts.naval; i++) {
-    let spawn: SpawnCandidate | null = null;
-    for (const pool of opponentNavalPools) {
-      const picked = pickClosestSpawnCandidates(pool, 1, usedH3, 0, -25);
-      if (picked.length > 0) {
-        spawn = picked[0]!;
-        break;
-      }
-    }
-    if (!spawn) throw new Error('Could not allocate required opponent naval spawn hex');
-    opponentUnits.push([`opponent-naval-${i + 1}`, 'naval', spawn.h3]);
-  }
-  for (const [id, unitType, h3Index] of opponentUnits) {
-    const displayOrder = allocateNextUnitDisplayOrder(unitType);
-    run('INSERT INTO units (id, player, unit_type, display_order, h3_index) VALUES (?, ?, ?, ?, ?)', [
-      id,
-      'opponent',
-      unitType,
-      displayOrder,
-      h3Index,
-    ]);
-  }
 }
 
 /**
@@ -893,129 +495,19 @@ export function saveDatabase(): void {
   logTrace('gameDb saveDatabase (no-op; file-backed auto-persist)');
 }
 
-const STALE_INTEL_TURNS = 2;
-const FOG_PLAYERS = ['human', 'opponent'] as const;
 const FOG_OF_WAR_ENABLED_KEY = 'fog_of_war_enabled';
 
-function isFogOfWarEnabled(): boolean {
-  const row = getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [FOG_OF_WAR_ENABLED_KEY]);
-  if (!row?.value) return true;
-  return row.value !== '0' && row.value.toLowerCase() !== 'false';
-}
-
-function getCurrentTurnNumberFromDb(): number {
-  const turnRow = getOne<{ turnNumber: number }>('SELECT turn_number AS turnNumber FROM turn_state WHERE id = 1');
-  return turnRow?.turnNumber ?? 1;
-}
-
-function refreshFogOfWarIntelForPlayer(
-  state: GameStateSnapshot,
-  playerId: string,
-  currentTurn: number,
-  traversedHexes: Set<string> | undefined
-): void {
-  logDebug('gameDb refreshFogOfWarIntelForPlayer', { playerId, currentTurn });
-  const mapHexSet = new Set(state.hexes.map((h) => h.h3Index));
-  const visibleHexes = computeVisibleHexesForSide(state, playerId, mapHexSet);
-  const ownOccupiedHexes = new Set(
-    state.units.filter((u) => u.player === playerId).map((u) => u.h3Index)
-  );
-
-  for (const h3 of ownOccupiedHexes) {
-    run(
-      `INSERT OR IGNORE INTO player_hex_intel (player_id, h3_index, seen_state, last_seen_turn) VALUES (?, ?, 'visible', ?)`,
-      [playerId, h3, currentTurn]
-    );
-  }
-  for (const h3 of traversedHexes ?? []) {
-    if (!mapHexSet.has(h3)) continue;
-    run(
-      `INSERT OR IGNORE INTO player_hex_intel (player_id, h3_index, seen_state, last_seen_turn) VALUES (?, ?, 'visible', ?)`,
-      [playerId, h3, currentTurn]
-    );
-    run(
-      `UPDATE player_hex_intel SET seen_state = 'visible', last_seen_turn = ? WHERE player_id = ? AND h3_index = ?`,
-      [currentTurn, playerId, h3]
-    );
-  }
-
-  const exploredRows = getAll<{ h3_index: string; last_seen_turn: number | null }>(
-    'SELECT h3_index, last_seen_turn FROM player_hex_intel WHERE player_id = ?',
-    [playerId]
-  );
-  for (const row of exploredRows) {
-    if (visibleHexes.has(row.h3_index)) {
-      run(
-        `UPDATE player_hex_intel SET seen_state = 'visible', last_seen_turn = ? WHERE player_id = ? AND h3_index = ?`,
-        [currentTurn, playerId, row.h3_index]
-      );
-    } else {
-      run(
-        `UPDATE player_hex_intel SET seen_state = 'stale' WHERE player_id = ? AND h3_index = ?`,
-        [playerId, row.h3_index]
-      );
-    }
-  }
-
-  const enemyUnits = state.units.filter((u) => u.player !== playerId);
-  const enemyById = new Map(enemyUnits.map((u) => [u.id, u]));
-  const existingIntelRows = getAll<{ enemy_unit_id: string }>(
-    'SELECT enemy_unit_id FROM player_unit_intel WHERE player_id = ?',
-    [playerId]
-  );
-  const existingIntelIds = new Set(existingIntelRows.map((r) => r.enemy_unit_id));
-  const newContactIds: string[] = [];
-  const currentEnemyHexes = new Set<string>();
-  for (const enemy of enemyUnits) {
-    if (!visibleHexes.has(enemy.h3Index)) continue;
-    if (!existingIntelIds.has(enemy.id)) newContactIds.push(enemy.id);
-    currentEnemyHexes.add(enemy.h3Index);
-    run(
-      `INSERT INTO player_unit_intel (player_id, enemy_unit_id, last_known_h3_index, intel_state, last_seen_turn, stale_until_turn)
-       VALUES (?, ?, ?, 'current', ?, ?)
-       ON CONFLICT(player_id, enemy_unit_id) DO UPDATE SET
-         last_known_h3_index = excluded.last_known_h3_index,
-         intel_state = 'current',
-         last_seen_turn = excluded.last_seen_turn,
-         stale_until_turn = excluded.stale_until_turn`,
-      [playerId, enemy.id, enemy.h3Index, currentTurn, currentTurn + STALE_INTEL_TURNS]
-    );
-  }
-
-  const intelRows = getAll<{
-    enemy_unit_id: string;
-    last_known_h3_index: string;
-    intel_state: 'current' | 'stale';
-    stale_until_turn: number | null;
-  }>(
-    'SELECT enemy_unit_id, last_known_h3_index, intel_state, stale_until_turn FROM player_unit_intel WHERE player_id = ?',
-    [playerId]
-  );
-  for (const row of intelRows) {
-    const enemy = enemyById.get(row.enemy_unit_id);
-    if (enemy && visibleHexes.has(enemy.h3Index)) continue;
-    if (currentEnemyHexes.has(row.last_known_h3_index)) {
-      run('DELETE FROM player_unit_intel WHERE player_id = ? AND enemy_unit_id = ?', [playerId, row.enemy_unit_id]);
-      continue;
-    }
-    if (visibleHexes.has(row.last_known_h3_index) && (!enemy || enemy.h3Index !== row.last_known_h3_index)) {
-      run('DELETE FROM player_unit_intel WHERE player_id = ? AND enemy_unit_id = ?', [playerId, row.enemy_unit_id]);
-      continue;
-    }
-    const staleUntil = row.stale_until_turn ?? Number.MIN_SAFE_INTEGER;
-    if (currentTurn > staleUntil) {
-      run('DELETE FROM player_unit_intel WHERE player_id = ? AND enemy_unit_id = ?', [playerId, row.enemy_unit_id]);
-      continue;
-    }
-    run(`UPDATE player_unit_intel SET intel_state = 'stale' WHERE player_id = ? AND enemy_unit_id = ?`, [
-      playerId,
-      row.enemy_unit_id,
-    ]);
-  }
-  run(
-    `INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)`,
-    [`fog_new_contacts_${playerId}`, JSON.stringify(newContactIds)]
-  );
+function getFogDeps() {
+  return {
+    ops: {
+      hasDb: () => db !== null,
+      run,
+      getOne,
+      getAll,
+    },
+    listUnitsForSnapshot,
+    listRes1InfrastructureRows,
+  };
 }
 
 /**
@@ -1025,130 +517,21 @@ function refreshFogOfWarIntelForPlayer(
 export function refreshFogOfWarIntelFromCurrentState(options?: {
   traversedHexesByPlayer?: Partial<Record<'human' | 'opponent', string[]>>;
 }): void {
-  logDebug('gameDb refreshFogOfWarIntelFromCurrentState', {
-    humanTraversed: options?.traversedHexesByPlayer?.human?.length ?? 0,
-    opponentTraversed: options?.traversedHexesByPlayer?.opponent?.length ?? 0,
-  });
-  if (!db) return;
-  if (!isFogOfWarEnabled()) {
-    run('DELETE FROM player_hex_intel');
-    run('DELETE FROM player_unit_intel');
-    run("DELETE FROM game_config WHERE key IN ('fog_new_contacts_human', 'fog_new_contacts_opponent')");
-    return;
-  }
-  const state = getGameState();
-  const currentTurn = getCurrentTurnNumberFromDb();
-  for (const playerId of FOG_PLAYERS) {
-    const traversed = new Set(options?.traversedHexesByPlayer?.[playerId] ?? []);
-    refreshFogOfWarIntelForPlayer(state, playerId, currentTurn, traversed);
-  }
+  refreshFogOfWarIntelFromCurrentStateFromModule(getFogDeps(), options);
 }
 
 /**
  * Returns and clears newly discovered enemy unit ids for the given side (computed during latest fog refresh).
  */
 export function consumeFogNewContactsForPlayer(playerId: 'human' | 'opponent'): string[] {
-  logDebug('gameDb consumeFogNewContactsForPlayer', { playerId });
-  if (!db) return [];
-  const key = `fog_new_contacts_${playerId}`;
-  const row = getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [key]);
-  run('DELETE FROM game_config WHERE key = ?', [key]);
-  if (!row?.value) return [];
-  try {
-    const parsed = JSON.parse(row.value) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((x): x is string => typeof x === 'string');
-  } catch {
-    return [];
-  }
+  return consumeFogNewContactsForPlayerFromModule(
+    { hasDb: () => db !== null, run, getOne, getAll },
+    playerId
+  );
 }
 
 export function getGameState(): GameStateSnapshot {
-  logTrace('getGameState');
-  if (db === null) {
-    return {
-      hexes: [],
-      units: [],
-      phase: 'planning',
-      turnNumber: 1,
-      pendingOrders: [],
-    };
-  }
-
-  const hexCount = getOne<{ c: number }>('SELECT COUNT(*) AS c FROM hexes');
-  const hasHexes = hexCount && hexCount.c > 0;
-  const ordered = hasHexes ? getOrderedHexList() : [];
-  const hexRows: { h3Index: string; terrain: string; terrainKind: string }[] = ordered.map((h3Index) => {
-    const row = getOne<{ terrain: string; terrain_kind: string }>(
-      'SELECT terrain, terrain_kind FROM hexes WHERE h3_index = ?',
-      [h3Index]
-    );
-    return {
-      h3Index,
-      terrain: row?.terrain ?? 'land',
-      terrainKind: row?.terrain_kind ?? 'plains',
-    };
-  });
-  const unitRows = listUnitsForSnapshot();
-  const turnRow = getOne<{ phase: string; turnNumber: number }>('SELECT phase, turn_number AS turnNumber FROM turn_state WHERE id = 1');
-  const orderRows = getAll<{ unitId: string; toH3Index: string }>(
-    'SELECT unit_id AS unitId, to_h3_index AS toH3Index FROM pending_orders'
-  );
-  const gameOverRow = getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'game_over'");
-  const winnerRow = getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'winner'");
-  const controlRows = getAll<{ h3Index: string; controllerPlayerId: string | null }>(
-    'SELECT h3_index AS h3Index, controller_player_id AS controllerPlayerId FROM res1_control'
-  );
-  const queueTotalRows = getAll<{
-    h3Index: string;
-    queuedUnits: number;
-    nextUnitType: BuildUnitType | null;
-    nextRemainingCount: number | null;
-    storedPoints: number;
-  }>(
-    `SELECT q.h3_index AS h3Index,
-            COALESCE(SUM(q.remaining_count), 0) AS queuedUnits,
-            (
-              SELECT qh.unit_type
-              FROM res1_build_queue qh
-              WHERE qh.h3_index = q.h3_index
-              ORDER BY qh.queue_index ASC, qh.id ASC
-              LIMIT 1
-            ) AS nextUnitType,
-            (
-              SELECT qh.remaining_count
-              FROM res1_build_queue qh
-              WHERE qh.h3_index = q.h3_index
-              ORDER BY qh.queue_index ASC, qh.id ASC
-              LIMIT 1
-            ) AS nextRemainingCount,
-            COALESCE(
-              (
-                SELECT p.stored_points
-                FROM res1_build_progress p
-                WHERE p.h3_index = q.h3_index
-              ),
-              0
-            ) AS storedPoints
-     FROM res1_build_queue q
-     GROUP BY q.h3_index`
-  );
-  const infrastructureRows = listRes1InfrastructureRowsInternal();
-  const gameOver = gameOverRow?.value === '1';
-  const winner = winnerRow?.value ?? undefined;
-
-  return withFogMetadata({
-    hexes: hexRows,
-    units: unitRows,
-    phase: turnRow?.phase ?? 'planning',
-    turnNumber: turnRow?.turnNumber ?? 1,
-    pendingOrders: orderRows,
-    res1Control: controlRows,
-    res1BuildQueueTotals: queueTotalRows,
-    res1Infrastructure: infrastructureRows,
-    gameOver: gameOver || undefined,
-    winner,
-  }, isFogOfWarEnabled());
+  return getGameStateSnapshotFromModule(getFogDeps());
 }
 
 /**
@@ -1160,86 +543,7 @@ export function getGameStateForPlayer(
   playerId: 'human' | 'opponent',
   options?: { maskUnexploredTerrain?: boolean }
 ): GameStateSnapshot {
-  logTrace('gameDb getGameStateForPlayer', { playerId });
-  const state = getGameState();
-  const fogEnabled = isFogOfWarEnabled();
-  if (!db) return withFogMetadata({ ...state, playerPerspective: playerId }, fogEnabled);
-  if (!fogEnabled) {
-    const allHexes = state.hexes.map((h) => h.h3Index);
-    const enemyIntel = state.units
-      .filter((u) => u.player !== playerId)
-      .map((u) => {
-        const [lat, lng] = cellToLatLng(u.h3Index);
-        return {
-          unitId: u.id,
-          lastKnownH3Index: u.h3Index,
-          lastKnownLatLng: [Number(lat.toFixed(LATLNG_DECIMAL_PLACES)), Number(lng.toFixed(LATLNG_DECIMAL_PLACES))] as [number, number],
-          intelState: 'current' as const,
-          lastSeenTurn: state.turnNumber,
-          staleUntilTurn: state.turnNumber + STALE_INTEL_TURNS,
-        };
-      });
-    return withFogMetadata({
-      ...state,
-      visibleHexes: allHexes,
-      exploredHexes: allHexes,
-      staleHexes: [],
-      enemyIntel,
-      playerPerspective: playerId,
-    }, false);
-  }
-
-  const mapHexSet = new Set(state.hexes.map((h) => h.h3Index));
-  const visibleHexes = computeVisibleHexesForSide(state, playerId, mapHexSet);
-  const visibleHexList = state.hexes.map((h) => h.h3Index).filter((h3) => visibleHexes.has(h3));
-  const exploredRows = getAll<{ h3_index: string }>(
-    'SELECT h3_index FROM player_hex_intel WHERE player_id = ?',
-    [playerId]
-  );
-  const exploredHexes = new Set(exploredRows.map((r) => r.h3_index));
-  const staleHexes = [...exploredHexes].filter((h3) => !visibleHexes.has(h3));
-
-  const filteredHexes = options?.maskUnexploredTerrain === false
-    ? state.hexes
-    : state.hexes.map((h) => {
-      if (exploredHexes.has(h.h3Index)) return h;
-      return { ...h, terrain: 'unknown', terrainKind: 'unknown' };
-    });
-
-  const filteredUnits = state.units.filter((u) => u.player === playerId || visibleHexes.has(u.h3Index));
-  const intelRows = getAll<{
-    enemy_unit_id: string;
-    last_known_h3_index: string;
-    intel_state: 'current' | 'stale';
-    last_seen_turn: number;
-    stale_until_turn: number;
-  }>(
-    `SELECT enemy_unit_id, last_known_h3_index, intel_state, last_seen_turn, stale_until_turn
-     FROM player_unit_intel WHERE player_id = ? ORDER BY enemy_unit_id`,
-    [playerId]
-  );
-  const enemyIntel = intelRows.map((row) => {
-    const [lat, lng] = cellToLatLng(row.last_known_h3_index);
-    return {
-      unitId: row.enemy_unit_id,
-      lastKnownH3Index: row.last_known_h3_index,
-      lastKnownLatLng: [Number(lat.toFixed(LATLNG_DECIMAL_PLACES)), Number(lng.toFixed(LATLNG_DECIMAL_PLACES))] as [number, number],
-      intelState: row.intel_state,
-      lastSeenTurn: row.last_seen_turn,
-      staleUntilTurn: row.stale_until_turn,
-    };
-  });
-
-  return withFogMetadata({
-    ...state,
-    hexes: filteredHexes,
-    units: filteredUnits,
-    visibleHexes: visibleHexList,
-    exploredHexes: [...exploredHexes],
-    staleHexes,
-    enemyIntel,
-    playerPerspective: playerId,
-  }, true);
+  return getGameStateForPlayerFromModule(getFogDeps(), playerId, options);
 }
 
 /**
@@ -1280,19 +584,6 @@ export function listUnitsForSnapshot(): GameStateSnapshot['units'] {
   return rows.map(mapDbUnitSnapshotRow);
 }
 
-export interface HexControlRow {
-  h3Index: string;
-  controllerPlayerId: string | null;
-}
-
-export interface BuildQueueRow {
-  id: number;
-  h3Index: string;
-  queueIndex: number;
-  unitType: BuildUnitType;
-  remainingCount: number;
-}
-
 /**
  * Why this exists:
  *     Reads the persisted controller for one res-1 hex.
@@ -1302,12 +593,7 @@ export interface BuildQueueRow {
  *     Returns null when a hex is currently uncontrolled or missing a row.
  */
 export function getHexController(h3Index: string): string | null {
-  logTrace('gameDb getHexController', { h3Index });
-  const row = getOne<{ controllerPlayerId: string | null }>(
-    'SELECT controller_player_id AS controllerPlayerId FROM res1_control WHERE h3_index = ?',
-    [h3Index]
-  );
-  return row?.controllerPlayerId ?? null;
+  return getHexControllerFromModule({ run, getOne, getAll }, h3Index);
 }
 
 /**
@@ -1319,13 +605,7 @@ export function getHexController(h3Index: string): string | null {
  *     Persists null for uncontrolled or a player id for controlled.
  */
 export function setHexController(h3Index: string, controllerPlayerId: string | null): void {
-  logDebug('gameDb setHexController', { h3Index, controllerPlayerId });
-  run(
-    `INSERT INTO res1_control (h3_index, controller_player_id)
-     VALUES (?, ?)
-     ON CONFLICT(h3_index) DO UPDATE SET controller_player_id = excluded.controller_player_id`,
-    [h3Index, controllerPlayerId]
-  );
+  setHexControllerFromModule({ run, getOne, getAll }, h3Index, controllerPlayerId);
 }
 
 /**
@@ -1337,13 +617,7 @@ export function setHexController(h3Index: string, controllerPlayerId: string | n
  *     Sorted by h3 index for stable iteration.
  */
 export function listAllHexControls(): HexControlRow[] {
-  logTrace('gameDb listAllHexControls');
-  const rows = getAll<{ h3Index: string; controllerPlayerId: string | null }>(
-    `SELECT h3_index AS h3Index, controller_player_id AS controllerPlayerId
-     FROM res1_control
-     ORDER BY h3_index ASC`
-  );
-  return rows.map((row) => ({ h3Index: row.h3Index, controllerPlayerId: row.controllerPlayerId }));
+  return listAllHexControlsFromModule({ run, getOne, getAll });
 }
 
 /**
@@ -1355,27 +629,7 @@ export function listAllHexControls(): HexControlRow[] {
  *     Empty list when no queued entries exist.
  */
 export function listBuildQueueRowsForHex(h3Index: string): BuildQueueRow[] {
-  logTrace('gameDb listBuildQueueRowsForHex', { h3Index });
-  const rows = getAll<{
-    id: number;
-    h3Index: string;
-    queueIndex: number;
-    unitType: BuildUnitType;
-    remainingCount: number;
-  }>(
-    `SELECT id, h3_index AS h3Index, queue_index AS queueIndex, unit_type AS unitType, remaining_count AS remainingCount
-     FROM res1_build_queue
-     WHERE h3_index = ?
-     ORDER BY queue_index ASC, id ASC`,
-    [h3Index]
-  );
-  return rows.map((row) => ({
-    id: row.id,
-    h3Index: row.h3Index,
-    queueIndex: row.queueIndex,
-    unitType: row.unitType,
-    remainingCount: row.remainingCount,
-  }));
+  return listBuildQueueRowsForHexFromModule({ run, getOne, getAll }, h3Index);
 }
 
 /**
@@ -1387,12 +641,7 @@ export function listBuildQueueRowsForHex(h3Index: string): BuildQueueRow[] {
  *     Defaults to zero when no row exists.
  */
 export function getBuildProgressPointsForHex(h3Index: string): number {
-  logTrace('gameDb getBuildProgressPointsForHex', { h3Index });
-  const row = getOne<{ storedPoints: number }>(
-    'SELECT stored_points AS storedPoints FROM res1_build_progress WHERE h3_index = ?',
-    [h3Index]
-  );
-  return Math.max(0, row?.storedPoints ?? 0);
+  return getBuildProgressPointsForHexFromModule({ run, getOne, getAll }, h3Index);
 }
 
 /**
@@ -1404,14 +653,7 @@ export function getBuildProgressPointsForHex(h3Index: string): number {
  *     Stores non-negative points and upserts existing row.
  */
 export function setBuildProgressPointsForHex(h3Index: string, storedPoints: number): void {
-  const safePoints = Math.max(0, Math.trunc(storedPoints));
-  logDebug('gameDb setBuildProgressPointsForHex', { h3Index, storedPoints: safePoints });
-  run(
-    `INSERT INTO res1_build_progress (h3_index, stored_points)
-     VALUES (?, ?)
-     ON CONFLICT(h3_index) DO UPDATE SET stored_points = excluded.stored_points`,
-    [h3Index, safePoints]
-  );
+  setBuildProgressPointsForHexFromModule({ run, getOne, getAll }, h3Index, storedPoints);
 }
 
 /**
@@ -1423,9 +665,7 @@ export function setBuildProgressPointsForHex(h3Index: string, storedPoints: numb
  *     Idempotent clear; safe to call when rows are already absent.
  */
 export function clearBuildQueueAndProgressForHex(h3Index: string): void {
-  logDebug('gameDb clearBuildQueueAndProgressForHex', { h3Index });
-  run('DELETE FROM res1_build_queue WHERE h3_index = ?', [h3Index]);
-  run('DELETE FROM res1_build_progress WHERE h3_index = ?', [h3Index]);
+  clearBuildQueueAndProgressForHexFromModule({ run, getOne, getAll }, h3Index);
 }
 
 /**
@@ -1437,56 +677,7 @@ export function clearBuildQueueAndProgressForHex(h3Index: string): void {
  *     Drops old rows then writes normalized `queueIndex` order.
  */
 export function replaceBuildQueueForHex(h3Index: string, entries: Array<{ unitType: BuildUnitType; remainingCount: number }>): void {
-  logDebug('gameDb replaceBuildQueueForHex', { h3Index, entryCount: entries.length });
-  run('DELETE FROM res1_build_queue WHERE h3_index = ?', [h3Index]);
-  for (let i = 0; i < entries.length; i++) {
-    const entry = entries[i]!;
-    run(
-      `INSERT INTO res1_build_queue (h3_index, queue_index, unit_type, remaining_count)
-       VALUES (?, ?, ?, ?)`,
-      [h3Index, i, entry.unitType, Math.max(1, Math.trunc(entry.remainingCount))]
-    );
-  }
-}
-
-export interface Res1InfrastructureRow {
-  h3Index: string;
-  urbanHexCount: number;
-  airportCount: number;
-  seaportCount: number;
-}
-
-interface Res1InfrastructureDbRow extends Record<string, unknown> {
-  h3Index: string;
-  urbanHexCount: number;
-  airportCount: number;
-  seaportCount: number;
-}
-
-function mapRes1InfrastructureDbRow(row: Res1InfrastructureDbRow): Res1InfrastructureRow {
-  return {
-    h3Index: row.h3Index,
-    urbanHexCount: Math.max(0, row.urbanHexCount),
-    airportCount: Math.max(0, row.airportCount),
-    seaportCount: Math.max(0, row.seaportCount),
-  };
-}
-
-function listRes1InfrastructureRowsInternal(options?: {
-  whereClause?: string;
-  params?: unknown[];
-  orderByClause?: string;
-}): Res1InfrastructureRow[] {
-  const whereClause = options?.whereClause ? ` ${options.whereClause}` : '';
-  const orderByClause = options?.orderByClause ? ` ${options.orderByClause}` : '';
-  return getAll<Res1InfrastructureDbRow>(
-    `SELECT h3_index AS h3Index,
-            urban_hex_count AS urbanHexCount,
-            airport_count AS airportCount,
-            seaport_count AS seaportCount
-     FROM res1_infrastructure${whereClause}${orderByClause}`,
-    options?.params ?? []
-  ).map(mapRes1InfrastructureDbRow);
+  replaceBuildQueueForHexFromModule({ run, getOne, getAll }, h3Index, entries);
 }
 
 /**
@@ -1498,12 +689,7 @@ function listRes1InfrastructureRowsInternal(options?: {
  *     Returns zeros when no row exists (defensive default).
  */
 export function getRes1InfrastructureForHex(h3Index: string): Res1InfrastructureRow {
-  logTrace('gameDb getRes1InfrastructureForHex', { h3Index });
-  const row = listRes1InfrastructureRowsInternal({
-    whereClause: 'WHERE h3_index = ?',
-    params: [h3Index],
-  })[0];
-  return row ?? { h3Index, urbanHexCount: 0, airportCount: 0, seaportCount: 0 };
+  return getRes1InfrastructureForHexFromModule({ run, getOne, getAll }, h3Index);
 }
 
 /**
@@ -1515,8 +701,7 @@ export function getRes1InfrastructureForHex(h3Index: string): Res1Infrastructure
  *     Stable h3-sorted list.
  */
 export function listRes1InfrastructureRows(): Res1InfrastructureRow[] {
-  logTrace('gameDb listRes1InfrastructureRows');
-  return listRes1InfrastructureRowsInternal({ orderByClause: 'ORDER BY h3_index ASC' });
+  return listRes1InfrastructureRowsFromModule({ run, getOne, getAll });
 }
 
 /**
@@ -1531,31 +716,7 @@ export function setRes1InfrastructureForHex(
   h3Index: string,
   counts: { urbanHexCount: number; airportCount: number; seaportCount: number }
 ): void {
-  logDebug('gameDb setRes1InfrastructureForHex', { h3Index, ...counts });
-  run(
-    `INSERT INTO res1_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
-     VALUES (?, ?, ?, ?)
-     ON CONFLICT(h3_index) DO UPDATE SET
-       urban_hex_count = excluded.urban_hex_count,
-       airport_count = excluded.airport_count,
-       seaport_count = excluded.seaport_count`,
-    [
-      h3Index,
-      Math.max(0, Math.trunc(counts.urbanHexCount)),
-      Math.max(0, Math.trunc(counts.airportCount)),
-      Math.max(0, Math.trunc(counts.seaportCount)),
-    ]
-  );
-}
-
-export interface Res4FeatureOverrideRow {
-  h3Index: string;
-  parentH3Index: string;
-  terrainKind: string;
-  isUrban: boolean;
-  isAirport: boolean;
-  isSeaport: boolean;
-  isRubble: boolean;
+  setRes1InfrastructureForHexFromModule({ run, getOne, getAll }, h3Index, counts);
 }
 
 /**
@@ -1567,34 +728,7 @@ export interface Res4FeatureOverrideRow {
  *     Stable h3-sorted rows.
  */
 export function listRes4FeatureOverridesForGame(): Res4FeatureOverrideRow[] {
-  logTrace('gameDb listRes4FeatureOverridesForGame');
-  return getAll<{
-    h3Index: string;
-    parentH3Index: string;
-    terrainKind: string;
-    isUrban: number;
-    isAirport: number;
-    isSeaport: number;
-    isRubble: number;
-  }>(
-    `SELECT h3_index AS h3Index,
-            parent_h3_index AS parentH3Index,
-            terrain_kind AS terrainKind,
-            is_urban AS isUrban,
-            is_airport AS isAirport,
-            is_seaport AS isSeaport,
-            is_rubble AS isRubble
-     FROM res4_feature_overrides
-     ORDER BY h3_index ASC`
-  ).map((row) => ({
-    h3Index: row.h3Index,
-    parentH3Index: row.parentH3Index,
-    terrainKind: row.terrainKind,
-    isUrban: row.isUrban === 1,
-    isAirport: row.isAirport === 1,
-    isSeaport: row.isSeaport === 1,
-    isRubble: row.isRubble === 1,
-  }));
+  return listRes4FeatureOverridesForGameFromModule({ run, getOne, getAll });
 }
 
 /**
@@ -1609,49 +743,7 @@ export function updateRes4FeatureOverrideRow(
   h3Index: string,
   patch: Partial<Pick<Res4FeatureOverrideRow, 'isUrban' | 'isAirport' | 'isSeaport' | 'isRubble'>>
 ): void {
-  logDebug('gameDb updateRes4FeatureOverrideRow', { h3Index, patch });
-  const row = getOne<{
-    parentH3Index: string;
-    isUrban: number;
-    isAirport: number;
-    isSeaport: number;
-    isRubble: number;
-  }>(
-    `SELECT parent_h3_index AS parentH3Index,
-            is_urban AS isUrban,
-            is_airport AS isAirport,
-            is_seaport AS isSeaport,
-            is_rubble AS isRubble
-     FROM res4_feature_overrides
-     WHERE h3_index = ?`,
-    [h3Index]
-  );
-  if (!row) return;
-  run(
-    `UPDATE res4_feature_overrides
-     SET is_urban = ?, is_airport = ?, is_seaport = ?, is_rubble = ?
-     WHERE h3_index = ?`,
-    [
-      patch.isUrban === undefined ? row.isUrban : patch.isUrban ? 1 : 0,
-      patch.isAirport === undefined ? row.isAirport : patch.isAirport ? 1 : 0,
-      patch.isSeaport === undefined ? row.isSeaport : patch.isSeaport ? 1 : 0,
-      patch.isRubble === undefined ? row.isRubble : patch.isRubble ? 1 : 0,
-      h3Index,
-    ]
-  );
-  const parentCounts = getAll<{ urbanHexCount: number; airportCount: number; seaportCount: number }>(
-    `SELECT SUM(CASE WHEN is_urban = 1 THEN 1 ELSE 0 END) AS urbanHexCount,
-            SUM(CASE WHEN is_airport = 1 THEN 1 ELSE 0 END) AS airportCount,
-            SUM(CASE WHEN is_seaport = 1 THEN 1 ELSE 0 END) AS seaportCount
-     FROM res4_feature_overrides
-     WHERE parent_h3_index = ?`,
-    [row.parentH3Index]
-  )[0] ?? { urbanHexCount: 0, airportCount: 0, seaportCount: 0 };
-  setRes1InfrastructureForHex(row.parentH3Index, {
-    urbanHexCount: parentCounts.urbanHexCount,
-    airportCount: parentCounts.airportCount,
-    seaportCount: parentCounts.seaportCount,
-  });
+  updateRes4FeatureOverrideRowFromModule({ run, getOne, getAll }, h3Index, patch);
 }
 
 /**
@@ -1670,45 +762,7 @@ export function getRes4TerrainOverridesForRendererFromGame(): Array<{
   isSeaport?: boolean;
   isRubble?: boolean;
 }> {
-  logDebug('gameDb getRes4TerrainOverridesForRendererFromGame');
-  const baseRows = getRes4TerrainOverridesFromCache();
-  const mergedByH3 = new Map(
-    baseRows.map((row) => [
-      row.h3Index,
-      {
-        h3Index: row.h3Index,
-        terrainKind: row.terrainKind,
-        isUrban: row.isUrban,
-        isAirport: false,
-        isSeaport: false,
-        isRubble: !!row.isRubble,
-      },
-    ])
-  );
-  for (const feature of listRes4FeatureOverridesForGame()) {
-    const current = mergedByH3.get(feature.h3Index);
-    mergedByH3.set(feature.h3Index, {
-      h3Index: feature.h3Index,
-      terrainKind: current?.terrainKind ?? (feature.terrainKind as (typeof baseRows)[number]['terrainKind']),
-      isUrban: feature.isUrban,
-      isAirport: feature.isAirport,
-      isSeaport: feature.isSeaport,
-      isRubble: feature.isRubble,
-    });
-  }
-  const rows = [...mergedByH3.values()].sort((a, b) => a.h3Index.localeCompare(b.h3Index));
-  let airportCount = 0;
-  let seaportCount = 0;
-  for (const row of rows) {
-    if (row.isAirport) airportCount += 1;
-    if (row.isSeaport) seaportCount += 1;
-  }
-  logDebug('gameDb getRes4TerrainOverridesForRendererFromGame: prepared rows', {
-    rowCount: rows.length,
-    airportCount,
-    seaportCount,
-  });
-  return rows;
+  return getRes4TerrainOverridesForRendererFromGameFromModule({ run, getOne, getAll });
 }
 
 /**
@@ -1735,16 +789,21 @@ export function clearGameOver(): void {
   run("DELETE FROM game_config WHERE key IN ('game_over', 'winner')");
 }
 
-const AI_TOOL_LIMIT_EXCEEDED_KEY = 'ai_tool_limit_exceeded_last_turn';
-const AI_LAST_CONSULTATION_TURN_KEY = 'ai_last_consultation_turn';
+function getAiStateDbOps() {
+  return {
+    hasDb: () => db !== null,
+    run,
+    getOne,
+    getAll,
+  };
+}
 
 /**
  * Records that the AI exceeded the tool-call cap last turn so the next prompt can show a one-time warning. Call from
  * the OpenRouter loop when the cap is hit.
  */
 export function setAiToolLimitExceededLastTurn(): void {
-  if (!db) return;
-  run("INSERT OR REPLACE INTO game_config (key, value) VALUES (?, '1')", [AI_TOOL_LIMIT_EXCEEDED_KEY]);
+  setAiToolLimitExceededLastTurnFromModule(getAiStateDbOps());
 }
 
 /**
@@ -1752,10 +811,7 @@ export function setAiToolLimitExceededLastTurn(): void {
  * system prompt so the warning shows at most once.
  */
 export function getAndClearAiToolLimitExceededLastTurn(): boolean {
-  if (!db) return false;
-  const row = getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [AI_TOOL_LIMIT_EXCEEDED_KEY]);
-  run('DELETE FROM game_config WHERE key = ?', [AI_TOOL_LIMIT_EXCEEDED_KEY]);
-  return row?.value === '1';
+  return getAndClearAiToolLimitExceededLastTurnFromModule(getAiStateDbOps());
 }
 
 /**
@@ -1763,12 +819,7 @@ export function getAndClearAiToolLimitExceededLastTurn(): boolean {
  * first_consultation triggers and similar turn-gated logic.
  */
 export function getAiLastConsultationTurn(): number {
-  logTrace('gameDb getAiLastConsultationTurn');
-  if (!db) return 0;
-  const row = getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [AI_LAST_CONSULTATION_TURN_KEY]);
-  if (!row) return 0;
-  const n = parseInt(row.value, 10);
-  return Number.isNaN(n) ? 0 : n;
+  return getAiLastConsultationTurnFromModule(getAiStateDbOps());
 }
 
 /**
@@ -1776,30 +827,15 @@ export function getAiLastConsultationTurn(): number {
  * when applying AI orders from LLM or pending buffer.
  */
 export function setAiLastConsultationTurn(turn: number): void {
-  if (!db) return;
-  const existing = getAiLastConsultationTurn();
-  if (existing === turn) {
-    logTrace('gameDb setAiLastConsultationTurn: unchanged', { turn });
-    return;
-  }
-  logDebug('gameDb setAiLastConsultationTurn', { turn });
-  run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [AI_LAST_CONSULTATION_TURN_KEY, String(turn)]);
+  setAiLastConsultationTurnFromModule(getAiStateDbOps(), turn);
 }
-
-const OPPONENT_ID = 'opponent';
 
 /**
  * Lists opponent unit ids that entered combat since the last consultation. Use to decide whether to re-prompt the AI
  * under event-driven rules; empty when the DB is closed or the set is empty.
  */
 export function getOpponentUnitsInCombatSinceConsultation(): string[] {
-  logTrace('gameDb getOpponentUnitsInCombatSinceConsultation');
-  if (!db) return [];
-  const rows = dbGetAll<{ unit_id: string }>(
-    'SELECT unit_id FROM ai_combat_since_consultation WHERE player_id = ?',
-    [OPPONENT_ID]
-  );
-  return rows.map((r) => r.unit_id);
+  return getOpponentUnitsInCombatSinceConsultationFromModule(getAiStateDbOps());
 }
 
 /**
@@ -1807,28 +843,14 @@ export function getOpponentUnitsInCombatSinceConsultation(): string[] {
  * opponent units fight; duplicates are ignored (INSERT OR IGNORE).
  */
 export function addOpponentCombatParticipants(unitIds: string[]): void {
-  logDebug('gameDb addOpponentCombatParticipants', { count: unitIds.length });
-  if (!db || unitIds.length === 0) return;
-  for (const id of unitIds) {
-    run('INSERT OR IGNORE INTO ai_combat_since_consultation (player_id, unit_id) VALUES (?, ?)', [OPPONENT_ID, id]);
-  }
+  addOpponentCombatParticipantsFromModule(getAiStateDbOps(), unitIds);
 }
 
 /**
  * Clears the combat-since-consultation set after a new AI consultation. Call when starting a fresh planning window.
  */
 export function clearOpponentCombatSinceConsultation(): void {
-  logDebug('gameDb clearOpponentCombatSinceConsultation');
-  if (!db) return;
-  run('DELETE FROM ai_combat_since_consultation WHERE player_id = ?', [OPPONENT_ID]);
-}
-
-export interface AiLossEventSinceConsultation {
-  turnNumber: number;
-  victimUnitId: string;
-  victimPlayer: string;
-  cause: 'direct_fire' | 'return_fire' | 'melee_or_other';
-  killerIds: string[];
+  clearOpponentCombatSinceConsultationFromModule(getAiStateDbOps());
 }
 
 /**
@@ -1843,44 +865,15 @@ export function addAiLossEventsSinceConsultation(
   killsByDirectFire?: { victimId: string; killerIds: string[] }[],
   killsByReturnFire?: { victimId: string; killerIds: string[] }[]
 ): void {
-  if (!db) return;
-  if (removedUnits.length === 0 || kills.length === 0) {
-    logTrace('gameDb addAiLossEventsSinceConsultation: no losses to record', {
-      playerId,
-      turnNumber,
-      removedCount: removedUnits.length,
-      killCount: kills.length,
-    });
-    return;
-  }
-
-  const removedById = new Map(removedUnits.map((u) => [u.id, u]));
-  const directVictims = new Set((killsByDirectFire ?? []).map((k) => k.victimId));
-  const returnVictims = new Set((killsByReturnFire ?? []).map((k) => k.victimId));
-  let recordedCount = 0;
-  for (const kill of kills) {
-    const victim = removedById.get(kill.victimId);
-    if (!victim) continue;
-    const cause: AiLossEventSinceConsultation['cause'] = directVictims.has(kill.victimId)
-      ? 'direct_fire'
-      : returnVictims.has(kill.victimId)
-        ? 'return_fire'
-        : 'melee_or_other';
-    run(
-      `INSERT OR REPLACE INTO ai_loss_events_since_consultation
-       (player_id, turn_number, victim_unit_id, victim_player, cause, killer_ids_json)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [playerId, turnNumber, kill.victimId, victim.player, cause, JSON.stringify(kill.killerIds ?? [])]
-    );
-    recordedCount++;
-  }
-  logDebug('gameDb addAiLossEventsSinceConsultation', {
+  addAiLossEventsSinceConsultationFromModule(
+    getAiStateDbOps(),
     playerId,
     turnNumber,
-    removedCount: removedUnits.length,
-    killCount: kills.length,
-    recordedCount,
-  });
+    removedUnits,
+    kills,
+    killsByDirectFire,
+    killsByReturnFire
+  );
 }
 
 /**
@@ -1888,46 +881,14 @@ export function addAiLossEventsSinceConsultation(
  * Use this to build an explicit "losses since last call" briefing block.
  */
 export function getAiLossEventsSinceConsultation(playerId: string): AiLossEventSinceConsultation[] {
-  logTrace('gameDb getAiLossEventsSinceConsultation', { playerId });
-  if (!db) return [];
-  const rows = getAll<{
-    turn_number: number;
-    victim_unit_id: string;
-    victim_player: string;
-    cause: AiLossEventSinceConsultation['cause'];
-    killer_ids_json: string;
-  }>(
-    `SELECT turn_number, victim_unit_id, victim_player, cause, killer_ids_json
-     FROM ai_loss_events_since_consultation
-     WHERE player_id = ?
-     ORDER BY turn_number ASC, victim_unit_id ASC`,
-    [playerId]
-  );
-  return rows.map((row) => {
-    let killerIds: string[] = [];
-    try {
-      const parsed = JSON.parse(row.killer_ids_json) as unknown;
-      if (Array.isArray(parsed)) killerIds = parsed.filter((x): x is string => typeof x === 'string');
-    } catch {
-      killerIds = [];
-    }
-    return {
-      turnNumber: row.turn_number,
-      victimUnitId: row.victim_unit_id,
-      victimPlayer: row.victim_player,
-      cause: row.cause,
-      killerIds,
-    };
-  });
+  return getAiLossEventsSinceConsultationFromModule(getAiStateDbOps(), playerId);
 }
 
 /**
  * Clears accumulated loss events after a successful LLM consultation so the next briefing window starts fresh.
  */
 export function clearAiLossEventsSinceConsultation(playerId: string): void {
-  logDebug('gameDb clearAiLossEventsSinceConsultation', { playerId });
-  if (!db) return;
-  run('DELETE FROM ai_loss_events_since_consultation WHERE player_id = ?', [playerId]);
+  clearAiLossEventsSinceConsultationFromModule(getAiStateDbOps(), playerId);
 }
 
 /**
@@ -1940,47 +901,7 @@ export function getAiPendingOrders(playerId: string): {
   airStrikeOrders: AirStrikeOrder[];
   ferryOrders: FerryOrder[];
 } | null {
-  logTrace('gameDb getAiPendingOrders', { playerId });
-  if (!db) return null;
-  const row = getOne<{ movement_orders: string; ranged_orders: string; strategy_text: string | null }>(
-    'SELECT movement_orders, ranged_orders, strategy_text FROM ai_pending_orders WHERE player_id = ?',
-    [playerId]
-  );
-  if (!row) return null;
-  try {
-    const movementOrders = JSON.parse(row.movement_orders) as MovementOrder[];
-    const rangedOrders = JSON.parse(row.ranged_orders) as RangedAttackOrder[];
-    const { airStrikeOrders, ferryOrders } = decodeAiPendingOrdersExtra(row.strategy_text);
-    return { movementOrders, rangedOrders, airStrikeOrders, ferryOrders };
-  } catch (err) {
-    logError('gameDb getAiPendingOrders: failed to parse stored orders', err);
-    return null;
-  }
-}
-
-function coerceAiPendingOrdersExtraPayload(value: unknown): AiPendingOrdersExtraPayload {
-  const payload = value as { airStrikeOrders?: unknown; ferryOrders?: unknown } | null;
-  const airStrikeOrders = Array.isArray(payload?.airStrikeOrders) ? (payload.airStrikeOrders as AirStrikeOrder[]) : [];
-  const ferryOrders = Array.isArray(payload?.ferryOrders) ? (payload.ferryOrders as FerryOrder[]) : [];
-  return { airStrikeOrders, ferryOrders };
-}
-
-function decodeAiPendingOrdersExtra(
-  strategyText: string | null
-): AiPendingOrdersExtraPayload {
-  if (typeof strategyText !== 'string' || strategyText.trim().length === 0) {
-    return { airStrikeOrders: [], ferryOrders: [] };
-  }
-  try {
-    return coerceAiPendingOrdersExtraPayload(JSON.parse(strategyText));
-  } catch (err) {
-    logError('gameDb decodeAiPendingOrdersExtra: failed to parse pending-order extra payload', err);
-    return { airStrikeOrders: [], ferryOrders: [] };
-  }
-}
-
-function encodeAiPendingOrdersExtra(payload: AiPendingOrdersExtraPayload): string {
-  return JSON.stringify(payload);
+  return getAiPendingOrdersFromModule(getAiStateDbOps(), playerId);
 }
 
 /**
@@ -1994,49 +915,14 @@ export function setAiPendingOrders(
   airStrikeOrders: AirStrikeOrder[] = [],
   ferryOrders: FerryOrder[] = []
 ): void {
-  logDebug('gameDb setAiPendingOrders', {
-    playerId,
-    movementCount: movementOrders.length,
-    rangedCount: rangedOrders.length,
-    airStrikeCount: airStrikeOrders.length,
-    ferryCount: ferryOrders.length,
-  });
-  if (!db) return;
-  const strategyText = encodeAiPendingOrdersExtra({
-    airStrikeOrders,
-    ferryOrders,
-  });
-  run(
-    'INSERT OR REPLACE INTO ai_pending_orders (player_id, movement_orders, ranged_orders, strategy_text) VALUES (?, ?, ?, ?)',
-    [playerId, JSON.stringify(movementOrders), JSON.stringify(rangedOrders), strategyText]
-  );
+  setAiPendingOrdersFromModule(getAiStateDbOps(), playerId, movementOrders, rangedOrders, airStrikeOrders, ferryOrders);
 }
 
 /**
  * Deletes staged AI orders for a player after they have been applied or superseded. Use paired with getAiPendingOrders.
  */
 export function clearAiPendingOrders(playerId: string): void {
-  logDebug('gameDb clearAiPendingOrders', { playerId });
-  if (!db) return;
-  run('DELETE FROM ai_pending_orders WHERE player_id = ?', [playerId]);
-}
-
-function seedInitialHexControlFromUnitOccupancy(): void {
-  logDebug('gameDb seedInitialHexControlFromUnitOccupancy');
-  if (!db) return;
-  run('DELETE FROM res1_control');
-  const rows = getAll<{ h3Index: string; distinctPlayers: number; solePlayer: string | null }>(
-    `SELECT h3_index AS h3Index,
-            COUNT(DISTINCT player) AS distinctPlayers,
-            CASE WHEN COUNT(DISTINCT player) = 1 THEN MIN(player) ELSE NULL END AS solePlayer
-     FROM units
-     GROUP BY h3_index`
-  );
-  for (const row of rows) {
-    if (row.distinctPlayers === 1 && row.solePlayer) {
-      run('INSERT INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [row.h3Index, row.solePlayer]);
-    }
-  }
+  clearAiPendingOrdersFromModule(getAiStateDbOps(), playerId);
 }
 
 /**
@@ -2045,40 +931,19 @@ function seedInitialHexControlFromUnitOccupancy(): void {
  * Optionally disables fog of war for the new match so both sides always receive full-map/full-unit snapshots.
  */
 export function resetGameForNewMatch(options?: { fogOfWarEnabled?: boolean }): void {
-  const fogOfWarEnabled = options?.fogOfWarEnabled !== false;
-  logDebug('gameDb resetGameForNewMatch', { fogOfWarEnabled });
-  if (!db) return;
-  run('DELETE FROM units');
-  run('DELETE FROM hexes');
-  run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('map_size', 'world')");
-  run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [FOG_OF_WAR_ENABLED_KEY, fogOfWarEnabled ? '1' : '0']);
-  run("DELETE FROM game_config WHERE key = 'game_seed'");
-  run("DELETE FROM game_config WHERE key LIKE 'unit_display_sequence_%'");
-  seedGameSeedIfMissing();
-  seedHexesFromTerrainMetadata();
-  seedInfrastructureStateFromMetadata();
-  seedUnits();
-  run('DELETE FROM pending_orders');
-  run('DELETE FROM pending_ranged_orders');
-  run('DELETE FROM pending_air_orders');
-  run('DELETE FROM pending_ferry_orders');
-  run('UPDATE turn_state SET phase = ?, turn_number = 1 WHERE id = 1', ['planning']);
-  clearGameOver();
-  run('DELETE FROM game_config WHERE key = ?', [AI_TOOL_LIMIT_EXCEEDED_KEY]);
-  run('DELETE FROM ai_callback_subscriptions');
-  run('DELETE FROM ai_pending_orders');
-  run('DELETE FROM ai_combat_since_consultation');
-  run('DELETE FROM ai_loss_events_since_consultation');
-  run("DELETE FROM game_config WHERE key = 'ai_last_consultation_turn'");
-  run("DELETE FROM game_config WHERE key IN ('fog_new_contacts_human', 'fog_new_contacts_opponent')");
-  run('DELETE FROM standing_orders');
-  run('DELETE FROM ai_memory');
-  run('DELETE FROM player_hex_intel');
-  run('DELETE FROM player_unit_intel');
-  run('DELETE FROM res1_control');
-  run('DELETE FROM res1_build_queue');
-  run('DELETE FROM res1_build_progress');
-  seedInitialHexControlFromUnitOccupancy();
-  refreshFogOfWarIntelFromCurrentState();
-  saveDatabase();
+  resetGameForNewMatchFromModule(
+    {
+      hasDb: () => db !== null,
+      run,
+      getAll,
+      clearGameOver,
+      seedGameSeedIfMissing,
+      seedHexesFromTerrainMetadata,
+      seedInfrastructureStateFromMetadata,
+      seedUnits,
+      refreshFogOfWarIntelFromCurrentState: () => refreshFogOfWarIntelFromCurrentState(),
+      saveDatabase,
+    },
+    options
+  );
 }
