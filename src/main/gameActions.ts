@@ -26,6 +26,7 @@ import {
   allocateNextUnitDisplayOrder,
   listUnitsForSnapshot,
   getRes1InfrastructureForHex,
+  getGameStateForPlayer,
 } from './gameDb';
 import { buildLatLngCoordinateMap, getOrderedHexList } from './mapData';
 import { getRange } from './combatConstants';
@@ -402,7 +403,7 @@ export function listHumanStandingOrders(): HumanStandingOrderView[] {
           const planned = executePlanRoute(
             unitId,
             [Number(o.destination[0]), Number(o.destination[1])],
-            { avoidEnemies: true },
+            { avoidEnemies: false },
             state,
             latLngByH3,
             resolveToH3
@@ -898,7 +899,8 @@ export function ready(
     const preMoveState = dbBackedStateSnapshot();
     const preMoveHexList = preMoveState.hexes.map((h) => h.h3Index);
     const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(preMoveHexList);
-    const generatedHuman = generateOrdersForStandingOrders(HUMAN_PLAYER_ID, preMoveState, latLngByH3, resolveToH3);
+    const preMoveStateForHuman = getGameStateForPlayer(HUMAN_PLAYER_ID, { maskUnexploredTerrain: false });
+    const generatedHuman = generateOrdersForStandingOrders(HUMAN_PLAYER_ID, preMoveStateForHuman, latLngByH3, resolveToH3);
     const mergedHuman = new Map<string, string>();
     for (const o of generatedHuman.movementOrders) mergedHuman.set(o.unitId, o.toH3Index);
     for (const o of humanOrders) mergedHuman.set(o.unit_id, o.to_h3_index);

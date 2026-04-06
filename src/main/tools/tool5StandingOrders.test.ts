@@ -8,7 +8,7 @@ import * as assert from 'assert';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { cellToLatLng, latLngToCell } from 'h3-js';
+import { cellToLatLng, gridDisk, latLngToCell } from 'h3-js';
 import { executeTool5, getInjectionText } from './tool5StandingOrders';
 import {
   dbGetOne,
@@ -196,6 +196,53 @@ function testGenerateRemovesArrivedMarchOrder(): void {
   }
 }
 
+function testHumanMarchDefaultsAvoidEnemiesFalse(): void {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-tool5-'));
+  const dbPath = path.join(tempDir, 't.sqlite');
+  try {
+    openGameDatabaseAtPathForTests(dbPath);
+    resetGameForNewMatch();
+    const state = getGameState();
+    const unit = state.units.find((u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor'));
+    assert.ok(unit, 'Expected a human land unit in seeded test state');
+    const hexByH3 = new Map(state.hexes.map((h) => [h.h3Index, h]));
+    const destinationH3 = gridDisk(unit!.h3Index, 1).find((h3) => {
+      if (h3 === unit!.h3Index) return false;
+      const hex = hexByH3.get(h3);
+      if (!hex) return false;
+      return hex.terrain !== 'water';
+    });
+    assert.ok(destinationH3, 'Expected an adjacent non-water destination hex');
+    const [destLat, destLng] = cellToLatLng(destinationH3!);
+    const latLngByH3 = new Map(state.hexes.map((h) => [h.h3Index, cellToLatLng(h.h3Index) as [number, number]]));
+    const resolveToH3 = (a: number, b: number): string | undefined => {
+      try {
+        return latLngToCell(a, b, 1);
+      } catch {
+        return undefined;
+      }
+    };
+    const result = executeStandingOrderActionForPlayer(
+      'human',
+      'assign_order',
+      { unitId: unit!.id, order: { type: 'march', destination: [destLat, destLng] } },
+      state,
+      latLngByH3,
+      resolveToH3
+    );
+    assert.strictEqual(result.status, 'ok');
+    const row = dbGetOne<{ params: string }>(
+      'SELECT params FROM standing_orders WHERE player_id = ? AND unit_id = ?',
+      ['human', unit!.id]
+    );
+    assert.ok(row?.params, 'Expected persisted standing order params');
+    const parsed = JSON.parse(row!.params) as { avoidEnemies?: boolean };
+    assert.strictEqual(parsed.avoidEnemies, false, 'Human march should default avoidEnemies to false');
+  } finally {
+    closeGameDatabaseForTests();
+  }
+}
+
 function run(): void {
   testAssignOrderUnitNotFound();
   testAssignOrderPursueTargetNotFound();
@@ -205,6 +252,7 @@ function run(): void {
   testGetInjectionTextEmpty();
   testAssignMarchToCurrentHexDoesNotPersistStandingOrder();
   testGenerateRemovesArrivedMarchOrder();
+  testHumanMarchDefaultsAvoidEnemiesFalse();
   console.log('tool5StandingOrders tests passed');
 }
 

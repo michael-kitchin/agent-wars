@@ -88,15 +88,12 @@ export function getLandWaterToWaterMoveBlockReason(args: {
     const terrainKind = args.terrainKindByH3.get(h3Index) ?? '';
     return terrain === 'water' || terrain === 'arctic' || terrainKind === 'water' || terrainKind === 'arctic';
   };
-  const specialHexes = routeH3.filter((h3Index) => isWaterOrArcticHex(h3Index));
-  if (specialHexes.length === 0) return null;
-  const firstSpecial = specialHexes[0];
-  const hasInternalSpecial = specialHexes.some((h3Index) => h3Index !== args.originH3Index && h3Index !== args.destinationH3Index);
-  const hasMultipleSpecialHexes = specialHexes.length > 1;
-  const hasSingleNonEndpointSpecial =
-    specialHexes.length === 1 && firstSpecial !== args.originH3Index && firstSpecial !== args.destinationH3Index;
-  if (hasInternalSpecial || hasMultipleSpecialHexes || hasSingleNonEndpointSpecial) {
-    return LAND_UNITS_CANNOT_MOVE_WATER_OR_ARCTIC_TO_WATER_OR_ARCTIC_REASON;
+  for (let i = 1; i < routeH3.length; i++) {
+    const previousHex = routeH3[i - 1]!;
+    const currentHex = routeH3[i]!;
+    if (isWaterOrArcticHex(previousHex) && isWaterOrArcticHex(currentHex)) {
+      return LAND_UNITS_CANNOT_MOVE_WATER_OR_ARCTIC_TO_WATER_OR_ARCTIC_REASON;
+    }
   }
   return null;
 }
@@ -127,7 +124,7 @@ export function buildTerrainMapsFromHexRows(
  * When to use:
  *     Movement order validation and hover preview validation for infantry/armor movement attempts.
  * What to expect:
- *     Returns the first blocking reason (embarked-at-sea, then water->water, then arctic); returns null when allowed.
+ *     Returns the first blocking reason (embarked-at-sea, then consecutive special-class transitions); returns null when allowed.
  */
 export function getLandMovementBlockReason(args: {
   unitType: string;
@@ -150,14 +147,5 @@ export function getLandMovementBlockReason(args: {
     traversedH3Indices: args.traversedH3Indices,
   });
   if (waterToWaterReason) return waterToWaterReason;
-  const arcticReason = getArcticMovementBlockReason({
-    unitType: args.unitType,
-    originH3Index: args.originH3Index,
-    destinationH3Index: args.destinationH3Index,
-    terrainKindByH3: args.terrainKindByH3,
-    terrainByH3: args.terrainByH3,
-    traversedH3Indices: args.traversedH3Indices,
-  });
-  if (arcticReason) return arcticReason;
   return null;
 }

@@ -21,7 +21,6 @@ import { getRes1ProductionContext } from './terrainClassificationCache';
 import { withTempGameDb } from './testSupport/withTempGameDb';
 import {
   EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON,
-  LAND_UNITS_CANNOT_ENTER_ARCTIC_REASON,
   LAND_UNITS_CANNOT_MOVE_WATER_OR_ARCTIC_TO_WATER_OR_ARCTIC_REASON,
 } from './game-actions/landMovementConstraints';
 
@@ -334,7 +333,7 @@ function testReadyIncludesEmbarkedCargoFollowMoveForNavalMovement(): void {
   });
 }
 
-function testSubmitOrdersRejectsLandMovementToArcticHex(): void {
+function testSubmitOrdersAllowsLandMovementToSingleArcticHex(): void {
   withTempDb(() => {
     const state = getGameState();
     const landUnit = state.units.find((u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor'));
@@ -345,12 +344,11 @@ function testSubmitOrdersRejectsLandMovementToArcticHex(): void {
     const result = submitOrders({
       movementOrders: [{ unitId: landUnit!.id, toH3Index: adjacent! }],
     });
-    assert.strictEqual(result.success, false);
-    assert.strictEqual(result.reason, LAND_UNITS_CANNOT_ENTER_ARCTIC_REASON);
+    assert.strictEqual(result.success, true, result.reason ?? 'expected single-transition movement into arctic to be allowed');
   });
 }
 
-function testSubmitOrdersRejectsLandMovementFromArcticHex(): void {
+function testSubmitOrdersAllowsLandMovementFromSingleArcticHex(): void {
   withTempDb(() => {
     const state = getGameState();
     const landUnit = state.units.find((u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor'));
@@ -362,8 +360,7 @@ function testSubmitOrdersRejectsLandMovementFromArcticHex(): void {
     const result = submitOrders({
       movementOrders: [{ unitId: landUnit!.id, toH3Index: adjacent! }],
     });
-    assert.strictEqual(result.success, false);
-    assert.strictEqual(result.reason, LAND_UNITS_CANNOT_ENTER_ARCTIC_REASON);
+    assert.strictEqual(result.success, true, result.reason ?? 'expected single-transition movement from arctic to be allowed');
   });
 }
 
@@ -427,8 +424,8 @@ function run(): void {
   testAssignMarchRejectsAirUnits();
   testPreviewEmbarkedLandUnitOnWaterShowsInvalidWithoutPathPlanning();
   testReadyIncludesEmbarkedCargoFollowMoveForNavalMovement();
-  testSubmitOrdersRejectsLandMovementToArcticHex();
-  testSubmitOrdersRejectsLandMovementFromArcticHex();
+  testSubmitOrdersAllowsLandMovementToSingleArcticHex();
+  testSubmitOrdersAllowsLandMovementFromSingleArcticHex();
   testSubmitOrdersRejectsLandWaterToWaterPortMovement();
   testPreviewShowsInvalidForLandWaterToWaterPortMovement();
   testSubmitOrdersRejectsLandWaterToArcticPortMovement();

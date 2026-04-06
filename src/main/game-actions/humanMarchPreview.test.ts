@@ -1,0 +1,89 @@
+import * as assert from 'assert';
+import { dbRun, getGameState } from '../gameDb';
+import { withTempGameDb } from '../testSupport/withTempGameDb';
+import {
+  configureHumanMarchPreviewCacheLimitsForTests,
+  getHumanMarchPreviewDiagnostics,
+  previewHumanMarchOrdersImpl,
+  resetHumanMarchPreviewDiagnosticsForTests,
+} from './humanMarchPreview';
+
+function withTempDb(runCase: () => void): void {
+  withTempGameDb('aw-human-march-preview-', runCase);
+}
+
+function testSessionInvalidatesOnSelectionChange(): void {
+  withTempDb(() => {
+    resetHumanMarchPreviewDiagnosticsForTests();
+    const state = getGameState();
+    const humanUnits = state.units.filter((u) => u.player === 'human');
+    assert.ok(humanUnits.length >= 2, 'expected at least two human units');
+    const hovered = state.hexes[0]?.h3Index ?? '';
+    assert.ok(hovered, 'expected a hovered destination hex');
+
+    previewHumanMarchOrdersImpl([humanUnits[0]!.id], hovered);
+    previewHumanMarchOrdersImpl([humanUnits[0]!.id], hovered);
+    previewHumanMarchOrdersImpl([humanUnits[1]!.id], hovered);
+
+    const diagnostics = getHumanMarchPreviewDiagnostics();
+    assert.ok(diagnostics.sessionCreateCount >= 2, 'expected a new session after selection change');
+    assert.ok(diagnostics.sessionReuseCount >= 1, 'expected session reuse for repeated selection');
+    assert.ok(diagnostics.sessionInvalidateCount >= 1, 'expected invalidation when selection changed');
+  });
+}
+
+function testCacheEvictionRespectsConfiguredBounds(): void {
+  withTempDb(() => {
+    resetHumanMarchPreviewDiagnosticsForTests();
+    configureHumanMarchPreviewCacheLimitsForTests({ route: 3, result: 4, throttle: 2 });
+    const state = getGameState();
+    const unit = state.units.find((u) => u.player === 'human');
+    assert.ok(unit, 'expected a seeded human unit');
+    const hoveredHexes = state.hexes.slice(0, 20).map((hex) => hex.h3Index);
+    assert.ok(hoveredHexes.length >= 8, 'expected enough destination hexes for eviction test');
+
+    for (const hoveredH3Index of hoveredHexes) {
+      previewHumanMarchOrdersImpl([unit!.id], hoveredH3Index);
+    }
+
+    const diagnostics = getHumanMarchPreviewDiagnostics();
+    assert.ok(diagnostics.routeCacheSize <= 3, `route cache exceeded bound: ${diagnostics.routeCacheSize}`);
+    assert.ok(diagnostics.resultCacheSize <= 4, `result cache exceeded bound: ${diagnostics.resultCacheSize}`);
+    assert.ok(diagnostics.throttleCacheSize <= 2, `throttle cache exceeded bound: ${diagnostics.throttleCacheSize}`);
+    configureHumanMarchPreviewCacheLimitsForTests();
+  });
+}
+
+function testSessionInvalidatesOnVisibleOccupancyChange(): void {
+  withTempDb(() => {
+    resetHumanMarchPreviewDiagnosticsForTests();
+    const state = getGameState();
+    const humanUnit = state.units.find((u) => u.player === 'human');
+    const movingUnit = state.units.find((u) => u.player === 'opponent');
+    assert.ok(humanUnit, 'expected a seeded human unit');
+    assert.ok(movingUnit, 'expected a seeded opponent unit');
+    const originalHex = movingUnit!.h3Index;
+    const destinationHex = state.hexes.find((hex) => hex.h3Index !== originalHex)?.h3Index;
+    assert.ok(destinationHex, 'expected an alternate hex for occupancy change');
+    const hovered = state.hexes[0]?.h3Index ?? '';
+    assert.ok(hovered, 'expected a hovered destination hex');
+
+    previewHumanMarchOrdersImpl([humanUnit!.id], hovered);
+    previewHumanMarchOrdersImpl([humanUnit!.id], hovered);
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [destinationHex!, movingUnit!.id]);
+    previewHumanMarchOrdersImpl([humanUnit!.id], hovered);
+
+    const diagnostics = getHumanMarchPreviewDiagnostics();
+    assert.ok(diagnostics.sessionReuseCount >= 1, 'expected session reuse before occupancy changed');
+    assert.ok(diagnostics.sessionInvalidateCount >= 1, 'expected invalidation after occupancy changed');
+  });
+}
+
+function run(): void {
+  testSessionInvalidatesOnSelectionChange();
+  testCacheEvictionRespectsConfiguredBounds();
+  testSessionInvalidatesOnVisibleOccupancyChange();
+  console.log('humanMarchPreview tests passed');
+}
+
+run();
