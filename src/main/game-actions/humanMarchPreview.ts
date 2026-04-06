@@ -8,12 +8,38 @@ import { logError, logTrace } from '../logger';
 import { AIR_FERRY_RANGE_HEXES, MOVEMENT_RANGE_BY_UNIT_TYPE, formatFerryOutOfRangeReason } from '../../shared/tacticalRanges';
 import { isWithinGridRangeSafe } from './gridRange';
 import { isEmbarkedLandUnitOnWater } from './sealift';
+import {
+  buildTerrainMapsFromHexRows,
+  EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON,
+  getLandMovementBlockReason,
+  isLandUnitType,
+} from './landMovementConstraints';
+import type { PlanRouteError, PlanRouteOk } from '../tools/tool1Pathfinding';
 
 type HumanOwnedUnit = { id: string; player: string; unitType: string; h3Index: string };
 type StateSnapshot = {
   hexes: Array<{ h3Index: string; terrain: string; terrainKind: string }>;
   units: Array<{ id: string; player: string; unitType: string; h3Index: string }>;
 };
+
+type PlanRouteResult = PlanRouteOk | PlanRouteError;
+type PreviewComputationContext = {
+  state: StateSnapshot;
+  latLngByH3: Map<string, [number, number]>;
+  resolveToH3: (lat: number, lng: number) => string | undefined;
+  passabilityByH3: Map<string, string>;
+  terrainByH3: Map<string, string>;
+  terrainKindByH3: Map<string, string>;
+  stateCacheKey: string;
+};
+
+const MAX_PREVIEW_ROUTE_CACHE_ENTRIES = 2048;
+const MAX_PREVIEW_RESULT_CACHE_ENTRIES = 2048;
+const MAX_NEARBY_FALLBACK_ATTEMPTS = 6;
+const MAX_NEARBY_FALLBACK_RADIUS = 2;
+
+const previewRouteCache = new Map<string, PlanRouteResult>();
+const previewResultCache = new Map<string, HumanOrderPreviewResult>();
 
 export interface HumanOrderPreviewSegment {
   turn: number;
@@ -62,6 +88,87 @@ function selectionHasMixedLandAndNaval(units: HumanOwnedUnit[]): boolean {
   return hasNaval && hasLand;
 }
 
+function cacheSetBounded<T>(cache: Map<string, T>, key: string, value: T, maxEntries: number): void {
+  if (cache.has(key)) cache.delete(key);
+  cache.set(key, value);
+  while (cache.size > maxEntries) {
+    const oldestKey = cache.keys().next().value;
+    if (!oldestKey) break;
+    cache.delete(oldestKey);
+  }
+}
+
+function buildStateCacheKey(state: StateSnapshot): string {
+  const unitSignature = state.units
+    .map((u) => `${u.id}:${u.h3Index}`)
+    .sort()
+    .join('|');
+  return `u:${unitSignature}`;
+}
+
+function executePlanRouteCached(context: PreviewComputationContext, unitId: string, destinationH3Index: string): PlanRouteResult {
+  const cacheKey = `${context.stateCacheKey}|${unitId}|${destinationH3Index}`;
+  const cached = previewRouteCache.get(cacheKey);
+  if (cached) return cached;
+  const destinationLatLng = context.latLngByH3.get(destinationH3Index) ?? cellToLatLng(destinationH3Index);
+  const planned = executePlanRoute(
+    unitId,
+    [destinationLatLng[0], destinationLatLng[1]],
+    { avoidEnemies: true },
+    context.state as never,
+    context.latLngByH3,
+    context.resolveToH3
+  );
+  cacheSetBounded(previewRouteCache, cacheKey, planned, MAX_PREVIEW_ROUTE_CACHE_ENTRIES);
+  return planned;
+}
+
+function findNearbyReachablePreview(
+  context: PreviewComputationContext,
+  unit: HumanOwnedUnit,
+  hoveredH3Index: string,
+  passableFor: 'land' | 'water'
+): HumanOrderPreviewResult | null {
+  let attempts = 0;
+  const seen = new Set<string>([hoveredH3Index]);
+  for (let radius = 1; radius <= MAX_NEARBY_FALLBACK_RADIUS; radius++) {
+    let ring: string[] = [];
+    try {
+      ring = gridDisk(hoveredH3Index, radius);
+    } catch {
+      break;
+    }
+    for (const candidateH3 of ring) {
+      if (attempts >= MAX_NEARBY_FALLBACK_ATTEMPTS) return null;
+      if (seen.has(candidateH3)) continue;
+      seen.add(candidateH3);
+      const passabilityTerrain = context.passabilityByH3.get(candidateH3) ?? 'land';
+      if (!terrainIsPassableForDomain(passabilityTerrain, passableFor)) continue;
+      if (isLandUnitType(unit.unitType) && candidateH3 !== unit.h3Index) {
+        const blockReason = getLandMovementBlockReason({
+          unitType: unit.unitType,
+          originH3Index: unit.h3Index,
+          destinationH3Index: candidateH3,
+          terrainByH3: context.terrainByH3,
+          terrainKindByH3: context.terrainKindByH3,
+          isEmbarkedAtSea: false,
+        });
+        if (blockReason) continue;
+      }
+      attempts += 1;
+      const planned = executePlanRouteCached(context, unit.id, candidateH3);
+      if (planned.status !== 'ok') continue;
+      return {
+        valid: true,
+        showInvalidMarker: false,
+        arrowLatLng: planned.destination,
+        segments: planned.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes })),
+      };
+    }
+  }
+  return null;
+}
+
 function hexSupportsMixedLandAndNaval(hex: { h3Index: string; terrain: string; terrainKind?: string }): boolean {
   const passabilityByH3 = buildNormalizedTerrainByH3([hex]);
   const passabilityTerrain = passabilityByH3.get(hex.h3Index) ?? 'land';
@@ -71,17 +178,15 @@ function hexSupportsMixedLandAndNaval(hex: { h3Index: string; terrain: string; t
   );
 }
 
-function buildHumanMarchPreviewForUnit(
-  state: StateSnapshot,
-  latLngByH3: Map<string, [number, number]>,
-  resolveToH3: (lat: number, lng: number) => string | undefined,
-  unitId: string,
-  hoveredH3Index: string
-): HumanOrderPreviewResult {
-  const unit = state.units.find((u) => u.id === unitId && u.player === 'human');
+function buildHumanMarchPreviewForUnit(context: PreviewComputationContext, unitId: string, hoveredH3Index: string): HumanOrderPreviewResult {
+  const cacheKey = `${context.stateCacheKey}|${unitId}|${hoveredH3Index}`;
+  const cached = previewResultCache.get(cacheKey);
+  if (cached) return cached;
+  const unit = context.state.units.find((u) => u.id === unitId && u.player === 'human');
   if (!unit) return { valid: false, showInvalidMarker: false, invalidReason: 'Unit not found', segments: [] };
-  const hoveredHex = state.hexes.find((h) => h.h3Index === hoveredH3Index);
+  const hoveredHex = context.state.hexes.find((h) => h.h3Index === hoveredH3Index);
   if (!hoveredHex) return { valid: false, showInvalidMarker: false, segments: [] };
+  let result: HumanOrderPreviewResult;
   if (unit.unitType === 'air') {
     const controller = getHexController(hoveredH3Index);
     if (controller !== 'human') {
@@ -110,9 +215,9 @@ function buildHumanMarchPreviewForUnit(
         segments: [],
       };
     }
-    const originLatLng = latLngByH3.get(unit.h3Index) ?? cellToLatLng(unit.h3Index);
-    const destinationLatLng = latLngByH3.get(hoveredH3Index) ?? cellToLatLng(hoveredH3Index);
-    return {
+    const originLatLng = context.latLngByH3.get(unit.h3Index) ?? cellToLatLng(unit.h3Index);
+    const destinationLatLng = context.latLngByH3.get(hoveredH3Index) ?? cellToLatLng(hoveredH3Index);
+    result = {
       valid: true,
       showInvalidMarker: false,
       arrowLatLng: [destinationLatLng[0], destinationLatLng[1]],
@@ -126,72 +231,78 @@ function buildHumanMarchPreviewForUnit(
         },
       ],
     };
+    cacheSetBounded(previewResultCache, cacheKey, result, MAX_PREVIEW_RESULT_CACHE_ENTRIES);
+    return result;
   }
 
-  const unitIsLand = unit.unitType === 'infantry' || unit.unitType === 'armor';
+  const unitIsLand = isLandUnitType(unit.unitType);
   if (unitIsLand && isEmbarkedLandUnitOnWater(unit.id)) {
-    return {
+    result = {
       valid: false,
       showInvalidMarker: true,
-      invalidReason: 'Embarked land units cannot receive independent movement orders while at sea.',
+      invalidReason: getLandMovementBlockReason({
+        unitType: unit.unitType,
+        originH3Index: unit.h3Index,
+        destinationH3Index: unit.h3Index,
+        terrainByH3: context.terrainByH3,
+        terrainKindByH3: context.terrainKindByH3,
+        isEmbarkedAtSea: true,
+      }) ?? EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON,
       segments: [],
     };
+    cacheSetBounded(previewResultCache, cacheKey, result, MAX_PREVIEW_RESULT_CACHE_ENTRIES);
+    return result;
+  }
+  if (unitIsLand && hoveredH3Index !== unit.h3Index) {
+    const blockReason = getLandMovementBlockReason({
+      unitType: unit.unitType,
+      originH3Index: unit.h3Index,
+      destinationH3Index: hoveredH3Index,
+      terrainByH3: context.terrainByH3,
+      terrainKindByH3: context.terrainKindByH3,
+      isEmbarkedAtSea: false,
+    });
+    if (blockReason) {
+      result = {
+        valid: false,
+        showInvalidMarker: true,
+        invalidReason: blockReason,
+        segments: [],
+      };
+      cacheSetBounded(previewResultCache, cacheKey, result, MAX_PREVIEW_RESULT_CACHE_ENTRIES);
+      return result;
+    }
   }
 
   const passableFor = unit.unitType === 'naval' ? 'water' : 'land';
-  const passabilityByH3 = buildNormalizedTerrainByH3(state.hexes);
-  const hoveredPassabilityTerrain = passabilityByH3.get(hoveredHex.h3Index) ?? 'land';
+  const hoveredPassabilityTerrain = context.passabilityByH3.get(hoveredHex.h3Index) ?? 'land';
   const hoveredPassable = terrainIsPassableForDomain(hoveredPassabilityTerrain, passableFor);
-  const [hoverLat, hoverLng] = cellToLatLng(hoveredH3Index);
-  const direct = executePlanRoute(unitId, [hoverLat, hoverLng], { avoidEnemies: true }, state as never, latLngByH3, resolveToH3);
-  if (hoveredPassable && direct.status === 'ok') {
-    return {
+  const direct = hoveredPassable ? executePlanRouteCached(context, unitId, hoveredH3Index) : undefined;
+  if (hoveredPassable && direct?.status === 'ok') {
+    result = {
       valid: true,
       showInvalidMarker: false,
       arrowLatLng: direct.destination,
       segments: direct.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes })),
     };
+    cacheSetBounded(previewResultCache, cacheKey, result, MAX_PREVIEW_RESULT_CACHE_ENTRIES);
+    return result;
   }
 
-  let partialArrow: [number, number] | undefined;
-  let partialSegments: HumanOrderPreviewSegment[] = [];
-  const hexByH3 = new Map(state.hexes.map((h) => [h.h3Index, h]));
-  const seen = new Set<string>();
-  for (let radius = 1; radius <= 12; radius++) {
-    let ring: string[] = [];
-    try {
-      ring = gridDisk(hoveredH3Index, radius);
-    } catch {
-      break;
-    }
-    const candidates = ring.filter((h3) => {
-      if (seen.has(h3)) return false;
-      seen.add(h3);
-      if (h3 === hoveredH3Index) return false;
-      const hx = hexByH3.get(h3);
-      if (!hx) return false;
-      return terrainIsPassableForDomain(passabilityByH3.get(h3) ?? 'land', passableFor);
-    });
-    if (candidates.length === 0) continue;
-    for (const candidateH3 of candidates) {
-      const [nearLat, nearLng] = cellToLatLng(candidateH3);
-      const partial = executePlanRoute(unitId, [nearLat, nearLng], { avoidEnemies: true }, state as never, latLngByH3, resolveToH3);
-      if (partial.status === 'ok') {
-        partialArrow = partial.destination;
-        partialSegments = partial.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes }));
-        break;
-      }
-    }
-    if (partialSegments.length > 0) break;
+  const nearby = findNearbyReachablePreview(context, unit, hoveredH3Index, passableFor);
+  if (nearby) {
+    cacheSetBounded(previewResultCache, cacheKey, nearby, MAX_PREVIEW_RESULT_CACHE_ENTRIES);
+    return nearby;
   }
 
-  return {
+  result = {
     valid: false,
     showInvalidMarker: true,
     invalidReason: 'Destination is invalid for this unit type or unreachable.',
-    arrowLatLng: partialArrow,
-    segments: partialSegments,
+    segments: [],
   };
+  cacheSetBounded(previewResultCache, cacheKey, result, MAX_PREVIEW_RESULT_CACHE_ENTRIES);
+  return result;
 }
 
 export function previewHumanMarchOrderImpl(unitId: string, hoveredH3Index: string): HumanOrderPreviewResult {
@@ -201,7 +312,17 @@ export function previewHumanMarchOrderImpl(unitId: string, hoveredH3Index: strin
     const state = snapshotState();
     const hexList = state.hexes.map((h) => h.h3Index);
     const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
-    return buildHumanMarchPreviewForUnit(state, latLngByH3, resolveToH3, unitId, hoveredH3Index);
+    const { terrainByH3, terrainKindByH3 } = buildTerrainMapsFromHexRows(state.hexes);
+    const context: PreviewComputationContext = {
+      state,
+      latLngByH3,
+      resolveToH3,
+      passabilityByH3: buildNormalizedTerrainByH3(state.hexes),
+      terrainByH3,
+      terrainKindByH3,
+      stateCacheKey: buildStateCacheKey(state),
+    };
+    return buildHumanMarchPreviewForUnit(context, unitId, hoveredH3Index);
   } catch (err) {
     logError('previewHumanMarchOrder: exception', err);
     return { valid: false, showInvalidMarker: false, invalidReason: String(err), segments: [] };
@@ -233,6 +354,16 @@ export function previewHumanMarchOrdersImpl(unitIds: string[], hoveredH3Index: s
     const state = snapshotState();
     const hexList = state.hexes.map((h) => h.h3Index);
     const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
+    const { terrainByH3, terrainKindByH3 } = buildTerrainMapsFromHexRows(state.hexes);
+    const context: PreviewComputationContext = {
+      state,
+      latLngByH3,
+      resolveToH3,
+      passabilityByH3: buildNormalizedTerrainByH3(state.hexes),
+      terrainByH3,
+      terrainKindByH3,
+      stateCacheKey: buildStateCacheKey(state),
+    };
     const selectedUnits = uniqueUnitIds
       .map((unitId) => state.units.find((u) => u.id === unitId && u.player === 'human'))
       .filter((unit): unit is HumanOwnedUnit => !!unit);
@@ -252,7 +383,7 @@ export function previewHumanMarchOrdersImpl(unitIds: string[], hoveredH3Index: s
     const previewUnitIds = Array.from(representativeUnitIdsByOrigin.values());
     const previews: HumanOrderGroupPreviewUnitResult[] = previewUnitIds.map((unitId) => ({
       unitId,
-      preview: buildHumanMarchPreviewForUnit(state, latLngByH3, resolveToH3, unitId, hoveredH3Index),
+      preview: buildHumanMarchPreviewForUnit(context, unitId, hoveredH3Index),
     }));
     const invalid = previews.find((entry) => !entry.preview.valid);
     const hoveredHex = state.hexes.find((h) => h.h3Index === hoveredH3Index);

@@ -236,6 +236,8 @@ import {
   updatePendingOrdersSidebar as updatePendingOrdersSidebarFromModule,
 } from './gameplay/sidebarSupport';
 
+let stackCalloutNonSelectableUnitIds: ReadonlySet<string> = new Set<string>();
+
 declare global {
   interface Window {
     gameApi?: GameApi;
@@ -288,6 +290,7 @@ function hideStackCallout(): void {
     el.removeAttribute('data-unit-ids');
   }
   S.stackCalloutModalActive = false;
+  stackCalloutNonSelectableUnitIds = new Set<string>();
   scheduleTerrainTooltipRestoreAfterPopoverClose();
 }
 
@@ -350,23 +353,52 @@ function onStackSingleUnitToggleClick(
 
 function onStackAllActionClick(
   action: 'selectAll' | 'addAll' | 'removeAll',
-  humanIds: string[],
+  selectableHumanIds: string[],
   allUnitsAtHex: GameStateSnapshot['units'],
   clientX: number,
   clientY: number
 ): void {
-  if (humanIds.length === 0) return;
+  if (selectableHumanIds.length === 0) return;
   if (action === 'selectAll') {
-    replaceSelection(humanIds);
+    replaceSelection(selectableHumanIds);
     hideStackCallout();
     syncUiAfterSelectionChange({ refreshHoverPreview: false });
     return;
   }
   activateStackCalloutModal();
-  if (action === 'addAll') addUnitsToSelection(humanIds);
-  else removeUnitsFromSelection(humanIds);
+  if (action === 'addAll') addUnitsToSelection(selectableHumanIds);
+  else removeUnitsFromSelection(selectableHumanIds);
   showStackCallout(allUnitsAtHex, clientX, clientY);
   syncUiAfterSelectionChange({ refreshHoverPreview: false });
+}
+
+function applyStackCalloutSelectionButtonVisibility(calloutEl: HTMLElement, nonSelectableUnitIds: ReadonlySet<string>): void {
+  const listEl = document.getElementById('stack-callout-list');
+  if (!listEl) return;
+  const rows = Array.from(listEl.querySelectorAll('li'));
+  for (const row of rows) {
+    const unitId = row.getAttribute('data-unit-id');
+    if (!unitId) continue;
+    const btn = row.querySelector('button.stack-unit-toggle') as HTMLButtonElement | null;
+    if (!btn) continue;
+    btn.style.display = nonSelectableUnitIds.has(unitId) ? 'none' : '';
+  }
+}
+
+function setStackPopupNonSelectableUnitIds(calloutEl: HTMLElement, unitIds: string[]): void {
+  const normalized = [...new Set(unitIds)].sort((a, b) => a.localeCompare(b));
+  const nonSelectable = new Set<string>(normalized);
+  stackCalloutNonSelectableUnitIds = nonSelectable;
+  const selectedBlockedIds = normalized.filter((unitId) => S.selectedUnitIds.includes(unitId));
+  if (selectedBlockedIds.length > 0) {
+    removeUnitsFromSelection(selectedBlockedIds);
+    syncUiAfterSelectionChange({ refreshHoverPreview: false });
+  }
+  applyStackCalloutSelectionButtonVisibility(calloutEl, nonSelectable);
+}
+
+function getSelectableHumanIdsForStackCallout(units: GameStateSnapshot['units']): string[] {
+  return units.filter((u) => u.player === 'human' && !stackCalloutNonSelectableUnitIds.has(u.id)).map((u) => u.id);
 }
 
 function removeSealiftSection(calloutEl: HTMLElement): void {
@@ -389,6 +421,13 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
     if (calloutEl.classList.contains('hidden')) return;
     if (calloutEl.getAttribute('data-h3-index') !== h3Index) return;
     if (!state.showSealiftSection) return;
+    const nonSelectableEmbarkedIds =
+      state.contextMode === 'water'
+        ? state.navalRows
+            .flatMap((row) => [row.slot1UnitId, row.slot2UnitId])
+            .filter((unitId): unitId is string => typeof unitId === 'string' && unitId.length > 0)
+        : [];
+    setStackPopupNonSelectableUnitIds(calloutEl, nonSelectableEmbarkedIds);
 
     const section = document.createElement('div');
     section.className = 'stack-sealift-section';
@@ -442,25 +481,27 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
         });
         slotRow.appendChild(select);
 
-        const debarkBtn = document.createElement('button');
-        debarkBtn.type = 'button';
-        debarkBtn.className = 'unit-select stack-unit-toggle';
-        debarkBtn.textContent = UNIT_DESELECT_GLYPH;
-        debarkBtn.disabled = !debarkEnabled;
-        debarkBtn.addEventListener('click', async () => {
-          const result = await window.gameApi!.updateSealiftSlot({
-            h3Index,
-            navalUnitId: row.navalUnitId,
-            slotIndex,
-            landUnitId: null,
+        if (state.contextMode !== 'water') {
+          const debarkBtn = document.createElement('button');
+          debarkBtn.type = 'button';
+          debarkBtn.className = 'unit-select stack-unit-toggle';
+          debarkBtn.textContent = UNIT_DESELECT_GLYPH;
+          debarkBtn.disabled = !debarkEnabled;
+          debarkBtn.addEventListener('click', async () => {
+            const result = await window.gameApi!.updateSealiftSlot({
+              h3Index,
+              navalUnitId: row.navalUnitId,
+              slotIndex,
+              landUnitId: null,
+            });
+            if (!result.success) {
+              showMapToast(formatTargetingValidationReason(result.reason, 'Failed to debark unit.'));
+            }
+            refreshStackCalloutIfOpen();
+            requestRedraw();
           });
-          if (!result.success) {
-            showMapToast(formatTargetingValidationReason(result.reason, 'Failed to debark unit.'));
-          }
-          refreshStackCalloutIfOpen();
-          requestRedraw();
-        });
-        slotRow.appendChild(debarkBtn);
+          slotRow.appendChild(debarkBtn);
+        }
         right.appendChild(slotRow);
       };
 
@@ -505,6 +546,7 @@ function showStackCallout(
   calloutEl.setAttribute('data-y', String(clientY));
   calloutEl.setAttribute('data-h3-index', sorted[0]?.h3Index ?? '');
   calloutEl.setAttribute('data-unit-ids', JSON.stringify(sorted.map((u) => u.id)));
+  stackCalloutNonSelectableUnitIds = new Set<string>();
 
   listEl.innerHTML = '';
   const existingHeader = calloutEl.querySelector('.stack-callout-actions');
@@ -532,7 +574,7 @@ function showStackCallout(
     selectAllBtn.className = 'unit-select';
     selectAllBtn.textContent = `${UNIT_SELECT_GLYPH} All`;
     selectAllBtn.addEventListener('click', () => {
-      onStackAllActionClick('selectAll', humanIds, units, clientX, clientY);
+      onStackAllActionClick('selectAll', getSelectableHumanIdsForStackCallout(units), units, clientX, clientY);
     });
     header.appendChild(selectAllBtn);
   } else if (humanIds.length > 0) {
@@ -541,14 +583,14 @@ function showStackCallout(
     addAllBtn.className = 'unit-select';
     addAllBtn.textContent = `${UNIT_SELECT_GLYPH} All`;
     addAllBtn.addEventListener('click', () => {
-      onStackAllActionClick('addAll', humanIds, units, clientX, clientY);
+      onStackAllActionClick('addAll', getSelectableHumanIdsForStackCallout(units), units, clientX, clientY);
     });
     const removeAllBtn = document.createElement('button');
     removeAllBtn.type = 'button';
     removeAllBtn.className = 'unit-select';
     removeAllBtn.textContent = `${UNIT_DESELECT_GLYPH} All`;
     removeAllBtn.addEventListener('click', () => {
-      onStackAllActionClick('removeAll', humanIds, units, clientX, clientY);
+      onStackAllActionClick('removeAll', getSelectableHumanIdsForStackCallout(units), units, clientX, clientY);
     });
     header.appendChild(removeAllBtn);
     header.appendChild(addAllBtn);
@@ -556,6 +598,7 @@ function showStackCallout(
   calloutEl.insertBefore(header, listEl);
   for (const u of sorted) {
     const li = document.createElement('li');
+    li.setAttribute('data-unit-id', u.id);
     const label = document.createElement('span');
     label.className = 'unit-label';
     label.textContent = formatUnitDisplayName(u.id);
@@ -573,6 +616,7 @@ function showStackCallout(
     }
     listEl.appendChild(li);
   }
+  applyStackCalloutSelectionButtonVisibility(calloutEl, stackCalloutNonSelectableUnitIds);
 
   calloutEl.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
   calloutEl.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;

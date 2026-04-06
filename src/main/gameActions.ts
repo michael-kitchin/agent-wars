@@ -95,6 +95,10 @@ import {
   type HumanOrderPreviewSegment,
 } from './game-actions/humanMarchPreview';
 import {
+  getLandMovementBlockReason,
+  isLandUnitType,
+} from './game-actions/landMovementConstraints';
+import {
   collectTraversedHexesByPlayer,
   processProductionAfterControlResolution,
   resolveRes1ControlAfterCombatAndMovement,
@@ -147,6 +151,27 @@ function getMovementTerrainForH3(h3Index: string): string {
     terrain: terrainRow?.terrain ?? 'land',
     terrainKind: terrainRow?.terrainKind,
   });
+}
+
+function getTerrainMapsForH3Indexes(h3Indexes: readonly string[]): {
+  terrainByH3: Map<string, string>;
+  terrainKindByH3: Map<string, string>;
+} {
+  if (h3Indexes.length === 0) {
+    return { terrainByH3: new Map<string, string>(), terrainKindByH3: new Map<string, string>() };
+  }
+  const placeholders = h3Indexes.map(() => '?').join(', ');
+  const rows = dbGetAll<{ h3Index: string; terrain: string | null; terrainKind: string | null }>(
+    `SELECT h3_index AS h3Index, terrain, terrain_kind AS terrainKind FROM hexes WHERE h3_index IN (${placeholders})`,
+    [...h3Indexes]
+  );
+  const terrainByH3 = new Map<string, string>();
+  const terrainKindByH3 = new Map<string, string>();
+  for (const row of rows) {
+    terrainByH3.set(row.h3Index, row.terrain ?? '');
+    terrainKindByH3.set(row.h3Index, row.terrainKind ?? '');
+  }
+  return { terrainByH3, terrainKindByH3 };
 }
 
 type DeployedUnitsByType = { armor?: number; infantry?: number; naval?: number; air?: number };
@@ -251,8 +276,26 @@ function validateOrder(
   if ((unit.unit_type === 'infantry' || unit.unit_type === 'armor') && !passabilityAllowsLandUnit(destinationTerrain)) {
     return { valid: false, reason: 'Land units must move to land, coastal, or wetlands hexes' };
   }
-  if ((unit.unit_type === 'infantry' || unit.unit_type === 'armor') && isEmbarkedLandUnitOnWater(unitId)) {
-    return { valid: false, reason: 'Embarked land units cannot receive independent movement orders while at sea.' };
+  if (isLandUnitType(unit.unit_type)) {
+    const traversedH3: string[] = [];
+    if (dist > 1) {
+      try {
+        traversedH3.push(...gridPathCells(unit.h3_index, toH3Index));
+      } catch {
+        return { valid: false, reason: 'Invalid hex or path; try starting a new game.' };
+      }
+    }
+    const { terrainByH3, terrainKindByH3 } = getTerrainMapsForH3Indexes([unit.h3_index, toH3Index, ...traversedH3]);
+    const blockReason = getLandMovementBlockReason({
+      unitType: unit.unit_type,
+      originH3Index: unit.h3_index,
+      destinationH3Index: toH3Index,
+      terrainByH3,
+      terrainKindByH3,
+      traversedH3Indices: traversedH3,
+      isEmbarkedAtSea: isEmbarkedLandUnitOnWater(unitId),
+    });
+    if (blockReason) return { valid: false, reason: blockReason };
   }
 
   return { valid: true };

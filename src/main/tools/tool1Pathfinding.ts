@@ -18,6 +18,11 @@ import type { PassableDomain } from '../pathfinding';
 import { logDebug, logError } from '../logger';
 import { buildNormalizedTerrainByH3, isLandSeaportSpawnHex } from '../movementTerrain';
 import {
+  buildTerrainMapsFromHexRows,
+  getLandMovementBlockReason,
+  getLandWaterToWaterMoveBlockReason,
+} from '../game-actions/landMovementConstraints';
+import {
   PLAN_ROUTE_ERR_NAVAL_START,
   PLAN_ROUTE_ERR_SEAPORT_EGRESS,
   PLAN_ROUTE_HINT_DESTINATION_LAND,
@@ -230,6 +235,23 @@ function prependSeaportEgressStep(path: string[] | null, originH3: string, seapo
   if (!path) return null;
   if (!seaportEgressHex || path[0] !== seaportEgressHex) return path;
   return [originH3, ...path];
+}
+
+function addArcticBlocksForLandUnit(
+  unitType: string,
+  state: GameStateSnapshot,
+  blocked: Set<string> | undefined
+): Set<string> | undefined {
+  if (unitType !== 'infantry' && unitType !== 'armor') return blocked;
+  const arcticHexes = state.hexes
+    .filter((hex) => hex.terrainKind === 'arctic' || hex.terrain === 'arctic')
+    .map((hex) => hex.h3Index);
+  if (arcticHexes.length === 0) return blocked;
+  const nextBlocked = blocked ?? new Set<string>();
+  for (const arcticH3 of arcticHexes) {
+    nextBlocked.add(arcticH3);
+  }
+  return nextBlocked;
 }
 
 function findPathWithOptionalAvoidanceRetry(payload: {
@@ -492,6 +514,7 @@ export function executePlanRoute(
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): PlanRouteOk | PlanRouteError {
   logDebug('tool1Pathfinding executePlanRoute', { unitId, destination: destination.join(','), options });
+  try {
   const hexList = state.hexes.map((h) => h.h3Index);
   const hexSet = new Set(hexList);
   const terrainByH3 = buildNormalizedTerrainByH3(state.hexes);
@@ -515,12 +538,24 @@ export function executePlanRoute(
   }
 
   const originH3 = unit.h3Index;
+  const { terrainByH3: rawTerrainByH3, terrainKindByH3 } = buildTerrainMapsFromHexRows(state.hexes);
+  const landWaterBlockReason = getLandWaterToWaterMoveBlockReason({
+    unitType: unit.unitType,
+    originH3Index: originH3,
+    destinationH3Index: destH3,
+    terrainByH3: rawTerrainByH3,
+    terrainKindByH3,
+  });
+  if (landWaterBlockReason) {
+    return { status: 'error', error: landWaterBlockReason };
+  }
   const avoidEnemies = options?.avoidEnemies !== false;
   let blocked: Set<string> | undefined;
   if (avoidEnemies) {
     blocked = new Set(state.units.filter((u) => u.player !== unit.player).map((u) => u.h3Index));
     blocked.delete(originH3);
   }
+  blocked = addArcticBlocksForLandUnit(unit.unitType, state, blocked);
   const routeResolution = resolveRoutePathForUnit({
     unitType: unit.unitType,
     originH3,
@@ -563,6 +598,20 @@ export function executePlanRoute(
     const destTerrainAtError = terrainByH3.get(destH3) ?? 'land';
     const hint = planRouteNoPathHint(passableFor, destTerrainAtError);
     return { status: 'error', error: `No path exists - destination is impassable for this unit type or unreachable.${hint}` };
+  }
+  if (unit.unitType === 'infantry' || unit.unitType === 'armor') {
+    const routeBlockReason = getLandMovementBlockReason({
+      unitType: unit.unitType,
+      originH3Index: originH3,
+      destinationH3Index: destH3,
+      terrainByH3: rawTerrainByH3,
+      terrainKindByH3,
+      traversedH3Indices: path,
+      isEmbarkedAtSea: false,
+    });
+    if (routeBlockReason) {
+      return { status: 'error', error: routeBlockReason };
+    }
   }
 
   let turnsRequired = 0;
@@ -628,6 +677,14 @@ export function executePlanRoute(
     warnings,
     error: null,
   };
+  } catch (err) {
+    logError('tool1Pathfinding executePlanRoute: exception', {
+      unitId,
+      destination,
+      error: String(err),
+    });
+    return { status: 'error', error: 'Route planning failed due to an internal error. Please retry.' };
+  }
 }
 
 /**

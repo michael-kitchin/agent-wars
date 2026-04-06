@@ -226,6 +226,38 @@ function testStackCalloutSingleUnitNonCtrlClosesPopup(): void {
   );
 }
 
+function testStackSealiftWaterStateHidesDebarkAndEmbarkedSelectionControls(): void {
+  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const source = fs.readFileSync(rendererPath, 'utf8');
+  const renderSealiftSectionFn = getFunctionSource(source, 'renderSealiftSection');
+  const setNonSelectableFn = getFunctionSource(source, 'setStackPopupNonSelectableUnitIds');
+  const applyVisibilityFn = getFunctionSource(source, 'applyStackCalloutSelectionButtonVisibility');
+  const showStackCalloutFn = getFunctionSource(source, 'showStackCallout');
+
+  assert.ok(
+    renderSealiftSectionFn.includes('state.contextMode === \'water\'') &&
+      renderSealiftSectionFn.includes('setStackPopupNonSelectableUnitIds(calloutEl, nonSelectableEmbarkedIds);'),
+    'water-context sealift rendering should mark embarked land units as non-selectable in the stack popup'
+  );
+  assert.ok(
+    renderSealiftSectionFn.includes('if (state.contextMode !== \'water\') {') &&
+      renderSealiftSectionFn.includes('debarkBtn'),
+    'water-context sealift rendering should hide debark controls instead of disabling them'
+  );
+  assert.ok(
+    setNonSelectableFn.includes('applyStackCalloutSelectionButtonVisibility(calloutEl, nonSelectable);') &&
+      applyVisibilityFn.includes('btn.style.display = nonSelectableUnitIds.has(unitId) ? \'none\' : \'\';'),
+    'non-selectable stack-popup units should hide per-unit select/unselect buttons'
+  );
+  assert.ok(
+    showStackCalloutFn.includes('getSelectableHumanIdsForStackCallout(units)') &&
+      showStackCalloutFn.includes("onStackAllActionClick('selectAll'") &&
+      showStackCalloutFn.includes("onStackAllActionClick('addAll'") &&
+      showStackCalloutFn.includes("onStackAllActionClick('removeAll'"),
+    'stack callout all-actions should filter through selectable human IDs so embarked land units on water remain unselectable'
+  );
+}
+
 function testModifierDrivenPopoverCloseRulesCentralized(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
@@ -482,6 +514,7 @@ function run(): void {
   testCommittedPathsRemainVisibleDuringResolutionAnimation();
   testProductionLabelContractsForExploredVsUnexploredHexes();
   testStackCalloutSingleUnitNonCtrlClosesPopup();
+  testStackSealiftWaterStateHidesDebarkAndEmbarkedSelectionControls();
   testModifierDrivenPopoverCloseRulesCentralized();
   testInfrastructureGlyphSetsComeFromRes4Overrides();
   testAirFerryDoubleClickContracts();

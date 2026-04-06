@@ -19,6 +19,11 @@ import {
 } from './gameActions';
 import { getRes1ProductionContext } from './terrainClassificationCache';
 import { withTempGameDb } from './testSupport/withTempGameDb';
+import {
+  EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON,
+  LAND_UNITS_CANNOT_ENTER_ARCTIC_REASON,
+  LAND_UNITS_CANNOT_MOVE_WATER_OR_ARCTIC_TO_WATER_OR_ARCTIC_REASON,
+} from './game-actions/landMovementConstraints';
 
 function withTempDb(runCase: () => void): void {
   withTempGameDb('aw-gameactions-multi-', runCase);
@@ -50,6 +55,41 @@ function findAdjacentNavalPassableHex(state: ReturnType<typeof getGameState>, ce
   return adjacentNavalHex?.h3Index ?? null;
 }
 
+function findAdjacentWaterHex(state: ReturnType<typeof getGameState>, centerH3: string): string | null {
+  const adjacentWaterHex = state.hexes.find((hex) => {
+    if (hex.terrain !== 'water') return false;
+    try {
+      return gridDistance(hex.h3Index, centerH3) === 1;
+    } catch {
+      return false;
+    }
+  });
+  return adjacentWaterHex?.h3Index ?? null;
+}
+
+function setHumanControlledPort(h3Index: string): void {
+  dbRun('UPDATE res1_infrastructure SET seaport_count = 1 WHERE h3_index = ?', [h3Index]);
+  dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, 'human']);
+}
+
+function setArcticTerrain(h3Index: string): void {
+  dbRun('UPDATE hexes SET terrain = ?, terrain_kind = ? WHERE h3_index = ?', ['land', 'arctic', h3Index]);
+}
+
+function positionLandUnitOnAdjacentWaterPorts(
+  state: ReturnType<typeof getGameState>,
+  landUnitId: string
+): { originWaterHex: string; destinationWaterHex: string } {
+  const originWaterHex = state.hexes.find((hex) => hex.terrain === 'water');
+  assert.ok(originWaterHex, 'expected a water origin hex');
+  const destinationWaterHex = originWaterHex ? findAdjacentWaterHex(state, originWaterHex.h3Index) : null;
+  assert.ok(destinationWaterHex, 'expected an adjacent water destination hex');
+  dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [originWaterHex!.h3Index, landUnitId]);
+  setHumanControlledPort(originWaterHex!.h3Index);
+  setHumanControlledPort(destinationWaterHex!);
+  return { originWaterHex: originWaterHex!.h3Index, destinationWaterHex: destinationWaterHex! };
+}
+
 function findHexByDistance(
   state: ReturnType<typeof getGameState>,
   originH3: string,
@@ -62,6 +102,18 @@ function findHexByDistance(
       if (predicate(distance)) return hex.h3Index;
     } catch {
       // Ignore uncomputable pairs in tests and keep searching.
+    }
+  }
+  return null;
+}
+
+function findAdjacentHex(state: ReturnType<typeof getGameState>, originH3: string): string | null {
+  for (const hex of state.hexes) {
+    if (hex.h3Index === originH3) continue;
+    try {
+      if (gridDistance(originH3, hex.h3Index) === 1) return hex.h3Index;
+    } catch {
+      // Ignore malformed test pairs.
     }
   }
   return null;
@@ -243,7 +295,7 @@ function testPreviewEmbarkedLandUnitOnWaterShowsInvalidWithoutPathPlanning(): vo
     assert.strictEqual(result.showInvalidMarker, true);
     assert.strictEqual(
       result.invalidReason,
-      'Embarked land units cannot receive independent movement orders while at sea.'
+      EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON
     );
     assert.strictEqual(result.previews.length, 1);
     assert.strictEqual(result.previews[0]?.preview.valid, false);
@@ -282,6 +334,87 @@ function testReadyIncludesEmbarkedCargoFollowMoveForNavalMovement(): void {
   });
 }
 
+function testSubmitOrdersRejectsLandMovementToArcticHex(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const landUnit = state.units.find((u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor'));
+    assert.ok(landUnit, 'expected seeded human land unit');
+    const adjacent = findAdjacentHex(state, landUnit!.h3Index);
+    assert.ok(adjacent, 'expected adjacent destination hex');
+    dbRun('UPDATE hexes SET terrain = ?, terrain_kind = ? WHERE h3_index = ?', ['land', 'arctic', adjacent!]);
+    const result = submitOrders({
+      movementOrders: [{ unitId: landUnit!.id, toH3Index: adjacent! }],
+    });
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.reason, LAND_UNITS_CANNOT_ENTER_ARCTIC_REASON);
+  });
+}
+
+function testSubmitOrdersRejectsLandMovementFromArcticHex(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const landUnit = state.units.find((u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor'));
+    assert.ok(landUnit, 'expected seeded human land unit');
+    const adjacent = findAdjacentHex(state, landUnit!.h3Index);
+    assert.ok(adjacent, 'expected adjacent destination hex');
+    dbRun('UPDATE hexes SET terrain = ?, terrain_kind = ? WHERE h3_index = ?', ['land', 'arctic', landUnit!.h3Index]);
+    dbRun('UPDATE hexes SET terrain = ?, terrain_kind = ? WHERE h3_index = ?', ['land', 'plains', adjacent!]);
+    const result = submitOrders({
+      movementOrders: [{ unitId: landUnit!.id, toH3Index: adjacent! }],
+    });
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.reason, LAND_UNITS_CANNOT_ENTER_ARCTIC_REASON);
+  });
+}
+
+function testSubmitOrdersRejectsLandWaterToWaterPortMovement(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const landUnit = state.units.find((u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor'));
+    assert.ok(landUnit, 'expected seeded human land unit');
+    const { destinationWaterHex } = positionLandUnitOnAdjacentWaterPorts(state, landUnit!.id);
+    const result = submitOrders({
+      movementOrders: [{ unitId: landUnit!.id, toH3Index: destinationWaterHex! }],
+    });
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.reason, LAND_UNITS_CANNOT_MOVE_WATER_OR_ARCTIC_TO_WATER_OR_ARCTIC_REASON);
+  });
+}
+
+function testPreviewShowsInvalidForLandWaterToWaterPortMovement(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const landUnit = state.units.find((u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor'));
+    assert.ok(landUnit, 'expected seeded human land unit');
+    const { destinationWaterHex } = positionLandUnitOnAdjacentWaterPorts(state, landUnit!.id);
+    const result = previewHumanMarchOrders([landUnit!.id], destinationWaterHex!);
+    assert.strictEqual(result.validForAll, false);
+    assert.strictEqual(result.showInvalidMarker, true);
+    assert.strictEqual(result.invalidReason, LAND_UNITS_CANNOT_MOVE_WATER_OR_ARCTIC_TO_WATER_OR_ARCTIC_REASON);
+  });
+}
+
+function testSubmitOrdersRejectsLandWaterToArcticPortMovement(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const landUnit = state.units.find((u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor'));
+    assert.ok(landUnit, 'expected seeded human land unit');
+    const originWaterHex = state.hexes.find((hex) => hex.terrain === 'water');
+    assert.ok(originWaterHex, 'expected a water origin hex');
+    const destinationAdjacentHex = originWaterHex ? findAdjacentHex(state, originWaterHex.h3Index) : null;
+    assert.ok(destinationAdjacentHex, 'expected an adjacent destination hex for arctic setup');
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [originWaterHex!.h3Index, landUnit!.id]);
+    setArcticTerrain(destinationAdjacentHex!);
+    setHumanControlledPort(originWaterHex!.h3Index);
+    setHumanControlledPort(destinationAdjacentHex!);
+    const result = submitOrders({
+      movementOrders: [{ unitId: landUnit!.id, toH3Index: destinationAdjacentHex! }],
+    });
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.reason, LAND_UNITS_CANNOT_MOVE_WATER_OR_ARCTIC_TO_WATER_OR_ARCTIC_REASON);
+  });
+}
+
 function run(): void {
   testPreviewGroupedHappyPathSingleUnit();
   testPreviewGroupedFailsForUnknownUnit();
@@ -294,6 +427,11 @@ function run(): void {
   testAssignMarchRejectsAirUnits();
   testPreviewEmbarkedLandUnitOnWaterShowsInvalidWithoutPathPlanning();
   testReadyIncludesEmbarkedCargoFollowMoveForNavalMovement();
+  testSubmitOrdersRejectsLandMovementToArcticHex();
+  testSubmitOrdersRejectsLandMovementFromArcticHex();
+  testSubmitOrdersRejectsLandWaterToWaterPortMovement();
+  testPreviewShowsInvalidForLandWaterToWaterPortMovement();
+  testSubmitOrdersRejectsLandWaterToArcticPortMovement();
   console.log('gameActionsMultiSelect.test.ts passed');
 }
 

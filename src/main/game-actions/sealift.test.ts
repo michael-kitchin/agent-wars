@@ -29,8 +29,13 @@ function insertUnit(id: string, player: 'human' | 'opponent', unitType: string, 
   dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [id, player, unitType, h3Index]);
 }
 
-function setHexTerrain(h3Index: string, terrain: 'coastal' | 'water'): void {
+function setHexTerrain(h3Index: string, terrain: 'land' | 'coastal' | 'water'): void {
   dbRun('UPDATE hexes SET terrain = ? WHERE h3_index = ?', [terrain, h3Index]);
+}
+
+function setPortControl(h3Index: string, controllerPlayerId: 'human' | 'opponent', seaportCount = 1): void {
+  dbRun('UPDATE res1_infrastructure SET seaport_count = ? WHERE h3_index = ?', [seaportCount, h3Index]);
+  dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, controllerPlayerId]);
 }
 
 function loadAssignments(): Array<{ landUnitId: string; navalUnitId: string }> {
@@ -43,8 +48,7 @@ function testApplyEmbarkOrdersEnforcesCapacityAndReassignment(): void {
   withTempDb(() => {
     const coastalHex = pickHex(1);
     setHexTerrain(coastalHex, 'coastal');
-    dbRun('UPDATE res1_infrastructure SET seaport_count = 1 WHERE h3_index = ?', [coastalHex]);
-    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [coastalHex, 'opponent']);
+    setPortControl(coastalHex, 'opponent');
 
     insertUnit('opponent-naval-a', 'opponent', 'naval', coastalHex);
     insertUnit('opponent-naval-b', 'opponent', 'naval', coastalHex);
@@ -101,8 +105,7 @@ function testApplyEmbarkOrdersAllowsControlledSeaportRegardlessTerrainLabel(): v
     const landHex = pickHex(6);
     setHexTerrain(landHex, 'coastal');
     dbRun('UPDATE hexes SET terrain = ? WHERE h3_index = ?', ['land', landHex]);
-    dbRun('UPDATE res1_infrastructure SET seaport_count = 1 WHERE h3_index = ?', [landHex]);
-    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [landHex, 'opponent']);
+    setPortControl(landHex, 'opponent');
 
     insertUnit('opponent-naval-land-port', 'opponent', 'naval', landHex);
     insertUnit('opponent-inf-land-port', 'opponent', 'infantry', landHex);
@@ -141,7 +144,39 @@ function testApplyEmbarkOrdersRejectsAtSeaAndNoPort(): void {
     );
 
     const assignments = loadAssignments();
-    assert.strictEqual(assignments.length, 0, 'expected no assignments for at-sea or no-port embark attempts');
+    assert.deepStrictEqual(assignments, [
+      { landUnitId: 'opponent-inf-no-port', navalUnitId: 'opponent-naval-no-port' },
+    ]);
+  });
+}
+
+function testApplyEmbarkOrdersAllowsWaterAndArcticWhenPortPresent(): void {
+  withTempDb(() => {
+    const waterPortHex = pickHex(0);
+    const arcticPortHex = pickHex(1);
+    setHexTerrain(waterPortHex, 'water');
+    setHexTerrain(arcticPortHex, 'land');
+    dbRun('UPDATE hexes SET terrain_kind = ? WHERE h3_index = ?', ['arctic', arcticPortHex]);
+    setPortControl(waterPortHex, 'opponent');
+    setPortControl(arcticPortHex, 'opponent');
+    insertUnit('opponent-naval-water-port', 'opponent', 'naval', waterPortHex);
+    insertUnit('opponent-inf-water-port', 'opponent', 'infantry', waterPortHex);
+    insertUnit('opponent-naval-arctic-port', 'opponent', 'naval', arcticPortHex);
+    insertUnit('opponent-inf-arctic-port', 'opponent', 'infantry', arcticPortHex);
+
+    applyEmbarkOrdersForPlayer(
+      [
+        { unitId: 'opponent-inf-water-port', navalUnitId: 'opponent-naval-water-port' },
+        { unitId: 'opponent-inf-arctic-port', navalUnitId: 'opponent-naval-arctic-port' },
+      ],
+      'opponent'
+    );
+
+    const assignments = loadAssignments();
+    assert.deepStrictEqual(assignments, [
+      { landUnitId: 'opponent-inf-arctic-port', navalUnitId: 'opponent-naval-arctic-port' },
+      { landUnitId: 'opponent-inf-water-port', navalUnitId: 'opponent-naval-water-port' },
+    ]);
   });
 }
 
@@ -242,6 +277,7 @@ function run(): void {
   testApplyEmbarkOrdersEnforcesCapacityAndReassignment();
   testApplyEmbarkOrdersAllowsControlledSeaportRegardlessTerrainLabel();
   testApplyEmbarkOrdersRejectsAtSeaAndNoPort();
+  testApplyEmbarkOrdersAllowsWaterAndArcticWhenPortPresent();
   testTransportLossDestroysCargoOnWaterAndDebarksOnCoastal();
   testAutoDisembarkOnIndependentMoveWhenNotOnWater();
   testSealiftStateDisablesDebarkButtonsOnWater();

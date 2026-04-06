@@ -18521,6 +18521,7 @@
   }
 
   // src/renderer/renderer.ts
+  var stackCalloutNonSelectableUnitIds = /* @__PURE__ */ new Set();
   function buildResolutionPlaybackState2(anim, elapsed) {
     return buildResolutionPlaybackState(anim, elapsed);
   }
@@ -18547,6 +18548,7 @@
       el.removeAttribute("data-unit-ids");
     }
     rendererSharedState.stackCalloutModalActive = false;
+    stackCalloutNonSelectableUnitIds = /* @__PURE__ */ new Set();
     scheduleTerrainTooltipRestoreAfterPopoverClose();
   }
   function isStackOrBuildMapPopoverOpen() {
@@ -18590,19 +18592,45 @@
     showStackCallout(allUnitsAtHex, clientX, clientY);
     syncUiAfterSelectionChange2({ refreshHoverPreview: false });
   }
-  function onStackAllActionClick(action, humanIds, allUnitsAtHex, clientX, clientY) {
-    if (humanIds.length === 0) return;
+  function onStackAllActionClick(action, selectableHumanIds, allUnitsAtHex, clientX, clientY) {
+    if (selectableHumanIds.length === 0) return;
     if (action === "selectAll") {
-      replaceSelection2(humanIds);
+      replaceSelection2(selectableHumanIds);
       hideStackCallout();
       syncUiAfterSelectionChange2({ refreshHoverPreview: false });
       return;
     }
     activateStackCalloutModal();
-    if (action === "addAll") addUnitsToSelection2(humanIds);
-    else removeUnitsFromSelection2(humanIds);
+    if (action === "addAll") addUnitsToSelection2(selectableHumanIds);
+    else removeUnitsFromSelection2(selectableHumanIds);
     showStackCallout(allUnitsAtHex, clientX, clientY);
     syncUiAfterSelectionChange2({ refreshHoverPreview: false });
+  }
+  function applyStackCalloutSelectionButtonVisibility(calloutEl, nonSelectableUnitIds) {
+    const listEl = document.getElementById("stack-callout-list");
+    if (!listEl) return;
+    const rows = Array.from(listEl.querySelectorAll("li"));
+    for (const row of rows) {
+      const unitId = row.getAttribute("data-unit-id");
+      if (!unitId) continue;
+      const btn = row.querySelector("button.stack-unit-toggle");
+      if (!btn) continue;
+      btn.style.display = nonSelectableUnitIds.has(unitId) ? "none" : "";
+    }
+  }
+  function setStackPopupNonSelectableUnitIds(calloutEl, unitIds) {
+    const normalized = [...new Set(unitIds)].sort((a, b) => a.localeCompare(b));
+    const nonSelectable = new Set(normalized);
+    stackCalloutNonSelectableUnitIds = nonSelectable;
+    const selectedBlockedIds = normalized.filter((unitId) => rendererSharedState.selectedUnitIds.includes(unitId));
+    if (selectedBlockedIds.length > 0) {
+      removeUnitsFromSelection2(selectedBlockedIds);
+      syncUiAfterSelectionChange2({ refreshHoverPreview: false });
+    }
+    applyStackCalloutSelectionButtonVisibility(calloutEl, nonSelectable);
+  }
+  function getSelectableHumanIdsForStackCallout(units) {
+    return units.filter((u) => u.player === "human" && !stackCalloutNonSelectableUnitIds.has(u.id)).map((u) => u.id);
   }
   function removeSealiftSection(calloutEl) {
     const existing = calloutEl.querySelector(".stack-sealift-section");
@@ -18622,6 +18650,8 @@
       if (calloutEl.classList.contains("hidden")) return;
       if (calloutEl.getAttribute("data-h3-index") !== h3Index) return;
       if (!state.showSealiftSection) return;
+      const nonSelectableEmbarkedIds = state.contextMode === "water" ? state.navalRows.flatMap((row) => [row.slot1UnitId, row.slot2UnitId]).filter((unitId) => typeof unitId === "string" && unitId.length > 0) : [];
+      setStackPopupNonSelectableUnitIds(calloutEl, nonSelectableEmbarkedIds);
       const section = document.createElement("div");
       section.className = "stack-sealift-section";
       for (const row of state.navalRows) {
@@ -18665,25 +18695,27 @@
             requestRedraw();
           });
           slotRow.appendChild(select);
-          const debarkBtn = document.createElement("button");
-          debarkBtn.type = "button";
-          debarkBtn.className = "unit-select stack-unit-toggle";
-          debarkBtn.textContent = UNIT_DESELECT_GLYPH;
-          debarkBtn.disabled = !debarkEnabled;
-          debarkBtn.addEventListener("click", async () => {
-            const result = await window.gameApi.updateSealiftSlot({
-              h3Index,
-              navalUnitId: row.navalUnitId,
-              slotIndex,
-              landUnitId: null
+          if (state.contextMode !== "water") {
+            const debarkBtn = document.createElement("button");
+            debarkBtn.type = "button";
+            debarkBtn.className = "unit-select stack-unit-toggle";
+            debarkBtn.textContent = UNIT_DESELECT_GLYPH;
+            debarkBtn.disabled = !debarkEnabled;
+            debarkBtn.addEventListener("click", async () => {
+              const result = await window.gameApi.updateSealiftSlot({
+                h3Index,
+                navalUnitId: row.navalUnitId,
+                slotIndex,
+                landUnitId: null
+              });
+              if (!result.success) {
+                showMapToast(formatTargetingValidationReason(result.reason, "Failed to debark unit."));
+              }
+              refreshStackCalloutIfOpen();
+              requestRedraw();
             });
-            if (!result.success) {
-              showMapToast(formatTargetingValidationReason(result.reason, "Failed to debark unit."));
-            }
-            refreshStackCalloutIfOpen();
-            requestRedraw();
-          });
-          slotRow.appendChild(debarkBtn);
+            slotRow.appendChild(debarkBtn);
+          }
           right.appendChild(slotRow);
         };
         addSlotControl(1, row.slot1UnitId, row.controlsDisabled, row.debarkSlot1Enabled);
@@ -18715,6 +18747,7 @@
     calloutEl.setAttribute("data-y", String(clientY));
     calloutEl.setAttribute("data-h3-index", sorted[0]?.h3Index ?? "");
     calloutEl.setAttribute("data-unit-ids", JSON.stringify(sorted.map((u) => u.id)));
+    stackCalloutNonSelectableUnitIds = /* @__PURE__ */ new Set();
     listEl.innerHTML = "";
     const existingHeader = calloutEl.querySelector(".stack-callout-actions");
     if (existingHeader) existingHeader.remove();
@@ -18740,7 +18773,7 @@
       selectAllBtn.className = "unit-select";
       selectAllBtn.textContent = `${UNIT_SELECT_GLYPH} All`;
       selectAllBtn.addEventListener("click", () => {
-        onStackAllActionClick("selectAll", humanIds, units, clientX, clientY);
+        onStackAllActionClick("selectAll", getSelectableHumanIdsForStackCallout(units), units, clientX, clientY);
       });
       header.appendChild(selectAllBtn);
     } else if (humanIds.length > 0) {
@@ -18749,14 +18782,14 @@
       addAllBtn.className = "unit-select";
       addAllBtn.textContent = `${UNIT_SELECT_GLYPH} All`;
       addAllBtn.addEventListener("click", () => {
-        onStackAllActionClick("addAll", humanIds, units, clientX, clientY);
+        onStackAllActionClick("addAll", getSelectableHumanIdsForStackCallout(units), units, clientX, clientY);
       });
       const removeAllBtn = document.createElement("button");
       removeAllBtn.type = "button";
       removeAllBtn.className = "unit-select";
       removeAllBtn.textContent = `${UNIT_DESELECT_GLYPH} All`;
       removeAllBtn.addEventListener("click", () => {
-        onStackAllActionClick("removeAll", humanIds, units, clientX, clientY);
+        onStackAllActionClick("removeAll", getSelectableHumanIdsForStackCallout(units), units, clientX, clientY);
       });
       header.appendChild(removeAllBtn);
       header.appendChild(addAllBtn);
@@ -18764,6 +18797,7 @@
     calloutEl.insertBefore(header, listEl);
     for (const u of sorted) {
       const li = document.createElement("li");
+      li.setAttribute("data-unit-id", u.id);
       const label = document.createElement("span");
       label.className = "unit-label";
       label.textContent = formatUnitDisplayName(u.id);
@@ -18781,6 +18815,7 @@
       }
       listEl.appendChild(li);
     }
+    applyStackCalloutSelectionButtonVisibility(calloutEl, stackCalloutNonSelectableUnitIds);
     calloutEl.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
     calloutEl.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
     calloutEl.setAttribute("aria-label", formatStackTooltip(units));
