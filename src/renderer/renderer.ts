@@ -180,6 +180,7 @@ import {
   startBackgroundRequestIfAllowed as startBackgroundRequestIfAllowedFromModule,
   syncEventDrivenFromTools as syncEventDrivenFromToolsFromModule,
 } from './openRouter/openRouterRuntime';
+import { resetPrecomputedAiState } from './openRouter/precomputedAiState';
 import {
   containerPixelHitsDrawnUnitIcon as containerPixelHitsDrawnUnitIconFromModule,
   drawLoadingScene as drawLoadingSceneFromModule,
@@ -368,6 +369,112 @@ function onStackAllActionClick(
   syncUiAfterSelectionChange({ refreshHoverPreview: false });
 }
 
+function removeSealiftSection(calloutEl: HTMLElement): void {
+  const existing = calloutEl.querySelector('.stack-sealift-section');
+  if (existing) existing.remove();
+}
+
+function buildSealiftUnitLabel(unitId: string, unitType: string): string {
+  void unitType;
+  return formatUnitDisplayName(unitId);
+}
+
+async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl: HTMLElement): Promise<void> {
+  removeSealiftSection(calloutEl);
+  if (!window.gameApi?.getSealiftStackState || !window.gameApi?.updateSealiftSlot) return;
+  const h3Index = units[0]?.h3Index;
+  if (!h3Index) return;
+  try {
+    const state = await window.gameApi.getSealiftStackState({ h3Index });
+    if (calloutEl.classList.contains('hidden')) return;
+    if (calloutEl.getAttribute('data-h3-index') !== h3Index) return;
+    if (!state.showSealiftSection) return;
+
+    const section = document.createElement('div');
+    section.className = 'stack-sealift-section';
+
+    for (const row of state.navalRows) {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'stack-sealift-row';
+      const left = document.createElement('span');
+      left.className = 'stack-sealift-naval';
+      left.textContent = formatUnitDisplayName(row.navalUnitId);
+      rowEl.appendChild(left);
+
+      const right = document.createElement('div');
+      right.className = 'stack-sealift-slots';
+
+      const addSlotControl = (
+        slotIndex: 1 | 2,
+        selectedUnitId: string | null,
+        slotDisabled: boolean,
+        debarkEnabled: boolean
+      ) => {
+        const slotRow = document.createElement('div');
+        slotRow.className = 'stack-sealift-slot-row';
+        const select = document.createElement('select');
+        select.className = 'stack-sealift-select';
+        select.disabled = slotDisabled;
+        const noneOption = document.createElement('option');
+        noneOption.value = '';
+        noneOption.textContent = '(none)';
+        select.appendChild(noneOption);
+        for (const option of state.landOptions) {
+          const opt = document.createElement('option');
+          opt.value = option.unitId;
+          opt.textContent = buildSealiftUnitLabel(option.unitId, option.unitType);
+          select.appendChild(opt);
+        }
+        select.value = selectedUnitId ?? '';
+        select.addEventListener('change', async () => {
+          const selected = select.value.trim();
+          const result = await window.gameApi!.updateSealiftSlot({
+            h3Index,
+            navalUnitId: row.navalUnitId,
+            slotIndex,
+            landUnitId: selected.length > 0 ? selected : null,
+          });
+          if (!result.success) {
+            showMapToast(formatTargetingValidationReason(result.reason, 'Failed to update sealift assignment.'));
+          }
+          refreshStackCalloutIfOpen();
+          requestRedraw();
+        });
+        slotRow.appendChild(select);
+
+        const debarkBtn = document.createElement('button');
+        debarkBtn.type = 'button';
+        debarkBtn.className = 'unit-select stack-unit-toggle';
+        debarkBtn.textContent = UNIT_DESELECT_GLYPH;
+        debarkBtn.disabled = !debarkEnabled;
+        debarkBtn.addEventListener('click', async () => {
+          const result = await window.gameApi!.updateSealiftSlot({
+            h3Index,
+            navalUnitId: row.navalUnitId,
+            slotIndex,
+            landUnitId: null,
+          });
+          if (!result.success) {
+            showMapToast(formatTargetingValidationReason(result.reason, 'Failed to debark unit.'));
+          }
+          refreshStackCalloutIfOpen();
+          requestRedraw();
+        });
+        slotRow.appendChild(debarkBtn);
+        right.appendChild(slotRow);
+      };
+
+      addSlotControl(1, row.slot1UnitId, row.controlsDisabled, row.debarkSlot1Enabled);
+      addSlotControl(2, row.slot2UnitId, row.controlsDisabled || row.slot2Disabled, row.debarkSlot2Enabled);
+      rowEl.appendChild(right);
+      section.appendChild(rowEl);
+    }
+    calloutEl.appendChild(section);
+  } catch (err) {
+    console.error('sealift stack section failed:', err);
+  }
+}
+
 /**
  * Shows the stack callout at the given screen position with an alphabetized list of units.
  * Units belonging to the human player get +/- controls for adding/removing from the active selection.
@@ -396,6 +503,7 @@ function showStackCallout(
   calloutEl.setAttribute('data-open', 'true');
   calloutEl.setAttribute('data-x', String(clientX));
   calloutEl.setAttribute('data-y', String(clientY));
+  calloutEl.setAttribute('data-h3-index', sorted[0]?.h3Index ?? '');
   calloutEl.setAttribute('data-unit-ids', JSON.stringify(sorted.map((u) => u.id)));
 
   listEl.innerHTML = '';
@@ -470,6 +578,7 @@ function showStackCallout(
   calloutEl.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
   calloutEl.setAttribute('aria-label', formatStackTooltip(units));
   calloutEl.classList.remove('hidden');
+  void renderSealiftSection(sorted, calloutEl);
 }
 
 function refreshStackCalloutIfOpen(): void {
@@ -2117,10 +2226,7 @@ async function syncOpenRouterRunToggleInteractable(): Promise<void> {
         S.runButtonOn = false;
         runBtn.setAttribute('aria-pressed', 'false');
         window.gameApi?.cancelRequestAiOrders?.();
-        S.precomputedAiOrders = null;
-        S.precomputedAiRangedOrders = null;
-        S.precomputedAiStrategy = null;
-        S.precomputedToolInvocationCounts = null;
+        resetPrecomputedAiState('null');
         S.eventDrivenInitialConsultationDone = false;
         updateReadyButtonState();
       }

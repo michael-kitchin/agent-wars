@@ -8,6 +8,7 @@ import type {
 import { buildTurnUpdateBullets } from './turnUpdateSummary';
 import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
 import { rendererSharedState as S } from '../core/state';
+import { resetPrecomputedAiState } from '../openRouter/precomputedAiState';
 
 export interface ReadyHandlerDeps {
   clearSidebarError: () => void;
@@ -84,6 +85,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
               aiPlanningRunEnabled: S.runButtonOn,
               precomputedAiOrders: S.precomputedAiOrders!,
               precomputedAiRangedOrders: S.precomputedAiRangedOrders ?? [],
+              precomputedAiEmbarkOrders: S.precomputedAiEmbarkOrders ?? [],
               precomputedAiStrategy: S.precomputedAiStrategy ?? undefined,
             }
           : {
@@ -97,6 +99,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
               aiPlanningRunEnabled: S.runButtonOn,
               precomputedAiOrders: S.precomputedAiOrders!,
               precomputedAiRangedOrders: S.precomputedAiRangedOrders ?? [],
+              precomputedAiEmbarkOrders: S.precomputedAiEmbarkOrders ?? [],
               precomputedAiStrategy: S.precomputedAiStrategy ?? undefined,
             }
           : {
@@ -110,10 +113,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       return;
     }
 
-    S.precomputedAiOrders = null;
-    S.precomputedAiRangedOrders = null;
-    S.precomputedAiStrategy = null;
-    S.precomputedToolInvocationCounts = null;
+    resetPrecomputedAiState('null');
     const humanMoves: ResolutionMove[] = readyResult.humanMoves ?? [];
     await deps.refreshRes4TerrainOverridesForRenderer();
     const nextState = (await window.gameApi.getGameState()) as GameStateSnapshot;

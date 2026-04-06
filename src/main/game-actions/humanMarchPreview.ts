@@ -7,6 +7,7 @@ import { buildNormalizedTerrainByH3 } from '../movementTerrain';
 import { logError, logTrace } from '../logger';
 import { AIR_FERRY_RANGE_HEXES, MOVEMENT_RANGE_BY_UNIT_TYPE, formatFerryOutOfRangeReason } from '../../shared/tacticalRanges';
 import { isWithinGridRangeSafe } from './gridRange';
+import { isEmbarkedLandUnitOnWater } from './sealift';
 
 type HumanOwnedUnit = { id: string; player: string; unitType: string; h3Index: string };
 type StateSnapshot = {
@@ -124,6 +125,16 @@ function buildHumanMarchPreviewForUnit(
           ],
         },
       ],
+    };
+  }
+
+  const unitIsLand = unit.unitType === 'infantry' || unit.unitType === 'armor';
+  if (unitIsLand && isEmbarkedLandUnitOnWater(unit.id)) {
+    return {
+      valid: false,
+      showInvalidMarker: true,
+      invalidReason: 'Embarked land units cannot receive independent movement orders while at sea.',
+      segments: [],
     };
   }
 

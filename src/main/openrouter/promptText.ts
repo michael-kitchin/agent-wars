@@ -80,6 +80,7 @@ export function buildToolUsageGuidance(flags: PromptToolFlags, hasPrecomputedBri
     if (flags.planningEnabled && !hasPrecomputedBriefing) {
       lines.push('- For units several turns from combat, use assign_order (march/pursue) in final JSON instead of re-planning every turn.');
     }
+    lines.push('- Sealift doctrine: when water crossing is required, proactively plan embark/transport/disembark sequences (stage land units with naval units, transport them across water, then disembark inland).');
   }
   if (flags.memoryEnabled) {
     lines.push(

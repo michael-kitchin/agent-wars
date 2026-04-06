@@ -51,6 +51,11 @@ export function getFullDdl(): string {
       destination_h3_index TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS unit_transport_assignments (
+      land_unit_id TEXT PRIMARY KEY,
+      naval_unit_id TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS game_config (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL

@@ -13,7 +13,7 @@ import {
 } from './gameDb';
 import { buildLatLngCoordinateMap } from './mapData';
 import { generateOrdersForStandingOrders } from './tools/tool5StandingOrders';
-import { afterResolution } from './afterResolution';
+import { afterResolution } from './openrouter/afterResolution';
 import { logError } from './logger';
 import { logHybridPipelineBoundary } from './hybridTurnPipeline';
 import type {
@@ -21,6 +21,7 @@ import type {
   RequestAiOrdersResult,
   RangedAttackOrder,
   AirStrikeOrder,
+  EmbarkOrder,
   FerryOrder,
   ReadyResult,
 } from '../shared/ipcTypes';
@@ -112,7 +113,8 @@ export interface ReadyDeps {
     aiOrders: { unitId: string; toH3Index: string }[],
     aiRangedOrders: RangedAttackOrder[],
     aiAirStrikeOrders?: AirStrikeOrder[],
-    aiFerryOrders?: FerryOrder[]
+    aiFerryOrders?: FerryOrder[],
+    aiEmbarkOrders?: EmbarkOrder[]
   ) => ReadyResult;
 }
 
@@ -146,6 +148,7 @@ export async function handleGameReady(
   let aiRangedOrders: RangedAttackOrder[] = [];
   let aiAirStrikeOrders: AirStrikeOrder[] = [];
   let aiFerryOrders: FerryOrder[] = [];
+  let aiEmbarkOrders: EmbarkOrder[] = [];
   let aiSkipped = false;
   let aiDropped: number | undefined;
   let aiDropReasons: string[] | undefined;
@@ -156,17 +159,21 @@ export async function handleGameReady(
   let turnOutputTokens: number | undefined;
   let aiSkipReason: string | undefined;
   let aiStrategy: string | undefined;
+  const applyPrecomputedOrdersFromPayload = (precomputedPayload: GameReadyIpcPayload | undefined): void => {
+    aiOrders = precomputedPayload?.precomputedAiOrders ?? [];
+    aiRangedOrders = precomputedPayload?.precomputedAiRangedOrders ?? [];
+    aiAirStrikeOrders = precomputedPayload?.precomputedAiAirStrikeOrders ?? [];
+    aiFerryOrders = precomputedPayload?.precomputedAiFerryOrders ?? [];
+    aiEmbarkOrders = precomputedPayload?.precomputedAiEmbarkOrders ?? [];
+    aiStrategy = precomputedPayload?.precomputedAiStrategy;
+  };
 
   const usePrecomputed =
     payload?.precomputedAiOrders !== undefined && payload?.precomputedAiRangedOrders !== undefined;
   let aiConsulted: boolean | undefined;
   if (useEventDrivenConsultation) {
     if (usePrecomputed) {
-      aiOrders = payload.precomputedAiOrders ?? [];
-      aiRangedOrders = payload.precomputedAiRangedOrders ?? [];
-      aiAirStrikeOrders = payload.precomputedAiAirStrikeOrders ?? [];
-      aiFerryOrders = payload.precomputedAiFerryOrders ?? [];
-      aiStrategy = payload.precomputedAiStrategy;
+      applyPrecomputedOrdersFromPayload(payload);
       aiConsulted = true;
       // Initial event-driven consultation can happen before the first Ready; record it so
       // first_consultation does not fire again on the immediate after-resolution evaluation.
@@ -179,6 +186,7 @@ export async function handleGameReady(
         aiRangedOrders = pending.rangedOrders;
         aiAirStrikeOrders = pending.airStrikeOrders;
         aiFerryOrders = pending.ferryOrders;
+        aiEmbarkOrders = pending.embarkOrders ?? [];
         clearAiPendingOrders('opponent');
         aiConsulted = true;
       } else {
@@ -192,11 +200,7 @@ export async function handleGameReady(
     }
   } else {
   if (usePrecomputed) {
-    aiOrders = payload.precomputedAiOrders ?? [];
-    aiRangedOrders = payload.precomputedAiRangedOrders ?? [];
-    aiAirStrikeOrders = payload.precomputedAiAirStrikeOrders ?? [];
-    aiFerryOrders = payload.precomputedAiFerryOrders ?? [];
-    aiStrategy = payload.precomputedAiStrategy;
+    applyPrecomputedOrdersFromPayload(payload);
   } else if (aiPlanningRunEnabled && modelId && deps.hasKey()) {
     const result = await deps.requestOrders(aiState, modelId, {
       enabledToolNames,
@@ -207,6 +211,7 @@ export async function handleGameReady(
       aiRangedOrders = result.rangedAttacks ?? [];
       aiAirStrikeOrders = result.airStrikes ?? [];
       aiFerryOrders = result.ferryOrders ?? [];
+      aiEmbarkOrders = result.embarkOrders ?? [];
       aiStrategy = result.strategy;
       aiDropped = result.dropped;
       aiDropReasons = result.dropReasons?.length ? result.dropReasons : undefined;
@@ -245,7 +250,7 @@ export async function handleGameReady(
           .filter((m): m is { unitId: string; fromH3Index: string; toH3Index: string } => m !== null)
       : [];
 
-  const readyResult = deps.ready(aiOrders, aiRangedOrders, aiAirStrikeOrders, aiFerryOrders);
+  const readyResult = deps.ready(aiOrders, aiRangedOrders, aiAirStrikeOrders, aiFerryOrders, aiEmbarkOrders);
   if (!readyResult.success) {
     return { success: false, reason: readyResult.reason };
   }

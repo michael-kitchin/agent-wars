@@ -11,7 +11,7 @@ import {
   type RequestAiOrdersResult,
   type ReadyResultMinimal,
 } from './gameIpcHandlers';
-import type { AirStrikeOrder, FerryOrder } from '../shared/ipcTypes';
+import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../shared/ipcTypes';
 
 const minimalPlanningState = {
   hexes: [{ h3Index: '891f1d48b9fffff', terrain: 'land' as const, terrainKind: 'plains' }],
@@ -231,7 +231,7 @@ async function testGameReadyPrecomputedWithOrders(): Promise<void> {
   assert.strictEqual(result.aiOrderCount, 1);
 }
 
-async function testGameReadyForwardsAiAirStrikeAndFerryOrders(): Promise<void> {
+async function testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders(): Promise<void> {
   const deps = {
     getGameState: () => minimalPlanningState,
     getGameStateForPlayer: () => minimalPlanningState,
@@ -246,17 +246,20 @@ async function testGameReadyForwardsAiAirStrikeAndFerryOrders(): Promise<void> {
         { unitId: 'opponent-air-1', targetH3Index: '891f1d48b9fffff', targetType: 'units' },
       ],
       ferryOrders: [{ unitId: 'opponent-air-2', destinationH3Index: '891f1d48b9fffff' }],
+      embarkOrders: [{ unitId: 'opponent-inf-1', navalUnitId: 'opponent-naval-1' }],
     }),
     ready: (
       aiOrders: { unitId: string; toH3Index: string }[],
       aiRangedOrders: { unitId: string; targetH3Index: string }[],
       aiAirStrikeOrders?: AirStrikeOrder[],
-      aiFerryOrders?: FerryOrder[]
+      aiFerryOrders?: FerryOrder[],
+      aiEmbarkOrders?: EmbarkOrder[]
     ): ReadyResultMinimal & { success: boolean } => {
       assert.strictEqual(aiOrders.length, 0);
       assert.strictEqual(aiRangedOrders.length, 0);
       assert.strictEqual(aiAirStrikeOrders?.length ?? 0, 1);
       assert.strictEqual(aiFerryOrders?.length ?? 0, 1);
+      assert.strictEqual(aiEmbarkOrders?.length ?? 0, 1);
       return { success: true, aiOrderCount: 0 };
     },
   };
@@ -280,7 +283,10 @@ async function runAll(): Promise<void> {
       fn: testGameReadyRunOffSkipsRequestOrdersNonEventDriven,
     },
     { name: 'game:ready precomputed with orders', fn: testGameReadyPrecomputedWithOrders },
-    { name: 'game:ready forwards AI air strike and ferry orders', fn: testGameReadyForwardsAiAirStrikeAndFerryOrders },
+    {
+      name: 'game:ready forwards AI air strike, ferry, and embark orders',
+      fn: testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders,
+    },
   ];
   for (const t of tests) {
     try {

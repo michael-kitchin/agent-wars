@@ -56,6 +56,7 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: { fogOfWarEn
   run('DELETE FROM pending_ranged_orders');
   run('DELETE FROM pending_air_orders');
   run('DELETE FROM pending_ferry_orders');
+  run('DELETE FROM unit_transport_assignments');
   run('UPDATE turn_state SET phase = ?, turn_number = 1 WHERE id = 1', ['planning']);
   deps.clearGameOver();
   run('DELETE FROM game_config WHERE key = ?', ['ai_tool_limit_exceeded_last_turn']);

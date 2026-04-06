@@ -15,8 +15,8 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import Module = require('module');
-import type { AirStrikeOrder, FerryOrder } from '../shared/ipcTypes';
-import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../shared/tacticalRanges';
+import type { AirStrikeOrder, FerryOrder } from '../../shared/ipcTypes';
+import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 
 type ChatResponse = {
   id?: string;
@@ -108,7 +108,7 @@ async function run(): Promise<void> {
       }>;
       getToolNamesForEnabledGroups: (ids: string[]) => string[];
     };
-    const mapData = require('./mapData') as {
+    const mapData = require('../mapData') as {
       getOrderedHexList: () => string[];
       H3_RESOLUTION: number;
       LATLNG_DECIMAL_PLACES: number;

@@ -7,9 +7,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { app, safeStorage } from 'electron';
 import { cellToLatLng, gridDistance } from 'h3-js';
-import { getAttack, getDefense, getRange } from './combatConstants';
-import { logDebug, logError, logTrace } from './logger';
-import type { GameStateSnapshot } from './gameDb';
+import { getAttack, getDefense, getRange } from '../combatConstants';
+import { logDebug, logError, logTrace } from '../logger';
+import type { GameStateSnapshot } from '../gameDb';
 import {
   setAiToolLimitExceededLastTurn,
   getAndClearAiToolLimitExceededLastTurn,
@@ -18,26 +18,26 @@ import {
   setAiLastConsultationTurn,
   dbGetOne,
   dbRun,
-} from './gameDb';
-import { buildLatLngCoordinateMap, H3_RESOLUTION, LATLNG_DECIMAL_PLACES } from './mapData';
-import { executeTool1, TOOL1_NAMES } from './tools/tool1Pathfinding';
-import { executeTool2, TOOL2_NAMES } from './tools/tool2Assessment';
-import { executeTool3, TOOL3_NAMES } from './tools/tool3CombatEstimation';
-import { executeTool4, getInjectionText, TOOL4_NAMES } from './tools/tool4Memory';
+} from '../gameDb';
+import { buildLatLngCoordinateMap, H3_RESOLUTION, LATLNG_DECIMAL_PLACES } from '../mapData';
+import { executeTool1, TOOL1_NAMES } from '../tools/tool1Pathfinding';
+import { executeTool2, TOOL2_NAMES } from '../tools/tool2Assessment';
+import { executeTool3, TOOL3_NAMES } from '../tools/tool3CombatEstimation';
+import { executeTool4, getInjectionText, TOOL4_NAMES } from '../tools/tool4Memory';
 import {
   executeTool5,
   getInjectionText as getStandingOrderInjectionText,
   generateOrdersForStandingOrders,
   TOOL5_NAMES,
-} from './tools/tool5StandingOrders';
-import { executeTool6, TOOL6_NAMES } from './tools/tool6Production';
-import { runPrecomputation } from './precomputation';
-import { formatBriefing } from './briefingFormatter';
-import { replaceSubscriptions, getSubscriptions } from './callbackSubscriptions';
-import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
-import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../shared/tacticalRanges';
-import { buildFinalJsonContractInstruction } from './openRouterPromptContracts';
-import { buildAirOperationsBriefingBlock, buildProductionBriefingBlock } from './openrouter/briefingSections';
+} from '../tools/tool5StandingOrders';
+import { executeTool6, TOOL6_NAMES } from '../tools/tool6Production';
+import { runPrecomputation } from '../precomputation';
+import { formatBriefing } from '../briefingFormatter';
+import { replaceSubscriptions, getSubscriptions } from '../callbackSubscriptions';
+import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
+import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
+import { buildFinalJsonContractInstruction } from './promptContracts';
+import { buildAirOperationsBriefingBlock, buildProductionBriefingBlock, buildSealiftBriefingBlock } from './briefingSections';
 import {
   buildAdjacentCellsFallbackBlock,
   buildHumanUnitsPromptLine,
@@ -47,20 +47,20 @@ import {
   formatLatLng as formatLatLngWithPrecision,
   getInitialUserMessage,
   getMovementOrderInstruction,
-} from './openrouter/promptText';
-import { buildJsonAssistantRepairSchema, parseOrdersResponse } from './openrouter/orderResponseParsing';
+} from './promptText';
+import { buildJsonAssistantRepairSchema, parseOrdersResponse } from './orderResponseParsing';
 import {
   requestOrdersFlow,
-} from './openrouter/requestOrdersFlow';
+} from './requestOrdersFlow';
 import {
   NAVAL_DESTINATION_MUST_BE_WATER_COASTAL,
   NAVAL_MOVEMENT_PROMPT_RULE,
   NAVAL_PLAN_ROUTE_LAND_TARGET_HINT,
   NAVAL_PLAN_ROUTE_PROMPT_SUFFIX,
-} from './navalMovementMessages';
-import type { AirStrikeOrder, FerryOrder } from '../shared/ipcTypes';
+} from '../navalMovementMessages';
+import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
 
-export type { MemoryUpdateItem } from './openrouter/orderResponseParsing';
+export type { MemoryUpdateItem } from './orderResponseParsing';
 
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -354,8 +354,9 @@ function validateAiOrder(
     }
   }
 
+  const seaportCountByHex = new Map((state.res1Infrastructure ?? []).map((row) => [row.h3Index, row.seaportCount] as const));
   const destHex = state.hexes.find((h) => h.h3Index === order.toH3Index);
-  const terrain = destHex?.terrain ?? 'land';
+  const terrain = resolveMovementTerrainForHex(destHex, seaportCountByHex);
   if (unit.unitType === 'naval' && !passabilityAllowsNavalUnit(terrain)) {
     return { valid: false, reason: NAVAL_DESTINATION_MUST_BE_WATER_COASTAL };
   }
@@ -373,6 +374,7 @@ function validateAiOrder(
 function getValidDestinations(unit: { h3Index: string; unitType: string }, state: GameStateSnapshot): string[] {
   const range = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
   const wantLand = unit.unitType === 'infantry' || unit.unitType === 'armor';
+  const seaportCountByHex = new Map((state.res1Infrastructure ?? []).map((row) => [row.h3Index, row.seaportCount] as const));
   const valid: string[] = [];
   for (const h of state.hexes) {
     if (h.h3Index === unit.h3Index) continue;
@@ -383,11 +385,20 @@ function getValidDestinations(unit: { h3Index: string; unitType: string }, state
       continue;
     }
     if (dist < 1 || dist > range) continue;
-    if (unit.unitType === 'naval' && !passabilityAllowsNavalUnit(h.terrain)) continue;
+    const movementTerrain = resolveMovementTerrainForHex(h, seaportCountByHex);
+    if (unit.unitType === 'naval' && !passabilityAllowsNavalUnit(movementTerrain)) continue;
     if (wantLand && !passabilityAllowsLandUnit(h.terrain)) continue;
     valid.push(h.h3Index);
   }
   return valid;
+}
+
+function resolveMovementTerrainForHex(
+  hex: { h3Index: string; terrain: string } | undefined,
+  seaportCountByHex: Map<string, number>
+): string {
+  if (!hex) return 'land';
+  return (seaportCountByHex.get(hex.h3Index) ?? 0) > 0 ? 'coastal' : hex.terrain;
 }
 
 /**
@@ -516,6 +527,7 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
       }) + '\n\n'
     : '';
   const airOpsBlock = buildAirOperationsBriefingBlock(state, format) + '\n\n';
+  const sealiftBlock = buildSealiftBriefingBlock(state, format) + '\n\n';
 
   const hasNaval = opponentUnits.some((u) => u.unitType === 'naval');
   const hasRanged = opponentUnits.some((u) => getRange(u.unitType as 'infantry' | 'armor' | 'naval') >= 1);
@@ -540,8 +552,8 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
 
   const humanUnitsLine = buildHumanUnitsPromptLine(humanRoster);
   const mainBlock = briefingOverride != null && briefingOverride.length > 0
-    ? `${briefingOverride}\n\n${airOpsBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}`
-    : `${memoryBlock}${standingOrderBlock}${productionBlock}${airOpsBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}${adjacentCellsBlock}`;
+    ? `${briefingOverride}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}`
+    : `${memoryBlock}${standingOrderBlock}${productionBlock}${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}${adjacentCellsBlock}`;
 
   const finalJsonContract = buildFinalJsonContractInstruction({
     includeMemoryUpdates: flags.memoryEnabled,
@@ -571,6 +583,7 @@ export interface RequestOrdersResult {
   rangedAttacks?: { unitId: string; targetH3Index: string }[];
   airStrikes?: AirStrikeOrder[];
   ferryOrders?: FerryOrder[];
+  embarkOrders?: EmbarkOrder[];
   strategy?: string;
   dropped?: number;
   dropReasons?: string[];

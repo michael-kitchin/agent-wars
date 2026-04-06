@@ -1,5 +1,6 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
+import { resetPrecomputedAiState } from '../openRouter/precomputedAiState';
 
 type NewGameDeps = {
   refreshRes4TerrainOverridesForRenderer: () => Promise<void>;
@@ -51,9 +52,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       S.selectedUnitIdsAtMouseDown = [];
       S.selectedHexIndex = null;
       deps.hideStackCallout();
-      S.precomputedAiOrders = null;
-      S.precomputedAiRangedOrders = null;
-      S.precomputedAiStrategy = null;
+      resetPrecomputedAiState('null');
       S.backgroundRequestInFlight = false;
       S.eventDrivenInitialConsultationDone = false;
       S.openRouterGameCost = 0;
@@ -75,10 +74,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
 
 export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enabled: boolean) => void, updateReadyButtonState: () => void): void {
   window.gameApi?.cancelRequestAiOrders?.();
-  S.precomputedAiOrders = null;
-  S.precomputedAiRangedOrders = null;
-  S.precomputedAiStrategy = null;
-  S.precomputedToolInvocationCounts = null;
+  resetPrecomputedAiState('null');
   S.backgroundRequestInFlight = false;
   S.readyRequestInFlight = false;
   S.eventDrivenInitialConsultationDone = false;

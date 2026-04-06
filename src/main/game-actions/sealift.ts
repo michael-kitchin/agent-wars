@@ -1,0 +1,449 @@
+import type { EmbarkOrder, SealiftContextMode, SealiftLandUnitOption, SealiftNavalRow, SealiftStackState } from '../../shared/ipcTypes';
+import { dbGetAll, dbGetOne, dbRun, isDbReady } from '../gameDb';
+import type { CombatUnit } from '../combatUnitTypes';
+
+interface UnitRow {
+  id: string;
+  player: string;
+  unitType: string;
+  h3Index: string;
+}
+
+interface AssignmentRow {
+  landUnitId: string;
+  navalUnitId: string;
+  landUnitType: 'infantry' | 'armor';
+}
+
+interface SealiftSlots {
+  slot1UnitId: string | null;
+  slot2UnitId: string | null;
+}
+
+interface HexEmbarkContext {
+  terrain: string;
+  seaportCount: number;
+  controllerPlayerId: string | null;
+}
+
+function getUnitsAtHex(h3Index: string): UnitRow[] {
+  return dbGetAll<{ id: string; player: string; unitType: string; h3Index: string }>(
+    'SELECT id, player, unit_type AS unitType, h3_index AS h3Index FROM units WHERE h3_index = ?',
+    [h3Index]
+  );
+}
+
+function getHumanNavalIds(unitsAtHex: UnitRow[]): string[] {
+  return unitsAtHex
+    .filter((unit) => unit.player === 'human' && unit.unitType === 'naval')
+    .map((unit) => unit.id)
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function getHumanLandOptions(unitsAtHex: UnitRow[]): SealiftLandUnitOption[] {
+  const land = unitsAtHex.filter((unit) => unit.player === 'human' && (unit.unitType === 'infantry' || unit.unitType === 'armor'));
+  return land
+    .map((unit) => ({ unitId: unit.id, unitType: unit.unitType as 'infantry' | 'armor' }))
+    .sort((a, b) => {
+      if (a.unitType !== b.unitType) return a.unitType === 'armor' ? -1 : 1;
+      return a.unitId.localeCompare(b.unitId);
+    });
+}
+
+function getHexEmbarkContext(h3Index: string): HexEmbarkContext | null {
+  const terrainRow = dbGetOne<{ terrain: string }>('SELECT terrain FROM hexes WHERE h3_index = ?', [h3Index]);
+  if (!terrainRow) return null;
+  const infra = dbGetOne<{ seaportCount: number }>(
+    'SELECT seaport_count AS seaportCount FROM res1_infrastructure WHERE h3_index = ?',
+    [h3Index]
+  );
+  const control = dbGetOne<{ controllerPlayerId: string | null }>(
+    'SELECT controller_player_id AS controllerPlayerId FROM res1_control WHERE h3_index = ?',
+    [h3Index]
+  );
+  return {
+    terrain: terrainRow.terrain,
+    seaportCount: infra?.seaportCount ?? 0,
+    controllerPlayerId: control?.controllerPlayerId ?? null,
+  };
+}
+
+function canPlayerEmbarkFromHex(h3Index: string, playerId: string): boolean {
+  const context = getHexEmbarkContext(h3Index);
+  if (!context) return false;
+  if (context.terrain === 'water') return false;
+  return context.seaportCount > 0 && context.controllerPlayerId === playerId;
+}
+
+function getHexContextMode(h3Index: string): SealiftContextMode {
+  const context = getHexEmbarkContext(h3Index);
+  if (!context) return 'unsupported';
+  if (context.terrain === 'water') return 'water';
+  if (canPlayerEmbarkFromHex(h3Index, 'human')) return 'coastal_port';
+  if (context.terrain === 'coastal' || context.seaportCount > 0) return 'coastal_no_port';
+  return 'unsupported';
+}
+
+function loadAssignmentsAtHex(h3Index: string): AssignmentRow[] {
+  return dbGetAll<{ landUnitId: string; navalUnitId: string; landUnitType: 'infantry' | 'armor' }>(
+    `SELECT uta.land_unit_id AS landUnitId,
+            uta.naval_unit_id AS navalUnitId,
+            lu.unit_type AS landUnitType
+     FROM unit_transport_assignments uta
+     JOIN units lu ON lu.id = uta.land_unit_id
+     JOIN units nu ON nu.id = uta.naval_unit_id
+     WHERE lu.h3_index = ?
+       AND nu.h3_index = ?
+       AND lu.player = 'human'
+       AND nu.player = 'human'
+       AND nu.unit_type = 'naval'
+       AND lu.unit_type IN ('infantry', 'armor')`,
+    [h3Index, h3Index]
+  );
+}
+
+function buildSlotsByNavalId(navalIds: string[], assignments: AssignmentRow[]): Map<string, SealiftSlots> {
+  const slotsByNavalId = new Map<string, SealiftSlots>();
+  for (const navalUnitId of navalIds) {
+    slotsByNavalId.set(navalUnitId, { slot1UnitId: null, slot2UnitId: null });
+  }
+  const grouped = new Map<string, AssignmentRow[]>();
+  for (const row of assignments) {
+    const list = grouped.get(row.navalUnitId) ?? [];
+    list.push(row);
+    grouped.set(row.navalUnitId, list);
+  }
+  for (const navalUnitId of navalIds) {
+    const slots = slotsByNavalId.get(navalUnitId)!;
+    const rows = grouped.get(navalUnitId) ?? [];
+    const armor = rows.find((row) => row.landUnitType === 'armor');
+    if (armor) {
+      slots.slot1UnitId = armor.landUnitId;
+      slots.slot2UnitId = null;
+      continue;
+    }
+    const infantry = rows
+      .filter((row) => row.landUnitType === 'infantry')
+      .map((row) => row.landUnitId)
+      .sort((a, b) => a.localeCompare(b));
+    slots.slot1UnitId = infantry[0] ?? null;
+    slots.slot2UnitId = infantry[1] ?? null;
+  }
+  return slotsByNavalId;
+}
+
+function normalizeSlots(
+  navalIds: string[],
+  slotsByNavalId: Map<string, SealiftSlots>,
+  landTypeById: Map<string, 'infantry' | 'armor'>
+): void {
+  const seen = new Set<string>();
+  for (const navalUnitId of navalIds) {
+    const slots = slotsByNavalId.get(navalUnitId);
+    if (!slots) continue;
+    for (const key of ['slot1UnitId', 'slot2UnitId'] as const) {
+      const unitId = slots[key];
+      if (!unitId) continue;
+      if (!landTypeById.has(unitId) || seen.has(unitId)) {
+        slots[key] = null;
+        continue;
+      }
+      seen.add(unitId);
+    }
+    if (!slots.slot1UnitId && slots.slot2UnitId) {
+      slots.slot1UnitId = slots.slot2UnitId;
+      slots.slot2UnitId = null;
+    }
+    if (slots.slot1UnitId && landTypeById.get(slots.slot1UnitId) === 'armor') {
+      slots.slot2UnitId = null;
+    } else if (slots.slot2UnitId && landTypeById.get(slots.slot2UnitId) === 'armor') {
+      slots.slot1UnitId = slots.slot2UnitId;
+      slots.slot2UnitId = null;
+    }
+  }
+}
+
+function writeAssignmentsForHex(
+  h3Index: string,
+  landOptions: SealiftLandUnitOption[],
+  slotsByNavalId: Map<string, SealiftSlots>
+): void {
+  const landIds = landOptions.map((option) => option.unitId);
+  if (landIds.length > 0) {
+    const placeholders = landIds.map(() => '?').join(', ');
+    dbRun(`DELETE FROM unit_transport_assignments WHERE land_unit_id IN (${placeholders})`, landIds);
+  }
+  for (const [navalUnitId, slots] of slotsByNavalId.entries()) {
+    if (slots.slot1UnitId) {
+      dbRun(
+        'INSERT OR REPLACE INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)',
+        [slots.slot1UnitId, navalUnitId]
+      );
+    }
+    if (slots.slot2UnitId) {
+      dbRun(
+        'INSERT OR REPLACE INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)',
+        [slots.slot2UnitId, navalUnitId]
+      );
+    }
+  }
+  // Defensive cleanup when stale records still point at this hex via naval id.
+  dbRun(
+    `DELETE FROM unit_transport_assignments
+     WHERE naval_unit_id IN (
+       SELECT id FROM units WHERE h3_index = ? AND unit_type = 'naval'
+     ) AND land_unit_id NOT IN (
+       SELECT id FROM units WHERE h3_index = ? AND unit_type IN ('infantry', 'armor')
+     )`,
+    [h3Index, h3Index]
+  );
+}
+
+function buildNavalRows(
+  contextMode: SealiftContextMode,
+  navalIds: string[],
+  slotsByNavalId: Map<string, SealiftSlots>,
+  landTypeById: Map<string, 'infantry' | 'armor'>
+): SealiftNavalRow[] {
+  const controlsDisabled = contextMode === 'water' || contextMode === 'coastal_no_port';
+  return navalIds.map((navalUnitId) => {
+    const slots = slotsByNavalId.get(navalUnitId) ?? { slot1UnitId: null, slot2UnitId: null };
+    const slot1Armor = !!slots.slot1UnitId && landTypeById.get(slots.slot1UnitId) === 'armor';
+    return {
+      navalUnitId,
+      slot1UnitId: slots.slot1UnitId,
+      slot2UnitId: slots.slot2UnitId,
+      slot2Disabled: controlsDisabled || slot1Armor,
+      controlsDisabled,
+      debarkSlot1Enabled: contextMode !== 'water' && !!slots.slot1UnitId,
+      debarkSlot2Enabled: contextMode !== 'water' && !!slots.slot2UnitId,
+    };
+  });
+}
+
+export function getSealiftStackStateImpl(h3Index: string): SealiftStackState {
+  const unitsAtHex = getUnitsAtHex(h3Index);
+  const contextMode = getHexContextMode(h3Index);
+  const navalIds = getHumanNavalIds(unitsAtHex);
+  const landOptions = getHumanLandOptions(unitsAtHex);
+  const landTypeById = new Map(landOptions.map((option) => [option.unitId, option.unitType] as const));
+  const assignments = loadAssignmentsAtHex(h3Index);
+  const slotsByNavalId = buildSlotsByNavalId(navalIds, assignments);
+  normalizeSlots(navalIds, slotsByNavalId, landTypeById);
+  const navalRows = buildNavalRows(contextMode, navalIds, slotsByNavalId, landTypeById);
+  const hasEmbarkedUnitsInStack = assignments.length > 0;
+  const hasMixedStack = navalIds.length > 0 && landOptions.length > 0;
+  return {
+    h3Index,
+    showSealiftSection: hasMixedStack || hasEmbarkedUnitsInStack,
+    contextMode,
+    controlsDisabled: contextMode === 'water' || contextMode === 'coastal_no_port',
+    hasEmbarkedUnitsInStack,
+    navalRows,
+    landOptions,
+  };
+}
+
+export function updateSealiftSlotImpl(args: {
+  h3Index: string;
+  navalUnitId: string;
+  slotIndex: 1 | 2;
+  landUnitId: string | null;
+}): { success: boolean; reason?: string; state?: SealiftStackState } {
+  if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
+  const state = getSealiftStackStateImpl(args.h3Index);
+  const navalIds = state.navalRows.map((row) => row.navalUnitId);
+  if (!navalIds.includes(args.navalUnitId)) return { success: false, reason: 'Selected naval unit is not in this stack.' };
+  if (state.contextMode === 'water') return { success: false, reason: 'Sealift assignments cannot be changed while at sea.' };
+  if (args.landUnitId && !canPlayerEmbarkFromHex(args.h3Index, 'human')) {
+    return { success: false, reason: 'Embarkation requires a valid port.' };
+  }
+  if (args.landUnitId && !state.landOptions.some((option) => option.unitId === args.landUnitId)) {
+    return { success: false, reason: 'Selected land unit is not available for this stack.' };
+  }
+
+  const landTypeById = new Map(state.landOptions.map((option) => [option.unitId, option.unitType] as const));
+  const slotsByNavalId = new Map(
+    state.navalRows.map((row) => [
+      row.navalUnitId,
+      { slot1UnitId: row.slot1UnitId, slot2UnitId: row.slot2UnitId } satisfies SealiftSlots,
+    ])
+  );
+
+  if (args.landUnitId) {
+    for (const slots of slotsByNavalId.values()) {
+      if (slots.slot1UnitId === args.landUnitId) slots.slot1UnitId = null;
+      if (slots.slot2UnitId === args.landUnitId) slots.slot2UnitId = null;
+    }
+  }
+
+  const targetSlots = slotsByNavalId.get(args.navalUnitId);
+  if (!targetSlots) return { success: false, reason: 'Selected naval unit is not available.' };
+  const targetKey = args.slotIndex === 1 ? 'slot1UnitId' : 'slot2UnitId';
+  targetSlots[targetKey] = args.landUnitId;
+  if (args.slotIndex === 2 && args.landUnitId && targetSlots.slot1UnitId && landTypeById.get(targetSlots.slot1UnitId) === 'armor') {
+    return { success: false, reason: 'This naval unit already carries armor and has no second slot.' };
+  }
+
+  normalizeSlots(navalIds, slotsByNavalId, landTypeById);
+  writeAssignmentsForHex(args.h3Index, state.landOptions, slotsByNavalId);
+  return { success: true, state: getSealiftStackStateImpl(args.h3Index) };
+}
+
+export function getEmbarkedNavalForLandUnit(unitId: string): string | null {
+  const row = dbGetOne<{ navalUnitId: string }>(
+    'SELECT naval_unit_id AS navalUnitId FROM unit_transport_assignments WHERE land_unit_id = ?',
+    [unitId]
+  );
+  return row?.navalUnitId ?? null;
+}
+
+export function isEmbarkedLandUnitOnWater(unitId: string): boolean {
+  const row = dbGetOne<{ terrain: string }>(
+    `SELECT hx.terrain AS terrain
+     FROM unit_transport_assignments uta
+     JOIN units lu ON lu.id = uta.land_unit_id
+     JOIN hexes hx ON hx.h3_index = lu.h3_index
+     WHERE uta.land_unit_id = ?`,
+    [unitId]
+  );
+  return row?.terrain === 'water';
+}
+
+export function autoDisembarkIndependentLandMoves(movementOrders: Array<{ unitId: string; toH3Index: string }>): void {
+  for (const order of movementOrders) {
+    const assignment = dbGetOne<{ navalUnitId: string }>(
+      'SELECT naval_unit_id AS navalUnitId FROM unit_transport_assignments WHERE land_unit_id = ?',
+      [order.unitId]
+    );
+    if (!assignment) continue;
+    const pair = dbGetOne<{ landH3Index: string; navalH3Index: string; terrain: string }>(
+      `SELECT lu.h3_index AS landH3Index,
+              nu.h3_index AS navalH3Index,
+              hx.terrain AS terrain
+       FROM units lu
+       JOIN units nu ON nu.id = ?
+       JOIN hexes hx ON hx.h3_index = lu.h3_index
+       WHERE lu.id = ?`,
+      [assignment.navalUnitId, order.unitId]
+    );
+    if (!pair) {
+      dbRun('DELETE FROM unit_transport_assignments WHERE land_unit_id = ?', [order.unitId]);
+      continue;
+    }
+    if (pair.landH3Index !== pair.navalH3Index) {
+      dbRun('DELETE FROM unit_transport_assignments WHERE land_unit_id = ?', [order.unitId]);
+      continue;
+    }
+    if (pair.terrain === 'water') continue;
+    if (order.toH3Index !== pair.navalH3Index) {
+      dbRun('DELETE FROM unit_transport_assignments WHERE land_unit_id = ?', [order.unitId]);
+    }
+  }
+}
+
+export function syncEmbarkedLandUnitPositionsWithNaval(): void {
+  const rows = dbGetAll<{ landUnitId: string; navalH3Index: string; landH3Index: string }>(
+    `SELECT lu.id AS landUnitId,
+            lu.h3_index AS landH3Index,
+            nu.h3_index AS navalH3Index
+     FROM unit_transport_assignments uta
+     JOIN units lu ON lu.id = uta.land_unit_id
+     JOIN units nu ON nu.id = uta.naval_unit_id`
+  );
+  for (const row of rows) {
+    if (row.landH3Index === row.navalH3Index) continue;
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [row.navalH3Index, row.landUnitId]);
+  }
+}
+
+/**
+ * Why this exists:
+ *     Applies AI-authored embark intents through the same capacity and terrain constraints used by gameplay sealift.
+ * When to use:
+ *     During turn resolution after AI orders are parsed and before movement is resolved.
+ * What to expect:
+ *     Valid orders assign land units to target naval units; invalid requests are ignored without mutating unrelated assignments.
+ */
+export function applyEmbarkOrdersForPlayer(orders: EmbarkOrder[], playerId: string): void {
+  if (orders.length <= 0) return;
+  for (const order of orders) {
+    const land = dbGetOne<{ id: string; player: string; unitType: string; h3Index: string }>(
+      'SELECT id, player, unit_type AS unitType, h3_index AS h3Index FROM units WHERE id = ?',
+      [order.unitId]
+    );
+    const naval = dbGetOne<{ id: string; player: string; unitType: string; h3Index: string }>(
+      'SELECT id, player, unit_type AS unitType, h3_index AS h3Index FROM units WHERE id = ?',
+      [order.navalUnitId]
+    );
+    if (!land || !naval) continue;
+    if (land.player !== playerId || naval.player !== playerId) continue;
+    if (!(land.unitType === 'infantry' || land.unitType === 'armor') || naval.unitType !== 'naval') continue;
+    if (land.h3Index !== naval.h3Index) continue;
+    if (!canPlayerEmbarkFromHex(land.h3Index, playerId)) continue;
+
+    const existingCargo = dbGetAll<{ unitType: string }>(
+      `SELECT lu.unit_type AS unitType
+       FROM unit_transport_assignments uta
+       JOIN units lu ON lu.id = uta.land_unit_id
+       WHERE uta.naval_unit_id = ?
+         AND uta.land_unit_id != ?`,
+      [order.navalUnitId, order.unitId]
+    );
+    const existingArmor = existingCargo.some((cargo) => cargo.unitType === 'armor');
+    const existingInfantryCount = existingCargo.filter((cargo) => cargo.unitType === 'infantry').length;
+    if (land.unitType === 'armor' && existingCargo.length > 0) continue;
+    if (land.unitType === 'infantry' && (existingArmor || existingInfantryCount >= 2)) continue;
+
+    dbRun(
+      'INSERT OR REPLACE INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)',
+      [order.unitId, order.navalUnitId]
+    );
+  }
+}
+
+export function deleteTransportAssignmentsForRemovedUnits(unitIds: string[]): void {
+  if (unitIds.length <= 0) return;
+  const placeholders = unitIds.map(() => '?').join(', ');
+  dbRun(
+    `DELETE FROM unit_transport_assignments
+     WHERE land_unit_id IN (${placeholders}) OR naval_unit_id IN (${placeholders})`,
+    [...unitIds, ...unitIds]
+  );
+}
+
+export function applyTransportLossForRemovedNavalUnits(removedUnits: CombatUnit[]): CombatUnit[] {
+  const removedCargo: CombatUnit[] = [];
+  const removedNaval = removedUnits.filter((unit) => unit.unitType === 'naval');
+  for (const naval of removedNaval) {
+    const assignments = dbGetAll<{ id: string; player: string; unitType: string; h3Index: string; displayOrder: number | null }>(
+      `SELECT lu.id AS id,
+              lu.player AS player,
+              lu.unit_type AS unitType,
+              lu.h3_index AS h3Index,
+              lu.display_order AS displayOrder
+       FROM unit_transport_assignments uta
+       JOIN units lu ON lu.id = uta.land_unit_id
+       WHERE uta.naval_unit_id = ?`,
+      [naval.id]
+    );
+    if (assignments.length <= 0) continue;
+    const terrain = dbGetOne<{ terrain: string }>('SELECT terrain FROM hexes WHERE h3_index = ?', [naval.h3Index])?.terrain;
+    if (terrain === 'water') {
+      for (const land of assignments) {
+        dbRun('DELETE FROM units WHERE id = ?', [land.id]);
+        removedCargo.push({
+          id: land.id,
+          player: land.player,
+          unitType: land.unitType,
+          h3Index: land.h3Index,
+          displayOrder: typeof land.displayOrder === 'number' ? land.displayOrder : undefined,
+        });
+      }
+      dbRun('DELETE FROM unit_transport_assignments WHERE naval_unit_id = ?', [naval.id]);
+      continue;
+    }
+    dbRun('DELETE FROM unit_transport_assignments WHERE naval_unit_id = ?', [naval.id]);
+  }
+  return removedCargo;
+}

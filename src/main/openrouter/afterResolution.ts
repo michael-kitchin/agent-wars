@@ -5,8 +5,8 @@
  * Call synchronously after ready() returns so pending orders are set before the next Ready.
  */
 
-import { logDebug, logError } from './logger';
-import type { GameStateSnapshot } from './gameDb';
+import { logDebug, logError } from '../logger';
+import type { GameStateSnapshot } from '../gameDb';
 import {
   getAiLastConsultationTurn,
   setAiLastConsultationTurn,
@@ -16,10 +16,10 @@ import {
   clearOpponentCombatSinceConsultation,
   setAiPendingOrders,
   clearAiPendingOrders,
-} from './gameDb';
-import { getSubscriptions } from './callbackSubscriptions';
-import { evaluateMandatoryOverrides, evaluateSubscriptionEvents, type ResolutionContext } from './callbackEvaluation';
-import type { ReadyResult, RequestAiOrdersResult } from '../shared/ipcTypes';
+} from '../gameDb';
+import { getSubscriptions } from '../callbackSubscriptions';
+import { evaluateMandatoryOverrides, evaluateSubscriptionEvents, type ResolutionContext } from '../callbackEvaluation';
+import type { ReadyResult, RequestAiOrdersResult } from '../../shared/ipcTypes';
 
 type ReadyResultWithParticipants = Pick<
   ReadyResult,
@@ -100,7 +100,8 @@ export async function afterResolution(
           result.orders,
           result.rangedAttacks ?? [],
           result.airStrikes ?? [],
-          result.ferryOrders ?? []
+          result.ferryOrders ?? [],
+          result.embarkOrders ?? []
         );
         setAiLastConsultationTurn(state.turnNumber);
         clearOpponentCombatSinceConsultation();

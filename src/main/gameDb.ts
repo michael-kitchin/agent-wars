@@ -22,7 +22,7 @@ import {
 } from './terrainClassificationCache';
 import { pipelineTerrainToPassability } from './terrainPassability';
 import { logDebug, logError, logTrace } from './logger';
-import type { AirStrikeOrder, FerryOrder, GameStateSnapshot, MovementOrder, RangedAttackOrder } from '../shared/ipcTypes';
+import type { AirStrikeOrder, EmbarkOrder, FerryOrder, GameStateSnapshot, MovementOrder, RangedAttackOrder } from '../shared/ipcTypes';
 import type { BuildUnitType } from './productionRules';
 import { seedUnits as seedUnitsFromModule } from './game-db/seeding/seedUnits';
 import {
@@ -79,12 +79,12 @@ export type { AiLossEventSinceConsultation } from './game-db/aiState';
 export type { BuildQueueRow, HexControlRow, Res1InfrastructureRow, Res4FeatureOverrideRow } from './game-db/controlInfrastructure';
 
 /** Baseline schema version; bump when a future milestone adds migration chains. */
-export const EXPECTED_USER_VERSION = 10;
+export const EXPECTED_USER_VERSION = 11;
 
 /**
  * Baseline filename for world-map + fog-of-war + production schema (v9).
  */
-export const GAME_DB_FILE_NAME = 'game-baseline-v10.sqlite';
+export const GAME_DB_FILE_NAME = 'game-baseline-v11.sqlite';
 
 let db: InstanceType<typeof Database> | null = null;
 
@@ -96,6 +96,7 @@ const REQUIRED_TABLES = [
   'pending_ranged_orders',
   'pending_air_orders',
   'pending_ferry_orders',
+  'unit_transport_assignments',
   'game_config',
   'ai_memory',
   'standing_orders',
@@ -443,7 +444,8 @@ function getInfrastructureSeedRowsFromMetadata(): InfrastructureSeedRows {
       seaportCount: ctx.seaportCount,
     };
   });
-  const res4Rows = getRes4FeatureRowsForSeeding().filter((row) => row.isUrban || row.isAirport || row.isSeaport);
+  const res4Rows = getRes4FeatureRowsForSeeding()
+    .filter((row) => row.isUrban || row.isAirport || row.isSeaport);
   return { res1Rows, res4Rows };
 }
 
@@ -900,6 +902,7 @@ export function getAiPendingOrders(playerId: string): {
   rangedOrders: RangedAttackOrder[];
   airStrikeOrders: AirStrikeOrder[];
   ferryOrders: FerryOrder[];
+  embarkOrders: EmbarkOrder[];
 } | null {
   return getAiPendingOrdersFromModule(getAiStateDbOps(), playerId);
 }
@@ -913,9 +916,18 @@ export function setAiPendingOrders(
   movementOrders: MovementOrder[],
   rangedOrders: RangedAttackOrder[],
   airStrikeOrders: AirStrikeOrder[] = [],
-  ferryOrders: FerryOrder[] = []
+  ferryOrders: FerryOrder[] = [],
+  embarkOrders: EmbarkOrder[] = []
 ): void {
-  setAiPendingOrdersFromModule(getAiStateDbOps(), playerId, movementOrders, rangedOrders, airStrikeOrders, ferryOrders);
+  setAiPendingOrdersFromModule(
+    getAiStateDbOps(),
+    playerId,
+    movementOrders,
+    rangedOrders,
+    airStrikeOrders,
+    ferryOrders,
+    embarkOrders
+  );
 }
 
 /**

@@ -28,7 +28,7 @@ export function buildFinalJsonContractInstruction(args: {
   const strictSchemaClause =
     'Strict schema: top-level must be a JSON object with "strategy" (string) and "orders" (array); do not return a top-level array.';
   const ordersClause =
-    'The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: assign_order (include "order": { "type": "defend"|"march"|"pursue"|"patrol"|"hold_fire", ... } — pursue uses targetUnitId string for the enemy only; march/patrol/defend use [lat,lng] where a place is required), cancel_order, explicit_move (include "destination": [lat,lng] for this turn\'s move), explicit_attack (include "targetHex": [lat,lng] OR enemy unit id string).';
+    'The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: assign_order (include "order": { "type": "defend"|"march"|"pursue"|"patrol"|"hold_fire", ... } — pursue uses targetUnitId string for the enemy only; march/patrol/defend use [lat,lng] where a place is required), cancel_order, explicit_move (include "destination": [lat,lng] for this turn\'s move), explicit_attack (include "targetHex": [lat,lng] OR enemy unit id string), transport_move (include "navalUnitId" and "destination": [lat,lng]), disembark (include "unitId" and "destination": [lat,lng]), embark (include "unitId" and "navalUnitId").';
   const airClause =
     'Optional top-level air actions: airStrikes[] entries use { "unitId": "...", "targetHex": [lat,lng], "targetType": "units"|"urban"|"airport"|"seaport" }, ferryOrders[] entries use { "unitId": "...", "destination": [lat,lng] }.';
   const legacyClause = 'Do not use top-level movementOrders or rangedAttacks (legacy).';

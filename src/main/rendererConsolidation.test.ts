@@ -449,6 +449,33 @@ function testRes4RubbleTooltipAndTerrainVariantContracts(): void {
   );
 }
 
+function testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves(): void {
+  const pathDrawingPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'pathDrawing.ts');
+  const source = fs.readFileSync(pathDrawingPath, 'utf8');
+  const drawMovingUnitsFn = getFunctionSource(source, 'drawMovingUnits');
+
+  assert.ok(
+    drawMovingUnitsFn.includes('const groupKey = `${move.player}|${move.fromH3Index}|${move.toH3Index}`;'),
+    'drawMovingUnits should group by player+origin+destination so naval + embarked cargo animate as one stack'
+  );
+  assert.ok(
+    drawMovingUnitsFn.includes('existing.count += 1;') &&
+      drawMovingUnitsFn.includes('existing.unitTypes.add(move.unitType);'),
+    'drawMovingUnits should aggregate grouped move count and unit-type set for mixed stacks'
+  );
+  assert.ok(
+    drawMovingUnitsFn.includes("const label = group.unitTypes.size > 1 ? '*' : (UNIT_TYPE_LABELS[move.unitType] ?? '?');"),
+    'drawMovingUnits should show mixed-type stack marker when grouped moves include multiple unit types'
+  );
+  assert.ok(
+    drawMovingUnitsFn.includes('if (group.count > 1) {') &&
+      drawMovingUnitsFn.includes('p.x + STACK_OFFSET_X') &&
+      drawMovingUnitsFn.includes('p.y + STACK_OFFSET_Y') &&
+      drawMovingUnitsFn.includes('ctx.fillText(String(group.count), badgeX, badgeY);'),
+    'drawMovingUnits should render grouped movement as stacked markers with a count badge'
+  );
+}
+
 function run(): void {
   testRedrawAndResizeDelegateToSharedScene();
   testSharedSceneStillRendersStaleIntel();
@@ -461,6 +488,7 @@ function run(): void {
   testAirStrikeAndAirGlyphContracts();
   testKillUpdateTextOmitsPlayerSuffixes();
   testRes4RubbleTooltipAndTerrainVariantContracts();
+  testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves();
   console.log('rendererConsolidation.test.ts passed');
 }
 

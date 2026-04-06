@@ -1,5 +1,5 @@
 import { cellToLatLng } from 'h3-js';
-import type { AirStrikeOrder, FerryOrder } from '../../shared/ipcTypes';
+import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
 import { buildLatLngCoordinateMap, LATLNG_DECIMAL_PLACES } from '../mapData';
 import { logDebug, logError, logTrace } from '../logger';
 import { buildJsonAssistantRepairSchema, parseOrdersResponse } from './orderResponseParsing';
@@ -37,6 +37,7 @@ export interface RequestOrdersResult {
   rangedAttacks?: { unitId: string; targetH3Index: string }[];
   airStrikes?: AirStrikeOrder[];
   ferryOrders?: FerryOrder[];
+  embarkOrders?: EmbarkOrder[];
   strategy?: string;
   dropped?: number;
   dropReasons?: string[];
@@ -393,6 +394,7 @@ export async function requestOrdersFlow(
       const llmRangedOrders = dedupeByUnitKeepLast(parsed.rangedAttacks ?? []);
       const llmAirStrikes = dedupeByUnitKeepLast(parsed.airStrikes ?? []);
       const llmFerryOrders = dedupeByUnitKeepLast(parsed.ferryOrders ?? []);
+      const llmEmbarkOrders = dedupeByUnitKeepLast(parsed.embarkOrders ?? []);
       const llmMovementByUnit = new Map(llmMovementOrders.map((o) => [o.unitId, o.toH3Index]));
       const llmMovementUnitIds = new Set(llmMovementOrders.map((o) => o.unitId));
       const mergedMovement = [...standingOrderMovement.filter((o) => !llmMovementUnitIds.has(o.unitId)), ...llmMovementOrders];
@@ -455,6 +457,7 @@ export async function requestOrdersFlow(
         rangedAttacks: validatedRanged.length > 0 ? validatedRanged : undefined,
         airStrikes: llmAirStrikes.length > 0 ? llmAirStrikes : undefined,
         ferryOrders: llmFerryOrders.length > 0 ? llmFerryOrders : undefined,
+        embarkOrders: llmEmbarkOrders.length > 0 ? llmEmbarkOrders : undefined,
         strategy: parsed.strategy,
         dropped: dropReasons.length,
         dropReasons: dropReasons.length > 0 ? dropReasons : undefined,

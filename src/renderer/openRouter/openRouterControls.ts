@@ -1,4 +1,5 @@
 import { rendererSharedState as S } from '../core/state';
+import { resetPrecomputedAiState } from './precomputedAiState';
 
 interface OpenRouterUiDeps {
   appendOpenRouterLog: (line: string, isError?: boolean) => void;
@@ -188,16 +189,14 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       runBtn.setAttribute('aria-pressed', S.runButtonOn ? 'true' : 'false');
       if (S.runButtonOn) {
         document.getElementById('openrouter-tab-tools')?.click();
-        S.precomputedAiOrders = null;
-        S.precomputedAiRangedOrders = null;
-        S.precomputedAiStrategy = null;
+        resetPrecomputedAiState('null');
         if (S.useEventDrivenConsultation) S.eventDrivenInitialConsultationDone = false;
         deps.updateReadyButtonState();
         deps.startBackgroundRequestIfAllowed();
       } else {
         window.gameApi?.cancelRequestAiOrders?.();
-        S.precomputedAiOrders = null;
-        S.precomputedAiRangedOrders = null;
+        resetPrecomputedAiState('null');
+        S.precomputedAiEmbarkOrders = null;
         S.precomputedAiStrategy = null;
         S.eventDrivenInitialConsultationDone = false;
         deps.updateReadyButtonState();

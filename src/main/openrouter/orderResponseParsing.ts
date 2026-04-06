@@ -10,7 +10,7 @@ import type { LatLng } from '../tools/tool1Pathfinding';
 import { executeTool5 } from '../tools/tool5StandingOrders';
 import { executeTool6 } from '../tools/tool6Production';
 import { normalizeProductionOrders } from '../productionOrders';
-import type { AirStrikeOrder, AirStrikeTargetType, FerryOrder } from '../../shared/ipcTypes';
+import type { AirStrikeOrder, AirStrikeTargetType, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
 import { formatLatLng } from './promptText';
 import { LATLNG_DECIMAL_PLACES } from '../mapData';
 
@@ -346,14 +346,20 @@ function processV3OrdersArray(
   state: GameStateSnapshot,
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined
-): { movementOrders: { unitId: string; toH3Index: string }[]; rangedAttacks: { unitId: string; targetH3Index: string }[] } {
+): {
+  movementOrders: { unitId: string; toH3Index: string }[];
+  rangedAttacks: { unitId: string; targetH3Index: string }[];
+  embarkOrders: EmbarkOrder[];
+} {
   const movementOrders: { unitId: string; toH3Index: string }[] = [];
   const rangedAttacks: { unitId: string; targetH3Index: string }[] = [];
+  const embarkOrders: EmbarkOrder[] = [];
   for (const raw of entries) {
     if (!raw || typeof raw !== 'object') continue;
     const o = raw as {
       action?: unknown;
       unitId?: unknown;
+      navalUnitId?: unknown;
       order?: unknown;
       destination?: unknown;
       targetHex?: unknown;
@@ -394,9 +400,47 @@ function processV3OrdersArray(
       else logDebug('openRouter processV3OrdersArray: explicit_attack unresolved', { unitId });
       continue;
     }
+    if (action === 'transport_move') {
+      const navalUnitId = typeof o.navalUnitId === 'string' ? o.navalUnitId : '';
+      const dest = o.destination;
+      if (!navalUnitId || !Array.isArray(dest) || dest.length < 2) {
+        logDebug('openRouter processV3OrdersArray: transport_move missing fields', { unitId, navalUnitId });
+        continue;
+      }
+      const lat = Number(dest[0]);
+      const lng = Number(dest[1]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      const h3 = resolveToH3(lat, lng);
+      if (h3) movementOrders.push({ unitId: navalUnitId, toH3Index: h3 });
+      else logDebug('openRouter processV3OrdersArray: transport_move unresolved', { navalUnitId, lat, lng });
+      continue;
+    }
+    if (action === 'disembark') {
+      const dest = o.destination;
+      if (!Array.isArray(dest) || dest.length < 2) {
+        logDebug('openRouter processV3OrdersArray: disembark missing destination', { unitId });
+        continue;
+      }
+      const lat = Number(dest[0]);
+      const lng = Number(dest[1]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      const h3 = resolveToH3(lat, lng);
+      if (h3) movementOrders.push({ unitId, toH3Index: h3 });
+      else logDebug('openRouter processV3OrdersArray: disembark unresolved', { unitId, lat, lng });
+      continue;
+    }
+    if (action === 'embark') {
+      const navalUnitId = typeof o.navalUnitId === 'string' ? o.navalUnitId.trim() : '';
+      if (!navalUnitId) {
+        logDebug('openRouter processV3OrdersArray: embark missing navalUnitId', { unitId });
+        continue;
+      }
+      embarkOrders.push({ unitId, navalUnitId });
+      continue;
+    }
     logDebug('openRouter processV3OrdersArray: skipped unknown action', { action, unitId });
   }
-  return { movementOrders, rangedAttacks };
+  return { movementOrders, rangedAttacks, embarkOrders };
 }
 
 function formatLatLngForDropMessage(ll: [number, number]): string {
@@ -446,6 +490,7 @@ export function parseOrdersResponse(
 ): {
   movementOrders: { unitId: string; toH3Index: string }[];
   rangedAttacks: { unitId: string; targetH3Index: string }[];
+  embarkOrders: EmbarkOrder[];
   airStrikes: AirStrikeOrder[];
   ferryOrders: FerryOrder[];
   strategy?: string;
@@ -486,7 +531,12 @@ export function parseOrdersResponse(
           logDebug('openRouter parseOrdersResponse: rejected non-empty legacy movementOrders/rangedAttacks');
           return null;
         }
-        const { movementOrders, rangedAttacks } = processV3OrdersArray(obj.orders as unknown[], state, latLngByH3, resolveToH3);
+        const { movementOrders, rangedAttacks, embarkOrders } = processV3OrdersArray(
+          obj.orders as unknown[],
+          state,
+          latLngByH3,
+          resolveToH3
+        );
         const normalizedAirStrikes = normalizeAirStrikeOrders(obj.airStrikes, resolveToH3);
         const normalizedFerryOrders = normalizeFerryOrders(obj.ferryOrders, resolveToH3);
         let productionDropReasons: string[] = [];
@@ -509,6 +559,7 @@ export function parseOrdersResponse(
         return {
           movementOrders,
           rangedAttacks,
+          embarkOrders,
           airStrikes: normalizedAirStrikes.airStrikes,
           ferryOrders: normalizedFerryOrders.ferryOrders,
           strategy,

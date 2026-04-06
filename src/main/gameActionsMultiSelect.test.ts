@@ -13,6 +13,7 @@ import {
   assignHumanMarchOrder,
   assignHumanMarchOrders,
   previewHumanMarchOrders,
+  ready,
   validateGroupRangedTarget,
   submitOrders,
 } from './gameActions';
@@ -218,6 +219,69 @@ function testAssignMarchRejectsAirUnits(): void {
   });
 }
 
+function testPreviewEmbarkedLandUnitOnWaterShowsInvalidWithoutPathPlanning(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const landUnit = state.units.find(
+      (u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor')
+    );
+    const navalUnit = state.units.find((u) => u.player === 'human' && u.unitType === 'naval');
+    const waterHex = state.hexes.find((hex) => hex.terrain === 'water');
+    const hoveredHex = state.hexes.find((hex) => hex.h3Index !== (waterHex?.h3Index ?? ''));
+    assert.ok(landUnit, 'expected seeded human land unit');
+    assert.ok(navalUnit, 'expected seeded human naval unit');
+    assert.ok(waterHex, 'expected at least one water hex');
+    assert.ok(hoveredHex, 'expected at least one hovered destination hex');
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [waterHex!.h3Index, landUnit!.id]);
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [waterHex!.h3Index, navalUnit!.id]);
+    dbRun('INSERT OR REPLACE INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', [
+      landUnit!.id,
+      navalUnit!.id,
+    ]);
+    const result = previewHumanMarchOrders([landUnit!.id], hoveredHex!.h3Index);
+    assert.strictEqual(result.validForAll, false);
+    assert.strictEqual(result.showInvalidMarker, true);
+    assert.strictEqual(
+      result.invalidReason,
+      'Embarked land units cannot receive independent movement orders while at sea.'
+    );
+    assert.strictEqual(result.previews.length, 1);
+    assert.strictEqual(result.previews[0]?.preview.valid, false);
+    assert.strictEqual(result.previews[0]?.preview.showInvalidMarker, true);
+    assert.deepStrictEqual(result.previews[0]?.preview.segments, []);
+  });
+}
+
+function testReadyIncludesEmbarkedCargoFollowMoveForNavalMovement(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const navalUnit = state.units.find((u) => u.player === 'human' && u.unitType === 'naval');
+    const landUnit = state.units.find(
+      (u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor')
+    );
+    assert.ok(navalUnit, 'expected seeded human naval unit');
+    assert.ok(landUnit, 'expected seeded human land unit');
+    const destination = findAdjacentNavalPassableHex(state, navalUnit!.h3Index);
+    assert.ok(destination, 'expected adjacent naval-passable destination');
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [navalUnit!.h3Index, landUnit!.id]);
+    dbRun('INSERT OR REPLACE INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', [
+      landUnit!.id,
+      navalUnit!.id,
+    ]);
+    const assignResult = assignHumanMarchOrders([navalUnit!.id], destination!);
+    assert.strictEqual(assignResult.success, true, assignResult.reason ?? 'expected naval order assignment to succeed');
+    const readyResult = ready();
+    assert.strictEqual(readyResult.success, true, readyResult.reason ?? 'expected ready to succeed');
+    const moves = readyResult.humanMoves ?? [];
+    const navalMove = moves.find((m) => m.unitId === navalUnit!.id);
+    const cargoMove = moves.find((m) => m.unitId === landUnit!.id);
+    assert.ok(navalMove, 'expected naval move in playback moves');
+    assert.ok(cargoMove, 'expected embarked cargo follow move in playback moves');
+    assert.strictEqual(navalMove!.toH3Index, destination);
+    assert.strictEqual(cargoMove!.toH3Index, destination);
+  });
+}
+
 function run(): void {
   testPreviewGroupedHappyPathSingleUnit();
   testPreviewGroupedFailsForUnknownUnit();
@@ -228,6 +292,8 @@ function run(): void {
   testPreviewGroupedRejectsAirUnitsForMarchPlanning();
   testPreviewGroupedAcceptsAirFerryDestinationWithinRange();
   testAssignMarchRejectsAirUnits();
+  testPreviewEmbarkedLandUnitOnWaterShowsInvalidWithoutPathPlanning();
+  testReadyIncludesEmbarkedCargoFollowMoveForNavalMovement();
   console.log('gameActionsMultiSelect.test.ts passed');
 }
 

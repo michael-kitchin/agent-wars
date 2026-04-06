@@ -14779,6 +14779,7 @@
     eventDrivenInitialConsultationDone: false,
     precomputedAiOrders: null,
     precomputedAiRangedOrders: null,
+    precomputedAiEmbarkOrders: null,
     precomputedAiStrategy: null,
     precomputedToolInvocationCounts: null,
     backgroundRequestInFlight: false,
@@ -15521,7 +15522,19 @@
     const map = getMainLeafletMap();
     if (!map) return;
     const L = getLeafletGlobal();
+    const groupedMoves = /* @__PURE__ */ new Map();
     for (const move of moves) {
+      const groupKey = `${move.player}|${move.fromH3Index}|${move.toH3Index}`;
+      const existing = groupedMoves.get(groupKey);
+      if (existing) {
+        existing.count += 1;
+        existing.unitTypes.add(move.unitType);
+        continue;
+      }
+      groupedMoves.set(groupKey, { move, count: 1, unitTypes: /* @__PURE__ */ new Set([move.unitType]) });
+    }
+    for (const group of groupedMoves.values()) {
+      const move = group.move;
       const [lat0, lng0] = cellToLatLng(move.fromH3Index);
       const [lat1, lng1] = cellToLatLng(move.toH3Index);
       const lng1Aligned = alignLngToReference(lng1, lng0);
@@ -15529,8 +15542,21 @@
       const lng = lng0 + progress * (lng1Aligned - lng0);
       const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
       const color = PLAYER_COLORS[move.player] ?? "#333";
-      const label = UNIT_TYPE_LABELS[move.unitType] ?? "?";
+      const label = group.unitTypes.size > 1 ? "*" : UNIT_TYPE_LABELS[move.unitType] ?? "?";
       drawOneUnitMarker(ctx, p.x, p.y, color, label, "#fff");
+      if (group.count > 1) {
+        drawOneUnitMarker(ctx, p.x + STACK_OFFSET_X, p.y + STACK_OFFSET_Y, color, label, "#fff");
+        const badgeX = p.x + COUNT_BADGE_OFFSET;
+        const badgeY = p.y - COUNT_BADGE_OFFSET;
+        ctx.font = "bold 13px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.strokeText(String(group.count), badgeX, badgeY);
+        ctx.fillStyle = "#000";
+        ctx.fillText(String(group.count), badgeX, badgeY);
+      }
     }
   }
 
@@ -15655,6 +15681,27 @@
     updateReadyButtonState2();
   }
 
+  // src/renderer/openRouter/precomputedAiState.ts
+  function resetPrecomputedAiState(mode) {
+    if (mode === "empty") {
+      rendererSharedState.precomputedAiOrders = [];
+      rendererSharedState.precomputedAiRangedOrders = [];
+      rendererSharedState.precomputedAiEmbarkOrders = [];
+    } else {
+      rendererSharedState.precomputedAiOrders = null;
+      rendererSharedState.precomputedAiRangedOrders = null;
+      rendererSharedState.precomputedAiEmbarkOrders = null;
+    }
+    rendererSharedState.precomputedAiStrategy = null;
+    rendererSharedState.precomputedToolInvocationCounts = null;
+  }
+  function applySuccessfulPrecomputedAiResult(result) {
+    rendererSharedState.precomputedAiOrders = result.orders;
+    rendererSharedState.precomputedAiRangedOrders = result.rangedAttacks ?? [];
+    rendererSharedState.precomputedAiEmbarkOrders = result.embarkOrders ?? [];
+    rendererSharedState.precomputedAiStrategy = result.strategy ?? null;
+  }
+
   // src/renderer/gameplay/newGame.ts
   function registerNewGameButton(deps) {
     document.getElementById("new-game-btn")?.addEventListener("click", async () => {
@@ -15684,9 +15731,7 @@
         rendererSharedState.selectedUnitIdsAtMouseDown = [];
         rendererSharedState.selectedHexIndex = null;
         deps.hideStackCallout();
-        rendererSharedState.precomputedAiOrders = null;
-        rendererSharedState.precomputedAiRangedOrders = null;
-        rendererSharedState.precomputedAiStrategy = null;
+        resetPrecomputedAiState("null");
         rendererSharedState.backgroundRequestInFlight = false;
         rendererSharedState.eventDrivenInitialConsultationDone = false;
         rendererSharedState.openRouterGameCost = 0;
@@ -15707,10 +15752,7 @@
   }
   function openNewGameOverlayFromModelTab(setMainUIControlsEnabled3, updateReadyButtonState2) {
     window.gameApi?.cancelRequestAiOrders?.();
-    rendererSharedState.precomputedAiOrders = null;
-    rendererSharedState.precomputedAiRangedOrders = null;
-    rendererSharedState.precomputedAiStrategy = null;
-    rendererSharedState.precomputedToolInvocationCounts = null;
+    resetPrecomputedAiState("null");
     rendererSharedState.backgroundRequestInFlight = false;
     rendererSharedState.readyRequestInFlight = false;
     rendererSharedState.eventDrivenInitialConsultationDone = false;
@@ -16222,16 +16264,14 @@
         runBtn.setAttribute("aria-pressed", rendererSharedState.runButtonOn ? "true" : "false");
         if (rendererSharedState.runButtonOn) {
           document.getElementById("openrouter-tab-tools")?.click();
-          rendererSharedState.precomputedAiOrders = null;
-          rendererSharedState.precomputedAiRangedOrders = null;
-          rendererSharedState.precomputedAiStrategy = null;
+          resetPrecomputedAiState("null");
           if (rendererSharedState.useEventDrivenConsultation) rendererSharedState.eventDrivenInitialConsultationDone = false;
           deps.updateReadyButtonState();
           deps.startBackgroundRequestIfAllowed();
         } else {
           window.gameApi?.cancelRequestAiOrders?.();
-          rendererSharedState.precomputedAiOrders = null;
-          rendererSharedState.precomputedAiRangedOrders = null;
+          resetPrecomputedAiState("null");
+          rendererSharedState.precomputedAiEmbarkOrders = null;
           rendererSharedState.precomputedAiStrategy = null;
           rendererSharedState.eventDrivenInitialConsultationDone = false;
           deps.updateReadyButtonState();
@@ -16273,9 +16313,7 @@
           rendererSharedState.eventDrivenInitialConsultationDone = true;
         }
         if (rendererSharedState.runButtonOn && result.success) {
-          rendererSharedState.precomputedAiOrders = result.orders;
-          rendererSharedState.precomputedAiRangedOrders = result.rangedAttacks ?? [];
-          rendererSharedState.precomputedAiStrategy = result.strategy ?? null;
+          applySuccessfulPrecomputedAiResult(result);
           if (result.toolInvocationCounts) {
             rendererSharedState.precomputedToolInvocationCounts = { ...result.toolInvocationCounts };
             for (const [groupId, count] of Object.entries(result.toolInvocationCounts)) {
@@ -16291,10 +16329,7 @@
           }
         } else if (!result.success) {
           deps.showSidebarError(result.error ?? "Background AI request failed");
-          rendererSharedState.precomputedAiOrders = [];
-          rendererSharedState.precomputedAiRangedOrders = [];
-          rendererSharedState.precomputedAiStrategy = null;
-          rendererSharedState.precomputedToolInvocationCounts = null;
+          resetPrecomputedAiState("empty");
         }
         deps.updateReadyButtonState();
       }).catch((err) => {
@@ -16303,10 +16338,7 @@
           rendererSharedState.eventDrivenInitialConsultationDone = true;
         }
         deps.showSidebarError(String(err));
-        rendererSharedState.precomputedAiOrders = [];
-        rendererSharedState.precomputedAiRangedOrders = [];
-        rendererSharedState.precomputedAiStrategy = null;
-        rendererSharedState.precomputedToolInvocationCounts = null;
+        resetPrecomputedAiState("empty");
         deps.updateReadyButtonState();
       });
     }).catch((err) => {
@@ -16315,10 +16347,7 @@
         rendererSharedState.eventDrivenInitialConsultationDone = true;
       }
       deps.showSidebarError(String(err));
-      rendererSharedState.precomputedAiOrders = [];
-      rendererSharedState.precomputedAiRangedOrders = [];
-      rendererSharedState.precomputedAiStrategy = null;
-      rendererSharedState.precomputedToolInvocationCounts = null;
+      resetPrecomputedAiState("empty");
       deps.updateReadyButtonState();
     });
   }
@@ -16353,15 +16382,15 @@
           syncEventDrivenFromTools();
           if (rendererSharedState.runButtonOn && rendererSharedState.useEventDrivenConsultation && !wasEventDriven) {
             window.gameApi?.cancelRequestAiOrders?.();
-            rendererSharedState.precomputedAiOrders = null;
-            rendererSharedState.precomputedAiRangedOrders = null;
-            rendererSharedState.precomputedAiStrategy = null;
-            rendererSharedState.precomputedToolInvocationCounts = null;
+            resetPrecomputedAiState("null");
             rendererSharedState.eventDrivenInitialConsultationDone = false;
             startBackgroundRequestIfAllowed(deps);
           } else if (rendererSharedState.runButtonOn && !rendererSharedState.useEventDrivenConsultation && wasEventDriven) {
+            resetPrecomputedAiState("null");
+          } else if (rendererSharedState.runButtonOn && !rendererSharedState.useEventDrivenConsultation && wasEventDriven) {
             rendererSharedState.precomputedAiOrders = null;
             rendererSharedState.precomputedAiRangedOrders = null;
+            rendererSharedState.precomputedAiEmbarkOrders = null;
             rendererSharedState.precomputedAiStrategy = null;
             rendererSharedState.precomputedToolInvocationCounts = null;
             rendererSharedState.eventDrivenInitialConsultationDone = false;
@@ -16963,6 +16992,7 @@
         aiPlanningRunEnabled: rendererSharedState.runButtonOn,
         precomputedAiOrders: rendererSharedState.precomputedAiOrders,
         precomputedAiRangedOrders: rendererSharedState.precomputedAiRangedOrders ?? [],
+        precomputedAiEmbarkOrders: rendererSharedState.precomputedAiEmbarkOrders ?? [],
         precomputedAiStrategy: rendererSharedState.precomputedAiStrategy ?? void 0
       } : {
         enabledToolGroups: enabledToolGroupsPayload,
@@ -16973,6 +17003,7 @@
         aiPlanningRunEnabled: rendererSharedState.runButtonOn,
         precomputedAiOrders: rendererSharedState.precomputedAiOrders,
         precomputedAiRangedOrders: rendererSharedState.precomputedAiRangedOrders ?? [],
+        precomputedAiEmbarkOrders: rendererSharedState.precomputedAiEmbarkOrders ?? [],
         precomputedAiStrategy: rendererSharedState.precomputedAiStrategy ?? void 0
       } : {
         enabledToolGroups: enabledToolGroupsPayload,
@@ -16984,10 +17015,7 @@
         deps.updateReadyButtonState();
         return;
       }
-      rendererSharedState.precomputedAiOrders = null;
-      rendererSharedState.precomputedAiRangedOrders = null;
-      rendererSharedState.precomputedAiStrategy = null;
-      rendererSharedState.precomputedToolInvocationCounts = null;
+      resetPrecomputedAiState("null");
       const humanMoves = readyResult.humanMoves ?? [];
       await deps.refreshRes4TerrainOverridesForRenderer();
       const nextState = await window.gameApi.getGameState();
@@ -18576,6 +18604,98 @@
     showStackCallout(allUnitsAtHex, clientX, clientY);
     syncUiAfterSelectionChange2({ refreshHoverPreview: false });
   }
+  function removeSealiftSection(calloutEl) {
+    const existing = calloutEl.querySelector(".stack-sealift-section");
+    if (existing) existing.remove();
+  }
+  function buildSealiftUnitLabel(unitId, unitType) {
+    void unitType;
+    return formatUnitDisplayName(unitId);
+  }
+  async function renderSealiftSection(units, calloutEl) {
+    removeSealiftSection(calloutEl);
+    if (!window.gameApi?.getSealiftStackState || !window.gameApi?.updateSealiftSlot) return;
+    const h3Index = units[0]?.h3Index;
+    if (!h3Index) return;
+    try {
+      const state = await window.gameApi.getSealiftStackState({ h3Index });
+      if (calloutEl.classList.contains("hidden")) return;
+      if (calloutEl.getAttribute("data-h3-index") !== h3Index) return;
+      if (!state.showSealiftSection) return;
+      const section = document.createElement("div");
+      section.className = "stack-sealift-section";
+      for (const row of state.navalRows) {
+        const rowEl = document.createElement("div");
+        rowEl.className = "stack-sealift-row";
+        const left = document.createElement("span");
+        left.className = "stack-sealift-naval";
+        left.textContent = formatUnitDisplayName(row.navalUnitId);
+        rowEl.appendChild(left);
+        const right = document.createElement("div");
+        right.className = "stack-sealift-slots";
+        const addSlotControl = (slotIndex, selectedUnitId, slotDisabled, debarkEnabled) => {
+          const slotRow = document.createElement("div");
+          slotRow.className = "stack-sealift-slot-row";
+          const select = document.createElement("select");
+          select.className = "stack-sealift-select";
+          select.disabled = slotDisabled;
+          const noneOption = document.createElement("option");
+          noneOption.value = "";
+          noneOption.textContent = "(none)";
+          select.appendChild(noneOption);
+          for (const option of state.landOptions) {
+            const opt = document.createElement("option");
+            opt.value = option.unitId;
+            opt.textContent = buildSealiftUnitLabel(option.unitId, option.unitType);
+            select.appendChild(opt);
+          }
+          select.value = selectedUnitId ?? "";
+          select.addEventListener("change", async () => {
+            const selected = select.value.trim();
+            const result = await window.gameApi.updateSealiftSlot({
+              h3Index,
+              navalUnitId: row.navalUnitId,
+              slotIndex,
+              landUnitId: selected.length > 0 ? selected : null
+            });
+            if (!result.success) {
+              showMapToast(formatTargetingValidationReason(result.reason, "Failed to update sealift assignment."));
+            }
+            refreshStackCalloutIfOpen();
+            requestRedraw();
+          });
+          slotRow.appendChild(select);
+          const debarkBtn = document.createElement("button");
+          debarkBtn.type = "button";
+          debarkBtn.className = "unit-select stack-unit-toggle";
+          debarkBtn.textContent = UNIT_DESELECT_GLYPH;
+          debarkBtn.disabled = !debarkEnabled;
+          debarkBtn.addEventListener("click", async () => {
+            const result = await window.gameApi.updateSealiftSlot({
+              h3Index,
+              navalUnitId: row.navalUnitId,
+              slotIndex,
+              landUnitId: null
+            });
+            if (!result.success) {
+              showMapToast(formatTargetingValidationReason(result.reason, "Failed to debark unit."));
+            }
+            refreshStackCalloutIfOpen();
+            requestRedraw();
+          });
+          slotRow.appendChild(debarkBtn);
+          right.appendChild(slotRow);
+        };
+        addSlotControl(1, row.slot1UnitId, row.controlsDisabled, row.debarkSlot1Enabled);
+        addSlotControl(2, row.slot2UnitId, row.controlsDisabled || row.slot2Disabled, row.debarkSlot2Enabled);
+        rowEl.appendChild(right);
+        section.appendChild(rowEl);
+      }
+      calloutEl.appendChild(section);
+    } catch (err) {
+      console.error("sealift stack section failed:", err);
+    }
+  }
   function showStackCallout(units, clientX, clientY) {
     const calloutEl = document.getElementById("stack-callout");
     const listEl = document.getElementById("stack-callout-list");
@@ -18593,6 +18713,7 @@
     calloutEl.setAttribute("data-open", "true");
     calloutEl.setAttribute("data-x", String(clientX));
     calloutEl.setAttribute("data-y", String(clientY));
+    calloutEl.setAttribute("data-h3-index", sorted[0]?.h3Index ?? "");
     calloutEl.setAttribute("data-unit-ids", JSON.stringify(sorted.map((u) => u.id)));
     listEl.innerHTML = "";
     const existingHeader = calloutEl.querySelector(".stack-callout-actions");
@@ -18664,6 +18785,7 @@
     calloutEl.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
     calloutEl.setAttribute("aria-label", formatStackTooltip(units));
     calloutEl.classList.remove("hidden");
+    void renderSealiftSection(sorted, calloutEl);
   }
   function refreshStackCalloutIfOpen() {
     const calloutEl = document.getElementById("stack-callout");
@@ -19855,10 +19977,7 @@
           rendererSharedState.runButtonOn = false;
           runBtn.setAttribute("aria-pressed", "false");
           window.gameApi?.cancelRequestAiOrders?.();
-          rendererSharedState.precomputedAiOrders = null;
-          rendererSharedState.precomputedAiRangedOrders = null;
-          rendererSharedState.precomputedAiStrategy = null;
-          rendererSharedState.precomputedToolInvocationCounts = null;
+          resetPrecomputedAiState("null");
           rendererSharedState.eventDrivenInitialConsultationDone = false;
           updateReadyButtonState();
         }

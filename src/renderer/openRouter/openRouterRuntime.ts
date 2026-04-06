@@ -1,4 +1,5 @@
 import { rendererSharedState as S } from '../core/state';
+import { applySuccessfulPrecomputedAiResult, resetPrecomputedAiState } from './precomputedAiState';
 
 interface OpenRouterRuntimeDeps {
   appendOpenRouterLog: (line: string, isError?: boolean) => void;
@@ -47,9 +48,7 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
           S.eventDrivenInitialConsultationDone = true;
         }
         if (S.runButtonOn && result.success) {
-          S.precomputedAiOrders = result.orders;
-          S.precomputedAiRangedOrders = result.rangedAttacks ?? [];
-          S.precomputedAiStrategy = result.strategy ?? null;
+          applySuccessfulPrecomputedAiResult(result);
           if (result.toolInvocationCounts) {
             S.precomputedToolInvocationCounts = { ...result.toolInvocationCounts };
             for (const [groupId, count] of Object.entries(result.toolInvocationCounts)) {
@@ -66,10 +65,7 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
         } else if (!result.success) {
           deps.showSidebarError(result.error ?? 'Background AI request failed');
           // Allow Ready to be clicked so the turn can advance with no AI orders (e.g. after parse error).
-          S.precomputedAiOrders = [];
-          S.precomputedAiRangedOrders = [];
-          S.precomputedAiStrategy = null;
-          S.precomputedToolInvocationCounts = null;
+          resetPrecomputedAiState('empty');
         }
         deps.updateReadyButtonState();
       })
@@ -79,10 +75,7 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
           S.eventDrivenInitialConsultationDone = true;
         }
         deps.showSidebarError(String(err));
-        S.precomputedAiOrders = [];
-        S.precomputedAiRangedOrders = [];
-        S.precomputedAiStrategy = null;
-        S.precomputedToolInvocationCounts = null;
+        resetPrecomputedAiState('empty');
         deps.updateReadyButtonState();
       });
   }).catch((err) => {
@@ -91,10 +84,7 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
       S.eventDrivenInitialConsultationDone = true;
     }
     deps.showSidebarError(String(err));
-    S.precomputedAiOrders = [];
-    S.precomputedAiRangedOrders = [];
-    S.precomputedAiStrategy = null;
-    S.precomputedToolInvocationCounts = null;
+    resetPrecomputedAiState('empty');
     deps.updateReadyButtonState();
   });
 }
@@ -134,15 +124,15 @@ export function renderOpenRouterToolsList(deps: OpenRouterRuntimeDeps): void {
         syncEventDrivenFromTools();
         if (S.runButtonOn && S.useEventDrivenConsultation && !wasEventDriven) {
           window.gameApi?.cancelRequestAiOrders?.();
-          S.precomputedAiOrders = null;
-          S.precomputedAiRangedOrders = null;
-          S.precomputedAiStrategy = null;
-          S.precomputedToolInvocationCounts = null;
+          resetPrecomputedAiState('null');
           S.eventDrivenInitialConsultationDone = false;
           startBackgroundRequestIfAllowed(deps);
         } else if (S.runButtonOn && !S.useEventDrivenConsultation && wasEventDriven) {
+          resetPrecomputedAiState('null');
+        } else if (S.runButtonOn && !S.useEventDrivenConsultation && wasEventDriven) {
           S.precomputedAiOrders = null;
           S.precomputedAiRangedOrders = null;
+          S.precomputedAiEmbarkOrders = null;
           S.precomputedAiStrategy = null;
           S.precomputedToolInvocationCounts = null;
           S.eventDrivenInitialConsultationDone = false;

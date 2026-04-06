@@ -1,6 +1,17 @@
 import { cellToLatLng } from 'h3-js';
 import { alignLngToReference, clampLatForWebMercatorDisplay } from '../map/hexGrid';
-import { AI_ORDER_LINE_COLOR, ORDER_ARROW_SIZE, ORDER_LINE_COLOR, ORDER_LINE_WIDTH, PLAYER_COLORS, UNIT_RADIUS, UNIT_TYPE_LABELS } from '../core/constants';
+import {
+  AI_ORDER_LINE_COLOR,
+  COUNT_BADGE_OFFSET,
+  ORDER_ARROW_SIZE,
+  ORDER_LINE_COLOR,
+  ORDER_LINE_WIDTH,
+  PLAYER_COLORS,
+  STACK_OFFSET_X,
+  STACK_OFFSET_Y,
+  UNIT_RADIUS,
+  UNIT_TYPE_LABELS,
+} from '../core/constants';
 import { getLeafletGlobal, hexCenterPx, hexCenterPxRelativeTo } from '../map/mapUtils';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
 import type { GameStateSnapshot, HumanStandingOrderSnapshot } from '../../shared/ipcTypes';
@@ -222,7 +233,27 @@ export function drawMovingUnits(
     | null;
   if (!map) return;
   const L = getLeafletGlobal();
+  const groupedMoves = new Map<
+    string,
+    {
+      move: ResolutionPlaybackMove;
+      count: number;
+      unitTypes: Set<string>;
+    }
+  >();
   for (const move of moves) {
+    const groupKey = `${move.player}|${move.fromH3Index}|${move.toH3Index}`;
+    const existing = groupedMoves.get(groupKey);
+    if (existing) {
+      existing.count += 1;
+      existing.unitTypes.add(move.unitType);
+      continue;
+    }
+    groupedMoves.set(groupKey, { move, count: 1, unitTypes: new Set([move.unitType]) });
+  }
+
+  for (const group of groupedMoves.values()) {
+    const move = group.move;
     const [lat0, lng0] = cellToLatLng(move.fromH3Index);
     const [lat1, lng1] = cellToLatLng(move.toH3Index);
     const lng1Aligned = alignLngToReference(lng1, lng0);
@@ -230,7 +261,20 @@ export function drawMovingUnits(
     const lng = lng0 + progress * (lng1Aligned - lng0);
     const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
     const color = PLAYER_COLORS[move.player] ?? '#333';
-    const label = UNIT_TYPE_LABELS[move.unitType] ?? '?';
+    const label = group.unitTypes.size > 1 ? '*' : (UNIT_TYPE_LABELS[move.unitType] ?? '?');
     drawOneUnitMarker(ctx, p.x, p.y, color, label, '#fff');
+    if (group.count > 1) {
+      drawOneUnitMarker(ctx, p.x + STACK_OFFSET_X, p.y + STACK_OFFSET_Y, color, label, '#fff');
+      const badgeX = p.x + COUNT_BADGE_OFFSET;
+      const badgeY = p.y - COUNT_BADGE_OFFSET;
+      ctx.font = 'bold 13px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.strokeText(String(group.count), badgeX, badgeY);
+      ctx.fillStyle = '#000';
+      ctx.fillText(String(group.count), badgeX, badgeY);
+    }
   }
 }

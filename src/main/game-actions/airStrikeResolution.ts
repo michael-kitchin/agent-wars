@@ -4,6 +4,7 @@ import { casualtyPriorityIndex, getAttack, getDefense, getRange } from '../comba
 import type { AirStrikeAnimationMove, AirStrikeOrder, AirStrikeTargetType, InfrastructureDestroyedEvent } from '../../shared/ipcTypes';
 import type { CombatUnit } from '../combatUnitTypes';
 import { validateAirStrikeOrder } from './airValidation';
+import { isEmbarkedLandUnitOnWater } from './sealift';
 
 function pruneBuildQueueForInfrastructureState(h3Index: string): void {
   const infra = getRes1InfrastructureForHex(h3Index);
@@ -139,6 +140,10 @@ function resolveAirStrikeAgainstUnits(
     'SELECT id, player, unit_type, h3_index, display_order FROM units WHERE h3_index = ? AND player != ?',
     [targetH3Index, attacker.player]
   );
+  const eligibleDefenders = defenders.filter((defender) => {
+    if (defender.unit_type !== 'infantry' && defender.unit_type !== 'armor') return true;
+    return !isEmbarkedLandUnitOnWater(defender.id);
+  });
   let success = false;
   let attackerLost = false;
   if (attackHit && defenders.length > 0) {
@@ -150,7 +155,7 @@ function resolveAirStrikeAgainstUnits(
     success = true;
   }
 
-  for (const defender of defenders) {
+  for (const defender of eligibleDefenders) {
     if (getRange(defender.unit_type) < 1) continue;
     if (rollD6() > getAttack(defender.unit_type)) continue;
     dbRun('DELETE FROM units WHERE id = ?', [attacker.id]);

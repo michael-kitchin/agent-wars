@@ -1,5 +1,5 @@
 import { logDebug, logError, logTrace } from '../logger';
-import type { AirStrikeOrder, FerryOrder, MovementOrder, RangedAttackOrder } from '../../shared/ipcTypes';
+import type { AirStrikeOrder, EmbarkOrder, FerryOrder, MovementOrder, RangedAttackOrder } from '../../shared/ipcTypes';
 import type { GuardedDbOps } from './dbOps';
 
 const AI_TOOL_LIMIT_EXCEEDED_KEY = 'ai_tool_limit_exceeded_last_turn';
@@ -17,26 +17,28 @@ export interface AiLossEventSinceConsultation {
 interface AiPendingOrdersExtraPayload {
   airStrikeOrders: AirStrikeOrder[];
   ferryOrders: FerryOrder[];
+  embarkOrders: EmbarkOrder[];
 }
 
 type AiStateDbOps = GuardedDbOps;
 
 function coerceAiPendingOrdersExtraPayload(value: unknown): AiPendingOrdersExtraPayload {
-  const payload = value as { airStrikeOrders?: unknown; ferryOrders?: unknown } | null;
+  const payload = value as { airStrikeOrders?: unknown; ferryOrders?: unknown; embarkOrders?: unknown } | null;
   const airStrikeOrders = Array.isArray(payload?.airStrikeOrders) ? (payload.airStrikeOrders as AirStrikeOrder[]) : [];
   const ferryOrders = Array.isArray(payload?.ferryOrders) ? (payload.ferryOrders as FerryOrder[]) : [];
-  return { airStrikeOrders, ferryOrders };
+  const embarkOrders = Array.isArray(payload?.embarkOrders) ? (payload.embarkOrders as EmbarkOrder[]) : [];
+  return { airStrikeOrders, ferryOrders, embarkOrders };
 }
 
 function decodeAiPendingOrdersExtra(strategyText: string | null): AiPendingOrdersExtraPayload {
   if (typeof strategyText !== 'string' || strategyText.trim().length === 0) {
-    return { airStrikeOrders: [], ferryOrders: [] };
+    return { airStrikeOrders: [], ferryOrders: [], embarkOrders: [] };
   }
   try {
     return coerceAiPendingOrdersExtraPayload(JSON.parse(strategyText));
   } catch (err) {
     logError('gameDb decodeAiPendingOrdersExtra: failed to parse pending-order extra payload', err);
-    return { airStrikeOrders: [], ferryOrders: [] };
+    return { airStrikeOrders: [], ferryOrders: [], embarkOrders: [] };
   }
 }
 
@@ -197,6 +199,7 @@ export function getAiPendingOrders(
   rangedOrders: RangedAttackOrder[];
   airStrikeOrders: AirStrikeOrder[];
   ferryOrders: FerryOrder[];
+  embarkOrders: EmbarkOrder[];
 } | null {
   logTrace('gameDb getAiPendingOrders', { playerId });
   if (!ops.hasDb()) return null;
@@ -208,8 +211,8 @@ export function getAiPendingOrders(
   try {
     const movementOrders = JSON.parse(row.movement_orders) as MovementOrder[];
     const rangedOrders = JSON.parse(row.ranged_orders) as RangedAttackOrder[];
-    const { airStrikeOrders, ferryOrders } = decodeAiPendingOrdersExtra(row.strategy_text);
-    return { movementOrders, rangedOrders, airStrikeOrders, ferryOrders };
+    const { airStrikeOrders, ferryOrders, embarkOrders } = decodeAiPendingOrdersExtra(row.strategy_text);
+    return { movementOrders, rangedOrders, airStrikeOrders, ferryOrders, embarkOrders };
   } catch (err) {
     logError('gameDb getAiPendingOrders: failed to parse stored orders', err);
     return null;
@@ -222,7 +225,8 @@ export function setAiPendingOrders(
   movementOrders: MovementOrder[],
   rangedOrders: RangedAttackOrder[],
   airStrikeOrders: AirStrikeOrder[] = [],
-  ferryOrders: FerryOrder[] = []
+  ferryOrders: FerryOrder[] = [],
+  embarkOrders: EmbarkOrder[] = []
 ): void {
   logDebug('gameDb setAiPendingOrders', {
     playerId,
@@ -230,9 +234,10 @@ export function setAiPendingOrders(
     rangedCount: rangedOrders.length,
     airStrikeCount: airStrikeOrders.length,
     ferryCount: ferryOrders.length,
+    embarkCount: embarkOrders.length,
   });
   if (!ops.hasDb()) return;
-  const strategyText = encodeAiPendingOrdersExtra({ airStrikeOrders, ferryOrders });
+  const strategyText = encodeAiPendingOrdersExtra({ airStrikeOrders, ferryOrders, embarkOrders });
   ops.run(
     'INSERT OR REPLACE INTO ai_pending_orders (player_id, movement_orders, ranged_orders, strategy_text) VALUES (?, ?, ?, ?)',
     [playerId, JSON.stringify(movementOrders), JSON.stringify(rangedOrders), strategyText]

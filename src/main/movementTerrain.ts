@@ -8,16 +8,25 @@ export interface HexMovementTerrainInput {
   terrainKind?: string;
 }
 
+function hexHasSeaport(h3Index: string): boolean {
+  const live = getRes1InfrastructureForHex(h3Index);
+  if (live.seaportCount > 0) return true;
+  if (!isTerrainClassificationCacheLoaded()) return false;
+  return getRes1ProductionContext({ h3Index }).seaportCount > 0;
+}
+
 /**
  * Why this exists:
  *     Provides one normalization rule for movement/passability terrain derived from hex DB fields.
  * When to use:
  *     Any planning/validation path that consumes `terrain` + `terrainKind` from snapshots or DB rows.
  * What to expect:
- *     Returns coastal/wetlands from terrainKind when present; otherwise returns base terrain.
+ *     Returns coastal for seaport hexes, otherwise coastal/wetlands from terrainKind when present; falls back to base terrain.
  */
 export function normalizeMovementTerrain(input: HexMovementTerrainInput): string {
   logTrace('movementTerrain normalizeMovementTerrain', input);
+  // Naval routing/validation treats any seaport hex as littoral-passable.
+  if (hexHasSeaport(input.h3Index)) return 'coastal';
   if (input.terrainKind === 'coastal' || input.terrainKind === 'wetlands') return input.terrainKind;
   return input.terrain;
 }
@@ -55,8 +64,5 @@ export function buildNormalizedTerrainByH3(
 export function isLandSeaportSpawnHex(input: { h3Index: string; normalizedTerrain: string }): boolean {
   logTrace('movementTerrain isLandSeaportSpawnHex', input);
   if (input.normalizedTerrain !== 'land') return false;
-  const live = getRes1InfrastructureForHex(input.h3Index);
-  if (live.seaportCount > 0) return true;
-  if (!isTerrainClassificationCacheLoaded()) return false;
-  return getRes1ProductionContext({ h3Index: input.h3Index }).seaportCount > 0;
+  return hexHasSeaport(input.h3Index);
 }

@@ -36,10 +36,12 @@ import type {
   RangedAttackOrder,
   SubmitOrdersPayload,
   AirStrikeOrder,
+  EmbarkOrder,
   FerryOrder,
   AirStrikeTargetType,
   ReadyResult,
   FerryAnimationMove,
+  SealiftStackState,
 } from '../shared/ipcTypes';
 import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
 import { executePlanRoute } from './tools/tool1Pathfinding';
@@ -98,6 +100,16 @@ import {
   resolveRes1ControlAfterCombatAndMovement,
 } from './game-actions/controlAndProduction';
 import { submitOrdersImpl } from './game-actions/submitOrders';
+import {
+  applyTransportLossForRemovedNavalUnits,
+  applyEmbarkOrdersForPlayer,
+  autoDisembarkIndependentLandMoves,
+  deleteTransportAssignmentsForRemovedUnits,
+  getSealiftStackStateImpl,
+  isEmbarkedLandUnitOnWater,
+  syncEmbarkedLandUnitPositionsWithNaval,
+  updateSealiftSlotImpl,
+} from './game-actions/sealift';
 
 export type { MovementOrder, RangedAttackOrder, SubmitOrdersPayload };
 export type { HexBuildQueueEntryView, HexBuildQueueView } from './game-actions/buildQueue';
@@ -239,6 +251,9 @@ function validateOrder(
   if ((unit.unit_type === 'infantry' || unit.unit_type === 'armor') && !passabilityAllowsLandUnit(destinationTerrain)) {
     return { valid: false, reason: 'Land units must move to land, coastal, or wetlands hexes' };
   }
+  if ((unit.unit_type === 'infantry' || unit.unit_type === 'armor') && isEmbarkedLandUnitOnWater(unitId)) {
+    return { valid: false, reason: 'Embarked land units cannot receive independent movement orders while at sea.' };
+  }
 
   return { valid: true };
 }
@@ -268,6 +283,9 @@ export function validateRangedAttack(
   const range = getRange(unit.unit_type);
   if (unit.unit_type === 'air') return { valid: false, reason: 'Air units use Strike mode, not ranged attack mode' };
   if (range < 1) return { valid: false, reason: `${unit.unit_type} has no ranged attack (melee only)` };
+  if ((unit.unit_type === 'infantry' || unit.unit_type === 'armor') && isEmbarkedLandUnitOnWater(unitId)) {
+    return { valid: false, reason: 'Embarked land units cannot attack while at sea.' };
+  }
 
   if (!getMapHexSet().has(targetH3Index)) return { valid: false, reason: 'Target hex not on map' };
 
@@ -688,6 +706,42 @@ export function previewHumanMarchOrders(unitIds: string[], hoveredH3Index: strin
 }
 
 /**
+ * Why this exists:
+ *     Returns renderer-facing sealift slot state for one stack hex, including embark/debark control gating.
+ * When to use:
+ *     Stack popup render/refresh in mixed land+naval contexts or when embarked units are present.
+ * What to expect:
+ *     Stable rows, slot selections, and context flags derived from authoritative DB state.
+ */
+export function getSealiftStackState(h3Index: string): SealiftStackState {
+  logTrace('gameActions getSealiftStackState');
+  return getSealiftStackStateImpl(h3Index);
+}
+
+/**
+ * Why this exists:
+ *     Applies one slot-level embark/debark mutation with uniqueness and capacity reconciliation.
+ * When to use:
+ *     Renderer dropdown/debark interactions for immediate sealift assignment updates.
+ * What to expect:
+ *     Returns updated state on success; returns reason on rejected interaction.
+ */
+export function updateSealiftSlot(
+  h3Index: string,
+  navalUnitId: string,
+  slotIndex: 1 | 2,
+  landUnitId: string | null
+): { success: boolean; reason?: string; state?: SealiftStackState } {
+  logDebug('gameActions updateSealiftSlot', { h3Index, navalUnitId, slotIndex, landUnitId });
+  try {
+    return updateSealiftSlotImpl({ h3Index, navalUnitId, slotIndex, landUnitId });
+  } catch (err) {
+    logError('updateSealiftSlot: exception', err);
+    return { success: false, reason: String(err) };
+  }
+}
+
+/**
  * Submits movement and optional ranged attack orders for the current planning phase.
  * Validates all orders; if any human order (movement or ranged) is invalid, rejects the entire batch with a clear reason.
  * Otherwise stores pending_orders and pending_ranged_orders and returns success: true.
@@ -712,13 +766,15 @@ export function ready(
   aiOrders: MovementOrder[] = [],
   aiRangedOrders: RangedAttackOrder[] = [],
   aiAirStrikeOrders: AirStrikeOrder[] = [],
-  aiFerryOrders: FerryOrder[] = []
+  aiFerryOrders: FerryOrder[] = [],
+  aiEmbarkOrders: EmbarkOrder[] = []
 ): ReadyResult {
   logDebug('ready', {
     aiOrderCount: aiOrders.length,
     aiRangedCount: aiRangedOrders.length,
     aiAirStrikeCount: aiAirStrikeOrders.length,
     aiFerryCount: aiFerryOrders.length,
+    aiEmbarkCount: aiEmbarkOrders.length,
   });
   try {
     if (!isDbReady()) {
@@ -757,6 +813,7 @@ export function ready(
     ).map((r) => ({ unitId: r.unit_id, destinationH3Index: r.destination_h3_index }));
     const allAirStrikes = [...humanAirStrikes, ...aiAirStrikeOrders];
     const allFerryOrders = [...humanFerryOrders, ...aiFerryOrders];
+    applyEmbarkOrdersForPlayer(aiEmbarkOrders, 'opponent');
     const allRanged = [...humanRanged, ...aiRangedOrders];
 
     const turnNumber = turnRow?.turn_number ?? 1;
@@ -765,19 +822,34 @@ export function ready(
     const seed = (gameSeed + turnNumber * 7919) >>> 0;
     const next = createCombatRng(seed);
     logDebug('ready: combat resolution', { turnNumber, gameSeed, combatSeed: seed });
+    const applyTransportOutcomeForPhase = (removedUnitIds: string[], removedUnits: CombatUnit[]): CombatUnit[] => {
+      const transportLosses = applyTransportLossForRemovedNavalUnits(removedUnits);
+      deleteTransportAssignmentsForRemovedUnits(removedUnitIds);
+      if (transportLosses.length > 0) {
+        deleteTransportAssignmentsForRemovedUnits(transportLosses.map((unit) => unit.id));
+      }
+      return transportLosses;
+    };
 
     const airStrikeResult = resolveAirStrikePhase(allAirStrikes, next);
-    const rangedInputUnits = listUnitsForSnapshot().map((u) => ({
-      id: u.id,
-      player: u.player,
-      unitType: u.unitType,
-      h3Index: u.h3Index,
-      displayOrder: u.displayOrder,
-    }));
+    const airStrikeTransportLosses = applyTransportOutcomeForPhase(airStrikeResult.removedUnitIds, airStrikeResult.removedUnits);
+    const rangedInputUnits = listUnitsForSnapshot()
+      .filter((u) => {
+        if (u.unitType !== 'infantry' && u.unitType !== 'armor') return true;
+        return !isEmbarkedLandUnitOnWater(u.id);
+      })
+      .map((u) => ({
+        id: u.id,
+        player: u.player,
+        unitType: u.unitType,
+        h3Index: u.h3Index,
+        displayOrder: u.displayOrder,
+      }));
     const rangedResult = runRangedPhase(rangedInputUnits, hexList, allRanged, next);
     for (const id of rangedResult.removedUnitIds) {
       dbRun('DELETE FROM units WHERE id = ?', [id]);
     }
+    const rangedTransportLosses = applyTransportOutcomeForPhase(rangedResult.removedUnitIds, rangedResult.removedUnits);
 
     const humanOrders = dbGetAll<{ unit_id: string; to_h3_index: string }>('SELECT unit_id, to_h3_index FROM pending_orders');
     const preMoveState = dbBackedStateSnapshot();
@@ -798,6 +870,33 @@ export function ready(
       ...Array.from(mergedHuman.entries()).map(([unitId, toH3Index]) => ({ unitId, toH3Index })),
       ...aiOrders,
     ];
+    autoDisembarkIndependentLandMoves(allOrders);
+    const orderDestinationByUnitId = new Map(allOrders.map((order) => [order.unitId, order.toH3Index]));
+    const movingNavalUnitIds = allOrders
+      .filter((order) => unitsBeforeMove.find((unit) => unit.id === order.unitId)?.unitType === 'naval')
+      .map((order) => order.unitId);
+    const embarkedFollowMoves: Array<{ unitId: string; fromH3Index: string; toH3Index: string }> = [];
+    if (movingNavalUnitIds.length > 0) {
+      const placeholders = movingNavalUnitIds.map(() => '?').join(', ');
+      const embarkedRows = dbGetAll<{ landUnitId: string; landH3Index: string; navalUnitId: string }>(
+        `SELECT uta.land_unit_id AS landUnitId,
+                lu.h3_index AS landH3Index,
+                uta.naval_unit_id AS navalUnitId
+         FROM unit_transport_assignments uta
+         JOIN units lu ON lu.id = uta.land_unit_id
+         WHERE uta.naval_unit_id IN (${placeholders})`,
+        movingNavalUnitIds
+      );
+      for (const row of embarkedRows) {
+        const destination = orderDestinationByUnitId.get(row.navalUnitId);
+        if (!destination || destination === row.landH3Index) continue;
+        embarkedFollowMoves.push({
+          unitId: row.landUnitId,
+          fromH3Index: row.landH3Index,
+          toH3Index: destination,
+        });
+      }
+    }
     const traversedHexesByPlayer = collectTraversedHexesByPlayer(
       allOrders,
       preMoveState.units.map((u) => ({ id: u.id, player: u.player, h3Index: u.h3Index }))
@@ -805,6 +904,7 @@ export function ready(
     for (const order of allOrders) {
       dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [order.toH3Index, order.unitId]);
     }
+    syncEmbarkedLandUnitPositionsWithNaval();
 
     const resolvedFerryMoves: FerryAnimationMove[] = [];
     for (const ferry of allFerryOrders) {
@@ -840,6 +940,10 @@ export function ready(
     // Melee must not see units removed in ranged phase; exclude them explicitly so attackers cannot engage dead defenders.
     const combatUnitsAfter: CombatUnit[] = unitsAfterMove
       .filter((u) => !rangedRemovedSet.has(u.id))
+      .filter((u) => {
+        if (u.unitType !== 'infantry' && u.unitType !== 'armor') return true;
+        return !isEmbarkedLandUnitOnWater(u.id);
+      })
       .map((u) => ({
         id: u.id,
         player: u.player,
@@ -852,6 +956,7 @@ export function ready(
     for (const id of meleeResult.removedUnitIds) {
       dbRun('DELETE FROM units WHERE id = ?', [id]);
     }
+    const meleeTransportLosses = applyTransportOutcomeForPhase(meleeResult.removedUnitIds, meleeResult.removedUnits);
 
     const controlTransitions = resolveRes1ControlAfterCombatAndMovement(traversedHexesByPlayer);
     const baseLossRemovedAir = destroyAirUnitsWithInvalidBase();
@@ -919,11 +1024,22 @@ export function ready(
     saveDatabase();
     const allRemovedIds = [
       ...airStrikeResult.removedUnitIds,
+      ...airStrikeTransportLosses.map((unit) => unit.id),
       ...rangedResult.removedUnitIds,
+      ...rangedTransportLosses.map((unit) => unit.id),
       ...meleeResult.removedUnitIds,
+      ...meleeTransportLosses.map((unit) => unit.id),
       ...baseLossRemovedAir.map((u) => u.id),
     ];
-    const allRemovedUnits = [...airStrikeResult.removedUnits, ...rangedResult.removedUnits, ...meleeResult.removedUnits, ...baseLossRemovedAir];
+    const allRemovedUnits = [
+      ...airStrikeResult.removedUnits,
+      ...airStrikeTransportLosses,
+      ...rangedResult.removedUnits,
+      ...rangedTransportLosses,
+      ...meleeResult.removedUnits,
+      ...meleeTransportLosses,
+      ...baseLossRemovedAir,
+    ];
     const allKills = [...rangedResult.kills, ...meleeResult.kills];
     const allCombatHexes = [...rangedResult.combatHexes, ...meleeResult.combatHexes];
     const allCasualtyHexes = [
@@ -982,7 +1098,7 @@ export function ready(
       meleeCombatHexes: meleeResult.combatHexes.length > 0 ? meleeResult.combatHexes : undefined,
       meleeCasualtyHexes: meleeResult.casualtyHexes.length > 0 ? meleeResult.casualtyHexes : undefined,
       meleeRemovedUnits: meleeResult.removedUnits.length > 0 ? meleeResult.removedUnits : undefined,
-      humanMoves: humanMoves.length > 0 ? humanMoves : undefined,
+      humanMoves: humanMoves.length + embarkedFollowMoves.length > 0 ? [...humanMoves, ...embarkedFollowMoves] : undefined,
       deployedUnitsByType: Object.keys(deployedUnitsByType).length > 0 ? deployedUnitsByType : undefined,
       humanHexesLostCount: humanHexesLost.length > 0 ? humanHexesLost.length : undefined,
       controlLossLightningHexes: controlLossLightningHexes.length > 0 ? controlLossLightningHexes : undefined,

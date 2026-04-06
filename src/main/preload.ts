@@ -78,6 +78,10 @@ const gameApi = {
     reason?: string;
     queue?: HexBuildQueueSnapshot;
   }> => ipcRenderer.invoke('game:removeHexBuildQueueEntry', payload),
+  getSealiftStackState: (payload: { h3Index: string }) =>
+    ipcRenderer.invoke('game:getSealiftStackState', payload),
+  updateSealiftSlot: (payload: { h3Index: string; navalUnitId: string; slotIndex: 1 | 2; landUnitId: string | null }) =>
+    ipcRenderer.invoke('game:updateSealiftSlot', payload),
   requestAiOrders: (payload?: { enabledToolGroups?: string[] }): Promise<RequestAiOrdersResult> =>
     ipcRenderer.invoke('game:requestAiOrders', payload),
   cancelRequestAiOrders: (): Promise<void> =>

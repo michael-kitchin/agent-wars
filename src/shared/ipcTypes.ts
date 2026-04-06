@@ -110,6 +110,12 @@ export interface FerryOrder {
   destinationH3Index: string;
 }
 
+/** Sealift embark assignment declaration linking one land unit to one naval unit. */
+export interface EmbarkOrder {
+  unitId: string;
+  navalUnitId: string;
+}
+
 /** One resolved ferry relocation move used for renderer playback. */
 export interface FerryAnimationMove {
   unitId: string;
@@ -145,6 +151,7 @@ export interface GameReadyIpcPayload {
   precomputedAiRangedOrders?: RangedAttackOrder[];
   precomputedAiAirStrikeOrders?: AirStrikeOrder[];
   precomputedAiFerryOrders?: FerryOrder[];
+  precomputedAiEmbarkOrders?: EmbarkOrder[];
   precomputedAiStrategy?: string;
   /** When true, Ready may invoke the LLM (non–event-driven path or afterResolution). Omitted/false ⇒ no LLM on Ready. */
   aiPlanningRunEnabled?: boolean;
@@ -164,6 +171,7 @@ export type RequestAiOrdersResult =
       rangedAttacks?: RangedAttackOrder[];
       airStrikes?: AirStrikeOrder[];
       ferryOrders?: FerryOrder[];
+      embarkOrders?: EmbarkOrder[];
       strategy?: string;
       dropped?: number;
       dropReasons?: string[];
@@ -323,6 +331,33 @@ export interface HexBuildQueueSnapshot {
   entries: HexBuildQueueEntrySnapshot[];
 }
 
+export type SealiftContextMode = 'coastal_port' | 'coastal_no_port' | 'water' | 'unsupported';
+
+export interface SealiftLandUnitOption {
+  unitId: string;
+  unitType: 'infantry' | 'armor';
+}
+
+export interface SealiftNavalRow {
+  navalUnitId: string;
+  slot1UnitId: string | null;
+  slot2UnitId: string | null;
+  slot2Disabled: boolean;
+  controlsDisabled: boolean;
+  debarkSlot1Enabled: boolean;
+  debarkSlot2Enabled: boolean;
+}
+
+export interface SealiftStackState {
+  h3Index: string;
+  showSealiftSection: boolean;
+  contextMode: SealiftContextMode;
+  controlsDisabled: boolean;
+  hasEmbarkedUnitsInStack: boolean;
+  navalRows: SealiftNavalRow[];
+  landOptions: SealiftLandUnitOption[];
+}
+
 /** Preload-exposed renderer bridge contract. */
 export interface GameApi {
   getGameState: () => Promise<GameStateSnapshot>;
@@ -357,6 +392,13 @@ export interface GameApi {
     reason?: string;
     queue?: HexBuildQueueSnapshot;
   }>;
+  getSealiftStackState: (payload: { h3Index: string }) => Promise<SealiftStackState>;
+  updateSealiftSlot: (payload: {
+    h3Index: string;
+    navalUnitId: string;
+    slotIndex: 1 | 2;
+    landUnitId: string | null;
+  }) => Promise<{ success: boolean; reason?: string; state?: SealiftStackState }>;
   requestAiOrders: (payload?: { enabledToolGroups?: string[] }) => Promise<RequestAiOrdersResult>;
   cancelRequestAiOrders: () => Promise<void>;
   registerOpenRouterLogListener?: (callback: (payload: { line: string; isError?: boolean }) => void) => void;

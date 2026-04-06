@@ -28,6 +28,8 @@ import {
   addHexBuildQueueEntry,
   updateHexBuildQueueEntry,
   removeHexBuildQueueEntry,
+  getSealiftStackState,
+  updateSealiftSlot,
 } from './gameActions';
 import { normalizeSubmitOrdersPayload } from './submitOrdersPayload';
 import {
@@ -47,7 +49,7 @@ import {
   getToolNamesForEnabledGroups,
   getToolGroupList,
   TOOL_GROUP_REGISTRY,
-} from './openRouter';
+} from './openrouter/openRouter';
 import { logDebug } from './logger';
 import {
   getHexNamingTooltipLineForRenderer,
@@ -266,6 +268,37 @@ function registerIpcHandlers(): void {
     }
     return removeHexBuildQueueEntry(payload.h3Index, payload.entryId, 'human');
   });
+  ipcMain.handle('game:getSealiftStackState', (_event, payload: { h3Index?: string }) => {
+    if (typeof payload?.h3Index !== 'string') {
+      return {
+        h3Index: '',
+        showSealiftSection: false,
+        contextMode: 'unsupported',
+        controlsDisabled: true,
+        hasEmbarkedUnitsInStack: false,
+        navalRows: [],
+        landOptions: [],
+      };
+    }
+    return getSealiftStackState(payload.h3Index);
+  });
+  ipcMain.handle(
+    'game:updateSealiftSlot',
+    (_event, payload: { h3Index?: string; navalUnitId?: string; slotIndex?: number; landUnitId?: string | null }) => {
+      if (
+        typeof payload?.h3Index !== 'string' ||
+        typeof payload?.navalUnitId !== 'string' ||
+        (payload?.slotIndex !== 1 && payload?.slotIndex !== 2)
+      ) {
+        return { success: false, reason: 'Invalid sealift payload' };
+      }
+      const landUnitId =
+        payload.landUnitId === null || typeof payload.landUnitId === 'string'
+          ? payload.landUnitId
+          : null;
+      return updateSealiftSlot(payload.h3Index, payload.navalUnitId, payload.slotIndex, landUnitId);
+    }
+  );
   ipcMain.handle(
     'game:ready',
     async (_event, payload?: GameReadyIpcPayload): Promise<ReadyResult> => {

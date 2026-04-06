@@ -145,3 +145,50 @@ export function buildAirOperationsBriefingBlock(
   lines.push('Callback support: use callback event "infrastructure_destroyed" to be re-consulted after successful infra strikes.');
   return lines.join('\n');
 }
+
+/**
+ * Why this exists:
+ *     Adds sealift-oriented planning context to briefings so the model can stage embark/transport/disembark sequences.
+ * When to use:
+ *     During prompt assembly for opponent planning turns.
+ * What to expect:
+ *     Returns deterministic rows for naval transport opportunities and vulnerable sea movement.
+ */
+export function buildSealiftBriefingBlock(
+  state: GameStateSnapshot,
+  format: (h3: string) => string
+): string {
+  const lines: string[] = [];
+  const opponentNaval = state.units.filter((unit) => unit.player === 'opponent' && unit.unitType === 'naval');
+  const opponentLand = state.units.filter(
+    (unit) => unit.player === 'opponent' && (unit.unitType === 'infantry' || unit.unitType === 'armor')
+  );
+  const infraByHex = new Map((state.res1Infrastructure ?? []).map((row) => [row.h3Index, row]));
+  const controlByHex = new Map((state.res1Control ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
+  const landByHex = new Map<string, { infantry: number; armor: number }>();
+  for (const unit of opponentLand) {
+    const row = landByHex.get(unit.h3Index) ?? { infantry: 0, armor: 0 };
+    if (unit.unitType === 'armor') row.armor += 1;
+    else row.infantry += 1;
+    landByHex.set(unit.h3Index, row);
+  }
+
+  lines.push('=== NAVAL TRANSPORT STATUS ===');
+  lines.push('Sealift rules: embark at controlled coastal hexes with seaports; naval capacity is 1 armor or 2 infantry.');
+  if (opponentNaval.length <= 0) {
+    lines.push('No opponent naval units currently available for transport.');
+    return lines.join('\n');
+  }
+
+  for (const naval of opponentNaval) {
+    const infra = infraByHex.get(naval.h3Index);
+    const hasPort = (infra?.seaportCount ?? 0) > 0;
+    const controlled = controlByHex.get(naval.h3Index) === 'opponent';
+    const coLocated = landByHex.get(naval.h3Index) ?? { infantry: 0, armor: 0 };
+    lines.push(
+      `- ${naval.id} @ ${format(naval.h3Index)} controlled=${controlled} seaport=${hasPort} nearbyLand[infantry=${coLocated.infantry},armor=${coLocated.armor}]`
+    );
+  }
+  lines.push('When crossing water is required, prefer coordinated embark -> transport_move -> disembark plans.');
+  return lines.join('\n');
+}
