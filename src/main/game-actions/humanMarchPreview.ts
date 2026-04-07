@@ -5,7 +5,6 @@ import {
   getHexController,
   getRes1InfrastructureForHex,
   isDbReady,
-  reconcileRes1InfrastructureCountsFromRes4Overrides,
 } from '../gameDb';
 import { createPathfindingSession, executePlanRouteWithSession } from '../tools/tool1Pathfinding';
 import { terrainIsPassableForDomain } from '../pathfinding';
@@ -170,8 +169,6 @@ function getOrCreateHoverSessionContext(
   playerId: 'human' | 'opponent',
   selectedUnitIds: readonly string[]
 ): PreviewComputationContext {
-  // Keep movement terrain classification aligned with renderer overlays when legacy DB rows drift.
-  reconcileRes1InfrastructureCountsFromRes4Overrides();
   const selectionSignature = buildSelectionSignature(selectedUnitIds);
   const selectedPositionsSignature = buildSelectedUnitPositionsSignature(selectedUnitIds);
   const environmentSignature = buildEnvironmentSignature(playerId);

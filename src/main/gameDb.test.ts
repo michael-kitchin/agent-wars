@@ -8,7 +8,16 @@ import * as assert from 'assert';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { cellToLatLng } from 'h3-js';
+import { cellToLatLng, gridDistance } from 'h3-js';
+import { resolveAirStrikePhase } from './game-actions/airStrikeResolution';
+import type { AirStrikeTargetType } from '../shared/ipcTypes';
+import { AIR_STRIKE_RANGE_HEXES } from '../shared/tacticalRanges';
+
+const INFRASTRUCTURE_SYNC_TRIGGER_NAMES = [
+  'res4_sync_res1_after_delete',
+  'res4_sync_res1_after_insert',
+  'res4_sync_res1_after_update',
+] as const;
 
 function betterSqliteNativeAvailable(): boolean {
   try {
@@ -276,6 +285,14 @@ function getRes1CountsDerivedFromRes4(
   };
 }
 
+function assertRes1MatchesRes4RollupForHex(gameDb: typeof import('./gameDb'), h3Index: string): void {
+  const expected = getRes1CountsDerivedFromRes4(gameDb, h3Index);
+  const actual = gameDb.getRes1InfrastructureForHex(h3Index);
+  assert.strictEqual(actual.urbanHexCount, expected.urbanHexCount);
+  assert.strictEqual(actual.airportCount, expected.airportCount);
+  assert.strictEqual(actual.seaportCount, expected.seaportCount);
+}
+
 function testOpenExistingDatabaseReconcilesRes1InfrastructureDrift(gameDb: typeof import('./gameDb')): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
@@ -297,11 +314,7 @@ function testOpenExistingDatabaseReconcilesRes1InfrastructureDrift(gameDb: typeo
     gameDb.closeGameDatabaseForTests();
 
     gameDb.openGameDatabaseAtPathForTests(p);
-    const expected = getRes1CountsDerivedFromRes4(gameDb, target!.h3Index);
-    const actual = gameDb.getRes1InfrastructureForHex(target!.h3Index);
-    assert.strictEqual(actual.urbanHexCount, expected.urbanHexCount);
-    assert.strictEqual(actual.airportCount, expected.airportCount);
-    assert.strictEqual(actual.seaportCount, expected.seaportCount);
+    assertRes1MatchesRes4RollupForHex(gameDb, target!.h3Index);
   } finally {
     gameDb.closeGameDatabaseForTests();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -335,12 +348,104 @@ function testRes1InfrastructureStaysInSyncWhenRes4FeaturesChange(gameDb: typeof 
 
     const touchedParents = [...new Set(targetRows.map((row) => row!.parentH3Index))];
     for (const parentH3Index of touchedParents) {
-      const expected = getRes1CountsDerivedFromRes4(gameDb, parentH3Index);
-      const actual = gameDb.getRes1InfrastructureForHex(parentH3Index);
-      assert.strictEqual(actual.urbanHexCount, expected.urbanHexCount);
-      assert.strictEqual(actual.airportCount, expected.airportCount);
-      assert.strictEqual(actual.seaportCount, expected.seaportCount);
+      assertRes1MatchesRes4RollupForHex(gameDb, parentH3Index);
     }
+  } finally {
+    gameDb.closeGameDatabaseForTests();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function testOpenExistingDatabaseInstallsInfrastructureSyncTriggers(gameDb: typeof import('./gameDb')): void {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
+  const p = path.join(dir, 't.sqlite');
+  try {
+    gameDb.openGameDatabaseAtPathForTests(p);
+    gameDb.resetGameForNewMatch();
+    gameDb.dbRun('DROP TRIGGER IF EXISTS res4_sync_res1_after_insert');
+    gameDb.dbRun('DROP TRIGGER IF EXISTS res4_sync_res1_after_delete');
+    gameDb.dbRun('DROP TRIGGER IF EXISTS res4_sync_res1_after_update');
+    gameDb.closeGameDatabaseForTests();
+
+    gameDb.openGameDatabaseAtPathForTests(p);
+    const triggerNames = gameDb.dbGetAll<{ name: string }>(
+      `SELECT name
+       FROM sqlite_master
+       WHERE type = 'trigger'
+         AND name IN ('res4_sync_res1_after_insert', 'res4_sync_res1_after_delete', 'res4_sync_res1_after_update')
+       ORDER BY name ASC`
+    ).map((row) => row.name);
+    assert.deepStrictEqual(triggerNames, INFRASTRUCTURE_SYNC_TRIGGER_NAMES);
+  } finally {
+    gameDb.closeGameDatabaseForTests();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function findAirStrikeOriginAndTargetForInfrastructureType(
+  gameDb: typeof import('./gameDb'),
+  targetType: Exclude<AirStrikeTargetType, 'units'>
+): { originH3Index: string; targetH3Index: string } {
+  const targetWhereClause =
+    targetType === 'urban'
+      ? 'urban_hex_count > 0'
+      : targetType === 'airport'
+        ? 'airport_count > 0'
+        : 'seaport_count > 0';
+  const targetRows = gameDb.dbGetAll<{ h3Index: string }>(
+    `SELECT h3_index AS h3Index
+     FROM res1_infrastructure
+     WHERE ${targetWhereClause}`
+  );
+  const originRows = gameDb.dbGetAll<{ h3Index: string }>(
+    `SELECT h3_index AS h3Index
+     FROM res1_infrastructure
+     WHERE airport_count > 0`
+  );
+  for (const target of targetRows) {
+    for (const origin of originRows) {
+      try {
+        if (gridDistance(origin.h3Index, target.h3Index) <= AIR_STRIKE_RANGE_HEXES) {
+          return { originH3Index: origin.h3Index, targetH3Index: target.h3Index };
+        }
+      } catch {
+        // Ignore invalid geometry pairs in tests.
+      }
+    }
+  }
+  throw new Error(`expected reachable ${targetType} target from an airport within strike range ${AIR_STRIKE_RANGE_HEXES}`);
+}
+
+function testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity(
+  gameDb: typeof import('./gameDb'),
+  targetType: Exclude<AirStrikeTargetType, 'units'>
+): void {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
+  const p = path.join(dir, 't.sqlite');
+  try {
+    gameDb.openGameDatabaseAtPathForTests(p);
+    gameDb.resetGameForNewMatch();
+    const { originH3Index, targetH3Index } = findAirStrikeOriginAndTargetForInfrastructureType(gameDb, targetType);
+    gameDb.dbRun(
+      'INSERT OR REPLACE INTO units (id, player, unit_type, h3_index, display_order) VALUES (?, ?, ?, ?, ?)',
+      ['human-air-trigger-test', 'human', 'air', originH3Index, 1]
+    );
+
+    const next = () => 0;
+    const result = resolveAirStrikePhase(
+      [
+        {
+          unitId: 'human-air-trigger-test',
+          targetH3Index,
+          targetType,
+        },
+      ],
+      next
+    );
+    const event = result.infrastructureDestroyedEvents.find((entry) => entry.h3Index === targetH3Index && entry.targetType === targetType);
+    assert.ok(event, `expected infrastructure destruction event for ${targetType}`);
+    assert.ok((event?.changedRubbleCount ?? 0) > 0, `expected rubble changes for ${targetType}`);
+    assertRes1MatchesRes4RollupForHex(gameDb, targetH3Index);
   } finally {
     gameDb.closeGameDatabaseForTests();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -365,7 +470,11 @@ function run(): void {
   testResetSeedsInfrastructureState(gameDb);
   testRendererRes4OverridesIncludeInfrastructureFeatureRows(gameDb);
   testOpenExistingDatabaseReconcilesRes1InfrastructureDrift(gameDb);
+  testOpenExistingDatabaseInstallsInfrastructureSyncTriggers(gameDb);
   testRes1InfrastructureStaysInSyncWhenRes4FeaturesChange(gameDb);
+  testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity(gameDb, 'urban');
+  testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity(gameDb, 'airport');
+  testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity(gameDb, 'seaport');
   testSeededUnitsUseRegionalSpawnContracts(gameDb);
   testFogOfWarToggleVisibilityContract(gameDb);
   testWrongUserVersionRecovers(gameDb, Database);

@@ -26,7 +26,6 @@ import {
   allocateNextUnitDisplayOrder,
   listUnitsForSnapshot,
   getRes1InfrastructureForHex,
-  reconcileRes1InfrastructureCountsFromRes4Overrides,
   getGameStateForPlayer,
 } from './gameDb';
 import { buildLatLngCoordinateMap, getOrderedHexList } from './mapData';
@@ -475,7 +474,6 @@ export function assignHumanMarchOrder(unitId: string, destinationH3Index: string
   logDebug('gameActions assignHumanMarchOrder', { unitId, destinationH3Index });
   try {
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
-    reconcileRes1InfrastructureCountsFromRes4Overrides();
     const state = dbBackedStateSnapshot();
     const turnRow = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1');
     if (turnRow?.phase !== VALID_PHASE) return { success: false, reason: 'Not in planning phase' };
@@ -530,7 +528,6 @@ export function assignHumanMarchOrders(unitIds: string[], destinationH3Index: st
   logDebug('gameActions assignHumanMarchOrders', { unitCount: unitIds.length, destinationH3Index });
   try {
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
-    reconcileRes1InfrastructureCountsFromRes4Overrides();
     const uniqueUnitIds = getUniqueNonEmptyIds(unitIds);
     if (uniqueUnitIds.length === 0) return { success: false, reason: 'No selected units to assign' };
     const state = dbBackedStateSnapshot();

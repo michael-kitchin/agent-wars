@@ -35,6 +35,48 @@ export interface Res4FeatureOverrideRow {
 
 type ControlDbOps = BasicDbOps;
 
+const RES4_TO_RES1_SYNC_TRIGGER_NAMES = {
+  afterInsert: 'res4_sync_res1_after_insert',
+  afterDelete: 'res4_sync_res1_after_delete',
+  afterUpdate: 'res4_sync_res1_after_update',
+} as const;
+
+const RES4_INFRASTRUCTURE_COUNTS_SUBQUERY_SQL = `SELECT parent_h3_index AS h3Index,
+              SUM(CASE WHEN is_urban = 1 THEN 1 ELSE 0 END) AS urbanHexCount,
+              SUM(CASE WHEN is_airport = 1 THEN 1 ELSE 0 END) AS airportCount,
+              SUM(CASE WHEN is_seaport = 1 THEN 1 ELSE 0 END) AS seaportCount
+       FROM res4_feature_overrides
+       GROUP BY parent_h3_index`;
+
+function buildRes1CountsMismatchPredicateSql(res1TableAlias: string, countsAlias: string): string {
+  return `${res1TableAlias}.urban_hex_count != COALESCE(${countsAlias}.urbanHexCount, 0)
+       OR ${res1TableAlias}.airport_count != COALESCE(${countsAlias}.airportCount, 0)
+       OR ${res1TableAlias}.seaport_count != COALESCE(${countsAlias}.seaportCount, 0)`;
+}
+
+function buildRes1RollupUpdateSql(parentH3Expression: string): string {
+  return `UPDATE res1_infrastructure
+          SET urban_hex_count = COALESCE(
+                (SELECT SUM(CASE WHEN is_urban = 1 THEN 1 ELSE 0 END)
+                 FROM res4_feature_overrides
+                 WHERE parent_h3_index = ${parentH3Expression}),
+                0
+              ),
+              airport_count = COALESCE(
+                (SELECT SUM(CASE WHEN is_airport = 1 THEN 1 ELSE 0 END)
+                 FROM res4_feature_overrides
+                 WHERE parent_h3_index = ${parentH3Expression}),
+                0
+              ),
+              seaport_count = COALESCE(
+                (SELECT SUM(CASE WHEN is_seaport = 1 THEN 1 ELSE 0 END)
+                 FROM res4_feature_overrides
+                 WHERE parent_h3_index = ${parentH3Expression}),
+                0
+              )
+          WHERE h3_index = ${parentH3Expression};`;
+}
+
 interface Res1InfrastructureDbRow extends Record<string, unknown> {
   h3Index: string;
   urbanHexCount: number;
@@ -231,6 +273,14 @@ export function listRes4FeatureOverridesForGame(ops: ControlDbOps): Res4FeatureO
   }));
 }
 
+/**
+ * Why this exists:
+ *     Applies one feature-flag patch to a single res-4 override row as the mutation source of truth.
+ * When to use:
+ *     Infrastructure mutation flows (for example rubble conversion during strike resolution).
+ * What to expect:
+ *     No-op when row is missing; trigger-backed res-1 synchronization happens automatically.
+ */
 export function updateRes4FeatureOverrideRow(
   ops: ControlDbOps,
   h3Index: string,
@@ -238,14 +288,12 @@ export function updateRes4FeatureOverrideRow(
 ): void {
   logDebug('gameDb updateRes4FeatureOverrideRow', { h3Index, patch });
   const row = ops.getOne<{
-    parentH3Index: string;
     isUrban: number;
     isAirport: number;
     isSeaport: number;
     isRubble: number;
   }>(
-    `SELECT parent_h3_index AS parentH3Index,
-            is_urban AS isUrban,
+    `SELECT is_urban AS isUrban,
             is_airport AS isAirport,
             is_seaport AS isSeaport,
             is_rubble AS isRubble
@@ -266,19 +314,40 @@ export function updateRes4FeatureOverrideRow(
       h3Index,
     ]
   );
-  const parentCounts = ops.getAll<{ urbanHexCount: number; airportCount: number; seaportCount: number }>(
-    `SELECT SUM(CASE WHEN is_urban = 1 THEN 1 ELSE 0 END) AS urbanHexCount,
-            SUM(CASE WHEN is_airport = 1 THEN 1 ELSE 0 END) AS airportCount,
-            SUM(CASE WHEN is_seaport = 1 THEN 1 ELSE 0 END) AS seaportCount
-     FROM res4_feature_overrides
-     WHERE parent_h3_index = ?`,
-    [row.parentH3Index]
-  )[0] ?? { urbanHexCount: 0, airportCount: 0, seaportCount: 0 };
-  setRes1InfrastructureForHex(ops, row.parentH3Index, {
-    urbanHexCount: parentCounts.urbanHexCount,
-    airportCount: parentCounts.airportCount,
-    seaportCount: parentCounts.seaportCount,
-  });
+}
+
+/**
+ * Why this exists:
+ *     Installs trigger-based synchronization from res-4 feature rows to res-1 infrastructure counts.
+ * When to use:
+ *     Database open/create startup paths before gameplay mutations begin.
+ * What to expect:
+ *     Idempotently creates all required triggers; safe to call repeatedly.
+ */
+export function ensureRes1InfrastructureSyncTriggers(ops: ControlDbOps): void {
+  logDebug('gameDb ensureRes1InfrastructureSyncTriggers');
+  ops.run(
+    `CREATE TRIGGER IF NOT EXISTS ${RES4_TO_RES1_SYNC_TRIGGER_NAMES.afterInsert}
+     AFTER INSERT ON res4_feature_overrides
+     BEGIN
+       ${buildRes1RollupUpdateSql('NEW.parent_h3_index')}
+     END;`
+  );
+  ops.run(
+    `CREATE TRIGGER IF NOT EXISTS ${RES4_TO_RES1_SYNC_TRIGGER_NAMES.afterDelete}
+     AFTER DELETE ON res4_feature_overrides
+     BEGIN
+       ${buildRes1RollupUpdateSql('OLD.parent_h3_index')}
+     END;`
+  );
+  ops.run(
+    `CREATE TRIGGER IF NOT EXISTS ${RES4_TO_RES1_SYNC_TRIGGER_NAMES.afterUpdate}
+     AFTER UPDATE ON res4_feature_overrides
+     BEGIN
+       ${buildRes1RollupUpdateSql('OLD.parent_h3_index')}
+       ${buildRes1RollupUpdateSql('NEW.parent_h3_index')}
+     END;`
+  );
 }
 
 /**
@@ -294,31 +363,15 @@ export function reconcileRes1InfrastructureCountsFromRes4Overrides(ops: ControlD
   const mismatch = ops.getOne<{ mismatchCount: number }>(
     `SELECT COUNT(*) AS mismatchCount
      FROM res1_infrastructure ri
-     LEFT JOIN (
-       SELECT parent_h3_index AS h3Index,
-              SUM(CASE WHEN is_urban = 1 THEN 1 ELSE 0 END) AS urbanHexCount,
-              SUM(CASE WHEN is_airport = 1 THEN 1 ELSE 0 END) AS airportCount,
-              SUM(CASE WHEN is_seaport = 1 THEN 1 ELSE 0 END) AS seaportCount
-       FROM res4_feature_overrides
-       GROUP BY parent_h3_index
-     ) counts ON counts.h3Index = ri.h3_index
-     WHERE ri.urban_hex_count != COALESCE(counts.urbanHexCount, 0)
-        OR ri.airport_count != COALESCE(counts.airportCount, 0)
-        OR ri.seaport_count != COALESCE(counts.seaportCount, 0)`
+     LEFT JOIN (${RES4_INFRASTRUCTURE_COUNTS_SUBQUERY_SQL}) counts ON counts.h3Index = ri.h3_index
+     WHERE ${buildRes1CountsMismatchPredicateSql('ri', 'counts')}`
   )?.mismatchCount ?? 0;
   if (mismatch <= 0) {
     logDebug('gameDb reconcileRes1InfrastructureCountsFromRes4Overrides: no-op');
     return { changedHexCount: 0 };
   }
   ops.run(
-    `WITH counts AS (
-       SELECT parent_h3_index AS h3Index,
-              SUM(CASE WHEN is_urban = 1 THEN 1 ELSE 0 END) AS urbanHexCount,
-              SUM(CASE WHEN is_airport = 1 THEN 1 ELSE 0 END) AS airportCount,
-              SUM(CASE WHEN is_seaport = 1 THEN 1 ELSE 0 END) AS seaportCount
-       FROM res4_feature_overrides
-       GROUP BY parent_h3_index
-     )
+    `WITH counts AS (${RES4_INFRASTRUCTURE_COUNTS_SUBQUERY_SQL})
      UPDATE res1_infrastructure
      SET urban_hex_count = COALESCE((SELECT urbanHexCount FROM counts WHERE counts.h3Index = res1_infrastructure.h3_index), 0),
          airport_count = COALESCE((SELECT airportCount FROM counts WHERE counts.h3Index = res1_infrastructure.h3_index), 0),

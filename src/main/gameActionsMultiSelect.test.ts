@@ -33,7 +33,12 @@ function withTempDb(runCase: () => void): void {
 
 function findNearestLandSeaportHex(state: ReturnType<typeof getGameState>, originH3: string): string | null {
   const landSeaportHexes = state.hexes
-    .filter((hex) => hex.terrain === 'land' && getRes1ProductionContext({ h3Index: hex.h3Index }).seaportCount > 0)
+    .filter(
+      (hex) =>
+        hex.terrain === 'land' &&
+        getRes1ProductionContext({ h3Index: hex.h3Index }).seaportCount > 0 &&
+        findAdjacentNonArcticLandHex(state, hex.h3Index) !== null
+    )
     .sort((a, b) => {
       try {
         return gridDistance(originH3, a.h3Index) - gridDistance(originH3, b.h3Index);
@@ -437,45 +442,6 @@ function testAssignMarchForEmbarkedLandUnitImmediatelyDebarksAndClearsSealiftSlo
   });
 }
 
-function testPreviewEmbarkedLandUnitRepairsRes1Res4SeaportDrift(): void {
-  withTempDb(() => {
-    const state = getGameState();
-    const landUnit = state.units.find(
-      (u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor')
-    );
-    const navalUnit = state.units.find((u) => u.player === 'human' && u.unitType === 'naval');
-    const waterWithAdjacentLand = findWaterHexWithAdjacentLand(state);
-    assert.ok(landUnit, 'expected seeded human land unit');
-    assert.ok(navalUnit, 'expected seeded human naval unit');
-    assert.ok(waterWithAdjacentLand, 'expected a water hex with an adjacent land destination');
-
-    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [waterWithAdjacentLand!.waterHex, landUnit!.id]);
-    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [waterWithAdjacentLand!.waterHex, navalUnit!.id]);
-    dbRun('INSERT OR REPLACE INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', [
-      landUnit!.id,
-      navalUnit!.id,
-    ]);
-
-    // Simulate drift: res4 says seaport exists while res1 count is stale at zero.
-    const childRes4 = dbGetOne<{ h3Index: string }>(
-      'SELECT h3_index AS h3Index FROM res4_feature_overrides WHERE parent_h3_index = ? LIMIT 1',
-      [waterWithAdjacentLand!.waterHex]
-    );
-    assert.ok(childRes4, 'expected at least one res4 child row under the selected water hex');
-    dbRun('UPDATE res4_feature_overrides SET is_seaport = 1 WHERE h3_index = ?', [childRes4!.h3Index]);
-    dbRun('UPDATE res1_infrastructure SET seaport_count = 0 WHERE h3_index = ?', [waterWithAdjacentLand!.waterHex]);
-
-    const preview = previewHumanMarchOrders([landUnit!.id], waterWithAdjacentLand!.adjacentLandHex);
-    assert.strictEqual(preview.validForAll, true, preview.invalidReason ?? 'expected preview to recover from infrastructure drift');
-    const repairedSeaportCount =
-      dbGetOne<{ seaportCount: number }>(
-        'SELECT seaport_count AS seaportCount FROM res1_infrastructure WHERE h3_index = ?',
-        [waterWithAdjacentLand!.waterHex]
-      )?.seaportCount ?? 0;
-    assert.ok(repairedSeaportCount > 0, 'expected preview path to reconcile stale res1 seaport count');
-  });
-}
-
 function testEmbarkImmediatelyCancelsExistingHumanMovementOrder(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -638,7 +604,6 @@ function run(): void {
   testPreviewEmbarkedLandUnitOnWaterShowsInvalidWithoutPathPlanning();
   testEmbarkedLandUnitCanPreviewAndAssignFromSeaportWaterToAdjacentLand();
   testAssignMarchForEmbarkedLandUnitImmediatelyDebarksAndClearsSealiftSlot();
-  testPreviewEmbarkedLandUnitRepairsRes1Res4SeaportDrift();
   testEmbarkImmediatelyCancelsExistingHumanMovementOrder();
   testReadyIncludesEmbarkedCargoFollowMoveForNavalMovement();
   testSubmitOrdersAllowsLandMovementToSingleArcticHex();

@@ -1,4 +1,4 @@
-import { dbGetAll, dbGetOne, dbRun, getRes1InfrastructureForHex, listBuildQueueRowsForHex, listRes4FeatureOverridesForGame, replaceBuildQueueForHex, clearBuildQueueAndProgressForHex, reconcileRes1InfrastructureCountsFromRes4Overrides, updateRes4FeatureOverrideRow } from '../gameDb';
+import { dbGetAll, dbGetOne, dbRun, getRes1InfrastructureForHex, listBuildQueueRowsForHex, listRes4FeatureOverridesForGame, replaceBuildQueueForHex, clearBuildQueueAndProgressForHex, updateRes4FeatureOverrideRow } from '../gameDb';
 import { getAvailableBuildUnitTypes } from '../productionRules';
 import { casualtyPriorityIndex, getAttack, getDefense, getRange } from '../combatConstants';
 import type { AirStrikeAnimationMove, AirStrikeOrder, AirStrikeTargetType, InfrastructureDestroyedEvent } from '../../shared/ipcTypes';
@@ -84,7 +84,6 @@ function applyInfrastructureDestructionEffects(
     if (destroyCount <= 0) return result;
     result.changedRubbleCount = replaceRandomRes4FeaturesWithRubble(h3Index, 'urban', destroyCount, next);
     if (result.changedRubbleCount > 0) {
-      reconcileRes1InfrastructureCountsFromRes4Overrides();
       pruneBuildQueueForInfrastructureState(h3Index);
     }
     return result;
@@ -93,7 +92,6 @@ function applyInfrastructureDestructionEffects(
     if (current.airportCount <= 0) return result;
     result.changedRubbleCount = replaceRandomRes4FeaturesWithRubble(h3Index, 'airport', 1, next);
     if (result.changedRubbleCount > 0) {
-      reconcileRes1InfrastructureCountsFromRes4Overrides();
       result.destroyedAirUnits = destroyBasedAirUnitsAtHex(h3Index);
       pruneBuildQueueForInfrastructureState(h3Index);
     }
@@ -103,7 +101,6 @@ function applyInfrastructureDestructionEffects(
     if (current.seaportCount <= 0) return result;
     result.changedRubbleCount = replaceRandomRes4FeaturesWithRubble(h3Index, 'seaport', 1, next);
     if (result.changedRubbleCount > 0) {
-      reconcileRes1InfrastructureCountsFromRes4Overrides();
       pruneBuildQueueForInfrastructureState(h3Index);
     }
   }

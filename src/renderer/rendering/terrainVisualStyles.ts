@@ -80,7 +80,7 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
     urbanOverlayFill: 'rgba(137, 117, 98, 0.46)',
     urbanOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: false, pattern: 'orthogonal' },
     rubbleOverlayFill: 'rgba(137, 117, 98, 0.46)',
-    rubbleOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
+    rubbleOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
   },
   atlas: {
     label: 'Atlas',
@@ -107,7 +107,7 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
     urbanOverlayFill: 'rgba(141, 122, 103, 0.46)',
     urbanOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: false, pattern: 'orthogonal' },
     rubbleOverlayFill: 'rgba(141, 122, 103, 0.46)',
-    rubbleOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
+    rubbleOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
   },
   wargame: {
     label: 'Wargame',
@@ -134,7 +134,7 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
     urbanOverlayFill: 'rgba(132, 112, 97, 0.46)',
     urbanOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.88, reverseDiagonal: false, pattern: 'orthogonal' },
     rubbleOverlayFill: 'rgba(132, 112, 97, 0.46)',
-    rubbleOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.88, reverseDiagonal: true, crosshatch: true },
+    rubbleOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 5, lineWidth: 0.88, reverseDiagonal: true, crosshatch: true },
   },
   scientific: {
     label: 'Scientific',
@@ -161,7 +161,7 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
     urbanOverlayFill: 'rgba(130, 112, 96, 0.46)',
     urbanOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: false, pattern: 'orthogonal' },
     rubbleOverlayFill: 'rgba(130, 112, 96, 0.46)',
-    rubbleOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 6, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
+    rubbleOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
   },
 };
 

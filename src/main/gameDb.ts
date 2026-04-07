@@ -36,6 +36,7 @@ import {
   getHexController as getHexControllerFromModule,
   getRes1InfrastructureForHex as getRes1InfrastructureForHexFromModule,
   getRes4TerrainOverridesForRendererFromGame as getRes4TerrainOverridesForRendererFromGameFromModule,
+  ensureRes1InfrastructureSyncTriggers as ensureRes1InfrastructureSyncTriggersFromModule,
   listAllHexControls as listAllHexControlsFromModule,
   listBuildQueueRowsForHex as listBuildQueueRowsForHexFromModule,
   listRes1InfrastructureRows as listRes1InfrastructureRowsFromModule,
@@ -112,6 +113,12 @@ const REQUIRED_TABLES = [
   'res1_build_progress',
   'res1_infrastructure',
   'res4_feature_overrides',
+] as const;
+
+const INFRASTRUCTURE_SYNC_TRIGGER_NAMES = [
+  'res4_sync_res1_after_insert',
+  'res4_sync_res1_after_delete',
+  'res4_sync_res1_after_update',
 ] as const;
 
 /**
@@ -208,6 +215,7 @@ export function createFreshGameDatabaseAt(canonicalPath: string): void {
   db = new Database(canonicalPath);
   applyGameDbPragmas(db);
   db.exec(getFullDdl());
+  ensureRes1InfrastructureSyncTriggers();
   ensureTurnStateRow();
   db.pragma(`user_version = ${EXPECTED_USER_VERSION}`);
   seedGameSeedIfMissing();
@@ -236,7 +244,7 @@ export function openGameDatabaseAtPathForTests(absPath: string): void {
     validateGameDatabaseOrThrow(d);
     db = d;
     d = null;
-    reconcileRes1InfrastructureCountsFromRes4Overrides();
+    runInfrastructureStartupConsistencyPass();
   } catch (err) {
     if (d) {
       try {
@@ -285,6 +293,7 @@ export async function initDatabase(): Promise<void> {
     validateGameDatabaseOrThrow(d);
     db = d;
     d = null;
+    runInfrastructureStartupConsistencyPass({ includeReconciliation: false });
     ensureTurnStateRow();
     seedGameSeedIfMissing();
     ensureTerrainClassificationCacheLoaded();
@@ -380,15 +389,25 @@ function seedHexesFromTerrainMetadata(): void {
 function seedInfrastructureStateFromMetadata(): void {
   logDebug('gameDb seedInfrastructureStateFromMetadata');
   if (db === null) return;
-  run('DELETE FROM res1_infrastructure');
-  run('DELETE FROM res4_feature_overrides');
-  const { res1Rows, res4Rows } = getInfrastructureSeedRowsFromMetadata();
-  for (const row of res1Rows) {
-    insertRes1InfrastructureRow(row.h3Index, row.urbanHexCount, row.airportCount, row.seaportCount);
+  for (const triggerName of INFRASTRUCTURE_SYNC_TRIGGER_NAMES) {
+    run(`DROP TRIGGER IF EXISTS ${triggerName}`);
   }
-  for (const row of res4Rows) {
-    insertRes4FeatureOverrideSeedRow(row);
+  try {
+    run('DELETE FROM res1_infrastructure');
+    run('DELETE FROM res4_feature_overrides');
+    const { res1Rows, res4Rows } = getInfrastructureSeedRowsFromMetadata();
+    for (const row of res1Rows) {
+      insertRes1InfrastructureRow(row.h3Index, row.urbanHexCount, row.airportCount, row.seaportCount);
+    }
+    for (const row of res4Rows) {
+      insertRes4FeatureOverrideSeedRow(row);
+    }
+  } finally {
+    // Bulk reseed already writes canonical res1 counts, so restoring triggers afterwards avoids N-per-row trigger overhead.
+    ensureRes1InfrastructureSyncTriggers();
   }
+  const { changedHexCount } = reconcileRes1InfrastructureCountsFromRes4Overrides();
+  logDebug('gameDb seedInfrastructureStateFromMetadata: post-seed reconciliation complete', { changedHexCount });
 }
 
 function backfillInfrastructureStateFromMetadataIfMissing(): void {
@@ -749,6 +768,24 @@ export function reconcileRes1InfrastructureCountsFromRes4Overrides(): { changedH
   return reconcileRes1InfrastructureCountsFromRes4OverridesFromModule({ run, getOne, getAll });
 }
 
+function runInfrastructureStartupConsistencyPass(options?: { includeReconciliation?: boolean }): void {
+  ensureRes1InfrastructureSyncTriggers();
+  if (options?.includeReconciliation === false) return;
+  reconcileRes1InfrastructureCountsFromRes4Overrides();
+}
+
+/**
+ * Why this exists:
+ *     Ensures trigger-based res-4 to res-1 infrastructure synchronization is installed for this database.
+ * When to use:
+ *     Database creation/open startup paths before gameplay writes.
+ * What to expect:
+ *     Safe/idempotent trigger creation with no data mutation.
+ */
+export function ensureRes1InfrastructureSyncTriggers(): void {
+  ensureRes1InfrastructureSyncTriggersFromModule({ run, getOne, getAll });
+}
+
 /**
  * Why this exists:
  *     Updates feature flags for one res-4 row after randomized infrastructure-to-rubble replacement.
@@ -780,7 +817,6 @@ export function getRes4TerrainOverridesForRendererFromGame(): Array<{
   isSeaport?: boolean;
   isRubble?: boolean;
 }> {
-  reconcileRes1InfrastructureCountsFromRes4Overrides();
   return getRes4TerrainOverridesForRendererFromGameFromModule({ run, getOne, getAll });
 }
 
