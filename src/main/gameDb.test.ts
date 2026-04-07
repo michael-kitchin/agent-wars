@@ -257,6 +257,96 @@ function testWrongUserVersionRecovers(gameDb: typeof import('./gameDb'), Databas
   }
 }
 
+function getRes1CountsDerivedFromRes4(
+  gameDb: typeof import('./gameDb'),
+  h3Index: string
+): { urbanHexCount: number; airportCount: number; seaportCount: number } {
+  const row = gameDb.dbGetOne<{ urbanHexCount: number; airportCount: number; seaportCount: number }>(
+    `SELECT COALESCE(SUM(CASE WHEN is_urban = 1 THEN 1 ELSE 0 END), 0) AS urbanHexCount,
+            COALESCE(SUM(CASE WHEN is_airport = 1 THEN 1 ELSE 0 END), 0) AS airportCount,
+            COALESCE(SUM(CASE WHEN is_seaport = 1 THEN 1 ELSE 0 END), 0) AS seaportCount
+     FROM res4_feature_overrides
+     WHERE parent_h3_index = ?`,
+    [h3Index]
+  );
+  return {
+    urbanHexCount: row?.urbanHexCount ?? 0,
+    airportCount: row?.airportCount ?? 0,
+    seaportCount: row?.seaportCount ?? 0,
+  };
+}
+
+function testOpenExistingDatabaseReconcilesRes1InfrastructureDrift(gameDb: typeof import('./gameDb')): void {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
+  const p = path.join(dir, 't.sqlite');
+  try {
+    gameDb.openGameDatabaseAtPathForTests(p);
+    gameDb.resetGameForNewMatch();
+    const target = gameDb.dbGetOne<{ h3Index: string }>(
+      `SELECT h3_index AS h3Index
+       FROM res1_infrastructure
+       WHERE seaport_count > 0 OR airport_count > 0 OR urban_hex_count > 0
+       ORDER BY h3_index ASC
+       LIMIT 1`
+    );
+    assert.ok(target?.h3Index, 'expected at least one infrastructure-bearing hex');
+    gameDb.dbRun(
+      'UPDATE res1_infrastructure SET urban_hex_count = 0, airport_count = 0, seaport_count = 0 WHERE h3_index = ?',
+      [target!.h3Index]
+    );
+    gameDb.closeGameDatabaseForTests();
+
+    gameDb.openGameDatabaseAtPathForTests(p);
+    const expected = getRes1CountsDerivedFromRes4(gameDb, target!.h3Index);
+    const actual = gameDb.getRes1InfrastructureForHex(target!.h3Index);
+    assert.strictEqual(actual.urbanHexCount, expected.urbanHexCount);
+    assert.strictEqual(actual.airportCount, expected.airportCount);
+    assert.strictEqual(actual.seaportCount, expected.seaportCount);
+  } finally {
+    gameDb.closeGameDatabaseForTests();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function testRes1InfrastructureStaysInSyncWhenRes4FeaturesChange(gameDb: typeof import('./gameDb')): void {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
+  const p = path.join(dir, 't.sqlite');
+  try {
+    gameDb.openGameDatabaseAtPathForTests(p);
+    gameDb.resetGameForNewMatch();
+    const targetRows = [
+      gameDb.dbGetOne<{ h3Index: string; parentH3Index: string }>(
+        'SELECT h3_index AS h3Index, parent_h3_index AS parentH3Index FROM res4_feature_overrides WHERE is_urban = 1 LIMIT 1'
+      ),
+      gameDb.dbGetOne<{ h3Index: string; parentH3Index: string }>(
+        'SELECT h3_index AS h3Index, parent_h3_index AS parentH3Index FROM res4_feature_overrides WHERE is_airport = 1 LIMIT 1'
+      ),
+      gameDb.dbGetOne<{ h3Index: string; parentH3Index: string }>(
+        'SELECT h3_index AS h3Index, parent_h3_index AS parentH3Index FROM res4_feature_overrides WHERE is_seaport = 1 LIMIT 1'
+      ),
+    ];
+    assert.ok(targetRows[0], 'expected at least one urban res4 feature row');
+    assert.ok(targetRows[1], 'expected at least one airport res4 feature row');
+    assert.ok(targetRows[2], 'expected at least one seaport res4 feature row');
+
+    gameDb.updateRes4FeatureOverrideRow(targetRows[0]!.h3Index, { isUrban: false, isRubble: true });
+    gameDb.updateRes4FeatureOverrideRow(targetRows[1]!.h3Index, { isAirport: false, isRubble: true });
+    gameDb.updateRes4FeatureOverrideRow(targetRows[2]!.h3Index, { isSeaport: false, isRubble: true });
+
+    const touchedParents = [...new Set(targetRows.map((row) => row!.parentH3Index))];
+    for (const parentH3Index of touchedParents) {
+      const expected = getRes1CountsDerivedFromRes4(gameDb, parentH3Index);
+      const actual = gameDb.getRes1InfrastructureForHex(parentH3Index);
+      assert.strictEqual(actual.urbanHexCount, expected.urbanHexCount);
+      assert.strictEqual(actual.airportCount, expected.airportCount);
+      assert.strictEqual(actual.seaportCount, expected.seaportCount);
+    }
+  } finally {
+    gameDb.closeGameDatabaseForTests();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 
 function run(): void {
   if (!betterSqliteNativeAvailable()) {
@@ -274,6 +364,8 @@ function run(): void {
   testResetRegeneratesTerrain(gameDb);
   testResetSeedsInfrastructureState(gameDb);
   testRendererRes4OverridesIncludeInfrastructureFeatureRows(gameDb);
+  testOpenExistingDatabaseReconcilesRes1InfrastructureDrift(gameDb);
+  testRes1InfrastructureStaysInSyncWhenRes4FeaturesChange(gameDb);
   testSeededUnitsUseRegionalSpawnContracts(gameDb);
   testFogOfWarToggleVisibilityContract(gameDb);
   testWrongUserVersionRecovers(gameDb, Database);

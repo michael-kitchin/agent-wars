@@ -26,6 +26,7 @@ import {
   allocateNextUnitDisplayOrder,
   listUnitsForSnapshot,
   getRes1InfrastructureForHex,
+  reconcileRes1InfrastructureCountsFromRes4Overrides,
   getGameStateForPlayer,
 } from './gameDb';
 import { buildLatLngCoordinateMap, getOrderedHexList } from './mapData';
@@ -278,6 +279,8 @@ function validateOrder(
     return { valid: false, reason: 'Land units must move to land, coastal, or wetlands hexes' };
   }
   if (isLandUnitType(unit.unit_type)) {
+    const embarkedAtSeaWithoutCoastalOrigin =
+      isEmbarkedLandUnitOnWater(unitId) && originTerrain !== 'coastal';
     const traversedH3: string[] = [];
     if (dist > 1) {
       try {
@@ -294,7 +297,7 @@ function validateOrder(
       terrainByH3,
       terrainKindByH3,
       traversedH3Indices: traversedH3,
-      isEmbarkedAtSea: isEmbarkedLandUnitOnWater(unitId),
+      isEmbarkedAtSea: embarkedAtSeaWithoutCoastalOrigin,
     });
     if (blockReason) return { valid: false, reason: blockReason };
   }
@@ -431,6 +434,35 @@ export function listHumanStandingOrders(): HumanStandingOrderView[] {
   }
 }
 
+function cancelHumanMovementOrdersForUnit(unitId: string): void {
+  dbRun('DELETE FROM standing_orders WHERE player_id = ? AND unit_id = ? AND order_type = ?', [
+    HUMAN_PLAYER_ID,
+    unitId,
+    'march',
+  ]);
+  dbRun('DELETE FROM pending_orders WHERE unit_id = ?', [unitId]);
+}
+
+function clearEmbarkAssignmentForIndependentLandMove(unitId: string, destinationH3Index: string): void {
+  const assignment = dbGetOne<{ navalUnitId: string; navalH3Index: string }>(
+    `SELECT uta.naval_unit_id AS navalUnitId,
+            nu.h3_index AS navalH3Index
+     FROM unit_transport_assignments uta
+     JOIN units nu ON nu.id = uta.naval_unit_id
+     WHERE uta.land_unit_id = ?`,
+    [unitId]
+  );
+  if (!assignment) return;
+  if (destinationH3Index === assignment.navalH3Index) return;
+  dbRun('DELETE FROM unit_transport_assignments WHERE land_unit_id = ?', [unitId]);
+  logDebug('gameActions assignHumanMarchOrder: auto-disembarked land unit for independent move', {
+    unitId,
+    destinationH3Index,
+    navalUnitId: assignment.navalUnitId,
+    navalH3Index: assignment.navalH3Index,
+  });
+}
+
 /**
  * Why this exists:
  *     Assigns/updates a human march standing order from renderer double-click input.
@@ -443,14 +475,25 @@ export function assignHumanMarchOrder(unitId: string, destinationH3Index: string
   logDebug('gameActions assignHumanMarchOrder', { unitId, destinationH3Index });
   try {
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
+    reconcileRes1InfrastructureCountsFromRes4Overrides();
     const state = dbBackedStateSnapshot();
     const turnRow = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1');
     if (turnRow?.phase !== VALID_PHASE) return { success: false, reason: 'Not in planning phase' };
     const unitRow = state.units.find((unit) => unit.id === unitId && unit.player === HUMAN_PLAYER_ID);
     if (!unitRow) return { success: false, reason: 'Unit not found or not human-controlled' };
     if (unitRow.unitType === 'air') return { success: false, reason: AIR_UNITS_CANNOT_MARCH_REASON };
-    const mapHexes = new Set(state.hexes.map((h) => h.h3Index));
-    if (!mapHexes.has(destinationH3Index)) return { success: false, reason: 'Destination not on map' };
+    const destinationHex = state.hexes.find((hex) => hex.h3Index === destinationH3Index);
+    if (!destinationHex) return { success: false, reason: 'Destination not on map' };
+    const destinationTerrain = effectiveHexPassabilityTerrain(destinationHex);
+    const destinationSeaportCount = getRes1InfrastructureForHex(destinationH3Index).seaportCount;
+    logDebug('gameActions assignHumanMarchOrder: destination terrain classification', {
+      unitId,
+      destinationH3Index,
+      destinationTerrain,
+      destinationTerrainRaw: destinationHex.terrain,
+      destinationTerrainKind: destinationHex.terrainKind,
+      destinationSeaportCount,
+    });
     const hexList = state.hexes.map((h) => h.h3Index);
     const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
     const destinationLatLng = latLngByH3.get(destinationH3Index);
@@ -467,6 +510,7 @@ export function assignHumanMarchOrder(unitId: string, destinationH3Index: string
       });
       return { success: false, reason: result.error ?? 'Failed to assign order' };
     }
+    clearEmbarkAssignmentForIndependentLandMove(unitId, destinationH3Index);
     return { success: true };
   } catch (err) {
     logError('assignHumanMarchOrder: exception', err);
@@ -486,6 +530,7 @@ export function assignHumanMarchOrders(unitIds: string[], destinationH3Index: st
   logDebug('gameActions assignHumanMarchOrders', { unitCount: unitIds.length, destinationH3Index });
   try {
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
+    reconcileRes1InfrastructureCountsFromRes4Overrides();
     const uniqueUnitIds = getUniqueNonEmptyIds(unitIds);
     if (uniqueUnitIds.length === 0) return { success: false, reason: 'No selected units to assign' };
     const state = dbBackedStateSnapshot();
@@ -502,6 +547,7 @@ export function assignHumanMarchOrders(unitIds: string[], destinationH3Index: st
       return { success: false, reason: 'At least one selected unit is invalid or not human-controlled.' };
     }
     const destinationTerrain = effectiveHexPassabilityTerrain(destinationHex);
+    const destinationSeaportCount = getRes1InfrastructureForHex(destinationH3Index).seaportCount;
     const sharedMixedTerrain = hexSupportsMixedLandAndNaval(destinationHex);
     const hasMixedSelection = selectionHasMixedLandAndNaval(selectedUnits);
     logDebug('gameActions assignHumanMarchOrders: destination terrain classification', {
@@ -509,6 +555,7 @@ export function assignHumanMarchOrders(unitIds: string[], destinationH3Index: st
       destinationTerrain,
       destinationTerrainRaw: destinationHex.terrain,
       destinationTerrainKind: destinationHex.terrainKind,
+      destinationSeaportCount,
       hasLand: selectedUnits.some((unit) => unit.unitType === 'infantry' || unit.unitType === 'armor'),
       hasNaval: selectedUnits.some((unit) => unit.unitType === 'naval'),
       sharedMixedTerrain,
@@ -778,7 +825,14 @@ export function updateSealiftSlot(
 ): { success: boolean; reason?: string; state?: SealiftStackState } {
   logDebug('gameActions updateSealiftSlot', { h3Index, navalUnitId, slotIndex, landUnitId });
   try {
-    return updateSealiftSlotImpl({ h3Index, navalUnitId, slotIndex, landUnitId });
+    const result = updateSealiftSlotImpl({ h3Index, navalUnitId, slotIndex, landUnitId });
+    if (result.success && landUnitId) {
+      cancelHumanMovementOrdersForUnit(landUnitId);
+      logDebug('gameActions updateSealiftSlot: cancelled land-unit movement orders after embark', {
+        landUnitId,
+      });
+    }
+    return result;
   } catch (err) {
     logError('updateSealiftSlot: exception', err);
     return { success: false, reason: String(err) };

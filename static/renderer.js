@@ -18690,6 +18690,10 @@
             });
             if (!result.success) {
               showMapToast(formatTargetingValidationReason(result.reason, "Failed to update sealift assignment."));
+            } else if (selected.length > 0) {
+              await refreshHumanStandingOrders2();
+              updatePendingOrdersSidebar2();
+              await refreshHoverRoutePreview2();
             }
             refreshStackCalloutIfOpen();
             requestRedraw();

@@ -6,16 +6,19 @@
 import * as assert from 'assert';
 import { gridDistance } from 'h3-js';
 import {
+  dbGetOne,
   getGameState,
   dbRun,
 } from './gameDb';
 import {
   assignHumanMarchOrder,
   assignHumanMarchOrders,
+  getSealiftStackState,
   previewHumanMarchOrders,
   ready,
   validateGroupRangedTarget,
   submitOrders,
+  updateSealiftSlot,
 } from './gameActions';
 import { getRes1ProductionContext } from './terrainClassificationCache';
 import { withTempGameDb } from './testSupport/withTempGameDb';
@@ -67,8 +70,45 @@ function findAdjacentWaterHex(state: ReturnType<typeof getGameState>, centerH3: 
 }
 
 function setHumanControlledPort(h3Index: string): void {
+  const childRes4 = dbGetOne<{ h3Index: string }>(
+    'SELECT h3_index AS h3Index FROM res4_feature_overrides WHERE parent_h3_index = ? LIMIT 1',
+    [h3Index]
+  );
+  if (childRes4) {
+    dbRun('UPDATE res4_feature_overrides SET is_seaport = 1 WHERE h3_index = ?', [childRes4.h3Index]);
+  }
   dbRun('UPDATE res1_infrastructure SET seaport_count = 1 WHERE h3_index = ?', [h3Index]);
   dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, 'human']);
+}
+
+function findAirportPairByDistance(
+  state: ReturnType<typeof getGameState>,
+  predicate: (distance: number) => boolean
+): { originH3: string; destinationH3: string } | null {
+  const airportHexes = state.hexes
+    .map((hex) => {
+      const airportCount =
+        dbGetOne<{ airportCount: number }>(
+          'SELECT airport_count AS airportCount FROM res1_infrastructure WHERE h3_index = ?',
+          [hex.h3Index]
+        )?.airportCount ?? 0;
+      return airportCount > 0 ? hex.h3Index : null;
+    })
+    .filter((h3): h3 is string => !!h3);
+  for (let i = 0; i < airportHexes.length; i++) {
+    const originH3 = airportHexes[i]!;
+    for (let j = 0; j < airportHexes.length; j++) {
+      if (i === j) continue;
+      const destinationH3 = airportHexes[j]!;
+      try {
+        const distance = gridDistance(originH3, destinationH3);
+        if (predicate(distance)) return { originH3, destinationH3 };
+      } catch {
+        // Ignore malformed test pairs.
+      }
+    }
+  }
+  return null;
 }
 
 function setArcticTerrain(h3Index: string): void {
@@ -114,6 +154,46 @@ function findAdjacentHex(state: ReturnType<typeof getGameState>, originH3: strin
     } catch {
       // Ignore malformed test pairs.
     }
+  }
+  return null;
+}
+
+function findAdjacentLandHex(state: ReturnType<typeof getGameState>, originH3: string): string | null {
+  for (const hex of state.hexes) {
+    if (hex.h3Index === originH3 || hex.terrain !== 'land') continue;
+    try {
+      if (gridDistance(originH3, hex.h3Index) === 1) return hex.h3Index;
+    } catch {
+      // Ignore malformed test pairs.
+    }
+  }
+  return null;
+}
+
+function findAdjacentNonArcticLandHex(state: ReturnType<typeof getGameState>, originH3: string): string | null {
+  for (const hex of state.hexes) {
+    if (hex.h3Index === originH3 || hex.terrain !== 'land' || hex.terrainKind === 'arctic') continue;
+    try {
+      if (gridDistance(originH3, hex.h3Index) === 1) return hex.h3Index;
+    } catch {
+      // Ignore malformed test pairs.
+    }
+  }
+  return null;
+}
+
+function findWaterHexWithAdjacentLand(state: ReturnType<typeof getGameState>): { waterHex: string; adjacentLandHex: string } | null {
+  for (const hex of state.hexes) {
+    if (hex.terrain !== 'water') continue;
+    const hasRes4Child =
+      (dbGetOne<{ count: number }>(
+        'SELECT COUNT(*) AS count FROM res4_feature_overrides WHERE parent_h3_index = ?',
+        [hex.h3Index]
+      )?.count ?? 0) > 0;
+    if (!hasRes4Child) continue;
+    const adjacentLandHex = findAdjacentNonArcticLandHex(state, hex.h3Index);
+    if (!adjacentLandHex) continue;
+    return { waterHex: hex.h3Index, adjacentLandHex };
   }
   return null;
 }
@@ -204,22 +284,19 @@ function testNavalOrdersCanEgressFromLandSeaportToAdjacentWaterOrCoastal(): void
 function testPreviewGroupedRejectsAirUnitsForMarchPlanning(): void {
   withTempDb(() => {
     const state = getGameState();
-    const human = state.units.find((u) => u.player === 'human');
-    assert.ok(human, 'expected seeded human unit');
+    const airportPair = findAirportPairByDistance(state, (distance) => distance > 4);
+    assert.ok(airportPair, 'expected at least one airport destination beyond ferry range');
     const airUnitId = 'human-air-preview-test-1';
     dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
       airUnitId,
       'human',
       'air',
-      human!.h3Index,
+      airportPair!.originH3,
     ]);
-    dbRun('UPDATE res1_infrastructure SET airport_count = 1 WHERE h3_index = ?', [human!.h3Index]);
-    const hovered = findHexByDistance(state, human!.h3Index, (distance) => distance > 4);
-    assert.ok(hovered, 'expected at least one destination beyond ferry range');
 
-    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [hovered!, 'human']);
-    dbRun('UPDATE res1_infrastructure SET airport_count = 1 WHERE h3_index = ?', [hovered!]);
-    const result = previewHumanMarchOrders([airUnitId], hovered!);
+    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [airportPair!.destinationH3, 'human']);
+    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [airportPair!.originH3, 'human']);
+    const result = previewHumanMarchOrders([airUnitId], airportPair!.destinationH3);
     const outOfRangeReason = result.invalidReason ?? null;
     const hasExpectedOutOfRangeReason =
       outOfRangeReason?.includes('out of range') || outOfRangeReason?.includes('out of ferry range');
@@ -230,21 +307,18 @@ function testPreviewGroupedRejectsAirUnitsForMarchPlanning(): void {
 function testPreviewGroupedAcceptsAirFerryDestinationWithinRange(): void {
   withTempDb(() => {
     const state = getGameState();
-    const human = state.units.find((u) => u.player === 'human');
-    assert.ok(human, 'expected seeded human unit');
-    const hovered = findHexByDistance(state, human!.h3Index, (distance) => distance >= 1 && distance <= 4);
-    assert.ok(hovered, 'expected a destination within ferry range');
+    const airportPair = findAirportPairByDistance(state, (distance) => distance >= 1 && distance <= 4);
+    assert.ok(airportPair, 'expected an airport destination within ferry range');
     const airUnitId = 'human-air-preview-test-2';
     dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
       airUnitId,
       'human',
       'air',
-      human!.h3Index,
+      airportPair!.originH3,
     ]);
-    dbRun('UPDATE res1_infrastructure SET airport_count = 1 WHERE h3_index = ?', [human!.h3Index]);
-    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [hovered!, 'human']);
-    dbRun('UPDATE res1_infrastructure SET airport_count = 1 WHERE h3_index = ?', [hovered!]);
-    const result = previewHumanMarchOrders([airUnitId], hovered!);
+    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [airportPair!.destinationH3, 'human']);
+    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [airportPair!.originH3, 'human']);
+    const result = previewHumanMarchOrders([airUnitId], airportPair!.destinationH3);
     assert.strictEqual(result.validForAll, true);
     assert.strictEqual(result.previews.length, 1);
     assert.strictEqual(result.previews[0]?.preview.valid, true);
@@ -300,6 +374,145 @@ function testPreviewEmbarkedLandUnitOnWaterShowsInvalidWithoutPathPlanning(): vo
     assert.strictEqual(result.previews[0]?.preview.valid, false);
     assert.strictEqual(result.previews[0]?.preview.showInvalidMarker, true);
     assert.deepStrictEqual(result.previews[0]?.preview.segments, []);
+  });
+}
+
+function testEmbarkedLandUnitCanPreviewAndAssignFromSeaportWaterToAdjacentLand(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const landUnit = state.units.find(
+      (u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor')
+    );
+    const navalUnit = state.units.find((u) => u.player === 'human' && u.unitType === 'naval');
+    const waterWithAdjacentLand = findWaterHexWithAdjacentLand(state);
+    assert.ok(landUnit, 'expected seeded human land unit');
+    assert.ok(navalUnit, 'expected seeded human naval unit');
+    assert.ok(waterWithAdjacentLand, 'expected a water hex with an adjacent land destination');
+
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [waterWithAdjacentLand!.waterHex, landUnit!.id]);
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [waterWithAdjacentLand!.waterHex, navalUnit!.id]);
+    setHumanControlledPort(waterWithAdjacentLand!.waterHex);
+    dbRun('INSERT OR REPLACE INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', [
+      landUnit!.id,
+      navalUnit!.id,
+    ]);
+
+    const preview = previewHumanMarchOrders([landUnit!.id], waterWithAdjacentLand!.adjacentLandHex);
+    assert.strictEqual(preview.validForAll, true, preview.invalidReason ?? 'expected preview to allow seaport disembark move');
+    const assign = assignHumanMarchOrder(landUnit!.id, waterWithAdjacentLand!.adjacentLandHex);
+    assert.strictEqual(assign.success, true, assign.reason ?? 'expected assignment to allow seaport disembark move');
+  });
+}
+
+function testAssignMarchForEmbarkedLandUnitImmediatelyDebarksAndClearsSealiftSlot(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const landUnit = state.units.find(
+      (u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor')
+    );
+    const navalUnit = state.units.find((u) => u.player === 'human' && u.unitType === 'naval');
+    const waterWithAdjacentLand = findWaterHexWithAdjacentLand(state);
+    assert.ok(landUnit, 'expected seeded human land unit');
+    assert.ok(navalUnit, 'expected seeded human naval unit');
+    assert.ok(waterWithAdjacentLand, 'expected a water hex with an adjacent land destination');
+
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [waterWithAdjacentLand!.waterHex, landUnit!.id]);
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [waterWithAdjacentLand!.waterHex, navalUnit!.id]);
+    setHumanControlledPort(waterWithAdjacentLand!.waterHex);
+    dbRun('INSERT OR REPLACE INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', [
+      landUnit!.id,
+      navalUnit!.id,
+    ]);
+
+    const assign = assignHumanMarchOrder(landUnit!.id, waterWithAdjacentLand!.adjacentLandHex);
+    assert.strictEqual(assign.success, true, assign.reason ?? 'expected independent disembark move assignment to succeed');
+    const assignmentCount =
+      dbGetOne<{ count: number }>('SELECT COUNT(*) AS count FROM unit_transport_assignments WHERE land_unit_id = ?', [landUnit!.id])
+        ?.count ?? 0;
+    assert.strictEqual(assignmentCount, 0, 'expected embarked assignment to be removed immediately');
+    const sealiftState = getSealiftStackState(waterWithAdjacentLand!.waterHex);
+    const navalRow = sealiftState.navalRows.find((row) => row.navalUnitId === navalUnit!.id);
+    assert.ok(navalRow, 'expected naval row in sealift state');
+    assert.strictEqual(navalRow?.slot1UnitId ?? null, null, 'expected sealift slot to be deselected after debark move order');
+  });
+}
+
+function testPreviewEmbarkedLandUnitRepairsRes1Res4SeaportDrift(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const landUnit = state.units.find(
+      (u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor')
+    );
+    const navalUnit = state.units.find((u) => u.player === 'human' && u.unitType === 'naval');
+    const waterWithAdjacentLand = findWaterHexWithAdjacentLand(state);
+    assert.ok(landUnit, 'expected seeded human land unit');
+    assert.ok(navalUnit, 'expected seeded human naval unit');
+    assert.ok(waterWithAdjacentLand, 'expected a water hex with an adjacent land destination');
+
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [waterWithAdjacentLand!.waterHex, landUnit!.id]);
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [waterWithAdjacentLand!.waterHex, navalUnit!.id]);
+    dbRun('INSERT OR REPLACE INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', [
+      landUnit!.id,
+      navalUnit!.id,
+    ]);
+
+    // Simulate drift: res4 says seaport exists while res1 count is stale at zero.
+    const childRes4 = dbGetOne<{ h3Index: string }>(
+      'SELECT h3_index AS h3Index FROM res4_feature_overrides WHERE parent_h3_index = ? LIMIT 1',
+      [waterWithAdjacentLand!.waterHex]
+    );
+    assert.ok(childRes4, 'expected at least one res4 child row under the selected water hex');
+    dbRun('UPDATE res4_feature_overrides SET is_seaport = 1 WHERE h3_index = ?', [childRes4!.h3Index]);
+    dbRun('UPDATE res1_infrastructure SET seaport_count = 0 WHERE h3_index = ?', [waterWithAdjacentLand!.waterHex]);
+
+    const preview = previewHumanMarchOrders([landUnit!.id], waterWithAdjacentLand!.adjacentLandHex);
+    assert.strictEqual(preview.validForAll, true, preview.invalidReason ?? 'expected preview to recover from infrastructure drift');
+    const repairedSeaportCount =
+      dbGetOne<{ seaportCount: number }>(
+        'SELECT seaport_count AS seaportCount FROM res1_infrastructure WHERE h3_index = ?',
+        [waterWithAdjacentLand!.waterHex]
+      )?.seaportCount ?? 0;
+    assert.ok(repairedSeaportCount > 0, 'expected preview path to reconcile stale res1 seaport count');
+  });
+}
+
+function testEmbarkImmediatelyCancelsExistingHumanMovementOrder(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const landUnit = state.units.find(
+      (u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor')
+    );
+    const navalUnit = state.units.find((u) => u.player === 'human' && u.unitType === 'naval');
+    assert.ok(landUnit, 'expected seeded human land unit');
+    assert.ok(navalUnit, 'expected seeded human naval unit');
+    const seaportHex = findNearestLandSeaportHex(state, landUnit!.h3Index);
+    assert.ok(seaportHex, 'expected at least one land seaport');
+    const adjacentLandHex = findAdjacentNonArcticLandHex(state, seaportHex!);
+    assert.ok(adjacentLandHex, 'expected adjacent non-arctic land destination from seaport hex');
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [seaportHex!, landUnit!.id]);
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [seaportHex!, navalUnit!.id]);
+    setHumanControlledPort(seaportHex!);
+
+    const assignResult = assignHumanMarchOrder(landUnit!.id, adjacentLandHex!);
+    assert.strictEqual(assignResult.success, true, assignResult.reason ?? 'expected initial land movement order assignment');
+    const beforeStandingOrderCount =
+      dbGetOne<{ count: number }>(
+        'SELECT COUNT(*) AS count FROM standing_orders WHERE player_id = ? AND unit_id = ? AND order_type = ?',
+        ['human', landUnit!.id, 'march']
+      )?.count ?? 0;
+    assert.strictEqual(beforeStandingOrderCount, 1, 'expected precondition: unit has one march standing order');
+
+    const embarkResult = updateSealiftSlot(seaportHex!, navalUnit!.id, 1, landUnit!.id);
+    assert.strictEqual(embarkResult.success, true, embarkResult.reason ?? 'expected embark slot update success');
+    const afterStandingOrderCount =
+      dbGetOne<{ count: number }>(
+        'SELECT COUNT(*) AS count FROM standing_orders WHERE player_id = ? AND unit_id = ? AND order_type = ?',
+        ['human', landUnit!.id, 'march']
+      )?.count ?? 0;
+    assert.strictEqual(afterStandingOrderCount, 0, 'expected movement standing order to be cancelled on embark');
+    const pendingCount =
+      dbGetOne<{ count: number }>('SELECT COUNT(*) AS count FROM pending_orders WHERE unit_id = ?', [landUnit!.id])?.count ?? 0;
+    assert.strictEqual(pendingCount, 0, 'expected pending movement orders to be cleared on embark');
   });
 }
 
@@ -423,6 +636,10 @@ function run(): void {
   testPreviewGroupedAcceptsAirFerryDestinationWithinRange();
   testAssignMarchRejectsAirUnits();
   testPreviewEmbarkedLandUnitOnWaterShowsInvalidWithoutPathPlanning();
+  testEmbarkedLandUnitCanPreviewAndAssignFromSeaportWaterToAdjacentLand();
+  testAssignMarchForEmbarkedLandUnitImmediatelyDebarksAndClearsSealiftSlot();
+  testPreviewEmbarkedLandUnitRepairsRes1Res4SeaportDrift();
+  testEmbarkImmediatelyCancelsExistingHumanMovementOrder();
   testReadyIncludesEmbarkedCargoFollowMoveForNavalMovement();
   testSubmitOrdersAllowsLandMovementToSingleArcticHex();
   testSubmitOrdersAllowsLandMovementFromSingleArcticHex();

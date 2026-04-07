@@ -281,6 +281,56 @@ export function updateRes4FeatureOverrideRow(
   });
 }
 
+/**
+ * Why this exists:
+ *     Reconciles persisted res-1 infrastructure counts against the authoritative res-4 feature rows.
+ * When to use:
+ *     Database startup/recovery paths and any integrity repair flow after suspected drift.
+ * What to expect:
+ *     Updates only mismatched rows; returns how many res-1 hex rows changed.
+ */
+export function reconcileRes1InfrastructureCountsFromRes4Overrides(ops: ControlDbOps): { changedHexCount: number } {
+  logDebug('gameDb reconcileRes1InfrastructureCountsFromRes4Overrides');
+  const mismatch = ops.getOne<{ mismatchCount: number }>(
+    `SELECT COUNT(*) AS mismatchCount
+     FROM res1_infrastructure ri
+     LEFT JOIN (
+       SELECT parent_h3_index AS h3Index,
+              SUM(CASE WHEN is_urban = 1 THEN 1 ELSE 0 END) AS urbanHexCount,
+              SUM(CASE WHEN is_airport = 1 THEN 1 ELSE 0 END) AS airportCount,
+              SUM(CASE WHEN is_seaport = 1 THEN 1 ELSE 0 END) AS seaportCount
+       FROM res4_feature_overrides
+       GROUP BY parent_h3_index
+     ) counts ON counts.h3Index = ri.h3_index
+     WHERE ri.urban_hex_count != COALESCE(counts.urbanHexCount, 0)
+        OR ri.airport_count != COALESCE(counts.airportCount, 0)
+        OR ri.seaport_count != COALESCE(counts.seaportCount, 0)`
+  )?.mismatchCount ?? 0;
+  if (mismatch <= 0) {
+    logDebug('gameDb reconcileRes1InfrastructureCountsFromRes4Overrides: no-op');
+    return { changedHexCount: 0 };
+  }
+  ops.run(
+    `WITH counts AS (
+       SELECT parent_h3_index AS h3Index,
+              SUM(CASE WHEN is_urban = 1 THEN 1 ELSE 0 END) AS urbanHexCount,
+              SUM(CASE WHEN is_airport = 1 THEN 1 ELSE 0 END) AS airportCount,
+              SUM(CASE WHEN is_seaport = 1 THEN 1 ELSE 0 END) AS seaportCount
+       FROM res4_feature_overrides
+       GROUP BY parent_h3_index
+     )
+     UPDATE res1_infrastructure
+     SET urban_hex_count = COALESCE((SELECT urbanHexCount FROM counts WHERE counts.h3Index = res1_infrastructure.h3_index), 0),
+         airport_count = COALESCE((SELECT airportCount FROM counts WHERE counts.h3Index = res1_infrastructure.h3_index), 0),
+         seaport_count = COALESCE((SELECT seaportCount FROM counts WHERE counts.h3Index = res1_infrastructure.h3_index), 0)
+     WHERE urban_hex_count != COALESCE((SELECT urbanHexCount FROM counts WHERE counts.h3Index = res1_infrastructure.h3_index), 0)
+        OR airport_count != COALESCE((SELECT airportCount FROM counts WHERE counts.h3Index = res1_infrastructure.h3_index), 0)
+        OR seaport_count != COALESCE((SELECT seaportCount FROM counts WHERE counts.h3Index = res1_infrastructure.h3_index), 0)`
+  );
+  logDebug('gameDb reconcileRes1InfrastructureCountsFromRes4Overrides: applied', { changedHexCount: mismatch });
+  return { changedHexCount: mismatch };
+}
+
 export function getRes4TerrainOverridesForRendererFromGame(ops: ControlDbOps): Array<{
   h3Index: string;
   terrainKind: string;

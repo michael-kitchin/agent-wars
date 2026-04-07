@@ -40,6 +40,7 @@ import {
   listBuildQueueRowsForHex as listBuildQueueRowsForHexFromModule,
   listRes1InfrastructureRows as listRes1InfrastructureRowsFromModule,
   listRes4FeatureOverridesForGame as listRes4FeatureOverridesForGameFromModule,
+  reconcileRes1InfrastructureCountsFromRes4Overrides as reconcileRes1InfrastructureCountsFromRes4OverridesFromModule,
   replaceBuildQueueForHex as replaceBuildQueueForHexFromModule,
   setBuildProgressPointsForHex as setBuildProgressPointsForHexFromModule,
   setHexController as setHexControllerFromModule,
@@ -235,6 +236,7 @@ export function openGameDatabaseAtPathForTests(absPath: string): void {
     validateGameDatabaseOrThrow(d);
     db = d;
     d = null;
+    reconcileRes1InfrastructureCountsFromRes4Overrides();
   } catch (err) {
     if (d) {
       try {
@@ -287,6 +289,7 @@ export async function initDatabase(): Promise<void> {
     seedGameSeedIfMissing();
     ensureTerrainClassificationCacheLoaded();
     backfillInfrastructureStateFromMetadataIfMissing();
+    reconcileRes1InfrastructureCountsFromRes4Overrides();
     logDebug('gameDb initDatabase: opened existing', { canonicalPath });
   } catch (err) {
     if (d) {
@@ -735,6 +738,19 @@ export function listRes4FeatureOverridesForGame(): Res4FeatureOverrideRow[] {
 
 /**
  * Why this exists:
+ *     Repairs drift by recomputing res-1 infrastructure counts from authoritative res-4 feature flags.
+ * When to use:
+ *     Startup/recovery integrity checks and targeted maintenance commands.
+ * What to expect:
+ *     Returns number of res-1 rows updated; no-op when already synchronized.
+ */
+export function reconcileRes1InfrastructureCountsFromRes4Overrides(): { changedHexCount: number } {
+  logDebug('gameDb reconcileRes1InfrastructureCountsFromRes4Overrides');
+  return reconcileRes1InfrastructureCountsFromRes4OverridesFromModule({ run, getOne, getAll });
+}
+
+/**
+ * Why this exists:
  *     Updates feature flags for one res-4 row after randomized infrastructure-to-rubble replacement.
  * When to use:
  *     Air-strike infrastructure destruction effect application.
@@ -764,6 +780,7 @@ export function getRes4TerrainOverridesForRendererFromGame(): Array<{
   isSeaport?: boolean;
   isRubble?: boolean;
 }> {
+  reconcileRes1InfrastructureCountsFromRes4Overrides();
   return getRes4TerrainOverridesForRendererFromGameFromModule({ run, getOne, getAll });
 }
 

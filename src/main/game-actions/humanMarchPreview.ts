@@ -1,6 +1,12 @@
 import { cellToLatLng, gridDisk } from 'h3-js';
 import { buildLatLngCoordinateMap } from '../mapData';
-import { getGameStateForPlayer, getHexController, getRes1InfrastructureForHex, isDbReady } from '../gameDb';
+import {
+  getGameStateForPlayer,
+  getHexController,
+  getRes1InfrastructureForHex,
+  isDbReady,
+  reconcileRes1InfrastructureCountsFromRes4Overrides,
+} from '../gameDb';
 import { createPathfindingSession, executePlanRouteWithSession } from '../tools/tool1Pathfinding';
 import { terrainIsPassableForDomain } from '../pathfinding';
 import { buildNormalizedTerrainByH3 } from '../movementTerrain';
@@ -57,7 +63,7 @@ let maxPreviewThrottleEntries = DEFAULT_MAX_PREVIEW_THROTTLE_ENTRIES;
 const MAX_NEARBY_FALLBACK_ATTEMPTS = 16;
 const MAX_NEARBY_FALLBACK_RADIUS = 6;
 const MAX_NEARBY_FALLBACK_BUDGET_MS = 20;
-const PREVIEW_THROTTLE_WINDOW_MS = 12;
+const PREVIEW_THROTTLE_WINDOW_MS = 20;
 
 const previewDiagnostics: HumanMarchPreviewDiagnostics = createEmptyHumanMarchPreviewDiagnostics();
 
@@ -93,6 +99,23 @@ export interface HumanOrderGroupPreviewResult {
   invalidReason?: string;
   slowestMovementRange: number;
   previews: HumanOrderGroupPreviewUnitResult[];
+}
+
+function logPreviewOutcome(
+  unitId: string,
+  hoveredH3Index: string,
+  preview: HumanOrderPreviewResult,
+  source: 'computed' | 'result_cache' | 'throttle_reuse'
+): void {
+  logDebug('gameActions previewHumanMarchOrder: outcome', {
+    unitId,
+    hoveredH3Index,
+    source,
+    valid: preview.valid,
+    showInvalidMarker: preview.showInvalidMarker,
+    invalidReason: preview.invalidReason ?? null,
+    segmentCount: preview.segments.length,
+  });
 }
 
 function snapshotStateForPlayer(playerId: 'human' | 'opponent'): GameStateSnapshot {
@@ -147,6 +170,8 @@ function getOrCreateHoverSessionContext(
   playerId: 'human' | 'opponent',
   selectedUnitIds: readonly string[]
 ): PreviewComputationContext {
+  // Keep movement terrain classification aligned with renderer overlays when legacy DB rows drift.
+  reconcileRes1InfrastructureCountsFromRes4Overrides();
   const selectionSignature = buildSelectionSignature(selectedUnitIds);
   const selectedPositionsSignature = buildSelectedUnitPositionsSignature(selectedUnitIds);
   const environmentSignature = buildEnvironmentSignature(playerId);
@@ -296,7 +321,10 @@ function computeHumanMarchPreviewForUnit(
 ): HumanOrderPreviewResult {
   const cacheKey = `${context.stateCacheKey}|${unitId}|${hoveredH3Index}`;
   const cached = previewResultCache.get(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    logPreviewOutcome(unitId, hoveredH3Index, cached, 'result_cache');
+    return cached;
+  }
   const unit = context.state.units.find((u) => u.id === unitId && u.player === 'human');
   if (!unit) return { valid: false, showInvalidMarker: false, invalidReason: 'Unit not found', segments: [] };
   const hoveredHex = context.state.hexes.find((h) => h.h3Index === hoveredH3Index);
@@ -347,11 +375,34 @@ function computeHumanMarchPreviewForUnit(
       ],
     };
     cacheSetBounded(previewResultCache, cacheKey, result, maxPreviewResultCacheEntries);
+    logPreviewOutcome(unitId, hoveredH3Index, result, 'computed');
     return result;
   }
 
   const unitIsLand = isLandUnitType(unit.unitType);
-  if (unitIsLand && isEmbarkedLandUnitOnWater(unit.id)) {
+  const embarkedOnWater = unitIsLand && isEmbarkedLandUnitOnWater(unit.id);
+  const originPassabilityTerrain = context.passabilityByH3.get(unit.h3Index) ?? 'land';
+  const embarkedAtSeaWithoutCoastalOrigin = embarkedOnWater && originPassabilityTerrain !== 'coastal';
+  if (embarkedOnWater) {
+    const hoveredPassabilityTerrain = context.passabilityByH3.get(hoveredH3Index) ?? 'land';
+    const hoveredSeaportCount = getRes1InfrastructureForHex(hoveredH3Index).seaportCount;
+    const originSeaportCount = getRes1InfrastructureForHex(unit.h3Index).seaportCount;
+    logDebug('gameActions previewHumanMarchOrder: embarked terrain classification', {
+      unitId: unit.id,
+      originH3Index: unit.h3Index,
+      originTerrainRaw: context.terrainByH3.get(unit.h3Index) ?? null,
+      originTerrainKind: context.terrainKindByH3.get(unit.h3Index) ?? null,
+      originNormalizedTerrain: originPassabilityTerrain,
+      originSeaportCount,
+      hoveredH3Index,
+      hoveredTerrainRaw: context.terrainByH3.get(hoveredH3Index) ?? null,
+      hoveredTerrainKind: context.terrainKindByH3.get(hoveredH3Index) ?? null,
+      hoveredNormalizedTerrain: hoveredPassabilityTerrain,
+      hoveredSeaportCount,
+      embarkedAtSeaWithoutCoastalOrigin,
+    });
+  }
+  if (embarkedAtSeaWithoutCoastalOrigin) {
     result = {
       valid: false,
       showInvalidMarker: true,
@@ -366,6 +417,7 @@ function computeHumanMarchPreviewForUnit(
       segments: [],
     };
     cacheSetBounded(previewResultCache, cacheKey, result, maxPreviewResultCacheEntries);
+    logPreviewOutcome(unitId, hoveredH3Index, result, 'computed');
     return result;
   }
   if (unitIsLand && hoveredH3Index !== unit.h3Index) {
@@ -375,7 +427,7 @@ function computeHumanMarchPreviewForUnit(
       destinationH3Index: hoveredH3Index,
       terrainByH3: context.terrainByH3,
       terrainKindByH3: context.terrainKindByH3,
-      isEmbarkedAtSea: false,
+      isEmbarkedAtSea: embarkedAtSeaWithoutCoastalOrigin,
     });
     if (blockReason) {
       result = {
@@ -385,6 +437,7 @@ function computeHumanMarchPreviewForUnit(
         segments: [],
       };
       cacheSetBounded(previewResultCache, cacheKey, result, maxPreviewResultCacheEntries);
+      logPreviewOutcome(unitId, hoveredH3Index, result, 'computed');
       return result;
     }
   }
@@ -401,6 +454,7 @@ function computeHumanMarchPreviewForUnit(
       segments: direct.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes })),
     };
     cacheSetBounded(previewResultCache, cacheKey, result, maxPreviewResultCacheEntries);
+    logPreviewOutcome(unitId, hoveredH3Index, result, 'computed');
     return result;
   }
 
@@ -409,6 +463,7 @@ function computeHumanMarchPreviewForUnit(
   const nearby = hoveredPassable ? findNearbyReachablePreview(context, unit, hoveredH3Index, passableFor) : null;
   if (nearby) {
     cacheSetBounded(previewResultCache, cacheKey, nearby, maxPreviewResultCacheEntries);
+    logPreviewOutcome(unitId, hoveredH3Index, nearby, 'computed');
     return nearby;
   }
 
@@ -419,6 +474,7 @@ function computeHumanMarchPreviewForUnit(
     segments: [],
   };
   cacheSetBounded(previewResultCache, cacheKey, result, maxPreviewResultCacheEntries);
+  logPreviewOutcome(unitId, hoveredH3Index, result, 'computed');
   return result;
 }
 
@@ -434,6 +490,16 @@ function buildHumanMarchPreviewForUnit(
     const ageMs = nowMs - throttleEntry.computedAtMs;
     // Coalesce rapid hover updates by reusing the latest preview inside a short time window.
     if (throttleEntry.hoveredH3Index === hoveredH3Index || ageMs < PREVIEW_THROTTLE_WINDOW_MS) {
+      if (throttleEntry.hoveredH3Index !== hoveredH3Index) {
+        logDebug('gameActions previewHumanMarchOrder: throttle reuse', {
+          unitId,
+          requestedHoveredH3Index: hoveredH3Index,
+          reusedFromHoveredH3Index: throttleEntry.hoveredH3Index,
+          ageMs,
+          throttleWindowMs: PREVIEW_THROTTLE_WINDOW_MS,
+        });
+      }
+      logPreviewOutcome(unitId, hoveredH3Index, throttleEntry.preview, 'throttle_reuse');
       return throttleEntry.preview;
     }
   }

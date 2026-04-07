@@ -475,6 +475,11 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
           });
           if (!result.success) {
             showMapToast(formatTargetingValidationReason(result.reason, 'Failed to update sealift assignment.'));
+          } else if (selected.length > 0) {
+            // Embarking can cancel existing movement orders server-side, so refresh client order state immediately.
+            await refreshHumanStandingOrders();
+            updatePendingOrdersSidebar();
+            await refreshHoverRoutePreview();
           }
           refreshStackCalloutIfOpen();
           requestRedraw();
