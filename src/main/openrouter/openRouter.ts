@@ -551,9 +551,30 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
     : ' When Memory tools are not listed above, omit "memoryUpdates" or use []; any entries are ignored.';
 
   const humanUnitsLine = buildHumanUnitsPromptLine(humanRoster);
+  const landHexes = state.hexes.filter((hex) => hex.terrain === 'land');
+  const totalLandHexes = landHexes.length;
+  const landHexSet = new Set(landHexes.map((hex) => hex.h3Index));
+  const exploredHexesRaw = Array.isArray(state.exploredHexes)
+    ? state.exploredHexes
+    : state.hexes.map((hex) => hex.h3Index);
+  const exploredLandHexes = exploredHexesRaw.filter((h3Index) => landHexSet.has(h3Index)).length;
+  const controlledLandHexes = (state.res1Control ?? []).filter(
+    (row) => row.controllerPlayerId === 'opponent' && landHexSet.has(row.h3Index)
+  ).length;
+  const exploredPct = totalLandHexes > 0 ? Math.round((exploredLandHexes / totalLandHexes) * 100) : 0;
+  const controlledPct = totalLandHexes > 0 ? Math.round((controlledLandHexes / totalLandHexes) * 100) : 0;
+  const strategicContextBlock = `Strategic context:
+- At least one enemy unit remains in play, and the human player is actively searching for your forces with intent to destroy them.
+- Your priorities are:
+  (1) Expand territorial control toward likely enemy positions
+  (2) Disperse infantry as scouts to maximize visibility
+  (3) Maximize unit production (idle production capacity is wasted)
+  (4) Engage the enemy and destroy them
+- Explored: ${exploredLandHexes} of ${totalLandHexes} land hexes (${exploredPct}%)
+- Controlled: ${controlledLandHexes} of ${totalLandHexes} land hexes (${controlledPct}%)`;
   const mainBlock = briefingOverride != null && briefingOverride.length > 0
-    ? `${briefingOverride}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}`
-    : `${memoryBlock}${standingOrderBlock}${productionBlock}${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}${adjacentCellsBlock}`;
+    ? `${briefingOverride}\n\n${strategicContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}`
+    : `${memoryBlock}${standingOrderBlock}${productionBlock}${strategicContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}${adjacentCellsBlock}`;
 
   const finalJsonContract = buildFinalJsonContractInstruction({
     includeMemoryUpdates: flags.memoryEnabled,

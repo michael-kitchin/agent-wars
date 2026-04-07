@@ -53,6 +53,8 @@ function installElectronMock(userDataDir: string): () => void {
 function buildFixtureState(hexes: string[]): {
   hexes: { h3Index: string; terrain: string; terrainKind: string }[];
   units: { id: string; player: string; unitType: string; h3Index: string }[];
+  exploredHexes: string[];
+  res1Control: { h3Index: string; controllerPlayerId: string | null }[];
   phase: 'planning';
   turnNumber: number;
   pendingOrders: { unitId: string; toH3Index: string }[];
@@ -62,6 +64,12 @@ function buildFixtureState(hexes: string[]): {
     units: [
       { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: hexes[0]! },
       { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: hexes[1]! },
+    ],
+    exploredHexes: [hexes[0]!, hexes[1]!, hexes[2]!],
+    res1Control: [
+      { h3Index: hexes[0]!, controllerPlayerId: 'opponent' },
+      { h3Index: hexes[1]!, controllerPlayerId: 'opponent' },
+      { h3Index: hexes[2]!, controllerPlayerId: 'human' },
     ],
     phase: 'planning',
     turnNumber: 7,
@@ -183,6 +191,37 @@ async function run(): Promise<void> {
       assert.ok(
         systemPrompt.includes(`Map context: global Earth map (H3 resolution ${mapData.H3_RESOLUTION}), not a local/contrived arena.`),
         `global-map context guidance missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes(
+          'At least one enemy unit remains in play, and the human player is actively searching for your forces with intent to destroy them.'
+        ),
+        `enemy-intent strategic context missing for mask=${mask}`
+      );
+      assert.ok(systemPrompt.includes('- Your priorities are:'), `priority coaching header missing for mask=${mask}`);
+      assert.ok(
+        systemPrompt.includes('(1) Expand territorial control toward likely enemy positions'),
+        `priority (1) coaching missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('(2) Disperse infantry as scouts to maximize visibility'),
+        `priority (2) coaching missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('(3) Maximize unit production (idle production capacity is wasted)'),
+        `priority (3) coaching missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('(4) Engage the enemy and destroy them'),
+        `priority (4) coaching missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('- Explored: 3 of 8 land hexes (38%)'),
+        `explored-land progress metric missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('- Controlled: 2 of 8 land hexes (25%)'),
+        `controlled-land progress metric missing for mask=${mask}`
       );
       assert.ok(
         systemPrompt.includes(`rounded to ${mapData.LATLNG_DECIMAL_PLACES} decimal places`),
