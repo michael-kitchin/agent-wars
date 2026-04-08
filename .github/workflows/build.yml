@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       # Used by scripts/extract-generated-data.cjs (npm run build / test). Linux runners often lack `python`; setup-python provides it.
       - name: Setup Python
@@ -31,7 +31,7 @@ jobs:
           python-version: "3.13"
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v4
         with:
           node-version: "24"
           cache: "npm"
@@ -71,14 +71,14 @@ jobs:
 
       - name: Upload release artifacts (Windows)
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: agent-wars-${{ steps.app_version.outputs.value }}-${{ runner.os }}
           path: release/win-unpacked/*
 
       - name: Upload release artifacts (Linux/macOS)
         if: runner.os != 'Windows'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: agent-wars-${{ steps.app_version.outputs.value }}-${{ runner.os }}
           path: release/
