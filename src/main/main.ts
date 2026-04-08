@@ -51,7 +51,7 @@ import {
   getToolGroupList,
   TOOL_GROUP_REGISTRY,
 } from './openrouter/openRouter';
-import { logDebug } from './logger';
+import { logDebug, logError } from './logger';
 import {
   getHexNamingTooltipLineForRenderer,
   getHexContinentNamesForRenderer,
@@ -123,6 +123,12 @@ function createWindow(): void {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    logError('main renderer process exited unexpectedly', {
+      reason: details.reason,
+      exitCode: details.exitCode,
+    });
   });
 }
 
@@ -367,10 +373,26 @@ function registerIpcHandlers(): void {
 
 applyVersionedAppName();
 
+process.on('uncaughtException', (err) => {
+  logError('main uncaughtException', { message: err?.message ?? String(err), stack: err?.stack ?? null });
+});
+process.on('unhandledRejection', (reason) => {
+  logError('main unhandledRejection', reason);
+});
+
 app.whenReady().then(async () => {
   await initDatabase();
   registerIpcHandlers();
   createWindow();
+  app.on('child-process-gone', (_event, details) => {
+    logError('main child process gone', {
+      type: details.type,
+      reason: details.reason,
+      exitCode: details.exitCode,
+      serviceName: details.serviceName ?? null,
+      name: details.name ?? null,
+    });
+  });
 });
 
 app.on('window-all-closed', () => {

@@ -24,6 +24,10 @@ function resolveLogLevel(): LogLevel {
 }
 
 const LOG_LEVEL: LogLevel = resolveLogLevel();
+const MAX_LOG_FLUSH_BATCH_LINES = 200;
+const pendingLogLines: string[] = [];
+let logFlushScheduled = false;
+let logFlushInFlight = false;
 
 function iso8601(): string {
   return new Date().toISOString();
@@ -38,12 +42,33 @@ function formatLine(level: string, message: string, args: unknown[]): string {
   return `[${iso8601()}] ${PREFIX} [${level}] ${message}${argsStr}`;
 }
 
-function appendToDebugLog(level: string, message: string, args: unknown[]): void {
-  try {
-    fs.appendFileSync(getDebugLogPath(), formatLine(level, message, args) + '\n');
-  } catch {
-    // Ignore file write errors (e.g. read-only fs)
+function flushPendingLogLines(): void {
+  if (logFlushInFlight || pendingLogLines.length === 0) {
+    logFlushScheduled = false;
+    return;
   }
+  logFlushInFlight = true;
+  logFlushScheduled = false;
+  const batch = pendingLogLines.splice(0, MAX_LOG_FLUSH_BATCH_LINES).join('');
+  fs.appendFile(getDebugLogPath(), batch, (err) => {
+    // Keep runtime resilient if debug log file is unavailable.
+    if (err) {
+      // Intentionally ignored.
+    }
+    logFlushInFlight = false;
+    if (pendingLogLines.length > 0) scheduleLogFlush();
+  });
+}
+
+function scheduleLogFlush(): void {
+  if (logFlushScheduled) return;
+  logFlushScheduled = true;
+  setImmediate(flushPendingLogLines);
+}
+
+function appendToDebugLog(level: string, message: string, args: unknown[]): void {
+  pendingLogLines.push(formatLine(level, message, args) + '\n');
+  scheduleLogFlush();
 }
 
 export function logDebug(message: string, ...args: unknown[]): void {

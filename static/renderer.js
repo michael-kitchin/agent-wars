@@ -16352,6 +16352,7 @@
   }
 
   // src/renderer/openRouter/openRouterRuntime.ts
+  var BACKGROUND_AI_REQUEST_TIMEOUT_MS = 75e3;
   function syncEventDrivenFromTools() {
     rendererSharedState.useEventDrivenConsultation = rendererSharedState.enabledToolGroups.has("events");
   }
@@ -16374,7 +16375,11 @@
         return;
       }
       const enabledToolGroupsPayload = Array.from(rendererSharedState.enabledToolGroups).filter((id) => id !== "events");
-      window.gameApi.requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload }).then((result) => {
+      const requestPromise = window.gameApi.requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload });
+      const timeoutPromise = new Promise((_resolve, reject) => {
+        setTimeout(() => reject(new Error(`AI planning timed out after ${BACKGROUND_AI_REQUEST_TIMEOUT_MS}ms`)), BACKGROUND_AI_REQUEST_TIMEOUT_MS);
+      });
+      Promise.race([requestPromise, timeoutPromise]).then((result) => {
         rendererSharedState.backgroundRequestInFlight = false;
         if (rendererSharedState.useEventDrivenConsultation && !rendererSharedState.eventDrivenInitialConsultationDone) {
           rendererSharedState.eventDrivenInitialConsultationDone = true;
@@ -16395,12 +16400,15 @@
             deps.updateOpenRouterCostLabel();
           }
         } else if (!result.success) {
+          deps.appendOpenRouterLog(`Background planning failed: ${result.error ?? "Unknown error"}`, true);
           deps.showSidebarError(result.error ?? "Background AI request failed");
           resetPrecomputedAiState("null");
         }
         deps.updateReadyButtonState();
       }).catch((err) => {
+        window.gameApi?.cancelRequestAiOrders?.();
         rendererSharedState.backgroundRequestInFlight = false;
+        deps.appendOpenRouterLog(`Background planning request rejected: ${String(err)}`, true);
         deps.showSidebarError(String(err));
         resetPrecomputedAiState("null");
         deps.updateReadyButtonState();
@@ -17034,6 +17042,19 @@
   }
   function deriveCombatVisibilityClassification(readyResult, visibleHexes) {
     const allKills = readyResult.kills ?? [];
+    const anyCombatResolved = (readyResult.airStrikeHexes?.length ?? 0) > 0 || (readyResult.airStrikeCasualtyHexes?.length ?? 0) > 0 || (readyResult.rangedCombatHexes?.length ?? 0) > 0 || (readyResult.rangedCasualtyHexes?.length ?? 0) > 0 || (readyResult.meleeCombatHexes?.length ?? 0) > 0 || (readyResult.meleeCasualtyHexes?.length ?? 0) > 0 || (readyResult.combatHexes?.length ?? 0) > 0 || (readyResult.casualtyHexes?.length ?? 0) > 0 || allKills.length > 0 || (readyResult.removedUnits?.length ?? 0) > 0;
+    if (anyCombatResolved) {
+      const knownVictimIds2 = /* @__PURE__ */ new Set([
+        ...allKills.map((k) => k.victimId),
+        ...(readyResult.removedUnits ?? []).map((u) => u.id)
+      ]);
+      return {
+        unknownCombatHexes: [],
+        unknownCasualtyHexes: [],
+        knownVictimIds: knownVictimIds2,
+        unknownVictimIds: []
+      };
+    }
     const removedById = new Map((readyResult.removedUnits ?? []).map((u) => [u.id, u]));
     const friendlyInvolvedKillVictimIds = new Set(
       allKills.filter((k) => {
@@ -17084,6 +17105,19 @@
     });
     return { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds };
   }
+  function formatHexCount(label, count) {
+    return `\u2022 ${label} at ${count.toLocaleString()} ${count === 1 ? "hex" : "hexes"}.`;
+  }
+  function buildCombatActivityFallbackBullets(readyResult) {
+    const bullets = [];
+    const rangedHexCount = readyResult.rangedCombatHexes?.length ?? 0;
+    if (rangedHexCount > 0) bullets.push(formatHexCount("Ranged engagements", rangedHexCount));
+    const meleeHexCount = readyResult.meleeCombatHexes?.length ?? 0;
+    if (meleeHexCount > 0) bullets.push(formatHexCount("Melee engagements", meleeHexCount));
+    const casualtyHexCount = (readyResult.rangedCasualtyHexes?.length ?? 0) + (readyResult.meleeCasualtyHexes?.length ?? 0) + (readyResult.airStrikeCasualtyHexes?.length ?? 0);
+    if (casualtyHexCount > 0) bullets.push(formatHexCount("Casualty outcomes", casualtyHexCount));
+    return bullets;
+  }
   async function handleReadyButtonClick(deps) {
     if (!window.gameApi) return;
     if (rendererSharedState.gameState?.gameOver) return;
@@ -17113,6 +17147,7 @@
       const enabledToolGroupsPayload = Array.from(rendererSharedState.enabledToolGroups).filter((id) => id !== "events");
       const useEventDriven = rendererSharedState.useEventDrivenConsultation;
       const usePrecomputed = rendererSharedState.runButtonOn && rendererSharedState.precomputedAiOrders !== null;
+      const cachedPrecomputedToolCounts = rendererSharedState.precomputedToolInvocationCounts ? { ...rendererSharedState.precomputedToolInvocationCounts } : null;
       const readyPayload = buildReadyPayload({ enabledToolGroupsPayload, useEventDriven, usePrecomputed });
       const readyResult = await deps.callReadyWithTimeout(readyPayload);
       if (!readyResult.success) {
@@ -17143,9 +17178,8 @@
       if (readyResult.toolInvocationCounts) {
         rendererSharedState.toolInvocationCounts = readyResult.toolInvocationCounts;
         deps.updateOpenRouterToolCountLabels();
-      } else if (usePrecomputed && rendererSharedState.precomputedToolInvocationCounts) {
-        const precomputedCounts = rendererSharedState.precomputedToolInvocationCounts;
-        rendererSharedState.toolInvocationCounts = Object.assign({}, precomputedCounts ?? {});
+      } else if (usePrecomputed && cachedPrecomputedToolCounts) {
+        rendererSharedState.toolInvocationCounts = Object.assign({}, cachedPrecomputedToolCounts);
         deps.updateOpenRouterToolCountLabels();
       }
       rendererSharedState.precomputedToolInvocationCounts = null;
@@ -17206,7 +17240,13 @@
           formatKillLine: killToastFormatter.formatKillLine,
           formatUnitName: killToastFormatter.formatUnitName
         });
-        if (bullets.length > 0) deps.showMapToast(bullets.join("\n"), { isError: false });
+        const combatFallbackBullets = buildCombatActivityFallbackBullets(readyResult);
+        const updateBullets = bullets.length > 0 ? bullets : combatFallbackBullets;
+        if (updateBullets.length > 0) {
+          const updateText = updateBullets.join("\n");
+          deps.showMapToast(updateText, { isError: false });
+          deps.appendOpenRouterLog(`Update: ${updateBullets.join(" | ")}`);
+        }
         const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
         if (hasUnknownBattle) {
           const unknownContinentNames = [];

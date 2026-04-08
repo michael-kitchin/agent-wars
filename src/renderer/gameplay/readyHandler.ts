@@ -98,6 +98,31 @@ function deriveCombatVisibilityClassification(
   visibleHexes: ReadonlySet<string>
 ): CombatVisibilityClassification {
   const allKills = readyResult.kills ?? [];
+  const anyCombatResolved =
+    (readyResult.airStrikeHexes?.length ?? 0) > 0 ||
+    (readyResult.airStrikeCasualtyHexes?.length ?? 0) > 0 ||
+    (readyResult.rangedCombatHexes?.length ?? 0) > 0 ||
+    (readyResult.rangedCasualtyHexes?.length ?? 0) > 0 ||
+    (readyResult.meleeCombatHexes?.length ?? 0) > 0 ||
+    (readyResult.meleeCasualtyHexes?.length ?? 0) > 0 ||
+    (readyResult.combatHexes?.length ?? 0) > 0 ||
+    (readyResult.casualtyHexes?.length ?? 0) > 0 ||
+    allKills.length > 0 ||
+    (readyResult.removedUnits?.length ?? 0) > 0;
+  if (anyCombatResolved) {
+    // In the two-side game flow, any resolved battle necessarily involves the human side.
+    // Treat all battle outcomes as known for turn updates and suppress unknown-battle toasts.
+    const knownVictimIds = new Set<string>([
+      ...allKills.map((k) => k.victimId),
+      ...(readyResult.removedUnits ?? []).map((u) => u.id),
+    ]);
+    return {
+      unknownCombatHexes: [],
+      unknownCasualtyHexes: [],
+      knownVictimIds,
+      unknownVictimIds: [],
+    };
+  }
   const removedById = new Map<string, RemovedUnitSnapshot>((readyResult.removedUnits ?? []).map((u) => [u.id, u] as const));
   const friendlyInvolvedKillVictimIds = new Set<string>(
     allKills
@@ -159,6 +184,24 @@ function deriveCombatVisibilityClassification(
   return { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds };
 }
 
+function formatHexCount(label: string, count: number): string {
+  return `• ${label} at ${count.toLocaleString()} ${count === 1 ? 'hex' : 'hexes'}.`;
+}
+
+function buildCombatActivityFallbackBullets(readyResult: ReadyResult): string[] {
+  const bullets: string[] = [];
+  const rangedHexCount = readyResult.rangedCombatHexes?.length ?? 0;
+  if (rangedHexCount > 0) bullets.push(formatHexCount('Ranged engagements', rangedHexCount));
+  const meleeHexCount = readyResult.meleeCombatHexes?.length ?? 0;
+  if (meleeHexCount > 0) bullets.push(formatHexCount('Melee engagements', meleeHexCount));
+  const casualtyHexCount =
+    (readyResult.rangedCasualtyHexes?.length ?? 0) +
+    (readyResult.meleeCasualtyHexes?.length ?? 0) +
+    (readyResult.airStrikeCasualtyHexes?.length ?? 0);
+  if (casualtyHexCount > 0) bullets.push(formatHexCount('Casualty outcomes', casualtyHexCount));
+  return bullets;
+}
+
 export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<void> {
   if (!window.gameApi) return;
   if (S.gameState?.gameOver) return;
@@ -188,6 +231,9 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     const enabledToolGroupsPayload = Array.from(S.enabledToolGroups).filter((id) => id !== 'events');
     const useEventDriven = S.useEventDrivenConsultation;
     const usePrecomputed = S.runButtonOn && S.precomputedAiOrders !== null;
+    const cachedPrecomputedToolCounts = S.precomputedToolInvocationCounts
+      ? { ...S.precomputedToolInvocationCounts }
+      : null;
     const readyPayload = buildReadyPayload({ enabledToolGroupsPayload, useEventDriven, usePrecomputed });
     const readyResult = await deps.callReadyWithTimeout(readyPayload);
     if (!readyResult.success) {
@@ -221,9 +267,8 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     if (readyResult.toolInvocationCounts) {
       S.toolInvocationCounts = readyResult.toolInvocationCounts;
       deps.updateOpenRouterToolCountLabels();
-    } else if (usePrecomputed && S.precomputedToolInvocationCounts) {
-      const precomputedCounts = S.precomputedToolInvocationCounts;
-      S.toolInvocationCounts = Object.assign({}, precomputedCounts ?? {});
+    } else if (usePrecomputed && cachedPrecomputedToolCounts) {
+      S.toolInvocationCounts = Object.assign({}, cachedPrecomputedToolCounts);
       deps.updateOpenRouterToolCountLabels();
     }
     S.precomputedToolInvocationCounts = null;
@@ -296,7 +341,15 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         formatKillLine: killToastFormatter.formatKillLine,
         formatUnitName: killToastFormatter.formatUnitName,
       });
-      if (bullets.length > 0) deps.showMapToast(bullets.join('\n'), { isError: false });
+      const combatFallbackBullets = buildCombatActivityFallbackBullets(readyResult);
+      const updateBullets = bullets.length > 0
+        ? bullets
+        : combatFallbackBullets;
+      if (updateBullets.length > 0) {
+        const updateText = updateBullets.join('\n');
+        deps.showMapToast(updateText, { isError: false });
+        deps.appendOpenRouterLog(`Update: ${updateBullets.join(' | ')}`);
+      }
       const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
       if (hasUnknownBattle) {
         const unknownContinentNames: string[] = [];

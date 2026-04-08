@@ -25,6 +25,19 @@ function run(cmd, args, opts = {}) {
   return r.status ?? 1;
 }
 
+function sleepMs(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function isBetterSqliteLoadableForRuntime(targetRuntime) {
+  if (targetRuntime === 'node') {
+    return run('node', ['-e', "require('better-sqlite3');"]) === 0;
+  }
+  // Electron does not support Node-style "-e" execution for module checks.
+  // Runtime validation for Electron is therefore based on rebuild command success.
+  return false;
+}
+
 if (!fs.existsSync(betterSqlite)) {
   console.error('rebuild-native: node_modules/better-sqlite3 not found. Run npm install first.');
   process.exit(1);
@@ -33,6 +46,11 @@ if (!fs.existsSync(betterSqlite)) {
 if (runtime !== 'electron' && runtime !== 'node') {
   console.error(`rebuild-native: unsupported runtime "${runtime}". Use --runtime=electron or --runtime=node.`);
   process.exit(1);
+}
+
+if (isBetterSqliteLoadableForRuntime(runtime)) {
+  console.log(`rebuild-native: better-sqlite3 already loadable for ${runtime} runtime.`);
+  process.exit(0);
 }
 
 let prebuildArgs;
@@ -60,10 +78,21 @@ if (runtime === 'electron') {
     'rebuild-native: prebuild-install failed (no binary for this Electron/OS yet?). Trying electron-rebuild — requires Visual Studio Build Tools (Desktop C++) on Windows.'
   );
   code = run('npx', ['electron-rebuild', '-f', '-w', 'better-sqlite3'], { cwd: root });
+  if (code !== 0) {
+    console.warn('rebuild-native: electron-rebuild failed; retrying once after short delay.');
+    sleepMs(1200);
+    code = run('npx', ['electron-rebuild', '-f', '-w', 'better-sqlite3'], { cwd: root });
+  }
 } else {
   console.warn(
     'rebuild-native: prebuild-install failed for node runtime. Trying npm rebuild better-sqlite3 (may require native build tools).'
   );
   code = run('npm', ['rebuild', 'better-sqlite3'], { cwd: root });
 }
-process.exit(code === 0 ? 0 : 1);
+if (code === 0 || (runtime === 'node' && isBetterSqliteLoadableForRuntime(runtime))) {
+  if (code !== 0) {
+    console.warn(`rebuild-native: build command failed, but existing better-sqlite3 is loadable for ${runtime}; continuing.`);
+  }
+  process.exit(0);
+}
+process.exit(1);

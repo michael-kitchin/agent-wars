@@ -421,6 +421,10 @@ export function executeTool1(
       if (typeof a?.unitId !== 'string') {
         return { status: 'error', error: 'plan_route requires unitId (string)' };
       }
+      const matchedUnit = state.units.find((u) => u.id === a.unitId);
+      if (matchedUnit?.unitType === 'air') {
+        return { status: 'error', error: 'Air units use air strikes, not hex movement. Use the air_strike order instead of plan_route.' };
+      }
       const dest = Array.isArray(a.destination) && a.destination.length >= 2 && a.destination.every((n) => typeof n === 'number')
         ? [Number(a.destination[0]), Number(a.destination[1])] as LatLng
         : undefined;

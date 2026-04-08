@@ -60,6 +60,25 @@ export interface RequestOrdersOptions {
   usePrecomputation?: boolean;
 }
 
+const FULL_PROMPT_LOG_PREVIEW_CHARS = 1200;
+const FULL_PROMPT_LOG_ENV_FLAG = 'AGENT_WARS_LOG_FULL_PROMPTS';
+const REQUEST_ORDERS_MAX_WALL_CLOCK_MS = 90_000;
+
+function logPromptPreview(label: string, content: string): void {
+  const fullPromptLoggingEnabled = process.env[FULL_PROMPT_LOG_ENV_FLAG] === '1';
+  if (fullPromptLoggingEnabled) {
+    logDebug(`${label} (full)`, content);
+    return;
+  }
+  const preview = content.slice(0, FULL_PROMPT_LOG_PREVIEW_CHARS);
+  logDebug(`${label} (preview)`, {
+    preview,
+    truncated: content.length > FULL_PROMPT_LOG_PREVIEW_CHARS,
+    chars: content.length,
+    fullLogEnvFlag: FULL_PROMPT_LOG_ENV_FLAG,
+  });
+}
+
 interface RequestOrdersFlowDeps {
   loadKey: () => string;
   getToolFlags: (enabledToolNames: string[] | undefined) => {
@@ -92,7 +111,7 @@ interface RequestOrdersFlowDeps {
     signal?: AbortSignal;
     onLog?: (line: string, isError?: boolean) => void;
     requestLabel: string;
-  }) => Promise<{ ok: true; response: Response } | { ok: false; error: string }>;
+  }) => Promise<{ ok: true; status: number; headers: Record<string, string>; bodyText: string } | { ok: false; error: string }>;
   getGroupIdForToolName: (toolName: string) => string | undefined;
   validateAiOrder: (order: { unitId: string; toH3Index: string }, state: GameStateSnapshot) => { valid: true } | { valid: false; reason: string };
   validateAiRangedOrder: (
@@ -155,15 +174,18 @@ export async function requestOrdersFlow(
     filteredForPrecomputation: usePrecomputation,
   });
   const key = loadKey();
+  const failRequest = (error: string): RequestOrdersError => {
+    return { success: false, error };
+  };
   if (!key) {
     logError('openRouter requestOrders: no API key');
     if (onLog) onLog('No API key set.', true);
-    return { success: false, error: 'No API key set' };
+    return failRequest('No API key set');
   }
   if (!modelId.trim()) {
     logError('openRouter requestOrders: no model selected');
     if (onLog) onLog('No model selected.', true);
-    return { success: false, error: 'No model selected' };
+    return failRequest('No model selected');
   }
 
   const opponentUnits = state.units.filter((u) => u.player === 'opponent');
@@ -248,8 +270,8 @@ export async function requestOrdersFlow(
 
   logDebug('openRouter requestOrders: system prompt prepared', { chars: systemPrompt.length });
   logDebug('openRouter requestOrders: user message prepared', { chars: userMessage.length });
-  logDebug('openRouter requestOrders: system prompt (full)', systemPrompt);
-  logDebug('openRouter requestOrders: user message (full)', userMessage);
+  logPromptPreview('openRouter requestOrders: system prompt', systemPrompt);
+  logPromptPreview('openRouter requestOrders: user message', userMessage);
   logDebug('openRouter requestOrders: starting tool loop', { turnNumber: state.turnNumber });
 
   const wallClockStart = Date.now();
@@ -264,6 +286,16 @@ export async function requestOrdersFlow(
     let iteration = 0;
     let parseRepairAttempted = false;
     while (iteration < 50) {
+      if (Date.now() - wallClockStart > REQUEST_ORDERS_MAX_WALL_CLOCK_MS) {
+        const timeoutMsg = 'AI planning took too long and was cancelled. Please try again.';
+        if (onLog) onLog(timeoutMsg, true);
+        logError('openRouter requestOrders: wall-clock budget exceeded', {
+          maxWallClockMs: REQUEST_ORDERS_MAX_WALL_CLOCK_MS,
+          iteration,
+          turnNumber: state.turnNumber,
+        });
+        return failRequest(timeoutMsg);
+      }
       iteration++;
       const body: Record<string, unknown> = {
         model: modelId,
@@ -282,10 +314,9 @@ export async function requestOrdersFlow(
       });
       if (!chatResponse.ok) {
         if (onLog && chatResponse.error !== 'Cancelled') onLog(chatResponse.error, true);
-        return { success: false, error: chatResponse.error };
+        return failRequest(chatResponse.error);
       }
-      const res = chatResponse.response;
-      const json = (await res.json()) as {
+      let json: {
         choices?: Array<{
           message?: {
             content?: string | null;
@@ -294,11 +325,27 @@ export async function requestOrdersFlow(
         }>;
         usage?: { cost?: number; prompt_tokens?: number; completion_tokens?: number };
       };
+      try {
+        const responseText = chatResponse.bodyText;
+        json = JSON.parse(responseText) as {
+          choices?: Array<{
+            message?: {
+              content?: string | null;
+              tool_calls?: Array<{ id: string; type: string; function: { name: string; arguments: string } }>;
+            };
+          }>;
+          usage?: { cost?: number; prompt_tokens?: number; completion_tokens?: number };
+        };
+      } catch {
+        const errorMessage = 'AI response was not valid JSON. Please try again.';
+        if (onLog) onLog(errorMessage, true);
+        return failRequest(errorMessage);
+      }
       requestCost += json.usage?.cost ?? 0;
       totalInputTokens += json.usage?.prompt_tokens ?? 0;
       totalOutputTokens += json.usage?.completion_tokens ?? 0;
       const assistantMessage = json.choices?.[0]?.message;
-      if (!assistantMessage) return { success: false, error: 'Invalid response: no message' };
+      if (!assistantMessage) return failRequest('Invalid response: no message');
 
       const toolCalls = assistantMessage.tool_calls;
       if (toolCalls && toolCalls.length > 0) {
@@ -311,7 +358,7 @@ export async function requestOrdersFlow(
             function: { name: tc.function.name, arguments: tc.function.arguments },
           })),
         });
-        for (const tc of toolCalls) {
+        for (const [toolCallIndex, tc] of toolCalls.entries()) {
           const toolName = tc.function.name;
           if (!enabledToolNameSet.has(toolName)) {
             messages.push({
@@ -347,7 +394,9 @@ export async function requestOrdersFlow(
       }
 
       const content = assistantMessage.content;
-      if (typeof content !== 'string' || !content.trim()) return { success: false, error: 'Invalid response: no content' };
+      if (typeof content !== 'string' || !content.trim()) {
+        return failRequest('Invalid response: no content');
+      }
       let parsed = parseOrdersResponse(content, resolveToH3, state, latLngByH3, flags.productionEnabled);
       if (!parsed && !parseRepairAttempted) {
         parseRepairAttempted = true;
@@ -368,8 +417,8 @@ export async function requestOrdersFlow(
           requestLabel: 'requestOrders repair',
         });
         if (repairResponse.ok) {
-          const repairRes = repairResponse.response;
-          const repairJson = (await repairRes.json()) as {
+          const repairText = repairResponse.bodyText;
+          const repairJson = JSON.parse(repairText) as {
             choices?: Array<{ message?: { content?: string | null } }>;
             usage?: { cost?: number; prompt_tokens?: number; completion_tokens?: number };
           };
@@ -382,7 +431,7 @@ export async function requestOrdersFlow(
           }
         }
       }
-      if (!parsed) return { success: false, error: 'Invalid response: could not parse orders' };
+      if (!parsed) return failRequest('Invalid response: could not parse orders');
 
       if (parsed.callbacks?.length) replaceSubscriptions('opponent', parsed.callbacks, state.turnNumber);
       toolInvocationCounts['events'] = parsed.callbacks?.length ?? 0;
@@ -483,10 +532,10 @@ export async function requestOrdersFlow(
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
       if (onLog) onLog('Cancelled.');
-      return { success: false, error: 'Cancelled' };
+      return failRequest('Cancelled');
     }
     logError('openRouter requestOrders: exception', err);
     if (onLog) onLog(String(err), true);
-    return { success: false, error: String(err) };
+    return failRequest(String(err));
   }
 }

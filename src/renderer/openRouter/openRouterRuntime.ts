@@ -2,6 +2,8 @@ import { rendererSharedState as S } from '../core/state';
 import { applySuccessfulPrecomputedAiResult, resetPrecomputedAiState } from './precomputedAiState';
 import { isWaitingForPrecomputedAiOrders } from './aiPlanningState';
 
+const BACKGROUND_AI_REQUEST_TIMEOUT_MS = 75_000;
+
 interface OpenRouterRuntimeDeps {
   appendOpenRouterLog: (line: string, isError?: boolean) => void;
   updateReadyButtonState: () => void;
@@ -40,8 +42,11 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
       return;
     }
     const enabledToolGroupsPayload = Array.from(S.enabledToolGroups).filter((id) => id !== 'events');
-    window.gameApi
-      .requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload })
+    const requestPromise = window.gameApi.requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload });
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      setTimeout(() => reject(new Error(`AI planning timed out after ${BACKGROUND_AI_REQUEST_TIMEOUT_MS}ms`)), BACKGROUND_AI_REQUEST_TIMEOUT_MS);
+    });
+    Promise.race([requestPromise, timeoutPromise])
       .then((result) => {
         S.backgroundRequestInFlight = false;
         if (S.useEventDrivenConsultation && !S.eventDrivenInitialConsultationDone) {
@@ -63,13 +68,16 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
             deps.updateOpenRouterCostLabel();
           }
         } else if (!result.success) {
+          deps.appendOpenRouterLog(`Background planning failed: ${result.error ?? 'Unknown error'}`, true);
           deps.showSidebarError(result.error ?? 'Background AI request failed');
           resetPrecomputedAiState('null');
         }
         deps.updateReadyButtonState();
       })
       .catch((err) => {
+        window.gameApi?.cancelRequestAiOrders?.();
         S.backgroundRequestInFlight = false;
+        deps.appendOpenRouterLog(`Background planning request rejected: ${String(err)}`, true);
         deps.showSidebarError(String(err));
         resetPrecomputedAiState('null');
         deps.updateReadyButtonState();

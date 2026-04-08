@@ -1,12 +1,46 @@
 import { gridDistance } from 'h3-js';
-import { logError } from '../logger';
+import { logDebug } from '../logger';
 import type { GameStateSnapshot } from '../gameDb';
+
+const GRID_DISTANCE_ERROR_LOG_LIMIT = 24;
+const GRID_DISTANCE_ERROR_PAIR_CAP = 5000;
+const gridDistanceErrorPairs = new Set<string>();
+let gridDistanceSuppressedCount = 0;
+
+function getGridDistancePairKey(aH3: string, bH3: string): string {
+  return aH3 <= bH3 ? `${aH3}|${bH3}` : `${bH3}|${aH3}`;
+}
 
 function safeGridDistance(aH3: string, bH3: string): number | null {
   try {
     return gridDistance(aH3, bH3);
   } catch (err) {
-    logError('openRouter safeGridDistance: gridDistance failed', { aH3, bH3, err });
+    const pairKey = getGridDistancePairKey(aH3, bH3);
+    if (!gridDistanceErrorPairs.has(pairKey)) {
+      gridDistanceErrorPairs.add(pairKey);
+      if (gridDistanceErrorPairs.size > GRID_DISTANCE_ERROR_PAIR_CAP) {
+        gridDistanceErrorPairs.clear();
+        gridDistanceSuppressedCount = 0;
+        logDebug('openRouter safeGridDistance: reset error pair cache at cap', {
+          pairCap: GRID_DISTANCE_ERROR_PAIR_CAP,
+        });
+      }
+      if (gridDistanceErrorPairs.size <= GRID_DISTANCE_ERROR_LOG_LIMIT) {
+        logDebug('openRouter safeGridDistance: gridDistance unavailable for pair', {
+          aH3,
+          bH3,
+          code: (err as { code?: unknown } | null | undefined)?.code ?? null,
+        });
+      } else {
+        gridDistanceSuppressedCount += 1;
+        if (gridDistanceSuppressedCount === 1 || gridDistanceSuppressedCount % 500 === 0) {
+          logDebug('openRouter safeGridDistance: suppressing repetitive pair errors', {
+            distinctPairCount: gridDistanceErrorPairs.size,
+            suppressedCount: gridDistanceSuppressedCount,
+          });
+        }
+      }
+    }
     return null;
   }
 }

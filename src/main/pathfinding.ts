@@ -12,6 +12,9 @@ import { getMovementBudget } from './combatConstants';
 /** Domain for passability: land units use land + coastal/wetlands; naval use water + coastal. */
 export type PassableDomain = 'land' | 'water';
 
+const FIND_PATH_DEBUG_SAMPLE_EVERY = 250;
+let findPathInvocationCount = 0;
+
 /**
  * Why this exists:
  *     Single rule for whether a hex `terrain` value is in the land domain (land + coastal/wetlands) or water domain (water + coastal).
@@ -39,7 +42,20 @@ export function findPath(
   passableFor: PassableDomain,
   blocked?: Set<string>
 ): string[] | null {
-  logDebug('pathfinding findPath', { passableFor, blockedCount: blocked?.size ?? 0 });
+  findPathInvocationCount += 1;
+  logTrace('pathfinding findPath', {
+    passableFor,
+    blockedCount: blocked?.size ?? 0,
+    invocation: findPathInvocationCount,
+  });
+  if (findPathInvocationCount === 1 || findPathInvocationCount % FIND_PATH_DEBUG_SAMPLE_EVERY === 0) {
+    logDebug('pathfinding findPath sampled', {
+      invocation: findPathInvocationCount,
+      passableFor,
+      blockedCount: blocked?.size ?? 0,
+      sampleEvery: FIND_PATH_DEBUG_SAMPLE_EVERY,
+    });
+  }
   if (originH3 === destinationH3) return [originH3];
   if (!hexSet.has(originH3) || !hexSet.has(destinationH3)) return null;
   const passable = (h3: string) => {
@@ -135,6 +151,7 @@ export function partitionPathByTurn(
 ): { turn: number; hexes: string[]; movementSpent: number; movementBudget: number; endHex: string }[] {
   logTrace('pathfinding partitionPathByTurn', { pathLength: pathH3.length, movementBudget });
   if (pathH3.length <= 1) return [];
+  if (movementBudget <= 0) return [];
   const segments: { turn: number; hexes: string[]; movementSpent: number; movementBudget: number; endHex: string }[] = [];
   let turn = 1;
   let i = 0;
