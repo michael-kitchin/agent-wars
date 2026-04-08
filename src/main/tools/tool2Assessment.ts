@@ -37,6 +37,10 @@ function getEnemyIntelForPlayer(state: GameStateSnapshot): EnemyIntelEntry[] {
     .filter((r) => r.intelState === 'stale');
 }
 
+function shouldIncludeStaleEnemyIntel(state: GameStateSnapshot): boolean {
+  return state.playerPerspective !== 'opponent';
+}
+
 /**
  * Converts an H3 index to [lat, lng] for tool responses. Uses the coordinate map when present;
  * falls back to cellToLatLng so we never expose raw H3 strings to the LLM.
@@ -79,10 +83,13 @@ function getGridDistance(h3A: string, h3B: string): number {
 export const TOOL2_NAMES = ['assess_unit', 'assess_hex'] as const;
 
 /**
- * Dispatcher for Tool 2 (Threat and Situation Assessment). Given tool name and parsed arguments, runs assess_unit or
- * assess_hex and returns a JSON-serializable response. Use from the OpenRouter tool-calling loop when the model
- * requests assess_unit or assess_hex. Every response has status ("ok" or "error") and error (null when ok).
- * Throws are caught and returned as status "error" with error message.
+ * Why this exists:
+ *     Single entry point for Tool 2 (`assess_unit`, `assess_hex`) so OpenRouter and precomputation share one implementation.
+ * When to use:
+ *     Whenever the model or precomputation pipeline requests threat or hex assessment.
+ * What to expect:
+ *     JSON-serializable `{ status, error, ... }`; exceptions become `status: "error"`. Opponent-perspective snapshots omit
+ *     stale `enemyIntel` from enemy lists in both tools (see executeAssessUnit / executeAssessHex).
  */
 export function executeTool2(
   toolName: string,
@@ -128,10 +135,13 @@ export function executeTool2(
 }
 
 /**
- * Executes assess_unit: returns tactical briefing for one unit (nearby enemies/friendlies, threats, canAttackThisTurn).
- * Use when the AI needs a situational summary for a specific unit. Requires unitId and optional radius (default 4).
- * Returns status "ok" with unit, nearbyEnemies, nearbyFriendlies, threats, canAttackThisTurn; or status "error" with
- * error message if the unit is not found or not on the map.
+ * Why this exists:
+ *     Produces the assess_unit tool payload (nearby enemies/friendlies, threats, canAttackThisTurn) for tactical planning.
+ * When to use:
+ *     Invoked via executeTool2 and from precomputation for each opponent unit when building the Commander's Briefing.
+ * What to expect:
+ *     Status "ok" with unit, nearbyEnemies, nearbyFriendlies, threats, canAttackThisTurn; or "error" if the unit is missing.
+ *     When `state.playerPerspective === 'opponent'`, stale rows from `enemyIntel` are not merged into nearbyEnemies (visible-enemy parity with the snapshot).
  */
 function executeAssessUnit(
   unitId: string,
@@ -265,36 +275,40 @@ function executeAssessUnit(
     }
   }
 
-  const staleIntel = getEnemyIntelForPlayer(state);
-  const currentEnemyIds = new Set(nearbyEnemies.map((e) => e.unitId));
-  for (const intel of staleIntel) {
-    if (currentEnemyIds.has(intel.unitId)) continue;
-    if (!hexSet.has(intel.lastKnownH3Index)) continue;
-    const gridDist = (() => {
-      try {
-        return getGridDistance(unit.h3Index, intel.lastKnownH3Index);
-      } catch {
-        return 999;
-      }
-    })();
-    if (gridDist > radius && gridDist !== 999) continue;
-    const distResult = getPathDistanceAndTurns(unit.h3Index, intel.lastKnownH3Index, unit.unitType, hexSet, terrainByH3);
-    const pathWithinRadius = distResult !== null && distResult.hexDistance <= radius;
-    const gridWithinRadius = gridDist <= radius;
-    if (!pathWithinRadius && !gridWithinRadius) continue;
-    const hexDistance = distResult !== null ? distResult.hexDistance : gridDist;
-    nearbyEnemies.push({
-      unitId: intel.unitId,
-      type: 'unknown',
-      position: h3ToLatLng(intel.lastKnownH3Index, latLngByH3),
-      hexDistance,
-      estimatedTurnsToReach: distResult !== null ? distResult.estimatedTurns : null,
-      inRangedRange: gridDist <= myRange,
-      inMeleeRange: gridDist === 0,
-      inEnemyRangedRange: false,
-      confidence: 'stale',
-      lastSeen: intel.lastSeenTurn,
-    });
+  if (shouldIncludeStaleEnemyIntel(state)) {
+    const staleIntel = getEnemyIntelForPlayer(state);
+    const currentEnemyIds = new Set(nearbyEnemies.map((e) => e.unitId));
+    for (const intel of staleIntel) {
+      if (currentEnemyIds.has(intel.unitId)) continue;
+      if (!hexSet.has(intel.lastKnownH3Index)) continue;
+      const gridDist = (() => {
+        try {
+          return getGridDistance(unit.h3Index, intel.lastKnownH3Index);
+        } catch {
+          return 999;
+        }
+      })();
+      if (gridDist > radius && gridDist !== 999) continue;
+      const distResult = getPathDistanceAndTurns(unit.h3Index, intel.lastKnownH3Index, unit.unitType, hexSet, terrainByH3);
+      const pathWithinRadius = distResult !== null && distResult.hexDistance <= radius;
+      const gridWithinRadius = gridDist <= radius;
+      if (!pathWithinRadius && !gridWithinRadius) continue;
+      const hexDistance = distResult !== null ? distResult.hexDistance : gridDist;
+      nearbyEnemies.push({
+        unitId: intel.unitId,
+        type: 'unknown',
+        position: h3ToLatLng(intel.lastKnownH3Index, latLngByH3),
+        hexDistance,
+        estimatedTurnsToReach: distResult !== null ? distResult.estimatedTurns : null,
+        inRangedRange: gridDist <= myRange,
+        inMeleeRange: gridDist === 0,
+        inEnemyRangedRange: false,
+        confidence: 'stale',
+        lastSeen: intel.lastSeenTurn,
+      });
+    }
+  } else {
+    logTrace('tool2Assessment executeAssessUnit: omitting stale enemy intel for opponent perspective', { unitId });
   }
 
   nearbyEnemies.sort((a, b) => a.hexDistance - b.hexDistance);
@@ -325,9 +339,13 @@ function executeAssessUnit(
 }
 
 /**
- * Executes assess_hex: returns terrain, passableBy, unitsAtHex, unitsInRange, adjacentTerrain, strategicNotes.
- * Use when the AI needs to evaluate a hex (e.g. before moving there). Requires position [lat, lng]; forUnitType is optional.
- * Returns status "ok" with full hex briefing; or status "error" with "Invalid hex position" if off-map.
+ * Why this exists:
+ *     Produces the assess_hex tool payload (terrain, passability, units at hex, enemies in range bands, adjacent stats, notes).
+ * When to use:
+ *     Invoked via executeTool2 and from precomputation for human-occupied hexes when building supplemental briefing text.
+ * What to expect:
+ *     Status "ok" with full hex briefing, or "error" for an invalid [lat,lng]. When `state.playerPerspective === 'opponent'`,
+ *     stale enemy intel is not merged into unitsInRange range lists (visible-enemy parity with the snapshot).
  */
 function executeAssessHex(
   position: LatLng,
@@ -378,24 +396,28 @@ function executeAssessHex(
       continue;
     }
   }
-  for (const intel of getEnemyIntelForPlayer(state)) {
-    if (!hexSet.has(intel.lastKnownH3Index)) continue;
-    try {
-      const d = getGridDistance(intel.lastKnownH3Index, hexH3);
-      const entry = {
-        unitId: intel.unitId,
-        type: 'unknown',
-        position: h3ToLatLng(intel.lastKnownH3Index, latLngByH3) as LatLng,
-        hexDistance: d,
-        confidence: 'stale' as const,
-        lastSeen: intel.lastSeenTurn,
-      };
-      if (d === 0) meleeRange.push(entry);
-      else if (d === 1) rangedRange1.push(entry);
-      else if (d === 2) rangedRange2.push(entry);
-    } catch {
-      continue;
+  if (shouldIncludeStaleEnemyIntel(state)) {
+    for (const intel of getEnemyIntelForPlayer(state)) {
+      if (!hexSet.has(intel.lastKnownH3Index)) continue;
+      try {
+        const d = getGridDistance(intel.lastKnownH3Index, hexH3);
+        const entry = {
+          unitId: intel.unitId,
+          type: 'unknown',
+          position: h3ToLatLng(intel.lastKnownH3Index, latLngByH3) as LatLng,
+          hexDistance: d,
+          confidence: 'stale' as const,
+          lastSeen: intel.lastSeenTurn,
+        };
+        if (d === 0) meleeRange.push(entry);
+        else if (d === 1) rangedRange1.push(entry);
+        else if (d === 2) rangedRange2.push(entry);
+      } catch {
+        continue;
+      }
     }
+  } else {
+    logTrace('tool2Assessment executeAssessHex: omitting stale enemy intel for opponent perspective', { hexH3 });
   }
 
   let adjacentLand = 0;

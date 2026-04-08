@@ -45,11 +45,11 @@ export function buildToolUsageGuidance(flags: PromptToolFlags, hasPrecomputedBri
   const lines: string[] = [];
   if (hasPrecomputedBriefing) {
     lines.push(
-      '- The COMMANDER\'S BRIEFING above already contains unit assessments, hex intelligence, and combat estimates for this turn. Do NOT call assess_unit, assess_hex, or estimate_combat — that information is already in the briefing tables. Use the briefing to decide targets and priorities.'
+      '- The COMMANDER\'S BRIEFING above already contains unit assessments, possible unit actions, and supplemental hex intelligence for this turn. Do NOT call assess_unit, assess_hex, or estimate_combat — that information is already in the briefing. Use the briefing to decide targets and priorities.'
     );
     if (flags.planningEnabled) {
       lines.push(
-        '- Use plan_route only when you need the exact orderToXY for a unit\'s move. Call it sparingly (e.g. one per unit that needs to move); the briefing already tells you nearest enemies and distances. After you have orderToXY for each unit that needs orders, submit — do not re-assess or re-route.'
+        '- Use plan_route only when you need the exact orderToXY for a unit\'s move. Call it sparingly (e.g. one per unit that needs to move); the briefing already summarizes nearest enemies, distances, and legal tactical options. After you have orderToXY for each unit that needs orders, submit — do not re-assess or re-route.'
       );
     }
     if (flags.ordersEnabled) {
@@ -190,7 +190,7 @@ export function getInitialUserMessage(flags: PromptToolFlags, hasPrecomputedBrie
       const ordersNudge = flags.ordersEnabled
         ? ' For units without standing orders in the briefing, include assign_order entries in orders[]. Then use plan_route and explicit_move only where needed this turn. '
         : '';
-      return `Use the COMMANDER'S BRIEFING above for unit status and combat info.${ordersNudge}Call plan_route for each unit that needs a move (orderToXY).${memoryNote}${productionNote} Then submit final JSON with "strategy", "orders" (assign_order / explicit_move / explicit_attack / cancel_order as needed)${jsonOptionalTail}.`;
+      return `Use the COMMANDER'S BRIEFING above for unit status, possible unit actions, and supplemental hex intelligence.${ordersNudge}Call plan_route for each unit that needs a move (orderToXY).${memoryNote}${productionNote} Then submit final JSON with "strategy", "orders" (assign_order / explicit_move / explicit_attack / cancel_order as needed)${jsonOptionalTail}.`;
     }
     return `Use the tools as needed to plan movement.${memoryNote}${productionNote} Then submit final JSON with "strategy", "orders"${jsonOptionalTail}.`;
   }

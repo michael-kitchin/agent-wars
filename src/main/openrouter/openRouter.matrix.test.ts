@@ -112,11 +112,17 @@ function assertPromptAvoidsPlayerFacingUnitLabels(systemPrompt: string, mask: nu
 async function run(): Promise<void> {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-wars-openrouter-test-'));
   const restoreElectron = installElectronMock(userDataDir);
-  const originalFetch = (globalThis as unknown as { fetch?: unknown }).fetch;
   try {
     const openRouter = require('./openRouter') as {
       saveKey: (key: string) => void;
       setSelectedModel: (modelId: string) => void;
+      setChatTransportOverrideForTests: (override: (payload: {
+        key: string;
+        body: Record<string, unknown>;
+        signal?: AbortSignal;
+        onLog?: (line: string, isError?: boolean) => void;
+        requestLabel: string;
+      }) => Promise<{ ok: true; status: number; headers: Record<string, string>; bodyText: string } | { ok: false; error: string }> | null) => void;
       requestOrders: (
         state: unknown,
         modelId: string,
@@ -158,16 +164,15 @@ async function run(): Promise<void> {
       const fakeResponse: ChatResponse = {
         choices: [{ message: { content: '{"strategy":"hold","orders":[]}' } }],
       };
-      (globalThis as unknown as { fetch: unknown }).fetch = (async (_url: unknown, init?: unknown) => {
-        const body = (init as { body?: string } | undefined)?.body ?? '{}';
-        capturedRef.value = JSON.parse(body) as CapturedPayload;
+      openRouter.setChatTransportOverrideForTests(async (payload) => {
+        capturedRef.value = payload.body as CapturedPayload;
         return {
           ok: true,
           status: 200,
-          json: async () => fakeResponse,
-          text: async () => JSON.stringify(fakeResponse),
+          headers: {},
+          bodyText: JSON.stringify(fakeResponse),
         };
-      }) as unknown;
+      });
 
       const result = await openRouter.requestOrders(state, 'test-model', {
         enabledToolNames,
@@ -209,6 +214,10 @@ async function run(): Promise<void> {
           'At least one enemy unit remains in play, and the human player is actively searching for your forces with intent to destroy them.'
         ),
         `enemy-intent strategic context missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('Your primary goal is to defeat the enemy'),
+        `primary scenario goal clause missing for mask=${mask}`
       );
       assert.ok(systemPrompt.includes('- Your priorities are:'), `priority coaching header missing for mask=${mask}`);
       assert.ok(
@@ -303,14 +312,14 @@ async function run(): Promise<void> {
     const strictSchemaErrorResponse: ChatResponse = {
       choices: [{ message: { content: '[{"unitId":"opponent-armor-1","action":"explicit_move","destination":[0,0]}]' } }],
     };
-    (globalThis as unknown as { fetch: unknown }).fetch = (async () => {
+    openRouter.setChatTransportOverrideForTests(async () => {
       return {
         ok: true,
         status: 200,
-        json: async () => strictSchemaErrorResponse,
-        text: async () => JSON.stringify(strictSchemaErrorResponse),
+        headers: {},
+        bodyText: JSON.stringify(strictSchemaErrorResponse),
       };
-    }) as unknown;
+    });
     const strictResult = await openRouter.requestOrders(state, 'test-model', {
       enabledToolNames: openRouter.getToolNamesForEnabledGroups(apiToggleIds),
       usePrecomputation: false,
@@ -335,14 +344,14 @@ async function run(): Promise<void> {
         },
       ],
     };
-    (globalThis as unknown as { fetch: unknown }).fetch = (async () => {
+    openRouter.setChatTransportOverrideForTests(async () => {
       return {
         ok: true,
         status: 200,
-        json: async () => airOrdersResponse,
-        text: async () => JSON.stringify(airOrdersResponse),
+        headers: {},
+        bodyText: JSON.stringify(airOrdersResponse),
       };
-    }) as unknown;
+    });
     const airResult = await openRouter.requestOrders(state, 'test-model', {
       enabledToolNames: openRouter.getToolNamesForEnabledGroups(apiToggleIds),
       usePrecomputation: false,
@@ -353,11 +362,8 @@ async function run(): Promise<void> {
 
     console.log(`openRouter.matrix.test.ts passed (${combosChecked} combinations)`);
   } finally {
-    if (originalFetch === undefined) {
-      delete (globalThis as unknown as { fetch?: unknown }).fetch;
-    } else {
-      (globalThis as unknown as { fetch: unknown }).fetch = originalFetch;
-    }
+    const openRouter = require('./openRouter') as { setChatTransportOverrideForTests: (override: null) => void };
+    openRouter.setChatTransportOverrideForTests(null);
     restoreElectron();
   }
 }

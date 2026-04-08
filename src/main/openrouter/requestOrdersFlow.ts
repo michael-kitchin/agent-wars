@@ -62,6 +62,8 @@ export interface RequestOrdersOptions {
 
 const FULL_PROMPT_LOG_PREVIEW_CHARS = 1200;
 const FULL_PROMPT_LOG_ENV_FLAG = 'AGENT_WARS_LOG_FULL_PROMPTS';
+const FULL_RESPONSE_LOG_PREVIEW_CHARS = 1200;
+const FULL_RESPONSE_LOG_ENV_FLAG = 'AGENT_WARS_LOG_FULL_RESPONSES';
 const REQUEST_ORDERS_MAX_WALL_CLOCK_MS = 90_000;
 
 function logPromptPreview(label: string, content: string): void {
@@ -76,6 +78,21 @@ function logPromptPreview(label: string, content: string): void {
     truncated: content.length > FULL_PROMPT_LOG_PREVIEW_CHARS,
     chars: content.length,
     fullLogEnvFlag: FULL_PROMPT_LOG_ENV_FLAG,
+  });
+}
+
+function logResponsePreview(label: string, content: string): void {
+  const fullResponseLoggingEnabled = process.env[FULL_RESPONSE_LOG_ENV_FLAG] === '1';
+  if (fullResponseLoggingEnabled) {
+    logDebug(`${label} (full)`, content);
+    return;
+  }
+  const preview = content.slice(0, FULL_RESPONSE_LOG_PREVIEW_CHARS);
+  logDebug(`${label} (preview)`, {
+    preview,
+    truncated: content.length > FULL_RESPONSE_LOG_PREVIEW_CHARS,
+    chars: content.length,
+    fullLogEnvFlag: FULL_RESPONSE_LOG_ENV_FLAG,
   });
 }
 
@@ -227,9 +244,7 @@ export async function requestOrdersFlow(
   if (usePrecomputation) {
     const precomputed = runPrecomputation(state, { latLngByH3, resolveToH3 });
     toolInvocationCounts['precomputation'] =
-      precomputed.unitAssessments.length +
-      precomputed.combatEstimates.length +
-      precomputed.hexAssessments.length;
+      precomputed.unitAssessments.length + precomputed.hexAssessments.length;
     const standingOrderText = getStandingOrderInjectionText('opponent', state);
     const memoryText = getInjectionText('opponent', state.turnNumber);
     const subscriptions = getSubscriptions('opponent');
@@ -254,7 +269,6 @@ export async function requestOrdersFlow(
     logDebug('openRouter requestOrders: pre-computation ran', {
       briefingLength: briefingOverride.length,
       unitAssessments: precomputed.unitAssessments.length,
-      combatEstimates: precomputed.combatEstimates.length,
       precomputationCount: toolInvocationCounts['precomputation'],
     });
   }
@@ -316,6 +330,7 @@ export async function requestOrdersFlow(
         if (onLog && chatResponse.error !== 'Cancelled') onLog(chatResponse.error, true);
         return failRequest(chatResponse.error);
       }
+      logResponsePreview('openRouter requestOrders: raw response body', chatResponse.bodyText);
       let json: {
         choices?: Array<{
           message?: {
@@ -418,6 +433,7 @@ export async function requestOrdersFlow(
         });
         if (repairResponse.ok) {
           const repairText = repairResponse.bodyText;
+          logResponsePreview('openRouter requestOrders repair: raw response body', repairText);
           const repairJson = JSON.parse(repairText) as {
             choices?: Array<{ message?: { content?: string | null } }>;
             usage?: { cost?: number; prompt_tokens?: number; completion_tokens?: number };

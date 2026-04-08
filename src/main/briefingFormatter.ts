@@ -1,16 +1,17 @@
 /**
  * Formats the Commander's Briefing block for Milestone 0.6/0.7. Consumes pre-computed assessments and
- * builds the three-section structure (strategic narrative, unit status + combat tables, attention flags)
+ * builds the three-section structure (strategic narrative, unit status, possible actions, attention flags)
  * plus memory, standing-order, and ACTIVE CALLBACKS sections.
  */
 
 import type { GameStateSnapshot } from './gameDb';
 import type { AiLossEventSinceConsultation } from './gameDb';
-import type { PrecomputationResult, UnitAssessmentResult, CombatEstimateEntry } from './precomputation';
+import type { PrecomputationResult, UnitAssessmentResult, HexAssessmentEntry } from './precomputation';
 import type { CallbackSubscription } from './callbackSubscriptions';
 import { cellToLatLng } from 'h3-js';
 import { LATLNG_DECIMAL_PLACES } from './mapData';
 import { logTrace } from './logger';
+import { buildPossibleUnitActionsMarkdown } from './openrouter/possibleUnitActions';
 
 /** Standing order statuses that require immediate attention (match tool5 WARNING_STATUSES). */
 const WARNING_STATUSES = new Set([
@@ -94,7 +95,7 @@ function buildStrategicNarrative(
     sentences.push(`${critical} unit(s) face a critical threat and require immediate attention.`);
   }
   sentences.push(
-    'Review the unit status and combat tables below, then issue movement and ranged attacks as needed.'
+    'Review the unit status table and possible unit actions below, then issue movement, ranged attacks, and air strikes as permitted this turn.'
   );
   return sentences.slice(0, 5).join(' ');
 }
@@ -181,22 +182,21 @@ function buildUnitStatusTable(
 }
 
 /**
- * Builds Section 2 Table 2: combat estimates (matchup, assessment, P(eliminate), P(lose unit), note).
+ * Summarizes assess_hex outputs that are not folded into possible unit actions (terrain, passability, strategic notes).
  */
-function buildCombatEstimatesTable(
-  combatEstimates: CombatEstimateEntry[]
-): string {
-  const header =
-    '| Matchup | Assessment | P(eliminate) | P(lose unit) | Note |';
-  const sep = '|---------|------------|--------------|--------------|------|';
-  const rows = combatEstimates.map((ce) => {
-    const posStr = formatPos(ce.targetHex);
-    const matchup = `${formatUnitDisplayRef(ce.aiUnitId)} vs ${formatUnitDisplayRef(ce.enemyUnitId)} @ ${posStr}`;
-    const note = (ce.note ?? '').slice(0, 80);
-    return `| ${matchup} | ${(ce.assessment ?? 'even').toUpperCase().replace('_', ' ')} | ${(ce.probabilityDefenderEliminated ?? 0).toFixed(2)} | ${(ce.probabilityAttackerLosesUnit ?? 0).toFixed(2)} | ${note} |`;
-  });
-  if (rows.length === 0) return `${header}\n${sep}\n(No pre-computed engagements)`;
-  return [header, sep, ...rows].join('\n');
+function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntry[]): string {
+  if (hexAssessments.length === 0) return '';
+  const lines: string[] = ['**Supplemental hex intelligence**', ''];
+  for (const entry of hexAssessments) {
+    const posStr = formatPos(entry.position);
+    const r = entry.result;
+    const terrain = typeof r.terrain === 'string' ? r.terrain : 'unknown';
+    const passableBy = Array.isArray(r.passableBy) ? (r.passableBy as string[]).join(', ') : '';
+    const notes = Array.isArray(r.strategicNotes) ? (r.strategicNotes as string[]).filter((x) => typeof x === 'string') : [];
+    const noteStr = notes.length > 0 ? ` notes: ${notes.join('; ')}` : '';
+    lines.push(`- ${posStr}: terrain ${terrain}; passableBy: ${passableBy || 'unknown'}${noteStr}`);
+  }
+  return lines.join('\n');
 }
 
 /**
@@ -301,7 +301,7 @@ export function formatBriefing(
   logTrace('briefingFormatter formatBriefing', {
     turnNumber: state.turnNumber,
     unitAssessmentCount: precomputed.unitAssessments.length,
-    combatEstimateCount: precomputed.combatEstimates.length,
+    hexAssessmentCount: precomputed.hexAssessments.length,
     callbackCount: subscriptions?.length ?? 0,
     hasProductionText: productionText.trim().length > 0,
   });
@@ -315,8 +315,20 @@ export function formatBriefing(
   sections.push(buildStrategicNarrative(state, precomputed.unitAssessments));
   sections.push('\n\n**Unit status and threats**\n');
   sections.push(buildUnitStatusTable(precomputed.unitAssessments));
-  sections.push('\n\n**Combat estimates (likely engagements)**\n');
-  sections.push(buildCombatEstimatesTable(precomputed.combatEstimates));
+  const possibleActions = buildPossibleUnitActionsMarkdown({
+    state,
+    latLngByH3,
+    formatLatLng: formatPos,
+  });
+  if (possibleActions.trim().length > 0) {
+    sections.push('\n\n');
+    sections.push(possibleActions);
+  }
+  const supplementalHex = buildSupplementalHexIntelligenceBlock(precomputed.hexAssessments);
+  if (supplementalHex.trim().length > 0) {
+    sections.push('\n\n');
+    sections.push(supplementalHex);
+  }
   sections.push('\n\n**Losses since last consultation**\n');
   sections.push(buildLossesSinceLastConsultationTable(lossesSinceLastConsultation, 'opponent'));
   if (productionText.trim().length > 0) {

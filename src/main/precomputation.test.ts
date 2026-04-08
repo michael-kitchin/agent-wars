@@ -1,6 +1,6 @@
 /**
- * Tests for the pre-computation pipeline (Milestone 0.6). Covers unit assessments, combat estimates,
- * hex assessments, and the orchestrator. Uses real tool executors; DB may be null (standing orders then absent).
+ * Tests for the pre-computation pipeline (Milestone 0.6). Covers unit assessments, hex assessments,
+ * and the orchestrator. Uses real tool executors; DB may be null (standing orders then absent).
  */
 
 import * as assert from 'assert';
@@ -54,22 +54,12 @@ function testRunPrecomputation(): void {
   const { state, coordMap } = buildFixtureState(10);
   const out = runPrecomputation(state, coordMap);
   assert.strictEqual(out.unitAssessments.length, 2);
-  assert.ok(Array.isArray(out.combatEstimates));
   assert.ok(Array.isArray(out.hexAssessments));
   assert.strictEqual(
     out.hexAssessments.length,
     1,
     'one hex has a human unit'
   );
-  if (out.combatEstimates.length > 0) {
-    const ce = out.combatEstimates[0]!;
-    assert.ok(ce.aiUnitId);
-    assert.ok(ce.enemyUnitId);
-    assert.ok(Array.isArray(ce.targetHex) && ce.targetHex.length === 2);
-    assert.ok(typeof ce.assessment === 'string');
-    assert.ok(typeof ce.probabilityDefenderEliminated === 'number');
-    assert.ok(typeof ce.probabilityAttackerLosesUnit === 'number');
-  }
 }
 
 function testRunPrecomputationSkipHexAssessments(): void {

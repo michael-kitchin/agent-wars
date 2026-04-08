@@ -38,6 +38,11 @@ import { runPrecomputation } from '../precomputation';
 import { formatBriefing } from '../briefingFormatter';
 import { replaceSubscriptions, getSubscriptions } from '../callbackSubscriptions';
 import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
+import {
+  getValidDestinations,
+  getValidDestinationsUnoccupied,
+  resolveMovementTerrainForHex,
+} from '../oneStepMoveDestinations';
 import { countControlledHexesInRegion } from '../../shared/homeRegionRules';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
 import { buildFinalJsonContractInstruction } from './promptContracts';
@@ -54,6 +59,7 @@ import {
   getMovementOrderInstruction,
 } from './promptText';
 import { buildJsonAssistantRepairSchema, parseOrdersResponse } from './orderResponseParsing';
+import { buildPrimaryScenarioGoalOpeningClause, buildRegionVsRegionScenarioObjectiveBlock } from './scenarioGoals';
 import {
   requestOrdersFlow,
 } from './requestOrdersFlow';
@@ -372,51 +378,6 @@ function validateAiOrder(
 }
 
 /**
- * Returns H3 indices that are valid move destinations for the given unit (within range, correct terrain).
- * Skips hexes where gridDistance throws (e.g. invalid or mismatched resolution).
- * Does not exclude occupied hexes; use getValidDestinationsUnoccupied when building the fallback list.
- */
-function getValidDestinations(unit: { h3Index: string; unitType: string }, state: GameStateSnapshot): string[] {
-  const range = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
-  const wantLand = unit.unitType === 'infantry' || unit.unitType === 'armor';
-  const seaportCountByHex = new Map((state.res1Infrastructure ?? []).map((row) => [row.h3Index, row.seaportCount] as const));
-  const valid: string[] = [];
-  for (const h of state.hexes) {
-    if (h.h3Index === unit.h3Index) continue;
-    let dist: number;
-    try {
-      dist = gridDistance(unit.h3Index, h.h3Index);
-    } catch {
-      continue;
-    }
-    if (dist < 1 || dist > range) continue;
-    const movementTerrain = resolveMovementTerrainForHex(h, seaportCountByHex);
-    if (unit.unitType === 'naval' && !passabilityAllowsNavalUnit(movementTerrain)) continue;
-    if (wantLand && !passabilityAllowsLandUnit(h.terrain)) continue;
-    valid.push(h.h3Index);
-  }
-  return valid;
-}
-
-function resolveMovementTerrainForHex(
-  hex: { h3Index: string; terrain: string } | undefined,
-  seaportCountByHex: Map<string, number>
-): string {
-  if (!hex) return 'land';
-  return (seaportCountByHex.get(hex.h3Index) ?? 0) > 0 ? 'coastal' : hex.terrain;
-}
-
-/**
- * Returns valid one-step move destinations for a unit, excluding hexes occupied by any unit.
- * Used to build the adjacent-cells fallback list when Planning and Orders tools are disabled.
- */
-function getValidDestinationsUnoccupied(unit: { h3Index: string; unitType: string }, state: GameStateSnapshot): string[] {
-  logTrace('openRouter getValidDestinationsUnoccupied', { h3Index: unit.h3Index, unitType: unit.unitType });
-  const occupied = new Set(state.units.map((u) => u.h3Index));
-  return getValidDestinations(unit, state).filter((h3) => !occupied.has(h3));
-}
-
-/**
  * Validates a single AI ranged order against the state snapshot. Unit must be opponent-owned, have range ≥ 1, target in range, target has enemy.
  */
 function validateAiRangedOrder(
@@ -508,7 +469,7 @@ function buildSystemPromptForTools(
   const hasPrecomputedBriefing = briefingOverride != null && briefingOverride.length > 0;
   const toolsIntro = toolsIntroPurpose
     ? hasPrecomputedBriefing
-      ? 'Use the COMMANDER\'S BRIEFING above for assessments and combat estimates; use these tools only when you need plan_route (exact orderToXY), memory_read, or query_orders.'
+      ? 'Use the COMMANDER\'S BRIEFING above for assessments and possible unit actions; use these tools only when you need plan_route (exact orderToXY), memory_read, or query_orders.'
       : `Use these tools to ${toolsIntroPurpose} before submitting orders. You may use multiple rounds of tool calls and mix tool types if that helps.` +
         (flags.memoryEnabled ? ' Memory: use memory_read as needed; persist notes via memoryUpdates in your final JSON.' : '')
     : 'Use only the tools listed below. Do not call tools that are not in the list.';
@@ -581,16 +542,7 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
   (4) Engage the enemy and destroy them
 - ${formatControlProgressLine('Explored', exploredLandHexes, totalLandHexes, 'land hexes').slice(2)}
 - ${formatControlProgressLine('Controlled', controlledLandHexes, totalLandHexes, 'land hexes').slice(2)}${homeRegionOwnershipSummary}`;
-  const scenarioObjectiveBlock = state.scenarioId === 'region_vs_region'
-    ? `=== SCENARIO OBJECTIVE (REQUIRED) ===
-Scenario: region_vs_region
-Your home region: ${state.aiHomeRegion ?? 'unknown'}
-Opponent home region: ${state.humanHomeRegion ?? 'unknown'}
-Win at end of turn by either:
-1) Controlling all hexes intersecting the opponent home region, OR
-2) Destroying all opponent units.
-Both home-region outlines are always visible on the map.`
-    : '';
+  const scenarioObjectiveBlock = buildRegionVsRegionScenarioObjectiveBlock(state);
   const mainBlock = briefingOverride != null && briefingOverride.length > 0
     ? `${briefingOverride}\n\n${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${strategicContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}`
     : `${memoryBlock}${standingOrderBlock}${productionBlock}${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${strategicContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}${adjacentCellsBlock}`;
@@ -605,7 +557,8 @@ Both home-region outlines are always visible on the map.`
   const scoutingDirective = humanRoster.length === 0
     ? ' No human units are currently observed: prioritize scouting this turn by moving units along plausible approach routes to reveal enemy positions; do not remain static unless required for immediate defense.'
     : '';
-  const prompt = `You are the opponent in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}. Your objective is to destroy all human units. Move toward human units to get in ranged or melee range; do not stay passive.${scoutingDirective}${warning}
+  const primaryGoal = buildPrimaryScenarioGoalOpeningClause();
+  const prompt = `You are the opponent in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}. ${primaryGoal} Move toward observed enemy forces to bring them into ranged, melee, or air-strike range as rules allow; do not stay passive.${scoutingDirective}${warning}
 
 ${buildLatLngPreamble(H3_RESOLUTION, LATLNG_DECIMAL_PLACES)}
 
@@ -1003,6 +956,29 @@ async function postOpenRouterChatWithTimeoutAndRetry(payload: {
   return { ok: false, error: lastError };
 }
 
+type OpenRouterChatTransport = (payload: {
+  key: string;
+  body: Record<string, unknown>;
+  signal?: AbortSignal;
+  onLog?: (line: string, isError?: boolean) => void;
+  requestLabel: string;
+}) => Promise<{ ok: true; status: number; headers: Record<string, string>; bodyText: string } | { ok: false; error: string }>;
+
+let chatTransportOverride: OpenRouterChatTransport | null = null;
+
+/**
+ * Why this exists:
+ *     Allows tests to inject a deterministic OpenRouter chat transport without relying on global fetch monkeypatching.
+ * When to use:
+ *     Matrix and parsing tests that need to capture outbound payloads and return canned responses.
+ * What to expect:
+ *     Passing null restores default HTTPS transport. Production paths should never set this.
+ */
+export function setChatTransportOverrideForTests(override: OpenRouterChatTransport | null): void {
+  logDebug('openRouter setChatTransportOverrideForTests', { enabled: override !== null });
+  chatTransportOverride = override;
+}
+
 async function postChatViaHttps(args: {
   key: string;
   requestBody: Record<string, unknown>;
@@ -1127,6 +1103,7 @@ export async function requestOrders(
   modelId: string,
   options?: RequestOrdersOptions
 ): Promise<RequestOrdersResult | RequestOrdersError> {
+  const activeTransport = chatTransportOverride ?? postOpenRouterChatWithTimeoutAndRetry;
   return requestOrdersFlow(
     {
       loadKey,
@@ -1134,7 +1111,7 @@ export async function requestOrders(
       toolGroupRegistry: TOOL_GROUP_REGISTRY,
       buildSystemPromptForTools,
       buildToolDefinitions,
-      postOpenRouterChatWithTimeoutAndRetry,
+      postOpenRouterChatWithTimeoutAndRetry: activeTransport,
       getGroupIdForToolName,
       validateAiOrder,
       validateAiRangedOrder,

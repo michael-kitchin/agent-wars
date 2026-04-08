@@ -5,7 +5,7 @@
 
 import * as assert from 'assert';
 import type { GameStateSnapshot } from './gameDb';
-import type { PrecomputationResult, UnitAssessmentResult, CombatEstimateEntry } from './precomputation';
+import type { PrecomputationResult, UnitAssessmentResult } from './precomputation';
 import { formatBriefing } from './briefingFormatter';
 
 const fixtureState: GameStateSnapshot = {
@@ -55,30 +55,8 @@ const fixtureUnitAssessments: UnitAssessmentResult[] = [
   },
 ];
 
-const fixtureCombatEstimates: CombatEstimateEntry[] = [
-  {
-    aiUnitId: 'opponent-armor-1',
-    enemyUnitId: 'human-inf-1',
-    targetHex: [2.1, 0.5],
-    assessment: 'favorable',
-    probabilityDefenderEliminated: 0.5,
-    probabilityAttackerLosesUnit: 0.33,
-    note: 'Return fire unlikely',
-  },
-  {
-    aiUnitId: 'opponent-infantry-1',
-    enemyUnitId: 'human-inf-1',
-    targetHex: [8.2, 4.3],
-    assessment: 'even',
-    probabilityDefenderEliminated: 0.17,
-    probabilityAttackerLosesUnit: 0.33,
-    note: 'Melee if they advance',
-  },
-];
-
 const precomputed: PrecomputationResult = {
   unitAssessments: fixtureUnitAssessments,
-  combatEstimates: fixtureCombatEstimates,
   hexAssessments: [],
 };
 
@@ -90,11 +68,11 @@ function testFormatBriefingContainsSections(): void {
   assert.ok(out.includes('Turn 2:'), 'Section 1 narrative');
   assert.ok(out.match(/\.\s+[A-Z]/), 'Section 1 has multiple sentences');
   assert.ok(out.includes('| Unit ID |'), 'unit table header');
-  assert.ok(out.includes('| Matchup |'), 'combat table header');
+  assert.ok(out.includes('**Possible unit actions**'), 'possible unit actions section');
   assert.ok(out.includes('**Losses since last consultation**'), 'losses subsection header');
   assert.ok(out.includes('| Turn | Victim Unit | Side | Cause | Killer IDs |'), 'losses subsection table header');
   assert.ok(out.includes('opponent-armor-1'), 'unit table has unit');
-  assert.ok(out.includes('P(eliminate)'), 'combat table has P(eliminate) column');
+  assert.ok(out.includes('Ranged attacks:') || out.includes('Possible unit actions'), 'tactical actions present');
   assert.ok(out.includes('**Attention flags**'), 'Section 3 header');
   assert.ok(out.includes('YOUR STRATEGIC MEMORY'), 'memory block');
   assert.ok(out.includes('Remember: push south.'), 'memory text');
@@ -146,24 +124,22 @@ function testFormatBriefingIncludesLossRowsWhenProvided(): void {
 function testFormatBriefingUnitTableRows(): void {
   const out = formatBriefing(fixtureState, precomputed, '', '');
   const unitTableStart = out.indexOf('| Unit ID |');
-  const unitTableEnd = out.indexOf('| Matchup |');
+  const unitTableEnd = out.indexOf('**Possible unit actions**');
   const unitTable = out.slice(unitTableStart, unitTableEnd);
   assert.ok(unitTable.includes('opponent-armor-1') && unitTable.includes('opponent-infantry-1'));
   assert.ok(unitTable.includes('yes') || unitTable.includes('no'), 'action needed column');
 }
 
-function testFormatBriefingCombatTable(): void {
+function testFormatBriefingPossibleActionsArmorRanged(): void {
   const out = formatBriefing(fixtureState, precomputed, '', '');
-  assert.ok(out.includes('opponent-armor-1 vs human-inf-1'));
-  assert.ok(out.includes('0.50') && out.includes('0.33'));
-  assert.ok(out.includes('FAVORABLE') || out.includes('favorable'));
-  assert.ok(out.includes('Return fire unlikely') || out.includes('Melee'));
+  assert.ok(out.includes('opponent-armor-1 (armor):'));
+  assert.ok(out.includes('  - Ranged attacks:'));
 }
 
 const tests = [
   { name: 'formatBriefing contains all sections', fn: testFormatBriefingContainsSections },
   { name: 'formatBriefing unit table rows', fn: testFormatBriefingUnitTableRows },
-  { name: 'formatBriefing combat table', fn: testFormatBriefingCombatTable },
+  { name: 'formatBriefing possible actions armor ranged', fn: testFormatBriefingPossibleActionsArmorRanged },
   { name: 'formatBriefing ACTIVE CALLBACKS with subscriptions', fn: testFormatBriefingActiveCallbacksWithSubscriptions },
   { name: 'formatBriefing losses table rows', fn: testFormatBriefingIncludesLossRowsWhenProvided },
 ];

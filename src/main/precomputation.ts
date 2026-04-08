@@ -1,17 +1,13 @@
 /**
- * Pre-computation pipeline for Milestone 0.6: runs assess_unit, assess_hex, and estimate_combat
- * before the LLM is invoked, so the briefing can inject results into the prompt. Used when
- * usePrecomputation is true to validate the hybrid AI architecture (fewer ad-hoc tool calls,
- * lower latency/cost). Pre-computation calls the same tool executors as the LLM loop; it does
- * not duplicate tool logic.
+ * Pre-computation pipeline for Milestone 0.6: runs assess_unit and assess_hex before the LLM is invoked,
+ * so the briefing can inject results into the prompt. Used when usePrecomputation is true to validate the
+ * hybrid AI architecture (fewer ad-hoc tool calls, lower latency/cost). Pre-computation calls the same tool
+ * executors as the LLM loop; it does not duplicate tool logic. Combat estimates were removed in favor of
+ * the structured "Possible unit actions" briefing section.
  */
 
 import type { GameStateSnapshot } from './gameDb';
 import { executeTool2 } from './tools/tool2Assessment';
-import { executeTool3 } from './tools/tool3CombatEstimation';
-import { getRange } from './combatConstants';
-import { gridDistance } from 'h3-js';
-import { getMovementBudgetForUnit } from './pathfinding';
 import { logDebug, logError } from './logger';
 
 /** Coordinate map built from buildLatLngCoordinateMap; pre-computation uses the same map as requestOrders. */
@@ -87,109 +83,6 @@ export function runUnitAssessments(
   return results;
 }
 
-/** One pre-computed combat estimate (estimate_combat ok response summarized). */
-export interface CombatEstimateEntry {
-  aiUnitId: string;
-  enemyUnitId: string;
-  targetHex: [number, number];
-  assessment: string;
-  probabilityDefenderEliminated: number;
-  probabilityAttackerLosesUnit: number;
-  note: string;
-}
-
-const DEFAULT_MAX_COMBAT_ESTIMATES = 15;
-
-/**
- * Builds likely (AI unit, human unit) pairs that are in combat range this turn, sorted by distance (closest first),
- * then runs estimate_combat for each up to the cap. Returns only successful results.
- */
-function runCombatEstimates(
-  state: GameStateSnapshot,
-  coordMap: PrecomputationCoordMap,
-  maxEstimates: number
-): CombatEstimateEntry[] {
-  logDebug('precomputation runCombatEstimates', { turnNumber: state.turnNumber, maxEstimates });
-  const { latLngByH3, resolveToH3 } = coordMap;
-  const opponentUnits = state.units.filter((u) => u.player === 'opponent');
-  const humanUnits = state.units.filter((u) => u.player === 'human');
-  const pairs: Array<{
-    ai: (typeof state.units)[0];
-    human: (typeof state.units)[0];
-    distance: number;
-    engagementType: 'ranged' | 'melee';
-  }> = [];
-  for (const ai of opponentUnits) {
-    const aiRange = getRange(ai.unitType as 'infantry' | 'armor' | 'naval');
-    const moveBudget = getMovementBudgetForUnit(ai.unitType);
-    for (const human of humanUnits) {
-      try {
-        const d = gridDistance(ai.h3Index, human.h3Index);
-        // Current-position ranged attack candidates.
-        if (d <= aiRange && d !== 0) {
-          pairs.push({ ai, human, distance: d, engagementType: 'ranged' });
-          continue;
-        }
-        // Melee now (same hex).
-        if (d === 0) {
-          pairs.push({ ai, human, distance: d, engagementType: 'melee' });
-          continue;
-        }
-        // Melee after move (can reach the enemy hex this turn, but not shoot this turn).
-        if (d <= moveBudget && d > aiRange) {
-          pairs.push({ ai, human, distance: d, engagementType: 'melee' });
-        }
-      } catch {
-        // skip invalid pair
-      }
-    }
-  }
-  pairs.sort((a, b) => a.distance - b.distance);
-
-  const results: CombatEstimateEntry[] = [];
-  for (let i = 0; i < Math.min(pairs.length, maxEstimates); i++) {
-    const { ai, human, engagementType } = pairs[i]!;
-    const targetLatLng = latLngByH3.get(human.h3Index);
-    if (!targetLatLng) continue;
-    const out = executeTool3(
-      'estimate_combat',
-      {
-        engagementType,
-        attackers: { units: [ai.id] },
-        targetHex: targetLatLng,
-        defenders: { units: [human.id] },
-      },
-      state,
-      latLngByH3,
-      resolveToH3
-    );
-    if (out.status === 'ok' && out.prediction) {
-      const p = out.prediction as {
-        assessment?: string;
-        probabilityDefenderEliminated?: number;
-        probabilityAttackerLosesUnit?: number;
-        reasoning?: string;
-      };
-      const defSummary = out.defenderSummary as { returnFireDetails?: string } | undefined;
-      results.push({
-        aiUnitId: ai.id,
-        enemyUnitId: human.id,
-        targetHex: targetLatLng,
-        assessment: p.assessment ?? 'even',
-        probabilityDefenderEliminated: p.probabilityDefenderEliminated ?? 0,
-        probabilityAttackerLosesUnit: p.probabilityAttackerLosesUnit ?? 0,
-        note: p.reasoning ?? defSummary?.returnFireDetails ?? '',
-      });
-    }
-  }
-
-  logDebug('precomputation runCombatEstimates complete', {
-    pairsConsidered: pairs.length,
-    returned: results.length,
-  });
-  return results;
-}
-
 /** One successful assess_hex result, keyed by hex position for the briefing. */
 export interface HexAssessmentEntry {
   position: [number, number];
@@ -234,19 +127,16 @@ function runHexAssessments(
 
 export interface PrecomputationResult {
   unitAssessments: UnitAssessmentResult[];
-  combatEstimates: CombatEstimateEntry[];
   hexAssessments: HexAssessmentEntry[];
 }
 
 export interface RunPrecomputationOptions {
   /** When true, skip assess_hex for enemy-occupied hexes (default false). */
   skipHexAssessments?: boolean;
-  /** Max number of estimate_combat calls (default 15). */
-  maxCombatEstimates?: number;
 }
 
 /**
- * Orchestrates full pre-computation: unit assessments, combat estimates (capped), and hex assessments.
+ * Orchestrates full pre-computation: unit assessments and hex assessments.
  * Returns a single object for use by the briefing formatter. Logs total time at debug.
  */
 export function runPrecomputation(
@@ -257,16 +147,13 @@ export function runPrecomputation(
   const start = Date.now();
   logDebug('precomputation runPrecomputation start', { turnNumber: state.turnNumber });
   const unitAssessments = runUnitAssessments(state, coordMap);
-  const maxCombat = options?.maxCombatEstimates ?? DEFAULT_MAX_COMBAT_ESTIMATES;
-  const combatEstimates = runCombatEstimates(state, coordMap, maxCombat);
   const hexAssessments =
     options?.skipHexAssessments === true ? [] : runHexAssessments(state, coordMap);
   const elapsed = Date.now() - start;
   logDebug('precomputation runPrecomputation complete', {
     elapsedMs: elapsed,
     unitAssessments: unitAssessments.length,
-    combatEstimates: combatEstimates.length,
     hexAssessments: hexAssessments.length,
   });
-  return { unitAssessments, combatEstimates, hexAssessments };
+  return { unitAssessments, hexAssessments };
 }
