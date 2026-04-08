@@ -1,5 +1,6 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from './state';
+import { initializeScenarioRegionSelectorsOnOverlayOpen } from '../gameplay/newGameRegionUi';
 
 export function updateSidebar(
   getPrimarySelectedUnitId: () => string | null,
@@ -49,6 +50,7 @@ export function updateGameOverUI(
   const gameOver = !!state?.gameOver;
   const showOverlay = noGame || gameOver;
 
+  const wasHidden = overlay?.classList.contains('hidden') !== false;
   if (!showOverlay) {
     overlay?.classList.add('hidden');
     setMainUIControlsEnabled(true);
@@ -59,6 +61,9 @@ export function updateGameOverUI(
 
   overlay?.classList.remove('hidden');
   if (fogCheckbox) fogCheckbox.checked = true;
+  if (wasHidden) {
+    void initializeScenarioRegionSelectorsOnOverlayOpen();
+  }
   setMainUIControlsEnabled(false);
   if (messageEl) {
     if (gameOver) {

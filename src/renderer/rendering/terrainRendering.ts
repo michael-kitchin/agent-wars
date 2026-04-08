@@ -4,6 +4,7 @@ import { getHexBoundaryLatLngForLeafletOverlay } from '../map/hexGrid';
 import { getActiveHexStrokeStyle, fillHexTerrain } from './terrainVisualStyles';
 import { drawTerrainInfrastructureGlyphs, RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE } from './terrainInfrastructureOverlay';
 import { DETAIL_H3_RESOLUTION } from '../core/constants';
+import { MULTI_PLAYER_FILL, PLAYER_COLORS } from '../core/constants';
 import { getLeafletGlobal, hexCenterPx } from '../map/mapUtils';
 import {
   projectHexBoundaryToContainerPoints,
@@ -13,6 +14,7 @@ import {
 } from '../map/terrainView';
 import { rendererSharedState as S } from '../core/state';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
+import { strokeDualClosedPolygon } from './polygonOutline';
 
 interface TerrainRenderingDeps {
   getExploredHexSet: (state: GameStateSnapshot | null) => Set<string>;
@@ -20,6 +22,26 @@ interface TerrainRenderingDeps {
   isMapInspectionModeHeld: () => boolean;
   infraGlyphsAllowedForRes1Hex: (h3: string) => boolean;
   infraGlyphsAllowedForRes4Child: (parentH3: string, childH3: string) => boolean;
+}
+
+function withOpacity(color: string, alpha: number): string {
+  const normalizedAlpha = Math.max(0, Math.min(1, alpha));
+  if (color.startsWith('#')) {
+    const hex = color.slice(1);
+    if (hex.length === 3) {
+      const r = Number.parseInt(`${hex[0]}${hex[0]}`, 16);
+      const g = Number.parseInt(`${hex[1]}${hex[1]}`, 16);
+      const b = Number.parseInt(`${hex[2]}${hex[2]}`, 16);
+      return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
+    }
+    if (hex.length === 6) {
+      const r = Number.parseInt(hex.slice(0, 2), 16);
+      const g = Number.parseInt(hex.slice(2, 4), 16);
+      const b = Number.parseInt(hex.slice(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
+    }
+  }
+  return color;
 }
 
 export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void {
@@ -132,6 +154,45 @@ export function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D, deps: Terrai
       ctx.stroke();
     }
   }
+}
+
+/**
+ * Draws always-visible home-region hex outlines for region-vs-region scenario.
+ * Uses a black under-stroke plus player-color top stroke for contrast on all terrain styles.
+ */
+export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): void {
+  const state = S.gameState;
+  if (!state || state.scenarioId !== 'region_vs_region') return;
+  const map = getMainLeafletMap() as { latLngToContainerPoint: (ll: unknown) => { x: number; y: number }; getZoom?: () => number } | null;
+  if (!map) return;
+  const L = getLeafletGlobal();
+  const zoom = typeof map.getZoom === 'function' ? map.getZoom() : 4;
+  const zoomScale = Math.max(0.88, Math.min(1.22, 1.22 - ((zoom - 2) * (0.32 / 8))));
+  const sameRegion =
+    typeof state.humanHomeRegion === 'string' &&
+    typeof state.aiHomeRegion === 'string' &&
+    state.humanHomeRegion.length > 0 &&
+    state.humanHomeRegion === state.aiHomeRegion;
+  const humanColor = sameRegion ? MULTI_PLAYER_FILL : (PLAYER_COLORS.human ?? '#2e5a7b');
+  const aiColor = sameRegion ? MULTI_PLAYER_FILL : (PLAYER_COLORS.opponent ?? '#7b4a2e');
+  const drawRegion = (hexes: string[] | undefined, color: string): void => {
+    if (!Array.isArray(hexes) || hexes.length <= 0) return;
+    for (const h3Index of hexes) {
+      const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
+      const pts = boundary.map(([lat, lng]: [number, number]) => {
+        const p = map.latLngToContainerPoint(L.latLng(lat, lng));
+        return { x: p.x, y: p.y };
+      });
+      strokeDualClosedPolygon(ctx, pts, {
+        underStrokeColor: 'rgba(0, 0, 0, 0.25)',
+        underStrokeWidth: Math.max(1.2, 2.2 * zoomScale),
+        topStrokeColor: withOpacity(color, 0.5),
+        topStrokeWidth: Math.max(0.75, 1.25 * zoomScale) * 0.75 * 1.5,
+      });
+    }
+  };
+  drawRegion(state.humanHomeRegionHexes, humanColor);
+  drawRegion(state.aiHomeRegionHexes, aiColor);
 }
 
 export function hasVisibleRes1InfrastructureGlyphs(

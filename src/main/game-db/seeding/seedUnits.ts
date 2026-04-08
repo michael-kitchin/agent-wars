@@ -13,8 +13,10 @@ import {
   type SpawnCandidate,
 } from './spawnSelection';
 import type { GuardedDbRunAndGetAllOps } from '../dbOps';
+import { trySeedScenarioRegionVsRegion } from './regionScenarioSeeding';
 
 interface SeedUnitsDeps extends GuardedDbRunAndGetAllOps {
+  getOne: <T extends Record<string, unknown>>(sql: string, params?: unknown[]) => T | undefined;
   allocateNextUnitDisplayOrder: (unitType: BuildUnitType) => number;
 }
 
@@ -29,6 +31,7 @@ interface SeedUnitsDeps extends GuardedDbRunAndGetAllOps {
 export function seedUnits(deps: SeedUnitsDeps): void {
   logDebug('gameDb seedUnits');
   if (!deps.hasDb()) return;
+  if (trySeedScenarioRegionVsRegion(deps)) return;
   const hexes = getOrderedHexList();
   const counts = getWorldUnitCounts();
   const terrainRows = deps.getAll<{ h3_index: string; terrain: string }>('SELECT h3_index, terrain FROM hexes');

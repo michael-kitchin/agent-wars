@@ -572,9 +572,19 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
   (4) Engage the enemy and destroy them
 - Explored: ${exploredLandHexes} of ${totalLandHexes} land hexes (${exploredPct}%)
 - Controlled: ${controlledLandHexes} of ${totalLandHexes} land hexes (${controlledPct}%)`;
+  const scenarioObjectiveBlock = state.scenarioId === 'region_vs_region'
+    ? `=== SCENARIO OBJECTIVE (REQUIRED) ===
+Scenario: region_vs_region
+Your home region: ${state.aiHomeRegion ?? 'unknown'}
+Opponent home region: ${state.humanHomeRegion ?? 'unknown'}
+Win at end of turn by either:
+1) Controlling all hexes intersecting the opponent home region, OR
+2) Destroying all opponent units.
+Both home-region outlines are always visible on the map.`
+    : '';
   const mainBlock = briefingOverride != null && briefingOverride.length > 0
-    ? `${briefingOverride}\n\n${strategicContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}`
-    : `${memoryBlock}${standingOrderBlock}${productionBlock}${strategicContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}${adjacentCellsBlock}`;
+    ? `${briefingOverride}\n\n${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${strategicContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}`
+    : `${memoryBlock}${standingOrderBlock}${productionBlock}${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${strategicContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}${adjacentCellsBlock}`;
 
   const finalJsonContract = buildFinalJsonContractInstruction({
     includeMemoryUpdates: flags.memoryEnabled,

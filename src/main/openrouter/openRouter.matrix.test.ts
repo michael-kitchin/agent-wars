@@ -55,6 +55,11 @@ function buildFixtureState(hexes: string[]): {
   units: { id: string; player: string; unitType: string; h3Index: string }[];
   exploredHexes: string[];
   res1Control: { h3Index: string; controllerPlayerId: string | null }[];
+  scenarioId: 'region_vs_region';
+  humanHomeRegion: string;
+  aiHomeRegion: string;
+  humanHomeRegionHexes: string[];
+  aiHomeRegionHexes: string[];
   phase: 'planning';
   turnNumber: number;
   pendingOrders: { unitId: string; toH3Index: string }[];
@@ -71,6 +76,11 @@ function buildFixtureState(hexes: string[]): {
       { h3Index: hexes[1]!, controllerPlayerId: 'opponent' },
       { h3Index: hexes[2]!, controllerPlayerId: 'human' },
     ],
+    scenarioId: 'region_vs_region',
+    humanHomeRegion: 'Northern America',
+    aiHomeRegion: 'Eastern Europe',
+    humanHomeRegionHexes: [hexes[1]!, hexes[2]!],
+    aiHomeRegionHexes: [hexes[0]!, hexes[3]!],
     phase: 'planning',
     turnNumber: 7,
     pendingOrders: [],
@@ -222,6 +232,22 @@ async function run(): Promise<void> {
       assert.ok(
         systemPrompt.includes('- Controlled: 2 of 8 land hexes (25%)'),
         `controlled-land progress metric missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('=== SCENARIO OBJECTIVE (REQUIRED) ==='),
+        `required scenario objective section missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('Scenario: region_vs_region'),
+        `scenario id guidance missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('Your home region: Eastern Europe'),
+        `AI home-region guidance missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('Opponent home region: Northern America'),
+        `human home-region guidance missing for mask=${mask}`
       );
       assert.ok(
         systemPrompt.includes(`rounded to ${mapData.LATLNG_DECIMAL_PLACES} decimal places`),

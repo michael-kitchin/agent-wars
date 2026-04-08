@@ -37,6 +37,8 @@ const gameApi = {
     ipcRenderer.invoke('game:getHexNamingTooltipLine', payload),
   getHexContinentNames: (payload: HexContinentNamesRequest): Promise<string[]> =>
     ipcRenderer.invoke('game:getHexContinentNames', payload),
+  listScenarioHomeRegions: (): Promise<string[]> =>
+    ipcRenderer.invoke('game:listScenarioHomeRegions'),
   newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRenderer.invoke('game:newGame', payload),
   submitOrders: (payload: SubmitOrdersIpcPayload): Promise<{ success: boolean; reason?: string }> =>
     ipcRenderer.invoke('game:submitOrders', payload),

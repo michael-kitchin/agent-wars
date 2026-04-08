@@ -27,7 +27,9 @@ import {
   listUnitsForSnapshot,
   getRes1InfrastructureForHex,
   getGameStateForPlayer,
+  getScenarioHomeRegionHexes,
 } from './gameDb';
+import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from './game-db/scenarioState';
 import { buildLatLngCoordinateMap, getOrderedHexList } from './mapData';
 import { getRange } from './combatConstants';
 import { runRangedPhase, runMeleePhase, createCombatRng, type CombatUnit } from './combatResolution';
@@ -115,6 +117,31 @@ import {
   syncEmbarkedLandUnitPositionsWithNaval,
   updateSealiftSlotImpl,
 } from './game-actions/sealift';
+
+/**
+ * Why this exists:
+ *     Applies end-of-turn region-vs-region control victory checks without relying on visibility state.
+ * When to use:
+ *     End of turn resolution, before fallback elimination-only winner checks.
+ * What to expect:
+ *     Returns winning player id when one side controls all hexes intersecting the opponent home region; otherwise null.
+ */
+export function evaluateRegionControlWinnerAtEndOfTurn(): 'human' | 'opponent' | null {
+  logTrace('gameActions evaluateRegionControlWinnerAtEndOfTurn');
+  const scenario = loadScenarioState({ getOne: dbGetOne });
+  if (scenario.scenarioId !== REGION_VS_REGION_SCENARIO_ID) return null;
+  const humanHomeRegion = scenario.humanHomeRegion;
+  const aiHomeRegion = scenario.aiHomeRegion;
+  const humanRegionHexes = getScenarioHomeRegionHexes(humanHomeRegion);
+  const aiRegionHexes = getScenarioHomeRegionHexes(aiHomeRegion);
+  if (humanRegionHexes.length <= 0 || aiRegionHexes.length <= 0) return null;
+  const controlByHex = new Map(listAllHexControls().map((row) => [row.h3Index, row.controllerPlayerId]));
+  const humanControlsAiRegion = aiRegionHexes.every((h3Index) => controlByHex.get(h3Index) === 'human');
+  const aiControlsHumanRegion = humanRegionHexes.every((h3Index) => controlByHex.get(h3Index) === 'opponent');
+  if (humanControlsAiRegion && !aiControlsHumanRegion) return 'human';
+  if (aiControlsHumanRegion && !humanControlsAiRegion) return 'opponent';
+  return null;
+}
 
 export type { MovementOrder, RangedAttackOrder, SubmitOrdersPayload };
 export type { HexBuildQueueEntryView, HexBuildQueueView } from './game-actions/buildQueue';
@@ -221,6 +248,10 @@ function dbBackedStateSnapshot() {
       'SELECT unit_id AS unitId, to_h3_index AS toH3Index FROM pending_orders'
     ),
   };
+}
+
+function humanPerspectiveStateSnapshot(): ReturnType<typeof dbBackedStateSnapshot> {
+  return getGameStateForPlayer(HUMAN_PLAYER_ID, { maskUnexploredTerrain: false });
 }
 
 /**
@@ -361,7 +392,7 @@ export function listHumanStandingOrders(): HumanStandingOrderView[] {
   logTrace('gameActions listHumanStandingOrders');
   try {
     if (!isDbReady()) return [];
-    const state = dbBackedStateSnapshot();
+    const state = humanPerspectiveStateSnapshot();
     const hexList = state.hexes.map((h) => h.h3Index);
     const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
     const result = queryHumanStandingOrders(state, latLngByH3, resolveToH3) as {
@@ -474,7 +505,7 @@ export function assignHumanMarchOrder(unitId: string, destinationH3Index: string
   logDebug('gameActions assignHumanMarchOrder', { unitId, destinationH3Index });
   try {
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
-    const state = dbBackedStateSnapshot();
+    const state = humanPerspectiveStateSnapshot();
     const turnRow = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1');
     if (turnRow?.phase !== VALID_PHASE) return { success: false, reason: 'Not in planning phase' };
     const unitRow = state.units.find((unit) => unit.id === unitId && unit.player === HUMAN_PLAYER_ID);
@@ -530,7 +561,7 @@ export function assignHumanMarchOrders(unitIds: string[], destinationH3Index: st
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
     const uniqueUnitIds = getUniqueNonEmptyIds(unitIds);
     if (uniqueUnitIds.length === 0) return { success: false, reason: 'No selected units to assign' };
-    const state = dbBackedStateSnapshot();
+    const state = humanPerspectiveStateSnapshot();
     const destinationHex = state.hexes.find((h) => h.h3Index === destinationH3Index);
     if (!destinationHex) return { success: false, reason: 'Destination not on map' };
     const selectedUnits = uniqueUnitIds
@@ -592,7 +623,7 @@ export function cancelHumanOrder(unitId: string): SubmitOrdersResult {
   logDebug('gameActions cancelHumanOrder', { unitId });
   try {
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
-    const state = dbBackedStateSnapshot();
+    const state = humanPerspectiveStateSnapshot();
     const hexList = state.hexes.map((h) => h.h3Index);
     const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
     const result = cancelHumanStandingOrder(unitId, state, latLngByH3, resolveToH3) as { status: string; error?: string };
@@ -1099,7 +1130,9 @@ export function ready(
 
     const humanCount = dbGetAll<{ c: number }>('SELECT COUNT(*) AS c FROM units WHERE player = ?', ['human'])[0]?.c ?? 0;
     const opponentCount = dbGetAll<{ c: number }>('SELECT COUNT(*) AS c FROM units WHERE player = ?', ['opponent'])[0]?.c ?? 0;
-    if (humanCount === 0 && opponentCount > 0) setGameOver('opponent');
+    const regionWinner = evaluateRegionControlWinnerAtEndOfTurn();
+    if (regionWinner) setGameOver(regionWinner);
+    else if (humanCount === 0 && opponentCount > 0) setGameOver('opponent');
     else if (opponentCount === 0 && humanCount > 0) setGameOver('human');
 
     dbRun('DELETE FROM pending_orders');

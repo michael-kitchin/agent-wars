@@ -48,6 +48,16 @@ export interface GameStateSnapshot {
   playerPerspective?: string;
   /** True when fog restrictions apply to this snapshot; false means both sides have full map/unit visibility. */
   fogOfWarEnabled?: boolean;
+  /** Scenario id for the current match when scenario-specific rules are active. */
+  scenarioId?: 'region_vs_region';
+  /** Human-selected home region for region-vs-region scenario. */
+  humanHomeRegion?: string;
+  /** AI-selected home region for region-vs-region scenario. */
+  aiHomeRegion?: string;
+  /** Res-1 hexes intersecting the human home region (always-visible outline source). */
+  humanHomeRegionHexes?: string[];
+  /** Res-1 hexes intersecting the AI home region (always-visible outline source). */
+  aiHomeRegionHexes?: string[];
   phase: string;
   turnNumber: number;
   pendingOrders: { unitId: string; toH3Index: string }[];
@@ -135,6 +145,8 @@ export interface SubmitOrdersPayload {
 /** Optional arguments for game:newGame (currently fog-of-war toggle). */
 export interface NewGameIpcPayload {
   fogOfWarEnabled?: boolean;
+  humanHomeRegion?: string;
+  aiHomeRegion?: string;
 }
 
 /**
@@ -364,6 +376,7 @@ export interface GameApi {
   getRes4TerrainOverrides: () => Promise<Res4TerrainOverrideRow[]>;
   getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest) => Promise<string | null>;
   getHexContinentNames: (payload: HexContinentNamesRequest) => Promise<string[]>;
+  listScenarioHomeRegions: () => Promise<string[]>;
   newGame: (payload?: NewGameIpcPayload) => Promise<GameStateSnapshot>;
   submitOrders: (payload: SubmitOrdersIpcPayload) => Promise<{ success: boolean; reason?: string }>;
   ready: (payload?: GameReadyIpcPayload) => Promise<ReadyResult>;

@@ -1,5 +1,7 @@
 import { logDebug } from '../logger';
+import { resolveScenarioHomeRegions } from '../regionScenario';
 import type { GuardedDbRunAndGetAllOps } from './dbOps';
+import { persistRegionVsRegionScenarioState } from './scenarioState';
 
 interface ResetGameDeps extends GuardedDbRunAndGetAllOps {
   clearGameOver: () => void;
@@ -37,15 +39,20 @@ function seedInitialHexControlFromUnitOccupancy(deps: ResetGameDeps): void {
  * What to expect:
  *     Clears per-match transient state, reseeds map/units/control, refreshes fog intel, and persists immediately.
  */
-export function resetGameForNewMatch(deps: ResetGameDeps, options?: { fogOfWarEnabled?: boolean }): void {
+export function resetGameForNewMatch(
+  deps: ResetGameDeps,
+  options?: { fogOfWarEnabled?: boolean; humanHomeRegion?: string; aiHomeRegion?: string }
+): void {
   const fogOfWarEnabled = options?.fogOfWarEnabled !== false;
-  logDebug('gameDb resetGameForNewMatch', { fogOfWarEnabled });
+  const { humanHomeRegion, aiHomeRegion } = resolveScenarioHomeRegions(options);
+  logDebug('gameDb resetGameForNewMatch', { fogOfWarEnabled, humanHomeRegion, aiHomeRegion });
   if (!deps.hasDb()) return;
   const { run } = deps;
   run('DELETE FROM units');
   run('DELETE FROM hexes');
   run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('map_size', 'world')");
   run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['fog_of_war_enabled', fogOfWarEnabled ? '1' : '0']);
+  persistRegionVsRegionScenarioState({ run }, { humanHomeRegion, aiHomeRegion });
   run("DELETE FROM game_config WHERE key = 'game_seed'");
   run("DELETE FROM game_config WHERE key LIKE 'unit_display_sequence_%'");
   deps.seedGameSeedIfMissing();

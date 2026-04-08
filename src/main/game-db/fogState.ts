@@ -6,11 +6,12 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { logDebug, logTrace } from '../logger';
 import type { Res1InfrastructureRow } from './controlInfrastructure';
 import type { GuardedDbOps } from './dbOps';
+import { getScenarioHomeRegionHexes } from '../regionScenario';
+import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from './scenarioState';
 
 const STALE_INTEL_TURNS = 2;
 const FOG_PLAYERS = ['human', 'opponent'] as const;
 const FOG_OF_WAR_ENABLED_KEY = 'fog_of_war_enabled';
-
 type FogDbOps = GuardedDbOps;
 
 interface FogDeps {
@@ -21,6 +22,21 @@ interface FogDeps {
 
 function withFogMetadata(snapshot: GameStateSnapshot, fogOfWarEnabled: boolean): GameStateSnapshot {
   return { ...snapshot, fogOfWarEnabled };
+}
+
+function withScenarioMetadata(snapshot: GameStateSnapshot, ops: FogDbOps): GameStateSnapshot {
+  const scenario = loadScenarioState(ops);
+  if (scenario.scenarioId !== REGION_VS_REGION_SCENARIO_ID) return snapshot;
+  const humanHomeRegion = scenario.humanHomeRegion;
+  const aiHomeRegion = scenario.aiHomeRegion;
+  return {
+    ...snapshot,
+    scenarioId: 'region_vs_region',
+    humanHomeRegion,
+    aiHomeRegion,
+    humanHomeRegionHexes: getScenarioHomeRegionHexes(humanHomeRegion),
+    aiHomeRegionHexes: getScenarioHomeRegionHexes(aiHomeRegion),
+  };
 }
 
 function isFogOfWarEnabled(ops: FogDbOps): boolean {
@@ -93,7 +109,7 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
   const infrastructureRows = deps.listRes1InfrastructureRows();
   const gameOver = gameOverRow?.value === '1';
   const winner = winnerRow?.value ?? undefined;
-  return withFogMetadata({
+  const snapshot = {
     hexes: hexRows,
     units: unitRows,
     phase: turnRow?.phase ?? 'planning',
@@ -104,7 +120,8 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
     res1Infrastructure: infrastructureRows,
     gameOver: gameOver || undefined,
     winner,
-  }, isFogOfWarEnabled(ops));
+  };
+  return withFogMetadata(withScenarioMetadata(snapshot, ops), isFogOfWarEnabled(ops));
 }
 
 function refreshFogOfWarIntelForPlayer(

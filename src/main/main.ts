@@ -11,6 +11,7 @@ import {
   getGameStateForPlayer,
   resetGameForNewMatch,
   getRes4TerrainOverridesForRendererFromGame,
+  listScenarioHomeRegions,
 } from './gameDb';
 import {
   submitOrders,
@@ -155,10 +156,19 @@ function registerIpcHandlers(): void {
     if (typeof payload?.h3Index !== 'string') return [];
     return getHexContinentNamesForRenderer({ h3Index: payload.h3Index });
   });
+  ipcMain.handle('game:listScenarioHomeRegions', () => listScenarioHomeRegions());
   ipcMain.handle('game:newGame', (_event, payload: NewGameIpcPayload | undefined) => {
     const fogOfWarEnabled = payload?.fogOfWarEnabled !== false;
-    logDebug('main game:newGame', { fogOfWarEnabled });
-    resetGameForNewMatch({ fogOfWarEnabled });
+    logDebug('main game:newGame', {
+      fogOfWarEnabled,
+      requestedHumanHomeRegion: payload?.humanHomeRegion ?? '',
+      requestedAiHomeRegion: payload?.aiHomeRegion ?? '',
+    });
+    resetGameForNewMatch({
+      fogOfWarEnabled,
+      humanHomeRegion: payload?.humanHomeRegion,
+      aiHomeRegion: payload?.aiHomeRegion,
+    });
     return getGameStateForPlayer('human', { maskUnexploredTerrain: false });
   });
   ipcMain.handle('game:submitOrders', (_event, payload: SubmitOrdersPayload | { unitId: string; toH3Index: string }[]) => {

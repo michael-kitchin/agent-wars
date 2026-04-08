@@ -75,6 +75,10 @@ import {
   refreshFogOfWarIntelFromCurrentState as refreshFogOfWarIntelFromCurrentStateFromModule,
 } from './game-db/fogState';
 import { resetGameForNewMatch as resetGameForNewMatchFromModule } from './game-db/resetGame';
+import {
+  getScenarioHomeRegionHexes as getScenarioHomeRegionHexesFromModule,
+  listScenarioHomeRegions as listScenarioHomeRegionsFromModule,
+} from './regionScenario';
 
 export type { GameStateSnapshot } from '../shared/ipcTypes';
 export type { AiLossEventSinceConsultation } from './game-db/aiState';
@@ -365,6 +369,32 @@ export function getGameSeed(): number {
 }
 
 /**
+ * Why this exists:
+ *     Returns canonical region-vs-region home-region names sourced from res1 naming data.
+ * When to use:
+ *     New-game UI option population and main-process payload validation.
+ * What to expect:
+ *     Sorted unique non-empty names; throws only when underlying naming metadata fails to load/validate.
+ */
+export function listScenarioHomeRegions(): string[] {
+  logTrace('gameDb listScenarioHomeRegions');
+  return listScenarioHomeRegionsFromModule();
+}
+
+/**
+ * Why this exists:
+ *     Resolves res1 home-region hex membership for scenario objective checks and renderer outlines.
+ * When to use:
+ *     Region-vs-region win-condition checks and snapshot enrichment.
+ * What to expect:
+ *     Sorted unique h3 list for known names; empty array for unknown/blank names.
+ */
+export function getScenarioHomeRegionHexes(regionName: string): string[] {
+  logTrace('gameDb getScenarioHomeRegionHexes', { regionName });
+  return getScenarioHomeRegionHexesFromModule(regionName);
+}
+
+/**
  * Seeds all world hexes from bundled `terrain_res1_metadata.json` via the in-memory classification cache:
  * `terrain` is passability (land / water / coastal / wetlands); `terrain_kind` preserves pipeline labels for the renderer.
  */
@@ -496,6 +526,7 @@ function insertRes4FeatureOverrideSeedRow(row: ReturnType<typeof getRes4FeatureR
 function seedUnits(): void {
   seedUnitsFromModule({
     run,
+    getOne,
     getAll,
     allocateNextUnitDisplayOrder,
     hasDb: () => db !== null,
@@ -995,7 +1026,11 @@ export function clearAiPendingOrders(playerId: string): void {
  * pending orders, callbacks, AI memory, and standing orders cleared so no prior-match AI state leaks.
  * Optionally disables fog of war for the new match so both sides always receive full-map/full-unit snapshots.
  */
-export function resetGameForNewMatch(options?: { fogOfWarEnabled?: boolean }): void {
+export function resetGameForNewMatch(options?: {
+  fogOfWarEnabled?: boolean;
+  humanHomeRegion?: string;
+  aiHomeRegion?: string;
+}): void {
   resetGameForNewMatchFromModule(
     {
       hasDb: () => db !== null,

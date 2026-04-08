@@ -8,7 +8,7 @@ import * as assert from 'assert';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { cellToLatLng, gridDistance } from 'h3-js';
+import { gridDistance } from 'h3-js';
 import { resolveAirStrikePhase } from './game-actions/airStrikeResolution';
 import type { AirStrikeTargetType } from '../shared/ipcTypes';
 import { AIR_STRIKE_RANGE_HEXES } from '../shared/tacticalRanges';
@@ -144,61 +144,65 @@ function testSeededUnitsUseRegionalSpawnContracts(gameDb: typeof import('./gameD
   const p = path.join(dir, 't.sqlite');
   try {
     gameDb.openGameDatabaseAtPathForTests(p);
-    gameDb.resetGameForNewMatch();
-    const rows = gameDb.dbGetAll<{ h3Index: string; player: string; unitType: string; terrain: string }>(
-      `SELECT u.h3_index AS h3Index, u.player AS player, u.unit_type AS unitType, h.terrain AS terrain
+    const regions = gameDb.listScenarioHomeRegions();
+    assert.ok(regions.length > 0, 'expected at least one scenario home region');
+    const humanRegion = regions[0]!;
+    const aiRegion = regions[1] ?? regions[0]!;
+    gameDb.resetGameForNewMatch({ humanHomeRegion: humanRegion, aiHomeRegion: aiRegion });
+    const rows = gameDb.dbGetAll<{ h3Index: string; player: string; unitType: string; terrain: string; terrainKind: string }>(
+      `SELECT u.h3_index AS h3Index, u.player AS player, u.unit_type AS unitType, h.terrain AS terrain, h.terrain_kind AS terrainKind
        FROM units u
        JOIN hexes h ON h.h3_index = u.h3_index`
     );
     assert.ok(rows.length > 0, 'expected resetGameForNewMatch to seed units');
-
-    const inNortheastAsia = (lat: number, lng: number) =>
-      (lat >= 35 && lat <= 78 && lng >= 95 && lng <= 180) ||
-      (lat >= 30 && lat <= 80 && lng >= 80 && lng <= 180) ||
-      (lat >= 20 && lat <= 82 && lng >= 60 && lng <= 180);
-    const inSouthernAfrica = (lat: number, lng: number) =>
-      (lat >= -38 && lat <= -22 && lng >= 10 && lng <= 42) ||
-      (lat >= -42 && lat <= -18 && lng >= 5 && lng <= 45) ||
-      (lat >= -45 && lat <= -12 && lng >= -5 && lng <= 50) ||
-      (lat >= -50 && lat <= -5 && lng >= -20 && lng <= 55);
-    const inPacific = (lat: number, lng: number) => lat >= -55 && lat <= 55 && (lng >= 120 || lng <= -90);
-    const inAtlantic = (lat: number, lng: number) => lat >= -55 && lat <= 60 && lng >= -75 && lng <= 20;
-    const inIndian = (lat: number, lng: number) => lat >= -50 && lat <= 30 && lng >= 20 && lng <= 120;
-    let humanLandInAsia = 0;
-    let humanLandInAfrica = 0;
-    let opponentLandInAsia = 0;
-    let opponentLandInAfrica = 0;
-
+    const humanRegionHexes = new Set(gameDb.getScenarioHomeRegionHexes(humanRegion));
+    const aiRegionHexes = new Set(gameDb.getScenarioHomeRegionHexes(aiRegion));
+    assert.ok(humanRegionHexes.size > 0, 'expected human region to map to at least one hex');
+    assert.ok(aiRegionHexes.size > 0, 'expected AI region to map to at least one hex');
+    const passableLandKinds = new Set(['plains', 'mountain', 'wetlands', 'coastal', 'desert', 'forest']);
     for (const row of rows) {
-      const [lat, lng] = cellToLatLng(row.h3Index);
+      const expectedRegionHexes = row.player === 'human' ? humanRegionHexes : aiRegionHexes;
+      assert.ok(expectedRegionHexes.has(row.h3Index), `expected ${row.player} unit ${row.h3Index} to spawn in selected region`);
       if (row.unitType === 'naval') {
-        assert.ok(row.terrain === 'water', `expected naval unit ${row.h3Index} on water terrain`);
-        assert.ok(
-          inPacific(lat, lng) || inAtlantic(lat, lng) || inIndian(lat, lng),
-          `expected naval unit at ${row.h3Index} in Pacific/Atlantic/Indian ocean`
-        );
-        continue;
-      }
-      assert.strictEqual(row.terrain, 'land', `expected land unit ${row.h3Index} on land terrain`);
-      const isAsia = inNortheastAsia(lat, lng);
-      const isAfrica = inSouthernAfrica(lat, lng);
-      assert.ok(isAsia || isAfrica, `expected land unit at ${row.h3Index} in northeast Asia or southern Africa`);
-      if (row.player === 'human') {
-        if (isAsia) humanLandInAsia++;
-        if (isAfrica) humanLandInAfrica++;
-      } else {
-        if (isAsia) opponentLandInAsia++;
-        if (isAfrica) opponentLandInAfrica++;
+        assert.ok(row.terrain === 'water' || row.terrain === 'coastal', 'expected naval spawn on water/coastal terrain');
+      } else if (row.unitType === 'infantry' || row.unitType === 'armor') {
+        assert.ok(passableLandKinds.has(row.terrainKind), `expected land unit terrain kind to be passable land, got ${row.terrainKind}`);
       }
     }
-    const humanAllInAsia = humanLandInAsia > 0 && humanLandInAfrica === 0;
-    const humanAllInAfrica = humanLandInAfrica > 0 && humanLandInAsia === 0;
-    const opponentAllInAsia = opponentLandInAsia > 0 && opponentLandInAfrica === 0;
-    const opponentAllInAfrica = opponentLandInAfrica > 0 && opponentLandInAsia === 0;
-    assert.ok(
-      (humanAllInAsia && opponentAllInAfrica) || (humanAllInAfrica && opponentAllInAsia),
-      `expected randomized side assignment (one side in Asia, other in Africa), got human asia=${humanLandInAsia} africa=${humanLandInAfrica}, opponent asia=${opponentLandInAsia} africa=${opponentLandInAfrica}`
-    );
+    const humanState = gameDb.getGameStateForPlayer('human', { maskUnexploredTerrain: false });
+    assert.strictEqual(humanState.scenarioId, 'region_vs_region');
+    assert.strictEqual(humanState.humanHomeRegion, humanRegion);
+    assert.strictEqual(humanState.aiHomeRegion, aiRegion);
+    assert.deepStrictEqual(humanState.humanHomeRegionHexes, gameDb.getScenarioHomeRegionHexes(humanRegion));
+    assert.deepStrictEqual(humanState.aiHomeRegionHexes, gameDb.getScenarioHomeRegionHexes(aiRegion));
+  } finally {
+    gameDb.closeGameDatabaseForTests();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function testScenarioHomeRegionListIsSortedUnique(gameDb: typeof import('./gameDb')): void {
+  const regions = gameDb.listScenarioHomeRegions();
+  assert.ok(regions.length > 0, 'expected non-empty scenario home region list');
+  const sorted = [...regions].sort((a, b) => a.localeCompare(b));
+  assert.deepStrictEqual(regions, sorted, 'expected scenario home regions to be sorted');
+  assert.strictEqual(new Set(regions).size, regions.length, 'expected scenario home regions to be unique');
+}
+
+function testResetNormalizesInvalidScenarioHomeRegions(gameDb: typeof import('./gameDb')): void {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
+  const p = path.join(dir, 't.sqlite');
+  try {
+    gameDb.openGameDatabaseAtPathForTests(p);
+    gameDb.resetGameForNewMatch({
+      humanHomeRegion: 'not-a-real-region',
+      aiHomeRegion: '',
+    });
+    const state = gameDb.getGameStateForPlayer('human', { maskUnexploredTerrain: false });
+    const regionOptions = gameDb.listScenarioHomeRegions();
+    assert.strictEqual(state.scenarioId, 'region_vs_region');
+    assert.ok(typeof state.humanHomeRegion === 'string' && regionOptions.includes(state.humanHomeRegion), 'expected normalized human home region');
+    assert.ok(typeof state.aiHomeRegion === 'string' && regionOptions.includes(state.aiHomeRegion), 'expected normalized AI home region');
   } finally {
     gameDb.closeGameDatabaseForTests();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -469,6 +473,8 @@ function run(): void {
   testResetRegeneratesTerrain(gameDb);
   testResetSeedsInfrastructureState(gameDb);
   testRendererRes4OverridesIncludeInfrastructureFeatureRows(gameDb);
+  testScenarioHomeRegionListIsSortedUnique(gameDb);
+  testResetNormalizesInvalidScenarioHomeRegions(gameDb);
   testOpenExistingDatabaseReconcilesRes1InfrastructureDrift(gameDb);
   testOpenExistingDatabaseInstallsInfrastructureSyncTriggers(gameDb);
   testRes1InfrastructureStaysInSyncWhenRes4FeaturesChange(gameDb);

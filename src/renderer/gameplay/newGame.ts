@@ -1,6 +1,20 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
 import { resetPrecomputedAiState } from '../openRouter/precomputedAiState';
+import {
+  getSelectedScenarioRegions,
+  initializeScenarioRegionSelectorsOnOverlayOpen,
+  randomizeScenarioRegionSelect,
+} from './newGameRegionUi';
+
+function registerRegionRandomizeButtons(): void {
+  document.getElementById('new-game-human-region-randomize')?.addEventListener('click', () => {
+    randomizeScenarioRegionSelect('new-game-human-region-select');
+  });
+  document.getElementById('new-game-ai-region-randomize')?.addEventListener('click', () => {
+    randomizeScenarioRegionSelect('new-game-ai-region-select');
+  });
+}
 
 type NewGameDeps = {
   refreshRes4TerrainOverridesForRenderer: () => Promise<void>;
@@ -25,12 +39,17 @@ type NewGameDeps = {
 };
 
 export function registerNewGameButton(deps: NewGameDeps): void {
+  void initializeScenarioRegionSelectorsOnOverlayOpen();
+  registerRegionRandomizeButtons();
   document.getElementById('new-game-btn')?.addEventListener('click', async () => {
     if (!window.gameApi?.newGame) return;
     try {
       const fogCheckbox = document.getElementById('new-game-fog-checkbox') as HTMLInputElement | null;
+      const selectedRegions = getSelectedScenarioRegions();
       const state = (await window.gameApi.newGame({
         fogOfWarEnabled: fogCheckbox?.checked !== false,
+        humanHomeRegion: selectedRegions.humanHomeRegion,
+        aiHomeRegion: selectedRegions.aiHomeRegion,
       })) as GameStateSnapshot;
       await deps.refreshRes4TerrainOverridesForRenderer();
       S.gameState = state;
@@ -88,6 +107,7 @@ export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enable
   }
   if (newGameBtn) newGameBtn.textContent = 'Start game';
   if (fogCheckbox) fogCheckbox.checked = true;
+  void initializeScenarioRegionSelectorsOnOverlayOpen();
   overlay?.classList.remove('hidden');
   setMainUIControlsEnabled(false);
   updateReadyButtonState();

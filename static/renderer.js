@@ -15617,6 +15617,52 @@
     return explored.has(h3Index);
   }
 
+  // src/renderer/gameplay/newGameRegionUi.ts
+  var HUMAN_REGION_SELECT_ID = "new-game-human-region-select";
+  var AI_REGION_SELECT_ID = "new-game-ai-region-select";
+  function getRegionSelect(id) {
+    return document.getElementById(id);
+  }
+  function randomizeScenarioRegionSelect(id) {
+    const select = getRegionSelect(id);
+    if (!select || select.options.length <= 0) return;
+    const idx = Math.floor(Math.random() * select.options.length);
+    select.selectedIndex = idx;
+  }
+  function randomizeScenarioRegionSelects() {
+    randomizeScenarioRegionSelect(HUMAN_REGION_SELECT_ID);
+    randomizeScenarioRegionSelect(AI_REGION_SELECT_ID);
+  }
+  async function ensureScenarioRegionOptionsLoaded() {
+    const humanSelect = getRegionSelect(HUMAN_REGION_SELECT_ID);
+    const aiSelect = getRegionSelect(AI_REGION_SELECT_ID);
+    if (!humanSelect || !aiSelect) return;
+    if (humanSelect.options.length > 0 && aiSelect.options.length > 0) return;
+    const regions = await window.gameApi?.listScenarioHomeRegions?.();
+    if (!Array.isArray(regions) || regions.length <= 0) return;
+    const renderOptions = (select) => {
+      select.innerHTML = "";
+      for (const region of regions) {
+        const option = document.createElement("option");
+        option.value = region;
+        option.textContent = region;
+        select.appendChild(option);
+      }
+    };
+    renderOptions(humanSelect);
+    renderOptions(aiSelect);
+  }
+  async function initializeScenarioRegionSelectorsOnOverlayOpen() {
+    await ensureScenarioRegionOptionsLoaded();
+    randomizeScenarioRegionSelects();
+  }
+  function getSelectedScenarioRegions() {
+    return {
+      humanHomeRegion: getRegionSelect(HUMAN_REGION_SELECT_ID)?.value ?? "",
+      aiHomeRegion: getRegionSelect(AI_REGION_SELECT_ID)?.value ?? ""
+    };
+  }
+
   // src/renderer/core/uiState.ts
   function updateSidebar(getPrimarySelectedUnitId2, formatUnitDisplayName2) {
     const selectedUnitEl = document.getElementById("sidebar-selected-unit");
@@ -15655,6 +15701,7 @@
     const noGame = !state || state.hexes.length === 0;
     const gameOver = !!state?.gameOver;
     const showOverlay = noGame || gameOver;
+    const wasHidden = overlay?.classList.contains("hidden") !== false;
     if (!showOverlay) {
       overlay?.classList.add("hidden");
       setMainUIControlsEnabled(true);
@@ -15664,6 +15711,9 @@
     }
     overlay?.classList.remove("hidden");
     if (fogCheckbox) fogCheckbox.checked = true;
+    if (wasHidden) {
+      void initializeScenarioRegionSelectorsOnOverlayOpen();
+    }
     setMainUIControlsEnabled(false);
     if (messageEl) {
       if (gameOver) {
@@ -15703,13 +15753,26 @@
   }
 
   // src/renderer/gameplay/newGame.ts
+  function registerRegionRandomizeButtons() {
+    document.getElementById("new-game-human-region-randomize")?.addEventListener("click", () => {
+      randomizeScenarioRegionSelect("new-game-human-region-select");
+    });
+    document.getElementById("new-game-ai-region-randomize")?.addEventListener("click", () => {
+      randomizeScenarioRegionSelect("new-game-ai-region-select");
+    });
+  }
   function registerNewGameButton(deps) {
+    void initializeScenarioRegionSelectorsOnOverlayOpen();
+    registerRegionRandomizeButtons();
     document.getElementById("new-game-btn")?.addEventListener("click", async () => {
       if (!window.gameApi?.newGame) return;
       try {
         const fogCheckbox = document.getElementById("new-game-fog-checkbox");
+        const selectedRegions = getSelectedScenarioRegions();
         const state = await window.gameApi.newGame({
-          fogOfWarEnabled: fogCheckbox?.checked !== false
+          fogOfWarEnabled: fogCheckbox?.checked !== false,
+          humanHomeRegion: selectedRegions.humanHomeRegion,
+          aiHomeRegion: selectedRegions.aiHomeRegion
         });
         await deps.refreshRes4TerrainOverridesForRenderer();
         rendererSharedState.gameState = state;
@@ -15766,6 +15829,7 @@
     }
     if (newGameBtn) newGameBtn.textContent = "Start game";
     if (fogCheckbox) fogCheckbox.checked = true;
+    void initializeScenarioRegionSelectorsOnOverlayOpen();
     overlay?.classList.remove("hidden");
     setMainUIControlsEnabled3(false);
     updateReadyButtonState2();
@@ -18136,7 +18200,46 @@
     }
   }
 
+  // src/renderer/rendering/polygonOutline.ts
+  function drawClosedPolygonPath(ctx, points) {
+    ctx.beginPath();
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath();
+  }
+  function strokeDualClosedPolygon(ctx, points, styles) {
+    drawClosedPolygonPath(ctx, points);
+    ctx.strokeStyle = styles.underStrokeColor;
+    ctx.lineWidth = styles.underStrokeWidth;
+    ctx.stroke();
+    ctx.strokeStyle = styles.topStrokeColor;
+    ctx.lineWidth = styles.topStrokeWidth;
+    ctx.stroke();
+  }
+
   // src/renderer/rendering/terrainRendering.ts
+  function withOpacity(color, alpha) {
+    const normalizedAlpha = Math.max(0, Math.min(1, alpha));
+    if (color.startsWith("#")) {
+      const hex = color.slice(1);
+      if (hex.length === 3) {
+        const r = Number.parseInt(`${hex[0]}${hex[0]}`, 16);
+        const g = Number.parseInt(`${hex[1]}${hex[1]}`, 16);
+        const b = Number.parseInt(`${hex[2]}${hex[2]}`, 16);
+        return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
+      }
+      if (hex.length === 6) {
+        const r = Number.parseInt(hex.slice(0, 2), 16);
+        const g = Number.parseInt(hex.slice(2, 4), 16);
+        const b = Number.parseInt(hex.slice(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
+      }
+    }
+    return color;
+  }
   function drawTerrainHexes(ctx, deps) {
     if (!rendererSharedState.gameState) return;
     const exploredHexes = deps.getExploredHexSet(rendererSharedState.gameState);
@@ -18238,6 +18341,36 @@
         ctx.stroke();
       }
     }
+  }
+  function drawScenarioHomeRegionOutlines(ctx) {
+    const state = rendererSharedState.gameState;
+    if (!state || state.scenarioId !== "region_vs_region") return;
+    const map = getMainLeafletMap();
+    if (!map) return;
+    const L = getLeafletGlobal();
+    const zoom = typeof map.getZoom === "function" ? map.getZoom() : 4;
+    const zoomScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
+    const sameRegion = typeof state.humanHomeRegion === "string" && typeof state.aiHomeRegion === "string" && state.humanHomeRegion.length > 0 && state.humanHomeRegion === state.aiHomeRegion;
+    const humanColor = sameRegion ? MULTI_PLAYER_FILL : PLAYER_COLORS.human ?? "#2e5a7b";
+    const aiColor = sameRegion ? MULTI_PLAYER_FILL : PLAYER_COLORS.opponent ?? "#7b4a2e";
+    const drawRegion = (hexes, color) => {
+      if (!Array.isArray(hexes) || hexes.length <= 0) return;
+      for (const h3Index of hexes) {
+        const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
+        const pts = boundary.map(([lat, lng]) => {
+          const p = map.latLngToContainerPoint(L.latLng(lat, lng));
+          return { x: p.x, y: p.y };
+        });
+        strokeDualClosedPolygon(ctx, pts, {
+          underStrokeColor: "rgba(0, 0, 0, 0.25)",
+          underStrokeWidth: Math.max(1.2, 2.2 * zoomScale),
+          topStrokeColor: withOpacity(color, 0.5),
+          topStrokeWidth: Math.max(0.75, 1.25 * zoomScale) * 0.75 * 1.5
+        });
+      }
+    };
+    drawRegion(state.humanHomeRegionHexes, humanColor);
+    drawRegion(state.aiHomeRegionHexes, aiColor);
   }
   function hasVisibleRes1InfrastructureGlyphs(h3Index, res4On, unitHexes, deps) {
     void unitHexes;
@@ -19578,6 +19711,9 @@
       infraGlyphsAllowedForRes4Child
     });
   }
+  function drawScenarioHomeRegionOutlines2(ctx) {
+    return drawScenarioHomeRegionOutlines(ctx);
+  }
   function infraGlyphsAllowedForRes1Hex(h3) {
     if (!isHexExploredByPlayer2(h3)) return false;
     return true;
@@ -19702,6 +19838,7 @@
     ctx.clearRect(0, 0, width, height);
     drawTerrainHexes2(ctx);
     drawRes4TerrainHexes2(ctx);
+    drawScenarioHomeRegionOutlines2(ctx);
     const hexList = state.hexes.map((h) => h.h3Index);
     let moveProgress = 1;
     let airStrikeOutboundProgress = 1;

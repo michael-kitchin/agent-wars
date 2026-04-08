@@ -384,6 +384,48 @@
       font-size: 0.95rem;
       color: #222;
     }
+    .game-over-region-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 0.9rem;
+      margin: 0 0 0.7rem 0;
+    }
+    .game-over-region-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 0.22rem;
+      min-width: 220px;
+      text-align: left;
+    }
+    .game-over-region-cell label {
+      font-size: 0.88rem;
+      color: #222;
+      font-weight: 600;
+    }
+    .game-over-region-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .game-over-region-controls select {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-size: 12px;
+      padding: 0.16rem 0.28rem;
+      border: 1px solid #aaa;
+      border-radius: 2px;
+      background: #f8f6f3;
+    }
+    .game-over-region-randomize {
+      min-width: 1.2rem;
+      width: 1.2rem;
+      height: 1.2rem;
+      padding: 0;
+      line-height: 1;
+      font-size: 11px;
+      font-weight: 700;
+    }
     .map-toast p { margin: 0; flex: 1; white-space: pre-line; }
     #map-toast-dismiss {
       flex-shrink: 0;
@@ -698,6 +740,22 @@
     <div id="game-over-overlay" class="game-over-overlay hidden" aria-live="polite">
       <div class="game-over-box">
         <p id="game-over-message"></p>
+        <div class="game-over-region-row">
+          <div class="game-over-region-cell">
+            <label for="new-game-human-region-select">Human Player:</label>
+            <div class="game-over-region-controls">
+              <select id="new-game-human-region-select"></select>
+              <button type="button" id="new-game-human-region-randomize" class="compact-blue-btn compact-square-btn game-over-region-randomize" aria-label="Randomize human home region">↻</button>
+            </div>
+          </div>
+          <div class="game-over-region-cell">
+            <label for="new-game-ai-region-select">AI Player:</label>
+            <div class="game-over-region-controls">
+              <select id="new-game-ai-region-select"></select>
+              <button type="button" id="new-game-ai-region-randomize" class="compact-blue-btn compact-square-btn game-over-region-randomize" aria-label="Randomize AI home region">↻</button>
+            </div>
+          </div>
+        </div>
         <label class="game-over-options" for="new-game-fog-checkbox">
           <input type="checkbox" id="new-game-fog-checkbox" checked />
           Fog of war

@@ -213,6 +213,7 @@ import { wireInitCore as wireInitCoreFromModule } from './map/initCore';
 import {
   computeRes1OverlayTextY as computeRes1OverlayTextYFromModule,
   drawRes4TerrainHexes as drawRes4TerrainHexesFromModule,
+  drawScenarioHomeRegionOutlines as drawScenarioHomeRegionOutlinesFromModule,
   drawTerrainHexes as drawTerrainHexesFromModule,
   drawTerrainInfrastructureOverlays as drawTerrainInfrastructureOverlaysFromModule,
   hasVisibleRes1InfrastructureGlyphs as hasVisibleRes1InfrastructureGlyphsFromModule,
@@ -1633,6 +1634,10 @@ function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void {
   });
 }
 
+function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): void {
+  return drawScenarioHomeRegionOutlinesFromModule(ctx);
+}
+
 /**
  * Res-1 glyphs track terrain fill visibility and are hidden while T is held.
  */
@@ -1842,6 +1847,7 @@ function drawGameScene(
   ctx.clearRect(0, 0, width, height);
   drawTerrainHexes(ctx);
   drawRes4TerrainHexes(ctx);
+  drawScenarioHomeRegionOutlines(ctx);
   const hexList = state.hexes.map((h) => h.h3Index);
   let moveProgress = 1;
   let airStrikeOutboundProgress = 1;
