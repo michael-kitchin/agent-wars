@@ -31,7 +31,13 @@ function sleepMs(ms) {
 
 function isBetterSqliteLoadableForRuntime(targetRuntime) {
   if (targetRuntime === 'node') {
-    return run('node', ['-e', "require('better-sqlite3');"]) === 0;
+    return (
+      run(
+        'node',
+        ['-e', "new (require('better-sqlite3'))(':memory:').close()"],
+        { shell: false }
+      ) === 0
+    );
   }
   // Electron does not support Node-style "-e" execution for module checks.
   // Runtime validation for Electron is therefore based on rebuild command success.
@@ -69,8 +75,15 @@ if (runtime === 'electron') {
 
 let code = run('npx', prebuildArgs, { cwd: betterSqlite });
 if (code === 0) {
+  if (runtime === 'node' && !isBetterSqliteLoadableForRuntime(runtime)) {
+    console.warn(
+      'rebuild-native: prebuild-install reported success, but better-sqlite3 is still not loadable for node runtime; falling back to npm rebuild.'
+    );
+    code = 1;
+  } else {
   console.log(`rebuild-native: better-sqlite3 ready (${runtime} prebuilt binary).`);
   process.exit(0);
+  }
 }
 
 if (runtime === 'electron') {
