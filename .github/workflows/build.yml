@@ -39,6 +39,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Rebuild better-sqlite3 for Node (tests)
+        run: npm run rebuild:native:node
+
       - name: Read app version
         id: app_version
         run: node -e "const fs=require('fs');const v=require('./package.json').version;fs.appendFileSync(process.env.GITHUB_OUTPUT, 'value='+v+String.fromCharCode(10));"
@@ -47,7 +50,7 @@ jobs:
         run: npm run test
 
       - name: Rebuild better-sqlite3 for Electron (packaging)
-        run: npx electron-rebuild -f -w better-sqlite3
+        run: npm run rebuild:native:electron
 
       - name: Build (Windows)
         if: runner.os == 'Windows'

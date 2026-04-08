@@ -1,5 +1,10 @@
 import { cellToChildren } from 'h3-js';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import {
+  classifyHomeRegionOutlineState,
+  computeContestedHomeRegionHexes,
+  computeIntersectingHomeRegionHexes,
+} from '../../shared/homeRegionRules';
 import { getHexBoundaryLatLngForLeafletOverlay } from '../map/hexGrid';
 import { getActiveHexStrokeStyle, fillHexTerrain } from './terrainVisualStyles';
 import { drawTerrainInfrastructureGlyphs, RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE } from './terrainInfrastructureOverlay';
@@ -42,6 +47,10 @@ function withOpacity(color: string, alpha: number): string {
     }
   }
   return color;
+}
+
+function buildControlByHex(state: GameStateSnapshot): Map<string, string | null> {
+  return new Map((state.res1Control ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
 }
 
 export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void {
@@ -168,14 +177,30 @@ export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): v
   const L = getLeafletGlobal();
   const zoom = typeof map.getZoom === 'function' ? map.getZoom() : 4;
   const zoomScale = Math.max(0.88, Math.min(1.22, 1.22 - ((zoom - 2) * (0.32 / 8))));
-  const sameRegion =
-    typeof state.humanHomeRegion === 'string' &&
-    typeof state.aiHomeRegion === 'string' &&
-    state.humanHomeRegion.length > 0 &&
-    state.humanHomeRegion === state.aiHomeRegion;
-  const humanColor = sameRegion ? MULTI_PLAYER_FILL : (PLAYER_COLORS.human ?? '#2e5a7b');
-  const aiColor = sameRegion ? MULTI_PLAYER_FILL : (PLAYER_COLORS.opponent ?? '#7b4a2e');
-  const drawRegion = (hexes: string[] | undefined, color: string): void => {
+  const humanColor = PLAYER_COLORS.human ?? '#2e5a7b';
+  const aiColor = PLAYER_COLORS.opponent ?? '#7b4a2e';
+  const intersectionHexes = new Set(
+    state.intersectingHomeRegionHexes ??
+      computeIntersectingHomeRegionHexes(state.humanHomeRegionHexes ?? [], state.aiHomeRegionHexes ?? [])
+  );
+  const contestedHomeHexes = new Set(
+    state.contestedHomeRegionHexes ??
+      computeContestedHomeRegionHexes(state.units, [...(state.humanHomeRegionHexes ?? []), ...(state.aiHomeRegionHexes ?? [])])
+  );
+  const controlByHex = buildControlByHex(state);
+  const resolveHexOutlineColor = (h3Index: string, fallbackColor: string): string => {
+    const outlineState = classifyHomeRegionOutlineState(
+      h3Index,
+      intersectionHexes,
+      contestedHomeHexes,
+      controlByHex.get(h3Index)
+    );
+    if (outlineState === 'intersection' || outlineState === 'contested') return MULTI_PLAYER_FILL;
+    if (outlineState === 'controlledByHuman') return humanColor;
+    if (outlineState === 'controlledByOpponent') return aiColor;
+    return fallbackColor;
+  };
+  const drawRegion = (hexes: string[] | undefined, fallbackColor: string): void => {
     if (!Array.isArray(hexes) || hexes.length <= 0) return;
     for (const h3Index of hexes) {
       const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
@@ -183,10 +208,11 @@ export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): v
         const p = map.latLngToContainerPoint(L.latLng(lat, lng));
         return { x: p.x, y: p.y };
       });
+      const outlineColor = resolveHexOutlineColor(h3Index, fallbackColor);
       strokeDualClosedPolygon(ctx, pts, {
         underStrokeColor: 'rgba(0, 0, 0, 0.25)',
         underStrokeWidth: Math.max(1.2, 2.2 * zoomScale),
-        topStrokeColor: withOpacity(color, 0.5),
+        topStrokeColor: withOpacity(outlineColor, 0.5),
         topStrokeWidth: Math.max(0.75, 1.25 * zoomScale) * 0.75 * 1.5,
       });
     }

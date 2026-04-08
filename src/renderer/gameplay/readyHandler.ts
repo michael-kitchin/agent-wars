@@ -9,6 +9,7 @@ import { buildTurnUpdateBullets } from './turnUpdateSummary';
 import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
 import { rendererSharedState as S } from '../core/state';
 import { resetPrecomputedAiState } from '../openRouter/precomputedAiState';
+import { isWaitingForPrecomputedAiOrders } from '../openRouter/aiPlanningState';
 
 export interface ReadyHandlerDeps {
   clearSidebarError: () => void;
@@ -54,6 +55,110 @@ export interface ReadyHandlerDeps {
   redraw: () => void;
 }
 
+interface ReadyPayloadBuildArgs {
+  enabledToolGroupsPayload: string[];
+  useEventDriven: boolean;
+  usePrecomputed: boolean;
+}
+
+/**
+ * Use this to keep game:ready payload construction consistent for Run/event-driven/precomputed combinations.
+ * The payload never enables Ready-time AI planning, because Run mode requires background precomputation first.
+ */
+function buildReadyPayload(args: ReadyPayloadBuildArgs): GameReadyIpcPayload {
+  const { enabledToolGroupsPayload, useEventDriven, usePrecomputed } = args;
+  const base: GameReadyIpcPayload = {
+    enabledToolGroups: enabledToolGroupsPayload,
+    aiPlanningRunEnabled: false,
+  };
+  if (useEventDriven) {
+    base.useEventDrivenConsultation = true;
+  }
+  if (!usePrecomputed) return base;
+  base.precomputedAiOrders = S.precomputedAiOrders ?? [];
+  base.precomputedAiRangedOrders = S.precomputedAiRangedOrders ?? [];
+  base.precomputedAiEmbarkOrders = S.precomputedAiEmbarkOrders ?? [];
+  base.precomputedAiStrategy = S.precomputedAiStrategy ?? undefined;
+  return base;
+}
+
+interface CombatVisibilityClassification {
+  unknownCombatHexes: string[];
+  unknownCasualtyHexes: string[];
+  knownVictimIds: Set<string>;
+  unknownVictimIds: string[];
+}
+
+/**
+ * Use this to classify combat visibility for turn updates and unknown-battle announcements.
+ * Human-involved combat is treated as observable even when the post-resolution hex is not currently visible.
+ */
+function deriveCombatVisibilityClassification(
+  readyResult: ReadyResult,
+  visibleHexes: ReadonlySet<string>
+): CombatVisibilityClassification {
+  const allKills = readyResult.kills ?? [];
+  const removedById = new Map<string, RemovedUnitSnapshot>((readyResult.removedUnits ?? []).map((u) => [u.id, u] as const));
+  const friendlyInvolvedKillVictimIds = new Set<string>(
+    allKills
+      .filter((k) => {
+        const victim = removedById.get(k.victimId);
+        const killerIsFriendly = k.killerIds.some((id) => id.startsWith('human-'));
+        const victimIsFriendly = victim?.player === 'human';
+        return killerIsFriendly || victimIsFriendly;
+      })
+      .map((k) => k.victimId)
+  );
+  const friendlyInvolvedCombatHexes = new Set(
+    [...friendlyInvolvedKillVictimIds]
+      .map((victimId) => removedById.get(victimId)?.h3Index ?? null)
+      .filter((h3): h3 is string => typeof h3 === 'string')
+  );
+  const friendlyPlannedCombatHexes = new Set<string>([
+    ...(readyResult.humanMoves ?? []).flatMap((move) => [move.fromH3Index, move.toH3Index]),
+    ...S.pendingRangedAttacks.map((order) => order.targetH3Index),
+    ...S.pendingAirStrikes.map((order) => order.targetH3Index),
+    ...(readyResult.airStrikeMoves ?? [])
+      .filter((move) => move.player === 'human')
+      .flatMap((move) => [move.fromH3Index, move.targetH3Index]),
+    ...(readyResult.removedUnits ?? []).filter((unit) => unit.player === 'human').map((unit) => unit.h3Index),
+  ]);
+  for (const h3 of friendlyPlannedCombatHexes) friendlyInvolvedCombatHexes.add(h3);
+  const knownHumanAirStrikeTargetHexes = new Set(
+    (readyResult.airStrikeMoves ?? []).filter((move) => move.player === 'human').map((move) => move.targetH3Index)
+  );
+  const unknownCombatHexes = [
+    ...(readyResult.airStrikeHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
+    ...(readyResult.rangedCombatHexes ?? []),
+    ...(readyResult.meleeCombatHexes ?? []),
+    ...(readyResult.combatHexes ?? []),
+  ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
+  const unknownCasualtyHexes = [
+    ...(readyResult.airStrikeCasualtyHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
+    ...(readyResult.rangedCasualtyHexes ?? []),
+    ...(readyResult.meleeCasualtyHexes ?? []),
+    ...(readyResult.casualtyHexes ?? []),
+  ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
+  const knownVictimIds = new Set((readyResult.removedUnits ?? []).filter((u) => visibleHexes.has(u.h3Index)).map((u) => u.id));
+  for (const removed of readyResult.removedUnits ?? []) {
+    if (removed.player === 'human') knownVictimIds.add(removed.id);
+  }
+  for (const victimId of friendlyInvolvedKillVictimIds) knownVictimIds.add(victimId);
+  const unknownVictimIds = allKills
+    .map((k) => k.victimId)
+    .filter((id, idx, arr) => arr.indexOf(id) === idx)
+    .filter((id) => {
+      const removed = removedById.get(id);
+      if (removed?.player === 'human') return false;
+      return !friendlyInvolvedKillVictimIds.has(id);
+    })
+    .filter((id) => {
+      const removed = removedById.get(id);
+      return removed ? !visibleHexes.has(removed.h3Index) : false;
+    });
+  return { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds };
+}
+
 export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<void> {
   if (!window.gameApi) return;
   if (S.gameState?.gameOver) return;
@@ -63,6 +168,12 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
   deps.updateOpenRouterToolCountLabels();
   deps.updateReadyButtonState();
   try {
+    if (isWaitingForPrecomputedAiOrders()) {
+      deps.startBackgroundRequestIfAllowed();
+      deps.showMapToast('AI planning is still running. Ready will unlock once precomputed orders are available.', { isError: false });
+      deps.updateReadyButtonState();
+      return;
+    }
     const submitResult = (await window.gameApi.submitOrders({
       movementOrders: [],
       rangedAttacks: S.pendingRangedAttacks,
@@ -77,35 +188,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     const enabledToolGroupsPayload = Array.from(S.enabledToolGroups).filter((id) => id !== 'events');
     const useEventDriven = S.useEventDrivenConsultation;
     const usePrecomputed = S.runButtonOn && S.precomputedAiOrders !== null;
-    const readyPayload: GameReadyIpcPayload = useEventDriven
-      ? (usePrecomputed
-          ? {
-              enabledToolGroups: enabledToolGroupsPayload,
-              useEventDrivenConsultation: true,
-              aiPlanningRunEnabled: S.runButtonOn,
-              precomputedAiOrders: S.precomputedAiOrders!,
-              precomputedAiRangedOrders: S.precomputedAiRangedOrders ?? [],
-              precomputedAiEmbarkOrders: S.precomputedAiEmbarkOrders ?? [],
-              precomputedAiStrategy: S.precomputedAiStrategy ?? undefined,
-            }
-          : {
-              enabledToolGroups: enabledToolGroupsPayload,
-              useEventDrivenConsultation: true,
-              aiPlanningRunEnabled: S.runButtonOn,
-            })
-      : (usePrecomputed
-          ? {
-              enabledToolGroups: enabledToolGroupsPayload,
-              aiPlanningRunEnabled: S.runButtonOn,
-              precomputedAiOrders: S.precomputedAiOrders!,
-              precomputedAiRangedOrders: S.precomputedAiRangedOrders ?? [],
-              precomputedAiEmbarkOrders: S.precomputedAiEmbarkOrders ?? [],
-              precomputedAiStrategy: S.precomputedAiStrategy ?? undefined,
-            }
-          : {
-              enabledToolGroups: enabledToolGroupsPayload,
-              aiPlanningRunEnabled: S.runButtonOn,
-            });
+    const readyPayload = buildReadyPayload({ enabledToolGroupsPayload, useEventDriven, usePrecomputed });
     const readyResult = await deps.callReadyWithTimeout(readyPayload);
     if (!readyResult.success) {
       deps.showSidebarError(readyResult.reason ?? 'Ready failed');
@@ -170,37 +253,10 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       (readyResult.baseInvalidAirLossCount ?? 0) > 0;
     const visibleHexes = deps.getVisibleHexSet(state);
     const allKills = readyResult.kills ?? [];
-    const removedById = new Map<string, RemovedUnitSnapshot>((readyResult.removedUnits ?? []).map((u) => [u.id, u] as const));
-    const friendlyInvolvedKillVictimIds = new Set<string>(
-      allKills
-        .filter((k) => {
-          const victim = removedById.get(k.victimId);
-          const killerIsFriendly = k.killerIds.some((id) => id.startsWith('human-'));
-          const victimIsFriendly = victim?.player === 'human';
-          return killerIsFriendly || victimIsFriendly;
-        })
-        .map((k) => k.victimId)
+    const { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds } = deriveCombatVisibilityClassification(
+      readyResult,
+      visibleHexes
     );
-    const friendlyInvolvedCombatHexes = new Set(
-      [...friendlyInvolvedKillVictimIds]
-        .map((victimId) => removedById.get(victimId)?.h3Index ?? null)
-        .filter((h3): h3 is string => typeof h3 === 'string')
-    );
-    const knownHumanAirStrikeTargetHexes = new Set(
-      (readyResult.airStrikeMoves ?? []).filter((move) => move.player === 'human').map((move) => move.targetH3Index)
-    );
-    const unknownCombatHexes = [
-      ...(readyResult.airStrikeHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
-      ...(readyResult.rangedCombatHexes ?? []),
-      ...(readyResult.meleeCombatHexes ?? []),
-      ...(readyResult.combatHexes ?? []),
-    ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
-    const unknownCasualtyHexes = [
-      ...(readyResult.airStrikeCasualtyHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
-      ...(readyResult.rangedCasualtyHexes ?? []),
-      ...(readyResult.meleeCasualtyHexes ?? []),
-      ...(readyResult.casualtyHexes ?? []),
-    ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
     const needsAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution;
     if (needsAnimation) {
       if (S.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
@@ -225,8 +281,6 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       };
       const directFire = readyResult.killsByDirectFire ?? [];
       const returnFire = readyResult.killsByReturnFire ?? [];
-      const knownVictimIds = new Set((readyResult.removedUnits ?? []).filter((u) => visibleHexes.has(u.h3Index)).map((u) => u.id));
-      for (const victimId of friendlyInvolvedKillVictimIds) knownVictimIds.add(victimId);
       const directSet = new Set(directFire.map((k) => k.victimId));
       const returnSet = new Set(returnFire.map((k) => k.victimId));
       const meleeKills = allKills.filter((k) => !directSet.has(k.victimId) && !returnSet.has(k.victimId));
@@ -243,14 +297,6 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         formatUnitName: killToastFormatter.formatUnitName,
       });
       if (bullets.length > 0) deps.showMapToast(bullets.join('\n'), { isError: false });
-      const unknownVictimIds = allKills
-        .map((k) => k.victimId)
-        .filter((id, idx, arr) => arr.indexOf(id) === idx)
-        .filter((id) => !friendlyInvolvedKillVictimIds.has(id))
-        .filter((id) => {
-          const removed = removedById.get(id);
-          return removed ? !visibleHexes.has(removed.h3Index) : false;
-        });
       const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
       if (hasUnknownBattle) {
         const unknownContinentNames: string[] = [];

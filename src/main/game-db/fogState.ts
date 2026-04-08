@@ -3,6 +3,11 @@ import { LATLNG_DECIMAL_PLACES, getOrderedHexList } from '../mapData';
 import { computeVisibleHexesForSide } from '../visibility';
 import type { BuildUnitType } from '../productionRules';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import {
+  computeContestedHomeRegionHexes,
+  computeIntersectingHomeRegionHexes,
+  getForcedVisibleHomeRegionHexesForPlayer,
+} from '../../shared/homeRegionRules';
 import { logDebug, logTrace } from '../logger';
 import type { Res1InfrastructureRow } from './controlInfrastructure';
 import type { GuardedDbOps } from './dbOps';
@@ -29,13 +34,22 @@ function withScenarioMetadata(snapshot: GameStateSnapshot, ops: FogDbOps): GameS
   if (scenario.scenarioId !== REGION_VS_REGION_SCENARIO_ID) return snapshot;
   const humanHomeRegion = scenario.humanHomeRegion;
   const aiHomeRegion = scenario.aiHomeRegion;
+  const humanHomeRegionHexes = getScenarioHomeRegionHexes(humanHomeRegion);
+  const aiHomeRegionHexes = getScenarioHomeRegionHexes(aiHomeRegion);
+  const intersectingHomeRegionHexes = computeIntersectingHomeRegionHexes(humanHomeRegionHexes, aiHomeRegionHexes);
+  const contestedHomeRegionHexes = computeContestedHomeRegionHexes(
+    snapshot.units,
+    [...humanHomeRegionHexes, ...aiHomeRegionHexes]
+  );
   return {
     ...snapshot,
     scenarioId: 'region_vs_region',
     humanHomeRegion,
     aiHomeRegion,
-    humanHomeRegionHexes: getScenarioHomeRegionHexes(humanHomeRegion),
-    aiHomeRegionHexes: getScenarioHomeRegionHexes(aiHomeRegion),
+    humanHomeRegionHexes,
+    aiHomeRegionHexes,
+    intersectingHomeRegionHexes,
+    contestedHomeRegionHexes,
   };
 }
 
@@ -135,9 +149,23 @@ function refreshFogOfWarIntelForPlayer(
   logDebug('gameDb refreshFogOfWarIntelForPlayer', { playerId, currentTurn });
   const mapHexSet = new Set(state.hexes.map((h) => h.h3Index));
   const visibleHexes = computeVisibleHexesForSide(state, playerId, mapHexSet);
+  const forcedVisibleHomeHexes = getForcedVisibleHomeRegionHexesForPlayer(
+    state,
+    playerId === 'human' ? 'human' : 'opponent',
+    mapHexSet
+  );
+  for (const h3 of forcedVisibleHomeHexes) visibleHexes.add(h3);
+  logDebug('gameDb refreshFogOfWarIntelForPlayer: forced home-region visibility', {
+    playerId,
+    forcedVisibleHexCount: forcedVisibleHomeHexes.size,
+  });
   const ownOccupiedHexes = new Set(state.units.filter((u) => u.player === playerId).map((u) => u.h3Index));
   for (const h3 of ownOccupiedHexes) {
     ops.run(`INSERT OR IGNORE INTO player_hex_intel (player_id, h3_index, seen_state, last_seen_turn) VALUES (?, ?, 'visible', ?)`, [playerId, h3, currentTurn]);
+  }
+  for (const h3 of forcedVisibleHomeHexes) {
+    ops.run(`INSERT OR IGNORE INTO player_hex_intel (player_id, h3_index, seen_state, last_seen_turn) VALUES (?, ?, 'visible', ?)`, [playerId, h3, currentTurn]);
+    ops.run(`UPDATE player_hex_intel SET seen_state = 'visible', last_seen_turn = ? WHERE player_id = ? AND h3_index = ?`, [currentTurn, playerId, h3]);
   }
   for (const h3 of traversedHexes ?? []) {
     if (!mapHexSet.has(h3)) continue;
@@ -260,9 +288,12 @@ export function getGameStateForPlayer(
   }
   const mapHexSet = new Set(state.hexes.map((h) => h.h3Index));
   const visibleHexes = computeVisibleHexesForSide(state, playerId, mapHexSet);
+  const forcedVisibleHomeHexes = getForcedVisibleHomeRegionHexesForPlayer(state, playerId, mapHexSet);
+  for (const h3 of forcedVisibleHomeHexes) visibleHexes.add(h3);
   const visibleHexList = state.hexes.map((h) => h.h3Index).filter((h3) => visibleHexes.has(h3));
   const exploredRows = ops.getAll<{ h3_index: string }>('SELECT h3_index FROM player_hex_intel WHERE player_id = ?', [playerId]);
   const exploredHexes = new Set(exploredRows.map((r) => r.h3_index));
+  for (const h3 of forcedVisibleHomeHexes) exploredHexes.add(h3);
   const staleHexes = [...exploredHexes].filter((h3) => !visibleHexes.has(h3));
   const filteredHexes = options?.maskUnexploredTerrain === false
     ? state.hexes

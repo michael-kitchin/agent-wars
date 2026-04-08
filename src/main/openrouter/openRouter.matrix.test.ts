@@ -60,6 +60,7 @@ function buildFixtureState(hexes: string[]): {
   aiHomeRegion: string;
   humanHomeRegionHexes: string[];
   aiHomeRegionHexes: string[];
+  intersectingHomeRegionHexes: string[];
   phase: 'planning';
   turnNumber: number;
   pendingOrders: { unitId: string; toH3Index: string }[];
@@ -80,7 +81,8 @@ function buildFixtureState(hexes: string[]): {
     humanHomeRegion: 'Northern America',
     aiHomeRegion: 'Eastern Europe',
     humanHomeRegionHexes: [hexes[1]!, hexes[2]!],
-    aiHomeRegionHexes: [hexes[0]!, hexes[3]!],
+    aiHomeRegionHexes: [hexes[0]!, hexes[1]!],
+    intersectingHomeRegionHexes: [hexes[1]!],
     phase: 'planning',
     turnNumber: 7,
     pendingOrders: [],
@@ -232,6 +234,14 @@ async function run(): Promise<void> {
       assert.ok(
         systemPrompt.includes('- Controlled: 2 of 8 land hexes (25%)'),
         `controlled-land progress metric missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('- Your home region control: 2 of 2 hexes (100%)'),
+        `own-home-region ownership summary missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('- Opponent home region control: 1 of 2 hexes (50%)'),
+        `opponent-home-region ownership summary missing for mask=${mask}`
       );
       assert.ok(
         systemPrompt.includes('=== SCENARIO OBJECTIVE (REQUIRED) ==='),

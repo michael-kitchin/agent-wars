@@ -35,11 +35,13 @@ import { runPrecomputation } from '../precomputation';
 import { formatBriefing } from '../briefingFormatter';
 import { replaceSubscriptions, getSubscriptions } from '../callbackSubscriptions';
 import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
+import { countControlledHexesInRegion } from '../../shared/homeRegionRules';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
 import { buildFinalJsonContractInstruction } from './promptContracts';
 import { buildAirOperationsBriefingBlock, buildProductionBriefingBlock, buildSealiftBriefingBlock } from './briefingSections';
 import {
   buildAdjacentCellsFallbackBlock,
+  formatControlProgressLine,
   buildHumanUnitsPromptLine,
   buildLatLngPreamble,
   buildProductionSubmitClause,
@@ -561,8 +563,12 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
   const controlledLandHexes = (state.res1Control ?? []).filter(
     (row) => row.controllerPlayerId === 'opponent' && landHexSet.has(row.h3Index)
   ).length;
-  const exploredPct = totalLandHexes > 0 ? Math.round((exploredLandHexes / totalLandHexes) * 100) : 0;
-  const controlledPct = totalLandHexes > 0 ? Math.round((controlledLandHexes / totalLandHexes) * 100) : 0;
+  const ownHomeRegionControl = countControlledHexesInRegion(state.res1Control ?? [], state.aiHomeRegionHexes, 'opponent');
+  const opponentHomeRegionControl = countControlledHexesInRegion(state.res1Control ?? [], state.humanHomeRegionHexes, 'opponent');
+  const homeRegionOwnershipSummary =
+    state.scenarioId === 'region_vs_region'
+      ? `\n${formatControlProgressLine('Your home region control', ownHomeRegionControl.controlled, ownHomeRegionControl.total)}\n${formatControlProgressLine('Opponent home region control', opponentHomeRegionControl.controlled, opponentHomeRegionControl.total)}`
+      : '';
   const strategicContextBlock = `Strategic context:
 - At least one enemy unit remains in play, and the human player is actively searching for your forces with intent to destroy them.
 - Your priorities are:
@@ -570,8 +576,8 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
   (2) Disperse infantry as scouts to maximize visibility
   (3) Maximize unit production (idle production capacity is wasted)
   (4) Engage the enemy and destroy them
-- Explored: ${exploredLandHexes} of ${totalLandHexes} land hexes (${exploredPct}%)
-- Controlled: ${controlledLandHexes} of ${totalLandHexes} land hexes (${controlledPct}%)`;
+- ${formatControlProgressLine('Explored', exploredLandHexes, totalLandHexes, 'land hexes').slice(2)}
+- ${formatControlProgressLine('Controlled', controlledLandHexes, totalLandHexes, 'land hexes').slice(2)}${homeRegionOwnershipSummary}`;
   const scenarioObjectiveBlock = state.scenarioId === 'region_vs_region'
     ? `=== SCENARIO OBJECTIVE (REQUIRED) ===
 Scenario: region_vs_region

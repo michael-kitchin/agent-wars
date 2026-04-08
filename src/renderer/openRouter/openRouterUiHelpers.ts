@@ -1,6 +1,7 @@
 import type { GameApi, GameReadyIpcPayload } from '../../shared/ipcTypes';
 import { READY_REQUEST_TIMEOUT_MS, TOAST_DURATION_MS } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
+import { isWaitingForPrecomputedAiOrders } from './aiPlanningState';
 
 export function formatElapsedMmSs(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -25,15 +26,7 @@ export function updateReadyButtonState(): void {
   const readyBtn = document.getElementById('ready-btn') as HTMLButtonElement | null;
   if (!readyBtn) return;
   const gameOver = S.gameState?.gameOver ?? false;
-  const waitingOnReadyRequest =
-    S.readyRequestInFlight && S.runButtonOn && S.useEventDrivenConsultation;
-  const waitingOnAi =
-    waitingOnReadyRequest ||
-    (S.runButtonOn &&
-      ((!S.useEventDrivenConsultation && S.precomputedAiOrders === null) ||
-        (S.useEventDrivenConsultation &&
-          !S.eventDrivenInitialConsultationDone &&
-          S.precomputedAiOrders === null)));
+  const waitingOnAi = isWaitingForPrecomputedAiOrders();
   readyBtn.disabled = gameOver || waitingOnAi;
 
   if (waitingOnAi) {

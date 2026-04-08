@@ -246,6 +246,76 @@ function testFogOfWarToggleVisibilityContract(gameDb: typeof import('./gameDb'))
   }
 }
 
+function testHomeRegionVisibilityAndInitialControlContracts(gameDb: typeof import('./gameDb')): void {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
+  const p = path.join(dir, 't.sqlite');
+  try {
+    gameDb.openGameDatabaseAtPathForTests(p);
+    const regions = gameDb.listScenarioHomeRegions();
+    assert.ok(regions.length > 1, 'expected at least two scenario home regions for control-ownership contract checks');
+    const humanHomeRegion = regions[0]!;
+    const aiHomeRegion = regions[1]!;
+    gameDb.resetGameForNewMatch({
+      fogOfWarEnabled: true,
+      humanHomeRegion,
+      aiHomeRegion,
+    });
+
+    const humanState = gameDb.getGameStateForPlayer('human');
+    const opponentState = gameDb.getGameStateForPlayer('opponent');
+    const humanHomeHexes = new Set(humanState.humanHomeRegionHexes ?? []);
+    const aiHomeHexes = new Set(humanState.aiHomeRegionHexes ?? []);
+    const intersectingHexes = new Set(humanState.intersectingHomeRegionHexes ?? []);
+    const humanVisible = new Set(humanState.visibleHexes ?? []);
+    const opponentVisible = new Set(opponentState.visibleHexes ?? []);
+    const controlsByHex = new Map(gameDb.listAllHexControls().map((row) => [row.h3Index, row.controllerPlayerId]));
+
+    for (const h3Index of humanHomeHexes) {
+      assert.ok(humanVisible.has(h3Index), `expected human home-region hex to remain visible: ${h3Index}`);
+    }
+    for (const h3Index of aiHomeHexes) {
+      assert.ok(opponentVisible.has(h3Index), `expected opponent home-region hex to remain visible: ${h3Index}`);
+    }
+    for (const h3Index of intersectingHexes) {
+      assert.ok(humanVisible.has(h3Index), `expected intersecting home hex visible to human: ${h3Index}`);
+      assert.ok(opponentVisible.has(h3Index), `expected intersecting home hex visible to opponent: ${h3Index}`);
+    }
+
+    for (const h3Index of humanHomeHexes) {
+      if (aiHomeHexes.has(h3Index)) continue;
+      assert.strictEqual(
+        controlsByHex.get(h3Index),
+        'human',
+        `expected non-intersecting human home hex to initialize under human control: ${h3Index}`
+      );
+    }
+    for (const h3Index of aiHomeHexes) {
+      if (humanHomeHexes.has(h3Index)) continue;
+      assert.strictEqual(
+        controlsByHex.get(h3Index),
+        'opponent',
+        `expected non-intersecting opponent home hex to initialize under opponent control: ${h3Index}`
+      );
+    }
+
+    const enemyUnitId = gameDb.dbGetOne<{ id: string }>("SELECT id FROM units WHERE player = 'opponent' ORDER BY id LIMIT 1")?.id;
+    const forcedVisibleHumanHomeHex = [...humanHomeHexes][0];
+    assert.ok(enemyUnitId, 'expected at least one opponent unit for forced-visibility contract');
+    assert.ok(forcedVisibleHumanHomeHex, 'expected at least one human home-region hex');
+    gameDb.dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [forcedVisibleHumanHomeHex!, enemyUnitId!]);
+    gameDb.refreshFogOfWarIntelFromCurrentState();
+
+    const refreshedHumanState = gameDb.getGameStateForPlayer('human');
+    assert.ok(
+      refreshedHumanState.units.some((unit) => unit.id === enemyUnitId),
+      'expected enemy unit on always-visible human home hex to be visible to human player'
+    );
+  } finally {
+    gameDb.closeGameDatabaseForTests();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function testWrongUserVersionRecovers(gameDb: typeof import('./gameDb'), Database: any): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
@@ -483,6 +553,7 @@ function run(): void {
   testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity(gameDb, 'seaport');
   testSeededUnitsUseRegionalSpawnContracts(gameDb);
   testFogOfWarToggleVisibilityContract(gameDb);
+  testHomeRegionVisibilityAndInitialControlContracts(gameDb);
   testWrongUserVersionRecovers(gameDb, Database);
   console.log('gameDb.test.ts passed');
 }

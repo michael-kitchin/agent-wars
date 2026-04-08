@@ -1,5 +1,5 @@
 import { logDebug } from '../logger';
-import { resolveScenarioHomeRegions } from '../regionScenario';
+import { getScenarioHomeRegionHexes, resolveScenarioHomeRegions } from '../regionScenario';
 import type { GuardedDbRunAndGetAllOps } from './dbOps';
 import { persistRegionVsRegionScenarioState } from './scenarioState';
 
@@ -29,6 +29,41 @@ function seedInitialHexControlFromUnitOccupancy(deps: ResetGameDeps): void {
       run('INSERT INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [row.h3Index, row.solePlayer]);
     }
   }
+}
+
+function seedInitialHexControlFromHomeRegions(
+  deps: ResetGameDeps,
+  options: { humanHomeRegion: string; aiHomeRegion: string }
+): void {
+  const { run } = deps;
+  const humanHomeHexes = new Set(getScenarioHomeRegionHexes(options.humanHomeRegion));
+  const aiHomeHexes = new Set(getScenarioHomeRegionHexes(options.aiHomeRegion));
+  let forcedHumanControlCount = 0;
+  let forcedOpponentControlCount = 0;
+  let intersectingHexCount = 0;
+
+  for (const h3Index of humanHomeHexes) {
+    if (aiHomeHexes.has(h3Index)) {
+      intersectingHexCount += 1;
+      continue;
+    }
+    run('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, 'human']);
+    forcedHumanControlCount += 1;
+  }
+  for (const h3Index of aiHomeHexes) {
+    if (humanHomeHexes.has(h3Index)) continue;
+    run('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, 'opponent']);
+    forcedOpponentControlCount += 1;
+  }
+  logDebug('gameDb seedInitialHexControlFromHomeRegions', {
+    humanHomeRegion: options.humanHomeRegion,
+    aiHomeRegion: options.aiHomeRegion,
+    humanHomeHexCount: humanHomeHexes.size,
+    aiHomeHexCount: aiHomeHexes.size,
+    forcedHumanControlCount,
+    forcedOpponentControlCount,
+    intersectingHexCount,
+  });
 }
 
 /**
@@ -81,6 +116,7 @@ export function resetGameForNewMatch(
   run('DELETE FROM res1_build_queue');
   run('DELETE FROM res1_build_progress');
   seedInitialHexControlFromUnitOccupancy(deps);
+  seedInitialHexControlFromHomeRegions(deps, { humanHomeRegion, aiHomeRegion });
   deps.refreshFogOfWarIntelFromCurrentState();
   deps.saveDatabase();
 }

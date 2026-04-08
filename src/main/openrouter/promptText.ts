@@ -1,4 +1,5 @@
 import type { GameStateSnapshot } from '../gameDb';
+import { computeRoundedPercentage } from '../../shared/progressFormatting';
 
 export interface PromptToolFlags {
   planningEnabled: boolean;
@@ -25,6 +26,11 @@ export function buildLatLngPreamble(h3Resolution: number, decimalPlaces: number)
 Positions use [lat, lng] coordinates (latitude, longitude). Values in this prompt are rounded to ${decimalPlaces} decimal places for this map resolution; preserve that precision when you copy coordinates. Use only coordinates from the unit and target lists below; do not invent coordinates. Hex distances are given in the prompt where relevant.
 
 Final JSON uses an "orders" array (see submit instruction below). Geographic targets use [lat, lng] only. Follow/pursue standing orders use enemy unit id strings only (targetUnitId). Never use raw H3 cell IDs or hex index strings.`;
+}
+
+/** Use this to format "<label>: X of Y ... (Z%)" progress bullets in the system prompt. */
+export function formatControlProgressLine(label: string, controlled: number, total: number, subjectLabel = 'hexes'): string {
+  return `- ${label}: ${controlled} of ${total} ${subjectLabel} (${computeRoundedPercentage(controlled, total)}%)`;
 }
 
 /** Formats [lat, lng] for prompts using fixed decimal precision. */

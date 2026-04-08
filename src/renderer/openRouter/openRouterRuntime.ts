@@ -1,5 +1,6 @@
 import { rendererSharedState as S } from '../core/state';
 import { applySuccessfulPrecomputedAiResult, resetPrecomputedAiState } from './precomputedAiState';
+import { isWaitingForPrecomputedAiOrders } from './aiPlanningState';
 
 interface OpenRouterRuntimeDeps {
   appendOpenRouterLog: (line: string, isError?: boolean) => void;
@@ -21,8 +22,7 @@ export function syncEventDrivenFromTools(): void {
  * Used when Run is toggled on and after new game when Run is on. On success stores orders and enables Ready; on failure shows a user-visible error.
  */
 export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): void {
-  if (S.backgroundRequestInFlight || !S.runButtonOn || S.gameState?.phase !== 'planning') return;
-  if (S.useEventDrivenConsultation && S.eventDrivenInitialConsultationDone) return;
+  if (S.backgroundRequestInFlight || !isWaitingForPrecomputedAiOrders() || S.gameState?.phase !== 'planning') return;
   const keyPromise = window.gameApi?.openRouter?.getKey?.();
   const modelPromise = window.gameApi?.openRouter?.getSelectedModel?.();
   if (!keyPromise || !modelPromise) return;
@@ -64,29 +64,34 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
           }
         } else if (!result.success) {
           deps.showSidebarError(result.error ?? 'Background AI request failed');
-          // Allow Ready to be clicked so the turn can advance with no AI orders (e.g. after parse error).
-          resetPrecomputedAiState('empty');
+          resetPrecomputedAiState('null');
         }
         deps.updateReadyButtonState();
       })
       .catch((err) => {
         S.backgroundRequestInFlight = false;
-        if (S.useEventDrivenConsultation && !S.eventDrivenInitialConsultationDone) {
-          S.eventDrivenInitialConsultationDone = true;
-        }
         deps.showSidebarError(String(err));
-        resetPrecomputedAiState('empty');
+        resetPrecomputedAiState('null');
         deps.updateReadyButtonState();
       });
   }).catch((err) => {
     S.backgroundRequestInFlight = false;
-    if (S.useEventDrivenConsultation && !S.eventDrivenInitialConsultationDone) {
-      S.eventDrivenInitialConsultationDone = true;
-    }
     deps.showSidebarError(String(err));
-    resetPrecomputedAiState('empty');
+    resetPrecomputedAiState('null');
     deps.updateReadyButtonState();
   });
+}
+
+/**
+ * Use this to apply the full side effects when the Events toggle changes while Run is active.
+ * It keeps cancellation/reset/restart behavior in one place for maintainable mode transitions.
+ */
+function handleEventDrivenModeTransition(deps: OpenRouterRuntimeDeps, wasEventDriven: boolean): void {
+  if (!S.runButtonOn || wasEventDriven === S.useEventDrivenConsultation) return;
+  window.gameApi?.cancelRequestAiOrders?.();
+  resetPrecomputedAiState('null');
+  S.eventDrivenInitialConsultationDone = false;
+  startBackgroundRequestIfAllowed(deps);
 }
 
 /**
@@ -122,22 +127,7 @@ export function renderOpenRouterToolsList(deps: OpenRouterRuntimeDeps): void {
       if (group.id === 'events') {
         const wasEventDriven = S.useEventDrivenConsultation;
         syncEventDrivenFromTools();
-        if (S.runButtonOn && S.useEventDrivenConsultation && !wasEventDriven) {
-          window.gameApi?.cancelRequestAiOrders?.();
-          resetPrecomputedAiState('null');
-          S.eventDrivenInitialConsultationDone = false;
-          startBackgroundRequestIfAllowed(deps);
-        } else if (S.runButtonOn && !S.useEventDrivenConsultation && wasEventDriven) {
-          resetPrecomputedAiState('null');
-        } else if (S.runButtonOn && !S.useEventDrivenConsultation && wasEventDriven) {
-          S.precomputedAiOrders = null;
-          S.precomputedAiRangedOrders = null;
-          S.precomputedAiEmbarkOrders = null;
-          S.precomputedAiStrategy = null;
-          S.precomputedToolInvocationCounts = null;
-          S.eventDrivenInitialConsultationDone = false;
-          startBackgroundRequestIfAllowed(deps);
-        }
+        handleEventDrivenModeTransition(deps, wasEventDriven);
         deps.updateReadyButtonState();
       }
     });

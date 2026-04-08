@@ -58,6 +58,10 @@ export interface GameStateSnapshot {
   humanHomeRegionHexes?: string[];
   /** Res-1 hexes intersecting the AI home region (always-visible outline source). */
   aiHomeRegionHexes?: string[];
+  /** Home-region hexes shared by both players' selected regions (always-gray outline precedence). */
+  intersectingHomeRegionHexes?: string[];
+  /** Home-region hexes currently occupied by units from multiple players (gray contested precedence). */
+  contestedHomeRegionHexes?: string[];
   phase: string;
   turnNumber: number;
   pendingOrders: { unitId: string; toH3Index: string }[];

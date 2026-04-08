@@ -14792,6 +14792,11 @@
     lastAppliedMapInteractionCursor: ""
   };
 
+  // src/renderer/openRouter/aiPlanningState.ts
+  function isWaitingForPrecomputedAiOrders() {
+    return rendererSharedState.runButtonOn && rendererSharedState.precomputedAiOrders === null;
+  }
+
   // src/renderer/openRouter/openRouterUiHelpers.ts
   function formatElapsedMmSs(ms) {
     const totalSeconds = Math.floor(ms / 1e3);
@@ -14813,8 +14818,7 @@
     const readyBtn = document.getElementById("ready-btn");
     if (!readyBtn) return;
     const gameOver = rendererSharedState.gameState?.gameOver ?? false;
-    const waitingOnReadyRequest = rendererSharedState.readyRequestInFlight && rendererSharedState.runButtonOn && rendererSharedState.useEventDrivenConsultation;
-    const waitingOnAi = waitingOnReadyRequest || rendererSharedState.runButtonOn && (!rendererSharedState.useEventDrivenConsultation && rendererSharedState.precomputedAiOrders === null || rendererSharedState.useEventDrivenConsultation && !rendererSharedState.eventDrivenInitialConsultationDone && rendererSharedState.precomputedAiOrders === null);
+    const waitingOnAi = isWaitingForPrecomputedAiOrders();
     readyBtn.disabled = gameOver || waitingOnAi;
     if (waitingOnAi) {
       const now = Date.now();
@@ -16352,8 +16356,7 @@
     rendererSharedState.useEventDrivenConsultation = rendererSharedState.enabledToolGroups.has("events");
   }
   function startBackgroundRequestIfAllowed(deps) {
-    if (rendererSharedState.backgroundRequestInFlight || !rendererSharedState.runButtonOn || rendererSharedState.gameState?.phase !== "planning") return;
-    if (rendererSharedState.useEventDrivenConsultation && rendererSharedState.eventDrivenInitialConsultationDone) return;
+    if (rendererSharedState.backgroundRequestInFlight || !isWaitingForPrecomputedAiOrders() || rendererSharedState.gameState?.phase !== "planning") return;
     const keyPromise = window.gameApi?.openRouter?.getKey?.();
     const modelPromise = window.gameApi?.openRouter?.getSelectedModel?.();
     if (!keyPromise || !modelPromise) return;
@@ -16393,27 +16396,28 @@
           }
         } else if (!result.success) {
           deps.showSidebarError(result.error ?? "Background AI request failed");
-          resetPrecomputedAiState("empty");
+          resetPrecomputedAiState("null");
         }
         deps.updateReadyButtonState();
       }).catch((err) => {
         rendererSharedState.backgroundRequestInFlight = false;
-        if (rendererSharedState.useEventDrivenConsultation && !rendererSharedState.eventDrivenInitialConsultationDone) {
-          rendererSharedState.eventDrivenInitialConsultationDone = true;
-        }
         deps.showSidebarError(String(err));
-        resetPrecomputedAiState("empty");
+        resetPrecomputedAiState("null");
         deps.updateReadyButtonState();
       });
     }).catch((err) => {
       rendererSharedState.backgroundRequestInFlight = false;
-      if (rendererSharedState.useEventDrivenConsultation && !rendererSharedState.eventDrivenInitialConsultationDone) {
-        rendererSharedState.eventDrivenInitialConsultationDone = true;
-      }
       deps.showSidebarError(String(err));
-      resetPrecomputedAiState("empty");
+      resetPrecomputedAiState("null");
       deps.updateReadyButtonState();
     });
+  }
+  function handleEventDrivenModeTransition(deps, wasEventDriven) {
+    if (!rendererSharedState.runButtonOn || wasEventDriven === rendererSharedState.useEventDrivenConsultation) return;
+    window.gameApi?.cancelRequestAiOrders?.();
+    resetPrecomputedAiState("null");
+    rendererSharedState.eventDrivenInitialConsultationDone = false;
+    startBackgroundRequestIfAllowed(deps);
   }
   function renderOpenRouterToolsList(deps) {
     const container = document.getElementById("openrouter-tools-list");
@@ -16444,22 +16448,7 @@
         if (group.id === "events") {
           const wasEventDriven = rendererSharedState.useEventDrivenConsultation;
           syncEventDrivenFromTools();
-          if (rendererSharedState.runButtonOn && rendererSharedState.useEventDrivenConsultation && !wasEventDriven) {
-            window.gameApi?.cancelRequestAiOrders?.();
-            resetPrecomputedAiState("null");
-            rendererSharedState.eventDrivenInitialConsultationDone = false;
-            startBackgroundRequestIfAllowed(deps);
-          } else if (rendererSharedState.runButtonOn && !rendererSharedState.useEventDrivenConsultation && wasEventDriven) {
-            resetPrecomputedAiState("null");
-          } else if (rendererSharedState.runButtonOn && !rendererSharedState.useEventDrivenConsultation && wasEventDriven) {
-            rendererSharedState.precomputedAiOrders = null;
-            rendererSharedState.precomputedAiRangedOrders = null;
-            rendererSharedState.precomputedAiEmbarkOrders = null;
-            rendererSharedState.precomputedAiStrategy = null;
-            rendererSharedState.precomputedToolInvocationCounts = null;
-            rendererSharedState.eventDrivenInitialConsultationDone = false;
-            startBackgroundRequestIfAllowed(deps);
-          }
+          handleEventDrivenModeTransition(deps, wasEventDriven);
           deps.updateReadyButtonState();
         }
       });
@@ -17027,6 +17016,74 @@
   }
 
   // src/renderer/gameplay/readyHandler.ts
+  function buildReadyPayload(args) {
+    const { enabledToolGroupsPayload, useEventDriven, usePrecomputed } = args;
+    const base = {
+      enabledToolGroups: enabledToolGroupsPayload,
+      aiPlanningRunEnabled: false
+    };
+    if (useEventDriven) {
+      base.useEventDrivenConsultation = true;
+    }
+    if (!usePrecomputed) return base;
+    base.precomputedAiOrders = rendererSharedState.precomputedAiOrders ?? [];
+    base.precomputedAiRangedOrders = rendererSharedState.precomputedAiRangedOrders ?? [];
+    base.precomputedAiEmbarkOrders = rendererSharedState.precomputedAiEmbarkOrders ?? [];
+    base.precomputedAiStrategy = rendererSharedState.precomputedAiStrategy ?? void 0;
+    return base;
+  }
+  function deriveCombatVisibilityClassification(readyResult, visibleHexes) {
+    const allKills = readyResult.kills ?? [];
+    const removedById = new Map((readyResult.removedUnits ?? []).map((u) => [u.id, u]));
+    const friendlyInvolvedKillVictimIds = new Set(
+      allKills.filter((k) => {
+        const victim = removedById.get(k.victimId);
+        const killerIsFriendly = k.killerIds.some((id) => id.startsWith("human-"));
+        const victimIsFriendly = victim?.player === "human";
+        return killerIsFriendly || victimIsFriendly;
+      }).map((k) => k.victimId)
+    );
+    const friendlyInvolvedCombatHexes = new Set(
+      [...friendlyInvolvedKillVictimIds].map((victimId) => removedById.get(victimId)?.h3Index ?? null).filter((h3) => typeof h3 === "string")
+    );
+    const friendlyPlannedCombatHexes = /* @__PURE__ */ new Set([
+      ...(readyResult.humanMoves ?? []).flatMap((move) => [move.fromH3Index, move.toH3Index]),
+      ...rendererSharedState.pendingRangedAttacks.map((order) => order.targetH3Index),
+      ...rendererSharedState.pendingAirStrikes.map((order) => order.targetH3Index),
+      ...(readyResult.airStrikeMoves ?? []).filter((move) => move.player === "human").flatMap((move) => [move.fromH3Index, move.targetH3Index]),
+      ...(readyResult.removedUnits ?? []).filter((unit) => unit.player === "human").map((unit) => unit.h3Index)
+    ]);
+    for (const h3 of friendlyPlannedCombatHexes) friendlyInvolvedCombatHexes.add(h3);
+    const knownHumanAirStrikeTargetHexes = new Set(
+      (readyResult.airStrikeMoves ?? []).filter((move) => move.player === "human").map((move) => move.targetH3Index)
+    );
+    const unknownCombatHexes = [
+      ...(readyResult.airStrikeHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
+      ...readyResult.rangedCombatHexes ?? [],
+      ...readyResult.meleeCombatHexes ?? [],
+      ...readyResult.combatHexes ?? []
+    ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
+    const unknownCasualtyHexes = [
+      ...(readyResult.airStrikeCasualtyHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
+      ...readyResult.rangedCasualtyHexes ?? [],
+      ...readyResult.meleeCasualtyHexes ?? [],
+      ...readyResult.casualtyHexes ?? []
+    ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
+    const knownVictimIds = new Set((readyResult.removedUnits ?? []).filter((u) => visibleHexes.has(u.h3Index)).map((u) => u.id));
+    for (const removed of readyResult.removedUnits ?? []) {
+      if (removed.player === "human") knownVictimIds.add(removed.id);
+    }
+    for (const victimId of friendlyInvolvedKillVictimIds) knownVictimIds.add(victimId);
+    const unknownVictimIds = allKills.map((k) => k.victimId).filter((id, idx, arr) => arr.indexOf(id) === idx).filter((id) => {
+      const removed = removedById.get(id);
+      if (removed?.player === "human") return false;
+      return !friendlyInvolvedKillVictimIds.has(id);
+    }).filter((id) => {
+      const removed = removedById.get(id);
+      return removed ? !visibleHexes.has(removed.h3Index) : false;
+    });
+    return { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds };
+  }
   async function handleReadyButtonClick(deps) {
     if (!window.gameApi) return;
     if (rendererSharedState.gameState?.gameOver) return;
@@ -17036,6 +17093,12 @@
     deps.updateOpenRouterToolCountLabels();
     deps.updateReadyButtonState();
     try {
+      if (isWaitingForPrecomputedAiOrders()) {
+        deps.startBackgroundRequestIfAllowed();
+        deps.showMapToast("AI planning is still running. Ready will unlock once precomputed orders are available.", { isError: false });
+        deps.updateReadyButtonState();
+        return;
+      }
       const submitResult = await window.gameApi.submitOrders({
         movementOrders: [],
         rangedAttacks: rendererSharedState.pendingRangedAttacks,
@@ -17050,29 +17113,7 @@
       const enabledToolGroupsPayload = Array.from(rendererSharedState.enabledToolGroups).filter((id) => id !== "events");
       const useEventDriven = rendererSharedState.useEventDrivenConsultation;
       const usePrecomputed = rendererSharedState.runButtonOn && rendererSharedState.precomputedAiOrders !== null;
-      const readyPayload = useEventDriven ? usePrecomputed ? {
-        enabledToolGroups: enabledToolGroupsPayload,
-        useEventDrivenConsultation: true,
-        aiPlanningRunEnabled: rendererSharedState.runButtonOn,
-        precomputedAiOrders: rendererSharedState.precomputedAiOrders,
-        precomputedAiRangedOrders: rendererSharedState.precomputedAiRangedOrders ?? [],
-        precomputedAiEmbarkOrders: rendererSharedState.precomputedAiEmbarkOrders ?? [],
-        precomputedAiStrategy: rendererSharedState.precomputedAiStrategy ?? void 0
-      } : {
-        enabledToolGroups: enabledToolGroupsPayload,
-        useEventDrivenConsultation: true,
-        aiPlanningRunEnabled: rendererSharedState.runButtonOn
-      } : usePrecomputed ? {
-        enabledToolGroups: enabledToolGroupsPayload,
-        aiPlanningRunEnabled: rendererSharedState.runButtonOn,
-        precomputedAiOrders: rendererSharedState.precomputedAiOrders,
-        precomputedAiRangedOrders: rendererSharedState.precomputedAiRangedOrders ?? [],
-        precomputedAiEmbarkOrders: rendererSharedState.precomputedAiEmbarkOrders ?? [],
-        precomputedAiStrategy: rendererSharedState.precomputedAiStrategy ?? void 0
-      } : {
-        enabledToolGroups: enabledToolGroupsPayload,
-        aiPlanningRunEnabled: rendererSharedState.runButtonOn
-      };
+      const readyPayload = buildReadyPayload({ enabledToolGroupsPayload, useEventDriven, usePrecomputed });
       const readyResult = await deps.callReadyWithTimeout(readyPayload);
       if (!readyResult.success) {
         deps.showSidebarError(readyResult.reason ?? "Ready failed");
@@ -17122,33 +17163,10 @@
       const hasAirStrikeResolution = (readyResult.airStrikeAttemptCount ?? 0) > 0 || (readyResult.airStrikeHexes?.length ?? 0) > 0 || (readyResult.infrastructureDestroyedEvents?.length ?? 0) > 0 || (readyResult.baseInvalidAirLossCount ?? 0) > 0;
       const visibleHexes = deps.getVisibleHexSet(state);
       const allKills = readyResult.kills ?? [];
-      const removedById = new Map((readyResult.removedUnits ?? []).map((u) => [u.id, u]));
-      const friendlyInvolvedKillVictimIds = new Set(
-        allKills.filter((k) => {
-          const victim = removedById.get(k.victimId);
-          const killerIsFriendly = k.killerIds.some((id) => id.startsWith("human-"));
-          const victimIsFriendly = victim?.player === "human";
-          return killerIsFriendly || victimIsFriendly;
-        }).map((k) => k.victimId)
+      const { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds } = deriveCombatVisibilityClassification(
+        readyResult,
+        visibleHexes
       );
-      const friendlyInvolvedCombatHexes = new Set(
-        [...friendlyInvolvedKillVictimIds].map((victimId) => removedById.get(victimId)?.h3Index ?? null).filter((h3) => typeof h3 === "string")
-      );
-      const knownHumanAirStrikeTargetHexes = new Set(
-        (readyResult.airStrikeMoves ?? []).filter((move) => move.player === "human").map((move) => move.targetH3Index)
-      );
-      const unknownCombatHexes = [
-        ...(readyResult.airStrikeHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
-        ...readyResult.rangedCombatHexes ?? [],
-        ...readyResult.meleeCombatHexes ?? [],
-        ...readyResult.combatHexes ?? []
-      ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
-      const unknownCasualtyHexes = [
-        ...(readyResult.airStrikeCasualtyHexes ?? []).filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3)),
-        ...readyResult.rangedCasualtyHexes ?? [],
-        ...readyResult.meleeCasualtyHexes ?? [],
-        ...readyResult.casualtyHexes ?? []
-      ].filter((h3, idx, arr) => arr.indexOf(h3) === idx && !visibleHexes.has(h3) && !friendlyInvolvedCombatHexes.has(h3));
       const needsAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution;
       if (needsAnimation) {
         if (rendererSharedState.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
@@ -17173,8 +17191,6 @@
         };
         const directFire = readyResult.killsByDirectFire ?? [];
         const returnFire = readyResult.killsByReturnFire ?? [];
-        const knownVictimIds = new Set((readyResult.removedUnits ?? []).filter((u) => visibleHexes.has(u.h3Index)).map((u) => u.id));
-        for (const victimId of friendlyInvolvedKillVictimIds) knownVictimIds.add(victimId);
         const directSet = new Set(directFire.map((k) => k.victimId));
         const returnSet = new Set(returnFire.map((k) => k.victimId));
         const meleeKills = allKills.filter((k) => !directSet.has(k.victimId) && !returnSet.has(k.victimId));
@@ -17191,10 +17207,6 @@
           formatUnitName: killToastFormatter.formatUnitName
         });
         if (bullets.length > 0) deps.showMapToast(bullets.join("\n"), { isError: false });
-        const unknownVictimIds = allKills.map((k) => k.victimId).filter((id, idx, arr) => arr.indexOf(id) === idx).filter((id) => !friendlyInvolvedKillVictimIds.has(id)).filter((id) => {
-          const removed = removedById.get(id);
-          return removed ? !visibleHexes.has(removed.h3Index) : false;
-        });
         const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
         if (hasUnknownBattle) {
           const unknownContinentNames = [];
@@ -18081,6 +18093,38 @@
     });
   }
 
+  // src/shared/homeRegionRules.ts
+  function uniqueSortedHexes(hexes) {
+    return [...new Set(hexes)].sort();
+  }
+  function computeIntersectingHomeRegionHexes(humanHomeRegionHexes, aiHomeRegionHexes) {
+    const aiSet = new Set(aiHomeRegionHexes);
+    return uniqueSortedHexes(humanHomeRegionHexes.filter((h3Index) => aiSet.has(h3Index)));
+  }
+  function computeContestedHomeRegionHexes(units, homeRegionHexes) {
+    const homeHexSet = new Set(homeRegionHexes);
+    const playersByHomeHex = /* @__PURE__ */ new Map();
+    for (const unit of units) {
+      if (!homeHexSet.has(unit.h3Index)) continue;
+      let players = playersByHomeHex.get(unit.h3Index);
+      if (!players) {
+        players = /* @__PURE__ */ new Set();
+        playersByHomeHex.set(unit.h3Index, players);
+      }
+      players.add(unit.player);
+    }
+    return uniqueSortedHexes(
+      [...playersByHomeHex.entries()].filter(([, players]) => players.size > 1).map(([h3Index]) => h3Index)
+    );
+  }
+  function classifyHomeRegionOutlineState(h3Index, intersectionHexes, contestedHexes, controllerPlayerId) {
+    if (intersectionHexes.has(h3Index)) return "intersection";
+    if (contestedHexes.has(h3Index)) return "contested";
+    if (controllerPlayerId === "human") return "controlledByHuman";
+    if (controllerPlayerId === "opponent") return "controlledByOpponent";
+    return "unknown";
+  }
+
   // src/renderer/rendering/terrainInfrastructureIconPaths.ts
   var AIRPLANE_VIEWBOX_SIZE = 16;
   var AIRPLANE_VIEWBOX_CENTER = { x: 8, y: 8 };
@@ -18240,6 +18284,9 @@
     }
     return color;
   }
+  function buildControlByHex(state) {
+    return new Map((state.res1Control ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
+  }
   function drawTerrainHexes(ctx, deps) {
     if (!rendererSharedState.gameState) return;
     const exploredHexes = deps.getExploredHexSet(rendererSharedState.gameState);
@@ -18350,10 +18397,28 @@
     const L = getLeafletGlobal();
     const zoom = typeof map.getZoom === "function" ? map.getZoom() : 4;
     const zoomScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
-    const sameRegion = typeof state.humanHomeRegion === "string" && typeof state.aiHomeRegion === "string" && state.humanHomeRegion.length > 0 && state.humanHomeRegion === state.aiHomeRegion;
-    const humanColor = sameRegion ? MULTI_PLAYER_FILL : PLAYER_COLORS.human ?? "#2e5a7b";
-    const aiColor = sameRegion ? MULTI_PLAYER_FILL : PLAYER_COLORS.opponent ?? "#7b4a2e";
-    const drawRegion = (hexes, color) => {
+    const humanColor = PLAYER_COLORS.human ?? "#2e5a7b";
+    const aiColor = PLAYER_COLORS.opponent ?? "#7b4a2e";
+    const intersectionHexes = new Set(
+      state.intersectingHomeRegionHexes ?? computeIntersectingHomeRegionHexes(state.humanHomeRegionHexes ?? [], state.aiHomeRegionHexes ?? [])
+    );
+    const contestedHomeHexes = new Set(
+      state.contestedHomeRegionHexes ?? computeContestedHomeRegionHexes(state.units, [...state.humanHomeRegionHexes ?? [], ...state.aiHomeRegionHexes ?? []])
+    );
+    const controlByHex = buildControlByHex(state);
+    const resolveHexOutlineColor = (h3Index, fallbackColor) => {
+      const outlineState = classifyHomeRegionOutlineState(
+        h3Index,
+        intersectionHexes,
+        contestedHomeHexes,
+        controlByHex.get(h3Index)
+      );
+      if (outlineState === "intersection" || outlineState === "contested") return MULTI_PLAYER_FILL;
+      if (outlineState === "controlledByHuman") return humanColor;
+      if (outlineState === "controlledByOpponent") return aiColor;
+      return fallbackColor;
+    };
+    const drawRegion = (hexes, fallbackColor) => {
       if (!Array.isArray(hexes) || hexes.length <= 0) return;
       for (const h3Index of hexes) {
         const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
@@ -18361,10 +18426,11 @@
           const p = map.latLngToContainerPoint(L.latLng(lat, lng));
           return { x: p.x, y: p.y };
         });
+        const outlineColor = resolveHexOutlineColor(h3Index, fallbackColor);
         strokeDualClosedPolygon(ctx, pts, {
           underStrokeColor: "rgba(0, 0, 0, 0.25)",
           underStrokeWidth: Math.max(1.2, 2.2 * zoomScale),
-          topStrokeColor: withOpacity(color, 0.5),
+          topStrokeColor: withOpacity(outlineColor, 0.5),
           topStrokeWidth: Math.max(0.75, 1.25 * zoomScale) * 0.75 * 1.5
         });
       }
