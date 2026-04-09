@@ -16,6 +16,11 @@ const ENEMY_PLAYER = 'human';
 const FRIENDLY_PLAYER = 'opponent';
 const MOVES_MELEE_SECTION = '  - Moves/Melee attacks:';
 
+/** Removes the unit's current hex from briefing lists (not a meaningful destination/target line). */
+function excludeUnitCurrentHex(unitH3: string, hexes: string[]): string[] {
+  return hexes.filter((h3) => h3 !== unitH3);
+}
+
 interface InfraCounts {
   urban: number;
   seaport: number;
@@ -132,9 +137,10 @@ function getInfra(indexed: IndexedState, h3: string): InfraCounts {
   return indexed.infraByHex.get(h3) ?? { urban: 0, seaport: 0, airport: 0 };
 }
 
-function formatEnemyUnitCounts(indexed: IndexedState, h3: string): string {
+/** Comma-separated enemy unit counts at hex, or null when no enemies (omit from briefing). */
+function describeEnemyUnitsAtHex(indexed: IndexedState, h3: string): string | null {
   const atHex = indexed.enemyUnitsByHex.get(h3) ?? [];
-  if (atHex.length === 0) return 'none';
+  if (atHex.length === 0) return null;
   const byType = new Map<string, number>();
   for (const u of atHex) {
     byType.set(u.unitType, (byType.get(u.unitType) ?? 0) + 1);
@@ -145,11 +151,21 @@ function formatEnemyUnitCounts(indexed: IndexedState, h3: string): string {
     .join(', ');
 }
 
-function formatInfraCounts(urban: number, seaport: number, airport: number): string {
-  return `urban hexes: ${urban}; ${seaport} seaport${seaport === 1 ? '' : 's'}; ${airport} airport${airport === 1 ? '' : 's'}`;
+function infraBriefSegments(inf: InfraCounts): string[] {
+  const parts: string[] = [];
+  if (inf.urban > 0) {
+    parts.push(inf.urban === 1 ? '1 urban hex' : `${inf.urban} urban hexes`);
+  }
+  if (inf.seaport > 0) parts.push(`${inf.seaport} seaport${inf.seaport === 1 ? '' : 's'}`);
+  if (inf.airport > 0) parts.push(`${inf.airport} airport${inf.airport === 1 ? '' : 's'}`);
+  return parts;
 }
 
-function formatStandardHexDetail(
+/**
+ * One briefing line for a candidate hex: coordinates, then optional parenthesis with only non-empty
+ * enemy/infra facts (no "none" or zero placeholders).
+ */
+function formatPossibleActionHexDetail(
   indexed: IndexedState,
   h3: string,
   latLngByH3: Map<string, [number, number]>,
@@ -158,8 +174,12 @@ function formatStandardHexDetail(
   const ll = latLngByH3.get(h3);
   const pos = ll ? formatLatLng(ll) : h3;
   const inf = getInfra(indexed, h3);
-  const units = formatEnemyUnitCounts(indexed, h3);
-  return `${pos} (enemy units: ${units}; ${formatInfraCounts(inf.urban, inf.seaport, inf.airport)})`;
+  const segments: string[] = [];
+  const enemyDesc = describeEnemyUnitsAtHex(indexed, h3);
+  if (enemyDesc !== null) segments.push(`enemy units: ${enemyDesc}`);
+  segments.push(...infraBriefSegments(inf));
+  if (segments.length === 0) return pos;
+  return `${pos} (${segments.join('; ')})`;
 }
 
 function formatAirStrikeHexDetail(
@@ -169,25 +189,9 @@ function formatAirStrikeHexDetail(
   formatLatLng: (ll: [number, number]) => string,
   strikeKinds: string[]
 ): string {
-  const base = formatStandardHexDetail(indexed, h3, latLngByH3, formatLatLng);
+  const base = formatPossibleActionHexDetail(indexed, h3, latLngByH3, formatLatLng);
   const kinds = strikeKinds.join(', ');
   return `${base}; strikes: ${kinds}`;
-}
-
-function formatRangedHexDetail(
-  indexed: IndexedState,
-  h3: string,
-  latLngByH3: Map<string, [number, number]>,
-  formatLatLng: (ll: [number, number]) => string
-): string {
-  const ll = latLngByH3.get(h3);
-  const pos = ll ? formatLatLng(ll) : h3;
-  const inf = getInfra(indexed, h3);
-  const units = formatEnemyUnitCounts(indexed, h3);
-  const hasInfra = inf.urban > 0 || inf.seaport > 0 || inf.airport > 0;
-  return hasInfra
-    ? `${pos} (enemy units: ${units}; ${formatInfraCounts(inf.urban, inf.seaport, inf.airport)})`
-    : `${pos} (enemy units: ${units})`;
 }
 
 function buildBucketLines(
@@ -342,25 +346,29 @@ export function buildPossibleUnitActionsMarkdown(args: {
   for (const unit of opponentUnits) {
     const sub: string[] = [];
 
-    const moveHexes =
+    const moveHexes = excludeUnitCurrentHex(
+      unit.h3Index,
       unit.unitType === 'air'
         ? collectLegalFerryDestinationHexes(unit, indexed)
-        : getValidDestinations(unit, state);
+        : getValidDestinations(unit, state)
+    );
     sub.push(
       ...buildActionSectionLines({
         label: MOVES_MELEE_SECTION,
         legalHexes: moveHexes,
         homeland,
         latLngByH3,
-        detailForHex: (h3) => formatStandardHexDetail(indexed, h3, latLngByH3, formatLatLng),
+        detailForHex: (h3) => formatPossibleActionHexDetail(indexed, h3, latLngByH3, formatLatLng),
       })
     );
 
     if (unit.unitType === 'air' && airBaseHasIntactAirport(indexed, unit.h3Index)) {
-      const strikeTargets = collectStrikeHexesForAirUnit(unit.h3Index, indexed)
-        .filter((h3) => h3 !== unit.h3Index)
-        .filter((h3) => isWithinGridRangeSafe(unit.h3Index, h3, AIR_STRIKE_RANGE_HEXES, 'possibleUnitActions air strike'))
-        .filter((h3) => strikeKindsForHex(indexed, h3).length > 0);
+      const strikeTargets = excludeUnitCurrentHex(
+        unit.h3Index,
+        collectStrikeHexesForAirUnit(unit.h3Index, indexed)
+          .filter((h3) => isWithinGridRangeSafe(unit.h3Index, h3, AIR_STRIKE_RANGE_HEXES, 'possibleUnitActions air strike'))
+          .filter((h3) => strikeKindsForHex(indexed, h3).length > 0)
+      );
       sub.push(
         ...buildActionSectionLines({
           label: '  - Air strikes:',
@@ -377,10 +385,13 @@ export function buildPossibleUnitActionsMarkdown(args: {
       sub.push(
         ...buildActionSectionLines({
           label: '  - Ranged attacks:',
-          legalHexes: collectRangedTargetHexes(unit.h3Index, unit.unitType, indexed),
+          legalHexes: excludeUnitCurrentHex(
+            unit.h3Index,
+            collectRangedTargetHexes(unit.h3Index, unit.unitType, indexed)
+          ),
           homeland,
           latLngByH3,
-          detailForHex: (h3) => formatRangedHexDetail(indexed, h3, latLngByH3, formatLatLng),
+          detailForHex: (h3) => formatPossibleActionHexDetail(indexed, h3, latLngByH3, formatLatLng),
         })
       );
     }

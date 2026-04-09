@@ -4,16 +4,23 @@
  */
 
 import * as assert from 'assert';
+import { gridDisk, latLngToCell } from 'h3-js';
 import type { GameStateSnapshot } from './gameDb';
 import type { PrecomputationResult, UnitAssessmentResult } from './precomputation';
 import { formatBriefing } from './briefingFormatter';
 
+const fixtureOriginH3 = latLngToCell(0, 0, 3);
+const fixtureNeighborH3 = gridDisk(fixtureOriginH3, 1).find((h3) => h3 !== fixtureOriginH3)!;
+
 const fixtureState: GameStateSnapshot = {
-  hexes: [{ h3Index: '891f1d48b9fffff', terrain: 'land', terrainKind: 'plains' }],
+  hexes: [
+    { h3Index: fixtureOriginH3, terrain: 'land', terrainKind: 'plains' },
+    { h3Index: fixtureNeighborH3, terrain: 'land', terrainKind: 'plains' },
+  ],
   units: [
-    { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: '891f1d48b9fffff' },
-    { id: 'opponent-infantry-1', player: 'opponent', unitType: 'infantry', h3Index: '891f1d48b9fffff' },
-    { id: 'human-inf-1', player: 'human', unitType: 'infantry', h3Index: '891f1d48b9fffff' },
+    { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: fixtureOriginH3 },
+    { id: 'opponent-infantry-1', player: 'opponent', unitType: 'infantry', h3Index: fixtureOriginH3 },
+    { id: 'human-inf-1', player: 'human', unitType: 'infantry', h3Index: fixtureNeighborH3 },
   ],
   phase: 'planning',
   turnNumber: 2,
@@ -32,7 +39,7 @@ const fixtureUnitAssessments: UnitAssessmentResult[] = [
         currentStandingOrder: null,
       },
       nearbyEnemies: [
-        { unitId: 'human-inf-1', hexDistance: 0, inRangedRange: true, inMeleeRange: true } as UnitAssessmentResult['result']['nearbyEnemies'][0],
+        { unitId: 'human-inf-1', hexDistance: 1, inRangedRange: true, inMeleeRange: true } as UnitAssessmentResult['result']['nearbyEnemies'][0],
       ],
       threats: [{ description: 'in range', severity: 'critical', sourceUnit: 'human-inf-1' }],
       canAttackThisTurn: [],
