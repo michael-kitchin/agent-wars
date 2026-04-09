@@ -151,7 +151,7 @@ function describeEnemyUnitsAtHex(indexed: IndexedState, h3: string): string | nu
     .join(', ');
 }
 
-function describeFeatures(inf: InfraCounts): string | null {
+function describeInfrastructure(inf: InfraCounts): string | null {
   const parts: string[] = [];
   if (inf.urban > 0) parts.push(`${inf.urban} urban hex${inf.urban === 1 ? '' : 'es'}`);
   if (inf.seaport > 0) parts.push(`${inf.seaport} seaport${inf.seaport === 1 ? '' : 's'}`);
@@ -176,8 +176,8 @@ function formatPossibleActionHexDetail(
   const segments: string[] = [];
   const enemyDesc = describeEnemyUnitsAtHex(indexed, h3);
   if (enemyDesc !== null) segments.push(`enemy units: ${enemyDesc}`);
-  const featureDesc = describeFeatures(inf);
-  if (featureDesc !== null) segments.push(`features: ${featureDesc}`)
+  const infraDesc = describeInfrastructure(inf);
+  if (infraDesc !== null) segments.push(`features: ${infraDesc}`)
   if (segments.length === 0) return pos;
   return `${pos} (${segments.join('; ')})`;
 }
