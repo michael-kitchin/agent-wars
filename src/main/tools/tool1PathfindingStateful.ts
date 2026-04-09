@@ -39,21 +39,34 @@ function buildStateKey(hexId: string, prevSpecial: boolean): string {
   return `${hexId}|${prevSpecial ? '1' : '0'}`;
 }
 
+function buildBlockedSetSignature(blocked: Set<string> | undefined): string {
+  if (!blocked) return 'none';
+  if (blocked.size === 0) return 'empty';
+  return [...blocked].sort().join(',');
+}
+
+function buildDestinationCacheKey(originH3: string, destinationH3: string, blocked: Set<string> | undefined): string {
+  return `${originH3}->${destinationH3}|blocked:${buildBlockedSetSignature(blocked)}`;
+}
+
 function getOrCreateStatefulDestinationCache(
   session: StatefulLandSearchSessionData,
-  destinationH3: string
+  originH3: string,
+  destinationH3: string,
+  blocked: Set<string> | undefined
 ): StatefulDestinationCache {
   const byDestination = session.statefulCache.deadStateByDestination;
-  const existing = byDestination.get(destinationH3);
+  const destinationCacheKey = buildDestinationCacheKey(originH3, destinationH3, blocked);
+  const existing = byDestination.get(destinationCacheKey);
   const now = Date.now();
   if (existing) {
     existing.lastTouchedAtMs = now;
-    byDestination.delete(destinationH3);
-    byDestination.set(destinationH3, existing);
+    byDestination.delete(destinationCacheKey);
+    byDestination.set(destinationCacheKey, existing);
     return existing;
   }
   const created: StatefulDestinationCache = { deadStateSet: new Set<string>(), lastTouchedAtMs: now };
-  byDestination.set(destinationH3, created);
+  byDestination.set(destinationCacheKey, created);
   while (byDestination.size > STATEFUL_MAX_DESTINATIONS_PER_SESSION) {
     const oldestDestination = byDestination.keys().next().value;
     if (!oldestDestination) break;
@@ -95,7 +108,12 @@ function findLandPathWithStatefulRule(payload: {
     return terrainIsPassableForDomain(terrain, 'land');
   };
   if (!passable(payload.originH3) || !passable(payload.destinationH3)) return { path: null, stats };
-  const destinationCache = getOrCreateStatefulDestinationCache(payload.session, payload.destinationH3);
+  const destinationCache = getOrCreateStatefulDestinationCache(
+    payload.session,
+    payload.originH3,
+    payload.destinationH3,
+    payload.blocked
+  );
   const deadStateSet = destinationCache.deadStateSet;
 
   const queue: Array<{ stateKey: string; h3: string; prevSpecial: boolean }> = [];

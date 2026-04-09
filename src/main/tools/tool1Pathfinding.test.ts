@@ -179,11 +179,111 @@ function testPlanRouteAllowsSeparatedSpecialTransitions(): void {
   assert.ok(okResult.path.length > 0, 'expected a traversable path for separated special transitions');
 }
 
+/**
+ * Shared-session land search dead-state caching is scoped by origin+destination so
+ * one unit's failed/successful exploration does not poison another unit with same destination.
+ */
+function testPlanRouteSessionDeadStateCacheUsesOriginDestinationCompositeKey(): void {
+  const destinationH3 = latLngToCell(22, 22, 3);
+  const neighborHexes = gridDisk(destinationH3, 1).filter((h3) => h3 !== destinationH3);
+  assert.ok(neighborHexes.length >= 2, 'expected at least two neighboring origin hexes');
+  const originA = neighborHexes[0]!;
+  const originB = neighborHexes[1]!;
+  const state: GameStateSnapshot = {
+    hexes: [
+      { h3Index: destinationH3, terrain: 'land', terrainKind: 'plains' },
+      { h3Index: originA, terrain: 'land', terrainKind: 'plains' },
+      { h3Index: originB, terrain: 'land', terrainKind: 'plains' },
+    ],
+    units: [
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: originA },
+      { id: 'opponent-armor-2', player: 'opponent', unitType: 'armor', h3Index: originB },
+    ],
+    phase: 'planning',
+    turnNumber: 1,
+    pendingOrders: [],
+  };
+  const destinationLatLng: [number, number] = [0.9, 0.9];
+  const latLngByH3 = new Map<string, [number, number]>([
+    [destinationH3, destinationLatLng],
+    [originA, [0.1, 0.1]],
+    [originB, [0.5, 0.5]],
+  ]);
+  const resolveToH3 = (lat: number, lng: number): string | undefined => {
+    if (lat >= 0.8 && lng >= 0.8) return destinationH3;
+    if (lat <= 0.2 && lng <= 0.2) return originA;
+    if (lat >= 0.4 && lng >= 0.4 && lat <= 0.6 && lng <= 0.6) return originB;
+    return destinationH3;
+  };
+  const session = createPathfindingSession(state, latLngByH3, resolveToH3);
+  const resultA = executePlanRouteWithSession('opponent-armor-1', destinationLatLng, undefined, session);
+  const resultB = executePlanRouteWithSession('opponent-armor-2', destinationLatLng, undefined, session);
+  assert.strictEqual(resultA.status, 'ok');
+  assert.strictEqual(resultB.status, 'ok');
+  assert.strictEqual(
+    session.statefulCache.deadStateByDestination.size,
+    2,
+    'expected distinct stateful dead-state cache entries for the same destination from two different origins'
+  );
+}
+
+/**
+ * Avoid-enemy first attempts and unblocked retry attempts must use different stateful cache buckets
+ * so a failed blocked search cannot poison the unblocked retry for the same route.
+ */
+function testPlanRouteSessionDeadStateCacheSeparatesBlockedAndUnblockedSearches(): void {
+  const originH3 = latLngToCell(30, 30, 3);
+  const middleH3 = gridDisk(originH3, 1).find((h3) => h3 !== originH3);
+  assert.ok(middleH3, 'expected a neighboring middle hex');
+  const destinationH3 = gridDisk(middleH3!, 1).find((h3) => h3 !== middleH3 && h3 !== originH3);
+  assert.ok(destinationH3, 'expected a destination neighbor for middle hex');
+  const state: GameStateSnapshot = {
+    hexes: [
+      { h3Index: originH3, terrain: 'land', terrainKind: 'plains' },
+      { h3Index: middleH3!, terrain: 'land', terrainKind: 'plains' },
+      { h3Index: destinationH3!, terrain: 'land', terrainKind: 'plains' },
+    ],
+    units: [
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: originH3 },
+      { id: 'human-blocker-1', player: 'human', unitType: 'infantry', h3Index: middleH3! },
+    ],
+    phase: 'planning',
+    turnNumber: 1,
+    pendingOrders: [],
+  };
+  const destinationLatLng: [number, number] = [0.9, 0.9];
+  const latLngByH3 = new Map<string, [number, number]>([
+    [originH3, [0.1, 0.1]],
+    [middleH3!, [0.5, 0.5]],
+    [destinationH3!, destinationLatLng],
+  ]);
+  const resolveToH3 = (lat: number, lng: number): string | undefined => {
+    if (lat >= 0.8 && lng >= 0.8) return destinationH3!;
+    if (lat >= 0.4 && lng >= 0.4 && lat <= 0.6 && lng <= 0.6) return middleH3!;
+    return originH3;
+  };
+  const session = createPathfindingSession(state, latLngByH3, resolveToH3);
+  const result = executePlanRouteWithSession('opponent-armor-1', destinationLatLng, { avoidEnemies: true }, session);
+  assert.strictEqual(result.status, 'ok');
+  const warnings = (result as { warnings?: string[] }).warnings ?? [];
+  assert.ok(
+    warnings.some((w) => w.includes('avoidance was not possible')),
+    'expected fallback warning when blocked route fails and unblocked retry succeeds'
+  );
+  assert.strictEqual(
+    session.statefulCache.deadStateByDestination.size,
+    2,
+    'expected separate blocked/unblocked dead-state cache entries for one origin+destination route'
+  );
+}
+
 function run(): void {
   testPlanRouteLandUnitToWaterHexReturnsTerrainHint();
   testPlanRouteLandUnitRejectsWaterKindToWaterKindMovement();
   testPlanRouteSessionParity();
   testPlanRouteAllowsSeparatedSpecialTransitions();
+  testPlanRouteSessionDeadStateCacheUsesOriginDestinationCompositeKey();
+  testPlanRouteSessionDeadStateCacheSeparatesBlockedAndUnblockedSearches();
   console.log('tool1Pathfinding tests passed');
 }
 
