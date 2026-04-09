@@ -1,13 +1,12 @@
-import { gridDistance } from 'h3-js';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { dbRun, dbGetOne, dbGetAll, saveDatabase } from '../gameDb';
-import { getRange } from '../combatConstants';
 import { createPathfindingSession, executePlanRouteWithSession } from './tool1Pathfinding';
 import type { LatLng } from './tool1Pathfinding';
 import { terrainIsPassableForDomain } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
 import { LATLNG_DECIMAL_PLACES } from '../mapData';
 import { logDebug, logError, logTrace } from '../logger';
+import { buildPromptTableLines } from '../promptTableUtils';
 import {
   parseComputedRoute,
   parseOrderParams,
@@ -26,6 +25,64 @@ const WARNING_STATUSES = new Set([
   'arrived',
   'contact',
 ]);
+
+interface StandingOrderPromptRow {
+  unitId: string;
+  unitType: string;
+  orderType: string;
+  destination: string;
+  status: string;
+  nextMove: string;
+  turnsRemaining: string | number;
+  attention: 'yes' | 'no';
+}
+
+function toStandingOrderPromptRow(
+  row: StandingOrderRow,
+  unitTypeById: Map<string, string>
+): StandingOrderPromptRow {
+  const params = parseOrderParams(row);
+  const computed = parseComputedRoute(row);
+  const nextMove = computed?.nextMoveHex;
+  const turnsRemaining = Number(computed?.turnsRemaining ?? 0);
+  let destination = '—';
+  if (row.order_type === 'march' && params.destination) {
+    const d = params.destination as [number, number];
+    destination = `[${d[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${d[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
+  }
+  if (row.order_type === 'defend' && params.defendHex) {
+    const d = params.defendHex as [number, number];
+    destination = `[${d[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${d[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
+  }
+  if (row.order_type === 'pursue' && params.targetUnitId) {
+    destination = String(params.targetUnitId);
+  }
+  let nextMoveText = '—';
+  let turnsRemainingText: string | number = '—';
+  if (turnsRemaining > 0 && nextMove) {
+    const ll = nextMove as [number, number];
+    nextMoveText = `[${ll[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${ll[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
+    turnsRemainingText = turnsRemaining;
+  } else if (row.status === 'en_route' || row.status === 'closing') {
+    if (nextMove) {
+      const ll = nextMove as [number, number];
+      nextMoveText = `[${ll[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${ll[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
+    } else {
+      nextMoveText = 'pending route refresh';
+    }
+    turnsRemainingText = 'pending';
+  }
+  return {
+    unitId: row.unit_id,
+    unitType: unitTypeById.get(row.unit_id) ?? '—',
+    orderType: row.order_type.toUpperCase(),
+    destination,
+    status: row.status,
+    nextMove: nextMoveText,
+    turnsRemaining: turnsRemainingText,
+    attention: WARNING_STATUSES.has(row.status) ? 'yes' : 'no',
+  };
+}
 
 /**
  * Validates and persists a standing order for a unit. Uses Tool 1 (executePlanRoute) for march and pursue.
@@ -350,7 +407,7 @@ export function getStandingOrderForUnit(
 }
 
 /**
- * Builds the standing order status injection block for the system prompt (bullets per unit, footer).
+ * Builds the standing order status injection block for the system prompt (markdown status tables).
  * Call only when Orders tool group is enabled. Injection reflects DB state (call after expire/generate if status should be current).
  */
 export function getInjectionText(playerId: string, state: GameStateSnapshot): string {
@@ -360,46 +417,44 @@ export function getInjectionText(playerId: string, state: GameStateSnapshot): st
     'SELECT * FROM standing_orders WHERE player_id = ? ORDER BY unit_id',
     [playerId]
   );
-  const aiUnitIds = state.units.filter((u) => u.player === playerId).map((u) => u.id);
+  const aiUnits = state.units.filter((u) => u.player === playerId);
+  const aiUnitIds = aiUnits.map((u) => u.id);
+  const aiUnitIdSet = new Set(aiUnitIds);
+  const aiUnitTypeById = new Map(aiUnits.map((u) => [u.id, u.unitType]));
   const unitIdsWithOrders = new Set(rows.map((r) => r.unit_id));
   const unitIdsWithoutOrders = aiUnitIds.filter((id) => !unitIdsWithOrders.has(id));
 
   const lines: string[] = [];
   lines.push(`=== STANDING ORDER STATUS (Turn ${state.turnNumber}) ===`);
-  for (const row of rows) {
-    if (!aiUnitIds.includes(row.unit_id)) continue;
-    const params = parseOrderParams(row);
-    const computed = parseComputedRoute(row);
-    const nextMove = computed?.nextMoveHex;
-    const turnsRemaining = Number(computed?.turnsRemaining ?? 0);
-    let bullet = `- ${row.unit_id}: ${row.order_type.toUpperCase()}`;
-    if (row.order_type === 'march' && params.destination) {
-      const d = params.destination as [number, number];
-      bullet += ` to [${d[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${d[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
-    }
-    if (row.order_type === 'defend' && params.defendHex) {
-      const d = params.defendHex as [number, number];
-      bullet += ` [${d[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${d[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
-    }
-    if (row.order_type === 'pursue' && params.targetUnitId) {
-      bullet += ` ${params.targetUnitId}`;
-    }
-    bullet += ` - ${row.status}`;
-    if (turnsRemaining > 0 && nextMove) {
-      const ll = nextMove as [number, number];
-      bullet += `, ${turnsRemaining} turns remaining, next move to [${ll[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${ll[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
-    }
-    if (WARNING_STATUSES.has(row.status)) {
-      bullet = '⚠ ' + bullet;
-    }
-    lines.push(bullet);
-  }
+  const standingOrderRows = rows
+    .filter((row) => aiUnitIdSet.has(row.unit_id))
+    .map((row) => toStandingOrderPromptRow(row, aiUnitTypeById))
+    .map((row) => [
+      row.unitId,
+      row.unitType,
+      row.orderType,
+      row.destination,
+      row.status,
+      row.nextMove,
+      row.turnsRemaining,
+      row.attention,
+    ]);
+  lines.push(
+    ...buildPromptTableLines(
+      ['Unit ID', 'Unit Type', 'Order Type', 'Destination / Target', 'Status', 'Next Move', 'Turns Remaining', 'Attention'],
+      standingOrderRows,
+      ['—', '—', '—', '—', '—', '—', '—', '—']
+    )
+  );
+  lines.push('');
+  lines.push('**Units without standing orders**');
+  const withoutOrderRows = unitIdsWithoutOrders.map((unitId) => [unitId, aiUnitTypeById.get(unitId) ?? '—']);
   if (aiUnitIds.length === 0) {
-    lines.push('No opponent units remain.');
-  } else if (unitIdsWithoutOrders.length > 0) {
-    lines.push(`Units without standing orders: ${unitIdsWithoutOrders.join(', ')}`);
+    lines.push(...buildPromptTableLines(['Unit ID', 'Unit Type'], [], ['—', '—']));
+  } else if (withoutOrderRows.length > 0) {
+    lines.push(...buildPromptTableLines(['Unit ID', 'Unit Type'], withoutOrderRows, ['—', '—']));
   } else {
-    lines.push('All units have standing orders.');
+    lines.push(...buildPromptTableLines(['Unit ID', 'Unit Type'], [], ['—', '—']));
   }
   return lines.join('\n');
 }

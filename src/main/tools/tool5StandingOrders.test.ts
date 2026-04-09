@@ -110,7 +110,9 @@ function testGetInjectionTextEmpty(): void {
   const text = getInjectionText('opponent', stateWithUnits);
   assert.ok(text.includes('=== STANDING ORDER STATUS'));
   assert.ok(text.includes('Turn 1'));
-  assert.ok(text.includes('Units without standing orders: opponent-armor-1'));
+  assert.ok(text.includes('| Unit ID | Unit Type | Order Type | Destination / Target | Status | Next Move | Turns Remaining | Attention |'));
+  assert.ok(text.includes('**Units without standing orders**'));
+  assert.ok(text.includes('| opponent-armor-1 |'));
 }
 
 function testAssignMarchToCurrentHexDoesNotPersistStandingOrder(): void {

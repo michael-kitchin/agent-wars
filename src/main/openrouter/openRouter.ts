@@ -9,34 +9,25 @@ import { request as httpsRequest } from 'node:https';
 import { URL } from 'node:url';
 import { brotliDecompressSync, gunzipSync, inflateSync } from 'node:zlib';
 import { app, safeStorage } from 'electron';
-import { cellToLatLng, gridDistance } from 'h3-js';
+import { gridDistance } from 'h3-js';
 import { getAttack, getDefense, getRange } from '../combatConstants';
 import { logDebug, logError, logTrace } from '../logger';
 import type { GameStateSnapshot } from '../gameDb';
 import {
-  setAiToolLimitExceededLastTurn,
   getAndClearAiToolLimitExceededLastTurn,
-  getAiLossEventsSinceConsultation,
-  clearAiLossEventsSinceConsultation,
-  setAiLastConsultationTurn,
   dbGetOne,
   dbRun,
 } from '../gameDb';
-import { buildLatLngCoordinateMap, H3_RESOLUTION, LATLNG_DECIMAL_PLACES } from '../mapData';
-import { executeTool1, TOOL1_NAMES } from '../tools/tool1Pathfinding';
-import { executeTool2, TOOL2_NAMES } from '../tools/tool2Assessment';
-import { executeTool3, TOOL3_NAMES } from '../tools/tool3CombatEstimation';
-import { executeTool4, getInjectionText, TOOL4_NAMES } from '../tools/tool4Memory';
+import { H3_RESOLUTION, LATLNG_DECIMAL_PLACES } from '../mapData';
+import { TOOL1_NAMES } from '../tools/tool1Pathfinding';
+import { TOOL2_NAMES } from '../tools/tool2Assessment';
+import { TOOL3_NAMES } from '../tools/tool3CombatEstimation';
+import { getInjectionText, TOOL4_NAMES } from '../tools/tool4Memory';
 import {
-  executeTool5,
   getInjectionText as getStandingOrderInjectionText,
-  generateOrdersForStandingOrders,
   TOOL5_NAMES,
 } from '../tools/tool5StandingOrders';
-import { executeTool6, TOOL6_NAMES } from '../tools/tool6Production';
-import { runPrecomputation } from '../precomputation';
-import { formatBriefing } from '../briefingFormatter';
-import { replaceSubscriptions, getSubscriptions } from '../callbackSubscriptions';
+import { TOOL6_NAMES } from '../tools/tool6Production';
 import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
 import {
   getValidDestinations,
@@ -45,7 +36,7 @@ import {
 } from '../oneStepMoveDestinations';
 import { countControlledHexesInRegion } from '../../shared/homeRegionRules';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
-import { buildFinalJsonContractInstruction } from './promptContracts';
+import { buildFinalJsonContractInstruction, getFinalJsonOrdersExampleBlock } from './promptContracts';
 import { buildAirOperationsBriefingBlock, buildProductionBriefingBlock, buildSealiftBriefingBlock } from './briefingSections';
 import {
   buildAdjacentCellsFallbackBlock,
@@ -55,10 +46,8 @@ import {
   buildProductionSubmitClause,
   buildToolUsageGuidance,
   formatLatLng as formatLatLngWithPrecision,
-  getInitialUserMessage,
   getMovementOrderInstruction,
 } from './promptText';
-import { buildJsonAssistantRepairSchema, parseOrdersResponse } from './orderResponseParsing';
 import { buildPrimaryScenarioGoalOpeningClause, buildRegionVsRegionScenarioObjectiveBlock } from './scenarioGoals';
 import {
   requestOrdersFlow,
@@ -469,7 +458,7 @@ function buildSystemPromptForTools(
   const hasPrecomputedBriefing = briefingOverride != null && briefingOverride.length > 0;
   const toolsIntro = toolsIntroPurpose
     ? hasPrecomputedBriefing
-      ? 'Use the COMMANDER\'S BRIEFING above for assessments and possible unit actions; use these tools only when you need plan_route (exact orderToXY), memory_read, or query_orders.'
+      ? 'Use the COMMANDER\'S BRIEFING above for assessments and possible unit actions; use tools selectively for exact routing (plan_route), standing-order checks (query_orders), memory lookup (memory_read), and production queue checks/sets when needed.'
       : `Use these tools to ${toolsIntroPurpose} before submitting orders. You may use multiple rounds of tool calls and mix tool types if that helps.` +
         (flags.memoryEnabled ? ' Memory: use memory_read as needed; persist notes via memoryUpdates in your final JSON.' : '')
     : 'Use only the tools listed below. Do not call tools that are not in the list.';
@@ -554,6 +543,10 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
     submitMemoryClause,
     productionSubmitClause: buildProductionSubmitClause(flags),
   });
+  const finalJsonExample = getFinalJsonOrdersExampleBlock({
+    includeMemoryUpdates: flags.memoryEnabled,
+    includeProductionOrders: flags.productionEnabled,
+  });
   const scoutingDirective = humanRoster.length === 0
     ? ' No human units are currently observed: prioritize scouting this turn by moving units along plausible approach routes to reveal enemy positions; do not remain static unless required for immediate defense.'
     : '';
@@ -562,11 +555,13 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
 
 ${buildLatLngPreamble(H3_RESOLUTION, LATLNG_DECIMAL_PLACES)}
 
-Combat: each unit rolls d6 when attacking (hit if roll <= attack) or when defending (hit if roll <= defender's defense). Unit stats: ${combatSummary}. Ranged attacks use each unit's current position (before movement). Only add explicit_attack if already in range at turn start from that START position (before any explicit_move). At most one explicit_attack per unit per turn (duplicate unitIds dropped). targetHex must be enemy [lat,lng] from "Human units" or the enemy unit id string — never your own movement destination${combatTargetHint}. Self-filter illegal explicit_attack entries before submitting.${navalCoaching}${combatAssessHint}
+Combat: d6 per shot — attack hits on roll ≤ attack stat; defense hits on roll ≤ defense. ${combatSummary}. Ranged uses pre-move positions. At most one explicit_attack per unit from turn-start range; targetHex is enemy [lat,lng] or enemy unit id (not your move destination)${combatTargetHint}. Drop invalid attacks before submit.${navalCoaching}${combatAssessHint}
 
 ${mainBlock}
 
-${finalJsonContract}`;
+${finalJsonContract}
+
+${finalJsonExample}`;
   return prompt;
 }
 
@@ -747,46 +742,18 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
     promptLine: 'query_production(hex?, all?) - Read production queue status and available unit types by controlled hex.',
   },
   {
-    name: 'add_build_entry',
-    description: 'Append one production queue entry for a controlled hex.',
+    name: 'set_build_queue',
+    description: 'Set one production unit type/count for a controlled hex, replacing existing queue entries.',
     parameters: {
       type: 'object',
       properties: {
         hex: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Controlled hex [lat, lng]' },
-        unitType: { type: 'string', enum: ['infantry', 'armor', 'naval', 'air'], description: 'Unit type for the new queue entry' },
-        count: { type: 'number', description: 'Requested build count (1..99)' },
+        unitType: { type: 'string', enum: ['infantry', 'armor', 'naval', 'air'], description: 'Unit type to keep in queue' },
+        count: { type: 'number', description: 'Build count (1..99) for the selected unit type' },
       },
       required: ['hex', 'unitType', 'count'],
     },
-    promptLine: 'add_build_entry(hex, unitType, count) - Append one production queue entry for a controlled hex.',
-  },
-  {
-    name: 'update_build_entry',
-    description: 'Update one existing production queue entry (unit type and count).',
-    parameters: {
-      type: 'object',
-      properties: {
-        hex: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Controlled hex [lat, lng]' },
-        entryId: { type: 'number', description: 'Queue entry id to edit' },
-        unitType: { type: 'string', enum: ['infantry', 'armor', 'naval', 'air'], description: 'Replacement unit type' },
-        count: { type: 'number', description: 'Replacement build count (1..99)' },
-      },
-      required: ['hex', 'entryId', 'unitType', 'count'],
-    },
-    promptLine: 'update_build_entry(hex, entryId, unitType, count) - Edit one production queue row in place.',
-  },
-  {
-    name: 'remove_build_entry',
-    description: 'Remove one production queue entry from a controlled hex.',
-    parameters: {
-      type: 'object',
-      properties: {
-        hex: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Controlled hex [lat, lng]' },
-        entryId: { type: 'number', description: 'Queue entry id to remove' },
-      },
-      required: ['hex', 'entryId'],
-    },
-    promptLine: 'remove_build_entry(hex, entryId) - Remove one production queue row by id.',
+    promptLine: 'set_build_queue(hex, unitType, count) - Set one queue unit type/count and replace any previous entries for that hex.',
   },
 ];
 
@@ -811,36 +778,6 @@ function buildToolDefinitions(enabledToolNames?: string[]): ToolDef[] {
   }));
 }
 
-/** Message type for the chat API (system, user, assistant, or tool). */
-type ChatMessage =
-  | { role: 'system'; content: string }
-  | { role: 'user'; content: string }
-  | { role: 'assistant'; content: string | null; tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }> }
-  | { role: 'tool'; tool_call_id: string; content: string };
-
-function sanitizeToolResultForModel(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map((item) => sanitizeToolResultForModel(item));
-  if (value && typeof value === 'object') {
-    const inObj = value as Record<string, unknown>;
-    const outObj: Record<string, unknown> = {};
-    for (const [key, entry] of Object.entries(inObj)) {
-      const normalizedKey = key.toLowerCase();
-      if (
-        normalizedKey.includes('h3') ||
-        normalizedKey.includes('hex_index') ||
-        normalizedKey.includes('toh3') ||
-        normalizedKey.includes('fromh3')
-      ) {
-        continue;
-      }
-      outObj[key] = sanitizeToolResultForModel(entry);
-    }
-    return outObj;
-  }
-  return value;
-}
-
-const MAX_TOOL_ITERATIONS = 50;
 const OPENROUTER_REQUEST_TIMEOUT_MS = 45_000;
 const OPENROUTER_RESPONSE_IDLE_TIMEOUT_MS = 15_000;
 const OPENROUTER_RESPONSE_HARD_TIMEOUT_MS = 90_000;

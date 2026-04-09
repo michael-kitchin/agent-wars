@@ -209,7 +209,7 @@ function buildLossesSinceLastConsultationTable(
 ): string {
   const header = '| Turn | Victim Unit | Side | Cause | Killer IDs |';
   const sep = '|------|-------------|------|-------|------------|';
-  if (losses.length === 0) return `${header}\n${sep}\n| - | none | - | - | - |`;
+  if (losses.length === 0) return `${header}\n${sep}\n| — | — | — | — | — |`;
   const rows = losses.map((loss) => {
     const side = loss.victimPlayer === perspectivePlayerId ? 'own' : 'enemy';
     const killers = loss.killerIds.length > 0
@@ -279,10 +279,13 @@ function buildActiveCallbacksSection(
   subscriptions: CallbackSubscription[],
   latLngByH3: Map<string, [number, number]>
 ): string {
+  const header = '| Event | Details |';
+  const sep = '| --- | --- |';
   if (subscriptions.length === 0) {
-    return 'None. You may add callbacks in your response JSON to be consulted on specific events.';
+    return `${header}\n${sep}\n| — | None. You may add callbacks in your response JSON to be consulted on specific events. |`;
   }
-  return subscriptions.map((s) => `- ${formatCallbackLine(s, latLngByH3)}`).join('\n');
+  const rows = subscriptions.map((s) => `| ${s.event} | ${formatCallbackLine(s, latLngByH3)} |`);
+  return [header, sep, ...rows].join('\n');
 }
 
 /**

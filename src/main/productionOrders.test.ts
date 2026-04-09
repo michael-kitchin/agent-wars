@@ -7,19 +7,18 @@ import { normalizeProductionOrders } from './productionOrders';
 
 function testNormalizeProductionOrdersHappyPath(): void {
   const parsed = normalizeProductionOrders([
-    { action: 'add_build_entry', hex: [12.34, 56.78], unitType: 'infantry', count: 3 },
-    { action: 'update_build_entry', hex: [12.34, 56.78], entryId: 9, unitType: 'armor', count: 2 },
-    { action: 'remove_build_entry', hex: [12.34, 56.78], entryId: 9 },
+    { action: 'set_build_queue', hex: [12.34, 56.78], unitType: 'infantry', count: 3 },
+    { action: 'set_build_queue', hex: [12.35, 56.79], unitType: 'air', count: 2 },
   ]);
-  assert.strictEqual(parsed.validOrders.length, 3);
+  assert.strictEqual(parsed.validOrders.length, 2);
   assert.strictEqual(parsed.droppedReasons.length, 0);
 }
 
 function testNormalizeProductionOrdersDropsMalformedEntriesButKeepsValid(): void {
   const parsed = normalizeProductionOrders([
-    { action: 'add_build_entry', hex: [12.34, 56.78], unitType: 'infantry', count: 1 },
-    { action: 'add_build_entry', hex: [12.34, 56.78], count: 1 },
-    { action: 'remove_build_entry', hex: [12.34, 56.78], entryId: 0 },
+    { action: 'set_build_queue', hex: [12.34, 56.78], unitType: 'infantry', count: 1 },
+    { action: 'set_build_queue', hex: [12.34, 56.78], count: 1 },
+    { action: 'unknown_build_action', hex: [12.34, 56.78], entryId: 0 },
     'not-an-object',
   ]);
   assert.strictEqual(parsed.validOrders.length, 1);
@@ -28,15 +27,15 @@ function testNormalizeProductionOrdersDropsMalformedEntriesButKeepsValid(): void
 
 function testNormalizeProductionOrdersRejectsOutOfBoundsCount(): void {
   const parsed = normalizeProductionOrders([
-    { action: 'add_build_entry', hex: [12.34, 56.78], unitType: 'infantry', count: 0 },
-    { action: 'update_build_entry', hex: [12.34, 56.78], entryId: 2, unitType: 'naval', count: 100 },
+    { action: 'set_build_queue', hex: [12.34, 56.78], unitType: 'infantry', count: 0 },
+    { action: 'set_build_queue', hex: [12.34, 56.78], unitType: 'naval', count: 100 },
   ]);
   assert.strictEqual(parsed.validOrders.length, 0);
   assert.strictEqual(parsed.droppedReasons.length, 2);
 }
 
 function testNormalizeProductionOrdersRequiresArrayWhenPresent(): void {
-  const parsed = normalizeProductionOrders({ action: 'add_build_entry' });
+  const parsed = normalizeProductionOrders({ action: 'set_build_queue' });
   assert.strictEqual(parsed.validOrders.length, 0);
   assert.strictEqual(parsed.droppedReasons.length, 1);
 }

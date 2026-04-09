@@ -19,7 +19,7 @@ import { isTerrainClassificationCacheLoaded } from '../terrainClassificationCach
 
 const AI_PLAYER_ID = 'opponent';
 
-const TOOL6_NAME_LIST = ['query_production', 'add_build_entry', 'update_build_entry', 'remove_build_entry'] as const;
+const TOOL6_NAME_LIST = ['query_production', 'set_build_queue'] as const;
 export const TOOL6_NAMES = TOOL6_NAME_LIST;
 
 function roundCoordinate(value: number): number {
@@ -97,27 +97,58 @@ function queryProduction(
   return { status: 'ok', production: { controlledHexQueues: snapshots } };
 }
 
-function addBuildEntry(
+function setBuildQueue(
   args: { hex?: unknown; unitType?: unknown; count?: unknown },
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): Record<string, unknown> {
+  logDebug('tool6Production setBuildQueue', { hasHex: args.hex !== undefined });
   const resolved = resolveHexArgument(args, resolveToH3);
   if (!resolved.ok) return { status: 'error', error: resolved.error };
   if (!isBuildUnitType(args.unitType)) {
-    return { status: 'error', error: 'add_build_entry requires unitType (infantry|armor|naval|air).' };
+    return { status: 'error', error: 'set_build_queue requires unitType (infantry|armor|naval|air).' };
   }
   const count = Number(args.count);
   if (!isValidBuildCount(count)) {
     return {
       status: 'error',
-      error: `add_build_entry count must be an integer from ${BUILD_ENTRY_MIN_COUNT} to ${BUILD_ENTRY_MAX_COUNT}.`,
+      error: `set_build_queue count must be an integer from ${BUILD_ENTRY_MIN_COUNT} to ${BUILD_ENTRY_MAX_COUNT}.`,
     };
+  }
+  const currentQueue = getHexBuildQueue(resolved.h3Index, AI_PLAYER_ID);
+  if (!currentQueue.controlledByRequester) {
+    return { status: 'error', error: currentQueue.noBuildReason ?? 'Hex is not controlled by requester.' };
+  }
+  if (!currentQueue.buildSectionVisible) {
+    return { status: 'error', error: currentQueue.noBuildReason ?? 'Build section is not available for this hex.' };
+  }
+  if (!currentQueue.availableUnitTypes.includes(args.unitType)) {
+    return {
+      status: 'error',
+      error: `set_build_queue unitType ${args.unitType} is not available for this hex.`,
+    };
+  }
+  const orderedEntries = [...currentQueue.entries].sort((a, b) => a.queueIndex - b.queueIndex);
+  if (orderedEntries.length > 0) {
+    const entryToKeep = orderedEntries[0]!;
+    const updateResult = updateHexBuildQueueEntry(resolved.h3Index, entryToKeep.id, args.unitType, count, AI_PLAYER_ID);
+    if (!updateResult.success || !updateResult.queue) {
+      return { status: 'error', error: updateResult.reason ?? 'Failed to update primary queue entry.' };
+    }
+    let queueAfter = updateResult.queue;
+    for (const entry of orderedEntries.slice(1)) {
+      const removeResult = removeHexBuildQueueEntry(resolved.h3Index, entry.id, AI_PLAYER_ID);
+      if (!removeResult.success || !removeResult.queue) {
+        return { status: 'error', error: removeResult.reason ?? 'Failed to remove obsolete queue entry.' };
+      }
+      queueAfter = removeResult.queue;
+    }
+    return { status: 'ok', production: summarizeQueue(queueAfter, latLngByH3) };
   }
 
   const addResult = addHexBuildQueueEntry(resolved.h3Index, AI_PLAYER_ID);
   if (!addResult.success || !addResult.queue) {
-    return { status: 'error', error: addResult.reason ?? 'Failed to add build queue entry.' };
+    return { status: 'error', error: addResult.reason ?? 'Failed to create build queue entry.' };
   }
   const newEntry = [...addResult.queue.entries].sort((a, b) => b.queueIndex - a.queueIndex)[0];
   if (!newEntry) {
@@ -125,54 +156,9 @@ function addBuildEntry(
   }
   const updateResult = updateHexBuildQueueEntry(resolved.h3Index, newEntry.id, args.unitType, count, AI_PLAYER_ID);
   if (!updateResult.success || !updateResult.queue) {
-    removeHexBuildQueueEntry(resolved.h3Index, newEntry.id, AI_PLAYER_ID);
-    return { status: 'error', error: updateResult.reason ?? 'Failed to apply build entry specifics.' };
+    return { status: 'error', error: updateResult.reason ?? 'Failed to set build queue entry.' };
   }
   return { status: 'ok', production: summarizeQueue(updateResult.queue, latLngByH3) };
-}
-
-function updateBuildEntry(
-  args: { hex?: unknown; entryId?: unknown; unitType?: unknown; count?: unknown },
-  latLngByH3: Map<string, LatLng>,
-  resolveToH3: (lat: number, lng: number) => string | undefined
-): Record<string, unknown> {
-  const resolved = resolveHexArgument(args, resolveToH3);
-  if (!resolved.ok) return { status: 'error', error: resolved.error };
-  if (!Number.isInteger(args.entryId) || Number(args.entryId) <= 0) {
-    return { status: 'error', error: 'update_build_entry requires positive integer entryId.' };
-  }
-  if (!isBuildUnitType(args.unitType)) {
-    return { status: 'error', error: 'update_build_entry requires unitType (infantry|armor|naval|air).' };
-  }
-  const count = Number(args.count);
-  if (!isValidBuildCount(count)) {
-    return {
-      status: 'error',
-      error: `update_build_entry count must be an integer from ${BUILD_ENTRY_MIN_COUNT} to ${BUILD_ENTRY_MAX_COUNT}.`,
-    };
-  }
-  const result = updateHexBuildQueueEntry(resolved.h3Index, Number(args.entryId), args.unitType, count, AI_PLAYER_ID);
-  if (!result.success || !result.queue) {
-    return { status: 'error', error: result.reason ?? 'Failed to update build queue entry.' };
-  }
-  return { status: 'ok', production: summarizeQueue(result.queue, latLngByH3) };
-}
-
-function removeBuildEntry(
-  args: { hex?: unknown; entryId?: unknown },
-  latLngByH3: Map<string, LatLng>,
-  resolveToH3: (lat: number, lng: number) => string | undefined
-): Record<string, unknown> {
-  const resolved = resolveHexArgument(args, resolveToH3);
-  if (!resolved.ok) return { status: 'error', error: resolved.error };
-  if (!Number.isInteger(args.entryId) || Number(args.entryId) <= 0) {
-    return { status: 'error', error: 'remove_build_entry requires positive integer entryId.' };
-  }
-  const result = removeHexBuildQueueEntry(resolved.h3Index, Number(args.entryId), AI_PLAYER_ID);
-  if (!result.success || !result.queue) {
-    return { status: 'error', error: result.reason ?? 'Failed to remove build queue entry.' };
-  }
-  return { status: 'ok', production: summarizeQueue(result.queue, latLngByH3) };
 }
 
 /**
@@ -194,15 +180,12 @@ export function executeTool6(
   try {
     const request = (args ?? {}) as {
       hex?: unknown;
-      entryId?: unknown;
       unitType?: unknown;
       count?: unknown;
       all?: unknown;
     };
     if (toolName === 'query_production') return queryProduction(request, state, latLngByH3, resolveToH3);
-    if (toolName === 'add_build_entry') return addBuildEntry(request, latLngByH3, resolveToH3);
-    if (toolName === 'update_build_entry') return updateBuildEntry(request, latLngByH3, resolveToH3);
-    if (toolName === 'remove_build_entry') return removeBuildEntry(request, latLngByH3, resolveToH3);
+    if (toolName === 'set_build_queue') return setBuildQueue(request, latLngByH3, resolveToH3);
     return { status: 'error', error: `Unknown tool: ${toolName}` };
   } catch (err) {
     logError('tool6Production executeTool6: exception', toolName, err);

@@ -79,7 +79,10 @@ function testFormatBriefingContainsSections(): void {
   assert.ok(out.includes('**Losses since last consultation**'), 'losses subsection header');
   assert.ok(out.includes('| Turn | Victim Unit | Side | Cause | Killer IDs |'), 'losses subsection table header');
   assert.ok(out.includes('opponent-armor-1'), 'unit table has unit');
-  assert.ok(out.includes('Ranged attacks:') || out.includes('Possible unit actions'), 'tactical actions present');
+  assert.ok(
+    out.includes('| Unit ID |') || out.includes('### Other hexes') || out.includes('**Possible unit actions**'),
+    'possible actions table or section present'
+  );
   assert.ok(out.includes('**Attention flags**'), 'Section 3 header');
   assert.ok(out.includes('YOUR STRATEGIC MEMORY'), 'memory block');
   assert.ok(out.includes('Remember: push south.'), 'memory text');
@@ -139,8 +142,9 @@ function testFormatBriefingUnitTableRows(): void {
 
 function testFormatBriefingPossibleActionsArmorRanged(): void {
   const out = formatBriefing(fixtureState, precomputed, '', '');
-  assert.ok(out.includes('opponent-armor-1 (armor):'));
-  assert.ok(out.includes('  - Ranged attacks:'));
+  assert.ok(out.includes('opponent-armor-1'));
+  assert.ok(out.includes('ranged attack'));
+  assert.ok(out.includes('| Unit ID | Unit Type | Action Types | Hex | Distance | Enemy Units | Hex Features |'));
 }
 
 const tests = [

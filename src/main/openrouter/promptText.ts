@@ -17,15 +17,14 @@ const MOVEMENT_INSTRUCTION_MEMORY_SUFFIX =
 
 const PRODUCTION_REQUIREMENT_BASE = 'when at least one controlled hex has availableUnitTypes and an empty queue';
 const PRODUCTION_REQUIREMENT_PRIORITY =
-  'Choose the unit types you expect to need, and prioritize what you will need first by putting those entries first in queue order.';
+  'Set exactly one unit type/count per controlled hex queue; each new set replaces the previous queue for that hex.';
 const PRODUCTION_REQUIREMENT_PRIORITY_INITIAL =
-  'Build the unit types you think you need, and prioritize what you think you will need first.';
+  'Set one unit type/count for each queue you choose to manage this turn.';
 
 export function buildLatLngPreamble(h3Resolution: number, decimalPlaces: number): string {
-  return `Map context: global Earth map (H3 resolution ${h3Resolution}), not a local/contrived arena.
-Positions use [lat, lng] coordinates (latitude, longitude). Values in this prompt are rounded to ${decimalPlaces} decimal places for this map resolution; preserve that precision when you copy coordinates. Use only coordinates from the unit and target lists below; do not invent coordinates. Hex distances are given in the prompt where relevant.
+  return `Global Earth map, H3 resolution ${h3Resolution}. All positions are [lat, lng] at ${decimalPlaces} decimal places — copy exactly from lists/tables below; never invent coordinates. Distances are hex counts where shown.
 
-Final JSON uses an "orders" array (see submit instruction below). Geographic targets use [lat, lng] only. Follow/pursue standing orders use enemy unit id strings only (targetUnitId). Never use raw H3 cell IDs or hex index strings.`;
+Final JSON: place targets as [lat,lng]; standing-order pursue uses enemy unit id (targetUnitId). Never emit raw H3 strings.`;
 }
 
 /** Use this to format "<label>: X of Y ... (Z%)" progress bullets in the system prompt. */
@@ -86,7 +85,7 @@ export function buildToolUsageGuidance(flags: PromptToolFlags, hasPrecomputedBri
     if (flags.planningEnabled && !hasPrecomputedBriefing) {
       lines.push('- For units several turns from combat, use assign_order (march/pursue) in final JSON instead of re-planning every turn.');
     }
-    lines.push('- Sealift doctrine: when water crossing is required, proactively plan embark/transport/disembark sequences (stage land units with naval units, transport them across water, then disembark inland).');
+    lines.push('- Sealift: use === NAVAL TRANSPORT STATUS === for each naval unit (capacity, co-located land, nearest embark hex); issue embark / transport_move / disembark in orders[] when crossing water.');
   }
   if (flags.memoryEnabled) {
     lines.push(
@@ -96,7 +95,7 @@ export function buildToolUsageGuidance(flags: PromptToolFlags, hasPrecomputedBri
   }
   if (flags.productionEnabled) {
     lines.push(
-      '- Production: use query_production to inspect controlled-hex queues and constraints; use add_build_entry/update_build_entry/remove_build_entry for iterative queue edits. If skipping tools, you may include productionOrders in final JSON.'
+      '- Production: use query_production to inspect controlled-hex queues and constraints; use set_build_queue to set one unit type/count for a queue (this replaces existing queue entries). If skipping tools, you may include productionOrders in final JSON.'
     );
     lines.push(
       `- Production requirement: ${PRODUCTION_REQUIREMENT_BASE}, queue at least one build this turn (via tools or productionOrders). ${PRODUCTION_REQUIREMENT_PRIORITY}`
@@ -157,12 +156,10 @@ export function buildProductionSubmitClause(flags: PromptToolFlags): string {
   if (!flags.productionEnabled) return '';
   return (
     ' "productionOrders" entries MUST include "action" on every item. Required forms:' +
-    ' {"action":"add_build_entry","hex":[lat,lng],"unitType":"infantry|armor|naval|air","count":1..99};' +
-    ' {"action":"update_build_entry","hex":[lat,lng],"entryId":number,"unitType":"infantry|armor|naval|air","count":1..99};' +
-    ' {"action":"remove_build_entry","hex":[lat,lng],"entryId":number}.' +
+    ' {"action":"set_build_queue","hex":[lat,lng],"unitType":"infantry|armor|naval|air","count":1..99}.' +
     ' Any productionOrders item missing "action" or required fields is dropped.' +
-    ` ${PRODUCTION_REQUIREMENT_BASE}, include at least one add_build_entry this turn.` +
-    ' Select the unit types you think you will need, and prioritize what you will need first in queue order.'
+    ` ${PRODUCTION_REQUIREMENT_BASE}, include at least one set_build_queue this turn.` +
+    ' Each set_build_queue item fully replaces the chosen hex queue with one unit type/count.'
   );
 }
 

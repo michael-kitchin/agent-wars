@@ -1,8 +1,95 @@
+import { gridDistance } from 'h3-js';
 import { executeTool6 } from '../tools/tool6Production';
 import { MAX_UNITS_PER_TYPE, getMaxedUnitTypesForPlayer, getPlayerUnitCountsByType } from '../productionCaps';
 import type { GameStateSnapshot } from '../gameDb';
+import { logDebug } from '../logger';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
-import { countRowsInStrikeRange, isInRange } from './rangeSupport';
+import { buildPromptTableLines } from '../promptTableUtils';
+import { getRangeEnvelopeByBase, type RangeEnvelopeCache } from './rangeSupport';
+
+function countStrikeableEnemyInfrastructure(args: {
+  strikeEnvelope: Set<string>;
+  infraRows: NonNullable<GameStateSnapshot['res1Infrastructure']>;
+  controllerByHex: Map<string, string | null | undefined>;
+}): { urban: number; airports: number; seaports: number } {
+  let urban = 0;
+  let airports = 0;
+  let seaports = 0;
+  for (const row of args.infraRows) {
+    if (!args.strikeEnvelope.has(row.h3Index)) continue;
+    if (args.controllerByHex.get(row.h3Index) === 'opponent') continue;
+    if (Number(row.urbanHexCount ?? 0) > 0) urban += 1;
+    if (Number(row.airportCount ?? 0) > 0) airports += 1;
+    if (Number(row.seaportCount ?? 0) > 0) seaports += 1;
+  }
+  return { urban, airports, seaports };
+}
+
+interface ProductionQueueEntrySnapshot {
+  entryId?: unknown;
+  queueIndex?: unknown;
+  unitType?: unknown;
+  count?: unknown;
+}
+
+interface ControlledHexQueueSnapshot {
+  hex?: unknown;
+  urbanHexCount?: unknown;
+  airportCount?: unknown;
+  seaportCount?: unknown;
+  availableUnitTypes?: unknown;
+  entries?: unknown;
+}
+
+interface NormalizedControlledHexQueueRow {
+  hexText: string;
+  urban: number;
+  airports: number;
+  seaports: number;
+  available: string;
+  entries: string;
+  hasQueuedEntries: boolean;
+}
+
+function normalizeControlledHexQueueRow(
+  row: ControlledHexQueueSnapshot,
+  formatLatLng: (ll: [number, number]) => string
+): NormalizedControlledHexQueueRow {
+  const hex = Array.isArray(row.hex) ? (row.hex as [number, number]) : null;
+  const hexText = hex ? formatLatLng(hex) : '[unknown]';
+  const urban = Number(row.urbanHexCount ?? 0);
+  const airports = Number(row.airportCount ?? 0);
+  const seaports = Number(row.seaportCount ?? 0);
+  const available = Array.isArray(row.availableUnitTypes)
+    ? (row.availableUnitTypes as unknown[]).map((x) => String(x)).join(', ')
+    : '';
+  const entriesList = Array.isArray(row.entries) ? (row.entries as ProductionQueueEntrySnapshot[]) : [];
+  const nextEntry = [...entriesList].sort((a, b) => {
+    const queueIndexA = Number(a.queueIndex);
+    const queueIndexB = Number(b.queueIndex);
+    if (Number.isFinite(queueIndexA) && Number.isFinite(queueIndexB) && queueIndexA !== queueIndexB) {
+      return queueIndexA - queueIndexB;
+    }
+    const entryIdA = Number(a.entryId);
+    const entryIdB = Number(b.entryId);
+    if (Number.isFinite(entryIdA) && Number.isFinite(entryIdB) && entryIdA !== entryIdB) {
+      return entryIdA - entryIdB;
+    }
+    return 0;
+  })[0];
+  const entries = nextEntry
+    ? `${Number.isFinite(Number(nextEntry.count)) ? Number(nextEntry.count) : '?'} ${String(nextEntry.unitType ?? '?')}`
+    : '—';
+  return {
+    hexText,
+    urban,
+    airports,
+    seaports,
+    available: available || '—',
+    entries,
+    hasQueuedEntries: entriesList.length > 0,
+  };
+}
 
 /**
  * Why this exists:
@@ -54,23 +141,32 @@ export function buildProductionBriefingBlock(args: {
     lines.push('No currently controlled hexes with editable production queues.');
     return lines.join('\n');
   }
-  lines.push('Controlled hex queues:');
-  for (const row of queues) {
-    const hex = Array.isArray(row.hex) ? (row.hex as [number, number]) : null;
-    const urban = Number(row.urbanHexCount ?? 0);
-    const seaports = Number(row.seaportCount ?? 0);
-    const available = Array.isArray(row.availableUnitTypes)
-      ? (row.availableUnitTypes as unknown[]).map((x) => String(x)).join(', ')
-      : '';
-    const entries = Array.isArray(row.entries)
-      ? (row.entries as Array<Record<string, unknown>>)
-          .map((entry) => `${entry.entryId}:${entry.unitType}x${entry.count}`)
-          .join(', ')
-      : '';
-    lines.push(
-      `- ${hex ? args.formatLatLng(hex) : '[unknown]'} urban=${urban} airports=${Number(row.airportCount ?? 0)} seaports=${seaports} available=[${available || 'none'}] queue=${entries || '(empty)'}`
-    );
+  lines.push('');
+  lines.push('**Controlled hex queues**');
+  lines.push('');
+  const normalizedRows = (queues as ControlledHexQueueSnapshot[]).map((row) =>
+    normalizeControlledHexQueueRow(row, args.formatLatLng)
+  );
+  normalizedRows.sort((a, b) => {
+    if (a.urban !== b.urban) return b.urban - a.urban;
+    return a.hexText.localeCompare(b.hexText);
+  });
+  const topTen = normalizedRows.slice(0, 10);
+  const selectedRows = [...topTen];
+  const seen = new Set(topTen.map((r) => r.hexText));
+  for (const row of normalizedRows.slice(10)) {
+    if (!row.hasQueuedEntries) continue;
+    if (seen.has(row.hexText)) continue;
+    selectedRows.push(row);
+    seen.add(row.hexText);
   }
+  lines.push(
+    ...buildPromptTableLines(
+      ['Hex', 'Urban Hexes', 'Airports', 'Seaports', 'Available Unit Types', 'Current Queue'],
+      selectedRows.map((row) => [row.hexText, row.urban, row.airports, row.seaports, row.available, row.entries]),
+      ['—', '—', '—', '—', '—', '—']
+    )
+  );
   return lines.join('\n');
 }
 
@@ -86,10 +182,12 @@ export function buildAirOperationsBriefingBlock(
   state: GameStateSnapshot,
   format: (h3: string) => string
 ): string {
+  logDebug('briefingSections buildAirOperationsBriefingBlock', { turnNumber: state.turnNumber });
   const opponentAir = state.units.filter((u) => u.player === 'opponent' && u.unitType === 'air');
   const humanAir = state.units.filter((u) => u.player === 'human' && u.unitType === 'air');
   const humanUnits = state.units.filter((u) => u.player === 'human');
   const infraRows = state.res1Infrastructure ?? [];
+  const hexUniverse = new Set(state.hexes.map((h) => h.h3Index));
   const controllerByHex = new Map((state.res1Control ?? []).map((r) => [r.h3Index, r.controllerPlayerId]));
   const infraByHex = new Map(infraRows.map((r) => [r.h3Index, r]));
   const opponentAirports = infraRows.filter(
@@ -103,42 +201,76 @@ export function buildAirOperationsBriefingBlock(
   );
 
   const lines: string[] = [];
+  const rangeEnvelopeCache: RangeEnvelopeCache = new Map();
   lines.push('=== AIR OPERATIONS STATUS ===');
   lines.push(
     `Air rules: strike range ${AIR_STRIKE_RANGE_HEXES} from base, ferry range ${AIR_FERRY_RANGE_HEXES} airport-to-airport, one air action per unit per turn.`
   );
   lines.push(`Air units: yours=${opponentAir.length}, enemy=${humanAir.length}.`);
+  lines.push('');
+  const airStatusRows: Array<Array<unknown>> = [];
 
   if (opponentAir.length === 0) {
-    lines.push('No opponent air units currently deployed.');
+    // Keep explicit empty-state row for stable section shape.
+    airStatusRows.push(['—', '—', '—', '—', '—', '—', '—', '—', '—']);
   } else {
-    lines.push('Your air unit options this turn:');
     for (const air of opponentAir) {
+      const strikeEnvelope = getRangeEnvelopeByBase(
+        air.h3Index,
+        AIR_STRIKE_RANGE_HEXES,
+        hexUniverse,
+        rangeEnvelopeCache
+      );
+      const ferryEnvelope = getRangeEnvelopeByBase(
+        air.h3Index,
+        AIR_FERRY_RANGE_HEXES,
+        hexUniverse,
+        rangeEnvelopeCache
+      );
       const baseInfra = infraByHex.get(air.h3Index);
       const baseIntact = Number(baseInfra?.airportCount ?? 0) > 0;
       const baseControlled = controllerByHex.get(air.h3Index) === 'opponent';
-      const targetableEnemyUnits = humanUnits.filter((u) => isInRange(air.h3Index, u.h3Index, 3)).length;
-      const strikeableUrban = countRowsInStrikeRange(air.h3Index, infraRows, (r) =>
-        controllerByHex.get(r.h3Index) !== 'opponent' && Number(r.urbanHexCount ?? 0) > 0
-      );
-      const strikeableAirports = countRowsInStrikeRange(air.h3Index, infraRows, (r) =>
-        controllerByHex.get(r.h3Index) !== 'opponent' && Number(r.airportCount ?? 0) > 0
-      );
-      const strikeableSeaports = countRowsInStrikeRange(air.h3Index, infraRows, (r) =>
-        controllerByHex.get(r.h3Index) !== 'opponent' && Number(r.seaportCount ?? 0) > 0
-      );
+      const targetableEnemyUnits = humanUnits.filter((u) => strikeEnvelope.has(u.h3Index)).length;
+      const strikeable = countStrikeableEnemyInfrastructure({ strikeEnvelope, infraRows, controllerByHex });
       const ferryDestinations = opponentAirports.filter((ap) => {
         if (ap.h3Index === air.h3Index) return false;
-        return isInRange(air.h3Index, ap.h3Index, 4);
+        return ferryEnvelope.has(ap.h3Index);
       }).length;
-      lines.push(
-        `- ${air.id} @ ${format(air.h3Index)} baseIntact=${baseIntact} baseControlled=${baseControlled} unitTargets=${targetableEnemyUnits} strikeable[urban=${strikeableUrban},airport=${strikeableAirports},seaport=${strikeableSeaports}] ferryDestinations=${ferryDestinations}`
-      );
+      airStatusRows.push([
+        air.id,
+        format(air.h3Index),
+        baseIntact ? 'yes' : 'no',
+        baseControlled ? 'yes' : 'no',
+        targetableEnemyUnits,
+        strikeable.urban,
+        strikeable.airports,
+        strikeable.seaports,
+        ferryDestinations,
+      ]);
     }
   }
+  lines.push(
+    ...buildPromptTableLines(
+      [
+        'Unit ID',
+        'Base Hex',
+        'Base Intact',
+        'Base Controlled',
+        'Enemy Unit Targets',
+        'Strikeable Urban',
+        'Strikeable Airports',
+        'Strikeable Seaports',
+        'Ferry Destinations',
+      ],
+      airStatusRows
+    )
+  );
 
-  const threatenedHumanAirports = humanAirports.filter((ap) => opponentAir.some((air) => isInRange(air.h3Index, ap.h3Index, 3))).length;
-  const threatenedHumanSeaports = humanSeaports.filter((sp) => opponentAir.some((air) => isInRange(air.h3Index, sp.h3Index, 3))).length;
+  const strikeEnvelopes = opponentAir.map((air) =>
+    getRangeEnvelopeByBase(air.h3Index, AIR_STRIKE_RANGE_HEXES, hexUniverse, rangeEnvelopeCache)
+  );
+  const threatenedHumanAirports = humanAirports.filter((ap) => strikeEnvelopes.some((s) => s.has(ap.h3Index))).length;
+  const threatenedHumanSeaports = humanSeaports.filter((sp) => strikeEnvelopes.some((s) => s.has(sp.h3Index))).length;
   lines.push(
     `Enemy infrastructure in your current strike envelope: airports=${threatenedHumanAirports}, seaports=${threatenedHumanSeaports}.`
   );
@@ -146,18 +278,45 @@ export function buildAirOperationsBriefingBlock(
   return lines.join('\n');
 }
 
+function findNearestOpponentEmbarkHex(
+  navalH3: string,
+  state: GameStateSnapshot,
+  format: (h3: string) => string
+): string {
+  const infraByHex = new Map((state.res1Infrastructure ?? []).map((row) => [row.h3Index, row]));
+  const controlByHex = new Map((state.res1Control ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
+  let best: { h3: string; d: number } | null = null;
+  for (const hex of state.hexes) {
+    const h3 = hex.h3Index;
+    if (controlByHex.get(h3) !== 'opponent') continue;
+    const seaport = Number(infraByHex.get(h3)?.seaportCount ?? 0);
+    const canEmbark = hex.terrain === 'coastal' || seaport > 0;
+    if (!canEmbark) continue;
+    try {
+      const d = gridDistance(navalH3, h3);
+      if (best === null || d < best.d) best = { h3, d };
+    } catch {
+      continue;
+    }
+  }
+  if (!best) return '—';
+  return `${format(best.h3)} at hex distance ${best.d}`;
+}
+
 /**
  * Why this exists:
- *     Adds sealift-oriented planning context to briefings so the model can stage embark/transport/disembark sequences.
+ *     Surfaces sealift-ready facts per naval unit (capacity, co-located land, nearest embark hex) so the model can
+ *     issue embark/transport_move/disembark without long doctrine prose.
  * When to use:
  *     During prompt assembly for opponent planning turns.
  * What to expect:
- *     Returns deterministic rows for naval transport opportunities and vulnerable sea movement.
+ *     Deterministic one-line rows per opponent naval unit plus a one-line capacity reminder.
  */
 export function buildSealiftBriefingBlock(
   state: GameStateSnapshot,
   format: (h3: string) => string
 ): string {
+  logDebug('briefingSections buildSealiftBriefingBlock', { turnNumber: state.turnNumber });
   const lines: string[] = [];
   const opponentNaval = state.units.filter((unit) => unit.player === 'opponent' && unit.unitType === 'naval');
   const opponentLand = state.units.filter(
@@ -174,9 +333,17 @@ export function buildSealiftBriefingBlock(
   }
 
   lines.push('=== NAVAL TRANSPORT STATUS ===');
-  lines.push('Sealift rules: embark at controlled coastal hexes with seaports; naval capacity is 1 armor or 2 infantry.');
+  lines.push('Embark: opponent-controlled coastal hex, or non-coastal with seaport+control. Capacity: 1 armor or 2 infantry per naval unit.');
+  lines.push('');
+  const navalRows: Array<Array<unknown>> = [];
   if (opponentNaval.length <= 0) {
-    lines.push('No opponent naval units currently available for transport.');
+    navalRows.push(['—', '—', '—', '—', '—', '—', '—']);
+    lines.push(
+      ...buildPromptTableLines(
+        ['Unit ID', 'Hex', 'Opponent Controlled', 'Seaport Here', 'Aboard', 'Capacity Used', 'Nearest Embark Hex'],
+        navalRows
+      )
+    );
     return lines.join('\n');
   }
 
@@ -185,10 +352,24 @@ export function buildSealiftBriefingBlock(
     const hasPort = (infra?.seaportCount ?? 0) > 0;
     const controlled = controlByHex.get(naval.h3Index) === 'opponent';
     const coLocated = landByHex.get(naval.h3Index) ?? { infantry: 0, armor: 0 };
-    lines.push(
-      `- ${naval.id} @ ${format(naval.h3Index)} controlled=${controlled} seaport=${hasPort} nearbyLand[infantry=${coLocated.infantry},armor=${coLocated.armor}]`
-    );
+    const nearestEmbark = findNearestOpponentEmbarkHex(naval.h3Index, state, format);
+    const capacityUsed = coLocated.armor >= 1 ? 2 : Math.min(coLocated.infantry, 2);
+    const aboard = `infantry ${coLocated.infantry}, armor ${coLocated.armor}`;
+    navalRows.push([
+      naval.id,
+      format(naval.h3Index),
+      controlled ? 'yes' : 'no',
+      hasPort ? 'yes' : 'no',
+      aboard,
+      `${capacityUsed}/2`,
+      nearestEmbark,
+    ]);
   }
-  lines.push('When crossing water is required, prefer coordinated embark -> transport_move -> disembark plans.');
+  lines.push(
+    ...buildPromptTableLines(
+      ['Unit ID', 'Hex', 'Opponent Controlled', 'Seaport Here', 'Aboard', 'Capacity Used', 'Nearest Embark Hex'],
+      navalRows
+    )
+  );
   return lines.join('\n');
 }

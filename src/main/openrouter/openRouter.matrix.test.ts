@@ -206,7 +206,7 @@ async function run(): Promise<void> {
         `ferry JSON contract guidance missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes(`Map context: global Earth map (H3 resolution ${mapData.H3_RESOLUTION}), not a local/contrived arena.`),
+        systemPrompt.includes(`Global Earth map, H3 resolution ${mapData.H3_RESOLUTION}`),
         `global-map context guidance missing for mask=${mask}`
       );
       assert.ok(
@@ -269,8 +269,12 @@ async function run(): Promise<void> {
         `human home-region guidance missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes(`rounded to ${mapData.LATLNG_DECIMAL_PLACES} decimal places`),
+        systemPrompt.includes(`at ${mapData.LATLNG_DECIMAL_PLACES} decimal places`),
         `lat/lng precision guidance missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('Example (illustrative only'),
+        `final JSON example block missing for mask=${mask}`
       );
       assertPromptAvoidsPlayerFacingUnitLabels(systemPrompt, mask);
 

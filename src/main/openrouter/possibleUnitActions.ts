@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Builds the "Possible unit actions" markdown block for AI Commander's Briefings.
  * Derives legal one-step moves/melee reach, air ferry destinations, ranged attacks, and air strikes from order validation rules.
  */
@@ -11,10 +11,38 @@ import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tact
 import { isWithinGridRangeSafe } from '../game-actions/gridRange';
 import { logDebug, logTrace } from '../logger';
 import { logHexControllerParityMismatch } from '../snapshotDbParity';
+import { buildPromptTableLines } from '../promptTableUtils';
 
 const ENEMY_PLAYER = 'human';
 const FRIENDLY_PLAYER = 'opponent';
-const MOVES_MELEE_SECTION = '  - Moves/Melee attacks:';
+
+const ACTION_MOVES_MELEE = 'move/melee';
+const ACTION_RANGED = 'ranged attack';
+const ACTION_AIR_STRIKES = 'air strike';
+const BUCKET_TITLES: Array<{ bucket: PossibleActionTableRow['bucket']; title: string }> = [
+  { bucket: 'homeland', title: 'Enemy homeland hexes' },
+  { bucket: 'nearest', title: 'Hexes nearest to enemy homeland' },
+  { bucket: 'other', title: 'Other hexes' },
+];
+const BUCKET_PRIORITY: Record<PossibleActionTableRow['bucket'], number> = {
+  homeland: 0,
+  nearest: 1,
+  other: 2,
+};
+
+/** Row shape for markdown tables under homeland / nearest / other subsections. */
+export interface PossibleActionTableRow {
+  bucket: 'homeland' | 'nearest' | 'other';
+  unitId: string;
+  unitType: string;
+  actionTypes: string;
+  targetH3: string;
+  distance: number;
+  enemySummary: string;
+  featuresSummary: string;
+  enemyUnitCount: number;
+  urbanHexCount: number;
+}
 
 /** Removes the unit's current hex from briefing lists (not a meaningful destination/target line). */
 function excludeUnitCurrentHex(unitH3: string, hexes: string[]): string[] {
@@ -160,109 +188,6 @@ function describeInfrastructure(inf: InfraCounts): string | null {
   return parts.join(', ');
 }
 
-/**
- * One briefing line for a candidate hex: coordinates, then optional parenthesis with only non-empty
- * enemy/infra facts (no "none" or zero placeholders).
- */
-function formatPossibleActionHexDetail(
-  indexed: IndexedState,
-  h3: string,
-  latLngByH3: Map<string, [number, number]>,
-  formatLatLng: (ll: [number, number]) => string
-): string {
-  const ll = latLngByH3.get(h3);
-  const pos = ll ? formatLatLng(ll) : h3;
-  const inf = getInfra(indexed, h3);
-  const segments: string[] = [];
-  const enemyDesc = describeEnemyUnitsAtHex(indexed, h3);
-  if (enemyDesc !== null) segments.push(`enemy units: ${enemyDesc}`);
-  const infraDesc = describeInfrastructure(inf);
-  if (infraDesc !== null) segments.push(`features: ${infraDesc}`)
-  if (segments.length === 0) return pos;
-  return `${pos} (${segments.join('; ')})`;
-}
-
-function formatAirStrikeHexDetail(
-  indexed: IndexedState,
-  h3: string,
-  latLngByH3: Map<string, [number, number]>,
-  formatLatLng: (ll: [number, number]) => string,
-  strikeKinds: string[]
-): string {
-  const base = formatPossibleActionHexDetail(indexed, h3, latLngByH3, formatLatLng);
-  const kinds = strikeKinds.join(', ');
-  return `${base}; strikes: ${kinds}`;
-}
-
-function buildBucketLines(
-  homeland: string[],
-  nearest: string[],
-  other: string[],
-  latLngByH3: Map<string, [number, number]>,
-  lineDetail: (h3: string) => string
-): string[] {
-  const out: string[] = [];
-  if (homeland.length > 0) {
-    out.push('    - Enemy homeland hexes:');
-    for (const h3 of sortHexesByLatLng(homeland, latLngByH3)) out.push(`        - ${lineDetail(h3)}`);
-  }
-  if (nearest.length > 0) {
-    out.push('    - Hexes nearest to enemy homeland:');
-    for (const h3 of sortHexesByLatLng(nearest, latLngByH3)) out.push(`        - ${lineDetail(h3)}`);
-  }
-  if (other.length > 0) {
-    out.push('    - Other hexes:');
-    for (const h3 of sortHexesByLatLng(other, latLngByH3)) out.push(`        - ${lineDetail(h3)}`);
-  }
-  return out;
-}
-
-function buildActionSectionLines(args: {
-  label: string;
-  legalHexes: string[];
-  homeland: Set<string>;
-  latLngByH3: Map<string, [number, number]>;
-  detailForHex: (h3: string) => string;
-}): string[] {
-  if (args.legalHexes.length === 0) return [];
-  const parts = partitionHomelandNearestOther(args.legalHexes, args.homeland);
-  const bucketLines = buildBucketLines(parts.homeland, parts.nearest, parts.other, args.latLngByH3, args.detailForHex);
-  if (bucketLines.length === 0) return [];
-  return [args.label, ...bucketLines];
-}
-
-function collectRangedTargetHexes(
-  unitH3: string,
-  unitType: string,
-  indexed: IndexedState
-): string[] {
-  const r = getRange(unitType);
-  if (r < 1) return [];
-  const out = new Set<string>();
-  for (const enemyHex of indexed.enemyUnitsByHex.keys()) {
-    try {
-      const d = gridDistance(unitH3, enemyHex);
-      if (d >= 0 && d <= r) out.add(enemyHex);
-    } catch {
-      continue;
-    }
-  }
-  return [...out];
-}
-
-function collectStrikeHexesForAirUnit(airH3: string, indexed: IndexedState): string[] {
-  try {
-    const disk = gridDisk(airH3, AIR_STRIKE_RANGE_HEXES);
-    return disk.filter((h3) => indexed.hexSet.has(h3));
-  } catch {
-    const out: string[] = [];
-    for (const h3 of indexed.hexSet) {
-      if (isWithinGridRangeSafe(airH3, h3, AIR_STRIKE_RANGE_HEXES, 'possibleUnitActions strike scan')) out.push(h3);
-    }
-    return out;
-  }
-}
-
 function strikeKindsForHex(indexed: IndexedState, targetH3: string): string[] {
   const kinds: string[] = [];
   if ((indexed.enemyUnitsByHex.get(targetH3)?.length ?? 0) > 0) kinds.push('enemy units');
@@ -271,6 +196,81 @@ function strikeKindsForHex(indexed: IndexedState, targetH3: string): string[] {
   if (inf.airport > 0) kinds.push('airport');
   if (inf.seaport > 0) kinds.push('seaport');
   return kinds;
+}
+
+function featuresCellForStrike(indexed: IndexedState, h3: string): string {
+  const inf = describeInfrastructure(getInfra(indexed, h3));
+  const kinds = strikeKindsForHex(indexed, h3);
+  const strikePart = kinds.length > 0 ? `strike: ${kinds.join(', ')}` : '';
+  if (inf && strikePart) return `${inf}; ${strikePart}`;
+  if (strikePart) return strikePart;
+  if (inf) return inf;
+  return '—';
+}
+
+function featuresCellForHex(indexed: IndexedState, h3: string): string {
+  return describeInfrastructure(getInfra(indexed, h3)) ?? '—';
+}
+
+function enemyCell(indexed: IndexedState, h3: string): string {
+  return describeEnemyUnitsAtHex(indexed, h3) ?? '—';
+}
+
+function safeGridDistance(from: string, to: string): number | null {
+  try {
+    return gridDistance(from, to);
+  } catch {
+    return null;
+  }
+}
+
+interface RawPossibleActionRow {
+  bucket: 'homeland' | 'nearest' | 'other';
+  unitId: string;
+  unitType: string;
+  actionType: string;
+  targetH3: string;
+  distance: number;
+  enemySummary: string;
+  featuresSummary: string;
+  enemyUnitCount: number;
+  urbanHexCount: number;
+}
+
+function appendRowsForLegalHexes(args: {
+  rows: RawPossibleActionRow[];
+  unitId: string;
+  unitType: string;
+  unitH3: string;
+  actionType: string;
+  legalHexes: string[];
+  homeland: Set<string>;
+  indexed: IndexedState;
+  latLngByH3: Map<string, [number, number]>;
+  isAirStrike: boolean;
+}): void {
+  const parts = partitionHomelandNearestOther(args.legalHexes, args.homeland);
+  const addForBucket = (bucket: PossibleActionTableRow['bucket'], hexList: string[]): void => {
+    for (const h3 of sortHexesByLatLng(hexList, args.latLngByH3)) {
+      const d = safeGridDistance(args.unitH3, h3);
+      if (d === null) continue;
+      args.rows.push({
+        bucket,
+        unitId: args.unitId,
+        unitType: args.unitType,
+        actionType: args.actionType,
+        targetH3: h3,
+        distance: d,
+        enemySummary: enemyCell(args.indexed, h3),
+        featuresSummary: args.isAirStrike ? featuresCellForStrike(args.indexed, h3) : featuresCellForHex(args.indexed, h3),
+        enemyUnitCount: (args.indexed.enemyUnitsByHex.get(h3) ?? []).length,
+        urbanHexCount: getInfra(args.indexed, h3).urban,
+      });
+    }
+  };
+  addForBucket('homeland', parts.homeland);
+  addForBucket('nearest', parts.nearest);
+  addForBucket('other', parts.other);
 }
 
 function airBaseHasIntactAirport(indexed: IndexedState, airH3: string): boolean {
@@ -322,14 +322,150 @@ function collectLegalFerryDestinationHexes(
   return [...out];
 }
 
+function collectRangedTargetHexes(unitH3: string, unitType: string, indexed: IndexedState): string[] {
+  const r = getRange(unitType);
+  if (r < 1) return [];
+  const out = new Set<string>();
+  for (const enemyHex of indexed.enemyUnitsByHex.keys()) {
+    try {
+      const d = gridDistance(unitH3, enemyHex);
+      if (d >= 0 && d <= r) out.add(enemyHex);
+    } catch {
+      continue;
+    }
+  }
+  return [...out];
+}
+
+function collectStrikeHexesForAirUnit(airH3: string, indexed: IndexedState): string[] {
+  try {
+    const disk = gridDisk(airH3, AIR_STRIKE_RANGE_HEXES);
+    return disk.filter((h3) => indexed.hexSet.has(h3));
+  } catch {
+    const out: string[] = [];
+    for (const h3 of indexed.hexSet) {
+      if (isWithinGridRangeSafe(airH3, h3, AIR_STRIKE_RANGE_HEXES, 'possibleUnitActions strike scan')) out.push(h3);
+    }
+    return out;
+  }
+}
+
+const TABLE_HEADERS = ['Unit ID', 'Unit Type', 'Action Types', 'Hex', 'Distance', 'Enemy Units', 'Hex Features'];
+
+const ACTION_TYPE_ORDER: Record<string, number> = {
+  'move/melee': 0,
+  'ranged attack': 1,
+  'air strike': 2,
+};
+
+function preferredSummary(a: string, b: string): string {
+  if (a === '—') return b;
+  if (b === '—') return a;
+  return b.length > a.length ? b : a;
+}
+
+function aggregateRows(rows: RawPossibleActionRow[]): PossibleActionTableRow[] {
+  const byKey = new Map<string, { row: Omit<PossibleActionTableRow, 'actionTypes'>; actionTypes: Set<string> }>();
+  for (const row of rows) {
+    const key = `${row.unitId}|${row.unitType}|${row.targetH3}`;
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, {
+        row: {
+          bucket: row.bucket,
+          unitId: row.unitId,
+          unitType: row.unitType,
+          targetH3: row.targetH3,
+          distance: row.distance,
+          enemySummary: row.enemySummary,
+          featuresSummary: row.featuresSummary,
+          enemyUnitCount: row.enemyUnitCount,
+          urbanHexCount: row.urbanHexCount,
+        },
+        actionTypes: new Set([row.actionType]),
+      });
+      continue;
+    }
+    existing.actionTypes.add(row.actionType);
+    if (BUCKET_PRIORITY[row.bucket] < BUCKET_PRIORITY[existing.row.bucket]) {
+      existing.row.bucket = row.bucket;
+    }
+    existing.row.enemySummary = preferredSummary(existing.row.enemySummary, row.enemySummary);
+    existing.row.featuresSummary = preferredSummary(existing.row.featuresSummary, row.featuresSummary);
+    existing.row.enemyUnitCount = Math.max(existing.row.enemyUnitCount, row.enemyUnitCount);
+    existing.row.urbanHexCount = Math.max(existing.row.urbanHexCount, row.urbanHexCount);
+  }
+  const out: PossibleActionTableRow[] = [];
+  for (const { row, actionTypes } of byKey.values()) {
+    const sortedTypes = [...actionTypes].sort((a, b) => (ACTION_TYPE_ORDER[a] ?? 999) - (ACTION_TYPE_ORDER[b] ?? 999) || a.localeCompare(b));
+    out.push({ ...row, actionTypes: sortedTypes.join(', ') });
+  }
+  return out;
+}
+
+function markdownTableLines(rows: string[][]): string[] {
+  return buildPromptTableLines(TABLE_HEADERS, rows);
+}
+
+function compareTableRowsForUnitPriority(
+  a: PossibleActionTableRow,
+  b: PossibleActionTableRow,
+  latLngByH3: Map<string, [number, number]>
+): number {
+  if (a.enemyUnitCount !== b.enemyUnitCount) return b.enemyUnitCount - a.enemyUnitCount;
+  if (a.urbanHexCount !== b.urbanHexCount) return b.urbanHexCount - a.urbanHexCount;
+  if (a.distance !== b.distance) return a.distance - b.distance;
+  const byAction = a.actionTypes.localeCompare(b.actionTypes);
+  if (byAction !== 0) return byAction;
+  const la = latLngByH3.get(a.targetH3);
+  const lb = latLngByH3.get(b.targetH3);
+  if (la && lb) {
+    if (la[0] !== lb[0]) return la[0] - lb[0];
+    if (la[1] !== lb[1]) return la[1] - lb[1];
+  }
+  const ca = compareHexIds(a.targetH3, b.targetH3);
+  if (ca !== 0) return ca;
+  return a.unitType.localeCompare(b.unitType);
+}
+
+function selectTopRowsPerUnit(
+  rows: PossibleActionTableRow[],
+  latLngByH3: Map<string, [number, number]>
+): PossibleActionTableRow[] {
+  const byUnit = new Map<string, PossibleActionTableRow[]>();
+  for (const row of rows) {
+    const list = byUnit.get(row.unitId) ?? [];
+    list.push(row);
+    byUnit.set(row.unitId, list);
+  }
+  const unitIds = [...byUnit.keys()].sort((a, b) => a.localeCompare(b));
+  const out: PossibleActionTableRow[] = [];
+  for (const unitId of unitIds) {
+    const unitRows = byUnit.get(unitId) ?? [];
+    unitRows.sort((a, b) => compareTableRowsForUnitPriority(a, b, latLngByH3));
+    out.push(...unitRows.slice(0, 5));
+  }
+  return out;
+}
+
+function groupRowsByBucket(rows: PossibleActionTableRow[]): Record<PossibleActionTableRow['bucket'], PossibleActionTableRow[]> {
+  const grouped: Record<PossibleActionTableRow['bucket'], PossibleActionTableRow[]> = {
+    homeland: [],
+    nearest: [],
+    other: [],
+  };
+  for (const row of rows) grouped[row.bucket].push(row);
+  return grouped;
+}
+
 /**
  * Why this exists:
  *     Produces the structured "Possible unit actions" briefing section so the model sees legal moves and attacks without extra tool calls.
  * When to use:
  *     During `formatBriefing` when precomputation is enabled (opponent perspective snapshot).
  * What to expect:
- *     Multi-line markdown, empty string when there are no opponent units or no actionable content. Air ferry destinations
- *     use snapshot `res1Control` only; error-level logs record any disagreement with live `getHexController` for those hexes.
+ *     Markdown with three optional subsections (Enemy homeland hexes / nearest / other), each a table mixing units and action types.
+ *     Air ferry destinations use snapshot `res1Control` only; error-level logs may record parity disagreement for those hexes.
  */
 export function buildPossibleUnitActionsMarkdown(args: {
   state: GameStateSnapshot;
@@ -341,26 +477,29 @@ export function buildPossibleUnitActionsMarkdown(args: {
   const indexed = buildIndexedState(state);
   const homeland = enemyHomelandHexSet(state);
   const opponentUnits = state.units.filter((u) => u.player === FRIENDLY_PLAYER).sort((a, b) => a.id.localeCompare(b.id));
-  const unitBlocks: string[] = [];
+  const rawRows: RawPossibleActionRow[] = [];
 
   for (const unit of opponentUnits) {
-    const sub: string[] = [];
-
     const moveHexes = excludeUnitCurrentHex(
       unit.h3Index,
       unit.unitType === 'air'
         ? collectLegalFerryDestinationHexes(unit, indexed)
         : getValidDestinations(unit, state)
     );
-    sub.push(
-      ...buildActionSectionLines({
-        label: MOVES_MELEE_SECTION,
+    if (moveHexes.length > 0) {
+      appendRowsForLegalHexes({
+        rows: rawRows,
+        unitId: unit.id,
+        unitType: unit.unitType,
+        unitH3: unit.h3Index,
+        actionType: ACTION_MOVES_MELEE,
         legalHexes: moveHexes,
         homeland,
+        indexed,
         latLngByH3,
-        detailForHex: (h3) => formatPossibleActionHexDetail(indexed, h3, latLngByH3, formatLatLng),
-      })
-    );
+        isAirStrike: false,
+      });
+    }
 
     if (unit.unitType === 'air' && airBaseHasIntactAirport(indexed, unit.h3Index)) {
       const strikeTargets = excludeUnitCurrentHex(
@@ -369,39 +508,59 @@ export function buildPossibleUnitActionsMarkdown(args: {
           .filter((h3) => isWithinGridRangeSafe(unit.h3Index, h3, AIR_STRIKE_RANGE_HEXES, 'possibleUnitActions air strike'))
           .filter((h3) => strikeKindsForHex(indexed, h3).length > 0)
       );
-      sub.push(
-        ...buildActionSectionLines({
-          label: '  - Air strikes:',
+      if (strikeTargets.length > 0) {
+        appendRowsForLegalHexes({
+          rows: rawRows,
+          unitId: unit.id,
+          unitType: unit.unitType,
+          unitH3: unit.h3Index,
+          actionType: ACTION_AIR_STRIKES,
           legalHexes: strikeTargets,
           homeland,
+          indexed,
           latLngByH3,
-          detailForHex: (h3) =>
-            formatAirStrikeHexDetail(indexed, h3, latLngByH3, formatLatLng, strikeKindsForHex(indexed, h3)),
-        })
-      );
+          isAirStrike: true,
+        });
+      }
     }
 
-    if (unit.unitType !== 'air' && getRange(unit.unitType) >= 1) {
-      sub.push(
-        ...buildActionSectionLines({
-          label: '  - Ranged attacks:',
-          legalHexes: excludeUnitCurrentHex(
-            unit.h3Index,
-            collectRangedTargetHexes(unit.h3Index, unit.unitType, indexed)
-          ),
+    if (unit.unitType !== 'air' && getRange(unit.unitType as 'infantry' | 'armor' | 'naval' | 'air') >= 1) {
+      const rangedHexes = excludeUnitCurrentHex(unit.h3Index, collectRangedTargetHexes(unit.h3Index, unit.unitType, indexed));
+      if (rangedHexes.length > 0) {
+        appendRowsForLegalHexes({
+          rows: rawRows,
+          unitId: unit.id,
+          unitType: unit.unitType,
+          unitH3: unit.h3Index,
+          actionType: ACTION_RANGED,
+          legalHexes: rangedHexes,
           homeland,
+          indexed,
           latLngByH3,
-          detailForHex: (h3) => formatPossibleActionHexDetail(indexed, h3, latLngByH3, formatLatLng),
-        })
-      );
-    }
-
-    if (sub.length > 0) {
-      unitBlocks.push(`- ${unit.id} (${unit.unitType}):`);
-      unitBlocks.push(...sub);
+          isAirStrike: false,
+        });
+      }
     }
   }
 
-  if (unitBlocks.length === 0) return '';
-  return ['**Possible unit actions**', '', ...unitBlocks].join('\n');
+  if (rawRows.length === 0) return '';
+  const rows = aggregateRows(rawRows);
+
+  const byBucket = groupRowsByBucket(rows);
+
+  const subsection = (title: string, bucketRows: PossibleActionTableRow[]): string[] => {
+    if (bucketRows.length === 0) return [];
+    const trimmed = selectTopRowsPerUnit(bucketRows, latLngByH3);
+    const tableBody = trimmed.map((r) => {
+      const ll = latLngByH3.get(r.targetH3);
+      const hexStr = ll ? formatLatLng(ll) : r.targetH3;
+      return [r.unitId, r.unitType, r.actionTypes, hexStr, String(r.distance), r.enemySummary, r.featuresSummary];
+    });
+    return [`### ${title}`, '', ...markdownTableLines(tableBody), ''];
+  };
+
+  const parts: string[] = ['**Possible unit actions**', ''];
+  for (const item of BUCKET_TITLES) parts.push(...subsection(item.title, byBucket[item.bucket]));
+  while (parts.length > 0 && parts[parts.length - 1] === '') parts.pop();
+  return parts.join('\n');
 }

@@ -1,6 +1,7 @@
 import { logDebug } from '../logger';
 import { getScenarioHomeRegionHexes, resolveScenarioHomeRegions } from '../regionScenario';
 import type { GuardedDbRunAndGetAllOps } from './dbOps';
+import { logHomeRegionControlParity } from './seeding/initialFlexAirSlot';
 import { persistRegionVsRegionScenarioState } from './scenarioState';
 
 interface ResetGameDeps extends GuardedDbRunAndGetAllOps {
@@ -118,6 +119,7 @@ export function resetGameForNewMatch(
   run('DELETE FROM res1_build_progress');
   seedInitialHexControlFromUnitOccupancy(deps);
   seedInitialHexControlFromHomeRegions(deps, { humanHomeRegion, aiHomeRegion });
+  logHomeRegionControlParity(deps, new Set(getScenarioHomeRegionHexes(humanHomeRegion)), new Set(getScenarioHomeRegionHexes(aiHomeRegion)));
   deps.refreshFogOfWarIntelFromCurrentState();
   deps.saveDatabase();
 }

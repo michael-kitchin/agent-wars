@@ -238,7 +238,7 @@ function normalizeMemoryUpdates(raw: unknown): MemoryUpdateItem[] {
  */
 export function buildJsonAssistantRepairSchema(includeProductionOrders: boolean): string {
   return includeProductionOrders
-    ? `{"strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":[lat,lng]}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":[lat,lng]},{"unitId":"opponent-armor-1","action":"explicit_attack","targetHex":[lat,lng]},{"unitId":"opponent-armor-1","action":"cancel_order"}],"airStrikes":[{"unitId":"opponent-air-1","targetHex":[lat,lng],"targetType":"units"}],"ferryOrders":[{"unitId":"opponent-air-2","destination":[lat,lng]}],"callbacks":[],"memoryUpdates":[],"productionOrders":[{"action":"add_build_entry","hex":[lat,lng],"unitType":"infantry","count":1}]}`
+    ? `{"strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":[lat,lng]}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":[lat,lng]},{"unitId":"opponent-armor-1","action":"explicit_attack","targetHex":[lat,lng]},{"unitId":"opponent-armor-1","action":"cancel_order"}],"airStrikes":[{"unitId":"opponent-air-1","targetHex":[lat,lng],"targetType":"units"}],"ferryOrders":[{"unitId":"opponent-air-2","destination":[lat,lng]}],"callbacks":[],"memoryUpdates":[],"productionOrders":[{"action":"set_build_queue","hex":[lat,lng],"unitType":"infantry","count":1}]}`
     : `{"strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":[lat,lng]}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":[lat,lng]},{"unitId":"opponent-armor-1","action":"explicit_attack","targetHex":[lat,lng]},{"unitId":"opponent-armor-1","action":"cancel_order"}],"airStrikes":[{"unitId":"opponent-air-1","targetHex":[lat,lng],"targetType":"units"}],"ferryOrders":[{"unitId":"opponent-air-2","destination":[lat,lng]}],"callbacks":[],"memoryUpdates":[]}`;
 }
 
@@ -457,12 +457,7 @@ function processProductionOrdersArray(
   const droppedReasons = [...normalized.droppedReasons];
   let appliedCount = 0;
   for (const order of normalized.validOrders) {
-    const args =
-      order.action === 'add_build_entry'
-        ? { hex: order.hex, unitType: order.unitType, count: order.count }
-        : order.action === 'update_build_entry'
-          ? { hex: order.hex, entryId: order.entryId, unitType: order.unitType, count: order.count }
-          : { hex: order.hex, entryId: order.entryId };
+    const args = { hex: order.hex, unitType: order.unitType, count: order.count };
     const result = executeTool6(order.action, args, state, latLngByH3, resolveToH3) as { status?: string; error?: string };
     if (result.status === 'ok') {
       appliedCount += 1;

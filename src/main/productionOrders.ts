@@ -6,14 +6,13 @@
 import { BUILD_ENTRY_MAX_COUNT, BUILD_ENTRY_MIN_COUNT, type BuildUnitType } from './productionRules';
 import { logTrace } from './logger';
 
-export type ProductionOrderAction = 'add_build_entry' | 'update_build_entry' | 'remove_build_entry';
+export type ProductionOrderAction = 'set_build_queue';
 
 export interface ProductionOrder {
   action: ProductionOrderAction;
   hex: [number, number];
-  entryId?: number;
-  unitType?: BuildUnitType;
-  count?: number;
+  unitType: BuildUnitType;
+  count: number;
 }
 
 export interface NormalizeProductionOrdersResult {
@@ -22,7 +21,7 @@ export interface NormalizeProductionOrdersResult {
 }
 
 function isBuildUnitType(value: unknown): value is BuildUnitType {
-  return value === 'infantry' || value === 'armor' || value === 'naval';
+  return value === 'infantry' || value === 'armor' || value === 'naval' || value === 'air';
 }
 
 function parseHex(value: unknown): [number, number] | undefined {
@@ -31,12 +30,6 @@ function parseHex(value: unknown): [number, number] | undefined {
   const lng = Number(value[1]);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
   return [lat, lng];
-}
-
-function parsePositiveInteger(value: unknown): number | undefined {
-  if (!Number.isInteger(value)) return undefined;
-  const parsed = Number(value);
-  return parsed > 0 ? parsed : undefined;
 }
 
 function parseBuildCount(value: unknown): number | undefined {
@@ -74,12 +67,11 @@ export function normalizeProductionOrders(raw: unknown): NormalizeProductionOrde
     const row = entry as {
       action?: unknown;
       hex?: unknown;
-      entryId?: unknown;
       unitType?: unknown;
       count?: unknown;
     };
     const action = row.action;
-    if (action !== 'add_build_entry' && action !== 'update_build_entry' && action !== 'remove_build_entry') {
+    if (action !== 'set_build_queue') {
       droppedReasons.push(`${prefix}: unknown action.`);
       continue;
     }
@@ -88,47 +80,18 @@ export function normalizeProductionOrders(raw: unknown): NormalizeProductionOrde
       droppedReasons.push(`${prefix}: hex must be [lat,lng].`);
       continue;
     }
-    if (action === 'add_build_entry') {
-      if (!isBuildUnitType(row.unitType)) {
-        droppedReasons.push(`${prefix}: add_build_entry requires unitType.`);
-        continue;
-      }
-      const count = parseBuildCount(row.count);
-      if (count === undefined) {
-        droppedReasons.push(
-          `${prefix}: add_build_entry count must be an integer from ${BUILD_ENTRY_MIN_COUNT} to ${BUILD_ENTRY_MAX_COUNT}.`
-        );
-        continue;
-      }
-      validOrders.push({ action, hex, unitType: row.unitType, count });
+    if (!isBuildUnitType(row.unitType)) {
+      droppedReasons.push(`${prefix}: set_build_queue requires unitType.`);
       continue;
     }
-    if (action === 'update_build_entry') {
-      const entryId = parsePositiveInteger(row.entryId);
-      if (entryId === undefined) {
-        droppedReasons.push(`${prefix}: update_build_entry requires positive integer entryId.`);
-        continue;
-      }
-      if (!isBuildUnitType(row.unitType)) {
-        droppedReasons.push(`${prefix}: update_build_entry requires unitType.`);
-        continue;
-      }
-      const count = parseBuildCount(row.count);
-      if (count === undefined) {
-        droppedReasons.push(
-          `${prefix}: update_build_entry count must be an integer from ${BUILD_ENTRY_MIN_COUNT} to ${BUILD_ENTRY_MAX_COUNT}.`
-        );
-        continue;
-      }
-      validOrders.push({ action, hex, entryId, unitType: row.unitType, count });
+    const count = parseBuildCount(row.count);
+    if (count === undefined) {
+      droppedReasons.push(
+        `${prefix}: set_build_queue count must be an integer from ${BUILD_ENTRY_MIN_COUNT} to ${BUILD_ENTRY_MAX_COUNT}.`
+      );
       continue;
     }
-    const entryId = parsePositiveInteger(row.entryId);
-    if (entryId === undefined) {
-      droppedReasons.push(`${prefix}: remove_build_entry requires positive integer entryId.`);
-      continue;
-    }
-    validOrders.push({ action, hex, entryId });
+    validOrders.push({ action, hex, unitType: row.unitType, count });
   }
   return { validOrders, droppedReasons };
 }

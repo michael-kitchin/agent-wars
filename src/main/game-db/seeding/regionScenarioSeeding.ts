@@ -6,6 +6,9 @@ import { MAX_UNITS_PER_TYPE } from '../../productionCaps';
 import { getScenarioHomeRegionHexes, isScenarioPassableLandTerrainKind } from '../../regionScenario';
 import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from '../scenarioState';
 import type { GuardedDbRunAndGetAllOps } from '../dbOps';
+import type { FlexAirSlotDeps } from './initialFlexAirSlot';
+import { applySacrificeToBaselineCounts, resolveFlexUnitPlacement } from './initialFlexAirSlot';
+import { countPlannedUnitsOfType, insertPlannedUnitsForPlayer, type PlannedUnitTuple } from './plannedUnits';
 import type { SpawnCandidate } from './spawnSelection';
 
 export interface RegionScenarioSeedDeps extends GuardedDbRunAndGetAllOps {
@@ -115,6 +118,38 @@ function summarizePlanCounts(entries: UnitPlanEntry[]): Record<BuildUnitType, nu
   return counts;
 }
 
+/**
+ * Why this exists:
+ *     Removes one baseline plan row so a substitutive flex unit (air-preferred) can be added without increasing roster size.
+ * When to use:
+ *     Region-vs-region spawn planning after terrain filtering.
+ * What to expect:
+ *     Prefers dropping the last infantry plan row, else last armor, else last naval; returns the input unchanged if empty.
+ */
+function sacrificeOnePlanEntry(entries: UnitPlanEntry[]): UnitPlanEntry[] {
+  const counts = summarizePlanCounts(entries);
+  const after = applySacrificeToBaselineCounts({
+    infantry: counts.infantry,
+    armor: counts.armor,
+    naval: counts.naval,
+  });
+  if (!after) return entries;
+  const droppedType: BuildUnitType | null =
+    after.infantry < counts.infantry
+      ? 'infantry'
+      : after.armor < counts.armor
+        ? 'armor'
+        : after.naval < counts.naval
+          ? 'naval'
+          : null;
+  if (!droppedType) return entries;
+  for (let i = entries.length - 1; i >= 0; i--) {
+    if (entries[i]!.unitType !== droppedType) continue;
+    return entries.filter((_, idx) => idx !== i);
+  }
+  return entries;
+}
+
 function assignSpawnHexesRoundRobin(
   candidates: ReadonlyArray<SpawnCandidate>,
   count: number,
@@ -167,7 +202,7 @@ export function trySeedScenarioRegionVsRegion(deps: RegionScenarioSeedDeps): boo
     const terrain = terrainByH3.get(h3)?.terrain ?? 'land';
     return { h3, lat, lng, terrain };
   });
-  const buildSidePlan = (player: 'human' | 'opponent', regionName: string): { units: [string, BuildUnitType, string][] } => {
+  const buildSidePlan = (player: 'human' | 'opponent', regionName: string): { units: PlannedUnitTuple[] } => {
     const regionHexes = new Set(getScenarioHomeRegionHexes(regionName));
     const regionCandidates = allCandidates.filter((candidate) => regionHexes.has(candidate.h3));
     const passableLandCandidates = regionCandidates.filter(
@@ -185,8 +220,9 @@ export function trySeedScenarioRegionVsRegion(deps: RegionScenarioSeedDeps): boo
       passableLandCandidates.length > 0,
       navalCandidates.length > 0
     );
+    const sacrificedEntries = sacrificeOnePlanEntry(terrainFiltered.entries);
     const droppedReasons = [...capped.droppedReasons, ...terrainFiltered.droppedReasons];
-    const finalCounts = summarizePlanCounts(terrainFiltered.entries);
+    const finalCounts = summarizePlanCounts(sacrificedEntries);
     const landAnchor = averageLatLng(passableLandCandidates.length > 0 ? passableLandCandidates : regionCandidates);
     const navalAnchor = averageLatLng(navalCandidates.length > 0 ? navalCandidates : regionCandidates);
     const infantrySpawns = assignSpawnHexesRoundRobin(passableLandCandidates, finalCounts.infantry, landAnchor.lat, landAnchor.lng);
@@ -201,26 +237,29 @@ export function trySeedScenarioRegionVsRegion(deps: RegionScenarioSeedDeps): boo
       finalCounts,
       droppedReasons,
     });
-    const units: [string, BuildUnitType, string][] = [];
+    const units: PlannedUnitTuple[] = [];
     for (let i = 0; i < infantrySpawns.length; i++) units.push([`${player}-infantry-${i + 1}`, 'infantry', infantrySpawns[i]!]);
     for (let i = 0; i < armorSpawns.length; i++) units.push([`${player}-armor-${i + 1}`, 'armor', armorSpawns[i]!]);
     for (let i = 0; i < navalSpawns.length; i++) units.push([`${player}-naval-${i + 1}`, 'naval', navalSpawns[i]!]);
+    const usedH3 = new Set(units.map((u) => u[2]));
+    const flex = resolveFlexUnitPlacement({
+      deps: deps as FlexAirSlotDeps,
+      player,
+      regionHexSet: regionHexes,
+      passableLandCandidates,
+      navalCandidates,
+      usedH3,
+      plannedCountsAfterSacrifice: { ...finalCounts, air: 0 },
+    });
+    if (flex) {
+      const ord = countPlannedUnitsOfType(units, flex.unitType) + 1;
+      units.push([`${player}-${flex.unitType}-${ord}`, flex.unitType, flex.h3Index]);
+    }
     return { units };
   };
   const humanPlan = buildSidePlan('human', scenario.humanHomeRegion);
   const opponentPlan = buildSidePlan('opponent', scenario.aiHomeRegion);
-  const insertPlannedUnits = (units: [string, BuildUnitType, string][], player: 'human' | 'opponent'): void => {
-    for (const [id, unitType, h3Index] of units) {
-      deps.run('INSERT INTO units (id, player, unit_type, display_order, h3_index) VALUES (?, ?, ?, ?, ?)', [
-        id,
-        player,
-        unitType,
-        deps.allocateNextUnitDisplayOrder(unitType),
-        h3Index,
-      ]);
-    }
-  };
-  insertPlannedUnits(humanPlan.units, 'human');
-  insertPlannedUnits(opponentPlan.units, 'opponent');
+  insertPlannedUnitsForPlayer(deps, 'human', humanPlan.units);
+  insertPlannedUnitsForPlayer(deps, 'opponent', opponentPlan.units);
   return true;
 }

@@ -1,3 +1,5 @@
+import { logDebug } from '../logger';
+
 /**
  * Why this exists:
  *     Centralizes final JSON contract wording used in OpenRouter system prompts.
@@ -34,4 +36,56 @@ export function buildFinalJsonContractInstruction(args: {
   const legacyClause = 'Do not use top-level movementOrders or rangedAttacks (legacy).';
   const callbacksClause = 'Include optional "callbacks" for re-consultation planning.';
   return `${submitHeader} ${strictSchemaClause} ${ordersClause} ${airClause} ${legacyClause}${movementOrderInstruction} ${callbacksClause}${submitMemoryClause} ${productionSubmitClause}`;
+}
+
+export interface FinalJsonExampleFlags {
+  includeMemoryUpdates: boolean;
+  includeProductionOrders: boolean;
+}
+
+interface FinalOrdersExamplePayload {
+  strategy: string;
+  orders: Array<Record<string, unknown>>;
+  airStrikes: unknown[];
+  ferryOrders: unknown[];
+  callbacks: unknown[];
+  memoryUpdates?: unknown[];
+  productionOrders?: Array<Record<string, unknown>>;
+}
+
+/**
+ * Why this exists:
+ *     Provides a concrete multi-order JSON example below the schema paragraph so models (especially via OpenRouter)
+ *     see valid nesting and field names without replacing the formal contract text.
+ * When to use:
+ *     Append immediately after `buildFinalJsonContractInstruction` in the system prompt.
+ * What to expect:
+ *     A fenced JSON block with 2–3 sample orders; optional memory/production keys match enabled tool flags.
+ */
+export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): string {
+  logDebug('promptContracts getFinalJsonOrdersExampleBlock', {
+    includeMemoryUpdates: flags.includeMemoryUpdates,
+    includeProductionOrders: flags.includeProductionOrders,
+  });
+  const example: FinalOrdersExamplePayload = {
+    strategy: 'Close with observed enemies and keep production moving.',
+    orders: [
+      { action: 'assign_order', unitId: 'opponent-infantry-1', order: { type: 'march', destination: [12.34, 56.78] } },
+      { action: 'explicit_move', unitId: 'opponent-armor-2', destination: [12.35, 56.79] },
+      { action: 'explicit_attack', unitId: 'opponent-naval-1', targetHex: 'human-armor-1' },
+    ],
+    airStrikes: [],
+    ferryOrders: [],
+    callbacks: [],
+  };
+  if (flags.includeMemoryUpdates) example.memoryUpdates = [];
+  if (flags.includeProductionOrders) {
+    example.productionOrders = [{ action: 'set_build_queue', hex: [12.34, 56.78], unitType: 'infantry', count: 1 }];
+  }
+  const json = JSON.stringify(example, null, 2);
+  return (
+    'Example (illustrative only — use [lat,lng] and unit ids from this briefing, not these placeholders):\n```json\n' +
+    json +
+    '\n```'
+  );
 }

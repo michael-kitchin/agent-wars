@@ -2,8 +2,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { cellToLatLng } from 'h3-js';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
-import { buildLatLngCoordinateMap, LATLNG_DECIMAL_PLACES } from '../mapData';
-import { logDebug, logError, logTrace } from '../logger';
+import { buildLatLngCoordinateMap } from '../mapData';
+import { logDebug, logError } from '../logger';
 import { buildJsonAssistantRepairSchema, parseOrdersResponse } from './orderResponseParsing';
 import { createPathfindingSession, executeTool1 } from '../tools/tool1Pathfinding';
 import { executeTool2 } from '../tools/tool2Assessment';
@@ -17,7 +17,6 @@ import { getSubscriptions, replaceSubscriptions } from '../callbackSubscriptions
 import {
   clearAiLossEventsSinceConsultation,
   getAiLossEventsSinceConsultation,
-  getAndClearAiToolLimitExceededLastTurn,
   setAiLastConsultationTurn,
   setAiToolLimitExceededLastTurn,
 } from '../gameDb';
@@ -462,7 +461,7 @@ export async function requestOrdersFlow(
             function: { name: tc.function.name, arguments: tc.function.arguments },
           })),
         });
-        for (const [toolCallIndex, tc] of toolCalls.entries()) {
+        for (const tc of toolCalls) {
           const toolName = tc.function.name;
           if (!enabledToolNameSet.has(toolName)) {
             messages.push({

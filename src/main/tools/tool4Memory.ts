@@ -7,6 +7,7 @@
 
 import { dbRun, dbGetOne, dbGetAll, saveDatabase } from '../gameDb';
 import { logDebug, logError, logTrace } from '../logger';
+import { buildPromptTableLines } from '../promptTableUtils';
 
 const PERSISTENT_LIMIT = 5;
 const STORED_LIMIT = 15;
@@ -103,27 +104,27 @@ export function getInjectionText(playerId: string, currentTurn: number): string 
   lines.push(`=== YOUR STRATEGIC MEMORY (Turn ${currentTurn}) ===`);
   lines.push('');
   lines.push('[PERSISTENT - your active strategic context]');
-  if (persistent.length === 0) {
-    lines.push('(none)');
-  } else {
-    for (const row of persistent) {
-      lines.push(`- ${row.key} (updated turn ${row.created_turn}): "${row.content}"`);
-    }
-  }
+  lines.push(
+    ...buildPromptTableLines(
+      ['Key', 'Updated Turn', 'Content'],
+      persistent.map((row) => [row.key, row.created_turn, row.content]),
+      ['—', '—', '—']
+    )
+  );
   lines.push('');
   lines.push('[REMINDERS TRIGGERED THIS TURN]');
-  if (triggered.length === 0) {
-    lines.push('(none)');
-  } else {
-    for (const row of triggered) {
-      const tierLabel = row.tier === 'persistent' ? 'also persistent' : 'stored';
-      const recurLabel =
-        row.recurring_interval != null
-          ? `, recurring every ${row.recurring_interval} turns`
-          : '';
-      lines.push(`- ${row.key} (${tierLabel}${recurLabel}): "${row.content}"`);
-    }
-  }
+  lines.push(
+    ...buildPromptTableLines(
+      ['Key', 'Tier', 'Recurring', 'Content'],
+      triggered.map((row) => [
+        row.key,
+        row.tier === 'persistent' ? 'also persistent' : 'stored',
+        row.recurring_interval != null ? `every ${row.recurring_interval} turns` : '—',
+        row.content,
+      ]),
+      ['—', '—', '—', '—']
+    )
+  );
   lines.push('');
   lines.push(
     `Persistent: ${persistentCount} of ${PERSISTENT_LIMIT} slots used. Stored: ${storedCount} of ${STORED_LIMIT} slots used.`
