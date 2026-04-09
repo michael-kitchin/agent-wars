@@ -22,6 +22,7 @@ function seedInitialHexControlFromUnitOccupancy(deps: ResetGameDeps): void {
             COUNT(DISTINCT player) AS distinctPlayers,
             CASE WHEN COUNT(DISTINCT player) = 1 THEN MIN(player) ELSE NULL END AS solePlayer
      FROM units
+     WHERE unit_type IN ('infantry', 'armor', 'naval')
      GROUP BY h3_index`
   );
   for (const row of rows) {

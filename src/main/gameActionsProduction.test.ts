@@ -14,6 +14,10 @@ import {
   ready,
   submitOrders,
 } from './gameActions';
+import {
+  collectTraversedHexesByPlayer,
+  resolveRes1ControlAfterCombatAndMovement,
+} from './game-actions/controlAndProduction';
 import { MAX_UNITS_PER_TYPE } from './productionCaps';
 import { withTempGameDb } from './testSupport/withTempGameDb';
 
@@ -185,6 +189,119 @@ function testTraversedIntermediateHexCapturesControl(): void {
   });
 }
 
+function findNavalPassableHex(): string {
+  const state = getGameState();
+  const hit = state.hexes.find((hx) => hx.terrain === 'water' || hx.terrain === 'coastal');
+  if (!hit) throw new Error('Expected at least one naval-passable hex.');
+  return hit.h3Index;
+}
+
+function testNavalOccupancyGrantsControl(): void {
+  withTempDb(() => {
+    const targetHex = findNavalPassableHex();
+    dbRun('DELETE FROM units WHERE h3_index = ?', [targetHex]);
+    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [targetHex, 'opponent']);
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
+      'human-naval-control-grant',
+      'human',
+      'naval',
+      targetHex,
+    ]);
+
+    const transitions = resolveRes1ControlAfterCombatAndMovement();
+    const post = getHexBuildQueue(targetHex, 'human');
+
+    assert.strictEqual(post.controllerPlayerId, 'human');
+    assert.ok(
+      transitions.some((transition) => transition.h3Index === targetHex && transition.toControllerPlayerId === 'human'),
+      'expected control transition to human from naval-only occupancy'
+    );
+  });
+}
+
+function testNavalMixedOccupancyContestsControl(): void {
+  withTempDb(() => {
+    const targetHex = findNavalPassableHex();
+    dbRun('DELETE FROM units WHERE h3_index = ?', [targetHex]);
+    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [targetHex, 'human']);
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
+      'human-naval-control-contest',
+      'human',
+      'naval',
+      targetHex,
+    ]);
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
+      'opponent-naval-control-contest',
+      'opponent',
+      'naval',
+      targetHex,
+    ]);
+
+    const transitions = resolveRes1ControlAfterCombatAndMovement();
+    const post = getHexBuildQueue(targetHex, 'human');
+
+    assert.strictEqual(post.controllerPlayerId, 'human');
+    assert.strictEqual(
+      transitions.some((transition) => transition.h3Index === targetHex),
+      false,
+      'expected no control transition for contested naval occupancy'
+    );
+  });
+}
+
+function testNavalTraversedIntermediateHexCapturesControl(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const naval = state.units.find((u) => {
+      if (u.player !== 'human' || u.unitType !== 'naval') return false;
+      const originHex = state.hexes.find((hex) => hex.h3Index === u.h3Index);
+      return originHex?.terrain === 'water' || originHex?.terrain === 'coastal';
+    });
+    assert.ok(naval, 'expected a human naval unit on water/coastal');
+    const destination = state.hexes.find((hx) => {
+      if (hx.h3Index === naval!.h3Index) return false;
+      if (!(hx.terrain === 'water' || hx.terrain === 'coastal')) return false;
+      try {
+        return gridDistance(naval!.h3Index, hx.h3Index) === 2;
+      } catch {
+        return false;
+      }
+    });
+    assert.ok(destination, 'expected a naval-passable destination 2 hexes away');
+    let path: string[] = [];
+    try {
+      path = gridPathCells(naval!.h3Index, destination!.h3Index);
+    } catch {
+      path = [];
+    }
+    assert.ok(path.length >= 3, 'expected path with an intermediate hex');
+    const intermediateHex = path[1]!;
+    assert.notStrictEqual(intermediateHex, destination!.h3Index);
+    assert.notStrictEqual(intermediateHex, naval!.h3Index);
+
+    dbRun('UPDATE units SET h3_index = ? WHERE h3_index = ? AND id <> ?', [naval!.h3Index, intermediateHex, naval!.id]);
+    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [intermediateHex, 'opponent']);
+
+    const traversed = collectTraversedHexesByPlayer(
+      [{ unitId: naval!.id, toH3Index: destination!.h3Index }],
+      [{ id: naval!.id, player: naval!.player, h3Index: naval!.h3Index, unitType: naval!.unitType }]
+    );
+    const transitions = resolveRes1ControlAfterCombatAndMovement(traversed);
+    const postIntermediate = getHexBuildQueue(intermediateHex, 'human');
+
+    assert.strictEqual(postIntermediate.controllerPlayerId, 'human');
+    assert.ok(
+      transitions.some(
+        (transition) =>
+          transition.h3Index === intermediateHex &&
+          transition.fromControllerPlayerId === 'opponent' &&
+          transition.toControllerPlayerId === 'human'
+      ),
+      'expected intermediate traversal control transition from opponent to human for naval movement'
+    );
+  });
+}
+
 function testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap(): void {
   withTempDb(() => {
     const targetHex = findBuildableHumanControlledHex();
@@ -295,6 +412,9 @@ function run(): void {
   testNoProductionBeforeReadyDuringPlanningEdits();
   testControlTakeoverClearsQueueAndProgress();
   testTraversedIntermediateHexCapturesControl();
+  testNavalOccupancyGrantsControl();
+  testNavalMixedOccupancyContestsControl();
+  testNavalTraversedIntermediateHexCapturesControl();
   testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap();
   testAirBuildRequiresAirportInfrastructure();
   testNavalBuildRequiresSeaportAndUrbanInfrastructure();

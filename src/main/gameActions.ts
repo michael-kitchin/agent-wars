@@ -1026,7 +1026,7 @@ export function ready(
     }
     const traversedHexesByPlayer = collectTraversedHexesByPlayer(
       allOrders,
-      preMoveState.units.map((u) => ({ id: u.id, player: u.player, h3Index: u.h3Index }))
+      preMoveState.units.map((u) => ({ id: u.id, player: u.player, h3Index: u.h3Index, unitType: u.unitType }))
     );
     for (const order of allOrders) {
       dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [order.toH3Index, order.unitId]);

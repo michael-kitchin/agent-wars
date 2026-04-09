@@ -802,7 +802,7 @@ function isMapInspectionModeHeld(): boolean {
 }
 
 /**
- * True when this res1 hex is land, human-controlled, and has at least one urban res4 child (production
+ * True when this res1 hex is human-controlled and has at least one urban res4 child (production
  * capacity). Matches eligibility for build-entry buttons (plus explored) and for canvas production labels
  * when not in map inspection mode.
  */
@@ -810,7 +810,6 @@ function isRes1HexHumanUrbanProduction(
   state: GameStateSnapshot,
   hx: GameStateSnapshot['hexes'][number]
 ): boolean {
-  if (hx.terrain === 'water') return false;
   if (getControllerForHex(state, hx.h3Index) !== 'human') return false;
   return getUrbanProductionCapacityForHex(hx.h3Index) > 0;
 }
@@ -1585,7 +1584,6 @@ function syncBuildEntryButton(): void {
   const visibleUnitHexes = new Set(S.gameState.units.map((u) => u.h3Index));
   const rows: Array<{ h3: string; label: string; left: number; top: number; hasCapacity: boolean }> = [];
   for (const hx of S.gameState.hexes) {
-    if (hx.terrain === 'water') continue;
     const explored = isHexExploredByPlayer(hx.h3Index);
     if (!explored) continue;
     if (!isRes1HexHumanUrbanProduction(S.gameState, hx)) continue;
@@ -1686,7 +1684,6 @@ function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void {
   for (const hx of S.gameState.hexes) {
     const explored = isHexExploredByPlayer(hx.h3Index);
     if (!explored && !overlayContext.mapInspectionHeld) continue;
-    if (hx.terrain === 'water') continue;
     const controller = getControllerForHex(S.gameState, hx.h3Index);
     const controlledByHuman = controller === 'human';
     const capacityPerTurn = getUrbanProductionCapacityForHex(hx.h3Index);

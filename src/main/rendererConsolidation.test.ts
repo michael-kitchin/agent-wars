@@ -198,6 +198,11 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
     'syncBuildEntryButton should use shared human-urban production eligibility'
   );
   assert.ok(
+    !syncBuildEntryFn.includes("if (hx.terrain === 'water') continue;") &&
+      !drawProductionFn.includes("if (hx.terrain === 'water') continue;"),
+    'renderer production labels and build-entry buttons should not hard-exclude controlled water hexes'
+  );
+  assert.ok(
     isRes1HexHumanUrbanProductionFn.includes('getUrbanProductionCapacityForHex(hx.h3Index) > 0'),
     'isRes1HexHumanUrbanProduction should use canonical urban-res4 count for build eligibility'
   );

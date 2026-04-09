@@ -19184,7 +19184,6 @@
     return rendererSharedState.hideTerrainFillWhileHeld;
   }
   function isRes1HexHumanUrbanProduction(state, hx) {
-    if (hx.terrain === "water") return false;
     if (getControllerForHex(state, hx.h3Index) !== "human") return false;
     return getUrbanProductionCapacityForHex(hx.h3Index) > 0;
   }
@@ -19775,7 +19774,6 @@
     const visibleUnitHexes = new Set(rendererSharedState.gameState.units.map((u) => u.h3Index));
     const rows = [];
     for (const hx of rendererSharedState.gameState.hexes) {
-      if (hx.terrain === "water") continue;
       const explored = isHexExploredByPlayer2(hx.h3Index);
       if (!explored) continue;
       if (!isRes1HexHumanUrbanProduction(rendererSharedState.gameState, hx)) continue;
@@ -19848,7 +19846,6 @@
     for (const hx of rendererSharedState.gameState.hexes) {
       const explored = isHexExploredByPlayer2(hx.h3Index);
       if (!explored && !overlayContext.mapInspectionHeld) continue;
-      if (hx.terrain === "water") continue;
       const controller = getControllerForHex(rendererSharedState.gameState, hx.h3Index);
       const controlledByHuman = controller === "human";
       const capacityPerTurn = getUrbanProductionCapacityForHex(hx.h3Index);

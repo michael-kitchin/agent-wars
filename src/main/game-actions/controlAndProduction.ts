@@ -20,6 +20,8 @@ import { UNIT_COST_BY_TYPE, type BuildUnitType } from '../productionRules';
 type DeployedUnitsByType = { armor?: number; infantry?: number; naval?: number; air?: number };
 type ControlTransition = { h3Index: string; fromControllerPlayerId: string | null; toControllerPlayerId: string | null };
 type DeploymentCapReachedByPlayer = { human: BuildUnitType[]; opponent: BuildUnitType[] };
+const CONTROL_UNIT_TYPES = ['infantry', 'armor', 'naval'] as const;
+const CONTROL_UNIT_TYPE_SET = new Set<string>(CONTROL_UNIT_TYPES);
 
 function currentPlanningTurnNumber(): number {
   return dbGetOne<{ turnNumber: number }>('SELECT turn_number AS turnNumber FROM turn_state WHERE id = 1')?.turnNumber ?? 1;
@@ -66,6 +68,14 @@ function spawnProducedUnitsForHex(
   return deployed;
 }
 
+/**
+ * Why this exists:
+ *     Resolves post-resolution res-1 control ownership from control-capable occupancy and movement traversal.
+ * When to use:
+ *     Called once per turn after movement/combat outcomes are applied and before production processing.
+ * What to expect:
+ *     Returns persisted ownership transitions where infantry/armor/naval exclusively occupy or uniquely traversed an empty hex.
+ */
 export function resolveRes1ControlAfterCombatAndMovement(
   traversedHexesByPlayer?: Record<'human' | 'opponent', Set<string>>
 ): ControlTransition[] {
@@ -79,6 +89,7 @@ export function resolveRes1ControlAfterCombatAndMovement(
             COUNT(DISTINCT player) AS distinctPlayers,
             CASE WHEN COUNT(DISTINCT player) = 1 THEN MIN(player) ELSE NULL END AS solePlayer
      FROM units
+     WHERE unit_type IN ('infantry', 'armor', 'naval')
      GROUP BY h3_index`
   );
   const occupancyByHex = new Map(occupantRows.map((row) => [row.h3Index, row]));
@@ -223,10 +234,22 @@ export function processProductionAfterControlResolution(): {
   return { deployedByPlayer, capReachedByPlayer };
 }
 
+/**
+ * Why this exists:
+ *     Collects per-player hex traversal for control resolution from committed movement orders.
+ * When to use:
+ *     Build the traversal input for `resolveRes1ControlAfterCombatAndMovement` during turn resolution.
+ * What to expect:
+ *     Returns de-duplicated traversed hex sets for control-capable unit types only (infantry/armor/naval).
+ */
 export function collectTraversedHexesByPlayer(
   orders: Array<{ unitId: string; toH3Index: string }>,
-  unitsBeforeMove: Array<{ id: string; player: string; h3Index: string }>
+  unitsBeforeMove: Array<{ id: string; player: string; h3Index: string; unitType: string }>
 ): Record<'human' | 'opponent', Set<string>> {
+  logDebug('gameActions collectTraversedHexesByPlayer', {
+    orderCount: orders.length,
+    unitCount: unitsBeforeMove.length,
+  });
   const traversed: Record<'human' | 'opponent', Set<string>> = {
     human: new Set<string>(),
     opponent: new Set<string>(),
@@ -235,6 +258,7 @@ export function collectTraversedHexesByPlayer(
   for (const order of orders) {
     const unit = byId.get(order.unitId);
     if (!unit) continue;
+    if (!CONTROL_UNIT_TYPE_SET.has(unit.unitType)) continue;
     const player = unit.player === 'opponent' ? 'opponent' : 'human';
     try {
       const path = gridPathCells(unit.h3Index, order.toH3Index);
