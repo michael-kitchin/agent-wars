@@ -3,6 +3,7 @@
  * the renderer. Use this as the process started by Electron (see package.json main).
  */
 
+import 'dotenv/config';
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import * as path from 'path';
 import {

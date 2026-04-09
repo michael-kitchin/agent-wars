@@ -1,9 +1,11 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import { cellToLatLng } from 'h3-js';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
 import { buildLatLngCoordinateMap, LATLNG_DECIMAL_PLACES } from '../mapData';
 import { logDebug, logError, logTrace } from '../logger';
 import { buildJsonAssistantRepairSchema, parseOrdersResponse } from './orderResponseParsing';
-import { executeTool1 } from '../tools/tool1Pathfinding';
+import { createPathfindingSession, executeTool1 } from '../tools/tool1Pathfinding';
 import { executeTool2 } from '../tools/tool2Assessment';
 import { executeTool3 } from '../tools/tool3CombatEstimation';
 import { executeTool4, getInjectionText } from '../tools/tool4Memory';
@@ -66,10 +68,78 @@ const FULL_RESPONSE_LOG_PREVIEW_CHARS = 1200;
 const FULL_RESPONSE_LOG_ENV_FLAG = 'AGENT_WARS_LOG_FULL_RESPONSES';
 const REQUEST_ORDERS_MAX_WALL_CLOCK_MS = 90_000;
 
+interface AiPathfindingSessionMetrics {
+  created: number;
+  reused: number;
+  planRouteToolCalls: number;
+  checkDistanceToolCalls: number;
+  totalToolCalls: number;
+}
+
+interface AiPathfindingTurnAggregateMetrics extends AiPathfindingSessionMetrics {
+  turnNumber: number;
+  requestCount: number;
+}
+
+const aiPathfindingTurnAggregateMetrics: AiPathfindingTurnAggregateMetrics = {
+  turnNumber: -1,
+  requestCount: 0,
+  created: 0,
+  reused: 0,
+  planRouteToolCalls: 0,
+  checkDistanceToolCalls: 0,
+  totalToolCalls: 0,
+};
+
+function getAiPathfindingTurnAggregateMetrics(turnNumber: number): AiPathfindingTurnAggregateMetrics {
+  if (aiPathfindingTurnAggregateMetrics.turnNumber !== turnNumber) {
+    aiPathfindingTurnAggregateMetrics.turnNumber = turnNumber;
+    aiPathfindingTurnAggregateMetrics.requestCount = 0;
+    aiPathfindingTurnAggregateMetrics.created = 0;
+    aiPathfindingTurnAggregateMetrics.reused = 0;
+    aiPathfindingTurnAggregateMetrics.planRouteToolCalls = 0;
+    aiPathfindingTurnAggregateMetrics.checkDistanceToolCalls = 0;
+    aiPathfindingTurnAggregateMetrics.totalToolCalls = 0;
+  }
+  return aiPathfindingTurnAggregateMetrics;
+}
+
+/**
+ * True when env is set to a common affirmative (1, true, yes, on); case-insensitive.
+ * Strips optional surrounding quotes so .env lines like AGENT_WARS_LOG_FULL_PROMPTS="1" work.
+ */
+function isFullLogEnvEnabled(flagName: string): boolean {
+  let v = process.env[flagName]?.trim();
+  if (v === undefined || v.length === 0) return false;
+  if (
+    (v.startsWith('"') && v.endsWith('"')) ||
+    (v.startsWith("'") && v.endsWith("'"))
+  ) {
+    v = v.slice(1, -1).trim();
+  }
+  const lower = v.toLowerCase();
+  return lower === '1' || lower === 'true' || lower === 'yes' || lower === 'on';
+}
+
+function writeFullLogArtifact(fileName: string, content: string): string | null {
+  const absPath = path.join(process.cwd(), fileName);
+  try {
+    fs.writeFileSync(absPath, content, 'utf8');
+    return absPath;
+  } catch (err) {
+    logError('openRouter requestOrders: failed to write full-log artifact', { fileName, err });
+    return null;
+  }
+}
+
 function logPromptPreview(label: string, content: string): void {
-  const fullPromptLoggingEnabled = process.env[FULL_PROMPT_LOG_ENV_FLAG] === '1';
+  const fullPromptLoggingEnabled = isFullLogEnvEnabled(FULL_PROMPT_LOG_ENV_FLAG);
   if (fullPromptLoggingEnabled) {
-    logDebug(`${label} (full)`, content);
+    const fileName = label.includes('user message')
+      ? 'debug-last-user-prompt.txt'
+      : 'debug-last-system-prompt.txt';
+    const absPath = writeFullLogArtifact(fileName, content);
+    logDebug(`${label} (full)`, { chars: content.length, writtenTo: absPath ?? '(write failed)' });
     return;
   }
   const preview = content.slice(0, FULL_PROMPT_LOG_PREVIEW_CHARS);
@@ -82,9 +152,10 @@ function logPromptPreview(label: string, content: string): void {
 }
 
 function logResponsePreview(label: string, content: string): void {
-  const fullResponseLoggingEnabled = process.env[FULL_RESPONSE_LOG_ENV_FLAG] === '1';
+  const fullResponseLoggingEnabled = isFullLogEnvEnabled(FULL_RESPONSE_LOG_ENV_FLAG);
   if (fullResponseLoggingEnabled) {
-    logDebug(`${label} (full)`, content);
+    const absPath = writeFullLogArtifact('debug-last-openrouter-response-body.txt', content);
+    logDebug(`${label} (full)`, { chars: content.length, writtenTo: absPath ?? '(write failed)' });
     return;
   }
   const preview = content.slice(0, FULL_RESPONSE_LOG_PREVIEW_CHARS);
@@ -224,6 +295,24 @@ export async function requestOrdersFlow(
       return formatLatLng([lat, lng]);
     },
   };
+  let aiPlanningPathfindingSession: ReturnType<typeof createPathfindingSession> | null = null;
+  const aiPathfindingSessionMetrics: AiPathfindingSessionMetrics = {
+    created: 0,
+    reused: 0,
+    planRouteToolCalls: 0,
+    checkDistanceToolCalls: 0,
+    totalToolCalls: 0,
+  };
+  const getOrCreateAiPlanningPathfindingSession = (): ReturnType<typeof createPathfindingSession> => {
+    if (aiPlanningPathfindingSession) {
+      aiPathfindingSessionMetrics.reused += 1;
+      return aiPlanningPathfindingSession;
+    }
+    aiPlanningPathfindingSession = createPathfindingSession(state, latLngByH3, resolveToH3);
+    aiPathfindingSessionMetrics.created += 1;
+    return aiPlanningPathfindingSession;
+  };
+  const aiTurnAggregateMetrics = getAiPathfindingTurnAggregateMetrics(state.turnNumber);
 
   const flags = getToolFlags(enabledToolNames);
   const enabledToolNameSet =
@@ -389,6 +478,10 @@ export async function requestOrdersFlow(
           } catch {
             args = {};
           }
+          const isPathfindingTool = toolName === 'plan_route' || toolName === 'check_distance';
+          if (toolName === 'plan_route') aiPathfindingSessionMetrics.planRouteToolCalls += 1;
+          if (toolName === 'check_distance') aiPathfindingSessionMetrics.checkDistanceToolCalls += 1;
+          aiPathfindingSessionMetrics.totalToolCalls += 1;
           const result = (toolName.includes('order') || toolName.includes('standing'))
             ? executeTool5(toolName, args, state, latLngByH3, resolveToH3)
             : (toolName.includes('build') || toolName.includes('production') || toolName.includes('query_production'))
@@ -397,9 +490,16 @@ export async function requestOrdersFlow(
                 ? executeTool4(toolName, args, state, latLngByH3, resolveToH3)
                 : toolName.includes('estimate')
                   ? executeTool3(toolName, args, state, latLngByH3, resolveToH3)
-                  : (toolName.includes('assess') || toolName.includes('check_distance'))
+                  : toolName.includes('assess')
                     ? executeTool2(toolName, args, state, latLngByH3, resolveToH3)
-                    : executeTool1(toolName, args, state, latLngByH3, resolveToH3);
+                    : executeTool1(
+                        toolName,
+                        args,
+                        state,
+                        latLngByH3,
+                        resolveToH3,
+                        isPathfindingTool ? getOrCreateAiPlanningPathfindingSession() : undefined
+                      );
           const resultStr = JSON.stringify(result);
           messages.push({ role: 'tool', tool_call_id: tc.id, content: resultStr });
           const groupId = getGroupIdForToolName(toolName);
@@ -553,5 +653,26 @@ export async function requestOrdersFlow(
     logError('openRouter requestOrders: exception', err);
     if (onLog) onLog(String(err), true);
     return failRequest(String(err));
+  } finally {
+    aiTurnAggregateMetrics.requestCount += 1;
+    aiTurnAggregateMetrics.created += aiPathfindingSessionMetrics.created;
+    aiTurnAggregateMetrics.reused += aiPathfindingSessionMetrics.reused;
+    aiTurnAggregateMetrics.planRouteToolCalls += aiPathfindingSessionMetrics.planRouteToolCalls;
+    aiTurnAggregateMetrics.checkDistanceToolCalls += aiPathfindingSessionMetrics.checkDistanceToolCalls;
+    aiTurnAggregateMetrics.totalToolCalls += aiPathfindingSessionMetrics.totalToolCalls;
+    logDebug('openRouter requestOrders: pathfinding session metrics', {
+      turnNumber: state.turnNumber,
+      modelId,
+      requestMetrics: aiPathfindingSessionMetrics,
+      turnAggregateMetrics: {
+        turnNumber: aiTurnAggregateMetrics.turnNumber,
+        requestCount: aiTurnAggregateMetrics.requestCount,
+        created: aiTurnAggregateMetrics.created,
+        reused: aiTurnAggregateMetrics.reused,
+        planRouteToolCalls: aiTurnAggregateMetrics.planRouteToolCalls,
+        checkDistanceToolCalls: aiTurnAggregateMetrics.checkDistanceToolCalls,
+        totalToolCalls: aiTurnAggregateMetrics.totalToolCalls,
+      },
+    });
   }
 }

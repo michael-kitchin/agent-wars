@@ -159,7 +159,7 @@ function formatStandardHexDetail(
   const pos = ll ? formatLatLng(ll) : h3;
   const inf = getInfra(indexed, h3);
   const units = formatEnemyUnitCounts(indexed, h3);
-  return `${pos} (units: ${units}; ${formatInfraCounts(inf.urban, inf.seaport, inf.airport)})`;
+  return `${pos} (enemy units: ${units}; ${formatInfraCounts(inf.urban, inf.seaport, inf.airport)})`;
 }
 
 function formatAirStrikeHexDetail(
@@ -186,8 +186,8 @@ function formatRangedHexDetail(
   const units = formatEnemyUnitCounts(indexed, h3);
   const hasInfra = inf.urban > 0 || inf.seaport > 0 || inf.airport > 0;
   return hasInfra
-    ? `${pos} (units: ${units}; ${formatInfraCounts(inf.urban, inf.seaport, inf.airport)})`
-    : `${pos} (units: ${units})`;
+    ? `${pos} (enemy units: ${units}; ${formatInfraCounts(inf.urban, inf.seaport, inf.airport)})`
+    : `${pos} (enemy units: ${units})`;
 }
 
 function buildBucketLines(

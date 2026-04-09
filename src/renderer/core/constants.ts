@@ -44,7 +44,7 @@ export const OPENROUTER_TOOL_GROUPS: { id: string; label: string }[] = [
 export const UNIT_SELECT_GLYPH = '+';
 export const UNIT_DESELECT_GLYPH = '-';
 
-export const TOAST_DURATION_MS = 12_000;
+export const TOAST_DURATION_MS = 24_000;
 export const READY_REQUEST_TIMEOUT_MS = 120_000;
 
 export const UNIT_ICON_HIT_PAD_PX = 2;

@@ -1,12 +1,9 @@
 # Build and test Agent Wars on Windows, Linux, and macOS.
-# Runs on push and pull_request to main. Uploads release artifacts per OS.
+# On-demand only (workflow_dispatch). Uploads release artifacts per OS.
 name: Build
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
   build:

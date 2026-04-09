@@ -67,6 +67,62 @@ export interface PathfindingSession {
   statefulCache: PathfindingSessionStatefulCache;
 }
 
+type PlanningPhaseSessionCache = {
+  key: string;
+  session: PathfindingSession;
+};
+
+let planningPhaseHumanSessionCache: PlanningPhaseSessionCache | null = null;
+const humanPlanningSessionMetrics = {
+  turnNumber: -1,
+  created: 0,
+  reused: 0,
+};
+
+function resetHumanPlanningSessionMetricsForTurn(turnNumber: number): void {
+  if (humanPlanningSessionMetrics.turnNumber === turnNumber) return;
+  humanPlanningSessionMetrics.turnNumber = turnNumber;
+  humanPlanningSessionMetrics.created = 0;
+  humanPlanningSessionMetrics.reused = 0;
+  planningPhaseHumanSessionCache = null;
+}
+
+function getHumanPlanningSessionMetrics(): { turnNumber: number; created: number; reused: number } {
+  return {
+    turnNumber: humanPlanningSessionMetrics.turnNumber,
+    created: humanPlanningSessionMetrics.created,
+    reused: humanPlanningSessionMetrics.reused,
+  };
+}
+
+function shouldReusePlanningPhaseSession(state: GameStateSnapshot): boolean {
+  return state.phase === 'planning' && state.playerPerspective === 'human';
+}
+
+/**
+ * Why this exists:
+ *     Provides a stable cache key so one pathfinding session can be reused for the entire human planning phase.
+ * When to use:
+ *     Internal only; called by createPathfindingSession before constructing a new session.
+ * What to expect:
+ *     Returns a deterministic key that changes when turn/phase/map/unit positions or perspective changes.
+ */
+function buildPlanningPhaseSessionKey(state: GameStateSnapshot): string {
+  const unitsSignature = state.units
+    .map((u) => `${u.id}:${u.h3Index}`)
+    .sort()
+    .join('|');
+  const hexSignature = state.hexes.map((h) => h.h3Index).join('|');
+  return [
+    `turn:${state.turnNumber}`,
+    `phase:${state.phase}`,
+    `perspective:${state.playerPerspective ?? 'none'}`,
+    `fog:${state.fogOfWarEnabled === true ? '1' : '0'}`,
+    `units:${unitsSignature}`,
+    `hexes:${hexSignature}`,
+  ].join('||');
+}
+
 /**
  * Why this exists:
  *     Builds reusable pathfinding state once so callers can plan multiple routes without re-deriving map indexes.
@@ -80,6 +136,20 @@ export function createPathfindingSession(
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): PathfindingSession {
+  if (shouldReusePlanningPhaseSession(state)) {
+    resetHumanPlanningSessionMetricsForTurn(state.turnNumber);
+    const key = buildPlanningPhaseSessionKey(state);
+    if (planningPhaseHumanSessionCache?.key === key) {
+      humanPlanningSessionMetrics.reused += 1;
+      logDebug('tool1Pathfinding createPathfindingSession: reused planning-phase human session', {
+        turnNumber: state.turnNumber,
+        phase: state.phase,
+        playerPerspective: state.playerPerspective ?? null,
+        metrics: getHumanPlanningSessionMetrics(),
+      });
+      return planningPhaseHumanSessionCache.session;
+    }
+  }
   logDebug('tool1Pathfinding createPathfindingSession', {
     turnNumber: state.turnNumber,
     hexCount: state.hexes.length,
@@ -91,7 +161,7 @@ export function createPathfindingSession(
   const hexSet = new Set(hexList);
   const terrainByH3 = buildNormalizedTerrainByH3(state.hexes);
   const { terrainByH3: rawTerrainByH3, terrainKindByH3 } = buildTerrainMapsFromHexRows(state.hexes);
-  return {
+  const session: PathfindingSession = {
     state,
     latLngByH3,
     resolveToH3,
@@ -103,6 +173,20 @@ export function createPathfindingSession(
       deadStateByDestination: new Map(),
     },
   };
+  if (shouldReusePlanningPhaseSession(state)) {
+    humanPlanningSessionMetrics.created += 1;
+    planningPhaseHumanSessionCache = {
+      key: buildPlanningPhaseSessionKey(state),
+      session,
+    };
+    logDebug('tool1Pathfinding createPathfindingSession: cached planning-phase human session', {
+      turnNumber: state.turnNumber,
+      phase: state.phase,
+      playerPerspective: state.playerPerspective ?? null,
+      metrics: getHumanPlanningSessionMetrics(),
+    });
+  }
+  return session;
 }
 
 
@@ -412,7 +496,8 @@ export function executeTool1(
   args: unknown,
   state: GameStateSnapshot,
   latLngByH3: Map<string, LatLng>,
-  resolveToH3: (lat: number, lng: number) => string | undefined
+  resolveToH3: (lat: number, lng: number) => string | undefined,
+  pathfindingSession?: PathfindingSession
 ): Record<string, unknown> {
   logDebug('tool1Pathfinding executeTool1', { toolName, stateTurn: state.turnNumber });
   try {
@@ -431,7 +516,9 @@ export function executeTool1(
       if (!dest) {
         return { status: 'error', error: 'plan_route requires destination as [lat, lng]' };
       }
-      const result = executePlanRoute(a.unitId, dest, a.options, state, latLngByH3, resolveToH3);
+      const result = pathfindingSession
+        ? executePlanRouteWithSession(a.unitId, dest, a.options, pathfindingSession)
+        : executePlanRoute(a.unitId, dest, a.options, state, latLngByH3, resolveToH3);
       return result as unknown as Record<string, unknown>;
     }
     if (toolName === 'check_distance') {
