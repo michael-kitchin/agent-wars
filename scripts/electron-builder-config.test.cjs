@@ -73,6 +73,21 @@ function testWindowsIconContract() {
   );
 }
 
+function testLinuxAndMacIconContract() {
+  assert.ok(buildConfig.linux && buildConfig.linux.icon, 'electron-builder linux.icon must be configured');
+  assert.ok(buildConfig.mac && buildConfig.mac.icon, 'electron-builder mac.icon must be configured');
+  assert.strictEqual(
+    buildConfig.linux.icon,
+    'build/icon.ico',
+    'electron-builder linux.icon must point to build/icon.ico'
+  );
+  assert.strictEqual(
+    buildConfig.mac.icon,
+    'build/icon.ico',
+    'electron-builder mac.icon must point to build/icon.ico'
+  );
+}
+
 function testIconPackagingContract() {
   const files = Array.isArray(buildConfig.files) ? buildConfig.files : [];
   const ciFiles = Array.isArray(ciBuildConfig.files) ? ciBuildConfig.files : [];
@@ -86,6 +101,7 @@ function main() {
   testWindowsZipTargetContract();
   testArtifactNameContract();
   testWindowsIconContract();
+  testLinuxAndMacIconContract();
   testIconPackagingContract();
   console.log('electron-builder-config.test.cjs passed');
 }

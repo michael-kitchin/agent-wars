@@ -19,10 +19,12 @@ function buildElectronBuilderConfig(options) {
     },
     linux: {
       target: options.linuxTarget,
+      icon: 'build/icon.ico',
     },
     mac: {
       target: options.macTarget,
       category: 'public.app-category.games',
+      icon: 'build/icon.ico',
     },
   };
 }
