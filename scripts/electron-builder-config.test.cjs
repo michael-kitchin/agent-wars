@@ -64,11 +64,29 @@ function testArtifactNameContract() {
   );
 }
 
+function testWindowsIconContract() {
+  assert.ok(buildConfig.win && buildConfig.win.icon, 'electron-builder win.icon must be configured');
+  assert.strictEqual(
+    buildConfig.win.icon,
+    'build/icon.ico',
+    'electron-builder win.icon must point to build/icon.ico'
+  );
+}
+
+function testIconPackagingContract() {
+  const files = Array.isArray(buildConfig.files) ? buildConfig.files : [];
+  const ciFiles = Array.isArray(ciBuildConfig.files) ? ciBuildConfig.files : [];
+  assert.ok(files.includes('symbols'), 'electron-builder files must include symbols directory');
+  assert.ok(ciFiles.includes('symbols'), 'CI electron-builder files must include symbols directory');
+}
+
 function main() {
   testVersionedIdentityContract();
   testGeneratedTerrainResourcesContract();
   testWindowsZipTargetContract();
   testArtifactNameContract();
+  testWindowsIconContract();
+  testIconPackagingContract();
   console.log('electron-builder-config.test.cjs passed');
 }
 

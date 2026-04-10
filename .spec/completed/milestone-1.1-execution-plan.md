@@ -43,7 +43,7 @@ Deliver a **maintainable production baseline** that still runs the **same small-
 3. **New Game:** After New Game, no stale `standing_orders` or `ai_memory` from the previous match.
 4. **CI:** `npm run lint`, `npm run test`, and `.github/workflows/build.yml` succeed (including **native** `better-sqlite3` builds per OS matrix, following **`paratext`** patterns from **Section 4 item 8** when integrated).
 5. **SQLite pragmas:** Every open of the game DB applies **Section 4 item 7** (`journal_mode = MEMORY`, `foreign_keys`, `defer_foreign_keys`, `synchronous = OFF`).
-6. **Write path (hard cut):** LLM-facing tool list excludes write tools (`assign_order`, `cancel_order`, `memory_write`, `memory_delete`). **Final JSON only:** `strategy`, `callbacks`, `memoryUpdates`, and v3 **`orders[]`** (`assign_order`, `cancel_order`, `explicit_move`, `explicit_attack`, etc.). **No** top-level `movementOrders` / `rangedAttacks` in the contract, prompts, or repair schema—one shape for troubleshooting and prompt engineering.
+6. **Write path (hard cut):** LLM-facing tool list excludes write tools (`assign_order`, `cancel_order`, `memory_write`, `memory_delete`). **Final JSON only:** `strategy`, `callbacks`, `memoryUpdates`, and v3 **`orders[]`** (`assign_order`, `cancel_order`, `explicit_move`, `ranged_attack`, etc.). **No** top-level `movementOrders` / `rangedAttacks` in the contract, prompts, or repair schema—one shape for troubleshooting and prompt engineering.
 7. **No H3 in the model context; targets per 3.2:** Every prompt and tool payload the model receives is free of H3 index strings; geographic places use **`[lat, lng]`** at established resolution (**Section 3.3**). **Follow** = unit id only; **move to place** = `[lat, lng]` only; **ranged** = unit id **or** `[lat, lng]` (**Section 3.2**).
 8. **DB recovery:** Corrupt / incompatible file: **one** initial error dialog; **one** rename attempt; if rename fails, **log** and **one** delete attempt on the canonical file, then proceed with new DB if delete succeeds; if delete fails, **second** dialog + **exit**—per Section 4 item 5 and Phase C.
 
@@ -70,7 +70,7 @@ Deliver a **maintainable production baseline** that still runs the **same small-
 
 ### 3.1 Normative LLM JSON (hard cut) — align with v3
 
-The **authoritative** shape for `orders[]` / `memoryUpdates` / `callbacks` is **`devleopment-plan-v3.md` — section “LLM Output Format (revised)”** (lines ~94–112 in the current file): each order entry uses **`action`** (`assign_order`, `cancel_order`, `explicit_move`, `explicit_attack`), **`unitId`**, and type-specific fields such as **`order`** (for assign), **`destination`**, **`targetHex`**. Map v3 field names to the **targeting rules in Section 3.2** (e.g. `targetHex` in JSON may carry **unit id or `[lat, lng]`** per 3.2—not a raw H3 string).
+The **authoritative** shape for `orders[]` / `memoryUpdates` / `callbacks` is **`devleopment-plan-v3.md` — section “LLM Output Format (revised)”** (lines ~94–112 in the current file): each order entry uses **`action`** (`assign_order`, `cancel_order`, `explicit_move`, `ranged_attack`), **`unitId`**, and type-specific fields such as **`order`** (for assign), **`destination`**, **`targetHex`**. Map v3 field names to the **targeting rules in Section 3.2** (e.g. `targetHex` in JSON may carry **unit id or `[lat, lng]`** per 3.2—not a raw H3 string).
 
 ### 3.2 Targets: unit names vs `[lat, lng]` (locked)
 
@@ -245,10 +245,10 @@ Each phase lists **work**, **verification**, and **dependencies**. Complete phas
 
 1. **Specification (single shape):** Final assistant JSON **only** (no legacy top-level move/ranged keys):
    - `strategy`, `callbacks`, `memoryUpdates` (as today, adjusted if needed).
-   - **`orders[]`:** v3 entries: `assign_order`, `cancel_order`, `explicit_move`, `explicit_attack` (and any other v3 order types you already rely on). **Target fields** must enforce **Section 3.2** (follow = unit id only; move-to-place = `[lat, lng]` only; ranged = unit id **or** `[lat, lng]`). Map each to the **same** DB mutations and validation as current `executeTool5` / `gameActions` paths. **Internally**, after applying `orders[]` and merging with standing-order automation, you may still produce `{ movementOrders, rangedAttacks }` **in memory** for `ready()`—that is an implementation detail, not part of the LLM contract.
+   - **`orders[]`:** v3 entries: `assign_order`, `cancel_order`, `explicit_move`, `ranged_attack` (and any other v3 order types you already rely on). **Target fields** must enforce **Section 3.2** (follow = unit id only; move-to-place = `[lat, lng]` only; ranged = unit id **or** `[lat, lng]`). Map each to the **same** DB mutations and validation as current `executeTool5` / `gameActions` paths. **Internally**, after applying `orders[]` and merging with standing-order automation, you may still produce `{ movementOrders, rangedAttacks }` **in memory** for `ready()`—that is an implementation detail, not part of the LLM contract.
 2. **Parser and repair prompt:** `parseOrdersResponse` (and the JSON-repair branch) must accept **only** the hard-cut schema—**remove** parsing and examples for top-level `movementOrders` / `rangedAttacks` from the model-facing contract.
 3. **Implementation strategy:**
-   - Extract **internal** helpers: `applyAssignOrderFromJson`, `applyCancelOrderFromJson`, `applyExplicitMoveFromJson`, `applyExplicitAttackFromJson`, etc., reusing tool5/tool4 logic where safe.
+   - Extract **internal** helpers: `applyAssignOrderFromJson`, `applyCancelOrderFromJson`, `applyExplicitMoveFromJson`, `applyRangedAttackFromJson`, etc., reusing tool5/tool4 logic where safe.
    - Preserve **standing-order merge** behavior after `orders[]` are applied (same semantics as current turn).
 4. **Remove write tools from the model:** Unregister `assign_order`, `cancel_order`, `memory_write`, `memory_delete` from the OpenRouter tool list. Keep **read/query** tools per v3 appendix.
 5. **Prompts:** Single documented JSON shape end-to-end (system prompt, user nudge, repair message). Simplifies troubleshooting and prompt iteration—**no** dual code paths.

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 40" width="72" height="40">
+  <!-- Fuselage -->
+  <polygon points="6,20 16,17 54,15 64,17 68,20 64,23 54,25 16,23" fill="white"/>
+  <!-- Nose cone -->
+  <polygon points="68,18 72,20 68,22" fill="white"/>
+  <!-- Main wing (swept back) -->
+  <polygon points="34,15 44,15 34,4 24,4" fill="white"/>
+  <polygon points="34,25 44,25 34,36 24,36" fill="white"/>
+  <!-- Tail wing (swept back) -->
+  <polygon points="12,17 18,17 12,8 8,8" fill="white"/>
+  <polygon points="12,23 18,23 12,32 8,32" fill="white"/>
+  <!-- Tail fin -->
+  <polygon points="8,17 16,17 10,6 6,6" fill="white"/>
+  <!-- Cockpit -->
+  <polygon points="50,17 58,16 62,18 56,18" fill="white" opacity="0.5"/>
+</svg>

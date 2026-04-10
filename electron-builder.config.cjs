@@ -6,6 +6,7 @@ module.exports = buildElectronBuilderConfig({
   files: [
     'dist',
     'static',
+    'symbols',
     'package.json',
     'node_modules',
     'data/generated/terrain_res1_metadata.json',

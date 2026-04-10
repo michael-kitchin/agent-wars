@@ -55,6 +55,9 @@ export function buildToolUsageGuidance(flags: PromptToolFlags, hasPrecomputedBri
       lines.push(
         '- Standing orders: for every unit listed as "Units without standing orders" in the briefing, add an orders[] entry with action assign_order (march/pursue for closing; defend to hold). Then use plan_route and explicit_move in orders[] only where you need a one-step move this turn.'
       );
+      lines.push(
+        '- Tempo rule: if any unit can make a legal ranged_attack or air strike this turn, do it now. Ranged attacks and air strikes use turn-start positions and can be combined with movement orders in the same turn.'
+      );
     }
     if (flags.memoryEnabled) {
       lines.push(
@@ -100,6 +103,9 @@ export function buildToolUsageGuidance(flags: PromptToolFlags, hasPrecomputedBri
     lines.push(
       `- Production requirement: ${PRODUCTION_REQUIREMENT_BASE}, queue at least one build this turn (via tools or productionOrders). ${PRODUCTION_REQUIREMENT_PRIORITY}`
     );
+    lines.push(
+      '- Queue production aggressively: set_build_queue on every controlled hex that can build, so queues keep running if you lose hexes and reinforcements spawn closer to the front.'
+    );
   }
   if (lines.length === 0) return '';
   return '\n\nHOW TO USE THESE TOOLS EFFECTIVELY:\n' + lines.join('\n');
@@ -134,7 +140,7 @@ export function getMovementOrderInstruction(flags: PromptToolFlags): string {
   }
   if (flags.ordersEnabled) {
     return (
-      ' You have no movement planning tools: you cannot compute valid one-step explicit_move destinations yourself. Use assign_order in orders[] for standing missions; leave explicit_move / explicit_attack out unless you can copy valid [lat,lng] from the briefing only.' +
+      ' You have no movement planning tools: you cannot compute valid one-step explicit_move destinations yourself. Use assign_order in orders[] for standing missions; leave explicit_move / ranged_attack out unless you can copy valid [lat,lng] from the briefing only.' +
       memorySuffix
     );
   }
@@ -181,13 +187,13 @@ export function getInitialUserMessage(flags: PromptToolFlags, hasPrecomputedBrie
       ? ' After your analysis, include memoryUpdates in your final JSON for strategy notes. '
       : '';
     const productionNote = flags.productionEnabled
-      ? ` Also ensure production is actively queued when viable: ${PRODUCTION_REQUIREMENT_BASE}, include at least one production action. ${PRODUCTION_REQUIREMENT_PRIORITY_INITIAL} `
+      ? ` Also ensure production is actively queued when viable: ${PRODUCTION_REQUIREMENT_BASE}, include at least one production action. ${PRODUCTION_REQUIREMENT_PRIORITY_INITIAL} Prefer setting queues on every eligible controlled hex so production survives territory swings and reinforcements stay close to the front. `
       : '';
     if (hasPrecomputedBriefing) {
       const ordersNudge = flags.ordersEnabled
         ? ' For units without standing orders in the briefing, include assign_order entries in orders[]. Then use plan_route and explicit_move only where needed this turn. '
         : '';
-      return `Use the COMMANDER'S BRIEFING above for unit status, possible unit actions, and supplemental hex intelligence.${ordersNudge}Call plan_route for each unit that needs a move (orderToXY).${memoryNote}${productionNote} Then submit final JSON with "strategy", "orders" (assign_order / explicit_move / explicit_attack / cancel_order as needed)${jsonOptionalTail}.`;
+      return `Use the COMMANDER'S BRIEFING above for unit status, possible unit actions, and supplemental hex intelligence.${ordersNudge}Call plan_route for each unit that needs a move (orderToXY).${memoryNote}${productionNote} Then submit final JSON with "strategy", "orders" (assign_order / explicit_move / ranged_attack / cancel_order as needed)${jsonOptionalTail}.`;
     }
     return `Use the tools as needed to plan movement.${memoryNote}${productionNote} Then submit final JSON with "strategy", "orders"${jsonOptionalTail}.`;
   }

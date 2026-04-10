@@ -262,9 +262,9 @@ export function drawMovingUnits(
     const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
     const color = PLAYER_COLORS[move.player] ?? '#333';
     const label = group.unitTypes.size > 1 ? '*' : (UNIT_TYPE_LABELS[move.unitType] ?? '?');
-    drawOneUnitMarker(ctx, p.x, p.y, color, label, '#fff');
+    drawOneUnitMarker(ctx, p.x, p.y, color, label, '#fff', move.player);
     if (group.count > 1) {
-      drawOneUnitMarker(ctx, p.x + STACK_OFFSET_X, p.y + STACK_OFFSET_Y, color, label, '#fff');
+      drawOneUnitMarker(ctx, p.x + STACK_OFFSET_X, p.y + STACK_OFFSET_Y, color, label, '#fff', move.player);
       const badgeX = p.x + COUNT_BADGE_OFFSET;
       const badgeY = p.y - COUNT_BADGE_OFFSET;
       ctx.font = 'bold 13px system-ui, sans-serif';

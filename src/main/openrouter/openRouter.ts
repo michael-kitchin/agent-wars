@@ -489,11 +489,11 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
 
   const combatTargetHint = flags.estimationEnabled ? ' (e.g. use estimate_combat to pick the best)' : '';
   const navalCoaching = hasNaval
-    ? ` Naval units can attack land units at 1 or 2 hexes (range 2). Add explicit_attack when a naval unit is within 2 hexes of an enemy at turn start. ${NAVAL_MOVEMENT_PROMPT_RULE}${flags.planningEnabled ? NAVAL_PLAN_ROUTE_LAND_TARGET_HINT : ''}`
+    ? ` Naval units can attack land units at 1 or 2 hexes (range 2). Add ranged_attack when a naval unit is within 2 hexes of an enemy at turn start. ${NAVAL_MOVEMENT_PROMPT_RULE}${flags.planningEnabled ? NAVAL_PLAN_ROUTE_LAND_TARGET_HINT : ''}`
     : '';
   const combatAssessHint = flags.assessmentEnabled && hasRanged
-    ? ' When assess_unit reports canAttackThisTurn with attackType "ranged" for an enemy, add explicit_attack with targetHex as that enemy\'s [lat,lng] (or unit id).' +
-      (hasNaval ? ' Naval inRangedRange: add explicit_attack for that naval unit.' : '') +
+    ? ' When assess_unit reports canAttackThisTurn with attackType "ranged" for an enemy, add ranged_attack with targetHex as that enemy\'s [lat,lng] (or unit id).' +
+      (hasNaval ? ' Naval inRangedRange: add ranged_attack for that naval unit.' : '') +
       ' Note: inEnemyRangedRange = enemy can fire at you; inRangedRange = you can fire at them.'
     : '';
 
@@ -555,7 +555,7 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
 
 ${buildLatLngPreamble(H3_RESOLUTION, LATLNG_DECIMAL_PLACES)}
 
-Combat: d6 per shot — attack hits on roll ≤ attack stat; defense hits on roll ≤ defense. ${combatSummary}. Ranged uses pre-move positions. At most one explicit_attack per unit from turn-start range; targetHex is enemy [lat,lng] or enemy unit id (not your move destination)${combatTargetHint}. Drop invalid attacks before submit.${navalCoaching}${combatAssessHint}
+Combat: d6 per shot — attack hits on roll ≤ attack stat; defense hits on roll ≤ defense. ${combatSummary}. Ranged uses pre-move positions. At most one ranged_attack per unit from turn-start range; targetHex is enemy [lat,lng] or enemy unit id (not your move destination)${combatTargetHint}. Infantry are melee-only: do not emit ranged_attack for infantry; close distance and use movement/standing orders to enter melee. If a legal ranged_attack or air strike is available this turn, take it — these attacks resolve from turn-start positions and do not prevent movement in the same turn. Drop invalid attacks before submit.${navalCoaching}${combatAssessHint}
 
 ${mainBlock}
 

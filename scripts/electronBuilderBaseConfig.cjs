@@ -8,12 +8,14 @@ function buildElectronBuilderConfig(options) {
     publish: options.publish,
     directories: {
       output: 'release',
+      buildResources: 'build',
     },
     files: options.files,
     ...(options.extraResources ? { extraResources: options.extraResources } : {}),
     ...(options.artifactName ? { artifactName: options.artifactName } : {}),
     win: {
       target: options.winTarget,
+      icon: 'build/icon.ico',
     },
     linux: {
       target: options.linuxTarget,

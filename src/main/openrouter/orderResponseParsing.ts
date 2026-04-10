@@ -238,8 +238,8 @@ function normalizeMemoryUpdates(raw: unknown): MemoryUpdateItem[] {
  */
 export function buildJsonAssistantRepairSchema(includeProductionOrders: boolean): string {
   return includeProductionOrders
-    ? `{"strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":[lat,lng]}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":[lat,lng]},{"unitId":"opponent-armor-1","action":"explicit_attack","targetHex":[lat,lng]},{"unitId":"opponent-armor-1","action":"cancel_order"}],"airStrikes":[{"unitId":"opponent-air-1","targetHex":[lat,lng],"targetType":"units"}],"ferryOrders":[{"unitId":"opponent-air-2","destination":[lat,lng]}],"callbacks":[],"memoryUpdates":[],"productionOrders":[{"action":"set_build_queue","hex":[lat,lng],"unitType":"infantry","count":1}]}`
-    : `{"strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":[lat,lng]}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":[lat,lng]},{"unitId":"opponent-armor-1","action":"explicit_attack","targetHex":[lat,lng]},{"unitId":"opponent-armor-1","action":"cancel_order"}],"airStrikes":[{"unitId":"opponent-air-1","targetHex":[lat,lng],"targetType":"units"}],"ferryOrders":[{"unitId":"opponent-air-2","destination":[lat,lng]}],"callbacks":[],"memoryUpdates":[]}`;
+    ? `{"strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":[lat,lng]}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":[lat,lng]},{"unitId":"opponent-armor-1","action":"ranged_attack","targetHex":[lat,lng]},{"unitId":"opponent-armor-1","action":"cancel_order"}],"airStrikes":[{"unitId":"opponent-air-1","targetHex":[lat,lng],"targetType":"units"}],"ferryOrders":[{"unitId":"opponent-air-2","destination":[lat,lng]}],"callbacks":[],"memoryUpdates":[],"productionOrders":[{"action":"set_build_queue","hex":[lat,lng],"unitType":"infantry","count":1}]}`
+    : `{"strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":[lat,lng]}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":[lat,lng]},{"unitId":"opponent-armor-1","action":"ranged_attack","targetHex":[lat,lng]},{"unitId":"opponent-armor-1","action":"cancel_order"}],"airStrikes":[{"unitId":"opponent-air-1","targetHex":[lat,lng],"targetType":"units"}],"ferryOrders":[{"unitId":"opponent-air-2","destination":[lat,lng]}],"callbacks":[],"memoryUpdates":[]}`;
 }
 
 function hasNonEmptyLegacyTopLevel(obj: Record<string, unknown>): boolean {
@@ -393,11 +393,11 @@ function processV3OrdersArray(
       else logDebug('openRouter processV3OrdersArray: explicit_move unresolved', { unitId, lat, lng });
       continue;
     }
-    if (action === 'explicit_attack') {
+    if (action === 'ranged_attack') {
       const attackTarget = o.targetHex ?? o.targetUnitId;
       const targetH3 = resolveExplicitRangedTarget(attackTarget, state, resolveToH3);
       if (targetH3) rangedAttacks.push({ unitId, targetH3Index: targetH3 });
-      else logDebug('openRouter processV3OrdersArray: explicit_attack unresolved', { unitId });
+      else logDebug('openRouter processV3OrdersArray: ranged_attack unresolved', { unitId });
       continue;
     }
     if (action === 'transport_move') {

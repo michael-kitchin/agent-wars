@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 64" width="32" height="64">
+  <!-- Helmet -->
+  <rect x="11" y="5" width="10" height="5" rx="3" fill="white"/>
+  <rect x="9" y="9" width="14" height="2" rx="1" fill="white"/>
+  <!-- Head/face -->
+  <rect x="12" y="11" width="8" height="6" rx="2" fill="white"/>
+  <!-- Neck -->
+  <rect x="14" y="17" width="4" height="2" fill="white"/>
+  <!-- Torso -->
+  <polygon points="11,19 21,19 23,38 9,38" fill="white"/>
+  <!-- Belt -->
+  <rect x="9" y="36" width="14" height="2" rx="0.5" fill="white"/>
+  <!-- Left leg -->
+  <polygon points="10,38 15,38 14,53 9,53" fill="white"/>
+  <!-- Right leg -->
+  <polygon points="17,38 22,38 23,53 18,53" fill="white"/>
+  <!-- Left boot -->
+  <rect x="7" y="52" width="8" height="3" rx="1" fill="white"/>
+  <!-- Right boot -->
+  <rect x="17" y="52" width="8" height="3" rx="1" fill="white"/>
+  <!-- Rifle -->
+  <rect x="22" y="8" width="2.5" height="30" rx="1" fill="white" transform="rotate(6,23,23)"/>
+</svg>

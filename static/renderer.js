@@ -15171,7 +15171,53 @@
   }
 
   // src/renderer/rendering/unitDrawing.ts
-  function drawOneUnitMarker(ctx, x, y, color, label, strokeColor = "#fff") {
+  var TOKEN_ICON_FIT_RATIO = 0.9;
+  var UNIT_ICON_FILE_BY_TYPE = {
+    infantry: "infantry-1.svg",
+    armor: "armor-1.svg",
+    naval: "naval-1.svg",
+    air: "air-1.svg",
+    mixed: "mixed-1.svg"
+  };
+  var unitIconCache = /* @__PURE__ */ new Map();
+  function iconPathForType(unitType) {
+    return `../symbols/${UNIT_ICON_FILE_BY_TYPE[unitType]}`;
+  }
+  function getOrStartUnitIconLoad(unitType) {
+    if (unitIconCache.has(unitType)) return unitIconCache.get(unitType) ?? null;
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => {
+    };
+    img.onerror = () => {
+      unitIconCache.set(unitType, null);
+    };
+    img.src = iconPathForType(unitType);
+    unitIconCache.set(unitType, img);
+    return img;
+  }
+  function drawUnitSvgIcon(ctx, centerX, centerY, unitType, unitPlayer, flipForOpponent = true, fitScaleMultiplier = 1) {
+    const img = getOrStartUnitIconLoad(unitType);
+    if (!img || !img.complete || img.naturalWidth <= 0 || img.naturalHeight <= 0) return false;
+    const maxIconSize = UNIT_RADIUS * 2 * TOKEN_ICON_FIT_RATIO * fitScaleMultiplier;
+    const iconScale = maxIconSize / Math.max(img.naturalWidth, img.naturalHeight);
+    const width = img.naturalWidth * iconScale;
+    const height = img.naturalHeight * iconScale;
+    const drawX = centerX - width / 2;
+    const drawY = centerY - height / 2;
+    const shouldFlip = flipForOpponent && unitPlayer === "opponent";
+    ctx.save();
+    if (shouldFlip) {
+      ctx.translate(centerX, centerY);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, -width / 2, -height / 2, width, height);
+    } else {
+      ctx.drawImage(img, drawX, drawY, width, height);
+    }
+    ctx.restore();
+    return true;
+  }
+  function drawOneUnitMarker(ctx, x, y, color, label, strokeColor = "#fff", unitPlayer) {
     ctx.beginPath();
     ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
     ctx.fillStyle = color;
@@ -15183,6 +15229,21 @@
     ctx.font = "bold 14px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
+    if (label === UNIT_TYPE_LABELS.armor && drawUnitSvgIcon(ctx, x, y, "armor", unitPlayer)) {
+      return;
+    }
+    if (label === UNIT_TYPE_LABELS.infantry && drawUnitSvgIcon(ctx, x, y, "infantry", unitPlayer)) {
+      return;
+    }
+    if (label === UNIT_TYPE_LABELS.air && drawUnitSvgIcon(ctx, x, y, "air", unitPlayer)) {
+      return;
+    }
+    if (label === UNIT_TYPE_LABELS.naval && drawUnitSvgIcon(ctx, x, y, "naval", unitPlayer)) {
+      return;
+    }
+    if (label === "*" && drawUnitSvgIcon(ctx, x, y, "mixed", unitPlayer, false, 0.5)) {
+      return;
+    }
     ctx.fillText(label, x, y);
   }
   function drawUnits(ctx, units, movingUnitIds) {
@@ -15203,9 +15264,9 @@
       const fillColor = multiPlayer ? MULTI_PLAYER_FILL : PLAYER_COLORS[hexUnits[0].player] ?? "#333";
       const strokeColor = multiPlayer ? MULTI_PLAYER_STROKE : "#fff";
       const label = mixedType ? "*" : UNIT_TYPE_LABELS[hexUnits[0].unitType] ?? "?";
-      drawOneUnitMarker(ctx, x, y, fillColor, label, strokeColor);
+      drawOneUnitMarker(ctx, x, y, fillColor, label, strokeColor, hexUnits[0].player);
       if (count > 1) {
-        drawOneUnitMarker(ctx, x + STACK_OFFSET_X, y + STACK_OFFSET_Y, fillColor, label, strokeColor);
+        drawOneUnitMarker(ctx, x + STACK_OFFSET_X, y + STACK_OFFSET_Y, fillColor, label, strokeColor, hexUnits[0].player);
         const badgeX = x + COUNT_BADGE_OFFSET;
         const badgeY = y - COUNT_BADGE_OFFSET;
         ctx.font = "bold 13px system-ui, sans-serif";
@@ -15286,7 +15347,7 @@
       const { x, y } = hexCenterPx(h3Index);
       ctx.save();
       ctx.globalAlpha = alpha;
-      drawOneUnitMarker(ctx, x, y, PLAYER_COLORS.opponent, label);
+      drawOneUnitMarker(ctx, x, y, PLAYER_COLORS.opponent, label, "#fff", "opponent");
       ctx.restore();
     }
   }
@@ -15547,9 +15608,9 @@
       const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
       const color = PLAYER_COLORS[move.player] ?? "#333";
       const label = group.unitTypes.size > 1 ? "*" : UNIT_TYPE_LABELS[move.unitType] ?? "?";
-      drawOneUnitMarker(ctx, p.x, p.y, color, label, "#fff");
+      drawOneUnitMarker(ctx, p.x, p.y, color, label, "#fff", move.player);
       if (group.count > 1) {
-        drawOneUnitMarker(ctx, p.x + STACK_OFFSET_X, p.y + STACK_OFFSET_Y, color, label, "#fff");
+        drawOneUnitMarker(ctx, p.x + STACK_OFFSET_X, p.y + STACK_OFFSET_Y, color, label, "#fff", move.player);
         const badgeX = p.x + COUNT_BADGE_OFFSET;
         const badgeY = p.y - COUNT_BADGE_OFFSET;
         ctx.font = "bold 13px system-ui, sans-serif";

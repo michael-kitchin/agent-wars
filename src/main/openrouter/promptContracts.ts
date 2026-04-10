@@ -30,7 +30,7 @@ export function buildFinalJsonContractInstruction(args: {
   const strictSchemaClause =
     'Strict schema: top-level must be a JSON object with "strategy" (string) and "orders" (array); do not return a top-level array.';
   const ordersClause =
-    'The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: assign_order (include "order": { "type": "defend"|"march"|"pursue"|"patrol"|"hold_fire", ... } — pursue uses targetUnitId string for the enemy only; march/patrol/defend use [lat,lng] where a place is required), cancel_order, explicit_move (include "destination": [lat,lng] for this turn\'s move), explicit_attack (include "targetHex": [lat,lng] OR enemy unit id string), transport_move (include "navalUnitId" and "destination": [lat,lng]), disembark (include "unitId" and "destination": [lat,lng]), embark (include "unitId" and "navalUnitId").';
+    'The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: assign_order (include "order": { "type": "defend"|"march"|"pursue"|"patrol"|"hold_fire", ... } — pursue uses targetUnitId string for the enemy only; march/patrol/defend use [lat,lng] where a place is required), cancel_order, explicit_move (include "destination": [lat,lng] for this turn\'s move), ranged_attack (include "targetHex": [lat,lng] OR enemy unit id string; ranged-only units/actions), transport_move (include "navalUnitId" and "destination": [lat,lng]), disembark (include "unitId" and "destination": [lat,lng]), embark (include "unitId" and "navalUnitId").';
   const airClause =
     'Optional top-level air actions: airStrikes[] entries use { "unitId": "...", "targetHex": [lat,lng], "targetType": "units"|"urban"|"airport"|"seaport" }, ferryOrders[] entries use { "unitId": "...", "destination": [lat,lng] }.';
   const legacyClause = 'Do not use top-level movementOrders or rangedAttacks (legacy).';
@@ -72,7 +72,7 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
     orders: [
       { action: 'assign_order', unitId: 'opponent-infantry-1', order: { type: 'march', destination: [12.34, 56.78] } },
       { action: 'explicit_move', unitId: 'opponent-armor-2', destination: [12.35, 56.79] },
-      { action: 'explicit_attack', unitId: 'opponent-naval-1', targetHex: 'human-armor-1' },
+      { action: 'ranged_attack', unitId: 'opponent-naval-1', targetHex: 'human-armor-1' },
     ],
     airStrikes: [],
     ferryOrders: [],

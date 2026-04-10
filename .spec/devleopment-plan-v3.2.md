@@ -102,7 +102,7 @@ When consulted, the LLM responds with:
     { "unitId": "...", "action": "assign_order", "order": { "type": "march", "destination": [...], ... } },
     { "unitId": "...", "action": "cancel_order" },
     { "unitId": "...", "action": "explicit_move", "destination": [...] },
-    { "unitId": "...", "action": "explicit_attack", "targetHex": [...] },
+    { "unitId": "...", "action": "ranged_attack", "targetHex": [...] },
     { "unitId": "...", "action": "air_strike", "targetHex": [...], "targetType": "units" },
     { "unitId": "...", "action": "ferry", "destinationAirport": [...] },
     { "unitId": "...", "action": "build", "unitType": "armor", "productionHex": [...] },

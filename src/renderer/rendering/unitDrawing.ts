@@ -3,13 +3,76 @@ import { CASUALTY_X_COLOR, COUNT_BADGE_OFFSET, LIGHTNING_COLOR, MULTI_PLAYER_FIL
 import { rendererSharedState as S } from '../core/state';
 import { hexCenterPx } from '../map/mapUtils';
 
+const TOKEN_ICON_FIT_RATIO = 0.9;
+type UnitIconType = 'infantry' | 'armor' | 'naval' | 'air' | 'mixed';
+const UNIT_ICON_FILE_BY_TYPE: Record<UnitIconType, string> = {
+  infantry: 'infantry-1.svg',
+  armor: 'armor-1.svg',
+  naval: 'naval-1.svg',
+  air: 'air-1.svg',
+  mixed: 'mixed-1.svg',
+};
+const unitIconCache = new Map<UnitIconType, HTMLImageElement | null>();
+
+function iconPathForType(unitType: UnitIconType): string {
+  return `../symbols/${UNIT_ICON_FILE_BY_TYPE[unitType]}`;
+}
+
+function getOrStartUnitIconLoad(unitType: UnitIconType): HTMLImageElement | null {
+  if (unitIconCache.has(unitType)) return unitIconCache.get(unitType) ?? null;
+  const img = new Image();
+  img.decoding = 'async';
+  img.onload = () => {
+    // no-op: presence in cache is enough to render on next frame
+  };
+  img.onerror = () => {
+    unitIconCache.set(unitType, null);
+  };
+  img.src = iconPathForType(unitType);
+  unitIconCache.set(unitType, img);
+  return img;
+}
+
+function drawUnitSvgIcon(
+  ctx: CanvasRenderingContext2D,
+  centerX: number,
+  centerY: number,
+  unitType: UnitIconType,
+  unitPlayer?: string,
+  flipForOpponent = true,
+  fitScaleMultiplier = 1
+): boolean {
+  const img = getOrStartUnitIconLoad(unitType);
+  if (!img || !img.complete || img.naturalWidth <= 0 || img.naturalHeight <= 0) return false;
+
+  const maxIconSize = UNIT_RADIUS * 2 * TOKEN_ICON_FIT_RATIO * fitScaleMultiplier;
+  const iconScale = maxIconSize / Math.max(img.naturalWidth, img.naturalHeight);
+  const width = img.naturalWidth * iconScale;
+  const height = img.naturalHeight * iconScale;
+  const drawX = centerX - width / 2;
+  const drawY = centerY - height / 2;
+  const shouldFlip = flipForOpponent && unitPlayer === 'opponent';
+
+  ctx.save();
+  if (shouldFlip) {
+    ctx.translate(centerX, centerY);
+    ctx.scale(-1, 1);
+    ctx.drawImage(img, -width / 2, -height / 2, width, height);
+  } else {
+    ctx.drawImage(img, drawX, drawY, width, height);
+  }
+  ctx.restore();
+  return true;
+}
+
 export function drawOneUnitMarker(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   color: string,
   label: string,
-  strokeColor: string = '#fff'
+  strokeColor: string = '#fff',
+  unitPlayer?: string
 ): void {
   ctx.beginPath();
   ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
@@ -22,6 +85,21 @@ export function drawOneUnitMarker(
   ctx.font = 'bold 14px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  if (label === UNIT_TYPE_LABELS.armor && drawUnitSvgIcon(ctx, x, y, 'armor', unitPlayer)) {
+    return;
+  }
+  if (label === UNIT_TYPE_LABELS.infantry && drawUnitSvgIcon(ctx, x, y, 'infantry', unitPlayer)) {
+    return;
+  }
+  if (label === UNIT_TYPE_LABELS.air && drawUnitSvgIcon(ctx, x, y, 'air', unitPlayer)) {
+    return;
+  }
+  if (label === UNIT_TYPE_LABELS.naval && drawUnitSvgIcon(ctx, x, y, 'naval', unitPlayer)) {
+    return;
+  }
+  if (label === '*' && drawUnitSvgIcon(ctx, x, y, 'mixed', unitPlayer, false, 0.5)) {
+    return;
+  }
   ctx.fillText(label, x, y);
 }
 
@@ -48,9 +126,9 @@ export function drawUnits(
     const strokeColor = multiPlayer ? MULTI_PLAYER_STROKE : '#fff';
     const label = mixedType ? '*' : (UNIT_TYPE_LABELS[hexUnits[0]!.unitType] ?? '?');
 
-    drawOneUnitMarker(ctx, x, y, fillColor, label, strokeColor);
+    drawOneUnitMarker(ctx, x, y, fillColor, label, strokeColor, hexUnits[0]!.player);
     if (count > 1) {
-      drawOneUnitMarker(ctx, x + STACK_OFFSET_X, y + STACK_OFFSET_Y, fillColor, label, strokeColor);
+      drawOneUnitMarker(ctx, x + STACK_OFFSET_X, y + STACK_OFFSET_Y, fillColor, label, strokeColor, hexUnits[0]!.player);
       const badgeX = x + COUNT_BADGE_OFFSET;
       const badgeY = y - COUNT_BADGE_OFFSET;
       ctx.font = 'bold 13px system-ui, sans-serif';
@@ -139,7 +217,7 @@ export function drawStaleEnemyIntel(
     const { x, y } = hexCenterPx(h3Index);
     ctx.save();
     ctx.globalAlpha = alpha;
-    drawOneUnitMarker(ctx, x, y, PLAYER_COLORS.opponent, label);
+    drawOneUnitMarker(ctx, x, y, PLAYER_COLORS.opponent, label, '#fff', 'opponent');
     ctx.restore();
   }
 }
