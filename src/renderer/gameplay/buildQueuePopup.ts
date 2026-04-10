@@ -35,6 +35,33 @@ interface BuildQueuePopupDeps {
   showMapToast: (message: string, options?: { isError?: boolean }) => void;
 }
 
+function escapeHtml(text: string): string {
+  return text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function formatGroupedNamingLineHtml(namingLine: string): string {
+  const groups = namingLine
+    .split(';')
+    .map((g) => g.trim())
+    .filter((g) => g.length > 0);
+  if (groups.length === 0) return escapeHtml(namingLine);
+  const formattedGroups = groups.map((group) => {
+    const colonIdx = group.indexOf(':');
+    if (colonIdx < 0) return escapeHtml(group);
+    const heading = group.slice(0, colonIdx).trim();
+    const remainder = group.slice(colonIdx + 1).trim();
+    if (!heading) return escapeHtml(group);
+    if (!remainder) return `<strong>${escapeHtml(heading)}:</strong>`;
+    return `<strong>${escapeHtml(heading)}:</strong> ${escapeHtml(remainder)}`;
+  });
+  return formattedGroups.join('; ');
+}
+
 export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
   async function runBuildQueueMutation(args: {
     mutate: () => Promise<{ success: boolean; reason?: string }>;
@@ -60,8 +87,12 @@ export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
     if (!window.gameApi?.getHexBuildQueue) return;
     const requestSeq = ++S.buildPopupRequestSeq;
     let snapshot: HexBuildQueueSnapshot | null = null;
+    let namingLine: string | null = null;
     try {
       snapshot = await window.gameApi.getHexBuildQueue({ h3Index });
+      if (window.gameApi.getHexNamingTooltipLine) {
+        namingLine = await window.gameApi.getHexNamingTooltipLine({ h3Index, resolution: 1 });
+      }
     } catch (err) {
       console.error('getHexBuildQueue failed:', err);
     }
@@ -80,12 +111,21 @@ export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
 
     const section = document.createElement('div');
     section.className = 'build-queue-section';
-    const controlLine = document.createElement('div');
-    controlLine.innerHTML = `<strong>Control:</strong> ${snapshot.controllerPlayerId ?? 'Uncontrolled'}`;
-    section.appendChild(controlLine);
+    const trimmedNamingLine = namingLine?.trim() ?? '';
+    if (trimmedNamingLine.length > 0) {
+      const descriptionLine = document.createElement('div');
+      descriptionLine.innerHTML = formatGroupedNamingLineHtml(trimmedNamingLine);
+      section.appendChild(descriptionLine);
+      const descriptionSpacer = document.createElement('div');
+      descriptionSpacer.style.height = '0.5em';
+      section.appendChild(descriptionSpacer);
+    }
     const pointsLine = document.createElement('div');
     pointsLine.innerHTML = `<strong>Production:</strong> ${snapshot.urbanHexCount.toLocaleString()} / turn`;
     section.appendChild(pointsLine);
+    const productionSpacer = document.createElement('div');
+    productionSpacer.style.height = '0.5em';
+    section.appendChild(productionSpacer);
 
     if (!snapshot.controlledByRequester) {
       mount.appendChild(section);

@@ -849,7 +849,7 @@ function formatProductionQueueAwareLabel(
   controller: string | null,
   unitCountsByPlayer?: UnitCountsByPlayer
 ): string {
-  const capacityText = `${Math.max(0, capacityPerTurn).toLocaleString()}c`;
+  const capacityText = `${Math.max(0, capacityPerTurn).toLocaleString()}p`;
   const queue = getBuildQueueSummaryForHex(state, h3Index);
   const queuedUnits = queue?.queuedUnits ?? 0;
   if (queuedUnits <= 0) return capacityText;
@@ -878,7 +878,7 @@ function formatProductionLabelForHumanControllerOnly(
   capacityPerTurn: number,
   controller: string | null
 ): string {
-  if (controller !== 'human') return `${Math.max(0, capacityPerTurn).toLocaleString()}c / ?t`;
+  if (controller !== 'human') return `${Math.max(0, capacityPerTurn).toLocaleString()}p / ?t`;
   return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller);
 }
 
@@ -1231,10 +1231,10 @@ function formatTerrainTooltipHtml(state: TerrainTooltipState, namingLine: string
   const bodyParts: string[] = [terrainLine];
   if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
   else if (state.features.length > 0) bodyParts.push(`<strong>Features:</strong> ${state.features.join(', ')}`);
-  if (state.urbanHexCount != null) bodyParts.push(`<strong>Urban Hexes:</strong> ${state.urbanHexCount.toLocaleString()}`);
-  const bodyLine = bodyParts.join('<br/>');
+  if (state.urbanHexCount != null) bodyParts.push(`<strong>Production:</strong> ${state.urbanHexCount.toLocaleString()}`);
+  const bodyLine = bodyParts.join('<br/><span style="display:block;height:0.5em"></span>');
   if (!namingLine) return bodyLine;
-  return `${formatGroupedNamingLineHtml(namingLine)}<br/>${bodyLine}`;
+  return `${formatGroupedNamingLineHtml(namingLine)}<br/><span style="display:block;height:0.5em"></span>${bodyLine}`;
 }
 
 function terrainTooltipContentKey(state: TerrainTooltipState, namingLine: string | null): string {
@@ -1706,7 +1706,7 @@ function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void {
             overlayContext.unitCountsByPlayer
           )
         : formatProductionLabelForHumanControllerOnly(S.gameState, hx.h3Index, capacityPerTurn, controller)
-      : `${Math.max(0, capacityPerTurn).toLocaleString()}c`;
+      : `${Math.max(0, capacityPerTurn).toLocaleString()}p`;
     const hasClickableBuildEntryForHex =
       explored && isRes1HexHumanUrbanProduction(S.gameState, hx) && shouldShowBuildEntryZoom();
     if (hasClickableBuildEntryForHex) {

@@ -157,7 +157,7 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
     drawProductionFn.includes(
       'const canShowLabelWithoutInspection = isRes1HexHumanUrbanProduction(S.gameState, hx) || controlledByHuman;'
     ),
-    'drawRes1ProductionOverlays should keep 0c labels visible on explored human-controlled non-urban hexes'
+    'drawRes1ProductionOverlays should keep 0p labels visible on explored human-controlled non-urban hexes'
   );
   assert.ok(
     drawProductionFn.includes('const hasClickableBuildEntryForHex =') &&
@@ -166,8 +166,8 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   );
   assertMatches(
     drawProductionFn,
-    /:\s*`\$\{Math\.max\(0,\s*capacityPerTurn\)\.toLocaleString\(\)\}c`;/,
-    'drawRes1ProductionOverlays should show unexplored labels in N1c-only format'
+    /:\s*`\$\{Math\.max\(0,\s*capacityPerTurn\)\.toLocaleString\(\)\}p`;/,
+    'drawRes1ProductionOverlays should show unexplored labels in N1p-only format'
   );
   assert.ok(
     drawProductionFn.includes('const hasClickableBuildEntryForHex =') &&

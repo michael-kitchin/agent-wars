@@ -16024,6 +16024,23 @@
     const layer = document.getElementById("build-entry-layer");
     return !!(popup?.contains(target) || layer?.contains(target));
   }
+  function escapeHtml(text) {
+    return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+  }
+  function formatGroupedNamingLineHtml(namingLine) {
+    const groups = namingLine.split(";").map((g) => g.trim()).filter((g) => g.length > 0);
+    if (groups.length === 0) return escapeHtml(namingLine);
+    const formattedGroups = groups.map((group) => {
+      const colonIdx = group.indexOf(":");
+      if (colonIdx < 0) return escapeHtml(group);
+      const heading = group.slice(0, colonIdx).trim();
+      const remainder = group.slice(colonIdx + 1).trim();
+      if (!heading) return escapeHtml(group);
+      if (!remainder) return `<strong>${escapeHtml(heading)}:</strong>`;
+      return `<strong>${escapeHtml(heading)}:</strong> ${escapeHtml(remainder)}`;
+    });
+    return formattedGroups.join("; ");
+  }
   function createBuildQueuePopupController(deps) {
     async function runBuildQueueMutation(args) {
       try {
@@ -16044,8 +16061,12 @@
       if (!window.gameApi?.getHexBuildQueue) return;
       const requestSeq = ++rendererSharedState.buildPopupRequestSeq;
       let snapshot = null;
+      let namingLine = null;
       try {
         snapshot = await window.gameApi.getHexBuildQueue({ h3Index });
+        if (window.gameApi.getHexNamingTooltipLine) {
+          namingLine = await window.gameApi.getHexNamingTooltipLine({ h3Index, resolution: 1 });
+        }
       } catch (err) {
         console.error("getHexBuildQueue failed:", err);
       }
@@ -16062,12 +16083,21 @@
       mount.appendChild(closeRow);
       const section = document.createElement("div");
       section.className = "build-queue-section";
-      const controlLine = document.createElement("div");
-      controlLine.innerHTML = `<strong>Control:</strong> ${snapshot.controllerPlayerId ?? "Uncontrolled"}`;
-      section.appendChild(controlLine);
+      const trimmedNamingLine = namingLine?.trim() ?? "";
+      if (trimmedNamingLine.length > 0) {
+        const descriptionLine = document.createElement("div");
+        descriptionLine.innerHTML = formatGroupedNamingLineHtml(trimmedNamingLine);
+        section.appendChild(descriptionLine);
+        const descriptionSpacer = document.createElement("div");
+        descriptionSpacer.style.height = "0.5em";
+        section.appendChild(descriptionSpacer);
+      }
       const pointsLine = document.createElement("div");
       pointsLine.innerHTML = `<strong>Production:</strong> ${snapshot.urbanHexCount.toLocaleString()} / turn`;
       section.appendChild(pointsLine);
+      const productionSpacer = document.createElement("div");
+      productionSpacer.style.height = "0.5em";
+      section.appendChild(productionSpacer);
       if (!snapshot.controlledByRequester) {
         mount.appendChild(section);
         return;
@@ -19265,7 +19295,7 @@
     return state.fogOfWarEnabled === false;
   }
   function formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer) {
-    const capacityText = `${Math.max(0, capacityPerTurn).toLocaleString()}c`;
+    const capacityText = `${Math.max(0, capacityPerTurn).toLocaleString()}p`;
     const queue = getBuildQueueSummaryForHex(state, h3Index);
     const queuedUnits = queue?.queuedUnits ?? 0;
     if (queuedUnits <= 0) return capacityText;
@@ -19285,7 +19315,7 @@
     return `${capacityText} / ${turns.toLocaleString()}t`;
   }
   function formatProductionLabelForHumanControllerOnly(state, h3Index, capacityPerTurn, controller) {
-    if (controller !== "human") return `${Math.max(0, capacityPerTurn).toLocaleString()}c / ?t`;
+    if (controller !== "human") return `${Math.max(0, capacityPerTurn).toLocaleString()}p / ?t`;
     return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller);
   }
   function formatProductionLabelForAnyController(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer) {
@@ -19549,20 +19579,20 @@
       return null;
     }
   }
-  function escapeHtml(text) {
+  function escapeHtml2(text) {
     return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
   }
-  function formatGroupedNamingLineHtml(namingLine) {
+  function formatGroupedNamingLineHtml2(namingLine) {
     const groups = namingLine.split(";").map((g) => g.trim()).filter((g) => g.length > 0);
-    if (groups.length === 0) return escapeHtml(namingLine);
+    if (groups.length === 0) return escapeHtml2(namingLine);
     const formattedGroups = groups.map((group) => {
       const colonIdx = group.indexOf(":");
-      if (colonIdx < 0) return escapeHtml(group);
+      if (colonIdx < 0) return escapeHtml2(group);
       const heading = group.slice(0, colonIdx).trim();
       const remainder = group.slice(colonIdx + 1).trim();
-      if (!heading) return escapeHtml(group);
-      if (!remainder) return `<strong>${escapeHtml(heading)}:</strong>`;
-      return `<strong>${escapeHtml(heading)}:</strong> ${escapeHtml(remainder)}`;
+      if (!heading) return escapeHtml2(group);
+      if (!remainder) return `<strong>${escapeHtml2(heading)}:</strong>`;
+      return `<strong>${escapeHtml2(heading)}:</strong> ${escapeHtml2(remainder)}`;
     });
     return formattedGroups.join("; ");
   }
@@ -19579,10 +19609,10 @@
     const bodyParts = [terrainLine];
     if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
     else if (state.features.length > 0) bodyParts.push(`<strong>Features:</strong> ${state.features.join(", ")}`);
-    if (state.urbanHexCount != null) bodyParts.push(`<strong>Urban Hexes:</strong> ${state.urbanHexCount.toLocaleString()}`);
-    const bodyLine = bodyParts.join("<br/>");
+    if (state.urbanHexCount != null) bodyParts.push(`<strong>Production:</strong> ${state.urbanHexCount.toLocaleString()}`);
+    const bodyLine = bodyParts.join('<br/><span style="display:block;height:0.5em"></span>');
     if (!namingLine) return bodyLine;
-    return `${formatGroupedNamingLineHtml(namingLine)}<br/>${bodyLine}`;
+    return `${formatGroupedNamingLineHtml2(namingLine)}<br/><span style="display:block;height:0.5em"></span>${bodyLine}`;
   }
   function terrainTooltipContentKey(state, namingLine) {
     const namingKey = namingLine ?? "";
@@ -19925,7 +19955,7 @@
         capacityPerTurn,
         controller,
         overlayContext.unitCountsByPlayer
-      ) : formatProductionLabelForHumanControllerOnly(rendererSharedState.gameState, hx.h3Index, capacityPerTurn, controller) : `${Math.max(0, capacityPerTurn).toLocaleString()}c`;
+      ) : formatProductionLabelForHumanControllerOnly(rendererSharedState.gameState, hx.h3Index, capacityPerTurn, controller) : `${Math.max(0, capacityPerTurn).toLocaleString()}p`;
       const hasClickableBuildEntryForHex = explored && isRes1HexHumanUrbanProduction(rendererSharedState.gameState, hx) && shouldShowBuildEntryZoom();
       if (hasClickableBuildEntryForHex) {
         continue;
