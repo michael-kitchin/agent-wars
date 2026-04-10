@@ -2,26 +2,91 @@ import { rendererSharedState as S } from '../core/state';
 import { applySuccessfulPrecomputedAiResult, resetPrecomputedAiState } from './precomputedAiState';
 import { isWaitingForPrecomputedAiOrders } from './aiPlanningState';
 
+/**
+ * Documents the module-scope binding `BACKGROUND_AI_REQUEST_TIMEOUT_MS` (BACKGROUND_AI_REQUEST_TIMEOUT_MS).
+
+ * Purpose: Supports maintainability by documenting why `BACKGROUND_AI_REQUEST_TIMEOUT_MS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const BACKGROUND_AI_REQUEST_TIMEOUT_MS = 75_000;
 
+/**
+ * Documents the `OpenRouterRuntimeDeps` interface as a named contract surface (interface OpenRouterRuntimeDeps).
+
+ * Purpose: Supports maintainability by documenting why `OpenRouterRuntimeDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface OpenRouterRuntimeDeps {
-  appendOpenRouterLog: (line: string, isError?: boolean) => void;
-  updateReadyButtonState: () => void;
-  updateOpenRouterToolCountLabels: () => void;
-  updateOpenRouterCostLabel: () => void;
-  showSidebarError: (message: string) => void;
+    /**
+   * Specifies the contract for the `appendOpenRouterLog` member (appendOpenRouterLog: (line: string, isError?: boolean) => void;).
+
+   * Contract: Describes stable behavior for callers of `appendOpenRouterLog` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+appendOpenRouterLog: (line: string, isError?: boolean) => void;
+    /**
+   * Specifies the contract for the `updateReadyButtonState` member (updateReadyButtonState: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateReadyButtonState` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateReadyButtonState: () => void;
+    /**
+   * Specifies the contract for the `updateOpenRouterToolCountLabels` member (updateOpenRouterToolCountLabels: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateOpenRouterToolCountLabels` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateOpenRouterToolCountLabels: () => void;
+    /**
+   * Specifies the contract for the `updateOpenRouterCostLabel` member (updateOpenRouterCostLabel: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateOpenRouterCostLabel` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateOpenRouterCostLabel: () => void;
+    /**
+   * Specifies the contract for the `showSidebarError` member (showSidebarError: (message: string) => void;).
+
+   * Contract: Describes stable behavior for callers of `showSidebarError` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+showSidebarError: (message: string) => void;
 }
 
 /**
- * Synchronizes event-driven mode from the Tools tab "Events" toggle state.
+ * Defines the `syncEventDrivenFromTools` function shape (export function syncEventDrivenFromTools(): void).
+
+ * Purpose: Supports maintainability by documenting why `syncEventDrivenFromTools` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function syncEventDrivenFromTools(): void {
   S.useEventDrivenConsultation = S.enabledToolGroups.has('events');
 }
 
 /**
- * Starts one background AI orders request if conditions allow (planning phase, key and model set, no request in flight).
- * Used when Run is toggled on and after new game when Run is on. On success stores orders and enables Ready; on failure shows a user-visible error.
+ * Defines the `startBackgroundRequestIfAllowed` function shape (export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): void).
+
+ * Purpose: Supports maintainability by documenting why `startBackgroundRequestIfAllowed` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): void {
   if (S.backgroundRequestInFlight || !isWaitingForPrecomputedAiOrders() || S.gameState?.phase !== 'planning') return;
@@ -91,8 +156,12 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
 }
 
 /**
- * Use this to apply the full side effects when the Events toggle changes while Run is active.
- * It keeps cancellation/reset/restart behavior in one place for maintainable mode transitions.
+ * Defines the `handleEventDrivenModeTransition` function shape (function handleEventDrivenModeTransition(deps: OpenRouterRuntimeDeps, wasEventDriven: boolean): void).
+
+ * Purpose: Supports maintainability by documenting why `handleEventDrivenModeTransition` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function handleEventDrivenModeTransition(deps: OpenRouterRuntimeDeps, wasEventDriven: boolean): void {
   if (!S.runButtonOn || wasEventDriven === S.useEventDrivenConsultation) return;
@@ -103,8 +172,12 @@ function handleEventDrivenModeTransition(deps: OpenRouterRuntimeDeps, wasEventDr
 }
 
 /**
- * Renders or updates the Tools tab list: 2-column grid; each cell has label and count (toggle button).
- * Toggle click flips enabled state. Does not call main or Ready.
+ * Defines the `renderOpenRouterToolsList` function shape (export function renderOpenRouterToolsList(deps: OpenRouterRuntimeDeps): void).
+
+ * Purpose: Supports maintainability by documenting why `renderOpenRouterToolsList` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function renderOpenRouterToolsList(deps: OpenRouterRuntimeDeps): void {
   const container = document.getElementById('openrouter-tools-list');

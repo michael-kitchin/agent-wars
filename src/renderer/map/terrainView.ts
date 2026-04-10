@@ -11,6 +11,14 @@ import { rendererSharedState as S } from '../core/state';
 import { getLeafletGlobal } from './mapUtils';
 import { getMainLeafletMap } from './worldLeafletMap';
 
+/**
+ * Defines the `computeRes1HexFillFraction` function shape (export function computeRes1HexFillFraction(): number).
+
+ * Purpose: Supports maintainability by documenting why `computeRes1HexFillFraction` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function computeRes1HexFillFraction(): number {
   if (!S.gameState || S.gameState.hexes.length === 0) return 0;
   const map = getMainLeafletMap() as
@@ -55,6 +63,14 @@ export function computeRes1HexFillFraction(): number {
   return Math.max((maxX - minX) / viewW, (maxY - minY) / viewH);
 }
 
+/**
+ * Defines the `shouldRenderRes4Hexes` function shape (export function shouldRenderRes4Hexes(): boolean).
+
+ * Purpose: Supports maintainability by documenting why `shouldRenderRes4Hexes` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function shouldRenderRes4Hexes(): boolean {
   const fillFraction = computeRes1HexFillFraction();
   if (S.res4Visible) {
@@ -65,6 +81,14 @@ export function shouldRenderRes4Hexes(): boolean {
   return S.res4Visible;
 }
 
+/**
+ * Defines the `shouldShowBuildEntryZoom` function shape (export function shouldShowBuildEntryZoom(): boolean).
+
+ * Purpose: Supports maintainability by documenting why `shouldShowBuildEntryZoom` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function shouldShowBuildEntryZoom(): boolean {
   const map = getMainLeafletMap() as { getZoom: () => number } | null;
   if (!map) return false;
@@ -78,6 +102,14 @@ export function shouldShowBuildEntryZoom(): boolean {
   return currentZoom >= threshold;
 }
 
+/**
+ * Defines the `hideBuildEntryLayer` function shape (export function hideBuildEntryLayer(layer: HTMLElement, clearHtml = true): void).
+
+ * Purpose: Supports maintainability by documenting why `hideBuildEntryLayer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function hideBuildEntryLayer(layer: HTMLElement, clearHtml = true): void {
   layer.classList.add('hidden');
   layer.setAttribute('aria-hidden', 'true');
@@ -88,6 +120,14 @@ export function hideBuildEntryLayer(layer: HTMLElement, clearHtml = true): void 
   S.lastBuildEntryLayerKey = null;
 }
 
+/**
+ * Defines the `projectHexBoundaryToContainerPoints` function shape (export function projectHexBoundaryToContainerPoints( h3Index: string, map: { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } }, L: {).
+
+ * Purpose: Supports maintainability by documenting why `projectHexBoundaryToContainerPoints` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function projectHexBoundaryToContainerPoints(
   h3Index: string,
   map: { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } },
@@ -100,6 +140,14 @@ export function projectHexBoundaryToContainerPoints(
   });
 }
 
+/**
+ * Defines the `projectedPolygonOverlapsViewport` function shape (export function projectedPolygonOverlapsViewport().
+
+ * Purpose: Supports maintainability by documenting why `projectedPolygonOverlapsViewport` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function projectedPolygonOverlapsViewport(
   pts: { x: number; y: number }[],
   viewportWidth: number,
@@ -119,6 +167,14 @@ export function projectedPolygonOverlapsViewport(
   return maxX >= 0 && maxY >= 0 && minX <= viewportWidth && minY <= viewportHeight;
 }
 
+/**
+ * Defines the `spanForProjectedHex` function shape (export function spanForProjectedHex(pts:).
+
+ * Purpose: Supports maintainability by documenting why `spanForProjectedHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function spanForProjectedHex(pts: { x: number; y: number }[]): number {
   if (pts.length === 0) return 1;
   let minX = pts[0]!.x;

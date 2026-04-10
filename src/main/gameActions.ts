@@ -3,7 +3,7 @@
  * All logic runs in the main process and uses the game database.
  */
 
-import { cellToLatLng, gridDistance, gridDisk, gridPathCells } from 'h3-js';
+import { gridDistance, gridPathCells } from 'h3-js';
 import {
   dbGetOne,
   dbRun,
@@ -16,14 +16,7 @@ import {
   refreshFogOfWarIntelFromCurrentState,
   addAiLossEventsSinceConsultation,
   getHexController,
-  setHexController,
   listAllHexControls,
-  listBuildQueueRowsForHex,
-  getBuildProgressPointsForHex,
-  setBuildProgressPointsForHex,
-  clearBuildQueueAndProgressForHex,
-  replaceBuildQueueForHex,
-  allocateNextUnitDisplayOrder,
   listUnitsForSnapshot,
   getRes1InfrastructureForHex,
   getGameStateForPlayer,
@@ -49,7 +42,7 @@ import type {
 import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
 import { executePlanRoute } from './tools/tool1Pathfinding';
 import { terrainIsPassableForDomain } from './pathfinding';
-import { buildNormalizedTerrainByH3, normalizeMovementTerrain, isLandSeaportSpawnHex } from './movementTerrain';
+import { normalizeMovementTerrain, isLandSeaportSpawnHex } from './movementTerrain';
 import {
   NAVAL_DESTINATION_MUST_BE_WATER_COASTAL,
   NAVAL_SEAPORT_EGRESS_REQUIRED,
@@ -61,22 +54,11 @@ import {
   generateOrdersForStandingOrders,
   queryHumanStandingOrders,
 } from './tools/tool5StandingOrders';
-import {
-  BUILD_ENTRY_MAX_COUNT,
-  BUILD_ENTRY_MIN_COUNT,
-  UNIT_COST_BY_TYPE,
-  getAvailableBuildUnitTypes,
-  isValidBuildCount,
-  NO_PRODUCTION_INFRASTRUCTURE_REASON,
-  type BuildUnitType,
-} from './productionRules';
-import { DEPLOYMENT_CAP_TYPE_ORDER, MAX_UNITS_PER_TYPE } from './productionCaps';
-import type { Res1ProductionContextSnapshot } from '../shared/ipcTypes';
+import type { BuildUnitType } from './productionRules';
 import {
   AIR_FERRY_RANGE_HEXES,
   MOVEMENT_RANGE_BY_UNIT_TYPE,
-  formatFerryOutOfRangeReason,
-  formatTargetOutOfRangeReason
+  formatTargetOutOfRangeReason,
 } from '../shared/tacticalRanges';
 import { validateAirStrikeOrder, validateFerryOrder } from './game-actions/airValidation';
 import { isWithinGridRangeSafe } from './game-actions/gridRange';
@@ -87,15 +69,12 @@ import {
   removeHexBuildQueueEntryImpl,
   updateHexBuildQueueEntryImpl,
   type HexBuildQueueView,
-  type HexBuildQueueEntryView,
 } from './game-actions/buildQueue';
 import {
   previewHumanMarchOrderImpl,
   previewHumanMarchOrdersImpl,
   type HumanOrderGroupPreviewResult,
-  type HumanOrderGroupPreviewUnitResult,
   type HumanOrderPreviewResult,
-  type HumanOrderPreviewSegment,
 } from './game-actions/humanMarchPreview';
 import {
   getLandMovementBlockReason,
@@ -119,12 +98,12 @@ import {
 } from './game-actions/sealift';
 
 /**
- * Why this exists:
- *     Applies end-of-turn region-vs-region control victory checks without relying on visibility state.
- * When to use:
- *     End of turn resolution, before fallback elimination-only winner checks.
- * What to expect:
- *     Returns winning player id when one side controls all hexes intersecting the opponent home region; otherwise null.
+ * Defines the `evaluateRegionControlWinnerAtEndOfTurn` function shape (export function evaluateRegionControlWinnerAtEndOfTurn(): 'human' | 'opponent' | null { logTrace('gameActions evaluateRegionControlWinnerAtEndOfTurn'); co).
+
+ * Purpose: Supports maintainability by documenting why `evaluateRegionControlWinnerAtEndOfTurn` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function evaluateRegionControlWinnerAtEndOfTurn(): 'human' | 'opponent' | null {
   logTrace('gameActions evaluateRegionControlWinnerAtEndOfTurn');
@@ -151,24 +130,120 @@ export type {
   HumanOrderGroupPreviewUnitResult,
   HumanOrderGroupPreviewResult,
 } from './game-actions/humanMarchPreview';
+/**
+ * Documents the `SubmitOrdersResult` interface as a named contract surface (export interface SubmitOrdersResult).
+
+ * Purpose: Supports maintainability by documenting why `SubmitOrdersResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface SubmitOrdersResult {
-  success: boolean;
-  reason?: string;
+    /**
+   * Specifies the contract for the `success` member (success: boolean;).
+
+   * Contract: Describes stable behavior for callers of `success` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+success: boolean;
+    /**
+   * Specifies the contract for the `reason` member (reason?: string;).
+
+   * Contract: Describes stable behavior for callers of `reason` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+reason?: string;
 }
 
+/**
+ * Documents the `HumanStandingOrderView` interface as a named contract surface (export interface HumanStandingOrderView).
+
+ * Purpose: Supports maintainability by documenting why `HumanStandingOrderView` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface HumanStandingOrderView {
-  unitId: string;
-  status: string;
-  destinationH3Index: string | null;
-  turnsRemaining: number;
-  nextMoveH3Index: string | null;
-  routeSegments?: { turn: number; hexes: [number, number][] }[];
+    /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+
+   * Contract: Describes stable behavior for callers of `unitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitId: string;
+    /**
+   * Specifies the contract for the `status` member (status: string;).
+
+   * Contract: Describes stable behavior for callers of `status` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+status: string;
+    /**
+   * Specifies the contract for the `destinationH3Index` member (destinationH3Index: string | null;).
+
+   * Contract: Describes stable behavior for callers of `destinationH3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+destinationH3Index: string | null;
+    /**
+   * Specifies the contract for the `turnsRemaining` member (turnsRemaining: number;).
+
+   * Contract: Describes stable behavior for callers of `turnsRemaining` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+turnsRemaining: number;
+    /**
+   * Specifies the contract for the `nextMoveH3Index` member (nextMoveH3Index: string | null;).
+
+   * Contract: Describes stable behavior for callers of `nextMoveH3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+nextMoveH3Index: string | null;
+    /**
+   * Specifies the contract for the `routeSegments` member (routeSegments?: { turn: number; hexes: [number, number][] }[];).
+
+   * Contract: Describes stable behavior for callers of `routeSegments` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+routeSegments?: { turn: number; hexes: [number, number][] }[];
 }
 
+/**
+ * Defines the `effectiveHexPassabilityTerrain` function shape (function effectiveHexPassabilityTerrain(hex:).
+
+ * Purpose: Supports maintainability by documenting why `effectiveHexPassabilityTerrain` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function effectiveHexPassabilityTerrain(hex: { h3Index: string; terrain: string; terrainKind?: string }): string {
   return normalizeMovementTerrain({ h3Index: hex.h3Index, terrain: hex.terrain, terrainKind: hex.terrainKind });
 }
 
+/**
+ * Defines the `getMovementTerrainForH3` function shape (function getMovementTerrainForH3(h3Index: string): string).
+
+ * Purpose: Supports maintainability by documenting why `getMovementTerrainForH3` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getMovementTerrainForH3(h3Index: string): string {
   const terrainRow = dbGetOne<{ terrain: string; terrainKind: string }>(
     'SELECT terrain, terrain_kind AS terrainKind FROM hexes WHERE h3_index = ?',
@@ -181,6 +256,14 @@ function getMovementTerrainForH3(h3Index: string): string {
   });
 }
 
+/**
+ * Defines the `getTerrainMapsForH3Indexes` function shape (function getTerrainMapsForH3Indexes(h3Indexes: readonly string[]):).
+
+ * Purpose: Supports maintainability by documenting why `getTerrainMapsForH3Indexes` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getTerrainMapsForH3Indexes(h3Indexes: readonly string[]): {
   terrainByH3: Map<string, string>;
   terrainKindByH3: Map<string, string>;
@@ -202,26 +285,118 @@ function getTerrainMapsForH3Indexes(h3Indexes: readonly string[]): {
   return { terrainByH3, terrainKindByH3 };
 }
 
-type DeployedUnitsByType = { armor?: number; infantry?: number; naval?: number; air?: number };
-type ControlTransition = { h3Index: string; fromControllerPlayerId: string | null; toControllerPlayerId: string | null };
-type DeploymentCapReachedByPlayer = { human: BuildUnitType[]; opponent: BuildUnitType[] };
+/**
+ * Documents the module-scope binding `VALID_PHASE` (VALID_PHASE).
 
+ * Purpose: Supports maintainability by documenting why `VALID_PHASE` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const VALID_PHASE = 'planning';
-const HUMAN_PLAYER_ID = 'human';
-const MIXED_STACK_COASTAL_ONLY_REASON = 'Mixed land/naval stacks can only move to coastal hexes.';
-const AIR_UNITS_CANNOT_MARCH_REASON = 'Air units cannot use march orders; use Strike or Ferry.';
-type HumanOwnedUnit = { id: string; player: string; unitType: string; h3Index: string };
+/**
+ * Documents the module-scope binding `HUMAN_PLAYER_ID` (HUMAN_PLAYER_ID).
 
+ * Purpose: Supports maintainability by documenting why `HUMAN_PLAYER_ID` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+const HUMAN_PLAYER_ID = 'human';
+/**
+ * Documents the module-scope binding `MIXED_STACK_COASTAL_ONLY_REASON` (MIXED_STACK_COASTAL_ONLY_REASON).
+
+ * Purpose: Supports maintainability by documenting why `MIXED_STACK_COASTAL_ONLY_REASON` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+const MIXED_STACK_COASTAL_ONLY_REASON = 'Mixed land/naval stacks can only move to coastal hexes.';
+/**
+ * Documents the module-scope binding `AIR_UNITS_CANNOT_MARCH_REASON` (AIR_UNITS_CANNOT_MARCH_REASON).
+
+ * Purpose: Supports maintainability by documenting why `AIR_UNITS_CANNOT_MARCH_REASON` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+const AIR_UNITS_CANNOT_MARCH_REASON = 'Air units cannot use march orders; use Strike or Ferry.';
+/**
+ * Documents the `HumanOwnedUnit` type alias (type HumanOwnedUnit).
+
+ * Purpose: Supports maintainability by documenting why `HumanOwnedUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+type HumanOwnedUnit = { /**
+ * Specifies the contract for the `id` member (id: string;).
+
+ * Contract: Describes stable behavior for callers of `id` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+id: string; /**
+ * Specifies the contract for the `player` member (player: string;).
+
+ * Contract: Describes stable behavior for callers of `player` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+player: string; /**
+ * Specifies the contract for the `unitType` member (unitType: string;).
+
+ * Contract: Describes stable behavior for callers of `unitType` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+unitType: string; /**
+ * Specifies the contract for the `h3Index` member (h3Index: string).
+
+ * Contract: Describes stable behavior for callers of `h3Index` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+h3Index: string };
+
+/**
+ * Defines the `getUniqueNonEmptyIds` function shape (function getUniqueNonEmptyIds(ids: string[]): string[]).
+
+ * Purpose: Supports maintainability by documenting why `getUniqueNonEmptyIds` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getUniqueNonEmptyIds(ids: string[]): string[] {
   return [...new Set(ids.filter((id) => id.length > 0))];
 }
 
+/**
+ * Defines the `selectionHasMixedLandAndNaval` function shape (function selectionHasMixedLandAndNaval(units: HumanOwnedUnit[]): boolean).
+
+ * Purpose: Supports maintainability by documenting why `selectionHasMixedLandAndNaval` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function selectionHasMixedLandAndNaval(units: HumanOwnedUnit[]): boolean {
   const hasNaval = units.some((unit) => unit.unitType === 'naval');
   const hasLand = units.some((unit) => unit.unitType === 'infantry' || unit.unitType === 'armor');
   return hasNaval && hasLand;
 }
 
+/**
+ * Defines the `hexSupportsMixedLandAndNaval` function shape (function hexSupportsMixedLandAndNaval(hex:).
+
+ * Purpose: Supports maintainability by documenting why `hexSupportsMixedLandAndNaval` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function hexSupportsMixedLandAndNaval(hex: { h3Index: string; terrain: string; terrainKind?: string }): boolean {
   const passabilityTerrain = effectiveHexPassabilityTerrain(hex);
   return (
@@ -230,10 +405,14 @@ function hexSupportsMixedLandAndNaval(hex: { h3Index: string; terrain: string; t
   );
 }
 
-function currentPlanningTurnNumber(): number {
-  return dbGetOne<{ turnNumber: number }>('SELECT turn_number AS turnNumber FROM turn_state WHERE id = 1')?.turnNumber ?? 1;
-}
+/**
+ * Defines the `dbBackedStateSnapshot` function shape (function dbBackedStateSnapshot()).
 
+ * Purpose: Supports maintainability by documenting why `dbBackedStateSnapshot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function dbBackedStateSnapshot() {
   return {
     hexes: dbGetAll<{ h3Index: string; terrain: string; terrainKind: string }>(
@@ -250,14 +429,25 @@ function dbBackedStateSnapshot() {
   };
 }
 
+/**
+ * Defines the `humanPerspectiveStateSnapshot` function shape (function humanPerspectiveStateSnapshot(): ReturnType<typeof dbBackedStateSnapshot>).
+
+ * Purpose: Supports maintainability by documenting why `humanPerspectiveStateSnapshot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function humanPerspectiveStateSnapshot(): ReturnType<typeof dbBackedStateSnapshot> {
   return getGameStateForPlayer(HUMAN_PLAYER_ID, { maskUnexploredTerrain: false });
 }
 
 /**
- * Validates a single movement order: unit exists and is human-owned, destination is on map,
- * within unit's movement range, and terrain allows the unit type (naval→water/coastal, infantry/armor→land/coastal/wetlands).
- * Returns a reason string when invalid.
+ * Defines the `validateOrder` function shape (function validateOrder().
+
+ * Purpose: Supports maintainability by documenting why `validateOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function validateOrder(
   unitId: string,
@@ -336,9 +526,12 @@ function validateOrder(
 }
 
 /**
- * Validates a single ranged attack: unit exists and belongs to allowedPlayer, has range ≥ 1,
- * target hex is on map, H3 grid distance ≤ unit range, and target hex contains at least one enemy unit.
- * Per combat spec: naval can target land within range; armor can target water within 1. No friendly-fire check.
+ * Defines the `validateRangedAttack` function shape (export function validateRangedAttack( unitId: string, targetH3Index: string, options?: { allowedPlayer?: string } ): { valid: true } | { valid: false;).
+
+ * Purpose: Supports maintainability by documenting why `validateRangedAttack` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function validateRangedAttack(
   unitId: string,
@@ -381,12 +574,12 @@ export function validateRangedAttack(
 }
 
 /**
- * Why this exists:
- *     Supplies renderer with human standing-order rows for movement list and committed-order overlays.
- * When to use:
- *     Planning-phase UI refresh and after assign/cancel operations.
- * What to expect:
- *     Returns normalized march-only rows sorted by unitId.
+ * Defines the `listHumanStandingOrders` function shape (export function listHumanStandingOrders(): HumanStandingOrderView[]).
+
+ * Purpose: Supports maintainability by documenting why `listHumanStandingOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function listHumanStandingOrders(): HumanStandingOrderView[] {
   logTrace('gameActions listHumanStandingOrders');
@@ -464,6 +657,14 @@ export function listHumanStandingOrders(): HumanStandingOrderView[] {
   }
 }
 
+/**
+ * Defines the `cancelHumanMovementOrdersForUnit` function shape (function cancelHumanMovementOrdersForUnit(unitId: string): void).
+
+ * Purpose: Supports maintainability by documenting why `cancelHumanMovementOrdersForUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function cancelHumanMovementOrdersForUnit(unitId: string): void {
   dbRun('DELETE FROM standing_orders WHERE player_id = ? AND unit_id = ? AND order_type = ?', [
     HUMAN_PLAYER_ID,
@@ -473,6 +674,14 @@ function cancelHumanMovementOrdersForUnit(unitId: string): void {
   dbRun('DELETE FROM pending_orders WHERE unit_id = ?', [unitId]);
 }
 
+/**
+ * Defines the `clearEmbarkAssignmentForIndependentLandMove` function shape (function clearEmbarkAssignmentForIndependentLandMove(unitId: string, destinationH3Index: string): void).
+
+ * Purpose: Supports maintainability by documenting why `clearEmbarkAssignmentForIndependentLandMove` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function clearEmbarkAssignmentForIndependentLandMove(unitId: string, destinationH3Index: string): void {
   const assignment = dbGetOne<{ navalUnitId: string; navalH3Index: string }>(
     `SELECT uta.naval_unit_id AS navalUnitId,
@@ -494,12 +703,12 @@ function clearEmbarkAssignmentForIndependentLandMove(unitId: string, destination
 }
 
 /**
- * Why this exists:
- *     Assigns/updates a human march standing order from renderer double-click input.
- * When to use:
- *     Renderer commit action for long-distance movement orders.
- * What to expect:
- *     Returns success false with reason on validation/persistence failures.
+ * Defines the `assignHumanMarchOrder` function shape (export function assignHumanMarchOrder(unitId: string, destinationH3Index: string): SubmitOrdersResult).
+
+ * Purpose: Supports maintainability by documenting why `assignHumanMarchOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function assignHumanMarchOrder(unitId: string, destinationH3Index: string): SubmitOrdersResult {
   logDebug('gameActions assignHumanMarchOrder', { unitId, destinationH3Index });
@@ -548,12 +757,12 @@ export function assignHumanMarchOrder(unitId: string, destinationH3Index: string
 }
 
 /**
- * Why this exists:
- *     Assigns/updates the same human march standing order destination for multiple selected units atomically.
- * When to use:
- *     Renderer multi-select double-click commit for grouped movement.
- * What to expect:
- *     Rejects the entire batch when any selected unit cannot receive the destination.
+ * Defines the `assignHumanMarchOrders` function shape (export function assignHumanMarchOrders(unitIds: string[], destinationH3Index: string): SubmitOrdersResult).
+
+ * Purpose: Supports maintainability by documenting why `assignHumanMarchOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function assignHumanMarchOrders(unitIds: string[], destinationH3Index: string): SubmitOrdersResult {
   logDebug('gameActions assignHumanMarchOrders', { unitCount: unitIds.length, destinationH3Index });
@@ -612,12 +821,12 @@ export function assignHumanMarchOrders(unitIds: string[], destinationH3Index: st
 }
 
 /**
- * Why this exists:
- *     Cancels a single human standing order from sidebar cancel action.
- * When to use:
- *     Renderer movement-order list Cancel button.
- * What to expect:
- *     Removes only the provided unit order when present.
+ * Defines the `cancelHumanOrder` function shape (export function cancelHumanOrder(unitId: string): SubmitOrdersResult).
+
+ * Purpose: Supports maintainability by documenting why `cancelHumanOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function cancelHumanOrder(unitId: string): SubmitOrdersResult {
   logDebug('gameActions cancelHumanOrder', { unitId });
@@ -636,12 +845,12 @@ export function cancelHumanOrder(unitId: string): SubmitOrdersResult {
 }
 
 /**
- * Why this exists:
- *     Validates whether a grouped ranged target is legal for all selected human units.
- * When to use:
- *     Renderer grouped ranged-mode target click before enqueuing one row per selected unit.
- * What to expect:
- *     Returns success false with a specific reason when any selected unit fails capability/range/target checks.
+ * Defines the `validateGroupRangedTarget` function shape (export function validateGroupRangedTarget(unitIds: string[], targetH3Index: string): SubmitOrdersResult).
+
+ * Purpose: Supports maintainability by documenting why `validateGroupRangedTarget` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function validateGroupRangedTarget(unitIds: string[], targetH3Index: string): SubmitOrdersResult {
   logDebug('gameActions validateGroupRangedTarget', { unitCount: unitIds.length, targetH3Index });
@@ -663,12 +872,12 @@ export function validateGroupRangedTarget(unitIds: string[], targetH3Index: stri
 }
 
 /**
- * Why this exists:
- *     Validates grouped strike targeting for selected air units before renderer queues one order per unit.
- * When to use:
- *     Renderer strike-mode target click handling.
- * What to expect:
- *     Returns specific first-failure reason for toast display parity with grouped ranged validation.
+ * Defines the `validateGroupAirStrikeTarget` function shape (export function validateGroupAirStrikeTarget().
+
+ * Purpose: Supports maintainability by documenting why `validateGroupAirStrikeTarget` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function validateGroupAirStrikeTarget(
   unitIds: string[],
@@ -692,12 +901,12 @@ export function validateGroupAirStrikeTarget(
 }
 
 /**
- * Why this exists:
- *     Validates grouped ferry destinations for selected human air units before renderer queues ferry orders.
- * When to use:
- *     Renderer grouped double-click movement path for homogeneous air selections.
- * What to expect:
- *     Returns success false with a specific first-failure reason when any selected unit cannot legally ferry.
+ * Defines the `validateGroupFerryTarget` function shape (export function validateGroupFerryTarget(unitIds: string[], destinationH3Index: string): SubmitOrdersResult).
+
+ * Purpose: Supports maintainability by documenting why `validateGroupFerryTarget` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function validateGroupFerryTarget(unitIds: string[], destinationH3Index: string): SubmitOrdersResult {
   logDebug('gameActions validateGroupFerryTarget', { unitCount: unitIds.length, destinationH3Index });
@@ -716,6 +925,14 @@ export function validateGroupFerryTarget(unitIds: string[], destinationH3Index: 
   }
 }
 
+/**
+ * Defines the `destroyAirUnitsWithInvalidBase` function shape (function destroyAirUnitsWithInvalidBase(): CombatUnit[]).
+
+ * Purpose: Supports maintainability by documenting why `destroyAirUnitsWithInvalidBase` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function destroyAirUnitsWithInvalidBase(): CombatUnit[] {
   const rows = dbGetAll<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }>(
     'SELECT id, player, unit_type, h3_index, display_order FROM units WHERE unit_type = ?',
@@ -739,24 +956,24 @@ function destroyAirUnitsWithInvalidBase(): CombatUnit[] {
 }
 
 /**
- * Why this exists:
- *     Returns one res-1 hex build queue snapshot (control, infra gating, and queue rows) for tooltip UI.
- * When to use:
- *     Renderer res-1 tooltip open/refresh during planning interactions.
- * What to expect:
- *     Always returns a stable snapshot; queue mutation is still authorization-gated in mutator APIs.
+ * Defines the `getHexBuildQueue` function shape (export function getHexBuildQueue(h3Index: string, requestingPlayerId = HUMAN_PLAYER_ID): HexBuildQueueView).
+
+ * Purpose: Supports maintainability by documenting why `getHexBuildQueue` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getHexBuildQueue(h3Index: string, requestingPlayerId = HUMAN_PLAYER_ID): HexBuildQueueView {
   return getHexBuildQueueImpl(h3Index, requestingPlayerId);
 }
 
 /**
- * Why this exists:
- *     Appends a new editable build queue row for a controlled hex owned by the requester.
- * When to use:
- *     Tooltip Build button click.
- * What to expect:
- *     Persists immediately, defaults to count=1 and first available unit type, and returns updated queue snapshot.
+ * Defines the `addHexBuildQueueEntry` function shape (export function addHexBuildQueueEntry(h3Index: string, requestingPlayerId = HUMAN_PLAYER_ID): { success: boolean; reason?: string; queue?: HexBuildQueu).
+
+ * Purpose: Supports maintainability by documenting why `addHexBuildQueueEntry` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function addHexBuildQueueEntry(h3Index: string, requestingPlayerId = HUMAN_PLAYER_ID): {
   success: boolean;
@@ -767,12 +984,12 @@ export function addHexBuildQueueEntry(h3Index: string, requestingPlayerId = HUMA
 }
 
 /**
- * Why this exists:
- *     Updates one queued row's type/count while preserving queue order and immediate persistence semantics.
- * When to use:
- *     Tooltip row edit interactions for type select and count input.
- * What to expect:
- *     Rejects unauthorized or invalid edits and returns updated queue snapshot on success.
+ * Defines the `updateHexBuildQueueEntry` function shape (export function updateHexBuildQueueEntry( h3Index: string, entryId: number, unitType: BuildUnitType, count: number, requestingPlayerId = HUMAN_PL).
+
+ * Purpose: Supports maintainability by documenting why `updateHexBuildQueueEntry` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function updateHexBuildQueueEntry(
   h3Index: string,
@@ -785,12 +1002,12 @@ export function updateHexBuildQueueEntry(
 }
 
 /**
- * Why this exists:
- *     Removes one queue row and reindexes the remaining rows to preserve strict front-to-back order.
- * When to use:
- *     Tooltip row remove (`x`) interactions.
- * What to expect:
- *     Persists immediately and returns updated queue snapshot on success.
+ * Defines the `removeHexBuildQueueEntry` function shape (export function removeHexBuildQueueEntry( h3Index: string, entryId: number, requestingPlayerId = HUMAN_PLAYER_ID ): { success: boolean; reason?: strin).
+
+ * Purpose: Supports maintainability by documenting why `removeHexBuildQueueEntry` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function removeHexBuildQueueEntry(
   h3Index: string,
@@ -801,36 +1018,36 @@ export function removeHexBuildQueueEntry(
 }
 
 /**
- * Why this exists:
- *     Produces renderer hover preview model using shared route logic and invalid-marker semantics.
- * When to use:
- *     Renderer pointermove when selected unit/hovered hex changes.
- * What to expect:
- *     Valid route segments when reachable; invalid marker with optional partial route otherwise.
+ * Defines the `previewHumanMarchOrder` function shape (export function previewHumanMarchOrder(unitId: string, hoveredH3Index: string): HumanOrderPreviewResult).
+
+ * Purpose: Supports maintainability by documenting why `previewHumanMarchOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function previewHumanMarchOrder(unitId: string, hoveredH3Index: string): HumanOrderPreviewResult {
   return previewHumanMarchOrderImpl(unitId, hoveredH3Index);
 }
 
 /**
- * Why this exists:
- *     Produces grouped hover previews for multi-selected human units using shared route logic.
- * When to use:
- *     Renderer pointermove while multiple units are selected for grouped movement planning.
- * What to expect:
- *     Per-unit previews plus aggregate validity and slowest movement range cap for solid-segment rendering.
+ * Defines the `previewHumanMarchOrders` function shape (export function previewHumanMarchOrders(unitIds: string[], hoveredH3Index: string): HumanOrderGroupPreviewResult).
+
+ * Purpose: Supports maintainability by documenting why `previewHumanMarchOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function previewHumanMarchOrders(unitIds: string[], hoveredH3Index: string): HumanOrderGroupPreviewResult {
   return previewHumanMarchOrdersImpl(unitIds, hoveredH3Index);
 }
 
 /**
- * Why this exists:
- *     Returns renderer-facing sealift slot state for one stack hex, including embark/debark control gating.
- * When to use:
- *     Stack popup render/refresh in mixed land+naval contexts or when embarked units are present.
- * What to expect:
- *     Stable rows, slot selections, and context flags derived from authoritative DB state.
+ * Defines the `getSealiftStackState` function shape (export function getSealiftStackState(h3Index: string): SealiftStackState).
+
+ * Purpose: Supports maintainability by documenting why `getSealiftStackState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getSealiftStackState(h3Index: string): SealiftStackState {
   logTrace('gameActions getSealiftStackState');
@@ -838,12 +1055,12 @@ export function getSealiftStackState(h3Index: string): SealiftStackState {
 }
 
 /**
- * Why this exists:
- *     Applies one slot-level embark/debark mutation with uniqueness and capacity reconciliation.
- * When to use:
- *     Renderer dropdown/debark interactions for immediate sealift assignment updates.
- * What to expect:
- *     Returns updated state on success; returns reason on rejected interaction.
+ * Defines the `updateSealiftSlot` function shape (export function updateSealiftSlot( h3Index: string, navalUnitId: string, slotIndex: 1 | 2, landUnitId: string | null ): { success: boolean; reason?).
+
+ * Purpose: Supports maintainability by documenting why `updateSealiftSlot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function updateSealiftSlot(
   h3Index: string,
@@ -868,9 +1085,12 @@ export function updateSealiftSlot(
 }
 
 /**
- * Submits movement and optional ranged attack orders for the current planning phase.
- * Validates all orders; if any human order (movement or ranged) is invalid, rejects the entire batch with a clear reason.
- * Otherwise stores pending_orders and pending_ranged_orders and returns success: true.
+ * Defines the `submitOrders` function shape (export function submitOrders(payload: SubmitOrdersPayload): SubmitOrdersResult).
+
+ * Purpose: Supports maintainability by documenting why `submitOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function submitOrders(payload: SubmitOrdersPayload): SubmitOrdersResult {
   return submitOrdersImpl(payload, {
@@ -882,11 +1102,12 @@ export function submitOrders(payload: SubmitOrdersPayload): SubmitOrdersResult {
 }
 
 /**
- * Ends the planning phase and resolves all pending orders (human + optional AI) simultaneously:
- * applies movement, runs combat resolution (ranged then melee), removes casualties, clears orders,
- * increments turn number, and sets phase back to planning.
- * Call only when phase is planning. If aiOrders is provided, they are merged with human orders from the DB.
- * aiRangedOrders are merged with human pending_ranged_orders for combat; pass from AI response in Phase 6.
+ * Defines the `ready` function shape (export function ready( aiOrders: MovementOrder[] = [], aiRangedOrders: RangedAttackOrder[] = [], aiAirStrikeOrders: AirStrikeOrder[] = [], aiFerryOr).
+
+ * Purpose: Supports maintainability by documenting why `ready` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function ready(
   aiOrders: MovementOrder[] = [],

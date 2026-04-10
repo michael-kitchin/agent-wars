@@ -16,8 +16,12 @@
 import { logTrace } from './logger';
 
 /**
- * Emits a single trace when crossing a documented pipeline boundary (no behavior change).
- * Use sparingly at stable chokepoints (e.g. start of Ready handling).
+ * Defines the `logHybridPipelineBoundary` function shape (export function logHybridPipelineBoundary(stage: string, detail?: Record<string, unknown>): void).
+
+ * Purpose: Supports maintainability by documenting why `logHybridPipelineBoundary` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function logHybridPipelineBoundary(stage: string, detail?: Record<string, unknown>): void {
   logTrace('hybridTurnPipeline boundary', { stage, ...detail });

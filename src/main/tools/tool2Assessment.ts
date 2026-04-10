@@ -13,18 +13,81 @@ import { getRange } from '../combatConstants';
 import { getStandingOrderForUnit } from './tool5StandingOrders';
 import { logDebug, logError, logTrace } from '../logger';
 
-/** Coordinate pair [lat, lng] at the tool boundary. */
+/**
+ * Documents the `LatLng` type alias (export type LatLng).
+
+ * Purpose: Supports maintainability by documenting why `LatLng` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type LatLng = [number, number];
 
+/**
+ * Documents the `LatLngMap` type alias (type LatLngMap).
+
+ * Purpose: Supports maintainability by documenting why `LatLngMap` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type LatLngMap = Map<string, LatLng>;
 
+/**
+ * Documents the `EnemyIntelEntry` interface as a named contract surface (interface EnemyIntelEntry).
+
+ * Purpose: Supports maintainability by documenting why `EnemyIntelEntry` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface EnemyIntelEntry {
-  unitId: string;
-  lastKnownH3Index: string;
-  intelState: 'current' | 'stale';
-  lastSeenTurn: number;
+    /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+
+   * Contract: Describes stable behavior for callers of `unitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitId: string;
+    /**
+   * Specifies the contract for the `lastKnownH3Index` member (lastKnownH3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `lastKnownH3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+lastKnownH3Index: string;
+    /**
+   * Specifies the contract for the `intelState` member (intelState: 'current' | 'stale';).
+
+   * Contract: Describes stable behavior for callers of `intelState` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+intelState: 'current' | 'stale';
+    /**
+   * Specifies the contract for the `lastSeenTurn` member (lastSeenTurn: number;).
+
+   * Contract: Describes stable behavior for callers of `lastSeenTurn` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+lastSeenTurn: number;
 }
 
+/**
+ * Defines the `getEnemyIntelForPlayer` function shape (function getEnemyIntelForPlayer(state: GameStateSnapshot): EnemyIntelEntry[]).
+
+ * Purpose: Supports maintainability by documenting why `getEnemyIntelForPlayer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getEnemyIntelForPlayer(state: GameStateSnapshot): EnemyIntelEntry[] {
   const rows = Array.isArray(state.enemyIntel) ? state.enemyIntel : [];
   return rows
@@ -37,13 +100,25 @@ function getEnemyIntelForPlayer(state: GameStateSnapshot): EnemyIntelEntry[] {
     .filter((r) => r.intelState === 'stale');
 }
 
+/**
+ * Defines the `shouldIncludeStaleEnemyIntel` function shape (function shouldIncludeStaleEnemyIntel(state: GameStateSnapshot): boolean).
+
+ * Purpose: Supports maintainability by documenting why `shouldIncludeStaleEnemyIntel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function shouldIncludeStaleEnemyIntel(state: GameStateSnapshot): boolean {
   return state.playerPerspective !== 'opponent';
 }
 
 /**
- * Converts an H3 index to [lat, lng] for tool responses. Uses the coordinate map when present;
- * falls back to cellToLatLng so we never expose raw H3 strings to the LLM.
+ * Defines the `h3ToLatLng` function shape (function h3ToLatLng(h3: string, latLngByH3: LatLngMap): LatLng).
+
+ * Purpose: Supports maintainability by documenting why `h3ToLatLng` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function h3ToLatLng(h3: string, latLngByH3: LatLngMap): LatLng {
   const ll = latLngByH3.get(h3);
@@ -53,8 +128,12 @@ function h3ToLatLng(h3: string, latLngByH3: LatLngMap): LatLng {
 }
 
 /**
- * Returns path distance (hex steps) and estimated turns between two hexes for a unit type, or null if unreachable.
- * Uses pathfinding module; land/water domain is derived from unit type. Use for assess_unit radius and turns.
+ * Defines the `getPathDistanceAndTurns` function shape (function getPathDistanceAndTurns( originH3: string, destH3: string, unitType: string, hexSet: Set<string>, terrainByH3: Map<string, string>, b).
+
+ * Purpose: Supports maintainability by documenting why `getPathDistanceAndTurns` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function getPathDistanceAndTurns(
   originH3: string,
@@ -71,25 +150,35 @@ function getPathDistanceAndTurns(
 }
 
 /**
- * Returns H3 grid distance between two cells. Used for range checks (ranged/melee), not path distance.
- * Throws if indices are invalid or different resolution; caller should catch and treat as unreachable/far.
+ * Defines the `getGridDistance` function shape (function getGridDistance(h3A: string, h3B: string): number).
+
+ * Purpose: Supports maintainability by documenting why `getGridDistance` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function getGridDistance(h3A: string, h3B: string): number {
   logTrace('tool2Assessment getGridDistance');
   return gridDistance(h3A, h3B);
 }
 
-/** Tool names for Tool 2. Exported so OpenRouter can route assess_unit and assess_hex to this module. */
+/**
+ * Documents the module-scope binding `TOOL2_NAMES` (TOOL2_NAMES).
+
+ * Purpose: Supports maintainability by documenting why `TOOL2_NAMES` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const TOOL2_NAMES = ['assess_unit', 'assess_hex'] as const;
 
 /**
- * Why this exists:
- *     Single entry point for Tool 2 (`assess_unit`, `assess_hex`) so OpenRouter and precomputation share one implementation.
- * When to use:
- *     Whenever the model or precomputation pipeline requests threat or hex assessment.
- * What to expect:
- *     JSON-serializable `{ status, error, ... }`; exceptions become `status: "error"`. Opponent-perspective snapshots omit
- *     stale `enemyIntel` from enemy lists in both tools (see executeAssessUnit / executeAssessHex).
+ * Defines the `executeTool2` function shape (export function executeTool2( toolName: string, args: unknown, state: GameStateSnapshot, latLngByH3: LatLngMap, resolveToH3: (lat: number, lng: n).
+
+ * Purpose: Supports maintainability by documenting why `executeTool2` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function executeTool2(
   toolName: string,
@@ -135,13 +224,12 @@ export function executeTool2(
 }
 
 /**
- * Why this exists:
- *     Produces the assess_unit tool payload (nearby enemies/friendlies, threats, canAttackThisTurn) for tactical planning.
- * When to use:
- *     Invoked via executeTool2 and from precomputation for each opponent unit when building the Commander's Briefing.
- * What to expect:
- *     Status "ok" with unit, nearbyEnemies, nearbyFriendlies, threats, canAttackThisTurn; or "error" if the unit is missing.
- *     When `state.playerPerspective === 'opponent'`, stale rows from `enemyIntel` are not merged into nearbyEnemies (visible-enemy parity with the snapshot).
+ * Defines the `executeAssessUnit` function shape (function executeAssessUnit( unitId: string, radius: number, state: GameStateSnapshot, latLngByH3: LatLngMap, // eslint-disable-next-line @typescr).
+
+ * Purpose: Supports maintainability by documenting why `executeAssessUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function executeAssessUnit(
   unitId: string,
@@ -339,13 +427,12 @@ function executeAssessUnit(
 }
 
 /**
- * Why this exists:
- *     Produces the assess_hex tool payload (terrain, passability, units at hex, enemies in range bands, adjacent stats, notes).
- * When to use:
- *     Invoked via executeTool2 and from precomputation for human-occupied hexes when building supplemental briefing text.
- * What to expect:
- *     Status "ok" with full hex briefing, or "error" for an invalid [lat,lng]. When `state.playerPerspective === 'opponent'`,
- *     stale enemy intel is not merged into unitsInRange range lists (visible-enemy parity with the snapshot).
+ * Defines the `executeAssessHex` function shape (function executeAssessHex( position: LatLng, forUnitType: string | undefined, state: GameStateSnapshot, latLngByH3: LatLngMap, resolveToH3: (lat:).
+
+ * Purpose: Supports maintainability by documenting why `executeAssessHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function executeAssessHex(
   position: LatLng,

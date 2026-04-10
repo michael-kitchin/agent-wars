@@ -11,25 +11,113 @@ import { applySacrificeToBaselineCounts, resolveFlexUnitPlacement } from './init
 import { countPlannedUnitsOfType, insertPlannedUnitsForPlayer, type PlannedUnitTuple } from './plannedUnits';
 import type { SpawnCandidate } from './spawnSelection';
 
+/**
+ * Documents the `RegionScenarioSeedDeps` interface as a named contract surface (export interface RegionScenarioSeedDeps extends GuardedDbRunAndGetAllOps).
+
+ * Purpose: Supports maintainability by documenting why `RegionScenarioSeedDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface RegionScenarioSeedDeps extends GuardedDbRunAndGetAllOps {
-  getOne: <T extends Record<string, unknown>>(sql: string, params?: unknown[]) => T | undefined;
-  allocateNextUnitDisplayOrder: (unitType: BuildUnitType) => number;
+    /**
+   * Specifies the contract for the `getOne` member (getOne: <T extends Record<string, unknown>>(sql: string, params?: unknown[]) => T | undefined;).
+
+   * Contract: Describes stable behavior for callers of `getOne` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getOne: <T extends Record<string, unknown>>(sql: string, params?: unknown[]) => T | undefined;
+    /**
+   * Specifies the contract for the `allocateNextUnitDisplayOrder` member (allocateNextUnitDisplayOrder: (unitType: BuildUnitType) => number;).
+
+   * Contract: Describes stable behavior for callers of `allocateNextUnitDisplayOrder` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+allocateNextUnitDisplayOrder: (unitType: BuildUnitType) => number;
 }
 
+/**
+ * Documents the `UnitPlanEntry` interface as a named contract surface (interface UnitPlanEntry).
+
+ * Purpose: Supports maintainability by documenting why `UnitPlanEntry` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface UnitPlanEntry {
-  key: string;
-  unitType: BuildUnitType;
+    /**
+   * Specifies the contract for the `key` member (key: string;).
+
+   * Contract: Describes stable behavior for callers of `key` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+key: string;
+    /**
+   * Specifies the contract for the `unitType` member (unitType: BuildUnitType;).
+
+   * Contract: Describes stable behavior for callers of `unitType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitType: BuildUnitType;
 }
 
+/**
+ * Documents the `ScenarioSpawnPlan` interface as a named contract surface (interface ScenarioSpawnPlan).
+
+ * Purpose: Supports maintainability by documenting why `ScenarioSpawnPlan` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface ScenarioSpawnPlan {
-  entries: UnitPlanEntry[];
-  droppedReasons: string[];
+    /**
+   * Specifies the contract for the `entries` member (entries: UnitPlanEntry[];).
+
+   * Contract: Describes stable behavior for callers of `entries` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+entries: UnitPlanEntry[];
+    /**
+   * Specifies the contract for the `droppedReasons` member (droppedReasons: string[];).
+
+   * Contract: Describes stable behavior for callers of `droppedReasons` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+droppedReasons: string[];
 }
 
+/**
+ * Defines the `isNavalSpawnTerrain` function shape (function isNavalSpawnTerrain(terrain: string): boolean).
+
+ * Purpose: Supports maintainability by documenting why `isNavalSpawnTerrain` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function isNavalSpawnTerrain(terrain: string): boolean {
   return terrain === 'water' || terrain === 'coastal';
 }
 
+/**
+ * Defines the `buildInitialPlanEntries` function shape (function buildInitialPlanEntries(counts:).
+
+ * Purpose: Supports maintainability by documenting why `buildInitialPlanEntries` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildInitialPlanEntries(counts: { infantry: number; armor: number; naval: number }): UnitPlanEntry[] {
   const entries: UnitPlanEntry[] = [];
   for (let i = 0; i < counts.infantry; i++) entries.push({ key: `infantry-${i + 1}`, unitType: 'infantry' });
@@ -38,6 +126,14 @@ function buildInitialPlanEntries(counts: { infantry: number; armor: number; nava
   return entries;
 }
 
+/**
+ * Defines the `applyScenarioSubstitutions` function shape (function applyScenarioSubstitutions().
+
+ * Purpose: Supports maintainability by documenting why `applyScenarioSubstitutions` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function applyScenarioSubstitutions(
   initialEntries: UnitPlanEntry[],
   hasLandCandidates: boolean,
@@ -66,6 +162,14 @@ function applyScenarioSubstitutions(
   return entries;
 }
 
+/**
+ * Defines the `enforceScenarioCaps` function shape (function enforceScenarioCaps(entries: UnitPlanEntry[]): ScenarioSpawnPlan).
+
+ * Purpose: Supports maintainability by documenting why `enforceScenarioCaps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function enforceScenarioCaps(entries: UnitPlanEntry[]): ScenarioSpawnPlan {
   const droppedReasons: string[] = [];
   let working = [...entries];
@@ -92,6 +196,14 @@ function enforceScenarioCaps(entries: UnitPlanEntry[]): ScenarioSpawnPlan {
   return { entries: working, droppedReasons };
 }
 
+/**
+ * Defines the `dropUnitsWithoutTerrainCandidates` function shape (function dropUnitsWithoutTerrainCandidates().
+
+ * Purpose: Supports maintainability by documenting why `dropUnitsWithoutTerrainCandidates` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function dropUnitsWithoutTerrainCandidates(
   entries: UnitPlanEntry[],
   hasLandCandidates: boolean,
@@ -112,6 +224,14 @@ function dropUnitsWithoutTerrainCandidates(
   return { entries: filtered, droppedReasons };
 }
 
+/**
+ * Defines the `summarizePlanCounts` function shape (function summarizePlanCounts(entries: UnitPlanEntry[]): Record<BuildUnitType, number>).
+
+ * Purpose: Supports maintainability by documenting why `summarizePlanCounts` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function summarizePlanCounts(entries: UnitPlanEntry[]): Record<BuildUnitType, number> {
   const counts: Record<BuildUnitType, number> = { infantry: 0, armor: 0, naval: 0, air: 0 };
   for (const entry of entries) counts[entry.unitType] += 1;
@@ -119,12 +239,12 @@ function summarizePlanCounts(entries: UnitPlanEntry[]): Record<BuildUnitType, nu
 }
 
 /**
- * Why this exists:
- *     Removes one baseline plan row so a substitutive flex unit (air-preferred) can be added without increasing roster size.
- * When to use:
- *     Region-vs-region spawn planning after terrain filtering.
- * What to expect:
- *     Prefers dropping the last infantry plan row, else last armor, else last naval; returns the input unchanged if empty.
+ * Defines the `sacrificeOnePlanEntry` function shape (function sacrificeOnePlanEntry(entries: UnitPlanEntry[]): UnitPlanEntry[]).
+
+ * Purpose: Supports maintainability by documenting why `sacrificeOnePlanEntry` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function sacrificeOnePlanEntry(entries: UnitPlanEntry[]): UnitPlanEntry[] {
   const counts = summarizePlanCounts(entries);
@@ -150,6 +270,14 @@ function sacrificeOnePlanEntry(entries: UnitPlanEntry[]): UnitPlanEntry[] {
   return entries;
 }
 
+/**
+ * Defines the `assignSpawnHexesRoundRobin` function shape (function assignSpawnHexesRoundRobin().
+
+ * Purpose: Supports maintainability by documenting why `assignSpawnHexesRoundRobin` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function assignSpawnHexesRoundRobin(
   candidates: ReadonlyArray<SpawnCandidate>,
   count: number,
@@ -169,6 +297,14 @@ function assignSpawnHexesRoundRobin(
   return out;
 }
 
+/**
+ * Defines the `averageLatLng` function shape (function averageLatLng(candidates: ReadonlyArray<SpawnCandidate>):).
+
+ * Purpose: Supports maintainability by documenting why `averageLatLng` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function averageLatLng(candidates: ReadonlyArray<SpawnCandidate>): { lat: number; lng: number } {
   if (candidates.length <= 0) return { lat: 0, lng: 0 };
   let lat = 0;
@@ -181,12 +317,12 @@ function averageLatLng(candidates: ReadonlyArray<SpawnCandidate>): { lat: number
 }
 
 /**
- * Why this exists:
- *     Encapsulates region-vs-region spawn planning, substitution, cap enforcement, and deterministic placement.
- * When to use:
- *     Initial unit seeding during new-game reset before falling back to legacy global spawn logic.
- * What to expect:
- *     Returns true after inserting scenario units when scenario is active; returns false for non-scenario matches.
+ * Defines the `trySeedScenarioRegionVsRegion` function shape (export function trySeedScenarioRegionVsRegion(deps: RegionScenarioSeedDeps): boolean).
+
+ * Purpose: Supports maintainability by documenting why `trySeedScenarioRegionVsRegion` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function trySeedScenarioRegionVsRegion(deps: RegionScenarioSeedDeps): boolean {
   const scenario = loadScenarioState(deps);

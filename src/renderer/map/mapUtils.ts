@@ -4,12 +4,21 @@ import {
   getMainLeafletMap,
   hexCenterToOverlayPoint,
   hexCenterToOverlayPointWithReferenceLng,
+  type GlobalLeafletFactory,
 } from './worldLeafletMap';
 import { DETAIL_H3_RESOLUTION, INITIAL_CAMERA_ZOOM_IN_LEVELS, WORLD_H3_RESOLUTION } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import type { PanDirection } from '../core/types';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 
+/**
+ * Defines the `shouldIgnoreGlobalKeydown` function shape (export function shouldIgnoreGlobalKeydown(e: KeyboardEvent): boolean).
+
+ * Purpose: Supports maintainability by documenting why `shouldIgnoreGlobalKeydown` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function shouldIgnoreGlobalKeydown(e: KeyboardEvent): boolean {
   const target = e.target as HTMLElement | null;
   if (!target) return false;
@@ -17,6 +26,14 @@ export function shouldIgnoreGlobalKeydown(e: KeyboardEvent): boolean {
   return tag === 'input' || tag === 'textarea' || tag === 'select' || !!target.isContentEditable;
 }
 
+/**
+ * Defines the `getNeighborForPan` function shape (export function getNeighborForPan(centerH3: string, direction: PanDirection): string | null).
+
+ * Purpose: Supports maintainability by documenting why `getNeighborForPan` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function getNeighborForPan(centerH3: string, direction: PanDirection): string | null {
   const [centerLat, centerLng] = cellToLatLng(centerH3);
   const neighbors = Array.from(gridDisk(centerH3, 1)).filter((h3) => h3 !== centerH3);
@@ -49,6 +66,14 @@ export function getNeighborForPan(centerH3: string, direction: PanDirection): st
   return bestH3;
 }
 
+/**
+ * Defines the `panMapOneRes1Hex` function shape (export function panMapOneRes1Hex(direction: PanDirection): void).
+
+ * Purpose: Supports maintainability by documenting why `panMapOneRes1Hex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function panMapOneRes1Hex(direction: PanDirection): void {
   const map = getMainLeafletMap() as {
     getCenter: () => { lat: number; lng: number };
@@ -71,6 +96,14 @@ export function panMapOneRes1Hex(direction: PanDirection): void {
   map.setView(Lref.latLng(clampLatForWebMercatorDisplay(nextLat), nextLng), map.getZoom());
 }
 
+/**
+ * Defines the `applyInitialCameraForState` function shape (export function applyInitialCameraForState(state: GameStateSnapshot): void).
+
+ * Purpose: Supports maintainability by documenting why `applyInitialCameraForState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function applyInitialCameraForState(state: GameStateSnapshot): void {
   const map = getMainLeafletMap() as {
     getZoom: () => number;
@@ -102,20 +135,51 @@ export function applyInitialCameraForState(state: GameStateSnapshot): void {
   S.initialCameraApplied = true;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getLeafletGlobal(): any {
-  return (globalThis as unknown as { L?: unknown }).L;
+/**
+ * Defines the `getLeafletGlobal` function shape (export function getLeafletGlobal(): GlobalLeafletFactory | undefined).
+
+ * Purpose: Supports maintainability by documenting why `getLeafletGlobal` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export function getLeafletGlobal(): GlobalLeafletFactory | undefined {
+  return (globalThis as unknown as { L?: GlobalLeafletFactory }).L;
 }
 
+/**
+ * Defines the `hexCenterPx` function shape (export function hexCenterPx(h3Index: string):).
+
+ * Purpose: Supports maintainability by documenting why `hexCenterPx` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function hexCenterPx(h3Index: string): { x: number; y: number } {
   return hexCenterToOverlayPoint(h3Index, cellToLatLng);
 }
 
+/**
+ * Defines the `hexCenterPxRelativeTo` function shape (export function hexCenterPxRelativeTo(fromH3Index: string, toH3Index: string):).
+
+ * Purpose: Supports maintainability by documenting why `hexCenterPxRelativeTo` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function hexCenterPxRelativeTo(fromH3Index: string, toH3Index: string): { x: number; y: number } {
   const [, refLng] = cellToLatLng(fromH3Index);
   return hexCenterToOverlayPointWithReferenceLng(toH3Index, refLng, cellToLatLng);
 }
 
+/**
+ * Defines the `hitTestHexAtContainerPixel` function shape (export function hitTestHexAtContainerPixel(x: number, y: number, mapHexSet: Set<string>): string | null).
+
+ * Purpose: Supports maintainability by documenting why `hitTestHexAtContainerPixel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function hitTestHexAtContainerPixel(x: number, y: number, mapHexSet: Set<string>): string | null {
   const map = getMainLeafletMap() as
     | { containerPointToLatLng: (pt: unknown) => { lat: number; lng: number } }

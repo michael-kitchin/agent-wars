@@ -6,10 +6,26 @@
 import * as assert from 'assert';
 import { runRangedPhase, type CombatUnit } from './combatResolution';
 
+/**
+ * Defines the `makeUnit` function shape (function makeUnit(id: string, player: string, unitType: string, h3Index: string): CombatUnit).
+
+ * Purpose: Supports maintainability by documenting why `makeUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function makeUnit(id: string, player: string, unitType: string, h3Index: string): CombatUnit {
   return { id, player, unitType, h3Index };
 }
 
+/**
+ * Defines the `testRangedMixedStackTargetsEnemiesOnlyAndEnemyReturnFireOnly` function shape (function testRangedMixedStackTargetsEnemiesOnlyAndEnemyReturnFireOnly(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRangedMixedStackTargetsEnemiesOnlyAndEnemyReturnFireOnly` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRangedMixedStackTargetsEnemiesOnlyAndEnemyReturnFireOnly(): void {
   const hex = '891f1d48b9fffff';
   const units: CombatUnit[] = [
@@ -43,6 +59,14 @@ function testRangedMixedStackTargetsEnemiesOnlyAndEnemyReturnFireOnly(): void {
   );
 }
 
+/**
+ * Defines the `run` function shape (function run(): void).
+
+ * Purpose: Supports maintainability by documenting why `run` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function run(): void {
   testRangedMixedStackTargetsEnemiesOnlyAndEnemyReturnFireOnly();
   console.log('combatResolution tests passed');

@@ -1,18 +1,29 @@
 /**
- * Shared IPC payload guards for main-process handlers.
- * Keeps request validation consistent across grouped movement/combat/build endpoints.
- */
+ * Documents the `GroupTargetType` type alias (type GroupTargetType).
 
+ * Purpose: Supports maintainability by documenting why `GroupTargetType` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type GroupTargetType = 'units' | 'urban' | 'airport' | 'seaport';
+/**
+ * Documents the `BuildQueueUnitType` type alias (type BuildQueueUnitType).
+
+ * Purpose: Supports maintainability by documenting why `BuildQueueUnitType` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type BuildQueueUnitType = 'infantry' | 'armor' | 'naval' | 'air';
 
 /**
- * Why this exists:
- *     Normalizes unknown unit-id arrays into compact string lists for grouped IPC handlers.
- * When to use:
- *     Any handler receiving a free-form `unitIds` array from renderer payloads.
- * What to expect:
- *     Returns null for invalid payload shape; otherwise returns only non-empty string IDs.
+ * Defines the `parseUnitIdList` function shape (export function parseUnitIdList(unitIds: unknown): string[] | null).
+
+ * Purpose: Supports maintainability by documenting why `parseUnitIdList` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function parseUnitIdList(unitIds: unknown): string[] | null {
   if (!Array.isArray(unitIds)) return null;
@@ -20,12 +31,12 @@ export function parseUnitIdList(unitIds: unknown): string[] | null {
 }
 
 /**
- * Why this exists:
- *     Validates grouped target-type payloads for strike endpoints.
- * When to use:
- *     Main-process grouped strike validation handler before delegating to game actions.
- * What to expect:
- *     Returns null for invalid payload shape; otherwise returns normalized unit IDs and target arguments.
+ * Defines the `parseGroupedStrikePayload` function shape (export function parseGroupedStrikePayload(payload: { unitIds?: unknown; targetH3Index?: unknown; targetType?: unknown; }): { unitIds: string[]; target).
+
+ * Purpose: Supports maintainability by documenting why `parseGroupedStrikePayload` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function parseGroupedStrikePayload(payload: {
   unitIds?: unknown;
@@ -46,6 +57,14 @@ export function parseGroupedStrikePayload(payload: {
   return { unitIds, targetH3Index: payload.targetH3Index, targetType: payload.targetType };
 }
 
+/**
+ * Defines the `parseGroupedTargetPayload` function shape (export function parseGroupedTargetPayload(payload: { unitIds?: unknown; targetH3Index?: unknown; }): { unitIds: string[]; targetH3Index: string } | null).
+
+ * Purpose: Supports maintainability by documenting why `parseGroupedTargetPayload` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function parseGroupedTargetPayload(payload: {
   unitIds?: unknown;
   targetH3Index?: unknown;
@@ -55,6 +74,14 @@ export function parseGroupedTargetPayload(payload: {
   return { unitIds, targetH3Index: payload.targetH3Index };
 }
 
+/**
+ * Defines the `parseGroupedDestinationPayload` function shape (export function parseGroupedDestinationPayload(payload: { unitIds?: unknown; destinationH3Index?: unknown; }): { unitIds: string[]; destinationH3Index: s).
+
+ * Purpose: Supports maintainability by documenting why `parseGroupedDestinationPayload` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function parseGroupedDestinationPayload(payload: {
   unitIds?: unknown;
   destinationH3Index?: unknown;
@@ -64,6 +91,14 @@ export function parseGroupedDestinationPayload(payload: {
   return { unitIds, destinationH3Index: payload.destinationH3Index };
 }
 
+/**
+ * Defines the `parseBuildQueueUpdatePayload` function shape (export function parseBuildQueueUpdatePayload(payload: { h3Index?: unknown; entryId?: unknown; unitType?: unknown; count?: unknown; }): { h3Index: s).
+
+ * Purpose: Supports maintainability by documenting why `parseBuildQueueUpdatePayload` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function parseBuildQueueUpdatePayload(payload: {
   h3Index?: unknown;
   entryId?: unknown;

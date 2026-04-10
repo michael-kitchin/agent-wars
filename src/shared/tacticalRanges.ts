@@ -1,9 +1,11 @@
 /**
- * Shared tactical range contracts used by main-process validation and renderer planning UX.
- * Keep these values and messages centralized so gameplay rules and UI wording stay in sync.
- */
+ * Documents the module-scope binding `MOVEMENT_RANGE_BY_UNIT_TYPE` (MOVEMENT_RANGE_BY_UNIT_TYPE: Readonly<Record<string, number>>).
 
-/** Per-turn movement budget in hex edges by unit type. */
+ * Purpose: Supports maintainability by documenting why `MOVEMENT_RANGE_BY_UNIT_TYPE` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const MOVEMENT_RANGE_BY_UNIT_TYPE: Readonly<Record<string, number>> = Object.freeze({
   infantry: 1,
   armor: 2,
@@ -11,7 +13,14 @@ export const MOVEMENT_RANGE_BY_UNIT_TYPE: Readonly<Record<string, number>> = Obj
   air: 0,
 });
 
-/** Standard ranged-combat range in hex edges by unit type. Air uses strike mode instead of ranged mode. */
+/**
+ * Documents the module-scope binding `RANGED_RANGE_BY_UNIT_TYPE` (RANGED_RANGE_BY_UNIT_TYPE: Readonly<Record<string, number>>).
+
+ * Purpose: Supports maintainability by documenting why `RANGED_RANGE_BY_UNIT_TYPE` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const RANGED_RANGE_BY_UNIT_TYPE: Readonly<Record<string, number>> = Object.freeze({
   infantry: 0,
   armor: 1,
@@ -19,31 +28,45 @@ export const RANGED_RANGE_BY_UNIT_TYPE: Readonly<Record<string, number>> = Objec
   air: 0,
 });
 
-/** Air-strike maximum range in hex edges. */
+/**
+ * Documents the module-scope binding `AIR_STRIKE_RANGE_HEXES` (AIR_STRIKE_RANGE_HEXES).
+
+ * Purpose: Supports maintainability by documenting why `AIR_STRIKE_RANGE_HEXES` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const AIR_STRIKE_RANGE_HEXES = 3;
 
-/** Air-ferry maximum range in hex edges. */
+/**
+ * Documents the module-scope binding `AIR_FERRY_RANGE_HEXES` (AIR_FERRY_RANGE_HEXES).
+
+ * Purpose: Supports maintainability by documenting why `AIR_FERRY_RANGE_HEXES` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const AIR_FERRY_RANGE_HEXES = 4;
 
 /**
- * Why this exists:
- *     Formats the canonical out-of-range reason shared by ranged and strike validation flows.
- * When to use:
- *     Returning human-readable range failures for tactical targeting checks.
- * What to expect:
- *     Text shape remains stable: "Target out of range (<unitType> range <N>)".
+ * Defines the `formatTargetOutOfRangeReason` function shape (export function formatTargetOutOfRangeReason(unitType: string, range: number): string).
+
+ * Purpose: Supports maintainability by documenting why `formatTargetOutOfRangeReason` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function formatTargetOutOfRangeReason(unitType: string, range: number): string {
   return `Target out of range (${unitType} range ${range})`;
 }
 
 /**
- * Why this exists:
- *     Formats the canonical ferry-range failure reason used by validation and planning preview.
- * When to use:
- *     Returning user-facing errors for ferry destination range checks.
- * What to expect:
- *     Text shape remains stable: "Destination out of ferry range (<N>)".
+ * Defines the `formatFerryOutOfRangeReason` function shape (export function formatFerryOutOfRangeReason(range: number): string).
+
+ * Purpose: Supports maintainability by documenting why `formatFerryOutOfRangeReason` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function formatFerryOutOfRangeReason(range: number): string {
   return `Destination out of ferry range (${range})`;

@@ -8,7 +8,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
- * Extracts one top-level function body from a TypeScript source string.
+ * Defines the `getFunctionSource` function shape (function getFunctionSource(source: string, functionName: string): string).
+
+ * Purpose: Supports maintainability by documenting why `getFunctionSource` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function getFunctionSource(source: string, functionName: string): string {
   const signature = `function ${functionName}(`;
@@ -29,10 +34,26 @@ function getFunctionSource(source: string, functionName: string): string {
   throw new Error(`Unterminated function body for ${functionName}`);
 }
 
+/**
+ * Defines the `assertMatches` function shape (function assertMatches(source: string, pattern: RegExp, message: string): void).
+
+ * Purpose: Supports maintainability by documenting why `assertMatches` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function assertMatches(source: string, pattern: RegExp, message: string): void {
   assert.ok(pattern.test(source), message);
 }
 
+/**
+ * Defines the `testRedrawAndResizeDelegateToSharedScene` function shape (function testRedrawAndResizeDelegateToSharedScene(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRedrawAndResizeDelegateToSharedScene` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRedrawAndResizeDelegateToSharedScene(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
@@ -53,6 +74,14 @@ function testRedrawAndResizeDelegateToSharedScene(): void {
   assert.ok(!redrawFn.includes('drawTerrainHexes('), 'redraw should not duplicate scene rendering steps');
 }
 
+/**
+ * Defines the `testSharedSceneStillRendersStaleIntel` function shape (function testSharedSceneStillRendersStaleIntel(): void).
+
+ * Purpose: Supports maintainability by documenting why `testSharedSceneStillRendersStaleIntel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testSharedSceneStillRendersStaleIntel(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
@@ -64,6 +93,14 @@ function testSharedSceneStillRendersStaleIntel(): void {
   );
 }
 
+/**
+ * Defines the `testCommittedPathsRemainVisibleDuringResolutionAnimation` function shape (function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void).
+
+ * Purpose: Supports maintainability by documenting why `testCommittedPathsRemainVisibleDuringResolutionAnimation` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
@@ -125,6 +162,14 @@ function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void {
   );
 }
 
+/**
+ * Defines the `testProductionLabelContractsForExploredVsUnexploredHexes` function shape (function testProductionLabelContractsForExploredVsUnexploredHexes(): void).
+
+ * Purpose: Supports maintainability by documenting why `testProductionLabelContractsForExploredVsUnexploredHexes` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
@@ -217,6 +262,14 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   );
 }
 
+/**
+ * Defines the `testStackCalloutSingleUnitNonCtrlClosesPopup` function shape (function testStackCalloutSingleUnitNonCtrlClosesPopup(): void).
+
+ * Purpose: Supports maintainability by documenting why `testStackCalloutSingleUnitNonCtrlClosesPopup` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testStackCalloutSingleUnitNonCtrlClosesPopup(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
@@ -231,6 +284,14 @@ function testStackCalloutSingleUnitNonCtrlClosesPopup(): void {
   );
 }
 
+/**
+ * Defines the `testStackSealiftWaterStateHidesDebarkAndEmbarkedSelectionControls` function shape (function testStackSealiftWaterStateHidesDebarkAndEmbarkedSelectionControls(): void).
+
+ * Purpose: Supports maintainability by documenting why `testStackSealiftWaterStateHidesDebarkAndEmbarkedSelectionControls` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testStackSealiftWaterStateHidesDebarkAndEmbarkedSelectionControls(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
@@ -263,6 +324,14 @@ function testStackSealiftWaterStateHidesDebarkAndEmbarkedSelectionControls(): vo
   );
 }
 
+/**
+ * Defines the `testModifierDrivenPopoverCloseRulesCentralized` function shape (function testModifierDrivenPopoverCloseRulesCentralized(): void).
+
+ * Purpose: Supports maintainability by documenting why `testModifierDrivenPopoverCloseRulesCentralized` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testModifierDrivenPopoverCloseRulesCentralized(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
@@ -283,6 +352,14 @@ function testModifierDrivenPopoverCloseRulesCentralized(): void {
   );
 }
 
+/**
+ * Defines the `testInfrastructureGlyphSetsComeFromRes4Overrides` function shape (function testInfrastructureGlyphSetsComeFromRes4Overrides(): void).
+
+ * Purpose: Supports maintainability by documenting why `testInfrastructureGlyphSetsComeFromRes4Overrides` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testInfrastructureGlyphSetsComeFromRes4Overrides(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
@@ -315,6 +392,14 @@ function testInfrastructureGlyphSetsComeFromRes4Overrides(): void {
   );
 }
 
+/**
+ * Defines the `testAirFerryDoubleClickContracts` function shape (function testAirFerryDoubleClickContracts(): void).
+
+ * Purpose: Supports maintainability by documenting why `testAirFerryDoubleClickContracts` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testAirFerryDoubleClickContracts(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const orderDrawingPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'orderDrawing.ts');
@@ -362,6 +447,14 @@ function testAirFerryDoubleClickContracts(): void {
   );
 }
 
+/**
+ * Defines the `testAirStrikeAndAirGlyphContracts` function shape (function testAirStrikeAndAirGlyphContracts(): void).
+
+ * Purpose: Supports maintainability by documenting why `testAirStrikeAndAirGlyphContracts` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testAirStrikeAndAirGlyphContracts(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const rendererConstantsPath = path.resolve(process.cwd(), 'src', 'renderer', 'core', 'constants.ts');
@@ -436,6 +529,14 @@ function testAirStrikeAndAirGlyphContracts(): void {
   );
 }
 
+/**
+ * Defines the `testKillUpdateTextOmitsPlayerSuffixes` function shape (function testKillUpdateTextOmitsPlayerSuffixes(): void).
+
+ * Purpose: Supports maintainability by documenting why `testKillUpdateTextOmitsPlayerSuffixes` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testKillUpdateTextOmitsPlayerSuffixes(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
@@ -447,6 +548,14 @@ function testKillUpdateTextOmitsPlayerSuffixes(): void {
   );
 }
 
+/**
+ * Defines the `testRes4RubbleTooltipAndTerrainVariantContracts` function shape (function testRes4RubbleTooltipAndTerrainVariantContracts(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRes4RubbleTooltipAndTerrainVariantContracts` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRes4RubbleTooltipAndTerrainVariantContracts(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const rendererSource = fs.readFileSync(rendererPath, 'utf8');
@@ -486,6 +595,14 @@ function testRes4RubbleTooltipAndTerrainVariantContracts(): void {
   );
 }
 
+/**
+ * Defines the `testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves` function shape (function testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves(): void).
+
+ * Purpose: Supports maintainability by documenting why `testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves(): void {
   const pathDrawingPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'pathDrawing.ts');
   const source = fs.readFileSync(pathDrawingPath, 'utf8');
@@ -513,6 +630,14 @@ function testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves(): void {
   );
 }
 
+/**
+ * Defines the `run` function shape (function run(): void).
+
+ * Purpose: Supports maintainability by documenting why `run` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function run(): void {
   testRedrawAndResizeDelegateToSharedScene();
   testSharedSceneStillRendersStaleIntel();

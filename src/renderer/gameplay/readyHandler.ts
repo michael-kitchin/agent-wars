@@ -11,14 +11,78 @@ import { rendererSharedState as S } from '../core/state';
 import { resetPrecomputedAiState } from '../openRouter/precomputedAiState';
 import { isWaitingForPrecomputedAiOrders } from '../openRouter/aiPlanningState';
 
+/**
+ * Documents the `ReadyHandlerDeps` interface as a named contract surface (export interface ReadyHandlerDeps).
+
+ * Purpose: Supports maintainability by documenting why `ReadyHandlerDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface ReadyHandlerDeps {
-  clearSidebarError: () => void;
-  updateReadyButtonState: () => void;
-  updateOpenRouterToolCountLabels: () => void;
-  showSidebarError: (message: string) => void;
-  callReadyWithTimeout: (payload: GameReadyIpcPayload) => Promise<ReadyResult>;
-  refreshRes4TerrainOverridesForRenderer: () => Promise<void>;
-  applyGameStateSnapshot: (
+    /**
+   * Specifies the contract for the `clearSidebarError` member (clearSidebarError: () => void;).
+
+   * Contract: Describes stable behavior for callers of `clearSidebarError` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+clearSidebarError: () => void;
+    /**
+   * Specifies the contract for the `updateReadyButtonState` member (updateReadyButtonState: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateReadyButtonState` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateReadyButtonState: () => void;
+    /**
+   * Specifies the contract for the `updateOpenRouterToolCountLabels` member (updateOpenRouterToolCountLabels: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateOpenRouterToolCountLabels` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateOpenRouterToolCountLabels: () => void;
+    /**
+   * Specifies the contract for the `showSidebarError` member (showSidebarError: (message: string) => void;).
+
+   * Contract: Describes stable behavior for callers of `showSidebarError` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+showSidebarError: (message: string) => void;
+    /**
+   * Specifies the contract for the `callReadyWithTimeout` member (callReadyWithTimeout: (payload: GameReadyIpcPayload) => Promise<ReadyResult>;).
+
+   * Contract: Describes stable behavior for callers of `callReadyWithTimeout` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+callReadyWithTimeout: (payload: GameReadyIpcPayload) => Promise<ReadyResult>;
+    /**
+   * Specifies the contract for the `refreshRes4TerrainOverridesForRenderer` member (refreshRes4TerrainOverridesForRenderer: () => Promise<void>;).
+
+   * Contract: Describes stable behavior for callers of `refreshRes4TerrainOverridesForRenderer` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+refreshRes4TerrainOverridesForRenderer: () => Promise<void>;
+    /**
+   * Specifies the contract for the `applyGameStateSnapshot` member (applyGameStateSnapshot: ( nextState: GameStateSnapshot, options: { refreshStandingOrders?: boolean; updateGameStateSidebarUi?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `applyGameStateSnapshot` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+applyGameStateSnapshot: (
     nextState: GameStateSnapshot,
     options: {
       refreshStandingOrders?: boolean;
@@ -30,40 +94,236 @@ export interface ReadyHandlerDeps {
       redraw?: boolean;
     }
   ) => Promise<void>;
-  buildAirStrikeOutboundPlaybackMoves: (moves: AirStrikeAnimationMove[] | undefined) => ResolutionPlaybackMove[];
-  buildAirStrikeReturnPlaybackMoves: (moves: AirStrikeAnimationMove[] | undefined) => ResolutionPlaybackMove[];
-  showAiStrategyToast: (content: string) => void;
-  hideAiStrategyToast: () => void;
-  updateOpenRouterCostLabel: () => void;
-  appendOpenRouterLog: (line: string, isError?: boolean) => void;
-  showMapToast: (message: string, options?: { isError?: boolean }) => void;
-  getVisibleHexSet: (state: GameStateSnapshot | null) => Set<string>;
-  buildKillToastFormatterBundle: (
+    /**
+   * Specifies the contract for the `buildAirStrikeOutboundPlaybackMoves` member (buildAirStrikeOutboundPlaybackMoves: (moves: AirStrikeAnimationMove[] | undefined) => ResolutionPlaybackMove[];).
+
+   * Contract: Describes stable behavior for callers of `buildAirStrikeOutboundPlaybackMoves` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+buildAirStrikeOutboundPlaybackMoves: (moves: AirStrikeAnimationMove[] | undefined) => ResolutionPlaybackMove[];
+    /**
+   * Specifies the contract for the `buildAirStrikeReturnPlaybackMoves` member (buildAirStrikeReturnPlaybackMoves: (moves: AirStrikeAnimationMove[] | undefined) => ResolutionPlaybackMove[];).
+
+   * Contract: Describes stable behavior for callers of `buildAirStrikeReturnPlaybackMoves` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+buildAirStrikeReturnPlaybackMoves: (moves: AirStrikeAnimationMove[] | undefined) => ResolutionPlaybackMove[];
+    /**
+   * Specifies the contract for the `showAiStrategyToast` member (showAiStrategyToast: (content: string) => void;).
+
+   * Contract: Describes stable behavior for callers of `showAiStrategyToast` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+showAiStrategyToast: (content: string) => void;
+    /**
+   * Specifies the contract for the `hideAiStrategyToast` member (hideAiStrategyToast: () => void;).
+
+   * Contract: Describes stable behavior for callers of `hideAiStrategyToast` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hideAiStrategyToast: () => void;
+    /**
+   * Specifies the contract for the `updateOpenRouterCostLabel` member (updateOpenRouterCostLabel: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateOpenRouterCostLabel` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateOpenRouterCostLabel: () => void;
+    /**
+   * Specifies the contract for the `appendOpenRouterLog` member (appendOpenRouterLog: (line: string, isError?: boolean) => void;).
+
+   * Contract: Describes stable behavior for callers of `appendOpenRouterLog` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+appendOpenRouterLog: (line: string, isError?: boolean) => void;
+    /**
+   * Specifies the contract for the `showMapToast` member (showMapToast: (message: string, options?: { isError?: boolean }) => void;).
+
+   * Contract: Describes stable behavior for callers of `showMapToast` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+showMapToast: (message: string, options?: { isError?: boolean }) => void;
+    /**
+   * Specifies the contract for the `getVisibleHexSet` member (getVisibleHexSet: (state: GameStateSnapshot | null) => Set<string>;).
+
+   * Contract: Describes stable behavior for callers of `getVisibleHexSet` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getVisibleHexSet: (state: GameStateSnapshot | null) => Set<string>;
+    /**
+   * Specifies the contract for the `buildKillToastFormatterBundle` member (buildKillToastFormatterBundle: ( state: GameStateSnapshot, removedUnits?: RemovedUnitSnapshot[] ) => { formatKillLine: (entry: { victimId: string;).
+
+   * Contract: Describes stable behavior for callers of `buildKillToastFormatterBundle` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+buildKillToastFormatterBundle: (
     state: GameStateSnapshot,
     removedUnits?: RemovedUnitSnapshot[]
   ) => { formatKillLine: (entry: { victimId: string; killerIds: string[] }) => string; formatUnitName: (unitId: string) => string };
-  formatUnknownBattleAnnouncement: (continentNames: string[]) => string;
-  tickResolutionMoveAnimation: () => void;
-  clearPendingTacticalOrders: () => void;
-  refreshHumanStandingOrders: () => Promise<void>;
-  updateGameStateSidebar: (state: GameStateSnapshot | null) => void;
-  updatePendingOrdersSidebar: () => void;
-  updateRangedSidebar: () => void;
-  updateSidebar: () => void;
-  updateGameOverUI: (state: GameStateSnapshot) => void;
-  startBackgroundRequestIfAllowed: () => void;
-  redraw: () => void;
-}
+    /**
+   * Specifies the contract for the `formatUnknownBattleAnnouncement` member (formatUnknownBattleAnnouncement: (continentNames: string[]) => string;).
 
-interface ReadyPayloadBuildArgs {
-  enabledToolGroupsPayload: string[];
-  useEventDriven: boolean;
-  usePrecomputed: boolean;
+   * Contract: Describes stable behavior for callers of `formatUnknownBattleAnnouncement` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+formatUnknownBattleAnnouncement: (continentNames: string[]) => string;
+    /**
+   * Specifies the contract for the `tickResolutionMoveAnimation` member (tickResolutionMoveAnimation: () => void;).
+
+   * Contract: Describes stable behavior for callers of `tickResolutionMoveAnimation` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+tickResolutionMoveAnimation: () => void;
+    /**
+   * Specifies the contract for the `clearPendingTacticalOrders` member (clearPendingTacticalOrders: () => void;).
+
+   * Contract: Describes stable behavior for callers of `clearPendingTacticalOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+clearPendingTacticalOrders: () => void;
+    /**
+   * Specifies the contract for the `refreshHumanStandingOrders` member (refreshHumanStandingOrders: () => Promise<void>;).
+
+   * Contract: Describes stable behavior for callers of `refreshHumanStandingOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+refreshHumanStandingOrders: () => Promise<void>;
+    /**
+   * Specifies the contract for the `updateGameStateSidebar` member (updateGameStateSidebar: (state: GameStateSnapshot | null) => void;).
+
+   * Contract: Describes stable behavior for callers of `updateGameStateSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateGameStateSidebar: (state: GameStateSnapshot | null) => void;
+    /**
+   * Specifies the contract for the `updatePendingOrdersSidebar` member (updatePendingOrdersSidebar: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updatePendingOrdersSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updatePendingOrdersSidebar: () => void;
+    /**
+   * Specifies the contract for the `updateRangedSidebar` member (updateRangedSidebar: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateRangedSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateRangedSidebar: () => void;
+    /**
+   * Specifies the contract for the `updateSidebar` member (updateSidebar: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateSidebar: () => void;
+    /**
+   * Specifies the contract for the `updateGameOverUI` member (updateGameOverUI: (state: GameStateSnapshot) => void;).
+
+   * Contract: Describes stable behavior for callers of `updateGameOverUI` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateGameOverUI: (state: GameStateSnapshot) => void;
+    /**
+   * Specifies the contract for the `startBackgroundRequestIfAllowed` member (startBackgroundRequestIfAllowed: () => void;).
+
+   * Contract: Describes stable behavior for callers of `startBackgroundRequestIfAllowed` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+startBackgroundRequestIfAllowed: () => void;
+    /**
+   * Specifies the contract for the `redraw` member (redraw: () => void;).
+
+   * Contract: Describes stable behavior for callers of `redraw` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+redraw: () => void;
 }
 
 /**
- * Use this to keep game:ready payload construction consistent for Run/event-driven/precomputed combinations.
- * The payload never enables Ready-time AI planning, because Run mode requires background precomputation first.
+ * Documents the `ReadyPayloadBuildArgs` interface as a named contract surface (interface ReadyPayloadBuildArgs).
+
+ * Purpose: Supports maintainability by documenting why `ReadyPayloadBuildArgs` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+interface ReadyPayloadBuildArgs {
+    /**
+   * Specifies the contract for the `enabledToolGroupsPayload` member (enabledToolGroupsPayload: string[];).
+
+   * Contract: Describes stable behavior for callers of `enabledToolGroupsPayload` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+enabledToolGroupsPayload: string[];
+    /**
+   * Specifies the contract for the `useEventDriven` member (useEventDriven: boolean;).
+
+   * Contract: Describes stable behavior for callers of `useEventDriven` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+useEventDriven: boolean;
+    /**
+   * Specifies the contract for the `usePrecomputed` member (usePrecomputed: boolean;).
+
+   * Contract: Describes stable behavior for callers of `usePrecomputed` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+usePrecomputed: boolean;
+}
+
+/**
+ * Defines the `buildReadyPayload` function shape (function buildReadyPayload(args: ReadyPayloadBuildArgs): GameReadyIpcPayload).
+
+ * Purpose: Supports maintainability by documenting why `buildReadyPayload` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function buildReadyPayload(args: ReadyPayloadBuildArgs): GameReadyIpcPayload {
   const { enabledToolGroupsPayload, useEventDriven, usePrecomputed } = args;
@@ -82,16 +342,60 @@ function buildReadyPayload(args: ReadyPayloadBuildArgs): GameReadyIpcPayload {
   return base;
 }
 
+/**
+ * Documents the `CombatVisibilityClassification` interface as a named contract surface (interface CombatVisibilityClassification).
+
+ * Purpose: Supports maintainability by documenting why `CombatVisibilityClassification` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface CombatVisibilityClassification {
-  unknownCombatHexes: string[];
-  unknownCasualtyHexes: string[];
-  knownVictimIds: Set<string>;
-  unknownVictimIds: string[];
+    /**
+   * Specifies the contract for the `unknownCombatHexes` member (unknownCombatHexes: string[];).
+
+   * Contract: Describes stable behavior for callers of `unknownCombatHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unknownCombatHexes: string[];
+    /**
+   * Specifies the contract for the `unknownCasualtyHexes` member (unknownCasualtyHexes: string[];).
+
+   * Contract: Describes stable behavior for callers of `unknownCasualtyHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unknownCasualtyHexes: string[];
+    /**
+   * Specifies the contract for the `knownVictimIds` member (knownVictimIds: Set<string>;).
+
+   * Contract: Describes stable behavior for callers of `knownVictimIds` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+knownVictimIds: Set<string>;
+    /**
+   * Specifies the contract for the `unknownVictimIds` member (unknownVictimIds: string[];).
+
+   * Contract: Describes stable behavior for callers of `unknownVictimIds` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unknownVictimIds: string[];
 }
 
 /**
- * Use this to classify combat visibility for turn updates and unknown-battle announcements.
- * Human-involved combat is treated as observable even when the post-resolution hex is not currently visible.
+ * Defines the `deriveCombatVisibilityClassification` function shape (function deriveCombatVisibilityClassification().
+
+ * Purpose: Supports maintainability by documenting why `deriveCombatVisibilityClassification` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function deriveCombatVisibilityClassification(
   readyResult: ReadyResult,
@@ -184,10 +488,26 @@ function deriveCombatVisibilityClassification(
   return { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds };
 }
 
+/**
+ * Defines the `formatHexCount` function shape (function formatHexCount(label: string, count: number): string).
+
+ * Purpose: Supports maintainability by documenting why `formatHexCount` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatHexCount(label: string, count: number): string {
   return `• ${label} at ${count.toLocaleString()} ${count === 1 ? 'hex' : 'hexes'}.`;
 }
 
+/**
+ * Defines the `buildCombatActivityFallbackBullets` function shape (function buildCombatActivityFallbackBullets(readyResult: ReadyResult): string[]).
+
+ * Purpose: Supports maintainability by documenting why `buildCombatActivityFallbackBullets` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildCombatActivityFallbackBullets(readyResult: ReadyResult): string[] {
   const bullets: string[] = [];
   const rangedHexCount = readyResult.rangedCombatHexes?.length ?? 0;
@@ -202,6 +522,14 @@ function buildCombatActivityFallbackBullets(readyResult: ReadyResult): string[] 
   return bullets;
 }
 
+/**
+ * Defines the `handleReadyButtonClick` function shape (export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `handleReadyButtonClick` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<void> {
   if (!window.gameApi) return;
   if (S.gameState?.gameOver) return;

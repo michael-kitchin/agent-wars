@@ -1,17 +1,105 @@
 import { dbGetAll, dbGetOne } from '../gameDb';
 
+/**
+ * Documents the `HumanMarchPreviewDiagnostics` type alias (export type HumanMarchPreviewDiagnostics).
+
+ * Purpose: Supports maintainability by documenting why `HumanMarchPreviewDiagnostics` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type HumanMarchPreviewDiagnostics = {
-  requestCount: number;
-  routePlanCalls: number;
-  routeCacheHitCount: number;
-  routeCacheMissCount: number;
-  fallbackAttemptCount: number;
-  fallbackBudgetAbortCount: number;
-  sessionCreateCount: number;
-  sessionReuseCount: number;
-  sessionInvalidateCount: number;
+    /**
+   * Specifies the contract for the `requestCount` member (requestCount: number;).
+
+   * Contract: Describes stable behavior for callers of `requestCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+requestCount: number;
+    /**
+   * Specifies the contract for the `routePlanCalls` member (routePlanCalls: number;).
+
+   * Contract: Describes stable behavior for callers of `routePlanCalls` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+routePlanCalls: number;
+    /**
+   * Specifies the contract for the `routeCacheHitCount` member (routeCacheHitCount: number;).
+
+   * Contract: Describes stable behavior for callers of `routeCacheHitCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+routeCacheHitCount: number;
+    /**
+   * Specifies the contract for the `routeCacheMissCount` member (routeCacheMissCount: number;).
+
+   * Contract: Describes stable behavior for callers of `routeCacheMissCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+routeCacheMissCount: number;
+    /**
+   * Specifies the contract for the `fallbackAttemptCount` member (fallbackAttemptCount: number;).
+
+   * Contract: Describes stable behavior for callers of `fallbackAttemptCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+fallbackAttemptCount: number;
+    /**
+   * Specifies the contract for the `fallbackBudgetAbortCount` member (fallbackBudgetAbortCount: number;).
+
+   * Contract: Describes stable behavior for callers of `fallbackBudgetAbortCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+fallbackBudgetAbortCount: number;
+    /**
+   * Specifies the contract for the `sessionCreateCount` member (sessionCreateCount: number;).
+
+   * Contract: Describes stable behavior for callers of `sessionCreateCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+sessionCreateCount: number;
+    /**
+   * Specifies the contract for the `sessionReuseCount` member (sessionReuseCount: number;).
+
+   * Contract: Describes stable behavior for callers of `sessionReuseCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+sessionReuseCount: number;
+    /**
+   * Specifies the contract for the `sessionInvalidateCount` member (sessionInvalidateCount: number;).
+
+   * Contract: Describes stable behavior for callers of `sessionInvalidateCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+sessionInvalidateCount: number;
 };
 
+/**
+ * Defines the `createEmptyHumanMarchPreviewDiagnostics` function shape (export function createEmptyHumanMarchPreviewDiagnostics(): HumanMarchPreviewDiagnostics).
+
+ * Purpose: Supports maintainability by documenting why `createEmptyHumanMarchPreviewDiagnostics` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function createEmptyHumanMarchPreviewDiagnostics(): HumanMarchPreviewDiagnostics {
   return {
     requestCount: 0,
@@ -26,6 +114,14 @@ export function createEmptyHumanMarchPreviewDiagnostics(): HumanMarchPreviewDiag
   };
 }
 
+/**
+ * Defines the `hashString` function shape (function hashString(text: string): number).
+
+ * Purpose: Supports maintainability by documenting why `hashString` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function hashString(text: string): number {
   let hash = 0;
   for (let i = 0; i < text.length; i++) {
@@ -34,10 +130,26 @@ function hashString(text: string): number {
   return hash;
 }
 
+/**
+ * Defines the `buildSelectionSignature` function shape (export function buildSelectionSignature(unitIds: readonly string[]): string).
+
+ * Purpose: Supports maintainability by documenting why `buildSelectionSignature` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function buildSelectionSignature(unitIds: readonly string[]): string {
   return [...new Set(unitIds)].sort().join('|');
 }
 
+/**
+ * Defines the `buildSelectedUnitPositionsSignature` function shape (export function buildSelectedUnitPositionsSignature(unitIds: readonly string[]): string).
+
+ * Purpose: Supports maintainability by documenting why `buildSelectedUnitPositionsSignature` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function buildSelectedUnitPositionsSignature(unitIds: readonly string[]): string {
   if (unitIds.length === 0) return '';
   const placeholders = unitIds.map(() => '?').join(', ');
@@ -51,6 +163,14 @@ export function buildSelectedUnitPositionsSignature(unitIds: readonly string[]):
   return rows.map((row) => `${row.id}:${row.h3Index}`).join('|');
 }
 
+/**
+ * Defines the `buildTurnPhaseSignature` function shape (function buildTurnPhaseSignature(): string).
+
+ * Purpose: Supports maintainability by documenting why `buildTurnPhaseSignature` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildTurnPhaseSignature(): string {
   const turnState = dbGetOne<{ turnNumber: number; phase: string }>(
     'SELECT turn_number AS turnNumber, phase FROM turn_state WHERE id = 1'
@@ -60,6 +180,14 @@ function buildTurnPhaseSignature(): string {
   return `t:${turnNumber}|p:${phase}`;
 }
 
+/**
+ * Defines the `buildInfrastructureSignature` function shape (function buildInfrastructureSignature(): string).
+
+ * Purpose: Supports maintainability by documenting why `buildInfrastructureSignature` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildInfrastructureSignature(): string {
   const infrastructure = dbGetOne<{ c: number; urban: number; airports: number; seaports: number }>(
     `SELECT COUNT(*) AS c,
@@ -71,6 +199,14 @@ function buildInfrastructureSignature(): string {
   return `i:${infrastructure?.c ?? 0}:${infrastructure?.urban ?? 0}:${infrastructure?.airports ?? 0}:${infrastructure?.seaports ?? 0}`;
 }
 
+/**
+ * Defines the `buildIntelSignature` function shape (function buildIntelSignature(playerId: 'human' | 'opponent'): string).
+
+ * Purpose: Supports maintainability by documenting why `buildIntelSignature` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildIntelSignature(playerId: 'human' | 'opponent'): string {
   const hexIntel = dbGetOne<{ c: number; lastSeen: number }>(
     `SELECT COUNT(*) AS c, COALESCE(SUM(last_seen_turn), 0) AS lastSeen
@@ -89,6 +225,14 @@ function buildIntelSignature(playerId: 'human' | 'opponent'): string {
   return `hx:${hexIntel?.c ?? 0}:${hexIntel?.lastSeen ?? 0}|ux:${unitIntel?.c ?? 0}:${unitIntel?.lastSeen ?? 0}:${unitIntel?.staleUntil ?? 0}`;
 }
 
+/**
+ * Defines the `buildTerrainSignature` function shape (function buildTerrainSignature(): string).
+
+ * Purpose: Supports maintainability by documenting why `buildTerrainSignature` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildTerrainSignature(): string {
   const terrainBreakdown = dbGetOne<{
     c: number;
@@ -111,6 +255,14 @@ function buildTerrainSignature(): string {
   return `tx:${terrainBreakdown?.c ?? 0}:${terrainBreakdown?.water ?? 0}:${terrainBreakdown?.coastal ?? 0}:${terrainBreakdown?.arctic ?? 0}:${terrainBreakdown?.wetlands ?? 0}:${terrainBreakdown?.kindWater ?? 0}:${terrainBreakdown?.kindArctic ?? 0}`;
 }
 
+/**
+ * Defines the `buildOccupancySignature` function shape (function buildOccupancySignature(): string).
+
+ * Purpose: Supports maintainability by documenting why `buildOccupancySignature` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildOccupancySignature(): string {
   const occupancyRows = dbGetAll<{ signature: string }>(
     `SELECT id || ':' || player || ':' || h3_index AS signature
@@ -121,6 +273,14 @@ function buildOccupancySignature(): string {
   return `ox:${occupancyRows.length}:${occupancySignature}`;
 }
 
+/**
+ * Defines the `buildEnvironmentSignature` function shape (export function buildEnvironmentSignature(playerId: 'human' | 'opponent'): string).
+
+ * Purpose: Supports maintainability by documenting why `buildEnvironmentSignature` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function buildEnvironmentSignature(playerId: 'human' | 'opponent'): string {
   return [
     buildTurnPhaseSignature(),
@@ -131,6 +291,14 @@ export function buildEnvironmentSignature(playerId: 'human' | 'opponent'): strin
   ].join('|');
 }
 
+/**
+ * Defines the `buildHoverSessionCacheKey` function shape (export function buildHoverSessionCacheKey(payload: { playerId: 'human' | 'opponent'; selectionSignature: string; selectedPositionsSignature: string;).
+
+ * Purpose: Supports maintainability by documenting why `buildHoverSessionCacheKey` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function buildHoverSessionCacheKey(payload: {
   playerId: 'human' | 'opponent';
   selectionSignature: string;

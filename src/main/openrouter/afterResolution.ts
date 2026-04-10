@@ -21,33 +21,115 @@ import { getSubscriptions } from '../callbackSubscriptions';
 import { evaluateMandatoryOverrides, evaluateSubscriptionEvents, type ResolutionContext } from '../callbackEvaluation';
 import type { ReadyResult, RequestAiOrdersResult } from '../../shared/ipcTypes';
 
+/**
+ * Documents the `ReadyResultWithParticipants` type alias (type ReadyResultWithParticipants).
+
+ * Purpose: Supports maintainability by documenting why `ReadyResultWithParticipants` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type ReadyResultWithParticipants = Pick<
   ReadyResult,
   'success' | 'reason' | 'removedUnitIds' | 'removedOpponentUnitIds' | 'opponentCombatParticipantUnitIds' | 'infrastructureDestroyedEvents'
 >;
 
+/**
+ * Documents the `AfterResolutionDeps` interface as a named contract surface (export interface AfterResolutionDeps).
+
+ * Purpose: Supports maintainability by documenting why `AfterResolutionDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface AfterResolutionDeps {
-  modelId: string;
-  enabledToolNames: string[];
-  hasKey: () => boolean;
-  requestOrders: (
+    /**
+   * Specifies the contract for the `modelId` member (modelId: string;).
+
+   * Contract: Describes stable behavior for callers of `modelId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+modelId: string;
+    /**
+   * Specifies the contract for the `enabledToolNames` member (enabledToolNames: string[];).
+
+   * Contract: Describes stable behavior for callers of `enabledToolNames` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+enabledToolNames: string[];
+    /**
+   * Specifies the contract for the `hasKey` member (hasKey: () => boolean;).
+
+   * Contract: Describes stable behavior for callers of `hasKey` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hasKey: () => boolean;
+    /**
+   * Specifies the contract for the `requestOrders` member (requestOrders: ( state: GameStateSnapshot, modelId: string, options: { enabledToolNames: string[]; usePrecomputation: boolean } ) => Promise<R).
+
+   * Contract: Describes stable behavior for callers of `requestOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+requestOrders: (
     state: GameStateSnapshot,
     modelId: string,
     options: { enabledToolNames: string[]; usePrecomputation: boolean }
   ) => Promise<RequestAiOrdersResult>;
 }
 
+/**
+ * Documents the `AfterResolutionResult` interface as a named contract surface (export interface AfterResolutionResult).
+
+ * Purpose: Supports maintainability by documenting why `AfterResolutionResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface AfterResolutionResult {
-  consulted: boolean;
-  strategy?: string;
-  toolInvocationCounts?: Record<string, number>;
+    /**
+   * Specifies the contract for the `consulted` member (consulted: boolean;).
+
+   * Contract: Describes stable behavior for callers of `consulted` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+consulted: boolean;
+    /**
+   * Specifies the contract for the `strategy` member (strategy?: string;).
+
+   * Contract: Describes stable behavior for callers of `strategy` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+strategy?: string;
+    /**
+   * Specifies the contract for the `toolInvocationCounts` member (toolInvocationCounts?: Record<string, number>;).
+
+   * Contract: Describes stable behavior for callers of `toolInvocationCounts` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+toolInvocationCounts?: Record<string, number>;
 }
 
 /**
- * Evaluates callbacks after resolution and optionally runs the LLM. When any event fires,
- * calls requestOrders, then stores pending orders and updates last-consultation state.
- * When no event fires, clears pending orders so the next Ready uses standing-order-only.
- * Call only when event-driven consultation is enabled and resolution succeeded.
+ * Defines the `afterResolution` function shape (export async function afterResolution( state: GameStateSnapshot, resolutionResult: ReadyResultWithParticipants, deps: AfterResolutionDeps ): Promise<A).
+
+ * Purpose: Supports maintainability by documenting why `afterResolution` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export async function afterResolution(
   state: GameStateSnapshot,

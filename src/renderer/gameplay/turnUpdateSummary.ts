@@ -1,20 +1,116 @@
 import type { BuildUnitType, ReadyResult } from '../../shared/ipcTypes';
 
-type Kill = { victimId: string; killerIds: string[] };
+/**
+ * Documents the `Kill` type alias (type Kill).
 
+ * Purpose: Supports maintainability by documenting why `Kill` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+type Kill = { /**
+ * Specifies the contract for the `victimId` member (victimId: string;).
+
+ * Contract: Describes stable behavior for callers of `victimId` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+victimId: string; /**
+ * Specifies the contract for the `killerIds` member (killerIds: string[]).
+
+ * Contract: Describes stable behavior for callers of `killerIds` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+killerIds: string[] };
+
+/**
+ * Defines the `formatCountLabel` function shape (function formatCountLabel(value: number, singular: string, plural: string): string).
+
+ * Purpose: Supports maintainability by documenting why `formatCountLabel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatCountLabel(value: number, singular: string, plural: string): string {
   return `${value.toLocaleString()} ${value === 1 ? singular : plural}`;
 }
 
+/**
+ * Documents the `TurnUpdateSummaryArgs` interface as a named contract surface (interface TurnUpdateSummaryArgs).
+
+ * Purpose: Supports maintainability by documenting why `TurnUpdateSummaryArgs` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface TurnUpdateSummaryArgs {
-  readyResult: ReadyResult;
-  knownDirectFire: Kill[];
-  knownReturnFire: Kill[];
-  knownMeleeKills: Kill[];
-  formatKillLine: (kill: Kill) => string;
-  formatUnitName: (unitId: string) => string;
+    /**
+   * Specifies the contract for the `readyResult` member (readyResult: ReadyResult;).
+
+   * Contract: Describes stable behavior for callers of `readyResult` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+readyResult: ReadyResult;
+    /**
+   * Specifies the contract for the `knownDirectFire` member (knownDirectFire: Kill[];).
+
+   * Contract: Describes stable behavior for callers of `knownDirectFire` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+knownDirectFire: Kill[];
+    /**
+   * Specifies the contract for the `knownReturnFire` member (knownReturnFire: Kill[];).
+
+   * Contract: Describes stable behavior for callers of `knownReturnFire` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+knownReturnFire: Kill[];
+    /**
+   * Specifies the contract for the `knownMeleeKills` member (knownMeleeKills: Kill[];).
+
+   * Contract: Describes stable behavior for callers of `knownMeleeKills` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+knownMeleeKills: Kill[];
+    /**
+   * Specifies the contract for the `formatKillLine` member (formatKillLine: (kill: Kill) => string;).
+
+   * Contract: Describes stable behavior for callers of `formatKillLine` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+formatKillLine: (kill: Kill) => string;
+    /**
+   * Specifies the contract for the `formatUnitName` member (formatUnitName: (unitId: string) => string;).
+
+   * Contract: Describes stable behavior for callers of `formatUnitName` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+formatUnitName: (unitId: string) => string;
 }
 
+/**
+ * Defines the `formatDeployedUnitsLine` function shape (function formatDeployedUnitsLine().
+
+ * Purpose: Supports maintainability by documenting why `formatDeployedUnitsLine` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatDeployedUnitsLine(
   deployed: { armor?: number; infantry?: number; naval?: number; air?: number } | undefined
 ): string | null {
@@ -31,6 +127,14 @@ function formatDeployedUnitsLine(
   return `${parts[0]}, ${parts[1]}, ${parts[2]}, and ${parts[3]} units deployed`;
 }
 
+/**
+ * Defines the `formatDeploymentCapReachedLine` function shape (function formatDeploymentCapReachedLine().
+
+ * Purpose: Supports maintainability by documenting why `formatDeploymentCapReachedLine` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatDeploymentCapReachedLine(
   cappedTypes: BuildUnitType[] | undefined,
   player: 'human' | 'opponent'
@@ -45,6 +149,14 @@ function formatDeploymentCapReachedLine(
   return `Maximum human ${ordered[0]}, ${ordered[1]}, ${ordered[2]}, and ${ordered[3]} units deployed.`;
 }
 
+/**
+ * Defines the `formatAirStrikeOutcomeLine` function shape (function formatAirStrikeOutcomeLine(readyResult: ReadyResult, formatUnitName: (unitId: string) => string): string | null).
+
+ * Purpose: Supports maintainability by documenting why `formatAirStrikeOutcomeLine` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatAirStrikeOutcomeLine(readyResult: ReadyResult, formatUnitName: (unitId: string) => string): string | null {
   const attempts = readyResult.airStrikeAttemptCount ?? 0;
   if (attempts <= 0) return null;
@@ -85,6 +197,14 @@ function formatAirStrikeOutcomeLine(readyResult: ReadyResult, formatUnitName: (u
   return `• Air strikes: ${attempts.toLocaleString()} attempted; ${destroyedPart}${lossesPart}`;
 }
 
+/**
+ * Defines the `buildTurnUpdateBullets` function shape (export function buildTurnUpdateBullets(args: TurnUpdateSummaryArgs): string[]).
+
+ * Purpose: Supports maintainability by documenting why `buildTurnUpdateBullets` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function buildTurnUpdateBullets(args: TurnUpdateSummaryArgs): string[] {
   const { readyResult, knownDirectFire, knownReturnFire, knownMeleeKills, formatKillLine, formatUnitName } = args;
   const bullets: string[] = [];

@@ -1,46 +1,320 @@
-import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import type { AirStrikeTargetType, GameStateSnapshot } from '../../shared/ipcTypes';
+import type { NamingLookupTarget, TerrainTooltipState } from './terrainTooltipTypes';
 import { TERRAIN_TOOLTIP_DELAY_MS } from '../core/constants';
 import { hitTestHexAtContainerPixel } from './mapUtils';
 import { rendererSharedState as S } from '../core/state';
 import { getMainLeafletMap } from './worldLeafletMap';
 
+/**
+ * Documents the `MainMapInteractionDeps` interface as a named contract surface (interface MainMapInteractionDeps).
+
+ * Purpose: Supports maintainability by documenting why `MainMapInteractionDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface MainMapInteractionDeps {
-  clearTerrainTooltipTimer: () => void;
-  hideTerrainTooltipVisual: () => void;
-  shouldSuppressTerrainTooltip: () => boolean;
-  requestRedraw: () => void;
-  refreshHoverRoutePreview: () => Promise<void>;
-  detailHitAtClientPixel: (clientX: number, clientY: number, mapHexSet: Set<string>) => string | null;
-  terrainStateForPointer: (clientX: number, clientY: number, fallbackRes1H3: string | null) => any;
-  namingLookupTargetForPointer: (clientX: number, clientY: number, fallbackRes1H3: string | null) => any;
-  showTerrainTooltip: (clientX: number, clientY: number, state: any, namingTarget: any) => Promise<void>;
-  clearSidebarError: () => void;
-  formatTargetingValidationReason: (reason: string | undefined, fallbackMessage: string) => string;
-  showMapToast: (message: string, options?: { isError?: boolean }) => void;
-  replacePendingAirStrikesForSelected: (selectedIds: string[], targetH3Index: string, targetType: any) => void;
-  replacePendingRangedAttacksForSelected: (selectedIds: string[], targetH3Index: string) => void;
-  clearSelection: () => void;
-  hideStackCallout: () => void;
-  updateSidebar: () => void;
-  updateRangedSidebar: () => void;
-  redraw: () => void;
-  getUnitsForDrawWithMovingIds: (state: GameStateSnapshot) => {
+    /**
+   * Specifies the contract for the `clearTerrainTooltipTimer` member (clearTerrainTooltipTimer: () => void;).
+
+   * Contract: Describes stable behavior for callers of `clearTerrainTooltipTimer` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+clearTerrainTooltipTimer: () => void;
+    /**
+   * Specifies the contract for the `hideTerrainTooltipVisual` member (hideTerrainTooltipVisual: () => void;).
+
+   * Contract: Describes stable behavior for callers of `hideTerrainTooltipVisual` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hideTerrainTooltipVisual: () => void;
+    /**
+   * Specifies the contract for the `shouldSuppressTerrainTooltip` member (shouldSuppressTerrainTooltip: () => boolean;).
+
+   * Contract: Describes stable behavior for callers of `shouldSuppressTerrainTooltip` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+shouldSuppressTerrainTooltip: () => boolean;
+    /**
+   * Specifies the contract for the `requestRedraw` member (requestRedraw: () => void;).
+
+   * Contract: Describes stable behavior for callers of `requestRedraw` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+requestRedraw: () => void;
+    /**
+   * Specifies the contract for the `refreshHoverRoutePreview` member (refreshHoverRoutePreview: () => Promise<void>;).
+
+   * Contract: Describes stable behavior for callers of `refreshHoverRoutePreview` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+refreshHoverRoutePreview: () => Promise<void>;
+    /**
+   * Specifies the contract for the `detailHitAtClientPixel` member (detailHitAtClientPixel: (clientX: number, clientY: number, mapHexSet: Set<string>) => string | null;).
+
+   * Contract: Describes stable behavior for callers of `detailHitAtClientPixel` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+detailHitAtClientPixel: (clientX: number, clientY: number, mapHexSet: Set<string>) => string | null;
+    /**
+   * Specifies the contract for the `terrainStateForPointer` member (terrainStateForPointer: (clientX: number, clientY: number, fallbackRes1H3: string | null) => TerrainTooltipState;).
+
+   * Contract: Describes stable behavior for callers of `terrainStateForPointer` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+terrainStateForPointer: (clientX: number, clientY: number, fallbackRes1H3: string | null) => TerrainTooltipState;
+    /**
+   * Specifies the contract for the `namingLookupTargetForPointer` member (namingLookupTargetForPointer: (clientX: number, clientY: number, fallbackRes1H3: string | null) => NamingLookupTarget | null;).
+
+   * Contract: Describes stable behavior for callers of `namingLookupTargetForPointer` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+namingLookupTargetForPointer: (clientX: number, clientY: number, fallbackRes1H3: string | null) => NamingLookupTarget | null;
+    /**
+   * Specifies the contract for the `showTerrainTooltip` member (showTerrainTooltip: (clientX: number, clientY: number, state: TerrainTooltipState, namingTarget: NamingLookupTarget | null) => Promise<void>;).
+
+   * Contract: Describes stable behavior for callers of `showTerrainTooltip` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+showTerrainTooltip: (
+    clientX: number,
+    clientY: number,
+    state: TerrainTooltipState,
+    namingTarget: NamingLookupTarget | null
+  ) => Promise<void>;
+    /**
+   * Specifies the contract for the `clearSidebarError` member (clearSidebarError: () => void;).
+
+   * Contract: Describes stable behavior for callers of `clearSidebarError` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+clearSidebarError: () => void;
+    /**
+   * Specifies the contract for the `formatTargetingValidationReason` member (formatTargetingValidationReason: (reason: string | undefined, fallbackMessage: string) => string;).
+
+   * Contract: Describes stable behavior for callers of `formatTargetingValidationReason` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+formatTargetingValidationReason: (reason: string | undefined, fallbackMessage: string) => string;
+    /**
+   * Specifies the contract for the `showMapToast` member (showMapToast: (message: string, options?: { isError?: boolean }) => void;).
+
+   * Contract: Describes stable behavior for callers of `showMapToast` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+showMapToast: (message: string, options?: { isError?: boolean }) => void;
+    /**
+   * Specifies the contract for the `replacePendingAirStrikesForSelected` member (replacePendingAirStrikesForSelected: (selectedIds: string[], targetH3Index: string, targetType: AirStrikeTargetType) => void;).
+
+   * Contract: Describes stable behavior for callers of `replacePendingAirStrikesForSelected` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+replacePendingAirStrikesForSelected: (
+    selectedIds: string[],
+    targetH3Index: string,
+    targetType: AirStrikeTargetType
+  ) => void;
+    /**
+   * Specifies the contract for the `replacePendingRangedAttacksForSelected` member (replacePendingRangedAttacksForSelected: (selectedIds: string[], targetH3Index: string) => void;).
+
+   * Contract: Describes stable behavior for callers of `replacePendingRangedAttacksForSelected` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+replacePendingRangedAttacksForSelected: (selectedIds: string[], targetH3Index: string) => void;
+    /**
+   * Specifies the contract for the `clearSelection` member (clearSelection: () => void;).
+
+   * Contract: Describes stable behavior for callers of `clearSelection` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+clearSelection: () => void;
+    /**
+   * Specifies the contract for the `hideStackCallout` member (hideStackCallout: () => void;).
+
+   * Contract: Describes stable behavior for callers of `hideStackCallout` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hideStackCallout: () => void;
+    /**
+   * Specifies the contract for the `updateSidebar` member (updateSidebar: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateSidebar: () => void;
+    /**
+   * Specifies the contract for the `updateRangedSidebar` member (updateRangedSidebar: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateRangedSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateRangedSidebar: () => void;
+    /**
+   * Specifies the contract for the `redraw` member (redraw: () => void;).
+
+   * Contract: Describes stable behavior for callers of `redraw` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+redraw: () => void;
+    /**
+   * Specifies the contract for the `getUnitsForDrawWithMovingIds` member (getUnitsForDrawWithMovingIds: (state: GameStateSnapshot) => { unitsToDraw: GameStateSnapshot['units']; movingIds: Set<string> | undefined; };).
+
+   * Contract: Describes stable behavior for callers of `getUnitsForDrawWithMovingIds` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getUnitsForDrawWithMovingIds: (state: GameStateSnapshot) => {
     unitsToDraw: GameStateSnapshot['units'];
     movingIds: Set<string> | undefined;
   };
-  tryHandleBuildEntryAtClientXY: (clientX: number, clientY: number) => boolean;
-  containerPixelHitsDrawnUnitIcon: (px: number, py: number, h3Index: string, unitCount: number) => boolean;
-  showStackCallout: (units: GameStateSnapshot['units'], clientX: number, clientY: number) => void;
-  getUnitAtHex: (h3Index: string) => GameStateSnapshot['units'][0] | null;
-  toggleUnitSelection: (unitId: string) => void;
-  replaceSelection: (unitIds: string[]) => void;
-  getPrimarySelectedUnitId: () => string | null;
-  updatePendingOrdersSidebar: () => void;
-  replacePendingFerryOrdersForSelected: (selectedIds: string[], destinationH3Index: string) => void;
-  clearCommittedOrderDraftState: () => void;
-  refreshHumanStandingOrders: () => Promise<void>;
+    /**
+   * Specifies the contract for the `tryHandleBuildEntryAtClientXY` member (tryHandleBuildEntryAtClientXY: (clientX: number, clientY: number) => boolean;).
+
+   * Contract: Describes stable behavior for callers of `tryHandleBuildEntryAtClientXY` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+tryHandleBuildEntryAtClientXY: (clientX: number, clientY: number) => boolean;
+    /**
+   * Specifies the contract for the `containerPixelHitsDrawnUnitIcon` member (containerPixelHitsDrawnUnitIcon: (px: number, py: number, h3Index: string, unitCount: number) => boolean;).
+
+   * Contract: Describes stable behavior for callers of `containerPixelHitsDrawnUnitIcon` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+containerPixelHitsDrawnUnitIcon: (px: number, py: number, h3Index: string, unitCount: number) => boolean;
+    /**
+   * Specifies the contract for the `showStackCallout` member (showStackCallout: (units: GameStateSnapshot['units'], clientX: number, clientY: number) => void;).
+
+   * Contract: Describes stable behavior for callers of `showStackCallout` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+showStackCallout: (units: GameStateSnapshot['units'], clientX: number, clientY: number) => void;
+    /**
+   * Specifies the contract for the `getUnitAtHex` member (getUnitAtHex: (h3Index: string) => GameStateSnapshot['units'][0] | null;).
+
+   * Contract: Describes stable behavior for callers of `getUnitAtHex` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getUnitAtHex: (h3Index: string) => GameStateSnapshot['units'][0] | null;
+    /**
+   * Specifies the contract for the `toggleUnitSelection` member (toggleUnitSelection: (unitId: string) => void;).
+
+   * Contract: Describes stable behavior for callers of `toggleUnitSelection` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+toggleUnitSelection: (unitId: string) => void;
+    /**
+   * Specifies the contract for the `replaceSelection` member (replaceSelection: (unitIds: string[]) => void;).
+
+   * Contract: Describes stable behavior for callers of `replaceSelection` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+replaceSelection: (unitIds: string[]) => void;
+    /**
+   * Specifies the contract for the `getPrimarySelectedUnitId` member (getPrimarySelectedUnitId: () => string | null;).
+
+   * Contract: Describes stable behavior for callers of `getPrimarySelectedUnitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getPrimarySelectedUnitId: () => string | null;
+    /**
+   * Specifies the contract for the `updatePendingOrdersSidebar` member (updatePendingOrdersSidebar: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updatePendingOrdersSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updatePendingOrdersSidebar: () => void;
+    /**
+   * Specifies the contract for the `replacePendingFerryOrdersForSelected` member (replacePendingFerryOrdersForSelected: (selectedIds: string[], destinationH3Index: string) => void;).
+
+   * Contract: Describes stable behavior for callers of `replacePendingFerryOrdersForSelected` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+replacePendingFerryOrdersForSelected: (selectedIds: string[], destinationH3Index: string) => void;
+    /**
+   * Specifies the contract for the `clearCommittedOrderDraftState` member (clearCommittedOrderDraftState: () => void;).
+
+   * Contract: Describes stable behavior for callers of `clearCommittedOrderDraftState` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+clearCommittedOrderDraftState: () => void;
+    /**
+   * Specifies the contract for the `refreshHumanStandingOrders` member (refreshHumanStandingOrders: () => Promise<void>;).
+
+   * Contract: Describes stable behavior for callers of `refreshHumanStandingOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+refreshHumanStandingOrders: () => Promise<void>;
 }
 
+/**
+ * Defines the `wireMainMapInteractions` function shape (export function wireMainMapInteractions(deps: MainMapInteractionDeps): void).
+
+ * Purpose: Supports maintainability by documenting why `wireMainMapInteractions` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
   const mainMapEl = document.getElementById('main-map');
   if (!mainMapEl) return;

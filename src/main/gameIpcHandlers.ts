@@ -27,28 +27,111 @@ import type {
 } from '../shared/ipcTypes';
 export type { RequestAiOrdersResult } from '../shared/ipcTypes';
 
+/**
+ * Documents the module-scope binding `POST_RESOLUTION_CONSULT_TIMEOUT_MS` (POST_RESOLUTION_CONSULT_TIMEOUT_MS).
+
+ * Purpose: Supports maintainability by documenting why `POST_RESOLUTION_CONSULT_TIMEOUT_MS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const POST_RESOLUTION_CONSULT_TIMEOUT_MS = 120_000;
 
-/** IPC-level ready payload extends the shared ready result contract. */
+/**
+ * Documents the `ReadyResultMinimal` type alias (export type ReadyResultMinimal).
+
+ * Purpose: Supports maintainability by documenting why `ReadyResultMinimal` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type ReadyResultMinimal = ReadyResult;
 
+/**
+ * Documents the `RequestAiOrdersDeps` interface as a named contract surface (export interface RequestAiOrdersDeps).
+
+ * Purpose: Supports maintainability by documenting why `RequestAiOrdersDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface RequestAiOrdersDeps {
-  getGameState: () => GameStateSnapshot;
-  getSelectedModel: () => string;
-  hasKey: () => boolean;
-  getToolNamesForEnabledGroups: (groupIds: string[]) => string[];
-  defaultGroupIds: string[];
-  requestOrders: (
+    /**
+   * Specifies the contract for the `getGameState` member (getGameState: () => GameStateSnapshot;).
+
+   * Contract: Describes stable behavior for callers of `getGameState` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getGameState: () => GameStateSnapshot;
+    /**
+   * Specifies the contract for the `getSelectedModel` member (getSelectedModel: () => string;).
+
+   * Contract: Describes stable behavior for callers of `getSelectedModel` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getSelectedModel: () => string;
+    /**
+   * Specifies the contract for the `hasKey` member (hasKey: () => boolean;).
+
+   * Contract: Describes stable behavior for callers of `hasKey` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hasKey: () => boolean;
+    /**
+   * Specifies the contract for the `getToolNamesForEnabledGroups` member (getToolNamesForEnabledGroups: (groupIds: string[]) => string[];).
+
+   * Contract: Describes stable behavior for callers of `getToolNamesForEnabledGroups` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getToolNamesForEnabledGroups: (groupIds: string[]) => string[];
+    /**
+   * Specifies the contract for the `defaultGroupIds` member (defaultGroupIds: string[];).
+
+   * Contract: Describes stable behavior for callers of `defaultGroupIds` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+defaultGroupIds: string[];
+    /**
+   * Specifies the contract for the `requestOrders` member (requestOrders: ( state: GameStateSnapshot, modelId: string, options: { enabledToolNames: string[]; signal?: AbortSignal; usePrecomputation?: bool).
+
+   * Contract: Describes stable behavior for callers of `requestOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+requestOrders: (
     state: GameStateSnapshot,
     modelId: string,
     options: { enabledToolNames: string[]; signal?: AbortSignal; usePrecomputation?: boolean }
   ) => Promise<RequestAiOrdersResult>;
-  controllerRef: { current: AbortController | null };
+    /**
+   * Specifies the contract for the `controllerRef` member (controllerRef: { current: AbortController | null };).
+
+   * Contract: Describes stable behavior for callers of `controllerRef` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+controllerRef: { current: AbortController | null };
 }
 
 /**
- * Logic for game:requestAiOrders. Returns AI orders without resolving the turn; supports cancellation via controllerRef.
- * Caller must wire cancelRequestAiOrders to the same controllerRef so the user can abort in-flight requests.
+ * Defines the `handleRequestAiOrders` function shape (export async function handleRequestAiOrders( payload: { enabledToolGroups?: string[] } | undefined, deps: RequestAiOrdersDeps ): Promise<RequestAiOrdersR).
+
+ * Purpose: Supports maintainability by documenting why `handleRequestAiOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export async function handleRequestAiOrders(
   payload: { enabledToolGroups?: string[] } | undefined,
@@ -88,7 +171,12 @@ export async function handleRequestAiOrders(
 }
 
 /**
- * Aborts the in-flight request for the given controller ref. Call when user toggles Run off.
+ * Defines the `cancelRequestAiOrders` function shape (export function cancelRequestAiOrders(controllerRef:).
+
+ * Purpose: Supports maintainability by documenting why `cancelRequestAiOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function cancelRequestAiOrders(controllerRef: { current: AbortController | null }): void {
   if (controllerRef.current) {
@@ -97,19 +185,91 @@ export function cancelRequestAiOrders(controllerRef: { current: AbortController 
   }
 }
 
+/**
+ * Documents the `ReadyDeps` interface as a named contract surface (export interface ReadyDeps).
+
+ * Purpose: Supports maintainability by documenting why `ReadyDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface ReadyDeps {
-  getGameState: () => GameStateSnapshot;
-  getGameStateForPlayer: (playerId: 'human' | 'opponent') => GameStateSnapshot;
-  getSelectedModel: () => string;
-  hasKey: () => boolean;
-  getToolNamesForEnabledGroups: (groupIds: string[]) => string[];
-  defaultGroupIds: string[];
-  requestOrders: (
+    /**
+   * Specifies the contract for the `getGameState` member (getGameState: () => GameStateSnapshot;).
+
+   * Contract: Describes stable behavior for callers of `getGameState` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getGameState: () => GameStateSnapshot;
+    /**
+   * Specifies the contract for the `getGameStateForPlayer` member (getGameStateForPlayer: (playerId: 'human' | 'opponent') => GameStateSnapshot;).
+
+   * Contract: Describes stable behavior for callers of `getGameStateForPlayer` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getGameStateForPlayer: (playerId: 'human' | 'opponent') => GameStateSnapshot;
+    /**
+   * Specifies the contract for the `getSelectedModel` member (getSelectedModel: () => string;).
+
+   * Contract: Describes stable behavior for callers of `getSelectedModel` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getSelectedModel: () => string;
+    /**
+   * Specifies the contract for the `hasKey` member (hasKey: () => boolean;).
+
+   * Contract: Describes stable behavior for callers of `hasKey` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hasKey: () => boolean;
+    /**
+   * Specifies the contract for the `getToolNamesForEnabledGroups` member (getToolNamesForEnabledGroups: (groupIds: string[]) => string[];).
+
+   * Contract: Describes stable behavior for callers of `getToolNamesForEnabledGroups` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getToolNamesForEnabledGroups: (groupIds: string[]) => string[];
+    /**
+   * Specifies the contract for the `defaultGroupIds` member (defaultGroupIds: string[];).
+
+   * Contract: Describes stable behavior for callers of `defaultGroupIds` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+defaultGroupIds: string[];
+    /**
+   * Specifies the contract for the `requestOrders` member (requestOrders: ( state: GameStateSnapshot, modelId: string, options: { enabledToolNames: string[]; usePrecomputation?: boolean } ) => Promise<).
+
+   * Contract: Describes stable behavior for callers of `requestOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+requestOrders: (
     state: GameStateSnapshot,
     modelId: string,
     options: { enabledToolNames: string[]; usePrecomputation?: boolean }
   ) => Promise<RequestAiOrdersResult>;
-  ready: (
+    /**
+   * Specifies the contract for the `ready` member (ready: ( aiOrders: { unitId: string; toH3Index: string }[], aiRangedOrders: RangedAttackOrder[], aiAirStrikeOrders?: AirStrikeOrder[], aiFer).
+
+   * Contract: Describes stable behavior for callers of `ready` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ready: (
     aiOrders: { unitId: string; toH3Index: string }[],
     aiRangedOrders: RangedAttackOrder[],
     aiAirStrikeOrders?: AirStrikeOrder[],
@@ -119,11 +279,12 @@ export interface ReadyDeps {
 }
 
 /**
- * Logic for game:ready. When useEventDrivenConsultation is true, uses pending AI orders from DB if present,
- * else generates orders from standing orders only (no LLM at Ready); after resolution runs afterResolution
- * only when aiPlanningRunEnabled is true.
- * When event-driven is false: if precomputedAiOrders and precomputedAiRangedOrders are present, uses them;
- * otherwise when aiPlanningRunEnabled requests orders from the LLM; when false, opponent uses standing orders only.
+ * Defines the `handleGameReady` function shape (export async function handleGameReady().
+
+ * Purpose: Supports maintainability by documenting why `handleGameReady` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export async function handleGameReady(
   payload: GameReadyIpcPayload | undefined,

@@ -1,6 +1,14 @@
 import * as assert from 'assert';
 import { normalizeSubmitOrdersPayload } from './submitOrdersPayload';
 
+/**
+ * Defines the `testLegacyArrayPayloadKeepsMovementOrders` function shape (function testLegacyArrayPayloadKeepsMovementOrders(): void).
+
+ * Purpose: Supports maintainability by documenting why `testLegacyArrayPayloadKeepsMovementOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testLegacyArrayPayloadKeepsMovementOrders(): void {
   const normalized = normalizeSubmitOrdersPayload([{ unitId: 'human-infantry-1', toH3Index: '8123fffffffffff' }]);
   assert.deepStrictEqual(normalized, {
@@ -8,6 +16,14 @@ function testLegacyArrayPayloadKeepsMovementOrders(): void {
   });
 }
 
+/**
+ * Defines the `testStructuredPayloadPreservesAirAndFerryOrders` function shape (function testStructuredPayloadPreservesAirAndFerryOrders(): void).
+
+ * Purpose: Supports maintainability by documenting why `testStructuredPayloadPreservesAirAndFerryOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testStructuredPayloadPreservesAirAndFerryOrders(): void {
   const normalized = normalizeSubmitOrdersPayload({
     movementOrders: [{ unitId: 'human-armor-1', toH3Index: '8125fffffffffff' }],
@@ -23,10 +39,17 @@ function testStructuredPayloadPreservesAirAndFerryOrders(): void {
   });
 }
 
+/**
+ * Defines the `run` function shape (function run(): void).
+
+ * Purpose: Supports maintainability by documenting why `run` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function run(): void {
   testLegacyArrayPayloadKeepsMovementOrders();
   testStructuredPayloadPreservesAirAndFerryOrders();
-  // eslint-disable-next-line no-console
   console.log('submitOrdersPayload.test.ts passed');
 }
 

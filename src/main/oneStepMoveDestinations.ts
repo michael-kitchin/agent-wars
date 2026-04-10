@@ -8,12 +8,12 @@ import type { GameStateSnapshot } from './gameDb';
 import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../shared/tacticalRanges';
 /**
- * Why this exists:
- *     Matches movement passability rules where seaports make a hex count as coastal for naval/embark context.
- * When to use:
- *     One-step destination filtering alongside `getValidDestinations`.
- * What to expect:
- *     `"coastal"` when seaportCount > 0 for that res-1 hex, otherwise the map hex terrain string.
+ * Defines the `resolveMovementTerrainForHex` function shape (export function resolveMovementTerrainForHex().
+
+ * Purpose: Supports maintainability by documenting why `resolveMovementTerrainForHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function resolveMovementTerrainForHex(
   hex: { h3Index: string; terrain: string } | undefined,
@@ -24,12 +24,12 @@ export function resolveMovementTerrainForHex(
 }
 
 /**
- * Why this exists:
- *     Lists legal one-step move targets for a unit using the same grid-distance and terrain rules as AI order validation.
- * When to use:
- *     Prompt precomputation (possible moves) and any path that must stay aligned with `validateAiOrder` movement checks.
- * What to expect:
- *     H3 indices within movement range and passable for the unit domain; includes occupied cells unless filtered by caller.
+ * Defines the `getValidDestinations` function shape (export function getValidDestinations().
+
+ * Purpose: Supports maintainability by documenting why `getValidDestinations` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getValidDestinations(
   unit: { h3Index: string; unitType: string },
@@ -57,12 +57,12 @@ export function getValidDestinations(
 }
 
 /**
- * Why this exists:
- *     Same as getValidDestinations but excludes occupied hexes for adjacent-cell fallback prompts.
- * When to use:
- *     OpenRouter fallback movement list when planning tools are disabled.
- * What to expect:
- *     Subset of getValidDestinations with no unit-occupied destination cells.
+ * Defines the `getValidDestinationsUnoccupied` function shape (export function getValidDestinationsUnoccupied().
+
+ * Purpose: Supports maintainability by documenting why `getValidDestinationsUnoccupied` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getValidDestinationsUnoccupied(
   unit: { h3Index: string; unitType: string },

@@ -27,10 +27,26 @@ import {
   LAND_UNITS_CANNOT_MOVE_WATER_OR_ARCTIC_TO_WATER_OR_ARCTIC_REASON,
 } from './game-actions/landMovementConstraints';
 
+/**
+ * Defines the `withTempDb` function shape (function withTempDb(runCase: () => void): void).
+
+ * Purpose: Supports maintainability by documenting why `withTempDb` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function withTempDb(runCase: () => void): void {
   withTempGameDb('aw-gameactions-multi-', runCase);
 }
 
+/**
+ * Defines the `findNearestLandSeaportHex` function shape (function findNearestLandSeaportHex(state: ReturnType<typeof getGameState>, originH3: string): string | null).
+
+ * Purpose: Supports maintainability by documenting why `findNearestLandSeaportHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function findNearestLandSeaportHex(state: ReturnType<typeof getGameState>, originH3: string): string | null {
   const landSeaportHexes = state.hexes
     .filter(
@@ -49,6 +65,14 @@ function findNearestLandSeaportHex(state: ReturnType<typeof getGameState>, origi
   return landSeaportHexes[0]?.h3Index ?? null;
 }
 
+/**
+ * Defines the `findAdjacentNavalPassableHex` function shape (function findAdjacentNavalPassableHex(state: ReturnType<typeof getGameState>, centerH3: string): string | null).
+
+ * Purpose: Supports maintainability by documenting why `findAdjacentNavalPassableHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function findAdjacentNavalPassableHex(state: ReturnType<typeof getGameState>, centerH3: string): string | null {
   const adjacentNavalHex = state.hexes.find((hex) => {
     const isNavalPassable = hex.terrain === 'water' || hex.terrain === 'coastal' || hex.terrainKind === 'coastal';
@@ -62,6 +86,14 @@ function findAdjacentNavalPassableHex(state: ReturnType<typeof getGameState>, ce
   return adjacentNavalHex?.h3Index ?? null;
 }
 
+/**
+ * Defines the `findAdjacentWaterHex` function shape (function findAdjacentWaterHex(state: ReturnType<typeof getGameState>, centerH3: string): string | null).
+
+ * Purpose: Supports maintainability by documenting why `findAdjacentWaterHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function findAdjacentWaterHex(state: ReturnType<typeof getGameState>, centerH3: string): string | null {
   const adjacentWaterHex = state.hexes.find((hex) => {
     if (hex.terrain !== 'water') return false;
@@ -74,6 +106,14 @@ function findAdjacentWaterHex(state: ReturnType<typeof getGameState>, centerH3: 
   return adjacentWaterHex?.h3Index ?? null;
 }
 
+/**
+ * Defines the `setHumanControlledPort` function shape (function setHumanControlledPort(h3Index: string): void).
+
+ * Purpose: Supports maintainability by documenting why `setHumanControlledPort` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function setHumanControlledPort(h3Index: string): void {
   const childRes4 = dbGetOne<{ h3Index: string }>(
     'SELECT h3_index AS h3Index FROM res4_feature_overrides WHERE parent_h3_index = ? LIMIT 1',
@@ -86,6 +126,14 @@ function setHumanControlledPort(h3Index: string): void {
   dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, 'human']);
 }
 
+/**
+ * Defines the `findAirportPairByDistance` function shape (function findAirportPairByDistance( state: ReturnType<typeof getGameState>, predicate: (distance: number) => boolean ): { originH3: string; destinationH3).
+
+ * Purpose: Supports maintainability by documenting why `findAirportPairByDistance` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function findAirportPairByDistance(
   state: ReturnType<typeof getGameState>,
   predicate: (distance: number) => boolean
@@ -116,10 +164,26 @@ function findAirportPairByDistance(
   return null;
 }
 
+/**
+ * Defines the `setArcticTerrain` function shape (function setArcticTerrain(h3Index: string): void).
+
+ * Purpose: Supports maintainability by documenting why `setArcticTerrain` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function setArcticTerrain(h3Index: string): void {
   dbRun('UPDATE hexes SET terrain = ?, terrain_kind = ? WHERE h3_index = ?', ['land', 'arctic', h3Index]);
 }
 
+/**
+ * Defines the `positionLandUnitOnAdjacentWaterPorts` function shape (function positionLandUnitOnAdjacentWaterPorts( state: ReturnType<typeof getGameState>, landUnitId: string ): { originWaterHex: string; destinationWaterHe).
+
+ * Purpose: Supports maintainability by documenting why `positionLandUnitOnAdjacentWaterPorts` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function positionLandUnitOnAdjacentWaterPorts(
   state: ReturnType<typeof getGameState>,
   landUnitId: string
@@ -134,23 +198,14 @@ function positionLandUnitOnAdjacentWaterPorts(
   return { originWaterHex: originWaterHex!.h3Index, destinationWaterHex: destinationWaterHex! };
 }
 
-function findHexByDistance(
-  state: ReturnType<typeof getGameState>,
-  originH3: string,
-  predicate: (distance: number) => boolean
-): string | null {
-  for (const hex of state.hexes) {
-    if (hex.h3Index === originH3) continue;
-    try {
-      const distance = gridDistance(originH3, hex.h3Index);
-      if (predicate(distance)) return hex.h3Index;
-    } catch {
-      // Ignore uncomputable pairs in tests and keep searching.
-    }
-  }
-  return null;
-}
+/**
+ * Defines the `findAdjacentHex` function shape (function findAdjacentHex(state: ReturnType<typeof getGameState>, originH3: string): string | null).
 
+ * Purpose: Supports maintainability by documenting why `findAdjacentHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function findAdjacentHex(state: ReturnType<typeof getGameState>, originH3: string): string | null {
   for (const hex of state.hexes) {
     if (hex.h3Index === originH3) continue;
@@ -163,18 +218,14 @@ function findAdjacentHex(state: ReturnType<typeof getGameState>, originH3: strin
   return null;
 }
 
-function findAdjacentLandHex(state: ReturnType<typeof getGameState>, originH3: string): string | null {
-  for (const hex of state.hexes) {
-    if (hex.h3Index === originH3 || hex.terrain !== 'land') continue;
-    try {
-      if (gridDistance(originH3, hex.h3Index) === 1) return hex.h3Index;
-    } catch {
-      // Ignore malformed test pairs.
-    }
-  }
-  return null;
-}
+/**
+ * Defines the `findAdjacentNonArcticLandHex` function shape (function findAdjacentNonArcticLandHex(state: ReturnType<typeof getGameState>, originH3: string): string | null).
 
+ * Purpose: Supports maintainability by documenting why `findAdjacentNonArcticLandHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function findAdjacentNonArcticLandHex(state: ReturnType<typeof getGameState>, originH3: string): string | null {
   for (const hex of state.hexes) {
     if (hex.h3Index === originH3 || hex.terrain !== 'land' || hex.terrainKind === 'arctic') continue;
@@ -187,6 +238,14 @@ function findAdjacentNonArcticLandHex(state: ReturnType<typeof getGameState>, or
   return null;
 }
 
+/**
+ * Defines the `findWaterHexWithAdjacentLand` function shape (function findWaterHexWithAdjacentLand(state: ReturnType<typeof getGameState>): { waterHex: string; adjacentLandHex: string } | null { for (const hex of state).
+
+ * Purpose: Supports maintainability by documenting why `findWaterHexWithAdjacentLand` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function findWaterHexWithAdjacentLand(state: ReturnType<typeof getGameState>): { waterHex: string; adjacentLandHex: string } | null {
   for (const hex of state.hexes) {
     if (hex.terrain !== 'water') continue;
@@ -203,6 +262,14 @@ function findWaterHexWithAdjacentLand(state: ReturnType<typeof getGameState>): {
   return null;
 }
 
+/**
+ * Defines the `testPreviewGroupedHappyPathSingleUnit` function shape (function testPreviewGroupedHappyPathSingleUnit(): void).
+
+ * Purpose: Supports maintainability by documenting why `testPreviewGroupedHappyPathSingleUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testPreviewGroupedHappyPathSingleUnit(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -215,6 +282,14 @@ function testPreviewGroupedHappyPathSingleUnit(): void {
   });
 }
 
+/**
+ * Defines the `testPreviewGroupedFailsForUnknownUnit` function shape (function testPreviewGroupedFailsForUnknownUnit(): void).
+
+ * Purpose: Supports maintainability by documenting why `testPreviewGroupedFailsForUnknownUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testPreviewGroupedFailsForUnknownUnit(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -225,6 +300,14 @@ function testPreviewGroupedFailsForUnknownUnit(): void {
   });
 }
 
+/**
+ * Defines the `testAssignGroupedRejectsEmptySelection` function shape (function testAssignGroupedRejectsEmptySelection(): void).
+
+ * Purpose: Supports maintainability by documenting why `testAssignGroupedRejectsEmptySelection` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testAssignGroupedRejectsEmptySelection(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -235,6 +318,14 @@ function testAssignGroupedRejectsEmptySelection(): void {
   });
 }
 
+/**
+ * Defines the `testAssignGroupedHappyPathSingleUnit` function shape (function testAssignGroupedHappyPathSingleUnit(): void).
+
+ * Purpose: Supports maintainability by documenting why `testAssignGroupedHappyPathSingleUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testAssignGroupedHappyPathSingleUnit(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -245,6 +336,14 @@ function testAssignGroupedHappyPathSingleUnit(): void {
   });
 }
 
+/**
+ * Defines the `testValidateGroupedRangedRejectsMeleeUnit` function shape (function testValidateGroupedRangedRejectsMeleeUnit(): void).
+
+ * Purpose: Supports maintainability by documenting why `testValidateGroupedRangedRejectsMeleeUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testValidateGroupedRangedRejectsMeleeUnit(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -257,6 +356,14 @@ function testValidateGroupedRangedRejectsMeleeUnit(): void {
   });
 }
 
+/**
+ * Defines the `testNavalOrdersCanEgressFromLandSeaportToAdjacentWaterOrCoastal` function shape (function testNavalOrdersCanEgressFromLandSeaportToAdjacentWaterOrCoastal(): void).
+
+ * Purpose: Supports maintainability by documenting why `testNavalOrdersCanEgressFromLandSeaportToAdjacentWaterOrCoastal` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testNavalOrdersCanEgressFromLandSeaportToAdjacentWaterOrCoastal(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -286,6 +393,14 @@ function testNavalOrdersCanEgressFromLandSeaportToAdjacentWaterOrCoastal(): void
   });
 }
 
+/**
+ * Defines the `testPreviewGroupedRejectsAirUnitsForMarchPlanning` function shape (function testPreviewGroupedRejectsAirUnitsForMarchPlanning(): void).
+
+ * Purpose: Supports maintainability by documenting why `testPreviewGroupedRejectsAirUnitsForMarchPlanning` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testPreviewGroupedRejectsAirUnitsForMarchPlanning(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -309,6 +424,14 @@ function testPreviewGroupedRejectsAirUnitsForMarchPlanning(): void {
   });
 }
 
+/**
+ * Defines the `testPreviewGroupedAcceptsAirFerryDestinationWithinRange` function shape (function testPreviewGroupedAcceptsAirFerryDestinationWithinRange(): void).
+
+ * Purpose: Supports maintainability by documenting why `testPreviewGroupedAcceptsAirFerryDestinationWithinRange` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testPreviewGroupedAcceptsAirFerryDestinationWithinRange(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -330,6 +453,14 @@ function testPreviewGroupedAcceptsAirFerryDestinationWithinRange(): void {
   });
 }
 
+/**
+ * Defines the `testAssignMarchRejectsAirUnits` function shape (function testAssignMarchRejectsAirUnits(): void).
+
+ * Purpose: Supports maintainability by documenting why `testAssignMarchRejectsAirUnits` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testAssignMarchRejectsAirUnits(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -349,6 +480,14 @@ function testAssignMarchRejectsAirUnits(): void {
   });
 }
 
+/**
+ * Defines the `testPreviewEmbarkedLandUnitOnWaterShowsInvalidWithoutPathPlanning` function shape (function testPreviewEmbarkedLandUnitOnWaterShowsInvalidWithoutPathPlanning(): void).
+
+ * Purpose: Supports maintainability by documenting why `testPreviewEmbarkedLandUnitOnWaterShowsInvalidWithoutPathPlanning` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testPreviewEmbarkedLandUnitOnWaterShowsInvalidWithoutPathPlanning(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -382,6 +521,14 @@ function testPreviewEmbarkedLandUnitOnWaterShowsInvalidWithoutPathPlanning(): vo
   });
 }
 
+/**
+ * Defines the `testEmbarkedLandUnitCanPreviewAndAssignFromSeaportWaterToAdjacentLand` function shape (function testEmbarkedLandUnitCanPreviewAndAssignFromSeaportWaterToAdjacentLand(): void).
+
+ * Purpose: Supports maintainability by documenting why `testEmbarkedLandUnitCanPreviewAndAssignFromSeaportWaterToAdjacentLand` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testEmbarkedLandUnitCanPreviewAndAssignFromSeaportWaterToAdjacentLand(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -409,6 +556,14 @@ function testEmbarkedLandUnitCanPreviewAndAssignFromSeaportWaterToAdjacentLand()
   });
 }
 
+/**
+ * Defines the `testAssignMarchForEmbarkedLandUnitImmediatelyDebarksAndClearsSealiftSlot` function shape (function testAssignMarchForEmbarkedLandUnitImmediatelyDebarksAndClearsSealiftSlot(): void).
+
+ * Purpose: Supports maintainability by documenting why `testAssignMarchForEmbarkedLandUnitImmediatelyDebarksAndClearsSealiftSlot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testAssignMarchForEmbarkedLandUnitImmediatelyDebarksAndClearsSealiftSlot(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -442,6 +597,14 @@ function testAssignMarchForEmbarkedLandUnitImmediatelyDebarksAndClearsSealiftSlo
   });
 }
 
+/**
+ * Defines the `testEmbarkImmediatelyCancelsExistingHumanMovementOrder` function shape (function testEmbarkImmediatelyCancelsExistingHumanMovementOrder(): void).
+
+ * Purpose: Supports maintainability by documenting why `testEmbarkImmediatelyCancelsExistingHumanMovementOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testEmbarkImmediatelyCancelsExistingHumanMovementOrder(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -482,6 +645,14 @@ function testEmbarkImmediatelyCancelsExistingHumanMovementOrder(): void {
   });
 }
 
+/**
+ * Defines the `testReadyIncludesEmbarkedCargoFollowMoveForNavalMovement` function shape (function testReadyIncludesEmbarkedCargoFollowMoveForNavalMovement(): void).
+
+ * Purpose: Supports maintainability by documenting why `testReadyIncludesEmbarkedCargoFollowMoveForNavalMovement` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testReadyIncludesEmbarkedCargoFollowMoveForNavalMovement(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -512,6 +683,14 @@ function testReadyIncludesEmbarkedCargoFollowMoveForNavalMovement(): void {
   });
 }
 
+/**
+ * Defines the `testSubmitOrdersAllowsLandMovementToSingleArcticHex` function shape (function testSubmitOrdersAllowsLandMovementToSingleArcticHex(): void).
+
+ * Purpose: Supports maintainability by documenting why `testSubmitOrdersAllowsLandMovementToSingleArcticHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testSubmitOrdersAllowsLandMovementToSingleArcticHex(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -527,6 +706,14 @@ function testSubmitOrdersAllowsLandMovementToSingleArcticHex(): void {
   });
 }
 
+/**
+ * Defines the `testSubmitOrdersAllowsLandMovementFromSingleArcticHex` function shape (function testSubmitOrdersAllowsLandMovementFromSingleArcticHex(): void).
+
+ * Purpose: Supports maintainability by documenting why `testSubmitOrdersAllowsLandMovementFromSingleArcticHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testSubmitOrdersAllowsLandMovementFromSingleArcticHex(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -543,6 +730,14 @@ function testSubmitOrdersAllowsLandMovementFromSingleArcticHex(): void {
   });
 }
 
+/**
+ * Defines the `testSubmitOrdersRejectsLandWaterToWaterPortMovement` function shape (function testSubmitOrdersRejectsLandWaterToWaterPortMovement(): void).
+
+ * Purpose: Supports maintainability by documenting why `testSubmitOrdersRejectsLandWaterToWaterPortMovement` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testSubmitOrdersRejectsLandWaterToWaterPortMovement(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -557,6 +752,14 @@ function testSubmitOrdersRejectsLandWaterToWaterPortMovement(): void {
   });
 }
 
+/**
+ * Defines the `testPreviewShowsInvalidForLandWaterToWaterPortMovement` function shape (function testPreviewShowsInvalidForLandWaterToWaterPortMovement(): void).
+
+ * Purpose: Supports maintainability by documenting why `testPreviewShowsInvalidForLandWaterToWaterPortMovement` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testPreviewShowsInvalidForLandWaterToWaterPortMovement(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -570,6 +773,14 @@ function testPreviewShowsInvalidForLandWaterToWaterPortMovement(): void {
   });
 }
 
+/**
+ * Defines the `testSubmitOrdersRejectsLandWaterToArcticPortMovement` function shape (function testSubmitOrdersRejectsLandWaterToArcticPortMovement(): void).
+
+ * Purpose: Supports maintainability by documenting why `testSubmitOrdersRejectsLandWaterToArcticPortMovement` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testSubmitOrdersRejectsLandWaterToArcticPortMovement(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -591,6 +802,14 @@ function testSubmitOrdersRejectsLandWaterToArcticPortMovement(): void {
   });
 }
 
+/**
+ * Defines the `run` function shape (function run(): void).
+
+ * Purpose: Supports maintainability by documenting why `run` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function run(): void {
   testPreviewGroupedHappyPathSingleUnit();
   testPreviewGroupedFailsForUnknownUnit();

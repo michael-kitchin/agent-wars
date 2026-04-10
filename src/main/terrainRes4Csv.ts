@@ -8,18 +8,42 @@ import * as path from 'path';
 import { logDebug, logError, logTrace } from './logger';
 import { isPipelineTerrainKind, type PipelineTerrainKind } from '../shared/pipelineTerrain';
 
+/**
+ * Documents the `LegacyRes4CsvTerrainKind` type alias (type LegacyRes4CsvTerrainKind).
+
+ * Purpose: Supports maintainability by documenting why `LegacyRes4CsvTerrainKind` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type LegacyRes4CsvTerrainKind = PipelineTerrainKind | 'urban';
 
+/**
+ * Documents the module-scope binding `CSV_FILENAME` (CSV_FILENAME).
+
+ * Purpose: Supports maintainability by documenting why `CSV_FILENAME` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const CSV_FILENAME = 'terrain_res4_exceptions.csv';
+/**
+ * Documents the module-scope binding `CSV_REL_SEGMENTS` (CSV_REL_SEGMENTS).
+
+ * Purpose: Supports maintainability by documenting why `CSV_REL_SEGMENTS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const CSV_REL_SEGMENTS = ['data', 'generated', CSV_FILENAME];
 
 /**
- * Why this exists:
- *     Resolve the generated exceptions CSV for parity harnesses (same search order as former runtime loader).
- * When to use:
- *     Parity tests that compare TS metadata classification to pipeline CSV output.
- * What to expect:
- *     Throws when the file is missing from all candidate locations.
+ * Defines the `resolveTerrainRes4ExceptionsCsvPath` function shape (export function resolveTerrainRes4ExceptionsCsvPath(): string).
+
+ * Purpose: Supports maintainability by documenting why `resolveTerrainRes4ExceptionsCsvPath` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function resolveTerrainRes4ExceptionsCsvPath(): string {
   logDebug('terrainRes4Csv resolveTerrainRes4ExceptionsCsvPath');
@@ -43,12 +67,12 @@ export function resolveTerrainRes4ExceptionsCsvPath(): string {
 }
 
 /**
- * Why this exists:
- *     Parse `terrain_res4_exceptions.csv` rows into a child-h3 → terrain-kind map.
- * When to use:
- *     From `terrainMetadataParity.test.ts` or offline QA scripts.
- * What to expect:
- *     Duplicate `h3_index` rows throw; invalid terrain labels throw.
+ * Defines the `parseTerrainRes4ExceptionsCsvText` function shape (export function parseTerrainRes4ExceptionsCsvText(fileText: string): Map<string, LegacyRes4CsvTerrainKind> { logTrace('terrainRes4Csv parseTerrainRes4Excepti).
+
+ * Purpose: Supports maintainability by documenting why `parseTerrainRes4ExceptionsCsvText` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function parseTerrainRes4ExceptionsCsvText(fileText: string): Map<string, LegacyRes4CsvTerrainKind> {
   logTrace('terrainRes4Csv parseTerrainRes4ExceptionsCsvText');

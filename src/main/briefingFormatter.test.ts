@@ -9,24 +9,96 @@ import type { GameStateSnapshot } from './gameDb';
 import type { PrecomputationResult, UnitAssessmentResult } from './precomputation';
 import { formatBriefing } from './briefingFormatter';
 
+/**
+ * Documents the module-scope binding `fixtureOriginH3` (fixtureOriginH3).
+
+ * Purpose: Supports maintainability by documenting why `fixtureOriginH3` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const fixtureOriginH3 = latLngToCell(0, 0, 3);
+/**
+ * Documents the module-scope binding `fixtureNeighborH3` (fixtureNeighborH3).
+
+ * Purpose: Supports maintainability by documenting why `fixtureNeighborH3` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const fixtureNeighborH3 = gridDisk(fixtureOriginH3, 1).find((h3) => h3 !== fixtureOriginH3)!;
 
+/**
+ * Documents the module-scope binding `fixtureState` (fixtureState: GameStateSnapshot).
+
+ * Purpose: Supports maintainability by documenting why `fixtureState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const fixtureState: GameStateSnapshot = {
-  hexes: [
+    /**
+   * Documents the object literal property `hexes` (hexes: [ { h3Index: fixtureOriginH3, terrain: 'land', terrainKind: 'plains' }, { h3Index: fixtureNeighborH3, terrain: 'land', terrainKind: 'plains' },).
+
+   * Purpose: Supports maintainability by documenting why `hexes` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hexes: [
     { h3Index: fixtureOriginH3, terrain: 'land', terrainKind: 'plains' },
     { h3Index: fixtureNeighborH3, terrain: 'land', terrainKind: 'plains' },
   ],
-  units: [
+    /**
+   * Documents the object literal property `units` (units: [ { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: fixtureOriginH3 }, { id: 'opponent-infantry-1', player: 'opponent',).
+
+   * Purpose: Supports maintainability by documenting why `units` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+units: [
     { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: fixtureOriginH3 },
     { id: 'opponent-infantry-1', player: 'opponent', unitType: 'infantry', h3Index: fixtureOriginH3 },
     { id: 'human-inf-1', player: 'human', unitType: 'infantry', h3Index: fixtureNeighborH3 },
   ],
-  phase: 'planning',
-  turnNumber: 2,
-  pendingOrders: [],
+    /**
+   * Documents the object literal property `phase` (phase: 'planning').
+
+   * Purpose: Supports maintainability by documenting why `phase` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+phase: 'planning',
+    /**
+   * Documents the object literal property `turnNumber` (turnNumber: 2).
+
+   * Purpose: Supports maintainability by documenting why `turnNumber` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+turnNumber: 2,
+    /**
+   * Documents the object literal property `pendingOrders` (pendingOrders: []).
+
+   * Purpose: Supports maintainability by documenting why `pendingOrders` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+pendingOrders: [],
 };
 
+/**
+ * Documents the module-scope binding `fixtureUnitAssessments` (fixtureUnitAssessments: UnitAssessmentResult[]).
+
+ * Purpose: Supports maintainability by documenting why `fixtureUnitAssessments` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const fixtureUnitAssessments: UnitAssessmentResult[] = [
   {
     unitId: 'opponent-armor-1',
@@ -62,11 +134,43 @@ const fixtureUnitAssessments: UnitAssessmentResult[] = [
   },
 ];
 
+/**
+ * Documents the module-scope binding `precomputed` (precomputed: PrecomputationResult).
+
+ * Purpose: Supports maintainability by documenting why `precomputed` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const precomputed: PrecomputationResult = {
-  unitAssessments: fixtureUnitAssessments,
-  hexAssessments: [],
+    /**
+   * Documents the object literal property `unitAssessments` (unitAssessments: fixtureUnitAssessments).
+
+   * Purpose: Supports maintainability by documenting why `unitAssessments` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitAssessments: fixtureUnitAssessments,
+    /**
+   * Documents the object literal property `hexAssessments` (hexAssessments: []).
+
+   * Purpose: Supports maintainability by documenting why `hexAssessments` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hexAssessments: [],
 };
 
+/**
+ * Defines the `testFormatBriefingContainsSections` function shape (function testFormatBriefingContainsSections(): void).
+
+ * Purpose: Supports maintainability by documenting why `testFormatBriefingContainsSections` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testFormatBriefingContainsSections(): void {
   const standingOrderText = '=== STANDING ORDER STATUS ===\n- opponent-infantry-1: MARCH to [1.000, 1.000] — en_route';
   const memoryText = 'Remember: push south.';
@@ -92,6 +196,14 @@ function testFormatBriefingContainsSections(): void {
   assert.ok(!out.includes('undefined'), 'no raw undefined');
 }
 
+/**
+ * Defines the `testFormatBriefingActiveCallbacksWithSubscriptions` function shape (function testFormatBriefingActiveCallbacksWithSubscriptions(): void).
+
+ * Purpose: Supports maintainability by documenting why `testFormatBriefingActiveCallbacksWithSubscriptions` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testFormatBriefingActiveCallbacksWithSubscriptions(): void {
   const subs = [
     { event: 'turns', params: { n: 3 }, subscribedTurn: 10 },
@@ -103,6 +215,14 @@ function testFormatBriefingActiveCallbacksWithSubscriptions(): void {
   assert.ok(out.includes('unit_engaged(opponent-armor-1)'), 'unit_engaged subscription line');
 }
 
+/**
+ * Defines the `testFormatBriefingIncludesLossRowsWhenProvided` function shape (function testFormatBriefingIncludesLossRowsWhenProvided(): void).
+
+ * Purpose: Supports maintainability by documenting why `testFormatBriefingIncludesLossRowsWhenProvided` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testFormatBriefingIncludesLossRowsWhenProvided(): void {
   const out = formatBriefing(
     fixtureState,
@@ -131,6 +251,14 @@ function testFormatBriefingIncludesLossRowsWhenProvided(): void {
   assert.ok(out.includes('| 6 | human-infantry-1 | enemy | melee_or_other | opponent-armor-1 |'));
 }
 
+/**
+ * Defines the `testFormatBriefingUnitTableRows` function shape (function testFormatBriefingUnitTableRows(): void).
+
+ * Purpose: Supports maintainability by documenting why `testFormatBriefingUnitTableRows` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testFormatBriefingUnitTableRows(): void {
   const out = formatBriefing(fixtureState, precomputed, '', '');
   const unitTableStart = out.indexOf('| Unit ID |');
@@ -140,6 +268,14 @@ function testFormatBriefingUnitTableRows(): void {
   assert.ok(unitTable.includes('yes') || unitTable.includes('no'), 'action needed column');
 }
 
+/**
+ * Defines the `testFormatBriefingPossibleActionsArmorRanged` function shape (function testFormatBriefingPossibleActionsArmorRanged(): void).
+
+ * Purpose: Supports maintainability by documenting why `testFormatBriefingPossibleActionsArmorRanged` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testFormatBriefingPossibleActionsArmorRanged(): void {
   const out = formatBriefing(fixtureState, precomputed, '', '');
   assert.ok(out.includes('opponent-armor-1'));
@@ -147,6 +283,14 @@ function testFormatBriefingPossibleActionsArmorRanged(): void {
   assert.ok(out.includes('| Unit ID | Unit Type | Action Types | Hex | Distance | Enemy Units | Hex Features |'));
 }
 
+/**
+ * Documents the module-scope binding `tests` (tests).
+
+ * Purpose: Supports maintainability by documenting why `tests` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const tests = [
   { name: 'formatBriefing contains all sections', fn: testFormatBriefingContainsSections },
   { name: 'formatBriefing unit table rows', fn: testFormatBriefingUnitTableRows },
@@ -155,6 +299,14 @@ const tests = [
   { name: 'formatBriefing losses table rows', fn: testFormatBriefingIncludesLossRowsWhenProvided },
 ];
 
+/**
+ * Defines the `run` function shape (function run(): void).
+
+ * Purpose: Supports maintainability by documenting why `run` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function run(): void {
   for (const t of tests) {
     try {

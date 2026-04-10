@@ -7,5 +7,5 @@
     "rootDir": "src",
     "lib": ["ES2022"]
   },
-  "include": ["src/main/**/*.ts", "src/shared/**/*.ts"]
+  "include": ["src/main/**/*.ts", "src/main/**/*.d.ts", "src/shared/**/*.ts"]
 }

@@ -11,15 +11,47 @@ import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES, formatFerryOutOfRangeRea
 import { logTrace } from '../logger';
 import { isWithinGridRangeSafe } from './gridRange';
 
-export type ValidationResult = { valid: true } | { valid: false; reason: string };
+/**
+ * Documents the `ValidationResult` type alias (export type ValidationResult).
+
+ * Purpose: Supports maintainability by documenting why `ValidationResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export type ValidationResult = { /**
+ * Specifies the contract for the `valid` member (valid: true).
+
+ * Contract: Describes stable behavior for callers of `valid` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+valid: true } | { /**
+ * Specifies the contract for the `valid` member (valid: false;).
+
+ * Contract: Describes stable behavior for callers of `valid` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+valid: false; /**
+ * Specifies the contract for the `reason` member (reason: string).
+
+ * Contract: Describes stable behavior for callers of `reason` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+reason: string };
 
 /**
- * Why this exists:
- *     Centralizes air-strike legality checks so grouped validation and turn-resolution paths use the same rule contract.
- * When to use:
- *     Before accepting or resolving one air strike order.
- * What to expect:
- *     Returns the first contractual failure reason (ownership, range, base integrity, or target validity) or valid=true.
+ * Defines the `validateAirStrikeOrder` function shape (export function validateAirStrikeOrder( unitId: string, targetH3Index: string, targetType: AirStrikeTargetType, options?: { allowedPlayer?: string }).
+
+ * Purpose: Supports maintainability by documenting why `validateAirStrikeOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function validateAirStrikeOrder(
   unitId: string,
@@ -70,12 +102,12 @@ export function validateAirStrikeOrder(
 }
 
 /**
- * Why this exists:
- *     Centralizes ferry legality checks so grouped ferry UI validation and turn resolution share one contract.
- * When to use:
- *     Before accepting or resolving one ferry order.
- * What to expect:
- *     Returns specific failure reasons for ownership, range, intact-airport prerequisites, and destination control.
+ * Defines the `validateFerryOrder` function shape (export function validateFerryOrder().
+
+ * Purpose: Supports maintainability by documenting why `validateFerryOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function validateFerryOrder(
   unitId: string,

@@ -13,6 +13,14 @@ import {
   type TerrainNamingRecordRes4,
 } from './terrainNamingLoad';
 
+/**
+ * Defines the `testNamesForFirstOccurringScalerankKeepsFirstRankOnly` function shape (function testNamesForFirstOccurringScalerankKeepsFirstRankOnly(): void).
+
+ * Purpose: Supports maintainability by documenting why `testNamesForFirstOccurringScalerankKeepsFirstRankOnly` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testNamesForFirstOccurringScalerankKeepsFirstRankOnly(): void {
   const line = namesForFirstOccurringScalerank([
     { name: 'Bridgeport', scalerank: 4 },
@@ -21,6 +29,14 @@ function testNamesForFirstOccurringScalerankKeepsFirstRankOnly(): void {
   assert.strictEqual(line, 'Bridgeport');
 }
 
+/**
+ * Defines the `testNamesForFirstOccurringScalerankListKeepsSourceOrder` function shape (function testNamesForFirstOccurringScalerankListKeepsSourceOrder(): void).
+
+ * Purpose: Supports maintainability by documenting why `testNamesForFirstOccurringScalerankListKeepsSourceOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testNamesForFirstOccurringScalerankListKeepsSourceOrder(): void {
   const list = namesForFirstOccurringScalerankList([
     { name: 'B', scalerank: 2 },
@@ -30,6 +46,14 @@ function testNamesForFirstOccurringScalerankListKeepsSourceOrder(): void {
   assert.deepStrictEqual(list, ['B', 'A']);
 }
 
+/**
+ * Defines the `testRes4PrefersCityLineOverStates` function shape (function testRes4PrefersCityLineOverStates(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRes4PrefersCityLineOverStates` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRes4PrefersCityLineOverStates(): void {
   const record: TerrainNamingRecordRes4 = {
     h3_index: '842a109ffffffff',
@@ -66,6 +90,14 @@ function testRes4PrefersCityLineOverStates(): void {
   assert.strictEqual(preferredNamingLineForRes4Record(record), 'United States of America: Connecticut, New York');
 }
 
+/**
+ * Defines the `testRes4FallsBackToStatesWhenNoCities` function shape (function testRes4FallsBackToStatesWhenNoCities(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRes4FallsBackToStatesWhenNoCities` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRes4FallsBackToStatesWhenNoCities(): void {
   const record: TerrainNamingRecordRes4 = {
     h3_index: '846a035ffffffff',
@@ -97,6 +129,14 @@ function testRes4FallsBackToStatesWhenNoCities(): void {
   );
 }
 
+/**
+ * Defines the `testRes1UsesFirstOccurringStateScalerank` function shape (function testRes1UsesFirstOccurringStateScalerank(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRes1UsesFirstOccurringStateScalerank` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRes1UsesFirstOccurringStateScalerank(): void {
   const record: TerrainNamingRecordRes1 = {
     h3_index: '81003ffffffffff',
@@ -112,6 +152,14 @@ function testRes1UsesFirstOccurringStateScalerank(): void {
   assert.strictEqual(preferredNamingLineForRes1Record(record), 'X: Xland');
 }
 
+/**
+ * Defines the `testRes4FallsBackToCountriesWhenNoCitiesOrStates` function shape (function testRes4FallsBackToCountriesWhenNoCitiesOrStates(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRes4FallsBackToCountriesWhenNoCitiesOrStates` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRes4FallsBackToCountriesWhenNoCitiesOrStates(): void {
   const record: TerrainNamingRecordRes4 = {
     h3_index: '846a035ffffffff',
@@ -129,6 +177,14 @@ function testRes4FallsBackToCountriesWhenNoCitiesOrStates(): void {
   );
 }
 
+/**
+ * Defines the `testRes4EscalatesCitiesToStatesWhenCityListTooLarge` function shape (function testRes4EscalatesCitiesToStatesWhenCityListTooLarge(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRes4EscalatesCitiesToStatesWhenCityListTooLarge` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRes4EscalatesCitiesToStatesWhenCityListTooLarge(): void {
   const cities = Array.from({ length: TOOLTIP_NAME_LIST_MAX_ITEMS + 1 }, (_, i) => ({
     name: `City ${i + 1}`,
@@ -149,6 +205,14 @@ function testRes4EscalatesCitiesToStatesWhenCityListTooLarge(): void {
   assert.strictEqual(preferredNamingLineForRes4Record(record), 'X: Country A');
 }
 
+/**
+ * Defines the `testRes4EscalatesStatesToCountriesWhenStateListTooLarge` function shape (function testRes4EscalatesStatesToCountriesWhenStateListTooLarge(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRes4EscalatesStatesToCountriesWhenStateListTooLarge` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRes4EscalatesStatesToCountriesWhenStateListTooLarge(): void {
   const states = Array.from({ length: TOOLTIP_NAME_LIST_MAX_ITEMS + 2 }, (_, i) => ({
     name: `State ${i + 1}`,
@@ -167,6 +231,14 @@ function testRes4EscalatesStatesToCountriesWhenStateListTooLarge(): void {
   assert.strictEqual(preferredNamingLineForRes4Record(record), 'X: Country A, Country B');
 }
 
+/**
+ * Defines the `testRes1FallsBackToCountriesWhenNoStates` function shape (function testRes1FallsBackToCountriesWhenNoStates(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRes1FallsBackToCountriesWhenNoStates` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRes1FallsBackToCountriesWhenNoStates(): void {
   const record: TerrainNamingRecordRes1 = {
     h3_index: '81003ffffffffff',
@@ -179,6 +251,14 @@ function testRes1FallsBackToCountriesWhenNoStates(): void {
   assert.strictEqual(preferredNamingLineForRes1Record(record), 'X: Country A, Country B');
 }
 
+/**
+ * Defines the `testRes1EscalatesStatesToCountriesWhenStateListTooLarge` function shape (function testRes1EscalatesStatesToCountriesWhenStateListTooLarge(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRes1EscalatesStatesToCountriesWhenStateListTooLarge` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRes1EscalatesStatesToCountriesWhenStateListTooLarge(): void {
   const states = Array.from({ length: TOOLTIP_NAME_LIST_MAX_ITEMS + 1 }, (_, i) => ({
     name: `State ${i + 1}`,
@@ -196,6 +276,14 @@ function testRes1EscalatesStatesToCountriesWhenStateListTooLarge(): void {
   assert.strictEqual(preferredNamingLineForRes1Record(record), 'X: Country A, Country B');
 }
 
+/**
+ * Defines the `testRes4GroupsCitiesByCountryAndState` function shape (function testRes4GroupsCitiesByCountryAndState(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRes4GroupsCitiesByCountryAndState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRes4GroupsCitiesByCountryAndState(): void {
   const record: TerrainNamingRecordRes4 = {
     h3_index: '8400001ffffffff',
@@ -216,6 +304,14 @@ function testRes4GroupsCitiesByCountryAndState(): void {
   );
 }
 
+/**
+ * Defines the `testRes4GroupsStatesByCountryWithinSameScalerank` function shape (function testRes4GroupsStatesByCountryWithinSameScalerank(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRes4GroupsStatesByCountryWithinSameScalerank` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRes4GroupsStatesByCountryWithinSameScalerank(): void {
   const record: TerrainNamingRecordRes4 = {
     h3_index: '8400001ffffffff',
@@ -231,6 +327,14 @@ function testRes4GroupsStatesByCountryWithinSameScalerank(): void {
   assert.strictEqual(preferredNamingLineForRes4Record(record), 'Country1: State1, State2; Country2: State3, State4');
 }
 
+/**
+ * Defines the `testNoFirstLineWhenNoCitiesStatesOrCountries` function shape (function testNoFirstLineWhenNoCitiesStatesOrCountries(): void).
+
+ * Purpose: Supports maintainability by documenting why `testNoFirstLineWhenNoCitiesStatesOrCountries` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testNoFirstLineWhenNoCitiesStatesOrCountries(): void {
   const record: TerrainNamingRecordRes4 = {
     h3_index: '846a035ffffffff',
@@ -241,6 +345,14 @@ function testNoFirstLineWhenNoCitiesStatesOrCountries(): void {
   assert.strictEqual(preferredNamingLineForRes4Record(record), null);
 }
 
+/**
+ * Defines the `testRes4FallsBackToStatesWhenCitiesMissSomeStates` function shape (function testRes4FallsBackToStatesWhenCitiesMissSomeStates(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRes4FallsBackToStatesWhenCitiesMissSomeStates` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRes4FallsBackToStatesWhenCitiesMissSomeStates(): void {
   const record: TerrainNamingRecordRes4 = {
     h3_index: '842a109ffffffff',
@@ -270,6 +382,14 @@ function testRes4FallsBackToStatesWhenCitiesMissSomeStates(): void {
   assert.strictEqual(preferredNamingLineForRes4Record(record), 'United States of America: Connecticut, New York');
 }
 
+/**
+ * Defines the `testRes1FallsBackToCountriesWhenStatesMissSomeCountries` function shape (function testRes1FallsBackToCountriesWhenStatesMissSomeCountries(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRes1FallsBackToCountriesWhenStatesMissSomeCountries` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRes1FallsBackToCountriesWhenStatesMissSomeCountries(): void {
   const record: TerrainNamingRecordRes1 = {
     h3_index: '81003ffffffffff',
@@ -282,6 +402,14 @@ function testRes1FallsBackToCountriesWhenStatesMissSomeCountries(): void {
   assert.strictEqual(preferredNamingLineForRes1Record(record), 'X: Country A, Country B');
 }
 
+/**
+ * Defines the `testRes4UsesTopFiveCitiesWhenTheyCoverStatesAndCountries` function shape (function testRes4UsesTopFiveCitiesWhenTheyCoverStatesAndCountries(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRes4UsesTopFiveCitiesWhenTheyCoverStatesAndCountries` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRes4UsesTopFiveCitiesWhenTheyCoverStatesAndCountries(): void {
   const record: TerrainNamingRecordRes4 = {
     h3_index: '842a109ffffffff',
@@ -311,6 +439,14 @@ function testRes4UsesTopFiveCitiesWhenTheyCoverStatesAndCountries(): void {
   );
 }
 
+/**
+ * Defines the `testRes1UsesTopFiveStatesWhenTheyCoverCountriesAndContinents` function shape (function testRes1UsesTopFiveStatesWhenTheyCoverCountriesAndContinents(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRes1UsesTopFiveStatesWhenTheyCoverCountriesAndContinents` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRes1UsesTopFiveStatesWhenTheyCoverCountriesAndContinents(): void {
   const record: TerrainNamingRecordRes1 = {
     h3_index: '81003ffffffffff',
@@ -330,6 +466,14 @@ function testRes1UsesTopFiveStatesWhenTheyCoverCountriesAndContinents(): void {
   assert.strictEqual(preferredNamingLineForRes1Record(record), 'Country A: State 1, State 2, State 5; Country B: State 3, State 4');
 }
 
+/**
+ * Defines the `main` function shape (function main(): void).
+
+ * Purpose: Supports maintainability by documenting why `main` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function main(): void {
   testNamesForFirstOccurringScalerankKeepsFirstRankOnly();
   testNamesForFirstOccurringScalerankListKeepsSourceOrder();

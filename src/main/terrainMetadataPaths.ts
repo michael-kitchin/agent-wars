@@ -6,21 +6,60 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { logDebug, logError } from './logger';
 
+/**
+ * Documents the module-scope binding `RES1_SEGMENTS` (RES1_SEGMENTS).
+
+ * Purpose: Supports maintainability by documenting why `RES1_SEGMENTS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const RES1_SEGMENTS = ['data', 'generated', 'terrain_res1_metadata.json'] as const;
+/**
+ * Documents the module-scope binding `RES4_SEGMENTS` (RES4_SEGMENTS).
+
+ * Purpose: Supports maintainability by documenting why `RES4_SEGMENTS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const RES4_SEGMENTS = ['data', 'generated', 'terrain_res4_metadata.json'] as const;
+/**
+ * Documents the module-scope binding `RES1_NAMING_SEGMENTS` (RES1_NAMING_SEGMENTS).
+
+ * Purpose: Supports maintainability by documenting why `RES1_NAMING_SEGMENTS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const RES1_NAMING_SEGMENTS = ['data', 'generated', 'terrain_res1_naming.json'] as const;
+/**
+ * Documents the module-scope binding `RES4_NAMING_SEGMENTS` (RES4_NAMING_SEGMENTS).
+
+ * Purpose: Supports maintainability by documenting why `RES4_NAMING_SEGMENTS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const RES4_NAMING_SEGMENTS = ['data', 'generated', 'terrain_res4_naming.json'] as const;
 
-/** Test-only override roots (checked before standard resolution). */
+/**
+ * Documents the module-scope binding `testOverrideRoot` (testOverrideRoot: string | null).
+
+ * Purpose: Supports maintainability by documenting why `testOverrideRoot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 let testOverrideRoot: string | null = null;
 
 /**
- * Why this exists:
- *     Point terrain loaders at fixture directories during main-process tests so classification does not depend on repo `data/generated`.
- * When to use:
- *     Call from test harness before `resetGameForNewMatch` when needed; pair with `clearTerrainMetadataPathOverrideForTests`.
- * What to expect:
- *     When set, resolution tries `join(overrideRoot, ...segments)` first for each metadata file.
+ * Defines the `setTerrainMetadataPathOverrideForTests` function shape (export function setTerrainMetadataPathOverrideForTests(overrideRoot: string | null): void).
+
+ * Purpose: Supports maintainability by documenting why `setTerrainMetadataPathOverrideForTests` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function setTerrainMetadataPathOverrideForTests(overrideRoot: string | null): void {
   logDebug('terrainMetadataPaths setTerrainMetadataPathOverrideForTests', {
@@ -30,18 +69,26 @@ export function setTerrainMetadataPathOverrideForTests(overrideRoot: string | nu
 }
 
 /**
- * Why this exists:
- *     Clear test fixture path override after tests complete.
- * When to use:
- *     In test `finally` blocks after calling `setTerrainMetadataPathOverrideForTests`.
- * What to expect:
- *     Subsequent resolution uses standard bundled paths only.
+ * Defines the `clearTerrainMetadataPathOverrideForTests` function shape (export function clearTerrainMetadataPathOverrideForTests(): void).
+
+ * Purpose: Supports maintainability by documenting why `clearTerrainMetadataPathOverrideForTests` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function clearTerrainMetadataPathOverrideForTests(): void {
   logDebug('terrainMetadataPaths clearTerrainMetadataPathOverrideForTests');
   testOverrideRoot = null;
 }
 
+/**
+ * Defines the `pathCandidates` function shape (function pathCandidates(...segments: string[]): string[]).
+
+ * Purpose: Supports maintainability by documenting why `pathCandidates` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function pathCandidates(...segments: string[]): string[] {
   const roots: string[] = [];
   if (testOverrideRoot) roots.push(testOverrideRoot);
@@ -67,12 +114,12 @@ function pathCandidates(...segments: string[]): string[] {
 }
 
 /**
- * Why this exists:
- *     Locate `terrain_res1_metadata.json` for world hex classification at resolution 1.
- * When to use:
- *     From terrain cache initialization and parity tests.
- * What to expect:
- *     Throws if the file is missing from every candidate location.
+ * Defines the `resolveTerrainRes1MetadataPath` function shape (export function resolveTerrainRes1MetadataPath(): string).
+
+ * Purpose: Supports maintainability by documenting why `resolveTerrainRes1MetadataPath` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function resolveTerrainRes1MetadataPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes1MetadataPath');
@@ -80,12 +127,12 @@ export function resolveTerrainRes1MetadataPath(): string {
 }
 
 /**
- * Why this exists:
- *     Locate `terrain_res4_metadata.json` for renderer override classification at resolution 4.
- * When to use:
- *     From terrain cache when building res-4 override rows.
- * What to expect:
- *     Throws if the file is missing from every candidate location.
+ * Defines the `resolveTerrainRes4MetadataPath` function shape (export function resolveTerrainRes4MetadataPath(): string).
+
+ * Purpose: Supports maintainability by documenting why `resolveTerrainRes4MetadataPath` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function resolveTerrainRes4MetadataPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes4MetadataPath');
@@ -93,12 +140,12 @@ export function resolveTerrainRes4MetadataPath(): string {
 }
 
 /**
- * Why this exists:
- *     Locate `terrain_res1_naming.json` for hover naming overlays at resolution 1.
- * When to use:
- *     From terrain naming cache initialization.
- * What to expect:
- *     Throws if the file is missing from every candidate location.
+ * Defines the `resolveTerrainRes1NamingPath` function shape (export function resolveTerrainRes1NamingPath(): string).
+
+ * Purpose: Supports maintainability by documenting why `resolveTerrainRes1NamingPath` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function resolveTerrainRes1NamingPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes1NamingPath');
@@ -106,18 +153,26 @@ export function resolveTerrainRes1NamingPath(): string {
 }
 
 /**
- * Why this exists:
- *     Locate `terrain_res4_naming.json` for detail hover naming overlays at resolution 4.
- * When to use:
- *     From terrain naming cache initialization.
- * What to expect:
- *     Throws if the file is missing from every candidate location.
+ * Defines the `resolveTerrainRes4NamingPath` function shape (export function resolveTerrainRes4NamingPath(): string).
+
+ * Purpose: Supports maintainability by documenting why `resolveTerrainRes4NamingPath` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function resolveTerrainRes4NamingPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes4NamingPath');
   return resolveFirstExisting('terrain_res4_naming.json', [...RES4_NAMING_SEGMENTS]);
 }
 
+/**
+ * Defines the `resolveFirstExisting` function shape (function resolveFirstExisting(label: string, segments: readonly string[]): string).
+
+ * Purpose: Supports maintainability by documenting why `resolveFirstExisting` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function resolveFirstExisting(label: string, segments: readonly string[]): string {
   const candidates = pathCandidates(...segments);
   for (const p of candidates) {

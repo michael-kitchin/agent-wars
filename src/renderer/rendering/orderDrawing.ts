@@ -3,6 +3,14 @@ import { ORDER_LINE_COLOR, ORDER_LINE_WIDTH } from '../core/constants';
 import { hexCenterPx, hexCenterPxRelativeTo } from '../map/mapUtils';
 import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
 
+/**
+ * Defines the `drawRangedAttackLines` function shape (export function drawRangedAttackLines( ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, ranged: RangedAttackOrder[], uni).
+
+ * Purpose: Supports maintainability by documenting why `drawRangedAttackLines` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function drawRangedAttackLines(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,
@@ -33,6 +41,14 @@ export function drawRangedAttackLines(
   ctx.restore();
 }
 
+/**
+ * Defines the `drawAirStrikeLines` function shape (export function drawAirStrikeLines( ctx: CanvasRenderingContext2D, airStrikes: AirStrikeOrder[], units: GameStateSnapshot['units'], hexList: string[).
+
+ * Purpose: Supports maintainability by documenting why `drawAirStrikeLines` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function drawAirStrikeLines(
   ctx: CanvasRenderingContext2D,
   airStrikes: AirStrikeOrder[],
@@ -59,6 +75,14 @@ export function drawAirStrikeLines(
   ctx.restore();
 }
 
+/**
+ * Defines the `drawPendingFerryLines` function shape (export function drawPendingFerryLines( ctx: CanvasRenderingContext2D, ferryOrders: FerryOrder[], units: GameStateSnapshot['units'], hexList: string[).
+
+ * Purpose: Supports maintainability by documenting why `drawPendingFerryLines` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function drawPendingFerryLines(
   ctx: CanvasRenderingContext2D,
   ferryOrders: FerryOrder[],
@@ -86,6 +110,14 @@ export function drawPendingFerryLines(
   ctx.restore();
 }
 
+/**
+ * Defines the `buildResolutionPlaybackMoves` function shape (export function buildResolutionPlaybackMoves().
+
+ * Purpose: Supports maintainability by documenting why `buildResolutionPlaybackMoves` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function buildResolutionPlaybackMoves(
   moves: ResolutionMove[],
   units: GameStateSnapshot['units']
@@ -106,6 +138,14 @@ export function buildResolutionPlaybackMoves(
     .filter((move): move is ResolutionPlaybackMove => move !== null);
 }
 
+/**
+ * Defines the `buildAirStrikeOutboundPlaybackMoves` function shape (export function buildAirStrikeOutboundPlaybackMoves().
+
+ * Purpose: Supports maintainability by documenting why `buildAirStrikeOutboundPlaybackMoves` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function buildAirStrikeOutboundPlaybackMoves(
   moves: AirStrikeAnimationMove[] | undefined
 ): ResolutionPlaybackMove[] {
@@ -119,6 +159,14 @@ export function buildAirStrikeOutboundPlaybackMoves(
   }));
 }
 
+/**
+ * Defines the `buildAirStrikeReturnPlaybackMoves` function shape (export function buildAirStrikeReturnPlaybackMoves().
+
+ * Purpose: Supports maintainability by documenting why `buildAirStrikeReturnPlaybackMoves` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function buildAirStrikeReturnPlaybackMoves(
   moves: AirStrikeAnimationMove[] | undefined
 ): ResolutionPlaybackMove[] {

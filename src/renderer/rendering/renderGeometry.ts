@@ -1,5 +1,10 @@
 /**
- * Returns true when the projected polygon bbox overlaps the viewport rectangle.
+ * Defines the `projectedPolygonOverlapsViewport` function shape (export function projectedPolygonOverlapsViewport().
+
+ * Purpose: Supports maintainability by documenting why `projectedPolygonOverlapsViewport` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function projectedPolygonOverlapsViewport(
   pts: { x: number; y: number }[],
@@ -21,7 +26,12 @@ export function projectedPolygonOverlapsViewport(
 }
 
 /**
- * Returns the smaller projected width/height span for a hex polygon.
+ * Defines the `spanForProjectedHex` function shape (export function spanForProjectedHex(pts:).
+
+ * Purpose: Supports maintainability by documenting why `spanForProjectedHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function spanForProjectedHex(pts: { x: number; y: number }[]): number {
   if (pts.length === 0) return 1;

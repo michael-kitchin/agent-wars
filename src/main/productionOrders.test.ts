@@ -5,6 +5,14 @@
 import * as assert from 'assert';
 import { normalizeProductionOrders } from './productionOrders';
 
+/**
+ * Defines the `testNormalizeProductionOrdersHappyPath` function shape (function testNormalizeProductionOrdersHappyPath(): void).
+
+ * Purpose: Supports maintainability by documenting why `testNormalizeProductionOrdersHappyPath` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testNormalizeProductionOrdersHappyPath(): void {
   const parsed = normalizeProductionOrders([
     { action: 'set_build_queue', hex: [12.34, 56.78], unitType: 'infantry', count: 3 },
@@ -14,6 +22,14 @@ function testNormalizeProductionOrdersHappyPath(): void {
   assert.strictEqual(parsed.droppedReasons.length, 0);
 }
 
+/**
+ * Defines the `testNormalizeProductionOrdersDropsMalformedEntriesButKeepsValid` function shape (function testNormalizeProductionOrdersDropsMalformedEntriesButKeepsValid(): void).
+
+ * Purpose: Supports maintainability by documenting why `testNormalizeProductionOrdersDropsMalformedEntriesButKeepsValid` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testNormalizeProductionOrdersDropsMalformedEntriesButKeepsValid(): void {
   const parsed = normalizeProductionOrders([
     { action: 'set_build_queue', hex: [12.34, 56.78], unitType: 'infantry', count: 1 },
@@ -25,6 +41,14 @@ function testNormalizeProductionOrdersDropsMalformedEntriesButKeepsValid(): void
   assert.ok(parsed.droppedReasons.length >= 3);
 }
 
+/**
+ * Defines the `testNormalizeProductionOrdersRejectsOutOfBoundsCount` function shape (function testNormalizeProductionOrdersRejectsOutOfBoundsCount(): void).
+
+ * Purpose: Supports maintainability by documenting why `testNormalizeProductionOrdersRejectsOutOfBoundsCount` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testNormalizeProductionOrdersRejectsOutOfBoundsCount(): void {
   const parsed = normalizeProductionOrders([
     { action: 'set_build_queue', hex: [12.34, 56.78], unitType: 'infantry', count: 0 },
@@ -34,12 +58,28 @@ function testNormalizeProductionOrdersRejectsOutOfBoundsCount(): void {
   assert.strictEqual(parsed.droppedReasons.length, 2);
 }
 
+/**
+ * Defines the `testNormalizeProductionOrdersRequiresArrayWhenPresent` function shape (function testNormalizeProductionOrdersRequiresArrayWhenPresent(): void).
+
+ * Purpose: Supports maintainability by documenting why `testNormalizeProductionOrdersRequiresArrayWhenPresent` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testNormalizeProductionOrdersRequiresArrayWhenPresent(): void {
   const parsed = normalizeProductionOrders({ action: 'set_build_queue' });
   assert.strictEqual(parsed.validOrders.length, 0);
   assert.strictEqual(parsed.droppedReasons.length, 1);
 }
 
+/**
+ * Defines the `run` function shape (function run(): void).
+
+ * Purpose: Supports maintainability by documenting why `run` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function run(): void {
   const tests = [
     { name: 'happy path', fn: testNormalizeProductionOrdersHappyPath },

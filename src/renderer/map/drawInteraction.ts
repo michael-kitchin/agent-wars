@@ -1,18 +1,67 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { UNIT_ICON_HIT_PAD_PX, UNIT_RADIUS, STACK_OFFSET_X, STACK_OFFSET_Y, BUILD_ENTRY_HIT_PAD_PX } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
+import type { ResolutionPlaybackState } from '../rendering/resolutionPlayback';
 import { hexCenterPx, hitTestHexAtContainerPixel } from './mapUtils';
 import { getMainLeafletMap } from './worldLeafletMap';
 
+/**
+ * Documents the `DrawInteractionDeps` interface as a named contract surface (interface DrawInteractionDeps).
+
+ * Purpose: Supports maintainability by documenting why `DrawInteractionDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface DrawInteractionDeps {
-  backgroundColor: string;
-  buildResolutionPlaybackState: (anim: NonNullable<typeof S.resolutionMoveAnimation>, elapsed: number) => { phase: any };
-  hideBuildPopup: () => void;
-  showBuildPopup: (h3Index: string, clientX: number, clientY: number) => void;
+    /**
+   * Specifies the contract for the `backgroundColor` member (backgroundColor: string;).
+
+   * Contract: Describes stable behavior for callers of `backgroundColor` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+backgroundColor: string;
+    /**
+   * Specifies the contract for the `buildResolutionPlaybackState` member (buildResolutionPlaybackState: (anim: NonNullable<typeof S.resolutionMoveAnimation>, elapsed: number) => ResolutionPlaybackState;).
+
+   * Contract: Describes stable behavior for callers of `buildResolutionPlaybackState` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+buildResolutionPlaybackState: (
+    anim: NonNullable<typeof S.resolutionMoveAnimation>,
+    elapsed: number
+  ) => ResolutionPlaybackState;
+    /**
+   * Specifies the contract for the `hideBuildPopup` member (hideBuildPopup: () => void;).
+
+   * Contract: Describes stable behavior for callers of `hideBuildPopup` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hideBuildPopup: () => void;
+    /**
+   * Specifies the contract for the `showBuildPopup` member (showBuildPopup: (h3Index: string, clientX: number, clientY: number) => void;).
+
+   * Contract: Describes stable behavior for callers of `showBuildPopup` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+showBuildPopup: (h3Index: string, clientX: number, clientY: number) => void;
 }
 
 /**
- * Draws a neutral loading canvas while map/game state is still initializing.
+ * Defines the `drawLoadingScene` function shape (export function drawLoadingScene(ctx: CanvasRenderingContext2D, width: number, height: number, deps: DrawInteractionDeps): void).
+
+ * Purpose: Supports maintainability by documenting why `drawLoadingScene` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function drawLoadingScene(ctx: CanvasRenderingContext2D, width: number, height: number, deps: DrawInteractionDeps): void {
   ctx.fillStyle = deps.backgroundColor;
@@ -25,7 +74,12 @@ export function drawLoadingScene(ctx: CanvasRenderingContext2D, width: number, h
 }
 
 /**
- * Mirrors which units are passed to drawUnits (including resolution-phase substitutions and moving exclusions).
+ * Defines the `getUnitsForDrawWithMovingIds` function shape (export function getUnitsForDrawWithMovingIds( state: GameStateSnapshot, deps: DrawInteractionDeps ): { unitsToDraw: GameStateSnapshot['units']; movingIds).
+
+ * Purpose: Supports maintainability by documenting why `getUnitsForDrawWithMovingIds` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getUnitsForDrawWithMovingIds(
   state: GameStateSnapshot,
@@ -85,7 +139,14 @@ export function getUnitsForDrawWithMovingIds(
   return { unitsToDraw, movingIds };
 }
 
-/** True if map-container pixel (px, py) lies on a drawn unit circle for this hex (same layout as drawUnits). */
+/**
+ * Defines the `containerPixelHitsDrawnUnitIcon` function shape (export function containerPixelHitsDrawnUnitIcon(px: number, py: number, h3Index: string, unitCount: number): boolean).
+
+ * Purpose: Supports maintainability by documenting why `containerPixelHitsDrawnUnitIcon` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function containerPixelHitsDrawnUnitIcon(px: number, py: number, h3Index: string, unitCount: number): boolean {
   const { x, y } = hexCenterPx(h3Index);
   const r = UNIT_RADIUS + UNIT_ICON_HIT_PAD_PX;
@@ -98,6 +159,14 @@ export function containerPixelHitsDrawnUnitIcon(px: number, py: number, h3Index:
   return within(x, y) || within(x + STACK_OFFSET_X, y + STACK_OFFSET_Y);
 }
 
+/**
+ * Defines the `pointInExpandedClientRect` function shape (export function pointInExpandedClientRect().
+
+ * Purpose: Supports maintainability by documenting why `pointInExpandedClientRect` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function pointInExpandedClientRect(
   clientX: number,
   clientY: number,
@@ -113,7 +182,12 @@ export function pointInExpandedClientRect(
 }
 
 /**
- * Opens or toggles the build popup when the pointer is over the slim build control.
+ * Defines the `tryHandleBuildEntryAtClientXY` function shape (export function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number, deps: DrawInteractionDeps): boolean).
+
+ * Purpose: Supports maintainability by documenting why `tryHandleBuildEntryAtClientXY` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number, deps: DrawInteractionDeps): boolean {
   const layer = document.getElementById('build-entry-layer');
@@ -136,7 +210,14 @@ export function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number, 
   return false;
 }
 
-/** Leaflet uses a grab hand on the map; use the normal arrow over actual click targets (icons, build control). */
+/**
+ * Defines the `updateMapInteractionCursor` function shape (export function updateMapInteractionCursor(clientX: number, clientY: number, deps: DrawInteractionDeps): void).
+
+ * Purpose: Supports maintainability by documenting why `updateMapInteractionCursor` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function updateMapInteractionCursor(clientX: number, clientY: number, deps: DrawInteractionDeps): void {
   const map = getMainLeafletMap() as { getContainer: () => HTMLElement } | null;
   if (!map) return;

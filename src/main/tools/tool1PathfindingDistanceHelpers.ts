@@ -4,11 +4,43 @@ import type { PassableDomain } from '../pathfinding';
 import { terrainIsPassableForDomain } from '../pathfinding';
 import { logDebug, logError } from '../logger';
 
+/**
+ * Documents the `GridDistanceFailureSample` interface as a named contract surface (interface GridDistanceFailureSample).
+
+ * Purpose: Supports maintainability by documenting why `GridDistanceFailureSample` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface GridDistanceFailureSample {
-  candidateH3: string;
-  error: string;
+    /**
+   * Specifies the contract for the `candidateH3` member (candidateH3: string;).
+
+   * Contract: Describes stable behavior for callers of `candidateH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+candidateH3: string;
+    /**
+   * Specifies the contract for the `error` member (error: string;).
+
+   * Contract: Describes stable behavior for callers of `error` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+error: string;
 }
 
+/**
+ * Defines the `approximateDistanceKm` function shape (function approximateDistanceKm(fromH3: string, toH3: string): number).
+
+ * Purpose: Supports maintainability by documenting why `approximateDistanceKm` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function approximateDistanceKm(fromH3: string, toH3: string): number {
   const [fromLat, fromLng] = cellToLatLng(fromH3);
   const [toLat, toLng] = cellToLatLng(toH3);
@@ -25,6 +57,14 @@ function approximateDistanceKm(fromH3: string, toH3: string): number {
   return EARTH_RADIUS_KM * c;
 }
 
+/**
+ * Defines the `tryDistanceWithFallback` function shape (function tryDistanceWithFallback(referenceH3: string, candidateH3: string): { ok: true; distance: number; usedFallback: boolean } | { ok: false; error: string }).
+
+ * Purpose: Supports maintainability by documenting why `tryDistanceWithFallback` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function tryDistanceWithFallback(referenceH3: string, candidateH3: string): { ok: true; distance: number; usedFallback: boolean } | { ok: false; error: string } {
   try {
     return { ok: true, distance: gridDistance(referenceH3, candidateH3), usedFallback: false };
@@ -37,6 +77,14 @@ function tryDistanceWithFallback(referenceH3: string, candidateH3: string): { ok
   }
 }
 
+/**
+ * Defines the `logGridDistanceFailureSummary` function shape (function logGridDistanceFailureSummary(payload: { context: string; referenceH3: string; failureCount: number; fallbackCount?: number; samples: Gr).
+
+ * Purpose: Supports maintainability by documenting why `logGridDistanceFailureSummary` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function logGridDistanceFailureSummary(payload: {
   context: string;
   referenceH3: string;
@@ -58,6 +106,14 @@ function logGridDistanceFailureSummary(payload: {
   });
 }
 
+/**
+ * Defines the `nearestReachableWaterHexTo` function shape (export function nearestReachableWaterHexTo( originH3: string, refLandH3: string, hexSet: Set<string>, terrainByH3: Map<string, string>, getReacha).
+
+ * Purpose: Supports maintainability by documenting why `nearestReachableWaterHexTo` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function nearestReachableWaterHexTo(
   originH3: string,
   refLandH3: string,
@@ -103,6 +159,14 @@ export function nearestReachableWaterHexTo(
   return best;
 }
 
+/**
+ * Defines the `nearestWaterHexTo` function shape (export function nearestWaterHexTo(refH3: string, hexSet: Set<string>, terrainByH3: Map<string, string>): string | undefined).
+
+ * Purpose: Supports maintainability by documenting why `nearestWaterHexTo` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function nearestWaterHexTo(refH3: string, hexSet: Set<string>, terrainByH3: Map<string, string>): string | undefined {
   let best: string | undefined;
   let bestDist = Infinity;
@@ -135,6 +199,14 @@ export function nearestWaterHexTo(refH3: string, hexSet: Set<string>, terrainByH
   return best;
 }
 
+/**
+ * Defines the `nearestAdjacentWaterOrCoastalHex` function shape (export function nearestAdjacentWaterOrCoastalHex( originH3: string, refTargetH3: string, hexSet: Set<string>, terrainByH3: Map<string, string>, b).
+
+ * Purpose: Supports maintainability by documenting why `nearestAdjacentWaterOrCoastalHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function nearestAdjacentWaterOrCoastalHex(
   originH3: string,
   refTargetH3: string,
@@ -187,12 +259,28 @@ export function nearestAdjacentWaterOrCoastalHex(
   return best;
 }
 
+/**
+ * Defines the `prependSeaportEgressStep` function shape (export function prependSeaportEgressStep(path: string[] | null, originH3: string, seaportEgressHex?: string): string[] | null).
+
+ * Purpose: Supports maintainability by documenting why `prependSeaportEgressStep` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function prependSeaportEgressStep(path: string[] | null, originH3: string, seaportEgressHex?: string): string[] | null {
   if (!path) return null;
   if (!seaportEgressHex || path[0] !== seaportEgressHex) return path;
   return [originH3, ...path];
 }
 
+/**
+ * Defines the `findPathWithOptionalAvoidanceRetry` function shape (export function findPathWithOptionalAvoidanceRetry(payload: { routeOriginH3: string; destinationH3: string; hexSet: Set<string>; terrainByH3: Map<st).
+
+ * Purpose: Supports maintainability by documenting why `findPathWithOptionalAvoidanceRetry` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function findPathWithOptionalAvoidanceRetry(payload: {
   routeOriginH3: string;
   destinationH3: string;

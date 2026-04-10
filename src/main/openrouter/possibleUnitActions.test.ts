@@ -9,6 +9,14 @@ import { formatLatLng } from './promptText';
 import { buildPossibleUnitActionsMarkdown, partitionHomelandNearestOther } from './possibleUnitActions';
 import type { GameStateSnapshot } from '../gameDb';
 
+/**
+ * Defines the `minDistToHomeland` function shape (function minDistToHomeland(h: string, homeland: Set<string>): number).
+
+ * Purpose: Supports maintainability by documenting why `minDistToHomeland` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function minDistToHomeland(h: string, homeland: Set<string>): number {
   let m = Infinity;
   for (const t of homeland) {
@@ -22,6 +30,14 @@ function minDistToHomeland(h: string, homeland: Set<string>): number {
   return m;
 }
 
+/**
+ * Defines the `testPartitionPrefersHomelandOverNearest` function shape (function testPartitionPrefersHomelandOverNearest(): void).
+
+ * Purpose: Supports maintainability by documenting why `testPartitionPrefersHomelandOverNearest` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testPartitionPrefersHomelandOverNearest(): void {
   const hexList = getOrderedHexList().slice(0, 5);
   const homeland = new Set([hexList[0]!, hexList[1]!]);
@@ -32,6 +48,14 @@ function testPartitionPrefersHomelandOverNearest(): void {
   assert.deepStrictEqual(p.other, [hexList[4]!]);
 }
 
+/**
+ * Defines the `testPartitionNearestWhenNoneInHomeland` function shape (function testPartitionNearestWhenNoneInHomeland(): void).
+
+ * Purpose: Supports maintainability by documenting why `testPartitionNearestWhenNoneInHomeland` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testPartitionNearestWhenNoneInHomeland(): void {
   const hexList = getOrderedHexList().slice(0, 8);
   const homeland = new Set([hexList[0]!]);
@@ -45,6 +69,14 @@ function testPartitionNearestWhenNoneInHomeland(): void {
   }
 }
 
+/**
+ * Defines the `testPartitionEmptyHomelandAllOther` function shape (function testPartitionEmptyHomelandAllOther(): void).
+
+ * Purpose: Supports maintainability by documenting why `testPartitionEmptyHomelandAllOther` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testPartitionEmptyHomelandAllOther(): void {
   const hexList = getOrderedHexList().slice(0, 3);
   const p = partitionHomelandNearestOther([hexList[1]!, hexList[2]!], new Set());
@@ -53,6 +85,14 @@ function testPartitionEmptyHomelandAllOther(): void {
   assert.deepStrictEqual(p.other, [hexList[1]!, hexList[2]!].sort((a, b) => a.localeCompare(b)));
 }
 
+/**
+ * Defines the `testPartitionIncludesAllTiesAtMinDistance` function shape (function testPartitionIncludesAllTiesAtMinDistance(): void).
+
+ * Purpose: Supports maintainability by documenting why `testPartitionIncludesAllTiesAtMinDistance` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testPartitionIncludesAllTiesAtMinDistance(): void {
   const hexList = getOrderedHexList().slice(0, 20);
   const homeland = new Set([hexList[0]!]);
@@ -66,6 +106,14 @@ function testPartitionIncludesAllTiesAtMinDistance(): void {
   }
 }
 
+/**
+ * Defines the `testBuildPossibleUnitActionsUsesTables` function shape (function testBuildPossibleUnitActionsUsesTables(): void).
+
+ * Purpose: Supports maintainability by documenting why `testBuildPossibleUnitActionsUsesTables` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testBuildPossibleUnitActionsUsesTables(): void {
   const allHexes = getOrderedHexList();
   const h0 = allHexes[0]!;
@@ -101,6 +149,14 @@ function testBuildPossibleUnitActionsUsesTables(): void {
   assert.ok(md.includes('### Enemy homeland hexes') || md.includes('### Other hexes'));
 }
 
+/**
+ * Defines the `testUnitHexAppearsInSingleBucketWithPriority` function shape (function testUnitHexAppearsInSingleBucketWithPriority(): void).
+
+ * Purpose: Supports maintainability by documenting why `testUnitHexAppearsInSingleBucketWithPriority` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testUnitHexAppearsInSingleBucketWithPriority(): void {
   const allHexes = getOrderedHexList();
   const base = allHexes[0]!;
@@ -146,6 +202,14 @@ function testUnitHexAppearsInSingleBucketWithPriority(): void {
   assert.ok(md.includes('### Hexes nearest to enemy homeland'), 'expected higher-priority nearest bucket to be used');
 }
 
+/**
+ * Documents the module-scope binding `tests` (tests).
+
+ * Purpose: Supports maintainability by documenting why `tests` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const tests = [
   { name: 'partitionHomelandNearestOther prefers homeland', fn: testPartitionPrefersHomelandOverNearest },
   { name: 'partitionHomelandNearestOther uses nearest when no homeland hit', fn: testPartitionNearestWhenNoneInHomeland },
@@ -155,6 +219,14 @@ const tests = [
   { name: 'buildPossibleUnitActionsMarkdown de-duplicates unit+hex across buckets', fn: testUnitHexAppearsInSingleBucketWithPriority },
 ];
 
+/**
+ * Defines the `run` function shape (function run(): void).
+
+ * Purpose: Supports maintainability by documenting why `run` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function run(): void {
   for (const t of tests) {
     try {

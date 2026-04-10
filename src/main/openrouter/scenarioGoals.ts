@@ -2,12 +2,12 @@ import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
 
 /**
- * Why this exists:
- *     Centralizes scenario win-condition text for AI prompts so objectives stay consistent and can evolve per scenario later.
- * When to use:
- *     When assembling the opponent system prompt opening line and any scenario-specific objective blocks.
- * What to expect:
- *     Returns concise, scenario-appropriate goal prose (wording may change; semantics stay stable).
+ * Defines the `buildPrimaryScenarioGoalOpeningClause` function shape (export function buildPrimaryScenarioGoalOpeningClause(): string).
+
+ * Purpose: Supports maintainability by documenting why `buildPrimaryScenarioGoalOpeningClause` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function buildPrimaryScenarioGoalOpeningClause(): string {
   logDebug('scenarioGoals buildPrimaryScenarioGoalOpeningClause', {});
@@ -17,12 +17,12 @@ export function buildPrimaryScenarioGoalOpeningClause(): string {
 }
 
 /**
- * Why this exists:
- *     Builds the region-vs-region objective block with optional homeland names omitted when unknown.
- * When to use:
- *     Only when `state.scenarioId === 'region_vs_region'` during prompt assembly.
- * What to expect:
- *     Multi-line markdown block or empty string when not applicable.
+ * Defines the `buildRegionVsRegionScenarioObjectiveBlock` function shape (export function buildRegionVsRegionScenarioObjectiveBlock(state: GameStateSnapshot): string).
+
+ * Purpose: Supports maintainability by documenting why `buildRegionVsRegionScenarioObjectiveBlock` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function buildRegionVsRegionScenarioObjectiveBlock(state: GameStateSnapshot): string {
   logDebug('scenarioGoals buildRegionVsRegionScenarioObjectiveBlock', { scenarioId: state.scenarioId });

@@ -15,7 +15,23 @@ import {
   getStandingOrderForUnit,
 } from './tool5StandingOrdersCore';
 
+/**
+ * Documents the module-scope binding `AI_PLAYER_ID` (AI_PLAYER_ID).
+
+ * Purpose: Supports maintainability by documenting why `AI_PLAYER_ID` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const AI_PLAYER_ID = 'opponent';
+/**
+ * Documents the module-scope binding `HUMAN_PLAYER_ID` (HUMAN_PLAYER_ID).
+
+ * Purpose: Supports maintainability by documenting why `HUMAN_PLAYER_ID` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const HUMAN_PLAYER_ID = 'human';
 
 export {
@@ -26,16 +42,23 @@ export {
   getStandingOrderForUnit,
 };
 
-/** Read-only API tool names; assign_order/cancel_order are applied via final JSON orders[] only. */
+/**
+ * Documents the module-scope binding `TOOL5_NAMES` (TOOL5_NAMES).
+
+ * Purpose: Supports maintainability by documenting why `TOOL5_NAMES` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const TOOL5_NAMES = ['query_orders'] as const;
 
 /**
- * Why this exists:
- *     Dedicated helper for renderer-driven human march assignment without exposing player id at callsites.
- * When to use:
- *     IPC handlers that set human long-distance movement orders.
- * What to expect:
- *     Applies march standing order for `human`; returns status payload from shared standing-order logic.
+ * Defines the `assignHumanMarchStandingOrder` function shape (export function assignHumanMarchStandingOrder( unitId: string, destination: [number, number], state: GameStateSnapshot, latLngByH3: Map<string, LatL).
+
+ * Purpose: Supports maintainability by documenting why `assignHumanMarchStandingOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function assignHumanMarchStandingOrder(
   unitId: string,
@@ -56,12 +79,12 @@ export function assignHumanMarchStandingOrder(
 }
 
 /**
- * Why this exists:
- *     Read-only getter for human standing orders used by renderer order list.
- * When to use:
- *     IPC handler that refreshes movement-order list overlays during planning.
- * What to expect:
- *     Returns `orders` array in the same normalized shape as query_orders.
+ * Defines the `queryHumanStandingOrders` function shape (export function queryHumanStandingOrders( state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: number, lng: number) => string).
+
+ * Purpose: Supports maintainability by documenting why `queryHumanStandingOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function queryHumanStandingOrders(
   state: GameStateSnapshot,
@@ -73,12 +96,12 @@ export function queryHumanStandingOrders(
 }
 
 /**
- * Why this exists:
- *     Dedicated helper for per-unit cancel from renderer movement-order list.
- * When to use:
- *     IPC handler for human order cancellation.
- * What to expect:
- *     Returns status payload and removes only the specified human unit order when present.
+ * Defines the `cancelHumanStandingOrder` function shape (export function cancelHumanStandingOrder( unitId: string, state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: number, lng:).
+
+ * Purpose: Supports maintainability by documenting why `cancelHumanStandingOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function cancelHumanStandingOrder(
   unitId: string,
@@ -91,8 +114,12 @@ export function cancelHumanStandingOrder(
 }
 
 /**
- * Dispatcher for Tool 5: query_orders for the model; assign_order/cancel_order are still invoked internally when applying final JSON orders[].
- * Returns a spec-shaped object (e.g. status/order/unitId) or { status: 'error', error: string }; exceptions are caught and returned as error.
+ * Defines the `executeTool5` function shape (export function executeTool5( toolName: string, args: unknown, state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: numb).
+
+ * Purpose: Supports maintainability by documenting why `executeTool5` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function executeTool5(
   toolName: string,

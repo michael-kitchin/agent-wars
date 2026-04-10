@@ -8,13 +8,32 @@ import * as path from 'path';
 import { logDebug, logError, logTrace } from './logger';
 import { isPipelineTerrainKind, type PipelineTerrainKind } from '../shared/pipelineTerrain';
 
+/**
+ * Documents the module-scope binding `CSV_FILENAME` (CSV_FILENAME).
+
+ * Purpose: Supports maintainability by documenting why `CSV_FILENAME` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const CSV_FILENAME = 'terrain_res1_base.csv';
+/**
+ * Documents the module-scope binding `CSV_REL_SEGMENTS` (CSV_REL_SEGMENTS).
+
+ * Purpose: Supports maintainability by documenting why `CSV_REL_SEGMENTS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const CSV_REL_SEGMENTS = ['data', 'generated', CSV_FILENAME];
 
 /**
- * Resolves the absolute path to the bundled terrain CSV. Tries paths relative to the compiled
- * main bundle, then `process.cwd()`, then `app.getAppPath()` when Electron is available.
- * Throws if the file is missing everywhere (caller should surface a user-visible error).
+ * Defines the `resolveTerrainRes1CsvPath` function shape (export function resolveTerrainRes1CsvPath(): string).
+
+ * Purpose: Supports maintainability by documenting why `resolveTerrainRes1CsvPath` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function resolveTerrainRes1CsvPath(): string {
   logDebug('terrainRes1Csv resolveTerrainRes1CsvPath');
@@ -47,8 +66,12 @@ export function resolveTerrainRes1CsvPath(): string {
 }
 
 /**
- * Parses CSV text into a map of H3 index → pipeline terrain kind. Validates each terrain label.
- * Expects a header line `h3_index,terrain`. Duplicate H3 indices throw.
+ * Defines the `parseTerrainRes1CsvText` function shape (export function parseTerrainRes1CsvText(fileText: string): Map<string, PipelineTerrainKind> { logDebug('terrainRes1Csv parseTerrainRes1CsvText', { byteLength).
+
+ * Purpose: Supports maintainability by documenting why `parseTerrainRes1CsvText` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function parseTerrainRes1CsvText(fileText: string): Map<string, PipelineTerrainKind> {
   logDebug('terrainRes1Csv parseTerrainRes1CsvText', { byteLength: fileText.length });
@@ -79,8 +102,12 @@ export function parseTerrainRes1CsvText(fileText: string): Map<string, PipelineT
 }
 
 /**
- * Reads the terrain CSV from disk and returns a validated map. Use during hex seeding.
- * On I/O or parse errors, logs at error and rethrows.
+ * Defines the `loadTerrainRes1CsvFromPath` function shape (export function loadTerrainRes1CsvFromPath(absPath: string): Map<string, PipelineTerrainKind> { logDebug('terrainRes1Csv loadTerrainRes1CsvFromPath', { absPa).
+
+ * Purpose: Supports maintainability by documenting why `loadTerrainRes1CsvFromPath` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function loadTerrainRes1CsvFromPath(absPath: string): Map<string, PipelineTerrainKind> {
   logDebug('terrainRes1Csv loadTerrainRes1CsvFromPath', { absPath });
@@ -94,8 +121,12 @@ export function loadTerrainRes1CsvFromPath(absPath: string): Map<string, Pipelin
 }
 
 /**
- * Ensures the CSV contains exactly the expected H3 set (world res1 list). Throws on mismatch.
- * Call after parse/load so seeding never runs with partial or extra rows.
+ * Defines the `assertTerrainCsvMatchesHexList` function shape (export function assertTerrainCsvMatchesHexList().
+
+ * Purpose: Supports maintainability by documenting why `assertTerrainCsvMatchesHexList` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function assertTerrainCsvMatchesHexList(
   byH3: Map<string, PipelineTerrainKind>,

@@ -7,6 +7,14 @@ import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tact
 import { buildPromptTableLines } from '../promptTableUtils';
 import { getRangeEnvelopeByBase, type RangeEnvelopeCache } from './rangeSupport';
 
+/**
+ * Defines the `countStrikeableEnemyInfrastructure` function shape (function countStrikeableEnemyInfrastructure(args: { strikeEnvelope: Set<string>; infraRows: NonNullable<GameStateSnapshot['res1Infrastructure']>; contr).
+
+ * Purpose: Supports maintainability by documenting why `countStrikeableEnemyInfrastructure` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function countStrikeableEnemyInfrastructure(args: {
   strikeEnvelope: Set<string>;
   infraRows: NonNullable<GameStateSnapshot['res1Infrastructure']>;
@@ -25,32 +33,200 @@ function countStrikeableEnemyInfrastructure(args: {
   return { urban, airports, seaports };
 }
 
+/**
+ * Documents the `ProductionQueueEntrySnapshot` interface as a named contract surface (interface ProductionQueueEntrySnapshot).
+
+ * Purpose: Supports maintainability by documenting why `ProductionQueueEntrySnapshot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface ProductionQueueEntrySnapshot {
-  entryId?: unknown;
-  queueIndex?: unknown;
-  unitType?: unknown;
-  count?: unknown;
+    /**
+   * Specifies the contract for the `entryId` member (entryId?: unknown;).
+
+   * Contract: Describes stable behavior for callers of `entryId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+entryId?: unknown;
+    /**
+   * Specifies the contract for the `queueIndex` member (queueIndex?: unknown;).
+
+   * Contract: Describes stable behavior for callers of `queueIndex` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+queueIndex?: unknown;
+    /**
+   * Specifies the contract for the `unitType` member (unitType?: unknown;).
+
+   * Contract: Describes stable behavior for callers of `unitType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitType?: unknown;
+    /**
+   * Specifies the contract for the `count` member (count?: unknown;).
+
+   * Contract: Describes stable behavior for callers of `count` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+count?: unknown;
 }
 
+/**
+ * Documents the `ControlledHexQueueSnapshot` interface as a named contract surface (interface ControlledHexQueueSnapshot).
+
+ * Purpose: Supports maintainability by documenting why `ControlledHexQueueSnapshot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface ControlledHexQueueSnapshot {
-  hex?: unknown;
-  urbanHexCount?: unknown;
-  airportCount?: unknown;
-  seaportCount?: unknown;
-  availableUnitTypes?: unknown;
-  entries?: unknown;
+    /**
+   * Specifies the contract for the `hex` member (hex?: unknown;).
+
+   * Contract: Describes stable behavior for callers of `hex` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hex?: unknown;
+    /**
+   * Specifies the contract for the `urbanHexCount` member (urbanHexCount?: unknown;).
+
+   * Contract: Describes stable behavior for callers of `urbanHexCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+urbanHexCount?: unknown;
+    /**
+   * Specifies the contract for the `airportCount` member (airportCount?: unknown;).
+
+   * Contract: Describes stable behavior for callers of `airportCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+airportCount?: unknown;
+    /**
+   * Specifies the contract for the `seaportCount` member (seaportCount?: unknown;).
+
+   * Contract: Describes stable behavior for callers of `seaportCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+seaportCount?: unknown;
+    /**
+   * Specifies the contract for the `availableUnitTypes` member (availableUnitTypes?: unknown;).
+
+   * Contract: Describes stable behavior for callers of `availableUnitTypes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+availableUnitTypes?: unknown;
+    /**
+   * Specifies the contract for the `entries` member (entries?: unknown;).
+
+   * Contract: Describes stable behavior for callers of `entries` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+entries?: unknown;
 }
 
+/**
+ * Documents the `NormalizedControlledHexQueueRow` interface as a named contract surface (interface NormalizedControlledHexQueueRow).
+
+ * Purpose: Supports maintainability by documenting why `NormalizedControlledHexQueueRow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface NormalizedControlledHexQueueRow {
-  hexText: string;
-  urban: number;
-  airports: number;
-  seaports: number;
-  available: string;
-  entries: string;
-  hasQueuedEntries: boolean;
+    /**
+   * Specifies the contract for the `hexText` member (hexText: string;).
+
+   * Contract: Describes stable behavior for callers of `hexText` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hexText: string;
+    /**
+   * Specifies the contract for the `urban` member (urban: number;).
+
+   * Contract: Describes stable behavior for callers of `urban` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+urban: number;
+    /**
+   * Specifies the contract for the `airports` member (airports: number;).
+
+   * Contract: Describes stable behavior for callers of `airports` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+airports: number;
+    /**
+   * Specifies the contract for the `seaports` member (seaports: number;).
+
+   * Contract: Describes stable behavior for callers of `seaports` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+seaports: number;
+    /**
+   * Specifies the contract for the `available` member (available: string;).
+
+   * Contract: Describes stable behavior for callers of `available` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+available: string;
+    /**
+   * Specifies the contract for the `entries` member (entries: string;).
+
+   * Contract: Describes stable behavior for callers of `entries` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+entries: string;
+    /**
+   * Specifies the contract for the `hasQueuedEntries` member (hasQueuedEntries: boolean;).
+
+   * Contract: Describes stable behavior for callers of `hasQueuedEntries` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hasQueuedEntries: boolean;
 }
 
+/**
+ * Defines the `normalizeControlledHexQueueRow` function shape (function normalizeControlledHexQueueRow( row: ControlledHexQueueSnapshot, formatLatLng: (ll: [number, number]) => string ): NormalizedControlledHexQueueR).
+
+ * Purpose: Supports maintainability by documenting why `normalizeControlledHexQueueRow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function normalizeControlledHexQueueRow(
   row: ControlledHexQueueSnapshot,
   formatLatLng: (ll: [number, number]) => string
@@ -92,12 +268,12 @@ function normalizeControlledHexQueueRow(
 }
 
 /**
- * Why this exists:
- *     Builds the production-status section used in AI system prompts from live production tooling and game-state counts.
- * When to use:
- *     During system prompt assembly when production tools are enabled.
- * What to expect:
- *     Returns a stable multi-line block or an unavailable message when production data cannot be read.
+ * Defines the `buildProductionBriefingBlock` function shape (export function buildProductionBriefingBlock(args: { productionEnabled: boolean; state: GameStateSnapshot; latLngByH3: Map<string, [number, number]>;).
+
+ * Purpose: Supports maintainability by documenting why `buildProductionBriefingBlock` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function buildProductionBriefingBlock(args: {
   productionEnabled: boolean;
@@ -171,12 +347,12 @@ export function buildProductionBriefingBlock(args: {
 }
 
 /**
- * Why this exists:
- *     Builds the air-operations briefing section so prompt assembly can stay focused on orchestration.
- * When to use:
- *     During system prompt creation for opponent planning turns.
- * What to expect:
- *     Returns deterministic air status lines including strike/ferry opportunity counts and threatened enemy infrastructure.
+ * Defines the `buildAirOperationsBriefingBlock` function shape (export function buildAirOperationsBriefingBlock().
+
+ * Purpose: Supports maintainability by documenting why `buildAirOperationsBriefingBlock` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function buildAirOperationsBriefingBlock(
   state: GameStateSnapshot,
@@ -278,6 +454,14 @@ export function buildAirOperationsBriefingBlock(
   return lines.join('\n');
 }
 
+/**
+ * Defines the `findNearestOpponentEmbarkHex` function shape (function findNearestOpponentEmbarkHex().
+
+ * Purpose: Supports maintainability by documenting why `findNearestOpponentEmbarkHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function findNearestOpponentEmbarkHex(
   navalH3: string,
   state: GameStateSnapshot,
@@ -304,13 +488,12 @@ function findNearestOpponentEmbarkHex(
 }
 
 /**
- * Why this exists:
- *     Surfaces sealift-ready facts per naval unit (capacity, co-located land, nearest embark hex) so the model can
- *     issue embark/transport_move/disembark without long doctrine prose.
- * When to use:
- *     During prompt assembly for opponent planning turns.
- * What to expect:
- *     Deterministic one-line rows per opponent naval unit plus a one-line capacity reminder.
+ * Defines the `buildSealiftBriefingBlock` function shape (export function buildSealiftBriefingBlock().
+
+ * Purpose: Supports maintainability by documenting why `buildSealiftBriefingBlock` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function buildSealiftBriefingBlock(
   state: GameStateSnapshot,

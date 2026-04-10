@@ -3,21 +3,109 @@ import { CASUALTY_X_COLOR, COUNT_BADGE_OFFSET, LIGHTNING_COLOR, MULTI_PLAYER_FIL
 import { rendererSharedState as S } from '../core/state';
 import { hexCenterPx } from '../map/mapUtils';
 
+/**
+ * Documents the module-scope binding `TOKEN_ICON_FIT_RATIO` (TOKEN_ICON_FIT_RATIO).
+
+ * Purpose: Supports maintainability by documenting why `TOKEN_ICON_FIT_RATIO` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const TOKEN_ICON_FIT_RATIO = 0.9;
+/**
+ * Documents the `UnitIconType` type alias (type UnitIconType).
+
+ * Purpose: Supports maintainability by documenting why `UnitIconType` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type UnitIconType = 'infantry' | 'armor' | 'naval' | 'air' | 'mixed';
+/**
+ * Documents the module-scope binding `UNIT_ICON_FILE_BY_TYPE` (UNIT_ICON_FILE_BY_TYPE: Record<UnitIconType, string>).
+
+ * Purpose: Supports maintainability by documenting why `UNIT_ICON_FILE_BY_TYPE` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const UNIT_ICON_FILE_BY_TYPE: Record<UnitIconType, string> = {
-  infantry: 'infantry-1.svg',
-  armor: 'armor-1.svg',
-  naval: 'naval-1.svg',
-  air: 'air-1.svg',
-  mixed: 'mixed-1.svg',
+    /**
+   * Documents the object literal property `infantry` (infantry: 'infantry-1.svg').
+
+   * Purpose: Supports maintainability by documenting why `infantry` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+infantry: 'infantry-1.svg',
+    /**
+   * Documents the object literal property `armor` (armor: 'armor-1.svg').
+
+   * Purpose: Supports maintainability by documenting why `armor` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+armor: 'armor-1.svg',
+    /**
+   * Documents the object literal property `naval` (naval: 'naval-1.svg').
+
+   * Purpose: Supports maintainability by documenting why `naval` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+naval: 'naval-1.svg',
+    /**
+   * Documents the object literal property `air` (air: 'air-1.svg').
+
+   * Purpose: Supports maintainability by documenting why `air` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+air: 'air-1.svg',
+    /**
+   * Documents the object literal property `mixed` (mixed: 'mixed-1.svg').
+
+   * Purpose: Supports maintainability by documenting why `mixed` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+mixed: 'mixed-1.svg',
 };
+/**
+ * Documents the module-scope binding `unitIconCache` (unitIconCache).
+
+ * Purpose: Supports maintainability by documenting why `unitIconCache` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const unitIconCache = new Map<UnitIconType, HTMLImageElement | null>();
 
+/**
+ * Defines the `iconPathForType` function shape (function iconPathForType(unitType: UnitIconType): string).
+
+ * Purpose: Supports maintainability by documenting why `iconPathForType` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function iconPathForType(unitType: UnitIconType): string {
   return `../symbols/${UNIT_ICON_FILE_BY_TYPE[unitType]}`;
 }
 
+/**
+ * Defines the `getOrStartUnitIconLoad` function shape (function getOrStartUnitIconLoad(unitType: UnitIconType): HTMLImageElement | null).
+
+ * Purpose: Supports maintainability by documenting why `getOrStartUnitIconLoad` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getOrStartUnitIconLoad(unitType: UnitIconType): HTMLImageElement | null {
   if (unitIconCache.has(unitType)) return unitIconCache.get(unitType) ?? null;
   const img = new Image();
@@ -33,6 +121,14 @@ function getOrStartUnitIconLoad(unitType: UnitIconType): HTMLImageElement | null
   return img;
 }
 
+/**
+ * Defines the `drawUnitSvgIcon` function shape (function drawUnitSvgIcon( ctx: CanvasRenderingContext2D, centerX: number, centerY: number, unitType: UnitIconType, unitPlayer?: string, flipFo).
+
+ * Purpose: Supports maintainability by documenting why `drawUnitSvgIcon` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function drawUnitSvgIcon(
   ctx: CanvasRenderingContext2D,
   centerX: number,
@@ -65,6 +161,14 @@ function drawUnitSvgIcon(
   return true;
 }
 
+/**
+ * Defines the `drawOneUnitMarker` function shape (export function drawOneUnitMarker( ctx: CanvasRenderingContext2D, x: number, y: number, color: string, label: string, strokeColor: string = '#).
+
+ * Purpose: Supports maintainability by documenting why `drawOneUnitMarker` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function drawOneUnitMarker(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -103,6 +207,14 @@ export function drawOneUnitMarker(
   ctx.fillText(label, x, y);
 }
 
+/**
+ * Defines the `drawUnits` function shape (export function drawUnits().
+
+ * Purpose: Supports maintainability by documenting why `drawUnits` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function drawUnits(
   ctx: CanvasRenderingContext2D,
   units: GameStateSnapshot['units'],
@@ -143,6 +255,14 @@ export function drawUnits(
   }
 }
 
+/**
+ * Defines the `drawStaleEnemyIntel` function shape (export function drawStaleEnemyIntel( ctx: CanvasRenderingContext2D, state: GameStateSnapshot, inferUnitTypeLabelFromId: (unitId: string) => string ):).
+
+ * Purpose: Supports maintainability by documenting why `drawStaleEnemyIntel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function drawStaleEnemyIntel(
   ctx: CanvasRenderingContext2D,
   state: GameStateSnapshot,
@@ -222,6 +342,14 @@ export function drawStaleEnemyIntel(
   }
 }
 
+/**
+ * Defines the `drawUnknownBattleMarkers` function shape (export function drawUnknownBattleMarkers().
+
+ * Purpose: Supports maintainability by documenting why `drawUnknownBattleMarkers` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function drawUnknownBattleMarkers(
   ctx: CanvasRenderingContext2D,
   hexes: string[],
@@ -237,6 +365,14 @@ export function drawUnknownBattleMarkers(
   ctx.restore();
 }
 
+/**
+ * Defines the `drawCombatLightning` function shape (export function drawCombatLightning( ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, combatHexes: string[], hexList: st).
+
+ * Purpose: Supports maintainability by documenting why `drawCombatLightning` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function drawCombatLightning(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,
@@ -271,6 +407,14 @@ export function drawCombatLightning(
   ctx.restore();
 }
 
+/**
+ * Defines the `drawCasualtyOverlay` function shape (export function drawCasualtyOverlay( ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, casualtyHexes: string[], hexList:).
+
+ * Purpose: Supports maintainability by documenting why `drawCasualtyOverlay` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function drawCasualtyOverlay(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,

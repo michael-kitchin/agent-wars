@@ -2,15 +2,23 @@ import { gridDisk } from 'h3-js';
 import { logDebug } from '../logger';
 import { isWithinGridRangeSafe } from '../game-actions/gridRange';
 
+/**
+ * Documents the `RangeEnvelopeCache` type alias (export type RangeEnvelopeCache).
+
+ * Purpose: Supports maintainability by documenting why `RangeEnvelopeCache` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type RangeEnvelopeCache = Map<string, Set<string>>;
 
 /**
- * Why this exists:
- *     Builds and caches a fixed-radius H3 envelope so multiple consumers can do fast set-membership range checks.
- * When to use:
- *     Prompt assembly paths that perform many repeated "within N hexes" checks from the same base.
- * What to expect:
- *     Returns all in-universe hexes within `rangeHexes` of `baseH3` and reuses cached envelopes per turn call-site.
+ * Defines the `getRangeEnvelopeByBase` function shape (export function getRangeEnvelopeByBase().
+
+ * Purpose: Supports maintainability by documenting why `getRangeEnvelopeByBase` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getRangeEnvelopeByBase(
   baseH3: string,

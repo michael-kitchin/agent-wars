@@ -12,11 +12,43 @@ import {
   getAnchorPath2D,
 } from './terrainInfrastructureIconPaths';
 
+/**
+ * Documents the `HexScreenPoint` interface as a named contract surface (export interface HexScreenPoint).
+
+ * Purpose: Supports maintainability by documenting why `HexScreenPoint` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface HexScreenPoint {
-  x: number;
-  y: number;
+    /**
+   * Specifies the contract for the `x` member (x: number;).
+
+   * Contract: Describes stable behavior for callers of `x` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+x: number;
+    /**
+   * Specifies the contract for the `y` member (y: number;).
+
+   * Contract: Describes stable behavior for callers of `y` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+y: number;
 }
 
+/**
+ * Defines the `centroidAndSpan` function shape (function centroidAndSpan(pts: HexScreenPoint[]):).
+
+ * Purpose: Supports maintainability by documenting why `centroidAndSpan` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function centroidAndSpan(pts: HexScreenPoint[]): { cx: number; cy: number; span: number } {
   if (pts.length === 0) return { cx: 0, cy: 0, span: 1 };
   let sx = 0;
@@ -39,7 +71,12 @@ function centroidAndSpan(pts: HexScreenPoint[]): { cx: number; cy: number; span:
 }
 
 /**
- * Renders a Path2D built from an SVG `d` string: maps viewBox coordinates to `pixelSize` on screen (max dimension).
+ * Defines the `drawFilledSvgPath` function shape (function drawFilledSvgPath( ctx: CanvasRenderingContext2D, path: Path2D, screenCx: number, screenCy: number, pixelSize: number, outlineScreenP).
+
+ * Purpose: Supports maintainability by documenting why `drawFilledSvgPath` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function drawFilledSvgPath(
   ctx: CanvasRenderingContext2D,
@@ -68,11 +105,33 @@ function drawFilledSvgPath(
   ctx.restore();
 }
 
-/** Narrows wingspan vs uniform `pixelSize` (viewBox X). */
+/**
+ * Documents the module-scope binding `AIRPLANE_WIDTH_SCALE` (AIRPLANE_WIDTH_SCALE).
+
+ * Purpose: Supports maintainability by documenting why `AIRPLANE_WIDTH_SCALE` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const AIRPLANE_WIDTH_SCALE = 0.74;
-/** Shortens fuselage (viewBox Y) by half the relative reduction applied on X: `1 - (1 - widthScale) / 2`. */
+/**
+ * Documents the module-scope binding `AIRPLANE_HEIGHT_SCALE` (AIRPLANE_HEIGHT_SCALE).
+
+ * Purpose: Supports maintainability by documenting why `AIRPLANE_HEIGHT_SCALE` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const AIRPLANE_HEIGHT_SCALE = 1 - (1 - AIRPLANE_WIDTH_SCALE) / 2;
 
+/**
+ * Defines the `drawAirplaneAt` function shape (function drawAirplaneAt( ctx: CanvasRenderingContext2D, cx: number, cy: number, pixelSize: number, outlineScreenPx: number, fillStyle: string,).
+
+ * Purpose: Supports maintainability by documenting why `drawAirplaneAt` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function drawAirplaneAt(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -102,6 +161,14 @@ function drawAirplaneAt(
   ctx.restore();
 }
 
+/**
+ * Defines the `drawAnchorAt` function shape (function drawAnchorAt( ctx: CanvasRenderingContext2D, cx: number, cy: number, pixelSize: number, outlineScreenPx: number, fillStyle: string,).
+
+ * Purpose: Supports maintainability by documenting why `drawAnchorAt` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function drawAnchorAt(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -119,33 +186,99 @@ function drawAnchorAt(
   });
 }
 
+/**
+ * Documents the module-scope binding `AIRPORT_FILL` (AIRPORT_FILL).
+
+ * Purpose: Supports maintainability by documenting why `AIRPORT_FILL` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const AIRPORT_FILL = '#e8eef6';
+/**
+ * Documents the module-scope binding `AIRPORT_STROKE` (AIRPORT_STROKE).
+
+ * Purpose: Supports maintainability by documenting why `AIRPORT_STROKE` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const AIRPORT_STROKE = '#1a1f28';
+/**
+ * Documents the module-scope binding `PORT_FILL` (PORT_FILL).
+
+ * Purpose: Supports maintainability by documenting why `PORT_FILL` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const PORT_FILL = '#6eb6f0';
+/**
+ * Documents the module-scope binding `PORT_STROKE` (PORT_STROKE).
+
+ * Purpose: Supports maintainability by documenting why `PORT_STROKE` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const PORT_STROKE = '#0d1f35';
 
-/** Multiply base outline from map zoom for icon strokes (both airplane and anchor). */
+/**
+ * Documents the module-scope binding `GLYPH_OUTLINE_MULT` (GLYPH_OUTLINE_MULT).
+
+ * Purpose: Supports maintainability by documenting why `GLYPH_OUTLINE_MULT` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const GLYPH_OUTLINE_MULT = 1.58;
 
-/** Max pixel size for aircraft (matches dual-symbol layout). */
+/**
+ * Documents the module-scope binding `GLYPH_AIR_PIXEL_FACTOR` (GLYPH_AIR_PIXEL_FACTOR).
+
+ * Purpose: Supports maintainability by documenting why `GLYPH_AIR_PIXEL_FACTOR` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const GLYPH_AIR_PIXEL_FACTOR = 0.22;
-/** Anchor vs aircraft max dimension; slightly above 1 so the seaport glyph reads a bit larger. */
+/**
+ * Documents the module-scope binding `GLYPH_ANCHOR_TO_AIR_RATIO` (GLYPH_ANCHOR_TO_AIR_RATIO).
+
+ * Purpose: Supports maintainability by documenting why `GLYPH_ANCHOR_TO_AIR_RATIO` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const GLYPH_ANCHOR_TO_AIR_RATIO = 1.03;
 
 /**
- * Pass as `glyphAreaScale` for res-4 child hexes so the combined glyph footprint covers more of the small hex
- * (linear scale = √areaScale; area scales by this factor).
+ * Documents the module-scope binding `RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE` (RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE).
+
+ * Purpose: Supports maintainability by documenting why `RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export const RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE = 1.2;
 
 /**
- * Solo airport or solo seaport only: footprint area × this vs the shared dual-symbol baseline sizes.
+ * Documents the module-scope binding `SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE` (SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE).
+
+ * Purpose: Supports maintainability by documenting why `SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export const SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE = 1.2;
 
 /**
- * Draws airport and/or seaport glyphs inside a hex polygon (container pixel space).
- * @param both When true, uses diagonal offset and a separating slash. Solo-only hexes use `SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE` (area ×1.2, linear √1.2).
+ * Defines the `drawTerrainInfrastructureGlyphs` function shape (export function drawTerrainInfrastructureGlyphs( ctx: CanvasRenderingContext2D, pts: HexScreenPoint[], options: { showAirport: boolean; showSeaport: bo).
+
+ * Purpose: Supports maintainability by documenting why `drawTerrainInfrastructureGlyphs` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function drawTerrainInfrastructureGlyphs(
   ctx: CanvasRenderingContext2D,

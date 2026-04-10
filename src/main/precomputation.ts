@@ -10,16 +10,62 @@ import type { GameStateSnapshot } from './gameDb';
 import { executeTool2 } from './tools/tool2Assessment';
 import { logDebug, logError } from './logger';
 
-/** Coordinate map built from buildLatLngCoordinateMap; pre-computation uses the same map as requestOrders. */
+/**
+ * Documents the `PrecomputationCoordMap` interface as a named contract surface (export interface PrecomputationCoordMap).
+
+ * Purpose: Supports maintainability by documenting why `PrecomputationCoordMap` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface PrecomputationCoordMap {
-  latLngByH3: Map<string, [number, number]>;
-  resolveToH3: (lat: number, lng: number) => string | undefined;
+    /**
+   * Specifies the contract for the `latLngByH3` member (latLngByH3: Map<string, [number, number]>;).
+
+   * Contract: Describes stable behavior for callers of `latLngByH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+latLngByH3: Map<string, [number, number]>;
+    /**
+   * Specifies the contract for the `resolveToH3` member (resolveToH3: (lat: number, lng: number) => string | undefined;).
+
+   * Contract: Describes stable behavior for callers of `resolveToH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+resolveToH3: (lat: number, lng: number) => string | undefined;
 }
 
-/** One successful assess_unit result: unit id plus the ok response from executeTool2. */
+/**
+ * Documents the `UnitAssessmentResult` interface as a named contract surface (export interface UnitAssessmentResult).
+
+ * Purpose: Supports maintainability by documenting why `UnitAssessmentResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface UnitAssessmentResult {
-  unitId: string;
-  result: {
+    /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+
+   * Contract: Describes stable behavior for callers of `unitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitId: string;
+    /**
+   * Specifies the contract for the `result` member (result: { status: 'ok'; unit: { unitId: string; type: string; position: [number, number]; currentStandingOrder: unknown }; nearbyEnemies: Array<{).
+
+   * Contract: Describes stable behavior for callers of `result` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+result: {
     status: 'ok';
     unit: { unitId: string; type: string; position: [number, number]; currentStandingOrder: unknown };
     nearbyEnemies: Array<{
@@ -37,9 +83,12 @@ export interface UnitAssessmentResult {
 }
 
 /**
- * Runs assess_unit for every AI unit and returns successful results in stable order (by unitId).
- * Uses the same executeTool2 as the LLM tool loop. Call from the pre-computation orchestrator
- * or when only unit assessments are needed.
+ * Defines the `runUnitAssessments` function shape (export function runUnitAssessments().
+
+ * Purpose: Supports maintainability by documenting why `runUnitAssessments` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function runUnitAssessments(
   state: GameStateSnapshot,
@@ -83,15 +132,42 @@ export function runUnitAssessments(
   return results;
 }
 
-/** One successful assess_hex result, keyed by hex position for the briefing. */
+/**
+ * Documents the `HexAssessmentEntry` interface as a named contract surface (export interface HexAssessmentEntry).
+
+ * Purpose: Supports maintainability by documenting why `HexAssessmentEntry` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface HexAssessmentEntry {
-  position: [number, number];
-  result: Record<string, unknown>;
+    /**
+   * Specifies the contract for the `position` member (position: [number, number];).
+
+   * Contract: Describes stable behavior for callers of `position` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+position: [number, number];
+    /**
+   * Specifies the contract for the `result` member (result: Record<string, unknown>;).
+
+   * Contract: Describes stable behavior for callers of `result` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+result: Record<string, unknown>;
 }
 
 /**
- * Runs assess_hex for every hex that contains at least one human unit (one call per such hex).
- * Returns only successful results. Option skipHexAssessments skips this step entirely.
+ * Defines the `runHexAssessments` function shape (function runHexAssessments().
+
+ * Purpose: Supports maintainability by documenting why `runHexAssessments` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function runHexAssessments(
   state: GameStateSnapshot,
@@ -125,19 +201,62 @@ function runHexAssessments(
   return results;
 }
 
-export interface PrecomputationResult {
-  unitAssessments: UnitAssessmentResult[];
-  hexAssessments: HexAssessmentEntry[];
-}
+/**
+ * Documents the `PrecomputationResult` interface as a named contract surface (export interface PrecomputationResult).
 
-export interface RunPrecomputationOptions {
-  /** When true, skip assess_hex for enemy-occupied hexes (default false). */
-  skipHexAssessments?: boolean;
+ * Purpose: Supports maintainability by documenting why `PrecomputationResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export interface PrecomputationResult {
+    /**
+   * Specifies the contract for the `unitAssessments` member (unitAssessments: UnitAssessmentResult[];).
+
+   * Contract: Describes stable behavior for callers of `unitAssessments` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitAssessments: UnitAssessmentResult[];
+    /**
+   * Specifies the contract for the `hexAssessments` member (hexAssessments: HexAssessmentEntry[];).
+
+   * Contract: Describes stable behavior for callers of `hexAssessments` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hexAssessments: HexAssessmentEntry[];
 }
 
 /**
- * Orchestrates full pre-computation: unit assessments and hex assessments.
- * Returns a single object for use by the briefing formatter. Logs total time at debug.
+ * Documents the `RunPrecomputationOptions` interface as a named contract surface (export interface RunPrecomputationOptions).
+
+ * Purpose: Supports maintainability by documenting why `RunPrecomputationOptions` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export interface RunPrecomputationOptions {
+    /**
+   * Specifies the contract for the `skipHexAssessments` member (skipHexAssessments?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `skipHexAssessments` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+skipHexAssessments?: boolean;
+}
+
+/**
+ * Defines the `runPrecomputation` function shape (export function runPrecomputation( state: GameStateSnapshot, coordMap: PrecomputationCoordMap, options?: RunPrecomputationOptions ): PrecomputationRes).
+
+ * Purpose: Supports maintainability by documenting why `runPrecomputation` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function runPrecomputation(
   state: GameStateSnapshot,

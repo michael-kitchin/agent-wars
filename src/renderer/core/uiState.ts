@@ -2,6 +2,14 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from './state';
 import { initializeScenarioRegionSelectorsOnOverlayOpen } from '../gameplay/newGameRegionUi';
 
+/**
+ * Defines the `updateSidebar` function shape (export function updateSidebar().
+
+ * Purpose: Supports maintainability by documenting why `updateSidebar` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function updateSidebar(
   getPrimarySelectedUnitId: () => string | null,
   formatUnitDisplayName: (unitId: string) => string
@@ -14,6 +22,14 @@ export function updateSidebar(
   }
 }
 
+/**
+ * Defines the `updateGameStateSidebar` function shape (export function updateGameStateSidebar(state: GameStateSnapshot | null): void).
+
+ * Purpose: Supports maintainability by documenting why `updateGameStateSidebar` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function updateGameStateSidebar(state: GameStateSnapshot | null): void {
   const phaseEl = document.getElementById('sidebar-phase');
   const turnEl = document.getElementById('sidebar-turn');
@@ -21,6 +37,14 @@ export function updateGameStateSidebar(state: GameStateSnapshot | null): void {
   if (turnEl) turnEl.textContent = state ? `Turn: ${state.turnNumber}` : '—';
 }
 
+/**
+ * Defines the `setMainUIControlsEnabled` function shape (export function setMainUIControlsEnabled(enabled: boolean): void).
+
+ * Purpose: Supports maintainability by documenting why `setMainUIControlsEnabled` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function setMainUIControlsEnabled(enabled: boolean): void {
   const container = document.getElementById('canvas-container');
   if (container) {
@@ -36,6 +60,14 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
   }
 }
 
+/**
+ * Defines the `updateGameOverUI` function shape (export function updateGameOverUI().
+
+ * Purpose: Supports maintainability by documenting why `updateGameOverUI` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function updateGameOverUI(
   state: GameStateSnapshot | null,
   updateReadyButtonState: () => void

@@ -3,6 +3,14 @@ import { READY_REQUEST_TIMEOUT_MS, TOAST_DURATION_MS } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { isWaitingForPrecomputedAiOrders } from './aiPlanningState';
 
+/**
+ * Defines the `formatElapsedMmSs` function shape (export function formatElapsedMmSs(ms: number): string).
+
+ * Purpose: Supports maintainability by documenting why `formatElapsedMmSs` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function formatElapsedMmSs(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
   const m = Math.floor(totalSeconds / 60);
@@ -10,10 +18,26 @@ export function formatElapsedMmSs(ms: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+/**
+ * Defines the `setReadyButtonLabelReady` function shape (export function setReadyButtonLabelReady(readyBtn: HTMLButtonElement): void).
+
+ * Purpose: Supports maintainability by documenting why `setReadyButtonLabelReady` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function setReadyButtonLabelReady(readyBtn: HTMLButtonElement): void {
   readyBtn.textContent = 'Ready';
 }
 
+/**
+ * Defines the `setReadyButtonLabelAiWait` function shape (export function setReadyButtonLabelAiWait(readyBtn: HTMLButtonElement, elapsedMs: number): void).
+
+ * Purpose: Supports maintainability by documenting why `setReadyButtonLabelAiWait` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function setReadyButtonLabelAiWait(readyBtn: HTMLButtonElement, elapsedMs: number): void {
   readyBtn.textContent = '';
   const strong = document.createElement('strong');
@@ -22,6 +46,14 @@ export function setReadyButtonLabelAiWait(readyBtn: HTMLButtonElement, elapsedMs
   readyBtn.appendChild(document.createTextNode(formatElapsedMmSs(elapsedMs)));
 }
 
+/**
+ * Defines the `updateReadyButtonState` function shape (export function updateReadyButtonState(): void).
+
+ * Purpose: Supports maintainability by documenting why `updateReadyButtonState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function updateReadyButtonState(): void {
   const readyBtn = document.getElementById('ready-btn') as HTMLButtonElement | null;
   if (!readyBtn) return;
@@ -50,6 +82,14 @@ export function updateReadyButtonState(): void {
   }
 }
 
+/**
+ * Defines the `updateOpenRouterToolCountLabels` function shape (export function updateOpenRouterToolCountLabels(): void).
+
+ * Purpose: Supports maintainability by documenting why `updateOpenRouterToolCountLabels` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function updateOpenRouterToolCountLabels(): void {
   for (const group of S.openRouterToolGroups) {
     const btn = document.querySelector(`.openrouter-tool-toggle[data-tool-group="${group.id}"]`);
@@ -57,6 +97,14 @@ export function updateOpenRouterToolCountLabels(): void {
   }
 }
 
+/**
+ * Defines the `formatOpenRouterCost` function shape (export function formatOpenRouterCost(dollars: number): string).
+
+ * Purpose: Supports maintainability by documenting why `formatOpenRouterCost` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function formatOpenRouterCost(dollars: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -66,11 +114,27 @@ export function formatOpenRouterCost(dollars: number): string {
   }).format(dollars);
 }
 
+/**
+ * Defines the `updateOpenRouterCostLabel` function shape (export function updateOpenRouterCostLabel(): void).
+
+ * Purpose: Supports maintainability by documenting why `updateOpenRouterCostLabel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function updateOpenRouterCostLabel(): void {
   const el = document.getElementById('openrouter-cost');
   if (el) el.textContent = formatOpenRouterCost(S.openRouterGameCost);
 }
 
+/**
+ * Defines the `appendOpenRouterLog` function shape (export function appendOpenRouterLog(line: string, isError = false): void).
+
+ * Purpose: Supports maintainability by documenting why `appendOpenRouterLog` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function appendOpenRouterLog(line: string, isError = false): void {
   const el = document.getElementById('openrouter-log');
   if (!el) return;
@@ -82,6 +146,14 @@ export function appendOpenRouterLog(line: string, isError = false): void {
   el.scrollTop = el.scrollHeight;
 }
 
+/**
+ * Defines the `bulletizeToastLines` function shape (export function bulletizeToastLines(message: string): string).
+
+ * Purpose: Supports maintainability by documenting why `bulletizeToastLines` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function bulletizeToastLines(message: string): string {
   const lines = message
     .split('\n')
@@ -93,6 +165,14 @@ export function bulletizeToastLines(message: string): string {
     .join('\n');
 }
 
+/**
+ * Defines the `showToast` function shape (function showToast().
+
+ * Purpose: Supports maintainability by documenting why `showToast` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function showToast(
   el: HTMLElement,
   textEl: HTMLElement,
@@ -105,6 +185,14 @@ function showToast(
   el.classList.remove('hidden');
 }
 
+/**
+ * Defines the `showMapToast` function shape (export function showMapToast(message: string, options?:).
+
+ * Purpose: Supports maintainability by documenting why `showMapToast` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function showMapToast(message: string, options?: { isError?: boolean }): void {
   if (S.toastHideTimer !== null) {
     clearTimeout(S.toastHideTimer);
@@ -131,6 +219,14 @@ export function showMapToast(message: string, options?: { isError?: boolean }): 
   }, TOAST_DURATION_MS);
 }
 
+/**
+ * Defines the `hideMapToast` function shape (export function hideMapToast(): void).
+
+ * Purpose: Supports maintainability by documenting why `hideMapToast` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function hideMapToast(): void {
   if (S.toastHideTimer !== null) {
     clearTimeout(S.toastHideTimer);
@@ -140,6 +236,14 @@ export function hideMapToast(): void {
   if (el) el.classList.add('hidden');
 }
 
+/**
+ * Defines the `showAiStrategyToast` function shape (export function showAiStrategyToast(message: string, modelName?: string): void).
+
+ * Purpose: Supports maintainability by documenting why `showAiStrategyToast` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function showAiStrategyToast(message: string, modelName?: string): void {
   if (S.aiStrategyToastHideTimer !== null) {
     clearTimeout(S.aiStrategyToastHideTimer);
@@ -170,6 +274,14 @@ export function showAiStrategyToast(message: string, modelName?: string): void {
   }, TOAST_DURATION_MS);
 }
 
+/**
+ * Defines the `hideAiStrategyToast` function shape (export function hideAiStrategyToast(): void).
+
+ * Purpose: Supports maintainability by documenting why `hideAiStrategyToast` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function hideAiStrategyToast(): void {
   if (S.aiStrategyToastHideTimer !== null) {
     clearTimeout(S.aiStrategyToastHideTimer);
@@ -179,6 +291,14 @@ export function hideAiStrategyToast(): void {
   if (el) el.classList.add('hidden');
 }
 
+/**
+ * Defines the `callReadyWithTimeout` function shape (export async function callReadyWithTimeout().
+
+ * Purpose: Supports maintainability by documenting why `callReadyWithTimeout` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export async function callReadyWithTimeout(
   payload: GameReadyIpcPayload
 ): Promise<Awaited<ReturnType<NonNullable<GameApi['ready']>>>> {

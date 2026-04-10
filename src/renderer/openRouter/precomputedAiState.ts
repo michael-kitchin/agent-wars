@@ -1,15 +1,23 @@
 import type { RequestAiOrdersResult } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
 
+/**
+ * Documents the `PrecomputedResetMode` type alias (type PrecomputedResetMode).
+
+ * Purpose: Supports maintainability by documenting why `PrecomputedResetMode` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type PrecomputedResetMode = 'null' | 'empty';
 
 /**
- * Why this exists:
- *     Centralizes precomputed AI planning cache resets used by Run toggle, Ready, and new-game flows.
- * When to use:
- *     Any renderer transition that invalidates cached AI planning output.
- * What to expect:
- *     Resets movement/ranged/embark/strategy/tool-count caches consistently to null or empty-array mode.
+ * Defines the `resetPrecomputedAiState` function shape (export function resetPrecomputedAiState(mode: PrecomputedResetMode): void).
+
+ * Purpose: Supports maintainability by documenting why `resetPrecomputedAiState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function resetPrecomputedAiState(mode: PrecomputedResetMode): void {
   if (mode === 'empty') {
@@ -26,12 +34,12 @@ export function resetPrecomputedAiState(mode: PrecomputedResetMode): void {
 }
 
 /**
- * Why this exists:
- *     Stores successful background AI planning payloads into the shared precomputed cache.
- * When to use:
- *     After game:requestAiOrders returns success while Run is enabled.
- * What to expect:
- *     Precomputed movement/ranged/embark/strategy payloads are updated for the next Ready click.
+ * Defines the `applySuccessfulPrecomputedAiResult` function shape (export function applySuccessfulPrecomputedAiResult(result: Extract<RequestAiOrdersResult,).
+
+ * Purpose: Supports maintainability by documenting why `applySuccessfulPrecomputedAiResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function applySuccessfulPrecomputedAiResult(result: Extract<RequestAiOrdersResult, { success: true }>): void {
   S.precomputedAiOrders = result.orders;

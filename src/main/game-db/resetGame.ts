@@ -4,16 +4,88 @@ import type { GuardedDbRunAndGetAllOps } from './dbOps';
 import { logHomeRegionControlParity } from './seeding/initialFlexAirSlot';
 import { persistRegionVsRegionScenarioState } from './scenarioState';
 
+/**
+ * Documents the `ResetGameDeps` interface as a named contract surface (interface ResetGameDeps extends GuardedDbRunAndGetAllOps).
+
+ * Purpose: Supports maintainability by documenting why `ResetGameDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface ResetGameDeps extends GuardedDbRunAndGetAllOps {
-  clearGameOver: () => void;
-  seedGameSeedIfMissing: () => void;
-  seedHexesFromTerrainMetadata: () => void;
-  seedInfrastructureStateFromMetadata: () => void;
-  seedUnits: () => void;
-  refreshFogOfWarIntelFromCurrentState: () => void;
-  saveDatabase: () => void;
+    /**
+   * Specifies the contract for the `clearGameOver` member (clearGameOver: () => void;).
+
+   * Contract: Describes stable behavior for callers of `clearGameOver` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+clearGameOver: () => void;
+    /**
+   * Specifies the contract for the `seedGameSeedIfMissing` member (seedGameSeedIfMissing: () => void;).
+
+   * Contract: Describes stable behavior for callers of `seedGameSeedIfMissing` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+seedGameSeedIfMissing: () => void;
+    /**
+   * Specifies the contract for the `seedHexesFromTerrainMetadata` member (seedHexesFromTerrainMetadata: () => void;).
+
+   * Contract: Describes stable behavior for callers of `seedHexesFromTerrainMetadata` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+seedHexesFromTerrainMetadata: () => void;
+    /**
+   * Specifies the contract for the `seedInfrastructureStateFromMetadata` member (seedInfrastructureStateFromMetadata: () => void;).
+
+   * Contract: Describes stable behavior for callers of `seedInfrastructureStateFromMetadata` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+seedInfrastructureStateFromMetadata: () => void;
+    /**
+   * Specifies the contract for the `seedUnits` member (seedUnits: () => void;).
+
+   * Contract: Describes stable behavior for callers of `seedUnits` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+seedUnits: () => void;
+    /**
+   * Specifies the contract for the `refreshFogOfWarIntelFromCurrentState` member (refreshFogOfWarIntelFromCurrentState: () => void;).
+
+   * Contract: Describes stable behavior for callers of `refreshFogOfWarIntelFromCurrentState` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+refreshFogOfWarIntelFromCurrentState: () => void;
+    /**
+   * Specifies the contract for the `saveDatabase` member (saveDatabase: () => void;).
+
+   * Contract: Describes stable behavior for callers of `saveDatabase` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+saveDatabase: () => void;
 }
 
+/**
+ * Defines the `seedInitialHexControlFromUnitOccupancy` function shape (function seedInitialHexControlFromUnitOccupancy(deps: ResetGameDeps): void).
+
+ * Purpose: Supports maintainability by documenting why `seedInitialHexControlFromUnitOccupancy` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function seedInitialHexControlFromUnitOccupancy(deps: ResetGameDeps): void {
   const { run, getAll } = deps;
   logDebug('gameDb seedInitialHexControlFromUnitOccupancy');
@@ -33,6 +105,14 @@ function seedInitialHexControlFromUnitOccupancy(deps: ResetGameDeps): void {
   }
 }
 
+/**
+ * Defines the `seedInitialHexControlFromHomeRegions` function shape (function seedInitialHexControlFromHomeRegions().
+
+ * Purpose: Supports maintainability by documenting why `seedInitialHexControlFromHomeRegions` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function seedInitialHexControlFromHomeRegions(
   deps: ResetGameDeps,
   options: { humanHomeRegion: string; aiHomeRegion: string }
@@ -69,12 +149,12 @@ function seedInitialHexControlFromHomeRegions(
 }
 
 /**
- * Why this exists:
- *     Re-initializes all runtime game tables for a clean new match with optional fog toggle.
- * When to use:
- *     New-game flow after user confirmation and before returning first planning snapshot.
- * What to expect:
- *     Clears per-match transient state, reseeds map/units/control, refreshes fog intel, and persists immediately.
+ * Defines the `resetGameForNewMatch` function shape (export function resetGameForNewMatch( deps: ResetGameDeps, options?: { fogOfWarEnabled?: boolean; humanHomeRegion?: string; aiHomeRegion?: string } ): vo).
+
+ * Purpose: Supports maintainability by documenting why `resetGameForNewMatch` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function resetGameForNewMatch(
   deps: ResetGameDeps,

@@ -21,10 +21,26 @@ import {
 import { MAX_UNITS_PER_TYPE } from './productionCaps';
 import { withTempGameDb } from './testSupport/withTempGameDb';
 
+/**
+ * Defines the `withTempDb` function shape (function withTempDb(runCase: () => void): void).
+
+ * Purpose: Supports maintainability by documenting why `withTempDb` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function withTempDb(runCase: () => void): void {
   withTempGameDb('aw-gameactions-prod-', runCase);
 }
 
+/**
+ * Defines the `findBuildableHumanControlledHex` function shape (function findBuildableHumanControlledHex(): string).
+
+ * Purpose: Supports maintainability by documenting why `findBuildableHumanControlledHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function findBuildableHumanControlledHex(): string {
   const state = getGameState();
   for (const hx of state.hexes) {
@@ -45,6 +61,14 @@ function findBuildableHumanControlledHex(): string {
   throw new Error('Expected at least one buildable human-controlled hex in seeded world.');
 }
 
+/**
+ * Defines the `findAnyHexExcluding` function shape (function findAnyHexExcluding(excluded: string): string).
+
+ * Purpose: Supports maintainability by documenting why `findAnyHexExcluding` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function findAnyHexExcluding(excluded: string): string {
   const state = getGameState();
   const hit = state.hexes.find((hx) => hx.h3Index !== excluded);
@@ -52,6 +76,14 @@ function findAnyHexExcluding(excluded: string): string {
   return hit.h3Index;
 }
 
+/**
+ * Defines the `testBuildQueueMutationContracts` function shape (function testBuildQueueMutationContracts(): void).
+
+ * Purpose: Supports maintainability by documenting why `testBuildQueueMutationContracts` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testBuildQueueMutationContracts(): void {
   withTempDb(() => {
     const h3 = findBuildableHumanControlledHex();
@@ -76,6 +108,14 @@ function testBuildQueueMutationContracts(): void {
   });
 }
 
+/**
+ * Defines the `testTypeChangeAfterCountEditKeepsCount` function shape (function testTypeChangeAfterCountEditKeepsCount(): void).
+
+ * Purpose: Supports maintainability by documenting why `testTypeChangeAfterCountEditKeepsCount` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testTypeChangeAfterCountEditKeepsCount(): void {
   withTempDb(() => {
     const h3 = findBuildableHumanControlledHex();
@@ -95,6 +135,14 @@ function testTypeChangeAfterCountEditKeepsCount(): void {
   });
 }
 
+/**
+ * Defines the `testNoProductionBeforeReadyDuringPlanningEdits` function shape (function testNoProductionBeforeReadyDuringPlanningEdits(): void).
+
+ * Purpose: Supports maintainability by documenting why `testNoProductionBeforeReadyDuringPlanningEdits` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testNoProductionBeforeReadyDuringPlanningEdits(): void {
   withTempDb(() => {
     const h3 = findBuildableHumanControlledHex();
@@ -113,6 +161,14 @@ function testNoProductionBeforeReadyDuringPlanningEdits(): void {
   });
 }
 
+/**
+ * Defines the `testControlTakeoverClearsQueueAndProgress` function shape (function testControlTakeoverClearsQueueAndProgress(): void).
+
+ * Purpose: Supports maintainability by documenting why `testControlTakeoverClearsQueueAndProgress` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testControlTakeoverClearsQueueAndProgress(): void {
   withTempDb(() => {
     const targetHex = findBuildableHumanControlledHex();
@@ -148,6 +204,14 @@ function testControlTakeoverClearsQueueAndProgress(): void {
   });
 }
 
+/**
+ * Defines the `testTraversedIntermediateHexCapturesControl` function shape (function testTraversedIntermediateHexCapturesControl(): void).
+
+ * Purpose: Supports maintainability by documenting why `testTraversedIntermediateHexCapturesControl` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testTraversedIntermediateHexCapturesControl(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -189,6 +253,14 @@ function testTraversedIntermediateHexCapturesControl(): void {
   });
 }
 
+/**
+ * Defines the `findNavalPassableHex` function shape (function findNavalPassableHex(): string).
+
+ * Purpose: Supports maintainability by documenting why `findNavalPassableHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function findNavalPassableHex(): string {
   const state = getGameState();
   const hit = state.hexes.find((hx) => hx.terrain === 'water' || hx.terrain === 'coastal');
@@ -196,6 +268,14 @@ function findNavalPassableHex(): string {
   return hit.h3Index;
 }
 
+/**
+ * Defines the `testNavalOccupancyGrantsControl` function shape (function testNavalOccupancyGrantsControl(): void).
+
+ * Purpose: Supports maintainability by documenting why `testNavalOccupancyGrantsControl` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testNavalOccupancyGrantsControl(): void {
   withTempDb(() => {
     const targetHex = findNavalPassableHex();
@@ -219,6 +299,14 @@ function testNavalOccupancyGrantsControl(): void {
   });
 }
 
+/**
+ * Defines the `testNavalMixedOccupancyContestsControl` function shape (function testNavalMixedOccupancyContestsControl(): void).
+
+ * Purpose: Supports maintainability by documenting why `testNavalMixedOccupancyContestsControl` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testNavalMixedOccupancyContestsControl(): void {
   withTempDb(() => {
     const targetHex = findNavalPassableHex();
@@ -249,6 +337,14 @@ function testNavalMixedOccupancyContestsControl(): void {
   });
 }
 
+/**
+ * Defines the `testNavalTraversedIntermediateHexCapturesControl` function shape (function testNavalTraversedIntermediateHexCapturesControl(): void).
+
+ * Purpose: Supports maintainability by documenting why `testNavalTraversedIntermediateHexCapturesControl` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testNavalTraversedIntermediateHexCapturesControl(): void {
   withTempDb(() => {
     const state = getGameState();
@@ -302,6 +398,14 @@ function testNavalTraversedIntermediateHexCapturesControl(): void {
   });
 }
 
+/**
+ * Defines the `testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap` function shape (function testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap(): void).
+
+ * Purpose: Supports maintainability by documenting why `testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap(): void {
   withTempDb(() => {
     const targetHex = findBuildableHumanControlledHex();
@@ -346,6 +450,14 @@ function testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap(): void {
   });
 }
 
+/**
+ * Defines the `testAirBuildRequiresAirportInfrastructure` function shape (function testAirBuildRequiresAirportInfrastructure(): void).
+
+ * Purpose: Supports maintainability by documenting why `testAirBuildRequiresAirportInfrastructure` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testAirBuildRequiresAirportInfrastructure(): void {
   withTempDb(() => {
     const targetHex = findBuildableHumanControlledHex();
@@ -380,6 +492,14 @@ function testAirBuildRequiresAirportInfrastructure(): void {
   });
 }
 
+/**
+ * Defines the `testNavalBuildRequiresSeaportAndUrbanInfrastructure` function shape (function testNavalBuildRequiresSeaportAndUrbanInfrastructure(): void).
+
+ * Purpose: Supports maintainability by documenting why `testNavalBuildRequiresSeaportAndUrbanInfrastructure` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testNavalBuildRequiresSeaportAndUrbanInfrastructure(): void {
   withTempDb(() => {
     const targetHex = findBuildableHumanControlledHex();
@@ -406,6 +526,14 @@ function testNavalBuildRequiresSeaportAndUrbanInfrastructure(): void {
   });
 }
 
+/**
+ * Defines the `run` function shape (function run(): void).
+
+ * Purpose: Supports maintainability by documenting why `run` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function run(): void {
   testBuildQueueMutationContracts();
   testTypeChangeAfterCountEditKeepsCount();
@@ -418,7 +546,6 @@ function run(): void {
   testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap();
   testAirBuildRequiresAirportInfrastructure();
   testNavalBuildRequiresSeaportAndUrbanInfrastructure();
-  // eslint-disable-next-line no-console
   console.log('gameActionsProduction.test.ts passed');
 }
 

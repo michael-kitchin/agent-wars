@@ -26,70 +26,526 @@ import { getInitialUserMessage } from './promptText';
 import { TOOL2_NAMES } from '../tools/tool2Assessment';
 import { TOOL3_NAMES } from '../tools/tool3CombatEstimation';
 
+/**
+ * Documents the `ChatMessage` type alias (type ChatMessage).
+
+ * Purpose: Supports maintainability by documenting why `ChatMessage` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type ChatMessage =
-  | { role: 'system'; content: string }
-  | { role: 'user'; content: string }
-  | { role: 'assistant'; content: string | null; tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }> }
-  | { role: 'tool'; tool_call_id: string; content: string };
+  | {   /**
+   * Specifies the contract for the `role` member (role: 'system';).
 
+   * Contract: Describes stable behavior for callers of `role` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+role: 'system';   /**
+   * Specifies the contract for the `content` member (content: string).
+
+   * Contract: Describes stable behavior for callers of `content` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+content: string }
+  | {   /**
+   * Specifies the contract for the `role` member (role: 'user';).
+
+   * Contract: Describes stable behavior for callers of `role` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+role: 'user';   /**
+   * Specifies the contract for the `content` member (content: string).
+
+   * Contract: Describes stable behavior for callers of `content` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+content: string }
+  | {   /**
+   * Specifies the contract for the `role` member (role: 'assistant';).
+
+   * Contract: Describes stable behavior for callers of `role` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+role: 'assistant';   /**
+   * Specifies the contract for the `content` member (content: string | null;).
+
+   * Contract: Describes stable behavior for callers of `content` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+content: string | null;   /**
+   * Specifies the contract for the `tool_calls` member (tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }>).
+
+   * Contract: Describes stable behavior for callers of `tool_calls` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }> }
+  | {   /**
+   * Specifies the contract for the `role` member (role: 'tool';).
+
+   * Contract: Describes stable behavior for callers of `role` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+role: 'tool';   /**
+   * Specifies the contract for the `tool_call_id` member (tool_call_id: string;).
+
+   * Contract: Describes stable behavior for callers of `tool_call_id` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+tool_call_id: string;   /**
+   * Specifies the contract for the `content` member (content: string).
+
+   * Contract: Describes stable behavior for callers of `content` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+content: string };
+
+/**
+ * Documents the `RequestOrdersResult` interface as a named contract surface (export interface RequestOrdersResult).
+
+ * Purpose: Supports maintainability by documenting why `RequestOrdersResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface RequestOrdersResult {
-  success: true;
-  orders: { unitId: string; toH3Index: string }[];
-  rangedAttacks?: { unitId: string; targetH3Index: string }[];
-  airStrikes?: AirStrikeOrder[];
-  ferryOrders?: FerryOrder[];
-  embarkOrders?: EmbarkOrder[];
-  strategy?: string;
-  dropped?: number;
-  dropReasons?: string[];
-  toolInvocationCounts?: Record<string, number>;
-  cost?: number;
-  wallClockMs?: number;
-  inputTokens?: number;
-  outputTokens?: number;
+    /**
+   * Specifies the contract for the `success` member (success: true;).
+
+   * Contract: Describes stable behavior for callers of `success` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+success: true;
+    /**
+   * Specifies the contract for the `orders` member (orders: { unitId: string; toH3Index: string }[];).
+
+   * Contract: Describes stable behavior for callers of `orders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+orders: { unitId: string; toH3Index: string }[];
+    /**
+   * Specifies the contract for the `rangedAttacks` member (rangedAttacks?: { unitId: string; targetH3Index: string }[];).
+
+   * Contract: Describes stable behavior for callers of `rangedAttacks` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+rangedAttacks?: { unitId: string; targetH3Index: string }[];
+    /**
+   * Specifies the contract for the `airStrikes` member (airStrikes?: AirStrikeOrder[];).
+
+   * Contract: Describes stable behavior for callers of `airStrikes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+airStrikes?: AirStrikeOrder[];
+    /**
+   * Specifies the contract for the `ferryOrders` member (ferryOrders?: FerryOrder[];).
+
+   * Contract: Describes stable behavior for callers of `ferryOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ferryOrders?: FerryOrder[];
+    /**
+   * Specifies the contract for the `embarkOrders` member (embarkOrders?: EmbarkOrder[];).
+
+   * Contract: Describes stable behavior for callers of `embarkOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+embarkOrders?: EmbarkOrder[];
+    /**
+   * Specifies the contract for the `strategy` member (strategy?: string;).
+
+   * Contract: Describes stable behavior for callers of `strategy` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+strategy?: string;
+    /**
+   * Specifies the contract for the `dropped` member (dropped?: number;).
+
+   * Contract: Describes stable behavior for callers of `dropped` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+dropped?: number;
+    /**
+   * Specifies the contract for the `dropReasons` member (dropReasons?: string[];).
+
+   * Contract: Describes stable behavior for callers of `dropReasons` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+dropReasons?: string[];
+    /**
+   * Specifies the contract for the `toolInvocationCounts` member (toolInvocationCounts?: Record<string, number>;).
+
+   * Contract: Describes stable behavior for callers of `toolInvocationCounts` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+toolInvocationCounts?: Record<string, number>;
+    /**
+   * Specifies the contract for the `cost` member (cost?: number;).
+
+   * Contract: Describes stable behavior for callers of `cost` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+cost?: number;
+    /**
+   * Specifies the contract for the `wallClockMs` member (wallClockMs?: number;).
+
+   * Contract: Describes stable behavior for callers of `wallClockMs` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+wallClockMs?: number;
+    /**
+   * Specifies the contract for the `inputTokens` member (inputTokens?: number;).
+
+   * Contract: Describes stable behavior for callers of `inputTokens` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+inputTokens?: number;
+    /**
+   * Specifies the contract for the `outputTokens` member (outputTokens?: number;).
+
+   * Contract: Describes stable behavior for callers of `outputTokens` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+outputTokens?: number;
 }
 
+/**
+ * Documents the `RequestOrdersError` interface as a named contract surface (export interface RequestOrdersError).
+
+ * Purpose: Supports maintainability by documenting why `RequestOrdersError` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface RequestOrdersError {
-  success: false;
-  error: string;
+    /**
+   * Specifies the contract for the `success` member (success: false;).
+
+   * Contract: Describes stable behavior for callers of `success` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+success: false;
+    /**
+   * Specifies the contract for the `error` member (error: string;).
+
+   * Contract: Describes stable behavior for callers of `error` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+error: string;
 }
 
+/**
+ * Documents the `RequestOrdersOptions` interface as a named contract surface (export interface RequestOrdersOptions).
+
+ * Purpose: Supports maintainability by documenting why `RequestOrdersOptions` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface RequestOrdersOptions {
-  enabledToolNames?: string[];
-  signal?: AbortSignal;
-  onLog?: (line: string, isError?: boolean) => void;
-  usePrecomputation?: boolean;
+    /**
+   * Specifies the contract for the `enabledToolNames` member (enabledToolNames?: string[];).
+
+   * Contract: Describes stable behavior for callers of `enabledToolNames` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+enabledToolNames?: string[];
+    /**
+   * Specifies the contract for the `signal` member (signal?: AbortSignal;).
+
+   * Contract: Describes stable behavior for callers of `signal` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+signal?: AbortSignal;
+    /**
+   * Specifies the contract for the `onLog` member (onLog?: (line: string, isError?: boolean) => void;).
+
+   * Contract: Describes stable behavior for callers of `onLog` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+onLog?: (line: string, isError?: boolean) => void;
+    /**
+   * Specifies the contract for the `usePrecomputation` member (usePrecomputation?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `usePrecomputation` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+usePrecomputation?: boolean;
 }
 
+/**
+ * Documents the module-scope binding `FULL_PROMPT_LOG_PREVIEW_CHARS` (FULL_PROMPT_LOG_PREVIEW_CHARS).
+
+ * Purpose: Supports maintainability by documenting why `FULL_PROMPT_LOG_PREVIEW_CHARS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const FULL_PROMPT_LOG_PREVIEW_CHARS = 1200;
+/**
+ * Documents the module-scope binding `FULL_PROMPT_LOG_ENV_FLAG` (FULL_PROMPT_LOG_ENV_FLAG).
+
+ * Purpose: Supports maintainability by documenting why `FULL_PROMPT_LOG_ENV_FLAG` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const FULL_PROMPT_LOG_ENV_FLAG = 'AGENT_WARS_LOG_FULL_PROMPTS';
+/**
+ * Documents the module-scope binding `FULL_RESPONSE_LOG_PREVIEW_CHARS` (FULL_RESPONSE_LOG_PREVIEW_CHARS).
+
+ * Purpose: Supports maintainability by documenting why `FULL_RESPONSE_LOG_PREVIEW_CHARS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const FULL_RESPONSE_LOG_PREVIEW_CHARS = 1200;
+/**
+ * Documents the module-scope binding `FULL_RESPONSE_LOG_ENV_FLAG` (FULL_RESPONSE_LOG_ENV_FLAG).
+
+ * Purpose: Supports maintainability by documenting why `FULL_RESPONSE_LOG_ENV_FLAG` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const FULL_RESPONSE_LOG_ENV_FLAG = 'AGENT_WARS_LOG_FULL_RESPONSES';
+/**
+ * Documents the module-scope binding `REQUEST_ORDERS_MAX_WALL_CLOCK_MS` (REQUEST_ORDERS_MAX_WALL_CLOCK_MS).
+
+ * Purpose: Supports maintainability by documenting why `REQUEST_ORDERS_MAX_WALL_CLOCK_MS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const REQUEST_ORDERS_MAX_WALL_CLOCK_MS = 90_000;
 
+/**
+ * Documents the `AiPathfindingSessionMetrics` interface as a named contract surface (interface AiPathfindingSessionMetrics).
+
+ * Purpose: Supports maintainability by documenting why `AiPathfindingSessionMetrics` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface AiPathfindingSessionMetrics {
-  created: number;
-  reused: number;
-  planRouteToolCalls: number;
-  checkDistanceToolCalls: number;
-  totalToolCalls: number;
+    /**
+   * Specifies the contract for the `created` member (created: number;).
+
+   * Contract: Describes stable behavior for callers of `created` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+created: number;
+    /**
+   * Specifies the contract for the `reused` member (reused: number;).
+
+   * Contract: Describes stable behavior for callers of `reused` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+reused: number;
+    /**
+   * Specifies the contract for the `planRouteToolCalls` member (planRouteToolCalls: number;).
+
+   * Contract: Describes stable behavior for callers of `planRouteToolCalls` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+planRouteToolCalls: number;
+    /**
+   * Specifies the contract for the `checkDistanceToolCalls` member (checkDistanceToolCalls: number;).
+
+   * Contract: Describes stable behavior for callers of `checkDistanceToolCalls` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+checkDistanceToolCalls: number;
+    /**
+   * Specifies the contract for the `totalToolCalls` member (totalToolCalls: number;).
+
+   * Contract: Describes stable behavior for callers of `totalToolCalls` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+totalToolCalls: number;
 }
 
+/**
+ * Documents the `AiPathfindingTurnAggregateMetrics` interface as a named contract surface (interface AiPathfindingTurnAggregateMetrics extends AiPathfindingSessionMetrics).
+
+ * Purpose: Supports maintainability by documenting why `AiPathfindingTurnAggregateMetrics` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface AiPathfindingTurnAggregateMetrics extends AiPathfindingSessionMetrics {
-  turnNumber: number;
-  requestCount: number;
+    /**
+   * Specifies the contract for the `turnNumber` member (turnNumber: number;).
+
+   * Contract: Describes stable behavior for callers of `turnNumber` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+turnNumber: number;
+    /**
+   * Specifies the contract for the `requestCount` member (requestCount: number;).
+
+   * Contract: Describes stable behavior for callers of `requestCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+requestCount: number;
 }
 
+/**
+ * Documents the module-scope binding `aiPathfindingTurnAggregateMetrics` (aiPathfindingTurnAggregateMetrics: AiPathfindingTurnAggregateMetrics).
+
+ * Purpose: Supports maintainability by documenting why `aiPathfindingTurnAggregateMetrics` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const aiPathfindingTurnAggregateMetrics: AiPathfindingTurnAggregateMetrics = {
-  turnNumber: -1,
-  requestCount: 0,
-  created: 0,
-  reused: 0,
-  planRouteToolCalls: 0,
-  checkDistanceToolCalls: 0,
-  totalToolCalls: 0,
+    /**
+   * Documents the object literal property `turnNumber` (turnNumber: -1).
+
+   * Purpose: Supports maintainability by documenting why `turnNumber` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+turnNumber: -1,
+    /**
+   * Documents the object literal property `requestCount` (requestCount: 0).
+
+   * Purpose: Supports maintainability by documenting why `requestCount` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+requestCount: 0,
+    /**
+   * Documents the object literal property `created` (created: 0).
+
+   * Purpose: Supports maintainability by documenting why `created` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+created: 0,
+    /**
+   * Documents the object literal property `reused` (reused: 0).
+
+   * Purpose: Supports maintainability by documenting why `reused` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+reused: 0,
+    /**
+   * Documents the object literal property `planRouteToolCalls` (planRouteToolCalls: 0).
+
+   * Purpose: Supports maintainability by documenting why `planRouteToolCalls` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+planRouteToolCalls: 0,
+    /**
+   * Documents the object literal property `checkDistanceToolCalls` (checkDistanceToolCalls: 0).
+
+   * Purpose: Supports maintainability by documenting why `checkDistanceToolCalls` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+checkDistanceToolCalls: 0,
+    /**
+   * Documents the object literal property `totalToolCalls` (totalToolCalls: 0).
+
+   * Purpose: Supports maintainability by documenting why `totalToolCalls` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+totalToolCalls: 0,
 };
 
+/**
+ * Defines the `getAiPathfindingTurnAggregateMetrics` function shape (function getAiPathfindingTurnAggregateMetrics(turnNumber: number): AiPathfindingTurnAggregateMetrics).
+
+ * Purpose: Supports maintainability by documenting why `getAiPathfindingTurnAggregateMetrics` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getAiPathfindingTurnAggregateMetrics(turnNumber: number): AiPathfindingTurnAggregateMetrics {
   if (aiPathfindingTurnAggregateMetrics.turnNumber !== turnNumber) {
     aiPathfindingTurnAggregateMetrics.turnNumber = turnNumber;
@@ -104,8 +560,12 @@ function getAiPathfindingTurnAggregateMetrics(turnNumber: number): AiPathfinding
 }
 
 /**
- * True when env is set to a common affirmative (1, true, yes, on); case-insensitive.
- * Strips optional surrounding quotes so .env lines like AGENT_WARS_LOG_FULL_PROMPTS="1" work.
+ * Defines the `isFullLogEnvEnabled` function shape (function isFullLogEnvEnabled(flagName: string): boolean).
+
+ * Purpose: Supports maintainability by documenting why `isFullLogEnvEnabled` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function isFullLogEnvEnabled(flagName: string): boolean {
   let v = process.env[flagName]?.trim();
@@ -120,6 +580,14 @@ function isFullLogEnvEnabled(flagName: string): boolean {
   return lower === '1' || lower === 'true' || lower === 'yes' || lower === 'on';
 }
 
+/**
+ * Defines the `writeFullLogArtifact` function shape (function writeFullLogArtifact(fileName: string, content: string): string | null).
+
+ * Purpose: Supports maintainability by documenting why `writeFullLogArtifact` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function writeFullLogArtifact(fileName: string, content: string): string | null {
   const absPath = path.join(process.cwd(), fileName);
   try {
@@ -131,6 +599,14 @@ function writeFullLogArtifact(fileName: string, content: string): string | null 
   }
 }
 
+/**
+ * Defines the `logPromptPreview` function shape (function logPromptPreview(label: string, content: string): void).
+
+ * Purpose: Supports maintainability by documenting why `logPromptPreview` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function logPromptPreview(label: string, content: string): void {
   const fullPromptLoggingEnabled = isFullLogEnvEnabled(FULL_PROMPT_LOG_ENV_FLAG);
   if (fullPromptLoggingEnabled) {
@@ -150,6 +626,14 @@ function logPromptPreview(label: string, content: string): void {
   });
 }
 
+/**
+ * Defines the `logResponsePreview` function shape (function logResponsePreview(label: string, content: string): void).
+
+ * Purpose: Supports maintainability by documenting why `logResponsePreview` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function logResponsePreview(label: string, content: string): void {
   const fullResponseLoggingEnabled = isFullLogEnvEnabled(FULL_RESPONSE_LOG_ENV_FLAG);
   if (fullResponseLoggingEnabled) {
@@ -166,9 +650,33 @@ function logResponsePreview(label: string, content: string): void {
   });
 }
 
+/**
+ * Documents the `RequestOrdersFlowDeps` interface as a named contract surface (interface RequestOrdersFlowDeps).
+
+ * Purpose: Supports maintainability by documenting why `RequestOrdersFlowDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface RequestOrdersFlowDeps {
-  loadKey: () => string;
-  getToolFlags: (enabledToolNames: string[] | undefined) => {
+    /**
+   * Specifies the contract for the `loadKey` member (loadKey: () => string;).
+
+   * Contract: Describes stable behavior for callers of `loadKey` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+loadKey: () => string;
+    /**
+   * Specifies the contract for the `getToolFlags` member (getToolFlags: (enabledToolNames: string[] | undefined) => { planningEnabled: boolean; assessmentEnabled: boolean; estimationEnabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `getToolFlags` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getToolFlags: (enabledToolNames: string[] | undefined) => {
     planningEnabled: boolean;
     assessmentEnabled: boolean;
     estimationEnabled: boolean;
@@ -177,8 +685,24 @@ interface RequestOrdersFlowDeps {
     productionEnabled: boolean;
     fallbackMovementEnabled: boolean;
   };
-  toolGroupRegistry: { id: string; toolNames: readonly string[] }[];
-  buildSystemPromptForTools: (
+    /**
+   * Specifies the contract for the `toolGroupRegistry` member (toolGroupRegistry: { id: string; toolNames: readonly string[] }[];).
+
+   * Contract: Describes stable behavior for callers of `toolGroupRegistry` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+toolGroupRegistry: { id: string; toolNames: readonly string[] }[];
+    /**
+   * Specifies the contract for the `buildSystemPromptForTools` member (buildSystemPromptForTools: ( state: GameStateSnapshot, coordMap: { latLngByH3: Map<string, [number, number]>; format: (h3: string) => st).
+
+   * Contract: Describes stable behavior for callers of `buildSystemPromptForTools` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+buildSystemPromptForTools: (
     state: GameStateSnapshot,
     coordMap: {
       latLngByH3: Map<string, [number, number]>;
@@ -188,26 +712,82 @@ interface RequestOrdersFlowDeps {
     enabledToolNames?: string[],
     briefingOverride?: string
   ) => string;
-  buildToolDefinitions: (enabledToolNames?: string[]) => Array<{
+    /**
+   * Specifies the contract for the `buildToolDefinitions` member (buildToolDefinitions: (enabledToolNames?: string[]) => Array<{ type: 'function'; function: { name: string; description: string; parameters: { type: 'o).
+
+   * Contract: Describes stable behavior for callers of `buildToolDefinitions` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+buildToolDefinitions: (enabledToolNames?: string[]) => Array<{
     type: 'function';
     function: { name: string; description: string; parameters: { type: 'object'; properties: Record<string, unknown>; required?: string[] } };
   }>;
-  postOpenRouterChatWithTimeoutAndRetry: (payload: {
+    /**
+   * Specifies the contract for the `postOpenRouterChatWithTimeoutAndRetry` member (postOpenRouterChatWithTimeoutAndRetry: (payload: { key: string; body: Record<string, unknown>; signal?: AbortSignal; onLog?: (line: string,).
+
+   * Contract: Describes stable behavior for callers of `postOpenRouterChatWithTimeoutAndRetry` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+postOpenRouterChatWithTimeoutAndRetry: (payload: {
     key: string;
     body: Record<string, unknown>;
     signal?: AbortSignal;
     onLog?: (line: string, isError?: boolean) => void;
     requestLabel: string;
   }) => Promise<{ ok: true; status: number; headers: Record<string, string>; bodyText: string } | { ok: false; error: string }>;
-  getGroupIdForToolName: (toolName: string) => string | undefined;
-  validateAiOrder: (order: { unitId: string; toH3Index: string }, state: GameStateSnapshot) => { valid: true } | { valid: false; reason: string };
-  validateAiRangedOrder: (
+    /**
+   * Specifies the contract for the `getGroupIdForToolName` member (getGroupIdForToolName: (toolName: string) => string | undefined;).
+
+   * Contract: Describes stable behavior for callers of `getGroupIdForToolName` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getGroupIdForToolName: (toolName: string) => string | undefined;
+    /**
+   * Specifies the contract for the `validateAiOrder` member (validateAiOrder: (order: { unitId: string; toH3Index: string }, state: GameStateSnapshot) => { valid: true } | { valid: false; reason: string };).
+
+   * Contract: Describes stable behavior for callers of `validateAiOrder` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+validateAiOrder: (order: { unitId: string; toH3Index: string }, state: GameStateSnapshot) => { valid: true } | { valid: false; reason: string };
+    /**
+   * Specifies the contract for the `validateAiRangedOrder` member (validateAiRangedOrder: ( order: { unitId: string; targetH3Index: string }, state: GameStateSnapshot ) => { valid: true } | { valid: false; reason:).
+
+   * Contract: Describes stable behavior for callers of `validateAiRangedOrder` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+validateAiRangedOrder: (
     order: { unitId: string; targetH3Index: string },
     state: GameStateSnapshot
   ) => { valid: true } | { valid: false; reason: string };
-  formatLatLng: (ll: [number, number]) => string;
+    /**
+   * Specifies the contract for the `formatLatLng` member (formatLatLng: (ll: [number, number]) => string;).
+
+   * Contract: Describes stable behavior for callers of `formatLatLng` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+formatLatLng: (ll: [number, number]) => string;
 }
 
+/**
+ * Defines the `dedupeByUnitKeepLast` function shape (function dedupeByUnitKeepLast<T extends).
+
+ * Purpose: Supports maintainability by documenting why `dedupeByUnitKeepLast` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function dedupeByUnitKeepLast<T extends { unitId: string }>(rows: T[]): T[] {
   const seen = new Set<string>();
   const keptReversed: T[] = [];
@@ -221,6 +801,14 @@ function dedupeByUnitKeepLast<T extends { unitId: string }>(rows: T[]): T[] {
   return keptReversed;
 }
 
+/**
+ * Defines the `requestOrdersFlow` function shape (export async function requestOrdersFlow( deps: RequestOrdersFlowDeps, state: GameStateSnapshot, modelId: string, options?: RequestOrdersOptions ):).
+
+ * Purpose: Supports maintainability by documenting why `requestOrdersFlow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export async function requestOrdersFlow(
   deps: RequestOrdersFlowDeps,
   state: GameStateSnapshot,

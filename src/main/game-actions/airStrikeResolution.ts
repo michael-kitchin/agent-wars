@@ -6,6 +6,14 @@ import type { CombatUnit } from '../combatUnitTypes';
 import { validateAirStrikeOrder } from './airValidation';
 import { isEmbarkedLandUnitOnWater } from './sealift';
 
+/**
+ * Defines the `pruneBuildQueueForInfrastructureState` function shape (function pruneBuildQueueForInfrastructureState(h3Index: string): void).
+
+ * Purpose: Supports maintainability by documenting why `pruneBuildQueueForInfrastructureState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function pruneBuildQueueForInfrastructureState(h3Index: string): void {
   const infra = getRes1InfrastructureForHex(h3Index);
   const rows = listBuildQueueRowsForHex(h3Index);
@@ -23,6 +31,14 @@ function pruneBuildQueueForInfrastructureState(h3Index: string): void {
   );
 }
 
+/**
+ * Defines the `replaceRandomRes4FeaturesWithRubble` function shape (function replaceRandomRes4FeaturesWithRubble( h3Index: string, feature: 'urban' | 'airport' | 'seaport', count: number, next: () => number ): numbe).
+
+ * Purpose: Supports maintainability by documenting why `replaceRandomRes4FeaturesWithRubble` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function replaceRandomRes4FeaturesWithRubble(
   h3Index: string,
   feature: 'urban' | 'airport' | 'seaport',
@@ -53,6 +69,14 @@ function replaceRandomRes4FeaturesWithRubble(
   return changed;
 }
 
+/**
+ * Defines the `destroyBasedAirUnitsAtHex` function shape (function destroyBasedAirUnitsAtHex().
+
+ * Purpose: Supports maintainability by documenting why `destroyBasedAirUnitsAtHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function destroyBasedAirUnitsAtHex(
   h3Index: string
 ): Array<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }> {
@@ -66,6 +90,14 @@ function destroyBasedAirUnitsAtHex(
   return rows;
 }
 
+/**
+ * Defines the `applyInfrastructureDestructionEffects` function shape (function applyInfrastructureDestructionEffects( h3Index: string, targetType: AirStrikeTargetType, next: () => number ): { destroyedAirUnits: Array<).
+
+ * Purpose: Supports maintainability by documenting why `applyInfrastructureDestructionEffects` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function applyInfrastructureDestructionEffects(
   h3Index: string,
   targetType: AirStrikeTargetType,
@@ -107,13 +139,61 @@ function applyInfrastructureDestructionEffects(
   return result;
 }
 
+/**
+ * Documents the `AirStrikePhaseAccumulator` interface as a named contract surface (interface AirStrikePhaseAccumulator).
+
+ * Purpose: Supports maintainability by documenting why `AirStrikePhaseAccumulator` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface AirStrikePhaseAccumulator {
-  removedSet: Set<string>;
-  removedUnitIds: string[];
-  removedUnits: CombatUnit[];
-  casualtyHexes: Set<string>;
+    /**
+   * Specifies the contract for the `removedSet` member (removedSet: Set<string>;).
+
+   * Contract: Describes stable behavior for callers of `removedSet` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+removedSet: Set<string>;
+    /**
+   * Specifies the contract for the `removedUnitIds` member (removedUnitIds: string[];).
+
+   * Contract: Describes stable behavior for callers of `removedUnitIds` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+removedUnitIds: string[];
+    /**
+   * Specifies the contract for the `removedUnits` member (removedUnits: CombatUnit[];).
+
+   * Contract: Describes stable behavior for callers of `removedUnits` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+removedUnits: CombatUnit[];
+    /**
+   * Specifies the contract for the `casualtyHexes` member (casualtyHexes: Set<string>;).
+
+   * Contract: Describes stable behavior for callers of `casualtyHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+casualtyHexes: Set<string>;
 }
 
+/**
+ * Defines the `recordRemovedUnit` function shape (function recordRemovedUnit( acc: AirStrikePhaseAccumulator, row: { id: string; player: string; unit_type: string; h3_index: string; display_order: number).
+
+ * Purpose: Supports maintainability by documenting why `recordRemovedUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function recordRemovedUnit(
   acc: AirStrikePhaseAccumulator,
   row: { id: string; player: string; unit_type: string; h3_index: string; display_order: number | null },
@@ -133,6 +213,14 @@ function recordRemovedUnit(
   acc.casualtyHexes.add(removedAtH3Index);
 }
 
+/**
+ * Defines the `resolveAirStrikeAgainstUnits` function shape (function resolveAirStrikeAgainstUnits( attacker: { id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }, target).
+
+ * Purpose: Supports maintainability by documenting why `resolveAirStrikeAgainstUnits` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function resolveAirStrikeAgainstUnits(
   attacker: { id: string; player: string; unit_type: string; h3_index: string; display_order: number | null },
   targetH3Index: string,
@@ -170,6 +258,14 @@ function resolveAirStrikeAgainstUnits(
   return { success, attackerLost };
 }
 
+/**
+ * Defines the `resolveAirStrikeAgainstInfrastructure` function shape (function resolveAirStrikeAgainstInfrastructure( attacker: { id: string; player: string; unit_type: string; h3_index: string; display_order: number | null },).
+
+ * Purpose: Supports maintainability by documenting why `resolveAirStrikeAgainstInfrastructure` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function resolveAirStrikeAgainstInfrastructure(
   attacker: { id: string; player: string; unit_type: string; h3_index: string; display_order: number | null },
   order: { targetH3Index: string; targetType: Exclude<AirStrikeTargetType, 'units'> },
@@ -207,12 +303,12 @@ function resolveAirStrikeAgainstInfrastructure(
 }
 
 /**
- * Why this exists:
- *     Resolves all air strikes for the turn (unit and infrastructure targets) and returns removal/animation/event aggregates.
- * When to use:
- *     During WEGO resolution before ranged/melee phases.
- * What to expect:
- *     Applies strike/counterfire outcomes, infrastructure destruction effects, and returns deterministic per-turn summaries.
+ * Defines the `resolveAirStrikePhase` function shape (export function resolveAirStrikePhase( airOrders: AirStrikeOrder[], next: () => number ): { removedUnitIds: string[]; removedUnits: CombatUnit[];).
+
+ * Purpose: Supports maintainability by documenting why `resolveAirStrikePhase` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function resolveAirStrikePhase(
   airOrders: AirStrikeOrder[],

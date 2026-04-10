@@ -1,10 +1,10 @@
 /**
- * Why this exists:
- *     Centralizes full SQLite DDL for game database bootstrap and test setup.
- * When to use:
- *     Database creation paths before baseline validation and seed initialization.
- * What to expect:
- *     Returns complete CREATE TABLE schema text for all required game tables.
+ * Defines the `getFullDdl` function shape (export function getFullDdl(): string).
+
+ * Purpose: Supports maintainability by documenting why `getFullDdl` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getFullDdl(): string {
   return `

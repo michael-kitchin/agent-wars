@@ -2,32 +2,176 @@ import { gridDisk } from 'h3-js';
 import { terrainIsPassableForDomain } from '../pathfinding';
 import { logError } from '../logger';
 
+/**
+ * Documents the module-scope binding `STATEFUL_MAX_DESTINATIONS_PER_SESSION` (STATEFUL_MAX_DESTINATIONS_PER_SESSION).
+
+ * Purpose: Supports maintainability by documenting why `STATEFUL_MAX_DESTINATIONS_PER_SESSION` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const STATEFUL_MAX_DESTINATIONS_PER_SESSION = 64;
+/**
+ * Documents the module-scope binding `STATEFUL_MAX_DEAD_STATES_PER_DESTINATION` (STATEFUL_MAX_DEAD_STATES_PER_DESTINATION).
+
+ * Purpose: Supports maintainability by documenting why `STATEFUL_MAX_DEAD_STATES_PER_DESTINATION` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const STATEFUL_MAX_DEAD_STATES_PER_DESTINATION = 10_000;
 
+/**
+ * Documents the `StatefulDestinationCache` interface as a named contract surface (export interface StatefulDestinationCache).
+
+ * Purpose: Supports maintainability by documenting why `StatefulDestinationCache` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface StatefulDestinationCache {
-  deadStateSet: Set<string>;
-  lastTouchedAtMs: number;
+    /**
+   * Specifies the contract for the `deadStateSet` member (deadStateSet: Set<string>;).
+
+   * Contract: Describes stable behavior for callers of `deadStateSet` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+deadStateSet: Set<string>;
+    /**
+   * Specifies the contract for the `lastTouchedAtMs` member (lastTouchedAtMs: number;).
+
+   * Contract: Describes stable behavior for callers of `lastTouchedAtMs` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+lastTouchedAtMs: number;
 }
 
+/**
+ * Documents the `PathfindingSessionStatefulCache` interface as a named contract surface (export interface PathfindingSessionStatefulCache).
+
+ * Purpose: Supports maintainability by documenting why `PathfindingSessionStatefulCache` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface PathfindingSessionStatefulCache {
-  deadStateByDestination: Map<string, StatefulDestinationCache>;
+    /**
+   * Specifies the contract for the `deadStateByDestination` member (deadStateByDestination: Map<string, StatefulDestinationCache>;).
+
+   * Contract: Describes stable behavior for callers of `deadStateByDestination` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+deadStateByDestination: Map<string, StatefulDestinationCache>;
 }
 
+/**
+ * Documents the `StatefulSearchStats` interface as a named contract surface (export interface StatefulSearchStats).
+
+ * Purpose: Supports maintainability by documenting why `StatefulSearchStats` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface StatefulSearchStats {
-  expandedStateCount: number;
-  rejectedConsecutiveSpecialCount: number;
-  deadStateCacheHitCount: number;
+    /**
+   * Specifies the contract for the `expandedStateCount` member (expandedStateCount: number;).
+
+   * Contract: Describes stable behavior for callers of `expandedStateCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+expandedStateCount: number;
+    /**
+   * Specifies the contract for the `rejectedConsecutiveSpecialCount` member (rejectedConsecutiveSpecialCount: number;).
+
+   * Contract: Describes stable behavior for callers of `rejectedConsecutiveSpecialCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+rejectedConsecutiveSpecialCount: number;
+    /**
+   * Specifies the contract for the `deadStateCacheHitCount` member (deadStateCacheHitCount: number;).
+
+   * Contract: Describes stable behavior for callers of `deadStateCacheHitCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+deadStateCacheHitCount: number;
 }
 
+/**
+ * Documents the `StatefulLandSearchSessionData` interface as a named contract surface (export interface StatefulLandSearchSessionData).
+
+ * Purpose: Supports maintainability by documenting why `StatefulLandSearchSessionData` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface StatefulLandSearchSessionData {
-  hexSet: Set<string>;
-  terrainByH3: Map<string, string>;
-  rawTerrainByH3: Map<string, string>;
-  terrainKindByH3: Map<string, string>;
-  statefulCache: PathfindingSessionStatefulCache;
+    /**
+   * Specifies the contract for the `hexSet` member (hexSet: Set<string>;).
+
+   * Contract: Describes stable behavior for callers of `hexSet` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hexSet: Set<string>;
+    /**
+   * Specifies the contract for the `terrainByH3` member (terrainByH3: Map<string, string>;).
+
+   * Contract: Describes stable behavior for callers of `terrainByH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+terrainByH3: Map<string, string>;
+    /**
+   * Specifies the contract for the `rawTerrainByH3` member (rawTerrainByH3: Map<string, string>;).
+
+   * Contract: Describes stable behavior for callers of `rawTerrainByH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+rawTerrainByH3: Map<string, string>;
+    /**
+   * Specifies the contract for the `terrainKindByH3` member (terrainKindByH3: Map<string, string>;).
+
+   * Contract: Describes stable behavior for callers of `terrainKindByH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+terrainKindByH3: Map<string, string>;
+    /**
+   * Specifies the contract for the `statefulCache` member (statefulCache: PathfindingSessionStatefulCache;).
+
+   * Contract: Describes stable behavior for callers of `statefulCache` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+statefulCache: PathfindingSessionStatefulCache;
 }
 
+/**
+ * Defines the `isSpecialWaterOrArcticHex` function shape (function isSpecialWaterOrArcticHex(h3Index: string, session: StatefulLandSearchSessionData): boolean).
+
+ * Purpose: Supports maintainability by documenting why `isSpecialWaterOrArcticHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function isSpecialWaterOrArcticHex(h3Index: string, session: StatefulLandSearchSessionData): boolean {
   const terrainKind = session.terrainKindByH3.get(h3Index) ?? '';
   if (terrainKind === 'water' || terrainKind === 'arctic') return true;
@@ -35,20 +179,52 @@ function isSpecialWaterOrArcticHex(h3Index: string, session: StatefulLandSearchS
   return terrain === 'water' || terrain === 'arctic';
 }
 
+/**
+ * Defines the `buildStateKey` function shape (function buildStateKey(hexId: string, prevSpecial: boolean): string).
+
+ * Purpose: Supports maintainability by documenting why `buildStateKey` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildStateKey(hexId: string, prevSpecial: boolean): string {
   return `${hexId}|${prevSpecial ? '1' : '0'}`;
 }
 
+/**
+ * Defines the `buildBlockedSetSignature` function shape (function buildBlockedSetSignature(blocked: Set<string> | undefined): string).
+
+ * Purpose: Supports maintainability by documenting why `buildBlockedSetSignature` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildBlockedSetSignature(blocked: Set<string> | undefined): string {
   if (!blocked) return 'none';
   if (blocked.size === 0) return 'empty';
   return [...blocked].sort().join(',');
 }
 
+/**
+ * Defines the `buildDestinationCacheKey` function shape (function buildDestinationCacheKey(originH3: string, destinationH3: string, blocked: Set<string> | undefined): string).
+
+ * Purpose: Supports maintainability by documenting why `buildDestinationCacheKey` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildDestinationCacheKey(originH3: string, destinationH3: string, blocked: Set<string> | undefined): string {
   return `${originH3}->${destinationH3}|blocked:${buildBlockedSetSignature(blocked)}`;
 }
 
+/**
+ * Defines the `getOrCreateStatefulDestinationCache` function shape (function getOrCreateStatefulDestinationCache( session: StatefulLandSearchSessionData, originH3: string, destinationH3: string, blocked: Set<string>).
+
+ * Purpose: Supports maintainability by documenting why `getOrCreateStatefulDestinationCache` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getOrCreateStatefulDestinationCache(
   session: StatefulLandSearchSessionData,
   originH3: string,
@@ -75,6 +251,14 @@ function getOrCreateStatefulDestinationCache(
   return created;
 }
 
+/**
+ * Defines the `addDeadStatesBounded` function shape (function addDeadStatesBounded(deadStateSet: Set<string>, states: Iterable<string>): void).
+
+ * Purpose: Supports maintainability by documenting why `addDeadStatesBounded` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function addDeadStatesBounded(deadStateSet: Set<string>, states: Iterable<string>): void {
   for (const stateKey of states) {
     deadStateSet.add(stateKey);
@@ -86,6 +270,14 @@ function addDeadStatesBounded(deadStateSet: Set<string>, states: Iterable<string
   }
 }
 
+/**
+ * Defines the `findLandPathWithStatefulRule` function shape (function findLandPathWithStatefulRule(payload: { originH3: string; destinationH3: string; session: StatefulLandSearchSessionData; blocked?: Set<stri).
+
+ * Purpose: Supports maintainability by documenting why `findLandPathWithStatefulRule` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function findLandPathWithStatefulRule(payload: {
   originH3: string;
   destinationH3: string;
@@ -189,6 +381,14 @@ function findLandPathWithStatefulRule(payload: {
   return { path, stats };
 }
 
+/**
+ * Defines the `findLandPathWithStatefulOptionalAvoidanceRetry` function shape (export function findLandPathWithStatefulOptionalAvoidanceRetry(payload: { originH3: string; destinationH3: string; session: StatefulLandSearchSessionDa).
+
+ * Purpose: Supports maintainability by documenting why `findLandPathWithStatefulOptionalAvoidanceRetry` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function findLandPathWithStatefulOptionalAvoidanceRetry(payload: {
   originH3: string;
   destinationH3: string;
@@ -224,6 +424,14 @@ export function findLandPathWithStatefulOptionalAvoidanceRetry(payload: {
   };
 }
 
+/**
+ * Defines the `countArcticBlockedHexes` function shape (export function countArcticBlockedHexes( blocked: Set<string> | undefined, session: Pick<StatefulLandSearchSessionData, 'terrainKindByH3' | 'rawTerrainByH).
+
+ * Purpose: Supports maintainability by documenting why `countArcticBlockedHexes` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function countArcticBlockedHexes(
   blocked: Set<string> | undefined,
   session: Pick<StatefulLandSearchSessionData, 'terrainKindByH3' | 'rawTerrainByH3'>

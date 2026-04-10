@@ -4,37 +4,197 @@ import { formatPendingFerryOrderSidebarLabel } from './orderLabelFormatting';
 import { UNIT_DESELECT_GLYPH, UNIT_SELECT_GLYPH } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 
+/**
+ * Documents the `SelectionActionDeps` interface as a named contract surface (interface SelectionActionDeps).
+
+ * Purpose: Supports maintainability by documenting why `SelectionActionDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface SelectionActionDeps {
-  toggleUnitSelection: (unitId: string) => void;
-  replaceSelection: (unitIds: string[]) => void;
-  syncUiAfterSelectionChange: () => void;
+    /**
+   * Specifies the contract for the `toggleUnitSelection` member (toggleUnitSelection: (unitId: string) => void;).
+
+   * Contract: Describes stable behavior for callers of `toggleUnitSelection` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+toggleUnitSelection: (unitId: string) => void;
+    /**
+   * Specifies the contract for the `replaceSelection` member (replaceSelection: (unitIds: string[]) => void;).
+
+   * Contract: Describes stable behavior for callers of `replaceSelection` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+replaceSelection: (unitIds: string[]) => void;
+    /**
+   * Specifies the contract for the `syncUiAfterSelectionChange` member (syncUiAfterSelectionChange: () => void;).
+
+   * Contract: Describes stable behavior for callers of `syncUiAfterSelectionChange` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+syncUiAfterSelectionChange: () => void;
 }
 
+/**
+ * Documents the `SyncUiDeps` interface as a named contract surface (interface SyncUiDeps).
+
+ * Purpose: Supports maintainability by documenting why `SyncUiDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface SyncUiDeps {
-  refreshHoverRoutePreview: () => Promise<void>;
-  updateSidebar: () => void;
-  updatePendingOrdersSidebar: () => void;
-  updateRangedSidebar: () => void;
-  refreshStackCalloutIfOpen: () => void;
-  redraw: () => void;
+    /**
+   * Specifies the contract for the `refreshHoverRoutePreview` member (refreshHoverRoutePreview: () => Promise<void>;).
+
+   * Contract: Describes stable behavior for callers of `refreshHoverRoutePreview` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+refreshHoverRoutePreview: () => Promise<void>;
+    /**
+   * Specifies the contract for the `updateSidebar` member (updateSidebar: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateSidebar: () => void;
+    /**
+   * Specifies the contract for the `updatePendingOrdersSidebar` member (updatePendingOrdersSidebar: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updatePendingOrdersSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updatePendingOrdersSidebar: () => void;
+    /**
+   * Specifies the contract for the `updateRangedSidebar` member (updateRangedSidebar: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateRangedSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateRangedSidebar: () => void;
+    /**
+   * Specifies the contract for the `refreshStackCalloutIfOpen` member (refreshStackCalloutIfOpen: () => void;).
+
+   * Contract: Describes stable behavior for callers of `refreshStackCalloutIfOpen` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+refreshStackCalloutIfOpen: () => void;
+    /**
+   * Specifies the contract for the `redraw` member (redraw: () => void;).
+
+   * Contract: Describes stable behavior for callers of `redraw` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+redraw: () => void;
 }
 
+/**
+ * Documents the `PendingOrdersDeps` interface as a named contract surface (interface PendingOrdersDeps).
+
+ * Purpose: Supports maintainability by documenting why `PendingOrdersDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface PendingOrdersDeps {
-  isPendingMovementOrderForDisplay: (order: HumanStandingOrderSnapshot) => boolean;
-  formatPendingOrderSidebarLabel: (order: HumanStandingOrderSnapshot) => string;
-  createSidebarOrderRow: (args: {
+    /**
+   * Specifies the contract for the `isPendingMovementOrderForDisplay` member (isPendingMovementOrderForDisplay: (order: HumanStandingOrderSnapshot) => boolean;).
+
+   * Contract: Describes stable behavior for callers of `isPendingMovementOrderForDisplay` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+isPendingMovementOrderForDisplay: (order: HumanStandingOrderSnapshot) => boolean;
+    /**
+   * Specifies the contract for the `formatPendingOrderSidebarLabel` member (formatPendingOrderSidebarLabel: (order: HumanStandingOrderSnapshot) => string;).
+
+   * Contract: Describes stable behavior for callers of `formatPendingOrderSidebarLabel` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+formatPendingOrderSidebarLabel: (order: HumanStandingOrderSnapshot) => string;
+    /**
+   * Specifies the contract for the `createSidebarOrderRow` member (createSidebarOrderRow: (args: { labelText: string; selected: boolean; onToggleSelect: (event: MouseEvent) => void; onCancel: () => void;).
+
+   * Contract: Describes stable behavior for callers of `createSidebarOrderRow` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+createSidebarOrderRow: (args: {
     labelText: string;
     selected: boolean;
     onToggleSelect: (event: MouseEvent) => void;
     onCancel: () => void;
     compactBlueButtons?: boolean;
   }) => HTMLElement;
-  applySelectionFromSidebarUnitButton: (unitId: string, event: MouseEvent) => void;
-  cancelOrderForUnit: (unitId: string) => Promise<void>;
-  cancelFerryForUnit: (unitId: string) => void;
-  formatUnitArrowLabel: (unitId: string, targetLabel: string) => string;
+    /**
+   * Specifies the contract for the `applySelectionFromSidebarUnitButton` member (applySelectionFromSidebarUnitButton: (unitId: string, event: MouseEvent) => void;).
+
+   * Contract: Describes stable behavior for callers of `applySelectionFromSidebarUnitButton` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+applySelectionFromSidebarUnitButton: (unitId: string, event: MouseEvent) => void;
+    /**
+   * Specifies the contract for the `cancelOrderForUnit` member (cancelOrderForUnit: (unitId: string) => Promise<void>;).
+
+   * Contract: Describes stable behavior for callers of `cancelOrderForUnit` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+cancelOrderForUnit: (unitId: string) => Promise<void>;
+    /**
+   * Specifies the contract for the `cancelFerryForUnit` member (cancelFerryForUnit: (unitId: string) => void;).
+
+   * Contract: Describes stable behavior for callers of `cancelFerryForUnit` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+cancelFerryForUnit: (unitId: string) => void;
+    /**
+   * Specifies the contract for the `formatUnitArrowLabel` member (formatUnitArrowLabel: (unitId: string, targetLabel: string) => string;).
+
+   * Contract: Describes stable behavior for callers of `formatUnitArrowLabel` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+formatUnitArrowLabel: (unitId: string, targetLabel: string) => string;
 }
 
+/**
+ * Defines the `estimateHexesLeftForOrder` function shape (export function estimateHexesLeftForOrder(order: HumanStandingOrderSnapshot): number).
+
+ * Purpose: Supports maintainability by documenting why `estimateHexesLeftForOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function estimateHexesLeftForOrder(order: HumanStandingOrderSnapshot): number {
   if (!Array.isArray(order.routeSegments) || order.routeSegments.length === 0) return 0;
   let total = 0;
@@ -45,10 +205,26 @@ export function estimateHexesLeftForOrder(order: HumanStandingOrderSnapshot): nu
   return total;
 }
 
+/**
+ * Defines the `isPendingMovementOrderForDisplay` function shape (export function isPendingMovementOrderForDisplay(order: HumanStandingOrderSnapshot): boolean).
+
+ * Purpose: Supports maintainability by documenting why `isPendingMovementOrderForDisplay` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function isPendingMovementOrderForDisplay(order: HumanStandingOrderSnapshot): boolean {
   return estimateHexesLeftForOrder(order) > 0;
 }
 
+/**
+ * Defines the `applySelectionFromSidebarUnitButton` function shape (export function applySelectionFromSidebarUnitButton(unitId: string, event: MouseEvent, deps: SelectionActionDeps): void).
+
+ * Purpose: Supports maintainability by documenting why `applySelectionFromSidebarUnitButton` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function applySelectionFromSidebarUnitButton(unitId: string, event: MouseEvent, deps: SelectionActionDeps): void {
   const useMultiSelect = event.ctrlKey || S.ctrlKeyActive;
   if (useMultiSelect) {
@@ -59,10 +235,26 @@ export function applySelectionFromSidebarUnitButton(unitId: string, event: Mouse
   deps.syncUiAfterSelectionChange();
 }
 
+/**
+ * Defines the `formatUnitArrowLabel` function shape (export function formatUnitArrowLabel(unitId: string, targetLabel: string, formatUnitDisplayName: (unitId: string) => string): string).
+
+ * Purpose: Supports maintainability by documenting why `formatUnitArrowLabel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function formatUnitArrowLabel(unitId: string, targetLabel: string, formatUnitDisplayName: (unitId: string) => string): string {
   return `${formatUnitDisplayName(unitId)} → ${targetLabel}`;
 }
 
+/**
+ * Defines the `formatPendingOrderSidebarLabel` function shape (export function formatPendingOrderSidebarLabel( order: HumanStandingOrderSnapshot, formatUnitArrowLabelFn: (unitId: string, targetLabel: string) => string).
+
+ * Purpose: Supports maintainability by documenting why `formatPendingOrderSidebarLabel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function formatPendingOrderSidebarLabel(
   order: HumanStandingOrderSnapshot,
   formatUnitArrowLabelFn: (unitId: string, targetLabel: string) => string
@@ -70,6 +262,14 @@ export function formatPendingOrderSidebarLabel(
   return formatUnitArrowLabelFn(order.unitId, `${estimateHexesLeftForOrder(order)}h (${order.status})`);
 }
 
+/**
+ * Defines the `formatKillToastLine` function shape (export function formatKillToastLine().
+
+ * Purpose: Supports maintainability by documenting why `formatKillToastLine` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function formatKillToastLine(
   kill: { victimId: string; killerIds: string[] },
   formatDisplayUnitName: (unitId: string) => string
@@ -78,6 +278,14 @@ export function formatKillToastLine(
   return `${killers} destroyed ${formatDisplayUnitName(kill.victimId)}`;
 }
 
+/**
+ * Defines the `buildKillToastFormatterBundle` function shape (export function buildKillToastFormatterBundle( state: GameStateSnapshot, removedUnits: RemovedUnitSnapshot[] | undefined ): { formatUnitName: (unitId: st).
+
+ * Purpose: Supports maintainability by documenting why `buildKillToastFormatterBundle` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function buildKillToastFormatterBundle(
   state: GameStateSnapshot,
   removedUnits: RemovedUnitSnapshot[] | undefined
@@ -100,6 +308,14 @@ export function buildKillToastFormatterBundle(
   return { formatUnitName: formatDisplayUnitName, formatKillLine };
 }
 
+/**
+ * Defines the `syncUiAfterSelectionChange` function shape (export function syncUiAfterSelectionChange(deps: SyncUiDeps, options:).
+
+ * Purpose: Supports maintainability by documenting why `syncUiAfterSelectionChange` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function syncUiAfterSelectionChange(deps: SyncUiDeps, options: { refreshHoverPreview?: boolean } = {}): void {
   if (options.refreshHoverPreview !== false) {
     void deps.refreshHoverRoutePreview();
@@ -111,6 +327,14 @@ export function syncUiAfterSelectionChange(deps: SyncUiDeps, options: { refreshH
   deps.redraw();
 }
 
+/**
+ * Defines the `createSidebarOrderRow` function shape (export function createSidebarOrderRow(args: { labelText: string; selected: boolean; onToggleSelect: (event: MouseEvent) => void; onCancel: () => voi).
+
+ * Purpose: Supports maintainability by documenting why `createSidebarOrderRow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function createSidebarOrderRow(args: {
   labelText: string;
   selected: boolean;
@@ -149,6 +373,14 @@ export function createSidebarOrderRow(args: {
   return row;
 }
 
+/**
+ * Defines the `updatePendingOrdersSidebar` function shape (export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void).
+
+ * Purpose: Supports maintainability by documenting why `updatePendingOrdersSidebar` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
   const container = document.getElementById('pending-orders-list');
   if (!container) return;
@@ -185,11 +417,27 @@ export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
   }
 }
 
+/**
+ * Defines the `showSidebarError` function shape (export function showSidebarError(message: string, showMapToast: (message: string, options?: { isError?: boolean }) => void, clearSidebarError: () => void): void).
+
+ * Purpose: Supports maintainability by documenting why `showSidebarError` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function showSidebarError(message: string, showMapToast: (message: string, options?: { isError?: boolean }) => void, clearSidebarError: () => void): void {
   showMapToast(message, { isError: true });
   clearSidebarError();
 }
 
+/**
+ * Defines the `clearSidebarError` function shape (export function clearSidebarError(): void).
+
+ * Purpose: Supports maintainability by documenting why `clearSidebarError` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function clearSidebarError(): void {
   const el = document.getElementById('sidebar-error');
   if (el) el.style.display = 'none';

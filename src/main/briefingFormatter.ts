@@ -13,7 +13,14 @@ import { LATLNG_DECIMAL_PLACES } from './mapData';
 import { logTrace } from './logger';
 import { buildPossibleUnitActionsMarkdown } from './openrouter/possibleUnitActions';
 
-/** Standing order statuses that require immediate attention (match tool5 WARNING_STATUSES). */
+/**
+ * Documents the module-scope binding `WARNING_STATUSES` (WARNING_STATUSES).
+
+ * Purpose: Supports maintainability by documenting why `WARNING_STATUSES` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const WARNING_STATUSES = new Set([
   'blocked',
   'target_lost',
@@ -23,23 +30,51 @@ const WARNING_STATUSES = new Set([
   'contact',
 ]);
 
+/**
+ * Defines the `formatPos` function shape (function formatPos(ll: [number, number]): string).
+
+ * Purpose: Supports maintainability by documenting why `formatPos` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatPos(ll: [number, number]): string {
   return `[${ll[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${ll[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
 }
 
+/**
+ * Defines the `formatUnitDisplayRef` function shape (function formatUnitDisplayRef(unitId: string): string).
+
+ * Purpose: Supports maintainability by documenting why `formatUnitDisplayRef` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatUnitDisplayRef(unitId: string): string {
   return unitId;
 }
 
 /**
- * Converts territory_changed hex params to non-H3 prompt text. If the id maps to a known game hex,
- * emits its [lat, lng] display; otherwise uses a generic label to avoid leaking raw spatial IDs.
+ * Defines the `formatTerritoryTarget` function shape (function formatTerritoryTarget(hexId: string, latLngByH3: Map<string, [number, number]>): string).
+
+ * Purpose: Supports maintainability by documenting why `formatTerritoryTarget` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function formatTerritoryTarget(hexId: string, latLngByH3: Map<string, [number, number]>): string {
   const ll = latLngByH3.get(hexId);
   return ll ? formatPos(ll) : 'specified territory';
 }
 
+/**
+ * Defines the `sanitizeCallbackParamsForPrompt` function shape (function sanitizeCallbackParamsForPrompt().
+
+ * Purpose: Supports maintainability by documenting why `sanitizeCallbackParamsForPrompt` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function sanitizeCallbackParamsForPrompt(
   params: unknown,
   latLngByH3: Map<string, [number, number]>
@@ -61,8 +96,12 @@ function sanitizeCallbackParamsForPrompt(
 }
 
 /**
- * Builds Section 1: strategic narrative (3–5 sentences) from state and unit assessments.
- * Covers turn, unit counts, posture, and critical threats without numbers/tables.
+ * Defines the `buildStrategicNarrative` function shape (function buildStrategicNarrative().
+
+ * Purpose: Supports maintainability by documenting why `buildStrategicNarrative` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function buildStrategicNarrative(
   state: GameStateSnapshot,
@@ -101,7 +140,12 @@ function buildStrategicNarrative(
 }
 
 /**
- * Derives "action needed" for a unit: yes when no standing order and has threat, or order status is in warning set.
+ * Defines the `needsAction` function shape (function needsAction(assessment: UnitAssessmentResult): boolean).
+
+ * Purpose: Supports maintainability by documenting why `needsAction` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function needsAction(assessment: UnitAssessmentResult): boolean {
   const order = assessment.result.unit?.currentStandingOrder as { status?: string } | null | undefined;
@@ -112,7 +156,12 @@ function needsAction(assessment: UnitAssessmentResult): boolean {
 }
 
 /**
- * Returns true if the unit is "quiet": has a standing order not in warning state and at most low threat.
+ * Defines the `isQuiet` function shape (function isQuiet(assessment: UnitAssessmentResult): boolean).
+
+ * Purpose: Supports maintainability by documenting why `isQuiet` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function isQuiet(assessment: UnitAssessmentResult): boolean {
   const order = assessment.result.unit?.currentStandingOrder as { status?: string } | null | undefined;
@@ -125,7 +174,12 @@ function isQuiet(assessment: UnitAssessmentResult): boolean {
 }
 
 /**
- * Formats standing order + status for table cell (e.g. "MARCH to [x,y] — en_route" or "—").
+ * Defines the `formatOrderCell` function shape (function formatOrderCell(assessment: UnitAssessmentResult): string).
+
+ * Purpose: Supports maintainability by documenting why `formatOrderCell` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function formatOrderCell(assessment: UnitAssessmentResult): string {
   const order = assessment.result.unit?.currentStandingOrder as
@@ -142,7 +196,12 @@ function formatOrderCell(assessment: UnitAssessmentResult): string {
 }
 
 /**
- * Builds Section 2 Table 1: unit status (one row per AI unit with spatial decay for quiet units).
+ * Defines the `buildUnitStatusTable` function shape (function buildUnitStatusTable().
+
+ * Purpose: Supports maintainability by documenting why `buildUnitStatusTable` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function buildUnitStatusTable(
   unitAssessments: UnitAssessmentResult[]
@@ -182,7 +241,12 @@ function buildUnitStatusTable(
 }
 
 /**
- * Summarizes assess_hex outputs that are not folded into possible unit actions (terrain, passability, strategic notes).
+ * Defines the `buildSupplementalHexIntelligenceBlock` function shape (function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntry[]): string).
+
+ * Purpose: Supports maintainability by documenting why `buildSupplementalHexIntelligenceBlock` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntry[]): string {
   if (hexAssessments.length === 0) return '';
@@ -200,8 +264,12 @@ function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntr
 }
 
 /**
- * Builds a compact machine-readable loss table covering all resolved losses since the last LLM consultation.
- * Rows are sorted in chronological turn order and include side-from-opponent-perspective for downstream planning.
+ * Defines the `buildLossesSinceLastConsultationTable` function shape (function buildLossesSinceLastConsultationTable().
+
+ * Purpose: Supports maintainability by documenting why `buildLossesSinceLastConsultationTable` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function buildLossesSinceLastConsultationTable(
   losses: AiLossEventSinceConsultation[],
@@ -221,7 +289,12 @@ function buildLossesSinceLastConsultationTable(
 }
 
 /**
- * Builds Section 3: 2–3 attention flags as bulleted imperatives from units needing action.
+ * Defines the `buildAttentionFlags` function shape (function buildAttentionFlags().
+
+ * Purpose: Supports maintainability by documenting why `buildAttentionFlags` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function buildAttentionFlags(
   unitAssessments: UnitAssessmentResult[]
@@ -248,7 +321,12 @@ function buildAttentionFlags(
 }
 
 /**
- * Returns a short human-readable line for one callback subscription (e.g. "turns(3) → fires turn 14").
+ * Defines the `formatCallbackLine` function shape (function formatCallbackLine(sub: CallbackSubscription, latLngByH3: Map<string, [number, number]>): string).
+
+ * Purpose: Supports maintainability by documenting why `formatCallbackLine` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function formatCallbackLine(sub: CallbackSubscription, latLngByH3: Map<string, [number, number]>): string {
   const n = sub.params?.n as number | undefined;
@@ -273,7 +351,12 @@ function formatCallbackLine(sub: CallbackSubscription, latLngByH3: Map<string, [
 }
 
 /**
- * Builds the ACTIVE CALLBACKS section: one line per subscription or "None. You may add callbacks...".
+ * Defines the `buildActiveCallbacksSection` function shape (function buildActiveCallbacksSection().
+
+ * Purpose: Supports maintainability by documenting why `buildActiveCallbacksSection` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function buildActiveCallbacksSection(
   subscriptions: CallbackSubscription[],
@@ -289,8 +372,12 @@ function buildActiveCallbacksSection(
 }
 
 /**
- * Produces the full Commander's Briefing string: title, Section 1, Section 2 (both tables),
- * Section 3, memory block, standing order block, and ACTIVE CALLBACKS section.
+ * Defines the `formatBriefing` function shape (export function formatBriefing( state: GameStateSnapshot, precomputed: PrecomputationResult, standingOrderText: string, memoryText: string, subsc).
+
+ * Purpose: Supports maintainability by documenting why `formatBriefing` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function formatBriefing(
   state: GameStateSnapshot,

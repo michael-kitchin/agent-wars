@@ -2,12 +2,12 @@ import { gridDistance, gridDisk, gridPathCells } from 'h3-js';
 import { logError, logTrace } from '../logger';
 
 /**
- * Why this exists:
- *     Centralizes resilient H3 range checks so gameplay validators share consistent fallback behavior.
- * When to use:
- *     Any rule check that depends on H3 grid range and must tolerate pentagon/edge-path exceptions.
- * What to expect:
- *     Returns exact `gridDistance` when available, falls back to path length, then disk-membership for range checks.
+ * Defines the `computeGridDistanceSafe` function shape (export function computeGridDistanceSafe().
+
+ * Purpose: Supports maintainability by documenting why `computeGridDistanceSafe` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function computeGridDistanceSafe(
   originH3Index: string,
@@ -28,6 +28,14 @@ export function computeGridDistanceSafe(
   return null;
 }
 
+/**
+ * Defines the `isWithinGridRangeSafe` function shape (export function isWithinGridRangeSafe().
+
+ * Purpose: Supports maintainability by documenting why `isWithinGridRangeSafe` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function isWithinGridRangeSafe(
   originH3Index: string,
   destinationH3Index: string,

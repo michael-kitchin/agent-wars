@@ -1,33 +1,81 @@
+/**
+ * Documents the module-scope binding `LAND_UNITS_CANNOT_ENTER_ARCTIC_REASON` (LAND_UNITS_CANNOT_ENTER_ARCTIC_REASON).
+
+ * Purpose: Supports maintainability by documenting why `LAND_UNITS_CANNOT_ENTER_ARCTIC_REASON` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const LAND_UNITS_CANNOT_ENTER_ARCTIC_REASON = 'Land units cannot move to or through arctic hexes.';
+/**
+ * Documents the module-scope binding `EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON` (EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON).
+
+ * Purpose: Supports maintainability by documenting why `EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON =
   'Embarked land units cannot receive independent movement orders while at sea.';
+/**
+ * Documents the module-scope binding `LAND_UNITS_CANNOT_MOVE_WATER_OR_ARCTIC_TO_WATER_OR_ARCTIC_REASON` (LAND_UNITS_CANNOT_MOVE_WATER_OR_ARCTIC_TO_WATER_OR_ARCTIC_REASON).
+
+ * Purpose: Supports maintainability by documenting why `LAND_UNITS_CANNOT_MOVE_WATER_OR_ARCTIC_TO_WATER_OR_ARCTIC_REASON` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const LAND_UNITS_CANNOT_MOVE_WATER_OR_ARCTIC_TO_WATER_OR_ARCTIC_REASON =
   'Land units cannot move directly from one water or arctic hex to another.';
 
+/**
+ * Documents the `TerrainMapsByH3` interface as a named contract surface (export interface TerrainMapsByH3).
+
+ * Purpose: Supports maintainability by documenting why `TerrainMapsByH3` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface TerrainMapsByH3 {
-  terrainByH3: Map<string, string>;
-  terrainKindByH3: Map<string, string>;
+    /**
+   * Specifies the contract for the `terrainByH3` member (terrainByH3: Map<string, string>;).
+
+   * Contract: Describes stable behavior for callers of `terrainByH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+terrainByH3: Map<string, string>;
+    /**
+   * Specifies the contract for the `terrainKindByH3` member (terrainKindByH3: Map<string, string>;).
+
+   * Contract: Describes stable behavior for callers of `terrainKindByH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+terrainKindByH3: Map<string, string>;
 }
 
 /**
- * Why this exists:
- *     Provides one canonical land-unit type gate for movement constraints shared by validation and preview.
- * When to use:
- *     Before applying infantry/armor-only movement checks (arctic blocking, embarked-at-sea restrictions).
- * What to expect:
- *     Returns true only for infantry and armor.
+ * Defines the `isLandUnitType` function shape (export function isLandUnitType(unitType: string): unitType is 'infantry' | 'armor').
+
+ * Purpose: Supports maintainability by documenting why `isLandUnitType` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function isLandUnitType(unitType: string): unitType is 'infantry' | 'armor' {
   return unitType === 'infantry' || unitType === 'armor';
 }
 
 /**
- * Why this exists:
- *     Applies the shared "land units cannot move to or through arctic" rule across order validation and previews.
- * When to use:
- *     After terrain-kind lookup is available for origin, destination, and optional traversed path cells.
- * What to expect:
- *     Returns a user-facing reason when movement should be rejected; returns null when movement is arctic-safe.
+ * Defines the `getArcticMovementBlockReason` function shape (export function getArcticMovementBlockReason(args: { unitType: string; originH3Index: string; destinationH3Index: string; terrainKindByH3: ReadonlyM).
+
+ * Purpose: Supports maintainability by documenting why `getArcticMovementBlockReason` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getArcticMovementBlockReason(args: {
   unitType: string;
@@ -58,12 +106,12 @@ export function getArcticMovementBlockReason(args: {
 }
 
 /**
- * Why this exists:
- *     Enforces the sealift planning restriction that land units cannot receive direct movement orders between water/arctic hexes.
- * When to use:
- *     Movement validation and planning previews once raw terrain and terrain-kind are known for origin and destination.
- * What to expect:
- *     Returns a user-facing reason only when a land unit attempts (water|arctic)->(water|arctic) movement; returns null otherwise.
+ * Defines the `getLandWaterToWaterMoveBlockReason` function shape (export function getLandWaterToWaterMoveBlockReason(args: { unitType: string; originH3Index: string; destinationH3Index: string; terrainByH3: Readonl).
+
+ * Purpose: Supports maintainability by documenting why `getLandWaterToWaterMoveBlockReason` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getLandWaterToWaterMoveBlockReason(args: {
   unitType: string;
@@ -99,12 +147,12 @@ export function getLandWaterToWaterMoveBlockReason(args: {
 }
 
 /**
- * Why this exists:
- *     Builds raw-terrain and terrain-kind maps once from snapshot hex rows for movement-rule evaluation.
- * When to use:
- *     Renderer march previews or any read-only flow that already has hex rows in memory.
- * What to expect:
- *     Returns two maps keyed by h3Index; missing terrain kinds are normalized to empty string.
+ * Defines the `buildTerrainMapsFromHexRows` function shape (export function buildTerrainMapsFromHexRows().
+
+ * Purpose: Supports maintainability by documenting why `buildTerrainMapsFromHexRows` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function buildTerrainMapsFromHexRows(
   hexes: ReadonlyArray<{ h3Index: string; terrain: string; terrainKind?: string | null }>
@@ -119,12 +167,12 @@ export function buildTerrainMapsFromHexRows(
 }
 
 /**
- * Why this exists:
- *     Orchestrates all shared land-movement exclusion checks in one deterministic order.
- * When to use:
- *     Movement order validation and hover preview validation for infantry/armor movement attempts.
- * What to expect:
- *     Returns the first blocking reason (embarked-at-sea, then consecutive special-class transitions); returns null when allowed.
+ * Defines the `getLandMovementBlockReason` function shape (export function getLandMovementBlockReason(args: { unitType: string; originH3Index: string; destinationH3Index: string; terrainByH3: ReadonlyMap<str).
+
+ * Purpose: Supports maintainability by documenting why `getLandMovementBlockReason` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getLandMovementBlockReason(args: {
   unitType: string;

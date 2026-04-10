@@ -14,10 +14,26 @@ import {
   getSealiftStackStateImpl,
 } from './sealift';
 
+/**
+ * Defines the `withTempDb` function shape (function withTempDb(runCase: () => void): void).
+
+ * Purpose: Supports maintainability by documenting why `withTempDb` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function withTempDb(runCase: () => void): void {
   withTempGameDb('aw-sealift-', runCase);
 }
 
+/**
+ * Defines the `pickHex` function shape (function pickHex(index: number): string).
+
+ * Purpose: Supports maintainability by documenting why `pickHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function pickHex(index: number): string {
   const state = getGameState();
   const hex = state.hexes[index];
@@ -25,25 +41,65 @@ function pickHex(index: number): string {
   return hex.h3Index;
 }
 
+/**
+ * Defines the `insertUnit` function shape (function insertUnit(id: string, player: 'human' | 'opponent', unitType: string, h3Index: string): void).
+
+ * Purpose: Supports maintainability by documenting why `insertUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function insertUnit(id: string, player: 'human' | 'opponent', unitType: string, h3Index: string): void {
   dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [id, player, unitType, h3Index]);
 }
 
+/**
+ * Defines the `setHexTerrain` function shape (function setHexTerrain(h3Index: string, terrain: 'land' | 'coastal' | 'water'): void).
+
+ * Purpose: Supports maintainability by documenting why `setHexTerrain` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function setHexTerrain(h3Index: string, terrain: 'land' | 'coastal' | 'water'): void {
   dbRun('UPDATE hexes SET terrain = ? WHERE h3_index = ?', [terrain, h3Index]);
 }
 
+/**
+ * Defines the `setPortControl` function shape (function setPortControl(h3Index: string, controllerPlayerId: 'human' | 'opponent', seaportCount = 1): void).
+
+ * Purpose: Supports maintainability by documenting why `setPortControl` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function setPortControl(h3Index: string, controllerPlayerId: 'human' | 'opponent', seaportCount = 1): void {
   dbRun('UPDATE res1_infrastructure SET seaport_count = ? WHERE h3_index = ?', [seaportCount, h3Index]);
   dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, controllerPlayerId]);
 }
 
+/**
+ * Defines the `loadAssignments` function shape (function loadAssignments(): Array<).
+
+ * Purpose: Supports maintainability by documenting why `loadAssignments` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function loadAssignments(): Array<{ landUnitId: string; navalUnitId: string }> {
   return dbGetAll<{ landUnitId: string; navalUnitId: string }>(
     'SELECT land_unit_id AS landUnitId, naval_unit_id AS navalUnitId FROM unit_transport_assignments ORDER BY land_unit_id'
   );
 }
 
+/**
+ * Defines the `testApplyEmbarkOrdersEnforcesCapacityAndReassignment` function shape (function testApplyEmbarkOrdersEnforcesCapacityAndReassignment(): void).
+
+ * Purpose: Supports maintainability by documenting why `testApplyEmbarkOrdersEnforcesCapacityAndReassignment` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testApplyEmbarkOrdersEnforcesCapacityAndReassignment(): void {
   withTempDb(() => {
     const coastalHex = pickHex(1);
@@ -100,6 +156,14 @@ function testApplyEmbarkOrdersEnforcesCapacityAndReassignment(): void {
   });
 }
 
+/**
+ * Defines the `testApplyEmbarkOrdersAllowsControlledSeaportRegardlessTerrainLabel` function shape (function testApplyEmbarkOrdersAllowsControlledSeaportRegardlessTerrainLabel(): void).
+
+ * Purpose: Supports maintainability by documenting why `testApplyEmbarkOrdersAllowsControlledSeaportRegardlessTerrainLabel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testApplyEmbarkOrdersAllowsControlledSeaportRegardlessTerrainLabel(): void {
   withTempDb(() => {
     const landHex = pickHex(6);
@@ -122,6 +186,14 @@ function testApplyEmbarkOrdersAllowsControlledSeaportRegardlessTerrainLabel(): v
   });
 }
 
+/**
+ * Defines the `testApplyEmbarkOrdersRejectsAtSeaAndNoPort` function shape (function testApplyEmbarkOrdersRejectsAtSeaAndNoPort(): void).
+
+ * Purpose: Supports maintainability by documenting why `testApplyEmbarkOrdersRejectsAtSeaAndNoPort` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testApplyEmbarkOrdersRejectsAtSeaAndNoPort(): void {
   withTempDb(() => {
     const waterHex = pickHex(2);
@@ -150,6 +222,14 @@ function testApplyEmbarkOrdersRejectsAtSeaAndNoPort(): void {
   });
 }
 
+/**
+ * Defines the `testApplyEmbarkOrdersAllowsWaterAndArcticWhenPortPresent` function shape (function testApplyEmbarkOrdersAllowsWaterAndArcticWhenPortPresent(): void).
+
+ * Purpose: Supports maintainability by documenting why `testApplyEmbarkOrdersAllowsWaterAndArcticWhenPortPresent` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testApplyEmbarkOrdersAllowsWaterAndArcticWhenPortPresent(): void {
   withTempDb(() => {
     const waterPortHex = pickHex(0);
@@ -180,6 +260,14 @@ function testApplyEmbarkOrdersAllowsWaterAndArcticWhenPortPresent(): void {
   });
 }
 
+/**
+ * Defines the `testTransportLossDestroysCargoOnWaterAndDebarksOnCoastal` function shape (function testTransportLossDestroysCargoOnWaterAndDebarksOnCoastal(): void).
+
+ * Purpose: Supports maintainability by documenting why `testTransportLossDestroysCargoOnWaterAndDebarksOnCoastal` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testTransportLossDestroysCargoOnWaterAndDebarksOnCoastal(): void {
   withTempDb(() => {
     const waterHex = pickHex(4);
@@ -231,6 +319,14 @@ function testTransportLossDestroysCargoOnWaterAndDebarksOnCoastal(): void {
   });
 }
 
+/**
+ * Defines the `testAutoDisembarkOnIndependentMoveWhenNotOnWater` function shape (function testAutoDisembarkOnIndependentMoveWhenNotOnWater(): void).
+
+ * Purpose: Supports maintainability by documenting why `testAutoDisembarkOnIndependentMoveWhenNotOnWater` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testAutoDisembarkOnIndependentMoveWhenNotOnWater(): void {
   withTempDb(() => {
     const landHex = pickHex(7);
@@ -253,6 +349,14 @@ function testAutoDisembarkOnIndependentMoveWhenNotOnWater(): void {
   });
 }
 
+/**
+ * Defines the `testSealiftStateDisablesDebarkButtonsOnWater` function shape (function testSealiftStateDisablesDebarkButtonsOnWater(): void).
+
+ * Purpose: Supports maintainability by documenting why `testSealiftStateDisablesDebarkButtonsOnWater` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testSealiftStateDisablesDebarkButtonsOnWater(): void {
   withTempDb(() => {
     const waterHex = pickHex(9);
@@ -273,6 +377,14 @@ function testSealiftStateDisablesDebarkButtonsOnWater(): void {
   });
 }
 
+/**
+ * Defines the `run` function shape (function run(): void).
+
+ * Purpose: Supports maintainability by documenting why `run` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function run(): void {
   testApplyEmbarkOrdersEnforcesCapacityAndReassignment();
   testApplyEmbarkOrdersAllowsControlledSeaportRegardlessTerrainLabel();

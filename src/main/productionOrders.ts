@@ -6,24 +6,112 @@
 import { BUILD_ENTRY_MAX_COUNT, BUILD_ENTRY_MIN_COUNT, type BuildUnitType } from './productionRules';
 import { logTrace } from './logger';
 
+/**
+ * Documents the `ProductionOrderAction` type alias (export type ProductionOrderAction).
+
+ * Purpose: Supports maintainability by documenting why `ProductionOrderAction` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type ProductionOrderAction = 'set_build_queue';
 
+/**
+ * Documents the `ProductionOrder` interface as a named contract surface (export interface ProductionOrder).
+
+ * Purpose: Supports maintainability by documenting why `ProductionOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface ProductionOrder {
-  action: ProductionOrderAction;
-  hex: [number, number];
-  unitType: BuildUnitType;
-  count: number;
+    /**
+   * Specifies the contract for the `action` member (action: ProductionOrderAction;).
+
+   * Contract: Describes stable behavior for callers of `action` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+action: ProductionOrderAction;
+    /**
+   * Specifies the contract for the `hex` member (hex: [number, number];).
+
+   * Contract: Describes stable behavior for callers of `hex` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hex: [number, number];
+    /**
+   * Specifies the contract for the `unitType` member (unitType: BuildUnitType;).
+
+   * Contract: Describes stable behavior for callers of `unitType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitType: BuildUnitType;
+    /**
+   * Specifies the contract for the `count` member (count: number;).
+
+   * Contract: Describes stable behavior for callers of `count` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+count: number;
 }
 
+/**
+ * Documents the `NormalizeProductionOrdersResult` interface as a named contract surface (export interface NormalizeProductionOrdersResult).
+
+ * Purpose: Supports maintainability by documenting why `NormalizeProductionOrdersResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface NormalizeProductionOrdersResult {
-  validOrders: ProductionOrder[];
-  droppedReasons: string[];
+    /**
+   * Specifies the contract for the `validOrders` member (validOrders: ProductionOrder[];).
+
+   * Contract: Describes stable behavior for callers of `validOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+validOrders: ProductionOrder[];
+    /**
+   * Specifies the contract for the `droppedReasons` member (droppedReasons: string[];).
+
+   * Contract: Describes stable behavior for callers of `droppedReasons` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+droppedReasons: string[];
 }
 
+/**
+ * Defines the `isBuildUnitType` function shape (function isBuildUnitType(value: unknown): value is BuildUnitType).
+
+ * Purpose: Supports maintainability by documenting why `isBuildUnitType` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function isBuildUnitType(value: unknown): value is BuildUnitType {
   return value === 'infantry' || value === 'armor' || value === 'naval' || value === 'air';
 }
 
+/**
+ * Defines the `parseHex` function shape (function parseHex(value: unknown): [number, number] | undefined).
+
+ * Purpose: Supports maintainability by documenting why `parseHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function parseHex(value: unknown): [number, number] | undefined {
   if (!Array.isArray(value) || value.length < 2) return undefined;
   const lat = Number(value[0]);
@@ -32,6 +120,14 @@ function parseHex(value: unknown): [number, number] | undefined {
   return [lat, lng];
 }
 
+/**
+ * Defines the `parseBuildCount` function shape (function parseBuildCount(value: unknown): number | undefined).
+
+ * Purpose: Supports maintainability by documenting why `parseBuildCount` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function parseBuildCount(value: unknown): number | undefined {
   if (!Number.isInteger(value)) return undefined;
   const parsed = Number(value);
@@ -39,12 +135,12 @@ function parseBuildCount(value: unknown): number | undefined {
 }
 
 /**
- * Why this exists:
- *     Enforces one strict JSON contract for productionOrders so malformed entries are dropped consistently.
- * When to use:
- *     OpenRouter final-response parsing before applying production changes.
- * What to expect:
- *     Returns valid orders plus explicit dropped reasons for malformed/contract-breaking entries.
+ * Defines the `normalizeProductionOrders` function shape (export function normalizeProductionOrders(raw: unknown): NormalizeProductionOrdersResult).
+
+ * Purpose: Supports maintainability by documenting why `normalizeProductionOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function normalizeProductionOrders(raw: unknown): NormalizeProductionOrdersResult {
   logTrace('productionOrders normalizeProductionOrders', { hasRaw: raw !== undefined && raw !== null, isArray: Array.isArray(raw) });

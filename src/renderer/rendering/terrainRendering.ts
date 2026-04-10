@@ -21,14 +21,70 @@ import { rendererSharedState as S } from '../core/state';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
 import { strokeDualClosedPolygon } from './polygonOutline';
 
+/**
+ * Documents the `TerrainRenderingDeps` interface as a named contract surface (interface TerrainRenderingDeps).
+
+ * Purpose: Supports maintainability by documenting why `TerrainRenderingDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface TerrainRenderingDeps {
-  getExploredHexSet: (state: GameStateSnapshot | null) => Set<string>;
-  getRes1DominantTerrainKind: (h3: string, parentKind: string) => string;
-  isMapInspectionModeHeld: () => boolean;
-  infraGlyphsAllowedForRes1Hex: (h3: string) => boolean;
-  infraGlyphsAllowedForRes4Child: (parentH3: string, childH3: string) => boolean;
+    /**
+   * Specifies the contract for the `getExploredHexSet` member (getExploredHexSet: (state: GameStateSnapshot | null) => Set<string>;).
+
+   * Contract: Describes stable behavior for callers of `getExploredHexSet` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getExploredHexSet: (state: GameStateSnapshot | null) => Set<string>;
+    /**
+   * Specifies the contract for the `getRes1DominantTerrainKind` member (getRes1DominantTerrainKind: (h3: string, parentKind: string) => string;).
+
+   * Contract: Describes stable behavior for callers of `getRes1DominantTerrainKind` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getRes1DominantTerrainKind: (h3: string, parentKind: string) => string;
+    /**
+   * Specifies the contract for the `isMapInspectionModeHeld` member (isMapInspectionModeHeld: () => boolean;).
+
+   * Contract: Describes stable behavior for callers of `isMapInspectionModeHeld` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+isMapInspectionModeHeld: () => boolean;
+    /**
+   * Specifies the contract for the `infraGlyphsAllowedForRes1Hex` member (infraGlyphsAllowedForRes1Hex: (h3: string) => boolean;).
+
+   * Contract: Describes stable behavior for callers of `infraGlyphsAllowedForRes1Hex` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+infraGlyphsAllowedForRes1Hex: (h3: string) => boolean;
+    /**
+   * Specifies the contract for the `infraGlyphsAllowedForRes4Child` member (infraGlyphsAllowedForRes4Child: (parentH3: string, childH3: string) => boolean;).
+
+   * Contract: Describes stable behavior for callers of `infraGlyphsAllowedForRes4Child` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+infraGlyphsAllowedForRes4Child: (parentH3: string, childH3: string) => boolean;
 }
 
+/**
+ * Defines the `withOpacity` function shape (function withOpacity(color: string, alpha: number): string).
+
+ * Purpose: Supports maintainability by documenting why `withOpacity` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function withOpacity(color: string, alpha: number): string {
   const normalizedAlpha = Math.max(0, Math.min(1, alpha));
   if (color.startsWith('#')) {
@@ -49,10 +105,26 @@ function withOpacity(color: string, alpha: number): string {
   return color;
 }
 
+/**
+ * Defines the `buildControlByHex` function shape (function buildControlByHex(state: GameStateSnapshot): Map<string, string | null>).
+
+ * Purpose: Supports maintainability by documenting why `buildControlByHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildControlByHex(state: GameStateSnapshot): Map<string, string | null> {
   return new Map((state.res1Control ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
 }
 
+/**
+ * Defines the `drawTerrainHexes` function shape (export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void).
+
+ * Purpose: Supports maintainability by documenting why `drawTerrainHexes` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void {
   if (!S.gameState) return;
   const exploredHexes = deps.getExploredHexSet(S.gameState);
@@ -106,6 +178,14 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
   }
 }
 
+/**
+ * Defines the `drawRes4TerrainHexes` function shape (export function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void).
+
+ * Purpose: Supports maintainability by documenting why `drawRes4TerrainHexes` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void {
   if (!S.gameState || !shouldRenderRes4Hexes()) return;
   const exploredHexes = deps.getExploredHexSet(S.gameState);
@@ -166,8 +246,12 @@ export function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D, deps: Terrai
 }
 
 /**
- * Draws always-visible home-region hex outlines for region-vs-region scenario.
- * Uses a black under-stroke plus player-color top stroke for contrast on all terrain styles.
+ * Defines the `drawScenarioHomeRegionOutlines` function shape (export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): void).
+
+ * Purpose: Supports maintainability by documenting why `drawScenarioHomeRegionOutlines` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): void {
   const state = S.gameState;
@@ -221,6 +305,14 @@ export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): v
   drawRegion(state.aiHomeRegionHexes, aiColor);
 }
 
+/**
+ * Defines the `hasVisibleRes1InfrastructureGlyphs` function shape (export function hasVisibleRes1InfrastructureGlyphs( h3Index: string, res4On: boolean, unitHexes: Set<string>, deps: TerrainRenderingDeps ): boolean).
+
+ * Purpose: Supports maintainability by documenting why `hasVisibleRes1InfrastructureGlyphs` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function hasVisibleRes1InfrastructureGlyphs(
   h3Index: string,
   res4On: boolean,
@@ -231,6 +323,14 @@ export function hasVisibleRes1InfrastructureGlyphs(
   return !res4On && deps.infraGlyphsAllowedForRes1Hex(h3Index) && (S.terrainInfraRes1Airport.has(h3Index) || S.terrainInfraRes1Seaport.has(h3Index));
 }
 
+/**
+ * Defines the `computeRes1OverlayTextY` function shape (export function computeRes1OverlayTextY( h3Index: string, map: { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } }, L: { latLng: (lat).
+
+ * Purpose: Supports maintainability by documenting why `computeRes1OverlayTextY` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function computeRes1OverlayTextY(
   h3Index: string,
   map: { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } },
@@ -243,6 +343,14 @@ export function computeRes1OverlayTextY(
   return center.y + spanForProjectedHex(pts) * 0.24;
 }
 
+/**
+ * Defines the `drawTerrainInfrastructureOverlays` function shape (export function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void).
+
+ * Purpose: Supports maintainability by documenting why `drawTerrainInfrastructureOverlays` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void {
   if (!S.gameState) return;
   const map = getMainLeafletMap() as

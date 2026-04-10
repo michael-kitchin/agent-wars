@@ -21,17 +21,89 @@ import {
 import { executeStandingOrderActionForPlayer, generateOrdersForStandingOrders } from './tool5StandingOrders';
 import type { GameStateSnapshot } from '../gameDb';
 
+/**
+ * Documents the module-scope binding `emptyMap` (emptyMap).
+
+ * Purpose: Supports maintainability by documenting why `emptyMap` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const emptyMap = new Map<string, [number, number]>();
+/**
+ * Documents the module-scope binding `noopResolve` (noopResolve).
+
+ * Purpose: Supports maintainability by documenting why `noopResolve` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const noopResolve = (): string | undefined => undefined;
 
+/**
+ * Documents the module-scope binding `emptyState` (emptyState: GameStateSnapshot).
+
+ * Purpose: Supports maintainability by documenting why `emptyState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const emptyState: GameStateSnapshot = {
-  turnNumber: 1,
-  phase: 'planning',
-  hexes: [],
-  units: [],
-  pendingOrders: [],
+    /**
+   * Documents the object literal property `turnNumber` (turnNumber: 1).
+
+   * Purpose: Supports maintainability by documenting why `turnNumber` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+turnNumber: 1,
+    /**
+   * Documents the object literal property `phase` (phase: 'planning').
+
+   * Purpose: Supports maintainability by documenting why `phase` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+phase: 'planning',
+    /**
+   * Documents the object literal property `hexes` (hexes: []).
+
+   * Purpose: Supports maintainability by documenting why `hexes` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hexes: [],
+    /**
+   * Documents the object literal property `units` (units: []).
+
+   * Purpose: Supports maintainability by documenting why `units` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+units: [],
+    /**
+   * Documents the object literal property `pendingOrders` (pendingOrders: []).
+
+   * Purpose: Supports maintainability by documenting why `pendingOrders` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+pendingOrders: [],
 };
 
+/**
+ * Defines the `testAssignOrderUnitNotFound` function shape (function testAssignOrderUnitNotFound(): void).
+
+ * Purpose: Supports maintainability by documenting why `testAssignOrderUnitNotFound` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testAssignOrderUnitNotFound(): void {
   const result = executeTool5(
     'assign_order',
@@ -44,6 +116,14 @@ function testAssignOrderUnitNotFound(): void {
   assert.ok((result as { error?: string }).error?.includes('Unit not found'));
 }
 
+/**
+ * Defines the `testAssignOrderPursueTargetNotFound` function shape (function testAssignOrderPursueTargetNotFound(): void).
+
+ * Purpose: Supports maintainability by documenting why `testAssignOrderPursueTargetNotFound` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testAssignOrderPursueTargetNotFound(): void {
   const stateWithUnit: GameStateSnapshot = {
     ...emptyState,
@@ -61,6 +141,14 @@ function testAssignOrderPursueTargetNotFound(): void {
   assert.ok((result as { error?: string }).error?.includes('Target unit not found'));
 }
 
+/**
+ * Defines the `testAssignOrderPatrolTooFewWaypoints` function shape (function testAssignOrderPatrolTooFewWaypoints(): void).
+
+ * Purpose: Supports maintainability by documenting why `testAssignOrderPatrolTooFewWaypoints` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testAssignOrderPatrolTooFewWaypoints(): void {
   const stateWithUnit: GameStateSnapshot = {
     ...emptyState,
@@ -81,12 +169,28 @@ function testAssignOrderPatrolTooFewWaypoints(): void {
   assert.ok((result as { error?: string }).error?.includes('at least 2 waypoints'));
 }
 
+/**
+ * Defines the `testQueryOrdersRequiresUnitIdOrAll` function shape (function testQueryOrdersRequiresUnitIdOrAll(): void).
+
+ * Purpose: Supports maintainability by documenting why `testQueryOrdersRequiresUnitIdOrAll` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testQueryOrdersRequiresUnitIdOrAll(): void {
   const result = executeTool5('query_orders', {}, emptyState, emptyMap, noopResolve);
   assert.strictEqual(result.status, 'error');
   assert.ok((result as { error?: string }).error?.includes('query_orders requires'));
 }
 
+/**
+ * Defines the `testCancelOrderWhenNoOrder` function shape (function testCancelOrderWhenNoOrder(): void).
+
+ * Purpose: Supports maintainability by documenting why `testCancelOrderWhenNoOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testCancelOrderWhenNoOrder(): void {
   const result = executeTool5(
     'cancel_order',
@@ -99,6 +203,14 @@ function testCancelOrderWhenNoOrder(): void {
   assert.ok((result as { error?: string }).error?.includes('No standing order found'));
 }
 
+/**
+ * Defines the `testGetInjectionTextEmpty` function shape (function testGetInjectionTextEmpty(): void).
+
+ * Purpose: Supports maintainability by documenting why `testGetInjectionTextEmpty` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testGetInjectionTextEmpty(): void {
   const stateWithUnits: GameStateSnapshot = {
     ...emptyState,
@@ -115,6 +227,14 @@ function testGetInjectionTextEmpty(): void {
   assert.ok(text.includes('| opponent-armor-1 |'));
 }
 
+/**
+ * Defines the `testAssignMarchToCurrentHexDoesNotPersistStandingOrder` function shape (function testAssignMarchToCurrentHexDoesNotPersistStandingOrder(): void).
+
+ * Purpose: Supports maintainability by documenting why `testAssignMarchToCurrentHexDoesNotPersistStandingOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testAssignMarchToCurrentHexDoesNotPersistStandingOrder(): void {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-tool5-'));
   const dbPath = path.join(tempDir, 't.sqlite');
@@ -153,6 +273,14 @@ function testAssignMarchToCurrentHexDoesNotPersistStandingOrder(): void {
   }
 }
 
+/**
+ * Defines the `testGenerateRemovesArrivedMarchOrder` function shape (function testGenerateRemovesArrivedMarchOrder(): void).
+
+ * Purpose: Supports maintainability by documenting why `testGenerateRemovesArrivedMarchOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testGenerateRemovesArrivedMarchOrder(): void {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-tool5-'));
   const dbPath = path.join(tempDir, 't.sqlite');
@@ -198,6 +326,14 @@ function testGenerateRemovesArrivedMarchOrder(): void {
   }
 }
 
+/**
+ * Defines the `testHumanMarchDefaultsAvoidEnemiesFalse` function shape (function testHumanMarchDefaultsAvoidEnemiesFalse(): void).
+
+ * Purpose: Supports maintainability by documenting why `testHumanMarchDefaultsAvoidEnemiesFalse` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testHumanMarchDefaultsAvoidEnemiesFalse(): void {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-tool5-'));
   const dbPath = path.join(tempDir, 't.sqlite');
@@ -245,6 +381,14 @@ function testHumanMarchDefaultsAvoidEnemiesFalse(): void {
   }
 }
 
+/**
+ * Defines the `run` function shape (function run(): void).
+
+ * Purpose: Supports maintainability by documenting why `run` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function run(): void {
   testAssignOrderUnitNotFound();
   testAssignOrderPursueTargetNotFound();

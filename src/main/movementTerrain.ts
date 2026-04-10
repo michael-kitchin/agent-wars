@@ -2,12 +2,52 @@ import { getRes1InfrastructureForHex } from './gameDb';
 import { getRes1ProductionContext, isTerrainClassificationCacheLoaded } from './terrainClassificationCache';
 import { logTrace } from './logger';
 
+/**
+ * Documents the `HexMovementTerrainInput` interface as a named contract surface (export interface HexMovementTerrainInput).
+
+ * Purpose: Supports maintainability by documenting why `HexMovementTerrainInput` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface HexMovementTerrainInput {
-  h3Index: string;
-  terrain: string;
-  terrainKind?: string;
+    /**
+   * Specifies the contract for the `h3Index` member (h3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `h3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+h3Index: string;
+    /**
+   * Specifies the contract for the `terrain` member (terrain: string;).
+
+   * Contract: Describes stable behavior for callers of `terrain` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+terrain: string;
+    /**
+   * Specifies the contract for the `terrainKind` member (terrainKind?: string;).
+
+   * Contract: Describes stable behavior for callers of `terrainKind` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+terrainKind?: string;
 }
 
+/**
+ * Defines the `hexHasSeaport` function shape (function hexHasSeaport(h3Index: string): boolean).
+
+ * Purpose: Supports maintainability by documenting why `hexHasSeaport` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function hexHasSeaport(h3Index: string): boolean {
   const live = getRes1InfrastructureForHex(h3Index);
   if (live.seaportCount > 0) return true;
@@ -16,12 +56,12 @@ function hexHasSeaport(h3Index: string): boolean {
 }
 
 /**
- * Why this exists:
- *     Provides one normalization rule for movement/passability terrain derived from hex DB fields.
- * When to use:
- *     Any planning/validation path that consumes `terrain` + `terrainKind` from snapshots or DB rows.
- * What to expect:
- *     Returns coastal for seaport hexes, otherwise coastal/wetlands from terrainKind when present; falls back to base terrain.
+ * Defines the `normalizeMovementTerrain` function shape (export function normalizeMovementTerrain(input: HexMovementTerrainInput): string).
+
+ * Purpose: Supports maintainability by documenting why `normalizeMovementTerrain` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function normalizeMovementTerrain(input: HexMovementTerrainInput): string {
   logTrace('movementTerrain normalizeMovementTerrain', input);
@@ -32,12 +72,12 @@ export function normalizeMovementTerrain(input: HexMovementTerrainInput): string
 }
 
 /**
- * Why this exists:
- *     Builds one canonical normalized-terrain lookup map for movement/pathfinding consumers.
- * When to use:
- *     Any read-only planning or validation flow that repeatedly needs normalized terrain by H3.
- * What to expect:
- *     Returns a map keyed by H3 index, where each value uses `normalizeMovementTerrain` rules.
+ * Defines the `buildNormalizedTerrainByH3` function shape (export function buildNormalizedTerrainByH3( hexes: ReadonlyArray<{ h3Index: string; terrain: string; terrainKind?: string }> ): Map<string, string> { log).
+
+ * Purpose: Supports maintainability by documenting why `buildNormalizedTerrainByH3` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function buildNormalizedTerrainByH3(
   hexes: ReadonlyArray<{ h3Index: string; terrain: string; terrainKind?: string }>
@@ -54,12 +94,12 @@ export function buildNormalizedTerrainByH3(
 }
 
 /**
- * Why this exists:
- *     Centralizes the seaport-land exception test for naval spawn/egress behavior.
- * When to use:
- *     Naval movement validation and route planning when origin terrain is non-water-domain.
- * What to expect:
- *     Returns true only for land hexes with at least one intact seaport in mutable game state.
+ * Defines the `isLandSeaportSpawnHex` function shape (export function isLandSeaportSpawnHex(input:).
+
+ * Purpose: Supports maintainability by documenting why `isLandSeaportSpawnHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function isLandSeaportSpawnHex(input: { h3Index: string; normalizedTerrain: string }): boolean {
   logTrace('movementTerrain isLandSeaportSpawnHex', input);

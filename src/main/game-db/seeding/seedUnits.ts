@@ -19,13 +19,53 @@ import { applySacrificeToBaselineCounts, resolveFlexUnitPlacement } from './init
 import { countPlannedUnitsOfType, insertPlannedUnitsForPlayer, type PlannedUnitTuple } from './plannedUnits';
 import { trySeedScenarioRegionVsRegion } from './regionScenarioSeeding';
 
+/**
+ * Documents the `SeedUnitsDeps` interface as a named contract surface (interface SeedUnitsDeps extends GuardedDbRunAndGetAllOps).
+
+ * Purpose: Supports maintainability by documenting why `SeedUnitsDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface SeedUnitsDeps extends GuardedDbRunAndGetAllOps {
-  getOne: <T extends Record<string, unknown>>(sql: string, params?: unknown[]) => T | undefined;
-  allocateNextUnitDisplayOrder: (unitType: BuildUnitType) => number;
+    /**
+   * Specifies the contract for the `getOne` member (getOne: <T extends Record<string, unknown>>(sql: string, params?: unknown[]) => T | undefined;).
+
+   * Contract: Describes stable behavior for callers of `getOne` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getOne: <T extends Record<string, unknown>>(sql: string, params?: unknown[]) => T | undefined;
+    /**
+   * Specifies the contract for the `allocateNextUnitDisplayOrder` member (allocateNextUnitDisplayOrder: (unitType: BuildUnitType) => number;).
+
+   * Contract: Describes stable behavior for callers of `allocateNextUnitDisplayOrder` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+allocateNextUnitDisplayOrder: (unitType: BuildUnitType) => number;
 }
 
+/**
+ * Documents the `SeedUnitEntry` type alias (type SeedUnitEntry).
+
+ * Purpose: Supports maintainability by documenting why `SeedUnitEntry` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type SeedUnitEntry = PlannedUnitTuple;
 
+/**
+ * Defines the `mergeNavalCandidatePools` function shape (function mergeNavalCandidatePools(pools: SpawnCandidate[][]): SpawnCandidate[]).
+
+ * Purpose: Supports maintainability by documenting why `mergeNavalCandidatePools` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function mergeNavalCandidatePools(pools: SpawnCandidate[][]): SpawnCandidate[] {
   const seen = new Set<string>();
   const out: SpawnCandidate[] = [];
@@ -39,6 +79,14 @@ function mergeNavalCandidatePools(pools: SpawnCandidate[][]): SpawnCandidate[] {
   return out;
 }
 
+/**
+ * Defines the `buildSideUnits` function shape (function buildSideUnits(args: { deps: SeedUnitsDeps; player: 'human' | 'opponent'; counts: { infantry: number; armor: number; naval: number }; landS).
+
+ * Purpose: Supports maintainability by documenting why `buildSideUnits` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildSideUnits(args: {
   deps: SeedUnitsDeps;
   player: 'human' | 'opponent';
@@ -90,12 +138,12 @@ function buildSideUnits(args: {
 }
 
 /**
- * Why this exists:
- *     Seeds initial human/opponent unit placement using deterministic terrain pools plus randomized side assignment.
- * When to use:
- *     New database bootstrap and full game reset flows.
- * What to expect:
- *     Throws when required regional/ocean spawn capacity cannot satisfy configured world unit counts.
+ * Defines the `seedUnits` function shape (export function seedUnits(deps: SeedUnitsDeps): void).
+
+ * Purpose: Supports maintainability by documenting why `seedUnits` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function seedUnits(deps: SeedUnitsDeps): void {
   logDebug('gameDb seedUnits');

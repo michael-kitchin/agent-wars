@@ -7,23 +7,73 @@ import { gridDisk } from 'h3-js';
 import type { GameStateSnapshot } from '../shared/ipcTypes';
 import { logError, logTrace } from './logger';
 
-/** Locked 1.3 vision ranges (hex radius) by unit type. */
+/**
+ * Documents the module-scope binding `VISION_RANGE_BY_UNIT_TYPE` (VISION_RANGE_BY_UNIT_TYPE: Record<string, number>).
+
+ * Purpose: Supports maintainability by documenting why `VISION_RANGE_BY_UNIT_TYPE` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const VISION_RANGE_BY_UNIT_TYPE: Record<string, number> = {
-  infantry: 1,
-  armor: 2,
-  naval: 2,
-  air: 3,
+    /**
+   * Documents the object literal property `infantry` (infantry: 1).
+
+   * Purpose: Supports maintainability by documenting why `infantry` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+infantry: 1,
+    /**
+   * Documents the object literal property `armor` (armor: 2).
+
+   * Purpose: Supports maintainability by documenting why `armor` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+armor: 2,
+    /**
+   * Documents the object literal property `naval` (naval: 2).
+
+   * Purpose: Supports maintainability by documenting why `naval` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+naval: 2,
+    /**
+   * Documents the object literal property `air` (air: 3).
+
+   * Purpose: Supports maintainability by documenting why `air` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+air: 3,
 };
 
-/** Locked 1.3 stale-icon opacity by stale age in turns. */
+/**
+ * Documents the module-scope binding `STALE_ICON_OPACITY_BY_AGE` (STALE_ICON_OPACITY_BY_AGE: Record<number, number>).
+
+ * Purpose: Supports maintainability by documenting why `STALE_ICON_OPACITY_BY_AGE` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const STALE_ICON_OPACITY_BY_AGE: Record<number, number> = {
   0: 0.5,
   1: 0.3,
 };
 
 /**
- * Computes side-wide visibility by unioning each alive friendly unit's hex disk.
- * Returns only map-contained hexes from `mapHexSet`.
+ * Defines the `computeVisibleHexesForSide` function shape (export function computeVisibleHexesForSide().
+
+ * Purpose: Supports maintainability by documenting why `computeVisibleHexesForSide` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function computeVisibleHexesForSide(
   state: GameStateSnapshot,

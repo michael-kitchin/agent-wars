@@ -1,15 +1,10 @@
 /**
- * Seeded pseudo-random number generator for deterministic combat and participant IDs.
- * Mulberry32: one 32-bit state, returns next() in [0, 1). Same seed yields same sequence.
- * The two Math.imul steps provide the avalanche effect that ensures small seed differences
- * (e.g. consecutive turn numbers) produce uncorrelated output sequences.
- */
+ * Defines the `createSeededRng` function shape (export function createSeededRng(seed: number): () => number).
 
-/**
- * Creates a seeded RNG function. Use for all combat dice and participant ID assignment
- * so replay with the same seed and same orders yields the same outcome.
- * @param seed - Integer seed (e.g. from game config).
- * @returns Function that returns the next value in [0, 1).
+ * Purpose: Supports maintainability by documenting why `createSeededRng` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function createSeededRng(seed: number): () => number {
   let state = seed >>> 0;

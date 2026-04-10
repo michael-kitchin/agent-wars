@@ -14,16 +14,42 @@ import type { CombatUnit } from './combatUnitTypes';
 
 export type { CombatUnit } from './combatUnitTypes';
 
-/** Result of resolving one ranged or melee engagement (who was removed). */
+/**
+ * Documents the `OneEngagementResult` interface as a named contract surface (export interface OneEngagementResult).
+
+ * Purpose: Supports maintainability by documenting why `OneEngagementResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface OneEngagementResult {
-  attackerRemovedIds: string[];
-  defenderRemovedIds: string[];
+    /**
+   * Specifies the contract for the `attackerRemovedIds` member (attackerRemovedIds: string[];).
+
+   * Contract: Describes stable behavior for callers of `attackerRemovedIds` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+attackerRemovedIds: string[];
+    /**
+   * Specifies the contract for the `defenderRemovedIds` member (defenderRemovedIds: string[];).
+
+   * Contract: Describes stable behavior for callers of `defenderRemovedIds` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+defenderRemovedIds: string[];
 }
 
 /**
- * Resolves one round of a single ranged engagement: attacker rolls, optional return fire, assign hits by casualty priority.
- * Used by runRangedPhase (game) and by Tool 3 (estimate_combat) with a simulation RNG. Does not mutate inputs.
- * Returns IDs of units that would be removed; caller applies to game state or aggregates for Monte Carlo.
+ * Defines the `resolveOneRangedEngagement` function shape (export function resolveOneRangedEngagement( attackerUnits: CombatUnit[], defenderUnits: CombatUnit[], defenderHexH3: string, rollD6: () => number,).
+
+ * Purpose: Supports maintainability by documenting why `resolveOneRangedEngagement` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function resolveOneRangedEngagement(
   attackerUnits: CombatUnit[],
@@ -99,8 +125,12 @@ export function resolveOneRangedEngagement(
 }
 
 /**
- * Resolves one round of a single melee engagement: attacker rolls attack, defender rolls defense, assign hits by casualty priority.
- * Used by runMeleePhase (game) and by Tool 3 (estimate_combat) with a simulation RNG. Does not mutate inputs.
+ * Defines the `resolveOneMeleeEngagement` function shape (export function resolveOneMeleeEngagement().
+
+ * Purpose: Supports maintainability by documenting why `resolveOneMeleeEngagement` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function resolveOneMeleeEngagement(
   attackerUnits: CombatUnit[],
@@ -139,33 +169,155 @@ export function resolveOneMeleeEngagement(
   return { attackerRemovedIds, defenderRemovedIds };
 }
 
-/** Records which unit(s) caused a casualty (for kill announcements). */
+/**
+ * Documents the `KillRecord` interface as a named contract surface (export interface KillRecord).
+
+ * Purpose: Supports maintainability by documenting why `KillRecord` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface KillRecord {
-  victimId: string;
-  killerIds: string[];
+    /**
+   * Specifies the contract for the `victimId` member (victimId: string;).
+
+   * Contract: Describes stable behavior for callers of `victimId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+victimId: string;
+    /**
+   * Specifies the contract for the `killerIds` member (killerIds: string[];).
+
+   * Contract: Describes stable behavior for callers of `killerIds` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+killerIds: string[];
 }
 
+/**
+ * Documents the `CombatResolutionResult` interface as a named contract surface (export interface CombatResolutionResult).
+
+ * Purpose: Supports maintainability by documenting why `CombatResolutionResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface CombatResolutionResult {
-  combatHexes: string[];
-  removedUnitIds: string[];
-  /** Hexes where at least one unit was removed (for casualty overlay). */
-  casualtyHexes: string[];
-  /** Snapshot of each removed unit at death (for display until death animation ends). */
-  removedUnits: CombatUnit[];
-  /** Per-casualty killer attribution for announcements. */
-  kills: KillRecord[];
-  /** Ranged only: defenders killed by attackers (direct fire). */
-  killsByDirectFire?: KillRecord[];
-  /** Ranged only: attackers killed by defenders (return fire). */
-  killsByReturnFire?: KillRecord[];
+    /**
+   * Specifies the contract for the `combatHexes` member (combatHexes: string[];).
+
+   * Contract: Describes stable behavior for callers of `combatHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+combatHexes: string[];
+    /**
+   * Specifies the contract for the `removedUnitIds` member (removedUnitIds: string[];).
+
+   * Contract: Describes stable behavior for callers of `removedUnitIds` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+removedUnitIds: string[];
+    /**
+   * Specifies the contract for the `casualtyHexes` member (casualtyHexes: string[];).
+
+   * Contract: Describes stable behavior for callers of `casualtyHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+casualtyHexes: string[];
+    /**
+   * Specifies the contract for the `removedUnits` member (removedUnits: CombatUnit[];).
+
+   * Contract: Describes stable behavior for callers of `removedUnits` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+removedUnits: CombatUnit[];
+    /**
+   * Specifies the contract for the `kills` member (kills: KillRecord[];).
+
+   * Contract: Describes stable behavior for callers of `kills` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+kills: KillRecord[];
+    /**
+   * Specifies the contract for the `killsByDirectFire` member (killsByDirectFire?: KillRecord[];).
+
+   * Contract: Describes stable behavior for callers of `killsByDirectFire` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+killsByDirectFire?: KillRecord[];
+    /**
+   * Specifies the contract for the `killsByReturnFire` member (killsByReturnFire?: KillRecord[];).
+
+   * Contract: Describes stable behavior for callers of `killsByReturnFire` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+killsByReturnFire?: KillRecord[];
 }
 
+/**
+ * Documents the `RangedEngagementGroup` interface as a named contract surface (interface RangedEngagementGroup).
+
+ * Purpose: Supports maintainability by documenting why `RangedEngagementGroup` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface RangedEngagementGroup {
-  defenderHex: string;
-  attackerPlayer: string;
-  attackerUnitIds: string[];
+    /**
+   * Specifies the contract for the `defenderHex` member (defenderHex: string;).
+
+   * Contract: Describes stable behavior for callers of `defenderHex` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+defenderHex: string;
+    /**
+   * Specifies the contract for the `attackerPlayer` member (attackerPlayer: string;).
+
+   * Contract: Describes stable behavior for callers of `attackerPlayer` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+attackerPlayer: string;
+    /**
+   * Specifies the contract for the `attackerUnitIds` member (attackerUnitIds: string[];).
+
+   * Contract: Describes stable behavior for callers of `attackerUnitIds` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+attackerUnitIds: string[];
 }
 
+/**
+ * Defines the `recordRemovedUnit` function shape (function recordRemovedUnit(payload: { removed: Set<string>; removedUnits: CombatUnit[]; casualtyHexSet: Set<string>; kills: KillRecord[]; victim:).
+
+ * Purpose: Supports maintainability by documenting why `recordRemovedUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function recordRemovedUnit(payload: {
   removed: Set<string>;
   removedUnits: CombatUnit[];
@@ -187,6 +339,14 @@ function recordRemovedUnit(payload: {
   payload.kills.push({ victimId: payload.victim.id, killerIds: payload.killerIds });
 }
 
+/**
+ * Defines the `buildRangedEngagementGroups` function shape (function buildRangedEngagementGroups( rangedOrders: RangedAttackOrder[], unitById: ReadonlyMap<string, CombatUnit>, removed: ReadonlySet<string> ): Ra).
+
+ * Purpose: Supports maintainability by documenting why `buildRangedEngagementGroups` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildRangedEngagementGroups(
   rangedOrders: RangedAttackOrder[],
   unitById: ReadonlyMap<string, CombatUnit>,
@@ -215,8 +375,12 @@ function buildRangedEngagementGroups(
 }
 
 /**
- * Runs only the ranged phase: declared attacks at current positions, return fire, casualties.
- * Call before movement. Caller must delete returned removedUnitIds from DB.
+ * Defines the `runRangedPhase` function shape (export function runRangedPhase( units: CombatUnit[], hexList: string[], rangedOrders: RangedAttackOrder[], next: () => number ): CombatResolutionRe).
+
+ * Purpose: Supports maintainability by documenting why `runRangedPhase` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function runRangedPhase(
   units: CombatUnit[],
@@ -308,8 +472,12 @@ export function runRangedPhase(
 }
 
 /**
- * Runs only the melee phase: same-hex combats at given positions. Participant IDs from units' players.
- * Call after movement. Caller must delete returned removedUnitIds from DB.
+ * Defines the `runMeleePhase` function shape (export function runMeleePhase().
+
+ * Purpose: Supports maintainability by documenting why `runMeleePhase` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function runMeleePhase(
   units: CombatUnit[],
@@ -436,8 +604,12 @@ export function runMeleePhase(
 }
 
 /**
- * Creates a seeded RNG from the game seed for use in combat resolution.
- * Exported so ready() can pass the same RNG to runCombatResolution.
+ * Defines the `createCombatRng` function shape (export function createCombatRng(seed: number): () => number).
+
+ * Purpose: Supports maintainability by documenting why `createCombatRng` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function createCombatRng(seed: number): () => number {
   return createSeededRng(seed);

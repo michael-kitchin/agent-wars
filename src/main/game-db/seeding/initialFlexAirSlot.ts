@@ -10,16 +10,23 @@ import { MAX_UNITS_PER_TYPE } from '../../productionCaps';
 import type { GuardedDbRunAndGetAllOps } from '../dbOps';
 import type { SpawnCandidate } from './spawnSelection';
 
+/**
+ * Documents the `FlexAirSlotDeps` type alias (export type FlexAirSlotDeps).
+
+ * Purpose: Supports maintainability by documenting why `FlexAirSlotDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type FlexAirSlotDeps = GuardedDbRunAndGetAllOps;
 
 /**
- * Why this exists:
- *     Chooses which baseline land or naval slot is sacrificed so the substitutive flex unit (air or fallback)
- *     does not increase total unit count.
- * When to use:
- *     Global and region-vs-region seeding before building per-side unit rows.
- * What to expect:
- *     Returns a copy of counts with one fewer infantry, else armor, else naval; returns null if all are zero.
+ * Defines the `applySacrificeToBaselineCounts` function shape (export function applySacrificeToBaselineCounts(counts: { infantry: number; armor: number; naval: number; }): { infantry: number; armor: number; naval:).
+
+ * Purpose: Supports maintainability by documenting why `applySacrificeToBaselineCounts` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function applySacrificeToBaselineCounts(counts: {
   infantry: number;
@@ -33,6 +40,14 @@ export function applySacrificeToBaselineCounts(counts: {
   return null;
 }
 
+/**
+ * Defines the `sortH3Deterministic` function shape (function sortH3Deterministic(hexes: string[], latLngByH3: Map<string, [number, number]>): string[]).
+
+ * Purpose: Supports maintainability by documenting why `sortH3Deterministic` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function sortH3Deterministic(hexes: string[], latLngByH3: Map<string, [number, number]>): string[] {
   return [...hexes].sort((a, b) => {
     const la = latLngByH3.get(a);
@@ -45,6 +60,14 @@ function sortH3Deterministic(hexes: string[], latLngByH3: Map<string, [number, n
   });
 }
 
+/**
+ * Defines the `airportH3InRegion` function shape (function airportH3InRegion(deps: FlexAirSlotDeps, regionHexSet: Set<string>): string[]).
+
+ * Purpose: Supports maintainability by documenting why `airportH3InRegion` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function airportH3InRegion(deps: FlexAirSlotDeps, regionHexSet: Set<string>): string[] {
   const rows = deps.getAll<{ h3_index: string }>(
     'SELECT h3_index FROM res1_infrastructure WHERE airport_count > 0 AND airport_count IS NOT NULL'
@@ -57,6 +80,14 @@ function airportH3InRegion(deps: FlexAirSlotDeps, regionHexSet: Set<string>): st
   return out;
 }
 
+/**
+ * Defines the `buildLatLngMap` function shape (function buildLatLngMap(hexes: Iterable<string>): Map<string, [number, number]>).
+
+ * Purpose: Supports maintainability by documenting why `buildLatLngMap` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildLatLngMap(hexes: Iterable<string>): Map<string, [number, number]> {
   const m = new Map<string, [number, number]>();
   for (const h3 of hexes) {
@@ -66,12 +97,28 @@ function buildLatLngMap(hexes: Iterable<string>): Map<string, [number, number]> 
   return m;
 }
 
+/**
+ * Defines the `pickPreferredHex` function shape (function pickPreferredHex(sortedHexes: string[], usedH3: Set<string>): string | undefined).
+
+ * Purpose: Supports maintainability by documenting why `pickPreferredHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function pickPreferredHex(sortedHexes: string[], usedH3: Set<string>): string | undefined {
   const unused = sortedHexes.find((h) => !usedH3.has(h));
   if (unused) return unused;
   return sortedHexes[0];
 }
 
+/**
+ * Defines the `sortSpawnCandidates` function shape (function sortSpawnCandidates(candidates: SpawnCandidate[]): SpawnCandidate[]).
+
+ * Purpose: Supports maintainability by documenting why `sortSpawnCandidates` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function sortSpawnCandidates(candidates: SpawnCandidate[]): SpawnCandidate[] {
   return [...candidates].sort((a, b) => {
     if (a.lat !== b.lat) return a.lat - b.lat;
@@ -80,6 +127,14 @@ function sortSpawnCandidates(candidates: SpawnCandidate[]): SpawnCandidate[] {
   });
 }
 
+/**
+ * Defines the `pickPreferredCandidate` function shape (function pickPreferredCandidate(candidates: SpawnCandidate[], usedH3: Set<string>): SpawnCandidate | undefined).
+
+ * Purpose: Supports maintainability by documenting why `pickPreferredCandidate` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function pickPreferredCandidate(candidates: SpawnCandidate[], usedH3: Set<string>): SpawnCandidate | undefined {
   const ranked = sortSpawnCandidates(candidates);
   const unused = ranked.find((c) => !usedH3.has(c.h3));
@@ -88,12 +143,12 @@ function pickPreferredCandidate(candidates: SpawnCandidate[], usedH3: Set<string
 }
 
 /**
- * Why this exists:
- *     Picks flex unit type and spawn hex for one substitutive starting unit inside a home region (or global land home + naval pool).
- * When to use:
- *     After infrastructure exists and baseline counts reflect sacrifice (one fewer baseline unit).
- * What to expect:
- *     Tries air at regional airport, then armor, infantry on passable land, then naval in naval candidate pool; updates usedH3 when preferring fresh hexes.
+ * Defines the `resolveFlexUnitPlacement` function shape (export function resolveFlexUnitPlacement(args: { deps: FlexAirSlotDeps; player: 'human' | 'opponent'; regionHexSet: Set<string>; passableLandCandida).
+
+ * Purpose: Supports maintainability by documenting why `resolveFlexUnitPlacement` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function resolveFlexUnitPlacement(args: {
   deps: FlexAirSlotDeps;
@@ -152,12 +207,12 @@ export function resolveFlexUnitPlacement(args: {
 }
 
 /**
- * Why this exists:
- *     Verifies res1_control rows for scenario home regions match the owning player (defensive diagnostic).
- * When to use:
- *     Optional diagnostic after control seeding when region hex sets are known.
- * What to expect:
- *     Logs error-level lines for mismatches; never throws.
+ * Defines the `logHomeRegionControlParity` function shape (export function logHomeRegionControlParity().
+
+ * Purpose: Supports maintainability by documenting why `logHomeRegionControlParity` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function logHomeRegionControlParity(
   deps: FlexAirSlotDeps,

@@ -7,6 +7,14 @@ import {
   roundLatLng,
 } from './mapData';
 
+/**
+ * Defines the `testDecimalPlacesByResolutionBands` function shape (function testDecimalPlacesByResolutionBands(): void).
+
+ * Purpose: Supports maintainability by documenting why `testDecimalPlacesByResolutionBands` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testDecimalPlacesByResolutionBands(): void {
   assert.strictEqual(getLatLngDecimalPlacesForResolution(0), 2);
   assert.strictEqual(getLatLngDecimalPlacesForResolution(1), 2);
@@ -17,6 +25,14 @@ function testDecimalPlacesByResolutionBands(): void {
   assert.strictEqual(getLatLngDecimalPlacesForResolution(6), 5);
 }
 
+/**
+ * Defines the `testExportedDecimalPlacesMatchActiveResolution` function shape (function testExportedDecimalPlacesMatchActiveResolution(): void).
+
+ * Purpose: Supports maintainability by documenting why `testExportedDecimalPlacesMatchActiveResolution` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testExportedDecimalPlacesMatchActiveResolution(): void {
   assert.strictEqual(
     LATLNG_DECIMAL_PLACES,
@@ -25,6 +41,14 @@ function testExportedDecimalPlacesMatchActiveResolution(): void {
   );
 }
 
+/**
+ * Defines the `testRoundLatLngUsesConfiguredPrecision` function shape (function testRoundLatLngUsesConfiguredPrecision(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRoundLatLngUsesConfiguredPrecision` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRoundLatLngUsesConfiguredPrecision(): void {
   const [lat, lng] = roundLatLng(12.345678, -98.7654321);
   if (LATLNG_DECIMAL_PLACES === 2) {
@@ -37,11 +61,18 @@ function testRoundLatLngUsesConfiguredPrecision(): void {
   }
 }
 
+/**
+ * Defines the `run` function shape (function run(): void).
+
+ * Purpose: Supports maintainability by documenting why `run` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function run(): void {
   testDecimalPlacesByResolutionBands();
   testExportedDecimalPlacesMatchActiveResolution();
   testRoundLatLngUsesConfiguredPrecision();
-  // eslint-disable-next-line no-console
   console.log('mapData.test.ts passed');
 }
 

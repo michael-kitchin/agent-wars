@@ -9,37 +9,208 @@ import { dbRun, dbGetOne, dbGetAll, saveDatabase } from '../gameDb';
 import { logDebug, logError, logTrace } from '../logger';
 import { buildPromptTableLines } from '../promptTableUtils';
 
+/**
+ * Documents the module-scope binding `PERSISTENT_LIMIT` (PERSISTENT_LIMIT).
+
+ * Purpose: Supports maintainability by documenting why `PERSISTENT_LIMIT` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const PERSISTENT_LIMIT = 5;
+/**
+ * Documents the module-scope binding `STORED_LIMIT` (STORED_LIMIT).
+
+ * Purpose: Supports maintainability by documenting why `STORED_LIMIT` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const STORED_LIMIT = 15;
+/**
+ * Documents the module-scope binding `CONTENT_MAX_LENGTH` (CONTENT_MAX_LENGTH).
+
+ * Purpose: Supports maintainability by documenting why `CONTENT_MAX_LENGTH` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const CONTENT_MAX_LENGTH = 500;
+/**
+ * Documents the module-scope binding `KEY_PATTERN` (KEY_PATTERN).
+
+ * Purpose: Supports maintainability by documenting why `KEY_PATTERN` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const KEY_PATTERN = /^[a-zA-Z0-9_-]+$/;
+/**
+ * Documents the module-scope binding `KEY_MAX_LENGTH` (KEY_MAX_LENGTH).
+
+ * Purpose: Supports maintainability by documenting why `KEY_MAX_LENGTH` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const KEY_MAX_LENGTH = 64;
+/**
+ * Documents the module-scope binding `AI_PLAYER_ID` (AI_PLAYER_ID).
+
+ * Purpose: Supports maintainability by documenting why `AI_PLAYER_ID` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const AI_PLAYER_ID = 'opponent';
 
+/**
+ * Documents the `MemoryRow` interface as a named contract surface (interface MemoryRow).
+
+ * Purpose: Supports maintainability by documenting why `MemoryRow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface MemoryRow {
   [key: string]: unknown;
-  player_id: string;
-  key: string;
-  content: string;
-  tier: string;
-  created_turn: number;
-  expires_turn: number | null;
-  recurring_interval: number | null;
-  next_trigger_turn: number | null;
-  last_triggered_turn: number | null;
-  tags: string;
-}
+    /**
+   * Specifies the contract for the `player_id` member (player_id: string;).
 
-interface WriteOptions {
-  expiresOnTurn?: number;
-  recurring?: { intervalTurns: number; nextTurn?: number };
-  tags?: string[];
+   * Contract: Describes stable behavior for callers of `player_id` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+player_id: string;
+    /**
+   * Specifies the contract for the `key` member (key: string;).
+
+   * Contract: Describes stable behavior for callers of `key` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+key: string;
+    /**
+   * Specifies the contract for the `content` member (content: string;).
+
+   * Contract: Describes stable behavior for callers of `content` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+content: string;
+    /**
+   * Specifies the contract for the `tier` member (tier: string;).
+
+   * Contract: Describes stable behavior for callers of `tier` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+tier: string;
+    /**
+   * Specifies the contract for the `created_turn` member (created_turn: number;).
+
+   * Contract: Describes stable behavior for callers of `created_turn` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+created_turn: number;
+    /**
+   * Specifies the contract for the `expires_turn` member (expires_turn: number | null;).
+
+   * Contract: Describes stable behavior for callers of `expires_turn` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+expires_turn: number | null;
+    /**
+   * Specifies the contract for the `recurring_interval` member (recurring_interval: number | null;).
+
+   * Contract: Describes stable behavior for callers of `recurring_interval` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+recurring_interval: number | null;
+    /**
+   * Specifies the contract for the `next_trigger_turn` member (next_trigger_turn: number | null;).
+
+   * Contract: Describes stable behavior for callers of `next_trigger_turn` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+next_trigger_turn: number | null;
+    /**
+   * Specifies the contract for the `last_triggered_turn` member (last_triggered_turn: number | null;).
+
+   * Contract: Describes stable behavior for callers of `last_triggered_turn` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+last_triggered_turn: number | null;
+    /**
+   * Specifies the contract for the `tags` member (tags: string;).
+
+   * Contract: Describes stable behavior for callers of `tags` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+tags: string;
 }
 
 /**
- * Expires memories whose expires_turn <= currentTurn and advances recurring reminders.
- * Call at the start of each AI turn when building the injection block. Mutates DB; saveDatabase is called after updates.
- * Idempotent for a given (playerId, currentTurn) when called once per turn.
+ * Documents the `WriteOptions` interface as a named contract surface (interface WriteOptions).
+
+ * Purpose: Supports maintainability by documenting why `WriteOptions` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+interface WriteOptions {
+    /**
+   * Specifies the contract for the `expiresOnTurn` member (expiresOnTurn?: number;).
+
+   * Contract: Describes stable behavior for callers of `expiresOnTurn` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+expiresOnTurn?: number;
+    /**
+   * Specifies the contract for the `recurring` member (recurring?: { intervalTurns: number; nextTurn?: number };).
+
+   * Contract: Describes stable behavior for callers of `recurring` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+recurring?: { intervalTurns: number; nextTurn?: number };
+    /**
+   * Specifies the contract for the `tags` member (tags?: string[];).
+
+   * Contract: Describes stable behavior for callers of `tags` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+tags?: string[];
+}
+
+/**
+ * Defines the `expireAndProcessRecurring` function shape (function expireAndProcessRecurring(playerId: string, currentTurn: number): void).
+
+ * Purpose: Supports maintainability by documenting why `expireAndProcessRecurring` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function expireAndProcessRecurring(playerId: string, currentTurn: number): void {
   logDebug('tool4Memory expireAndProcessRecurring', { playerId, currentTurn });
@@ -61,8 +232,12 @@ function expireAndProcessRecurring(playerId: string, currentTurn: number): void 
 }
 
 /**
- * Builds the strategic memory injection block for the system prompt (persistent list, reminders triggered this turn, footer with slot counts).
- * Call only when Memory tool group is enabled; openRouter must not call when Memory is disabled. Runs expireAndProcessRecurring first so expired and recurring state are up to date.
+ * Defines the `getInjectionText` function shape (export function getInjectionText(playerId: string, currentTurn: number): string).
+
+ * Purpose: Supports maintainability by documenting why `getInjectionText` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getInjectionText(playerId: string, currentTurn: number): string {
   logTrace('tool4Memory getInjectionText', { playerId, currentTurn });
@@ -138,6 +313,14 @@ export function getInjectionText(playerId: string, currentTurn: number): string 
   return lines.join('\n');
 }
 
+/**
+ * Defines the `countByTier` function shape (function countByTier(playerId: string):).
+
+ * Purpose: Supports maintainability by documenting why `countByTier` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function countByTier(playerId: string): { persistent: number; stored: number } {
   const p = dbGetOne<{ c: number }>('SELECT COUNT(*) AS c FROM ai_memory WHERE player_id = ? AND tier = ?', [
     playerId,
@@ -151,9 +334,12 @@ function countByTier(playerId: string): { persistent: number; stored: number } {
 }
 
 /**
- * Writes or updates a memory. Validates key (pattern and length), content (non-empty, max 500 chars), and tier limits.
- * When options.recurring is present and nextTurn is omitted, sets next_trigger_turn to currentTurn + intervalTurns.
- * Returns spec-shaped success with slot counts or error (tier full, content empty, key invalid, etc.).
+ * Defines the `write` function shape (function write( playerId: string, key: string, content: string, tier: 'persistent' | 'stored', options: WriteOptions | undefined, currentTurn:).
+
+ * Purpose: Supports maintainability by documenting why `write` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function write(
   playerId: string,
@@ -252,6 +438,14 @@ function write(
   };
 }
 
+/**
+ * Defines the `rowToMemory` function shape (function rowToMemory(row: MemoryRow): { key: string; content: string; tier: string; createdOnTurn: number; lastTriggered: number | null; tags:).
+
+ * Purpose: Supports maintainability by documenting why `rowToMemory` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function rowToMemory(row: MemoryRow): {
   key: string;
   content: string;
@@ -290,8 +484,12 @@ function rowToMemory(row: MemoryRow): {
 }
 
 /**
- * Reads one memory by key or multiple by tags/tier/all. When key is provided, returns that memory or error "Memory not found: {key}".
- * When key is omitted, at least one of tags, tier, or all must be provided; otherwise returns error. Tags match any; tier filters; all returns all for player.
+ * Defines the `read` function shape (function read( playerId: string, key?: string, tags?: string[], tier?: 'persistent' | 'stored', all?: boolean ): { status: string; error?: strin).
+
+ * Purpose: Supports maintainability by documenting why `read` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function read(
   playerId: string,
@@ -348,7 +546,12 @@ function read(
 }
 
 /**
- * Deletes a memory by key. Returns spec-shaped success or error "Memory not found: {key}" when no row exists.
+ * Defines the `deleteByKey` function shape (function deleteByKey( playerId: string, key: string ): { status: string; error?: string; key?: string; deleted?: boolean } { logDebug('tool4Memory del).
+
+ * Purpose: Supports maintainability by documenting why `deleteByKey` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function deleteByKey(
   playerId: string,
@@ -365,14 +568,22 @@ function deleteByKey(
 }
 
 /**
- * API tool names exposed to the LLM for Tool 4. Only memory_read is listed; the host applies memory_write and
- * memory_delete internally when processing memoryUpdates from the assistant's final JSON.
+ * Documents the module-scope binding `TOOL4_NAMES` (TOOL4_NAMES).
+
+ * Purpose: Supports maintainability by documenting why `TOOL4_NAMES` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export const TOOL4_NAMES = ['memory_read'] as const;
 
 /**
- * Dispatcher for Tool 4 (Strategic Memory). Same signature as Tools 1–3 for consistency (latLngByH3 and resolveToH3 unused).
- * Handles memory_read for the tool loop; memory_write and memory_delete are for host use when applying memoryUpdates.
+ * Defines the `executeTool4` function shape (export function executeTool4( toolName: string, args: unknown, state: { turnNumber: number }, // eslint-disable-next-line @typescript-eslint/no-unus).
+
+ * Purpose: Supports maintainability by documenting why `executeTool4` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function executeTool4(
   toolName: string,

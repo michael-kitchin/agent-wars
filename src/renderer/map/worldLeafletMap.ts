@@ -10,43 +10,196 @@ import {
   clampLatForWebMercatorDisplay,
 } from './hexGrid';
 
-// Leaflet is loaded from static bundle; keep maps loosely typed for compatibility with global `L`.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let mainMap: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let miniMap: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let viewportRect: any = null;
-/** Invoked whenever the main map view changes; drives overlay redraw in lockstep with the basemap. */
+/**
+ * Minimal Leaflet lat/lng point shape used only for vendor-global `L` calls in this module.
+ *
+ * Purpose: Avoids `any` while matching the subset of Leaflet used at runtime from `static/vendor/leaflet`.
+ * When to use: Only as a structural stand-in until `@types/leaflet` is adopted project-wide (see `.spec/file-size-decomposition-plan-v1.md`).
+ * Expected outcome: Coordinates flow through `latLngToContainerPoint` and bounds helpers without unsafe casts.
+ * Exceptions: None.
+ */
+type VendorLatLng = { lat: number; lng: number };
+
+/**
+ * Minimal Leaflet bounds surface used for basemap viewport syncing.
+ *
+ * Purpose: Types bounds returned by `getBounds` without importing the full Leaflet type graph offline.
+ * When to use: When computing spans for the minimap viewport rectangle.
+ * Expected outcome: North-east and south-west corners are readable for span math.
+ * Exceptions: None.
+ */
+type VendorLatLngBounds = {
+  getNorthEast: () => VendorLatLng;
+  getSouthWest: () => VendorLatLng;
+};
+
+/**
+ * Minimal Leaflet map instance surface used by the main and mini maps.
+ *
+ * Purpose: Encodes only the methods this module calls on `L.map(...)` results.
+ * When to use: For module-level `mainMap` / `miniMap` and helpers that touch map panes.
+ * Expected outcome: TypeScript catches missing methods during refactors; unknown panes stay optional.
+ * Exceptions: None.
+ */
+type VendorLeafletMap = {
+  removeLayer: (layer: unknown) => void;
+  on: (ev: string, handler: () => void) => void;
+  getBounds: () => VendorLatLngBounds;
+  fitBounds: (b: VendorLatLngBounds, opts?: { padding?: number[]; animate?: boolean }) => void;
+  doubleClickZoom: { disable: () => void };
+  getZoom: () => number;
+  setZoom: (z: number) => void;
+  latLngToContainerPoint: (ll: VendorLatLng) => { x: number; y: number };
+  invalidateSize: (opts?: { animate?: boolean }) => void;
+  getPanes?: () => { tilePane?: HTMLElement };
+};
+
+/**
+ * Raster tile layer handle returned by `tileLayer` with only the events this module registers.
+ *
+ * Purpose: Supports safe `tileerror` subscription and teardown during basemap fallback.
+ * When to use: Inside `mountRasterBasemap` only.
+ * Expected outcome: `on` / `off` remain typed without pulling plugin-specific fields.
+ * Exceptions: None.
+ */
+type VendorRasterLayer = {
+  on: (ev: string, handler: () => void) => void;
+  off: (ev: string, handler: () => void) => void;
+  addTo: (map: VendorLeafletMap) => VendorRasterLayer;
+};
+
+type VendorTileLayerFactory = {
+  addTo: (map: VendorLeafletMap) => VendorRasterLayer;
+};
+
+/**
+ * Viewport rectangle overlay on the minimap mirroring the main map bounds.
+ *
+ * Purpose: Types the return of `rectangle(...).addTo(miniMap)` for sync updates.
+ * When to use: When `zoomedIn` shows the main-map viewport on the minimap.
+ * Expected outcome: `setBounds` updates without casting through `any`.
+ * Exceptions: None.
+ */
+type VendorViewportRect = {
+  remove: () => void;
+  setBounds: (b: VendorLatLngBounds) => void;
+};
+
+/**
+ * Minimal factory shape for the global `L` object loaded from the Leaflet vendor bundle.
+ *
+ * Purpose: Centralizes the narrow contract for `getL()` instead of using `any` everywhere.
+ * When to use: Whenever this module calls `L.map`, `L.tileLayer`, `L.latLngBounds`, etc.
+ * Expected outcome: Call sites stay aligned with the CDN Leaflet build actually shipped.
+ * Exceptions: Throws when `globalThis.L` is missing.
+ */
+export type GlobalLeafletFactory = {
+  map: (el: HTMLElement, options?: Record<string, unknown>) => VendorLeafletMap;
+  latLngBounds: (sw: VendorLatLng, ne: VendorLatLng) => VendorLatLngBounds;
+  latLng: (lat: number, lng: number) => VendorLatLng;
+  tileLayer: (url: string, options?: Record<string, unknown>) => VendorTileLayerFactory;
+  rectangle: (bounds: VendorLatLngBounds, options?: Record<string, unknown>) => { addTo: (map: VendorLeafletMap) => VendorViewportRect };
+  control: {
+    scale: (options?: Record<string, unknown>) => { addTo: (map: VendorLeafletMap) => void };
+  };
+  point: (x: number, y: number) => unknown;
+};
+
+/**
+ * Documents the module-scope binding `mainMap` (mainMap: VendorLeafletMap | null).
+
+ * Purpose: Supports maintainability by documenting why `mainMap` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+let mainMap: VendorLeafletMap | null = null;
+/**
+ * Documents the module-scope binding `miniMap` (miniMap: VendorLeafletMap | null).
+
+ * Purpose: Supports maintainability by documenting why `miniMap` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+let miniMap: VendorLeafletMap | null = null;
+/**
+ * Documents the module-scope binding `viewportRect` (viewportRect: VendorViewportRect | null).
+
+ * Purpose: Supports maintainability by documenting why `viewportRect` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+let viewportRect: VendorViewportRect | null = null;
+/**
+ * Documents the module-scope binding `onMainViewChanged` (onMainViewChanged: (()).
+
+ * Purpose: Supports maintainability by documenting why `onMainViewChanged` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 let onMainViewChanged: (() => void) | null = null;
 
 /** Active tile layers so we can replace the basemap when the terrain style changes. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let mainBasemapLayer: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let miniBasemapLayer: any = null;
+/**
+ * Documents the module-scope binding `mainBasemapLayer` (mainBasemapLayer: VendorRasterLayer | null).
 
+ * Purpose: Supports maintainability by documenting why `mainBasemapLayer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+let mainBasemapLayer: VendorRasterLayer | null = null;
+/**
+ * Documents the module-scope binding `miniBasemapLayer` (miniBasemapLayer: VendorRasterLayer | null).
+
+ * Purpose: Supports maintainability by documenting why `miniBasemapLayer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+let miniBasemapLayer: VendorRasterLayer | null = null;
+
+/**
+ * Defines the `notifyMainViewChanged` function shape (function notifyMainViewChanged(): void).
+
+ * Purpose: Supports maintainability by documenting why `notifyMainViewChanged` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function notifyMainViewChanged(): void {
   syncMinimapViewportRect();
   onMainViewChanged?.();
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getL(): any {
-  const Lref = (globalThis as unknown as { L?: unknown }).L;
+/**
+ * Defines the `getL` function shape (function getL(): GlobalLeafletFactory).
+
+ * Purpose: Supports maintainability by documenting why `getL` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+function getL(): GlobalLeafletFactory {
+  const Lref = (globalThis as unknown as { L?: GlobalLeafletFactory }).L;
   if (!Lref) throw new Error('Leaflet not loaded: include static/vendor/leaflet/leaflet.js before renderer.js');
   return Lref;
 }
 
 /**
- * Attaches one raster basemap layer, advancing through the provider chain on tile errors.
- * @param target Which map instance to update (tracked layer ref cleared before add).
+ * Defines the `mountRasterBasemap` function shape (function mountRasterBasemap(Lref: GlobalLeafletFactory, map: VendorLeafletMap, showAttribution: boolean, chainIndex: number, target: 'main' | 'mini'): void).
+
+ * Purpose: Supports maintainability by documenting why `mountRasterBasemap` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function mountRasterBasemap(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Lref: any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  map: any,
+  Lref: GlobalLeafletFactory,
+  map: VendorLeafletMap,
   showAttribution: boolean,
   chainIndex: number,
   target: 'main' | 'mini'
@@ -80,7 +233,7 @@ function mountRasterBasemap(
     minZoom: spec.minZoom ?? 0,
   };
   if (spec.subdomains !== undefined) layerOpts.subdomains = spec.subdomains;
-  const layer = Lref.tileLayer(spec.urlTemplate, layerOpts).addTo(map);
+  const layer: VendorRasterLayer = Lref.tileLayer(spec.urlTemplate, layerOpts).addTo(map);
   if (target === 'main') mainBasemapLayer = layer;
   else miniBasemapLayer = layer;
 
@@ -105,7 +258,12 @@ function mountRasterBasemap(
 }
 
 /**
- * Replaces the main and minimap raster basemap to match a provider id (see `basemapProvider` / terrain styles).
+ * Defines the `setMainBasemapByProviderId` function shape (export function setMainBasemapByProviderId(providerId: string): void).
+
+ * Purpose: Supports maintainability by documenting why `setMainBasemapByProviderId` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function setMainBasemapByProviderId(providerId: string): void {
   if (!mainMap || !miniMap) return;
@@ -116,9 +274,12 @@ export function setMainBasemapByProviderId(providerId: string): void {
 }
 
 /**
- * Creates the main world map and minimap, wires tile layers (with fallback chain) and viewport sync.
- * Call once after DOM is ready. `onViewChanged` runs on every pan/zoom step (and after resize) so the
- * hex overlay stays aligned with tiles; Leaflet zoom/fade/inertia on the main map are reduced for the same reason.
+ * Defines the `initWorldLeafletMaps` function shape (export function initWorldLeafletMaps( mainContainerId: string, minimapContainerId: string, onViewChanged: () => void, initialBasemapProviderId?: str).
+
+ * Purpose: Supports maintainability by documenting why `initWorldLeafletMaps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function initWorldLeafletMaps(
   mainContainerId: string,
@@ -205,8 +366,24 @@ export function initWorldLeafletMaps(
   syncMinimapViewportRect();
 }
 
+/**
+ * Documents the module-scope binding `basemapErrorShown` (basemapErrorShown).
+
+ * Purpose: Supports maintainability by documenting why `basemapErrorShown` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 let basemapErrorShown = false;
 
+/**
+ * Defines the `showBasemapErrorToast` function shape (function showBasemapErrorToast(): void).
+
+ * Purpose: Supports maintainability by documenting why `showBasemapErrorToast` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function showBasemapErrorToast(): void {
   if (basemapErrorShown) return;
   basemapErrorShown = true;
@@ -221,7 +398,12 @@ function showBasemapErrorToast(): void {
 }
 
 /**
- * Updates the minimap rectangle to match the main map viewport, or removes it when zoomed out to world scale.
+ * Defines the `syncMinimapViewportRect` function shape (export function syncMinimapViewportRect(): void).
+
+ * Purpose: Supports maintainability by documenting why `syncMinimapViewportRect` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function syncMinimapViewportRect(): void {
   if (!mainMap || !miniMap) return;
@@ -259,15 +441,24 @@ export function syncMinimapViewportRect(): void {
 }
 
 /**
- * Returns the active Leaflet main map, or null before init.
+ * Defines the `getMainLeafletMap` function shape (export function getMainLeafletMap(): VendorLeafletMap | null).
+
+ * Purpose: Supports maintainability by documenting why `getMainLeafletMap` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
-export function getMainLeafletMap(): unknown {
+export function getMainLeafletMap(): VendorLeafletMap | null {
   return mainMap;
 }
 
 /**
- * Applies a CSS filter to the Leaflet tile pane, or clears it when `filter` is empty.
- * Basemap tiles are unfiltered in normal use (empty string).
+ * Defines the `setMainBasemapFilter` function shape (export function setMainBasemapFilter(filter: string): void).
+
+ * Purpose: Supports maintainability by documenting why `setMainBasemapFilter` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function setMainBasemapFilter(filter: string): void {
   // Apply at ONE layer only (tile pane) to avoid compounded filters that wash out the map.
@@ -290,7 +481,12 @@ export function setMainBasemapFilter(filter: string): void {
 }
 
 /**
- * Converts an H3 cell center to overlay canvas coordinates (CSS pixels, top-left origin).
+ * Defines the `hexCenterToOverlayPoint` function shape (export function hexCenterToOverlayPoint().
+
+ * Purpose: Supports maintainability by documenting why `hexCenterToOverlayPoint` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function hexCenterToOverlayPoint(
   h3Index: string,
@@ -304,16 +500,12 @@ export function hexCenterToOverlayPoint(
 }
 
 /**
- * Why this exists:
- *     Same geographic cell as `hexCenterToOverlayPoint`, but longitudes are shifted so the center lies in the
- *     same world copy as `referenceLngDegrees` (within ±180° on the number line). Use when drawing segments
- *     between two cells so antimeridian hops do not project to a line across the entire map.
- * When to use:
- *     Endpoint of a line or arrow whose start was projected with the reference hex; pass the start cell’s
- *     center longitude as `referenceLngDegrees` (e.g. from `cellToLatLng(fromH3)[1]`).
- * What to expect:
- *     Container pixel coordinates consistent with a short great-circle step in the current viewport; same as
- *     `hexCenterToOverlayPoint` when the cell already lies within 180° of the reference longitude.
+ * Defines the `hexCenterToOverlayPointWithReferenceLng` function shape (export function hexCenterToOverlayPointWithReferenceLng( h3Index: string, referenceLngDegrees: number, latLngFn: (idx: string) => [number, number] ):).
+
+ * Purpose: Supports maintainability by documenting why `hexCenterToOverlayPointWithReferenceLng` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function hexCenterToOverlayPointWithReferenceLng(
   h3Index: string,
@@ -331,7 +523,12 @@ export function hexCenterToOverlayPointWithReferenceLng(
 }
 
 /**
- * Invalidates Leaflet size after the map container is resized.
+ * Defines the `invalidateLeafletMapSizes` function shape (export function invalidateLeafletMapSizes(): void).
+
+ * Purpose: Supports maintainability by documenting why `invalidateLeafletMapSizes` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function invalidateLeafletMapSizes(): void {
   mainMap?.invalidateSize({ animate: false });

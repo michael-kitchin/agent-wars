@@ -31,17 +31,96 @@ import {
   type TerrainNamingRecordRes4,
 } from './terrainNamingLoad';
 
+/**
+ * Documents the `TerrainClassificationSnapshot` interface as a named contract surface (export interface TerrainClassificationSnapshot).
+
+ * Purpose: Supports maintainability by documenting why `TerrainClassificationSnapshot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface TerrainClassificationSnapshot {
-  res1KindByH3: ReadonlyMap<string, PipelineTerrainKind>;
-  /** Child res-4 rows carrying either a base-kind override and/or `isUrban` overlay flag for renderer detail mode. */
-  res4OverrideRows: ReadonlyArray<{ h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }>;
-  namingLinesRes1ByH3: ReadonlyMap<string, string>;
-  namingLinesRes4ByH3: ReadonlyMap<string, string>;
-  continentNamesRes1ByH3: ReadonlyMap<string, string[]>;
-  urbanHexCountByRes1H3: ReadonlyMap<string, number>;
-  airportCountByRes1H3: ReadonlyMap<string, number>;
-  seaportCountByRes1H3: ReadonlyMap<string, number>;
-  res4FeatureRows: ReadonlyArray<{
+    /**
+   * Specifies the contract for the `res1KindByH3` member (res1KindByH3: ReadonlyMap<string, PipelineTerrainKind>;).
+
+   * Contract: Describes stable behavior for callers of `res1KindByH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+res1KindByH3: ReadonlyMap<string, PipelineTerrainKind>;
+    /**
+   * Specifies the contract for the `res4OverrideRows` member (res4OverrideRows: ReadonlyArray<{ h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }>;).
+
+   * Contract: Describes stable behavior for callers of `res4OverrideRows` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+res4OverrideRows: ReadonlyArray<{ h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }>;
+    /**
+   * Specifies the contract for the `namingLinesRes1ByH3` member (namingLinesRes1ByH3: ReadonlyMap<string, string>;).
+
+   * Contract: Describes stable behavior for callers of `namingLinesRes1ByH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+namingLinesRes1ByH3: ReadonlyMap<string, string>;
+    /**
+   * Specifies the contract for the `namingLinesRes4ByH3` member (namingLinesRes4ByH3: ReadonlyMap<string, string>;).
+
+   * Contract: Describes stable behavior for callers of `namingLinesRes4ByH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+namingLinesRes4ByH3: ReadonlyMap<string, string>;
+    /**
+   * Specifies the contract for the `continentNamesRes1ByH3` member (continentNamesRes1ByH3: ReadonlyMap<string, string[]>;).
+
+   * Contract: Describes stable behavior for callers of `continentNamesRes1ByH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+continentNamesRes1ByH3: ReadonlyMap<string, string[]>;
+    /**
+   * Specifies the contract for the `urbanHexCountByRes1H3` member (urbanHexCountByRes1H3: ReadonlyMap<string, number>;).
+
+   * Contract: Describes stable behavior for callers of `urbanHexCountByRes1H3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+urbanHexCountByRes1H3: ReadonlyMap<string, number>;
+    /**
+   * Specifies the contract for the `airportCountByRes1H3` member (airportCountByRes1H3: ReadonlyMap<string, number>;).
+
+   * Contract: Describes stable behavior for callers of `airportCountByRes1H3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+airportCountByRes1H3: ReadonlyMap<string, number>;
+    /**
+   * Specifies the contract for the `seaportCountByRes1H3` member (seaportCountByRes1H3: ReadonlyMap<string, number>;).
+
+   * Contract: Describes stable behavior for callers of `seaportCountByRes1H3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+seaportCountByRes1H3: ReadonlyMap<string, number>;
+    /**
+   * Specifies the contract for the `res4FeatureRows` member (res4FeatureRows: ReadonlyArray<{ h3Index: string; parentH3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean; isAirport:).
+
+   * Contract: Describes stable behavior for callers of `res4FeatureRows` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+res4FeatureRows: ReadonlyArray<{
     h3Index: string;
     parentH3Index: string;
     terrainKind: PipelineTerrainKind;
@@ -51,8 +130,24 @@ export interface TerrainClassificationSnapshot {
   }>;
 }
 
+/**
+ * Documents the module-scope binding `cached` (cached: TerrainClassificationSnapshot | null).
+
+ * Purpose: Supports maintainability by documenting why `cached` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 let cached: TerrainClassificationSnapshot | null = null;
 
+/**
+ * Defines the `buildSnapshot` function shape (function buildSnapshot(): TerrainClassificationSnapshot).
+
+ * Purpose: Supports maintainability by documenting why `buildSnapshot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildSnapshot(): TerrainClassificationSnapshot {
   logDebug('terrainClassificationCache buildSnapshot: loading JSON');
   const res1Env = loadTerrainRes1MetadataBundled();
@@ -225,12 +320,12 @@ function buildSnapshot(): TerrainClassificationSnapshot {
 }
 
 /**
- * Why this exists:
- *     Load metadata JSON once and memoize classified maps for fast `resetGameForNewMatch` and renderer IPC without rereading disk.
- * When to use:
- *     During app init after the DB is ready, and implicitly before first hex seeding.
- * What to expect:
- *     Throws if any metadata file is missing or invalid; safe to call repeatedly (no-op when already loaded).
+ * Defines the `ensureTerrainClassificationCacheLoaded` function shape (export function ensureTerrainClassificationCacheLoaded(): void).
+
+ * Purpose: Supports maintainability by documenting why `ensureTerrainClassificationCacheLoaded` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function ensureTerrainClassificationCacheLoaded(): void {
   logTrace('terrainClassificationCache ensureTerrainClassificationCacheLoaded');
@@ -244,12 +339,12 @@ export function ensureTerrainClassificationCacheLoaded(): void {
 }
 
 /**
- * Why this exists:
- *     Provide classified res-1 kinds for SQLite `hexes` seeding.
- * When to use:
- *     From `gameDb` hex seeding after `ensureTerrainClassificationCacheLoaded`.
- * What to expect:
- *     Throws if cache was never built; returns an immutable map view.
+ * Defines the `getTerrainRes1KindsFromCache` function shape (export function getTerrainRes1KindsFromCache(): ReadonlyMap<string, PipelineTerrainKind> { logTrace('terrainClassificationCache getTerrainRes1KindsFromCache').
+
+ * Purpose: Supports maintainability by documenting why `getTerrainRes1KindsFromCache` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getTerrainRes1KindsFromCache(): ReadonlyMap<string, PipelineTerrainKind> {
   logTrace('terrainClassificationCache getTerrainRes1KindsFromCache');
@@ -262,12 +357,12 @@ export function getTerrainRes1KindsFromCache(): ReadonlyMap<string, PipelineTerr
 }
 
 /**
- * Why this exists:
- *     Supply res-4 renderer overlay rows (base terrain + urban state) for detail rendering.
- * When to use:
- *     From the `game:getRes4TerrainOverrides` IPC handler.
- * What to expect:
- *     Returns a new array snapshot; throws if cache was never built.
+ * Defines the `getRes4TerrainOverridesForRenderer` function shape (export function getRes4TerrainOverridesForRenderer(): Array<).
+
+ * Purpose: Supports maintainability by documenting why `getRes4TerrainOverridesForRenderer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getRes4TerrainOverridesForRenderer(): Array<{
   h3Index: string;
@@ -285,12 +380,12 @@ export function getRes4TerrainOverridesForRenderer(): Array<{
 }
 
 /**
- * Why this exists:
- *     Provide hover tooltip naming headline for one hex (res-4 city/state preference, res-1 state fallback).
- * When to use:
- *     Renderer `game:getHexNamingTooltipLine` IPC calls on hover.
- * What to expect:
- *     Returns null when no naming line exists for that hex/resolution; throws if cache is not loaded.
+ * Defines the `getHexNamingTooltipLineForRenderer` function shape (export function getHexNamingTooltipLineForRenderer( payload: { h3Index: string; resolution: 1 | 4 } ): string | null { logTrace('terrainClassificationCac).
+
+ * Purpose: Supports maintainability by documenting why `getHexNamingTooltipLineForRenderer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getHexNamingTooltipLineForRenderer(
   payload: { h3Index: string; resolution: 1 | 4 }
@@ -308,12 +403,12 @@ export function getHexNamingTooltipLineForRenderer(
 }
 
 /**
- * Why this exists:
- *     Return de-duplicated continent names for one res-1 hex for unknown-battle announcements.
- * When to use:
- *     Renderer/main formatting of fog-of-war combat announcements without unit identity.
- * What to expect:
- *     Returns empty list when no naming continents exist for the hex; throws if cache is not loaded.
+ * Defines the `getHexContinentNamesForRenderer` function shape (export function getHexContinentNamesForRenderer(payload:).
+
+ * Purpose: Supports maintainability by documenting why `getHexContinentNamesForRenderer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getHexContinentNamesForRenderer(payload: { h3Index: string }): string[] {
   logTrace('terrainClassificationCache getHexContinentNamesForRenderer', payload);
@@ -326,12 +421,12 @@ export function getHexContinentNamesForRenderer(payload: { h3Index: string }): s
 }
 
 /**
- * Why this exists:
- *     Returns production-relevant terrain infrastructure counts for one res-1 hex.
- * When to use:
- *     Build queue gating and turn production calculations in main-process gameplay logic.
- * What to expect:
- *     Always returns non-negative counts; missing rows default to zero.
+ * Defines the `getRes1ProductionContext` function shape (export function getRes1ProductionContext(payload:).
+
+ * Purpose: Supports maintainability by documenting why `getRes1ProductionContext` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getRes1ProductionContext(payload: { h3Index: string }): Res1ProductionContextSnapshot {
   logTrace('terrainClassificationCache getRes1ProductionContext', payload);
@@ -348,12 +443,12 @@ export function getRes1ProductionContext(payload: { h3Index: string }): Res1Prod
 }
 
 /**
- * Why this exists:
- *     Provides full res-4 feature rows for seeding mutable infrastructure/rubble state in SQLite.
- * When to use:
- *     New-match reset flow before gameplay mutations begin.
- * What to expect:
- *     Returns immutable row snapshots with parent mapping and feature booleans.
+ * Defines the `getRes4FeatureRowsForSeeding` function shape (export function getRes4FeatureRowsForSeeding(): ReadonlyArray<).
+
+ * Purpose: Supports maintainability by documenting why `getRes4FeatureRowsForSeeding` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getRes4FeatureRowsForSeeding(): ReadonlyArray<{
   h3Index: string;
@@ -373,12 +468,12 @@ export function getRes4FeatureRowsForSeeding(): ReadonlyArray<{
 }
 
 /**
- * Why this exists:
- *     Lets consumers decide whether production-context reads are safe without forcing cache initialization.
- * When to use:
- *     Movement/pathing helpers that should opportunistically use terrain metadata when available.
- * What to expect:
- *     Returns true only after `ensureTerrainClassificationCacheLoaded` has successfully built the cache.
+ * Defines the `isTerrainClassificationCacheLoaded` function shape (export function isTerrainClassificationCacheLoaded(): boolean).
+
+ * Purpose: Supports maintainability by documenting why `isTerrainClassificationCacheLoaded` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function isTerrainClassificationCacheLoaded(): boolean {
   logTrace('terrainClassificationCache isTerrainClassificationCacheLoaded');
@@ -386,12 +481,12 @@ export function isTerrainClassificationCacheLoaded(): boolean {
 }
 
 /**
- * Why this exists:
- *     Reset process-level terrain cache between main-process tests that swap metadata fixtures.
- * When to use:
- *     Test teardown after `setTerrainMetadataPathOverrideForTests`.
- * What to expect:
- *     Next `ensureTerrainClassificationCacheLoaded` rebuilds from disk.
+ * Defines the `clearTerrainClassificationCacheForTests` function shape (export function clearTerrainClassificationCacheForTests(): void).
+
+ * Purpose: Supports maintainability by documenting why `clearTerrainClassificationCacheForTests` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function clearTerrainClassificationCacheForTests(): void {
   logDebug('terrainClassificationCache clearTerrainClassificationCacheForTests');

@@ -9,19 +9,42 @@ import { gridDisk } from 'h3-js';
 import { logDebug, logError, logTrace } from './logger';
 import { getMovementBudget } from './combatConstants';
 
-/** Domain for passability: land units use land + coastal/wetlands; naval use water + coastal. */
+/**
+ * Documents the `PassableDomain` type alias (export type PassableDomain).
+
+ * Purpose: Supports maintainability by documenting why `PassableDomain` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type PassableDomain = 'land' | 'water';
 
+/**
+ * Documents the module-scope binding `FIND_PATH_DEBUG_SAMPLE_EVERY` (FIND_PATH_DEBUG_SAMPLE_EVERY).
+
+ * Purpose: Supports maintainability by documenting why `FIND_PATH_DEBUG_SAMPLE_EVERY` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const FIND_PATH_DEBUG_SAMPLE_EVERY = 250;
+/**
+ * Documents the module-scope binding `findPathInvocationCount` (findPathInvocationCount).
+
+ * Purpose: Supports maintainability by documenting why `findPathInvocationCount` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 let findPathInvocationCount = 0;
 
 /**
- * Why this exists:
- *     Single rule for whether a hex `terrain` value is in the land domain (land + coastal/wetlands) or water domain (water + coastal).
- * When to use:
- *     Pathfinding BFS, Tool 1/2/5, and any logic that must match movement domains.
- * What to expect:
- *     Unknown terrain defaults to `land` before evaluation; `coastal` is passable for both domains.
+ * Defines the `terrainIsPassableForDomain` function shape (export function terrainIsPassableForDomain(terrain: string | undefined, passableFor: PassableDomain): boolean).
+
+ * Purpose: Supports maintainability by documenting why `terrainIsPassableForDomain` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function terrainIsPassableForDomain(terrain: string | undefined, passableFor: PassableDomain): boolean {
   const t = terrain ?? 'land';
@@ -30,9 +53,12 @@ export function terrainIsPassableForDomain(terrain: string | undefined, passable
 }
 
 /**
- * Returns the shortest path (ordered list of H3 indices from origin to destination) or null if no path.
- * BFS over map hexes; only hexes in hexSet with matching terrain are traversable.
- * Blocked hexes (e.g. enemy-occupied for avoidEnemies) are skipped when non-null.
+ * Defines the `findPath` function shape (export function findPath( originH3: string, destinationH3: string, hexSet: Set<string>, terrainByH3: Map<string, string>, passableFor: PassableDo).
+
+ * Purpose: Supports maintainability by documenting why `findPath` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function findPath(
   originH3: string,
@@ -102,8 +128,12 @@ export function findPath(
 }
 
 /**
- * Returns the set of hexes reachable from origin by moving only over the given domain (land or water).
- * Used to find the nearest reachable water hex when redirecting naval routes to a land target.
+ * Defines the `getReachableHexes` function shape (export function getReachableHexes( originH3: string, hexSet: Set<string>, terrainByH3: Map<string, string>, passableFor: PassableDomain, blocked?).
+
+ * Purpose: Supports maintainability by documenting why `getReachableHexes` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getReachableHexes(
   originH3: string,
@@ -139,11 +169,12 @@ export function getReachableHexes(
 }
 
 /**
- * Partitions a path into per-turn segments given a movement budget per turn.
- * Each segment starts with the unit's position at the beginning of the turn (the previous
- * segment's endHex) and includes each hex moved through. movementSpent is the number of
- * hexes entered (each costing 1 movement point with uniform terrain costs).
- * Used to build the plan_route response path array.
+ * Defines the `partitionPathByTurn` function shape (export function partitionPathByTurn( pathH3: string[], movementBudget: number ): { turn: number; hexes: string[]; movementSpent: number; movementBudget:).
+
+ * Purpose: Supports maintainability by documenting why `partitionPathByTurn` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function partitionPathByTurn(
   pathH3: string[],
@@ -176,8 +207,12 @@ export function partitionPathByTurn(
 }
 
 /**
- * Returns hex distance (path length) and estimated turns for a unit type, or null if unreachable.
- * Reuses findPath; does not return the path. Use for check_distance tool.
+ * Defines the `getDistanceAndTurns` function shape (export function getDistanceAndTurns( originH3: string, destinationH3: string, hexSet: Set<string>, terrainByH3: Map<string, string>, passableFor:).
+
+ * Purpose: Supports maintainability by documenting why `getDistanceAndTurns` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getDistanceAndTurns(
   originH3: string,
@@ -198,8 +233,12 @@ export function getDistanceAndTurns(
 }
 
 /**
- * Returns movement budget for the given unit type. Delegates to combat constants.
- * Use when computing turns or partitioning paths.
+ * Defines the `getMovementBudgetForUnit` function shape (export function getMovementBudgetForUnit(unitType: string): number).
+
+ * Purpose: Supports maintainability by documenting why `getMovementBudgetForUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getMovementBudgetForUnit(unitType: string): number {
   logTrace('pathfinding getMovementBudgetForUnit', unitType);

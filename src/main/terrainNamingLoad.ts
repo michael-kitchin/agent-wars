@@ -5,58 +5,314 @@ import { getResolution } from 'h3-js';
 import { logDebug, logError, logTrace } from './logger';
 import { resolveTerrainRes1NamingPath, resolveTerrainRes4NamingPath } from './terrainMetadataPaths';
 
+/**
+ * Documents the module-scope binding `EXPECTED_HEX_NAMING_SCHEMA_VERSION` (EXPECTED_HEX_NAMING_SCHEMA_VERSION).
+
+ * Purpose: Supports maintainability by documenting why `EXPECTED_HEX_NAMING_SCHEMA_VERSION` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const EXPECTED_HEX_NAMING_SCHEMA_VERSION = '1.0.0';
+/**
+ * Documents the module-scope binding `TOOLTIP_NAME_LIST_MAX_ITEMS` (TOOLTIP_NAME_LIST_MAX_ITEMS).
+
+ * Purpose: Supports maintainability by documenting why `TOOLTIP_NAME_LIST_MAX_ITEMS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const TOOLTIP_NAME_LIST_MAX_ITEMS = 5;
 
+/**
+ * Documents the `TerrainNamingStateRow` interface as a named contract surface (export interface TerrainNamingStateRow).
+
+ * Purpose: Supports maintainability by documenting why `TerrainNamingStateRow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface TerrainNamingStateRow {
-  name: string;
-  country: string;
-  scalerank: number | null;
+    /**
+   * Specifies the contract for the `name` member (name: string;).
+
+   * Contract: Describes stable behavior for callers of `name` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+name: string;
+    /**
+   * Specifies the contract for the `country` member (country: string;).
+
+   * Contract: Describes stable behavior for callers of `country` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+country: string;
+    /**
+   * Specifies the contract for the `scalerank` member (scalerank: number | null;).
+
+   * Contract: Describes stable behavior for callers of `scalerank` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+scalerank: number | null;
 }
 
+/**
+ * Documents the `TerrainNamingCityRow` interface as a named contract surface (export interface TerrainNamingCityRow).
+
+ * Purpose: Supports maintainability by documenting why `TerrainNamingCityRow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface TerrainNamingCityRow {
-  name: string;
-  state: string | null;
-  country: string | null;
-  population: number | null;
-  scalerank: number | null;
+    /**
+   * Specifies the contract for the `name` member (name: string;).
+
+   * Contract: Describes stable behavior for callers of `name` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+name: string;
+    /**
+   * Specifies the contract for the `state` member (state: string | null;).
+
+   * Contract: Describes stable behavior for callers of `state` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+state: string | null;
+    /**
+   * Specifies the contract for the `country` member (country: string | null;).
+
+   * Contract: Describes stable behavior for callers of `country` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+country: string | null;
+    /**
+   * Specifies the contract for the `population` member (population: number | null;).
+
+   * Contract: Describes stable behavior for callers of `population` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+population: number | null;
+    /**
+   * Specifies the contract for the `scalerank` member (scalerank: number | null;).
+
+   * Contract: Describes stable behavior for callers of `scalerank` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+scalerank: number | null;
 }
 
+/**
+ * Documents the `TerrainNamingCountryRow` interface as a named contract surface (export interface TerrainNamingCountryRow).
+
+ * Purpose: Supports maintainability by documenting why `TerrainNamingCountryRow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface TerrainNamingCountryRow {
-  name: string;
-  continent: string | null;
-  region: string | null;
-  population: number | null;
-  scalerank: number | null;
+    /**
+   * Specifies the contract for the `name` member (name: string;).
+
+   * Contract: Describes stable behavior for callers of `name` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+name: string;
+    /**
+   * Specifies the contract for the `continent` member (continent: string | null;).
+
+   * Contract: Describes stable behavior for callers of `continent` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+continent: string | null;
+    /**
+   * Specifies the contract for the `region` member (region: string | null;).
+
+   * Contract: Describes stable behavior for callers of `region` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+region: string | null;
+    /**
+   * Specifies the contract for the `population` member (population: number | null;).
+
+   * Contract: Describes stable behavior for callers of `population` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+population: number | null;
+    /**
+   * Specifies the contract for the `scalerank` member (scalerank: number | null;).
+
+   * Contract: Describes stable behavior for callers of `scalerank` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+scalerank: number | null;
 }
 
+/**
+ * Documents the `TerrainNamingRecordRes1` interface as a named contract surface (export interface TerrainNamingRecordRes1).
+
+ * Purpose: Supports maintainability by documenting why `TerrainNamingRecordRes1` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface TerrainNamingRecordRes1 {
-  h3_index: string;
-  states: TerrainNamingStateRow[];
-  countries: TerrainNamingCountryRow[];
+    /**
+   * Specifies the contract for the `h3_index` member (h3_index: string;).
+
+   * Contract: Describes stable behavior for callers of `h3_index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+h3_index: string;
+    /**
+   * Specifies the contract for the `states` member (states: TerrainNamingStateRow[];).
+
+   * Contract: Describes stable behavior for callers of `states` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+states: TerrainNamingStateRow[];
+    /**
+   * Specifies the contract for the `countries` member (countries: TerrainNamingCountryRow[];).
+
+   * Contract: Describes stable behavior for callers of `countries` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+countries: TerrainNamingCountryRow[];
 }
 
+/**
+ * Documents the `TerrainNamingRecordRes4` interface as a named contract surface (export interface TerrainNamingRecordRes4 extends TerrainNamingRecordRes1).
+
+ * Purpose: Supports maintainability by documenting why `TerrainNamingRecordRes4` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface TerrainNamingRecordRes4 extends TerrainNamingRecordRes1 {
-  cities: TerrainNamingCityRow[];
+    /**
+   * Specifies the contract for the `cities` member (cities: TerrainNamingCityRow[];).
+
+   * Contract: Describes stable behavior for callers of `cities` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+cities: TerrainNamingCityRow[];
 }
 
+/**
+ * Documents the `TerrainNamingEnvelope` interface as a named contract surface (export interface TerrainNamingEnvelope).
+
+ * Purpose: Supports maintainability by documenting why `TerrainNamingEnvelope` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface TerrainNamingEnvelope {
-  schema_version: string;
-  resolution: number;
-  record_count: number;
-  records: TerrainNamingRecordRes1[] | TerrainNamingRecordRes4[];
+    /**
+   * Specifies the contract for the `schema_version` member (schema_version: string;).
+
+   * Contract: Describes stable behavior for callers of `schema_version` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+schema_version: string;
+    /**
+   * Specifies the contract for the `resolution` member (resolution: number;).
+
+   * Contract: Describes stable behavior for callers of `resolution` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+resolution: number;
+    /**
+   * Specifies the contract for the `record_count` member (record_count: number;).
+
+   * Contract: Describes stable behavior for callers of `record_count` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+record_count: number;
+    /**
+   * Specifies the contract for the `records` member (records: TerrainNamingRecordRes1[] | TerrainNamingRecordRes4[];).
+
+   * Contract: Describes stable behavior for callers of `records` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+records: TerrainNamingRecordRes1[] | TerrainNamingRecordRes4[];
 }
 
+/**
+ * Defines the `isRecord` function shape (function isRecord(x: unknown): x is Record<string, unknown>).
+
+ * Purpose: Supports maintainability by documenting why `isRecord` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function isRecord(x: unknown): x is Record<string, unknown> {
   return typeof x === 'object' && x !== null;
 }
 
+/**
+ * Defines the `readStr` function shape (function readStr(r: Record<string, unknown>, key: string): string).
+
+ * Purpose: Supports maintainability by documenting why `readStr` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function readStr(r: Record<string, unknown>, key: string): string {
   const v = r[key];
   if (typeof v !== 'string' || !v) throw new Error(`terrain naming: "${key}" must be a non-empty string`);
   return v;
 }
 
+/**
+ * Defines the `readNumOrNull` function shape (function readNumOrNull(r: Record<string, unknown>, key: string): number | null).
+
+ * Purpose: Supports maintainability by documenting why `readNumOrNull` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function readNumOrNull(r: Record<string, unknown>, key: string): number | null {
   const v = r[key];
   if (v === null || v === undefined) return null;
@@ -66,6 +322,14 @@ function readNumOrNull(r: Record<string, unknown>, key: string): number | null {
   return v;
 }
 
+/**
+ * Defines the `readIntOrNull` function shape (function readIntOrNull(r: Record<string, unknown>, key: string): number | null).
+
+ * Purpose: Supports maintainability by documenting why `readIntOrNull` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function readIntOrNull(r: Record<string, unknown>, key: string): number | null {
   const v = r[key];
   if (v === null || v === undefined) return null;
@@ -75,6 +339,14 @@ function readIntOrNull(r: Record<string, unknown>, key: string): number | null {
   return v;
 }
 
+/**
+ * Defines the `readRequiredIntOrNull` function shape (function readRequiredIntOrNull(r: Record<string, unknown>, key: string): number | null).
+
+ * Purpose: Supports maintainability by documenting why `readRequiredIntOrNull` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function readRequiredIntOrNull(r: Record<string, unknown>, key: string): number | null {
   if (!Object.prototype.hasOwnProperty.call(r, key)) {
     throw new Error(`terrain naming: "${key}" is required`);
@@ -82,6 +354,14 @@ function readRequiredIntOrNull(r: Record<string, unknown>, key: string): number 
   return readIntOrNull(r, key);
 }
 
+/**
+ * Defines the `readOptionalStrOrNull` function shape (function readOptionalStrOrNull(r: Record<string, unknown>, key: string): string | null).
+
+ * Purpose: Supports maintainability by documenting why `readOptionalStrOrNull` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function readOptionalStrOrNull(r: Record<string, unknown>, key: string): string | null {
   const v = r[key];
   if (v === null || v === undefined) return null;
@@ -89,6 +369,14 @@ function readOptionalStrOrNull(r: Record<string, unknown>, key: string): string 
   return v;
 }
 
+/**
+ * Defines the `readStateArray` function shape (function readStateArray(r: Record<string, unknown>, key: string): TerrainNamingStateRow[]).
+
+ * Purpose: Supports maintainability by documenting why `readStateArray` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function readStateArray(r: Record<string, unknown>, key: string): TerrainNamingStateRow[] {
   const v = r[key];
   if (!Array.isArray(v)) throw new Error(`terrain naming: "${key}" must be an array`);
@@ -102,6 +390,14 @@ function readStateArray(r: Record<string, unknown>, key: string): TerrainNamingS
   });
 }
 
+/**
+ * Defines the `readCountryArray` function shape (function readCountryArray(r: Record<string, unknown>, key: string): TerrainNamingCountryRow[]).
+
+ * Purpose: Supports maintainability by documenting why `readCountryArray` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function readCountryArray(r: Record<string, unknown>, key: string): TerrainNamingCountryRow[] {
   const v = r[key];
   if (!Array.isArray(v)) throw new Error(`terrain naming: "${key}" must be an array`);
@@ -117,6 +413,14 @@ function readCountryArray(r: Record<string, unknown>, key: string): TerrainNamin
   });
 }
 
+/**
+ * Defines the `readCityArray` function shape (function readCityArray(r: Record<string, unknown>, key: string): TerrainNamingCityRow[]).
+
+ * Purpose: Supports maintainability by documenting why `readCityArray` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function readCityArray(r: Record<string, unknown>, key: string): TerrainNamingCityRow[] {
   const v = r[key];
   if (!Array.isArray(v)) throw new Error(`terrain naming: "${key}" must be an array`);
@@ -132,6 +436,14 @@ function readCityArray(r: Record<string, unknown>, key: string): TerrainNamingCi
   });
 }
 
+/**
+ * Defines the `parseRes1Row` function shape (function parseRes1Row(raw: unknown, resolution: number): TerrainNamingRecordRes1).
+
+ * Purpose: Supports maintainability by documenting why `parseRes1Row` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function parseRes1Row(raw: unknown, resolution: number): TerrainNamingRecordRes1 {
   if (!isRecord(raw)) throw new Error('terrain naming: record must be an object');
   const h3_index = readStr(raw, 'h3_index');
@@ -145,6 +457,14 @@ function parseRes1Row(raw: unknown, resolution: number): TerrainNamingRecordRes1
   };
 }
 
+/**
+ * Defines the `parseRes4Row` function shape (function parseRes4Row(raw: unknown, resolution: number): TerrainNamingRecordRes4).
+
+ * Purpose: Supports maintainability by documenting why `parseRes4Row` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function parseRes4Row(raw: unknown, resolution: number): TerrainNamingRecordRes4 {
   if (!isRecord(raw)) throw new Error('terrain naming: record must be an object');
   const base = parseRes1Row(raw, resolution);
@@ -154,6 +474,14 @@ function parseRes4Row(raw: unknown, resolution: number): TerrainNamingRecordRes4
   };
 }
 
+/**
+ * Defines the `parseNamingEnvelope` function shape (function parseNamingEnvelope(raw: unknown, expectedResolution: number): TerrainNamingEnvelope).
+
+ * Purpose: Supports maintainability by documenting why `parseNamingEnvelope` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function parseNamingEnvelope(raw: unknown, expectedResolution: number): TerrainNamingEnvelope {
   if (!isRecord(raw)) throw new Error('terrain naming: root must be an object');
   if (raw.schema_version !== EXPECTED_HEX_NAMING_SCHEMA_VERSION) {
@@ -197,12 +525,12 @@ function parseNamingEnvelope(raw: unknown, expectedResolution: number): TerrainN
 }
 
 /**
- * Why this exists:
- *     Build the tooltip headline list from first-occurring scalerank only.
- * When to use:
- *     Renderer hover naming line generation for city/state/country name rows.
- * What to expect:
- *     Returns comma-delimited names preserving source order; empty string when no rows exist.
+ * Defines the `namesForFirstOccurringScalerank` function shape (export function namesForFirstOccurringScalerank().
+
+ * Purpose: Supports maintainability by documenting why `namesForFirstOccurringScalerank` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function namesForFirstOccurringScalerank(
   rows: ReadonlyArray<{ name: string; scalerank: number | null }>
@@ -211,12 +539,12 @@ export function namesForFirstOccurringScalerank(
 }
 
 /**
- * Why this exists:
- *     Return first-occurring-scalerank names as an ordered list for tooltip fallback decisions.
- * When to use:
- *     Res-1/Res-4 naming headline selection when deciding whether to escalate geographic level.
- * What to expect:
- *     Preserves source order and returns an empty list when no rows exist.
+ * Defines the `namesForFirstOccurringScalerankList` function shape (export function namesForFirstOccurringScalerankList().
+
+ * Purpose: Supports maintainability by documenting why `namesForFirstOccurringScalerankList` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function namesForFirstOccurringScalerankList(
   rows: ReadonlyArray<{ name: string; scalerank: number | null }>
@@ -231,6 +559,14 @@ export function namesForFirstOccurringScalerankList(
   return names;
 }
 
+/**
+ * Defines the `sortRowsByScalerankAscending` function shape (function sortRowsByScalerankAscending<T extends).
+
+ * Purpose: Supports maintainability by documenting why `sortRowsByScalerankAscending` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function sortRowsByScalerankAscending<T extends { scalerank: number | null }>(rows: ReadonlyArray<T>): T[] {
   return rows
     .map((row, index) => ({ row, index }))
@@ -243,6 +579,14 @@ function sortRowsByScalerankAscending<T extends { scalerank: number | null }>(ro
     .map((item) => item.row);
 }
 
+/**
+ * Defines the `groupedLabel` function shape (function groupedLabel<T>().
+
+ * Purpose: Supports maintainability by documenting why `groupedLabel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function groupedLabel<T>(
   rows: ReadonlyArray<T>,
   groupKey: (row: T) => string,
@@ -269,6 +613,14 @@ function groupedLabel<T>(
     .join('; ');
 }
 
+/**
+ * Defines the `formatGroupedCitiesForTooltip` function shape (function formatGroupedCitiesForTooltip(rows: ReadonlyArray<TerrainNamingCityRow>): string).
+
+ * Purpose: Supports maintainability by documenting why `formatGroupedCitiesForTooltip` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatGroupedCitiesForTooltip(rows: ReadonlyArray<TerrainNamingCityRow>): string {
   const countryOrder: string[] = [];
   const citiesByCountry = new Map<string, TerrainNamingCityRow[]>();
@@ -309,6 +661,14 @@ function formatGroupedCitiesForTooltip(rows: ReadonlyArray<TerrainNamingCityRow>
     .join('; ');
 }
 
+/**
+ * Defines the `formatGroupedStatesForTooltip` function shape (function formatGroupedStatesForTooltip(rows: ReadonlyArray<TerrainNamingStateRow>): string).
+
+ * Purpose: Supports maintainability by documenting why `formatGroupedStatesForTooltip` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatGroupedStatesForTooltip(rows: ReadonlyArray<TerrainNamingStateRow>): string {
   return groupedLabel(
     rows,
@@ -317,6 +677,14 @@ function formatGroupedStatesForTooltip(rows: ReadonlyArray<TerrainNamingStateRow
   );
 }
 
+/**
+ * Defines the `formatGroupedCountriesForTooltip` function shape (function formatGroupedCountriesForTooltip(rows: ReadonlyArray<TerrainNamingCountryRow>): string).
+
+ * Purpose: Supports maintainability by documenting why `formatGroupedCountriesForTooltip` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatGroupedCountriesForTooltip(rows: ReadonlyArray<TerrainNamingCountryRow>): string {
   return groupedLabel(
     rows,
@@ -325,6 +693,14 @@ function formatGroupedCountriesForTooltip(rows: ReadonlyArray<TerrainNamingCount
   );
 }
 
+/**
+ * Defines the `citiesCoverAllStates` function shape (function citiesCoverAllStates().
+
+ * Purpose: Supports maintainability by documenting why `citiesCoverAllStates` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function citiesCoverAllStates(
   cityRows: ReadonlyArray<TerrainNamingCityRow>,
   associatedStates: ReadonlyArray<TerrainNamingStateRow>
@@ -341,6 +717,14 @@ function citiesCoverAllStates(
   return true;
 }
 
+/**
+ * Defines the `citiesCoverAllCountries` function shape (function citiesCoverAllCountries().
+
+ * Purpose: Supports maintainability by documenting why `citiesCoverAllCountries` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function citiesCoverAllCountries(
   cityRows: ReadonlyArray<TerrainNamingCityRow>,
   associatedCountries: ReadonlyArray<TerrainNamingCountryRow>
@@ -357,6 +741,14 @@ function citiesCoverAllCountries(
   return true;
 }
 
+/**
+ * Defines the `statesCoverAllCountries` function shape (function statesCoverAllCountries( stateRows: ReadonlyArray<TerrainNamingStateRow>, associatedCountries: ReadonlyArray<TerrainNamingCountryRow> ): boolean).
+
+ * Purpose: Supports maintainability by documenting why `statesCoverAllCountries` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function statesCoverAllCountries(
   stateRows: ReadonlyArray<TerrainNamingStateRow>,
   associatedCountries: ReadonlyArray<TerrainNamingCountryRow>
@@ -369,6 +761,14 @@ function statesCoverAllCountries(
   return true;
 }
 
+/**
+ * Defines the `statesCoverAllContinents` function shape (function statesCoverAllContinents( stateRows: ReadonlyArray<TerrainNamingStateRow>, associatedCountries: ReadonlyArray<TerrainNamingCountryRow> ): boolea).
+
+ * Purpose: Supports maintainability by documenting why `statesCoverAllContinents` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function statesCoverAllContinents(
   stateRows: ReadonlyArray<TerrainNamingStateRow>,
   associatedCountries: ReadonlyArray<TerrainNamingCountryRow>
@@ -388,16 +788,12 @@ function statesCoverAllContinents(
 }
 
 /**
- * Why this exists:
- *     Resolve preferred naming headline for a res-4 hex with capped list size before escalation.
- * When to use:
- *     Build tooltip title line for detail-mode hover.
- * What to expect:
- *     Uses scalerank-ascending city/state rows (no scalerank filtering) with coverage gates:
- *       - cities from the first TOOLTIP_NAME_LIST_MAX_ITEMS entries when they cover all associated states and countries
- *       - otherwise states from the first TOOLTIP_NAME_LIST_MAX_ITEMS entries when they cover all associated countries and continents
- *       - otherwise countries (final fallback, uncapped), grouped by continent (all associated countries included)
- *     Returns null only when all levels are empty.
+ * Defines the `preferredNamingLineForRes4Record` function shape (export function preferredNamingLineForRes4Record(record: TerrainNamingRecordRes4): string | null).
+
+ * Purpose: Supports maintainability by documenting why `preferredNamingLineForRes4Record` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function preferredNamingLineForRes4Record(record: TerrainNamingRecordRes4): string | null {
   const firstRankCities = sortRowsByScalerankAscending(record.cities).slice(0, TOOLTIP_NAME_LIST_MAX_ITEMS);
@@ -421,15 +817,12 @@ export function preferredNamingLineForRes4Record(record: TerrainNamingRecordRes4
 }
 
 /**
- * Why this exists:
- *     Resolve preferred naming headline for a res-1 hex with capped list size before escalation.
- * When to use:
- *     Build tooltip title line for world-map hover.
- * What to expect:
- *     Uses scalerank-ascending states (no scalerank filtering) with coverage gate:
- *       - states from the first TOOLTIP_NAME_LIST_MAX_ITEMS entries when they cover all associated countries and continents
- *       - otherwise countries (final fallback, uncapped), grouped by continent (all associated countries included)
- *     Returns null when neither states nor countries exist.
+ * Defines the `preferredNamingLineForRes1Record` function shape (export function preferredNamingLineForRes1Record(record: TerrainNamingRecordRes1): string | null).
+
+ * Purpose: Supports maintainability by documenting why `preferredNamingLineForRes1Record` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function preferredNamingLineForRes1Record(record: TerrainNamingRecordRes1): string | null {
   const firstRankStates = sortRowsByScalerankAscending(record.states).slice(0, TOOLTIP_NAME_LIST_MAX_ITEMS);
@@ -445,12 +838,12 @@ export function preferredNamingLineForRes1Record(record: TerrainNamingRecordRes1
 }
 
 /**
- * Why this exists:
- *     Load res-1 naming metadata from disk with strict validation for tooltip naming lookups.
- * When to use:
- *     Terrain naming cache build.
- * What to expect:
- *     Throws on invalid JSON, schema mismatch, or H3 / field contract violations.
+ * Defines the `loadTerrainRes1NamingFromPath` function shape (export function loadTerrainRes1NamingFromPath(absPath: string): TerrainNamingEnvelope).
+
+ * Purpose: Supports maintainability by documenting why `loadTerrainRes1NamingFromPath` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function loadTerrainRes1NamingFromPath(absPath: string): TerrainNamingEnvelope {
   logDebug('terrainNamingLoad loadTerrainRes1NamingFromPath', { absPath });
@@ -465,12 +858,12 @@ export function loadTerrainRes1NamingFromPath(absPath: string): TerrainNamingEnv
 }
 
 /**
- * Why this exists:
- *     Load res-4 naming metadata from disk for detail-hover naming lookups.
- * When to use:
- *     Terrain naming cache build.
- * What to expect:
- *     Throws on invalid JSON, schema mismatch, or res-4 naming record contract violations.
+ * Defines the `loadTerrainRes4NamingFromPath` function shape (export function loadTerrainRes4NamingFromPath(absPath: string): TerrainNamingEnvelope).
+
+ * Purpose: Supports maintainability by documenting why `loadTerrainRes4NamingFromPath` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function loadTerrainRes4NamingFromPath(absPath: string): TerrainNamingEnvelope {
   logDebug('terrainNamingLoad loadTerrainRes4NamingFromPath', { absPath });
@@ -485,12 +878,12 @@ export function loadTerrainRes4NamingFromPath(absPath: string): TerrainNamingEnv
 }
 
 /**
- * Why this exists:
- *     Load bundled res-1 naming metadata using standard generated-data path resolution.
- * When to use:
- *     Terrain naming cache initialization in app startup.
- * What to expect:
- *     Same behavior as `loadTerrainRes1NamingFromPath`.
+ * Defines the `loadTerrainRes1NamingBundled` function shape (export function loadTerrainRes1NamingBundled(): TerrainNamingEnvelope).
+
+ * Purpose: Supports maintainability by documenting why `loadTerrainRes1NamingBundled` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function loadTerrainRes1NamingBundled(): TerrainNamingEnvelope {
   logTrace('terrainNamingLoad loadTerrainRes1NamingBundled');
@@ -498,12 +891,12 @@ export function loadTerrainRes1NamingBundled(): TerrainNamingEnvelope {
 }
 
 /**
- * Why this exists:
- *     Load bundled res-4 naming metadata using standard generated-data path resolution.
- * When to use:
- *     Terrain naming cache initialization in app startup.
- * What to expect:
- *     Same behavior as `loadTerrainRes4NamingFromPath`.
+ * Defines the `loadTerrainRes4NamingBundled` function shape (export function loadTerrainRes4NamingBundled(): TerrainNamingEnvelope).
+
+ * Purpose: Supports maintainability by documenting why `loadTerrainRes4NamingBundled` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function loadTerrainRes4NamingBundled(): TerrainNamingEnvelope {
   logTrace('terrainNamingLoad loadTerrainRes4NamingBundled');

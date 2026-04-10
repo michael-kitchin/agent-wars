@@ -18,6 +18,14 @@ import type { GameStateSnapshot, HumanStandingOrderSnapshot } from '../../shared
 import type { ResolutionPlaybackMove } from '../core/types';
 import { drawOneUnitMarker } from './unitDrawing';
 
+/**
+ * Defines the `drawLineArrow` function shape (export function drawLineArrow().
+
+ * Purpose: Supports maintainability by documenting why `drawLineArrow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function drawLineArrow(
   ctx: CanvasRenderingContext2D,
   from: { x: number; y: number },
@@ -56,6 +64,14 @@ export function drawLineArrow(
   ctx.stroke();
 }
 
+/**
+ * Defines the `drawArrowheadOnly` function shape (export function drawArrowheadOnly( ctx: CanvasRenderingContext2D, from: { x: number; y: number }, to: { x: number; y: number }, color: string, op).
+
+ * Purpose: Supports maintainability by documenting why `drawArrowheadOnly` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function drawArrowheadOnly(
   ctx: CanvasRenderingContext2D,
   from: { x: number; y: number },
@@ -87,6 +103,14 @@ export function drawArrowheadOnly(
   ctx.stroke();
 }
 
+/**
+ * Defines the `strokePolylineSkippingWrap` function shape (export function strokePolylineSkippingWrap( ctx: CanvasRenderingContext2D, points: Array<{ x: number; y: number }>, wrapJumpThresholdPx: number ): voi).
+
+ * Purpose: Supports maintainability by documenting why `strokePolylineSkippingWrap` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function strokePolylineSkippingWrap(
   ctx: CanvasRenderingContext2D,
   points: Array<{ x: number; y: number }>,
@@ -107,6 +131,14 @@ export function strokePolylineSkippingWrap(
   ctx.stroke();
 }
 
+/**
+ * Defines the `drawStandingOrderLines` function shape (export function drawStandingOrderLines( ctx: CanvasRenderingContext2D, orders: HumanStandingOrderSnapshot[], units: GameStateSnapshot['units'], excl).
+
+ * Purpose: Supports maintainability by documenting why `drawStandingOrderLines` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function drawStandingOrderLines(
   ctx: CanvasRenderingContext2D,
   orders: HumanStandingOrderSnapshot[],
@@ -157,6 +189,14 @@ export function drawStandingOrderLines(
   }
 }
 
+/**
+ * Defines the `drawResolutionMoveLines` function shape (export function drawResolutionMoveLines( ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, moves: ResolutionPlaybackMove[],).
+
+ * Purpose: Supports maintainability by documenting why `drawResolutionMoveLines` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function drawResolutionMoveLines(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,
@@ -216,6 +256,14 @@ export function drawResolutionMoveLines(
   ctx.restore();
 }
 
+/**
+ * Defines the `drawMovingUnits` function shape (export function drawMovingUnits( ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, moves: ResolutionPlaybackMove[], hexLi).
+
+ * Purpose: Supports maintainability by documenting why `drawMovingUnits` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function drawMovingUnits(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,

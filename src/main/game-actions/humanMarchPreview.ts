@@ -30,76 +30,532 @@ import {
   createEmptyHumanMarchPreviewDiagnostics,
   type HumanMarchPreviewDiagnostics,
 } from './humanMarchPreviewDiagnostics';
-type HumanOwnedUnit = { id: string; player: string; unitType: string; h3Index: string; displayOrder?: number };
+/**
+ * Documents the `HumanOwnedUnit` type alias (type HumanOwnedUnit).
 
+ * Purpose: Supports maintainability by documenting why `HumanOwnedUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+type HumanOwnedUnit = { /**
+ * Specifies the contract for the `id` member (id: string;).
+
+ * Contract: Describes stable behavior for callers of `id` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+id: string; /**
+ * Specifies the contract for the `player` member (player: string;).
+
+ * Contract: Describes stable behavior for callers of `player` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+player: string; /**
+ * Specifies the contract for the `unitType` member (unitType: string;).
+
+ * Contract: Describes stable behavior for callers of `unitType` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+unitType: string; /**
+ * Specifies the contract for the `h3Index` member (h3Index: string;).
+
+ * Contract: Describes stable behavior for callers of `h3Index` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+h3Index: string; /**
+ * Specifies the contract for the `displayOrder` member (displayOrder?: number).
+
+ * Contract: Describes stable behavior for callers of `displayOrder` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+displayOrder?: number };
+
+/**
+ * Documents the `PlanRouteResult` type alias (type PlanRouteResult).
+
+ * Purpose: Supports maintainability by documenting why `PlanRouteResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type PlanRouteResult = PlanRouteOk | PlanRouteError;
+/**
+ * Documents the `PreviewComputationContext` type alias (type PreviewComputationContext).
+
+ * Purpose: Supports maintainability by documenting why `PreviewComputationContext` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type PreviewComputationContext = {
-  state: GameStateSnapshot;
-  latLngByH3: Map<string, [number, number]>;
-  resolveToH3: (lat: number, lng: number) => string | undefined;
-  passabilityByH3: Map<string, string>;
-  terrainByH3: Map<string, string>;
-  terrainKindByH3: Map<string, string>;
-  stateCacheKey: string;
-  pathfindingSession: PathfindingSession;
+    /**
+   * Specifies the contract for the `state` member (state: GameStateSnapshot;).
+
+   * Contract: Describes stable behavior for callers of `state` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+state: GameStateSnapshot;
+    /**
+   * Specifies the contract for the `latLngByH3` member (latLngByH3: Map<string, [number, number]>;).
+
+   * Contract: Describes stable behavior for callers of `latLngByH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+latLngByH3: Map<string, [number, number]>;
+    /**
+   * Specifies the contract for the `resolveToH3` member (resolveToH3: (lat: number, lng: number) => string | undefined;).
+
+   * Contract: Describes stable behavior for callers of `resolveToH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+resolveToH3: (lat: number, lng: number) => string | undefined;
+    /**
+   * Specifies the contract for the `passabilityByH3` member (passabilityByH3: Map<string, string>;).
+
+   * Contract: Describes stable behavior for callers of `passabilityByH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+passabilityByH3: Map<string, string>;
+    /**
+   * Specifies the contract for the `terrainByH3` member (terrainByH3: Map<string, string>;).
+
+   * Contract: Describes stable behavior for callers of `terrainByH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+terrainByH3: Map<string, string>;
+    /**
+   * Specifies the contract for the `terrainKindByH3` member (terrainKindByH3: Map<string, string>;).
+
+   * Contract: Describes stable behavior for callers of `terrainKindByH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+terrainKindByH3: Map<string, string>;
+    /**
+   * Specifies the contract for the `stateCacheKey` member (stateCacheKey: string;).
+
+   * Contract: Describes stable behavior for callers of `stateCacheKey` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+stateCacheKey: string;
+    /**
+   * Specifies the contract for the `pathfindingSession` member (pathfindingSession: PathfindingSession;).
+
+   * Contract: Describes stable behavior for callers of `pathfindingSession` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+pathfindingSession: PathfindingSession;
 };
 
+/**
+ * Documents the `ActiveHoverPathfindingSession` interface as a named contract surface (interface ActiveHoverPathfindingSession).
+
+ * Purpose: Supports maintainability by documenting why `ActiveHoverPathfindingSession` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface ActiveHoverPathfindingSession {
-  playerId: 'human' | 'opponent';
-  selectionSignature: string;
-  selectedPositionsSignature: string;
-  environmentSignature: string;
-  sessionCacheKey: string;
-  context: PreviewComputationContext;
+    /**
+   * Specifies the contract for the `playerId` member (playerId: 'human' | 'opponent';).
+
+   * Contract: Describes stable behavior for callers of `playerId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+playerId: 'human' | 'opponent';
+    /**
+   * Specifies the contract for the `selectionSignature` member (selectionSignature: string;).
+
+   * Contract: Describes stable behavior for callers of `selectionSignature` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+selectionSignature: string;
+    /**
+   * Specifies the contract for the `selectedPositionsSignature` member (selectedPositionsSignature: string;).
+
+   * Contract: Describes stable behavior for callers of `selectedPositionsSignature` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+selectedPositionsSignature: string;
+    /**
+   * Specifies the contract for the `environmentSignature` member (environmentSignature: string;).
+
+   * Contract: Describes stable behavior for callers of `environmentSignature` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+environmentSignature: string;
+    /**
+   * Specifies the contract for the `sessionCacheKey` member (sessionCacheKey: string;).
+
+   * Contract: Describes stable behavior for callers of `sessionCacheKey` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+sessionCacheKey: string;
+    /**
+   * Specifies the contract for the `context` member (context: PreviewComputationContext;).
+
+   * Contract: Describes stable behavior for callers of `context` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+context: PreviewComputationContext;
 }
 
+/**
+ * Documents the module-scope binding `DEFAULT_MAX_PREVIEW_ROUTE_CACHE_ENTRIES` (DEFAULT_MAX_PREVIEW_ROUTE_CACHE_ENTRIES).
+
+ * Purpose: Supports maintainability by documenting why `DEFAULT_MAX_PREVIEW_ROUTE_CACHE_ENTRIES` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const DEFAULT_MAX_PREVIEW_ROUTE_CACHE_ENTRIES = 2048;
+/**
+ * Documents the module-scope binding `DEFAULT_MAX_PREVIEW_RESULT_CACHE_ENTRIES` (DEFAULT_MAX_PREVIEW_RESULT_CACHE_ENTRIES).
+
+ * Purpose: Supports maintainability by documenting why `DEFAULT_MAX_PREVIEW_RESULT_CACHE_ENTRIES` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const DEFAULT_MAX_PREVIEW_RESULT_CACHE_ENTRIES = 2048;
+/**
+ * Documents the module-scope binding `DEFAULT_MAX_PREVIEW_THROTTLE_ENTRIES` (DEFAULT_MAX_PREVIEW_THROTTLE_ENTRIES).
+
+ * Purpose: Supports maintainability by documenting why `DEFAULT_MAX_PREVIEW_THROTTLE_ENTRIES` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const DEFAULT_MAX_PREVIEW_THROTTLE_ENTRIES = 1024;
+/**
+ * Documents the module-scope binding `maxPreviewRouteCacheEntries` (maxPreviewRouteCacheEntries).
+
+ * Purpose: Supports maintainability by documenting why `maxPreviewRouteCacheEntries` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 let maxPreviewRouteCacheEntries = DEFAULT_MAX_PREVIEW_ROUTE_CACHE_ENTRIES;
+/**
+ * Documents the module-scope binding `maxPreviewResultCacheEntries` (maxPreviewResultCacheEntries).
+
+ * Purpose: Supports maintainability by documenting why `maxPreviewResultCacheEntries` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 let maxPreviewResultCacheEntries = DEFAULT_MAX_PREVIEW_RESULT_CACHE_ENTRIES;
+/**
+ * Documents the module-scope binding `maxPreviewThrottleEntries` (maxPreviewThrottleEntries).
+
+ * Purpose: Supports maintainability by documenting why `maxPreviewThrottleEntries` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 let maxPreviewThrottleEntries = DEFAULT_MAX_PREVIEW_THROTTLE_ENTRIES;
+/**
+ * Documents the module-scope binding `MAX_NEARBY_FALLBACK_ATTEMPTS` (MAX_NEARBY_FALLBACK_ATTEMPTS).
+
+ * Purpose: Supports maintainability by documenting why `MAX_NEARBY_FALLBACK_ATTEMPTS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const MAX_NEARBY_FALLBACK_ATTEMPTS = 16;
+/**
+ * Documents the module-scope binding `MAX_NEARBY_FALLBACK_RADIUS` (MAX_NEARBY_FALLBACK_RADIUS).
+
+ * Purpose: Supports maintainability by documenting why `MAX_NEARBY_FALLBACK_RADIUS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const MAX_NEARBY_FALLBACK_RADIUS = 6;
+/**
+ * Documents the module-scope binding `MAX_NEARBY_FALLBACK_BUDGET_MS` (MAX_NEARBY_FALLBACK_BUDGET_MS).
+
+ * Purpose: Supports maintainability by documenting why `MAX_NEARBY_FALLBACK_BUDGET_MS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const MAX_NEARBY_FALLBACK_BUDGET_MS = 20;
+/**
+ * Documents the module-scope binding `PREVIEW_THROTTLE_WINDOW_MS` (PREVIEW_THROTTLE_WINDOW_MS).
+
+ * Purpose: Supports maintainability by documenting why `PREVIEW_THROTTLE_WINDOW_MS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const PREVIEW_THROTTLE_WINDOW_MS = 20;
 
+/**
+ * Documents the module-scope binding `previewDiagnostics` (previewDiagnostics: HumanMarchPreviewDiagnostics).
+
+ * Purpose: Supports maintainability by documenting why `previewDiagnostics` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const previewDiagnostics: HumanMarchPreviewDiagnostics = createEmptyHumanMarchPreviewDiagnostics();
 
+/**
+ * Documents the module-scope binding `previewRouteCache` (previewRouteCache).
+
+ * Purpose: Supports maintainability by documenting why `previewRouteCache` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const previewRouteCache = new Map<string, PlanRouteResult>();
+/**
+ * Documents the module-scope binding `previewResultCache` (previewResultCache).
+
+ * Purpose: Supports maintainability by documenting why `previewResultCache` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const previewResultCache = new Map<string, HumanOrderPreviewResult>();
+/**
+ * Documents the module-scope binding `previewThrottleCache` (previewThrottleCache).
+
+ * Purpose: Supports maintainability by documenting why `previewThrottleCache` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const previewThrottleCache = new Map<
   string,
   { computedAtMs: number; hoveredH3Index: string; preview: HumanOrderPreviewResult }
 >();
+/**
+ * Documents the module-scope binding `activeHoverPathfindingSessionByPlayer` (activeHoverPathfindingSessionByPlayer).
+
+ * Purpose: Supports maintainability by documenting why `activeHoverPathfindingSessionByPlayer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const activeHoverPathfindingSessionByPlayer = new Map<'human' | 'opponent', ActiveHoverPathfindingSession>();
 
+/**
+ * Documents the `HumanOrderPreviewSegment` interface as a named contract surface (export interface HumanOrderPreviewSegment).
+
+ * Purpose: Supports maintainability by documenting why `HumanOrderPreviewSegment` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface HumanOrderPreviewSegment {
-  turn: number;
-  hexes: [number, number][];
+    /**
+   * Specifies the contract for the `turn` member (turn: number;).
+
+   * Contract: Describes stable behavior for callers of `turn` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+turn: number;
+    /**
+   * Specifies the contract for the `hexes` member (hexes: [number, number][];).
+
+   * Contract: Describes stable behavior for callers of `hexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hexes: [number, number][];
 }
 
+/**
+ * Documents the `HumanOrderPreviewResult` interface as a named contract surface (export interface HumanOrderPreviewResult).
+
+ * Purpose: Supports maintainability by documenting why `HumanOrderPreviewResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface HumanOrderPreviewResult {
-  valid: boolean;
-  showInvalidMarker: boolean;
-  invalidReason?: string;
-  arrowLatLng?: [number, number];
-  segments: HumanOrderPreviewSegment[];
+    /**
+   * Specifies the contract for the `valid` member (valid: boolean;).
+
+   * Contract: Describes stable behavior for callers of `valid` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+valid: boolean;
+    /**
+   * Specifies the contract for the `showInvalidMarker` member (showInvalidMarker: boolean;).
+
+   * Contract: Describes stable behavior for callers of `showInvalidMarker` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+showInvalidMarker: boolean;
+    /**
+   * Specifies the contract for the `invalidReason` member (invalidReason?: string;).
+
+   * Contract: Describes stable behavior for callers of `invalidReason` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+invalidReason?: string;
+    /**
+   * Specifies the contract for the `arrowLatLng` member (arrowLatLng?: [number, number];).
+
+   * Contract: Describes stable behavior for callers of `arrowLatLng` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+arrowLatLng?: [number, number];
+    /**
+   * Specifies the contract for the `segments` member (segments: HumanOrderPreviewSegment[];).
+
+   * Contract: Describes stable behavior for callers of `segments` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+segments: HumanOrderPreviewSegment[];
 }
 
+/**
+ * Documents the `HumanOrderGroupPreviewUnitResult` interface as a named contract surface (export interface HumanOrderGroupPreviewUnitResult).
+
+ * Purpose: Supports maintainability by documenting why `HumanOrderGroupPreviewUnitResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface HumanOrderGroupPreviewUnitResult {
-  unitId: string;
-  preview: HumanOrderPreviewResult;
+    /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+
+   * Contract: Describes stable behavior for callers of `unitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitId: string;
+    /**
+   * Specifies the contract for the `preview` member (preview: HumanOrderPreviewResult;).
+
+   * Contract: Describes stable behavior for callers of `preview` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+preview: HumanOrderPreviewResult;
 }
 
+/**
+ * Documents the `HumanOrderGroupPreviewResult` interface as a named contract surface (export interface HumanOrderGroupPreviewResult).
+
+ * Purpose: Supports maintainability by documenting why `HumanOrderGroupPreviewResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface HumanOrderGroupPreviewResult {
-  validForAll: boolean;
-  showInvalidMarker: boolean;
-  invalidReason?: string;
-  slowestMovementRange: number;
-  previews: HumanOrderGroupPreviewUnitResult[];
+    /**
+   * Specifies the contract for the `validForAll` member (validForAll: boolean;).
+
+   * Contract: Describes stable behavior for callers of `validForAll` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+validForAll: boolean;
+    /**
+   * Specifies the contract for the `showInvalidMarker` member (showInvalidMarker: boolean;).
+
+   * Contract: Describes stable behavior for callers of `showInvalidMarker` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+showInvalidMarker: boolean;
+    /**
+   * Specifies the contract for the `invalidReason` member (invalidReason?: string;).
+
+   * Contract: Describes stable behavior for callers of `invalidReason` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+invalidReason?: string;
+    /**
+   * Specifies the contract for the `slowestMovementRange` member (slowestMovementRange: number;).
+
+   * Contract: Describes stable behavior for callers of `slowestMovementRange` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+slowestMovementRange: number;
+    /**
+   * Specifies the contract for the `previews` member (previews: HumanOrderGroupPreviewUnitResult[];).
+
+   * Contract: Describes stable behavior for callers of `previews` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+previews: HumanOrderGroupPreviewUnitResult[];
 }
 
+/**
+ * Defines the `logPreviewOutcome` function shape (function logPreviewOutcome( unitId: string, hoveredH3Index: string, preview: HumanOrderPreviewResult, source: 'computed' | 'result_cache' | 'throttl).
+
+ * Purpose: Supports maintainability by documenting why `logPreviewOutcome` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function logPreviewOutcome(
   unitId: string,
   hoveredH3Index: string,
@@ -117,20 +573,52 @@ function logPreviewOutcome(
   });
 }
 
+/**
+ * Defines the `snapshotStateForPlayer` function shape (function snapshotStateForPlayer(playerId: 'human' | 'opponent'): GameStateSnapshot).
+
+ * Purpose: Supports maintainability by documenting why `snapshotStateForPlayer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function snapshotStateForPlayer(playerId: 'human' | 'opponent'): GameStateSnapshot {
   return getGameStateForPlayer(playerId, { maskUnexploredTerrain: false });
 }
 
+/**
+ * Defines the `getUniqueNonEmptyIds` function shape (function getUniqueNonEmptyIds(ids: string[]): string[]).
+
+ * Purpose: Supports maintainability by documenting why `getUniqueNonEmptyIds` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getUniqueNonEmptyIds(ids: string[]): string[] {
   return [...new Set(ids.filter((id) => id.length > 0))];
 }
 
+/**
+ * Defines the `selectionHasMixedLandAndNaval` function shape (function selectionHasMixedLandAndNaval(units: HumanOwnedUnit[]): boolean).
+
+ * Purpose: Supports maintainability by documenting why `selectionHasMixedLandAndNaval` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function selectionHasMixedLandAndNaval(units: HumanOwnedUnit[]): boolean {
   const hasNaval = units.some((unit) => unit.unitType === 'naval');
   const hasLand = units.some((unit) => unit.unitType === 'infantry' || unit.unitType === 'armor');
   return hasNaval && hasLand;
 }
 
+/**
+ * Defines the `cacheSetBounded` function shape (function cacheSetBounded<T>(cache: Map<string, T>, key: string, value: T, maxEntries: number): void).
+
+ * Purpose: Supports maintainability by documenting why `cacheSetBounded` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function cacheSetBounded<T>(cache: Map<string, T>, key: string, value: T, maxEntries: number): void {
   if (cache.has(key)) cache.delete(key);
   cache.set(key, value);
@@ -141,6 +629,14 @@ function cacheSetBounded<T>(cache: Map<string, T>, key: string, value: T, maxEnt
   }
 }
 
+/**
+ * Defines the `buildStateCacheKey` function shape (function buildStateCacheKey(state: GameStateSnapshot): string).
+
+ * Purpose: Supports maintainability by documenting why `buildStateCacheKey` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildStateCacheKey(state: GameStateSnapshot): string {
   const unitSignature = state.units
     .map((u) => `${u.id}:${u.h3Index}`)
@@ -149,6 +645,14 @@ function buildStateCacheKey(state: GameStateSnapshot): string {
   return `u:${unitSignature}`;
 }
 
+/**
+ * Defines the `buildPreviewContextFromState` function shape (function buildPreviewContextFromState(state: GameStateSnapshot): PreviewComputationContext).
+
+ * Purpose: Supports maintainability by documenting why `buildPreviewContextFromState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildPreviewContextFromState(state: GameStateSnapshot): PreviewComputationContext {
   const hexList = state.hexes.map((h) => h.h3Index);
   const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
@@ -165,6 +669,14 @@ function buildPreviewContextFromState(state: GameStateSnapshot): PreviewComputat
   };
 }
 
+/**
+ * Defines the `getOrCreateHoverSessionContext` function shape (function getOrCreateHoverSessionContext().
+
+ * Purpose: Supports maintainability by documenting why `getOrCreateHoverSessionContext` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getOrCreateHoverSessionContext(
   playerId: 'human' | 'opponent',
   selectedUnitIds: readonly string[]
@@ -226,6 +738,14 @@ function getOrCreateHoverSessionContext(
   return context;
 }
 
+/**
+ * Defines the `executePlanRouteCached` function shape (function executePlanRouteCached(context: PreviewComputationContext, unitId: string, destinationH3Index: string): PlanRouteResult).
+
+ * Purpose: Supports maintainability by documenting why `executePlanRouteCached` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function executePlanRouteCached(context: PreviewComputationContext, unitId: string, destinationH3Index: string): PlanRouteResult {
   const cacheKey = `${context.stateCacheKey}|${unitId}|${destinationH3Index}`;
   previewDiagnostics.routePlanCalls += 1;
@@ -246,6 +766,14 @@ function executePlanRouteCached(context: PreviewComputationContext, unitId: stri
   return planned;
 }
 
+/**
+ * Defines the `findNearbyReachablePreview` function shape (function findNearbyReachablePreview( context: PreviewComputationContext, unit: HumanOwnedUnit, hoveredH3Index: string, passableFor: 'land' | 'water').
+
+ * Purpose: Supports maintainability by documenting why `findNearbyReachablePreview` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function findNearbyReachablePreview(
   context: PreviewComputationContext,
   unit: HumanOwnedUnit,
@@ -302,6 +830,14 @@ function findNearbyReachablePreview(
   return null;
 }
 
+/**
+ * Defines the `hexSupportsMixedLandAndNaval` function shape (function hexSupportsMixedLandAndNaval(hex:).
+
+ * Purpose: Supports maintainability by documenting why `hexSupportsMixedLandAndNaval` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function hexSupportsMixedLandAndNaval(hex: { h3Index: string; terrain: string; terrainKind?: string }): boolean {
   const passabilityByH3 = buildNormalizedTerrainByH3([hex]);
   const passabilityTerrain = passabilityByH3.get(hex.h3Index) ?? 'land';
@@ -311,6 +847,14 @@ function hexSupportsMixedLandAndNaval(hex: { h3Index: string; terrain: string; t
   );
 }
 
+/**
+ * Defines the `computeHumanMarchPreviewForUnit` function shape (function computeHumanMarchPreviewForUnit().
+
+ * Purpose: Supports maintainability by documenting why `computeHumanMarchPreviewForUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function computeHumanMarchPreviewForUnit(
   context: PreviewComputationContext,
   unitId: string,
@@ -475,6 +1019,14 @@ function computeHumanMarchPreviewForUnit(
   return result;
 }
 
+/**
+ * Defines the `buildHumanMarchPreviewForUnit` function shape (function buildHumanMarchPreviewForUnit().
+
+ * Purpose: Supports maintainability by documenting why `buildHumanMarchPreviewForUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildHumanMarchPreviewForUnit(
   context: PreviewComputationContext,
   unitId: string,
@@ -510,6 +1062,14 @@ function buildHumanMarchPreviewForUnit(
   return preview;
 }
 
+/**
+ * Defines the `previewHumanMarchOrderImpl` function shape (export function previewHumanMarchOrderImpl(unitId: string, hoveredH3Index: string): HumanOrderPreviewResult).
+
+ * Purpose: Supports maintainability by documenting why `previewHumanMarchOrderImpl` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function previewHumanMarchOrderImpl(unitId: string, hoveredH3Index: string): HumanOrderPreviewResult {
   logTrace('gameActions previewHumanMarchOrder', { unitId, hoveredH3Index });
   try {
@@ -523,6 +1083,14 @@ export function previewHumanMarchOrderImpl(unitId: string, hoveredH3Index: strin
   }
 }
 
+/**
+ * Defines the `previewHumanMarchOrdersImpl` function shape (export function previewHumanMarchOrdersImpl(unitIds: string[], hoveredH3Index: string): HumanOrderGroupPreviewResult).
+
+ * Purpose: Supports maintainability by documenting why `previewHumanMarchOrdersImpl` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function previewHumanMarchOrdersImpl(unitIds: string[], hoveredH3Index: string): HumanOrderGroupPreviewResult {
   logTrace('gameActions previewHumanMarchOrders', { unitCount: unitIds.length, hoveredH3Index });
   try {
@@ -623,7 +1191,14 @@ export function previewHumanMarchOrdersImpl(unitIds: string[], hoveredH3Index: s
   }
 }
 
-/** Test/debug accessor for hover-preview diagnostics and cache/session sizes. */
+/**
+ * Defines the `getHumanMarchPreviewDiagnostics` function shape (export function getHumanMarchPreviewDiagnostics(): HumanMarchPreviewDiagnostics & { routeCacheSize: number; resultCacheSize: number; throttleCacheSize:).
+
+ * Purpose: Supports maintainability by documenting why `getHumanMarchPreviewDiagnostics` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function getHumanMarchPreviewDiagnostics(): HumanMarchPreviewDiagnostics & {
   routeCacheSize: number;
   resultCacheSize: number;
@@ -640,7 +1215,14 @@ export function getHumanMarchPreviewDiagnostics(): HumanMarchPreviewDiagnostics 
   };
 }
 
-/** Test helper that clears hover-preview diagnostics, caches, and sessions. */
+/**
+ * Defines the `resetHumanMarchPreviewDiagnosticsForTests` function shape (export function resetHumanMarchPreviewDiagnosticsForTests(): void).
+
+ * Purpose: Supports maintainability by documenting why `resetHumanMarchPreviewDiagnosticsForTests` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function resetHumanMarchPreviewDiagnosticsForTests(): void {
   logDebug('gameActions resetHumanMarchPreviewDiagnosticsForTests');
   previewRouteCache.clear();
@@ -650,7 +1232,14 @@ export function resetHumanMarchPreviewDiagnosticsForTests(): void {
   Object.assign(previewDiagnostics, createEmptyHumanMarchPreviewDiagnostics());
 }
 
-/** Test helper to override in-memory preview cache limits; omit to restore defaults. */
+/**
+ * Defines the `configureHumanMarchPreviewCacheLimitsForTests` function shape (export function configureHumanMarchPreviewCacheLimitsForTests(limits?:).
+
+ * Purpose: Supports maintainability by documenting why `configureHumanMarchPreviewCacheLimitsForTests` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function configureHumanMarchPreviewCacheLimitsForTests(limits?: {
   route?: number;
   result?: number;

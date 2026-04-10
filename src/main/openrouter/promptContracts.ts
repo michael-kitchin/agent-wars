@@ -1,12 +1,12 @@
 import { logDebug } from '../logger';
 
 /**
- * Why this exists:
- *     Centralizes final JSON contract wording used in OpenRouter system prompts.
- * When to use:
- *     Building the final "Submit your final JSON only..." instruction block.
- * What to expect:
- *     Stable, explicit schema guidance for movement, air, callbacks, and optional memory/production payloads.
+ * Defines the `buildFinalJsonContractInstruction` function shape (export function buildFinalJsonContractInstruction(args: { includeMemoryUpdates: boolean; includeProductionOrders: boolean; movementOrderInstruction: st).
+
+ * Purpose: Supports maintainability by documenting why `buildFinalJsonContractInstruction` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function buildFinalJsonContractInstruction(args: {
   includeMemoryUpdates: boolean;
@@ -38,29 +38,116 @@ export function buildFinalJsonContractInstruction(args: {
   return `${submitHeader} ${strictSchemaClause} ${ordersClause} ${airClause} ${legacyClause}${movementOrderInstruction} ${callbacksClause}${submitMemoryClause} ${productionSubmitClause}`;
 }
 
-export interface FinalJsonExampleFlags {
-  includeMemoryUpdates: boolean;
-  includeProductionOrders: boolean;
-}
+/**
+ * Documents the `FinalJsonExampleFlags` interface as a named contract surface (export interface FinalJsonExampleFlags).
 
-interface FinalOrdersExamplePayload {
-  strategy: string;
-  orders: Array<Record<string, unknown>>;
-  airStrikes: unknown[];
-  ferryOrders: unknown[];
-  callbacks: unknown[];
-  memoryUpdates?: unknown[];
-  productionOrders?: Array<Record<string, unknown>>;
+ * Purpose: Supports maintainability by documenting why `FinalJsonExampleFlags` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export interface FinalJsonExampleFlags {
+    /**
+   * Specifies the contract for the `includeMemoryUpdates` member (includeMemoryUpdates: boolean;).
+
+   * Contract: Describes stable behavior for callers of `includeMemoryUpdates` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+includeMemoryUpdates: boolean;
+    /**
+   * Specifies the contract for the `includeProductionOrders` member (includeProductionOrders: boolean;).
+
+   * Contract: Describes stable behavior for callers of `includeProductionOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+includeProductionOrders: boolean;
 }
 
 /**
- * Why this exists:
- *     Provides a concrete multi-order JSON example below the schema paragraph so models (especially via OpenRouter)
- *     see valid nesting and field names without replacing the formal contract text.
- * When to use:
- *     Append immediately after `buildFinalJsonContractInstruction` in the system prompt.
- * What to expect:
- *     A fenced JSON block with 2–3 sample orders; optional memory/production keys match enabled tool flags.
+ * Documents the `FinalOrdersExamplePayload` interface as a named contract surface (interface FinalOrdersExamplePayload).
+
+ * Purpose: Supports maintainability by documenting why `FinalOrdersExamplePayload` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+interface FinalOrdersExamplePayload {
+    /**
+   * Specifies the contract for the `strategy` member (strategy: string;).
+
+   * Contract: Describes stable behavior for callers of `strategy` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+strategy: string;
+    /**
+   * Specifies the contract for the `orders` member (orders: Array<Record<string, unknown>>;).
+
+   * Contract: Describes stable behavior for callers of `orders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+orders: Array<Record<string, unknown>>;
+    /**
+   * Specifies the contract for the `airStrikes` member (airStrikes: unknown[];).
+
+   * Contract: Describes stable behavior for callers of `airStrikes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+airStrikes: unknown[];
+    /**
+   * Specifies the contract for the `ferryOrders` member (ferryOrders: unknown[];).
+
+   * Contract: Describes stable behavior for callers of `ferryOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ferryOrders: unknown[];
+    /**
+   * Specifies the contract for the `callbacks` member (callbacks: unknown[];).
+
+   * Contract: Describes stable behavior for callers of `callbacks` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+callbacks: unknown[];
+    /**
+   * Specifies the contract for the `memoryUpdates` member (memoryUpdates?: unknown[];).
+
+   * Contract: Describes stable behavior for callers of `memoryUpdates` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+memoryUpdates?: unknown[];
+    /**
+   * Specifies the contract for the `productionOrders` member (productionOrders?: Array<Record<string, unknown>>;).
+
+   * Contract: Describes stable behavior for callers of `productionOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+productionOrders?: Array<Record<string, unknown>>;
+}
+
+/**
+ * Defines the `getFinalJsonOrdersExampleBlock` function shape (export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): string).
+
+ * Purpose: Supports maintainability by documenting why `getFinalJsonOrdersExampleBlock` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): string {
   logDebug('promptContracts getFinalJsonOrdersExampleBlock', {

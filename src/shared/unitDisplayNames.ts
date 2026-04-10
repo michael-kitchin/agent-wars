@@ -1,28 +1,119 @@
 /**
- * Centralized display-name formatting for units shown to players.
- * Internal unit IDs remain unchanged and are still used for game logic.
- */
+ * Documents the `UnitDisplayIdentity` interface as a named contract surface (export interface UnitDisplayIdentity).
 
+ * Purpose: Supports maintainability by documenting why `UnitDisplayIdentity` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface UnitDisplayIdentity {
-  id: string;
-  unitType: string;
-  displayOrder?: number;
+    /**
+   * Specifies the contract for the `id` member (id: string;).
+
+   * Contract: Describes stable behavior for callers of `id` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+id: string;
+    /**
+   * Specifies the contract for the `unitType` member (unitType: string;).
+
+   * Contract: Describes stable behavior for callers of `unitType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitType: string;
+    /**
+   * Specifies the contract for the `displayOrder` member (displayOrder?: number;).
+
+   * Contract: Describes stable behavior for callers of `displayOrder` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+displayOrder?: number;
 }
 
+/**
+ * Documents the module-scope binding `UNIT_TYPE_NOUN_BY_TYPE` (UNIT_TYPE_NOUN_BY_TYPE: Record<string, string>).
+
+ * Purpose: Supports maintainability by documenting why `UNIT_TYPE_NOUN_BY_TYPE` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const UNIT_TYPE_NOUN_BY_TYPE: Record<string, string> = {
-  infantry: 'Infantry',
-  armor: 'Armored',
-  naval: 'Fleet',
-  air: 'Squadron',
+    /**
+   * Documents the object literal property `infantry` (infantry: 'Infantry').
+
+   * Purpose: Supports maintainability by documenting why `infantry` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+infantry: 'Infantry',
+    /**
+   * Documents the object literal property `armor` (armor: 'Armored').
+
+   * Purpose: Supports maintainability by documenting why `armor` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+armor: 'Armored',
+    /**
+   * Documents the object literal property `naval` (naval: 'Fleet').
+
+   * Purpose: Supports maintainability by documenting why `naval` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+naval: 'Fleet',
+    /**
+   * Documents the object literal property `air` (air: 'Squadron').
+
+   * Purpose: Supports maintainability by documenting why `air` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+air: 'Squadron',
 };
 
+/**
+ * Documents the module-scope binding `NATURAL_ID_COLLATOR` (NATURAL_ID_COLLATOR).
+
+ * Purpose: Supports maintainability by documenting why `NATURAL_ID_COLLATOR` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const NATURAL_ID_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
+/**
+ * Defines the `capitalizeWord` function shape (function capitalizeWord(s: string): string).
+
+ * Purpose: Supports maintainability by documenting why `capitalizeWord` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function capitalizeWord(s: string): string {
   if (!s) return s;
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/**
+ * Defines the `ordinalSuffix` function shape (function ordinalSuffix(value: number): string).
+
+ * Purpose: Supports maintainability by documenting why `ordinalSuffix` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function ordinalSuffix(value: number): string {
   const abs = Math.abs(Math.trunc(value));
   const mod100 = abs % 100;
@@ -34,6 +125,14 @@ function ordinalSuffix(value: number): string {
   return 'th';
 }
 
+/**
+ * Defines the `toRomanNumeral` function shape (function toRomanNumeral(value: number): string).
+
+ * Purpose: Supports maintainability by documenting why `toRomanNumeral` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function toRomanNumeral(value: number): string {
   let remaining = Math.max(1, Math.trunc(value));
   const numerals: Array<[number, string]> = [
@@ -61,6 +160,14 @@ function toRomanNumeral(value: number): string {
   return out;
 }
 
+/**
+ * Defines the `formatUnitNumberLabel` function shape (function formatUnitNumberLabel().
+
+ * Purpose: Supports maintainability by documenting why `formatUnitNumberLabel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatUnitNumberLabel(
   unitId: string,
   value: number,
@@ -70,12 +177,12 @@ function formatUnitNumberLabel(
 }
 
 /**
- * Why this exists:
- *     Builds ordinal labels with locale-aware grouped numbers while keeping English ordinal suffix rules.
- * When to use:
- *     Any player-facing unit name surface that displays Nth-style numbering.
- * What to expect:
- *     Examples: 1st, 2nd, 3rd, 4th, 12th, 22nd, 1,234th (group separators from runtime locale).
+ * Defines the `formatOrdinalLabel` function shape (export function formatOrdinalLabel(value: number, locale?: Intl.LocalesArgument): string).
+
+ * Purpose: Supports maintainability by documenting why `formatOrdinalLabel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function formatOrdinalLabel(value: number, locale?: Intl.LocalesArgument): string {
   const normalized = Math.max(1, Math.trunc(value));
@@ -84,25 +191,24 @@ export function formatOrdinalLabel(value: number, locale?: Intl.LocalesArgument)
 }
 
 /**
- * Why this exists:
- *     Maps internal unit-type values to player-facing unit-class nouns.
- * When to use:
- *     Rendering display names in the UI and other player-visible summaries.
- * What to expect:
- *     Known types: Infantry/Armored/Fleet; unknown types are title-cased.
+ * Defines the `getUnitDisplayNoun` function shape (export function getUnitDisplayNoun(unitType: string): string).
+
+ * Purpose: Supports maintainability by documenting why `getUnitDisplayNoun` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getUnitDisplayNoun(unitType: string): string {
   return UNIT_TYPE_NOUN_BY_TYPE[unitType] ?? capitalizeWord(unitType || 'Unit');
 }
 
 /**
- * Why this exists:
- *     Generates stable per-unit-type ordinals for the current roster without changing internal IDs.
- * When to use:
- *     Build a lookup for any player-facing panel/toast/list that prints unit names.
- * What to expect:
- *     Numbering starts at 1 per unit type and should use persisted displayOrder when provided.
- *     Human units use locale-aware ordinal labels (1st, 2nd...), while AI units use Roman numerals (I, II...).
+ * Defines the `buildUnitDisplayNameLookup` function shape (export function buildUnitDisplayNameLookup().
+
+ * Purpose: Supports maintainability by documenting why `buildUnitDisplayNameLookup` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function buildUnitDisplayNameLookup(
   units: readonly UnitDisplayIdentity[],
@@ -141,8 +247,12 @@ export function buildUnitDisplayNameLookup(
 }
 
 /**
- * Best-effort fallback for rare cases where only a raw unit ID is available.
- * Prefers returning the original ID when type/ordinal cannot be inferred.
+ * Defines the `fallbackDisplayNameFromUnitId` function shape (export function fallbackDisplayNameFromUnitId(unitId: string, locale?: Intl.LocalesArgument): string).
+
+ * Purpose: Supports maintainability by documenting why `fallbackDisplayNameFromUnitId` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function fallbackDisplayNameFromUnitId(unitId: string, locale?: Intl.LocalesArgument): string {
   const typeMatch = unitId.match(/-(infantry|armor|naval|air)-/);

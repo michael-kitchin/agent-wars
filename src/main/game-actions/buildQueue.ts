@@ -10,32 +10,200 @@ import {
 } from '../productionRules';
 import type { Res1ProductionContextSnapshot } from '../../shared/ipcTypes';
 
+/**
+ * Documents the `HexBuildQueueEntryView` interface as a named contract surface (export interface HexBuildQueueEntryView).
+
+ * Purpose: Supports maintainability by documenting why `HexBuildQueueEntryView` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface HexBuildQueueEntryView {
-  id: number;
-  queueIndex: number;
-  unitType: BuildUnitType;
-  count: number;
+    /**
+   * Specifies the contract for the `id` member (id: number;).
+
+   * Contract: Describes stable behavior for callers of `id` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+id: number;
+    /**
+   * Specifies the contract for the `queueIndex` member (queueIndex: number;).
+
+   * Contract: Describes stable behavior for callers of `queueIndex` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+queueIndex: number;
+    /**
+   * Specifies the contract for the `unitType` member (unitType: BuildUnitType;).
+
+   * Contract: Describes stable behavior for callers of `unitType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitType: BuildUnitType;
+    /**
+   * Specifies the contract for the `count` member (count: number;).
+
+   * Contract: Describes stable behavior for callers of `count` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+count: number;
 }
 
+/**
+ * Documents the `HexBuildQueueView` interface as a named contract surface (export interface HexBuildQueueView).
+
+ * Purpose: Supports maintainability by documenting why `HexBuildQueueView` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface HexBuildQueueView {
-  h3Index: string;
-  controllerPlayerId: string | null;
-  controlledByRequester: boolean;
-  urbanHexCount: number;
-  seaportCount: number;
-  airportCount: number;
-  availableUnitTypes: BuildUnitType[];
-  buildSectionVisible: boolean;
-  noBuildReason: string | null;
-  entries: HexBuildQueueEntryView[];
+    /**
+   * Specifies the contract for the `h3Index` member (h3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `h3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+h3Index: string;
+    /**
+   * Specifies the contract for the `controllerPlayerId` member (controllerPlayerId: string | null;).
+
+   * Contract: Describes stable behavior for callers of `controllerPlayerId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+controllerPlayerId: string | null;
+    /**
+   * Specifies the contract for the `controlledByRequester` member (controlledByRequester: boolean;).
+
+   * Contract: Describes stable behavior for callers of `controlledByRequester` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+controlledByRequester: boolean;
+    /**
+   * Specifies the contract for the `urbanHexCount` member (urbanHexCount: number;).
+
+   * Contract: Describes stable behavior for callers of `urbanHexCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+urbanHexCount: number;
+    /**
+   * Specifies the contract for the `seaportCount` member (seaportCount: number;).
+
+   * Contract: Describes stable behavior for callers of `seaportCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+seaportCount: number;
+    /**
+   * Specifies the contract for the `airportCount` member (airportCount: number;).
+
+   * Contract: Describes stable behavior for callers of `airportCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+airportCount: number;
+    /**
+   * Specifies the contract for the `availableUnitTypes` member (availableUnitTypes: BuildUnitType[];).
+
+   * Contract: Describes stable behavior for callers of `availableUnitTypes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+availableUnitTypes: BuildUnitType[];
+    /**
+   * Specifies the contract for the `buildSectionVisible` member (buildSectionVisible: boolean;).
+
+   * Contract: Describes stable behavior for callers of `buildSectionVisible` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+buildSectionVisible: boolean;
+    /**
+   * Specifies the contract for the `noBuildReason` member (noBuildReason: string | null;).
+
+   * Contract: Describes stable behavior for callers of `noBuildReason` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+noBuildReason: string | null;
+    /**
+   * Specifies the contract for the `entries` member (entries: HexBuildQueueEntryView[];).
+
+   * Contract: Describes stable behavior for callers of `entries` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+entries: HexBuildQueueEntryView[];
 }
 
+/**
+ * Documents the `ProductionEligibilityView` interface as a named contract surface (interface ProductionEligibilityView extends Res1ProductionContextSnapshot).
+
+ * Purpose: Supports maintainability by documenting why `ProductionEligibilityView` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface ProductionEligibilityView extends Res1ProductionContextSnapshot {
-  availableUnitTypes: BuildUnitType[];
-  buildSectionVisible: boolean;
-  noBuildReason: string | null;
+    /**
+   * Specifies the contract for the `availableUnitTypes` member (availableUnitTypes: BuildUnitType[];).
+
+   * Contract: Describes stable behavior for callers of `availableUnitTypes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+availableUnitTypes: BuildUnitType[];
+    /**
+   * Specifies the contract for the `buildSectionVisible` member (buildSectionVisible: boolean;).
+
+   * Contract: Describes stable behavior for callers of `buildSectionVisible` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+buildSectionVisible: boolean;
+    /**
+   * Specifies the contract for the `noBuildReason` member (noBuildReason: string | null;).
+
+   * Contract: Describes stable behavior for callers of `noBuildReason` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+noBuildReason: string | null;
 }
 
+/**
+ * Defines the `buildProductionEligibilityView` function shape (function buildProductionEligibilityView().
+
+ * Purpose: Supports maintainability by documenting why `buildProductionEligibilityView` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildProductionEligibilityView(
   productionContext: Res1ProductionContextSnapshot
 ): ProductionEligibilityView {
@@ -53,6 +221,14 @@ function buildProductionEligibilityView(
   };
 }
 
+/**
+ * Defines the `buildQueueViewForRequester` function shape (function buildQueueViewForRequester(h3Index: string, requestingPlayerId: string): HexBuildQueueView).
+
+ * Purpose: Supports maintainability by documenting why `buildQueueViewForRequester` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildQueueViewForRequester(h3Index: string, requestingPlayerId: string): HexBuildQueueView {
   const controllerPlayerId = getHexController(h3Index);
   const controlledByRequester = controllerPlayerId === requestingPlayerId;
@@ -76,6 +252,14 @@ function buildQueueViewForRequester(h3Index: string, requestingPlayerId: string)
   };
 }
 
+/**
+ * Defines the `validateBuildQueueMutationContext` function shape (function validateBuildQueueMutationContext(args: { h3Index: string; requestingPlayerId: string; requireBuildSectionVisible: boolean; }): { valid: true).
+
+ * Purpose: Supports maintainability by documenting why `validateBuildQueueMutationContext` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function validateBuildQueueMutationContext(args: {
   h3Index: string;
   requestingPlayerId: string;
@@ -95,11 +279,27 @@ function validateBuildQueueMutationContext(args: {
   return { valid: true, queueView };
 }
 
+/**
+ * Defines the `getHexBuildQueueImpl` function shape (export function getHexBuildQueueImpl(h3Index: string, requestingPlayerId = 'human'): HexBuildQueueView).
+
+ * Purpose: Supports maintainability by documenting why `getHexBuildQueueImpl` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function getHexBuildQueueImpl(h3Index: string, requestingPlayerId = 'human'): HexBuildQueueView {
   logTrace('gameActions getHexBuildQueue', { h3Index, requestingPlayerId });
   return buildQueueViewForRequester(h3Index, requestingPlayerId);
 }
 
+/**
+ * Defines the `addHexBuildQueueEntryImpl` function shape (export function addHexBuildQueueEntryImpl(h3Index: string, requestingPlayerId = 'human'): { success: boolean; reason?: string; queue?: HexBuildQueueVie).
+
+ * Purpose: Supports maintainability by documenting why `addHexBuildQueueEntryImpl` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function addHexBuildQueueEntryImpl(h3Index: string, requestingPlayerId = 'human'): {
   success: boolean;
   reason?: string;
@@ -129,6 +329,14 @@ export function addHexBuildQueueEntryImpl(h3Index: string, requestingPlayerId = 
   }
 }
 
+/**
+ * Defines the `updateHexBuildQueueEntryImpl` function shape (export function updateHexBuildQueueEntryImpl( h3Index: string, entryId: number, unitType: BuildUnitType, count: number, requestingPlayerId = 'hum).
+
+ * Purpose: Supports maintainability by documenting why `updateHexBuildQueueEntryImpl` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function updateHexBuildQueueEntryImpl(
   h3Index: string,
   entryId: number,
@@ -164,6 +372,14 @@ export function updateHexBuildQueueEntryImpl(
   }
 }
 
+/**
+ * Defines the `removeHexBuildQueueEntryImpl` function shape (export function removeHexBuildQueueEntryImpl( h3Index: string, entryId: number, requestingPlayerId = 'human' ): { success: boolean; reason?: string; q).
+
+ * Purpose: Supports maintainability by documenting why `removeHexBuildQueueEntryImpl` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function removeHexBuildQueueEntryImpl(
   h3Index: string,
   entryId: number,

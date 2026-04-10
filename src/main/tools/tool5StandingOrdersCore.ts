@@ -16,7 +16,14 @@ import {
 } from './tool5StandingOrdersShared';
 export { expireAndUpdateStatus, generateOrdersForStandingOrders } from './tool5StandingOrdersGeneration';
 
-/** Status values that trigger the ⚠ warning prefix in the injection. */
+/**
+ * Documents the module-scope binding `WARNING_STATUSES` (WARNING_STATUSES).
+
+ * Purpose: Supports maintainability by documenting why `WARNING_STATUSES` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const WARNING_STATUSES = new Set([
   'blocked',
   'target_lost',
@@ -26,17 +33,97 @@ const WARNING_STATUSES = new Set([
   'contact',
 ]);
 
+/**
+ * Documents the `StandingOrderPromptRow` interface as a named contract surface (interface StandingOrderPromptRow).
+
+ * Purpose: Supports maintainability by documenting why `StandingOrderPromptRow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface StandingOrderPromptRow {
-  unitId: string;
-  unitType: string;
-  orderType: string;
-  destination: string;
-  status: string;
-  nextMove: string;
-  turnsRemaining: string | number;
-  attention: 'yes' | 'no';
+    /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+
+   * Contract: Describes stable behavior for callers of `unitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitId: string;
+    /**
+   * Specifies the contract for the `unitType` member (unitType: string;).
+
+   * Contract: Describes stable behavior for callers of `unitType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitType: string;
+    /**
+   * Specifies the contract for the `orderType` member (orderType: string;).
+
+   * Contract: Describes stable behavior for callers of `orderType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+orderType: string;
+    /**
+   * Specifies the contract for the `destination` member (destination: string;).
+
+   * Contract: Describes stable behavior for callers of `destination` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+destination: string;
+    /**
+   * Specifies the contract for the `status` member (status: string;).
+
+   * Contract: Describes stable behavior for callers of `status` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+status: string;
+    /**
+   * Specifies the contract for the `nextMove` member (nextMove: string;).
+
+   * Contract: Describes stable behavior for callers of `nextMove` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+nextMove: string;
+    /**
+   * Specifies the contract for the `turnsRemaining` member (turnsRemaining: string | number;).
+
+   * Contract: Describes stable behavior for callers of `turnsRemaining` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+turnsRemaining: string | number;
+    /**
+   * Specifies the contract for the `attention` member (attention: 'yes' | 'no';).
+
+   * Contract: Describes stable behavior for callers of `attention` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+attention: 'yes' | 'no';
 }
 
+/**
+ * Defines the `toStandingOrderPromptRow` function shape (function toStandingOrderPromptRow().
+
+ * Purpose: Supports maintainability by documenting why `toStandingOrderPromptRow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function toStandingOrderPromptRow(
   row: StandingOrderRow,
   unitTypeById: Map<string, string>
@@ -85,8 +172,12 @@ function toStandingOrderPromptRow(
 }
 
 /**
- * Validates and persists a standing order for a unit. Uses Tool 1 (executePlanRoute) for march and pursue.
- * Returns spec-shaped response with computedRoute for march/pursue, or error. New orders take effect next turn.
+ * Defines the `assignOrder` function shape (function assignOrder( playerId: string, unitId: string, order: AssignOrderParams, state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, r).
+
+ * Purpose: Supports maintainability by documenting why `assignOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function assignOrder(
   playerId: string,
@@ -301,7 +392,12 @@ function assignOrder(
 }
 
 /**
- * Returns standing orders for a unit or all units for the player. Requires unitId or all === true.
+ * Defines the `queryOrders` function shape (function queryOrders(playerId: string, unitId?: string, all?: boolean): Record<string, unknown> { logTrace('tool5StandingOrders queryOrders', { playerId, uni).
+
+ * Purpose: Supports maintainability by documenting why `queryOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function queryOrders(playerId: string, unitId?: string, all?: boolean): Record<string, unknown> {
   logTrace('tool5StandingOrders queryOrders', { playerId, unitId, all });
@@ -330,6 +426,14 @@ function queryOrders(playerId: string, unitId?: string, all?: boolean): Record<s
   return { status: 'ok', error: null, orders };
 }
 
+/**
+ * Defines the `rowToOrderResponse` function shape (function rowToOrderResponse(row: StandingOrderRow): Record<string, unknown>).
+
+ * Purpose: Supports maintainability by documenting why `rowToOrderResponse` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function rowToOrderResponse(row: StandingOrderRow): Record<string, unknown> {
   const params = parseOrderParams(row);
   const computed = parseComputedRoute(row);
@@ -352,7 +456,12 @@ function rowToOrderResponse(row: StandingOrderRow): Record<string, unknown> {
 }
 
 /**
- * Cancels the standing order for a unit. Returns error if the unit has no standing order.
+ * Defines the `cancelOrder` function shape (function cancelOrder(playerId: string, unitId: string): Record<string, unknown> { logDebug('tool5StandingOrders cancelOrder', { playerId, unitId }); con).
+
+ * Purpose: Supports maintainability by documenting why `cancelOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function cancelOrder(playerId: string, unitId: string): Record<string, unknown> {
   logDebug('tool5StandingOrders cancelOrder', { playerId, unitId });
@@ -382,8 +491,12 @@ function cancelOrder(playerId: string, unitId: string): Record<string, unknown> 
 }
 
 /**
- * Returns the current standing order for a unit for use in assess_unit (Tool 2). Null if the unit has no standing order.
- * Use to populate currentStandingOrder in the unit assessment response.
+ * Defines the `getStandingOrderForUnit` function shape (export function getStandingOrderForUnit( playerId: string, unitId: string ): { type: string; destination?: [number, number]; defendHex?: [number, number]).
+
+ * Purpose: Supports maintainability by documenting why `getStandingOrderForUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getStandingOrderForUnit(
   playerId: string,
@@ -407,8 +520,12 @@ export function getStandingOrderForUnit(
 }
 
 /**
- * Builds the standing order status injection block for the system prompt (markdown status tables).
- * Call only when Orders tool group is enabled. Injection reflects DB state (call after expire/generate if status should be current).
+ * Defines the `getInjectionText` function shape (export function getInjectionText(playerId: string, state: GameStateSnapshot): string).
+
+ * Purpose: Supports maintainability by documenting why `getInjectionText` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getInjectionText(playerId: string, state: GameStateSnapshot): string {
   logTrace('tool5StandingOrders getInjectionText', { playerId, turnNumber: state.turnNumber });
@@ -460,13 +577,12 @@ export function getInjectionText(playerId: string, state: GameStateSnapshot): st
 }
 
 /**
- * Why this exists:
- *     Provides a player-scoped standing-order operation entrypoint so renderer-driven human orders can reuse
- *     the same validation, routing, and persistence logic as AI orders.
- * When to use:
- *     Main-process IPC handlers for human order assign/query/cancel and internal AI order application paths.
- * What to expect:
- *     Returns spec-shaped status payloads; validation failures return `{ status: 'error', error }`.
+ * Defines the `executeStandingOrderActionForPlayer` function shape (export function executeStandingOrderActionForPlayer( playerId: string, toolName: 'assign_order' | 'query_orders' | 'cancel_order', args: unknown, st).
+
+ * Purpose: Supports maintainability by documenting why `executeStandingOrderActionForPlayer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function executeStandingOrderActionForPlayer(
   playerId: string,

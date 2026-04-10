@@ -1,29 +1,45 @@
+/**
+ * Documents the module-scope binding `PROMPT_EMPTY_CELL` (PROMPT_EMPTY_CELL).
+
+ * Purpose: Supports maintainability by documenting why `PROMPT_EMPTY_CELL` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const PROMPT_EMPTY_CELL = '—';
 
+/**
+ * Defines the `normalizePromptCell` function shape (function normalizePromptCell(value: unknown): string).
+
+ * Purpose: Supports maintainability by documenting why `normalizePromptCell` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function normalizePromptCell(value: unknown): string {
   if (value === null || value === undefined || value === '') return PROMPT_EMPTY_CELL;
   return String(value);
 }
 
 /**
- * Why this exists:
- *     Escapes markdown table-sensitive characters so prompt tables remain parseable and readable.
- * When to use:
- *     Before writing dynamic content into table cells.
- * What to expect:
- *     Returns a single-line string with pipes escaped and newlines collapsed.
+ * Defines the `sanitizePromptTableCell` function shape (export function sanitizePromptTableCell(value: unknown): string).
+
+ * Purpose: Supports maintainability by documenting why `sanitizePromptTableCell` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function sanitizePromptTableCell(value: unknown): string {
   return normalizePromptCell(value).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
 }
 
 /**
- * Why this exists:
- *     Builds markdown table lines consistently across prompt sections.
- * When to use:
- *     Rendering prompt tables with stable separators and optional empty fallback row.
- * What to expect:
- *     Returns header + separator + body rows; inserts emptyRow when body is empty and emptyRow is provided.
+ * Defines the `buildPromptTableLines` function shape (export function buildPromptTableLines().
+
+ * Purpose: Supports maintainability by documenting why `buildPromptTableLines` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function buildPromptTableLines(
   headers: string[],

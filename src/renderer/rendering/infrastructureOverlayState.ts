@@ -1,39 +1,199 @@
 import { cellToParent } from 'h3-js';
 
+/**
+ * Documents the module-scope binding `WORLD_H3_RESOLUTION` (WORLD_H3_RESOLUTION).
+
+ * Purpose: Supports maintainability by documenting why `WORLD_H3_RESOLUTION` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const WORLD_H3_RESOLUTION = 1;
 
+/**
+ * Documents the `Res4OverlayInfrastructureRow` interface as a named contract surface (export interface Res4OverlayInfrastructureRow).
+
+ * Purpose: Supports maintainability by documenting why `Res4OverlayInfrastructureRow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface Res4OverlayInfrastructureRow {
-  h3Index: string;
-  terrainKind: string;
-  isUrban: boolean;
-  isAirport?: boolean;
-  isSeaport?: boolean;
-  isRubble?: boolean;
-}
+    /**
+   * Specifies the contract for the `h3Index` member (h3Index: string;).
 
-export interface Res4OverlayEntry {
-  terrainKind: string;
-  isUrban: boolean;
-  isAirport: boolean;
-  isSeaport: boolean;
-  isRubble: boolean;
-}
+   * Contract: Describes stable behavior for callers of `h3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+h3Index: string;
+    /**
+   * Specifies the contract for the `terrainKind` member (terrainKind: string;).
 
-export interface InfrastructureOverlayStateSnapshot {
-  res4TerrainOverridesByH3: Map<string, Res4OverlayEntry>;
-  terrainInfraRes1Airport: Set<string>;
-  terrainInfraRes1Seaport: Set<string>;
-  terrainInfraRes4Airport: Set<string>;
-  terrainInfraRes4Seaport: Set<string>;
+   * Contract: Describes stable behavior for callers of `terrainKind` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+terrainKind: string;
+    /**
+   * Specifies the contract for the `isUrban` member (isUrban: boolean;).
+
+   * Contract: Describes stable behavior for callers of `isUrban` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+isUrban: boolean;
+    /**
+   * Specifies the contract for the `isAirport` member (isAirport?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `isAirport` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+isAirport?: boolean;
+    /**
+   * Specifies the contract for the `isSeaport` member (isSeaport?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `isSeaport` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+isSeaport?: boolean;
+    /**
+   * Specifies the contract for the `isRubble` member (isRubble?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `isRubble` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+isRubble?: boolean;
 }
 
 /**
- * Why this exists:
- *     Builds renderer infrastructure-overlay state from live res4 override rows in one place.
- * When to use:
- *     Renderer startup and post-resolution refreshes after `game:getRes4TerrainOverrides`.
- * What to expect:
- *     Returns synchronized res1/res4 airport/seaport glyph sets and res4 terrain override lookup.
+ * Documents the `Res4OverlayEntry` interface as a named contract surface (export interface Res4OverlayEntry).
+
+ * Purpose: Supports maintainability by documenting why `Res4OverlayEntry` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export interface Res4OverlayEntry {
+    /**
+   * Specifies the contract for the `terrainKind` member (terrainKind: string;).
+
+   * Contract: Describes stable behavior for callers of `terrainKind` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+terrainKind: string;
+    /**
+   * Specifies the contract for the `isUrban` member (isUrban: boolean;).
+
+   * Contract: Describes stable behavior for callers of `isUrban` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+isUrban: boolean;
+    /**
+   * Specifies the contract for the `isAirport` member (isAirport: boolean;).
+
+   * Contract: Describes stable behavior for callers of `isAirport` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+isAirport: boolean;
+    /**
+   * Specifies the contract for the `isSeaport` member (isSeaport: boolean;).
+
+   * Contract: Describes stable behavior for callers of `isSeaport` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+isSeaport: boolean;
+    /**
+   * Specifies the contract for the `isRubble` member (isRubble: boolean;).
+
+   * Contract: Describes stable behavior for callers of `isRubble` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+isRubble: boolean;
+}
+
+/**
+ * Documents the `InfrastructureOverlayStateSnapshot` interface as a named contract surface (export interface InfrastructureOverlayStateSnapshot).
+
+ * Purpose: Supports maintainability by documenting why `InfrastructureOverlayStateSnapshot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export interface InfrastructureOverlayStateSnapshot {
+    /**
+   * Specifies the contract for the `res4TerrainOverridesByH3` member (res4TerrainOverridesByH3: Map<string, Res4OverlayEntry>;).
+
+   * Contract: Describes stable behavior for callers of `res4TerrainOverridesByH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+res4TerrainOverridesByH3: Map<string, Res4OverlayEntry>;
+    /**
+   * Specifies the contract for the `terrainInfraRes1Airport` member (terrainInfraRes1Airport: Set<string>;).
+
+   * Contract: Describes stable behavior for callers of `terrainInfraRes1Airport` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+terrainInfraRes1Airport: Set<string>;
+    /**
+   * Specifies the contract for the `terrainInfraRes1Seaport` member (terrainInfraRes1Seaport: Set<string>;).
+
+   * Contract: Describes stable behavior for callers of `terrainInfraRes1Seaport` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+terrainInfraRes1Seaport: Set<string>;
+    /**
+   * Specifies the contract for the `terrainInfraRes4Airport` member (terrainInfraRes4Airport: Set<string>;).
+
+   * Contract: Describes stable behavior for callers of `terrainInfraRes4Airport` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+terrainInfraRes4Airport: Set<string>;
+    /**
+   * Specifies the contract for the `terrainInfraRes4Seaport` member (terrainInfraRes4Seaport: Set<string>;).
+
+   * Contract: Describes stable behavior for callers of `terrainInfraRes4Seaport` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+terrainInfraRes4Seaport: Set<string>;
+}
+
+/**
+ * Defines the `deriveInfrastructureOverlayState` function shape (export function deriveInfrastructureOverlayState().
+
+ * Purpose: Supports maintainability by documenting why `deriveInfrastructureOverlayState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function deriveInfrastructureOverlayState(
   rows: Res4OverlayInfrastructureRow[]

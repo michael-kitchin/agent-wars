@@ -1,49 +1,289 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import type { PassableDomain } from '../pathfinding';
 
+/**
+ * Documents the `LatLng` type alias (type LatLng).
+
+ * Purpose: Supports maintainability by documenting why `LatLng` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type LatLng = [number, number];
 
-type PlanRouteError = { status: 'error'; error: string };
+/**
+ * Documents the `PlanRouteError` type alias (type PlanRouteError).
 
+ * Purpose: Supports maintainability by documenting why `PlanRouteError` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+type PlanRouteError = { /**
+ * Specifies the contract for the `status` member (status: 'error';).
+
+ * Contract: Describes stable behavior for callers of `status` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+status: 'error'; /**
+ * Specifies the contract for the `error` member (error: string).
+
+ * Contract: Describes stable behavior for callers of `error` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+error: string };
+
+/**
+ * Documents the `PlanRoutePathSegment` type alias (type PlanRoutePathSegment).
+
+ * Purpose: Supports maintainability by documenting why `PlanRoutePathSegment` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type PlanRoutePathSegment = {
-  turn: number;
-  hexes: LatLng[];
-  movementSpent: number;
-  movementBudget: number;
-  endHex: LatLng;
-};
+    /**
+   * Specifies the contract for the `turn` member (turn: number;).
 
-type PlanRouteOk = {
-  status: 'ok';
-  unitId: string;
-  unitType: string;
-  origin: LatLng;
-  destination: LatLng;
-  orderToXY: LatLng;
-  orderToH3: string;
-  suggestedDestinations?: LatLng[];
-  hexDistance: number;
-  turnsRequired: number;
-  path: PlanRoutePathSegment[];
-  warnings: string[];
-  error?: null;
-  reachable?: boolean;
-};
+   * Contract: Describes stable behavior for callers of `turn` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+turn: number;
+    /**
+   * Specifies the contract for the `hexes` member (hexes: LatLng[];).
 
-export type ResolvedPlanRouteRequestContext = {
-  state: GameStateSnapshot;
-  unit: GameStateSnapshot['units'][number];
-  originH3: string;
-  destinationH3: string;
+   * Contract: Describes stable behavior for callers of `hexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hexes: LatLng[];
+    /**
+   * Specifies the contract for the `movementSpent` member (movementSpent: number;).
+
+   * Contract: Describes stable behavior for callers of `movementSpent` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+movementSpent: number;
+    /**
+   * Specifies the contract for the `movementBudget` member (movementBudget: number;).
+
+   * Contract: Describes stable behavior for callers of `movementBudget` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+movementBudget: number;
+    /**
+   * Specifies the contract for the `endHex` member (endHex: LatLng;).
+
+   * Contract: Describes stable behavior for callers of `endHex` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+endHex: LatLng;
 };
 
 /**
- * Why this exists:
- *     Centralizes unit/destination resolution for plan_route so validation and error contracts stay consistent.
- * When to use:
- *     At the start of plan_route execution before any path search work.
- * What to expect:
- *     Returns resolved unit/origin/destination context or a spec-compatible error payload.
+ * Documents the `PlanRouteOk` type alias (type PlanRouteOk).
+
+ * Purpose: Supports maintainability by documenting why `PlanRouteOk` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+type PlanRouteOk = {
+    /**
+   * Specifies the contract for the `status` member (status: 'ok';).
+
+   * Contract: Describes stable behavior for callers of `status` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+status: 'ok';
+    /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+
+   * Contract: Describes stable behavior for callers of `unitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitId: string;
+    /**
+   * Specifies the contract for the `unitType` member (unitType: string;).
+
+   * Contract: Describes stable behavior for callers of `unitType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitType: string;
+    /**
+   * Specifies the contract for the `origin` member (origin: LatLng;).
+
+   * Contract: Describes stable behavior for callers of `origin` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+origin: LatLng;
+    /**
+   * Specifies the contract for the `destination` member (destination: LatLng;).
+
+   * Contract: Describes stable behavior for callers of `destination` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+destination: LatLng;
+    /**
+   * Specifies the contract for the `orderToXY` member (orderToXY: LatLng;).
+
+   * Contract: Describes stable behavior for callers of `orderToXY` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+orderToXY: LatLng;
+    /**
+   * Specifies the contract for the `orderToH3` member (orderToH3: string;).
+
+   * Contract: Describes stable behavior for callers of `orderToH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+orderToH3: string;
+    /**
+   * Specifies the contract for the `suggestedDestinations` member (suggestedDestinations?: LatLng[];).
+
+   * Contract: Describes stable behavior for callers of `suggestedDestinations` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+suggestedDestinations?: LatLng[];
+    /**
+   * Specifies the contract for the `hexDistance` member (hexDistance: number;).
+
+   * Contract: Describes stable behavior for callers of `hexDistance` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hexDistance: number;
+    /**
+   * Specifies the contract for the `turnsRequired` member (turnsRequired: number;).
+
+   * Contract: Describes stable behavior for callers of `turnsRequired` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+turnsRequired: number;
+    /**
+   * Specifies the contract for the `path` member (path: PlanRoutePathSegment[];).
+
+   * Contract: Describes stable behavior for callers of `path` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+path: PlanRoutePathSegment[];
+    /**
+   * Specifies the contract for the `warnings` member (warnings: string[];).
+
+   * Contract: Describes stable behavior for callers of `warnings` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+warnings: string[];
+    /**
+   * Specifies the contract for the `error` member (error?: null;).
+
+   * Contract: Describes stable behavior for callers of `error` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+error?: null;
+    /**
+   * Specifies the contract for the `reachable` member (reachable?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `reachable` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+reachable?: boolean;
+};
+
+/**
+ * Documents the `ResolvedPlanRouteRequestContext` type alias (export type ResolvedPlanRouteRequestContext).
+
+ * Purpose: Supports maintainability by documenting why `ResolvedPlanRouteRequestContext` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export type ResolvedPlanRouteRequestContext = {
+    /**
+   * Specifies the contract for the `state` member (state: GameStateSnapshot;).
+
+   * Contract: Describes stable behavior for callers of `state` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+state: GameStateSnapshot;
+    /**
+   * Specifies the contract for the `unit` member (unit: GameStateSnapshot['units'][number];).
+
+   * Contract: Describes stable behavior for callers of `unit` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unit: GameStateSnapshot['units'][number];
+    /**
+   * Specifies the contract for the `originH3` member (originH3: string;).
+
+   * Contract: Describes stable behavior for callers of `originH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+originH3: string;
+    /**
+   * Specifies the contract for the `destinationH3` member (destinationH3: string;).
+
+   * Contract: Describes stable behavior for callers of `destinationH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+destinationH3: string;
+};
+
+/**
+ * Defines the `resolvePlanRouteRequestContext` function shape (export function resolvePlanRouteRequestContext(payload: { unitId: string; destination: LatLng; state: GameStateSnapshot; hexSet: Set<string>; res).
+
+ * Purpose: Supports maintainability by documenting why `resolvePlanRouteRequestContext` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function resolvePlanRouteRequestContext(payload: {
   unitId: string;
@@ -79,12 +319,12 @@ export function resolvePlanRouteRequestContext(payload: {
 }
 
 /**
- * Why this exists:
- *     Produces a consistent success payload for already-at-destination cases while preserving helpful alternatives.
- * When to use:
- *     When path planning resolves destination to the current unit hex.
- * What to expect:
- *     Returns a valid `status: "ok"` route response with no movement and optional nearby suggestions.
+ * Defines the `buildAlreadyAtDestinationResult` function shape (export function buildAlreadyAtDestinationResult(payload: { unitId: string; unitType: string; originH3: string; destinationH3: string; passableFor).
+
+ * Purpose: Supports maintainability by documenting why `buildAlreadyAtDestinationResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function buildAlreadyAtDestinationResult(payload: {
   unitId: string;
@@ -128,12 +368,12 @@ export function buildAlreadyAtDestinationResult(payload: {
 }
 
 /**
- * Why this exists:
- *     Consolidates standard and max-turn-truncated route response shaping to avoid drift across call paths.
- * When to use:
- *     After obtaining a concrete traversable path and movement budget.
- * What to expect:
- *     Returns an `ok` route payload; when `maxTurns` truncates, includes `reachable: false`.
+ * Defines the `buildPlanRouteSuccessResult` function shape (export function buildPlanRouteSuccessResult(payload: { unitId: string; unitType: string; originH3: string; destinationH3: string; path: string[];).
+
+ * Purpose: Supports maintainability by documenting why `buildPlanRouteSuccessResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function buildPlanRouteSuccessResult(payload: {
   unitId: string;

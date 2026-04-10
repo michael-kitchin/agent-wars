@@ -18,12 +18,52 @@ import Module = require('module');
 import type { AirStrikeOrder, FerryOrder } from '../../shared/ipcTypes';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 
+/**
+ * Documents the `ChatResponse` type alias (type ChatResponse).
+
+ * Purpose: Supports maintainability by documenting why `ChatResponse` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type ChatResponse = {
-  id?: string;
-  choices: Array<{ message?: { content?: string; tool_calls?: unknown[] } }>;
-  usage?: { cost?: number; prompt_tokens?: number; completion_tokens?: number };
+    /**
+   * Specifies the contract for the `id` member (id?: string;).
+
+   * Contract: Describes stable behavior for callers of `id` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+id?: string;
+    /**
+   * Specifies the contract for the `choices` member (choices: Array<{ message?: { content?: string; tool_calls?: unknown[] } }>;).
+
+   * Contract: Describes stable behavior for callers of `choices` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+choices: Array<{ message?: { content?: string; tool_calls?: unknown[] } }>;
+    /**
+   * Specifies the contract for the `usage` member (usage?: { cost?: number; prompt_tokens?: number; completion_tokens?: number };).
+
+   * Contract: Describes stable behavior for callers of `usage` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+usage?: { cost?: number; prompt_tokens?: number; completion_tokens?: number };
 };
 
+/**
+ * Defines the `installElectronMock` function shape (function installElectronMock(userDataDir: string): () => void).
+
+ * Purpose: Supports maintainability by documenting why `installElectronMock` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function installElectronMock(userDataDir: string): () => void {
   const originalLoad = (Module as unknown as { _load: Function })._load;
   (Module as unknown as { _load: Function })._load = function patchedLoad(
@@ -50,6 +90,14 @@ function installElectronMock(userDataDir: string): () => void {
   };
 }
 
+/**
+ * Defines the `buildFixtureState` function shape (function buildFixtureState(hexes: string[]): { hexes: { h3Index: string; terrain: string; terrainKind: string }[]; units: { id: string; player: string; un).
+
+ * Purpose: Supports maintainability by documenting why `buildFixtureState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildFixtureState(hexes: string[]): {
   hexes: { h3Index: string; terrain: string; terrainKind: string }[];
   units: { id: string; player: string; unitType: string; h3Index: string }[];
@@ -89,15 +137,55 @@ function buildFixtureState(hexes: string[]): {
   };
 }
 
+/**
+ * Documents the `CapturedPayload` type alias (type CapturedPayload).
+
+ * Purpose: Supports maintainability by documenting why `CapturedPayload` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type CapturedPayload = {
-  model?: string;
-  messages?: Array<{ role: string; content?: string }>;
-  tools?: Array<{
+    /**
+   * Specifies the contract for the `model` member (model?: string;).
+
+   * Contract: Describes stable behavior for callers of `model` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+model?: string;
+    /**
+   * Specifies the contract for the `messages` member (messages?: Array<{ role: string; content?: string }>;).
+
+   * Contract: Describes stable behavior for callers of `messages` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+messages?: Array<{ role: string; content?: string }>;
+    /**
+   * Specifies the contract for the `tools` member (tools?: Array<{ type: string; function: { name: string; description: string; parameters: { type?: string; properties?: Record<string, unknown> } };).
+
+   * Contract: Describes stable behavior for callers of `tools` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+tools?: Array<{
     type: string;
     function: { name: string; description: string; parameters: { type?: string; properties?: Record<string, unknown> } };
   }>;
 };
 
+/**
+ * Defines the `assertPromptAvoidsPlayerFacingUnitLabels` function shape (function assertPromptAvoidsPlayerFacingUnitLabels(systemPrompt: string, mask: number): void).
+
+ * Purpose: Supports maintainability by documenting why `assertPromptAvoidsPlayerFacingUnitLabels` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function assertPromptAvoidsPlayerFacingUnitLabels(systemPrompt: string, mask: number): void {
   assert.ok(
     !systemPrompt.includes('(AI)') && !systemPrompt.includes('(human)'),
@@ -109,6 +197,14 @@ function assertPromptAvoidsPlayerFacingUnitLabels(systemPrompt: string, mask: nu
   );
 }
 
+/**
+ * Defines the `run` function shape (async function run(): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `run` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function run(): Promise<void> {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-wars-openrouter-test-'));
   const restoreElectron = installElectronMock(userDataDir);

@@ -11,14 +11,44 @@ import { getAttack, getDefense, getRange } from '../combatConstants';
 import { type CombatUnit } from '../combatResolution';
 import { logDebug, logError, logTrace } from '../logger';
 
-/** Coordinate pair [lat, lng] at the tool boundary. */
+/**
+ * Documents the `LatLng` type alias (export type LatLng).
+
+ * Purpose: Supports maintainability by documenting why `LatLng` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type LatLng = [number, number];
 
+/**
+ * Documents the `LatLngMap` type alias (type LatLngMap).
+
+ * Purpose: Supports maintainability by documenting why `LatLngMap` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type LatLngMap = Map<string, LatLng>;
 
-/** Calling player id when not in state: AI is opponent, so enemy = human. */
+/**
+ * Documents the module-scope binding `AI_PLAYER_ID` (AI_PLAYER_ID).
+
+ * Purpose: Supports maintainability by documenting why `AI_PLAYER_ID` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const AI_PLAYER_ID = 'opponent';
 
+/**
+ * Defines the `h3ToLatLng` function shape (function h3ToLatLng(h3: string, latLngByH3: LatLngMap): LatLng).
+
+ * Purpose: Supports maintainability by documenting why `h3ToLatLng` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function h3ToLatLng(h3: string, latLngByH3: LatLngMap): LatLng {
   const ll = latLngByH3.get(h3);
   if (ll) return ll;
@@ -27,10 +57,12 @@ function h3ToLatLng(h3: string, latLngByH3: LatLngMap): LatLng {
 }
 
 /**
- * Computes the exact probability mass function for total successes from independent
- * Bernoulli trials with potentially different success probabilities (Poisson-Binomial
- * distribution). Returns array where element k = P(exactly k successes).
- * O(n^2) time and O(n) space; suitable for the small unit counts in this game.
+ * Defines the `poissonBinomialPMF` function shape (export function poissonBinomialPMF(probs: number[]): number[]).
+
+ * Purpose: Supports maintainability by documenting why `poissonBinomialPMF` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function poissonBinomialPMF(probs: number[]): number[] {
   let dp = [1.0];
@@ -45,12 +77,23 @@ export function poissonBinomialPMF(probs: number[]): number[] {
   return dp;
 }
 
-/** Tool name for Tool 3. Exported so OpenRouter can route estimate_combat to this module. */
+/**
+ * Documents the module-scope binding `TOOL3_NAMES` (TOOL3_NAMES).
+
+ * Purpose: Supports maintainability by documenting why `TOOL3_NAMES` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const TOOL3_NAMES = ['estimate_combat'] as const;
 
 /**
- * Returns the assessment category from probability of defender eliminated and probability attacker loses at least one unit.
- * Use for estimate_combat prediction; handle uncontested (no defenders) in the caller. Thresholds per MCP spec § Tool 3.
+ * Defines the `getAssessmentCategory` function shape (export function getAssessmentCategory( pDefenderEliminated: number, pAttackerLosesUnit: number ): 'strongly_favorable' | 'favorable' | 'even' | 'unfavora).
+
+ * Purpose: Supports maintainability by documenting why `getAssessmentCategory` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getAssessmentCategory(
   pDefenderEliminated: number,
@@ -66,9 +109,12 @@ export function getAssessmentCategory(
 }
 
 /**
- * Implements estimate_combat: parses args, resolves or builds attacker/defender lists, computes exact
- * outcome probabilities via Poisson-Binomial PMFs, returns spec-shaped response. Call from executeTool3.
- * Exported for unit tests.
+ * Defines the `executeEstimateCombat` function shape (export function executeEstimateCombat( args: unknown, state: GameStateSnapshot, latLngByH3: LatLngMap, resolveToH3: (lat: number, lng: number) => st).
+
+ * Purpose: Supports maintainability by documenting why `executeEstimateCombat` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function executeEstimateCombat(
   args: unknown,
@@ -345,9 +391,12 @@ export function executeEstimateCombat(
 }
 
 /**
- * Dispatcher for Tool 3 (Combat Outcome Estimation). Given tool name and parsed arguments, runs estimate_combat
- * and returns a JSON-serializable response. Use from the OpenRouter tool-calling loop when the model requests estimate_combat.
- * Every response has status ("ok" or "error") and error (null when ok). Throws are caught and returned as status "error".
+ * Defines the `executeTool3` function shape (export function executeTool3( toolName: string, args: unknown, state: GameStateSnapshot, latLngByH3: LatLngMap, resolveToH3: (lat: number, lng: n).
+
+ * Purpose: Supports maintainability by documenting why `executeTool3` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function executeTool3(
   toolName: string,

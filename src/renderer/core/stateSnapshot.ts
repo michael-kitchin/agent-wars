@@ -2,24 +2,152 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { applyInitialCameraForState } from '../map/mapUtils';
 import { rendererSharedState as S } from './state';
 
+/**
+ * Documents the `ApplySnapshotDeps` interface as a named contract surface (interface ApplySnapshotDeps).
+
+ * Purpose: Supports maintainability by documenting why `ApplySnapshotDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface ApplySnapshotDeps {
-  rebuildUnitDisplayNameLookup: (state: GameStateSnapshot | null) => void;
-  reconcileSelectionToCurrentState: () => void;
-  updateClientStaleEnemyIntel: (previousState: GameStateSnapshot | null, state: GameStateSnapshot) => void;
-  clearRes1TooltipSummaryCaches: () => void;
-  refreshHumanStandingOrders: () => Promise<void>;
-  updateGameStateSidebar: (state: GameStateSnapshot | null) => void;
-  updateRangedSidebar: () => void;
-  updateSidebar: () => void;
-  updatePendingOrdersSidebar: () => void;
-  updateGameOverUI: (state: GameStateSnapshot) => void;
-  updateReadyButtonState: () => void;
-  redraw: () => void;
-  refreshBuildPopupIfOpen: () => void;
+    /**
+   * Specifies the contract for the `rebuildUnitDisplayNameLookup` member (rebuildUnitDisplayNameLookup: (state: GameStateSnapshot | null) => void;).
+
+   * Contract: Describes stable behavior for callers of `rebuildUnitDisplayNameLookup` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+rebuildUnitDisplayNameLookup: (state: GameStateSnapshot | null) => void;
+    /**
+   * Specifies the contract for the `reconcileSelectionToCurrentState` member (reconcileSelectionToCurrentState: () => void;).
+
+   * Contract: Describes stable behavior for callers of `reconcileSelectionToCurrentState` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+reconcileSelectionToCurrentState: () => void;
+    /**
+   * Specifies the contract for the `updateClientStaleEnemyIntel` member (updateClientStaleEnemyIntel: (previousState: GameStateSnapshot | null, state: GameStateSnapshot) => void;).
+
+   * Contract: Describes stable behavior for callers of `updateClientStaleEnemyIntel` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateClientStaleEnemyIntel: (previousState: GameStateSnapshot | null, state: GameStateSnapshot) => void;
+    /**
+   * Specifies the contract for the `clearRes1TooltipSummaryCaches` member (clearRes1TooltipSummaryCaches: () => void;).
+
+   * Contract: Describes stable behavior for callers of `clearRes1TooltipSummaryCaches` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+clearRes1TooltipSummaryCaches: () => void;
+    /**
+   * Specifies the contract for the `refreshHumanStandingOrders` member (refreshHumanStandingOrders: () => Promise<void>;).
+
+   * Contract: Describes stable behavior for callers of `refreshHumanStandingOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+refreshHumanStandingOrders: () => Promise<void>;
+    /**
+   * Specifies the contract for the `updateGameStateSidebar` member (updateGameStateSidebar: (state: GameStateSnapshot | null) => void;).
+
+   * Contract: Describes stable behavior for callers of `updateGameStateSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateGameStateSidebar: (state: GameStateSnapshot | null) => void;
+    /**
+   * Specifies the contract for the `updateRangedSidebar` member (updateRangedSidebar: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateRangedSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateRangedSidebar: () => void;
+    /**
+   * Specifies the contract for the `updateSidebar` member (updateSidebar: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateSidebar: () => void;
+    /**
+   * Specifies the contract for the `updatePendingOrdersSidebar` member (updatePendingOrdersSidebar: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updatePendingOrdersSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updatePendingOrdersSidebar: () => void;
+    /**
+   * Specifies the contract for the `updateGameOverUI` member (updateGameOverUI: (state: GameStateSnapshot) => void;).
+
+   * Contract: Describes stable behavior for callers of `updateGameOverUI` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateGameOverUI: (state: GameStateSnapshot) => void;
+    /**
+   * Specifies the contract for the `updateReadyButtonState` member (updateReadyButtonState: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateReadyButtonState` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateReadyButtonState: () => void;
+    /**
+   * Specifies the contract for the `redraw` member (redraw: () => void;).
+
+   * Contract: Describes stable behavior for callers of `redraw` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+redraw: () => void;
+    /**
+   * Specifies the contract for the `refreshBuildPopupIfOpen` member (refreshBuildPopupIfOpen: () => void;).
+
+   * Contract: Describes stable behavior for callers of `refreshBuildPopupIfOpen` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+refreshBuildPopupIfOpen: () => void;
 }
 
+/**
+ * Documents the `RefreshBuildQueueDeps` interface as a named contract surface (interface RefreshBuildQueueDeps).
+
+ * Purpose: Supports maintainability by documenting why `RefreshBuildQueueDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface RefreshBuildQueueDeps {
-  applyGameStateSnapshot: (
+    /**
+   * Specifies the contract for the `applyGameStateSnapshot` member (applyGameStateSnapshot: ( nextState: GameStateSnapshot, options?: { refreshStandingOrders?: boolean; updateGameStateSidebarUi?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `applyGameStateSnapshot` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+applyGameStateSnapshot: (
     nextState: GameStateSnapshot,
     options?: {
       refreshStandingOrders?: boolean;
@@ -33,6 +161,14 @@ interface RefreshBuildQueueDeps {
   ) => Promise<void>;
 }
 
+/**
+ * Defines the `refreshGameStateAfterBuildQueueChange` function shape (export async function refreshGameStateAfterBuildQueueChange(deps: RefreshBuildQueueDeps): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `refreshGameStateAfterBuildQueueChange` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export async function refreshGameStateAfterBuildQueueChange(deps: RefreshBuildQueueDeps): Promise<void> {
   if (!window.gameApi?.getGameState) return;
   try {
@@ -51,6 +187,14 @@ export async function refreshGameStateAfterBuildQueueChange(deps: RefreshBuildQu
   }
 }
 
+/**
+ * Defines the `applyGameStateSnapshot` function shape (export async function applyGameStateSnapshot( deps: ApplySnapshotDeps, nextState: GameStateSnapshot, options: { refreshStandingOrders?: boolean;).
+
+ * Purpose: Supports maintainability by documenting why `applyGameStateSnapshot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export async function applyGameStateSnapshot(
   deps: ApplySnapshotDeps,
   nextState: GameStateSnapshot,
@@ -86,6 +230,14 @@ export async function applyGameStateSnapshot(
   if (options.refreshBuildPopup) deps.refreshBuildPopupIfOpen();
 }
 
+/**
+ * Defines the `updateClientStaleEnemyIntel` function shape (export function updateClientStaleEnemyIntel(previousState: GameStateSnapshot | null, state: GameStateSnapshot): void).
+
+ * Purpose: Supports maintainability by documenting why `updateClientStaleEnemyIntel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function updateClientStaleEnemyIntel(previousState: GameStateSnapshot | null, state: GameStateSnapshot): void {
   const currentTurn = state.turnNumber;
   const hasFogData = Array.isArray(state.visibleHexes);

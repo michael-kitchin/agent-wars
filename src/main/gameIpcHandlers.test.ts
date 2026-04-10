@@ -13,19 +13,91 @@ import {
 } from './gameIpcHandlers';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../shared/ipcTypes';
 
+/**
+ * Documents the module-scope binding `minimalPlanningState` (minimalPlanningState).
+
+ * Purpose: Supports maintainability by documenting why `minimalPlanningState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const minimalPlanningState = {
-  hexes: [{ h3Index: '891f1d48b9fffff', terrain: 'land' as const, terrainKind: 'plains' }],
-  units: [
+    /**
+   * Documents the object literal property `hexes` (hexes: [{ h3Index: '891f1d48b9fffff', terrain: 'land' as const, terrainKind: 'plains' }]).
+
+   * Purpose: Supports maintainability by documenting why `hexes` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hexes: [{ h3Index: '891f1d48b9fffff', terrain: 'land' as const, terrainKind: 'plains' }],
+    /**
+   * Documents the object literal property `units` (units: [ { id: 'human-1', player: 'human', unitType: 'infantry', h3Index: '891f1d48b9fffff' }, { id: 'opponent-1', player: 'opponent', unitType: 'armo).
+
+   * Purpose: Supports maintainability by documenting why `units` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+units: [
     { id: 'human-1', player: 'human', unitType: 'infantry', h3Index: '891f1d48b9fffff' },
     { id: 'opponent-1', player: 'opponent', unitType: 'armor', h3Index: '891f1d48b9fffff' },
   ],
-  phase: 'planning' as const,
-  turnNumber: 1,
-  pendingOrders: [] as { unitId: string; toH3Index: string }[],
+    /**
+   * Documents the object literal property `phase` (phase: 'planning' as const).
+
+   * Purpose: Supports maintainability by documenting why `phase` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+phase: 'planning' as const,
+    /**
+   * Documents the object literal property `turnNumber` (turnNumber: 1).
+
+   * Purpose: Supports maintainability by documenting why `turnNumber` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+turnNumber: 1,
+    /**
+   * Documents the object literal property `pendingOrders` (pendingOrders: [] as { unitId: string; toH3Index: string }[]).
+
+   * Purpose: Supports maintainability by documenting why `pendingOrders` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+pendingOrders: [] as { unitId: string; toH3Index: string }[],
 };
 
-const resolutionState = { ...minimalPlanningState, phase: 'resolution' as const };
+/**
+ * Documents the module-scope binding `resolutionState` (resolutionState).
 
+ * Purpose: Supports maintainability by documenting why `resolutionState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+const resolutionState = { ...minimalPlanningState, /**
+ * Documents the object literal property `phase` (phase: 'resolution' as const).
+
+ * Purpose: Supports maintainability by documenting why `phase` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+phase: 'resolution' as const };
+
+/**
+ * Defines the `testRequestAiOrdersNotInPlanningPhase` function shape (async function testRequestAiOrdersNotInPlanningPhase(): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `testRequestAiOrdersNotInPlanningPhase` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function testRequestAiOrdersNotInPlanningPhase(): Promise<void> {
   const deps = {
     getGameState: () => resolutionState,
@@ -41,6 +113,14 @@ async function testRequestAiOrdersNotInPlanningPhase(): Promise<void> {
   assert.strictEqual((result as { error: string }).error, 'Not in planning phase');
 }
 
+/**
+ * Defines the `testRequestAiOrdersNoModel` function shape (async function testRequestAiOrdersNoModel(): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `testRequestAiOrdersNoModel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function testRequestAiOrdersNoModel(): Promise<void> {
   const deps = {
     getGameState: () => minimalPlanningState,
@@ -56,6 +136,14 @@ async function testRequestAiOrdersNoModel(): Promise<void> {
   assert.strictEqual((result as { error: string }).error, 'No model selected');
 }
 
+/**
+ * Defines the `testRequestAiOrdersNoKey` function shape (async function testRequestAiOrdersNoKey(): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `testRequestAiOrdersNoKey` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function testRequestAiOrdersNoKey(): Promise<void> {
   const deps = {
     getGameState: () => minimalPlanningState,
@@ -72,6 +160,14 @@ async function testRequestAiOrdersNoKey(): Promise<void> {
   assert.strictEqual((result as { error: string }).error, 'No API key set');
 }
 
+/**
+ * Defines the `testRequestAiOrdersSuccess` function shape (async function testRequestAiOrdersSuccess(): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `testRequestAiOrdersSuccess` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function testRequestAiOrdersSuccess(): Promise<void> {
   const controllerRef = { current: null as AbortController | null };
   const deps = {
@@ -95,6 +191,14 @@ async function testRequestAiOrdersSuccess(): Promise<void> {
   assert.strictEqual((result as { strategy?: string }).strategy, 'hold');
 }
 
+/**
+ * Defines the `testRequestAiOrdersCancelled` function shape (async function testRequestAiOrdersCancelled(): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `testRequestAiOrdersCancelled` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function testRequestAiOrdersCancelled(): Promise<void> {
   const controllerRef = { current: null as AbortController | null };
   let capturedSignal: AbortSignal | undefined;
@@ -131,6 +235,14 @@ async function testRequestAiOrdersCancelled(): Promise<void> {
   assert.ok(capturedSignal);
 }
 
+/**
+ * Defines the `testGameReadyPrecomputedSkipsRequestOrders` function shape (async function testGameReadyPrecomputedSkipsRequestOrders(): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `testGameReadyPrecomputedSkipsRequestOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function testGameReadyPrecomputedSkipsRequestOrders(): Promise<void> {
   let requestOrdersCalled = false;
   const deps = {
@@ -165,6 +277,14 @@ async function testGameReadyPrecomputedSkipsRequestOrders(): Promise<void> {
   assert.strictEqual(result.aiOrderCount, 0);
 }
 
+/**
+ * Defines the `testGameReadyRunOffSkipsRequestOrdersNonEventDriven` function shape (async function testGameReadyRunOffSkipsRequestOrdersNonEventDriven(): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `testGameReadyRunOffSkipsRequestOrdersNonEventDriven` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function testGameReadyRunOffSkipsRequestOrdersNonEventDriven(): Promise<void> {
   let requestOrdersCalled = false;
   const deps = {
@@ -179,12 +299,16 @@ async function testGameReadyRunOffSkipsRequestOrdersNonEventDriven(): Promise<vo
       return { success: false, error: 'should not be called' };
     },
     ready: (
-      _aiOrders: { unitId: string; toH3Index: string }[],
-      _aiRangedOrders: { unitId: string; targetH3Index: string }[]
-    ): ReadyResultMinimal & { success: boolean } => ({
-      success: true,
-      aiOrderCount: 0,
-    }),
+      aiOrders: { unitId: string; toH3Index: string }[],
+      aiRangedOrders: { unitId: string; targetH3Index: string }[]
+    ): ReadyResultMinimal & { success: boolean } => {
+      void aiOrders;
+      void aiRangedOrders;
+      return {
+        success: true,
+        aiOrderCount: 0,
+      };
+    },
   };
   const result = await handleGameReady(
     { enabledToolGroups: ['planning'], aiPlanningRunEnabled: false },
@@ -194,6 +318,14 @@ async function testGameReadyRunOffSkipsRequestOrdersNonEventDriven(): Promise<vo
   assert.strictEqual(result.success, true);
 }
 
+/**
+ * Defines the `testGameReadyPrecomputedWithOrders` function shape (async function testGameReadyPrecomputedWithOrders(): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `testGameReadyPrecomputedWithOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function testGameReadyPrecomputedWithOrders(): Promise<void> {
   const precomputedOrders = [{ unitId: 'opponent-1', toH3Index: '891f1d48b9fffff' }];
   const precomputedRanged: { unitId: string; targetH3Index: string }[] = [];
@@ -231,6 +363,14 @@ async function testGameReadyPrecomputedWithOrders(): Promise<void> {
   assert.strictEqual(result.aiOrderCount, 1);
 }
 
+/**
+ * Defines the `testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders` function shape (async function testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders(): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders(): Promise<void> {
   const deps = {
     getGameState: () => minimalPlanningState,
@@ -270,6 +410,14 @@ async function testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders(): Promise<v
   assert.strictEqual(result.success, true);
 }
 
+/**
+ * Defines the `runAll` function shape (async function runAll(): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `runAll` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function runAll(): Promise<void> {
   const tests: { name: string; fn: () => void | Promise<void> }[] = [
     { name: 'requestAiOrders not in planning phase', fn: testRequestAiOrdersNotInPlanningPhase },

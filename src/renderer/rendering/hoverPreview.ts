@@ -6,6 +6,14 @@ import { rendererSharedState as S } from '../core/state';
 import { getLeafletGlobal, hexCenterPx } from '../map/mapUtils';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
 
+/**
+ * Defines the `drawHoverRoutePreview` function shape (export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void).
+
+ * Purpose: Supports maintainability by documenting why `drawHoverRoutePreview` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
   if (!S.hoverRoutePreview || !S.gameState) return;
   const state = S.gameState;

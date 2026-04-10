@@ -10,6 +10,14 @@ import {
   MAX_UNITS_PER_TYPE as MAX_UNITS_PER_TYPE_SHARED,
 } from '../shared/productionConfig';
 
+/**
+ * Defines the `testBuildTypeAvailabilityGates` function shape (function testBuildTypeAvailabilityGates(): void).
+
+ * Purpose: Supports maintainability by documenting why `testBuildTypeAvailabilityGates` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testBuildTypeAvailabilityGates(): void {
   assert.deepStrictEqual(getAvailableBuildUnitTypes(0, 0, 0), []);
   assert.deepStrictEqual(getAvailableBuildUnitTypes(1, 0, 0), ['infantry']);
@@ -26,6 +34,14 @@ function testBuildTypeAvailabilityGates(): void {
   assert.deepStrictEqual(getAvailableBuildUnitTypes(10, 1, 1), ['infantry', 'armor', 'naval', 'air']);
 }
 
+/**
+ * Defines the `testBuildCountValidationBounds` function shape (function testBuildCountValidationBounds(): void).
+
+ * Purpose: Supports maintainability by documenting why `testBuildCountValidationBounds` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testBuildCountValidationBounds(): void {
   assert.strictEqual(isValidBuildCount(0), false);
   assert.strictEqual(isValidBuildCount(1), true);
@@ -34,6 +50,14 @@ function testBuildCountValidationBounds(): void {
   assert.strictEqual(isValidBuildCount(3.5), false);
 }
 
+/**
+ * Defines the `testProductionExamplesFromSpec` function shape (function testProductionExamplesFromSpec(): void).
+
+ * Purpose: Supports maintainability by documenting why `testProductionExamplesFromSpec` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testProductionExamplesFromSpec(): void {
   // 2 urban -> one infantry (cost 10) in 5 turns.
   let points = 0;
@@ -61,6 +85,14 @@ function testProductionExamplesFromSpec(): void {
   assert.strictEqual(high.updatedEntries[0]?.remainingCount, 5);
 }
 
+/**
+ * Defines the `testTurnsToNextSpawnEstimateUsesNextUnitOnly` function shape (function testTurnsToNextSpawnEstimateUsesNextUnitOnly(): void).
+
+ * Purpose: Supports maintainability by documenting why `testTurnsToNextSpawnEstimateUsesNextUnitOnly` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testTurnsToNextSpawnEstimateUsesNextUnitOnly(): void {
   // Queue count does not matter for "next spawn" timing. At 5c/turn and infantry cost 10, first spawn is 2 turns away.
   assert.strictEqual(estimateTurnsToNextSpawn('infantry', 0, 5), 2);
@@ -70,6 +102,14 @@ function testTurnsToNextSpawnEstimateUsesNextUnitOnly(): void {
   assert.strictEqual(estimateTurnsToNextSpawn('armor', 0, 0), null);
 }
 
+/**
+ * Defines the `testDeploymentCapsMatchMilestone14Values` function shape (function testDeploymentCapsMatchMilestone14Values(): void).
+
+ * Purpose: Supports maintainability by documenting why `testDeploymentCapsMatchMilestone14Values` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testDeploymentCapsMatchMilestone14Values(): void {
   assert.deepStrictEqual(MAX_UNITS_PER_TYPE_SHARED, {
     infantry: 6,
@@ -80,13 +120,20 @@ function testDeploymentCapsMatchMilestone14Values(): void {
   assert.deepStrictEqual(MAX_UNITS_PER_TYPE_MAIN, MAX_UNITS_PER_TYPE_SHARED);
 }
 
+/**
+ * Defines the `run` function shape (function run(): void).
+
+ * Purpose: Supports maintainability by documenting why `run` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function run(): void {
   testBuildTypeAvailabilityGates();
   testBuildCountValidationBounds();
   testProductionExamplesFromSpec();
   testTurnsToNextSpawnEstimateUsesNextUnitOnly();
   testDeploymentCapsMatchMilestone14Values();
-  // eslint-disable-next-line no-console
   console.log('productionRules.test.ts passed');
 }
 

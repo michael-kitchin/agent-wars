@@ -9,6 +9,14 @@ import { createPathfindingSession, executePlanRoute, executePlanRouteWithSession
 import type { GameStateSnapshot } from '../gameDb';
 import { LAND_UNITS_CANNOT_MOVE_WATER_OR_ARCTIC_TO_WATER_OR_ARCTIC_REASON } from '../game-actions/landMovementConstraints';
 
+/**
+ * Defines the `buildAdjacentHexPair` function shape (function buildAdjacentHexPair():).
+
+ * Purpose: Supports maintainability by documenting why `buildAdjacentHexPair` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildAdjacentHexPair(): { originH3: string; destinationH3: string } {
   const originH3 = latLngToCell(0, 0, 3);
   const destinationH3 = gridDisk(originH3, 1).find((h3) => h3 !== originH3);
@@ -17,8 +25,12 @@ function buildAdjacentHexPair(): { originH3: string; destinationH3: string } {
 }
 
 /**
- * When a land unit is routed to a water hex, plan_route returns an error that includes
- * terrain guidance so the LLM can retry with a land destination.
+ * Defines the `testPlanRouteLandUnitToWaterHexReturnsTerrainHint` function shape (function testPlanRouteLandUnitToWaterHexReturnsTerrainHint(): void).
+
+ * Purpose: Supports maintainability by documenting why `testPlanRouteLandUnitToWaterHexReturnsTerrainHint` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function testPlanRouteLandUnitToWaterHexReturnsTerrainHint(): void {
   const { originH3: landH3, destinationH3: waterH3 } = buildAdjacentHexPair();
@@ -60,7 +72,12 @@ function testPlanRouteLandUnitToWaterHexReturnsTerrainHint(): void {
 }
 
 /**
- * Land route planning rejects movement between special water/arctic endpoints, even when terrain labels are coastal.
+ * Defines the `testPlanRouteLandUnitRejectsWaterKindToWaterKindMovement` function shape (function testPlanRouteLandUnitRejectsWaterKindToWaterKindMovement(): void).
+
+ * Purpose: Supports maintainability by documenting why `testPlanRouteLandUnitRejectsWaterKindToWaterKindMovement` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function testPlanRouteLandUnitRejectsWaterKindToWaterKindMovement(): void {
   const { originH3, destinationH3 } = buildAdjacentHexPair();
@@ -97,7 +114,12 @@ function testPlanRouteLandUnitRejectsWaterKindToWaterKindMovement(): void {
 }
 
 /**
- * Session-backed and default planning paths stay behaviorally equivalent for the same snapshot and destination.
+ * Defines the `testPlanRouteSessionParity` function shape (function testPlanRouteSessionParity(): void).
+
+ * Purpose: Supports maintainability by documenting why `testPlanRouteSessionParity` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function testPlanRouteSessionParity(): void {
   const { originH3, destinationH3 } = buildAdjacentHexPair();
@@ -135,7 +157,12 @@ function testPlanRouteSessionParity(): void {
 }
 
 /**
- * Stateful planner allows routes that touch special water/arctic classes when separated by a normal hex.
+ * Defines the `testPlanRouteAllowsSeparatedSpecialTransitions` function shape (function testPlanRouteAllowsSeparatedSpecialTransitions(): void).
+
+ * Purpose: Supports maintainability by documenting why `testPlanRouteAllowsSeparatedSpecialTransitions` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function testPlanRouteAllowsSeparatedSpecialTransitions(): void {
   const originH3 = latLngToCell(10, 10, 3);
@@ -180,8 +207,12 @@ function testPlanRouteAllowsSeparatedSpecialTransitions(): void {
 }
 
 /**
- * Shared-session land search dead-state caching is scoped by origin+destination so
- * one unit's failed/successful exploration does not poison another unit with same destination.
+ * Defines the `testPlanRouteSessionDeadStateCacheUsesOriginDestinationCompositeKey` function shape (function testPlanRouteSessionDeadStateCacheUsesOriginDestinationCompositeKey(): void).
+
+ * Purpose: Supports maintainability by documenting why `testPlanRouteSessionDeadStateCacheUsesOriginDestinationCompositeKey` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function testPlanRouteSessionDeadStateCacheUsesOriginDestinationCompositeKey(): void {
   const destinationH3 = latLngToCell(22, 22, 3);
@@ -228,8 +259,12 @@ function testPlanRouteSessionDeadStateCacheUsesOriginDestinationCompositeKey(): 
 }
 
 /**
- * Avoid-enemy first attempts and unblocked retry attempts must use different stateful cache buckets
- * so a failed blocked search cannot poison the unblocked retry for the same route.
+ * Defines the `testPlanRouteSessionDeadStateCacheSeparatesBlockedAndUnblockedSearches` function shape (function testPlanRouteSessionDeadStateCacheSeparatesBlockedAndUnblockedSearches(): void).
+
+ * Purpose: Supports maintainability by documenting why `testPlanRouteSessionDeadStateCacheSeparatesBlockedAndUnblockedSearches` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function testPlanRouteSessionDeadStateCacheSeparatesBlockedAndUnblockedSearches(): void {
   const originH3 = latLngToCell(30, 30, 3);
@@ -277,6 +312,14 @@ function testPlanRouteSessionDeadStateCacheSeparatesBlockedAndUnblockedSearches(
   );
 }
 
+/**
+ * Defines the `run` function shape (function run(): void).
+
+ * Purpose: Supports maintainability by documenting why `run` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function run(): void {
   testPlanRouteLandUnitToWaterHexReturnsTerrainHint();
   testPlanRouteLandUnitRejectsWaterKindToWaterKindMovement();

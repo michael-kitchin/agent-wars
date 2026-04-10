@@ -1,30 +1,84 @@
 /**
- * Raster basemap definitions for Leaflet (URL template, attribution, subdomains).
- * Order in RASTER_BASEMAP_ORDER is the runtime fallback sequence on tile load failures.
- * Swap or extend providers here without touching map wiring (see worldLeafletMap.ts).
- *
- * Providers are chosen for variety (color vs grayscale vs dark) while avoiding label layers;
- * political boundaries may appear faintly on some OSM-derived rasters at high zoom.
- */
+ * Documents the `RasterBasemapDefinition` interface as a named contract surface (export interface RasterBasemapDefinition).
 
-/** One XYZ raster provider usable with L.tileLayer. */
+ * Purpose: Supports maintainability by documenting why `RasterBasemapDefinition` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface RasterBasemapDefinition {
-  /** Stable id for logs and terrain-style mapping. */
-  id: string;
-  /** Human-readable label (settings UI / debugging). */
-  displayName: string;
-  urlTemplate: string;
-  /** HTML attribution snippet (shown on the main map only; keep terms-compliant). */
-  attributionHtml: string;
-  /** Leaflet tileLayer `subdomains` option, if any. */
-  subdomains?: string;
-  maxZoom?: number;
-  minZoom?: number;
+    /**
+   * Specifies the contract for the `id` member (id: string;).
+
+   * Contract: Describes stable behavior for callers of `id` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+id: string;
+    /**
+   * Specifies the contract for the `displayName` member (displayName: string;).
+
+   * Contract: Describes stable behavior for callers of `displayName` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+displayName: string;
+    /**
+   * Specifies the contract for the `urlTemplate` member (urlTemplate: string;).
+
+   * Contract: Describes stable behavior for callers of `urlTemplate` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+urlTemplate: string;
+    /**
+   * Specifies the contract for the `attributionHtml` member (attributionHtml: string;).
+
+   * Contract: Describes stable behavior for callers of `attributionHtml` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+attributionHtml: string;
+    /**
+   * Specifies the contract for the `subdomains` member (subdomains?: string;).
+
+   * Contract: Describes stable behavior for callers of `subdomains` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+subdomains?: string;
+    /**
+   * Specifies the contract for the `maxZoom` member (maxZoom?: number;).
+
+   * Contract: Describes stable behavior for callers of `maxZoom` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+maxZoom?: number;
+    /**
+   * Specifies the contract for the `minZoom` member (minZoom?: number;).
+
+   * Contract: Describes stable behavior for callers of `minZoom` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+minZoom?: number;
 }
 
 /**
- * Full fallback chain: primary for a given terrain style is selected by id; on tile errors we try
- * the next entries in this array.
+ * Documents the module-scope binding `RASTER_BASEMAP_ORDER` (RASTER_BASEMAP_ORDER: readonly RasterBasemapDefinition[]).
+
+ * Purpose: Supports maintainability by documenting why `RASTER_BASEMAP_ORDER` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export const RASTER_BASEMAP_ORDER: readonly RasterBasemapDefinition[] = [
   {
@@ -78,15 +132,24 @@ export const RASTER_BASEMAP_ORDER: readonly RasterBasemapDefinition[] = [
 ];
 
 /**
- * Returns the ordered list of basemap providers (primary first for a given start index, then fallbacks).
+ * Defines the `getRasterBasemapChain` function shape (export function getRasterBasemapChain(): readonly RasterBasemapDefinition[]).
+
+ * Purpose: Supports maintainability by documenting why `getRasterBasemapChain` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getRasterBasemapChain(): readonly RasterBasemapDefinition[] {
   return RASTER_BASEMAP_ORDER;
 }
 
 /**
- * Resolves a stable provider id to the first index in the fallback chain used when mounting tiles.
- * Unknown ids map to 0 (light Carto) so the map always gets a valid starting layer.
+ * Defines the `getRasterBasemapChainStartIndex` function shape (export function getRasterBasemapChainStartIndex(providerId: string): number).
+
+ * Purpose: Supports maintainability by documenting why `getRasterBasemapChainStartIndex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getRasterBasemapChainStartIndex(providerId: string): number {
   const i = RASTER_BASEMAP_ORDER.findIndex((d) => d.id === providerId);

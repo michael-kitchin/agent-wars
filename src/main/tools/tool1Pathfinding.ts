@@ -43,8 +43,12 @@ import {
 } from './tool1PathfindingRouteResolution';
 
 /**
- * Converts an H3 index to [lat, lng] for tool responses. Uses the coordinate map when present;
- * falls back to cellToLatLng so we never expose raw H3 strings to the LLM.
+ * Defines the `h3ToLatLng` function shape (function h3ToLatLng(h3: string, latLngByH3: Map<string, LatLng>): LatLng).
+
+ * Purpose: Supports maintainability by documenting why `h3ToLatLng` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function h3ToLatLng(h3: string, latLngByH3: Map<string, LatLng>): LatLng {
   const ll = latLngByH3.get(h3);
@@ -53,32 +57,183 @@ function h3ToLatLng(h3: string, latLngByH3: Map<string, LatLng>): LatLng {
   return [lat, lng];
 }
 
-/** Coordinate pair [lat, lng] at the tool boundary. */
+/**
+ * Documents the `LatLng` type alias (export type LatLng).
+
+ * Purpose: Supports maintainability by documenting why `LatLng` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type LatLng = [number, number];
 
+/**
+ * Documents the `PathfindingSession` interface as a named contract surface (export interface PathfindingSession).
+
+ * Purpose: Supports maintainability by documenting why `PathfindingSession` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface PathfindingSession {
-  state: GameStateSnapshot;
-  latLngByH3: Map<string, LatLng>;
-  resolveToH3: (lat: number, lng: number) => string | undefined;
-  hexSet: Set<string>;
-  terrainByH3: Map<string, string>;
-  rawTerrainByH3: Map<string, string>;
-  terrainKindByH3: Map<string, string>;
-  statefulCache: PathfindingSessionStatefulCache;
+    /**
+   * Specifies the contract for the `state` member (state: GameStateSnapshot;).
+
+   * Contract: Describes stable behavior for callers of `state` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+state: GameStateSnapshot;
+    /**
+   * Specifies the contract for the `latLngByH3` member (latLngByH3: Map<string, LatLng>;).
+
+   * Contract: Describes stable behavior for callers of `latLngByH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+latLngByH3: Map<string, LatLng>;
+    /**
+   * Specifies the contract for the `resolveToH3` member (resolveToH3: (lat: number, lng: number) => string | undefined;).
+
+   * Contract: Describes stable behavior for callers of `resolveToH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+resolveToH3: (lat: number, lng: number) => string | undefined;
+    /**
+   * Specifies the contract for the `hexSet` member (hexSet: Set<string>;).
+
+   * Contract: Describes stable behavior for callers of `hexSet` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hexSet: Set<string>;
+    /**
+   * Specifies the contract for the `terrainByH3` member (terrainByH3: Map<string, string>;).
+
+   * Contract: Describes stable behavior for callers of `terrainByH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+terrainByH3: Map<string, string>;
+    /**
+   * Specifies the contract for the `rawTerrainByH3` member (rawTerrainByH3: Map<string, string>;).
+
+   * Contract: Describes stable behavior for callers of `rawTerrainByH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+rawTerrainByH3: Map<string, string>;
+    /**
+   * Specifies the contract for the `terrainKindByH3` member (terrainKindByH3: Map<string, string>;).
+
+   * Contract: Describes stable behavior for callers of `terrainKindByH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+terrainKindByH3: Map<string, string>;
+    /**
+   * Specifies the contract for the `statefulCache` member (statefulCache: PathfindingSessionStatefulCache;).
+
+   * Contract: Describes stable behavior for callers of `statefulCache` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+statefulCache: PathfindingSessionStatefulCache;
 }
 
+/**
+ * Documents the `PlanningPhaseSessionCache` type alias (type PlanningPhaseSessionCache).
+
+ * Purpose: Supports maintainability by documenting why `PlanningPhaseSessionCache` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type PlanningPhaseSessionCache = {
-  key: string;
-  session: PathfindingSession;
+    /**
+   * Specifies the contract for the `key` member (key: string;).
+
+   * Contract: Describes stable behavior for callers of `key` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+key: string;
+    /**
+   * Specifies the contract for the `session` member (session: PathfindingSession;).
+
+   * Contract: Describes stable behavior for callers of `session` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+session: PathfindingSession;
 };
 
+/**
+ * Documents the module-scope binding `planningPhaseHumanSessionCache` (planningPhaseHumanSessionCache: PlanningPhaseSessionCache | null).
+
+ * Purpose: Supports maintainability by documenting why `planningPhaseHumanSessionCache` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 let planningPhaseHumanSessionCache: PlanningPhaseSessionCache | null = null;
+/**
+ * Documents the module-scope binding `humanPlanningSessionMetrics` (humanPlanningSessionMetrics).
+
+ * Purpose: Supports maintainability by documenting why `humanPlanningSessionMetrics` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const humanPlanningSessionMetrics = {
-  turnNumber: -1,
-  created: 0,
-  reused: 0,
+    /**
+   * Documents the object literal property `turnNumber` (turnNumber: -1).
+
+   * Purpose: Supports maintainability by documenting why `turnNumber` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+turnNumber: -1,
+    /**
+   * Documents the object literal property `created` (created: 0).
+
+   * Purpose: Supports maintainability by documenting why `created` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+created: 0,
+    /**
+   * Documents the object literal property `reused` (reused: 0).
+
+   * Purpose: Supports maintainability by documenting why `reused` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+reused: 0,
 };
 
+/**
+ * Defines the `resetHumanPlanningSessionMetricsForTurn` function shape (function resetHumanPlanningSessionMetricsForTurn(turnNumber: number): void).
+
+ * Purpose: Supports maintainability by documenting why `resetHumanPlanningSessionMetricsForTurn` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function resetHumanPlanningSessionMetricsForTurn(turnNumber: number): void {
   if (humanPlanningSessionMetrics.turnNumber === turnNumber) return;
   humanPlanningSessionMetrics.turnNumber = turnNumber;
@@ -87,6 +242,14 @@ function resetHumanPlanningSessionMetricsForTurn(turnNumber: number): void {
   planningPhaseHumanSessionCache = null;
 }
 
+/**
+ * Defines the `getHumanPlanningSessionMetrics` function shape (function getHumanPlanningSessionMetrics():).
+
+ * Purpose: Supports maintainability by documenting why `getHumanPlanningSessionMetrics` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getHumanPlanningSessionMetrics(): { turnNumber: number; created: number; reused: number } {
   return {
     turnNumber: humanPlanningSessionMetrics.turnNumber,
@@ -95,17 +258,25 @@ function getHumanPlanningSessionMetrics(): { turnNumber: number; created: number
   };
 }
 
+/**
+ * Defines the `shouldReusePlanningPhaseSession` function shape (function shouldReusePlanningPhaseSession(state: GameStateSnapshot): boolean).
+
+ * Purpose: Supports maintainability by documenting why `shouldReusePlanningPhaseSession` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function shouldReusePlanningPhaseSession(state: GameStateSnapshot): boolean {
   return state.phase === 'planning' && state.playerPerspective === 'human';
 }
 
 /**
- * Why this exists:
- *     Provides a stable cache key so one pathfinding session can be reused for the entire human planning phase.
- * When to use:
- *     Internal only; called by createPathfindingSession before constructing a new session.
- * What to expect:
- *     Returns a deterministic key that changes when turn/phase/map/unit positions or perspective changes.
+ * Defines the `buildPlanningPhaseSessionKey` function shape (function buildPlanningPhaseSessionKey(state: GameStateSnapshot): string).
+
+ * Purpose: Supports maintainability by documenting why `buildPlanningPhaseSessionKey` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function buildPlanningPhaseSessionKey(state: GameStateSnapshot): string {
   const unitsSignature = state.units
@@ -124,12 +295,12 @@ function buildPlanningPhaseSessionKey(state: GameStateSnapshot): string {
 }
 
 /**
- * Why this exists:
- *     Builds reusable pathfinding state once so callers can plan multiple routes without re-deriving map indexes.
- * When to use:
- *     Hover preview and other repeated route checks against the same snapshot.
- * What to expect:
- *     Returns an immutable-by-convention session object; callers should treat contained maps/sets as read-only.
+ * Defines the `createPathfindingSession` function shape (export function createPathfindingSession( state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: number, lng: number) => string).
+
+ * Purpose: Supports maintainability by documenting why `createPathfindingSession` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function createPathfindingSession(
   state: GameStateSnapshot,
@@ -190,72 +361,308 @@ export function createPathfindingSession(
 }
 
 
-/** Options for plan_route. */
+/**
+ * Documents the `PlanRouteOptions` interface as a named contract surface (export interface PlanRouteOptions).
+
+ * Purpose: Supports maintainability by documenting why `PlanRouteOptions` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface PlanRouteOptions {
-  avoidEnemies?: boolean;
-  maxTurns?: number;
+    /**
+   * Specifies the contract for the `avoidEnemies` member (avoidEnemies?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `avoidEnemies` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+avoidEnemies?: boolean;
+    /**
+   * Specifies the contract for the `maxTurns` member (maxTurns?: number;).
+
+   * Contract: Describes stable behavior for callers of `maxTurns` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+maxTurns?: number;
 }
 
-/** Plan-route response (ok). When maxTurns truncates, reachable is false. */
+/**
+ * Documents the `PlanRouteOk` interface as a named contract surface (export interface PlanRouteOk).
+
+ * Purpose: Supports maintainability by documenting why `PlanRouteOk` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface PlanRouteOk {
-  status: 'ok';
-  unitId: string;
-  unitType: string;
-  origin: LatLng;
-  destination: LatLng;
-  /** Exact [lat, lng] to use for this turn's movement order (path[0] end hex, or origin if already there). Copy into toXY. */
-  orderToXY: LatLng;
-  /** Exact H3 index for this turn's move (path[0] end hex, or origin if already there). */
-  orderToH3: string;
-  /**
-   * Optional nearby alternatives when destination resolves to the current hex.
-   * Helps callers retry with coordinates that produce movement at map resolution.
+    /**
+   * Specifies the contract for the `status` member (status: 'ok';).
+
+   * Contract: Describes stable behavior for callers of `status` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
    */
-  suggestedDestinations?: LatLng[];
-  hexDistance: number;
-  turnsRequired: number;
-  path: {
+status: 'ok';
+    /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+
+   * Contract: Describes stable behavior for callers of `unitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitId: string;
+    /**
+   * Specifies the contract for the `unitType` member (unitType: string;).
+
+   * Contract: Describes stable behavior for callers of `unitType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitType: string;
+    /**
+   * Specifies the contract for the `origin` member (origin: LatLng;).
+
+   * Contract: Describes stable behavior for callers of `origin` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+origin: LatLng;
+    /**
+   * Specifies the contract for the `destination` member (destination: LatLng;).
+
+   * Contract: Describes stable behavior for callers of `destination` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+destination: LatLng;
+    /**
+   * Specifies the contract for the `orderToXY` member (orderToXY: LatLng;).
+
+   * Contract: Describes stable behavior for callers of `orderToXY` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+orderToXY: LatLng;
+    /**
+   * Specifies the contract for the `orderToH3` member (orderToH3: string;).
+
+   * Contract: Describes stable behavior for callers of `orderToH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+orderToH3: string;
+    /**
+   * Specifies the contract for the `suggestedDestinations` member (suggestedDestinations?: LatLng[];).
+
+   * Contract: Describes stable behavior for callers of `suggestedDestinations` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+suggestedDestinations?: LatLng[];
+    /**
+   * Specifies the contract for the `hexDistance` member (hexDistance: number;).
+
+   * Contract: Describes stable behavior for callers of `hexDistance` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hexDistance: number;
+    /**
+   * Specifies the contract for the `turnsRequired` member (turnsRequired: number;).
+
+   * Contract: Describes stable behavior for callers of `turnsRequired` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+turnsRequired: number;
+    /**
+   * Specifies the contract for the `path` member (path: { turn: number; hexes: LatLng[]; movementSpent: number; movementBudget: number; endHex: LatLng; }[];).
+
+   * Contract: Describes stable behavior for callers of `path` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+path: {
     turn: number;
     hexes: LatLng[];
     movementSpent: number;
     movementBudget: number;
     endHex: LatLng;
   }[];
-  warnings: string[];
-  error?: null;
-  reachable?: boolean;
-}
+    /**
+   * Specifies the contract for the `warnings` member (warnings: string[];).
 
-/** Plan-route response (error). */
-export interface PlanRouteError {
-  status: 'error';
-  error: string;
-}
+   * Contract: Describes stable behavior for callers of `warnings` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+warnings: string[];
+    /**
+   * Specifies the contract for the `error` member (error?: null;).
 
-/** Check-distance response (ok). */
-export interface CheckDistanceOk {
-  status: 'ok';
-  from: LatLng;
-  to: LatLng;
-  hexDistance: number;
-  estimatedTurns: number;
-  reachable: boolean;
-}
+   * Contract: Describes stable behavior for callers of `error` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+error?: null;
+    /**
+   * Specifies the contract for the `reachable` member (reachable?: boolean;).
 
-/** Check-distance response (error). */
-export interface CheckDistanceError {
-  status: 'error';
-  error: string;
+   * Contract: Describes stable behavior for callers of `reachable` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+reachable?: boolean;
 }
 
 /**
- * Returns a short hint (including a leading space) to append to the standard plan_route "no path"
- * error when destination terrain is known. Enables the LLM to retry with a valid destination
- * (e.g. land unit to land hex, naval to water). Returns the empty string if terrain is unknown.
+ * Documents the `PlanRouteError` interface as a named contract surface (export interface PlanRouteError).
+
+ * Purpose: Supports maintainability by documenting why `PlanRouteError` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
+export interface PlanRouteError {
+    /**
+   * Specifies the contract for the `status` member (status: 'error';).
+
+   * Contract: Describes stable behavior for callers of `status` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+status: 'error';
+    /**
+   * Specifies the contract for the `error` member (error: string;).
+
+   * Contract: Describes stable behavior for callers of `error` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+error: string;
+}
+
 /**
- * Executes plan_route: returns optimal path for a unit to a destination, with per-turn segments.
- * Call with game state and coordinate map; snaps destination to nearest map hex.
+ * Documents the `CheckDistanceOk` interface as a named contract surface (export interface CheckDistanceOk).
+
+ * Purpose: Supports maintainability by documenting why `CheckDistanceOk` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export interface CheckDistanceOk {
+    /**
+   * Specifies the contract for the `status` member (status: 'ok';).
+
+   * Contract: Describes stable behavior for callers of `status` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+status: 'ok';
+    /**
+   * Specifies the contract for the `from` member (from: LatLng;).
+
+   * Contract: Describes stable behavior for callers of `from` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+from: LatLng;
+    /**
+   * Specifies the contract for the `to` member (to: LatLng;).
+
+   * Contract: Describes stable behavior for callers of `to` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+to: LatLng;
+    /**
+   * Specifies the contract for the `hexDistance` member (hexDistance: number;).
+
+   * Contract: Describes stable behavior for callers of `hexDistance` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hexDistance: number;
+    /**
+   * Specifies the contract for the `estimatedTurns` member (estimatedTurns: number;).
+
+   * Contract: Describes stable behavior for callers of `estimatedTurns` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+estimatedTurns: number;
+    /**
+   * Specifies the contract for the `reachable` member (reachable: boolean;).
+
+   * Contract: Describes stable behavior for callers of `reachable` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+reachable: boolean;
+}
+
+/**
+ * Documents the `CheckDistanceError` interface as a named contract surface (export interface CheckDistanceError).
+
+ * Purpose: Supports maintainability by documenting why `CheckDistanceError` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export interface CheckDistanceError {
+    /**
+   * Specifies the contract for the `status` member (status: 'error';).
+
+   * Contract: Describes stable behavior for callers of `status` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+status: 'error';
+    /**
+   * Specifies the contract for the `error` member (error: string;).
+
+   * Contract: Describes stable behavior for callers of `error` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+error: string;
+}
+
+/**
+ * Defines the `executePlanRoute` function shape (export function executePlanRoute( unitId: string, destination: LatLng, options: PlanRouteOptions | undefined, state: GameStateSnapshot, latLngByH).
+
+ * Purpose: Supports maintainability by documenting why `executePlanRoute` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function executePlanRoute(
   unitId: string,
@@ -270,12 +677,12 @@ export function executePlanRoute(
 }
 
 /**
- * Why this exists:
- *     Reuses precomputed pathfinding session data to reduce repeated setup overhead across many route calculations.
- * When to use:
- *     Hover preview and other batch planning flows that execute multiple route checks over the same snapshot.
- * What to expect:
- *     Returns the same route contract as `executePlanRoute`, using the provided session context.
+ * Defines the `executePlanRouteWithSession` function shape (export function executePlanRouteWithSession( unitId: string, destination: LatLng, options: PlanRouteOptions | undefined, session: PathfindingSession).
+
+ * Purpose: Supports maintainability by documenting why `executePlanRouteWithSession` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function executePlanRouteWithSession(
   unitId: string,
@@ -431,7 +838,12 @@ export function executePlanRouteWithSession(
 }
 
 /**
- * Executes check_distance: returns hex distance and estimated turns between two hexes for a unit type.
+ * Defines the `executeCheckDistance` function shape (export function executeCheckDistance( from: LatLng, to: LatLng, unitType: string, state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, r).
+
+ * Purpose: Supports maintainability by documenting why `executeCheckDistance` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function executeCheckDistance(
   from: LatLng,
@@ -484,12 +896,23 @@ export function executeCheckDistance(
   };
 }
 
-/** Tool names for Tool 1. */
+/**
+ * Documents the module-scope binding `TOOL1_NAMES` (TOOL1_NAMES).
+
+ * Purpose: Supports maintainability by documenting why `TOOL1_NAMES` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const TOOL1_NAMES = ['plan_route', 'check_distance'] as const;
 
 /**
- * Dispatcher: given tool name and parsed arguments, runs the corresponding tool and returns a JSON-serializable response.
- * Used by the OpenRouter tool-calling loop. Every response has status and error (null when ok).
+ * Defines the `executeTool1` function shape (export function executeTool1( toolName: string, args: unknown, state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: numb).
+
+ * Purpose: Supports maintainability by documenting why `executeTool1` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function executeTool1(
   toolName: string,

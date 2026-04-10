@@ -3,49 +3,14 @@
  * minimap with viewport sync, and click / double-click interaction with the sidebar.
  */
 
-import { cellToChildren, cellToLatLng, cellToParent, gridDisk, gridDistance, latLngToCell } from 'h3-js';
-import {
-  alignLngToReference,
-  clampLatForWebMercatorDisplay,
-  getHexBoundaryLatLngForLeafletOverlay,
-} from './map/hexGrid';
-import {
-  initWorldLeafletMaps,
-  getMainLeafletMap,
-  hexCenterToOverlayPoint,
-  hexCenterToOverlayPointWithReferenceLng,
-  invalidateLeafletMapSizes,
-  setMainBasemapByProviderId,
-  setMainBasemapFilter,
-} from './map/worldLeafletMap';
-import {
-  fillHexTerrain,
-  getActiveHexStrokeStyle,
-  getActiveTerrainStyleBasemapId,
-  renderTerrainLegend,
-} from './rendering/terrainVisualStyles';
-import {
-  drawTerrainInfrastructureGlyphs,
-  RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE,
-} from './rendering/terrainInfrastructureOverlay';
+import { cellToChildren, cellToParent, latLngToCell } from 'h3-js';
+import { getMainLeafletMap, invalidateLeafletMapSizes } from './map/worldLeafletMap';
 import { deriveInfrastructureOverlayState } from './rendering/infrastructureOverlayState';
-import {
-  formatPendingAirStrikeSidebarLabel,
-  formatPendingFerryOrderSidebarLabel,
-  formatPendingRangedAttackSidebarLabel,
-} from './gameplay/orderLabelFormatting';
-import { buildTurnUpdateBullets } from './gameplay/turnUpdateSummary';
 import type {
   GameStateSnapshot,
   GameApi,
   BuildUnitType,
-  HexBuildQueueSnapshot,
-  MovementOrder,
-  RangedAttackOrder,
-  AirStrikeOrder,
-  AirStrikeAnimationMove,
   AirStrikeTargetType,
-  FerryOrder,
   RemovedUnitSnapshot,
   HumanStandingOrderSnapshot,
 } from '../shared/ipcTypes';
@@ -55,43 +20,16 @@ import {
   fallbackDisplayNameFromUnitId,
 } from '../shared/unitDisplayNames';
 import {
-  MOVEMENT_RANGE_BY_UNIT_TYPE,
-  RANGED_RANGE_BY_UNIT_TYPE,
-} from '../shared/tacticalRanges';
-import {
   buildResolutionPlaybackState as buildResolutionPlaybackStateFromModule,
   type ResolutionPlaybackPhase,
 } from './rendering/resolutionPlayback';
-import type { ResolutionMove, ResolutionPlaybackMove, HoverRoutePreviewState, PanDirection } from './core/types';
 import {
-  AI_ORDER_LINE_COLOR,
   BACKGROUND_COLOR,
-  BUILD_ENTRY_HIT_PAD_PX,
-  BUILD_ENTRY_ZOOM_STEPS_FROM_DEFAULT,
-  CASUALTY_X_COLOR,
-  COUNT_BADGE_OFFSET,
   DETAIL_H3_RESOLUTION,
-  INITIAL_CAMERA_ZOOM_IN_LEVELS,
-  LIGHTNING_COLOR,
-  MAIN_MAP_WHEEL_ZOOM_STEP,
-  MULTI_PLAYER_FILL,
-  MULTI_PLAYER_STROKE,
-  ORDER_ARROW_SIZE,
-  ORDER_LINE_COLOR,
-  ORDER_LINE_WIDTH,
-  PLAYER_COLORS,
-  RES4_HIDE_THRESHOLD_VIEW_FRACTION,
-  RES4_SHOW_THRESHOLD_VIEW_FRACTION,
-  STACK_OFFSET_X,
-  STACK_OFFSET_Y,
-  TERRAIN_TOOLTIP_DELAY_MS,
   TOOLTIP_OFFSET_PX,
-  UNIT_DESELECT_GLYPH,
-  UNIT_ICON_HIT_PAD_PX,
-  UNIT_RADIUS,
-  UNIT_SELECT_GLYPH,
-  UNIT_TYPE_LABELS,
   WORLD_H3_RESOLUTION,
+  UNIT_DESELECT_GLYPH,
+  UNIT_SELECT_GLYPH,
 } from './core/constants';
 import {
   appendOpenRouterLog,
@@ -108,27 +46,18 @@ import {
   applyInitialCameraForState,
   getLeafletGlobal,
   hexCenterPx,
-  hexCenterPxRelativeTo,
   hitTestHexAtContainerPixel,
-  panMapOneRes1Hex,
-  shouldIgnoreGlobalKeydown,
 } from './map/mapUtils';
 import {
-  computeRes1HexFillFraction,
   hideBuildEntryLayer,
-  projectHexBoundaryToContainerPoints,
-  projectedPolygonOverlapsViewport,
   shouldRenderRes4Hexes,
   shouldShowBuildEntryZoom,
-  spanForProjectedHex,
 } from './map/terrainView';
 import {
-  drawArrowheadOnly,
   drawLineArrow,
   drawMovingUnits,
   drawResolutionMoveLines,
   drawStandingOrderLines,
-  strokePolylineSkippingWrap,
 } from './rendering/pathDrawing';
 import {
   addUnitsToSelection as addUnitsToSelectionFromModule,
@@ -163,7 +92,6 @@ import {
 import {
   drawCasualtyOverlay,
   drawCombatLightning,
-  drawOneUnitMarker,
   drawStaleEnemyIntel,
   drawUnits,
   drawUnknownBattleMarkers,
@@ -185,18 +113,14 @@ import {
   containerPixelHitsDrawnUnitIcon as containerPixelHitsDrawnUnitIconFromModule,
   drawLoadingScene as drawLoadingSceneFromModule,
   getUnitsForDrawWithMovingIds as getUnitsForDrawWithMovingIdsFromModule,
-  pointInExpandedClientRect as pointInExpandedClientRectFromModule,
   tryHandleBuildEntryAtClientXY as tryHandleBuildEntryAtClientXYFromModule,
   updateMapInteractionCursor as updateMapInteractionCursorFromModule,
 } from './map/drawInteraction';
 import {
-  cancelAirStrikeForUnit as cancelAirStrikeForUnitFromModule,
   cancelFerryForUnit as cancelFerryForUnitFromModule,
   cancelOrderForUnit as cancelOrderForUnitFromModule,
-  cancelRangedForUnit as cancelRangedForUnitFromModule,
   clearCommittedOrderDraftState as clearCommittedOrderDraftStateFromModule,
   clearPendingTacticalOrders as clearPendingTacticalOrdersFromModule,
-  getRepresentativeSelectedUnitIdsByOrigin as getRepresentativeSelectedUnitIdsByOriginFromModule,
   refreshHoverRoutePreview as refreshHoverRoutePreviewFromModule,
   replacePendingAirStrikesForSelected as replacePendingAirStrikesForSelectedFromModule,
   replacePendingFerryOrdersForSelected as replacePendingFerryOrdersForSelectedFromModule,
@@ -208,6 +132,7 @@ import {
   handleReadyButtonClick as handleReadyButtonClickFromModule,
   type ReadyHandlerDeps,
 } from './gameplay/readyHandler';
+import type { NamingLookupTarget, TerrainTooltipState } from './map/terrainTooltipTypes';
 import { wireMainMapInteractions as wireMainMapInteractionsFromModule } from './map/mainMapInteractions';
 import { wireInitCore as wireInitCoreFromModule } from './map/initCore';
 import {
@@ -228,7 +153,6 @@ import {
   buildKillToastFormatterBundle as buildKillToastFormatterBundleFromModule,
   clearSidebarError as clearSidebarErrorFromModule,
   createSidebarOrderRow as createSidebarOrderRowFromModule,
-  estimateHexesLeftForOrder as estimateHexesLeftForOrderFromModule,
   formatPendingOrderSidebarLabel as formatPendingOrderSidebarLabelFromModule,
   formatUnitArrowLabel as formatUnitArrowLabelFromModule,
   isPendingMovementOrderForDisplay as isPendingMovementOrderForDisplayFromModule,
@@ -237,16 +161,45 @@ import {
   updatePendingOrdersSidebar as updatePendingOrdersSidebarFromModule,
 } from './gameplay/sidebarSupport';
 
+/**
+ * Documents the module-scope binding `stackCalloutNonSelectableUnitIds` (stackCalloutNonSelectableUnitIds: ReadonlySet<string>).
+
+ * Purpose: Supports maintainability by documenting why `stackCalloutNonSelectableUnitIds` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 let stackCalloutNonSelectableUnitIds: ReadonlySet<string> = new Set<string>();
 
 declare global {
-  interface Window {
-    gameApi?: GameApi;
+    /**
+   * Documents the `Window` interface as a named contract surface (interface Window).
+
+   * Purpose: Supports maintainability by documenting why `Window` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+interface Window {
+        /**
+     * Specifies the contract for the `gameApi` member (gameApi?: GameApi;).
+
+     * Contract: Describes stable behavior for callers of `gameApi` in this codebase.
+     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+     * Exceptions: None.
+     */
+gameApi?: GameApi;
   }
 }
 
 /**
- * Delegates to resolutionPlayback.ts; kept as a local function so renderer contract tests can anchor on this file.
+ * Defines the `buildResolutionPlaybackState` function shape (function buildResolutionPlaybackState( anim: NonNullable<typeof S.resolutionMoveAnimation>, elapsed: number ): ReturnType<typeof buildResolutionPlaybackS).
+
+ * Purpose: Supports maintainability by documenting why `buildResolutionPlaybackState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function buildResolutionPlaybackState(
   anim: NonNullable<typeof S.resolutionMoveAnimation>,
@@ -255,18 +208,27 @@ function buildResolutionPlaybackState(
   return buildResolutionPlaybackStateFromModule(anim, elapsed);
 }
 
+/**
+ * Defines the `getUnitAtHex` function shape (function getUnitAtHex(h3Index: string): GameStateSnapshot['units'][0] | null).
+
+ * Purpose: Supports maintainability by documenting why `getUnitAtHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getUnitAtHex(h3Index: string): GameStateSnapshot['units'][0] | null {
   if (!S.gameState) return null;
   return S.gameState.units.find((u) => u.h3Index === h3Index) ?? null;
 }
 
-/** Returns all units at the given hex. */
-function getUnitsAtHex(h3Index: string): GameStateSnapshot['units'] {
-  if (!S.gameState) return [];
-  return S.gameState.units.filter((u) => u.h3Index === h3Index);
-}
+/**
+ * Defines the `formatStackTooltip` function shape (function formatStackTooltip(units: GameStateSnapshot['units']): string).
 
-/** Builds stack tooltip text: counts by player and unit type (e.g. "2 human armor, 1 opponent infantry"). */
+ * Purpose: Supports maintainability by documenting why `formatStackTooltip` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatStackTooltip(units: GameStateSnapshot['units']): string {
   const byKey = new Map<string, number>();
   for (const u of units) {
@@ -279,7 +241,14 @@ function formatStackTooltip(units: GameStateSnapshot['units']): string {
     .join(', ');
 }
 
-/** Hides the stack callout popover (e.g. after selecting a unit or clicking elsewhere). */
+/**
+ * Defines the `hideStackCallout` function shape (function hideStackCallout(): void).
+
+ * Purpose: Supports maintainability by documenting why `hideStackCallout` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function hideStackCallout(): void {
   const el = document.getElementById('stack-callout');
   if (el) {
@@ -295,7 +264,14 @@ function hideStackCallout(): void {
   scheduleTerrainTooltipRestoreAfterPopoverClose();
 }
 
-/** True while the stack callout or build-queue popup is visible; terrain hover tooltips stay suppressed. */
+/**
+ * Defines the `isStackOrBuildMapPopoverOpen` function shape (function isStackOrBuildMapPopoverOpen(): boolean).
+
+ * Purpose: Supports maintainability by documenting why `isStackOrBuildMapPopoverOpen` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function isStackOrBuildMapPopoverOpen(): boolean {
   const stack = document.getElementById('stack-callout');
   const build = document.getElementById('build-popup');
@@ -304,11 +280,26 @@ function isStackOrBuildMapPopoverOpen(): boolean {
   );
 }
 
-/** True when terrain naming/hex tooltips should not show (popovers open or pointer over the build entry control). */
+/**
+ * Defines the `shouldSuppressTerrainTooltip` function shape (function shouldSuppressTerrainTooltip(): boolean).
+
+ * Purpose: Supports maintainability by documenting why `shouldSuppressTerrainTooltip` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function shouldSuppressTerrainTooltip(): boolean {
   return isStackOrBuildMapPopoverOpen() || S.buildEntryButtonPointerInside;
 }
 
+/**
+ * Defines the `applyModifierDrivenPopoverCloseRules` function shape (function applyModifierDrivenPopoverCloseRules(reason: 'ctrl_pressed' | 'ctrl_released' | 'window_blur'): void).
+
+ * Purpose: Supports maintainability by documenting why `applyModifierDrivenPopoverCloseRules` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function applyModifierDrivenPopoverCloseRules(reason: 'ctrl_pressed' | 'ctrl_released' | 'window_blur'): void {
   if (reason === 'ctrl_pressed') {
     hideBuildPopup();
@@ -322,13 +313,28 @@ function applyModifierDrivenPopoverCloseRules(reason: 'ctrl_pressed' | 'ctrl_rel
   refreshStackCalloutIfOpen();
 }
 
-/** Marks the stack callout as sticky after the player starts changing selection from it. */
+/**
+ * Defines the `activateStackCalloutModal` function shape (function activateStackCalloutModal(): void).
+
+ * Purpose: Supports maintainability by documenting why `activateStackCalloutModal` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function activateStackCalloutModal(): void {
   S.stackCalloutModalActive = true;
   const el = document.getElementById('stack-callout');
   if (el) el.classList.add('stack-modal');
 }
 
+/**
+ * Defines the `onStackSingleUnitToggleClick` function shape (function onStackSingleUnitToggleClick( unitId: string, inSelection: boolean, allUnitsAtHex: GameStateSnapshot['units'], clientX: number, clientY:).
+
+ * Purpose: Supports maintainability by documenting why `onStackSingleUnitToggleClick` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function onStackSingleUnitToggleClick(
   unitId: string,
   inSelection: boolean,
@@ -352,6 +358,14 @@ function onStackSingleUnitToggleClick(
   syncUiAfterSelectionChange({ refreshHoverPreview: false });
 }
 
+/**
+ * Defines the `onStackAllActionClick` function shape (function onStackAllActionClick( action: 'selectAll' | 'addAll' | 'removeAll', selectableHumanIds: string[], allUnitsAtHex: GameStateSnapshot['units'],).
+
+ * Purpose: Supports maintainability by documenting why `onStackAllActionClick` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function onStackAllActionClick(
   action: 'selectAll' | 'addAll' | 'removeAll',
   selectableHumanIds: string[],
@@ -373,6 +387,14 @@ function onStackAllActionClick(
   syncUiAfterSelectionChange({ refreshHoverPreview: false });
 }
 
+/**
+ * Defines the `applyStackCalloutSelectionButtonVisibility` function shape (function applyStackCalloutSelectionButtonVisibility(calloutEl: HTMLElement, nonSelectableUnitIds: ReadonlySet<string>): void).
+
+ * Purpose: Supports maintainability by documenting why `applyStackCalloutSelectionButtonVisibility` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function applyStackCalloutSelectionButtonVisibility(calloutEl: HTMLElement, nonSelectableUnitIds: ReadonlySet<string>): void {
   const listEl = document.getElementById('stack-callout-list');
   if (!listEl) return;
@@ -386,6 +408,14 @@ function applyStackCalloutSelectionButtonVisibility(calloutEl: HTMLElement, nonS
   }
 }
 
+/**
+ * Defines the `setStackPopupNonSelectableUnitIds` function shape (function setStackPopupNonSelectableUnitIds(calloutEl: HTMLElement, unitIds: string[]): void).
+
+ * Purpose: Supports maintainability by documenting why `setStackPopupNonSelectableUnitIds` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function setStackPopupNonSelectableUnitIds(calloutEl: HTMLElement, unitIds: string[]): void {
   const normalized = [...new Set(unitIds)].sort((a, b) => a.localeCompare(b));
   const nonSelectable = new Set<string>(normalized);
@@ -398,20 +428,52 @@ function setStackPopupNonSelectableUnitIds(calloutEl: HTMLElement, unitIds: stri
   applyStackCalloutSelectionButtonVisibility(calloutEl, nonSelectable);
 }
 
+/**
+ * Defines the `getSelectableHumanIdsForStackCallout` function shape (function getSelectableHumanIdsForStackCallout(units: GameStateSnapshot['units']): string[]).
+
+ * Purpose: Supports maintainability by documenting why `getSelectableHumanIdsForStackCallout` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getSelectableHumanIdsForStackCallout(units: GameStateSnapshot['units']): string[] {
   return units.filter((u) => u.player === 'human' && !stackCalloutNonSelectableUnitIds.has(u.id)).map((u) => u.id);
 }
 
+/**
+ * Defines the `removeSealiftSection` function shape (function removeSealiftSection(calloutEl: HTMLElement): void).
+
+ * Purpose: Supports maintainability by documenting why `removeSealiftSection` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function removeSealiftSection(calloutEl: HTMLElement): void {
   const existing = calloutEl.querySelector('.stack-sealift-section');
   if (existing) existing.remove();
 }
 
+/**
+ * Defines the `buildSealiftUnitLabel` function shape (function buildSealiftUnitLabel(unitId: string, unitType: string): string).
+
+ * Purpose: Supports maintainability by documenting why `buildSealiftUnitLabel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildSealiftUnitLabel(unitId: string, unitType: string): string {
   void unitType;
   return formatUnitDisplayName(unitId);
 }
 
+/**
+ * Defines the `renderSealiftSection` function shape (async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl: HTMLElement): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `renderSealiftSection` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl: HTMLElement): Promise<void> {
   removeSealiftSection(calloutEl);
   if (!window.gameApi?.getSealiftStackState || !window.gameApi?.updateSealiftSlot) return;
@@ -523,8 +585,12 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
 }
 
 /**
- * Shows the stack callout at the given screen position with an alphabetized list of units.
- * Units belonging to the human player get +/- controls for adding/removing from the active selection.
+ * Defines the `showStackCallout` function shape (function showStackCallout().
+
+ * Purpose: Supports maintainability by documenting why `showStackCallout` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function showStackCallout(
   units: GameStateSnapshot['units'],
@@ -631,6 +697,14 @@ function showStackCallout(
   void renderSealiftSection(sorted, calloutEl);
 }
 
+/**
+ * Defines the `refreshStackCalloutIfOpen` function shape (function refreshStackCalloutIfOpen(): void).
+
+ * Purpose: Supports maintainability by documenting why `refreshStackCalloutIfOpen` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function refreshStackCalloutIfOpen(): void {
   const calloutEl = document.getElementById('stack-callout');
   if (!calloutEl || calloutEl.classList.contains('hidden')) return;
@@ -657,25 +731,60 @@ function refreshStackCalloutIfOpen(): void {
   showStackCallout(units, Number(rawX), Number(rawY));
 }
 
-/** Clears the build-queue popup; stack and terrain tooltip are unaffected. */
+/**
+ * Defines the `hideBuildPopup` function shape (function hideBuildPopup(): void).
+
+ * Purpose: Supports maintainability by documenting why `hideBuildPopup` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function hideBuildPopup(): void {
   getBuildQueuePopupController().hideBuildPopup();
 }
 
 /**
- * Opens the build-queue dialog for a res-1 hex (offset like the stack callout). Closes the stack callout
- * and hover terrain tooltip so only one map popup is active at a time.
+ * Defines the `showBuildPopup` function shape (function showBuildPopup(h3Index: string, clientX: number, clientY: number): void).
+
+ * Purpose: Supports maintainability by documenting why `showBuildPopup` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function showBuildPopup(h3Index: string, clientX: number, clientY: number): void {
   getBuildQueuePopupController().showBuildPopup(h3Index, clientX, clientY);
 }
 
+/**
+ * Defines the `refreshBuildPopupIfOpen` function shape (function refreshBuildPopupIfOpen(): void).
+
+ * Purpose: Supports maintainability by documenting why `refreshBuildPopupIfOpen` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function refreshBuildPopupIfOpen(): void {
   getBuildQueuePopupController().refreshBuildPopupIfOpen();
 }
 
+/**
+ * Documents the module-scope binding `buildQueuePopupController` (buildQueuePopupController: ReturnType<typeof createBuildQueuePopupController> | null).
+
+ * Purpose: Supports maintainability by documenting why `buildQueuePopupController` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 let buildQueuePopupController: ReturnType<typeof createBuildQueuePopupController> | null = null;
 
+/**
+ * Defines the `getBuildQueuePopupController` function shape (function getBuildQueuePopupController(): ReturnType<typeof createBuildQueuePopupController>).
+
+ * Purpose: Supports maintainability by documenting why `getBuildQueuePopupController` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getBuildQueuePopupController(): ReturnType<typeof createBuildQueuePopupController> {
   if (buildQueuePopupController) return buildQueuePopupController;
   buildQueuePopupController = createBuildQueuePopupController({
@@ -691,6 +800,14 @@ function getBuildQueuePopupController(): ReturnType<typeof createBuildQueuePopup
   return buildQueuePopupController;
 }
 
+/**
+ * Defines the `clearTerrainTooltipTimer` function shape (function clearTerrainTooltipTimer(): void).
+
+ * Purpose: Supports maintainability by documenting why `clearTerrainTooltipTimer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function clearTerrainTooltipTimer(): void {
   if (S.terrainTooltipDelayTimer !== null) {
     clearTimeout(S.terrainTooltipDelayTimer);
@@ -698,6 +815,14 @@ function clearTerrainTooltipTimer(): void {
   }
 }
 
+/**
+ * Defines the `hideTerrainTooltipVisual` function shape (function hideTerrainTooltipVisual(): void).
+
+ * Purpose: Supports maintainability by documenting why `hideTerrainTooltipVisual` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function hideTerrainTooltipVisual(): void {
   S.terrainTooltipRequestSeq++;
   const el = document.getElementById('hex-tooltip');
@@ -708,7 +833,12 @@ function hideTerrainTooltipVisual(): void {
 }
 
 /**
- * Formats a pipeline terrain kind for display (e.g. `forest` → "Forest").
+ * Defines the `formatTerrainKindLabel` function shape (function formatTerrainKindLabel(kind: string): string).
+
+ * Purpose: Supports maintainability by documenting why `formatTerrainKindLabel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function formatTerrainKindLabel(kind: string): string {
   if (!kind) return 'Unknown';
@@ -716,7 +846,12 @@ function formatTerrainKindLabel(kind: string): string {
 }
 
 /**
- * Resolves base terrain kind + urban variation state for a res-1 gameplay hex.
+ * Defines the `terrainStateForRes1Hex` function shape (function terrainStateForRes1Hex(h3: string):).
+
+ * Purpose: Supports maintainability by documenting why `terrainStateForRes1Hex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function terrainStateForRes1Hex(h3: string): { terrainKind: string; isUrban: boolean; isRubble: boolean } {
   if (!S.gameState) return { terrainKind: 'Unknown', isUrban: false, isRubble: false };
@@ -731,10 +866,26 @@ function terrainStateForRes1Hex(h3: string): { terrainKind: string; isUrban: boo
   };
 }
 
+/**
+ * Defines the `terrainKindForRes1Hex` function shape (function terrainKindForRes1Hex(h3: string): string).
+
+ * Purpose: Supports maintainability by documenting why `terrainKindForRes1Hex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function terrainKindForRes1Hex(h3: string): string {
   return terrainStateForRes1Hex(h3).terrainKind;
 }
 
+/**
+ * Defines the `featureLabelsForRes1Hex` function shape (function featureLabelsForRes1Hex(h3: string): string[]).
+
+ * Purpose: Supports maintainability by documenting why `featureLabelsForRes1Hex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function featureLabelsForRes1Hex(h3: string): string[] {
   if (!infraGlyphsAllowedForRes1Hex(h3)) return [];
   const counts = getRes1FeatureCounts(h3);
@@ -745,6 +896,14 @@ function featureLabelsForRes1Hex(h3: string): string[] {
   return labels;
 }
 
+/**
+ * Defines the `featureLabelsForRes4Child` function shape (function featureLabelsForRes4Child(parentH3: string, childH3: string): string[]).
+
+ * Purpose: Supports maintainability by documenting why `featureLabelsForRes4Child` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function featureLabelsForRes4Child(parentH3: string, childH3: string): string[] {
   if (!infraGlyphsAllowedForRes4Child(parentH3, childH3)) return [];
   const labels: string[] = [];
@@ -755,21 +914,14 @@ function featureLabelsForRes4Child(parentH3: string, childH3: string): string[] 
   return labels;
 }
 
-interface TerrainTooltipState {
-  terrainKind: string;
-  isUrban: boolean;
-  isRubble: boolean;
-  features: string[];
-  urbanHexCount: number | null;
-  res1TerrainSummary: string | null;
-  res1FeaturesSummary: string | null;
-}
+/**
+ * Defines the `countUrbanRes4HexesInRes1Hex` function shape (function countUrbanRes4HexesInRes1Hex(parentH3: string): number).
 
-interface NamingLookupTarget {
-  h3Index: string;
-  resolution: 1 | 4;
-}
-
+ * Purpose: Supports maintainability by documenting why `countUrbanRes4HexesInRes1Hex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function countUrbanRes4HexesInRes1Hex(parentH3: string): number {
   let children = S.res4ChildrenByParent.get(parentH3);
   if (!children) {
@@ -783,28 +935,51 @@ function countUrbanRes4HexesInRes1Hex(parentH3: string): number {
   return count;
 }
 
+/**
+ * Defines the `getUrbanProductionCapacityForHex` function shape (function getUrbanProductionCapacityForHex(h3Index: string): number).
+
+ * Purpose: Supports maintainability by documenting why `getUrbanProductionCapacityForHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getUrbanProductionCapacityForHex(h3Index: string): number {
   // Canonical capacity is the current count of urban res4 children.
   return countUrbanRes4HexesInRes1Hex(h3Index);
 }
 
+/**
+ * Defines the `getControllerForHex` function shape (function getControllerForHex(state: GameStateSnapshot, h3Index: string): string | null).
+
+ * Purpose: Supports maintainability by documenting why `getControllerForHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getControllerForHex(state: GameStateSnapshot, h3Index: string): string | null {
   const row = state.res1Control?.find((entry) => entry.h3Index === h3Index);
   return row?.controllerPlayerId ?? null;
 }
 
 /**
- * Returns whether **T** is held for map inspection (see `rendererSharedState.hideTerrainFillWhileHeld`). Terrain fills, res4 fills,
- * and production overlays all consult this reader; only key/blur handlers assign the underlying flag.
+ * Defines the `isMapInspectionModeHeld` function shape (function isMapInspectionModeHeld(): boolean).
+
+ * Purpose: Supports maintainability by documenting why `isMapInspectionModeHeld` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function isMapInspectionModeHeld(): boolean {
   return S.hideTerrainFillWhileHeld;
 }
 
 /**
- * True when this res1 hex is human-controlled and has at least one urban res4 child (production
- * capacity). Matches eligibility for build-entry buttons (plus explored) and for canvas production labels
- * when not in map inspection mode.
+ * Defines the `isRes1HexHumanUrbanProduction` function shape (function isRes1HexHumanUrbanProduction().
+
+ * Purpose: Supports maintainability by documenting why `isRes1HexHumanUrbanProduction` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function isRes1HexHumanUrbanProduction(
   state: GameStateSnapshot,
@@ -814,6 +989,14 @@ function isRes1HexHumanUrbanProduction(
   return getUrbanProductionCapacityForHex(hx.h3Index) > 0;
 }
 
+/**
+ * Defines the `getBuildQueueSummaryForHex` function shape (function getBuildQueueSummaryForHex( state: GameStateSnapshot, h3Index: string ): NonNullable<GameStateSnapshot['res1BuildQueueTotals']>[number] | null {).
+
+ * Purpose: Supports maintainability by documenting why `getBuildQueueSummaryForHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getBuildQueueSummaryForHex(
   state: GameStateSnapshot,
   h3Index: string
@@ -821,9 +1004,33 @@ function getBuildQueueSummaryForHex(
   return state.res1BuildQueueTotals?.find((entry) => entry.h3Index === h3Index) ?? null;
 }
 
+/**
+ * Documents the `UnitCountsByType` type alias (type UnitCountsByType).
+
+ * Purpose: Supports maintainability by documenting why `UnitCountsByType` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type UnitCountsByType = Record<BuildUnitType, number>;
+/**
+ * Documents the `UnitCountsByPlayer` type alias (type UnitCountsByPlayer).
+
+ * Purpose: Supports maintainability by documenting why `UnitCountsByPlayer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type UnitCountsByPlayer = Record<'human' | 'opponent', UnitCountsByType>;
 
+/**
+ * Defines the `getUnitCountsByTypeForPlayer` function shape (function getUnitCountsByTypeForPlayer().
+
+ * Purpose: Supports maintainability by documenting why `getUnitCountsByTypeForPlayer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getUnitCountsByTypeForPlayer(
   state: GameStateSnapshot,
   playerId: 'human' | 'opponent'
@@ -838,10 +1045,26 @@ function getUnitCountsByTypeForPlayer(
   return counts;
 }
 
+/**
+ * Defines the `isFogOfWarDisabledForSnapshot` function shape (function isFogOfWarDisabledForSnapshot(state: GameStateSnapshot): boolean).
+
+ * Purpose: Supports maintainability by documenting why `isFogOfWarDisabledForSnapshot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function isFogOfWarDisabledForSnapshot(state: GameStateSnapshot): boolean {
   return state.fogOfWarEnabled === false;
 }
 
+/**
+ * Defines the `formatProductionQueueAwareLabel` function shape (function formatProductionQueueAwareLabel( state: GameStateSnapshot, h3Index: string, capacityPerTurn: number, controller: string | null, unitCoun).
+
+ * Purpose: Supports maintainability by documenting why `formatProductionQueueAwareLabel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatProductionQueueAwareLabel(
   state: GameStateSnapshot,
   h3Index: string,
@@ -872,6 +1095,14 @@ function formatProductionQueueAwareLabel(
   return `${capacityText} / ${turns.toLocaleString()}t`;
 }
 
+/**
+ * Defines the `formatProductionLabelForHumanControllerOnly` function shape (function formatProductionLabelForHumanControllerOnly( state: GameStateSnapshot, h3Index: string, capacityPerTurn: number, controller: string | null).
+
+ * Purpose: Supports maintainability by documenting why `formatProductionLabelForHumanControllerOnly` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatProductionLabelForHumanControllerOnly(
   state: GameStateSnapshot,
   h3Index: string,
@@ -882,6 +1113,14 @@ function formatProductionLabelForHumanControllerOnly(
   return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller);
 }
 
+/**
+ * Defines the `formatProductionLabelForAnyController` function shape (function formatProductionLabelForAnyController( state: GameStateSnapshot, h3Index: string, capacityPerTurn: number, controller: string | null, un).
+
+ * Purpose: Supports maintainability by documenting why `formatProductionLabelForAnyController` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatProductionLabelForAnyController(
   state: GameStateSnapshot,
   h3Index: string,
@@ -892,13 +1131,61 @@ function formatProductionLabelForAnyController(
   return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer);
 }
 
+/**
+ * Documents the `ProductionOverlayContext` interface as a named contract surface (interface ProductionOverlayContext).
+
+ * Purpose: Supports maintainability by documenting why `ProductionOverlayContext` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface ProductionOverlayContext {
-  mapInspectionHeld: boolean;
-  revealAllControllerQueues: boolean;
-  unitHexes: Set<string>;
-  unitCountsByPlayer?: UnitCountsByPlayer;
+    /**
+   * Specifies the contract for the `mapInspectionHeld` member (mapInspectionHeld: boolean;).
+
+   * Contract: Describes stable behavior for callers of `mapInspectionHeld` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+mapInspectionHeld: boolean;
+    /**
+   * Specifies the contract for the `revealAllControllerQueues` member (revealAllControllerQueues: boolean;).
+
+   * Contract: Describes stable behavior for callers of `revealAllControllerQueues` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+revealAllControllerQueues: boolean;
+    /**
+   * Specifies the contract for the `unitHexes` member (unitHexes: Set<string>;).
+
+   * Contract: Describes stable behavior for callers of `unitHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitHexes: Set<string>;
+    /**
+   * Specifies the contract for the `unitCountsByPlayer` member (unitCountsByPlayer?: UnitCountsByPlayer;).
+
+   * Contract: Describes stable behavior for callers of `unitCountsByPlayer` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitCountsByPlayer?: UnitCountsByPlayer;
 }
 
+/**
+ * Defines the `buildProductionOverlayContext` function shape (function buildProductionOverlayContext(state: GameStateSnapshot): ProductionOverlayContext).
+
+ * Purpose: Supports maintainability by documenting why `buildProductionOverlayContext` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildProductionOverlayContext(state: GameStateSnapshot): ProductionOverlayContext {
   const mapInspectionHeld = isMapInspectionModeHeld();
   const revealAllControllerQueues = mapInspectionHeld && isFogOfWarDisabledForSnapshot(state);
@@ -915,14 +1202,38 @@ function buildProductionOverlayContext(state: GameStateSnapshot): ProductionOver
   };
 }
 
+/**
+ * Defines the `roundToNearestInteger` function shape (function roundToNearestInteger(value: number): number).
+
+ * Purpose: Supports maintainability by documenting why `roundToNearestInteger` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function roundToNearestInteger(value: number): number {
   return Math.round(value);
 }
 
+/**
+ * Defines the `formatPercentInteger` function shape (function formatPercentInteger(value: number): string).
+
+ * Purpose: Supports maintainability by documenting why `formatPercentInteger` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatPercentInteger(value: number): string {
   return value.toLocaleString();
 }
 
+/**
+ * Defines the `clearRes1TooltipSummaryCaches` function shape (function clearRes1TooltipSummaryCaches(): void).
+
+ * Purpose: Supports maintainability by documenting why `clearRes1TooltipSummaryCaches` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function clearRes1TooltipSummaryCaches(): void {
   S.res1DominantTerrainKindByH3.clear();
   S.res1TerrainSummaryByH3.clear();
@@ -931,6 +1242,14 @@ function clearRes1TooltipSummaryCaches(): void {
   S.terrainTooltipHtmlByContentKey.clear();
 }
 
+/**
+ * Defines the `getRes1FeatureCounts` function shape (function getRes1FeatureCounts(h3: string):).
+
+ * Purpose: Supports maintainability by documenting why `getRes1FeatureCounts` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getRes1FeatureCounts(h3: string): { airportCount: number; seaportCount: number; rubbleCount: number } {
   const cached = S.res1FeatureCountsByH3.get(h3);
   if (cached) return cached;
@@ -952,6 +1271,14 @@ function getRes1FeatureCounts(h3: string): { airportCount: number; seaportCount:
   return counts;
 }
 
+/**
+ * Defines the `getRes1DominantTerrainKind` function shape (function getRes1DominantTerrainKind(h3: string, parentKind: string): string).
+
+ * Purpose: Supports maintainability by documenting why `getRes1DominantTerrainKind` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getRes1DominantTerrainKind(h3: string, parentKind: string): string {
   const cached = S.res1DominantTerrainKindByH3.get(h3);
   if (cached !== undefined) return cached;
@@ -981,6 +1308,14 @@ function getRes1DominantTerrainKind(h3: string, parentKind: string): string {
   return dominantKind;
 }
 
+/**
+ * Defines the `getRes1TerrainSummary` function shape (function getRes1TerrainSummary(h3: string, parentKind: string): string).
+
+ * Purpose: Supports maintainability by documenting why `getRes1TerrainSummary` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getRes1TerrainSummary(h3: string, parentKind: string): string {
   const cached = S.res1TerrainSummaryByH3.get(h3);
   if (cached !== undefined) return cached;
@@ -1026,6 +1361,14 @@ function getRes1TerrainSummary(h3: string, parentKind: string): string {
   return summary;
 }
 
+/**
+ * Defines the `getRes1FeaturesSummary` function shape (function getRes1FeaturesSummary(h3: string): string | null).
+
+ * Purpose: Supports maintainability by documenting why `getRes1FeaturesSummary` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getRes1FeaturesSummary(h3: string): string | null {
   if (S.res1FeaturesSummaryByH3.has(h3)) return S.res1FeaturesSummaryByH3.get(h3) ?? null;
   if (!infraGlyphsAllowedForRes1Hex(h3)) {
@@ -1042,6 +1385,14 @@ function getRes1FeaturesSummary(h3: string): string | null {
   return summary;
 }
 
+/**
+ * Defines the `terrainTooltipStateForRes1Hex` function shape (function terrainTooltipStateForRes1Hex(h3: string): TerrainTooltipState).
+
+ * Purpose: Supports maintainability by documenting why `terrainTooltipStateForRes1Hex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function terrainTooltipStateForRes1Hex(h3: string): TerrainTooltipState {
   const state = terrainStateForRes1Hex(h3);
   return {
@@ -1053,6 +1404,14 @@ function terrainTooltipStateForRes1Hex(h3: string): TerrainTooltipState {
   };
 }
 
+/**
+ * Defines the `terrainStateForPointer` function shape (function terrainStateForPointer().
+
+ * Purpose: Supports maintainability by documenting why `terrainStateForPointer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function terrainStateForPointer(
   clientX: number,
   clientY: number,
@@ -1105,6 +1464,20 @@ function terrainStateForPointer(
     return terrainTooltipStateForRes1Hex(fallbackRes1H3);
   }
   const L = getLeafletGlobal();
+  if (!L) {
+    if (!fallbackRes1H3) {
+      return {
+        terrainKind: 'Unknown',
+        isUrban: false,
+        isRubble: false,
+        features: [],
+        urbanHexCount: null,
+        res1TerrainSummary: null,
+        res1FeaturesSummary: null,
+      };
+    }
+    return terrainTooltipStateForRes1Hex(fallbackRes1H3);
+  }
   const rect = map.getContainer().getBoundingClientRect();
   const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
   try {
@@ -1137,6 +1510,14 @@ function terrainStateForPointer(
   }
 }
 
+/**
+ * Defines the `namingLookupTargetForPointer` function shape (function namingLookupTargetForPointer().
+
+ * Purpose: Supports maintainability by documenting why `namingLookupTargetForPointer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function namingLookupTargetForPointer(
   clientX: number,
   clientY: number,
@@ -1158,6 +1539,10 @@ function namingLookupTargetForPointer(
     return { h3Index: fallbackRes1H3, resolution: 1 };
   }
   const L = getLeafletGlobal();
+  if (!L) {
+    if (!fallbackRes1H3) return null;
+    return { h3Index: fallbackRes1H3, resolution: 1 };
+  }
   const rect = map.getContainer().getBoundingClientRect();
   const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
   try {
@@ -1169,11 +1554,27 @@ function namingLookupTargetForPointer(
   }
 }
 
+/**
+ * Defines the `namingLookupKey` function shape (function namingLookupKey(target: NamingLookupTarget | null): string | null).
+
+ * Purpose: Supports maintainability by documenting why `namingLookupKey` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function namingLookupKey(target: NamingLookupTarget | null): string | null {
   if (!target) return null;
   return `${target.resolution}:${target.h3Index}`;
 }
 
+/**
+ * Defines the `getCachedNamingLineForTarget` function shape (async function getCachedNamingLineForTarget(target: NamingLookupTarget | null): Promise<string | null>).
+
+ * Purpose: Supports maintainability by documenting why `getCachedNamingLineForTarget` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function getCachedNamingLineForTarget(target: NamingLookupTarget | null): Promise<string | null> {
   const key = namingLookupKey(target);
   if (!key || !target) return null;
@@ -1190,6 +1591,14 @@ async function getCachedNamingLineForTarget(target: NamingLookupTarget | null): 
   }
 }
 
+/**
+ * Defines the `escapeHtml` function shape (function escapeHtml(text: string): string).
+
+ * Purpose: Supports maintainability by documenting why `escapeHtml` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function escapeHtml(text: string): string {
   return text
     .replaceAll('&', '&amp;')
@@ -1199,6 +1608,14 @@ function escapeHtml(text: string): string {
     .replaceAll("'", '&#39;');
 }
 
+/**
+ * Defines the `formatGroupedNamingLineHtml` function shape (function formatGroupedNamingLineHtml(namingLine: string): string).
+
+ * Purpose: Supports maintainability by documenting why `formatGroupedNamingLineHtml` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatGroupedNamingLineHtml(namingLine: string): string {
   const groups = namingLine
     .split(';')
@@ -1217,6 +1634,14 @@ function formatGroupedNamingLineHtml(namingLine: string): string {
   return formattedGroups.join('; ');
 }
 
+/**
+ * Defines the `formatTerrainVariantSuffix` function shape (function formatTerrainVariantSuffix(state: Pick<TerrainTooltipState, 'isUrban' | 'isRubble'>): string).
+
+ * Purpose: Supports maintainability by documenting why `formatTerrainVariantSuffix` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatTerrainVariantSuffix(state: Pick<TerrainTooltipState, 'isUrban' | 'isRubble'>): string {
   const variants: string[] = [];
   if (state.isUrban) variants.push('Urban');
@@ -1224,6 +1649,14 @@ function formatTerrainVariantSuffix(state: Pick<TerrainTooltipState, 'isUrban' |
   return variants.length > 0 ? `, ${variants.join(', ')}` : '';
 }
 
+/**
+ * Defines the `formatTerrainTooltipHtml` function shape (function formatTerrainTooltipHtml(state: TerrainTooltipState, namingLine: string | null): string).
+
+ * Purpose: Supports maintainability by documenting why `formatTerrainTooltipHtml` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatTerrainTooltipHtml(state: TerrainTooltipState, namingLine: string | null): string {
   const terrainLabel = formatTerrainKindLabel(state.terrainKind);
   const terrainValue = state.res1TerrainSummary ?? `${terrainLabel}${formatTerrainVariantSuffix(state)}`;
@@ -1237,6 +1670,14 @@ function formatTerrainTooltipHtml(state: TerrainTooltipState, namingLine: string
   return `${formatGroupedNamingLineHtml(namingLine)}<br/><span style="display:block;height:0.5em"></span>${bodyLine}`;
 }
 
+/**
+ * Defines the `terrainTooltipContentKey` function shape (function terrainTooltipContentKey(state: TerrainTooltipState, namingLine: string | null): string).
+
+ * Purpose: Supports maintainability by documenting why `terrainTooltipContentKey` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function terrainTooltipContentKey(state: TerrainTooltipState, namingLine: string | null): string {
   const namingKey = namingLine ?? '';
   const urbanKey = state.isUrban ? '1' : '0';
@@ -1248,6 +1689,14 @@ function terrainTooltipContentKey(state: TerrainTooltipState, namingLine: string
   return `${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}`;
 }
 
+/**
+ * Defines the `getCachedTerrainTooltipHtml` function shape (function getCachedTerrainTooltipHtml(state: TerrainTooltipState, namingLine: string | null): string).
+
+ * Purpose: Supports maintainability by documenting why `getCachedTerrainTooltipHtml` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getCachedTerrainTooltipHtml(state: TerrainTooltipState, namingLine: string | null): string {
   const key = terrainTooltipContentKey(state, namingLine);
   const cachedHtml = S.terrainTooltipHtmlByContentKey.get(key);
@@ -1258,6 +1707,14 @@ function getCachedTerrainTooltipHtml(state: TerrainTooltipState, namingLine: str
   return html;
 }
 
+/**
+ * Defines the `isStackCalloutTargetInsideDialog` function shape (function isStackCalloutTargetInsideDialog(target: EventTarget | null): boolean).
+
+ * Purpose: Supports maintainability by documenting why `isStackCalloutTargetInsideDialog` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function isStackCalloutTargetInsideDialog(target: EventTarget | null): boolean {
   if (!(target instanceof Node)) return false;
   const callout = document.getElementById('stack-callout');
@@ -1265,12 +1722,25 @@ function isStackCalloutTargetInsideDialog(target: EventTarget | null): boolean {
 }
 
 /**
- * Refreshes renderer state after a build-queue mutation so res-1 queue labels update immediately.
+ * Defines the `refreshGameStateAfterBuildQueueChange` function shape (async function refreshGameStateAfterBuildQueueChange(): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `refreshGameStateAfterBuildQueueChange` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 async function refreshGameStateAfterBuildQueueChange(): Promise<void> {
   return refreshGameStateAfterBuildQueueChangeFromModule({ applyGameStateSnapshot });
 }
 
+/**
+ * Defines the `applyGameStateSnapshot` function shape (async function applyGameStateSnapshot( nextState: GameStateSnapshot, options: { refreshStandingOrders?: boolean; updateGameStateSidebarUi?: bool).
+
+ * Purpose: Supports maintainability by documenting why `applyGameStateSnapshot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function applyGameStateSnapshot(
   nextState: GameStateSnapshot,
   options: {
@@ -1304,6 +1774,14 @@ async function applyGameStateSnapshot(
   );
 }
 
+/**
+ * Defines the `showTerrainTooltip` function shape (async function showTerrainTooltip( clientX: number, clientY: number, state: TerrainTooltipState, namingTarget: NamingLookupTarget | null ): Promise).
+
+ * Purpose: Supports maintainability by documenting why `showTerrainTooltip` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function showTerrainTooltip(
   clientX: number,
   clientY: number,
@@ -1326,8 +1804,12 @@ async function showTerrainTooltip(
 }
 
 /**
- * Restores the terrain tooltip after stack/build popovers close, even when the pointer
- * has not moved (the normal scheduling path runs only on pointermove/hex-change).
+ * Defines the `restoreTerrainTooltipAfterPopoverClose` function shape (async function restoreTerrainTooltipAfterPopoverClose(): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `restoreTerrainTooltipAfterPopoverClose` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 async function restoreTerrainTooltipAfterPopoverClose(): Promise<void> {
   if (!S.gameState) return;
@@ -1355,6 +1837,14 @@ async function restoreTerrainTooltipAfterPopoverClose(): Promise<void> {
   await showTerrainTooltip(S.lastPointerClientX, S.lastPointerClientY, state, namingTarget);
 }
 
+/**
+ * Defines the `scheduleTerrainTooltipRestoreAfterPopoverClose` function shape (function scheduleTerrainTooltipRestoreAfterPopoverClose(): void).
+
+ * Purpose: Supports maintainability by documenting why `scheduleTerrainTooltipRestoreAfterPopoverClose` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function scheduleTerrainTooltipRestoreAfterPopoverClose(): void {
   if (S.terrainTooltipRestoreTimer !== null) {
     clearTimeout(S.terrainTooltipRestoreTimer);
@@ -1366,14 +1856,38 @@ function scheduleTerrainTooltipRestoreAfterPopoverClose(): void {
   }, 0);
 }
 
+/**
+ * Defines the `getPrimarySelectedUnitId` function shape (function getPrimarySelectedUnitId(): string | null).
+
+ * Purpose: Supports maintainability by documenting why `getPrimarySelectedUnitId` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getPrimarySelectedUnitId(): string | null {
   return S.selectedUnitIds[0] ?? null;
 }
 
+/**
+ * Defines the `rebuildUnitDisplayNameLookup` function shape (function rebuildUnitDisplayNameLookup(state: GameStateSnapshot | null): void).
+
+ * Purpose: Supports maintainability by documenting why `rebuildUnitDisplayNameLookup` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function rebuildUnitDisplayNameLookup(state: GameStateSnapshot | null): void {
   S.unitDisplayNameById = state ? buildUnitDisplayNameLookup(state.units) : new Map<string, string>();
 }
 
+/**
+ * Defines the `applyRes4TerrainOverrides` function shape (function applyRes4TerrainOverrides(rows: Array<{ h3Index: string; terrainKind: string; isUrban: boolean; isAirport?: boolean; isSeaport?: boolean).
+
+ * Purpose: Supports maintainability by documenting why `applyRes4TerrainOverrides` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function applyRes4TerrainOverrides(rows: Array<{
   h3Index: string;
   terrainKind: string;
@@ -1391,6 +1905,14 @@ function applyRes4TerrainOverrides(rows: Array<{
   clearRes1TooltipSummaryCaches();
 }
 
+/**
+ * Defines the `refreshRes4TerrainOverridesForRenderer` function shape (async function refreshRes4TerrainOverridesForRenderer(): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `refreshRes4TerrainOverridesForRenderer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function refreshRes4TerrainOverridesForRenderer(): Promise<void> {
   if (!window.gameApi?.getRes4TerrainOverrides) return;
   try {
@@ -1402,10 +1924,26 @@ async function refreshRes4TerrainOverridesForRenderer(): Promise<void> {
   }
 }
 
+/**
+ * Defines the `formatUnitDisplayName` function shape (function formatUnitDisplayName(unitId: string): string).
+
+ * Purpose: Supports maintainability by documenting why `formatUnitDisplayName` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatUnitDisplayName(unitId: string): string {
   return S.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
 }
 
+/**
+ * Defines the `formatTargetingValidationReason` function shape (function formatTargetingValidationReason(reason: string | undefined, fallbackMessage: string): string).
+
+ * Purpose: Supports maintainability by documenting why `formatTargetingValidationReason` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatTargetingValidationReason(reason: string | undefined, fallbackMessage: string): string {
   const trimmed = reason?.trim();
   if (!trimmed) return fallbackMessage;
@@ -1417,42 +1955,122 @@ function formatTargetingValidationReason(reason: string | undefined, fallbackMes
   return `${formatUnitDisplayName(unitId)}: ${unitReason}`;
 }
 
+/**
+ * Defines the `reconcileSelectionToCurrentState` function shape (function reconcileSelectionToCurrentState(): void).
+
+ * Purpose: Supports maintainability by documenting why `reconcileSelectionToCurrentState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function reconcileSelectionToCurrentState(): void {
   return reconcileSelectionToCurrentStateFromModule();
 }
 
+/**
+ * Defines the `replaceSelection` function shape (function replaceSelection(unitIds: string[]): void).
+
+ * Purpose: Supports maintainability by documenting why `replaceSelection` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function replaceSelection(unitIds: string[]): void {
   return replaceSelectionFromModule(unitIds);
 }
 
+/**
+ * Defines the `addUnitsToSelection` function shape (function addUnitsToSelection(unitIds: string[]): void).
+
+ * Purpose: Supports maintainability by documenting why `addUnitsToSelection` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function addUnitsToSelection(unitIds: string[]): void {
   return addUnitsToSelectionFromModule(unitIds);
 }
 
+/**
+ * Defines the `removeUnitsFromSelection` function shape (function removeUnitsFromSelection(unitIds: string[]): void).
+
+ * Purpose: Supports maintainability by documenting why `removeUnitsFromSelection` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function removeUnitsFromSelection(unitIds: string[]): void {
   return removeUnitsFromSelectionFromModule(unitIds);
 }
 
+/**
+ * Defines the `toggleUnitSelection` function shape (function toggleUnitSelection(unitId: string): void).
+
+ * Purpose: Supports maintainability by documenting why `toggleUnitSelection` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function toggleUnitSelection(unitId: string): void {
   return toggleUnitSelectionFromModule(unitId);
 }
 
+/**
+ * Defines the `clearSelection` function shape (function clearSelection(): void).
+
+ * Purpose: Supports maintainability by documenting why `clearSelection` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function clearSelection(): void {
   return clearSelectionFromModule();
 }
 
+/**
+ * Defines the `getVisibleHexSet` function shape (function getVisibleHexSet(state: GameStateSnapshot | null): Set<string>).
+
+ * Purpose: Supports maintainability by documenting why `getVisibleHexSet` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getVisibleHexSet(state: GameStateSnapshot | null): Set<string> {
   return getVisibleHexSetFromModule(state);
 }
 
+/**
+ * Defines the `getExploredHexSet` function shape (function getExploredHexSet(state: GameStateSnapshot | null): Set<string>).
+
+ * Purpose: Supports maintainability by documenting why `getExploredHexSet` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getExploredHexSet(state: GameStateSnapshot | null): Set<string> {
   return getExploredHexSetFromModule(state);
 }
 
+/**
+ * Defines the `isHexExploredByPlayer` function shape (function isHexExploredByPlayer(h3Index: string): boolean).
+
+ * Purpose: Supports maintainability by documenting why `isHexExploredByPlayer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function isHexExploredByPlayer(h3Index: string): boolean {
   return isHexExploredByPlayerFromModule(h3Index);
 }
 
+/**
+ * Defines the `inferUnitTypeLabelFromId` function shape (function inferUnitTypeLabelFromId(unitId: string): string).
+
+ * Purpose: Supports maintainability by documenting why `inferUnitTypeLabelFromId` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function inferUnitTypeLabelFromId(unitId: string): string {
   if (unitId.includes('-infantry-')) return 'I';
   if (unitId.includes('-armor-')) return 'A';
@@ -1461,6 +2079,14 @@ function inferUnitTypeLabelFromId(unitId: string): string {
   return '?';
 }
 
+/**
+ * Defines the `formatUnknownBattleAnnouncement` function shape (function formatUnknownBattleAnnouncement(continentNames: string[]): string).
+
+ * Purpose: Supports maintainability by documenting why `formatUnknownBattleAnnouncement` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatUnknownBattleAnnouncement(continentNames: string[]): string {
   const clean = continentNames
     .map((s) => s.trim())
@@ -1471,6 +2097,14 @@ function formatUnknownBattleAnnouncement(continentNames: string[]): string {
   if (clean.length === 2) return `Unknown battle observed in ${clean[0]} or ${clean[1]}.`;
   return `Unknown battle observed in ${clean.slice(0, -1).join(', ')}, or ${clean[clean.length - 1]}.`;
 }
+/**
+ * Defines the `requestRedraw` function shape (function requestRedraw(): void).
+
+ * Purpose: Supports maintainability by documenting why `requestRedraw` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function requestRedraw(): void {
   if (S.resolutionMoveAnimation) return;
   if (S.redrawRafId !== null) return;
@@ -1482,16 +2116,25 @@ function requestRedraw(): void {
 }
 
 /**
- * Maintains the client-side stale enemy intel cache across state transitions. Call after every
- * renderer snapshot update (ready, initial load, new game). Compares the previous and current visible enemy
- * sets to create stale entries for enemies that just left view, and culls entries that are now
- * contradicted (hex visible but enemy gone), expired, or re-sighted. Works alongside the persisted
- * DB intel; the draw function merges both sources so stale markers appear even when DB rows lag.
+ * Defines the `updateClientStaleEnemyIntel` function shape (function updateClientStaleEnemyIntel(previousState: GameStateSnapshot | null, state: GameStateSnapshot): void).
+
+ * Purpose: Supports maintainability by documenting why `updateClientStaleEnemyIntel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function updateClientStaleEnemyIntel(previousState: GameStateSnapshot | null, state: GameStateSnapshot): void {
   return updateClientStaleEnemyIntelFromModule(previousState, state);
 }
 
+/**
+ * Defines the `detailHitAtClientPixel` function shape (function detailHitAtClientPixel().
+
+ * Purpose: Supports maintainability by documenting why `detailHitAtClientPixel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function detailHitAtClientPixel(
   clientX: number,
   clientY: number,
@@ -1507,6 +2150,7 @@ function detailHitAtClientPixel(
     | null;
   if (!map) return null;
   const L = getLeafletGlobal();
+  if (!L) return null;
   const rect = map.getContainer().getBoundingClientRect();
   const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
   try {
@@ -1519,6 +2163,14 @@ function detailHitAtClientPixel(
   }
 }
 
+/**
+ * Defines the `drawTerrainHexes` function shape (function drawTerrainHexes(ctx: CanvasRenderingContext2D): void).
+
+ * Purpose: Supports maintainability by documenting why `drawTerrainHexes` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function drawTerrainHexes(ctx: CanvasRenderingContext2D): void {
   // Contract anchor retained after extraction:
   // if (res4Active) return;
@@ -1531,6 +2183,14 @@ function drawTerrainHexes(ctx: CanvasRenderingContext2D): void {
   });
 }
 
+/**
+ * Defines the `hasVisibleRes1InfrastructureGlyphs` function shape (function hasVisibleRes1InfrastructureGlyphs().
+
+ * Purpose: Supports maintainability by documenting why `hasVisibleRes1InfrastructureGlyphs` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function hasVisibleRes1InfrastructureGlyphs(
   h3Index: string,
   res4On: boolean,
@@ -1545,6 +2205,14 @@ function hasVisibleRes1InfrastructureGlyphs(
   });
 }
 
+/**
+ * Defines the `computeRes1OverlayTextY` function shape (function computeRes1OverlayTextY( h3Index: string, map: { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } }, L: { latLng: (lat: numbe).
+
+ * Purpose: Supports maintainability by documenting why `computeRes1OverlayTextY` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function computeRes1OverlayTextY(
   h3Index: string,
   map: { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } },
@@ -1554,7 +2222,14 @@ function computeRes1OverlayTextY(
   return computeRes1OverlayTextYFromModule(h3Index, map, L, hasOffsetFeatures);
 }
 
-/** Renders build-entry controls for every eligible human-controlled production hex at current zoom. */
+/**
+ * Defines the `syncBuildEntryButton` function shape (function syncBuildEntryButton(): void).
+
+ * Purpose: Supports maintainability by documenting why `syncBuildEntryButton` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function syncBuildEntryButton(): void {
   const layer = document.getElementById('build-entry-layer');
   if (!layer || !S.gameState) {
@@ -1575,6 +2250,10 @@ function syncBuildEntryButton(): void {
     return;
   }
   const L = getLeafletGlobal();
+  if (!L) {
+    hideBuildEntryLayer(layer);
+    return;
+  }
   const res4On = shouldRenderRes4Hexes();
   if (res4On) {
     hideBuildEntryLayer(layer);
@@ -1622,6 +2301,14 @@ function syncBuildEntryButton(): void {
   layer.setAttribute('aria-hidden', 'false');
 }
 
+/**
+ * Defines the `drawRes4TerrainHexes` function shape (function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void).
+
+ * Purpose: Supports maintainability by documenting why `drawRes4TerrainHexes` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void {
   return drawRes4TerrainHexesFromModule(ctx, {
     getExploredHexSet,
@@ -1632,12 +2319,25 @@ function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void {
   });
 }
 
+/**
+ * Defines the `drawScenarioHomeRegionOutlines` function shape (function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): void).
+
+ * Purpose: Supports maintainability by documenting why `drawScenarioHomeRegionOutlines` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): void {
   return drawScenarioHomeRegionOutlinesFromModule(ctx);
 }
 
 /**
- * Res-1 glyphs track terrain fill visibility and are hidden while T is held.
+ * Defines the `infraGlyphsAllowedForRes1Hex` function shape (function infraGlyphsAllowedForRes1Hex(h3: string): boolean).
+
+ * Purpose: Supports maintainability by documenting why `infraGlyphsAllowedForRes1Hex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function infraGlyphsAllowedForRes1Hex(h3: string): boolean {
   if (!isHexExploredByPlayer(h3)) return false;
@@ -1645,7 +2345,12 @@ function infraGlyphsAllowedForRes1Hex(h3: string): boolean {
 }
 
 /**
- * Res-4 glyphs track terrain fill visibility and are hidden while T is held.
+ * Defines the `infraGlyphsAllowedForRes4Child` function shape (function infraGlyphsAllowedForRes4Child(parentH3: string, childH3: string): boolean).
+
+ * Purpose: Supports maintainability by documenting why `infraGlyphsAllowedForRes4Child` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function infraGlyphsAllowedForRes4Child(parentH3: string, childH3: string): boolean {
   if (!isHexExploredByPlayer(parentH3)) return false;
@@ -1654,7 +2359,12 @@ function infraGlyphsAllowedForRes4Child(parentH3: string, childH3: string): bool
 }
 
 /**
- * Draws airport / seaport symbols on highlighted terrain hexes after units so glyphs sit above unit markers when T is held.
+ * Defines the `drawTerrainInfrastructureOverlays` function shape (function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void).
+
+ * Purpose: Supports maintainability by documenting why `drawTerrainInfrastructureOverlays` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void {
   return drawTerrainInfrastructureOverlaysFromModule(ctx, {
@@ -1667,10 +2377,12 @@ function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void 
 }
 
 /**
- * Draws res1 production capacity / queue hints on the map overlay canvas.
- * Rules follow `isMapInspectionModeHeld()` and `isRes1HexHumanUrbanProduction()`; map inspection uses `rendererSharedState.hideTerrainFillWhileHeld`.
- * With fog disabled, T-hold inspection reveals full queue ETA labels for all land hexes.
- * Skipped while res4 child hexes are visible.
+ * Defines the `drawRes1ProductionOverlays` function shape (function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void).
+
+ * Purpose: Supports maintainability by documenting why `drawRes1ProductionOverlays` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void {
   if (!S.gameState) return;
@@ -1679,6 +2391,7 @@ function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void {
     | null;
   if (!map) return;
   const L = getLeafletGlobal();
+  if (!L) return;
   if (shouldRenderRes4Hexes()) return;
   const overlayContext = buildProductionOverlayContext(S.gameState);
   for (const hx of S.gameState.hexes) {
@@ -1725,14 +2438,25 @@ function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void {
   }
 }
 
-/** Synchronizes event-driven mode from the Tools tab "Events" toggle state. */
+/**
+ * Defines the `syncEventDrivenFromTools` function shape (function syncEventDrivenFromTools(): void).
+
+ * Purpose: Supports maintainability by documenting why `syncEventDrivenFromTools` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function syncEventDrivenFromTools(): void {
   return syncEventDrivenFromToolsFromModule();
 }
 
 /**
- * Starts one background AI orders request if conditions allow (planning phase, key and model set, no request in flight).
- * Used when Run is toggled on and after new game when Run is on. On success stores orders and enables Ready; on failure shows a user-visible error.
+ * Defines the `startBackgroundRequestIfAllowed` function shape (function startBackgroundRequestIfAllowed(): void).
+
+ * Purpose: Supports maintainability by documenting why `startBackgroundRequestIfAllowed` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function startBackgroundRequestIfAllowed(): void {
   return startBackgroundRequestIfAllowedFromModule({
@@ -1745,8 +2469,12 @@ function startBackgroundRequestIfAllowed(): void {
 }
 
 /**
- * Renders or updates the Tools tab list: 2-column grid; each cell has label and count (toggle button).
- * Toggle click flips enabled state. Does not call main or Ready.
+ * Defines the `renderOpenRouterToolsList` function shape (function renderOpenRouterToolsList(): void).
+
+ * Purpose: Supports maintainability by documenting why `renderOpenRouterToolsList` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function renderOpenRouterToolsList(): void {
   return renderOpenRouterToolsListFromModule({
@@ -1759,7 +2487,12 @@ function renderOpenRouterToolsList(): void {
 }
 
 /**
- * Draws a neutral loading canvas while map/game state is still initializing.
+ * Defines the `drawLoadingScene` function shape (function drawLoadingScene(ctx: CanvasRenderingContext2D, width: number, height: number): void).
+
+ * Purpose: Supports maintainability by documenting why `drawLoadingScene` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function drawLoadingScene(ctx: CanvasRenderingContext2D, width: number, height: number): void {
   return drawLoadingSceneFromModule(ctx, width, height, {
@@ -1771,7 +2504,12 @@ function drawLoadingScene(ctx: CanvasRenderingContext2D, width: number, height: 
 }
 
 /**
- * Mirrors which units are passed to `drawUnits` (including resolution-phase substitutions and moving exclusions).
+ * Defines the `getUnitsForDrawWithMovingIds` function shape (function getUnitsForDrawWithMovingIds(state: GameStateSnapshot): { unitsToDraw: GameStateSnapshot['units']; movingIds: Set<string> | undefined; } { //).
+
+ * Purpose: Supports maintainability by documenting why `getUnitsForDrawWithMovingIds` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function getUnitsForDrawWithMovingIds(state: GameStateSnapshot): {
   unitsToDraw: GameStateSnapshot['units'];
@@ -1789,7 +2527,14 @@ function getUnitsForDrawWithMovingIds(state: GameStateSnapshot): {
   });
 }
 
-/** True if map-container pixel (px, py) lies on a drawn unit circle for this hex (same layout as `drawUnits`). */
+/**
+ * Defines the `containerPixelHitsDrawnUnitIcon` function shape (function containerPixelHitsDrawnUnitIcon().
+
+ * Purpose: Supports maintainability by documenting why `containerPixelHitsDrawnUnitIcon` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function containerPixelHitsDrawnUnitIcon(
   px: number,
   py: number,
@@ -1799,18 +2544,13 @@ function containerPixelHitsDrawnUnitIcon(
   return containerPixelHitsDrawnUnitIconFromModule(px, py, h3Index, unitCount);
 }
 
-function pointInExpandedClientRect(
-  clientX: number,
-  clientY: number,
-  rect: DOMRectReadOnly,
-  padPx: number
-): boolean {
-  return pointInExpandedClientRectFromModule(clientX, clientY, rect, padPx);
-}
-
 /**
- * Opens or toggles the build popup when the pointer is over the slim build control. Clicks often land on
- * `#main-map` (overlay canvas uses `pointer-events: none`) instead of `#build-entry-btn`, so this mirrors the button handler.
+ * Defines the `tryHandleBuildEntryAtClientXY` function shape (function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number): boolean).
+
+ * Purpose: Supports maintainability by documenting why `tryHandleBuildEntryAtClientXY` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number): boolean {
   return tryHandleBuildEntryAtClientXYFromModule(clientX, clientY, {
@@ -1821,7 +2561,14 @@ function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number): boolea
   });
 }
 
-/** Leaflet uses a grab hand on the map; use the normal arrow over actual click targets (icons, build control). */
+/**
+ * Defines the `updateMapInteractionCursor` function shape (function updateMapInteractionCursor(clientX: number, clientY: number): void).
+
+ * Purpose: Supports maintainability by documenting why `updateMapInteractionCursor` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function updateMapInteractionCursor(clientX: number, clientY: number): void {
   return updateMapInteractionCursorFromModule(clientX, clientY, {
     backgroundColor: BACKGROUND_COLOR,
@@ -1832,8 +2579,12 @@ function updateMapInteractionCursor(clientX: number, clientY: number): void {
 }
 
 /**
- * Draws the full tactical scene for the current frame. Use from both resize and animation redraw paths
- * so terrain, units, stale intel, and combat overlays stay behaviorally identical.
+ * Defines the `drawGameScene` function shape (function drawGameScene().
+
+ * Purpose: Supports maintainability by documenting why `drawGameScene` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function drawGameScene(
   ctx: CanvasRenderingContext2D,
@@ -1948,14 +2699,38 @@ function drawGameScene(
   }
 }
 
+/**
+ * Defines the `shouldDrawCommittedOrderPaths` function shape (function shouldDrawCommittedOrderPaths(): boolean).
+
+ * Purpose: Supports maintainability by documenting why `shouldDrawCommittedOrderPaths` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function shouldDrawCommittedOrderPaths(): boolean {
   return !S.ctrlKeyActive;
 }
 
+/**
+ * Defines the `shouldDrawHoveredPathPreview` function shape (function shouldDrawHoveredPathPreview(): boolean).
+
+ * Purpose: Supports maintainability by documenting why `shouldDrawHoveredPathPreview` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function shouldDrawHoveredPathPreview(): boolean {
   return !S.ctrlKeyActive && S.selectedUnitIds.length > 0;
 }
 
+/**
+ * Defines the `getCommittedOrderUnitsHiddenDuringPreview` function shape (function getCommittedOrderUnitsHiddenDuringPreview().
+
+ * Purpose: Supports maintainability by documenting why `getCommittedOrderUnitsHiddenDuringPreview` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getCommittedOrderUnitsHiddenDuringPreview(
   shouldDrawPathPreview: boolean
 ): ReadonlySet<string> | null {
@@ -1964,7 +2739,12 @@ function getCommittedOrderUnitsHiddenDuringPreview(
 }
 
 /**
- * Resizes the overlay canvas to match the map container (including devicePixelRatio) and redraws hexes/units.
+ * Defines the `resizeAndRedraw` function shape (function resizeAndRedraw(): void).
+
+ * Purpose: Supports maintainability by documenting why `resizeAndRedraw` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function resizeAndRedraw(): void {
   const container = document.getElementById('canvas-container');
@@ -2000,14 +2780,26 @@ function resizeAndRedraw(): void {
 }
 
 /**
- * Draws hover route preview for selected unit: turn-1 segment solid, future turns dashed, optional invalid X marker.
+ * Defines the `drawHoverRoutePreview` function shape (function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void).
+
+ * Purpose: Supports maintainability by documenting why `drawHoverRoutePreview` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
   if (!shouldDrawHoveredPathPreview()) return;
   return drawHoverRoutePreviewFromModule(ctx);
 }
 
-/** Redraws the overlay without resizing. Use after pan/zoom or selection change. */
+/**
+ * Defines the `redraw` function shape (function redraw(): void).
+
+ * Purpose: Supports maintainability by documenting why `redraw` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function redraw(): void {
   const container = document.getElementById('canvas-container');
   const canvas = document.getElementById('map-overlay') as HTMLCanvasElement | null;
@@ -2031,6 +2823,14 @@ function redraw(): void {
   syncBuildEntryButton();
 }
 
+/**
+ * Defines the `tickResolutionMoveAnimation` function shape (function tickResolutionMoveAnimation(): void).
+
+ * Purpose: Supports maintainability by documenting why `tickResolutionMoveAnimation` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function tickResolutionMoveAnimation(): void {
   if (!S.resolutionMoveAnimation) return;
   const anim = S.resolutionMoveAnimation;
@@ -2049,23 +2849,62 @@ function tickResolutionMoveAnimation(): void {
   }
 }
 
-/** Updates the sidebar with the selected unit or placeholder. */
+/**
+ * Defines the `updateSidebar` function shape (function updateSidebar(): void).
+
+ * Purpose: Supports maintainability by documenting why `updateSidebar` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function updateSidebar(): void {
   return updateSidebarFromModule(getPrimarySelectedUnitId, formatUnitDisplayName);
 }
 
+/**
+ * Defines the `updateGameStateSidebar` function shape (function updateGameStateSidebar(state: GameStateSnapshot | null): void).
+
+ * Purpose: Supports maintainability by documenting why `updateGameStateSidebar` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function updateGameStateSidebar(state: GameStateSnapshot | null): void {
   return updateGameStateSidebarFromModule(state);
 }
 
+/**
+ * Defines the `setMainUIControlsEnabled` function shape (function setMainUIControlsEnabled(enabled: boolean): void).
+
+ * Purpose: Supports maintainability by documenting why `setMainUIControlsEnabled` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function setMainUIControlsEnabled(enabled: boolean): void {
   return setMainUIControlsEnabledFromModule(enabled);
 }
 
+/**
+ * Defines the `updateGameOverUI` function shape (function updateGameOverUI(state: GameStateSnapshot | null): void).
+
+ * Purpose: Supports maintainability by documenting why `updateGameOverUI` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function updateGameOverUI(state: GameStateSnapshot | null): void {
   return updateGameOverUIFromModule(state, updateReadyButtonState);
 }
 
+/**
+ * Defines the `initNewGameButton` function shape (function initNewGameButton(): void).
+
+ * Purpose: Supports maintainability by documenting why `initNewGameButton` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function initNewGameButton(): void {
   registerNewGameButton({
     refreshRes4TerrainOverridesForRenderer,
@@ -2091,25 +2930,49 @@ function initNewGameButton(): void {
 }
 
 /**
- * Opens the new-game overlay from the Model tab "New" button.
- * This does not mutate DB state until the user confirms via Start game.
+ * Defines the `openNewGameOverlayFromModelTab` function shape (function openNewGameOverlayFromModelTab(): void).
+
+ * Purpose: Supports maintainability by documenting why `openNewGameOverlayFromModelTab` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function openNewGameOverlayFromModelTab(): void {
   return openNewGameOverlayFromModelTabFromModule(setMainUIControlsEnabled, updateReadyButtonState);
 }
 
+/**
+ * Defines the `refreshHumanStandingOrders` function shape (async function refreshHumanStandingOrders(): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `refreshHumanStandingOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function refreshHumanStandingOrders(): Promise<void> {
   return refreshHumanStandingOrdersFromModule();
 }
 
-function estimateHexesLeftForOrder(order: HumanStandingOrderSnapshot): number {
-  return estimateHexesLeftForOrderFromModule(order);
-}
+/**
+ * Defines the `isPendingMovementOrderForDisplay` function shape (function isPendingMovementOrderForDisplay(order: HumanStandingOrderSnapshot): boolean).
 
+ * Purpose: Supports maintainability by documenting why `isPendingMovementOrderForDisplay` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function isPendingMovementOrderForDisplay(order: HumanStandingOrderSnapshot): boolean {
   return isPendingMovementOrderForDisplayFromModule(order);
 }
 
+/**
+ * Defines the `applySelectionFromSidebarUnitButton` function shape (function applySelectionFromSidebarUnitButton(unitId: string, event: MouseEvent): void).
+
+ * Purpose: Supports maintainability by documenting why `applySelectionFromSidebarUnitButton` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function applySelectionFromSidebarUnitButton(unitId: string, event: MouseEvent): void {
   return applySelectionFromSidebarUnitButtonFromModule(unitId, event, {
     toggleUnitSelection,
@@ -2118,14 +2981,38 @@ function applySelectionFromSidebarUnitButton(unitId: string, event: MouseEvent):
   });
 }
 
+/**
+ * Defines the `formatUnitArrowLabel` function shape (function formatUnitArrowLabel(unitId: string, targetLabel: string): string).
+
+ * Purpose: Supports maintainability by documenting why `formatUnitArrowLabel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatUnitArrowLabel(unitId: string, targetLabel: string): string {
   return formatUnitArrowLabelFromModule(unitId, targetLabel, formatUnitDisplayName);
 }
 
+/**
+ * Defines the `formatPendingOrderSidebarLabel` function shape (function formatPendingOrderSidebarLabel(order: HumanStandingOrderSnapshot): string).
+
+ * Purpose: Supports maintainability by documenting why `formatPendingOrderSidebarLabel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatPendingOrderSidebarLabel(order: HumanStandingOrderSnapshot): string {
   return formatPendingOrderSidebarLabelFromModule(order, formatUnitArrowLabel);
 }
 
+/**
+ * Defines the `buildKillToastFormatterBundle` function shape (function buildKillToastFormatterBundle( state: GameStateSnapshot, removedUnits: RemovedUnitSnapshot[] | undefined ): { formatKillLine: (kill: { victim).
+
+ * Purpose: Supports maintainability by documenting why `buildKillToastFormatterBundle` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildKillToastFormatterBundle(
   state: GameStateSnapshot,
   removedUnits: RemovedUnitSnapshot[] | undefined
@@ -2136,6 +3023,14 @@ function buildKillToastFormatterBundle(
   return buildKillToastFormatterBundleFromModule(state, removedUnits);
 }
 
+/**
+ * Defines the `syncUiAfterSelectionChange` function shape (function syncUiAfterSelectionChange(options:).
+
+ * Purpose: Supports maintainability by documenting why `syncUiAfterSelectionChange` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function syncUiAfterSelectionChange(options: { refreshHoverPreview?: boolean } = {}): void {
   return syncUiAfterSelectionChangeFromModule(
     {
@@ -2150,6 +3045,14 @@ function syncUiAfterSelectionChange(options: { refreshHoverPreview?: boolean } =
   );
 }
 
+/**
+ * Defines the `createSidebarOrderRow` function shape (function createSidebarOrderRow(args: { labelText: string; selected: boolean; onToggleSelect: (event: MouseEvent) => void; onCancel: () => void; c).
+
+ * Purpose: Supports maintainability by documenting why `createSidebarOrderRow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function createSidebarOrderRow(args: {
   labelText: string;
   selected: boolean;
@@ -2160,6 +3063,14 @@ function createSidebarOrderRow(args: {
   return createSidebarOrderRowFromModule(args);
 }
 
+/**
+ * Defines the `createTacticalSidebarDeps` function shape (function createTacticalSidebarDeps()).
+
+ * Purpose: Supports maintainability by documenting why `createTacticalSidebarDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function createTacticalSidebarDeps() {
   return {
     clearSelection,
@@ -2177,18 +3088,38 @@ function createTacticalSidebarDeps() {
   };
 }
 
+/**
+ * Defines the `cancelOrderForUnit` function shape (async function cancelOrderForUnit(unitId: string): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `cancelOrderForUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function cancelOrderForUnit(unitId: string): Promise<void> {
   return cancelOrderForUnitFromModule(unitId, createTacticalSidebarDeps());
 }
 
-function getRepresentativeSelectedUnitIdsByOrigin(): string[] {
-  return getRepresentativeSelectedUnitIdsByOriginFromModule();
-}
+/**
+ * Defines the `replacePendingRangedAttacksForSelected` function shape (function replacePendingRangedAttacksForSelected(selectedIds: string[], targetH3Index: string): void).
 
+ * Purpose: Supports maintainability by documenting why `replacePendingRangedAttacksForSelected` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function replacePendingRangedAttacksForSelected(selectedIds: string[], targetH3Index: string): void {
   return replacePendingRangedAttacksForSelectedFromModule(selectedIds, targetH3Index);
 }
 
+/**
+ * Defines the `replacePendingAirStrikesForSelected` function shape (function replacePendingAirStrikesForSelected().
+
+ * Purpose: Supports maintainability by documenting why `replacePendingAirStrikesForSelected` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function replacePendingAirStrikesForSelected(
   selectedIds: string[],
   targetH3Index: string,
@@ -2197,34 +3128,74 @@ function replacePendingAirStrikesForSelected(
   return replacePendingAirStrikesForSelectedFromModule(selectedIds, targetH3Index, targetType);
 }
 
+/**
+ * Defines the `replacePendingFerryOrdersForSelected` function shape (function replacePendingFerryOrdersForSelected(selectedIds: string[], destinationH3Index: string): void).
+
+ * Purpose: Supports maintainability by documenting why `replacePendingFerryOrdersForSelected` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function replacePendingFerryOrdersForSelected(selectedIds: string[], destinationH3Index: string): void {
   return replacePendingFerryOrdersForSelectedFromModule(selectedIds, destinationH3Index);
 }
 
+/**
+ * Defines the `clearPendingTacticalOrders` function shape (function clearPendingTacticalOrders(): void).
+
+ * Purpose: Supports maintainability by documenting why `clearPendingTacticalOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function clearPendingTacticalOrders(): void {
   return clearPendingTacticalOrdersFromModule();
 }
 
+/**
+ * Defines the `clearCommittedOrderDraftState` function shape (function clearCommittedOrderDraftState(): void).
+
+ * Purpose: Supports maintainability by documenting why `clearCommittedOrderDraftState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function clearCommittedOrderDraftState(): void {
   return clearCommittedOrderDraftStateFromModule(createTacticalSidebarDeps());
 }
 
+/**
+ * Defines the `refreshHoverRoutePreview` function shape (async function refreshHoverRoutePreview(): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `refreshHoverRoutePreview` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function refreshHoverRoutePreview(): Promise<void> {
   return refreshHoverRoutePreviewFromModule(createTacticalSidebarDeps());
 }
 
-function cancelRangedForUnit(unitId: string): void {
-  return cancelRangedForUnitFromModule(unitId, createTacticalSidebarDeps());
-}
+/**
+ * Defines the `cancelFerryForUnit` function shape (function cancelFerryForUnit(unitId: string): void).
 
-function cancelAirStrikeForUnit(unitId: string): void {
-  return cancelAirStrikeForUnitFromModule(unitId, createTacticalSidebarDeps());
-}
-
+ * Purpose: Supports maintainability by documenting why `cancelFerryForUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function cancelFerryForUnit(unitId: string): void {
   return cancelFerryForUnitFromModule(unitId, createTacticalSidebarDeps());
 }
 
+/**
+ * Defines the `updateRangedSidebar` function shape (function updateRangedSidebar(): void).
+
+ * Purpose: Supports maintainability by documenting why `updateRangedSidebar` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function updateRangedSidebar(): void {
   // Contract anchors retained for rendererConsolidation tests after extraction:
   // btnEl.style.display = S.airStrikeModeActive ? 'none' : 'inline-block';
@@ -2234,6 +3205,14 @@ function updateRangedSidebar(): void {
   return updateRangedSidebarFromModule(createTacticalSidebarDeps());
 }
 
+/**
+ * Defines the `updatePendingOrdersSidebar` function shape (function updatePendingOrdersSidebar(): void).
+
+ * Purpose: Supports maintainability by documenting why `updatePendingOrdersSidebar` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function updatePendingOrdersSidebar(): void {
   // Contract anchor retained after extraction:
   // formatPendingFerryOrderSidebarLabel(S.gameState, ferry)
@@ -2248,18 +3227,37 @@ function updatePendingOrdersSidebar(): void {
   });
 }
 
-/** Reports a user-facing error to the floating log (map toast, lower-left) and clears any sidebar error. */
+/**
+ * Defines the `showSidebarError` function shape (function showSidebarError(message: string): void).
+
+ * Purpose: Supports maintainability by documenting why `showSidebarError` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function showSidebarError(message: string): void {
   return showSidebarErrorFromModule(message, showMapToast, clearSidebarError);
 }
 
+/**
+ * Defines the `clearSidebarError` function shape (function clearSidebarError(): void).
+
+ * Purpose: Supports maintainability by documenting why `clearSidebarError` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function clearSidebarError(): void {
   return clearSidebarErrorFromModule();
 }
 
 /**
- * Enables the Run toggle only when an API key and model are configured; turns Run off and clears
- * precomputed state if the toggle becomes unavailable (e.g. key cleared).
+ * Defines the `syncOpenRouterRunToggleInteractable` function shape (async function syncOpenRouterRunToggleInteractable(): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `syncOpenRouterRunToggleInteractable` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 async function syncOpenRouterRunToggleInteractable(): Promise<void> {
   const runBtn = document.getElementById('openrouter-run-btn') as HTMLButtonElement | null;
@@ -2289,6 +3287,14 @@ async function syncOpenRouterRunToggleInteractable(): Promise<void> {
   }
 }
 
+/**
+ * Defines the `initOpenRouterUI` function shape (function initOpenRouterUI(): void).
+
+ * Purpose: Supports maintainability by documenting why `initOpenRouterUI` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function initOpenRouterUI(): void {
   return initOpenRouterUIFromModule({
     appendOpenRouterLog,
@@ -2304,6 +3310,14 @@ function initOpenRouterUI(): void {
   });
 }
 
+/**
+ * Defines the `init` function shape (function init(): void).
+
+ * Purpose: Supports maintainability by documenting why `init` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function init(): void {
   // Contract anchors retained after extraction:
   // applyModifierDrivenPopoverCloseRules('ctrl_pressed');

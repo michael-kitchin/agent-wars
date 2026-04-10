@@ -2,26 +2,146 @@ import { logDebug, logError, logTrace } from '../logger';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, MovementOrder, RangedAttackOrder } from '../../shared/ipcTypes';
 import type { GuardedDbOps } from './dbOps';
 
+/**
+ * Documents the module-scope binding `AI_TOOL_LIMIT_EXCEEDED_KEY` (AI_TOOL_LIMIT_EXCEEDED_KEY).
+
+ * Purpose: Supports maintainability by documenting why `AI_TOOL_LIMIT_EXCEEDED_KEY` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const AI_TOOL_LIMIT_EXCEEDED_KEY = 'ai_tool_limit_exceeded_last_turn';
+/**
+ * Documents the module-scope binding `AI_LAST_CONSULTATION_TURN_KEY` (AI_LAST_CONSULTATION_TURN_KEY).
+
+ * Purpose: Supports maintainability by documenting why `AI_LAST_CONSULTATION_TURN_KEY` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const AI_LAST_CONSULTATION_TURN_KEY = 'ai_last_consultation_turn';
+/**
+ * Documents the module-scope binding `OPPONENT_ID` (OPPONENT_ID).
+
+ * Purpose: Supports maintainability by documenting why `OPPONENT_ID` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const OPPONENT_ID = 'opponent';
 
+/**
+ * Documents the `AiLossEventSinceConsultation` interface as a named contract surface (export interface AiLossEventSinceConsultation).
+
+ * Purpose: Supports maintainability by documenting why `AiLossEventSinceConsultation` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface AiLossEventSinceConsultation {
-  turnNumber: number;
-  victimUnitId: string;
-  victimPlayer: string;
-  cause: 'direct_fire' | 'return_fire' | 'melee_or_other';
-  killerIds: string[];
+    /**
+   * Specifies the contract for the `turnNumber` member (turnNumber: number;).
+
+   * Contract: Describes stable behavior for callers of `turnNumber` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+turnNumber: number;
+    /**
+   * Specifies the contract for the `victimUnitId` member (victimUnitId: string;).
+
+   * Contract: Describes stable behavior for callers of `victimUnitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+victimUnitId: string;
+    /**
+   * Specifies the contract for the `victimPlayer` member (victimPlayer: string;).
+
+   * Contract: Describes stable behavior for callers of `victimPlayer` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+victimPlayer: string;
+    /**
+   * Specifies the contract for the `cause` member (cause: 'direct_fire' | 'return_fire' | 'melee_or_other';).
+
+   * Contract: Describes stable behavior for callers of `cause` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+cause: 'direct_fire' | 'return_fire' | 'melee_or_other';
+    /**
+   * Specifies the contract for the `killerIds` member (killerIds: string[];).
+
+   * Contract: Describes stable behavior for callers of `killerIds` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+killerIds: string[];
 }
 
+/**
+ * Documents the `AiPendingOrdersExtraPayload` interface as a named contract surface (interface AiPendingOrdersExtraPayload).
+
+ * Purpose: Supports maintainability by documenting why `AiPendingOrdersExtraPayload` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface AiPendingOrdersExtraPayload {
-  airStrikeOrders: AirStrikeOrder[];
-  ferryOrders: FerryOrder[];
-  embarkOrders: EmbarkOrder[];
+    /**
+   * Specifies the contract for the `airStrikeOrders` member (airStrikeOrders: AirStrikeOrder[];).
+
+   * Contract: Describes stable behavior for callers of `airStrikeOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+airStrikeOrders: AirStrikeOrder[];
+    /**
+   * Specifies the contract for the `ferryOrders` member (ferryOrders: FerryOrder[];).
+
+   * Contract: Describes stable behavior for callers of `ferryOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ferryOrders: FerryOrder[];
+    /**
+   * Specifies the contract for the `embarkOrders` member (embarkOrders: EmbarkOrder[];).
+
+   * Contract: Describes stable behavior for callers of `embarkOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+embarkOrders: EmbarkOrder[];
 }
 
+/**
+ * Documents the `AiStateDbOps` type alias (type AiStateDbOps).
+
+ * Purpose: Supports maintainability by documenting why `AiStateDbOps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type AiStateDbOps = GuardedDbOps;
 
+/**
+ * Defines the `coerceAiPendingOrdersExtraPayload` function shape (function coerceAiPendingOrdersExtraPayload(value: unknown): AiPendingOrdersExtraPayload).
+
+ * Purpose: Supports maintainability by documenting why `coerceAiPendingOrdersExtraPayload` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function coerceAiPendingOrdersExtraPayload(value: unknown): AiPendingOrdersExtraPayload {
   const payload = value as { airStrikeOrders?: unknown; ferryOrders?: unknown; embarkOrders?: unknown } | null;
   const airStrikeOrders = Array.isArray(payload?.airStrikeOrders) ? (payload.airStrikeOrders as AirStrikeOrder[]) : [];
@@ -30,6 +150,14 @@ function coerceAiPendingOrdersExtraPayload(value: unknown): AiPendingOrdersExtra
   return { airStrikeOrders, ferryOrders, embarkOrders };
 }
 
+/**
+ * Defines the `decodeAiPendingOrdersExtra` function shape (function decodeAiPendingOrdersExtra(strategyText: string | null): AiPendingOrdersExtraPayload).
+
+ * Purpose: Supports maintainability by documenting why `decodeAiPendingOrdersExtra` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function decodeAiPendingOrdersExtra(strategyText: string | null): AiPendingOrdersExtraPayload {
   if (typeof strategyText !== 'string' || strategyText.trim().length === 0) {
     return { airStrikeOrders: [], ferryOrders: [], embarkOrders: [] };
@@ -42,15 +170,39 @@ function decodeAiPendingOrdersExtra(strategyText: string | null): AiPendingOrder
   }
 }
 
+/**
+ * Defines the `encodeAiPendingOrdersExtra` function shape (function encodeAiPendingOrdersExtra(payload: AiPendingOrdersExtraPayload): string).
+
+ * Purpose: Supports maintainability by documenting why `encodeAiPendingOrdersExtra` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function encodeAiPendingOrdersExtra(payload: AiPendingOrdersExtraPayload): string {
   return JSON.stringify(payload);
 }
 
+/**
+ * Defines the `setAiToolLimitExceededLastTurn` function shape (export function setAiToolLimitExceededLastTurn(ops: AiStateDbOps): void).
+
+ * Purpose: Supports maintainability by documenting why `setAiToolLimitExceededLastTurn` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function setAiToolLimitExceededLastTurn(ops: AiStateDbOps): void {
   if (!ops.hasDb()) return;
   ops.run("INSERT OR REPLACE INTO game_config (key, value) VALUES (?, '1')", [AI_TOOL_LIMIT_EXCEEDED_KEY]);
 }
 
+/**
+ * Defines the `getAndClearAiToolLimitExceededLastTurn` function shape (export function getAndClearAiToolLimitExceededLastTurn(ops: AiStateDbOps): boolean).
+
+ * Purpose: Supports maintainability by documenting why `getAndClearAiToolLimitExceededLastTurn` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function getAndClearAiToolLimitExceededLastTurn(ops: AiStateDbOps): boolean {
   if (!ops.hasDb()) return false;
   const row = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [AI_TOOL_LIMIT_EXCEEDED_KEY]);
@@ -58,6 +210,14 @@ export function getAndClearAiToolLimitExceededLastTurn(ops: AiStateDbOps): boole
   return row?.value === '1';
 }
 
+/**
+ * Defines the `getAiLastConsultationTurn` function shape (export function getAiLastConsultationTurn(ops: AiStateDbOps): number).
+
+ * Purpose: Supports maintainability by documenting why `getAiLastConsultationTurn` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function getAiLastConsultationTurn(ops: AiStateDbOps): number {
   logTrace('gameDb getAiLastConsultationTurn');
   if (!ops.hasDb()) return 0;
@@ -67,6 +227,14 @@ export function getAiLastConsultationTurn(ops: AiStateDbOps): number {
   return Number.isNaN(n) ? 0 : n;
 }
 
+/**
+ * Defines the `setAiLastConsultationTurn` function shape (export function setAiLastConsultationTurn(ops: AiStateDbOps, turn: number): void).
+
+ * Purpose: Supports maintainability by documenting why `setAiLastConsultationTurn` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function setAiLastConsultationTurn(ops: AiStateDbOps, turn: number): void {
   if (!ops.hasDb()) return;
   const existing = getAiLastConsultationTurn(ops);
@@ -78,6 +246,14 @@ export function setAiLastConsultationTurn(ops: AiStateDbOps, turn: number): void
   ops.run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [AI_LAST_CONSULTATION_TURN_KEY, String(turn)]);
 }
 
+/**
+ * Defines the `getOpponentUnitsInCombatSinceConsultation` function shape (export function getOpponentUnitsInCombatSinceConsultation(ops: AiStateDbOps): string[]).
+
+ * Purpose: Supports maintainability by documenting why `getOpponentUnitsInCombatSinceConsultation` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function getOpponentUnitsInCombatSinceConsultation(ops: AiStateDbOps): string[] {
   logTrace('gameDb getOpponentUnitsInCombatSinceConsultation');
   if (!ops.hasDb()) return [];
@@ -88,6 +264,14 @@ export function getOpponentUnitsInCombatSinceConsultation(ops: AiStateDbOps): st
   return rows.map((r) => r.unit_id);
 }
 
+/**
+ * Defines the `addOpponentCombatParticipants` function shape (export function addOpponentCombatParticipants(ops: AiStateDbOps, unitIds: string[]): void).
+
+ * Purpose: Supports maintainability by documenting why `addOpponentCombatParticipants` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function addOpponentCombatParticipants(ops: AiStateDbOps, unitIds: string[]): void {
   logDebug('gameDb addOpponentCombatParticipants', { count: unitIds.length });
   if (!ops.hasDb() || unitIds.length === 0) return;
@@ -96,12 +280,28 @@ export function addOpponentCombatParticipants(ops: AiStateDbOps, unitIds: string
   }
 }
 
+/**
+ * Defines the `clearOpponentCombatSinceConsultation` function shape (export function clearOpponentCombatSinceConsultation(ops: AiStateDbOps): void).
+
+ * Purpose: Supports maintainability by documenting why `clearOpponentCombatSinceConsultation` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function clearOpponentCombatSinceConsultation(ops: AiStateDbOps): void {
   logDebug('gameDb clearOpponentCombatSinceConsultation');
   if (!ops.hasDb()) return;
   ops.run('DELETE FROM ai_combat_since_consultation WHERE player_id = ?', [OPPONENT_ID]);
 }
 
+/**
+ * Defines the `addAiLossEventsSinceConsultation` function shape (export function addAiLossEventsSinceConsultation( ops: AiStateDbOps, playerId: string, turnNumber: number, removedUnits: { id: string; player: strin).
+
+ * Purpose: Supports maintainability by documenting why `addAiLossEventsSinceConsultation` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function addAiLossEventsSinceConsultation(
   ops: AiStateDbOps,
   playerId: string,
@@ -151,6 +351,14 @@ export function addAiLossEventsSinceConsultation(
   });
 }
 
+/**
+ * Defines the `getAiLossEventsSinceConsultation` function shape (export function getAiLossEventsSinceConsultation(ops: AiStateDbOps, playerId: string): AiLossEventSinceConsultation[]).
+
+ * Purpose: Supports maintainability by documenting why `getAiLossEventsSinceConsultation` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function getAiLossEventsSinceConsultation(ops: AiStateDbOps, playerId: string): AiLossEventSinceConsultation[] {
   logTrace('gameDb getAiLossEventsSinceConsultation', { playerId });
   if (!ops.hasDb()) return [];
@@ -185,12 +393,28 @@ export function getAiLossEventsSinceConsultation(ops: AiStateDbOps, playerId: st
   });
 }
 
+/**
+ * Defines the `clearAiLossEventsSinceConsultation` function shape (export function clearAiLossEventsSinceConsultation(ops: AiStateDbOps, playerId: string): void).
+
+ * Purpose: Supports maintainability by documenting why `clearAiLossEventsSinceConsultation` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function clearAiLossEventsSinceConsultation(ops: AiStateDbOps, playerId: string): void {
   logDebug('gameDb clearAiLossEventsSinceConsultation', { playerId });
   if (!ops.hasDb()) return;
   ops.run('DELETE FROM ai_loss_events_since_consultation WHERE player_id = ?', [playerId]);
 }
 
+/**
+ * Defines the `getAiPendingOrders` function shape (export function getAiPendingOrders( ops: AiStateDbOps, playerId: string ): { movementOrders: MovementOrder[]; rangedOrders: RangedAttackOrder[];).
+
+ * Purpose: Supports maintainability by documenting why `getAiPendingOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function getAiPendingOrders(
   ops: AiStateDbOps,
   playerId: string
@@ -219,6 +443,14 @@ export function getAiPendingOrders(
   }
 }
 
+/**
+ * Defines the `setAiPendingOrders` function shape (export function setAiPendingOrders( ops: AiStateDbOps, playerId: string, movementOrders: MovementOrder[], rangedOrders: RangedAttackOrder[], airS).
+
+ * Purpose: Supports maintainability by documenting why `setAiPendingOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function setAiPendingOrders(
   ops: AiStateDbOps,
   playerId: string,
@@ -244,6 +476,14 @@ export function setAiPendingOrders(
   );
 }
 
+/**
+ * Defines the `clearAiPendingOrders` function shape (export function clearAiPendingOrders(ops: AiStateDbOps, playerId: string): void).
+
+ * Purpose: Supports maintainability by documenting why `clearAiPendingOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function clearAiPendingOrders(ops: AiStateDbOps, playerId: string): void {
   logDebug('gameDb clearAiPendingOrders', { playerId });
   if (!ops.hasDb()) return;

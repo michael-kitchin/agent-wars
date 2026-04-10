@@ -1,42 +1,180 @@
 /**
- * IPC-facing and snapshot types shared between main, preload, and tests.
- * Keep this module free of Node/Electron imports so it stays safe for any consumer.
+ * Documents the `HexNamingTooltipLineRequest` interface as a named contract surface (export interface HexNamingTooltipLineRequest).
+
+ * Purpose: Supports maintainability by documenting why `HexNamingTooltipLineRequest` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
-
-/** One-line naming headline for hover tooltips (city/state preference by resolution). */
 export interface HexNamingTooltipLineRequest {
-  h3Index: string;
-  resolution: 1 | 4;
+    /**
+   * Specifies the contract for the `h3Index` member (h3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `h3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+h3Index: string;
+    /**
+   * Specifies the contract for the `resolution` member (resolution: 1 | 4;).
+
+   * Contract: Describes stable behavior for callers of `resolution` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+resolution: 1 | 4;
 }
 
-/** Continent-list lookup for one res-1 hex used by unknown-battle fog announcements. */
+/**
+ * Documents the `HexContinentNamesRequest` interface as a named contract surface (export interface HexContinentNamesRequest).
+
+ * Purpose: Supports maintainability by documenting why `HexContinentNamesRequest` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface HexContinentNamesRequest {
-  h3Index: string;
+    /**
+   * Specifies the contract for the `h3Index` member (h3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `h3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+h3Index: string;
 }
 
-/** Res-4 terrain overlay row: base terrain kind plus optional urban variation state. */
+/**
+ * Documents the `Res4TerrainOverrideRow` interface as a named contract surface (export interface Res4TerrainOverrideRow).
+
+ * Purpose: Supports maintainability by documenting why `Res4TerrainOverrideRow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface Res4TerrainOverrideRow {
-  h3Index: string;
-  terrainKind: string;
-  isUrban: boolean;
-  isAirport?: boolean;
-  isSeaport?: boolean;
-  isRubble?: boolean;
+    /**
+   * Specifies the contract for the `h3Index` member (h3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `h3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+h3Index: string;
+    /**
+   * Specifies the contract for the `terrainKind` member (terrainKind: string;).
+
+   * Contract: Describes stable behavior for callers of `terrainKind` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+terrainKind: string;
+    /**
+   * Specifies the contract for the `isUrban` member (isUrban: boolean;).
+
+   * Contract: Describes stable behavior for callers of `isUrban` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+isUrban: boolean;
+    /**
+   * Specifies the contract for the `isAirport` member (isAirport?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `isAirport` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+isAirport?: boolean;
+    /**
+   * Specifies the contract for the `isSeaport` member (isSeaport?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `isSeaport` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+isSeaport?: boolean;
+    /**
+   * Specifies the contract for the `isRubble` member (isRubble?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `isRubble` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+isRubble?: boolean;
 }
 
-/** Snapshot of game state sent to the renderer (camelCase for JSON). */
+/**
+ * Documents the `GameStateSnapshot` interface as a named contract surface (export interface GameStateSnapshot).
+
+ * Purpose: Supports maintainability by documenting why `GameStateSnapshot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface GameStateSnapshot {
-  /** `terrain`: passability `land` | `water` | `coastal` | `wetlands`. `terrainKind`: pipeline label including `coastal`/`wetlands`. */
-  hexes: { h3Index: string; terrain: string; terrainKind: string }[];
-  units: { id: string; player: string; unitType: string; h3Index: string; displayOrder?: number }[];
-  /** Side-specific visibility union from all alive friendly units. */
-  visibleHexes?: string[];
-  /** Hexes permanently known after friendly entry at least once. */
-  exploredHexes?: string[];
-  /** Explored but not currently visible. */
-  staleHexes?: string[];
-  /** Enemy intelligence entries from the viewer side's perspective. */
-  enemyIntel?: {
+    /**
+   * Specifies the contract for the `hexes` member (hexes: { h3Index: string; terrain: string; terrainKind: string }[];).
+
+   * Contract: Describes stable behavior for callers of `hexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hexes: { h3Index: string; terrain: string; terrainKind: string }[];
+    /**
+   * Specifies the contract for the `units` member (units: { id: string; player: string; unitType: string; h3Index: string; displayOrder?: number }[];).
+
+   * Contract: Describes stable behavior for callers of `units` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+units: { id: string; player: string; unitType: string; h3Index: string; displayOrder?: number }[];
+    /**
+   * Specifies the contract for the `visibleHexes` member (visibleHexes?: string[];).
+
+   * Contract: Describes stable behavior for callers of `visibleHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+visibleHexes?: string[];
+    /**
+   * Specifies the contract for the `exploredHexes` member (exploredHexes?: string[];).
+
+   * Contract: Describes stable behavior for callers of `exploredHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+exploredHexes?: string[];
+    /**
+   * Specifies the contract for the `staleHexes` member (staleHexes?: string[];).
+
+   * Contract: Describes stable behavior for callers of `staleHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+staleHexes?: string[];
+    /**
+   * Specifies the contract for the `enemyIntel` member (enemyIntel?: { unitId: string; lastKnownH3Index: string; lastKnownLatLng: [number, number]; intelState: 'current' | 'stale'; lastSeenTu).
+
+   * Contract: Describes stable behavior for callers of `enemyIntel` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+enemyIntel?: {
     unitId: string;
     lastKnownH3Index: string;
     lastKnownLatLng: [number, number];
@@ -44,382 +182,2288 @@ export interface GameStateSnapshot {
     lastSeenTurn: number;
     staleUntilTurn: number;
   }[];
-  /** Perspective id used to build this snapshot (human/opponent). */
-  playerPerspective?: string;
-  /** True when fog restrictions apply to this snapshot; false means both sides have full map/unit visibility. */
-  fogOfWarEnabled?: boolean;
-  /** Scenario id for the current match when scenario-specific rules are active. */
-  scenarioId?: 'region_vs_region';
-  /** Human-selected home region for region-vs-region scenario. */
-  humanHomeRegion?: string;
-  /** AI-selected home region for region-vs-region scenario. */
-  aiHomeRegion?: string;
-  /** Res-1 hexes intersecting the human home region (always-visible outline source). */
-  humanHomeRegionHexes?: string[];
-  /** Res-1 hexes intersecting the AI home region (always-visible outline source). */
-  aiHomeRegionHexes?: string[];
-  /** Home-region hexes shared by both players' selected regions (always-gray outline precedence). */
-  intersectingHomeRegionHexes?: string[];
-  /** Home-region hexes currently occupied by units from multiple players (gray contested precedence). */
-  contestedHomeRegionHexes?: string[];
-  phase: string;
-  turnNumber: number;
-  pendingOrders: { unitId: string; toH3Index: string }[];
-  /** Res-1 control rows for overlay rendering and production UI. */
-  res1Control?: { h3Index: string; controllerPlayerId: string | null }[];
-  /** Res-1 queue summary per hex for production overlays (queue totals + next-enqueued metadata). */
-  res1BuildQueueTotals?: {
+    /**
+   * Specifies the contract for the `playerPerspective` member (playerPerspective?: string;).
+
+   * Contract: Describes stable behavior for callers of `playerPerspective` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+playerPerspective?: string;
+    /**
+   * Specifies the contract for the `fogOfWarEnabled` member (fogOfWarEnabled?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `fogOfWarEnabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+fogOfWarEnabled?: boolean;
+    /**
+   * Specifies the contract for the `scenarioId` member (scenarioId?: 'region_vs_region';).
+
+   * Contract: Describes stable behavior for callers of `scenarioId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+scenarioId?: 'region_vs_region';
+    /**
+   * Specifies the contract for the `humanHomeRegion` member (humanHomeRegion?: string;).
+
+   * Contract: Describes stable behavior for callers of `humanHomeRegion` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+humanHomeRegion?: string;
+    /**
+   * Specifies the contract for the `aiHomeRegion` member (aiHomeRegion?: string;).
+
+   * Contract: Describes stable behavior for callers of `aiHomeRegion` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+aiHomeRegion?: string;
+    /**
+   * Specifies the contract for the `humanHomeRegionHexes` member (humanHomeRegionHexes?: string[];).
+
+   * Contract: Describes stable behavior for callers of `humanHomeRegionHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+humanHomeRegionHexes?: string[];
+    /**
+   * Specifies the contract for the `aiHomeRegionHexes` member (aiHomeRegionHexes?: string[];).
+
+   * Contract: Describes stable behavior for callers of `aiHomeRegionHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+aiHomeRegionHexes?: string[];
+    /**
+   * Specifies the contract for the `intersectingHomeRegionHexes` member (intersectingHomeRegionHexes?: string[];).
+
+   * Contract: Describes stable behavior for callers of `intersectingHomeRegionHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+intersectingHomeRegionHexes?: string[];
+    /**
+   * Specifies the contract for the `contestedHomeRegionHexes` member (contestedHomeRegionHexes?: string[];).
+
+   * Contract: Describes stable behavior for callers of `contestedHomeRegionHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+contestedHomeRegionHexes?: string[];
+    /**
+   * Specifies the contract for the `phase` member (phase: string;).
+
+   * Contract: Describes stable behavior for callers of `phase` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+phase: string;
+    /**
+   * Specifies the contract for the `turnNumber` member (turnNumber: number;).
+
+   * Contract: Describes stable behavior for callers of `turnNumber` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+turnNumber: number;
+    /**
+   * Specifies the contract for the `pendingOrders` member (pendingOrders: { unitId: string; toH3Index: string }[];).
+
+   * Contract: Describes stable behavior for callers of `pendingOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+pendingOrders: { unitId: string; toH3Index: string }[];
+    /**
+   * Specifies the contract for the `res1Control` member (res1Control?: { h3Index: string; controllerPlayerId: string | null }[];).
+
+   * Contract: Describes stable behavior for callers of `res1Control` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+res1Control?: { h3Index: string; controllerPlayerId: string | null }[];
+    /**
+   * Specifies the contract for the `res1BuildQueueTotals` member (res1BuildQueueTotals?: { h3Index: string; queuedUnits: number; nextUnitType: BuildUnitType | null; nextRemainingCount: number | null; s).
+
+   * Contract: Describes stable behavior for callers of `res1BuildQueueTotals` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+res1BuildQueueTotals?: {
     h3Index: string;
     queuedUnits: number;
     nextUnitType: BuildUnitType | null;
     nextRemainingCount: number | null;
     storedPoints: number;
   }[];
-  /** Res-1 infrastructure snapshot used by production and air-strike planning. */
-  res1Infrastructure?: {
+    /**
+   * Specifies the contract for the `res1Infrastructure` member (res1Infrastructure?: { h3Index: string; urbanHexCount: number; airportCount: number; seaportCount: number; }[];).
+
+   * Contract: Describes stable behavior for callers of `res1Infrastructure` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+res1Infrastructure?: {
     h3Index: string;
     urbanHexCount: number;
     airportCount: number;
     seaportCount: number;
   }[];
-  gameOver?: boolean;
-  winner?: string;
-}
+    /**
+   * Specifies the contract for the `gameOver` member (gameOver?: boolean;).
 
-/** Human movement order in IPC payloads (internal resolution still uses H3 in the DB). */
-export interface MovementOrder {
-  unitId: string;
-  toH3Index: string;
-}
+   * Contract: Describes stable behavior for callers of `gameOver` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+gameOver?: boolean;
+    /**
+   * Specifies the contract for the `winner` member (winner?: string;).
 
-/** Ranged attack declaration for IPC (one target hex per unit per turn). */
-export interface RangedAttackOrder {
-  unitId: string;
-  targetH3Index: string;
-}
-
-/** Air strike target categories from milestone 1.5. */
-export type AirStrikeTargetType = 'units' | 'urban' | 'airport' | 'seaport';
-
-/** Air strike declaration for IPC (one target hex + target type per air unit per turn). */
-export interface AirStrikeOrder {
-  unitId: string;
-  targetH3Index: string;
-  targetType: AirStrikeTargetType;
-}
-
-/** One resolved air-strike sortie path used for renderer playback (outbound and optional return). */
-export interface AirStrikeAnimationMove {
-  unitId: string;
-  player: string;
-  unitType: string;
-  fromH3Index: string;
-  targetH3Index: string;
-  returnsToBase: boolean;
-}
-
-/** Air ferry declaration for IPC (one destination airport hex per air unit per turn). */
-export interface FerryOrder {
-  unitId: string;
-  destinationH3Index: string;
-}
-
-/** Sealift embark assignment declaration linking one land unit to one naval unit. */
-export interface EmbarkOrder {
-  unitId: string;
-  navalUnitId: string;
-}
-
-/** One resolved ferry relocation move used for renderer playback. */
-export interface FerryAnimationMove {
-  unitId: string;
-  player: string;
-  fromH3Index: string;
-  toH3Index: string;
-}
-
-/** Payload for submitOrders: movement and optional ranged attacks. */
-export interface SubmitOrdersPayload {
-  movementOrders: MovementOrder[];
-  rangedAttacks?: RangedAttackOrder[];
-  airStrikes?: AirStrikeOrder[];
-  ferryOrders?: FerryOrder[];
-}
-
-/** Optional arguments for game:newGame (currently fog-of-war toggle). */
-export interface NewGameIpcPayload {
-  fogOfWarEnabled?: boolean;
-  humanHomeRegion?: string;
-  aiHomeRegion?: string;
+   * Contract: Describes stable behavior for callers of `winner` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+winner?: string;
 }
 
 /**
- * Payload for game:submitOrders from the renderer. Either a structured object or a legacy array
- * of movement-only orders (treated as movementOrders).
+ * Documents the `MovementOrder` interface as a named contract surface (export interface MovementOrder).
+
+ * Purpose: Supports maintainability by documenting why `MovementOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export interface MovementOrder {
+    /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+
+   * Contract: Describes stable behavior for callers of `unitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitId: string;
+    /**
+   * Specifies the contract for the `toH3Index` member (toH3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `toH3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+toH3Index: string;
+}
+
+/**
+ * Documents the `RangedAttackOrder` interface as a named contract surface (export interface RangedAttackOrder).
+
+ * Purpose: Supports maintainability by documenting why `RangedAttackOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export interface RangedAttackOrder {
+    /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+
+   * Contract: Describes stable behavior for callers of `unitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitId: string;
+    /**
+   * Specifies the contract for the `targetH3Index` member (targetH3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `targetH3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+targetH3Index: string;
+}
+
+/**
+ * Documents the `AirStrikeTargetType` type alias (export type AirStrikeTargetType).
+
+ * Purpose: Supports maintainability by documenting why `AirStrikeTargetType` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export type AirStrikeTargetType = 'units' | 'urban' | 'airport' | 'seaport';
+
+/**
+ * Documents the `AirStrikeOrder` interface as a named contract surface (export interface AirStrikeOrder).
+
+ * Purpose: Supports maintainability by documenting why `AirStrikeOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export interface AirStrikeOrder {
+    /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+
+   * Contract: Describes stable behavior for callers of `unitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitId: string;
+    /**
+   * Specifies the contract for the `targetH3Index` member (targetH3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `targetH3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+targetH3Index: string;
+    /**
+   * Specifies the contract for the `targetType` member (targetType: AirStrikeTargetType;).
+
+   * Contract: Describes stable behavior for callers of `targetType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+targetType: AirStrikeTargetType;
+}
+
+/**
+ * Documents the `AirStrikeAnimationMove` interface as a named contract surface (export interface AirStrikeAnimationMove).
+
+ * Purpose: Supports maintainability by documenting why `AirStrikeAnimationMove` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export interface AirStrikeAnimationMove {
+    /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+
+   * Contract: Describes stable behavior for callers of `unitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitId: string;
+    /**
+   * Specifies the contract for the `player` member (player: string;).
+
+   * Contract: Describes stable behavior for callers of `player` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+player: string;
+    /**
+   * Specifies the contract for the `unitType` member (unitType: string;).
+
+   * Contract: Describes stable behavior for callers of `unitType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitType: string;
+    /**
+   * Specifies the contract for the `fromH3Index` member (fromH3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `fromH3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+fromH3Index: string;
+    /**
+   * Specifies the contract for the `targetH3Index` member (targetH3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `targetH3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+targetH3Index: string;
+    /**
+   * Specifies the contract for the `returnsToBase` member (returnsToBase: boolean;).
+
+   * Contract: Describes stable behavior for callers of `returnsToBase` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+returnsToBase: boolean;
+}
+
+/**
+ * Documents the `FerryOrder` interface as a named contract surface (export interface FerryOrder).
+
+ * Purpose: Supports maintainability by documenting why `FerryOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export interface FerryOrder {
+    /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+
+   * Contract: Describes stable behavior for callers of `unitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitId: string;
+    /**
+   * Specifies the contract for the `destinationH3Index` member (destinationH3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `destinationH3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+destinationH3Index: string;
+}
+
+/**
+ * Documents the `EmbarkOrder` interface as a named contract surface (export interface EmbarkOrder).
+
+ * Purpose: Supports maintainability by documenting why `EmbarkOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export interface EmbarkOrder {
+    /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+
+   * Contract: Describes stable behavior for callers of `unitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitId: string;
+    /**
+   * Specifies the contract for the `navalUnitId` member (navalUnitId: string;).
+
+   * Contract: Describes stable behavior for callers of `navalUnitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+navalUnitId: string;
+}
+
+/**
+ * Documents the `FerryAnimationMove` interface as a named contract surface (export interface FerryAnimationMove).
+
+ * Purpose: Supports maintainability by documenting why `FerryAnimationMove` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export interface FerryAnimationMove {
+    /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+
+   * Contract: Describes stable behavior for callers of `unitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitId: string;
+    /**
+   * Specifies the contract for the `player` member (player: string;).
+
+   * Contract: Describes stable behavior for callers of `player` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+player: string;
+    /**
+   * Specifies the contract for the `fromH3Index` member (fromH3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `fromH3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+fromH3Index: string;
+    /**
+   * Specifies the contract for the `toH3Index` member (toH3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `toH3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+toH3Index: string;
+}
+
+/**
+ * Documents the `SubmitOrdersPayload` interface as a named contract surface (export interface SubmitOrdersPayload).
+
+ * Purpose: Supports maintainability by documenting why `SubmitOrdersPayload` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export interface SubmitOrdersPayload {
+    /**
+   * Specifies the contract for the `movementOrders` member (movementOrders: MovementOrder[];).
+
+   * Contract: Describes stable behavior for callers of `movementOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+movementOrders: MovementOrder[];
+    /**
+   * Specifies the contract for the `rangedAttacks` member (rangedAttacks?: RangedAttackOrder[];).
+
+   * Contract: Describes stable behavior for callers of `rangedAttacks` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+rangedAttacks?: RangedAttackOrder[];
+    /**
+   * Specifies the contract for the `airStrikes` member (airStrikes?: AirStrikeOrder[];).
+
+   * Contract: Describes stable behavior for callers of `airStrikes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+airStrikes?: AirStrikeOrder[];
+    /**
+   * Specifies the contract for the `ferryOrders` member (ferryOrders?: FerryOrder[];).
+
+   * Contract: Describes stable behavior for callers of `ferryOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ferryOrders?: FerryOrder[];
+}
+
+/**
+ * Documents the `NewGameIpcPayload` interface as a named contract surface (export interface NewGameIpcPayload).
+
+ * Purpose: Supports maintainability by documenting why `NewGameIpcPayload` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export interface NewGameIpcPayload {
+    /**
+   * Specifies the contract for the `fogOfWarEnabled` member (fogOfWarEnabled?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `fogOfWarEnabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+fogOfWarEnabled?: boolean;
+    /**
+   * Specifies the contract for the `humanHomeRegion` member (humanHomeRegion?: string;).
+
+   * Contract: Describes stable behavior for callers of `humanHomeRegion` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+humanHomeRegion?: string;
+    /**
+   * Specifies the contract for the `aiHomeRegion` member (aiHomeRegion?: string;).
+
+   * Contract: Describes stable behavior for callers of `aiHomeRegion` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+aiHomeRegion?: string;
+}
+
+/**
+ * Documents the `SubmitOrdersIpcPayload` type alias (export type SubmitOrdersIpcPayload).
+
+ * Purpose: Supports maintainability by documenting why `SubmitOrdersIpcPayload` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export type SubmitOrdersIpcPayload = SubmitOrdersPayload | MovementOrder[];
 
-/** Optional arguments for game:ready (tool groups, event-driven mode, precomputed AI orders). */
+/**
+ * Documents the `GameReadyIpcPayload` interface as a named contract surface (export interface GameReadyIpcPayload).
+
+ * Purpose: Supports maintainability by documenting why `GameReadyIpcPayload` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface GameReadyIpcPayload {
-  enabledToolGroups?: string[];
-  useEventDrivenConsultation?: boolean;
-  precomputedAiOrders?: MovementOrder[];
-  precomputedAiRangedOrders?: RangedAttackOrder[];
-  precomputedAiAirStrikeOrders?: AirStrikeOrder[];
-  precomputedAiFerryOrders?: FerryOrder[];
-  precomputedAiEmbarkOrders?: EmbarkOrder[];
-  precomputedAiStrategy?: string;
-  /** When true, Ready may invoke the LLM (non–event-driven path or afterResolution). Omitted/false ⇒ no LLM on Ready. */
-  aiPlanningRunEnabled?: boolean;
+    /**
+   * Specifies the contract for the `enabledToolGroups` member (enabledToolGroups?: string[];).
+
+   * Contract: Describes stable behavior for callers of `enabledToolGroups` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+enabledToolGroups?: string[];
+    /**
+   * Specifies the contract for the `useEventDrivenConsultation` member (useEventDrivenConsultation?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `useEventDrivenConsultation` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+useEventDrivenConsultation?: boolean;
+    /**
+   * Specifies the contract for the `precomputedAiOrders` member (precomputedAiOrders?: MovementOrder[];).
+
+   * Contract: Describes stable behavior for callers of `precomputedAiOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+precomputedAiOrders?: MovementOrder[];
+    /**
+   * Specifies the contract for the `precomputedAiRangedOrders` member (precomputedAiRangedOrders?: RangedAttackOrder[];).
+
+   * Contract: Describes stable behavior for callers of `precomputedAiRangedOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+precomputedAiRangedOrders?: RangedAttackOrder[];
+    /**
+   * Specifies the contract for the `precomputedAiAirStrikeOrders` member (precomputedAiAirStrikeOrders?: AirStrikeOrder[];).
+
+   * Contract: Describes stable behavior for callers of `precomputedAiAirStrikeOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+precomputedAiAirStrikeOrders?: AirStrikeOrder[];
+    /**
+   * Specifies the contract for the `precomputedAiFerryOrders` member (precomputedAiFerryOrders?: FerryOrder[];).
+
+   * Contract: Describes stable behavior for callers of `precomputedAiFerryOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+precomputedAiFerryOrders?: FerryOrder[];
+    /**
+   * Specifies the contract for the `precomputedAiEmbarkOrders` member (precomputedAiEmbarkOrders?: EmbarkOrder[];).
+
+   * Contract: Describes stable behavior for callers of `precomputedAiEmbarkOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+precomputedAiEmbarkOrders?: EmbarkOrder[];
+    /**
+   * Specifies the contract for the `precomputedAiStrategy` member (precomputedAiStrategy?: string;).
+
+   * Contract: Describes stable behavior for callers of `precomputedAiStrategy` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+precomputedAiStrategy?: string;
+    /**
+   * Specifies the contract for the `aiPlanningRunEnabled` member (aiPlanningRunEnabled?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `aiPlanningRunEnabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+aiPlanningRunEnabled?: boolean;
 }
 
-/** API model row shown in the renderer model dropdown. */
+/**
+ * Documents the `OpenRouterModel` interface as a named contract surface (export interface OpenRouterModel).
+
+ * Purpose: Supports maintainability by documenting why `OpenRouterModel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface OpenRouterModel {
-  id: string;
-  name?: string;
+    /**
+   * Specifies the contract for the `id` member (id: string;).
+
+   * Contract: Describes stable behavior for callers of `id` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+id: string;
+    /**
+   * Specifies the contract for the `name` member (name?: string;).
+
+   * Contract: Describes stable behavior for callers of `name` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+name?: string;
 }
 
-/** Per-turn AI request response used by game:requestAiOrders. */
+/**
+ * Documents the `RequestAiOrdersResult` type alias (export type RequestAiOrdersResult).
+
+ * Purpose: Supports maintainability by documenting why `RequestAiOrdersResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type RequestAiOrdersResult =
   | {
-      success: true;
-      orders: MovementOrder[];
-      rangedAttacks?: RangedAttackOrder[];
-      airStrikes?: AirStrikeOrder[];
-      ferryOrders?: FerryOrder[];
-      embarkOrders?: EmbarkOrder[];
-      strategy?: string;
-      dropped?: number;
-      dropReasons?: string[];
-      toolInvocationCounts?: Record<string, number>;
-      cost?: number;
-      wallClockMs?: number;
-      inputTokens?: number;
-      outputTokens?: number;
+            /**
+       * Specifies the contract for the `success` member (success: true;).
+
+       * Contract: Describes stable behavior for callers of `success` in this codebase.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+success: true;
+            /**
+       * Specifies the contract for the `orders` member (orders: MovementOrder[];).
+
+       * Contract: Describes stable behavior for callers of `orders` in this codebase.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+orders: MovementOrder[];
+            /**
+       * Specifies the contract for the `rangedAttacks` member (rangedAttacks?: RangedAttackOrder[];).
+
+       * Contract: Describes stable behavior for callers of `rangedAttacks` in this codebase.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+rangedAttacks?: RangedAttackOrder[];
+            /**
+       * Specifies the contract for the `airStrikes` member (airStrikes?: AirStrikeOrder[];).
+
+       * Contract: Describes stable behavior for callers of `airStrikes` in this codebase.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+airStrikes?: AirStrikeOrder[];
+            /**
+       * Specifies the contract for the `ferryOrders` member (ferryOrders?: FerryOrder[];).
+
+       * Contract: Describes stable behavior for callers of `ferryOrders` in this codebase.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+ferryOrders?: FerryOrder[];
+            /**
+       * Specifies the contract for the `embarkOrders` member (embarkOrders?: EmbarkOrder[];).
+
+       * Contract: Describes stable behavior for callers of `embarkOrders` in this codebase.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+embarkOrders?: EmbarkOrder[];
+            /**
+       * Specifies the contract for the `strategy` member (strategy?: string;).
+
+       * Contract: Describes stable behavior for callers of `strategy` in this codebase.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+strategy?: string;
+            /**
+       * Specifies the contract for the `dropped` member (dropped?: number;).
+
+       * Contract: Describes stable behavior for callers of `dropped` in this codebase.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+dropped?: number;
+            /**
+       * Specifies the contract for the `dropReasons` member (dropReasons?: string[];).
+
+       * Contract: Describes stable behavior for callers of `dropReasons` in this codebase.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+dropReasons?: string[];
+            /**
+       * Specifies the contract for the `toolInvocationCounts` member (toolInvocationCounts?: Record<string, number>;).
+
+       * Contract: Describes stable behavior for callers of `toolInvocationCounts` in this codebase.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+toolInvocationCounts?: Record<string, number>;
+            /**
+       * Specifies the contract for the `cost` member (cost?: number;).
+
+       * Contract: Describes stable behavior for callers of `cost` in this codebase.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+cost?: number;
+            /**
+       * Specifies the contract for the `wallClockMs` member (wallClockMs?: number;).
+
+       * Contract: Describes stable behavior for callers of `wallClockMs` in this codebase.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+wallClockMs?: number;
+            /**
+       * Specifies the contract for the `inputTokens` member (inputTokens?: number;).
+
+       * Contract: Describes stable behavior for callers of `inputTokens` in this codebase.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+inputTokens?: number;
+            /**
+       * Specifies the contract for the `outputTokens` member (outputTokens?: number;).
+
+       * Contract: Describes stable behavior for callers of `outputTokens` in this codebase.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+outputTokens?: number;
     }
-  | { success: false; error: string };
+  | {   /**
+   * Specifies the contract for the `success` member (success: false;).
 
-/** Minimal removed-unit payload used by resolution rendering. */
+   * Contract: Describes stable behavior for callers of `success` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+success: false;   /**
+   * Specifies the contract for the `error` member (error: string).
+
+   * Contract: Describes stable behavior for callers of `error` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+error: string };
+
+/**
+ * Documents the `RemovedUnitSnapshot` interface as a named contract surface (export interface RemovedUnitSnapshot).
+
+ * Purpose: Supports maintainability by documenting why `RemovedUnitSnapshot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface RemovedUnitSnapshot {
-  id: string;
-  player: string;
-  unitType: string;
-  h3Index: string;
-  displayOrder?: number;
+    /**
+   * Specifies the contract for the `id` member (id: string;).
+
+   * Contract: Describes stable behavior for callers of `id` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+id: string;
+    /**
+   * Specifies the contract for the `player` member (player: string;).
+
+   * Contract: Describes stable behavior for callers of `player` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+player: string;
+    /**
+   * Specifies the contract for the `unitType` member (unitType: string;).
+
+   * Contract: Describes stable behavior for callers of `unitType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitType: string;
+    /**
+   * Specifies the contract for the `h3Index` member (h3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `h3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+h3Index: string;
+    /**
+   * Specifies the contract for the `displayOrder` member (displayOrder?: number;).
+
+   * Contract: Describes stable behavior for callers of `displayOrder` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+displayOrder?: number;
 }
 
-/** Infrastructure destruction event emitted during air-strike resolution. */
+/**
+ * Documents the `InfrastructureDestroyedEvent` interface as a named contract surface (export interface InfrastructureDestroyedEvent).
+
+ * Purpose: Supports maintainability by documenting why `InfrastructureDestroyedEvent` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface InfrastructureDestroyedEvent {
-  h3Index: string;
-  targetType: 'urban' | 'airport' | 'seaport';
-  changedRubbleCount: number;
-  destroyedAirUnitsCount: number;
+    /**
+   * Specifies the contract for the `h3Index` member (h3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `h3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+h3Index: string;
+    /**
+   * Specifies the contract for the `targetType` member (targetType: 'urban' | 'airport' | 'seaport';).
+
+   * Contract: Describes stable behavior for callers of `targetType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+targetType: 'urban' | 'airport' | 'seaport';
+    /**
+   * Specifies the contract for the `changedRubbleCount` member (changedRubbleCount: number;).
+
+   * Contract: Describes stable behavior for callers of `changedRubbleCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+changedRubbleCount: number;
+    /**
+   * Specifies the contract for the `destroyedAirUnitsCount` member (destroyedAirUnitsCount: number;).
+
+   * Contract: Describes stable behavior for callers of `destroyedAirUnitsCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+destroyedAirUnitsCount: number;
 }
 
-/** Shape returned by game:ready. */
+/**
+ * Documents the `ReadyResult` interface as a named contract surface (export interface ReadyResult).
+
+ * Purpose: Supports maintainability by documenting why `ReadyResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface ReadyResult {
-  success: boolean;
-  reason?: string;
-  aiSkipped?: boolean;
-  aiSkipReason?: string;
-  aiOrderCount?: number;
-  aiRangedByType?: { armor?: number; naval?: number; air?: number };
-  aiDropped?: number;
-  aiDropReasons?: string[];
-  aiMovesLog?: string[];
-  aiMoves?: { unitId: string; fromH3Index: string; toH3Index: string }[];
-  humanMoves?: { unitId: string; fromH3Index: string; toH3Index: string }[];
-  combatHexes?: string[];
-  removedUnitIds?: string[];
-  removedUnits?: RemovedUnitSnapshot[];
-  casualtyHexes?: string[];
-  rangedCombatHexes?: string[];
-  rangedCasualtyHexes?: string[];
-  rangedRemovedUnits?: RemovedUnitSnapshot[];
-  airStrikeHexes?: string[];
-  airStrikeCasualtyHexes?: string[];
-  airStrikeRemovedUnits?: RemovedUnitSnapshot[];
-  airStrikeMoves?: AirStrikeAnimationMove[];
-  airStrikeAttemptCount?: number;
-  airStrikeSuccessfulCount?: number;
-  airStrikeFailedCount?: number;
-  airStrikeAttackerLossCount?: number;
-  baseInvalidAirLossCount?: number;
-  infrastructureDestroyedEvents?: InfrastructureDestroyedEvent[];
-  resolvedFerryMoves?: FerryAnimationMove[];
-  meleeCombatHexes?: string[];
-  meleeCasualtyHexes?: string[];
-  meleeRemovedUnits?: RemovedUnitSnapshot[];
-  unknownCombatHexes?: string[];
-  unknownCasualtyHexes?: string[];
-  unknownBattleAnnouncement?: string;
-  kills?: { victimId: string; killerIds: string[] }[];
-  killsByDirectFire?: { victimId: string; killerIds: string[] }[];
-  killsByReturnFire?: { victimId: string; killerIds: string[] }[];
-  /** Newly spawned production units this turn, aggregated by unit type. */
-  deployedUnitsByType?: { armor?: number; infantry?: number; naval?: number; air?: number };
-  /** Unit types that hit deployment cap for human during production spawn. */
-  humanDeploymentCapReachedUnitTypes?: BuildUnitType[];
-  /** Unit types that hit deployment cap for opponent during production spawn. */
-  opponentDeploymentCapReachedUnitTypes?: BuildUnitType[];
-  /** Count of human-controlled hexes lost to the opponent this turn. */
-  humanHexesLostCount?: number;
-  /** Hexes that should show lightning due to off-hex control loss events. */
-  controlLossLightningHexes?: string[];
-  aiStrategy?: string;
-  toolInvocationCounts?: Record<string, number>;
-  cost?: number;
-  wallClockMs?: number;
-  inputTokens?: number;
-  outputTokens?: number;
-  opponentCombatParticipantUnitIds?: string[];
-  removedOpponentUnitIds?: string[];
-  aiConsulted?: boolean;
+    /**
+   * Specifies the contract for the `success` member (success: boolean;).
+
+   * Contract: Describes stable behavior for callers of `success` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+success: boolean;
+    /**
+   * Specifies the contract for the `reason` member (reason?: string;).
+
+   * Contract: Describes stable behavior for callers of `reason` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+reason?: string;
+    /**
+   * Specifies the contract for the `aiSkipped` member (aiSkipped?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `aiSkipped` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+aiSkipped?: boolean;
+    /**
+   * Specifies the contract for the `aiSkipReason` member (aiSkipReason?: string;).
+
+   * Contract: Describes stable behavior for callers of `aiSkipReason` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+aiSkipReason?: string;
+    /**
+   * Specifies the contract for the `aiOrderCount` member (aiOrderCount?: number;).
+
+   * Contract: Describes stable behavior for callers of `aiOrderCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+aiOrderCount?: number;
+    /**
+   * Specifies the contract for the `aiRangedByType` member (aiRangedByType?: { armor?: number; naval?: number; air?: number };).
+
+   * Contract: Describes stable behavior for callers of `aiRangedByType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+aiRangedByType?: { armor?: number; naval?: number; air?: number };
+    /**
+   * Specifies the contract for the `aiDropped` member (aiDropped?: number;).
+
+   * Contract: Describes stable behavior for callers of `aiDropped` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+aiDropped?: number;
+    /**
+   * Specifies the contract for the `aiDropReasons` member (aiDropReasons?: string[];).
+
+   * Contract: Describes stable behavior for callers of `aiDropReasons` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+aiDropReasons?: string[];
+    /**
+   * Specifies the contract for the `aiMovesLog` member (aiMovesLog?: string[];).
+
+   * Contract: Describes stable behavior for callers of `aiMovesLog` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+aiMovesLog?: string[];
+    /**
+   * Specifies the contract for the `aiMoves` member (aiMoves?: { unitId: string; fromH3Index: string; toH3Index: string }[];).
+
+   * Contract: Describes stable behavior for callers of `aiMoves` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+aiMoves?: { unitId: string; fromH3Index: string; toH3Index: string }[];
+    /**
+   * Specifies the contract for the `humanMoves` member (humanMoves?: { unitId: string; fromH3Index: string; toH3Index: string }[];).
+
+   * Contract: Describes stable behavior for callers of `humanMoves` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+humanMoves?: { unitId: string; fromH3Index: string; toH3Index: string }[];
+    /**
+   * Specifies the contract for the `combatHexes` member (combatHexes?: string[];).
+
+   * Contract: Describes stable behavior for callers of `combatHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+combatHexes?: string[];
+    /**
+   * Specifies the contract for the `removedUnitIds` member (removedUnitIds?: string[];).
+
+   * Contract: Describes stable behavior for callers of `removedUnitIds` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+removedUnitIds?: string[];
+    /**
+   * Specifies the contract for the `removedUnits` member (removedUnits?: RemovedUnitSnapshot[];).
+
+   * Contract: Describes stable behavior for callers of `removedUnits` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+removedUnits?: RemovedUnitSnapshot[];
+    /**
+   * Specifies the contract for the `casualtyHexes` member (casualtyHexes?: string[];).
+
+   * Contract: Describes stable behavior for callers of `casualtyHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+casualtyHexes?: string[];
+    /**
+   * Specifies the contract for the `rangedCombatHexes` member (rangedCombatHexes?: string[];).
+
+   * Contract: Describes stable behavior for callers of `rangedCombatHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+rangedCombatHexes?: string[];
+    /**
+   * Specifies the contract for the `rangedCasualtyHexes` member (rangedCasualtyHexes?: string[];).
+
+   * Contract: Describes stable behavior for callers of `rangedCasualtyHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+rangedCasualtyHexes?: string[];
+    /**
+   * Specifies the contract for the `rangedRemovedUnits` member (rangedRemovedUnits?: RemovedUnitSnapshot[];).
+
+   * Contract: Describes stable behavior for callers of `rangedRemovedUnits` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+rangedRemovedUnits?: RemovedUnitSnapshot[];
+    /**
+   * Specifies the contract for the `airStrikeHexes` member (airStrikeHexes?: string[];).
+
+   * Contract: Describes stable behavior for callers of `airStrikeHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+airStrikeHexes?: string[];
+    /**
+   * Specifies the contract for the `airStrikeCasualtyHexes` member (airStrikeCasualtyHexes?: string[];).
+
+   * Contract: Describes stable behavior for callers of `airStrikeCasualtyHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+airStrikeCasualtyHexes?: string[];
+    /**
+   * Specifies the contract for the `airStrikeRemovedUnits` member (airStrikeRemovedUnits?: RemovedUnitSnapshot[];).
+
+   * Contract: Describes stable behavior for callers of `airStrikeRemovedUnits` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+airStrikeRemovedUnits?: RemovedUnitSnapshot[];
+    /**
+   * Specifies the contract for the `airStrikeMoves` member (airStrikeMoves?: AirStrikeAnimationMove[];).
+
+   * Contract: Describes stable behavior for callers of `airStrikeMoves` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+airStrikeMoves?: AirStrikeAnimationMove[];
+    /**
+   * Specifies the contract for the `airStrikeAttemptCount` member (airStrikeAttemptCount?: number;).
+
+   * Contract: Describes stable behavior for callers of `airStrikeAttemptCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+airStrikeAttemptCount?: number;
+    /**
+   * Specifies the contract for the `airStrikeSuccessfulCount` member (airStrikeSuccessfulCount?: number;).
+
+   * Contract: Describes stable behavior for callers of `airStrikeSuccessfulCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+airStrikeSuccessfulCount?: number;
+    /**
+   * Specifies the contract for the `airStrikeFailedCount` member (airStrikeFailedCount?: number;).
+
+   * Contract: Describes stable behavior for callers of `airStrikeFailedCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+airStrikeFailedCount?: number;
+    /**
+   * Specifies the contract for the `airStrikeAttackerLossCount` member (airStrikeAttackerLossCount?: number;).
+
+   * Contract: Describes stable behavior for callers of `airStrikeAttackerLossCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+airStrikeAttackerLossCount?: number;
+    /**
+   * Specifies the contract for the `baseInvalidAirLossCount` member (baseInvalidAirLossCount?: number;).
+
+   * Contract: Describes stable behavior for callers of `baseInvalidAirLossCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+baseInvalidAirLossCount?: number;
+    /**
+   * Specifies the contract for the `infrastructureDestroyedEvents` member (infrastructureDestroyedEvents?: InfrastructureDestroyedEvent[];).
+
+   * Contract: Describes stable behavior for callers of `infrastructureDestroyedEvents` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+infrastructureDestroyedEvents?: InfrastructureDestroyedEvent[];
+    /**
+   * Specifies the contract for the `resolvedFerryMoves` member (resolvedFerryMoves?: FerryAnimationMove[];).
+
+   * Contract: Describes stable behavior for callers of `resolvedFerryMoves` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+resolvedFerryMoves?: FerryAnimationMove[];
+    /**
+   * Specifies the contract for the `meleeCombatHexes` member (meleeCombatHexes?: string[];).
+
+   * Contract: Describes stable behavior for callers of `meleeCombatHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+meleeCombatHexes?: string[];
+    /**
+   * Specifies the contract for the `meleeCasualtyHexes` member (meleeCasualtyHexes?: string[];).
+
+   * Contract: Describes stable behavior for callers of `meleeCasualtyHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+meleeCasualtyHexes?: string[];
+    /**
+   * Specifies the contract for the `meleeRemovedUnits` member (meleeRemovedUnits?: RemovedUnitSnapshot[];).
+
+   * Contract: Describes stable behavior for callers of `meleeRemovedUnits` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+meleeRemovedUnits?: RemovedUnitSnapshot[];
+    /**
+   * Specifies the contract for the `unknownCombatHexes` member (unknownCombatHexes?: string[];).
+
+   * Contract: Describes stable behavior for callers of `unknownCombatHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unknownCombatHexes?: string[];
+    /**
+   * Specifies the contract for the `unknownCasualtyHexes` member (unknownCasualtyHexes?: string[];).
+
+   * Contract: Describes stable behavior for callers of `unknownCasualtyHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unknownCasualtyHexes?: string[];
+    /**
+   * Specifies the contract for the `unknownBattleAnnouncement` member (unknownBattleAnnouncement?: string;).
+
+   * Contract: Describes stable behavior for callers of `unknownBattleAnnouncement` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unknownBattleAnnouncement?: string;
+    /**
+   * Specifies the contract for the `kills` member (kills?: { victimId: string; killerIds: string[] }[];).
+
+   * Contract: Describes stable behavior for callers of `kills` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+kills?: { victimId: string; killerIds: string[] }[];
+    /**
+   * Specifies the contract for the `killsByDirectFire` member (killsByDirectFire?: { victimId: string; killerIds: string[] }[];).
+
+   * Contract: Describes stable behavior for callers of `killsByDirectFire` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+killsByDirectFire?: { victimId: string; killerIds: string[] }[];
+    /**
+   * Specifies the contract for the `killsByReturnFire` member (killsByReturnFire?: { victimId: string; killerIds: string[] }[];).
+
+   * Contract: Describes stable behavior for callers of `killsByReturnFire` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+killsByReturnFire?: { victimId: string; killerIds: string[] }[];
+    /**
+   * Specifies the contract for the `deployedUnitsByType` member (deployedUnitsByType?: { armor?: number; infantry?: number; naval?: number; air?: number };).
+
+   * Contract: Describes stable behavior for callers of `deployedUnitsByType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+deployedUnitsByType?: { armor?: number; infantry?: number; naval?: number; air?: number };
+    /**
+   * Specifies the contract for the `humanDeploymentCapReachedUnitTypes` member (humanDeploymentCapReachedUnitTypes?: BuildUnitType[];).
+
+   * Contract: Describes stable behavior for callers of `humanDeploymentCapReachedUnitTypes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+humanDeploymentCapReachedUnitTypes?: BuildUnitType[];
+    /**
+   * Specifies the contract for the `opponentDeploymentCapReachedUnitTypes` member (opponentDeploymentCapReachedUnitTypes?: BuildUnitType[];).
+
+   * Contract: Describes stable behavior for callers of `opponentDeploymentCapReachedUnitTypes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+opponentDeploymentCapReachedUnitTypes?: BuildUnitType[];
+    /**
+   * Specifies the contract for the `humanHexesLostCount` member (humanHexesLostCount?: number;).
+
+   * Contract: Describes stable behavior for callers of `humanHexesLostCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+humanHexesLostCount?: number;
+    /**
+   * Specifies the contract for the `controlLossLightningHexes` member (controlLossLightningHexes?: string[];).
+
+   * Contract: Describes stable behavior for callers of `controlLossLightningHexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+controlLossLightningHexes?: string[];
+    /**
+   * Specifies the contract for the `aiStrategy` member (aiStrategy?: string;).
+
+   * Contract: Describes stable behavior for callers of `aiStrategy` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+aiStrategy?: string;
+    /**
+   * Specifies the contract for the `toolInvocationCounts` member (toolInvocationCounts?: Record<string, number>;).
+
+   * Contract: Describes stable behavior for callers of `toolInvocationCounts` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+toolInvocationCounts?: Record<string, number>;
+    /**
+   * Specifies the contract for the `cost` member (cost?: number;).
+
+   * Contract: Describes stable behavior for callers of `cost` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+cost?: number;
+    /**
+   * Specifies the contract for the `wallClockMs` member (wallClockMs?: number;).
+
+   * Contract: Describes stable behavior for callers of `wallClockMs` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+wallClockMs?: number;
+    /**
+   * Specifies the contract for the `inputTokens` member (inputTokens?: number;).
+
+   * Contract: Describes stable behavior for callers of `inputTokens` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+inputTokens?: number;
+    /**
+   * Specifies the contract for the `outputTokens` member (outputTokens?: number;).
+
+   * Contract: Describes stable behavior for callers of `outputTokens` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+outputTokens?: number;
+    /**
+   * Specifies the contract for the `opponentCombatParticipantUnitIds` member (opponentCombatParticipantUnitIds?: string[];).
+
+   * Contract: Describes stable behavior for callers of `opponentCombatParticipantUnitIds` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+opponentCombatParticipantUnitIds?: string[];
+    /**
+   * Specifies the contract for the `removedOpponentUnitIds` member (removedOpponentUnitIds?: string[];).
+
+   * Contract: Describes stable behavior for callers of `removedOpponentUnitIds` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+removedOpponentUnitIds?: string[];
+    /**
+   * Specifies the contract for the `aiConsulted` member (aiConsulted?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `aiConsulted` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+aiConsulted?: boolean;
 }
 
-/** Human standing-order row returned to renderer for movement order list and map overlays. */
+/**
+ * Documents the `HumanStandingOrderSnapshot` interface as a named contract surface (export interface HumanStandingOrderSnapshot).
+
+ * Purpose: Supports maintainability by documenting why `HumanStandingOrderSnapshot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface HumanStandingOrderSnapshot {
-  unitId: string;
-  status: string;
-  destinationH3Index: string | null;
-  turnsRemaining: number;
-  nextMoveH3Index: string | null;
-  routeSegments?: { turn: number; hexes: [number, number][] }[];
+    /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+
+   * Contract: Describes stable behavior for callers of `unitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitId: string;
+    /**
+   * Specifies the contract for the `status` member (status: string;).
+
+   * Contract: Describes stable behavior for callers of `status` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+status: string;
+    /**
+   * Specifies the contract for the `destinationH3Index` member (destinationH3Index: string | null;).
+
+   * Contract: Describes stable behavior for callers of `destinationH3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+destinationH3Index: string | null;
+    /**
+   * Specifies the contract for the `turnsRemaining` member (turnsRemaining: number;).
+
+   * Contract: Describes stable behavior for callers of `turnsRemaining` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+turnsRemaining: number;
+    /**
+   * Specifies the contract for the `nextMoveH3Index` member (nextMoveH3Index: string | null;).
+
+   * Contract: Describes stable behavior for callers of `nextMoveH3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+nextMoveH3Index: string | null;
+    /**
+   * Specifies the contract for the `routeSegments` member (routeSegments?: { turn: number; hexes: [number, number][] }[];).
+
+   * Contract: Describes stable behavior for callers of `routeSegments` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+routeSegments?: { turn: number; hexes: [number, number][] }[];
 }
 
-/** One turn-segment of a hover route preview, expressed in [lat, lng] points. */
+/**
+ * Documents the `HumanOrderPreviewSegment` interface as a named contract surface (export interface HumanOrderPreviewSegment).
+
+ * Purpose: Supports maintainability by documenting why `HumanOrderPreviewSegment` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface HumanOrderPreviewSegment {
-  turn: number;
-  hexes: [number, number][];
+    /**
+   * Specifies the contract for the `turn` member (turn: number;).
+
+   * Contract: Describes stable behavior for callers of `turn` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+turn: number;
+    /**
+   * Specifies the contract for the `hexes` member (hexes: [number, number][];).
+
+   * Contract: Describes stable behavior for callers of `hexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hexes: [number, number][];
 }
 
-/** Result of previewing a human march order from selected unit to hovered hex. */
+/**
+ * Documents the `HumanOrderPreviewResult` interface as a named contract surface (export interface HumanOrderPreviewResult).
+
+ * Purpose: Supports maintainability by documenting why `HumanOrderPreviewResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface HumanOrderPreviewResult {
-  valid: boolean;
-  showInvalidMarker: boolean;
-  invalidReason?: string;
-  arrowLatLng?: [number, number];
-  segments: HumanOrderPreviewSegment[];
+    /**
+   * Specifies the contract for the `valid` member (valid: boolean;).
+
+   * Contract: Describes stable behavior for callers of `valid` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+valid: boolean;
+    /**
+   * Specifies the contract for the `showInvalidMarker` member (showInvalidMarker: boolean;).
+
+   * Contract: Describes stable behavior for callers of `showInvalidMarker` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+showInvalidMarker: boolean;
+    /**
+   * Specifies the contract for the `invalidReason` member (invalidReason?: string;).
+
+   * Contract: Describes stable behavior for callers of `invalidReason` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+invalidReason?: string;
+    /**
+   * Specifies the contract for the `arrowLatLng` member (arrowLatLng?: [number, number];).
+
+   * Contract: Describes stable behavior for callers of `arrowLatLng` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+arrowLatLng?: [number, number];
+    /**
+   * Specifies the contract for the `segments` member (segments: HumanOrderPreviewSegment[];).
+
+   * Contract: Describes stable behavior for callers of `segments` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+segments: HumanOrderPreviewSegment[];
 }
 
-/** Per-unit hover preview for grouped multi-selection planning. */
+/**
+ * Documents the `HumanOrderGroupPreviewUnitResult` interface as a named contract surface (export interface HumanOrderGroupPreviewUnitResult).
+
+ * Purpose: Supports maintainability by documenting why `HumanOrderGroupPreviewUnitResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface HumanOrderGroupPreviewUnitResult {
-  unitId: string;
-  preview: HumanOrderPreviewResult;
+    /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+
+   * Contract: Describes stable behavior for callers of `unitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitId: string;
+    /**
+   * Specifies the contract for the `preview` member (preview: HumanOrderPreviewResult;).
+
+   * Contract: Describes stable behavior for callers of `preview` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+preview: HumanOrderPreviewResult;
 }
 
-/** Result of previewing a grouped human march order for multiple selected units. */
+/**
+ * Documents the `HumanOrderGroupPreviewResult` interface as a named contract surface (export interface HumanOrderGroupPreviewResult).
+
+ * Purpose: Supports maintainability by documenting why `HumanOrderGroupPreviewResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface HumanOrderGroupPreviewResult {
-  validForAll: boolean;
-  showInvalidMarker: boolean;
-  invalidReason?: string;
-  /** Slowest per-turn movement budget (hex edges) among selected units; used for solid-segment cap. */
-  slowestMovementRange: number;
-  previews: HumanOrderGroupPreviewUnitResult[];
+    /**
+   * Specifies the contract for the `validForAll` member (validForAll: boolean;).
+
+   * Contract: Describes stable behavior for callers of `validForAll` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+validForAll: boolean;
+    /**
+   * Specifies the contract for the `showInvalidMarker` member (showInvalidMarker: boolean;).
+
+   * Contract: Describes stable behavior for callers of `showInvalidMarker` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+showInvalidMarker: boolean;
+    /**
+   * Specifies the contract for the `invalidReason` member (invalidReason?: string;).
+
+   * Contract: Describes stable behavior for callers of `invalidReason` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+invalidReason?: string;
+    /**
+   * Specifies the contract for the `slowestMovementRange` member (slowestMovementRange: number;).
+
+   * Contract: Describes stable behavior for callers of `slowestMovementRange` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+slowestMovementRange: number;
+    /**
+   * Specifies the contract for the `previews` member (previews: HumanOrderGroupPreviewUnitResult[];).
+
+   * Contract: Describes stable behavior for callers of `previews` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+previews: HumanOrderGroupPreviewUnitResult[];
 }
 
+/**
+ * Documents the `BuildUnitType` type alias (export type BuildUnitType).
+
+ * Purpose: Supports maintainability by documenting why `BuildUnitType` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type BuildUnitType = 'infantry' | 'armor' | 'naval' | 'air';
 
-/** Shared production context for one res-1 hex used by queue validation/rendering. */
+/**
+ * Documents the `Res1ProductionContextSnapshot` interface as a named contract surface (export interface Res1ProductionContextSnapshot).
+
+ * Purpose: Supports maintainability by documenting why `Res1ProductionContextSnapshot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface Res1ProductionContextSnapshot {
-  urbanHexCount: number;
-  airportCount: number;
-  seaportCount: number;
+    /**
+   * Specifies the contract for the `urbanHexCount` member (urbanHexCount: number;).
+
+   * Contract: Describes stable behavior for callers of `urbanHexCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+urbanHexCount: number;
+    /**
+   * Specifies the contract for the `airportCount` member (airportCount: number;).
+
+   * Contract: Describes stable behavior for callers of `airportCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+airportCount: number;
+    /**
+   * Specifies the contract for the `seaportCount` member (seaportCount: number;).
+
+   * Contract: Describes stable behavior for callers of `seaportCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+seaportCount: number;
 }
 
+/**
+ * Documents the `HexBuildQueueEntrySnapshot` interface as a named contract surface (export interface HexBuildQueueEntrySnapshot).
+
+ * Purpose: Supports maintainability by documenting why `HexBuildQueueEntrySnapshot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface HexBuildQueueEntrySnapshot {
-  id: number;
-  queueIndex: number;
-  unitType: BuildUnitType;
-  count: number;
+    /**
+   * Specifies the contract for the `id` member (id: number;).
+
+   * Contract: Describes stable behavior for callers of `id` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+id: number;
+    /**
+   * Specifies the contract for the `queueIndex` member (queueIndex: number;).
+
+   * Contract: Describes stable behavior for callers of `queueIndex` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+queueIndex: number;
+    /**
+   * Specifies the contract for the `unitType` member (unitType: BuildUnitType;).
+
+   * Contract: Describes stable behavior for callers of `unitType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitType: BuildUnitType;
+    /**
+   * Specifies the contract for the `count` member (count: number;).
+
+   * Contract: Describes stable behavior for callers of `count` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+count: number;
 }
 
+/**
+ * Documents the `HexBuildQueueSnapshot` interface as a named contract surface (export interface HexBuildQueueSnapshot).
+
+ * Purpose: Supports maintainability by documenting why `HexBuildQueueSnapshot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface HexBuildQueueSnapshot {
-  h3Index: string;
-  controllerPlayerId: string | null;
-  controlledByRequester: boolean;
-  urbanHexCount: Res1ProductionContextSnapshot['urbanHexCount'];
-  airportCount: Res1ProductionContextSnapshot['airportCount'];
-  seaportCount: Res1ProductionContextSnapshot['seaportCount'];
-  availableUnitTypes: BuildUnitType[];
-  buildSectionVisible: boolean;
-  noBuildReason: string | null;
-  entries: HexBuildQueueEntrySnapshot[];
+    /**
+   * Specifies the contract for the `h3Index` member (h3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `h3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+h3Index: string;
+    /**
+   * Specifies the contract for the `controllerPlayerId` member (controllerPlayerId: string | null;).
+
+   * Contract: Describes stable behavior for callers of `controllerPlayerId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+controllerPlayerId: string | null;
+    /**
+   * Specifies the contract for the `controlledByRequester` member (controlledByRequester: boolean;).
+
+   * Contract: Describes stable behavior for callers of `controlledByRequester` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+controlledByRequester: boolean;
+    /**
+   * Specifies the contract for the `urbanHexCount` member (urbanHexCount: Res1ProductionContextSnapshot['urbanHexCount'];).
+
+   * Contract: Describes stable behavior for callers of `urbanHexCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+urbanHexCount: Res1ProductionContextSnapshot['urbanHexCount'];
+    /**
+   * Specifies the contract for the `airportCount` member (airportCount: Res1ProductionContextSnapshot['airportCount'];).
+
+   * Contract: Describes stable behavior for callers of `airportCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+airportCount: Res1ProductionContextSnapshot['airportCount'];
+    /**
+   * Specifies the contract for the `seaportCount` member (seaportCount: Res1ProductionContextSnapshot['seaportCount'];).
+
+   * Contract: Describes stable behavior for callers of `seaportCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+seaportCount: Res1ProductionContextSnapshot['seaportCount'];
+    /**
+   * Specifies the contract for the `availableUnitTypes` member (availableUnitTypes: BuildUnitType[];).
+
+   * Contract: Describes stable behavior for callers of `availableUnitTypes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+availableUnitTypes: BuildUnitType[];
+    /**
+   * Specifies the contract for the `buildSectionVisible` member (buildSectionVisible: boolean;).
+
+   * Contract: Describes stable behavior for callers of `buildSectionVisible` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+buildSectionVisible: boolean;
+    /**
+   * Specifies the contract for the `noBuildReason` member (noBuildReason: string | null;).
+
+   * Contract: Describes stable behavior for callers of `noBuildReason` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+noBuildReason: string | null;
+    /**
+   * Specifies the contract for the `entries` member (entries: HexBuildQueueEntrySnapshot[];).
+
+   * Contract: Describes stable behavior for callers of `entries` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+entries: HexBuildQueueEntrySnapshot[];
 }
 
+/**
+ * Documents the `SealiftContextMode` type alias (export type SealiftContextMode).
+
+ * Purpose: Supports maintainability by documenting why `SealiftContextMode` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type SealiftContextMode = 'coastal_port' | 'coastal_no_port' | 'water' | 'unsupported';
 
+/**
+ * Documents the `SealiftLandUnitOption` interface as a named contract surface (export interface SealiftLandUnitOption).
+
+ * Purpose: Supports maintainability by documenting why `SealiftLandUnitOption` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface SealiftLandUnitOption {
-  unitId: string;
-  unitType: 'infantry' | 'armor';
+    /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+
+   * Contract: Describes stable behavior for callers of `unitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitId: string;
+    /**
+   * Specifies the contract for the `unitType` member (unitType: 'infantry' | 'armor';).
+
+   * Contract: Describes stable behavior for callers of `unitType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitType: 'infantry' | 'armor';
 }
 
+/**
+ * Documents the `SealiftNavalRow` interface as a named contract surface (export interface SealiftNavalRow).
+
+ * Purpose: Supports maintainability by documenting why `SealiftNavalRow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface SealiftNavalRow {
-  navalUnitId: string;
-  slot1UnitId: string | null;
-  slot2UnitId: string | null;
-  slot2Disabled: boolean;
-  controlsDisabled: boolean;
-  debarkSlot1Enabled: boolean;
-  debarkSlot2Enabled: boolean;
+    /**
+   * Specifies the contract for the `navalUnitId` member (navalUnitId: string;).
+
+   * Contract: Describes stable behavior for callers of `navalUnitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+navalUnitId: string;
+    /**
+   * Specifies the contract for the `slot1UnitId` member (slot1UnitId: string | null;).
+
+   * Contract: Describes stable behavior for callers of `slot1UnitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+slot1UnitId: string | null;
+    /**
+   * Specifies the contract for the `slot2UnitId` member (slot2UnitId: string | null;).
+
+   * Contract: Describes stable behavior for callers of `slot2UnitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+slot2UnitId: string | null;
+    /**
+   * Specifies the contract for the `slot2Disabled` member (slot2Disabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `slot2Disabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+slot2Disabled: boolean;
+    /**
+   * Specifies the contract for the `controlsDisabled` member (controlsDisabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `controlsDisabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+controlsDisabled: boolean;
+    /**
+   * Specifies the contract for the `debarkSlot1Enabled` member (debarkSlot1Enabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `debarkSlot1Enabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+debarkSlot1Enabled: boolean;
+    /**
+   * Specifies the contract for the `debarkSlot2Enabled` member (debarkSlot2Enabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `debarkSlot2Enabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+debarkSlot2Enabled: boolean;
 }
 
+/**
+ * Documents the `SealiftStackState` interface as a named contract surface (export interface SealiftStackState).
+
+ * Purpose: Supports maintainability by documenting why `SealiftStackState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface SealiftStackState {
-  h3Index: string;
-  showSealiftSection: boolean;
-  contextMode: SealiftContextMode;
-  controlsDisabled: boolean;
-  hasEmbarkedUnitsInStack: boolean;
-  navalRows: SealiftNavalRow[];
-  landOptions: SealiftLandUnitOption[];
+    /**
+   * Specifies the contract for the `h3Index` member (h3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `h3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+h3Index: string;
+    /**
+   * Specifies the contract for the `showSealiftSection` member (showSealiftSection: boolean;).
+
+   * Contract: Describes stable behavior for callers of `showSealiftSection` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+showSealiftSection: boolean;
+    /**
+   * Specifies the contract for the `contextMode` member (contextMode: SealiftContextMode;).
+
+   * Contract: Describes stable behavior for callers of `contextMode` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+contextMode: SealiftContextMode;
+    /**
+   * Specifies the contract for the `controlsDisabled` member (controlsDisabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `controlsDisabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+controlsDisabled: boolean;
+    /**
+   * Specifies the contract for the `hasEmbarkedUnitsInStack` member (hasEmbarkedUnitsInStack: boolean;).
+
+   * Contract: Describes stable behavior for callers of `hasEmbarkedUnitsInStack` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hasEmbarkedUnitsInStack: boolean;
+    /**
+   * Specifies the contract for the `navalRows` member (navalRows: SealiftNavalRow[];).
+
+   * Contract: Describes stable behavior for callers of `navalRows` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+navalRows: SealiftNavalRow[];
+    /**
+   * Specifies the contract for the `landOptions` member (landOptions: SealiftLandUnitOption[];).
+
+   * Contract: Describes stable behavior for callers of `landOptions` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+landOptions: SealiftLandUnitOption[];
 }
 
-/** Preload-exposed renderer bridge contract. */
+/**
+ * Documents the `GameApi` interface as a named contract surface (export interface GameApi).
+
+ * Purpose: Supports maintainability by documenting why `GameApi` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface GameApi {
-  getGameState: () => Promise<GameStateSnapshot>;
-  getRes4TerrainOverrides: () => Promise<Res4TerrainOverrideRow[]>;
-  getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest) => Promise<string | null>;
-  getHexContinentNames: (payload: HexContinentNamesRequest) => Promise<string[]>;
-  listScenarioHomeRegions: () => Promise<string[]>;
-  newGame: (payload?: NewGameIpcPayload) => Promise<GameStateSnapshot>;
-  submitOrders: (payload: SubmitOrdersIpcPayload) => Promise<{ success: boolean; reason?: string }>;
-  ready: (payload?: GameReadyIpcPayload) => Promise<ReadyResult>;
-  listHumanStandingOrders: () => Promise<HumanStandingOrderSnapshot[]>;
-  previewHumanMarchOrder: (payload: { unitId: string; hoveredH3Index: string }) => Promise<HumanOrderPreviewResult>;
-  previewHumanMarchOrders: (payload: { unitIds: string[]; hoveredH3Index: string }) => Promise<HumanOrderGroupPreviewResult>;
-  assignHumanMarchOrder: (payload: { unitId: string; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
-  assignHumanMarchOrders: (payload: { unitIds: string[]; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
-  validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
-  validateGroupAirStrikeTarget: (payload: {
+    /**
+   * Specifies the contract for the `getGameState` member (getGameState: () => Promise<GameStateSnapshot>;).
+
+   * Contract: Describes stable behavior for callers of `getGameState` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getGameState: () => Promise<GameStateSnapshot>;
+    /**
+   * Specifies the contract for the `getRes4TerrainOverrides` member (getRes4TerrainOverrides: () => Promise<Res4TerrainOverrideRow[]>;).
+
+   * Contract: Describes stable behavior for callers of `getRes4TerrainOverrides` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getRes4TerrainOverrides: () => Promise<Res4TerrainOverrideRow[]>;
+    /**
+   * Specifies the contract for the `getHexNamingTooltipLine` member (getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest) => Promise<string | null>;).
+
+   * Contract: Describes stable behavior for callers of `getHexNamingTooltipLine` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest) => Promise<string | null>;
+    /**
+   * Specifies the contract for the `getHexContinentNames` member (getHexContinentNames: (payload: HexContinentNamesRequest) => Promise<string[]>;).
+
+   * Contract: Describes stable behavior for callers of `getHexContinentNames` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getHexContinentNames: (payload: HexContinentNamesRequest) => Promise<string[]>;
+    /**
+   * Specifies the contract for the `listScenarioHomeRegions` member (listScenarioHomeRegions: () => Promise<string[]>;).
+
+   * Contract: Describes stable behavior for callers of `listScenarioHomeRegions` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+listScenarioHomeRegions: () => Promise<string[]>;
+    /**
+   * Specifies the contract for the `newGame` member (newGame: (payload?: NewGameIpcPayload) => Promise<GameStateSnapshot>;).
+
+   * Contract: Describes stable behavior for callers of `newGame` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+newGame: (payload?: NewGameIpcPayload) => Promise<GameStateSnapshot>;
+    /**
+   * Specifies the contract for the `submitOrders` member (submitOrders: (payload: SubmitOrdersIpcPayload) => Promise<{ success: boolean; reason?: string }>;).
+
+   * Contract: Describes stable behavior for callers of `submitOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+submitOrders: (payload: SubmitOrdersIpcPayload) => Promise<{ success: boolean; reason?: string }>;
+    /**
+   * Specifies the contract for the `ready` member (ready: (payload?: GameReadyIpcPayload) => Promise<ReadyResult>;).
+
+   * Contract: Describes stable behavior for callers of `ready` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ready: (payload?: GameReadyIpcPayload) => Promise<ReadyResult>;
+    /**
+   * Specifies the contract for the `listHumanStandingOrders` member (listHumanStandingOrders: () => Promise<HumanStandingOrderSnapshot[]>;).
+
+   * Contract: Describes stable behavior for callers of `listHumanStandingOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+listHumanStandingOrders: () => Promise<HumanStandingOrderSnapshot[]>;
+    /**
+   * Specifies the contract for the `previewHumanMarchOrder` member (previewHumanMarchOrder: (payload: { unitId: string; hoveredH3Index: string }) => Promise<HumanOrderPreviewResult>;).
+
+   * Contract: Describes stable behavior for callers of `previewHumanMarchOrder` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+previewHumanMarchOrder: (payload: { unitId: string; hoveredH3Index: string }) => Promise<HumanOrderPreviewResult>;
+    /**
+   * Specifies the contract for the `previewHumanMarchOrders` member (previewHumanMarchOrders: (payload: { unitIds: string[]; hoveredH3Index: string }) => Promise<HumanOrderGroupPreviewResult>;).
+
+   * Contract: Describes stable behavior for callers of `previewHumanMarchOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+previewHumanMarchOrders: (payload: { unitIds: string[]; hoveredH3Index: string }) => Promise<HumanOrderGroupPreviewResult>;
+    /**
+   * Specifies the contract for the `assignHumanMarchOrder` member (assignHumanMarchOrder: (payload: { unitId: string; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;).
+
+   * Contract: Describes stable behavior for callers of `assignHumanMarchOrder` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+assignHumanMarchOrder: (payload: { unitId: string; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
+    /**
+   * Specifies the contract for the `assignHumanMarchOrders` member (assignHumanMarchOrders: (payload: { unitIds: string[]; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;).
+
+   * Contract: Describes stable behavior for callers of `assignHumanMarchOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+assignHumanMarchOrders: (payload: { unitIds: string[]; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
+    /**
+   * Specifies the contract for the `validateGroupRangedTarget` member (validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }) => Promise<{ success: boolean; reason?: string }>;).
+
+   * Contract: Describes stable behavior for callers of `validateGroupRangedTarget` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
+    /**
+   * Specifies the contract for the `validateGroupAirStrikeTarget` member (validateGroupAirStrikeTarget: (payload: { unitIds: string[]; targetH3Index: string; targetType: AirStrikeTargetType; }) => Promise<{ success:).
+
+   * Contract: Describes stable behavior for callers of `validateGroupAirStrikeTarget` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+validateGroupAirStrikeTarget: (payload: {
     unitIds: string[];
     targetH3Index: string;
     targetType: AirStrikeTargetType;
   }) => Promise<{ success: boolean; reason?: string }>;
-  validateGroupFerryTarget: (payload: { unitIds: string[]; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
-  cancelHumanStandingOrder: (payload: { unitId: string }) => Promise<{ success: boolean; reason?: string }>;
-  getHexBuildQueue: (payload: { h3Index: string }) => Promise<HexBuildQueueSnapshot | null>;
-  addHexBuildQueueEntry: (payload: { h3Index: string }) => Promise<{ success: boolean; reason?: string; queue?: HexBuildQueueSnapshot }>;
-  updateHexBuildQueueEntry: (payload: { h3Index: string; entryId: number; unitType: BuildUnitType; count: number }) => Promise<{
+    /**
+   * Specifies the contract for the `validateGroupFerryTarget` member (validateGroupFerryTarget: (payload: { unitIds: string[]; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;).
+
+   * Contract: Describes stable behavior for callers of `validateGroupFerryTarget` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+validateGroupFerryTarget: (payload: { unitIds: string[]; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
+    /**
+   * Specifies the contract for the `cancelHumanStandingOrder` member (cancelHumanStandingOrder: (payload: { unitId: string }) => Promise<{ success: boolean; reason?: string }>;).
+
+   * Contract: Describes stable behavior for callers of `cancelHumanStandingOrder` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+cancelHumanStandingOrder: (payload: { unitId: string }) => Promise<{ success: boolean; reason?: string }>;
+    /**
+   * Specifies the contract for the `getHexBuildQueue` member (getHexBuildQueue: (payload: { h3Index: string }) => Promise<HexBuildQueueSnapshot | null>;).
+
+   * Contract: Describes stable behavior for callers of `getHexBuildQueue` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getHexBuildQueue: (payload: { h3Index: string }) => Promise<HexBuildQueueSnapshot | null>;
+    /**
+   * Specifies the contract for the `addHexBuildQueueEntry` member (addHexBuildQueueEntry: (payload: { h3Index: string }) => Promise<{ success: boolean; reason?: string; queue?: HexBuildQueueSnapshot }>;).
+
+   * Contract: Describes stable behavior for callers of `addHexBuildQueueEntry` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+addHexBuildQueueEntry: (payload: { h3Index: string }) => Promise<{ success: boolean; reason?: string; queue?: HexBuildQueueSnapshot }>;
+    /**
+   * Specifies the contract for the `updateHexBuildQueueEntry` member (updateHexBuildQueueEntry: (payload: { h3Index: string; entryId: number; unitType: BuildUnitType; count: number }) => Promise<{ success: boolean; reaso).
+
+   * Contract: Describes stable behavior for callers of `updateHexBuildQueueEntry` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateHexBuildQueueEntry: (payload: { h3Index: string; entryId: number; unitType: BuildUnitType; count: number }) => Promise<{
     success: boolean;
     reason?: string;
     queue?: HexBuildQueueSnapshot;
   }>;
-  removeHexBuildQueueEntry: (payload: { h3Index: string; entryId: number }) => Promise<{
+    /**
+   * Specifies the contract for the `removeHexBuildQueueEntry` member (removeHexBuildQueueEntry: (payload: { h3Index: string; entryId: number }) => Promise<{ success: boolean; reason?: string; queue?: HexBuildQueueSn).
+
+   * Contract: Describes stable behavior for callers of `removeHexBuildQueueEntry` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+removeHexBuildQueueEntry: (payload: { h3Index: string; entryId: number }) => Promise<{
     success: boolean;
     reason?: string;
     queue?: HexBuildQueueSnapshot;
   }>;
-  getSealiftStackState: (payload: { h3Index: string }) => Promise<SealiftStackState>;
-  updateSealiftSlot: (payload: {
+    /**
+   * Specifies the contract for the `getSealiftStackState` member (getSealiftStackState: (payload: { h3Index: string }) => Promise<SealiftStackState>;).
+
+   * Contract: Describes stable behavior for callers of `getSealiftStackState` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getSealiftStackState: (payload: { h3Index: string }) => Promise<SealiftStackState>;
+    /**
+   * Specifies the contract for the `updateSealiftSlot` member (updateSealiftSlot: (payload: { h3Index: string; navalUnitId: string; slotIndex: 1 | 2; landUnitId: string | null; }) => Promise<{ success).
+
+   * Contract: Describes stable behavior for callers of `updateSealiftSlot` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateSealiftSlot: (payload: {
     h3Index: string;
     navalUnitId: string;
     slotIndex: 1 | 2;
     landUnitId: string | null;
   }) => Promise<{ success: boolean; reason?: string; state?: SealiftStackState }>;
-  requestAiOrders: (payload?: { enabledToolGroups?: string[] }) => Promise<RequestAiOrdersResult>;
-  cancelRequestAiOrders: () => Promise<void>;
-  registerOpenRouterLogListener?: (callback: (payload: { line: string; isError?: boolean }) => void) => void;
-  openRouter?: {
+    /**
+   * Specifies the contract for the `requestAiOrders` member (requestAiOrders: (payload?: { enabledToolGroups?: string[] }) => Promise<RequestAiOrdersResult>;).
+
+   * Contract: Describes stable behavior for callers of `requestAiOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+requestAiOrders: (payload?: { enabledToolGroups?: string[] }) => Promise<RequestAiOrdersResult>;
+    /**
+   * Specifies the contract for the `cancelRequestAiOrders` member (cancelRequestAiOrders: () => Promise<void>;).
+
+   * Contract: Describes stable behavior for callers of `cancelRequestAiOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+cancelRequestAiOrders: () => Promise<void>;
+    /**
+   * Specifies the contract for the `registerOpenRouterLogListener` member (registerOpenRouterLogListener?: (callback: (payload: { line: string; isError?: boolean }) => void) => void;).
+
+   * Contract: Describes stable behavior for callers of `registerOpenRouterLogListener` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+registerOpenRouterLogListener?: (callback: (payload: { line: string; isError?: boolean }) => void) => void;
+    /**
+   * Specifies the contract for the `openRouter` member (openRouter?: { getKey: () => Promise<{ hasKey: boolean }>; getSelectedModel: () => Promise<string>; setKey: (key: string) => Promise<void>;).
+
+   * Contract: Describes stable behavior for callers of `openRouter` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+openRouter?: {
     getKey: () => Promise<{ hasKey: boolean }>;
     getSelectedModel: () => Promise<string>;
     setKey: (key: string) => Promise<void>;

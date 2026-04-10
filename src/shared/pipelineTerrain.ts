@@ -1,11 +1,11 @@
 /**
- * Terrain labels produced by the terrain pipeline (`terrain_*_metadata.json` classification).
- * Shared between main (seeding) and renderer (styling); keep in sync with Python TERRAIN_ENUM.
- *
- * Passability (`land` | `water` | `coastal` | `wetlands`) is what SQLite `hexes.terrain` stores; pipeline kinds
- * include `coastal` and `wetlands` as littoral / mixed land-water labels.
- */
+ * Documents the module-scope binding `PIPELINE_TERRAIN_KINDS` (PIPELINE_TERRAIN_KINDS).
 
+ * Purpose: Supports maintainability by documenting why `PIPELINE_TERRAIN_KINDS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const PIPELINE_TERRAIN_KINDS = [
   'water',
   'coastal',
@@ -17,25 +17,55 @@ export const PIPELINE_TERRAIN_KINDS = [
   'arctic',
 ] as const;
 
+/**
+ * Documents the `PipelineTerrainKind` type alias (export type PipelineTerrainKind).
+
+ * Purpose: Supports maintainability by documenting why `PipelineTerrainKind` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type PipelineTerrainKind = (typeof PIPELINE_TERRAIN_KINDS)[number];
 
-/** Stored on `hexes.terrain` for movement and pathfinding. */
+/**
+ * Documents the `PassabilityTerrain` type alias (export type PassabilityTerrain).
+
+ * Purpose: Supports maintainability by documenting why `PassabilityTerrain` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type PassabilityTerrain = 'land' | 'water' | 'coastal' | 'wetlands';
 
+/**
+ * Documents the module-scope binding `KIND_SET` (KIND_SET).
+
+ * Purpose: Supports maintainability by documenting why `KIND_SET` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const KIND_SET = new Set<string>(PIPELINE_TERRAIN_KINDS);
 
 /**
- * Returns true when the string is one of the pipeline terrain enum values.
- * Use when validating CSV rows or DB values before insert.
+ * Defines the `isPipelineTerrainKind` function shape (export function isPipelineTerrainKind(s: string): s is PipelineTerrainKind).
+
+ * Purpose: Supports maintainability by documenting why `isPipelineTerrainKind` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function isPipelineTerrainKind(s: string): s is PipelineTerrainKind {
   return KIND_SET.has(s);
 }
 
 /**
- * Maps pipeline terrain kind to passability for SQLite and pathfinding.
- * `water` → `water`; `coastal` / `wetlands` keep dual-domain passability; all other kinds → `land`.
- * Main process seeding should call `terrainPassability.pipelineTerrainToPassability` for trace logging.
+ * Defines the `pipelineTerrainToPassability` function shape (export function pipelineTerrainToPassability(kind: PipelineTerrainKind): PassabilityTerrain).
+
+ * Purpose: Supports maintainability by documenting why `pipelineTerrainToPassability` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function pipelineTerrainToPassability(kind: PipelineTerrainKind): PassabilityTerrain {
   if (kind === 'water') return 'water';
@@ -45,14 +75,24 @@ export function pipelineTerrainToPassability(kind: PipelineTerrainKind): Passabi
 }
 
 /**
- * Returns true if infantry/armor may enter or end movement on this passability terrain.
+ * Defines the `passabilityAllowsLandUnit` function shape (export function passabilityAllowsLandUnit(t: PassabilityTerrain | string): boolean).
+
+ * Purpose: Supports maintainability by documenting why `passabilityAllowsLandUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function passabilityAllowsLandUnit(t: PassabilityTerrain | string): boolean {
   return t === 'land' || t === 'coastal' || t === 'wetlands';
 }
 
 /**
- * Returns true if naval units may enter or end movement on this passability terrain.
+ * Defines the `passabilityAllowsNavalUnit` function shape (export function passabilityAllowsNavalUnit(t: PassabilityTerrain | string): boolean).
+
+ * Purpose: Supports maintainability by documenting why `passabilityAllowsNavalUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function passabilityAllowsNavalUnit(t: PassabilityTerrain | string): boolean {
   return t === 'water' || t === 'coastal';

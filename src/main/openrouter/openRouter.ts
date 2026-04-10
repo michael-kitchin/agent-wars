@@ -62,32 +62,99 @@ import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTy
 
 export type { MemoryUpdateItem } from './orderResponseParsing';
 
+/**
+ * Documents the module-scope binding `OPENROUTER_MODELS_URL` (OPENROUTER_MODELS_URL).
+
+ * Purpose: Supports maintainability by documenting why `OPENROUTER_MODELS_URL` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
+/**
+ * Documents the module-scope binding `OPENROUTER_CHAT_URL` (OPENROUTER_CHAT_URL).
+
+ * Purpose: Supports maintainability by documenting why `OPENROUTER_CHAT_URL` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
+/**
+ * Documents the module-scope binding `OPENROUTER_KEY_DB_CONFIG_KEY` (OPENROUTER_KEY_DB_CONFIG_KEY).
+
+ * Purpose: Supports maintainability by documenting why `OPENROUTER_KEY_DB_CONFIG_KEY` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const OPENROUTER_KEY_DB_CONFIG_KEY = 'openrouter_api_key';
+/**
+ * Documents the module-scope binding `OPENROUTER_SELECTED_MODEL_DB_CONFIG_KEY` (OPENROUTER_SELECTED_MODEL_DB_CONFIG_KEY).
+
+ * Purpose: Supports maintainability by documenting why `OPENROUTER_SELECTED_MODEL_DB_CONFIG_KEY` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const OPENROUTER_SELECTED_MODEL_DB_CONFIG_KEY = 'openrouter_selected_model';
 
-/** Returns the path to the OpenRouter config file (userData). Call after app is ready. */
+/**
+ * Defines the `getConfigPath` function shape (function getConfigPath(): string).
+
+ * Purpose: Supports maintainability by documenting why `getConfigPath` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getConfigPath(): string {
   return path.join(app.getPath('userData'), 'openrouter-config.json');
 }
 
+/**
+ * Defines the `loadGameConfigValue` function shape (function loadGameConfigValue(key: string): string | null).
+
+ * Purpose: Supports maintainability by documenting why `loadGameConfigValue` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function loadGameConfigValue(key: string): string | null {
   const row = dbGetOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [key]);
   return row?.value ?? null;
 }
 
+/**
+ * Defines the `saveGameConfigValue` function shape (function saveGameConfigValue(key: string, value: string): void).
+
+ * Purpose: Supports maintainability by documenting why `saveGameConfigValue` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function saveGameConfigValue(key: string, value: string): void {
   dbRun('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [key, value]);
 }
 
+/**
+ * Defines the `deleteGameConfigValue` function shape (function deleteGameConfigValue(key: string): void).
+
+ * Purpose: Supports maintainability by documenting why `deleteGameConfigValue` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function deleteGameConfigValue(key: string): void {
   dbRun('DELETE FROM game_config WHERE key = ?', [key]);
 }
 
 /**
- * Loads the stored API key from disk. Uses safeStorage to decrypt if available.
- * Returns empty string if no key or read fails. Never logs the key.
+ * Defines the `loadKey` function shape (export function loadKey(): string).
+
+ * Purpose: Supports maintainability by documenting why `loadKey` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function loadKey(): string {
   const fromDb = loadGameConfigValue(OPENROUTER_KEY_DB_CONFIG_KEY);
@@ -124,8 +191,12 @@ export function loadKey(): string {
 }
 
 /**
- * Saves the API key to disk. Uses safeStorage to encrypt if available.
- * Pass empty string to clear. Never logs the key.
+ * Defines the `saveKey` function shape (export function saveKey(key: string): void).
+
+ * Purpose: Supports maintainability by documenting why `saveKey` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function saveKey(key: string): void {
   const configPath = getConfigPath();
@@ -149,16 +220,34 @@ export function saveKey(key: string): void {
 }
 
 /**
- * Returns whether the stored key is non-empty (masked for IPC; never returns the actual key).
+ * Defines the `hasKey` function shape (export function hasKey(): boolean).
+
+ * Purpose: Supports maintainability by documenting why `hasKey` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function hasKey(): boolean {
   return loadKey().length > 0;
 }
 
+/**
+ * Documents the module-scope binding `selectedModelId` (selectedModelId: string).
+
+ * Purpose: Supports maintainability by documenting why `selectedModelId` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 let selectedModelId: string = '';
 
 /**
- * Stores the model id selected in the UI for use when requesting AI orders. Call from IPC when the user selects a model.
+ * Defines the `setSelectedModel` function shape (export function setSelectedModel(modelId: string): void).
+
+ * Purpose: Supports maintainability by documenting why `setSelectedModel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function setSelectedModel(modelId: string): void {
   selectedModelId = modelId ?? '';
@@ -170,7 +259,12 @@ export function setSelectedModel(modelId: string): void {
 }
 
 /**
- * Returns the currently selected model id for AI orders. Used by the ready flow when requesting opponent orders.
+ * Defines the `getSelectedModel` function shape (export function getSelectedModel(): string).
+
+ * Purpose: Supports maintainability by documenting why `getSelectedModel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getSelectedModel(): string {
   if (!selectedModelId.trim()) {
@@ -179,14 +273,52 @@ export function getSelectedModel(): string {
   return selectedModelId;
 }
 
-/** Single tool group in the registry: id, display label, and API tool names (from TOOL*_NAMES). */
+/**
+ * Documents the `ToolGroupEntry` interface as a named contract surface (export interface ToolGroupEntry).
+
+ * Purpose: Supports maintainability by documenting why `ToolGroupEntry` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface ToolGroupEntry {
-  id: string;
-  label: string;
-  toolNames: readonly string[];
+    /**
+   * Specifies the contract for the `id` member (id: string;).
+
+   * Contract: Describes stable behavior for callers of `id` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+id: string;
+    /**
+   * Specifies the contract for the `label` member (label: string;).
+
+   * Contract: Describes stable behavior for callers of `label` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+label: string;
+    /**
+   * Specifies the contract for the `toolNames` member (toolNames: readonly string[];).
+
+   * Contract: Describes stable behavior for callers of `toolNames` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+toolNames: readonly string[];
 }
 
-/** Ordered registry of tool groups. Single source of truth for group id, label, and which API names belong to each group. */
+/**
+ * Documents the module-scope binding `TOOL_GROUP_REGISTRY` (TOOL_GROUP_REGISTRY: ToolGroupEntry[]).
+
+ * Purpose: Supports maintainability by documenting why `TOOL_GROUP_REGISTRY` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const TOOL_GROUP_REGISTRY: ToolGroupEntry[] = [
   { id: 'precomputation', label: 'Precomputation', toolNames: [] },
   { id: 'planning', label: 'Planning', toolNames: TOOL1_NAMES },
@@ -198,8 +330,12 @@ export const TOOL_GROUP_REGISTRY: ToolGroupEntry[] = [
 ];
 
 /**
- * Returns the ordered list of tool groups for the UI (id and label only).
- * Use so the renderer can build the Tools tab from a single source of truth.
+ * Defines the `getToolGroupList` function shape (export function getToolGroupList(): { id: string; label: string }[] { logTrace('openRouter getToolGroupList'); return TOOL_GROUP_REGISTRY.map((g) => ({ id).
+
+ * Purpose: Supports maintainability by documenting why `getToolGroupList` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getToolGroupList(): { id: string; label: string }[] {
   logTrace('openRouter getToolGroupList');
@@ -207,8 +343,12 @@ export function getToolGroupList(): { id: string; label: string }[] {
 }
 
 /**
- * Returns all API tool names for the given enabled group IDs.
- * Use when building the OpenRouter request (tools array and prompt) from enabled groups.
+ * Defines the `getToolNamesForEnabledGroups` function shape (export function getToolNamesForEnabledGroups(enabledGroupIds: string[]): string[]).
+
+ * Purpose: Supports maintainability by documenting why `getToolNamesForEnabledGroups` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getToolNamesForEnabledGroups(enabledGroupIds: string[]): string[] {
   logTrace('openRouter getToolNamesForEnabledGroups', { enabledGroupIds });
@@ -220,7 +360,14 @@ export function getToolNamesForEnabledGroups(enabledGroupIds: string[]): string[
   return names;
 }
 
-/** Map from API tool name to its group id. Used for per-group invocation counting. */
+/**
+ * Documents the module-scope binding `TOOL_NAME_TO_GROUP_ID` (TOOL_NAME_TO_GROUP_ID).
+
+ * Purpose: Supports maintainability by documenting why `TOOL_NAME_TO_GROUP_ID` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const TOOL_NAME_TO_GROUP_ID = (() => {
   const m = new Map<string, string>();
   for (const g of TOOL_GROUP_REGISTRY) {
@@ -230,7 +377,12 @@ const TOOL_NAME_TO_GROUP_ID = (() => {
 })();
 
 /**
- * Returns the tool group id for an API tool name, or undefined if unknown.
+ * Defines the `getGroupIdForToolName` function shape (export function getGroupIdForToolName(toolName: string): string | undefined { logTrace('openRouter getGroupIdForToolName', { toolName }); return TOOL_NAME).
+
+ * Purpose: Supports maintainability by documenting why `getGroupIdForToolName` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getGroupIdForToolName(toolName: string): string | undefined {
   logTrace('openRouter getGroupIdForToolName', { toolName });
@@ -238,23 +390,86 @@ export function getGroupIdForToolName(toolName: string): string | undefined {
 }
 
 /**
- * Which tool groups are enabled for this request. Single source of truth for prompt conditionals.
- * When enabledToolNames is undefined, all tools are considered enabled.
+ * Documents the `ToolFlags` interface as a named contract surface (export interface ToolFlags).
+
+ * Purpose: Supports maintainability by documenting why `ToolFlags` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export interface ToolFlags {
-  planningEnabled: boolean;
-  assessmentEnabled: boolean;
-  estimationEnabled: boolean;
-  ordersEnabled: boolean;
-  memoryEnabled: boolean;
-  productionEnabled: boolean;
-  /** True when neither Planning nor Orders is enabled; one-step move fallback is then used. */
-  fallbackMovementEnabled: boolean;
+    /**
+   * Specifies the contract for the `planningEnabled` member (planningEnabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `planningEnabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+planningEnabled: boolean;
+    /**
+   * Specifies the contract for the `assessmentEnabled` member (assessmentEnabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `assessmentEnabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+assessmentEnabled: boolean;
+    /**
+   * Specifies the contract for the `estimationEnabled` member (estimationEnabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `estimationEnabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+estimationEnabled: boolean;
+    /**
+   * Specifies the contract for the `ordersEnabled` member (ordersEnabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `ordersEnabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ordersEnabled: boolean;
+    /**
+   * Specifies the contract for the `memoryEnabled` member (memoryEnabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `memoryEnabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+memoryEnabled: boolean;
+    /**
+   * Specifies the contract for the `productionEnabled` member (productionEnabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `productionEnabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+productionEnabled: boolean;
+    /**
+   * Specifies the contract for the `fallbackMovementEnabled` member (fallbackMovementEnabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `fallbackMovementEnabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+fallbackMovementEnabled: boolean;
 }
 
 /**
- * Derives which tool groups are enabled from the list of enabled API tool names.
- * Use when building system prompt and user message so both use the same logic.
+ * Defines the `getToolFlags` function shape (export function getToolFlags(enabledToolNames: string[] | undefined): ToolFlags).
+
+ * Purpose: Supports maintainability by documenting why `getToolFlags` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getToolFlags(enabledToolNames: string[] | undefined): ToolFlags {
   logTrace('openRouter getToolFlags', { hasList: enabledToolNames !== undefined, count: enabledToolNames?.length ?? 0 });
@@ -280,14 +495,42 @@ export function getToolFlags(enabledToolNames: string[] | undefined): ToolFlags 
   };
 }
 
+/**
+ * Documents the `ModelItem` interface as a named contract surface (export interface ModelItem).
+
+ * Purpose: Supports maintainability by documenting why `ModelItem` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface ModelItem {
-  id: string;
-  name?: string;
+    /**
+   * Specifies the contract for the `id` member (id: string;).
+
+   * Contract: Describes stable behavior for callers of `id` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+id: string;
+    /**
+   * Specifies the contract for the `name` member (name?: string;).
+
+   * Contract: Describes stable behavior for callers of `name` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+name?: string;
 }
 
 /**
- * Fetches the list of models from OpenRouter. Uses the stored API key.
- * Returns models (id + name) or an error message. Logs errors; never logs the key.
+ * Defines the `listModels` function shape (export async function listModels(): Promise<).
+
+ * Purpose: Supports maintainability by documenting why `listModels` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export async function listModels(): Promise<{ models: ModelItem[] } | { error: string }> {
   logDebug('openRouter listModels');
@@ -323,8 +566,12 @@ export async function listModels(): Promise<{ models: ModelItem[] } | { error: s
 }
 
 /**
- * Validates a single AI order: unit must be opponent-owned, destination on map,
- * within movement range, and terrain must allow the unit type. Returns reason when invalid.
+ * Defines the `validateAiOrder` function shape (function validateAiOrder( order: { unitId: string; toH3Index: string }, state: GameStateSnapshot ): { valid: true } | { valid: false; reason: string } {).
+
+ * Purpose: Supports maintainability by documenting why `validateAiOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function validateAiOrder(
   order: { unitId: string; toH3Index: string },
@@ -367,7 +614,12 @@ function validateAiOrder(
 }
 
 /**
- * Validates a single AI ranged order against the state snapshot. Unit must be opponent-owned, have range ≥ 1, target in range, target has enemy.
+ * Defines the `validateAiRangedOrder` function shape (function validateAiRangedOrder( order: { unitId: string; targetH3Index: string }, state: GameStateSnapshot ): { valid: true } | { valid: false; reason: s).
+
+ * Purpose: Supports maintainability by documenting why `validateAiRangedOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function validateAiRangedOrder(
   order: { unitId: string; targetH3Index: string },
@@ -391,7 +643,14 @@ function validateAiRangedOrder(
   return { valid: true };
 }
 
-/** Formats [lat, lng] for prompts using LATLNG_DECIMAL_PLACES to match resolveToH3. */
+/**
+ * Defines the `formatLatLng` function shape (function formatLatLng(ll: [number, number]): string).
+
+ * Purpose: Supports maintainability by documenting why `formatLatLng` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatLatLng(ll: [number, number]): string {
   return formatLatLngWithPrecision(ll, LATLNG_DECIMAL_PLACES);
 }
@@ -399,17 +658,12 @@ function formatLatLng(ll: [number, number]): string {
 // prompt helpers extracted to openrouter/promptText.ts
 
 /**
- * Builds the system prompt for the tool-calling LLM: roster, combat summary, and tool descriptions.
- * When enabledToolNames is provided, "AVAILABLE TOOLS" lists only those tools (numbered 1..N); when omitted, all tools.
- * Injects a one-time warning if the previous turn exceeded the tool-call limit.
- * When briefingOverride is set (pre-computation path), it replaces the usual memory + standing-order + roster block
- * with the Commander's Briefing; combat rules, tools section, and submit instruction stay the same.
- *
- * Prompt conditionals (single source: getToolFlags):
- * - Planning enabled → use plan_route orderToXY for movement.
- * - Orders enabled, Planning disabled → prefer assign_order in orders[]; avoid invalid explicit_move without valid [lat,lng].
- * - Fallback (neither Planning nor Orders) → show adjacent-cells list; model may issue one-step moves from that list.
- * - Combat hints (naval plan, assess, estimate) and memory/standing-order blocks depend on their respective flags.
+ * Defines the `buildSystemPromptForTools` function shape (function buildSystemPromptForTools( state: GameStateSnapshot, coordMap: { latLngByH3: Map<string, [number, number]>; format: (h3: string) => str).
+
+ * Purpose: Supports maintainability by documenting why `buildSystemPromptForTools` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function buildSystemPromptForTools(
   state: GameStateSnapshot,
@@ -565,46 +819,255 @@ ${finalJsonExample}`;
   return prompt;
 }
 
+/**
+ * Documents the `RequestOrdersResult` interface as a named contract surface (export interface RequestOrdersResult).
+
+ * Purpose: Supports maintainability by documenting why `RequestOrdersResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface RequestOrdersResult {
-  success: true;
-  orders: { unitId: string; toH3Index: string }[];
-  rangedAttacks?: { unitId: string; targetH3Index: string }[];
-  airStrikes?: AirStrikeOrder[];
-  ferryOrders?: FerryOrder[];
-  embarkOrders?: EmbarkOrder[];
-  strategy?: string;
-  dropped?: number;
-  dropReasons?: string[];
-  /** Per-group invocation counts for this turn (ad-hoc LLM tool calls only; pre-computation not counted). */
-  toolInvocationCounts?: Record<string, number>;
-  /** Total cost in dollars for this request (sum of usage.cost across all round-trips in the tool loop). */
-  cost?: number;
-  /** Wall-clock time in ms for the request (from before tool loop to final response). */
-  wallClockMs?: number;
-  /** Input token count when the API supplies usage.prompt_tokens (sum across round-trips). */
-  inputTokens?: number;
-  /** Output token count when the API supplies usage.completion_tokens (sum across round-trips). */
-  outputTokens?: number;
+    /**
+   * Specifies the contract for the `success` member (success: true;).
+
+   * Contract: Describes stable behavior for callers of `success` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+success: true;
+    /**
+   * Specifies the contract for the `orders` member (orders: { unitId: string; toH3Index: string }[];).
+
+   * Contract: Describes stable behavior for callers of `orders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+orders: { unitId: string; toH3Index: string }[];
+    /**
+   * Specifies the contract for the `rangedAttacks` member (rangedAttacks?: { unitId: string; targetH3Index: string }[];).
+
+   * Contract: Describes stable behavior for callers of `rangedAttacks` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+rangedAttacks?: { unitId: string; targetH3Index: string }[];
+    /**
+   * Specifies the contract for the `airStrikes` member (airStrikes?: AirStrikeOrder[];).
+
+   * Contract: Describes stable behavior for callers of `airStrikes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+airStrikes?: AirStrikeOrder[];
+    /**
+   * Specifies the contract for the `ferryOrders` member (ferryOrders?: FerryOrder[];).
+
+   * Contract: Describes stable behavior for callers of `ferryOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ferryOrders?: FerryOrder[];
+    /**
+   * Specifies the contract for the `embarkOrders` member (embarkOrders?: EmbarkOrder[];).
+
+   * Contract: Describes stable behavior for callers of `embarkOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+embarkOrders?: EmbarkOrder[];
+    /**
+   * Specifies the contract for the `strategy` member (strategy?: string;).
+
+   * Contract: Describes stable behavior for callers of `strategy` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+strategy?: string;
+    /**
+   * Specifies the contract for the `dropped` member (dropped?: number;).
+
+   * Contract: Describes stable behavior for callers of `dropped` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+dropped?: number;
+    /**
+   * Specifies the contract for the `dropReasons` member (dropReasons?: string[];).
+
+   * Contract: Describes stable behavior for callers of `dropReasons` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+dropReasons?: string[];
+    /**
+   * Specifies the contract for the `toolInvocationCounts` member (toolInvocationCounts?: Record<string, number>;).
+
+   * Contract: Describes stable behavior for callers of `toolInvocationCounts` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+toolInvocationCounts?: Record<string, number>;
+    /**
+   * Specifies the contract for the `cost` member (cost?: number;).
+
+   * Contract: Describes stable behavior for callers of `cost` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+cost?: number;
+    /**
+   * Specifies the contract for the `wallClockMs` member (wallClockMs?: number;).
+
+   * Contract: Describes stable behavior for callers of `wallClockMs` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+wallClockMs?: number;
+    /**
+   * Specifies the contract for the `inputTokens` member (inputTokens?: number;).
+
+   * Contract: Describes stable behavior for callers of `inputTokens` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+inputTokens?: number;
+    /**
+   * Specifies the contract for the `outputTokens` member (outputTokens?: number;).
+
+   * Contract: Describes stable behavior for callers of `outputTokens` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+outputTokens?: number;
 }
+/**
+ * Documents the `RequestOrdersError` interface as a named contract surface (export interface RequestOrdersError).
+
+ * Purpose: Supports maintainability by documenting why `RequestOrdersError` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface RequestOrdersError {
-  success: false;
-  error: string;
+    /**
+   * Specifies the contract for the `success` member (success: false;).
+
+   * Contract: Describes stable behavior for callers of `success` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+success: false;
+    /**
+   * Specifies the contract for the `error` member (error: string;).
+
+   * Contract: Describes stable behavior for callers of `error` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+error: string;
 }
 
-/** OpenAI-compatible tool definition for OpenRouter. */
+/**
+ * Documents the `ToolDef` interface as a named contract surface (interface ToolDef).
+
+ * Purpose: Supports maintainability by documenting why `ToolDef` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface ToolDef {
-  type: 'function';
-  function: { name: string; description: string; parameters: { type: 'object'; properties: Record<string, unknown>; required?: string[] } };
+    /**
+   * Specifies the contract for the `type` member (type: 'function';).
+
+   * Contract: Describes stable behavior for callers of `type` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+type: 'function';
+    /**
+   * Specifies the contract for the `function` member (function: { name: string; description: string; parameters: { type: 'object'; properties: Record<string, unknown>; required?: string[] } };).
+
+   * Contract: Describes stable behavior for callers of `function` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+function: { name: string; description: string; parameters: { type: 'object'; properties: Record<string, unknown>; required?: string[] } };
 }
 
-/** Single source for tool schema and prompt line. Used to build both OpenRouter tools array and system prompt section. */
+/**
+ * Documents the `ToolMeta` interface as a named contract surface (interface ToolMeta).
+
+ * Purpose: Supports maintainability by documenting why `ToolMeta` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface ToolMeta {
-  name: string;
-  description: string;
-  parameters: { type: 'object'; properties: Record<string, unknown>; required?: string[] };
-  promptLine: string;
+    /**
+   * Specifies the contract for the `name` member (name: string;).
+
+   * Contract: Describes stable behavior for callers of `name` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+name: string;
+    /**
+   * Specifies the contract for the `description` member (description: string;).
+
+   * Contract: Describes stable behavior for callers of `description` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+description: string;
+    /**
+   * Specifies the contract for the `parameters` member (parameters: { type: 'object'; properties: Record<string, unknown>; required?: string[] };).
+
+   * Contract: Describes stable behavior for callers of `parameters` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+parameters: { type: 'object'; properties: Record<string, unknown>; required?: string[] };
+    /**
+   * Specifies the contract for the `promptLine` member (promptLine: string;).
+
+   * Contract: Describes stable behavior for callers of `promptLine` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+promptLine: string;
 }
 
+/**
+ * Documents the module-scope binding `ALL_TOOL_METADATA` (ALL_TOOL_METADATA: ToolMeta[]).
+
+ * Purpose: Supports maintainability by documenting why `ALL_TOOL_METADATA` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const ALL_TOOL_METADATA: ToolMeta[] = [
   {
     name: 'plan_route',
@@ -758,8 +1221,12 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
 ];
 
 /**
- * Returns tool metadata filtered by enabled tool names. If enabledToolNames is omitted, returns all tools.
- * Used so both buildToolDefinitions and the system prompt "AVAILABLE TOOLS" section use the same filtered list.
+ * Defines the `getFilteredToolMetadata` function shape (function getFilteredToolMetadata(enabledToolNames?: string[]): ToolMeta[]).
+
+ * Purpose: Supports maintainability by documenting why `getFilteredToolMetadata` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function getFilteredToolMetadata(enabledToolNames?: string[]): ToolMeta[] {
   if (enabledToolNames === undefined) return [...ALL_TOOL_METADATA];
@@ -768,8 +1235,12 @@ function getFilteredToolMetadata(enabledToolNames?: string[]): ToolMeta[] {
 }
 
 /**
- * Returns OpenRouter tool definitions for the given enabled tool names.
- * When enabledToolNames is omitted, returns all tools (current behavior).
+ * Defines the `buildToolDefinitions` function shape (function buildToolDefinitions(enabledToolNames?: string[]): ToolDef[]).
+
+ * Purpose: Supports maintainability by documenting why `buildToolDefinitions` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function buildToolDefinitions(enabledToolNames?: string[]): ToolDef[] {
   return getFilteredToolMetadata(enabledToolNames).map((m) => ({
@@ -778,23 +1249,87 @@ function buildToolDefinitions(enabledToolNames?: string[]): ToolDef[] {
   }));
 }
 
+/**
+ * Documents the module-scope binding `OPENROUTER_REQUEST_TIMEOUT_MS` (OPENROUTER_REQUEST_TIMEOUT_MS).
+
+ * Purpose: Supports maintainability by documenting why `OPENROUTER_REQUEST_TIMEOUT_MS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const OPENROUTER_REQUEST_TIMEOUT_MS = 45_000;
+/**
+ * Documents the module-scope binding `OPENROUTER_RESPONSE_IDLE_TIMEOUT_MS` (OPENROUTER_RESPONSE_IDLE_TIMEOUT_MS).
+
+ * Purpose: Supports maintainability by documenting why `OPENROUTER_RESPONSE_IDLE_TIMEOUT_MS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const OPENROUTER_RESPONSE_IDLE_TIMEOUT_MS = 15_000;
+/**
+ * Documents the module-scope binding `OPENROUTER_RESPONSE_HARD_TIMEOUT_MS` (OPENROUTER_RESPONSE_HARD_TIMEOUT_MS).
+
+ * Purpose: Supports maintainability by documenting why `OPENROUTER_RESPONSE_HARD_TIMEOUT_MS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const OPENROUTER_RESPONSE_HARD_TIMEOUT_MS = 90_000;
+/**
+ * Documents the module-scope binding `OPENROUTER_REQUEST_RETRY_COUNT` (OPENROUTER_REQUEST_RETRY_COUNT).
+
+ * Purpose: Supports maintainability by documenting why `OPENROUTER_REQUEST_RETRY_COUNT` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const OPENROUTER_REQUEST_RETRY_COUNT = 1;
 
+/**
+ * Defines the `isRetryableStatus` function shape (function isRetryableStatus(status: number): boolean).
+
+ * Purpose: Supports maintainability by documenting why `isRetryableStatus` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function isRetryableStatus(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
 }
 
+/**
+ * Defines the `getRetryDelayMs` function shape (function getRetryDelayMs(): number).
+
+ * Purpose: Supports maintainability by documenting why `getRetryDelayMs` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getRetryDelayMs(): number {
   return 300 + Math.floor(Math.random() * 700);
 }
 
+/**
+ * Defines the `delayMs` function shape (function delayMs(ms: number): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `delayMs` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function delayMs(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Defines the `postOpenRouterChatWithTimeoutAndRetry` function shape (async function postOpenRouterChatWithTimeoutAndRetry(payload: { key: string; body: Record<string, unknown>; signal?: AbortSignal; onLog?: (line: str).
+
+ * Purpose: Supports maintainability by documenting why `postOpenRouterChatWithTimeoutAndRetry` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function postOpenRouterChatWithTimeoutAndRetry(payload: {
   key: string;
   body: Record<string, unknown>;
@@ -893,6 +1428,14 @@ async function postOpenRouterChatWithTimeoutAndRetry(payload: {
   return { ok: false, error: lastError };
 }
 
+/**
+ * Documents the `OpenRouterChatTransport` type alias (type OpenRouterChatTransport).
+
+ * Purpose: Supports maintainability by documenting why `OpenRouterChatTransport` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type OpenRouterChatTransport = (payload: {
   key: string;
   body: Record<string, unknown>;
@@ -901,21 +1444,37 @@ type OpenRouterChatTransport = (payload: {
   requestLabel: string;
 }) => Promise<{ ok: true; status: number; headers: Record<string, string>; bodyText: string } | { ok: false; error: string }>;
 
+/**
+ * Documents the module-scope binding `chatTransportOverride` (chatTransportOverride: OpenRouterChatTransport | null).
+
+ * Purpose: Supports maintainability by documenting why `chatTransportOverride` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 let chatTransportOverride: OpenRouterChatTransport | null = null;
 
 /**
- * Why this exists:
- *     Allows tests to inject a deterministic OpenRouter chat transport without relying on global fetch monkeypatching.
- * When to use:
- *     Matrix and parsing tests that need to capture outbound payloads and return canned responses.
- * What to expect:
- *     Passing null restores default HTTPS transport. Production paths should never set this.
+ * Defines the `setChatTransportOverrideForTests` function shape (export function setChatTransportOverrideForTests(override: OpenRouterChatTransport | null): void).
+
+ * Purpose: Supports maintainability by documenting why `setChatTransportOverrideForTests` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function setChatTransportOverrideForTests(override: OpenRouterChatTransport | null): void {
   logDebug('openRouter setChatTransportOverrideForTests', { enabled: override !== null });
   chatTransportOverride = override;
 }
 
+/**
+ * Defines the `postChatViaHttps` function shape (async function postChatViaHttps(args: { key: string; requestBody: Record<string, unknown>; signal: AbortSignal; timeoutMs: number; responseIdleTi).
+
+ * Purpose: Supports maintainability by documenting why `postChatViaHttps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 async function postChatViaHttps(args: {
   key: string;
   requestBody: Record<string, unknown>;
@@ -1017,23 +1576,60 @@ async function postChatViaHttps(args: {
   });
 }
 
+/**
+ * Documents the `RequestOrdersOptions` interface as a named contract surface (export interface RequestOrdersOptions).
+
+ * Purpose: Supports maintainability by documenting why `RequestOrdersOptions` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface RequestOrdersOptions {
-  /** When provided, only these tool names are included in the request and prompt. When omitted, all tools are used. */
-  enabledToolNames?: string[];
-  /** Optional AbortSignal to cancel the request (e.g. when the user toggles Run off). Passed to fetch(); when aborted, returns { success: false, error: 'Cancelled' }. */
-  signal?: AbortSignal;
-  /** Optional sink for status log lines (e.g. to show in the renderer AI panel). Called for key events only. */
-  onLog?: (line: string, isError?: boolean) => void;
-  /** When true, run pre-computation (assess_unit, assess_hex, estimate_combat) and inject Commander's Briefing into the prompt (0.6 path). Default false. */
-  usePrecomputation?: boolean;
+    /**
+   * Specifies the contract for the `enabledToolNames` member (enabledToolNames?: string[];).
+
+   * Contract: Describes stable behavior for callers of `enabledToolNames` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+enabledToolNames?: string[];
+    /**
+   * Specifies the contract for the `signal` member (signal?: AbortSignal;).
+
+   * Contract: Describes stable behavior for callers of `signal` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+signal?: AbortSignal;
+    /**
+   * Specifies the contract for the `onLog` member (onLog?: (line: string, isError?: boolean) => void;).
+
+   * Contract: Describes stable behavior for callers of `onLog` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+onLog?: (line: string, isError?: boolean) => void;
+    /**
+   * Specifies the contract for the `usePrecomputation` member (usePrecomputation?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `usePrecomputation` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+usePrecomputation?: boolean;
 }
 
 /**
- * Requests movement orders from the LLM for the opponent. Uses the tool-calling loop:
- * send prompt and tool definitions; if the model returns tool_calls, execute tools locally,
- * append results, and resend until the model returns final order JSON or the iteration limit (50) is reached.
- * When options.enabledToolNames is provided, only those tools are sent and executed; disabled tool calls are skipped and not counted.
- * Validates and drops invalid orders. Never logs the API key.
+ * Defines the `requestOrders` function shape (export async function requestOrders( state: GameStateSnapshot, modelId: string, options?: RequestOrdersOptions ): Promise<RequestOrdersResult | Reques).
+
+ * Purpose: Supports maintainability by documenting why `requestOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export async function requestOrders(
   state: GameStateSnapshot,

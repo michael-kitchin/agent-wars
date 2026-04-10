@@ -12,10 +12,26 @@ import {
 import { getAssessmentCategory, executeEstimateCombat, poissonBinomialPMF } from './tool3CombatEstimation';
 import type { GameStateSnapshot } from '../gameDb';
 
+/**
+ * Defines the `makeUnit` function shape (function makeUnit(id: string, player: string, unitType: string, h3Index: string): CombatUnit).
+
+ * Purpose: Supports maintainability by documenting why `makeUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function makeUnit(id: string, player: string, unitType: string, h3Index: string): CombatUnit {
   return { id, player, unitType, h3Index };
 }
 
+/**
+ * Defines the `testGetAssessmentCategory` function shape (function testGetAssessmentCategory(): void).
+
+ * Purpose: Supports maintainability by documenting why `testGetAssessmentCategory` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testGetAssessmentCategory(): void {
   assert.strictEqual(getAssessmentCategory(0.8, 0.2), 'strongly_favorable');
   assert.strictEqual(getAssessmentCategory(0.2, 0.8), 'strongly_unfavorable');
@@ -24,6 +40,14 @@ function testGetAssessmentCategory(): void {
   assert.strictEqual(getAssessmentCategory(0.35, 0.6), 'unfavorable');
 }
 
+/**
+ * Defines the `testResolveOneMeleeDeterministic` function shape (function testResolveOneMeleeDeterministic(): void).
+
+ * Purpose: Supports maintainability by documenting why `testResolveOneMeleeDeterministic` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testResolveOneMeleeDeterministic(): void {
   const rollAlways3 = () => 3;
   const atk = [makeUnit('a1', 'p1', 'armor', 'hex')];
@@ -35,6 +59,14 @@ function testResolveOneMeleeDeterministic(): void {
   assert.strictEqual(out.attackerRemovedIds.length, 0);
 }
 
+/**
+ * Defines the `testResolveOneRangedNoReturnFire` function shape (function testResolveOneRangedNoReturnFire(): void).
+
+ * Purpose: Supports maintainability by documenting why `testResolveOneRangedNoReturnFire` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testResolveOneRangedNoReturnFire(): void {
   const rollAlways1 = () => 1;
   const atk = [makeUnit('a1', 'p1', 'armor', 'hexA')];
@@ -44,6 +76,14 @@ function testResolveOneRangedNoReturnFire(): void {
   assert.strictEqual(out.attackerRemovedIds.length, 0);
 }
 
+/**
+ * Defines the `testExecuteEstimateCombatUncontested` function shape (function testExecuteEstimateCombatUncontested(): void).
+
+ * Purpose: Supports maintainability by documenting why `testExecuteEstimateCombatUncontested` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testExecuteEstimateCombatUncontested(): void {
   const state: GameStateSnapshot = {
     hexes: [{ h3Index: '891f1d48b9fffff', terrain: 'land', terrainKind: 'plains' }],
@@ -70,6 +110,14 @@ function testExecuteEstimateCombatUncontested(): void {
   assert.strictEqual((result as { prediction?: { assessment: string } }).prediction?.assessment, 'uncontested');
 }
 
+/**
+ * Defines the `testExecuteEstimateCombatUnitNotFound` function shape (function testExecuteEstimateCombatUnitNotFound(): void).
+
+ * Purpose: Supports maintainability by documenting why `testExecuteEstimateCombatUnitNotFound` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testExecuteEstimateCombatUnitNotFound(): void {
   const state: GameStateSnapshot = {
     hexes: [{ h3Index: '891f1d48b9fffff', terrain: 'land', terrainKind: 'plains' }],
@@ -95,6 +143,14 @@ function testExecuteEstimateCombatUnitNotFound(): void {
   assert.ok((result.error as string).includes('Unit not found'));
 }
 
+/**
+ * Defines the `testExecuteEstimateCombatInvalidHex` function shape (function testExecuteEstimateCombatInvalidHex(): void).
+
+ * Purpose: Supports maintainability by documenting why `testExecuteEstimateCombatInvalidHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testExecuteEstimateCombatInvalidHex(): void {
   const state: GameStateSnapshot = {
     hexes: [],
@@ -119,6 +175,14 @@ function testExecuteEstimateCombatInvalidHex(): void {
   assert.ok((result.error as string).toLowerCase().includes('hex'));
 }
 
+/**
+ * Defines the `testPoissonBinomialPMF` function shape (function testPoissonBinomialPMF(): void).
+
+ * Purpose: Supports maintainability by documenting why `testPoissonBinomialPMF` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testPoissonBinomialPMF(): void {
   const eps = 1e-12;
   const pmf0 = poissonBinomialPMF([]);
@@ -141,6 +205,14 @@ function testPoissonBinomialPMF(): void {
   assert.ok(Math.abs(pmf2[2]! - p2) < eps);
 }
 
+/**
+ * Defines the `testExactCombatProbabilities` function shape (function testExactCombatProbabilities(): void).
+
+ * Purpose: Supports maintainability by documenting why `testExactCombatProbabilities` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testExactCombatProbabilities(): void {
   const eps = 1e-12;
   const h3 = '891f1d48b9fffff';
@@ -182,6 +254,14 @@ function testExactCombatProbabilities(): void {
   assert.strictEqual(result.prediction!.assessment, 'even');
 }
 
+/**
+ * Defines the `runTool3Verification` function shape (export function runTool3Verification(): void).
+
+ * Purpose: Supports maintainability by documenting why `runTool3Verification` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function runTool3Verification(): void {
   testGetAssessmentCategory();
   testResolveOneMeleeDeterministic();

@@ -1,30 +1,106 @@
 import type { BuildUnitType } from './ipcTypes';
 
-/** Canonical unit production costs used by backend logic and UI labels. */
-export const UNIT_COST_BY_TYPE: Readonly<Record<BuildUnitType, number>> = {
-  infantry: 10,
-  armor: 20,
-  naval: 50,
-  air: 30,
-};
+/**
+ * Documents the module-scope binding `UNIT_COST_BY_TYPE` (UNIT_COST_BY_TYPE: Readonly<Record<BuildUnitType, number>>).
 
-/** Canonical milestone-1.4 deployment caps for the three producible unit types. */
-export const MAX_UNITS_PER_TYPE: Readonly<Record<BuildUnitType, number>> = {
-  infantry: 6,
-  armor: 4,
-  naval: 4,
-  air: 3,
+ * Purpose: Supports maintainability by documenting why `UNIT_COST_BY_TYPE` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export const UNIT_COST_BY_TYPE: Readonly<Record<BuildUnitType, number>> = {
+    /**
+   * Documents the object literal property `infantry` (infantry: 10).
+
+   * Purpose: Supports maintainability by documenting why `infantry` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+infantry: 10,
+    /**
+   * Documents the object literal property `armor` (armor: 20).
+
+   * Purpose: Supports maintainability by documenting why `armor` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+armor: 20,
+    /**
+   * Documents the object literal property `naval` (naval: 50).
+
+   * Purpose: Supports maintainability by documenting why `naval` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+naval: 50,
+    /**
+   * Documents the object literal property `air` (air: 30).
+
+   * Purpose: Supports maintainability by documenting why `air` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+air: 30,
 };
 
 /**
- * Why this exists:
- *     Computes the label-facing "turns to next spawn" estimate from current stored points, unit cost,
- *     and per-turn urban production so UI text matches the milestone production contract.
- * When to use:
- *     Any surface that renders `N1c / N2t` production timing for the next spawn event.
- * What to expect:
- *     Returns `null` when the estimate is not computable (invalid unit or zero capacity);
- *     otherwise returns a positive integer turn count, where 1 means "spawns this turn".
+ * Documents the module-scope binding `MAX_UNITS_PER_TYPE` (MAX_UNITS_PER_TYPE: Readonly<Record<BuildUnitType, number>>).
+
+ * Purpose: Supports maintainability by documenting why `MAX_UNITS_PER_TYPE` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export const MAX_UNITS_PER_TYPE: Readonly<Record<BuildUnitType, number>> = {
+    /**
+   * Documents the object literal property `infantry` (infantry: 6).
+
+   * Purpose: Supports maintainability by documenting why `infantry` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+infantry: 6,
+    /**
+   * Documents the object literal property `armor` (armor: 4).
+
+   * Purpose: Supports maintainability by documenting why `armor` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+armor: 4,
+    /**
+   * Documents the object literal property `naval` (naval: 4).
+
+   * Purpose: Supports maintainability by documenting why `naval` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+naval: 4,
+    /**
+   * Documents the object literal property `air` (air: 3).
+
+   * Purpose: Supports maintainability by documenting why `air` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+air: 3,
+};
+
+/**
+ * Defines the `estimateTurnsToNextSpawn` function shape (export function estimateTurnsToNextSpawn( nextUnitType: BuildUnitType | null | undefined, storedPoints: number, capacityPerTurn: number ): number | nu).
+
+ * Purpose: Supports maintainability by documenting why `estimateTurnsToNextSpawn` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function estimateTurnsToNextSpawn(
   nextUnitType: BuildUnitType | null | undefined,

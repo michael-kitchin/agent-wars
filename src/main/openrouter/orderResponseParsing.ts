@@ -15,23 +15,59 @@ import { formatLatLng } from './promptText';
 import { LATLNG_DECIMAL_PLACES } from '../mapData';
 
 /**
- * Why this exists:
- *     Describes one memory write or delete the model may emit in its final JSON; applied after a successful parse.
- * When to use:
- *     Consumers merge parsed `memoryUpdates` into the memory tool pipeline.
- * What to expect:
- *     `write` entries may include tier; `delete` is key-only.
+ * Documents the `MemoryUpdateItem` interface as a named contract surface (export interface MemoryUpdateItem).
+
+ * Purpose: Supports maintainability by documenting why `MemoryUpdateItem` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export interface MemoryUpdateItem {
-  action: 'write' | 'delete';
-  key: string;
-  content?: string;
-  tier?: 'persistent' | 'stored';
+    /**
+   * Specifies the contract for the `action` member (action: 'write' | 'delete';).
+
+   * Contract: Describes stable behavior for callers of `action` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+action: 'write' | 'delete';
+    /**
+   * Specifies the contract for the `key` member (key: string;).
+
+   * Contract: Describes stable behavior for callers of `key` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+key: string;
+    /**
+   * Specifies the contract for the `content` member (content?: string;).
+
+   * Contract: Describes stable behavior for callers of `content` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+content?: string;
+    /**
+   * Specifies the contract for the `tier` member (tier?: 'persistent' | 'stored';).
+
+   * Contract: Describes stable behavior for callers of `tier` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+tier?: 'persistent' | 'stored';
 }
 
 /**
- * Strips JavaScript-style line (//) and block comments from JSON-like strings without touching string literals.
- * Why this exists: LLMs often emit comments inside JSON; this improves parse success before JSON.parse.
+ * Defines the `stripJsonLikeComments` function shape (function stripJsonLikeComments(s: string): string).
+
+ * Purpose: Supports maintainability by documenting why `stripJsonLikeComments` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function stripJsonLikeComments(s: string): string {
   let out = '';
@@ -134,6 +170,14 @@ function stripJsonLikeComments(s: string): string {
   return out;
 }
 
+/**
+ * Documents the module-scope binding `CALLBACK_EVENT_VOCAB` (CALLBACK_EVENT_VOCAB).
+
+ * Purpose: Supports maintainability by documenting why `CALLBACK_EVENT_VOCAB` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const CALLBACK_EVENT_VOCAB = new Set([
   'turns',
   'unit_engaged',
@@ -144,6 +188,14 @@ const CALLBACK_EVENT_VOCAB = new Set([
   'territory_changed',
 ]);
 
+/**
+ * Defines the `parseInfrastructureDestroyedCallbackArgs` function shape (function parseInfrastructureDestroyedCallbackArgs(arg: string): Record<string, unknown>).
+
+ * Purpose: Supports maintainability by documenting why `parseInfrastructureDestroyedCallbackArgs` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function parseInfrastructureDestroyedCallbackArgs(arg: string): Record<string, unknown> {
   const pieces = arg.split(',').map((x) => x.trim()).filter((x) => x.length > 0);
   const first = pieces[0] ?? '';
@@ -155,6 +207,14 @@ function parseInfrastructureDestroyedCallbackArgs(arg: string): Record<string, u
   return {};
 }
 
+/**
+ * Defines the `parseCompactCallbackParams` function shape (function parseCompactCallbackParams(event: string, arg: string): Record<string, unknown> | null).
+
+ * Purpose: Supports maintainability by documenting why `parseCompactCallbackParams` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function parseCompactCallbackParams(event: string, arg: string): Record<string, unknown> | null {
   if (event === 'turns') {
     const n = Number(arg);
@@ -168,6 +228,14 @@ function parseCompactCallbackParams(event: string, arg: string): Record<string, 
   return {};
 }
 
+/**
+ * Defines the `normalizeCallbacks` function shape (function normalizeCallbacks(raw: unknown): CallbackSubscription[]).
+
+ * Purpose: Supports maintainability by documenting why `normalizeCallbacks` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function normalizeCallbacks(raw: unknown): CallbackSubscription[] {
   if (!Array.isArray(raw)) return [];
   const out: CallbackSubscription[] = [];
@@ -208,6 +276,14 @@ function normalizeCallbacks(raw: unknown): CallbackSubscription[] {
   return out;
 }
 
+/**
+ * Defines the `normalizeMemoryUpdates` function shape (function normalizeMemoryUpdates(raw: unknown): MemoryUpdateItem[]).
+
+ * Purpose: Supports maintainability by documenting why `normalizeMemoryUpdates` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function normalizeMemoryUpdates(raw: unknown): MemoryUpdateItem[] {
   if (!Array.isArray(raw)) return [];
   const out: MemoryUpdateItem[] = [];
@@ -231,10 +307,12 @@ function normalizeMemoryUpdates(raw: unknown): MemoryUpdateItem[] {
 }
 
 /**
- * Why this exists:
- *     Embeds a minimal example schema in the repair prompt when the model's JSON failed to parse.
- * When to use:
- *     Only from the OpenRouter repair branch after parse failure.
+ * Defines the `buildJsonAssistantRepairSchema` function shape (export function buildJsonAssistantRepairSchema(includeProductionOrders: boolean): string).
+
+ * Purpose: Supports maintainability by documenting why `buildJsonAssistantRepairSchema` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function buildJsonAssistantRepairSchema(includeProductionOrders: boolean): string {
   return includeProductionOrders
@@ -242,12 +320,28 @@ export function buildJsonAssistantRepairSchema(includeProductionOrders: boolean)
     : `{"strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":[lat,lng]}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":[lat,lng]},{"unitId":"opponent-armor-1","action":"ranged_attack","targetHex":[lat,lng]},{"unitId":"opponent-armor-1","action":"cancel_order"}],"airStrikes":[{"unitId":"opponent-air-1","targetHex":[lat,lng],"targetType":"units"}],"ferryOrders":[{"unitId":"opponent-air-2","destination":[lat,lng]}],"callbacks":[],"memoryUpdates":[]}`;
 }
 
+/**
+ * Defines the `hasNonEmptyLegacyTopLevel` function shape (function hasNonEmptyLegacyTopLevel(obj: Record<string, unknown>): boolean).
+
+ * Purpose: Supports maintainability by documenting why `hasNonEmptyLegacyTopLevel` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function hasNonEmptyLegacyTopLevel(obj: Record<string, unknown>): boolean {
   const mo = obj.movementOrders;
   const ra = obj.rangedAttacks;
   return (Array.isArray(mo) && mo.length > 0) || (Array.isArray(ra) && ra.length > 0);
 }
 
+/**
+ * Defines the `resolveExplicitRangedTarget` function shape (function resolveExplicitRangedTarget( target: unknown, state: GameStateSnapshot, resolveToH3: (lat: number, lng: number) => string | undefined ): stri).
+
+ * Purpose: Supports maintainability by documenting why `resolveExplicitRangedTarget` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function resolveExplicitRangedTarget(
   target: unknown,
   state: GameStateSnapshot,
@@ -265,6 +359,14 @@ function resolveExplicitRangedTarget(
   return undefined;
 }
 
+/**
+ * Defines the `resolveLatLngToH3` function shape (function resolveLatLngToH3().
+
+ * Purpose: Supports maintainability by documenting why `resolveLatLngToH3` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function resolveLatLngToH3(
   point: unknown,
   resolveToH3: (lat: number, lng: number) => string | undefined
@@ -276,6 +378,14 @@ function resolveLatLngToH3(
   return resolveToH3(lat, lng);
 }
 
+/**
+ * Defines the `normalizeOrderEntries` function shape (function normalizeOrderEntries<T>( entries: unknown, options: { expectedObjectDropReason: string; missingFieldsDropReason: string; normaliz).
+
+ * Purpose: Supports maintainability by documenting why `normalizeOrderEntries` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function normalizeOrderEntries<T>(
   entries: unknown,
   options: {
@@ -302,6 +412,14 @@ function normalizeOrderEntries<T>(
   return { items, dropReasons };
 }
 
+/**
+ * Defines the `normalizeAirStrikeOrders` function shape (function normalizeAirStrikeOrders( entries: unknown, resolveToH3: (lat: number, lng: number) => string | undefined ): { airStrikes: AirStrikeOrder[]; dro).
+
+ * Purpose: Supports maintainability by documenting why `normalizeAirStrikeOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function normalizeAirStrikeOrders(
   entries: unknown,
   resolveToH3: (lat: number, lng: number) => string | undefined
@@ -324,6 +442,14 @@ function normalizeAirStrikeOrders(
   return { airStrikes: normalized.items, dropReasons: normalized.dropReasons };
 }
 
+/**
+ * Defines the `normalizeFerryOrders` function shape (function normalizeFerryOrders( entries: unknown, resolveToH3: (lat: number, lng: number) => string | undefined ): { ferryOrders: FerryOrder[]; dropReason).
+
+ * Purpose: Supports maintainability by documenting why `normalizeFerryOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function normalizeFerryOrders(
   entries: unknown,
   resolveToH3: (lat: number, lng: number) => string | undefined
@@ -341,6 +467,14 @@ function normalizeFerryOrders(
   return { ferryOrders: normalized.items, dropReasons: normalized.dropReasons };
 }
 
+/**
+ * Defines the `processV3OrdersArray` function shape (function processV3OrdersArray( entries: unknown[], state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: number, lng: number).
+
+ * Purpose: Supports maintainability by documenting why `processV3OrdersArray` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function processV3OrdersArray(
   entries: unknown[],
   state: GameStateSnapshot,
@@ -443,10 +577,26 @@ function processV3OrdersArray(
   return { movementOrders, rangedAttacks, embarkOrders };
 }
 
+/**
+ * Defines the `formatLatLngForDropMessage` function shape (function formatLatLngForDropMessage(ll: [number, number]): string).
+
+ * Purpose: Supports maintainability by documenting why `formatLatLngForDropMessage` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatLatLngForDropMessage(ll: [number, number]): string {
   return formatLatLng(ll, LATLNG_DECIMAL_PLACES);
 }
 
+/**
+ * Defines the `processProductionOrdersArray` function shape (function processProductionOrdersArray( entries: unknown, state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: number, lng:).
+
+ * Purpose: Supports maintainability by documenting why `processProductionOrdersArray` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function processProductionOrdersArray(
   entries: unknown,
   state: GameStateSnapshot,
@@ -469,12 +619,12 @@ function processProductionOrdersArray(
 }
 
 /**
- * Why this exists:
- *     Extracts movement, ranged, air, ferry, callbacks, memory, and production effects from the model's final JSON.
- * When to use:
- *     After the assistant message has no tool_calls, or after a repair pass.
- * What to expect:
- *     Returns null if the payload does not match the strict v3 object schema; otherwise normalized H3-native lists and optional drop reasons.
+ * Defines the `parseOrdersResponse` function shape (export function parseOrdersResponse( content: string, resolveToH3: (lat: number, lng: number) => string | undefined, state: GameStateSnapshot, latLn).
+
+ * Purpose: Supports maintainability by documenting why `parseOrdersResponse` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function parseOrdersResponse(
   content: string,

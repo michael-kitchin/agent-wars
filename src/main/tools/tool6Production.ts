@@ -17,23 +17,79 @@ import type { LatLng } from './tool1Pathfinding';
 import { logDebug, logError, logTrace } from '../logger';
 import { isTerrainClassificationCacheLoaded } from '../terrainClassificationCache';
 
+/**
+ * Documents the module-scope binding `AI_PLAYER_ID` (AI_PLAYER_ID).
+
+ * Purpose: Supports maintainability by documenting why `AI_PLAYER_ID` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const AI_PLAYER_ID = 'opponent';
 
+/**
+ * Documents the module-scope binding `TOOL6_NAME_LIST` (TOOL6_NAME_LIST).
+
+ * Purpose: Supports maintainability by documenting why `TOOL6_NAME_LIST` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const TOOL6_NAME_LIST = ['query_production', 'set_build_queue'] as const;
+/**
+ * Documents the module-scope binding `TOOL6_NAMES` (TOOL6_NAMES).
+
+ * Purpose: Supports maintainability by documenting why `TOOL6_NAMES` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const TOOL6_NAMES = TOOL6_NAME_LIST;
 
+/**
+ * Defines the `roundCoordinate` function shape (function roundCoordinate(value: number): number).
+
+ * Purpose: Supports maintainability by documenting why `roundCoordinate` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function roundCoordinate(value: number): number {
   return Number(value.toFixed(LATLNG_DECIMAL_PLACES));
 }
 
+/**
+ * Defines the `toDisplayLatLng` function shape (function toDisplayLatLng(ll: [number, number]): [number, number]).
+
+ * Purpose: Supports maintainability by documenting why `toDisplayLatLng` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function toDisplayLatLng(ll: [number, number]): [number, number] {
   return [roundCoordinate(ll[0]), roundCoordinate(ll[1])];
 }
 
+/**
+ * Defines the `isBuildUnitType` function shape (function isBuildUnitType(value: unknown): value is BuildUnitType).
+
+ * Purpose: Supports maintainability by documenting why `isBuildUnitType` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function isBuildUnitType(value: unknown): value is BuildUnitType {
   return value === 'infantry' || value === 'armor' || value === 'naval' || value === 'air';
 }
 
+/**
+ * Defines the `resolveHexArgument` function shape (function resolveHexArgument( args: { hex?: unknown }, resolveToH3: (lat: number, lng: number) => string | undefined ): { ok: true; h3Index: string } | {).
+
+ * Purpose: Supports maintainability by documenting why `resolveHexArgument` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function resolveHexArgument(
   args: { hex?: unknown },
   resolveToH3: (lat: number, lng: number) => string | undefined
@@ -48,6 +104,14 @@ function resolveHexArgument(
   return { ok: true, h3Index };
 }
 
+/**
+ * Defines the `summarizeQueue` function shape (function summarizeQueue(queue: HexBuildQueueView, latLngByH3: Map<string, LatLng>): Record<string, unknown>).
+
+ * Purpose: Supports maintainability by documenting why `summarizeQueue` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function summarizeQueue(queue: HexBuildQueueView, latLngByH3: Map<string, LatLng>): Record<string, unknown> {
   const ll = latLngByH3.get(queue.h3Index);
   return {
@@ -69,6 +133,14 @@ function summarizeQueue(queue: HexBuildQueueView, latLngByH3: Map<string, LatLng
   };
 }
 
+/**
+ * Defines the `queryProduction` function shape (function queryProduction( args: { hex?: unknown; all?: unknown }, state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: numb).
+
+ * Purpose: Supports maintainability by documenting why `queryProduction` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function queryProduction(
   args: { hex?: unknown; all?: unknown },
   state: GameStateSnapshot,
@@ -97,6 +169,14 @@ function queryProduction(
   return { status: 'ok', production: { controlledHexQueues: snapshots } };
 }
 
+/**
+ * Defines the `setBuildQueue` function shape (function setBuildQueue( args: { hex?: unknown; unitType?: unknown; count?: unknown }, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: number, lng:).
+
+ * Purpose: Supports maintainability by documenting why `setBuildQueue` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function setBuildQueue(
   args: { hex?: unknown; unitType?: unknown; count?: unknown },
   latLngByH3: Map<string, LatLng>,
@@ -162,12 +242,12 @@ function setBuildQueue(
 }
 
 /**
- * Why this exists:
- *     Central dispatcher for production tool operations so OpenRouter can enforce one stable contract.
- * When to use:
- *     OpenRouter tool-call loop and JSON productionOrders application.
- * What to expect:
- *     Returns `{status:'ok'}` with sanitized production snapshots or `{status:'error', error}` on validation/mutation failures.
+ * Defines the `executeTool6` function shape (export function executeTool6( toolName: string, args: unknown, state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: numb).
+
+ * Purpose: Supports maintainability by documenting why `executeTool6` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function executeTool6(
   toolName: string,

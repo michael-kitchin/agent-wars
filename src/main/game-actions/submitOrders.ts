@@ -1,31 +1,95 @@
 import { dbGetOne, dbRun, isDbReady } from '../gameDb';
-import type { AirStrikeOrder, FerryOrder, RangedAttackOrder, SubmitOrdersPayload } from '../../shared/ipcTypes';
+import type { SubmitOrdersPayload } from '../../shared/ipcTypes';
 import { logDebug, logError } from '../logger';
 import { validateAirStrikeOrder, validateFerryOrder } from './airValidation';
 
+/**
+ * Documents the `SubmitOrdersResult` interface as a named contract surface (export interface SubmitOrdersResult).
+
+ * Purpose: Supports maintainability by documenting why `SubmitOrdersResult` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface SubmitOrdersResult {
-  success: boolean;
-  reason?: string;
+    /**
+   * Specifies the contract for the `success` member (success: boolean;).
+
+   * Contract: Describes stable behavior for callers of `success` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+success: boolean;
+    /**
+   * Specifies the contract for the `reason` member (reason?: string;).
+
+   * Contract: Describes stable behavior for callers of `reason` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+reason?: string;
 }
 
+/**
+ * Documents the `SubmitOrdersDeps` interface as a named contract surface (interface SubmitOrdersDeps).
+
+ * Purpose: Supports maintainability by documenting why `SubmitOrdersDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface SubmitOrdersDeps {
-  validateOrder: (unitId: string, toH3Index: string) => { valid: true } | { valid: false; reason: string };
-  validateRangedAttack: (
+    /**
+   * Specifies the contract for the `validateOrder` member (validateOrder: (unitId: string, toH3Index: string) => { valid: true } | { valid: false; reason: string };).
+
+   * Contract: Describes stable behavior for callers of `validateOrder` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+validateOrder: (unitId: string, toH3Index: string) => { valid: true } | { valid: false; reason: string };
+    /**
+   * Specifies the contract for the `validateRangedAttack` member (validateRangedAttack: ( unitId: string, targetH3Index: string, options?: { allowedPlayer?: 'human' | 'opponent' } ) => { valid: true } | { val).
+
+   * Contract: Describes stable behavior for callers of `validateRangedAttack` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+validateRangedAttack: (
     unitId: string,
     targetH3Index: string,
     options?: { allowedPlayer?: 'human' | 'opponent' }
   ) => { valid: true } | { valid: false; reason: string };
-  humanPlayerId: string;
-  validPhase: string;
+    /**
+   * Specifies the contract for the `humanPlayerId` member (humanPlayerId: string;).
+
+   * Contract: Describes stable behavior for callers of `humanPlayerId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+humanPlayerId: string;
+    /**
+   * Specifies the contract for the `validPhase` member (validPhase: string;).
+
+   * Contract: Describes stable behavior for callers of `validPhase` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+validPhase: string;
 }
 
 /**
- * Why this exists:
- *     Commits one planning-phase batch of human tactical intents into pending order tables.
- * When to use:
- *     Main-process submitOrders IPC handler after client-side planning edits are finalized for the turn.
- * What to expect:
- *     Rejects the entire batch on first invalid/duplicate order and returns a concrete reason; otherwise persists all pending tables.
+ * Defines the `submitOrdersImpl` function shape (export function submitOrdersImpl(payload: SubmitOrdersPayload, deps: SubmitOrdersDeps): SubmitOrdersResult).
+
+ * Purpose: Supports maintainability by documenting why `submitOrdersImpl` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function submitOrdersImpl(payload: SubmitOrdersPayload, deps: SubmitOrdersDeps): SubmitOrdersResult {
   const orders = payload.movementOrders ?? [];

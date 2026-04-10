@@ -8,12 +8,12 @@ import {
 } from '../gameDb';
 
 /**
- * Why this exists:
- *     Provides one reusable temp-DB harness for game-action contract tests.
- * When to use:
- *     Tests that require an isolated sqlite file and fresh seeded match state.
- * What to expect:
- *     Opens a temporary database, resets match state, executes callback, and always cleans up.
+ * Defines the `withTempGameDb` function shape (export function withTempGameDb(prefix: string, runCase: () => void): void).
+
+ * Purpose: Supports maintainability by documenting why `withTempGameDb` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function withTempGameDb(prefix: string, runCase: () => void): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));

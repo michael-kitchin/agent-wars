@@ -1,44 +1,166 @@
 import type { GameStateSnapshot } from '../gameDb';
 import { computeRoundedPercentage } from '../../shared/progressFormatting';
 
+/**
+ * Documents the `PromptToolFlags` interface as a named contract surface (export interface PromptToolFlags).
+
+ * Purpose: Supports maintainability by documenting why `PromptToolFlags` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface PromptToolFlags {
-  planningEnabled: boolean;
-  assessmentEnabled: boolean;
-  estimationEnabled: boolean;
-  memoryEnabled: boolean;
-  ordersEnabled: boolean;
-  productionEnabled: boolean;
-  fallbackMovementEnabled: boolean;
+    /**
+   * Specifies the contract for the `planningEnabled` member (planningEnabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `planningEnabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+planningEnabled: boolean;
+    /**
+   * Specifies the contract for the `assessmentEnabled` member (assessmentEnabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `assessmentEnabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+assessmentEnabled: boolean;
+    /**
+   * Specifies the contract for the `estimationEnabled` member (estimationEnabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `estimationEnabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+estimationEnabled: boolean;
+    /**
+   * Specifies the contract for the `memoryEnabled` member (memoryEnabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `memoryEnabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+memoryEnabled: boolean;
+    /**
+   * Specifies the contract for the `ordersEnabled` member (ordersEnabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `ordersEnabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ordersEnabled: boolean;
+    /**
+   * Specifies the contract for the `productionEnabled` member (productionEnabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `productionEnabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+productionEnabled: boolean;
+    /**
+   * Specifies the contract for the `fallbackMovementEnabled` member (fallbackMovementEnabled: boolean;).
+
+   * Contract: Describes stable behavior for callers of `fallbackMovementEnabled` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+fallbackMovementEnabled: boolean;
 }
 
-/** Optional suffix when Memory is enabled: persistent strategy belongs in memoryUpdates in final JSON. */
+/**
+ * Documents the module-scope binding `MOVEMENT_INSTRUCTION_MEMORY_SUFFIX` (MOVEMENT_INSTRUCTION_MEMORY_SUFFIX).
+
+ * Purpose: Supports maintainability by documenting why `MOVEMENT_INSTRUCTION_MEMORY_SUFFIX` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const MOVEMENT_INSTRUCTION_MEMORY_SUFFIX =
   ' Include a memoryUpdates entry (e.g. write key "strategy" tier "persistent") in your final JSON to record your plan.';
 
+/**
+ * Documents the module-scope binding `PRODUCTION_REQUIREMENT_BASE` (PRODUCTION_REQUIREMENT_BASE).
+
+ * Purpose: Supports maintainability by documenting why `PRODUCTION_REQUIREMENT_BASE` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const PRODUCTION_REQUIREMENT_BASE = 'when at least one controlled hex has availableUnitTypes and an empty queue';
+/**
+ * Documents the module-scope binding `PRODUCTION_REQUIREMENT_PRIORITY` (PRODUCTION_REQUIREMENT_PRIORITY).
+
+ * Purpose: Supports maintainability by documenting why `PRODUCTION_REQUIREMENT_PRIORITY` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const PRODUCTION_REQUIREMENT_PRIORITY =
   'Set exactly one unit type/count per controlled hex queue; each new set replaces the previous queue for that hex.';
+/**
+ * Documents the module-scope binding `PRODUCTION_REQUIREMENT_PRIORITY_INITIAL` (PRODUCTION_REQUIREMENT_PRIORITY_INITIAL).
+
+ * Purpose: Supports maintainability by documenting why `PRODUCTION_REQUIREMENT_PRIORITY_INITIAL` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const PRODUCTION_REQUIREMENT_PRIORITY_INITIAL =
   'Set one unit type/count for each queue you choose to manage this turn.';
 
+/**
+ * Defines the `buildLatLngPreamble` function shape (export function buildLatLngPreamble(h3Resolution: number, decimalPlaces: number): string).
+
+ * Purpose: Supports maintainability by documenting why `buildLatLngPreamble` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function buildLatLngPreamble(h3Resolution: number, decimalPlaces: number): string {
   return `Global Earth map, H3 resolution ${h3Resolution}. All positions are [lat, lng] at ${decimalPlaces} decimal places — copy exactly from lists/tables below; never invent coordinates. Distances are hex counts where shown.
 
 Final JSON: place targets as [lat,lng]; standing-order pursue uses enemy unit id (targetUnitId). Never emit raw H3 strings.`;
 }
 
-/** Use this to format "<label>: X of Y ... (Z%)" progress bullets in the system prompt. */
+/**
+ * Defines the `formatControlProgressLine` function shape (export function formatControlProgressLine(label: string, controlled: number, total: number, subjectLabel = 'hexes'): string).
+
+ * Purpose: Supports maintainability by documenting why `formatControlProgressLine` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function formatControlProgressLine(label: string, controlled: number, total: number, subjectLabel = 'hexes'): string {
   return `- ${label}: ${controlled} of ${total} ${subjectLabel} (${computeRoundedPercentage(controlled, total)}%)`;
 }
 
-/** Formats [lat, lng] for prompts using fixed decimal precision. */
+/**
+ * Defines the `formatLatLng` function shape (export function formatLatLng(ll: [number, number], decimalPlaces: number): string).
+
+ * Purpose: Supports maintainability by documenting why `formatLatLng` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function formatLatLng(ll: [number, number], decimalPlaces: number): string {
   return `[${ll[0].toFixed(decimalPlaces)}, ${ll[1].toFixed(decimalPlaces)}]`;
 }
 
 /**
- * Builds the "HOW TO USE TOOLS" guidance block, conditional on enabled tool groups.
+ * Defines the `buildToolUsageGuidance` function shape (export function buildToolUsageGuidance(flags: PromptToolFlags, hasPrecomputedBriefing = false): string).
+
+ * Purpose: Supports maintainability by documenting why `buildToolUsageGuidance` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function buildToolUsageGuidance(flags: PromptToolFlags, hasPrecomputedBriefing = false): string {
   const lines: string[] = [];
@@ -111,7 +233,14 @@ export function buildToolUsageGuidance(flags: PromptToolFlags, hasPrecomputedBri
   return '\n\nHOW TO USE THESE TOOLS EFFECTIVELY:\n' + lines.join('\n');
 }
 
-/** Builds the "Adjacent cells (fallback)" block when Planning and Orders are both disabled. */
+/**
+ * Defines the `buildAdjacentCellsFallbackBlock` function shape (export function buildAdjacentCellsFallbackBlock( state: GameStateSnapshot, opponentUnits: { id: string; h3Index: string; unitType: string }[], coordMap).
+
+ * Purpose: Supports maintainability by documenting why `buildAdjacentCellsFallbackBlock` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function buildAdjacentCellsFallbackBlock(
   state: GameStateSnapshot,
   opponentUnits: { id: string; h3Index: string; unitType: string }[],
@@ -132,7 +261,14 @@ export function buildAdjacentCellsFallbackBlock(
   return `\nAdjacent cells (fallback for one-step moves when no planning/orders tools are available; prefer plan_route or standing orders when enabled):\n${lines.join('\n')}\n`;
 }
 
-/** Returns the movement-order instruction fragment for the system prompt. */
+/**
+ * Defines the `getMovementOrderInstruction` function shape (export function getMovementOrderInstruction(flags: PromptToolFlags): string).
+
+ * Purpose: Supports maintainability by documenting why `getMovementOrderInstruction` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function getMovementOrderInstruction(flags: PromptToolFlags): string {
   const memorySuffix = flags.memoryEnabled ? MOVEMENT_INSTRUCTION_MEMORY_SUFFIX : '';
   if (flags.planningEnabled) {
@@ -158,6 +294,14 @@ export function getMovementOrderInstruction(flags: PromptToolFlags): string {
   );
 }
 
+/**
+ * Defines the `buildProductionSubmitClause` function shape (export function buildProductionSubmitClause(flags: PromptToolFlags): string).
+
+ * Purpose: Supports maintainability by documenting why `buildProductionSubmitClause` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function buildProductionSubmitClause(flags: PromptToolFlags): string {
   if (!flags.productionEnabled) return '';
   return (
@@ -169,12 +313,27 @@ export function buildProductionSubmitClause(flags: PromptToolFlags): string {
   );
 }
 
+/**
+ * Defines the `buildHumanUnitsPromptLine` function shape (export function buildHumanUnitsPromptLine(humanRoster: string): string).
+
+ * Purpose: Supports maintainability by documenting why `buildHumanUnitsPromptLine` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function buildHumanUnitsPromptLine(humanRoster: string): string {
   if (humanRoster.length > 0) return `Human units (currently observed): ${humanRoster}`;
   return 'Human units (currently observed): none. Enemy units may be out of view; actively scout to reacquire contact.';
 }
 
-/** Returns the initial user message for the tool-calling flow. */
+/**
+ * Defines the `getInitialUserMessage` function shape (export function getInitialUserMessage(flags: PromptToolFlags, hasPrecomputedBriefing = false): string).
+
+ * Purpose: Supports maintainability by documenting why `getInitialUserMessage` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function getInitialUserMessage(flags: PromptToolFlags, hasPrecomputedBriefing = false): string {
   const productionSuffix = flags.productionEnabled
     ? ', optional "productionOrders" (EVERY item must include action + required fields)'

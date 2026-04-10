@@ -1,6 +1,14 @@
 import { logDebug, logError, logTrace } from './logger';
 import { loadTerrainRes1NamingBundled } from './terrainNamingLoad';
 
+/**
+ * Documents the module-scope binding `PASSABLE_LAND_TERRAIN_KINDS` (PASSABLE_LAND_TERRAIN_KINDS).
+
+ * Purpose: Supports maintainability by documenting why `PASSABLE_LAND_TERRAIN_KINDS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const PASSABLE_LAND_TERRAIN_KINDS = new Set([
   'plains',
   'mountain',
@@ -11,8 +19,24 @@ const PASSABLE_LAND_TERRAIN_KINDS = new Set([
   'forest',
 ]);
 
+/**
+ * Documents the module-scope binding `cachedRegionHexesByName` (cachedRegionHexesByName: Map<string, string[]> | null).
+
+ * Purpose: Supports maintainability by documenting why `cachedRegionHexesByName` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 let cachedRegionHexesByName: Map<string, string[]> | null = null;
 
+/**
+ * Defines the `buildRegionHexCache` function shape (function buildRegionHexCache(): Map<string, string[]> { logDebug('regionScenario buildRegionHexCache'); const env = loadTerrainRes1NamingBundled(); con).
+
+ * Purpose: Supports maintainability by documenting why `buildRegionHexCache` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildRegionHexCache(): Map<string, string[]> {
   logDebug('regionScenario buildRegionHexCache');
   const env = loadTerrainRes1NamingBundled();
@@ -36,6 +60,14 @@ function buildRegionHexCache(): Map<string, string[]> {
   return out;
 }
 
+/**
+ * Defines the `getRegionHexCache` function shape (function getRegionHexCache(): Map<string, string[]>).
+
+ * Purpose: Supports maintainability by documenting why `getRegionHexCache` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getRegionHexCache(): Map<string, string[]> {
   if (cachedRegionHexesByName) return cachedRegionHexesByName;
   try {
@@ -48,12 +80,12 @@ function getRegionHexCache(): Map<string, string[]> {
 }
 
 /**
- * Why this exists:
- *     Returns the canonical sorted home-region option list sourced from res1 naming data.
- * When to use:
- *     New-game UI region selector population and backend payload validation.
- * What to expect:
- *     Returns unique region names sorted lexicographically; never includes empty/null names.
+ * Defines the `listScenarioHomeRegions` function shape (export function listScenarioHomeRegions(): string[]).
+
+ * Purpose: Supports maintainability by documenting why `listScenarioHomeRegions` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function listScenarioHomeRegions(): string[] {
   logTrace('regionScenario listScenarioHomeRegions');
@@ -63,12 +95,12 @@ export function listScenarioHomeRegions(): string[] {
 }
 
 /**
- * Why this exists:
- *     Normalizes requested region selections against canonical region options with deterministic fallbacks.
- * When to use:
- *     New-game initialization and payload validation before persisting scenario state.
- * What to expect:
- *     Always returns non-empty valid region names when options exist; defaults prefer non-Antarctica regions.
+ * Defines the `resolveScenarioHomeRegions` function shape (export function resolveScenarioHomeRegions(options?: { humanHomeRegion?: string; aiHomeRegion?: string; }): { humanHomeRegion: string; aiHomeRegion: stri).
+
+ * Purpose: Supports maintainability by documenting why `resolveScenarioHomeRegions` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function resolveScenarioHomeRegions(options?: {
   humanHomeRegion?: string;
@@ -90,12 +122,12 @@ export function resolveScenarioHomeRegions(options?: {
 }
 
 /**
- * Why this exists:
- *     Resolves the set of res1 hexes intersecting one named home region.
- * When to use:
- *     Scenario spawn placement, objective evaluation, and always-visible region outline rendering.
- * What to expect:
- *     Returns sorted unique h3 indices; returns empty array when the region name is unknown.
+ * Defines the `getScenarioHomeRegionHexes` function shape (export function getScenarioHomeRegionHexes(regionName: string): string[]).
+
+ * Purpose: Supports maintainability by documenting why `getScenarioHomeRegionHexes` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getScenarioHomeRegionHexes(regionName: string): string[] {
   logTrace('regionScenario getScenarioHomeRegionHexes', { regionName });
@@ -105,24 +137,24 @@ export function getScenarioHomeRegionHexes(regionName: string): string[] {
 }
 
 /**
- * Why this exists:
- *     Centralizes which terrain kinds count as passable land for region-based spawn seeding.
- * When to use:
- *     Scenario land-unit spawn candidate filtering.
- * What to expect:
- *     True only for plains, mountains, wetlands, coastal, desert, and forest.
+ * Defines the `isScenarioPassableLandTerrainKind` function shape (export function isScenarioPassableLandTerrainKind(terrainKind: string): boolean).
+
+ * Purpose: Supports maintainability by documenting why `isScenarioPassableLandTerrainKind` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function isScenarioPassableLandTerrainKind(terrainKind: string): boolean {
   return PASSABLE_LAND_TERRAIN_KINDS.has(terrainKind);
 }
 
 /**
- * Why this exists:
- *     Allows tests to rebuild region-derived caches after fixture or metadata changes.
- * When to use:
- *     Main-process test teardown where naming inputs differ between cases.
- * What to expect:
- *     Next region lookup rebuilds cache from disk.
+ * Defines the `clearScenarioRegionCacheForTests` function shape (export function clearScenarioRegionCacheForTests(): void).
+
+ * Purpose: Supports maintainability by documenting why `clearScenarioRegionCacheForTests` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function clearScenarioRegionCacheForTests(): void {
   cachedRegionHexesByName = null;

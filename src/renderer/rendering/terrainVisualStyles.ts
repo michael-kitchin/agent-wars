@@ -5,57 +5,267 @@
 import type { PipelineTerrainKind } from '../../shared/pipelineTerrain';
 import { PIPELINE_TERRAIN_KINDS } from '../../shared/pipelineTerrain';
 
+/**
+ * Documents the module-scope binding `patternCache` (patternCache).
+
+ * Purpose: Supports maintainability by documenting why `patternCache` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const patternCache = new Map<string, CanvasPattern | null>();
+/**
+ * Documents the module-scope binding `UNKNOWN_FILL` (UNKNOWN_FILL).
+
+ * Purpose: Supports maintainability by documenting why `UNKNOWN_FILL` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const UNKNOWN_FILL = 'rgba(140, 140, 140, 0.075)';
 
 /**
- * Canonical hex outline for most terrain style presets; zoom scaling is applied in the renderer.
- * Matches the former `default` preset stroke.
+ * Documents the module-scope binding `DEFAULT_HEX_STROKE_COLOR` (DEFAULT_HEX_STROKE_COLOR).
+
+ * Purpose: Supports maintainability by documenting why `DEFAULT_HEX_STROKE_COLOR` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 const DEFAULT_HEX_STROKE_COLOR = 'rgba(36,38,42,0.4)';
+/**
+ * Documents the module-scope binding `DEFAULT_HEX_STROKE_WIDTH` (DEFAULT_HEX_STROKE_WIDTH).
+
+ * Purpose: Supports maintainability by documenting why `DEFAULT_HEX_STROKE_WIDTH` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const DEFAULT_HEX_STROKE_WIDTH = 0.5;
 
-/** Wargame uses a dark basemap; light strokes read as hex boundaries (opacity tuned vs legibility). */
+/**
+ * Documents the module-scope binding `WARGAME_HEX_STROKE_COLOR` (WARGAME_HEX_STROKE_COLOR).
+
+ * Purpose: Supports maintainability by documenting why `WARGAME_HEX_STROKE_COLOR` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const WARGAME_HEX_STROKE_COLOR = 'rgba(210, 216, 228, 0.077)';
+/**
+ * Documents the module-scope binding `WARGAME_HEX_STROKE_WIDTH` (WARGAME_HEX_STROKE_WIDTH).
+
+ * Purpose: Supports maintainability by documenting why `WARGAME_HEX_STROKE_WIDTH` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const WARGAME_HEX_STROKE_WIDTH = 0.72;
 
 /**
- * Hover highlight for generic `land` cells: slightly darker than the base land fill for feedback.
+ * Documents the module-scope binding `LAND_HOVER_FILL_BASE` (LAND_HOVER_FILL_BASE).
+
+ * Purpose: Supports maintainability by documenting why `LAND_HOVER_FILL_BASE` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 const LAND_HOVER_FILL_BASE = 'rgba(155, 168, 128, 0.42)';
 
+/**
+ * Documents the `TerrainVisualStyleId` type alias (export type TerrainVisualStyleId).
+
+ * Purpose: Supports maintainability by documenting why `TerrainVisualStyleId` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type TerrainVisualStyleId = 'default' | 'atlas' | 'wargame' | 'scientific';
 
+/**
+ * Documents the `HatchStyle` interface as a named contract surface (interface HatchStyle).
+
+ * Purpose: Supports maintainability by documenting why `HatchStyle` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface HatchStyle {
-  color: string;
-  spacing: number;
-  lineWidth: number;
-  reverseDiagonal: boolean;
-  crosshatch?: boolean;
-  pattern?: 'diagonal' | 'dots' | 'orthogonal';
-}
+    /**
+   * Specifies the contract for the `color` member (color: string;).
 
-interface TerrainStylePreset {
-  label: string;
-  /**
-   * Raster basemap provider id (see `basemapProvider.ts`). Switched with this terrain style so the
-   * map background matches the preset; no labels / minimal political detail in chosen providers.
+   * Contract: Describes stable behavior for callers of `color` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
    */
-  basemapId: string;
-  /** Multiplier for fill alpha (0..1 more transparent, >1 less transparent). */
-  fillAlphaMultiplier: number;
-  /** Multiplier for hatch line alpha. */
-  hatchAlphaMultiplier: number;
-  fills: Record<PipelineTerrainKind, string>;
-  hatches: Partial<Record<PipelineTerrainKind, HatchStyle>>;
-  urbanOverlayFill: string;
-  urbanOverlayHatch: HatchStyle;
-  rubbleOverlayFill: string;
-  rubbleOverlayHatch: HatchStyle;
+color: string;
+    /**
+   * Specifies the contract for the `spacing` member (spacing: number;).
+
+   * Contract: Describes stable behavior for callers of `spacing` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+spacing: number;
+    /**
+   * Specifies the contract for the `lineWidth` member (lineWidth: number;).
+
+   * Contract: Describes stable behavior for callers of `lineWidth` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+lineWidth: number;
+    /**
+   * Specifies the contract for the `reverseDiagonal` member (reverseDiagonal: boolean;).
+
+   * Contract: Describes stable behavior for callers of `reverseDiagonal` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+reverseDiagonal: boolean;
+    /**
+   * Specifies the contract for the `crosshatch` member (crosshatch?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `crosshatch` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+crosshatch?: boolean;
+    /**
+   * Specifies the contract for the `pattern` member (pattern?: 'diagonal' | 'dots' | 'orthogonal';).
+
+   * Contract: Describes stable behavior for callers of `pattern` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+pattern?: 'diagonal' | 'dots' | 'orthogonal';
 }
 
+/**
+ * Documents the `TerrainStylePreset` interface as a named contract surface (interface TerrainStylePreset).
+
+ * Purpose: Supports maintainability by documenting why `TerrainStylePreset` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+interface TerrainStylePreset {
+    /**
+   * Specifies the contract for the `label` member (label: string;).
+
+   * Contract: Describes stable behavior for callers of `label` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+label: string;
+    /**
+   * Specifies the contract for the `basemapId` member (basemapId: string;).
+
+   * Contract: Describes stable behavior for callers of `basemapId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+basemapId: string;
+    /**
+   * Specifies the contract for the `fillAlphaMultiplier` member (fillAlphaMultiplier: number;).
+
+   * Contract: Describes stable behavior for callers of `fillAlphaMultiplier` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+fillAlphaMultiplier: number;
+    /**
+   * Specifies the contract for the `hatchAlphaMultiplier` member (hatchAlphaMultiplier: number;).
+
+   * Contract: Describes stable behavior for callers of `hatchAlphaMultiplier` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hatchAlphaMultiplier: number;
+    /**
+   * Specifies the contract for the `fills` member (fills: Record<PipelineTerrainKind, string>;).
+
+   * Contract: Describes stable behavior for callers of `fills` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+fills: Record<PipelineTerrainKind, string>;
+    /**
+   * Specifies the contract for the `hatches` member (hatches: Partial<Record<PipelineTerrainKind, HatchStyle>>;).
+
+   * Contract: Describes stable behavior for callers of `hatches` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hatches: Partial<Record<PipelineTerrainKind, HatchStyle>>;
+    /**
+   * Specifies the contract for the `urbanOverlayFill` member (urbanOverlayFill: string;).
+
+   * Contract: Describes stable behavior for callers of `urbanOverlayFill` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+urbanOverlayFill: string;
+    /**
+   * Specifies the contract for the `urbanOverlayHatch` member (urbanOverlayHatch: HatchStyle;).
+
+   * Contract: Describes stable behavior for callers of `urbanOverlayHatch` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+urbanOverlayHatch: HatchStyle;
+    /**
+   * Specifies the contract for the `rubbleOverlayFill` member (rubbleOverlayFill: string;).
+
+   * Contract: Describes stable behavior for callers of `rubbleOverlayFill` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+rubbleOverlayFill: string;
+    /**
+   * Specifies the contract for the `rubbleOverlayHatch` member (rubbleOverlayHatch: HatchStyle;).
+
+   * Contract: Describes stable behavior for callers of `rubbleOverlayHatch` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+rubbleOverlayHatch: HatchStyle;
+}
+
+/**
+ * Documents the module-scope binding `TERRAIN_STYLE_PRESETS` (TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset>).
+
+ * Purpose: Supports maintainability by documenting why `TERRAIN_STYLE_PRESETS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = {
-  default: {
+    /**
+   * Documents the object literal property `default` (default: { label: 'Default', basemapId: 'carto_light_nolabels', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
+
+   * Purpose: Supports maintainability by documenting why `default` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+default: {
     label: 'Default',
     basemapId: 'carto_light_nolabels',
     fillAlphaMultiplier: 0.55,
@@ -82,7 +292,15 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
     rubbleOverlayFill: 'rgba(137, 117, 98, 0.46)',
     rubbleOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
   },
-  atlas: {
+    /**
+   * Documents the object literal property `atlas` (atlas: { label: 'Atlas', basemapId: 'carto_voyager_nolabels', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: { w).
+
+   * Purpose: Supports maintainability by documenting why `atlas` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+atlas: {
     label: 'Atlas',
     basemapId: 'carto_voyager_nolabels',
     fillAlphaMultiplier: 0.55,
@@ -109,7 +327,15 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
     rubbleOverlayFill: 'rgba(141, 122, 103, 0.46)',
     rubbleOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
   },
-  wargame: {
+    /**
+   * Documents the object literal property `wargame` (wargame: { label: 'Wargame', basemapId: 'carto_dark_nolabels', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
+
+   * Purpose: Supports maintainability by documenting why `wargame` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+wargame: {
     label: 'Wargame',
     basemapId: 'carto_dark_nolabels',
     fillAlphaMultiplier: 0.55,
@@ -136,7 +362,15 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
     rubbleOverlayFill: 'rgba(132, 112, 97, 0.46)',
     rubbleOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 5, lineWidth: 0.88, reverseDiagonal: true, crosshatch: true },
   },
-  scientific: {
+    /**
+   * Documents the object literal property `scientific` (scientific: { label: 'Scientific', basemapId: 'esri_world_shaded_relief', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills).
+
+   * Purpose: Supports maintainability by documenting why `scientific` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+scientific: {
     label: 'Scientific',
     basemapId: 'esri_world_shaded_relief',
     fillAlphaMultiplier: 0.55,
@@ -165,11 +399,23 @@ const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = 
   },
 };
 
+/**
+ * Documents the module-scope binding `activeTerrainStyleId` (activeTerrainStyleId: TerrainVisualStyleId).
+
+ * Purpose: Supports maintainability by documenting why `activeTerrainStyleId` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 let activeTerrainStyleId: TerrainVisualStyleId = 'default';
 
 /**
- * @param reverseDiagonal When true, hatch runs top-left → bottom-right ( / ); when false, bottom-left → top-right ( \\ ).
- *        Mountain and forest share one direction; coastal and wetlands use opposing littoral hatches.
+ * Defines the `makeDiagonalHatchPattern` function shape (function makeDiagonalHatchPattern( color: string, spacing: number, lineWidth: number, reverseDiagonal: boolean, crosshatch = false ): CanvasPatt).
+
+ * Purpose: Supports maintainability by documenting why `makeDiagonalHatchPattern` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function makeDiagonalHatchPattern(
   color: string,
@@ -207,6 +453,14 @@ function makeDiagonalHatchPattern(
   return p.createPattern(c, 'repeat');
 }
 
+/**
+ * Defines the `makeDotPattern` function shape (function makeDotPattern(color: string, spacing: number, diameter: number): CanvasPattern | null).
+
+ * Purpose: Supports maintainability by documenting why `makeDotPattern` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function makeDotPattern(color: string, spacing: number, diameter: number): CanvasPattern | null {
   const c = document.createElement('canvas');
   const s = Math.max(2, spacing);
@@ -222,6 +476,14 @@ function makeDotPattern(color: string, spacing: number, diameter: number): Canva
   return p.createPattern(c, 'repeat');
 }
 
+/**
+ * Defines the `makeOrthogonalHatchPattern` function shape (function makeOrthogonalHatchPattern(color: string, spacing: number, lineWidth: number): CanvasPattern | null).
+
+ * Purpose: Supports maintainability by documenting why `makeOrthogonalHatchPattern` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function makeOrthogonalHatchPattern(color: string, spacing: number, lineWidth: number): CanvasPattern | null {
   const c = document.createElement('canvas');
   const s = spacing * 2;
@@ -240,6 +502,14 @@ function makeOrthogonalHatchPattern(color: string, spacing: number, lineWidth: n
   return p.createPattern(c, 'repeat');
 }
 
+/**
+ * Defines the `boostRgbaAlpha` function shape (function boostRgbaAlpha(color: string, factor: number): string).
+
+ * Purpose: Supports maintainability by documenting why `boostRgbaAlpha` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function boostRgbaAlpha(color: string, factor: number): string {
   const m = color.match(/^rgba\(\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^)]+)\s*\)$/i);
   if (!m) return color;
@@ -253,11 +523,26 @@ function boostRgbaAlpha(color: string, factor: number): string {
   return `rgba(${r}, ${g}, ${b}, ${aStr})`;
 }
 
+/**
+ * Defines the `activePreset` function shape (function activePreset(): TerrainStylePreset).
+
+ * Purpose: Supports maintainability by documenting why `activePreset` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function activePreset(): TerrainStylePreset {
   return TERRAIN_STYLE_PRESETS[activeTerrainStyleId];
 }
 
-/** Returns available style options for the legend selector. */
+/**
+ * Defines the `getTerrainStyleOptions` function shape (export function getTerrainStyleOptions(): Array<).
+
+ * Purpose: Supports maintainability by documenting why `getTerrainStyleOptions` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function getTerrainStyleOptions(): Array<{ id: TerrainVisualStyleId; label: string }> {
   return (Object.keys(TERRAIN_STYLE_PRESETS) as TerrainVisualStyleId[]).map((id) => ({
     id,
@@ -265,22 +550,37 @@ export function getTerrainStyleOptions(): Array<{ id: TerrainVisualStyleId; labe
   }));
 }
 
-/** Returns the currently active terrain visual style id. */
+/**
+ * Defines the `getActiveTerrainStyleId` function shape (export function getActiveTerrainStyleId(): TerrainVisualStyleId).
+
+ * Purpose: Supports maintainability by documenting why `getActiveTerrainStyleId` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function getActiveTerrainStyleId(): TerrainVisualStyleId {
   return activeTerrainStyleId;
 }
 
 /**
- * Returns which raster basemap id should be shown for the current terrain style preset.
- * Used when initializing the map and when the legend style dropdown changes; ids match `basemapProvider`.
+ * Defines the `getActiveTerrainStyleBasemapId` function shape (export function getActiveTerrainStyleBasemapId(): string).
+
+ * Purpose: Supports maintainability by documenting why `getActiveTerrainStyleBasemapId` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getActiveTerrainStyleBasemapId(): string {
   return activePreset().basemapId;
 }
 
 /**
- * Hex boundary stroke for the active terrain style. Wargame uses a stronger, light-on-dark stroke;
- * others use the default neutral stroke (zoom scaling in renderer).
+ * Defines the `getActiveHexStrokeStyle` function shape (export function getActiveHexStrokeStyle():).
+
+ * Purpose: Supports maintainability by documenting why `getActiveHexStrokeStyle` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getActiveHexStrokeStyle(): { color: string; width: number } {
   if (activeTerrainStyleId === 'wargame') {
@@ -290,7 +590,12 @@ export function getActiveHexStrokeStyle(): { color: string; width: number } {
 }
 
 /**
- * Switches terrain visual style preset and clears hatch cache so new patterns are regenerated.
+ * Defines the `setActiveTerrainStyle` function shape (export function setActiveTerrainStyle(id: TerrainVisualStyleId): void).
+
+ * Purpose: Supports maintainability by documenting why `setActiveTerrainStyle` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function setActiveTerrainStyle(id: TerrainVisualStyleId): void {
   if (activeTerrainStyleId === id) return;
@@ -299,7 +604,12 @@ export function setActiveTerrainStyle(id: TerrainVisualStyleId): void {
 }
 
 /**
- * Returns the rgba fill for a terrain kind (always applied under any pattern).
+ * Defines the `terrainKindFillStyle` function shape (export function terrainKindFillStyle(kind: string, options?:).
+
+ * Purpose: Supports maintainability by documenting why `terrainKindFillStyle` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function terrainKindFillStyle(kind: string, options?: { urbanOverlay?: boolean }): string {
   const k = kind as PipelineTerrainKind;
@@ -309,15 +619,24 @@ export function terrainKindFillStyle(kind: string, options?: { urbanOverlay?: bo
 }
 
 /**
- * Fill for hovered generic land hexes: darker desert-like tan, same alpha pipeline as other fills.
+ * Defines the `landHoverFillStyle` function shape (function landHoverFillStyle(): string).
+
+ * Purpose: Supports maintainability by documenting why `landHoverFillStyle` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function landHoverFillStyle(): string {
   return boostRgbaAlpha(LAND_HOVER_FILL_BASE, activePreset().fillAlphaMultiplier);
 }
 
 /**
- * Optional hatch pattern layered after fill for a subset of kinds (mountain, forest).
- * @param fillAndHatchAlphaScale Extra multiplier on hatch line alpha (e.g. 2 on hover to match doubled fill opacity).
+ * Defines the `terrainKindPattern` function shape (export function terrainKindPattern( ctx: CanvasRenderingContext2D, kind: string, fillAndHatchAlphaScale = 1, options?: { urbanOverlay?: boolean; rub).
+
+ * Purpose: Supports maintainability by documenting why `terrainKindPattern` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function terrainKindPattern(
   ctx: CanvasRenderingContext2D,
@@ -358,9 +677,12 @@ export function terrainKindPattern(
 }
 
 /**
- * Fills a closed path on `ctx` using fill + optional pattern for `terrainKind`.
- * @param options.fillAndHatchAlphaScale Multiplies fill and hatch opacity (e.g. 2 on mouseover).
- * @param options.landHoverFill When true and `terrainKind` is `plains`, use a darker desert-like fill (plains is otherwise transparent).
+ * Defines the `fillHexTerrain` function shape (export function fillHexTerrain( ctx: CanvasRenderingContext2D, terrainKind: string, drawPath: () => void, options?: { fillAndHatchAlphaScale?: numbe).
+
+ * Purpose: Supports maintainability by documenting why `fillHexTerrain` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function fillHexTerrain(
   ctx: CanvasRenderingContext2D,
@@ -393,11 +715,23 @@ export function fillHexTerrain(
   }
 }
 
-/** Labels for legend rows (same order as pipeline enum). */
+/**
+ * Documents the module-scope binding `TERRAIN_LEGEND_ORDER` (TERRAIN_LEGEND_ORDER: PipelineTerrainKind[]).
+
+ * Purpose: Supports maintainability by documenting why `TERRAIN_LEGEND_ORDER` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const TERRAIN_LEGEND_ORDER: PipelineTerrainKind[] = [...PIPELINE_TERRAIN_KINDS];
 
 /**
- * Builds the removable legend DOM under `#terrain-legend` (swatches match canvas styles).
+ * Defines the `renderTerrainLegend` function shape (export function renderTerrainLegend().
+
+ * Purpose: Supports maintainability by documenting why `renderTerrainLegend` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function renderTerrainLegend(
   container: HTMLElement,

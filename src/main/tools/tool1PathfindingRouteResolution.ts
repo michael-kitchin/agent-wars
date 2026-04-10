@@ -20,15 +20,79 @@ import {
 import { findLandPathWithStatefulOptionalAvoidanceRetry, type StatefulSearchStats } from './tool1PathfindingStateful';
 import type { PathfindingSession, PlanRouteError } from './tool1Pathfinding';
 
+/**
+ * Documents the `ResolveRoutePathForUnitOk` type alias (export type ResolveRoutePathForUnitOk).
+
+ * Purpose: Supports maintainability by documenting why `ResolveRoutePathForUnitOk` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type ResolveRoutePathForUnitOk = {
-  passableFor: PassableDomain;
-  destinationH3: string;
-  path: string[] | null;
-  movementBudget: number;
-  warnings: string[];
-  statefulStats?: StatefulSearchStats;
+    /**
+   * Specifies the contract for the `passableFor` member (passableFor: PassableDomain;).
+
+   * Contract: Describes stable behavior for callers of `passableFor` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+passableFor: PassableDomain;
+    /**
+   * Specifies the contract for the `destinationH3` member (destinationH3: string;).
+
+   * Contract: Describes stable behavior for callers of `destinationH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+destinationH3: string;
+    /**
+   * Specifies the contract for the `path` member (path: string[] | null;).
+
+   * Contract: Describes stable behavior for callers of `path` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+path: string[] | null;
+    /**
+   * Specifies the contract for the `movementBudget` member (movementBudget: number;).
+
+   * Contract: Describes stable behavior for callers of `movementBudget` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+movementBudget: number;
+    /**
+   * Specifies the contract for the `warnings` member (warnings: string[];).
+
+   * Contract: Describes stable behavior for callers of `warnings` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+warnings: string[];
+    /**
+   * Specifies the contract for the `statefulStats` member (statefulStats?: StatefulSearchStats;).
+
+   * Contract: Describes stable behavior for callers of `statefulStats` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+statefulStats?: StatefulSearchStats;
 };
 
+/**
+ * Defines the `resolveNavalOriginForRouting` function shape (function resolveNavalOriginForRouting(payload: { unitType: string; originH3: string; destinationH3: string; hexSet: Set<string>; terrainByH3: Map).
+
+ * Purpose: Supports maintainability by documenting why `resolveNavalOriginForRouting` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function resolveNavalOriginForRouting(payload: {
   unitType: string;
   originH3: string;
@@ -67,6 +131,14 @@ function resolveNavalOriginForRouting(payload: {
   return { reachableOriginH3: seaportEgressHex, seaportEgressHex };
 }
 
+/**
+ * Defines the `buildBlockedEnemySetForUnit` function shape (export function buildBlockedEnemySetForUnit( unit: PathfindingSession['state']['units'][number], session: PathfindingSession, avoidEnemies: boolean ):).
+
+ * Purpose: Supports maintainability by documenting why `buildBlockedEnemySetForUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function buildBlockedEnemySetForUnit(
   unit: PathfindingSession['state']['units'][number],
   session: PathfindingSession,
@@ -86,6 +158,14 @@ export function buildBlockedEnemySetForUnit(
   return blocked;
 }
 
+/**
+ * Defines the `resolveRoutePathForUnit` function shape (export function resolveRoutePathForUnit(payload: { unitType: string; originH3: string; destinationH3: string; hexSet: Set<string>; terrainByH3: M).
+
+ * Purpose: Supports maintainability by documenting why `resolveRoutePathForUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function resolveRoutePathForUnit(payload: {
   unitType: string;
   originH3: string;
@@ -183,6 +263,14 @@ export function resolveRoutePathForUnit(payload: {
   return { passableFor, destinationH3, path, movementBudget, warnings, statefulStats };
 }
 
+/**
+ * Defines the `planRouteNoPathHint` function shape (export function planRouteNoPathHint(passableFor: PassableDomain, destTerrain: string): string).
+
+ * Purpose: Supports maintainability by documenting why `planRouteNoPathHint` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function planRouteNoPathHint(passableFor: PassableDomain, destTerrain: string): string {
   if (passableFor === 'land' && destTerrain === 'water') {
     return ' Destination is water; land units cannot move there. Route this unit to a land or coastal hex (e.g. an enemy land unit\'s position).';

@@ -1,21 +1,61 @@
 import { logDebug, logTrace } from '../../logger';
 import type { BuildUnitType } from '../../productionRules';
 
+/**
+ * Documents the `PlannedUnitTuple` type alias (export type PlannedUnitTuple).
+
+ * Purpose: Supports maintainability by documenting why `PlannedUnitTuple` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type PlannedUnitTuple = [id: string, unitType: BuildUnitType, h3Index: string];
+/**
+ * Documents the `PlannedUnitOwner` type alias (export type PlannedUnitOwner).
+
+ * Purpose: Supports maintainability by documenting why `PlannedUnitOwner` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type PlannedUnitOwner = 'human' | 'opponent';
 
+/**
+ * Documents the `PlannedUnitInsertDeps` interface as a named contract surface (interface PlannedUnitInsertDeps).
+
+ * Purpose: Supports maintainability by documenting why `PlannedUnitInsertDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface PlannedUnitInsertDeps {
-  run: (sql: string, params?: unknown[]) => unknown;
-  allocateNextUnitDisplayOrder: (unitType: BuildUnitType) => number;
+    /**
+   * Specifies the contract for the `run` member (run: (sql: string, params?: unknown[]) => unknown;).
+
+   * Contract: Describes stable behavior for callers of `run` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+run: (sql: string, params?: unknown[]) => unknown;
+    /**
+   * Specifies the contract for the `allocateNextUnitDisplayOrder` member (allocateNextUnitDisplayOrder: (unitType: BuildUnitType) => number;).
+
+   * Contract: Describes stable behavior for callers of `allocateNextUnitDisplayOrder` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+allocateNextUnitDisplayOrder: (unitType: BuildUnitType) => number;
 }
 
 /**
- * Why this exists:
- *     Counts how many planned seed rows already exist for one unit type so callers can assign stable next ordinals.
- * When to use:
- *     During pre-insert unit planning before appending flex/substitutive rows.
- * What to expect:
- *     Returns zero when no rows match; never mutates the input list.
+ * Defines the `countPlannedUnitsOfType` function shape (export function countPlannedUnitsOfType(units: PlannedUnitTuple[], unitType: BuildUnitType): number).
+
+ * Purpose: Supports maintainability by documenting why `countPlannedUnitsOfType` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function countPlannedUnitsOfType(units: PlannedUnitTuple[], unitType: BuildUnitType): number {
   logTrace('plannedUnits countPlannedUnitsOfType', { unitType, rowCount: units.length });
@@ -23,12 +63,12 @@ export function countPlannedUnitsOfType(units: PlannedUnitTuple[], unitType: Bui
 }
 
 /**
- * Why this exists:
- *     Centralizes DB insertion for planned seed units so scenario and non-scenario seeding paths share one persistence implementation.
- * When to use:
- *     After deterministic unit planning is complete and rows are ready for insertion.
- * What to expect:
- *     Inserts every tuple with allocated display order for the given player; does not mutate input rows.
+ * Defines the `insertPlannedUnitsForPlayer` function shape (export function insertPlannedUnitsForPlayer().
+
+ * Purpose: Supports maintainability by documenting why `insertPlannedUnitsForPlayer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function insertPlannedUnitsForPlayer(
   deps: PlannedUnitInsertDeps,

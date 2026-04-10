@@ -1,23 +1,127 @@
-import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import type { GameStateSnapshot, Res4TerrainOverrideRow } from '../../shared/ipcTypes';
 import { RANGED_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
 import { panMapOneRes1Hex, shouldIgnoreGlobalKeydown } from './mapUtils';
 import { rendererSharedState as S } from '../core/state';
 import { getActiveTerrainStyleBasemapId, renderTerrainLegend } from '../rendering/terrainVisualStyles';
 import { getMainLeafletMap, initWorldLeafletMaps, setMainBasemapByProviderId, setMainBasemapFilter } from './worldLeafletMap';
 
+/**
+ * Documents the `InitCoreDeps` interface as a named contract surface (interface InitCoreDeps).
+
+ * Purpose: Supports maintainability by documenting why `InitCoreDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface InitCoreDeps {
-  requestRedraw: () => void;
-  resizeAndRedraw: () => void;
-  updateSidebar: () => void;
-  updateGameStateSidebar: (state: GameStateSnapshot | null) => void;
-  refreshHumanStandingOrders: () => Promise<void>;
-  updatePendingOrdersSidebar: () => void;
-  initOpenRouterUI: () => void;
-  updateRangedSidebar: () => void;
-  initNewGameButton: () => void;
-  updateReadyButtonState: () => void;
-  refreshHoverRoutePreview: () => Promise<void>;
-  applyGameStateSnapshot: (
+    /**
+   * Specifies the contract for the `requestRedraw` member (requestRedraw: () => void;).
+
+   * Contract: Describes stable behavior for callers of `requestRedraw` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+requestRedraw: () => void;
+    /**
+   * Specifies the contract for the `resizeAndRedraw` member (resizeAndRedraw: () => void;).
+
+   * Contract: Describes stable behavior for callers of `resizeAndRedraw` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+resizeAndRedraw: () => void;
+    /**
+   * Specifies the contract for the `updateSidebar` member (updateSidebar: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateSidebar: () => void;
+    /**
+   * Specifies the contract for the `updateGameStateSidebar` member (updateGameStateSidebar: (state: GameStateSnapshot | null) => void;).
+
+   * Contract: Describes stable behavior for callers of `updateGameStateSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateGameStateSidebar: (state: GameStateSnapshot | null) => void;
+    /**
+   * Specifies the contract for the `refreshHumanStandingOrders` member (refreshHumanStandingOrders: () => Promise<void>;).
+
+   * Contract: Describes stable behavior for callers of `refreshHumanStandingOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+refreshHumanStandingOrders: () => Promise<void>;
+    /**
+   * Specifies the contract for the `updatePendingOrdersSidebar` member (updatePendingOrdersSidebar: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updatePendingOrdersSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updatePendingOrdersSidebar: () => void;
+    /**
+   * Specifies the contract for the `initOpenRouterUI` member (initOpenRouterUI: () => void;).
+
+   * Contract: Describes stable behavior for callers of `initOpenRouterUI` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+initOpenRouterUI: () => void;
+    /**
+   * Specifies the contract for the `updateRangedSidebar` member (updateRangedSidebar: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateRangedSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateRangedSidebar: () => void;
+    /**
+   * Specifies the contract for the `initNewGameButton` member (initNewGameButton: () => void;).
+
+   * Contract: Describes stable behavior for callers of `initNewGameButton` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+initNewGameButton: () => void;
+    /**
+   * Specifies the contract for the `updateReadyButtonState` member (updateReadyButtonState: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateReadyButtonState` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateReadyButtonState: () => void;
+    /**
+   * Specifies the contract for the `refreshHoverRoutePreview` member (refreshHoverRoutePreview: () => Promise<void>;).
+
+   * Contract: Describes stable behavior for callers of `refreshHoverRoutePreview` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+refreshHoverRoutePreview: () => Promise<void>;
+    /**
+   * Specifies the contract for the `applyGameStateSnapshot` member (applyGameStateSnapshot: ( nextState: GameStateSnapshot, options?: { refreshStandingOrders?: boolean; updateGameStateSidebarUi?: boolean;).
+
+   * Contract: Describes stable behavior for callers of `applyGameStateSnapshot` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+applyGameStateSnapshot: (
     nextState: GameStateSnapshot,
     options?: {
       refreshStandingOrders?: boolean;
@@ -29,21 +133,133 @@ interface InitCoreDeps {
       redraw?: boolean;
     }
   ) => Promise<void>;
-  applyRes4TerrainOverrides: (rows: Array<any>) => void;
-  hideBuildPopup: () => void;
-  hideStackCallout: () => void;
-  applyModifierDrivenPopoverCloseRules: (reason: 'ctrl_pressed' | 'ctrl_released' | 'window_blur') => void;
-  isMapInspectionModeHeld: () => boolean;
-  isBuildPopupOrEntryTarget: (target: EventTarget | null) => boolean;
-  isBuildQueueSelectInPopupFocused: () => boolean;
-  isStackCalloutTargetInsideDialog: (target: EventTarget | null) => boolean;
-  clearTerrainTooltipTimer: () => void;
-  hideTerrainTooltipVisual: () => void;
-  showBuildPopup: (h3Index: string, clientX: number, clientY: number) => void;
-  updateMapInteractionCursor: (clientX: number, clientY: number) => void;
-  redraw: () => void;
+    /**
+   * Specifies the contract for the `applyRes4TerrainOverrides` member (applyRes4TerrainOverrides: (rows: Res4TerrainOverrideRow[]) => void;).
+
+   * Contract: Describes stable behavior for callers of `applyRes4TerrainOverrides` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+applyRes4TerrainOverrides: (rows: Res4TerrainOverrideRow[]) => void;
+    /**
+   * Specifies the contract for the `hideBuildPopup` member (hideBuildPopup: () => void;).
+
+   * Contract: Describes stable behavior for callers of `hideBuildPopup` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hideBuildPopup: () => void;
+    /**
+   * Specifies the contract for the `hideStackCallout` member (hideStackCallout: () => void;).
+
+   * Contract: Describes stable behavior for callers of `hideStackCallout` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hideStackCallout: () => void;
+    /**
+   * Specifies the contract for the `applyModifierDrivenPopoverCloseRules` member (applyModifierDrivenPopoverCloseRules: (reason: 'ctrl_pressed' | 'ctrl_released' | 'window_blur') => void;).
+
+   * Contract: Describes stable behavior for callers of `applyModifierDrivenPopoverCloseRules` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+applyModifierDrivenPopoverCloseRules: (reason: 'ctrl_pressed' | 'ctrl_released' | 'window_blur') => void;
+    /**
+   * Specifies the contract for the `isMapInspectionModeHeld` member (isMapInspectionModeHeld: () => boolean;).
+
+   * Contract: Describes stable behavior for callers of `isMapInspectionModeHeld` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+isMapInspectionModeHeld: () => boolean;
+    /**
+   * Specifies the contract for the `isBuildPopupOrEntryTarget` member (isBuildPopupOrEntryTarget: (target: EventTarget | null) => boolean;).
+
+   * Contract: Describes stable behavior for callers of `isBuildPopupOrEntryTarget` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+isBuildPopupOrEntryTarget: (target: EventTarget | null) => boolean;
+    /**
+   * Specifies the contract for the `isBuildQueueSelectInPopupFocused` member (isBuildQueueSelectInPopupFocused: () => boolean;).
+
+   * Contract: Describes stable behavior for callers of `isBuildQueueSelectInPopupFocused` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+isBuildQueueSelectInPopupFocused: () => boolean;
+    /**
+   * Specifies the contract for the `isStackCalloutTargetInsideDialog` member (isStackCalloutTargetInsideDialog: (target: EventTarget | null) => boolean;).
+
+   * Contract: Describes stable behavior for callers of `isStackCalloutTargetInsideDialog` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+isStackCalloutTargetInsideDialog: (target: EventTarget | null) => boolean;
+    /**
+   * Specifies the contract for the `clearTerrainTooltipTimer` member (clearTerrainTooltipTimer: () => void;).
+
+   * Contract: Describes stable behavior for callers of `clearTerrainTooltipTimer` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+clearTerrainTooltipTimer: () => void;
+    /**
+   * Specifies the contract for the `hideTerrainTooltipVisual` member (hideTerrainTooltipVisual: () => void;).
+
+   * Contract: Describes stable behavior for callers of `hideTerrainTooltipVisual` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hideTerrainTooltipVisual: () => void;
+    /**
+   * Specifies the contract for the `showBuildPopup` member (showBuildPopup: (h3Index: string, clientX: number, clientY: number) => void;).
+
+   * Contract: Describes stable behavior for callers of `showBuildPopup` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+showBuildPopup: (h3Index: string, clientX: number, clientY: number) => void;
+    /**
+   * Specifies the contract for the `updateMapInteractionCursor` member (updateMapInteractionCursor: (clientX: number, clientY: number) => void;).
+
+   * Contract: Describes stable behavior for callers of `updateMapInteractionCursor` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateMapInteractionCursor: (clientX: number, clientY: number) => void;
+    /**
+   * Specifies the contract for the `redraw` member (redraw: () => void;).
+
+   * Contract: Describes stable behavior for callers of `redraw` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+redraw: () => void;
 }
 
+/**
+ * Defines the `wireInitCore` function shape (export function wireInitCore(deps: InitCoreDeps): void).
+
+ * Purpose: Supports maintainability by documenting why `wireInitCore` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function wireInitCore(deps: InitCoreDeps): void {
   try {
     initWorldLeafletMaps('main-map', 'minimap', () => deps.requestRedraw(), getActiveTerrainStyleBasemapId());

@@ -8,10 +8,26 @@ import {
   resetHumanMarchPreviewDiagnosticsForTests,
 } from './humanMarchPreview';
 
+/**
+ * Defines the `withTempDb` function shape (function withTempDb(runCase: () => void): void).
+
+ * Purpose: Supports maintainability by documenting why `withTempDb` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function withTempDb(runCase: () => void): void {
   withTempGameDb('aw-human-march-preview-', runCase);
 }
 
+/**
+ * Defines the `testSessionInvalidatesOnSelectionChange` function shape (function testSessionInvalidatesOnSelectionChange(): void).
+
+ * Purpose: Supports maintainability by documenting why `testSessionInvalidatesOnSelectionChange` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testSessionInvalidatesOnSelectionChange(): void {
   withTempDb(() => {
     resetHumanMarchPreviewDiagnosticsForTests();
@@ -32,6 +48,14 @@ function testSessionInvalidatesOnSelectionChange(): void {
   });
 }
 
+/**
+ * Defines the `testCacheEvictionRespectsConfiguredBounds` function shape (function testCacheEvictionRespectsConfiguredBounds(): void).
+
+ * Purpose: Supports maintainability by documenting why `testCacheEvictionRespectsConfiguredBounds` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testCacheEvictionRespectsConfiguredBounds(): void {
   withTempDb(() => {
     resetHumanMarchPreviewDiagnosticsForTests();
@@ -54,6 +78,14 @@ function testCacheEvictionRespectsConfiguredBounds(): void {
   });
 }
 
+/**
+ * Defines the `testSessionInvalidatesOnVisibleOccupancyChange` function shape (function testSessionInvalidatesOnVisibleOccupancyChange(): void).
+
+ * Purpose: Supports maintainability by documenting why `testSessionInvalidatesOnVisibleOccupancyChange` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testSessionInvalidatesOnVisibleOccupancyChange(): void {
   withTempDb(() => {
     resetHumanMarchPreviewDiagnosticsForTests();
@@ -79,6 +111,14 @@ function testSessionInvalidatesOnVisibleOccupancyChange(): void {
   });
 }
 
+/**
+ * Defines the `run` function shape (function run(): void).
+
+ * Purpose: Supports maintainability by documenting why `run` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function run(): void {
   testSessionInvalidatesOnSelectionChange();
   testCacheEvictionRespectsConfiguredBounds();

@@ -14,21 +14,101 @@ import type { GuardedDbOps } from './dbOps';
 import { getScenarioHomeRegionHexes } from '../regionScenario';
 import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from './scenarioState';
 
+/**
+ * Documents the module-scope binding `STALE_INTEL_TURNS` (STALE_INTEL_TURNS).
+
+ * Purpose: Supports maintainability by documenting why `STALE_INTEL_TURNS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const STALE_INTEL_TURNS = 2;
+/**
+ * Documents the module-scope binding `FOG_PLAYERS` (FOG_PLAYERS).
+
+ * Purpose: Supports maintainability by documenting why `FOG_PLAYERS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const FOG_PLAYERS = ['human', 'opponent'] as const;
+/**
+ * Documents the module-scope binding `FOG_OF_WAR_ENABLED_KEY` (FOG_OF_WAR_ENABLED_KEY).
+
+ * Purpose: Supports maintainability by documenting why `FOG_OF_WAR_ENABLED_KEY` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const FOG_OF_WAR_ENABLED_KEY = 'fog_of_war_enabled';
+/**
+ * Documents the `FogDbOps` type alias (type FogDbOps).
+
+ * Purpose: Supports maintainability by documenting why `FogDbOps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 type FogDbOps = GuardedDbOps;
 
+/**
+ * Documents the `FogDeps` interface as a named contract surface (interface FogDeps).
+
+ * Purpose: Supports maintainability by documenting why `FogDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface FogDeps {
-  ops: FogDbOps;
-  listUnitsForSnapshot: () => GameStateSnapshot['units'];
-  listRes1InfrastructureRows: () => Res1InfrastructureRow[];
+    /**
+   * Specifies the contract for the `ops` member (ops: FogDbOps;).
+
+   * Contract: Describes stable behavior for callers of `ops` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ops: FogDbOps;
+    /**
+   * Specifies the contract for the `listUnitsForSnapshot` member (listUnitsForSnapshot: () => GameStateSnapshot['units'];).
+
+   * Contract: Describes stable behavior for callers of `listUnitsForSnapshot` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+listUnitsForSnapshot: () => GameStateSnapshot['units'];
+    /**
+   * Specifies the contract for the `listRes1InfrastructureRows` member (listRes1InfrastructureRows: () => Res1InfrastructureRow[];).
+
+   * Contract: Describes stable behavior for callers of `listRes1InfrastructureRows` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+listRes1InfrastructureRows: () => Res1InfrastructureRow[];
 }
 
+/**
+ * Defines the `withFogMetadata` function shape (function withFogMetadata(snapshot: GameStateSnapshot, fogOfWarEnabled: boolean): GameStateSnapshot).
+
+ * Purpose: Supports maintainability by documenting why `withFogMetadata` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function withFogMetadata(snapshot: GameStateSnapshot, fogOfWarEnabled: boolean): GameStateSnapshot {
   return { ...snapshot, fogOfWarEnabled };
 }
 
+/**
+ * Defines the `withScenarioMetadata` function shape (function withScenarioMetadata(snapshot: GameStateSnapshot, ops: FogDbOps): GameStateSnapshot).
+
+ * Purpose: Supports maintainability by documenting why `withScenarioMetadata` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function withScenarioMetadata(snapshot: GameStateSnapshot, ops: FogDbOps): GameStateSnapshot {
   const scenario = loadScenarioState(ops);
   if (scenario.scenarioId !== REGION_VS_REGION_SCENARIO_ID) return snapshot;
@@ -53,17 +133,41 @@ function withScenarioMetadata(snapshot: GameStateSnapshot, ops: FogDbOps): GameS
   };
 }
 
+/**
+ * Defines the `isFogOfWarEnabled` function shape (function isFogOfWarEnabled(ops: FogDbOps): boolean).
+
+ * Purpose: Supports maintainability by documenting why `isFogOfWarEnabled` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function isFogOfWarEnabled(ops: FogDbOps): boolean {
   const row = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [FOG_OF_WAR_ENABLED_KEY]);
   if (!row?.value) return true;
   return row.value !== '0' && row.value.toLowerCase() !== 'false';
 }
 
+/**
+ * Defines the `getCurrentTurnNumberFromDb` function shape (function getCurrentTurnNumberFromDb(ops: FogDbOps): number).
+
+ * Purpose: Supports maintainability by documenting why `getCurrentTurnNumberFromDb` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getCurrentTurnNumberFromDb(ops: FogDbOps): number {
   const turnRow = ops.getOne<{ turnNumber: number }>('SELECT turn_number AS turnNumber FROM turn_state WHERE id = 1');
   return turnRow?.turnNumber ?? 1;
 }
 
+/**
+ * Defines the `getGameStateSnapshot` function shape (export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot).
+
+ * Purpose: Supports maintainability by documenting why `getGameStateSnapshot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
   const { ops } = deps;
   logTrace('getGameState');
@@ -138,6 +242,14 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
   return withFogMetadata(withScenarioMetadata(snapshot, ops), isFogOfWarEnabled(ops));
 }
 
+/**
+ * Defines the `refreshFogOfWarIntelForPlayer` function shape (function refreshFogOfWarIntelForPlayer( deps: FogDeps, state: GameStateSnapshot, playerId: string, currentTurn: number, traversedHexes: Set<strin).
+
+ * Purpose: Supports maintainability by documenting why `refreshFogOfWarIntelForPlayer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function refreshFogOfWarIntelForPlayer(
   deps: FogDeps,
   state: GameStateSnapshot,
@@ -223,6 +335,14 @@ function refreshFogOfWarIntelForPlayer(
   ops.run(`INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)`, [`fog_new_contacts_${playerId}`, JSON.stringify(newContactIds)]);
 }
 
+/**
+ * Defines the `refreshFogOfWarIntelFromCurrentState` function shape (export function refreshFogOfWarIntelFromCurrentState( deps: FogDeps, options?: { traversedHexesByPlayer?: Partial<Record<'human' | 'opponent', string[]>>).
+
+ * Purpose: Supports maintainability by documenting why `refreshFogOfWarIntelFromCurrentState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function refreshFogOfWarIntelFromCurrentState(
   deps: FogDeps,
   options?: { traversedHexesByPlayer?: Partial<Record<'human' | 'opponent', string[]>> }
@@ -246,6 +366,14 @@ export function refreshFogOfWarIntelFromCurrentState(
   }
 }
 
+/**
+ * Defines the `consumeFogNewContactsForPlayer` function shape (export function consumeFogNewContactsForPlayer(ops: FogDbOps, playerId: 'human' | 'opponent'): string[]).
+
+ * Purpose: Supports maintainability by documenting why `consumeFogNewContactsForPlayer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function consumeFogNewContactsForPlayer(ops: FogDbOps, playerId: 'human' | 'opponent'): string[] {
   logDebug('gameDb consumeFogNewContactsForPlayer', { playerId });
   if (!ops.hasDb()) return [];
@@ -261,6 +389,14 @@ export function consumeFogNewContactsForPlayer(ops: FogDbOps, playerId: 'human' 
   }
 }
 
+/**
+ * Defines the `getGameStateForPlayer` function shape (export function getGameStateForPlayer( deps: FogDeps, playerId: 'human' | 'opponent', options?: { maskUnexploredTerrain?: boolean } ): GameStateSnapsh).
+
+ * Purpose: Supports maintainability by documenting why `getGameStateForPlayer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function getGameStateForPlayer(
   deps: FogDeps,
   playerId: 'human' | 'opponent',

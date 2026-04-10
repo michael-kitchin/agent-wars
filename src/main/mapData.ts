@@ -5,14 +5,33 @@
 
 import { getRes0Cells, cellToChildren, cellToLatLng } from 'h3-js';
 
-/** Global world map uses H3 resolution 1; must match terrain_res1_base.csv and renderer. */
+/**
+ * Documents the module-scope binding `H3_RESOLUTION` (H3_RESOLUTION).
+
+ * Purpose: Supports maintainability by documenting why `H3_RESOLUTION` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const H3_RESOLUTION = 1;
 
+/**
+ * Documents the module-scope binding `cachedWorldHexList` (cachedWorldHexList: string[] | null).
+
+ * Purpose: Supports maintainability by documenting why `cachedWorldHexList` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 let cachedWorldHexList: string[] | null = null;
 
 /**
- * Returns every H3 cell at resolution 1 covering Earth, sorted lexicographically for stable DB order.
- * Use for seeding, snapshots, and any feature that needs the full playable hex set.
+ * Defines the `getOrderedHexList` function shape (export function getOrderedHexList(): string[]).
+
+ * Purpose: Supports maintainability by documenting why `getOrderedHexList` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getOrderedHexList(): string[] {
   if (cachedWorldHexList !== null) return cachedWorldHexList;
@@ -27,15 +46,24 @@ export function getOrderedHexList(): string[] {
 }
 
 /**
- * Unit counts per side for the fixed world map (same totals as the legacy small k-ring map).
+ * Defines the `getWorldUnitCounts` function shape (export function getWorldUnitCounts():).
+
+ * Purpose: Supports maintainability by documenting why `getWorldUnitCounts` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getWorldUnitCounts(): { infantry: number; armor: number; naval: number } {
   return { infantry: 2, armor: 2, naval: 1 };
 }
 
 /**
- * Returns decimal places for lat/lng exchanged with the LLM, scaled by H3 resolution.
- * Lower resolutions (larger hexes) use fewer decimals to avoid fake precision and token bloat.
+ * Defines the `getLatLngDecimalPlacesForResolution` function shape (export function getLatLngDecimalPlacesForResolution(resolution: number): number).
+
+ * Purpose: Supports maintainability by documenting why `getLatLngDecimalPlacesForResolution` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getLatLngDecimalPlacesForResolution(resolution: number): number {
   if (resolution <= 1) return 2;
@@ -44,11 +72,23 @@ export function getLatLngDecimalPlacesForResolution(resolution: number): number 
   return 5;
 }
 
-/** Decimal places for the active world-map resolution. */
+/**
+ * Documents the module-scope binding `LATLNG_DECIMAL_PLACES` (LATLNG_DECIMAL_PLACES).
+
+ * Purpose: Supports maintainability by documenting why `LATLNG_DECIMAL_PLACES` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const LATLNG_DECIMAL_PLACES = getLatLngDecimalPlacesForResolution(H3_RESOLUTION);
 
 /**
- * Rounds lat and lng so echoed coordinates resolve reliably to the same H3 cell.
+ * Defines the `roundLatLng` function shape (export function roundLatLng(lat: number, lng: number): [number, number]).
+
+ * Purpose: Supports maintainability by documenting why `roundLatLng` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function roundLatLng(lat: number, lng: number): [number, number] {
   const f = 10 ** LATLNG_DECIMAL_PLACES;
@@ -56,7 +96,12 @@ export function roundLatLng(lat: number, lng: number): [number, number] {
 }
 
 /**
- * Builds a lat/lng coordinate map for the given hex list and a nearest-hex resolver.
+ * Defines the `buildLatLngCoordinateMap` function shape (export function buildLatLngCoordinateMap(hexList: string[]): { latLngByH3: Map<string, [number, number]>; resolveToH3: (lat: number, lng: number) => strin).
+
+ * Purpose: Supports maintainability by documenting why `buildLatLngCoordinateMap` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function buildLatLngCoordinateMap(hexList: string[]): {
   latLngByH3: Map<string, [number, number]>;

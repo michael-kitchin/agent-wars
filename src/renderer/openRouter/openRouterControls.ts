@@ -1,19 +1,115 @@
 import { rendererSharedState as S } from '../core/state';
 import { resetPrecomputedAiState } from './precomputedAiState';
 
+/**
+ * Documents the `OpenRouterUiDeps` interface as a named contract surface (interface OpenRouterUiDeps).
+
+ * Purpose: Supports maintainability by documenting why `OpenRouterUiDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface OpenRouterUiDeps {
-  appendOpenRouterLog: (line: string, isError?: boolean) => void;
-  updateOpenRouterCostLabel: () => void;
-  renderOpenRouterToolsList: () => void;
-  syncEventDrivenFromTools: () => void;
-  hideMapToast: () => void;
-  hideAiStrategyToast: () => void;
-  openNewGameOverlayFromModelTab: () => void;
-  startBackgroundRequestIfAllowed: () => void;
-  updateReadyButtonState: () => void;
-  syncOpenRouterRunToggleInteractable: () => Promise<void>;
+    /**
+   * Specifies the contract for the `appendOpenRouterLog` member (appendOpenRouterLog: (line: string, isError?: boolean) => void;).
+
+   * Contract: Describes stable behavior for callers of `appendOpenRouterLog` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+appendOpenRouterLog: (line: string, isError?: boolean) => void;
+    /**
+   * Specifies the contract for the `updateOpenRouterCostLabel` member (updateOpenRouterCostLabel: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateOpenRouterCostLabel` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateOpenRouterCostLabel: () => void;
+    /**
+   * Specifies the contract for the `renderOpenRouterToolsList` member (renderOpenRouterToolsList: () => void;).
+
+   * Contract: Describes stable behavior for callers of `renderOpenRouterToolsList` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+renderOpenRouterToolsList: () => void;
+    /**
+   * Specifies the contract for the `syncEventDrivenFromTools` member (syncEventDrivenFromTools: () => void;).
+
+   * Contract: Describes stable behavior for callers of `syncEventDrivenFromTools` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+syncEventDrivenFromTools: () => void;
+    /**
+   * Specifies the contract for the `hideMapToast` member (hideMapToast: () => void;).
+
+   * Contract: Describes stable behavior for callers of `hideMapToast` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hideMapToast: () => void;
+    /**
+   * Specifies the contract for the `hideAiStrategyToast` member (hideAiStrategyToast: () => void;).
+
+   * Contract: Describes stable behavior for callers of `hideAiStrategyToast` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hideAiStrategyToast: () => void;
+    /**
+   * Specifies the contract for the `openNewGameOverlayFromModelTab` member (openNewGameOverlayFromModelTab: () => void;).
+
+   * Contract: Describes stable behavior for callers of `openNewGameOverlayFromModelTab` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+openNewGameOverlayFromModelTab: () => void;
+    /**
+   * Specifies the contract for the `startBackgroundRequestIfAllowed` member (startBackgroundRequestIfAllowed: () => void;).
+
+   * Contract: Describes stable behavior for callers of `startBackgroundRequestIfAllowed` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+startBackgroundRequestIfAllowed: () => void;
+    /**
+   * Specifies the contract for the `updateReadyButtonState` member (updateReadyButtonState: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateReadyButtonState` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateReadyButtonState: () => void;
+    /**
+   * Specifies the contract for the `syncOpenRouterRunToggleInteractable` member (syncOpenRouterRunToggleInteractable: () => Promise<void>;).
+
+   * Contract: Describes stable behavior for callers of `syncOpenRouterRunToggleInteractable` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+syncOpenRouterRunToggleInteractable: () => Promise<void>;
 }
 
+/**
+ * Defines the `initOpenRouterUI` function shape (export function initOpenRouterUI(deps: OpenRouterUiDeps): void).
+
+ * Purpose: Supports maintainability by documenting why `initOpenRouterUI` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
   const api = window.gameApi?.openRouter;
   if (!api) return;

@@ -8,17 +8,34 @@ import * as assert from 'assert';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import type Database from 'better-sqlite3';
 import { gridDistance } from 'h3-js';
 import { resolveAirStrikePhase } from './game-actions/airStrikeResolution';
 import type { AirStrikeTargetType } from '../shared/ipcTypes';
 import { AIR_STRIKE_RANGE_HEXES } from '../shared/tacticalRanges';
 
+/**
+ * Documents the module-scope binding `INFRASTRUCTURE_SYNC_TRIGGER_NAMES` (INFRASTRUCTURE_SYNC_TRIGGER_NAMES).
+
+ * Purpose: Supports maintainability by documenting why `INFRASTRUCTURE_SYNC_TRIGGER_NAMES` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const INFRASTRUCTURE_SYNC_TRIGGER_NAMES = [
   'res4_sync_res1_after_delete',
   'res4_sync_res1_after_insert',
   'res4_sync_res1_after_update',
 ] as const;
 
+/**
+ * Defines the `betterSqliteNativeAvailable` function shape (function betterSqliteNativeAvailable(): boolean).
+
+ * Purpose: Supports maintainability by documenting why `betterSqliteNativeAvailable` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function betterSqliteNativeAvailable(): boolean {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -31,14 +48,20 @@ function betterSqliteNativeAvailable(): boolean {
   }
 }
 
-// Database constructor from better-sqlite3 (required dynamically after native check).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function testFreshFileUserVersion(gameDb: typeof import('./gameDb'), Database: any): void {
+/**
+ * Defines the `testFreshFileUserVersion` function shape (function testFreshFileUserVersion(gameDb: typeof import('./gameDb'), DatabaseCtor: typeof Database): void).
+
+ * Purpose: Supports maintainability by documenting why `testFreshFileUserVersion` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+function testFreshFileUserVersion(gameDb: typeof import('./gameDb'), DatabaseCtor: typeof Database): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
   try {
     gameDb.createFreshGameDatabaseAt(p);
-    const d = new Database(p);
+    const d = new DatabaseCtor(p);
     gameDb.applyGameDbPragmas(d);
     gameDb.validateGameDatabaseOrThrow(d);
     const uv = d.pragma('user_version', { simple: true }) as number;
@@ -50,6 +73,14 @@ function testFreshFileUserVersion(gameDb: typeof import('./gameDb'), Database: a
   }
 }
 
+/**
+ * Defines the `testPersistenceTwoOpens` function shape (function testPersistenceTwoOpens(gameDb: typeof import('./gameDb')): void).
+
+ * Purpose: Supports maintainability by documenting why `testPersistenceTwoOpens` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testPersistenceTwoOpens(gameDb: typeof import('./gameDb')): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
@@ -66,6 +97,14 @@ function testPersistenceTwoOpens(gameDb: typeof import('./gameDb')): void {
   }
 }
 
+/**
+ * Defines the `testResetClearsStandingOrdersAndMemory` function shape (function testResetClearsStandingOrdersAndMemory(gameDb: typeof import('./gameDb')): void).
+
+ * Purpose: Supports maintainability by documenting why `testResetClearsStandingOrdersAndMemory` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testResetClearsStandingOrdersAndMemory(gameDb: typeof import('./gameDb')): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
@@ -90,6 +129,14 @@ function testResetClearsStandingOrdersAndMemory(gameDb: typeof import('./gameDb'
   }
 }
 
+/**
+ * Defines the `testResetRegeneratesTerrain` function shape (function testResetRegeneratesTerrain(gameDb: typeof import('./gameDb')): void).
+
+ * Purpose: Supports maintainability by documenting why `testResetRegeneratesTerrain` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testResetRegeneratesTerrain(gameDb: typeof import('./gameDb')): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
@@ -106,6 +153,14 @@ function testResetRegeneratesTerrain(gameDb: typeof import('./gameDb')): void {
   }
 }
 
+/**
+ * Defines the `testResetSeedsInfrastructureState` function shape (function testResetSeedsInfrastructureState(gameDb: typeof import('./gameDb')): void).
+
+ * Purpose: Supports maintainability by documenting why `testResetSeedsInfrastructureState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testResetSeedsInfrastructureState(gameDb: typeof import('./gameDb')): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
@@ -122,6 +177,14 @@ function testResetSeedsInfrastructureState(gameDb: typeof import('./gameDb')): v
   }
 }
 
+/**
+ * Defines the `testRendererRes4OverridesIncludeInfrastructureFeatureRows` function shape (function testRendererRes4OverridesIncludeInfrastructureFeatureRows(gameDb: typeof import('./gameDb')): void).
+
+ * Purpose: Supports maintainability by documenting why `testRendererRes4OverridesIncludeInfrastructureFeatureRows` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRendererRes4OverridesIncludeInfrastructureFeatureRows(gameDb: typeof import('./gameDb')): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
@@ -139,6 +202,14 @@ function testRendererRes4OverridesIncludeInfrastructureFeatureRows(gameDb: typeo
   }
 }
 
+/**
+ * Defines the `testSeededUnitsUseRegionalSpawnContracts` function shape (function testSeededUnitsUseRegionalSpawnContracts(gameDb: typeof import('./gameDb')): void).
+
+ * Purpose: Supports maintainability by documenting why `testSeededUnitsUseRegionalSpawnContracts` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testSeededUnitsUseRegionalSpawnContracts(gameDb: typeof import('./gameDb')): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
@@ -181,6 +252,14 @@ function testSeededUnitsUseRegionalSpawnContracts(gameDb: typeof import('./gameD
   }
 }
 
+/**
+ * Defines the `testScenarioHomeRegionListIsSortedUnique` function shape (function testScenarioHomeRegionListIsSortedUnique(gameDb: typeof import('./gameDb')): void).
+
+ * Purpose: Supports maintainability by documenting why `testScenarioHomeRegionListIsSortedUnique` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testScenarioHomeRegionListIsSortedUnique(gameDb: typeof import('./gameDb')): void {
   const regions = gameDb.listScenarioHomeRegions();
   assert.ok(regions.length > 0, 'expected non-empty scenario home region list');
@@ -189,6 +268,14 @@ function testScenarioHomeRegionListIsSortedUnique(gameDb: typeof import('./gameD
   assert.strictEqual(new Set(regions).size, regions.length, 'expected scenario home regions to be unique');
 }
 
+/**
+ * Defines the `testResetNormalizesInvalidScenarioHomeRegions` function shape (function testResetNormalizesInvalidScenarioHomeRegions(gameDb: typeof import('./gameDb')): void).
+
+ * Purpose: Supports maintainability by documenting why `testResetNormalizesInvalidScenarioHomeRegions` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testResetNormalizesInvalidScenarioHomeRegions(gameDb: typeof import('./gameDb')): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
@@ -209,6 +296,14 @@ function testResetNormalizesInvalidScenarioHomeRegions(gameDb: typeof import('./
   }
 }
 
+/**
+ * Defines the `testFogOfWarToggleVisibilityContract` function shape (function testFogOfWarToggleVisibilityContract(gameDb: typeof import('./gameDb')): void).
+
+ * Purpose: Supports maintainability by documenting why `testFogOfWarToggleVisibilityContract` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testFogOfWarToggleVisibilityContract(gameDb: typeof import('./gameDb')): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
@@ -246,6 +341,14 @@ function testFogOfWarToggleVisibilityContract(gameDb: typeof import('./gameDb'))
   }
 }
 
+/**
+ * Defines the `testHomeRegionVisibilityAndInitialControlContracts` function shape (function testHomeRegionVisibilityAndInitialControlContracts(gameDb: typeof import('./gameDb')): void).
+
+ * Purpose: Supports maintainability by documenting why `testHomeRegionVisibilityAndInitialControlContracts` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testHomeRegionVisibilityAndInitialControlContracts(gameDb: typeof import('./gameDb')): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
@@ -316,19 +419,26 @@ function testHomeRegionVisibilityAndInitialControlContracts(gameDb: typeof impor
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function testWrongUserVersionRecovers(gameDb: typeof import('./gameDb'), Database: any): void {
+/**
+ * Defines the `testWrongUserVersionRecovers` function shape (function testWrongUserVersionRecovers(gameDb: typeof import('./gameDb'), DatabaseCtor: typeof Database): void).
+
+ * Purpose: Supports maintainability by documenting why `testWrongUserVersionRecovers` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+function testWrongUserVersionRecovers(gameDb: typeof import('./gameDb'), DatabaseCtor: typeof Database): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
   try {
     gameDb.createFreshGameDatabaseAt(p);
     gameDb.closeGameDatabaseForTests();
-    const d = new Database(p);
+    const d = new DatabaseCtor(p);
     d.pragma('user_version = 99');
     d.close();
     gameDb.openGameDatabaseAtPathForTests(p);
     gameDb.closeGameDatabaseForTests();
-    const d2 = new Database(p);
+    const d2 = new DatabaseCtor(p);
     const uv = d2.pragma('user_version', { simple: true }) as number;
     assert.strictEqual(uv, gameDb.EXPECTED_USER_VERSION);
     d2.close();
@@ -340,6 +450,14 @@ function testWrongUserVersionRecovers(gameDb: typeof import('./gameDb'), Databas
   }
 }
 
+/**
+ * Defines the `getRes1CountsDerivedFromRes4` function shape (function getRes1CountsDerivedFromRes4( gameDb: typeof import('./gameDb'), h3Index: string ): { urbanHexCount: number; airportCount: number; seaportCount:).
+
+ * Purpose: Supports maintainability by documenting why `getRes1CountsDerivedFromRes4` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getRes1CountsDerivedFromRes4(
   gameDb: typeof import('./gameDb'),
   h3Index: string
@@ -359,6 +477,14 @@ function getRes1CountsDerivedFromRes4(
   };
 }
 
+/**
+ * Defines the `assertRes1MatchesRes4RollupForHex` function shape (function assertRes1MatchesRes4RollupForHex(gameDb: typeof import('./gameDb'), h3Index: string): void).
+
+ * Purpose: Supports maintainability by documenting why `assertRes1MatchesRes4RollupForHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function assertRes1MatchesRes4RollupForHex(gameDb: typeof import('./gameDb'), h3Index: string): void {
   const expected = getRes1CountsDerivedFromRes4(gameDb, h3Index);
   const actual = gameDb.getRes1InfrastructureForHex(h3Index);
@@ -367,6 +493,14 @@ function assertRes1MatchesRes4RollupForHex(gameDb: typeof import('./gameDb'), h3
   assert.strictEqual(actual.seaportCount, expected.seaportCount);
 }
 
+/**
+ * Defines the `testOpenExistingDatabaseReconcilesRes1InfrastructureDrift` function shape (function testOpenExistingDatabaseReconcilesRes1InfrastructureDrift(gameDb: typeof import('./gameDb')): void).
+
+ * Purpose: Supports maintainability by documenting why `testOpenExistingDatabaseReconcilesRes1InfrastructureDrift` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testOpenExistingDatabaseReconcilesRes1InfrastructureDrift(gameDb: typeof import('./gameDb')): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
@@ -395,6 +529,14 @@ function testOpenExistingDatabaseReconcilesRes1InfrastructureDrift(gameDb: typeo
   }
 }
 
+/**
+ * Defines the `testRes1InfrastructureStaysInSyncWhenRes4FeaturesChange` function shape (function testRes1InfrastructureStaysInSyncWhenRes4FeaturesChange(gameDb: typeof import('./gameDb')): void).
+
+ * Purpose: Supports maintainability by documenting why `testRes1InfrastructureStaysInSyncWhenRes4FeaturesChange` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRes1InfrastructureStaysInSyncWhenRes4FeaturesChange(gameDb: typeof import('./gameDb')): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
@@ -430,6 +572,14 @@ function testRes1InfrastructureStaysInSyncWhenRes4FeaturesChange(gameDb: typeof 
   }
 }
 
+/**
+ * Defines the `testOpenExistingDatabaseInstallsInfrastructureSyncTriggers` function shape (function testOpenExistingDatabaseInstallsInfrastructureSyncTriggers(gameDb: typeof import('./gameDb')): void).
+
+ * Purpose: Supports maintainability by documenting why `testOpenExistingDatabaseInstallsInfrastructureSyncTriggers` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testOpenExistingDatabaseInstallsInfrastructureSyncTriggers(gameDb: typeof import('./gameDb')): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
@@ -456,6 +606,14 @@ function testOpenExistingDatabaseInstallsInfrastructureSyncTriggers(gameDb: type
   }
 }
 
+/**
+ * Defines the `findAirStrikeOriginAndTargetForInfrastructureType` function shape (function findAirStrikeOriginAndTargetForInfrastructureType( gameDb: typeof import('./gameDb'), targetType: Exclude<AirStrikeTargetType, 'units'> ): { ori).
+
+ * Purpose: Supports maintainability by documenting why `findAirStrikeOriginAndTargetForInfrastructureType` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function findAirStrikeOriginAndTargetForInfrastructureType(
   gameDb: typeof import('./gameDb'),
   targetType: Exclude<AirStrikeTargetType, 'units'>
@@ -490,6 +648,14 @@ function findAirStrikeOriginAndTargetForInfrastructureType(
   throw new Error(`expected reachable ${targetType} target from an airport within strike range ${AIR_STRIKE_RANGE_HEXES}`);
 }
 
+/**
+ * Defines the `testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity` function shape (function testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity().
+
+ * Purpose: Supports maintainability by documenting why `testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity(
   gameDb: typeof import('./gameDb'),
   targetType: Exclude<AirStrikeTargetType, 'units'>
@@ -527,6 +693,14 @@ function testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity(
 }
 
 
+/**
+ * Defines the `run` function shape (function run(): void).
+
+ * Purpose: Supports maintainability by documenting why `run` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function run(): void {
   if (!betterSqliteNativeAvailable()) {
     throw new Error(

@@ -70,16 +70,70 @@ import type {
   NewGameIpcPayload,
 } from '../shared/ipcTypes';
 
-/** Ref for the in-flight requestAiOrders AbortController; used by handlers and cancel. */
-const requestAiOrdersControllerRef: { current: AbortController | null } = { current: null };
+/**
+ * Documents the module-scope binding `requestAiOrdersControllerRef` (requestAiOrdersControllerRef: { current: AbortController | null }).
 
-/** Single application window; created on ready, closed when all windows close. */
+ * Purpose: Supports maintainability by documenting why `requestAiOrdersControllerRef` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+const requestAiOrdersControllerRef: { current: AbortController | null } = { /**
+ * Documents the object literal property `current` (current: null).
+
+ * Purpose: Supports maintainability by documenting why `current` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+current: null };
+
+/**
+ * Documents the module-scope binding `mainWindow` (mainWindow: BrowserWindow | null).
+
+ * Purpose: Supports maintainability by documenting why `mainWindow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 let mainWindow: BrowserWindow | null = null;
 
+/**
+ * Documents the module-scope binding `MIN_WINDOW_WIDTH` (MIN_WINDOW_WIDTH).
+
+ * Purpose: Supports maintainability by documenting why `MIN_WINDOW_WIDTH` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const MIN_WINDOW_WIDTH = 800;
+/**
+ * Documents the module-scope binding `MIN_WINDOW_HEIGHT` (MIN_WINDOW_HEIGHT).
+
+ * Purpose: Supports maintainability by documenting why `MIN_WINDOW_HEIGHT` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const MIN_WINDOW_HEIGHT = 600;
+/**
+ * Documents the module-scope binding `VERSIONED_APP_NAME_PREFIX` (VERSIONED_APP_NAME_PREFIX).
+
+ * Purpose: Supports maintainability by documenting why `VERSIONED_APP_NAME_PREFIX` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const VERSIONED_APP_NAME_PREFIX = 'Agent Wars v';
 
+/**
+ * Defines the `applyVersionedAppName` function shape (function applyVersionedAppName(): void).
+
+ * Purpose: Supports maintainability by documenting why `applyVersionedAppName` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function applyVersionedAppName(): void {
   const versionedName = `${VERSIONED_APP_NAME_PREFIX}${app.getVersion()}`;
   app.setName(versionedName);
@@ -87,9 +141,12 @@ function applyVersionedAppName(): void {
 }
 
 /**
- * Creates the main browser window and loads the renderer HTML.
- * Sizes the window to 3/4 of the primary display work area, centered.
- * Called after Electron app is ready. Window loads `static/index.html` at the app root (sibling of `dist/`).
+ * Defines the `createWindow` function shape (function createWindow(): void).
+
+ * Purpose: Supports maintainability by documenting why `createWindow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 function createWindow(): void {
   const preloadPath = path.join(__dirname, 'preload.js');
@@ -133,7 +190,14 @@ function createWindow(): void {
   });
 }
 
-/** Wraps requestOrders with an onLog sink that forwards to the renderer status list. */
+/**
+ * Defines the `requestOrdersWithLog` function shape (function requestOrdersWithLog( state: Parameters<typeof requestOrders>[0], modelId: string, options?: Parameters<typeof requestOrders>[2] ): ReturnTyp).
+
+ * Purpose: Supports maintainability by documenting why `requestOrdersWithLog` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function requestOrdersWithLog(
   state: Parameters<typeof requestOrders>[0],
   modelId: string,
@@ -145,6 +209,14 @@ function requestOrdersWithLog(
   return requestOrders(state, modelId, { ...options, onLog });
 }
 
+/**
+ * Defines the `registerIpcHandlers` function shape (function registerIpcHandlers(): void).
+
+ * Purpose: Supports maintainability by documenting why `registerIpcHandlers` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function registerIpcHandlers(): void {
   ipcMain.handle('game:getState', () => getGameStateForPlayer('human', { maskUnexploredTerrain: false }));
   ipcMain.handle('game:getRes4TerrainOverrides', () => getRes4TerrainOverridesForRendererFromGame());

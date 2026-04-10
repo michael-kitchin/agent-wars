@@ -8,15 +8,51 @@
 import { dbGetAll, dbRun } from './gameDb';
 import { logDebug, logError, logTrace } from './logger';
 
+/**
+ * Documents the `CallbackSubscription` interface as a named contract surface (export interface CallbackSubscription).
+
+ * Purpose: Supports maintainability by documenting why `CallbackSubscription` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface CallbackSubscription {
-  event: string;
-  params: Record<string, unknown>;
-  subscribedTurn?: number;
+    /**
+   * Specifies the contract for the `event` member (event: string;).
+
+   * Contract: Describes stable behavior for callers of `event` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+event: string;
+    /**
+   * Specifies the contract for the `params` member (params: Record<string, unknown>;).
+
+   * Contract: Describes stable behavior for callers of `params` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+params: Record<string, unknown>;
+    /**
+   * Specifies the contract for the `subscribedTurn` member (subscribedTurn?: number;).
+
+   * Contract: Describes stable behavior for callers of `subscribedTurn` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+subscribedTurn?: number;
 }
 
 /**
- * Returns all callback subscriptions for a player. Use when evaluating subscription events
- * and when building the ACTIVE CALLBACKS briefing section.
+ * Defines the `getSubscriptions` function shape (export function getSubscriptions(playerId: string): CallbackSubscription[]).
+
+ * Purpose: Supports maintainability by documenting why `getSubscriptions` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getSubscriptions(playerId: string): CallbackSubscription[] {
   logTrace('callbackSubscriptions getSubscriptions', { playerId });
@@ -40,8 +76,12 @@ export function getSubscriptions(playerId: string): CallbackSubscription[] {
 }
 
 /**
- * Replaces all callback subscriptions for a player with the given list (replace-all semantics).
- * Call after a successful LLM consultation when the response includes a callbacks array.
+ * Defines the `replaceSubscriptions` function shape (export function replaceSubscriptions(playerId: string, subscriptions: CallbackSubscription[], subscribedTurn: number): void).
+
+ * Purpose: Supports maintainability by documenting why `replaceSubscriptions` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function replaceSubscriptions(playerId: string, subscriptions: CallbackSubscription[], subscribedTurn: number): void {
   logDebug('callbackSubscriptions replaceSubscriptions', { playerId, count: subscriptions.length, subscribedTurn });
@@ -55,7 +95,12 @@ export function replaceSubscriptions(playerId: string, subscriptions: CallbackSu
 }
 
 /**
- * Removes all callback subscriptions for a player. Use when resetting 0.7 state (e.g. new game).
+ * Defines the `clearSubscriptions` function shape (export function clearSubscriptions(playerId: string): void).
+
+ * Purpose: Supports maintainability by documenting why `clearSubscriptions` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function clearSubscriptions(playerId: string): void {
   logDebug('callbackSubscriptions clearSubscriptions', { playerId });

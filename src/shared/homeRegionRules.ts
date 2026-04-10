@@ -1,6 +1,14 @@
 import type { GameStateSnapshot } from './ipcTypes';
 import { computeRoundedPercentage } from './progressFormatting';
 
+/**
+ * Documents the `HomeRegionOutlineState` type alias (export type HomeRegionOutlineState).
+
+ * Purpose: Supports maintainability by documenting why `HomeRegionOutlineState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type HomeRegionOutlineState =
   | 'intersection'
   | 'contested'
@@ -8,18 +16,54 @@ export type HomeRegionOutlineState =
   | 'controlledByOpponent'
   | 'unknown';
 
+/**
+ * Documents the `HomeRegionUnitPosition` interface as a named contract surface (export interface HomeRegionUnitPosition).
+
+ * Purpose: Supports maintainability by documenting why `HomeRegionUnitPosition` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface HomeRegionUnitPosition {
-  player: string;
-  h3Index: string;
+    /**
+   * Specifies the contract for the `player` member (player: string;).
+
+   * Contract: Describes stable behavior for callers of `player` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+player: string;
+    /**
+   * Specifies the contract for the `h3Index` member (h3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `h3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+h3Index: string;
 }
 
+/**
+ * Defines the `uniqueSortedHexes` function shape (function uniqueSortedHexes(hexes: readonly string[]): string[]).
+
+ * Purpose: Supports maintainability by documenting why `uniqueSortedHexes` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function uniqueSortedHexes(hexes: readonly string[]): string[] {
   return [...new Set(hexes)].sort();
 }
 
 /**
- * Use this to determine which home-region hexes belong to both sides so renderer and fog logic can
- * apply shared intersection rules consistently.
+ * Defines the `computeIntersectingHomeRegionHexes` function shape (export function computeIntersectingHomeRegionHexes().
+
+ * Purpose: Supports maintainability by documenting why `computeIntersectingHomeRegionHexes` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function computeIntersectingHomeRegionHexes(
   humanHomeRegionHexes: readonly string[],
@@ -30,8 +74,12 @@ export function computeIntersectingHomeRegionHexes(
 }
 
 /**
- * Use this to mark home-region hexes that currently contain units from more than one player, which
- * are treated as contested for gray outlining.
+ * Defines the `computeContestedHomeRegionHexes` function shape (export function computeContestedHomeRegionHexes().
+
+ * Purpose: Supports maintainability by documenting why `computeContestedHomeRegionHexes` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function computeContestedHomeRegionHexes(
   units: readonly HomeRegionUnitPosition[],
@@ -56,8 +104,12 @@ export function computeContestedHomeRegionHexes(
 }
 
 /**
- * Use this to apply the canonical outline-state precedence for home hexes:
- * intersection first, then contested, then controller-colored ownership.
+ * Defines the `classifyHomeRegionOutlineState` function shape (export function classifyHomeRegionOutlineState( h3Index: string, intersectionHexes: ReadonlySet<string>, contestedHexes: ReadonlySet<string>, contro).
+
+ * Purpose: Supports maintainability by documenting why `classifyHomeRegionOutlineState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function classifyHomeRegionOutlineState(
   h3Index: string,
@@ -73,8 +125,12 @@ export function classifyHomeRegionOutlineState(
 }
 
 /**
- * Use this to derive always-visible home-region hexes for a player in region-vs-region scenarios.
- * The result includes that side's home hexes plus intersecting home hexes and is filtered to map cells.
+ * Defines the `getForcedVisibleHomeRegionHexesForPlayer` function shape (export function getForcedVisibleHomeRegionHexesForPlayer( state: Pick<GameStateSnapshot, 'scenarioId' | 'humanHomeRegionHexes' | 'aiHomeRegionHexes' | 'inter).
+
+ * Purpose: Supports maintainability by documenting why `getForcedVisibleHomeRegionHexesForPlayer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function getForcedVisibleHomeRegionHexesForPlayer(
   state: Pick<GameStateSnapshot, 'scenarioId' | 'humanHomeRegionHexes' | 'aiHomeRegionHexes' | 'intersectingHomeRegionHexes'>,
@@ -93,8 +149,12 @@ export function getForcedVisibleHomeRegionHexesForPlayer(
 }
 
 /**
- * Use this to produce count/percentage ownership summaries for a region from persisted control rows,
- * keeping prompt and UI ownership math aligned.
+ * Defines the `countControlledHexesInRegion` function shape (export function countControlledHexesInRegion( controlRows: ReadonlyArray<{ h3Index: string; controllerPlayerId: string | null }>, regionHexes: readonly st).
+
+ * Purpose: Supports maintainability by documenting why `countControlledHexesInRegion` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function countControlledHexesInRegion(
   controlRows: ReadonlyArray<{ h3Index: string; controllerPlayerId: string | null }>,

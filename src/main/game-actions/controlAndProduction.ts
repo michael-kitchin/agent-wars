@@ -17,16 +17,144 @@ import { logDebug } from '../logger';
 import { DEPLOYMENT_CAP_TYPE_ORDER, MAX_UNITS_PER_TYPE } from '../productionCaps';
 import { UNIT_COST_BY_TYPE, type BuildUnitType } from '../productionRules';
 
-type DeployedUnitsByType = { armor?: number; infantry?: number; naval?: number; air?: number };
-type ControlTransition = { h3Index: string; fromControllerPlayerId: string | null; toControllerPlayerId: string | null };
-type DeploymentCapReachedByPlayer = { human: BuildUnitType[]; opponent: BuildUnitType[] };
+/**
+ * Documents the `DeployedUnitsByType` type alias (type DeployedUnitsByType).
+
+ * Purpose: Supports maintainability by documenting why `DeployedUnitsByType` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+type DeployedUnitsByType = { /**
+ * Specifies the contract for the `armor` member (armor?: number;).
+
+ * Contract: Describes stable behavior for callers of `armor` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+armor?: number; /**
+ * Specifies the contract for the `infantry` member (infantry?: number;).
+
+ * Contract: Describes stable behavior for callers of `infantry` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+infantry?: number; /**
+ * Specifies the contract for the `naval` member (naval?: number;).
+
+ * Contract: Describes stable behavior for callers of `naval` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+naval?: number; /**
+ * Specifies the contract for the `air` member (air?: number).
+
+ * Contract: Describes stable behavior for callers of `air` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+air?: number };
+/**
+ * Documents the `ControlTransition` type alias (type ControlTransition).
+
+ * Purpose: Supports maintainability by documenting why `ControlTransition` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+type ControlTransition = { /**
+ * Specifies the contract for the `h3Index` member (h3Index: string;).
+
+ * Contract: Describes stable behavior for callers of `h3Index` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+h3Index: string; /**
+ * Specifies the contract for the `fromControllerPlayerId` member (fromControllerPlayerId: string | null;).
+
+ * Contract: Describes stable behavior for callers of `fromControllerPlayerId` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+fromControllerPlayerId: string | null; /**
+ * Specifies the contract for the `toControllerPlayerId` member (toControllerPlayerId: string | null).
+
+ * Contract: Describes stable behavior for callers of `toControllerPlayerId` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+toControllerPlayerId: string | null };
+/**
+ * Documents the `DeploymentCapReachedByPlayer` type alias (type DeploymentCapReachedByPlayer).
+
+ * Purpose: Supports maintainability by documenting why `DeploymentCapReachedByPlayer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+type DeploymentCapReachedByPlayer = { /**
+ * Specifies the contract for the `human` member (human: BuildUnitType[];).
+
+ * Contract: Describes stable behavior for callers of `human` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+human: BuildUnitType[]; /**
+ * Specifies the contract for the `opponent` member (opponent: BuildUnitType[]).
+
+ * Contract: Describes stable behavior for callers of `opponent` in this codebase.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+opponent: BuildUnitType[] };
+/**
+ * Documents the module-scope binding `CONTROL_UNIT_TYPES` (CONTROL_UNIT_TYPES).
+
+ * Purpose: Supports maintainability by documenting why `CONTROL_UNIT_TYPES` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const CONTROL_UNIT_TYPES = ['infantry', 'armor', 'naval'] as const;
+/**
+ * Documents the module-scope binding `CONTROL_UNIT_TYPE_SET` (CONTROL_UNIT_TYPE_SET).
+
+ * Purpose: Supports maintainability by documenting why `CONTROL_UNIT_TYPE_SET` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const CONTROL_UNIT_TYPE_SET = new Set<string>(CONTROL_UNIT_TYPES);
 
+/**
+ * Defines the `currentPlanningTurnNumber` function shape (function currentPlanningTurnNumber(): number).
+
+ * Purpose: Supports maintainability by documenting why `currentPlanningTurnNumber` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function currentPlanningTurnNumber(): number {
   return dbGetOne<{ turnNumber: number }>('SELECT turn_number AS turnNumber FROM turn_state WHERE id = 1')?.turnNumber ?? 1;
 }
 
+/**
+ * Defines the `spawnProducedUnitsForHex` function shape (function spawnProducedUnitsForHex( h3Index: string, controllerPlayerId: string, unitTypes: BuildUnitType[], unitCountsByPlayerType: Map<string, numb).
+
+ * Purpose: Supports maintainability by documenting why `spawnProducedUnitsForHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function spawnProducedUnitsForHex(
   h3Index: string,
   controllerPlayerId: string,
@@ -69,12 +197,12 @@ function spawnProducedUnitsForHex(
 }
 
 /**
- * Why this exists:
- *     Resolves post-resolution res-1 control ownership from control-capable occupancy and movement traversal.
- * When to use:
- *     Called once per turn after movement/combat outcomes are applied and before production processing.
- * What to expect:
- *     Returns persisted ownership transitions where infantry/armor/naval exclusively occupy or uniquely traversed an empty hex.
+ * Defines the `resolveRes1ControlAfterCombatAndMovement` function shape (export function resolveRes1ControlAfterCombatAndMovement().
+
+ * Purpose: Supports maintainability by documenting why `resolveRes1ControlAfterCombatAndMovement` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function resolveRes1ControlAfterCombatAndMovement(
   traversedHexesByPlayer?: Record<'human' | 'opponent', Set<string>>
@@ -129,6 +257,14 @@ export function resolveRes1ControlAfterCombatAndMovement(
   return transitions;
 }
 
+/**
+ * Defines the `processProductionAfterControlResolution` function shape (export function processProductionAfterControlResolution(): { deployedByPlayer: { human: DeployedUnitsByType; opponent: DeployedUnitsByType }; capReachedBy).
+
+ * Purpose: Supports maintainability by documenting why `processProductionAfterControlResolution` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function processProductionAfterControlResolution(): {
   deployedByPlayer: { human: DeployedUnitsByType; opponent: DeployedUnitsByType };
   capReachedByPlayer: DeploymentCapReachedByPlayer;
@@ -235,12 +371,12 @@ export function processProductionAfterControlResolution(): {
 }
 
 /**
- * Why this exists:
- *     Collects per-player hex traversal for control resolution from committed movement orders.
- * When to use:
- *     Build the traversal input for `resolveRes1ControlAfterCombatAndMovement` during turn resolution.
- * What to expect:
- *     Returns de-duplicated traversed hex sets for control-capable unit types only (infantry/armor/naval).
+ * Defines the `collectTraversedHexesByPlayer` function shape (export function collectTraversedHexesByPlayer( orders: Array<{ unitId: string; toH3Index: string }>, unitsBeforeMove: Array<{ id: string; player: string;).
+
+ * Purpose: Supports maintainability by documenting why `collectTraversedHexesByPlayer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function collectTraversedHexesByPlayer(
   orders: Array<{ unitId: string; toH3Index: string }>,

@@ -12,55 +12,309 @@ import { isWithinGridRangeSafe } from '../game-actions/gridRange';
 import { logDebug, logTrace } from '../logger';
 import { logHexControllerParityMismatch } from '../snapshotDbParity';
 import { buildPromptTableLines } from '../promptTableUtils';
+/**
+ * Documents the module-scope binding `ENEMY_PLAYER` (ENEMY_PLAYER).
 
-const ENEMY_PLAYER = 'human';
+ * Purpose: Supports maintainability by documenting why `ENEMY_PLAYER` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+
+const ENEMY_PLAYER = 'human';/**
+ * Documents the module-scope binding `FRIENDLY_PLAYER` (FRIENDLY_PLAYER).
+
+ * Purpose: Supports maintainability by documenting why `FRIENDLY_PLAYER` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+
 const FRIENDLY_PLAYER = 'opponent';
+/**
+ * Documents the module-scope binding `ACTION_MOVES_MELEE` (ACTION_MOVES_MELEE).
 
-const ACTION_MOVES_MELEE = 'move/melee';
-const ACTION_RANGED = 'ranged attack';
-const ACTION_AIR_STRIKES = 'air strike';
+ * Purpose: Supports maintainability by documenting why `ACTION_MOVES_MELEE` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+
+const ACTION_MOVES_MELEE = 'move/melee';/**
+ * Documents the module-scope binding `ACTION_RANGED` (ACTION_RANGED).
+
+ * Purpose: Supports maintainability by documenting why `ACTION_RANGED` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+
+const ACTION_RANGED = 'ranged attack';/**
+ * Documents the module-scope binding `ACTION_AIR_STRIKES` (ACTION_AIR_STRIKES).
+
+ * Purpose: Supports maintainability by documenting why `ACTION_AIR_STRIKES` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+
+const ACTION_AIR_STRIKES = 'air strike';/**
+ * Documents the module-scope binding `BUCKET_TITLES` (BUCKET_TITLES: Array<{ bucket: PossibleActionTableRow['bucket']; title: string }>).
+
+ * Purpose: Supports maintainability by documenting why `BUCKET_TITLES` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+
 const BUCKET_TITLES: Array<{ bucket: PossibleActionTableRow['bucket']; title: string }> = [
   { bucket: 'homeland', title: 'Enemy homeland hexes' },
   { bucket: 'nearest', title: 'Hexes nearest to enemy homeland' },
   { bucket: 'other', title: 'Other hexes' },
-];
+];/**
+ * Documents the module-scope binding `BUCKET_PRIORITY` (BUCKET_PRIORITY: Record<PossibleActionTableRow['bucket'], number>).
+
+ * Purpose: Supports maintainability by documenting why `BUCKET_PRIORITY` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+
 const BUCKET_PRIORITY: Record<PossibleActionTableRow['bucket'], number> = {
-  homeland: 0,
-  nearest: 1,
-  other: 2,
+   /**
+   * Documents the object literal property `homeland` (homeland: 0).
+
+   * Purpose: Supports maintainability by documenting why `homeland` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ homeland: 0,
+   /**
+   * Documents the object literal property `nearest` (nearest: 1).
+
+   * Purpose: Supports maintainability by documenting why `nearest` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ nearest: 1,
+   /**
+   * Documents the object literal property `other` (other: 2).
+
+   * Purpose: Supports maintainability by documenting why `other` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ other: 2,
 };
+/**
+ * Documents the `PossibleActionTableRow` interface as a named contract surface (export interface PossibleActionTableRow).
 
-/** Row shape for markdown tables under homeland / nearest / other subsections. */
+ * Purpose: Supports maintainability by documenting why `PossibleActionTableRow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+
 export interface PossibleActionTableRow {
-  bucket: 'homeland' | 'nearest' | 'other';
-  unitId: string;
-  unitType: string;
-  actionTypes: string;
-  targetH3: string;
-  distance: number;
-  enemySummary: string;
-  featuresSummary: string;
-  enemyUnitCount: number;
-  urbanHexCount: number;
-}
+   /**
+   * Specifies the contract for the `bucket` member (bucket: 'homeland' | 'nearest' | 'other';).
 
-/** Removes the unit's current hex from briefing lists (not a meaningful destination/target line). */
+   * Contract: Describes stable behavior for callers of `bucket` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ bucket: 'homeland' | 'nearest' | 'other';
+   /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+
+   * Contract: Describes stable behavior for callers of `unitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ unitId: string;
+   /**
+   * Specifies the contract for the `unitType` member (unitType: string;).
+
+   * Contract: Describes stable behavior for callers of `unitType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ unitType: string;
+   /**
+   * Specifies the contract for the `actionTypes` member (actionTypes: string;).
+
+   * Contract: Describes stable behavior for callers of `actionTypes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ actionTypes: string;
+   /**
+   * Specifies the contract for the `targetH3` member (targetH3: string;).
+
+   * Contract: Describes stable behavior for callers of `targetH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ targetH3: string;
+   /**
+   * Specifies the contract for the `distance` member (distance: number;).
+
+   * Contract: Describes stable behavior for callers of `distance` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ distance: number;
+   /**
+   * Specifies the contract for the `enemySummary` member (enemySummary: string;).
+
+   * Contract: Describes stable behavior for callers of `enemySummary` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ enemySummary: string;
+   /**
+   * Specifies the contract for the `featuresSummary` member (featuresSummary: string;).
+
+   * Contract: Describes stable behavior for callers of `featuresSummary` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ featuresSummary: string;
+   /**
+   * Specifies the contract for the `enemyUnitCount` member (enemyUnitCount: number;).
+
+   * Contract: Describes stable behavior for callers of `enemyUnitCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ enemyUnitCount: number;
+   /**
+   * Specifies the contract for the `urbanHexCount` member (urbanHexCount: number;).
+
+   * Contract: Describes stable behavior for callers of `urbanHexCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ urbanHexCount: number;
+}
+/**
+ * Defines the `excludeUnitCurrentHex` function shape (function excludeUnitCurrentHex(unitH3: string, hexes: string[]): string[]).
+
+ * Purpose: Supports maintainability by documenting why `excludeUnitCurrentHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+
 function excludeUnitCurrentHex(unitH3: string, hexes: string[]): string[] {
   return hexes.filter((h3) => h3 !== unitH3);
 }
+/**
+ * Documents the `InfraCounts` interface as a named contract surface (interface InfraCounts).
+
+ * Purpose: Supports maintainability by documenting why `InfraCounts` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 interface InfraCounts {
-  urban: number;
-  seaport: number;
-  airport: number;
+   /**
+   * Specifies the contract for the `urban` member (urban: number;).
+
+   * Contract: Describes stable behavior for callers of `urban` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ urban: number;
+   /**
+   * Specifies the contract for the `seaport` member (seaport: number;).
+
+   * Contract: Describes stable behavior for callers of `seaport` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ seaport: number;
+   /**
+   * Specifies the contract for the `airport` member (airport: number;).
+
+   * Contract: Describes stable behavior for callers of `airport` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ airport: number;
 }
+/**
+ * Documents the `IndexedState` interface as a named contract surface (interface IndexedState).
+
+ * Purpose: Supports maintainability by documenting why `IndexedState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 interface IndexedState {
-  infraByHex: Map<string, InfraCounts>;
-  controlByHex: Map<string, string | null>;
-  enemyUnitsByHex: Map<string, Array<{ unitType: string }>>;
-  hexSet: Set<string>;
+   /**
+   * Specifies the contract for the `infraByHex` member (infraByHex: Map<string, InfraCounts>;).
+
+   * Contract: Describes stable behavior for callers of `infraByHex` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ infraByHex: Map<string, InfraCounts>;
+   /**
+   * Specifies the contract for the `controlByHex` member (controlByHex: Map<string, string | null>;).
+
+   * Contract: Describes stable behavior for callers of `controlByHex` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ controlByHex: Map<string, string | null>;
+   /**
+   * Specifies the contract for the `enemyUnitsByHex` member (enemyUnitsByHex: Map<string, Array<{ unitType: string }>>;).
+
+   * Contract: Describes stable behavior for callers of `enemyUnitsByHex` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ enemyUnitsByHex: Map<string, Array<{ unitType: string }>>;
+   /**
+   * Specifies the contract for the `hexSet` member (hexSet: Set<string>;).
+
+   * Contract: Describes stable behavior for callers of `hexSet` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ hexSet: Set<string>;
 }
+/**
+ * Defines the `buildIndexedState` function shape (function buildIndexedState(state: GameStateSnapshot): IndexedState).
+
+ * Purpose: Supports maintainability by documenting why `buildIndexedState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function buildIndexedState(state: GameStateSnapshot): IndexedState {
   const infraByHex = new Map<string, InfraCounts>();
@@ -89,10 +343,26 @@ function buildIndexedState(state: GameStateSnapshot): IndexedState {
     hexSet: new Set(state.hexes.map((h) => h.h3Index)),
   };
 }
+/**
+ * Defines the `enemyHomelandHexSet` function shape (function enemyHomelandHexSet(state: GameStateSnapshot): Set<string>).
+
+ * Purpose: Supports maintainability by documenting why `enemyHomelandHexSet` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function enemyHomelandHexSet(state: GameStateSnapshot): Set<string> {
   return new Set(state.humanHomeRegionHexes ?? []);
 }
+/**
+ * Defines the `minDistanceToHomeland` function shape (function minDistanceToHomeland(h3: string, homeland: Set<string>): number | null).
+
+ * Purpose: Supports maintainability by documenting why `minDistanceToHomeland` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function minDistanceToHomeland(h3: string, homeland: Set<string>): number | null {
   if (homeland.size === 0) return null;
@@ -107,18 +377,15 @@ function minDistanceToHomeland(h3: string, homeland: Set<string>): number | null
   }
   return min === Infinity ? null : min;
 }
+/**
+ * Defines the `partitionHomelandNearestOther` function shape (export function partitionHomelandNearestOther(legalHexes: string[], homelandSet: Set<string>): { homeland: string[]; nearest: string[]; other: string[]).
 
-/**
- * Why this exists:
- *     Encodes the briefing rule that "Enemy homeland hexes" and "Hexes nearest to enemy homeland" are mutually exclusive,
- *     and that all targets at the minimum distance to homeland are included when using the nearest bucket.
- * When to use:
- *     When formatting possible moves, ranged targets, or air-strike targets for the Commander's Briefing (and in tests).
- * What to expect:
- *     Returns three disjoint lists: targets inside scenario enemy homeland (if any legal targets hit it), else all targets
- *     at minimum grid distance to that homeland (ties kept), plus remaining targets under "other". Empty homeland set
- *     puts every legal hex in "other" and leaves homeland and nearest empty.
+ * Purpose: Supports maintainability by documenting why `partitionHomelandNearestOther` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
+
 export function partitionHomelandNearestOther(legalHexes: string[], homelandSet: Set<string>): {
   homeland: string[];
   nearest: string[];
@@ -144,10 +411,26 @@ export function partitionHomelandNearestOther(legalHexes: string[], homelandSet:
   const other = withDist.filter((x) => x.d > minD).map((x) => x.h).sort(compareHexIds);
   return { homeland: [], nearest, other };
 }
+/**
+ * Defines the `compareHexIds` function shape (function compareHexIds(a: string, b: string): number).
+
+ * Purpose: Supports maintainability by documenting why `compareHexIds` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function compareHexIds(a: string, b: string): number {
   return a.localeCompare(b);
 }
+/**
+ * Defines the `sortHexesByLatLng` function shape (function sortHexesByLatLng(hexes: string[], latLngByH3: Map<string, [number, number]>): string[]).
+
+ * Purpose: Supports maintainability by documenting why `sortHexesByLatLng` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function sortHexesByLatLng(hexes: string[], latLngByH3: Map<string, [number, number]>): string[] {
   return [...hexes].sort((a, b) => {
@@ -160,12 +443,27 @@ function sortHexesByLatLng(hexes: string[], latLngByH3: Map<string, [number, num
     return compareHexIds(a, b);
   });
 }
+/**
+ * Defines the `getInfra` function shape (function getInfra(indexed: IndexedState, h3: string): InfraCounts).
+
+ * Purpose: Supports maintainability by documenting why `getInfra` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function getInfra(indexed: IndexedState, h3: string): InfraCounts {
   return indexed.infraByHex.get(h3) ?? { urban: 0, seaport: 0, airport: 0 };
 }
+/**
+ * Defines the `describeEnemyUnitsAtHex` function shape (function describeEnemyUnitsAtHex(indexed: IndexedState, h3: string): string | null).
 
-/** Comma-separated enemy unit counts at hex, or null when no enemies (omit from briefing). */
+ * Purpose: Supports maintainability by documenting why `describeEnemyUnitsAtHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+
 function describeEnemyUnitsAtHex(indexed: IndexedState, h3: string): string | null {
   const atHex = indexed.enemyUnitsByHex.get(h3) ?? [];
   if (atHex.length === 0) return null;
@@ -178,6 +476,14 @@ function describeEnemyUnitsAtHex(indexed: IndexedState, h3: string): string | nu
     .map(([t, n]) => `${n} ${t}`)
     .join(', ');
 }
+/**
+ * Defines the `describeInfrastructure` function shape (function describeInfrastructure(inf: InfraCounts): string | null).
+
+ * Purpose: Supports maintainability by documenting why `describeInfrastructure` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function describeInfrastructure(inf: InfraCounts): string | null {
   const parts: string[] = [];
@@ -187,6 +493,14 @@ function describeInfrastructure(inf: InfraCounts): string | null {
   if (parts.length === 0) return null;
   return parts.join(', ');
 }
+/**
+ * Defines the `strikeKindsForHex` function shape (function strikeKindsForHex(indexed: IndexedState, targetH3: string): string[]).
+
+ * Purpose: Supports maintainability by documenting why `strikeKindsForHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function strikeKindsForHex(indexed: IndexedState, targetH3: string): string[] {
   const kinds: string[] = [];
@@ -197,6 +511,14 @@ function strikeKindsForHex(indexed: IndexedState, targetH3: string): string[] {
   if (inf.seaport > 0) kinds.push('seaport');
   return kinds;
 }
+/**
+ * Defines the `featuresCellForStrike` function shape (function featuresCellForStrike(indexed: IndexedState, h3: string): string).
+
+ * Purpose: Supports maintainability by documenting why `featuresCellForStrike` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function featuresCellForStrike(indexed: IndexedState, h3: string): string {
   const inf = describeInfrastructure(getInfra(indexed, h3));
@@ -207,14 +529,38 @@ function featuresCellForStrike(indexed: IndexedState, h3: string): string {
   if (inf) return inf;
   return '—';
 }
+/**
+ * Defines the `featuresCellForHex` function shape (function featuresCellForHex(indexed: IndexedState, h3: string): string).
+
+ * Purpose: Supports maintainability by documenting why `featuresCellForHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function featuresCellForHex(indexed: IndexedState, h3: string): string {
   return describeInfrastructure(getInfra(indexed, h3)) ?? '—';
 }
+/**
+ * Defines the `enemyCell` function shape (function enemyCell(indexed: IndexedState, h3: string): string).
+
+ * Purpose: Supports maintainability by documenting why `enemyCell` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function enemyCell(indexed: IndexedState, h3: string): string {
   return describeEnemyUnitsAtHex(indexed, h3) ?? '—';
 }
+/**
+ * Defines the `safeGridDistance` function shape (function safeGridDistance(from: string, to: string): number | null).
+
+ * Purpose: Supports maintainability by documenting why `safeGridDistance` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function safeGridDistance(from: string, to: string): number | null {
   try {
@@ -223,19 +569,115 @@ function safeGridDistance(from: string, to: string): number | null {
     return null;
   }
 }
+/**
+ * Documents the `RawPossibleActionRow` interface as a named contract surface (interface RawPossibleActionRow).
+
+ * Purpose: Supports maintainability by documenting why `RawPossibleActionRow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 interface RawPossibleActionRow {
-  bucket: 'homeland' | 'nearest' | 'other';
-  unitId: string;
-  unitType: string;
-  actionType: string;
-  targetH3: string;
-  distance: number;
-  enemySummary: string;
-  featuresSummary: string;
-  enemyUnitCount: number;
-  urbanHexCount: number;
+   /**
+   * Specifies the contract for the `bucket` member (bucket: 'homeland' | 'nearest' | 'other';).
+
+   * Contract: Describes stable behavior for callers of `bucket` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ bucket: 'homeland' | 'nearest' | 'other';
+   /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+
+   * Contract: Describes stable behavior for callers of `unitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ unitId: string;
+   /**
+   * Specifies the contract for the `unitType` member (unitType: string;).
+
+   * Contract: Describes stable behavior for callers of `unitType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ unitType: string;
+   /**
+   * Specifies the contract for the `actionType` member (actionType: string;).
+
+   * Contract: Describes stable behavior for callers of `actionType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ actionType: string;
+   /**
+   * Specifies the contract for the `targetH3` member (targetH3: string;).
+
+   * Contract: Describes stable behavior for callers of `targetH3` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ targetH3: string;
+   /**
+   * Specifies the contract for the `distance` member (distance: number;).
+
+   * Contract: Describes stable behavior for callers of `distance` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ distance: number;
+   /**
+   * Specifies the contract for the `enemySummary` member (enemySummary: string;).
+
+   * Contract: Describes stable behavior for callers of `enemySummary` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ enemySummary: string;
+   /**
+   * Specifies the contract for the `featuresSummary` member (featuresSummary: string;).
+
+   * Contract: Describes stable behavior for callers of `featuresSummary` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ featuresSummary: string;
+   /**
+   * Specifies the contract for the `enemyUnitCount` member (enemyUnitCount: number;).
+
+   * Contract: Describes stable behavior for callers of `enemyUnitCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ enemyUnitCount: number;
+   /**
+   * Specifies the contract for the `urbanHexCount` member (urbanHexCount: number;).
+
+   * Contract: Describes stable behavior for callers of `urbanHexCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ urbanHexCount: number;
 }
+/**
+ * Defines the `appendRowsForLegalHexes` function shape (function appendRowsForLegalHexes(args: { rows: RawPossibleActionRow[]; unitId: string; unitType: string; unitH3: string; actionType: string; l).
+
+ * Purpose: Supports maintainability by documenting why `appendRowsForLegalHexes` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function appendRowsForLegalHexes(args: {
   rows: RawPossibleActionRow[];
@@ -272,21 +714,27 @@ function appendRowsForLegalHexes(args: {
   addForBucket('nearest', parts.nearest);
   addForBucket('other', parts.other);
 }
+/**
+ * Defines the `airBaseHasIntactAirport` function shape (function airBaseHasIntactAirport(indexed: IndexedState, airH3: string): boolean).
+
+ * Purpose: Supports maintainability by documenting why `airBaseHasIntactAirport` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function airBaseHasIntactAirport(indexed: IndexedState, airH3: string): boolean {
   return getInfra(indexed, airH3).airport > 0;
 }
-
 /**
- * Why this exists:
- *     Lists air ferry destinations for the Commander's Briefing using the same geometric and infrastructure rules as
- *     `validateFerryOrder`, while using snapshot control rows (not live DB reads) for inclusion.
- * When to use:
- *     Only from `buildPossibleUnitActionsMarkdown` for opponent `air` units with an intact base airport.
- * What to expect:
- *     H3 indices within ferry range with destination airports and `res1Control` matching the unit owner; parity logging
- *     may record mismatch against `getHexController` without altering the returned list.
+ * Defines the `collectLegalFerryDestinationHexes` function shape (function collectLegalFerryDestinationHexes().
+
+ * Purpose: Supports maintainability by documenting why `collectLegalFerryDestinationHexes` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
+
 function collectLegalFerryDestinationHexes(
   unit: { id: string; h3Index: string; player: string; unitType: string },
   indexed: IndexedState
@@ -321,6 +769,14 @@ function collectLegalFerryDestinationHexes(
   }
   return [...out];
 }
+/**
+ * Defines the `collectRangedTargetHexes` function shape (function collectRangedTargetHexes(unitH3: string, unitType: string, indexed: IndexedState): string[]).
+
+ * Purpose: Supports maintainability by documenting why `collectRangedTargetHexes` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function collectRangedTargetHexes(unitH3: string, unitType: string, indexed: IndexedState): string[] {
   const r = getRange(unitType);
@@ -336,6 +792,14 @@ function collectRangedTargetHexes(unitH3: string, unitType: string, indexed: Ind
   }
   return [...out];
 }
+/**
+ * Defines the `collectStrikeHexesForAirUnit` function shape (function collectStrikeHexesForAirUnit(airH3: string, indexed: IndexedState): string[]).
+
+ * Purpose: Supports maintainability by documenting why `collectStrikeHexesForAirUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function collectStrikeHexesForAirUnit(airH3: string, indexed: IndexedState): string[] {
   try {
@@ -349,20 +813,76 @@ function collectStrikeHexesForAirUnit(airH3: string, indexed: IndexedState): str
     return out;
   }
 }
+/**
+ * Documents the module-scope binding `TABLE_HEADERS` (TABLE_HEADERS).
+
+ * Purpose: Supports maintainability by documenting why `TABLE_HEADERS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 const TABLE_HEADERS = ['Unit ID', 'Unit Type', 'Action Types', 'Hex', 'Distance', 'Enemy Units', 'Hex Features'];
+/**
+ * Documents the module-scope binding `ACTION_TYPE_ORDER` (ACTION_TYPE_ORDER: Record<string, number>).
+
+ * Purpose: Supports maintainability by documenting why `ACTION_TYPE_ORDER` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 const ACTION_TYPE_ORDER: Record<string, number> = {
-  'move/melee': 0,
-  'ranged attack': 1,
-  'air strike': 2,
+   /**
+   * Documents the object literal property `move/melee` ('move/melee': 0).
+
+   * Purpose: Supports maintainability by documenting why `move/melee` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ 'move/melee': 0,
+   /**
+   * Documents the object literal property `ranged attack` ('ranged attack': 1).
+
+   * Purpose: Supports maintainability by documenting why `ranged attack` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ 'ranged attack': 1,
+   /**
+   * Documents the object literal property `air strike` ('air strike': 2).
+
+   * Purpose: Supports maintainability by documenting why `air strike` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+ 'air strike': 2,
 };
+/**
+ * Defines the `preferredSummary` function shape (function preferredSummary(a: string, b: string): string).
+
+ * Purpose: Supports maintainability by documenting why `preferredSummary` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function preferredSummary(a: string, b: string): string {
   if (a === '—') return b;
   if (b === '—') return a;
   return b.length > a.length ? b : a;
 }
+/**
+ * Defines the `aggregateRows` function shape (function aggregateRows(rows: RawPossibleActionRow[]): PossibleActionTableRow[]).
+
+ * Purpose: Supports maintainability by documenting why `aggregateRows` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function aggregateRows(rows: RawPossibleActionRow[]): PossibleActionTableRow[] {
   const byKey = new Map<string, { row: Omit<PossibleActionTableRow, 'actionTypes'>; actionTypes: Set<string> }>();
@@ -402,10 +922,26 @@ function aggregateRows(rows: RawPossibleActionRow[]): PossibleActionTableRow[] {
   }
   return out;
 }
+/**
+ * Defines the `markdownTableLines` function shape (function markdownTableLines(rows: string[][]): string[]).
+
+ * Purpose: Supports maintainability by documenting why `markdownTableLines` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function markdownTableLines(rows: string[][]): string[] {
   return buildPromptTableLines(TABLE_HEADERS, rows);
 }
+/**
+ * Defines the `compareTableRowsForUnitPriority` function shape (function compareTableRowsForUnitPriority().
+
+ * Purpose: Supports maintainability by documenting why `compareTableRowsForUnitPriority` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function compareTableRowsForUnitPriority(
   a: PossibleActionTableRow,
@@ -427,6 +963,14 @@ function compareTableRowsForUnitPriority(
   if (ca !== 0) return ca;
   return a.unitType.localeCompare(b.unitType);
 }
+/**
+ * Defines the `selectTopRowsPerUnit` function shape (function selectTopRowsPerUnit().
+
+ * Purpose: Supports maintainability by documenting why `selectTopRowsPerUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function selectTopRowsPerUnit(
   rows: PossibleActionTableRow[],
@@ -447,6 +991,14 @@ function selectTopRowsPerUnit(
   }
   return out;
 }
+/**
+ * Defines the `groupRowsByBucket` function shape (function groupRowsByBucket(rows: PossibleActionTableRow[]): Record<PossibleActionTableRow['bucket'], PossibleActionTableRow[]>).
+
+ * Purpose: Supports maintainability by documenting why `groupRowsByBucket` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 
 function groupRowsByBucket(rows: PossibleActionTableRow[]): Record<PossibleActionTableRow['bucket'], PossibleActionTableRow[]> {
   const grouped: Record<PossibleActionTableRow['bucket'], PossibleActionTableRow[]> = {
@@ -457,16 +1009,15 @@ function groupRowsByBucket(rows: PossibleActionTableRow[]): Record<PossibleActio
   for (const row of rows) grouped[row.bucket].push(row);
   return grouped;
 }
+/**
+ * Defines the `buildPossibleUnitActionsMarkdown` function shape (export function buildPossibleUnitActionsMarkdown(args: { state: GameStateSnapshot; latLngByH3: Map<string, [number, number]>; formatLatLng: (ll: [numbe).
 
-/**
- * Why this exists:
- *     Produces the structured "Possible unit actions" briefing section so the model sees legal moves and attacks without extra tool calls.
- * When to use:
- *     During `formatBriefing` when precomputation is enabled (opponent perspective snapshot).
- * What to expect:
- *     Markdown with three optional subsections (Enemy homeland hexes / nearest / other), each a table mixing units and action types.
- *     Air ferry destinations use snapshot `res1Control` only; error-level logs may record parity disagreement for those hexes.
+ * Purpose: Supports maintainability by documenting why `buildPossibleUnitActionsMarkdown` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
+
 export function buildPossibleUnitActionsMarkdown(args: {
   state: GameStateSnapshot;
   latLngByH3: Map<string, [number, number]>;

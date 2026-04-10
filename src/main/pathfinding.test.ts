@@ -6,7 +6,14 @@
 import * as assert from 'assert';
 import { partitionPathByTurn } from './pathfinding';
 
-/** Single-turn path: infantry (budget 1) moving 1 hex produces one segment. */
+/**
+ * Defines the `testSingleStepInfantry` function shape (function testSingleStepInfantry(): void).
+
+ * Purpose: Supports maintainability by documenting why `testSingleStepInfantry` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testSingleStepInfantry(): void {
   const path = ['A', 'B'];
   const segments = partitionPathByTurn(path, 1);
@@ -17,7 +24,14 @@ function testSingleStepInfantry(): void {
   assert.strictEqual(segments[0]!.turn, 1);
 }
 
-/** Multi-turn path: infantry (budget 1) over 4 hexes needs 3 turns (3 edges). */
+/**
+ * Defines the `testMultiTurnInfantry` function shape (function testMultiTurnInfantry(): void).
+
+ * Purpose: Supports maintainability by documenting why `testMultiTurnInfantry` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testMultiTurnInfantry(): void {
   const path = ['A', 'B', 'C', 'D'];
   const segments = partitionPathByTurn(path, 1);
@@ -30,7 +44,14 @@ function testMultiTurnInfantry(): void {
   assert.strictEqual(segments[2]!.endHex, 'D');
 }
 
-/** Multi-turn path: armor (budget 2) over 5 hexes needs 2 turns. */
+/**
+ * Defines the `testMultiTurnArmor` function shape (function testMultiTurnArmor(): void).
+
+ * Purpose: Supports maintainability by documenting why `testMultiTurnArmor` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testMultiTurnArmor(): void {
   const path = ['A', 'B', 'C', 'D', 'E'];
   const segments = partitionPathByTurn(path, 2);
@@ -41,7 +62,14 @@ function testMultiTurnArmor(): void {
   assert.strictEqual(segments[1]!.movementSpent, 2);
 }
 
-/** Hex continuity: each turn starts where the previous turn ended. */
+/**
+ * Defines the `testHexContinuity` function shape (function testHexContinuity(): void).
+
+ * Purpose: Supports maintainability by documenting why `testHexContinuity` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testHexContinuity(): void {
   const path = ['A', 'B', 'C', 'D', 'E', 'F'];
   const segments = partitionPathByTurn(path, 2);
@@ -54,17 +82,38 @@ function testHexContinuity(): void {
   }
 }
 
-/** Edge case: path with only the origin (length 1) returns no segments. */
+/**
+ * Defines the `testSingleHexReturnsEmpty` function shape (function testSingleHexReturnsEmpty(): void).
+
+ * Purpose: Supports maintainability by documenting why `testSingleHexReturnsEmpty` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testSingleHexReturnsEmpty(): void {
   assert.deepStrictEqual(partitionPathByTurn(['A'], 2), []);
 }
 
-/** Edge case: empty path returns no segments. */
+/**
+ * Defines the `testEmptyPathReturnsEmpty` function shape (function testEmptyPathReturnsEmpty(): void).
+
+ * Purpose: Supports maintainability by documenting why `testEmptyPathReturnsEmpty` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testEmptyPathReturnsEmpty(): void {
   assert.deepStrictEqual(partitionPathByTurn([], 2), []);
 }
 
-/** No zero-movement segments: every segment should have movementSpent > 0. */
+/**
+ * Defines the `testNoZeroMovementSegments` function shape (function testNoZeroMovementSegments(): void).
+
+ * Purpose: Supports maintainability by documenting why `testNoZeroMovementSegments` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testNoZeroMovementSegments(): void {
   const path = ['A', 'B', 'C', 'D'];
   const segments = partitionPathByTurn(path, 1);
@@ -73,7 +122,14 @@ function testNoZeroMovementSegments(): void {
   }
 }
 
-/** Armor with exact budget match: 3 edges with budget 3 = 1 turn. */
+/**
+ * Defines the `testExactBudgetMatch` function shape (function testExactBudgetMatch(): void).
+
+ * Purpose: Supports maintainability by documenting why `testExactBudgetMatch` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testExactBudgetMatch(): void {
   const path = ['A', 'B', 'C', 'D'];
   const segments = partitionPathByTurn(path, 3);
@@ -82,6 +138,14 @@ function testExactBudgetMatch(): void {
   assert.strictEqual(segments[0]!.movementSpent, 3);
 }
 
+/**
+ * Defines the `run` function shape (function run(): void).
+
+ * Purpose: Supports maintainability by documenting why `run` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function run(): void {
   testSingleStepInfantry();
   testMultiTurnInfantry();

@@ -11,8 +11,12 @@ import {
 } from '../shared/pipelineTerrain';
 
 /**
- * Maps a pipeline terrain kind to DB/pathfinding passability (`water` → `water`, `coastal/wetlands` keep dual-domain passability, else `land`).
- * Logs at trace with the kind for troubleshooting seeding and tool code paths.
+ * Defines the `pipelineTerrainToPassability` function shape (export function pipelineTerrainToPassability(kind: PipelineTerrainKind): PassabilityTerrain).
+
+ * Purpose: Supports maintainability by documenting why `pipelineTerrainToPassability` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function pipelineTerrainToPassability(kind: PipelineTerrainKind): PassabilityTerrain {
   logTrace('terrainPassability pipelineTerrainToPassability', { kind });

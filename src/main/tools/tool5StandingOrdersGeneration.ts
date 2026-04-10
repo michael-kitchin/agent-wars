@@ -12,10 +12,26 @@ import {
   type StandingOrderRow,
 } from './tool5StandingOrdersShared';
 
+/**
+ * Defines the `deleteStandingOrder` function shape (function deleteStandingOrder(playerId: string, unitId: string): void).
+
+ * Purpose: Supports maintainability by documenting why `deleteStandingOrder` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function deleteStandingOrder(playerId: string, unitId: string): void {
   dbRun('DELETE FROM standing_orders WHERE player_id = ? AND unit_id = ?', [playerId, unitId]);
 }
 
+/**
+ * Defines the `updateStandingOrderComputedRoute` function shape (function updateStandingOrderComputedRoute().
+
+ * Purpose: Supports maintainability by documenting why `updateStandingOrderComputedRoute` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function updateStandingOrderComputedRoute(
   playerId: string,
   unitId: string,
@@ -36,8 +52,12 @@ function updateStandingOrderComputedRoute(
 }
 
 /**
- * Expires and updates standing order statuses: removes orders for destroyed units, sets arrived/blocked/target_destroyed.
- * Call at the start of each AI turn before generating orders. Mutates DB.
+ * Defines the `expireAndUpdateStatus` function shape (export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot): void).
+
+ * Purpose: Supports maintainability by documenting why `expireAndUpdateStatus` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot): void {
   logDebug('tool5StandingOrders expireAndUpdateStatus', { playerId, turnNumber: state.turnNumber });
@@ -92,9 +112,12 @@ export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot
 }
 
 /**
- * Generates concrete movement and ranged orders from all active standing orders for this turn.
- * Calls expireAndUpdateStatus first, then for each remaining order produces one movement and/or ranged order.
- * Returns orders in the same shape as LLM orders for merging in requestOrders.
+ * Defines the `generateOrdersForStandingOrders` function shape (export function generateOrdersForStandingOrders( playerId: string, state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: num).
+
+ * Purpose: Supports maintainability by documenting why `generateOrdersForStandingOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function generateOrdersForStandingOrders(
   playerId: string,
@@ -187,7 +210,6 @@ export function generateOrdersForStandingOrders(
         });
         continue;
       }
-      const endHex = routeResult.path[0]!.endHex;
       const toH3 = routeResult.orderToH3;
       if (toH3) {
         movementOrders.push({ unitId: row.unit_id, toH3Index: toH3 });
@@ -247,7 +269,6 @@ export function generateOrdersForStandingOrders(
       );
       if (routeResult.status === 'error') continue;
       if (routeResult.path.length > 0) {
-        const endHex = routeResult.path[0]!.endHex;
         const toH3 = routeResult.orderToH3;
         if (toH3) movementOrders.push({ unitId: row.unit_id, toH3Index: toH3 });
         const routePayload = toComputedRoutePayload(routeResult);

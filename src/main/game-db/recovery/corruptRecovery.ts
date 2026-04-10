@@ -3,10 +3,26 @@ import * as path from 'path';
 import { app, dialog } from 'electron';
 import { logDebug, logError } from '../../logger';
 
+/**
+ * Defines the `isoTimestampForFilename` function shape (function isoTimestampForFilename(): string).
+
+ * Purpose: Supports maintainability by documenting why `isoTimestampForFilename` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function isoTimestampForFilename(): string {
   return new Date().toISOString().replace(/:/g, '-');
 }
 
+/**
+ * Defines the `tryRenameCorruptSet` function shape (export function tryRenameCorruptSet(canonicalPath: string): boolean).
+
+ * Purpose: Supports maintainability by documenting why `tryRenameCorruptSet` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function tryRenameCorruptSet(canonicalPath: string): boolean {
   const parsed = path.parse(canonicalPath);
   const backupMain = path.join(parsed.dir, `${parsed.name}.corrupt.${isoTimestampForFilename()}${parsed.ext}`);
@@ -26,6 +42,14 @@ export function tryRenameCorruptSet(canonicalPath: string): boolean {
   }
 }
 
+/**
+ * Defines the `tryDeleteCanonicalAndSidecars` function shape (export function tryDeleteCanonicalAndSidecars(canonicalPath: string): boolean).
+
+ * Purpose: Supports maintainability by documenting why `tryDeleteCanonicalAndSidecars` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function tryDeleteCanonicalAndSidecars(canonicalPath: string): boolean {
   const paths = [`${canonicalPath}-wal`, `${canonicalPath}-shm`, canonicalPath];
   try {
@@ -40,6 +64,14 @@ export function tryDeleteCanonicalAndSidecars(canonicalPath: string): boolean {
   }
 }
 
+/**
+ * Defines the `silentRecoverCorruptDatabase` function shape (export function silentRecoverCorruptDatabase().
+
+ * Purpose: Supports maintainability by documenting why `silentRecoverCorruptDatabase` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function silentRecoverCorruptDatabase(
   canonicalPath: string,
   createFreshDatabaseAt: (canonicalPath: string) => void
@@ -55,12 +87,12 @@ export function silentRecoverCorruptDatabase(
 }
 
 /**
- * Why this exists:
- *     Performs UI-visible corrupt database recovery with one rename attempt and delete fallback before recreating the DB file.
- * When to use:
- *     On startup/open validation failures where user feedback and deterministic recovery behavior are required.
- * What to expect:
- *     Shows error dialogs, attempts rename/delete recovery, recreates database, and exits app when recovery cannot proceed.
+ * Defines the `recoverCorruptDatabaseUi` function shape (export function recoverCorruptDatabaseUi( canonicalPath: string, cause: unknown, deps: { closeDbHandle: () => void; createFreshDatabaseAt: (c).
+
+ * Purpose: Supports maintainability by documenting why `recoverCorruptDatabaseUi` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function recoverCorruptDatabaseUi(
   canonicalPath: string,

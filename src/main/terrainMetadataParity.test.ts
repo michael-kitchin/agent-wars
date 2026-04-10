@@ -21,16 +21,48 @@ import { classifyCellWithoutUrbanOverride } from './terrainClassifierFromMetadat
 import { parseTerrainRes1CsvText } from './terrainRes1Csv';
 import { parseTerrainRes4ExceptionsCsvText, resolveTerrainRes4ExceptionsCsvPath } from './terrainRes4Csv';
 
+/**
+ * Documents the module-scope binding `PARITY_MIN` (PARITY_MIN).
+
+ * Purpose: Supports maintainability by documenting why `PARITY_MIN` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const PARITY_MIN = 0.99;
 
+/**
+ * Defines the `res1CsvPath` function shape (function res1CsvPath(): string).
+
+ * Purpose: Supports maintainability by documenting why `res1CsvPath` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function res1CsvPath(): string {
   return path.join(process.cwd(), 'data', 'generated', 'terrain_res1_base.csv');
 }
 
+/**
+ * Defines the `parityRatio` function shape (function parityRatio(matches: number, total: number): number).
+
+ * Purpose: Supports maintainability by documenting why `parityRatio` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function parityRatio(matches: number, total: number): number {
   return total === 0 ? 1 : matches / total;
 }
 
+/**
+ * Defines the `testRes1MetadataVsCsvParity` function shape (function testRes1MetadataVsCsvParity(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRes1MetadataVsCsvParity` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRes1MetadataVsCsvParity(): void {
   if (!fs.existsSync(res1CsvPath())) {
     console.log('terrainMetadataParity.test: skipped res1 parity (terrain_res1_base.csv missing)');
@@ -59,6 +91,14 @@ function testRes1MetadataVsCsvParity(): void {
   );
 }
 
+/**
+ * Defines the `testRes4OverridesVsCsvParity` function shape (function testRes4OverridesVsCsvParity(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRes4OverridesVsCsvParity` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRes4OverridesVsCsvParity(): void {
   let csvPath = '';
   try {
@@ -87,6 +127,14 @@ function testRes4OverridesVsCsvParity(): void {
   );
 }
 
+/**
+ * Defines the `main` function shape (function main(): void).
+
+ * Purpose: Supports maintainability by documenting why `main` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function main(): void {
   testRes1MetadataVsCsvParity();
   testRes4OverridesVsCsvParity();

@@ -10,16 +10,23 @@ import {
 } from './terrainMetadataLoad';
 import type { PipelineTerrainKind } from '../shared/pipelineTerrain';
 
+/**
+ * Documents the `WaterRelationKind` type alias (export type WaterRelationKind).
+
+ * Purpose: Supports maintainability by documenting why `WaterRelationKind` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export type WaterRelationKind = 'in_water' | 'coastal_band' | 'wetlands_band' | 'no_water';
 
 /**
- * Why this exists:
- *     Derive the water-mask relation string used by terrain classification from exported mask metrics.
- * When to use:
- *     Before interior / water / coastal / wetlands classification for each hex row.
- * What to expect:
- *     `in_water` matches `MaskPolygonMetrics.all_in_mask`; `no_water` when the cell does not intersect water.
- *     For intersecting mixed cells, classifies as `wetlands_band` when `water_edges <= 2`, otherwise `coastal_band`.
+ * Defines the `waterRelationFromMaskMetrics` function shape (export function waterRelationFromMaskMetrics().
+
+ * Purpose: Supports maintainability by documenting why `waterRelationFromMaskMetrics` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function waterRelationFromMaskMetrics(
   r: Pick<HexMetadataRecordRes1, 'all_water' | 'intersects_water' | 'water_edges'>
@@ -29,10 +36,26 @@ export function waterRelationFromMaskMetrics(
   return r.water_edges <= 2 ? 'wetlands_band' : 'coastal_band';
 }
 
+/**
+ * Defines the `landcoverDictNonEmpty` function shape (function landcoverDictNonEmpty(r: HexMetadataRecordRes1): boolean).
+
+ * Purpose: Supports maintainability by documenting why `landcoverDictNonEmpty` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function landcoverDictNonEmpty(r: HexMetadataRecordRes1): boolean {
   return r.arctic_mean != null || r.forest_mean != null || r.desert_mean != null;
 }
 
+/**
+ * Defines the `classifyInteriorBiome` function shape (function classifyInteriorBiome( r: HexMetadataRecordRes1, t: ClassifierThresholds ): Exclude<PipelineTerrainKind, 'water' | 'coastal' | 'wetlands'> {).
+
+ * Purpose: Supports maintainability by documenting why `classifyInteriorBiome` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function classifyInteriorBiome(
   r: HexMetadataRecordRes1,
   t: ClassifierThresholds
@@ -51,12 +74,12 @@ function classifyInteriorBiome(
 }
 
 /**
- * Why this exists:
- *     Replay `classify_cell` from aggregated metadata means (res-1 or res-4) without urban override.
- * When to use:
- *     For every parent hex and as the base step for res-4 before urban replacement.
- * What to expect:
- *     Returns pipeline terrain kinds; empty land-cover aggregates yield `nodataFallback` before water checks, matching Python order.
+ * Defines the `classifyCellWithoutUrbanOverride` function shape (export function classifyCellWithoutUrbanOverride( r: HexMetadataRecordRes1, t: ClassifierThresholds, nodataFallback: PipelineTerrainKind ): PipelineTe).
+
+ * Purpose: Supports maintainability by documenting why `classifyCellWithoutUrbanOverride` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function classifyCellWithoutUrbanOverride(
   r: HexMetadataRecordRes1,
@@ -72,12 +95,12 @@ export function classifyCellWithoutUrbanOverride(
 }
 
 /**
- * Why this exists:
- *     Classify a res-4 metadata row into the base terrain kind (urban handled separately as an overlay state).
- * When to use:
- *     When building res-4 base terrain kinds and renderer override rows.
- * What to expect:
- *     Same classification as res-1 replay (`classifyCellWithoutUrbanOverride`) with no urban substitution.
+ * Defines the `classifyRes4TerrainKind` function shape (export function classifyRes4TerrainKind( r: HexMetadataRecordRes4, t: ClassifierThresholds, nodataFallback: PipelineTerrainKind ): PipelineTerrainKind).
+
+ * Purpose: Supports maintainability by documenting why `classifyRes4TerrainKind` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function classifyRes4TerrainKind(
   r: HexMetadataRecordRes4,
@@ -88,12 +111,12 @@ export function classifyRes4TerrainKind(
 }
 
 /**
- * Why this exists:
- *     Determine whether a res-4 hex should be marked as urban overlay without changing its base terrain kind.
- * When to use:
- *     During res-4 cache build and renderer tooltip/fill selection.
- * What to expect:
- *     True when any urban bucket with scalerank <= `maxScalerank` intersects the hex.
+ * Defines the `isRes4UrbanOverlayHex` function shape (export function isRes4UrbanOverlayHex().
+
+ * Purpose: Supports maintainability by documenting why `isRes4UrbanOverlayHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function isRes4UrbanOverlayHex(
   r: Pick<HexMetadataRecordRes4, 'urban_by_scalerank'>,

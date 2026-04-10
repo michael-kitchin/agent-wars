@@ -14465,15 +14465,79 @@
 
   // src/shared/productionConfig.ts
   var UNIT_COST_BY_TYPE = {
+    /**
+       * Documents the object literal property `infantry` (infantry: 10).
+    
+       * Purpose: Supports maintainability by documenting why `infantry` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     infantry: 10,
+    /**
+       * Documents the object literal property `armor` (armor: 20).
+    
+       * Purpose: Supports maintainability by documenting why `armor` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     armor: 20,
+    /**
+       * Documents the object literal property `naval` (naval: 50).
+    
+       * Purpose: Supports maintainability by documenting why `naval` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     naval: 50,
+    /**
+       * Documents the object literal property `air` (air: 30).
+    
+       * Purpose: Supports maintainability by documenting why `air` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     air: 30
   };
   var MAX_UNITS_PER_TYPE = {
+    /**
+       * Documents the object literal property `infantry` (infantry: 6).
+    
+       * Purpose: Supports maintainability by documenting why `infantry` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     infantry: 6,
+    /**
+       * Documents the object literal property `armor` (armor: 4).
+    
+       * Purpose: Supports maintainability by documenting why `armor` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     armor: 4,
+    /**
+       * Documents the object literal property `naval` (naval: 4).
+    
+       * Purpose: Supports maintainability by documenting why `naval` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     naval: 4,
+    /**
+       * Documents the object literal property `air` (air: 3).
+    
+       * Purpose: Supports maintainability by documenting why `air` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     air: 3
   };
   function estimateTurnsToNextSpawn(nextUnitType, storedPoints, capacityPerTurn) {
@@ -14488,9 +14552,41 @@
 
   // src/shared/unitDisplayNames.ts
   var UNIT_TYPE_NOUN_BY_TYPE = {
+    /**
+       * Documents the object literal property `infantry` (infantry: 'Infantry').
+    
+       * Purpose: Supports maintainability by documenting why `infantry` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     infantry: "Infantry",
+    /**
+       * Documents the object literal property `armor` (armor: 'Armored').
+    
+       * Purpose: Supports maintainability by documenting why `armor` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     armor: "Armored",
+    /**
+       * Documents the object literal property `naval` (naval: 'Fleet').
+    
+       * Purpose: Supports maintainability by documenting why `naval` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     naval: "Fleet",
+    /**
+       * Documents the object literal property `air` (air: 'Squadron').
+    
+       * Purpose: Supports maintainability by documenting why `air` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     air: "Squadron"
   };
   var NATURAL_ID_COLLATOR = new Intl.Collator(void 0, { numeric: true, sensitivity: "base" });
@@ -14671,13 +14767,61 @@
   var BACKGROUND_COLOR = "#e0dcd4";
   var UNIT_RADIUS = 18;
   var PLAYER_COLORS = {
+    /**
+       * Documents the object literal property `human` (human: '#2e5a7b').
+    
+       * Purpose: Supports maintainability by documenting why `human` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     human: "#2e5a7b",
+    /**
+       * Documents the object literal property `opponent` (opponent: '#7b4a2e').
+    
+       * Purpose: Supports maintainability by documenting why `opponent` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     opponent: "#7b4a2e"
   };
   var UNIT_TYPE_LABELS = {
+    /**
+       * Documents the object literal property `infantry` (infantry: 'I').
+    
+       * Purpose: Supports maintainability by documenting why `infantry` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     infantry: "I",
+    /**
+       * Documents the object literal property `armor` (armor: 'A').
+    
+       * Purpose: Supports maintainability by documenting why `armor` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     armor: "A",
+    /**
+       * Documents the object literal property `naval` (naval: 'N').
+    
+       * Purpose: Supports maintainability by documenting why `naval` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     naval: "N",
+    /**
+       * Documents the object literal property `air` (air: 'S').
+    
+       * Purpose: Supports maintainability by documenting why `air` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     air: "S"
   };
   var ORDER_LINE_COLOR = "#2e5a7b";
@@ -14719,76 +14863,644 @@
 
   // src/renderer/core/state.ts
   var rendererSharedState = {
+    /**
+       * Documents the object literal property `buildEntryButtonPointerInside` (buildEntryButtonPointerInside: false).
+    
+       * Purpose: Supports maintainability by documenting why `buildEntryButtonPointerInside` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     buildEntryButtonPointerInside: false,
+    /**
+       * Documents the object literal property `lastPointerClientX` (lastPointerClientX: 0).
+    
+       * Purpose: Supports maintainability by documenting why `lastPointerClientX` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     lastPointerClientX: 0,
+    /**
+       * Documents the object literal property `lastPointerClientY` (lastPointerClientY: 0).
+    
+       * Purpose: Supports maintainability by documenting why `lastPointerClientY` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     lastPointerClientY: 0,
+    /**
+       * Documents the object literal property `terrainTooltipDelayTimer` (terrainTooltipDelayTimer: null as ReturnType<typeof setTimeout> | null).
+    
+       * Purpose: Supports maintainability by documenting why `terrainTooltipDelayTimer` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     terrainTooltipDelayTimer: null,
+    /**
+       * Documents the object literal property `buildEntryDefaultMapZoom` (buildEntryDefaultMapZoom: null as number | null).
+    
+       * Purpose: Supports maintainability by documenting why `buildEntryDefaultMapZoom` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     buildEntryDefaultMapZoom: null,
+    /**
+       * Documents the object literal property `lastBuildEntryLayerKey` (lastBuildEntryLayerKey: null as string | null).
+    
+       * Purpose: Supports maintainability by documenting why `lastBuildEntryLayerKey` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     lastBuildEntryLayerKey: null,
+    /**
+       * Documents the object literal property `res1DominantTerrainKindByH3` (res1DominantTerrainKindByH3: new Map<string, string>()).
+    
+       * Purpose: Supports maintainability by documenting why `res1DominantTerrainKindByH3` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     res1DominantTerrainKindByH3: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `res1TerrainSummaryByH3` (res1TerrainSummaryByH3: new Map<string, string>()).
+    
+       * Purpose: Supports maintainability by documenting why `res1TerrainSummaryByH3` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     res1TerrainSummaryByH3: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `res1FeaturesSummaryByH3` (res1FeaturesSummaryByH3: new Map<string, string | null>()).
+    
+       * Purpose: Supports maintainability by documenting why `res1FeaturesSummaryByH3` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     res1FeaturesSummaryByH3: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `res1FeatureCountsByH3` (res1FeatureCountsByH3: new Map< string, { airportCount: number; seaportCount: number; rubbleCount: number } >()).
+    
+       * Purpose: Supports maintainability by documenting why `res1FeatureCountsByH3` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     res1FeatureCountsByH3: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `namingLineByLookupKey` (namingLineByLookupKey: new Map<string, string | null>()).
+    
+       * Purpose: Supports maintainability by documenting why `namingLineByLookupKey` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     namingLineByLookupKey: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `terrainTooltipHtmlByContentKey` (terrainTooltipHtmlByContentKey: new Map<string, string>()).
+    
+       * Purpose: Supports maintainability by documenting why `terrainTooltipHtmlByContentKey` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     terrainTooltipHtmlByContentKey: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `terrainTooltipRequestSeq` (terrainTooltipRequestSeq: 0).
+    
+       * Purpose: Supports maintainability by documenting why `terrainTooltipRequestSeq` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     terrainTooltipRequestSeq: 0,
+    /**
+       * Documents the object literal property `terrainTooltipRestoreTimer` (terrainTooltipRestoreTimer: null as ReturnType<typeof setTimeout> | null).
+    
+       * Purpose: Supports maintainability by documenting why `terrainTooltipRestoreTimer` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     terrainTooltipRestoreTimer: null,
+    /**
+       * Documents the object literal property `selectedHexIndex` (selectedHexIndex: null as string | null).
+    
+       * Purpose: Supports maintainability by documenting why `selectedHexIndex` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     selectedHexIndex: null,
+    /**
+       * Documents the object literal property `hoveredHexH3` (hoveredHexH3: null as string | null).
+    
+       * Purpose: Supports maintainability by documenting why `hoveredHexH3` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     hoveredHexH3: null,
+    /**
+       * Documents the object literal property `hoveredDetailHexH3` (hoveredDetailHexH3: null as string | null).
+    
+       * Purpose: Supports maintainability by documenting why `hoveredDetailHexH3` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     hoveredDetailHexH3: null,
+    /**
+       * Documents the object literal property `hideTerrainFillWhileHeld` (hideTerrainFillWhileHeld: false).
+    
+       * Purpose: Supports maintainability by documenting why `hideTerrainFillWhileHeld` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     hideTerrainFillWhileHeld: false,
+    /**
+       * Documents the object literal property `selectedUnitIds` (selectedUnitIds: [] as string[]).
+    
+       * Purpose: Supports maintainability by documenting why `selectedUnitIds` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     selectedUnitIds: [],
+    /**
+       * Documents the object literal property `selectedUnitIdsAtMouseDown` (selectedUnitIdsAtMouseDown: [] as string[]).
+    
+       * Purpose: Supports maintainability by documenting why `selectedUnitIdsAtMouseDown` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     selectedUnitIdsAtMouseDown: [],
+    /**
+       * Documents the object literal property `ctrlKeyActive` (ctrlKeyActive: false).
+    
+       * Purpose: Supports maintainability by documenting why `ctrlKeyActive` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     ctrlKeyActive: false,
+    /**
+       * Documents the object literal property `pendingSelectTimeout` (pendingSelectTimeout: null as ReturnType<typeof setTimeout> | null).
+    
+       * Purpose: Supports maintainability by documenting why `pendingSelectTimeout` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     pendingSelectTimeout: null,
+    /**
+       * Documents the object literal property `humanStandingOrders` (humanStandingOrders: [] as HumanStandingOrderSnapshot[]).
+    
+       * Purpose: Supports maintainability by documenting why `humanStandingOrders` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     humanStandingOrders: [],
+    /**
+       * Documents the object literal property `hoverRoutePreview` (hoverRoutePreview: null as HoverRoutePreviewState | null).
+    
+       * Purpose: Supports maintainability by documenting why `hoverRoutePreview` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     hoverRoutePreview: null,
+    /**
+       * Documents the object literal property `hoverPreviewRequestSeq` (hoverPreviewRequestSeq: 0).
+    
+       * Purpose: Supports maintainability by documenting why `hoverPreviewRequestSeq` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     hoverPreviewRequestSeq: 0,
+    /**
+       * Documents the object literal property `pendingRangedAttacks` (pendingRangedAttacks: [] as RangedAttackOrder[]).
+    
+       * Purpose: Supports maintainability by documenting why `pendingRangedAttacks` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     pendingRangedAttacks: [],
+    /**
+       * Documents the object literal property `pendingAirStrikes` (pendingAirStrikes: [] as AirStrikeOrder[]).
+    
+       * Purpose: Supports maintainability by documenting why `pendingAirStrikes` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     pendingAirStrikes: [],
+    /**
+       * Documents the object literal property `pendingFerryOrders` (pendingFerryOrders: [] as FerryOrder[]).
+    
+       * Purpose: Supports maintainability by documenting why `pendingFerryOrders` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     pendingFerryOrders: [],
+    /**
+       * Documents the object literal property `hideCommittedOrderLinesAfterReady` (hideCommittedOrderLinesAfterReady: false).
+    
+       * Purpose: Supports maintainability by documenting why `hideCommittedOrderLinesAfterReady` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     hideCommittedOrderLinesAfterReady: false,
+    /**
+       * Documents the object literal property `rangedModeActive` (rangedModeActive: false).
+    
+       * Purpose: Supports maintainability by documenting why `rangedModeActive` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     rangedModeActive: false,
+    /**
+       * Documents the object literal property `airStrikeModeActive` (airStrikeModeActive: false).
+    
+       * Purpose: Supports maintainability by documenting why `airStrikeModeActive` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     airStrikeModeActive: false,
+    /**
+       * Documents the object literal property `airStrikeTargetType` (airStrikeTargetType: 'units' as AirStrikeTargetType).
+    
+       * Purpose: Supports maintainability by documenting why `airStrikeTargetType` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     airStrikeTargetType: "units",
+    /**
+       * Documents the object literal property `stackCalloutModalActive` (stackCalloutModalActive: false).
+    
+       * Purpose: Supports maintainability by documenting why `stackCalloutModalActive` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     stackCalloutModalActive: false,
+    /**
+       * Documents the object literal property `buildPopupHexH3` (buildPopupHexH3: null as string | null).
+    
+       * Purpose: Supports maintainability by documenting why `buildPopupHexH3` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     buildPopupHexH3: null,
+    /**
+       * Documents the object literal property `buildPopupRequestSeq` (buildPopupRequestSeq: 0).
+    
+       * Purpose: Supports maintainability by documenting why `buildPopupRequestSeq` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     buildPopupRequestSeq: 0,
+    /**
+       * Documents the object literal property `gameState` (gameState: null as GameStateSnapshot | null).
+    
+       * Purpose: Supports maintainability by documenting why `gameState` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     gameState: null,
+    /**
+       * Documents the object literal property `unitDisplayNameById` (unitDisplayNameById: new Map<string, string>()).
+    
+       * Purpose: Supports maintainability by documenting why `unitDisplayNameById` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     unitDisplayNameById: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `res4TerrainOverridesByH3` (res4TerrainOverridesByH3: new Map< string, { terrainKind: string; isUrban: boolean; isAirport: boolean; isSeaport: boolean; isRubble: boolean } >()).
+    
+       * Purpose: Supports maintainability by documenting why `res4TerrainOverridesByH3` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     res4TerrainOverridesByH3: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `terrainInfraRes1Airport` (terrainInfraRes1Airport: new Set<string>()).
+    
+       * Purpose: Supports maintainability by documenting why `terrainInfraRes1Airport` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     terrainInfraRes1Airport: /* @__PURE__ */ new Set(),
+    /**
+       * Documents the object literal property `terrainInfraRes1Seaport` (terrainInfraRes1Seaport: new Set<string>()).
+    
+       * Purpose: Supports maintainability by documenting why `terrainInfraRes1Seaport` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     terrainInfraRes1Seaport: /* @__PURE__ */ new Set(),
+    /**
+       * Documents the object literal property `terrainInfraRes4Airport` (terrainInfraRes4Airport: new Set<string>()).
+    
+       * Purpose: Supports maintainability by documenting why `terrainInfraRes4Airport` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     terrainInfraRes4Airport: /* @__PURE__ */ new Set(),
+    /**
+       * Documents the object literal property `terrainInfraRes4Seaport` (terrainInfraRes4Seaport: new Set<string>()).
+    
+       * Purpose: Supports maintainability by documenting why `terrainInfraRes4Seaport` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     terrainInfraRes4Seaport: /* @__PURE__ */ new Set(),
+    /**
+       * Documents the object literal property `res4ChildrenByParent` (res4ChildrenByParent: new Map<string, string[]>()).
+    
+       * Purpose: Supports maintainability by documenting why `res4ChildrenByParent` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     res4ChildrenByParent: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `res4Visible` (res4Visible: false).
+    
+       * Purpose: Supports maintainability by documenting why `res4Visible` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     res4Visible: false,
+    /**
+       * Documents the object literal property `resolutionMoveAnimation` (resolutionMoveAnimation: null as ResolutionMoveAnimationState).
+    
+       * Purpose: Supports maintainability by documenting why `resolutionMoveAnimation` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     resolutionMoveAnimation: null,
+    /**
+       * Documents the object literal property `resolutionMoveAnimationFrameId` (resolutionMoveAnimationFrameId: null as number | null).
+    
+       * Purpose: Supports maintainability by documenting why `resolutionMoveAnimationFrameId` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     resolutionMoveAnimationFrameId: null,
+    /**
+       * Documents the object literal property `initialCameraApplied` (initialCameraApplied: false).
+    
+       * Purpose: Supports maintainability by documenting why `initialCameraApplied` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     initialCameraApplied: false,
+    /**
+       * Documents the object literal property `clientStaleEnemyIntelByUnitId` (clientStaleEnemyIntelByUnitId: new Map< string, { unitId: string; lastKnownH3Index: string; lastSeenTurn: number; staleUnt).
+    
+       * Purpose: Supports maintainability by documenting why `clientStaleEnemyIntelByUnitId` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     clientStaleEnemyIntelByUnitId: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `lastRenderedVisibleEnemyByUnitId` (lastRenderedVisibleEnemyByUnitId: new Map<string, { h3Index: string; lastSeenTurn: number }>()).
+    
+       * Purpose: Supports maintainability by documenting why `lastRenderedVisibleEnemyByUnitId` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     lastRenderedVisibleEnemyByUnitId: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `lastObservedEnemyByUnitId` (lastObservedEnemyByUnitId: new Map<string, { h3Index: string; lastSeenTurn: number }>()).
+    
+       * Purpose: Supports maintainability by documenting why `lastObservedEnemyByUnitId` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     lastObservedEnemyByUnitId: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `redrawRafId` (redrawRafId: null as number | null).
+    
+       * Purpose: Supports maintainability by documenting why `redrawRafId` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     redrawRafId: null,
+    /**
+       * Documents the object literal property `canvasMetrics` (canvasMetrics: null as { w: number; h: number; dpr: number } | null).
+    
+       * Purpose: Supports maintainability by documenting why `canvasMetrics` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     canvasMetrics: null,
+    /**
+       * Documents the object literal property `openRouterToolGroups` (openRouterToolGroups: [...OPENROUTER_TOOL_GROUPS] as { id: string; label: string }[]).
+    
+       * Purpose: Supports maintainability by documenting why `openRouterToolGroups` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     openRouterToolGroups: [...OPENROUTER_TOOL_GROUPS],
+    /**
+       * Documents the object literal property `enabledToolGroups` (enabledToolGroups: new Set<string>(OPENROUTER_TOOL_GROUPS.map((g) => g.id))).
+    
+       * Purpose: Supports maintainability by documenting why `enabledToolGroups` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     enabledToolGroups: new Set(OPENROUTER_TOOL_GROUPS.map((g) => g.id)),
+    /**
+       * Documents the object literal property `toolInvocationCounts` (toolInvocationCounts: Object.fromEntries(OPENROUTER_TOOL_GROUPS.map((g) => [g.id, 0])) as Record< string, number >).
+    
+       * Purpose: Supports maintainability by documenting why `toolInvocationCounts` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     toolInvocationCounts: Object.fromEntries(OPENROUTER_TOOL_GROUPS.map((g) => [g.id, 0])),
+    /**
+       * Documents the object literal property `runButtonOn` (runButtonOn: false).
+    
+       * Purpose: Supports maintainability by documenting why `runButtonOn` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     runButtonOn: false,
+    /**
+       * Documents the object literal property `useEventDrivenConsultation` (useEventDrivenConsultation: true).
+    
+       * Purpose: Supports maintainability by documenting why `useEventDrivenConsultation` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     useEventDrivenConsultation: true,
+    /**
+       * Documents the object literal property `eventDrivenInitialConsultationDone` (eventDrivenInitialConsultationDone: false).
+    
+       * Purpose: Supports maintainability by documenting why `eventDrivenInitialConsultationDone` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     eventDrivenInitialConsultationDone: false,
+    /**
+       * Documents the object literal property `precomputedAiOrders` (precomputedAiOrders: null as MovementOrder[] | null).
+    
+       * Purpose: Supports maintainability by documenting why `precomputedAiOrders` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     precomputedAiOrders: null,
+    /**
+       * Documents the object literal property `precomputedAiRangedOrders` (precomputedAiRangedOrders: null as { unitId: string; targetH3Index: string }[] | null).
+    
+       * Purpose: Supports maintainability by documenting why `precomputedAiRangedOrders` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     precomputedAiRangedOrders: null,
+    /**
+       * Documents the object literal property `precomputedAiEmbarkOrders` (precomputedAiEmbarkOrders: null as EmbarkOrder[] | null).
+    
+       * Purpose: Supports maintainability by documenting why `precomputedAiEmbarkOrders` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     precomputedAiEmbarkOrders: null,
+    /**
+       * Documents the object literal property `precomputedAiStrategy` (precomputedAiStrategy: null as string | null).
+    
+       * Purpose: Supports maintainability by documenting why `precomputedAiStrategy` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     precomputedAiStrategy: null,
+    /**
+       * Documents the object literal property `precomputedToolInvocationCounts` (precomputedToolInvocationCounts: null as Record<string, number> | null).
+    
+       * Purpose: Supports maintainability by documenting why `precomputedToolInvocationCounts` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     precomputedToolInvocationCounts: null,
+    /**
+       * Documents the object literal property `backgroundRequestInFlight` (backgroundRequestInFlight: false).
+    
+       * Purpose: Supports maintainability by documenting why `backgroundRequestInFlight` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     backgroundRequestInFlight: false,
+    /**
+       * Documents the object literal property `readyRequestInFlight` (readyRequestInFlight: false).
+    
+       * Purpose: Supports maintainability by documenting why `readyRequestInFlight` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     readyRequestInFlight: false,
+    /**
+       * Documents the object literal property `readyBtnAiWaitStartTime` (readyBtnAiWaitStartTime: null as number | null).
+    
+       * Purpose: Supports maintainability by documenting why `readyBtnAiWaitStartTime` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     readyBtnAiWaitStartTime: null,
+    /**
+       * Documents the object literal property `readyBtnAiWaitIntervalId` (readyBtnAiWaitIntervalId: null as ReturnType<typeof setInterval> | null).
+    
+       * Purpose: Supports maintainability by documenting why `readyBtnAiWaitIntervalId` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     readyBtnAiWaitIntervalId: null,
+    /**
+       * Documents the object literal property `openRouterGameCost` (openRouterGameCost: 0).
+    
+       * Purpose: Supports maintainability by documenting why `openRouterGameCost` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     openRouterGameCost: 0,
+    /**
+       * Documents the object literal property `toastHideTimer` (toastHideTimer: null as ReturnType<typeof setTimeout> | null).
+    
+       * Purpose: Supports maintainability by documenting why `toastHideTimer` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     toastHideTimer: null,
+    /**
+       * Documents the object literal property `aiStrategyToastHideTimer` (aiStrategyToastHideTimer: null as ReturnType<typeof setTimeout> | null).
+    
+       * Purpose: Supports maintainability by documenting why `aiStrategyToastHideTimer` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     aiStrategyToastHideTimer: null,
+    /**
+       * Documents the object literal property `lastAppliedMapInteractionCursor` (lastAppliedMapInteractionCursor: '').
+    
+       * Purpose: Supports maintainability by documenting why `lastAppliedMapInteractionCursor` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     lastAppliedMapInteractionCursor: ""
   };
 
@@ -15173,10 +15885,50 @@
   // src/renderer/rendering/unitDrawing.ts
   var TOKEN_ICON_FIT_RATIO = 0.9;
   var UNIT_ICON_FILE_BY_TYPE = {
+    /**
+       * Documents the object literal property `infantry` (infantry: 'infantry-1.svg').
+    
+       * Purpose: Supports maintainability by documenting why `infantry` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     infantry: "infantry-1.svg",
+    /**
+       * Documents the object literal property `armor` (armor: 'armor-1.svg').
+    
+       * Purpose: Supports maintainability by documenting why `armor` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     armor: "armor-1.svg",
+    /**
+       * Documents the object literal property `naval` (naval: 'naval-1.svg').
+    
+       * Purpose: Supports maintainability by documenting why `naval` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     naval: "naval-1.svg",
+    /**
+       * Documents the object literal property `air` (air: 'air-1.svg').
+    
+       * Purpose: Supports maintainability by documenting why `air` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     air: "air-1.svg",
+    /**
+       * Documents the object literal property `mixed` (mixed: 'mixed-1.svg').
+    
+       * Purpose: Supports maintainability by documenting why `mixed` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     mixed: "mixed-1.svg"
   };
   var unitIconCache = /* @__PURE__ */ new Map();
@@ -17689,6 +18441,14 @@
   var WARGAME_HEX_STROKE_WIDTH = 0.72;
   var LAND_HOVER_FILL_BASE = "rgba(155, 168, 128, 0.42)";
   var TERRAIN_STYLE_PRESETS = {
+    /**
+       * Documents the object literal property `default` (default: { label: 'Default', basemapId: 'carto_light_nolabels', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
+    
+       * Purpose: Supports maintainability by documenting why `default` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     default: {
       label: "Default",
       basemapId: "carto_light_nolabels",
@@ -17716,6 +18476,14 @@
       rubbleOverlayFill: "rgba(137, 117, 98, 0.46)",
       rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
     },
+    /**
+       * Documents the object literal property `atlas` (atlas: { label: 'Atlas', basemapId: 'carto_voyager_nolabels', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: { w).
+    
+       * Purpose: Supports maintainability by documenting why `atlas` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     atlas: {
       label: "Atlas",
       basemapId: "carto_voyager_nolabels",
@@ -17743,6 +18511,14 @@
       rubbleOverlayFill: "rgba(141, 122, 103, 0.46)",
       rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
     },
+    /**
+       * Documents the object literal property `wargame` (wargame: { label: 'Wargame', basemapId: 'carto_dark_nolabels', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
+    
+       * Purpose: Supports maintainability by documenting why `wargame` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     wargame: {
       label: "Wargame",
       basemapId: "carto_dark_nolabels",
@@ -17770,6 +18546,14 @@
       rubbleOverlayFill: "rgba(132, 112, 97, 0.46)",
       rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.88, reverseDiagonal: true, crosshatch: true }
     },
+    /**
+       * Documents the object literal property `scientific` (scientific: { label: 'Scientific', basemapId: 'esri_world_shaded_relief', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills).
+    
+       * Purpose: Supports maintainability by documenting why `scientific` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
     scientific: {
       label: "Scientific",
       basemapId: "esri_world_shaded_relief",
@@ -18258,9 +19042,84 @@
 
   // src/renderer/rendering/terrainInfrastructureIconPaths.ts
   var AIRPLANE_VIEWBOX_SIZE = 16;
-  var AIRPLANE_VIEWBOX_CENTER = { x: 8, y: 8 };
-  var ANCHOR_VIEWBOX = { x: 0, y: -960, w: 960, h: 960 };
-  var ANCHOR_VIEWBOX_CENTER = { x: 480, y: -480 };
+  var AIRPLANE_VIEWBOX_CENTER = {
+    /**
+     * Documents the object literal property `x` (x: 8).
+    
+     * Purpose: Supports maintainability by documenting why `x` exists.
+     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+     * Exceptions: None.
+     */
+    x: 8,
+    /**
+     * Documents the object literal property `y` (y: 8).
+    
+     * Purpose: Supports maintainability by documenting why `y` exists.
+     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+     * Exceptions: None.
+     */
+    y: 8
+  };
+  var ANCHOR_VIEWBOX = {
+    /**
+     * Documents the object literal property `x` (x: 0).
+    
+     * Purpose: Supports maintainability by documenting why `x` exists.
+     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+     * Exceptions: None.
+     */
+    x: 0,
+    /**
+     * Documents the object literal property `y` (y: -960).
+    
+     * Purpose: Supports maintainability by documenting why `y` exists.
+     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+     * Exceptions: None.
+     */
+    y: -960,
+    /**
+     * Documents the object literal property `w` (w: 960).
+    
+     * Purpose: Supports maintainability by documenting why `w` exists.
+     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+     * Exceptions: None.
+     */
+    w: 960,
+    /**
+     * Documents the object literal property `h` (h: 960).
+    
+     * Purpose: Supports maintainability by documenting why `h` exists.
+     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+     * Exceptions: None.
+     */
+    h: 960
+  };
+  var ANCHOR_VIEWBOX_CENTER = {
+    /**
+     * Documents the object literal property `x` (x: 480).
+    
+     * Purpose: Supports maintainability by documenting why `x` exists.
+     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+     * Exceptions: None.
+     */
+    x: 480,
+    /**
+     * Documents the object literal property `y` (y: -480).
+    
+     * Purpose: Supports maintainability by documenting why `y` exists.
+     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+     * Exceptions: None.
+     */
+    y: -480
+  };
   var BOOTSTRAP_AIRPLANE_FILL_PATH = "M6.428 1.151C6.708.591 7.213 0 8 0s1.292.592 1.572 1.151C9.861 1.73 10 2.431 10 3v3.691l5.17 2.585a1.5 1.5 0 0 1 .83 1.342V12a.5.5 0 0 1-.582.493l-5.507-.918-.375 2.253 1.318 1.318A.5.5 0 0 1 10.5 16h-5a.5.5 0 0 1-.354-.854l1.319-1.318-.376-2.253-5.507.918A.5.5 0 0 1 0 12v-1.382a1.5 1.5 0 0 1 .83-1.342L6 6.691V3c0-.568.14-1.271.428-1.849";
   var MATERIAL_SYMBOLS_ANCHOR_PATH = "M355-102q-64-22-116-60t-85.5-89Q120-302 120-360v-120l160 120-62 62q29 51 92 88t130 47v-357H320v-80h120v-47q-35-13-57.5-43.5T360-760q0-50 35-85t85-35q50 0 85 35t35 85q0 39-22.5 69.5T520-647v47h120v80H520v357q67-10 130-47t92-88l-62-62 160-120v120q0 58-33.5 109T721-162q-52 38-116 60T480-80q-61 0-125-22Zm125-618q17 0 28.5-11.5T520-760q0-17-11.5-28.5T480-800q-17 0-28.5 11.5T440-760q0 17 11.5 28.5T480-720Z";
   var cachedAirplanePath = null;
@@ -19507,6 +20366,20 @@
       return terrainTooltipStateForRes1Hex(fallbackRes1H3);
     }
     const L = getLeafletGlobal();
+    if (!L) {
+      if (!fallbackRes1H3) {
+        return {
+          terrainKind: "Unknown",
+          isUrban: false,
+          isRubble: false,
+          features: [],
+          urbanHexCount: null,
+          res1TerrainSummary: null,
+          res1FeaturesSummary: null
+        };
+      }
+      return terrainTooltipStateForRes1Hex(fallbackRes1H3);
+    }
     const rect = map.getContainer().getBoundingClientRect();
     const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
     try {
@@ -19550,6 +20423,10 @@
       return { h3Index: fallbackRes1H3, resolution: 1 };
     }
     const L = getLeafletGlobal();
+    if (!L) {
+      if (!fallbackRes1H3) return null;
+      return { h3Index: fallbackRes1H3, resolution: 1 };
+    }
     const rect = map.getContainer().getBoundingClientRect();
     const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
     try {
@@ -19808,6 +20685,7 @@
     const map = getMainLeafletMap();
     if (!map) return null;
     const L = getLeafletGlobal();
+    if (!L) return null;
     const rect = map.getContainer().getBoundingClientRect();
     const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
     try {
@@ -19856,6 +20734,10 @@
       return;
     }
     const L = getLeafletGlobal();
+    if (!L) {
+      hideBuildEntryLayer(layer);
+      return;
+    }
     const res4On = shouldRenderRes4Hexes();
     if (res4On) {
       hideBuildEntryLayer(layer);
@@ -19932,6 +20814,7 @@
     const map = getMainLeafletMap();
     if (!map) return;
     const L = getLeafletGlobal();
+    if (!L) return;
     if (shouldRenderRes4Hexes()) return;
     const overlayContext = buildProductionOverlayContext(rendererSharedState.gameState);
     for (const hx of rendererSharedState.gameState.hexes) {

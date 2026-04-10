@@ -6,27 +6,139 @@ import {
 } from './orderLabelFormatting';
 import { rendererSharedState as S } from '../core/state';
 
+/**
+ * Documents the `TacticalOrderDeps` interface as a named contract surface (interface TacticalOrderDeps).
+
+ * Purpose: Supports maintainability by documenting why `TacticalOrderDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface TacticalOrderDeps {
-  clearSelection: () => void;
-  requestRedraw: () => void;
-  redraw: () => void;
-  updateSidebar: () => void;
-  updatePendingOrdersSidebar: () => void;
-  updateRangedSidebar: () => void;
-  refreshStackCalloutIfOpen: () => void;
-  refreshHumanStandingOrders: () => Promise<void>;
-  showMapToast: (message: string, options?: { isError?: boolean }) => void;
-  createSidebarOrderRow: (args: {
+    /**
+   * Specifies the contract for the `clearSelection` member (clearSelection: () => void;).
+
+   * Contract: Describes stable behavior for callers of `clearSelection` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+clearSelection: () => void;
+    /**
+   * Specifies the contract for the `requestRedraw` member (requestRedraw: () => void;).
+
+   * Contract: Describes stable behavior for callers of `requestRedraw` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+requestRedraw: () => void;
+    /**
+   * Specifies the contract for the `redraw` member (redraw: () => void;).
+
+   * Contract: Describes stable behavior for callers of `redraw` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+redraw: () => void;
+    /**
+   * Specifies the contract for the `updateSidebar` member (updateSidebar: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateSidebar: () => void;
+    /**
+   * Specifies the contract for the `updatePendingOrdersSidebar` member (updatePendingOrdersSidebar: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updatePendingOrdersSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updatePendingOrdersSidebar: () => void;
+    /**
+   * Specifies the contract for the `updateRangedSidebar` member (updateRangedSidebar: () => void;).
+
+   * Contract: Describes stable behavior for callers of `updateRangedSidebar` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+updateRangedSidebar: () => void;
+    /**
+   * Specifies the contract for the `refreshStackCalloutIfOpen` member (refreshStackCalloutIfOpen: () => void;).
+
+   * Contract: Describes stable behavior for callers of `refreshStackCalloutIfOpen` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+refreshStackCalloutIfOpen: () => void;
+    /**
+   * Specifies the contract for the `refreshHumanStandingOrders` member (refreshHumanStandingOrders: () => Promise<void>;).
+
+   * Contract: Describes stable behavior for callers of `refreshHumanStandingOrders` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+refreshHumanStandingOrders: () => Promise<void>;
+    /**
+   * Specifies the contract for the `showMapToast` member (showMapToast: (message: string, options?: { isError?: boolean }) => void;).
+
+   * Contract: Describes stable behavior for callers of `showMapToast` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+showMapToast: (message: string, options?: { isError?: boolean }) => void;
+    /**
+   * Specifies the contract for the `createSidebarOrderRow` member (createSidebarOrderRow: (args: { labelText: string; selected: boolean; onToggleSelect: (event: MouseEvent) => void; onCancel: () => void;).
+
+   * Contract: Describes stable behavior for callers of `createSidebarOrderRow` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+createSidebarOrderRow: (args: {
     labelText: string;
     selected: boolean;
     onToggleSelect: (event: MouseEvent) => void;
     onCancel: () => void;
     compactBlueButtons?: boolean;
   }) => HTMLElement;
-  formatUnitArrowLabel: (unitId: string, targetLabel: string) => string;
-  applySelectionFromSidebarUnitButton: (unitId: string, event: MouseEvent) => void;
+    /**
+   * Specifies the contract for the `formatUnitArrowLabel` member (formatUnitArrowLabel: (unitId: string, targetLabel: string) => string;).
+
+   * Contract: Describes stable behavior for callers of `formatUnitArrowLabel` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+formatUnitArrowLabel: (unitId: string, targetLabel: string) => string;
+    /**
+   * Specifies the contract for the `applySelectionFromSidebarUnitButton` member (applySelectionFromSidebarUnitButton: (unitId: string, event: MouseEvent) => void;).
+
+   * Contract: Describes stable behavior for callers of `applySelectionFromSidebarUnitButton` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+applySelectionFromSidebarUnitButton: (unitId: string, event: MouseEvent) => void;
 }
 
+/**
+ * Defines the `getRepresentativeSelectedUnitIdsByOrigin` function shape (export function getRepresentativeSelectedUnitIdsByOrigin(): string[]).
+
+ * Purpose: Supports maintainability by documenting why `getRepresentativeSelectedUnitIdsByOrigin` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function getRepresentativeSelectedUnitIdsByOrigin(): string[] {
   if (!S.gameState) return [...S.selectedUnitIds];
   const byId = new Map(S.gameState.units.map((u) => [u.id, u]));
@@ -42,6 +154,14 @@ export function getRepresentativeSelectedUnitIdsByOrigin(): string[] {
   return representatives;
 }
 
+/**
+ * Defines the `replacePendingRangedAttacksForSelected` function shape (export function replacePendingRangedAttacksForSelected(selectedIds: string[], targetH3Index: string): void).
+
+ * Purpose: Supports maintainability by documenting why `replacePendingRangedAttacksForSelected` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function replacePendingRangedAttacksForSelected(selectedIds: string[], targetH3Index: string): void {
   S.pendingRangedAttacks = S.pendingRangedAttacks.filter((row) => !selectedIds.includes(row.unitId));
   for (const unitId of selectedIds) {
@@ -49,6 +169,14 @@ export function replacePendingRangedAttacksForSelected(selectedIds: string[], ta
   }
 }
 
+/**
+ * Defines the `replacePendingAirStrikesForSelected` function shape (export function replacePendingAirStrikesForSelected().
+
+ * Purpose: Supports maintainability by documenting why `replacePendingAirStrikesForSelected` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function replacePendingAirStrikesForSelected(
   selectedIds: string[],
   targetH3Index: string,
@@ -60,6 +188,14 @@ export function replacePendingAirStrikesForSelected(
   }
 }
 
+/**
+ * Defines the `replacePendingFerryOrdersForSelected` function shape (export function replacePendingFerryOrdersForSelected(selectedIds: string[], destinationH3Index: string): void).
+
+ * Purpose: Supports maintainability by documenting why `replacePendingFerryOrdersForSelected` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function replacePendingFerryOrdersForSelected(selectedIds: string[], destinationH3Index: string): void {
   S.pendingFerryOrders = S.pendingFerryOrders.filter((row) => !selectedIds.includes(row.unitId));
   for (const unitId of selectedIds) {
@@ -67,6 +203,14 @@ export function replacePendingFerryOrdersForSelected(selectedIds: string[], dest
   }
 }
 
+/**
+ * Defines the `clearPendingTacticalOrders` function shape (export function clearPendingTacticalOrders(): void).
+
+ * Purpose: Supports maintainability by documenting why `clearPendingTacticalOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function clearPendingTacticalOrders(): void {
   S.pendingRangedAttacks = [];
   S.rangedModeActive = false;
@@ -75,6 +219,14 @@ export function clearPendingTacticalOrders(): void {
   S.pendingFerryOrders = [];
 }
 
+/**
+ * Defines the `clearCommittedOrderDraftState` function shape (export function clearCommittedOrderDraftState(deps: TacticalOrderDeps): void).
+
+ * Purpose: Supports maintainability by documenting why `clearCommittedOrderDraftState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function clearCommittedOrderDraftState(deps: TacticalOrderDeps): void {
   deps.clearSelection();
   S.selectedUnitIdsAtMouseDown = [];
@@ -83,6 +235,14 @@ export function clearCommittedOrderDraftState(deps: TacticalOrderDeps): void {
   S.hoverRoutePreview = null;
 }
 
+/**
+ * Defines the `refreshHoverRoutePreview` function shape (export async function refreshHoverRoutePreview(deps: TacticalOrderDeps): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `refreshHoverRoutePreview` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export async function refreshHoverRoutePreview(deps: TacticalOrderDeps): Promise<void> {
   const unitIds = [...S.selectedUnitIds];
   const hoveredH3 = S.hoveredHexH3;
@@ -109,6 +269,14 @@ export async function refreshHoverRoutePreview(deps: TacticalOrderDeps): Promise
   deps.requestRedraw();
 }
 
+/**
+ * Defines the `cancelOrderForUnit` function shape (export async function cancelOrderForUnit(unitId: string, deps: TacticalOrderDeps): Promise<void>).
+
+ * Purpose: Supports maintainability by documenting why `cancelOrderForUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export async function cancelOrderForUnit(unitId: string, deps: TacticalOrderDeps): Promise<void> {
   if (!window.gameApi?.cancelHumanStandingOrder) return;
   const result = await window.gameApi.cancelHumanStandingOrder({ unitId });
@@ -120,6 +288,14 @@ export async function cancelOrderForUnit(unitId: string, deps: TacticalOrderDeps
   deps.redraw();
 }
 
+/**
+ * Defines the `cancelRangedForUnit` function shape (export function cancelRangedForUnit(unitId: string, deps: TacticalOrderDeps): void).
+
+ * Purpose: Supports maintainability by documenting why `cancelRangedForUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function cancelRangedForUnit(unitId: string, deps: TacticalOrderDeps): void {
   S.pendingRangedAttacks = S.pendingRangedAttacks.filter((r) => r.unitId !== unitId);
   S.rangedModeActive = false;
@@ -131,6 +307,14 @@ export function cancelRangedForUnit(unitId: string, deps: TacticalOrderDeps): vo
   deps.redraw();
 }
 
+/**
+ * Defines the `cancelAirStrikeForUnit` function shape (export function cancelAirStrikeForUnit(unitId: string, deps: TacticalOrderDeps): void).
+
+ * Purpose: Supports maintainability by documenting why `cancelAirStrikeForUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function cancelAirStrikeForUnit(unitId: string, deps: TacticalOrderDeps): void {
   S.pendingAirStrikes = S.pendingAirStrikes.filter((r) => r.unitId !== unitId);
   S.airStrikeModeActive = false;
@@ -142,6 +326,14 @@ export function cancelAirStrikeForUnit(unitId: string, deps: TacticalOrderDeps):
   deps.redraw();
 }
 
+/**
+ * Defines the `cancelFerryForUnit` function shape (export function cancelFerryForUnit(unitId: string, deps: TacticalOrderDeps): void).
+
+ * Purpose: Supports maintainability by documenting why `cancelFerryForUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function cancelFerryForUnit(unitId: string, deps: TacticalOrderDeps): void {
   S.pendingFerryOrders = S.pendingFerryOrders.filter((r) => r.unitId !== unitId);
   void refreshHoverRoutePreview(deps);
@@ -150,6 +342,14 @@ export function cancelFerryForUnit(unitId: string, deps: TacticalOrderDeps): voi
   deps.redraw();
 }
 
+/**
+ * Defines the `updateRangedSidebar` function shape (export function updateRangedSidebar(deps: TacticalOrderDeps): void).
+
+ * Purpose: Supports maintainability by documenting why `updateRangedSidebar` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function updateRangedSidebar(deps: TacticalOrderDeps): void {
   const listEl = document.getElementById('ranged-attacks-list');
   const strikeListEl = document.getElementById('air-strikes-list');

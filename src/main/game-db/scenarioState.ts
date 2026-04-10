@@ -1,24 +1,88 @@
 import type { DbReadOps, DbWriteOps } from './dbOps';
 import { logDebug, logTrace } from '../logger';
 
+/**
+ * Documents the module-scope binding `REGION_VS_REGION_SCENARIO_ID` (REGION_VS_REGION_SCENARIO_ID).
+
+ * Purpose: Supports maintainability by documenting why `REGION_VS_REGION_SCENARIO_ID` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const REGION_VS_REGION_SCENARIO_ID = 'region_vs_region' as const;
+/**
+ * Documents the module-scope binding `SCENARIO_ID_KEY` (SCENARIO_ID_KEY).
+
+ * Purpose: Supports maintainability by documenting why `SCENARIO_ID_KEY` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const SCENARIO_ID_KEY = 'scenario_id';
+/**
+ * Documents the module-scope binding `HUMAN_HOME_REGION_KEY` (HUMAN_HOME_REGION_KEY).
+
+ * Purpose: Supports maintainability by documenting why `HUMAN_HOME_REGION_KEY` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const HUMAN_HOME_REGION_KEY = 'scenario_region_human';
+/**
+ * Documents the module-scope binding `AI_HOME_REGION_KEY` (AI_HOME_REGION_KEY).
+
+ * Purpose: Supports maintainability by documenting why `AI_HOME_REGION_KEY` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const AI_HOME_REGION_KEY = 'scenario_region_ai';
 
+/**
+ * Documents the `ScenarioStateSnapshot` interface as a named contract surface (export interface ScenarioStateSnapshot).
+
+ * Purpose: Supports maintainability by documenting why `ScenarioStateSnapshot` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export interface ScenarioStateSnapshot {
-  scenarioId: string;
-  humanHomeRegion: string;
-  aiHomeRegion: string;
+    /**
+   * Specifies the contract for the `scenarioId` member (scenarioId: string;).
+
+   * Contract: Describes stable behavior for callers of `scenarioId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+scenarioId: string;
+    /**
+   * Specifies the contract for the `humanHomeRegion` member (humanHomeRegion: string;).
+
+   * Contract: Describes stable behavior for callers of `humanHomeRegion` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+humanHomeRegion: string;
+    /**
+   * Specifies the contract for the `aiHomeRegion` member (aiHomeRegion: string;).
+
+   * Contract: Describes stable behavior for callers of `aiHomeRegion` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+aiHomeRegion: string;
 }
 
 /**
- * Why this exists:
- *     Provides one typed read path for persisted scenario config keys in `game_config`.
- * When to use:
- *     Any backend flow that needs scenario id or selected home regions.
- * What to expect:
- *     Returns empty strings when keys are missing.
+ * Defines the `loadScenarioState` function shape (export function loadScenarioState(ops: Pick<DbReadOps, 'getOne'>): ScenarioStateSnapshot).
+
+ * Purpose: Supports maintainability by documenting why `loadScenarioState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function loadScenarioState(ops: Pick<DbReadOps, 'getOne'>): ScenarioStateSnapshot {
   logTrace('gameDb loadScenarioState');
@@ -33,12 +97,12 @@ export function loadScenarioState(ops: Pick<DbReadOps, 'getOne'>): ScenarioState
 }
 
 /**
- * Why this exists:
- *     Persists normalized region-vs-region scenario config keys consistently in one place.
- * When to use:
- *     New-game reset flow after region selection has been validated.
- * What to expect:
- *     Upserts scenario id and both region keys atomically at caller transaction boundaries.
+ * Defines the `persistRegionVsRegionScenarioState` function shape (export function persistRegionVsRegionScenarioState().
+
+ * Purpose: Supports maintainability by documenting why `persistRegionVsRegionScenarioState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function persistRegionVsRegionScenarioState(
   ops: Pick<DbWriteOps, 'run'>,

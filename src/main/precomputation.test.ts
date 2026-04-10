@@ -13,6 +13,14 @@ import {
   type PrecomputationCoordMap,
 } from './precomputation';
 
+/**
+ * Defines the `buildFixtureState` function shape (function buildFixtureState().
+
+ * Purpose: Supports maintainability by documenting why `buildFixtureState` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildFixtureState(
   hexCount: number
 ): { state: GameStateSnapshot; coordMap: PrecomputationCoordMap } {
@@ -32,6 +40,14 @@ function buildFixtureState(
   return { state, coordMap };
 }
 
+/**
+ * Defines the `testRunUnitAssessments` function shape (function testRunUnitAssessments(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRunUnitAssessments` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRunUnitAssessments(): void {
   const { state, coordMap } = buildFixtureState(10);
   const results = runUnitAssessments(state, coordMap);
@@ -50,6 +66,14 @@ function testRunUnitAssessments(): void {
   );
 }
 
+/**
+ * Defines the `testRunPrecomputation` function shape (function testRunPrecomputation(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRunPrecomputation` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRunPrecomputation(): void {
   const { state, coordMap } = buildFixtureState(10);
   const out = runPrecomputation(state, coordMap);
@@ -62,6 +86,14 @@ function testRunPrecomputation(): void {
   );
 }
 
+/**
+ * Defines the `testRunPrecomputationSkipHexAssessments` function shape (function testRunPrecomputationSkipHexAssessments(): void).
+
+ * Purpose: Supports maintainability by documenting why `testRunPrecomputationSkipHexAssessments` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function testRunPrecomputationSkipHexAssessments(): void {
   const { state, coordMap } = buildFixtureState(5);
   const out = runPrecomputation(state, coordMap, { skipHexAssessments: true });
@@ -69,12 +101,28 @@ function testRunPrecomputationSkipHexAssessments(): void {
   assert.strictEqual(out.hexAssessments.length, 0);
 }
 
+/**
+ * Documents the module-scope binding `tests` (tests).
+
+ * Purpose: Supports maintainability by documenting why `tests` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const tests = [
   { name: 'runUnitAssessments', fn: testRunUnitAssessments },
   { name: 'runPrecomputation', fn: testRunPrecomputation },
   { name: 'runPrecomputation skipHexAssessments', fn: testRunPrecomputationSkipHexAssessments },
 ];
 
+/**
+ * Defines the `run` function shape (function run(): void).
+
+ * Purpose: Supports maintainability by documenting why `run` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function run(): void {
   for (const t of tests) {
     try {

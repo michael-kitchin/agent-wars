@@ -3,30 +3,166 @@ import { dbGetAll, dbGetOne, dbRun, isDbReady } from '../gameDb';
 import type { CombatUnit } from '../combatUnitTypes';
 import { normalizeMovementTerrain } from '../movementTerrain';
 
+/**
+ * Documents the `UnitRow` interface as a named contract surface (interface UnitRow).
+
+ * Purpose: Supports maintainability by documenting why `UnitRow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface UnitRow {
-  id: string;
-  player: string;
-  unitType: string;
-  h3Index: string;
+    /**
+   * Specifies the contract for the `id` member (id: string;).
+
+   * Contract: Describes stable behavior for callers of `id` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+id: string;
+    /**
+   * Specifies the contract for the `player` member (player: string;).
+
+   * Contract: Describes stable behavior for callers of `player` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+player: string;
+    /**
+   * Specifies the contract for the `unitType` member (unitType: string;).
+
+   * Contract: Describes stable behavior for callers of `unitType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+unitType: string;
+    /**
+   * Specifies the contract for the `h3Index` member (h3Index: string;).
+
+   * Contract: Describes stable behavior for callers of `h3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+h3Index: string;
 }
 
+/**
+ * Documents the `AssignmentRow` interface as a named contract surface (interface AssignmentRow).
+
+ * Purpose: Supports maintainability by documenting why `AssignmentRow` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface AssignmentRow {
-  landUnitId: string;
-  navalUnitId: string;
-  landUnitType: 'infantry' | 'armor';
+    /**
+   * Specifies the contract for the `landUnitId` member (landUnitId: string;).
+
+   * Contract: Describes stable behavior for callers of `landUnitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+landUnitId: string;
+    /**
+   * Specifies the contract for the `navalUnitId` member (navalUnitId: string;).
+
+   * Contract: Describes stable behavior for callers of `navalUnitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+navalUnitId: string;
+    /**
+   * Specifies the contract for the `landUnitType` member (landUnitType: 'infantry' | 'armor';).
+
+   * Contract: Describes stable behavior for callers of `landUnitType` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+landUnitType: 'infantry' | 'armor';
 }
 
+/**
+ * Documents the `SealiftSlots` interface as a named contract surface (interface SealiftSlots).
+
+ * Purpose: Supports maintainability by documenting why `SealiftSlots` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface SealiftSlots {
-  slot1UnitId: string | null;
-  slot2UnitId: string | null;
+    /**
+   * Specifies the contract for the `slot1UnitId` member (slot1UnitId: string | null;).
+
+   * Contract: Describes stable behavior for callers of `slot1UnitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+slot1UnitId: string | null;
+    /**
+   * Specifies the contract for the `slot2UnitId` member (slot2UnitId: string | null;).
+
+   * Contract: Describes stable behavior for callers of `slot2UnitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+slot2UnitId: string | null;
 }
 
+/**
+ * Documents the `HexEmbarkContext` interface as a named contract surface (interface HexEmbarkContext).
+
+ * Purpose: Supports maintainability by documenting why `HexEmbarkContext` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface HexEmbarkContext {
-  normalizedMovementTerrain: string;
-  seaportCount: number;
-  controllerPlayerId: string | null;
+    /**
+   * Specifies the contract for the `normalizedMovementTerrain` member (normalizedMovementTerrain: string;).
+
+   * Contract: Describes stable behavior for callers of `normalizedMovementTerrain` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+normalizedMovementTerrain: string;
+    /**
+   * Specifies the contract for the `seaportCount` member (seaportCount: number;).
+
+   * Contract: Describes stable behavior for callers of `seaportCount` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+seaportCount: number;
+    /**
+   * Specifies the contract for the `controllerPlayerId` member (controllerPlayerId: string | null;).
+
+   * Contract: Describes stable behavior for callers of `controllerPlayerId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+controllerPlayerId: string | null;
 }
 
+/**
+ * Defines the `getUnitsAtHex` function shape (function getUnitsAtHex(h3Index: string): UnitRow[]).
+
+ * Purpose: Supports maintainability by documenting why `getUnitsAtHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getUnitsAtHex(h3Index: string): UnitRow[] {
   return dbGetAll<{ id: string; player: string; unitType: string; h3Index: string }>(
     'SELECT id, player, unit_type AS unitType, h3_index AS h3Index FROM units WHERE h3_index = ?',
@@ -34,6 +170,14 @@ function getUnitsAtHex(h3Index: string): UnitRow[] {
   );
 }
 
+/**
+ * Defines the `getHumanNavalIds` function shape (function getHumanNavalIds(unitsAtHex: UnitRow[]): string[]).
+
+ * Purpose: Supports maintainability by documenting why `getHumanNavalIds` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getHumanNavalIds(unitsAtHex: UnitRow[]): string[] {
   return unitsAtHex
     .filter((unit) => unit.player === 'human' && unit.unitType === 'naval')
@@ -41,6 +185,14 @@ function getHumanNavalIds(unitsAtHex: UnitRow[]): string[] {
     .sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * Defines the `getHumanLandOptions` function shape (function getHumanLandOptions(unitsAtHex: UnitRow[]): SealiftLandUnitOption[]).
+
+ * Purpose: Supports maintainability by documenting why `getHumanLandOptions` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getHumanLandOptions(unitsAtHex: UnitRow[]): SealiftLandUnitOption[] {
   const land = unitsAtHex.filter((unit) => unit.player === 'human' && (unit.unitType === 'infantry' || unit.unitType === 'armor'));
   return land
@@ -51,6 +203,14 @@ function getHumanLandOptions(unitsAtHex: UnitRow[]): SealiftLandUnitOption[] {
     });
 }
 
+/**
+ * Defines the `getHexEmbarkContext` function shape (function getHexEmbarkContext(h3Index: string): HexEmbarkContext | null).
+
+ * Purpose: Supports maintainability by documenting why `getHexEmbarkContext` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getHexEmbarkContext(h3Index: string): HexEmbarkContext | null {
   const terrainRow = dbGetOne<{ terrain: string; terrainKind: string | null }>(
     'SELECT terrain, terrain_kind AS terrainKind FROM hexes WHERE h3_index = ?',
@@ -77,6 +237,14 @@ function getHexEmbarkContext(h3Index: string): HexEmbarkContext | null {
   };
 }
 
+/**
+ * Defines the `canPlayerEmbarkFromHex` function shape (function canPlayerEmbarkFromHex(h3Index: string, playerId: string): boolean).
+
+ * Purpose: Supports maintainability by documenting why `canPlayerEmbarkFromHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function canPlayerEmbarkFromHex(h3Index: string, playerId: string): boolean {
   const context = getHexEmbarkContext(h3Index);
   if (!context) return false;
@@ -86,6 +254,14 @@ function canPlayerEmbarkFromHex(h3Index: string, playerId: string): boolean {
   return context.seaportCount > 0 && context.controllerPlayerId === playerId;
 }
 
+/**
+ * Defines the `getHexContextMode` function shape (function getHexContextMode(h3Index: string): SealiftContextMode).
+
+ * Purpose: Supports maintainability by documenting why `getHexContextMode` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function getHexContextMode(h3Index: string): SealiftContextMode {
   const context = getHexEmbarkContext(h3Index);
   if (!context) return 'unsupported';
@@ -95,6 +271,14 @@ function getHexContextMode(h3Index: string): SealiftContextMode {
   return 'unsupported';
 }
 
+/**
+ * Defines the `loadAssignmentsAtHex` function shape (function loadAssignmentsAtHex(h3Index: string): AssignmentRow[]).
+
+ * Purpose: Supports maintainability by documenting why `loadAssignmentsAtHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function loadAssignmentsAtHex(h3Index: string): AssignmentRow[] {
   return dbGetAll<{ landUnitId: string; navalUnitId: string; landUnitType: 'infantry' | 'armor' }>(
     `SELECT uta.land_unit_id AS landUnitId,
@@ -113,6 +297,14 @@ function loadAssignmentsAtHex(h3Index: string): AssignmentRow[] {
   );
 }
 
+/**
+ * Defines the `buildSlotsByNavalId` function shape (function buildSlotsByNavalId(navalIds: string[], assignments: AssignmentRow[]): Map<string, SealiftSlots>).
+
+ * Purpose: Supports maintainability by documenting why `buildSlotsByNavalId` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildSlotsByNavalId(navalIds: string[], assignments: AssignmentRow[]): Map<string, SealiftSlots> {
   const slotsByNavalId = new Map<string, SealiftSlots>();
   for (const navalUnitId of navalIds) {
@@ -143,6 +335,14 @@ function buildSlotsByNavalId(navalIds: string[], assignments: AssignmentRow[]): 
   return slotsByNavalId;
 }
 
+/**
+ * Defines the `normalizeSlots` function shape (function normalizeSlots().
+
+ * Purpose: Supports maintainability by documenting why `normalizeSlots` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function normalizeSlots(
   navalIds: string[],
   slotsByNavalId: Map<string, SealiftSlots>,
@@ -174,6 +374,14 @@ function normalizeSlots(
   }
 }
 
+/**
+ * Defines the `writeAssignmentsForHex` function shape (function writeAssignmentsForHex().
+
+ * Purpose: Supports maintainability by documenting why `writeAssignmentsForHex` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function writeAssignmentsForHex(
   h3Index: string,
   landOptions: SealiftLandUnitOption[],
@@ -210,6 +418,14 @@ function writeAssignmentsForHex(
   );
 }
 
+/**
+ * Defines the `buildNavalRows` function shape (function buildNavalRows( contextMode: SealiftContextMode, navalIds: string[], slotsByNavalId: Map<string, SealiftSlots>, landTypeById: Map<string, ').
+
+ * Purpose: Supports maintainability by documenting why `buildNavalRows` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function buildNavalRows(
   contextMode: SealiftContextMode,
   navalIds: string[],
@@ -232,6 +448,14 @@ function buildNavalRows(
   });
 }
 
+/**
+ * Defines the `getSealiftStackStateImpl` function shape (export function getSealiftStackStateImpl(h3Index: string): SealiftStackState).
+
+ * Purpose: Supports maintainability by documenting why `getSealiftStackStateImpl` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function getSealiftStackStateImpl(h3Index: string): SealiftStackState {
   const unitsAtHex = getUnitsAtHex(h3Index);
   const contextMode = getHexContextMode(h3Index);
@@ -255,6 +479,14 @@ export function getSealiftStackStateImpl(h3Index: string): SealiftStackState {
   };
 }
 
+/**
+ * Defines the `updateSealiftSlotImpl` function shape (export function updateSealiftSlotImpl(args: { h3Index: string; navalUnitId: string; slotIndex: 1 | 2; landUnitId: string | null; }): { success: boo).
+
+ * Purpose: Supports maintainability by documenting why `updateSealiftSlotImpl` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function updateSealiftSlotImpl(args: {
   h3Index: string;
   navalUnitId: string;
@@ -301,6 +533,14 @@ export function updateSealiftSlotImpl(args: {
   return { success: true, state: getSealiftStackStateImpl(args.h3Index) };
 }
 
+/**
+ * Defines the `getEmbarkedNavalForLandUnit` function shape (export function getEmbarkedNavalForLandUnit(unitId: string): string | null).
+
+ * Purpose: Supports maintainability by documenting why `getEmbarkedNavalForLandUnit` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function getEmbarkedNavalForLandUnit(unitId: string): string | null {
   const row = dbGetOne<{ navalUnitId: string }>(
     'SELECT naval_unit_id AS navalUnitId FROM unit_transport_assignments WHERE land_unit_id = ?',
@@ -309,6 +549,14 @@ export function getEmbarkedNavalForLandUnit(unitId: string): string | null {
   return row?.navalUnitId ?? null;
 }
 
+/**
+ * Defines the `isEmbarkedLandUnitOnWater` function shape (export function isEmbarkedLandUnitOnWater(unitId: string): boolean).
+
+ * Purpose: Supports maintainability by documenting why `isEmbarkedLandUnitOnWater` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function isEmbarkedLandUnitOnWater(unitId: string): boolean {
   const row = dbGetOne<{ terrain: string }>(
     `SELECT hx.terrain AS terrain
@@ -321,6 +569,14 @@ export function isEmbarkedLandUnitOnWater(unitId: string): boolean {
   return row?.terrain === 'water';
 }
 
+/**
+ * Defines the `autoDisembarkIndependentLandMoves` function shape (export function autoDisembarkIndependentLandMoves(movementOrders: Array<).
+
+ * Purpose: Supports maintainability by documenting why `autoDisembarkIndependentLandMoves` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function autoDisembarkIndependentLandMoves(movementOrders: Array<{ unitId: string; toH3Index: string }>): void {
   for (const order of movementOrders) {
     const assignment = dbGetOne<{ navalUnitId: string }>(
@@ -353,6 +609,14 @@ export function autoDisembarkIndependentLandMoves(movementOrders: Array<{ unitId
   }
 }
 
+/**
+ * Defines the `syncEmbarkedLandUnitPositionsWithNaval` function shape (export function syncEmbarkedLandUnitPositionsWithNaval(): void).
+
+ * Purpose: Supports maintainability by documenting why `syncEmbarkedLandUnitPositionsWithNaval` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function syncEmbarkedLandUnitPositionsWithNaval(): void {
   const rows = dbGetAll<{ landUnitId: string; navalH3Index: string; landH3Index: string }>(
     `SELECT lu.id AS landUnitId,
@@ -369,12 +633,12 @@ export function syncEmbarkedLandUnitPositionsWithNaval(): void {
 }
 
 /**
- * Why this exists:
- *     Applies AI-authored embark intents through the same capacity and terrain constraints used by gameplay sealift.
- * When to use:
- *     During turn resolution after AI orders are parsed and before movement is resolved.
- * What to expect:
- *     Valid orders assign land units to target naval units; invalid requests are ignored without mutating unrelated assignments.
+ * Defines the `applyEmbarkOrdersForPlayer` function shape (export function applyEmbarkOrdersForPlayer(orders: EmbarkOrder[], playerId: string): void).
+
+ * Purpose: Supports maintainability by documenting why `applyEmbarkOrdersForPlayer` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function applyEmbarkOrdersForPlayer(orders: EmbarkOrder[], playerId: string): void {
   if (orders.length <= 0) return;
@@ -413,6 +677,14 @@ export function applyEmbarkOrdersForPlayer(orders: EmbarkOrder[], playerId: stri
   }
 }
 
+/**
+ * Defines the `deleteTransportAssignmentsForRemovedUnits` function shape (export function deleteTransportAssignmentsForRemovedUnits(unitIds: string[]): void).
+
+ * Purpose: Supports maintainability by documenting why `deleteTransportAssignmentsForRemovedUnits` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function deleteTransportAssignmentsForRemovedUnits(unitIds: string[]): void {
   if (unitIds.length <= 0) return;
   const placeholders = unitIds.map(() => '?').join(', ');
@@ -423,6 +695,14 @@ export function deleteTransportAssignmentsForRemovedUnits(unitIds: string[]): vo
   );
 }
 
+/**
+ * Defines the `applyTransportLossForRemovedNavalUnits` function shape (export function applyTransportLossForRemovedNavalUnits(removedUnits: CombatUnit[]): CombatUnit[]).
+
+ * Purpose: Supports maintainability by documenting why `applyTransportLossForRemovedNavalUnits` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function applyTransportLossForRemovedNavalUnits(removedUnits: CombatUnit[]): CombatUnit[] {
   const removedCargo: CombatUnit[] = [];
   const removedNaval = removedUnits.filter((unit) => unit.unitType === 'naval');

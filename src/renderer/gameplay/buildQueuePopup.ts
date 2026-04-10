@@ -1,7 +1,15 @@
-import type { BuildUnitType, GameStateSnapshot, HexBuildQueueSnapshot } from '../../shared/ipcTypes';
+import type { BuildUnitType, HexBuildQueueSnapshot } from '../../shared/ipcTypes';
 import { TOOLTIP_OFFSET_PX, UNIT_SELECT_GLYPH } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 
+/**
+ * Defines the `sanitizeBuildCountInputText` function shape (export function sanitizeBuildCountInputText(raw: string): string).
+
+ * Purpose: Supports maintainability by documenting why `sanitizeBuildCountInputText` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function sanitizeBuildCountInputText(raw: string): string {
   const digitsOnly = raw.replaceAll(/\D/g, '').slice(0, 2);
   if (digitsOnly.length === 0) return '1';
@@ -11,12 +19,28 @@ export function sanitizeBuildCountInputText(raw: string): string {
   return String(parsed);
 }
 
+/**
+ * Defines the `isBuildQueueSelectInPopupFocused` function shape (export function isBuildQueueSelectInPopupFocused(): boolean).
+
+ * Purpose: Supports maintainability by documenting why `isBuildQueueSelectInPopupFocused` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function isBuildQueueSelectInPopupFocused(): boolean {
   const popup = document.getElementById('build-popup');
   const active = document.activeElement;
   return !!popup && active instanceof HTMLSelectElement && popup.contains(active);
 }
 
+/**
+ * Defines the `isBuildPopupOrEntryTarget` function shape (export function isBuildPopupOrEntryTarget(target: EventTarget | null): boolean).
+
+ * Purpose: Supports maintainability by documenting why `isBuildPopupOrEntryTarget` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function isBuildPopupOrEntryTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Node)) return false;
   const popup = document.getElementById('build-popup');
@@ -24,17 +48,97 @@ export function isBuildPopupOrEntryTarget(target: EventTarget | null): boolean {
   return !!(popup?.contains(target) || layer?.contains(target));
 }
 
+/**
+ * Documents the `BuildQueuePopupDeps` interface as a named contract surface (interface BuildQueuePopupDeps).
+
+ * Purpose: Supports maintainability by documenting why `BuildQueuePopupDeps` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 interface BuildQueuePopupDeps {
-  shouldRenderRes4Hexes: () => boolean;
-  hideStackCallout: () => void;
-  clearTerrainTooltipTimer: () => void;
-  hideTerrainTooltipVisual: () => void;
-  requestRedraw: () => void;
-  scheduleTerrainTooltipRestoreAfterPopoverClose: () => void;
-  refreshGameStateAfterBuildQueueChange: () => Promise<void>;
-  showMapToast: (message: string, options?: { isError?: boolean }) => void;
+    /**
+   * Specifies the contract for the `shouldRenderRes4Hexes` member (shouldRenderRes4Hexes: () => boolean;).
+
+   * Contract: Describes stable behavior for callers of `shouldRenderRes4Hexes` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+shouldRenderRes4Hexes: () => boolean;
+    /**
+   * Specifies the contract for the `hideStackCallout` member (hideStackCallout: () => void;).
+
+   * Contract: Describes stable behavior for callers of `hideStackCallout` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hideStackCallout: () => void;
+    /**
+   * Specifies the contract for the `clearTerrainTooltipTimer` member (clearTerrainTooltipTimer: () => void;).
+
+   * Contract: Describes stable behavior for callers of `clearTerrainTooltipTimer` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+clearTerrainTooltipTimer: () => void;
+    /**
+   * Specifies the contract for the `hideTerrainTooltipVisual` member (hideTerrainTooltipVisual: () => void;).
+
+   * Contract: Describes stable behavior for callers of `hideTerrainTooltipVisual` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+hideTerrainTooltipVisual: () => void;
+    /**
+   * Specifies the contract for the `requestRedraw` member (requestRedraw: () => void;).
+
+   * Contract: Describes stable behavior for callers of `requestRedraw` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+requestRedraw: () => void;
+    /**
+   * Specifies the contract for the `scheduleTerrainTooltipRestoreAfterPopoverClose` member (scheduleTerrainTooltipRestoreAfterPopoverClose: () => void;).
+
+   * Contract: Describes stable behavior for callers of `scheduleTerrainTooltipRestoreAfterPopoverClose` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+scheduleTerrainTooltipRestoreAfterPopoverClose: () => void;
+    /**
+   * Specifies the contract for the `refreshGameStateAfterBuildQueueChange` member (refreshGameStateAfterBuildQueueChange: () => Promise<void>;).
+
+   * Contract: Describes stable behavior for callers of `refreshGameStateAfterBuildQueueChange` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+refreshGameStateAfterBuildQueueChange: () => Promise<void>;
+    /**
+   * Specifies the contract for the `showMapToast` member (showMapToast: (message: string, options?: { isError?: boolean }) => void;).
+
+   * Contract: Describes stable behavior for callers of `showMapToast` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+showMapToast: (message: string, options?: { isError?: boolean }) => void;
 }
 
+/**
+ * Defines the `escapeHtml` function shape (function escapeHtml(text: string): string).
+
+ * Purpose: Supports maintainability by documenting why `escapeHtml` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function escapeHtml(text: string): string {
   return text
     .replaceAll('&', '&amp;')
@@ -44,6 +148,14 @@ function escapeHtml(text: string): string {
     .replaceAll("'", '&#39;');
 }
 
+/**
+ * Defines the `formatGroupedNamingLineHtml` function shape (function formatGroupedNamingLineHtml(namingLine: string): string).
+
+ * Purpose: Supports maintainability by documenting why `formatGroupedNamingLineHtml` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function formatGroupedNamingLineHtml(namingLine: string): string {
   const groups = namingLine
     .split(';')
@@ -62,6 +174,14 @@ function formatGroupedNamingLineHtml(namingLine: string): string {
   return formattedGroups.join('; ');
 }
 
+/**
+ * Defines the `createBuildQueuePopupController` function shape (export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) { async function runBuildQueueMutation(args: { mutate: () => Promise<{ succes).
+
+ * Purpose: Supports maintainability by documenting why `createBuildQueuePopupController` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
   async function runBuildQueueMutation(args: {
     mutate: () => Promise<{ success: boolean; reason?: string }>;

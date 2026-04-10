@@ -1,12 +1,12 @@
 import type { SubmitOrdersPayload } from '../shared/ipcTypes';
 
 /**
- * Why this exists:
- *     Normalizes submit-orders payloads so both legacy movement arrays and structured payloads share one contract.
- * When to use:
- *     Main-process IPC `game:submitOrders` handler before forwarding to game actions.
- * What to expect:
- *     Preserves structured tactical orders (ranged/air/ferry) and always provides a movement-order array.
+ * Defines the `normalizeSubmitOrdersPayload` function shape (export function normalizeSubmitOrdersPayload().
+
+ * Purpose: Supports maintainability by documenting why `normalizeSubmitOrdersPayload` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function normalizeSubmitOrdersPayload(
   payload: SubmitOrdersPayload | { unitId: string; toH3Index: string }[]

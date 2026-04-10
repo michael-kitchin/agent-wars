@@ -1,9 +1,33 @@
 import { getHexController, isDbReady } from './gameDb';
 import { logDebug, logError } from './logger';
 
+/**
+ * Documents the module-scope binding `MAX_DEDUP_KEYS` (MAX_DEDUP_KEYS).
+
+ * Purpose: Supports maintainability by documenting why `MAX_DEDUP_KEYS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const MAX_DEDUP_KEYS = 2000;
+/**
+ * Documents the module-scope binding `seenParityLogKeys` (seenParityLogKeys).
+
+ * Purpose: Supports maintainability by documenting why `seenParityLogKeys` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 const seenParityLogKeys = new Set<string>();
 
+/**
+ * Defines the `shouldEmitDedupedLog` function shape (function shouldEmitDedupedLog(key: string): boolean).
+
+ * Purpose: Supports maintainability by documenting why `shouldEmitDedupedLog` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 function shouldEmitDedupedLog(key: string): boolean {
   if (seenParityLogKeys.has(key)) return false;
   seenParityLogKeys.add(key);
@@ -15,14 +39,12 @@ function shouldEmitDedupedLog(key: string): boolean {
 }
 
 /**
- * Why this exists:
- *     Centralizes snapshot-vs-DB controller parity logging so prompt/briefing paths can keep using snapshot state while
- *     still surfacing control mismatches against authoritative DB reads.
- * When to use:
- *     Whenever logic intentionally uses snapshot `res1Control` for decisions and needs observability for potential drift.
- * What to expect:
- *     Emits error-level logs when DB control differs from the snapshot control for a hex, or when DB reads throw.
- *     Returns silently when DB is unavailable.
+ * Defines the `logHexControllerParityMismatch` function shape (export function logHexControllerParityMismatch(args: { h3Index: string; snapshotController: string | null; context: string; unitId?: string; }): vo).
+
+ * Purpose: Supports maintainability by documenting why `logHexControllerParityMismatch` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
  */
 export function logHexControllerParityMismatch(args: {
   h3Index: string;
