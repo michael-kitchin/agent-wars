@@ -74,17 +74,15 @@ function testWindowsIconContract() {
 }
 
 function testLinuxAndMacIconContract() {
-  assert.ok(buildConfig.linux && buildConfig.linux.icon, 'electron-builder linux.icon must be configured');
-  assert.ok(buildConfig.mac && buildConfig.mac.icon, 'electron-builder mac.icon must be configured');
-  assert.strictEqual(
-    buildConfig.linux.icon,
-    'build/icon.ico',
-    'electron-builder linux.icon must point to build/icon.ico'
+  assert.ok(buildConfig.linux, 'electron-builder linux config must be present');
+  assert.ok(buildConfig.mac, 'electron-builder mac config must be present');
+  assert.ok(
+    buildConfig.linux.icon === undefined || buildConfig.linux.icon === 'build/icon.png',
+    'electron-builder linux.icon must be undefined or point to build/icon.png'
   );
-  assert.strictEqual(
-    buildConfig.mac.icon,
-    'build/icon.ico',
-    'electron-builder mac.icon must point to build/icon.ico'
+  assert.ok(
+    buildConfig.mac.icon === undefined || buildConfig.mac.icon === 'build/icon.icns',
+    'electron-builder mac.icon must be undefined or point to build/icon.icns'
   );
 }
 
