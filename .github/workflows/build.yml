@@ -73,8 +73,6 @@ jobs:
         run: |
           rm -f release/builder-debug.yml
           rm -f release/builder-effective-config.yaml
-          rm -rf release/linux-unpacked
-          rm -rf release/mac
 
       - name: Upload release artifacts (Windows)
         if: runner.os == 'Windows'
