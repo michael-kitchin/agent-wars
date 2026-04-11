@@ -78,6 +78,7 @@ jobs:
 
       - name: Upload release artifacts (Windows)
         if: runner.os == 'Windows'
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: agent-wars-${{ steps.app_version.outputs.value }}-${{ runner.os }}
@@ -85,6 +86,7 @@ jobs:
 
       - name: Upload release artifacts (Linux/macOS)
         if: runner.os != 'Windows'
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: agent-wars-${{ steps.app_version.outputs.value }}-${{ runner.os }}
