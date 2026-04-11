@@ -1072,7 +1072,7 @@ function formatProductionQueueAwareLabel(
   controller: string | null,
   unitCountsByPlayer?: UnitCountsByPlayer
 ): string {
-  const capacityText = `${Math.max(0, capacityPerTurn).toLocaleString()}p`;
+  const capacityText = `$${Math.max(0, capacityPerTurn).toLocaleString()}`;
   const queue = getBuildQueueSummaryForHex(state, h3Index);
   const queuedUnits = queue?.queuedUnits ?? 0;
   if (queuedUnits <= 0) return capacityText;
@@ -1109,7 +1109,7 @@ function formatProductionLabelForHumanControllerOnly(
   capacityPerTurn: number,
   controller: string | null
 ): string {
-  if (controller !== 'human') return `${Math.max(0, capacityPerTurn).toLocaleString()}p / ?t`;
+  if (controller !== 'human') return `$${Math.max(0, capacityPerTurn).toLocaleString()} / ?t`;
   return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller);
 }
 
@@ -1664,7 +1664,13 @@ function formatTerrainTooltipHtml(state: TerrainTooltipState, namingLine: string
   const bodyParts: string[] = [terrainLine];
   if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
   else if (state.features.length > 0) bodyParts.push(`<strong>Features:</strong> ${state.features.join(', ')}`);
-  if (state.urbanHexCount != null) bodyParts.push(`<strong>Production:</strong> ${state.urbanHexCount.toLocaleString()}`);
+  if (state.urbanHexCount != null) {
+    const productionLine =
+      state.urbanHexCount > 0
+        ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn`
+        : `<strong>Production:</strong> (none)`;
+    bodyParts.push(productionLine);
+  }
   const bodyLine = bodyParts.join('<br/><span style="display:block;height:0.5em"></span>');
   if (!namingLine) return bodyLine;
   return `${formatGroupedNamingLineHtml(namingLine)}<br/><span style="display:block;height:0.5em"></span>${bodyLine}`;
@@ -2419,7 +2425,7 @@ function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void {
             overlayContext.unitCountsByPlayer
           )
         : formatProductionLabelForHumanControllerOnly(S.gameState, hx.h3Index, capacityPerTurn, controller)
-      : `${Math.max(0, capacityPerTurn).toLocaleString()}p`;
+      : `$${Math.max(0, capacityPerTurn).toLocaleString()}`;
     const hasClickableBuildEntryForHex =
       explored && isRes1HexHumanUrbanProduction(S.gameState, hx) && shouldShowBuildEntryZoom();
     if (hasClickableBuildEntryForHex) {

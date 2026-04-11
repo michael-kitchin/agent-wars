@@ -166,7 +166,7 @@ export function buildToolUsageGuidance(flags: PromptToolFlags, hasPrecomputedBri
   const lines: string[] = [];
   if (hasPrecomputedBriefing) {
     lines.push(
-      '- The COMMANDER\'S BRIEFING above already contains unit assessments, possible unit actions, and supplemental hex intelligence for this turn. Do NOT call assess_unit, assess_hex, or estimate_combat — that information is already in the briefing. Use the briefing to decide targets and priorities.'
+      '- The Commander\'s Briefing above already contains unit status, attention flags, possible unit actions, and supplemental hex intelligence for this turn. Do NOT call assess_unit, assess_hex, or estimate_combat — that information is already in the briefing. Use the briefing to decide targets and priorities.'
     );
     if (flags.planningEnabled) {
       lines.push(
@@ -175,7 +175,7 @@ export function buildToolUsageGuidance(flags: PromptToolFlags, hasPrecomputedBri
     }
     if (flags.ordersEnabled) {
       lines.push(
-        '- Standing orders: for every unit listed as "Units without standing orders" in the briefing, add an orders[] entry with action assign_order (march/pursue for closing; defend to hold). Then use plan_route and explicit_move in orders[] only where you need a one-step move this turn.'
+        '- Standing orders: for every unit listed under ## Units Without Standing Orders in the briefing, add an orders[] entry with action assign_order (march/pursue for closing; defend to hold). Then use plan_route and explicit_move in orders[] only where you need a one-step move this turn.'
       );
       lines.push(
         '- Tempo rule: if any unit can make a legal ranged_attack or air strike this turn, do it now. Ranged attacks and air strikes use turn-start positions and can be combined with movement orders in the same turn.'
@@ -210,7 +210,7 @@ export function buildToolUsageGuidance(flags: PromptToolFlags, hasPrecomputedBri
     if (flags.planningEnabled && !hasPrecomputedBriefing) {
       lines.push('- For units several turns from combat, use assign_order (march/pursue) in final JSON instead of re-planning every turn.');
     }
-    lines.push('- Sealift: use === NAVAL TRANSPORT STATUS === for each naval unit (capacity, co-located land, nearest embark hex); issue embark / transport_move / disembark in orders[] when crossing water.');
+    lines.push('- Sealift: use the # Naval Transport Status section for each naval unit (capacity, co-located land, nearest embark hex); issue embark / transport_move / disembark in orders[] when crossing water.');
   }
   if (flags.memoryEnabled) {
     lines.push(
@@ -352,7 +352,7 @@ export function getInitialUserMessage(flags: PromptToolFlags, hasPrecomputedBrie
       const ordersNudge = flags.ordersEnabled
         ? ' For units without standing orders in the briefing, include assign_order entries in orders[]. Then use plan_route and explicit_move only where needed this turn. '
         : '';
-      return `Use the COMMANDER'S BRIEFING above for unit status, possible unit actions, and supplemental hex intelligence.${ordersNudge}Call plan_route for each unit that needs a move (orderToXY).${memoryNote}${productionNote} Then submit final JSON with "strategy", "orders" (assign_order / explicit_move / ranged_attack / cancel_order as needed)${jsonOptionalTail}.`;
+      return `Use the Commander's Briefing above for unit status, attention flags, possible unit actions, and supplemental hex intelligence.${ordersNudge}Call plan_route for each unit that needs a move (orderToXY).${memoryNote}${productionNote} Then submit final JSON with "strategy", "orders" (assign_order / explicit_move / ranged_attack / cancel_order as needed)${jsonOptionalTail}.`;
     }
     return `Use the tools as needed to plan movement.${memoryNote}${productionNote} Then submit final JSON with "strategy", "orders"${jsonOptionalTail}.`;
   }

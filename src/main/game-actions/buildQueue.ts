@@ -1,4 +1,12 @@
-import { dbGetOne, dbRun, getHexController, listBuildQueueRowsForHex, replaceBuildQueueForHex, getRes1InfrastructureForHex } from '../gameDb';
+import {
+  dbGetOne,
+  dbRun,
+  getBuildProgressPointsForHex,
+  getHexController,
+  listBuildQueueRowsForHex,
+  replaceBuildQueueForHex,
+  getRes1InfrastructureForHex,
+} from '../gameDb';
 import { logDebug, logError, logTrace } from '../logger';
 import {
   BUILD_ENTRY_MAX_COUNT,
@@ -102,6 +110,15 @@ controlledByRequester: boolean;
    * Exceptions: None.
    */
 urbanHexCount: number;
+    /**
+   * Specifies the contract for the `storedPoints` member (storedPoints: number;).
+
+   * Contract: Banked production points for this hex after the last resolution pulse, before the next turn adds urban capacity.
+   * When to use: Expose alongside queue rows so the renderer can estimate full-queue completion time.
+   * Expected outcome: Same value as `getBuildProgressPointsForHex` for `h3Index`.
+   * Exceptions: None.
+   */
+storedPoints: number;
     /**
    * Specifies the contract for the `seaportCount` member (seaportCount: number;).
 
@@ -238,6 +255,7 @@ function buildQueueViewForRequester(h3Index: string, requestingPlayerId: string)
     controllerPlayerId,
     controlledByRequester,
     urbanHexCount: productionView.urbanHexCount,
+    storedPoints: getBuildProgressPointsForHex(h3Index),
     seaportCount: productionView.seaportCount,
     airportCount: productionView.airportCount,
     availableUnitTypes: productionView.availableUnitTypes,

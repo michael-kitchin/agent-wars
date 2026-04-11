@@ -28,7 +28,8 @@ export function buildRegionVsRegionScenarioObjectiveBlock(state: GameStateSnapsh
   logDebug('scenarioGoals buildRegionVsRegionScenarioObjectiveBlock', { scenarioId: state.scenarioId });
   if (state.scenarioId !== 'region_vs_region') return '';
   const lines: string[] = [
-    '=== SCENARIO OBJECTIVE (REQUIRED) ===',
+    '# Scenario Objective (Required)',
+    '',
     'Scenario: region_vs_region',
   ];
   const aiName = typeof state.aiHomeRegion === 'string' ? state.aiHomeRegion.trim() : '';

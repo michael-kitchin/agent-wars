@@ -172,26 +172,31 @@ hexAssessments: [],
  * Exceptions: None.
  */
 function testFormatBriefingContainsSections(): void {
-  const standingOrderText = '=== STANDING ORDER STATUS ===\n- opponent-infantry-1: MARCH to [1.000, 1.000] — en_route';
+  const standingOrderText =
+    '# Standing Order Status\n\n- opponent-infantry-1: MARCH to [1.000, 1.000] — en_route';
   const memoryText = 'Remember: push south.';
   const out = formatBriefing(fixtureState, precomputed, standingOrderText, memoryText);
-  assert.ok(out.includes("=== COMMANDER'S BRIEFING (Turn 2) ==="), 'title');
+  assert.ok(out.includes("# Commander's Briefing"), 'title');
   assert.ok(out.includes('Turn 2:'), 'Section 1 narrative');
   assert.ok(out.match(/\.\s+[A-Z]/), 'Section 1 has multiple sentences');
   assert.ok(out.includes('| Unit ID |'), 'unit table header');
-  assert.ok(out.includes('**Possible unit actions**'), 'possible unit actions section');
-  assert.ok(out.includes('**Losses since last consultation**'), 'losses subsection header');
+  assert.ok(out.includes('# Possible Unit Actions'), 'possible unit actions section');
+  assert.ok(out.includes('## Losses Since Last Consultation'), 'losses subsection header');
   assert.ok(out.includes('| Turn | Victim Unit | Side | Cause | Killer IDs |'), 'losses subsection table header');
   assert.ok(out.includes('opponent-armor-1'), 'unit table has unit');
   assert.ok(
-    out.includes('| Unit ID |') || out.includes('### Other hexes') || out.includes('**Possible unit actions**'),
+    out.includes('| Unit ID |') || out.includes('## Other Hexes') || out.includes('# Possible Unit Actions'),
     'possible actions table or section present'
   );
-  assert.ok(out.includes('**Attention flags**'), 'Section 3 header');
-  assert.ok(out.includes('YOUR STRATEGIC MEMORY'), 'memory block');
+  assert.ok(out.includes('## Attention Flags'), 'attention flags header');
+  assert.ok(
+    out.indexOf('## Attention Flags') < out.indexOf('# Possible Unit Actions'),
+    'attention flags appear before possible unit actions'
+  );
+  assert.ok(out.includes('Your Strategic Memory'), 'memory block');
   assert.ok(out.includes('Remember: push south.'), 'memory text');
-  assert.ok(out.includes('STANDING ORDER STATUS'), 'standing order block');
-  assert.ok(out.includes('**ACTIVE CALLBACKS**'), 'ACTIVE CALLBACKS section');
+  assert.ok(out.includes('# Standing Order Status'), 'standing order block');
+  assert.ok(out.includes('## Active Callbacks'), 'Active Callbacks section');
   assert.ok(out.includes('None. You may add callbacks'), 'callbacks hint when none');
   assert.ok(!out.includes('undefined'), 'no raw undefined');
 }
@@ -210,7 +215,7 @@ function testFormatBriefingActiveCallbacksWithSubscriptions(): void {
     { event: 'unit_engaged', params: { unitId: 'opponent-armor-1' } },
   ];
   const out = formatBriefing(fixtureState, precomputed, '', '', subs);
-  assert.ok(out.includes('**ACTIVE CALLBACKS**'), 'ACTIVE CALLBACKS section');
+  assert.ok(out.includes('## Active Callbacks'), 'Active Callbacks section');
   assert.ok(out.includes('turns(3) → fires turn 13'), 'turns subscription line');
   assert.ok(out.includes('unit_engaged(opponent-armor-1)'), 'unit_engaged subscription line');
 }
@@ -262,7 +267,7 @@ function testFormatBriefingIncludesLossRowsWhenProvided(): void {
 function testFormatBriefingUnitTableRows(): void {
   const out = formatBriefing(fixtureState, precomputed, '', '');
   const unitTableStart = out.indexOf('| Unit ID |');
-  const unitTableEnd = out.indexOf('**Possible unit actions**');
+  const unitTableEnd = out.indexOf('# Possible Unit Actions');
   const unitTable = out.slice(unitTableStart, unitTableEnd);
   assert.ok(unitTable.includes('opponent-armor-1') && unitTable.includes('opponent-infantry-1'));
   assert.ok(unitTable.includes('yes') || unitTable.includes('no'), 'action needed column');
@@ -295,7 +300,7 @@ const tests = [
   { name: 'formatBriefing contains all sections', fn: testFormatBriefingContainsSections },
   { name: 'formatBriefing unit table rows', fn: testFormatBriefingUnitTableRows },
   { name: 'formatBriefing possible actions armor ranged', fn: testFormatBriefingPossibleActionsArmorRanged },
-  { name: 'formatBriefing ACTIVE CALLBACKS with subscriptions', fn: testFormatBriefingActiveCallbacksWithSubscriptions },
+  { name: 'formatBriefing Active callbacks with subscriptions', fn: testFormatBriefingActiveCallbacksWithSubscriptions },
   { name: 'formatBriefing losses table rows', fn: testFormatBriefingIncludesLossRowsWhenProvided },
 ];
 

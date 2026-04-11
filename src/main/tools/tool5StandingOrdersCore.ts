@@ -542,7 +542,8 @@ export function getInjectionText(playerId: string, state: GameStateSnapshot): st
   const unitIdsWithoutOrders = aiUnitIds.filter((id) => !unitIdsWithOrders.has(id));
 
   const lines: string[] = [];
-  lines.push(`=== STANDING ORDER STATUS (Turn ${state.turnNumber}) ===`);
+  lines.push('# Standing Order Status');
+  lines.push('');
   const standingOrderRows = rows
     .filter((row) => aiUnitIdSet.has(row.unit_id))
     .map((row) => toStandingOrderPromptRow(row, aiUnitTypeById))
@@ -564,7 +565,8 @@ export function getInjectionText(playerId: string, state: GameStateSnapshot): st
     )
   );
   lines.push('');
-  lines.push('**Units without standing orders**');
+  lines.push('## Units Without Standing Orders');
+  lines.push('');
   const withoutOrderRows = unitIdsWithoutOrders.map((unitId) => [unitId, aiUnitTypeById.get(unitId) ?? '—']);
   if (aiUnitIds.length === 0) {
     lines.push(...buildPromptTableLines(['Unit ID', 'Unit Type'], [], ['—', '—']));

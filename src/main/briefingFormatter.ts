@@ -1,7 +1,7 @@
 /**
  * Formats the Commander's Briefing block for Milestone 0.6/0.7. Consumes pre-computed assessments and
  * builds the three-section structure (strategic narrative, unit status, possible actions, attention flags)
- * plus memory, standing-order, and ACTIVE CALLBACKS sections.
+ * plus memory, standing-order, and active callbacks sections.
  */
 
 import type { GameStateSnapshot } from './gameDb';
@@ -52,6 +52,30 @@ function formatPos(ll: [number, number]): string {
  */
 function formatUnitDisplayRef(unitId: string): string {
   return unitId;
+}
+
+/**
+ * Defines the `markdownHeading1` function shape (function markdownHeading1(title: string): string).
+
+ * Purpose: Inserts an ATX Markdown H1 with a blank line after the heading line (no leading newline, so the opener does not stack with the double newline already inserted before the briefing in the system prompt).
+ * When to use: Use for major Commander briefing sections (e.g. briefing title, Possible unit actions, strategic memory).
+ * Expected outcome: A string fragment that joins cleanly after the prior prompt paragraph.
+ * Exceptions: None.
+ */
+function markdownHeading1(title: string): string {
+  return `# ${title}\n\n`;
+}
+
+/**
+ * Defines the `markdownHeading2` function shape (function markdownHeading2(title: string): string).
+
+ * Purpose: Inserts an ATX Markdown H2 with a blank line before the heading (so it never runs into a prior paragraph) and a blank line after the heading line.
+ * When to use: Use for briefingFormatter sections that follow prose or tables (not for possible-unit-actions bucket titles).
+ * Expected outcome: A fragment that joins with prior content without merging the heading into the previous paragraph.
+ * Exceptions: None.
+ */
+function markdownHeading2(title: string): string {
+  return `\n\n## ${title}\n\n`;
 }
 
 /**
@@ -134,7 +158,7 @@ function buildStrategicNarrative(
     sentences.push(`${critical} unit(s) face a critical threat and require immediate attention.`);
   }
   sentences.push(
-    'Review the unit status table and possible unit actions below, then issue movement, ranged attacks, and air strikes as permitted this turn.'
+    'Review the unit status table, attention flags, and possible unit actions below, then issue movement, ranged attacks, and air strikes as permitted this turn.'
   );
   return sentences.slice(0, 5).join(' ');
 }
@@ -236,8 +260,8 @@ function buildUnitStatusTable(
       rows.push(`| ${selfLabel} | ${pos} | ${orderCell} | ${nearestStr} | ${severity} | ${action} |`);
     }
   }
-  if (rows.length === 0) return `${header}\n${sep}\n(No AI units)`;
-  return [header, sep, ...rows].join('\n');
+  if (rows.length === 0) return `${header}\n${sep}\n(No AI units)\n`;
+  return `${[header, sep, ...rows].join('\n')}\n`;
 }
 
 /**
@@ -250,7 +274,7 @@ function buildUnitStatusTable(
  */
 function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntry[]): string {
   if (hexAssessments.length === 0) return '';
-  const lines: string[] = ['**Supplemental hex intelligence**', ''];
+  const bullets: string[] = [];
   for (const entry of hexAssessments) {
     const posStr = formatPos(entry.position);
     const r = entry.result;
@@ -258,9 +282,9 @@ function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntr
     const passableBy = Array.isArray(r.passableBy) ? (r.passableBy as string[]).join(', ') : '';
     const notes = Array.isArray(r.strategicNotes) ? (r.strategicNotes as string[]).filter((x) => typeof x === 'string') : [];
     const noteStr = notes.length > 0 ? ` notes: ${notes.join('; ')}` : '';
-    lines.push(`- ${posStr}: terrain ${terrain}; passableBy: ${passableBy || 'unknown'}${noteStr}`);
+    bullets.push(`- ${posStr}: terrain ${terrain}; passableBy: ${passableBy || 'unknown'}${noteStr}`);
   }
-  return lines.join('\n');
+  return markdownHeading2('Supplemental Hex Intelligence') + bullets.join('\n');
 }
 
 /**
@@ -277,7 +301,7 @@ function buildLossesSinceLastConsultationTable(
 ): string {
   const header = '| Turn | Victim Unit | Side | Cause | Killer IDs |';
   const sep = '|------|-------------|------|-------|------------|';
-  if (losses.length === 0) return `${header}\n${sep}\n| — | — | — | — | — |`;
+  if (losses.length === 0) return `${header}\n${sep}\n| — | — | — | — | — |\n`;
   const rows = losses.map((loss) => {
     const side = loss.victimPlayer === perspectivePlayerId ? 'own' : 'enemy';
     const killers = loss.killerIds.length > 0
@@ -285,7 +309,7 @@ function buildLossesSinceLastConsultationTable(
       : 'unknown';
     return `| ${loss.turnNumber} | ${formatUnitDisplayRef(loss.victimUnitId)} | ${side} | ${loss.cause} | ${killers} |`;
   });
-  return [header, sep, ...rows].join('\n');
+  return `${[header, sep, ...rows].join('\n')}\n`;
 }
 
 /**
@@ -401,42 +425,45 @@ export function formatBriefing(
     latLngByH3.set(hx.h3Index, [lat, lng]);
   }
   const sections: string[] = [];
-  sections.push(`=== COMMANDER'S BRIEFING (Turn ${state.turnNumber}) ===\n`);
+  sections.push(markdownHeading1("Commander's Briefing"));
   sections.push(buildStrategicNarrative(state, precomputed.unitAssessments));
-  sections.push('\n\n**Unit status and threats**\n');
+  sections.push(markdownHeading2('Unit Status and Threats'));
   sections.push(buildUnitStatusTable(precomputed.unitAssessments));
+  sections.push(markdownHeading2('Attention Flags'));
+  sections.push(buildAttentionFlags(precomputed.unitAssessments));
   const possibleActions = buildPossibleUnitActionsMarkdown({
     state,
     latLngByH3,
     formatLatLng: formatPos,
   });
   if (possibleActions.trim().length > 0) {
-    sections.push('\n\n');
-    sections.push(possibleActions);
+    sections.push('\n\n' + markdownHeading1('Possible Unit Actions'));
+    sections.push(possibleActions.trim());
   }
   const supplementalHex = buildSupplementalHexIntelligenceBlock(precomputed.hexAssessments);
   if (supplementalHex.trim().length > 0) {
-    sections.push('\n\n');
     sections.push(supplementalHex);
   }
-  sections.push('\n\n**Losses since last consultation**\n');
+  sections.push(markdownHeading2('Losses Since Last Consultation'));
   sections.push(buildLossesSinceLastConsultationTable(lossesSinceLastConsultation, 'opponent'));
   if (productionText.trim().length > 0) {
-    sections.push('\n\n**Production status and options**\n');
-    sections.push(productionText.trim());
+    sections.push('\n\n' + productionText.trim());
   }
-  sections.push('\n\n**Attention flags**\n');
-  sections.push(buildAttentionFlags(precomputed.unitAssessments));
-  const hasStrategicMemoryHeader = (memoryText ?? '').includes('=== YOUR STRATEGIC MEMORY');
+  const mem = memoryText ?? '';
+  const hasStrategicMemoryHeader =
+    mem.includes('=== YOUR STRATEGIC MEMORY') ||
+    mem.includes('# YOUR STRATEGIC MEMORY') ||
+    mem.includes('# Your strategic memory') ||
+    mem.includes('# Your Strategic Memory');
   if (hasStrategicMemoryHeader) {
     sections.push('\n\n' + (memoryText || '(none)'));
   } else {
-    sections.push('\n\n=== YOUR STRATEGIC MEMORY ===\n');
+    sections.push(markdownHeading1('Your Strategic Memory'));
     sections.push(memoryText || '(none)');
   }
   sections.push('\n\n');
   sections.push(standingOrderText || '');
-  sections.push('\n\n**ACTIVE CALLBACKS**\n');
+  sections.push(markdownHeading2('Active Callbacks'));
   sections.push(buildActiveCallbacksSection(subscriptions ?? [], latLngByH3));
   return sections.join('');
 }

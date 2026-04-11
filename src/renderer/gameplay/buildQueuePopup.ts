@@ -1,4 +1,5 @@
 import type { BuildUnitType, HexBuildQueueSnapshot } from '../../shared/ipcTypes';
+import { estimateTurnsToCompleteQueuedProduction, sumQueuedProductionCost } from '../../shared/productionConfig';
 import { TOOLTIP_OFFSET_PX, UNIT_SELECT_GLYPH } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 
@@ -241,8 +242,28 @@ export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
       section.appendChild(descriptionSpacer);
     }
     const pointsLine = document.createElement('div');
-    pointsLine.innerHTML = `<strong>Production:</strong> ${snapshot.urbanHexCount.toLocaleString()} / turn`;
+    const productionCapacity = snapshot.urbanHexCount;
+    const productionDetail =
+      productionCapacity > 0
+        ? `$${productionCapacity.toLocaleString()} / turn`
+        : '(none)';
+    pointsLine.innerHTML = `<strong>Production:</strong> ${productionDetail}`;
     section.appendChild(pointsLine);
+    const queueSummaryLine = document.createElement('div');
+    const queueTotalCost = sumQueuedProductionCost(snapshot.entries);
+    if (snapshot.entries.length === 0) {
+      queueSummaryLine.innerHTML = `<strong>Queue:</strong> (none)`;
+    } else {
+      const queueTurns = estimateTurnsToCompleteQueuedProduction(
+        snapshot.entries,
+        snapshot.storedPoints,
+        productionCapacity
+      );
+      const queueTurnsDisplay = queueTurns === null ? '?' : queueTurns.toLocaleString();
+      const turnLabel = queueTurns === 1 ? 'turn' : 'turns';
+      queueSummaryLine.innerHTML = `<strong>Queue:</strong> $${queueTotalCost.toLocaleString()} / ${queueTurnsDisplay} ${turnLabel}`;
+    }
+    section.appendChild(queueSummaryLine);
     const productionSpacer = document.createElement('div');
     productionSpacer.style.height = '0.5em';
     section.appendChild(productionSpacer);
@@ -311,7 +332,7 @@ export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
       };
       typeSelect.addEventListener('change', async () => {
         if (!window.gameApi?.updateHexBuildQueueEntry) return;
-        await runBuildQueueMutation({
+        const success = await runBuildQueueMutation({
           mutate: () =>
             window.gameApi!.updateHexBuildQueueEntry({
               h3Index,
@@ -322,6 +343,7 @@ export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
           failureMessage: 'Failed to update build queue entry.',
           refreshState: true,
         });
+        if (!success) return;
         void renderBuildQueueIntoMount(mount, h3Index);
       });
       row.appendChild(typeSelect);
@@ -335,7 +357,7 @@ export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
       countInput.addEventListener('input', async () => {
         if (!window.gameApi?.updateHexBuildQueueEntry) return;
         const count = readCurrentCount();
-        await runBuildQueueMutation({
+        const success = await runBuildQueueMutation({
           mutate: () =>
             window.gameApi!.updateHexBuildQueueEntry({
               h3Index,
@@ -346,6 +368,8 @@ export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
           failureMessage: 'Failed to update build count.',
           refreshState: true,
         });
+        if (!success) return;
+        void renderBuildQueueIntoMount(mount, h3Index);
       });
       row.appendChild(countInput);
 
@@ -355,11 +379,12 @@ export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
       removeBtn.textContent = 'x';
       removeBtn.addEventListener('click', async () => {
         if (!window.gameApi?.removeHexBuildQueueEntry) return;
-        await runBuildQueueMutation({
+        const success = await runBuildQueueMutation({
           mutate: () => window.gameApi!.removeHexBuildQueueEntry({ h3Index, entryId: entry.id }),
           failureMessage: 'Failed to remove build queue entry.',
           refreshState: true,
         });
+        if (!success) return;
         void renderBuildQueueIntoMount(mount, h3Index);
       });
       row.appendChild(removeBtn);

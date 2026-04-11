@@ -2,7 +2,10 @@
  * Centralized constants and pure queue-production helpers for milestone 1.4.
  */
 
-import { UNIT_COST_BY_TYPE as SHARED_UNIT_COST_BY_TYPE } from '../shared/productionConfig';
+import {
+  applyProduction as applyProductionShared,
+  UNIT_COST_BY_TYPE as SHARED_UNIT_COST_BY_TYPE,
+} from '../shared/productionConfig';
 
 /**
  * Documents the `BuildUnitType` type alias (export type BuildUnitType).
@@ -261,29 +264,5 @@ export function applyProduction(
   storedPoints: number,
   urbanHexCount: number
 ): ProductionApplyResult {
-  const sorted = [...entries].sort((a, b) => a.queueIndex - b.queueIndex || a.id - b.id);
-  const updated: BuildQueueEntryLike[] = sorted.map((entry) => ({ ...entry }));
-  const spawnedUnitTypes: BuildUnitType[] = [];
-  let points = Math.max(0, Math.trunc(storedPoints)) + Math.max(0, Math.trunc(urbanHexCount));
-  let idx = 0;
-  while (idx < updated.length) {
-    const entry = updated[idx]!;
-    const unitCost = UNIT_COST_BY_TYPE[entry.unitType];
-    if (points < unitCost) break;
-    const maxBuildable = Math.floor(points / unitCost);
-    const built = Math.min(maxBuildable, entry.remainingCount);
-    if (built <= 0) break;
-    for (let i = 0; i < built; i++) spawnedUnitTypes.push(entry.unitType);
-    points -= built * unitCost;
-    entry.remainingCount -= built;
-    if (entry.remainingCount <= 0) {
-      updated.splice(idx, 1);
-      continue;
-    }
-    idx++;
-  }
-  for (let i = 0; i < updated.length; i++) {
-    updated[i]!.queueIndex = i;
-  }
-  return { updatedEntries: updated, storedPoints: points, spawnedUnitTypes };
+  return applyProductionShared(entries, storedPoints, urbanHexCount);
 }

@@ -286,7 +286,7 @@ async function run(): Promise<void> {
         systemPrompt.includes('Strict schema: top-level must be a JSON object with "strategy" (string) and "orders" (array); do not return a top-level array.'),
         `strict-schema prompt guidance missing for mask=${mask}`
       );
-      assert.ok(systemPrompt.includes('=== AIR OPERATIONS STATUS ==='), `air-ops status guidance missing for mask=${mask}`);
+      assert.ok(systemPrompt.includes('# Air Operations Status'), `air-ops status guidance missing for mask=${mask}`);
       assert.ok(
         systemPrompt.includes(
           `Air rules: strike range ${AIR_STRIKE_RANGE_HEXES} from base, ferry range ${AIR_FERRY_RANGE_HEXES} airport-to-airport, one air action per unit per turn.`
@@ -345,11 +345,11 @@ async function run(): Promise<void> {
         `own-home-region ownership summary missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('- Opponent home region control: 1 of 2 hexes (50%)'),
+        systemPrompt.includes("- Your control of opponent's home region: 1 of 2 hexes (50%)"),
         `opponent-home-region ownership summary missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('=== SCENARIO OBJECTIVE (REQUIRED) ==='),
+        systemPrompt.includes('# Scenario Objective (Required)'),
         `required scenario objective section missing for mask=${mask}`
       );
       assert.ok(

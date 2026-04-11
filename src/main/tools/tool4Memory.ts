@@ -276,9 +276,10 @@ export function getInjectionText(playerId: string, currentTurn: number): string 
       : `Stored memories not shown this turn: ${storedNotTriggered.length} (tags: ${[...tagsFromStoredNotTriggered].sort().join(', ') || 'none'}). These are withheld until their reminder triggers; use memory_read to retrieve by key or tag.`;
 
   const lines: string[] = [];
-  lines.push(`=== YOUR STRATEGIC MEMORY (Turn ${currentTurn}) ===`);
+  lines.push('# Your Strategic Memory');
   lines.push('');
-  lines.push('[PERSISTENT - your active strategic context]');
+  lines.push('## Persistent (Active Strategic Context)');
+  lines.push('');
   lines.push(
     ...buildPromptTableLines(
       ['Key', 'Updated Turn', 'Content'],
@@ -287,7 +288,8 @@ export function getInjectionText(playerId: string, currentTurn: number): string 
     )
   );
   lines.push('');
-  lines.push('[REMINDERS TRIGGERED THIS TURN]');
+  lines.push('## Reminders Triggered This Turn');
+  lines.push('');
   lines.push(
     ...buildPromptTableLines(
       ['Key', 'Tier', 'Recurring', 'Content'],

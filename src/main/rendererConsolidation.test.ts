@@ -16,8 +16,9 @@ import * as path from 'path';
  * Exceptions: None.
  */
 function getFunctionSource(source: string, functionName: string): string {
-  const signature = `function ${functionName}(`;
-  const start = source.indexOf(signature);
+  const signaturePattern = new RegExp(`(^|\\n)(?:export\\s+)?(?:async\\s+)?function\\s+${functionName}\\s*\\(`, 'm');
+  const match = signaturePattern.exec(source);
+  const start = match ? match.index + (match[1]?.length ?? 0) : -1;
   assert.ok(start >= 0, `Expected function ${functionName} to exist`);
 
   const openBrace = source.indexOf('{', start);
@@ -202,7 +203,7 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
     drawProductionFn.includes(
       'const canShowLabelWithoutInspection = isRes1HexHumanUrbanProduction(S.gameState, hx) || controlledByHuman;'
     ),
-    'drawRes1ProductionOverlays should keep 0p labels visible on explored human-controlled non-urban hexes'
+    'drawRes1ProductionOverlays should keep $0 labels visible on explored human-controlled non-urban hexes'
   );
   assert.ok(
     drawProductionFn.includes('const hasClickableBuildEntryForHex =') &&
@@ -211,8 +212,8 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   );
   assertMatches(
     drawProductionFn,
-    /:\s*`\$\{Math\.max\(0,\s*capacityPerTurn\)\.toLocaleString\(\)\}p`;/,
-    'drawRes1ProductionOverlays should show unexplored labels in N1p-only format'
+    /:\s*`\$\$\{Math\.max\(0,\s*capacityPerTurn\)\.toLocaleString\(\)\}`;/,
+    'drawRes1ProductionOverlays should show unexplored labels in $N format'
   );
   assert.ok(
     drawProductionFn.includes('const hasClickableBuildEntryForHex =') &&
@@ -457,8 +458,14 @@ function testAirFerryDoubleClickContracts(): void {
  */
 function testAirStrikeAndAirGlyphContracts(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const readyHandlerPath = path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'readyHandler.ts');
+  const tacticalOrdersPath = path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'tacticalOrders.ts');
+  const sidebarSupportPath = path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'sidebarSupport.ts');
   const rendererConstantsPath = path.resolve(process.cwd(), 'src', 'renderer', 'core', 'constants.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
+  const readyHandlerSource = fs.readFileSync(readyHandlerPath, 'utf8');
+  const tacticalOrdersSource = fs.readFileSync(tacticalOrdersPath, 'utf8');
+  const sidebarSupportSource = fs.readFileSync(sidebarSupportPath, 'utf8');
   const rendererConstantsSource = fs.readFileSync(rendererConstantsPath, 'utf8');
   const inferUnitTypeLabelFromIdFn = getFunctionSource(source, 'inferUnitTypeLabelFromId');
 
@@ -471,9 +478,9 @@ function testAirStrikeAndAirGlyphContracts(): void {
     'unit-id fallback label should map air units to S instead of ?'
   );
   assert.ok(
-    source.includes("from './gameplay/turnUpdateSummary'") &&
-      source.includes('buildTurnUpdateBullets({') &&
-      source.includes('formatKillLine: killToastFormatter.formatKillLine'),
+    readyHandlerSource.includes("from './turnUpdateSummary'") &&
+      readyHandlerSource.includes('buildTurnUpdateBullets({') &&
+      readyHandlerSource.includes('formatKillLine: killToastFormatter.formatKillLine'),
     'ready update bullets should be delegated to shared turn update summary helpers'
   );
   assert.ok(
@@ -481,10 +488,11 @@ function testAirStrikeAndAirGlyphContracts(): void {
     'Strike button should hide while strike planning mode is active'
   );
   assert.ok(
-    source.includes("from './gameplay/orderLabelFormatting'") &&
-      source.includes('formatPendingRangedAttackSidebarLabel(S.gameState, r)') &&
-      source.includes('formatPendingAirStrikeSidebarLabel(S.gameState, strike)') &&
-      source.includes('formatPendingFerryOrderSidebarLabel(S.gameState, ferry)'),
+    tacticalOrdersSource.includes("from './orderLabelFormatting'") &&
+      tacticalOrdersSource.includes('formatPendingRangedAttackSidebarLabel(S.gameState, r)') &&
+      tacticalOrdersSource.includes('formatPendingAirStrikeSidebarLabel(S.gameState, strike)') &&
+      sidebarSupportSource.includes("from './orderLabelFormatting'") &&
+      sidebarSupportSource.includes('formatPendingFerryOrderSidebarLabel(S.gameState, ferry)'),
     'planned order list labels should use shared order label formatting helpers'
   );
   assert.ok(

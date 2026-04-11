@@ -290,16 +290,17 @@ export function buildProductionBriefingBlock(args: {
     unavailableReason?: string;
   };
   if (snapshot.status !== 'ok') {
-    return `=== PRODUCTION STATUS ===\nProduction status unavailable: ${snapshot.error ?? 'unknown error'}\n`;
+    return `# Production Status\n\nProduction status unavailable: ${snapshot.error ?? 'unknown error'}\n`;
   }
   if (typeof snapshot.unavailableReason === 'string' && snapshot.unavailableReason.trim().length > 0) {
-    return `=== PRODUCTION STATUS ===\nProduction status temporarily unavailable: ${snapshot.unavailableReason}\n`;
+    return `# Production Status\n\nProduction status temporarily unavailable: ${snapshot.unavailableReason}\n`;
   }
   const queues = snapshot.production?.controlledHexQueues ?? [];
   const opponentCounts = getPlayerUnitCountsByType(args.state.units, 'opponent');
   const maxedTypes = getMaxedUnitTypesForPlayer(args.state.units, 'opponent');
   const lines: string[] = [];
-  lines.push('=== PRODUCTION STATUS ===');
+  lines.push('# Production Status');
+  lines.push('');
   lines.push(
     'Rules: infantry cost 10 (min urban 1), armor cost 20 (min urban 2), naval cost 50 (min urban 10 + min seaports 1), air cost 30 (min urban 5 + requires airport).'
   );
@@ -318,7 +319,7 @@ export function buildProductionBriefingBlock(args: {
     return lines.join('\n');
   }
   lines.push('');
-  lines.push('**Controlled hex queues**');
+  lines.push('## Controlled Hex Queues');
   lines.push('');
   const normalizedRows = (queues as ControlledHexQueueSnapshot[]).map((row) =>
     normalizeControlledHexQueueRow(row, args.formatLatLng)
@@ -378,7 +379,8 @@ export function buildAirOperationsBriefingBlock(
 
   const lines: string[] = [];
   const rangeEnvelopeCache: RangeEnvelopeCache = new Map();
-  lines.push('=== AIR OPERATIONS STATUS ===');
+  lines.push('# Air Operations Status');
+  lines.push('');
   lines.push(
     `Air rules: strike range ${AIR_STRIKE_RANGE_HEXES} from base, ferry range ${AIR_FERRY_RANGE_HEXES} airport-to-airport, one air action per unit per turn.`
   );
@@ -515,7 +517,8 @@ export function buildSealiftBriefingBlock(
     landByHex.set(unit.h3Index, row);
   }
 
-  lines.push('=== NAVAL TRANSPORT STATUS ===');
+  lines.push('# Naval Transport Status');
+  lines.push('');
   lines.push('Embark: opponent-controlled coastal hex, or non-coastal with seaport+control. Capacity: 1 armor or 2 infantry per naval unit.');
   lines.push('');
   const navalRows: Array<Array<unknown>> = [];

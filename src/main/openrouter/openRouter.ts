@@ -712,15 +712,16 @@ function buildSystemPromptForTools(
   const hasPrecomputedBriefing = briefingOverride != null && briefingOverride.length > 0;
   const toolsIntro = toolsIntroPurpose
     ? hasPrecomputedBriefing
-      ? 'Use the COMMANDER\'S BRIEFING above for assessments and possible unit actions; use tools selectively for exact routing (plan_route), standing-order checks (query_orders), memory lookup (memory_read), and production queue checks/sets when needed.'
+      ? 'Use the Commander\'s Briefing above for assessments and possible unit actions; use tools selectively for exact routing (plan_route), standing-order checks (query_orders), memory lookup (memory_read), and production queue checks/sets when needed.'
       : `Use these tools to ${toolsIntroPurpose} before submitting orders. You may use multiple rounds of tool calls and mix tool types if that helps.` +
         (flags.memoryEnabled ? ' Memory: use memory_read as needed; persist notes via memoryUpdates in your final JSON.' : '')
     : 'Use only the tools listed below. Do not call tools that are not in the list.';
   const toolGuidance = buildToolUsageGuidance(flags, hasPrecomputedBriefing);
   const toolsSection =
     filtered.length === 0
-      ? '=== AVAILABLE TOOLS ===\nNo tools available.'
-      : `=== AVAILABLE TOOLS ===
+      ? '# Available Tools\n\nNo tools available.'
+      : `# Available Tools
+
 ${toolsIntro}
 ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}`;
 
@@ -774,7 +775,7 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
   const opponentHomeRegionControl = countControlledHexesInRegion(state.res1Control ?? [], state.humanHomeRegionHexes, 'opponent');
   const homeRegionOwnershipSummary =
     state.scenarioId === 'region_vs_region'
-      ? `\n${formatControlProgressLine('Your home region control', ownHomeRegionControl.controlled, ownHomeRegionControl.total)}\n${formatControlProgressLine('Opponent home region control', opponentHomeRegionControl.controlled, opponentHomeRegionControl.total)}`
+      ? `\n${formatControlProgressLine('Your home region control', ownHomeRegionControl.controlled, ownHomeRegionControl.total)}\n${formatControlProgressLine("Your control of opponent's home region", opponentHomeRegionControl.controlled, opponentHomeRegionControl.total)}`
       : '';
   const strategicContextBlock = `Strategic context:
 - At least one enemy unit remains in play, and the human player is actively searching for your forces with intent to destroy them.

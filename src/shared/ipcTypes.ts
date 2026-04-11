@@ -1953,6 +1953,15 @@ controlledByRequester: boolean;
    */
 urbanHexCount: Res1ProductionContextSnapshot['urbanHexCount'];
     /**
+   * Specifies the contract for the `storedPoints` member (storedPoints: number;).
+
+   * Contract: Carry-over production points for this hex before the next urban capacity pulse is applied.
+   * When to use: UI that simulates queue completion time or mirrors in-game production banked points.
+   * Expected outcome: Non-negative integer matching `res1_build_progress.stored_points` for the same hex.
+   * Exceptions: None.
+   */
+storedPoints: number;
+    /**
    * Specifies the contract for the `airportCount` member (airportCount: Res1ProductionContextSnapshot['airportCount'];).
 
    * Contract: Describes stable behavior for callers of `airportCount` in this codebase.

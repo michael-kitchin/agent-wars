@@ -12,7 +12,8 @@ import { isWithinGridRangeSafe } from '../game-actions/gridRange';
 import { logDebug, logTrace } from '../logger';
 import { logHexControllerParityMismatch } from '../snapshotDbParity';
 import { buildPromptTableLines } from '../promptTableUtils';
-/**
+
+/**
  * Documents the module-scope binding `ENEMY_PLAYER` (ENEMY_PLAYER).
 
  * Purpose: Supports maintainability by documenting why `ENEMY_PLAYER` exists.
@@ -21,7 +22,8 @@ import { buildPromptTableLines } from '../promptTableUtils';
  * Exceptions: None.
  */
 
-const ENEMY_PLAYER = 'human';/**
+const ENEMY_PLAYER = 'human';
+/**
  * Documents the module-scope binding `FRIENDLY_PLAYER` (FRIENDLY_PLAYER).
 
  * Purpose: Supports maintainability by documenting why `FRIENDLY_PLAYER` exists.
@@ -31,7 +33,8 @@ const ENEMY_PLAYER = 'human';/**
  */
 
 const FRIENDLY_PLAYER = 'opponent';
-/**
+
+/**
  * Documents the module-scope binding `ACTION_MOVES_MELEE` (ACTION_MOVES_MELEE).
 
  * Purpose: Supports maintainability by documenting why `ACTION_MOVES_MELEE` exists.
@@ -40,7 +43,8 @@ const FRIENDLY_PLAYER = 'opponent';
  * Exceptions: None.
  */
 
-const ACTION_MOVES_MELEE = 'move/melee';/**
+const ACTION_MOVES_MELEE = 'move/melee';
+/**
  * Documents the module-scope binding `ACTION_RANGED` (ACTION_RANGED).
 
  * Purpose: Supports maintainability by documenting why `ACTION_RANGED` exists.
@@ -49,7 +53,8 @@ const ACTION_MOVES_MELEE = 'move/melee';/**
  * Exceptions: None.
  */
 
-const ACTION_RANGED = 'ranged attack';/**
+const ACTION_RANGED = 'ranged attack';
+/**
  * Documents the module-scope binding `ACTION_AIR_STRIKES` (ACTION_AIR_STRIKES).
 
  * Purpose: Supports maintainability by documenting why `ACTION_AIR_STRIKES` exists.
@@ -58,7 +63,8 @@ const ACTION_RANGED = 'ranged attack';/**
  * Exceptions: None.
  */
 
-const ACTION_AIR_STRIKES = 'air strike';/**
+const ACTION_AIR_STRIKES = 'air strike';
+/**
  * Documents the module-scope binding `BUCKET_TITLES` (BUCKET_TITLES: Array<{ bucket: PossibleActionTableRow['bucket']; title: string }>).
 
  * Purpose: Supports maintainability by documenting why `BUCKET_TITLES` exists.
@@ -68,10 +74,11 @@ const ACTION_AIR_STRIKES = 'air strike';/**
  */
 
 const BUCKET_TITLES: Array<{ bucket: PossibleActionTableRow['bucket']; title: string }> = [
-  { bucket: 'homeland', title: 'Enemy homeland hexes' },
-  { bucket: 'nearest', title: 'Hexes nearest to enemy homeland' },
-  { bucket: 'other', title: 'Other hexes' },
-];/**
+  { bucket: 'homeland', title: 'Enemy Homeland Hexes' },
+  { bucket: 'nearest', title: 'Hexes Nearest to Enemy Homeland' },
+  { bucket: 'other', title: 'Other Hexes' },
+];
+/**
  * Documents the module-scope binding `BUCKET_PRIORITY` (BUCKET_PRIORITY: Record<PossibleActionTableRow['bucket'], number>).
 
  * Purpose: Supports maintainability by documenting why `BUCKET_PRIORITY` exists.
@@ -109,7 +116,8 @@ const BUCKET_PRIORITY: Record<PossibleActionTableRow['bucket'], number> = {
    */
  other: 2,
 };
-/**
+
+/**
  * Documents the `PossibleActionTableRow` interface as a named contract surface (export interface PossibleActionTableRow).
 
  * Purpose: Supports maintainability by documenting why `PossibleActionTableRow` exists.
@@ -222,7 +230,8 @@ export interface PossibleActionTableRow {
 function excludeUnitCurrentHex(unitH3: string, hexes: string[]): string[] {
   return hexes.filter((h3) => h3 !== unitH3);
 }
-/**
+
+/**
  * Documents the `InfraCounts` interface as a named contract surface (interface InfraCounts).
 
  * Purpose: Supports maintainability by documenting why `InfraCounts` exists.
@@ -260,7 +269,8 @@ interface InfraCounts {
    */
  airport: number;
 }
-/**
+
+/**
  * Documents the `IndexedState` interface as a named contract surface (interface IndexedState).
 
  * Purpose: Supports maintainability by documenting why `IndexedState` exists.
@@ -377,7 +387,8 @@ function minDistanceToHomeland(h3: string, homeland: Set<string>): number | null
   }
   return min === Infinity ? null : min;
 }
-/**
+
+/**
  * Defines the `partitionHomelandNearestOther` function shape (export function partitionHomelandNearestOther(legalHexes: string[], homelandSet: Set<string>): { homeland: string[]; nearest: string[]; other: string[]).
 
  * Purpose: Supports maintainability by documenting why `partitionHomelandNearestOther` exists.
@@ -569,7 +580,8 @@ function safeGridDistance(from: string, to: string): number | null {
     return null;
   }
 }
-/**
+
+/**
  * Documents the `RawPossibleActionRow` interface as a named contract surface (interface RawPossibleActionRow).
 
  * Purpose: Supports maintainability by documenting why `RawPossibleActionRow` exists.
@@ -670,7 +682,8 @@ interface RawPossibleActionRow {
    */
  urbanHexCount: number;
 }
-/**
+
+/**
  * Defines the `appendRowsForLegalHexes` function shape (function appendRowsForLegalHexes(args: { rows: RawPossibleActionRow[]; unitId: string; unitType: string; unitH3: string; actionType: string; l).
 
  * Purpose: Supports maintainability by documenting why `appendRowsForLegalHexes` exists.
@@ -813,7 +826,8 @@ function collectStrikeHexesForAirUnit(airH3: string, indexed: IndexedState): str
     return out;
   }
 }
-/**
+
+/**
  * Documents the module-scope binding `TABLE_HEADERS` (TABLE_HEADERS).
 
  * Purpose: Supports maintainability by documenting why `TABLE_HEADERS` exists.
@@ -823,7 +837,8 @@ function collectStrikeHexesForAirUnit(airH3: string, indexed: IndexedState): str
  */
 
 const TABLE_HEADERS = ['Unit ID', 'Unit Type', 'Action Types', 'Hex', 'Distance', 'Enemy Units', 'Hex Features'];
-/**
+
+/**
  * Documents the module-scope binding `ACTION_TYPE_ORDER` (ACTION_TYPE_ORDER: Record<string, number>).
 
  * Purpose: Supports maintainability by documenting why `ACTION_TYPE_ORDER` exists.
@@ -1009,7 +1024,8 @@ function groupRowsByBucket(rows: PossibleActionTableRow[]): Record<PossibleActio
   for (const row of rows) grouped[row.bucket].push(row);
   return grouped;
 }
-/**
+
+/**
  * Defines the `buildPossibleUnitActionsMarkdown` function shape (export function buildPossibleUnitActionsMarkdown(args: { state: GameStateSnapshot; latLngByH3: Map<string, [number, number]>; formatLatLng: (ll: [numbe).
 
  * Purpose: Supports maintainability by documenting why `buildPossibleUnitActionsMarkdown` exists.
@@ -1099,19 +1115,22 @@ export function buildPossibleUnitActionsMarkdown(args: {
 
   const byBucket = groupRowsByBucket(rows);
 
-  const subsection = (title: string, bucketRows: PossibleActionTableRow[]): string[] => {
-    if (bucketRows.length === 0) return [];
+  const subsection = (title: string, bucketRows: PossibleActionTableRow[]): string => {
+    if (bucketRows.length === 0) return '';
     const trimmed = selectTopRowsPerUnit(bucketRows, latLngByH3);
     const tableBody = trimmed.map((r) => {
       const ll = latLngByH3.get(r.targetH3);
       const hexStr = ll ? formatLatLng(ll) : r.targetH3;
       return [r.unitId, r.unitType, r.actionTypes, hexStr, String(r.distance), r.enemySummary, r.featuresSummary];
     });
-    return [`### ${title}`, '', ...markdownTableLines(tableBody), ''];
+    const tableLines = markdownTableLines(tableBody);
+    return `## ${title}\n\n${tableLines.join('\n')}`;
   };
 
-  const parts: string[] = ['**Possible unit actions**', ''];
-  for (const item of BUCKET_TITLES) parts.push(...subsection(item.title, byBucket[item.bucket]));
-  while (parts.length > 0 && parts[parts.length - 1] === '') parts.pop();
-  return parts.join('\n');
+  const blocks: string[] = [];
+  for (const item of BUCKET_TITLES) {
+    const block = subsection(item.title, byBucket[item.bucket]);
+    if (block.length > 0) blocks.push(block);
+  }
+  return blocks.join('\n\n');
 }

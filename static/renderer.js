@@ -14549,6 +14549,67 @@
     const deficit = Math.max(0, unitCost - safeStoredPoints);
     return Math.max(1, Math.ceil(deficit / safeCapacity));
   }
+  function applyProduction(entries, storedPoints, urbanHexCount) {
+    const sorted = [...entries].sort((a, b) => a.queueIndex - b.queueIndex || a.id - b.id);
+    const updated = sorted.map((entry) => ({ ...entry }));
+    const spawnedUnitTypes = [];
+    let points = Math.max(0, Math.trunc(storedPoints)) + Math.max(0, Math.trunc(urbanHexCount));
+    let idx = 0;
+    while (idx < updated.length) {
+      const entry = updated[idx];
+      const unitCost = UNIT_COST_BY_TYPE[entry.unitType];
+      if (points < unitCost) break;
+      const maxBuildable = Math.floor(points / unitCost);
+      const built = Math.min(maxBuildable, entry.remainingCount);
+      if (built <= 0) break;
+      for (let i = 0; i < built; i++) spawnedUnitTypes.push(entry.unitType);
+      points -= built * unitCost;
+      entry.remainingCount -= built;
+      if (entry.remainingCount <= 0) {
+        updated.splice(idx, 1);
+        continue;
+      }
+      idx++;
+    }
+    for (let i = 0; i < updated.length; i++) {
+      updated[i].queueIndex = i;
+    }
+    return { updatedEntries: updated, storedPoints: points, spawnedUnitTypes };
+  }
+  function sumQueuedProductionCost(entries) {
+    let sum = 0;
+    for (const row of entries) {
+      const cost = UNIT_COST_BY_TYPE[row.unitType];
+      sum += cost * Math.max(0, Math.trunc(row.count));
+    }
+    return sum;
+  }
+  function estimateTurnsToCompleteQueuedProduction(entries, storedPoints, capacityPerTurn) {
+    let working = entries.map((e) => ({
+      id: e.id,
+      queueIndex: e.queueIndex,
+      unitType: e.unitType,
+      remainingCount: Math.max(0, Math.trunc(e.count))
+    })).sort((a, b) => a.queueIndex - b.queueIndex || a.id - b.id);
+    let stored = Math.max(0, Math.trunc(storedPoints));
+    const cap = Math.max(0, Math.trunc(capacityPerTurn));
+    const remainingUnits = () => working.reduce((acc, row) => acc + row.remainingCount, 0);
+    if (remainingUnits() === 0) return 0;
+    if (cap < 1) return null;
+    let turns = 0;
+    const maxTurns = 1e6;
+    while (remainingUnits() > 0) {
+      const before = JSON.stringify({ working, stored });
+      const result = applyProduction(working, stored, cap);
+      working = result.updatedEntries;
+      stored = result.storedPoints;
+      turns++;
+      const after = JSON.stringify({ working, stored });
+      if (after === before) return null;
+      if (turns > maxTurns) return null;
+    }
+    return turns;
+  }
 
   // src/shared/unitDisplayNames.ts
   var UNIT_TYPE_NOUN_BY_TYPE = {
@@ -16845,8 +16906,25 @@
         section.appendChild(descriptionSpacer);
       }
       const pointsLine = document.createElement("div");
-      pointsLine.innerHTML = `<strong>Production:</strong> ${snapshot.urbanHexCount.toLocaleString()} / turn`;
+      const productionCapacity = snapshot.urbanHexCount;
+      const productionDetail = productionCapacity > 0 ? `$${productionCapacity.toLocaleString()} / turn` : "(none)";
+      pointsLine.innerHTML = `<strong>Production:</strong> ${productionDetail}`;
       section.appendChild(pointsLine);
+      const queueSummaryLine = document.createElement("div");
+      const queueTotalCost = sumQueuedProductionCost(snapshot.entries);
+      if (snapshot.entries.length === 0) {
+        queueSummaryLine.innerHTML = `<strong>Queue:</strong> (none)`;
+      } else {
+        const queueTurns = estimateTurnsToCompleteQueuedProduction(
+          snapshot.entries,
+          snapshot.storedPoints,
+          productionCapacity
+        );
+        const queueTurnsDisplay = queueTurns === null ? "?" : queueTurns.toLocaleString();
+        const turnLabel = queueTurns === 1 ? "turn" : "turns";
+        queueSummaryLine.innerHTML = `<strong>Queue:</strong> $${queueTotalCost.toLocaleString()} / ${queueTurnsDisplay} ${turnLabel}`;
+      }
+      section.appendChild(queueSummaryLine);
       const productionSpacer = document.createElement("div");
       productionSpacer.style.height = "0.5em";
       section.appendChild(productionSpacer);
@@ -16912,7 +16990,7 @@
         };
         typeSelect.addEventListener("change", async () => {
           if (!window.gameApi?.updateHexBuildQueueEntry) return;
-          await runBuildQueueMutation({
+          const success = await runBuildQueueMutation({
             mutate: () => window.gameApi.updateHexBuildQueueEntry({
               h3Index,
               entryId: entry.id,
@@ -16922,6 +17000,7 @@
             failureMessage: "Failed to update build queue entry.",
             refreshState: true
           });
+          if (!success) return;
           void renderBuildQueueIntoMount(mount, h3Index);
         });
         row.appendChild(typeSelect);
@@ -16934,7 +17013,7 @@
         countInput.addEventListener("input", async () => {
           if (!window.gameApi?.updateHexBuildQueueEntry) return;
           const count = readCurrentCount();
-          await runBuildQueueMutation({
+          const success = await runBuildQueueMutation({
             mutate: () => window.gameApi.updateHexBuildQueueEntry({
               h3Index,
               entryId: entry.id,
@@ -16944,6 +17023,8 @@
             failureMessage: "Failed to update build count.",
             refreshState: true
           });
+          if (!success) return;
+          void renderBuildQueueIntoMount(mount, h3Index);
         });
         row.appendChild(countInput);
         const removeBtn = document.createElement("button");
@@ -16952,11 +17033,12 @@
         removeBtn.textContent = "x";
         removeBtn.addEventListener("click", async () => {
           if (!window.gameApi?.removeHexBuildQueueEntry) return;
-          await runBuildQueueMutation({
+          const success = await runBuildQueueMutation({
             mutate: () => window.gameApi.removeHexBuildQueueEntry({ h3Index, entryId: entry.id }),
             failureMessage: "Failed to remove build queue entry.",
             refreshState: true
           });
+          if (!success) return;
           void renderBuildQueueIntoMount(mount, h3Index);
         });
         row.appendChild(removeBtn);
@@ -20154,7 +20236,7 @@
     return state.fogOfWarEnabled === false;
   }
   function formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer) {
-    const capacityText = `${Math.max(0, capacityPerTurn).toLocaleString()}p`;
+    const capacityText = `$${Math.max(0, capacityPerTurn).toLocaleString()}`;
     const queue = getBuildQueueSummaryForHex(state, h3Index);
     const queuedUnits = queue?.queuedUnits ?? 0;
     if (queuedUnits <= 0) return capacityText;
@@ -20174,7 +20256,7 @@
     return `${capacityText} / ${turns.toLocaleString()}t`;
   }
   function formatProductionLabelForHumanControllerOnly(state, h3Index, capacityPerTurn, controller) {
-    if (controller !== "human") return `${Math.max(0, capacityPerTurn).toLocaleString()}p / ?t`;
+    if (controller !== "human") return `$${Math.max(0, capacityPerTurn).toLocaleString()} / ?t`;
     return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller);
   }
   function formatProductionLabelForAnyController(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer) {
@@ -20486,7 +20568,10 @@
     const bodyParts = [terrainLine];
     if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
     else if (state.features.length > 0) bodyParts.push(`<strong>Features:</strong> ${state.features.join(", ")}`);
-    if (state.urbanHexCount != null) bodyParts.push(`<strong>Production:</strong> ${state.urbanHexCount.toLocaleString()}`);
+    if (state.urbanHexCount != null) {
+      const productionLine = state.urbanHexCount > 0 ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn` : `<strong>Production:</strong> (none)`;
+      bodyParts.push(productionLine);
+    }
     const bodyLine = bodyParts.join('<br/><span style="display:block;height:0.5em"></span>');
     if (!namingLine) return bodyLine;
     return `${formatGroupedNamingLineHtml2(namingLine)}<br/><span style="display:block;height:0.5em"></span>${bodyLine}`;
@@ -20838,7 +20923,7 @@
         capacityPerTurn,
         controller,
         overlayContext.unitCountsByPlayer
-      ) : formatProductionLabelForHumanControllerOnly(rendererSharedState.gameState, hx.h3Index, capacityPerTurn, controller) : `${Math.max(0, capacityPerTurn).toLocaleString()}p`;
+      ) : formatProductionLabelForHumanControllerOnly(rendererSharedState.gameState, hx.h3Index, capacityPerTurn, controller) : `$${Math.max(0, capacityPerTurn).toLocaleString()}`;
       const hasClickableBuildEntryForHex = explored && isRes1HexHumanUrbanProduction(rendererSharedState.gameState, hx) && shouldShowBuildEntryZoom();
       if (hasClickableBuildEntryForHex) {
         continue;

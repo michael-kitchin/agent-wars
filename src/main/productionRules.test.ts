@@ -6,8 +6,10 @@ import {
 } from './productionRules';
 import { MAX_UNITS_PER_TYPE as MAX_UNITS_PER_TYPE_MAIN } from './productionCaps';
 import {
+  estimateTurnsToCompleteQueuedProduction,
   estimateTurnsToNextSpawn,
   MAX_UNITS_PER_TYPE as MAX_UNITS_PER_TYPE_SHARED,
+  sumQueuedProductionCost,
 } from '../shared/productionConfig';
 
 /**
@@ -121,6 +123,34 @@ function testDeploymentCapsMatchMilestone14Values(): void {
 }
 
 /**
+ * Defines the `testQueuedCostAndCompletionTurnEstimates` function shape (function testQueuedCostAndCompletionTurnEstimates(): void).
+
+ * Purpose: Locks shared helpers used by the build popup for queue cost totals and simulated drain turns.
+ * When to use: Regression coverage when production pacing or costs change.
+ * Expected outcome: Empty queues cost zero and complete in zero turns; simple queues match small hand-simulations; zero capacity yields `null` when work remains.
+ * Exceptions: None.
+ */
+function testQueuedCostAndCompletionTurnEstimates(): void {
+  assert.strictEqual(sumQueuedProductionCost([]), 0);
+  assert.strictEqual(
+    sumQueuedProductionCost([
+      { unitType: 'infantry', count: 2 },
+      { unitType: 'armor', count: 1 },
+    ]),
+    40
+  );
+  assert.strictEqual(estimateTurnsToCompleteQueuedProduction([], 0, 3), 0);
+  assert.strictEqual(
+    estimateTurnsToCompleteQueuedProduction([{ id: 1, queueIndex: 0, unitType: 'infantry', count: 1 }], 0, 2),
+    5
+  );
+  assert.strictEqual(
+    estimateTurnsToCompleteQueuedProduction([{ id: 1, queueIndex: 0, unitType: 'infantry', count: 1 }], 0, 0),
+    null
+  );
+}
+
+/**
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Supports maintainability by documenting why `run` exists.
@@ -134,6 +164,7 @@ function run(): void {
   testProductionExamplesFromSpec();
   testTurnsToNextSpawnEstimateUsesNextUnitOnly();
   testDeploymentCapsMatchMilestone14Values();
+  testQueuedCostAndCompletionTurnEstimates();
   console.log('productionRules.test.ts passed');
 }
 

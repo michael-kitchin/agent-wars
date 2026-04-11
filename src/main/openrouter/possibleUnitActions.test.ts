@@ -144,9 +144,12 @@ function testBuildPossibleUnitActionsUsesTables(): void {
     latLngByH3,
     formatLatLng: (ll) => formatLatLng(ll, LATLNG_DECIMAL_PLACES),
   });
-  assert.ok(md.includes('**Possible unit actions**'));
   assert.ok(md.includes('| Unit ID | Unit Type | Action Types | Hex | Distance | Enemy Units | Hex Features |'));
-  assert.ok(md.includes('### Enemy homeland hexes') || md.includes('### Other hexes'));
+  assert.ok(
+    md.includes('## Enemy Homeland Hexes') ||
+      md.includes('## Hexes Nearest to Enemy Homeland') ||
+      md.includes('## Other Hexes')
+  );
 }
 
 /**
@@ -199,7 +202,7 @@ function testUnitHexAppearsInSingleBucketWithPriority(): void {
   assert.strictEqual(rowLines.length, 1, 'expected one row for same unit+hex across all buckets');
   assert.ok(rowLines[0]!.includes('move/melee'), 'expected merged row to include move/melee action');
   assert.ok(rowLines[0]!.includes('air strike'), 'expected merged row to include air strike action');
-  assert.ok(md.includes('### Hexes nearest to enemy homeland'), 'expected higher-priority nearest bucket to be used');
+  assert.ok(md.includes('## Hexes Nearest to Enemy Homeland'), 'expected higher-priority nearest bucket to be used');
 }
 
 /**
