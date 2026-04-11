@@ -1,6 +1,6 @@
 # Game Vision Document
 
-*Version 2.0 — March 2026*
+*Version 3.0 — April 2026*
 
 ---
 
@@ -14,33 +14,33 @@ The game plays like Axis & Allies at its core — a simple but diverse unit mix,
 
 **LLM-powered opponents.** Every AI player reasons about the game through a suite of deterministic tool services — querying what they can see, evaluating terrain, estimating combat outcomes, issuing orders. The LLM handles strategy; the tools handle precision. Players choose what model backs each AI opponent and pay for it through their own OpenRouter key, which means I don't need server infrastructure and players control both the cost and the quality of their opponents. The AI's reasoning is transparent — players can optionally inspect the tool calls, the game state the AI saw, and even manipulate those inputs to create more interesting games. These transparency features are controllable game-level options, not always-on defaults.
 
-**Two-level command with attention as a strategic resource.** The map operates at two scales built on Uber's H3 hierarchical hex grid. The global level (H3 resolution 1, ~842 hexes at ~610,000 km² each — roughly France-sized) shows the entire Earth and is where you make strategic commitments: allocate forces across theatres, manage the economy, set the overall war plan. The theatre level (H3 resolution 4, ~1,770 km² per hex, ~42 km edge-to-edge) zooms into a single global hex to reveal ~343 child hexes at division scale — this is where you manage individual units, plan maneuvers, and fight battles.
+**Two-level command: strategic and tactical.** The map operates at two scales built on Uber's H3 hierarchical hex grid. The global level (H3 resolution 1, ~842 hexes at ~610,000 km² each — roughly France-sized) shows the entire Earth and is where you make strategic commitments: allocate forces across theatres, manage the economy, set the overall war plan. The tactical level (H3 resolution 4, ~1,770 km² per hex, ~42 km edge-to-edge) zooms into a single global hex to reveal ~343 child hexes — this is where you fight battles at division scale.
 
-The attention mechanic is the bridge between them. Each turn, a player operates at one level: either the global level, issuing broad directives that the engine executes through standing orders, or zoomed into a single theatre for finer control. You cannot do both in the same turn — choosing to zoom into a theatre means your other theatres run on autopilot, and choosing to stay at the global level means every theatre runs on standing orders without fine-grained intervention. This is a strict constraint, not a soft guideline. The AI manages its own attention independently under the same budget — and after each turn, players can optionally view where the AI chose to focus, where it didn't, and how that compared to their own allocation. Areas outside anyone's focus continue executing their last orders through deterministic engine resolution.
+The tactical game is optional and triggered by contact: when your units and enemy units share the same res1 hex, the UI offers a "tactical battle" option. Accepting pauses the strategic game entirely — no other hexes resolve while you're fighting the tactical battle. This is the Total War model: zoom in to fight, or skip it and let the engine resolve the battle using strategic-level dice rolls. You can also bail out mid-battle, in which case the remaining forces resolve automatically with modifiers that account for losses already taken. An immediate bail-out produces results similar to a standard strategic engagement, so there's no incentive to game the system.
+
+This design means the tactical layer doesn't need to be perfect to ship — it's an enhancement to the strategic game, not a dependency. Players who prefer the grand strategic view can ignore it entirely.
 
 **Subjective fog of war.** No player — human or AI — ever sees the true state of the board. You see what your units can see, period. The AI receives only its own subjective view through the same tool services. Different players can have contradictory pictures of the same part of the map, and both can be wrong. This isn't a feature bolted on top — it's the foundation of the game state architecture.
 
 **WEGO simultaneous resolution.** All players issue orders, then all orders resolve at once. This creates a planning-and-anticipation rhythm that maps naturally to how LLMs reason — they're committing to a plan based on incomplete information, exactly like a real commander. It also means the moment of resolution is genuinely suspenseful, because you don't know what anyone else committed to until you see it play out.
 
-**Land, water, and air.** The initial release covers three domains: ground forces from infantry to armor, naval surface and subsurface units, and aircraft operating from bases with limited range. The unit roster at each zoom level is deliberately small — the design philosophy is fewer types with clearly distinct roles rather than a sprawling roster with overlapping capabilities (see Unit Roster below). Space-based assets for surveillance and communication are a potential post-launch expansion if the game's scope warrants it, but they are not part of the initial design.
+**Land, water, and air.** The initial release covers three domains: ground forces from infantry to armor, naval surface units, and aircraft operating from bases with limited range. The unit roster at each zoom level is deliberately small — the design philosophy is fewer types with clearly distinct roles rather than a sprawling roster with overlapping capabilities (see Unit Roster below). Space-based assets for surveillance and communication are a potential post-launch expansion if the game's scope warrants it, but they are not part of the initial design.
 
 ## The Map
 
-The two zoom levels correspond to two distinct command experiences, each with its own hex scale, unit roster, and decision texture.
+The two zoom levels correspond to two distinct command experiences, each with its own hex scale and decision texture.
 
 **Global level (H3 resolution 1).** ~842 hexes covering the entire Earth. Each hex is roughly the size of France or Ukraine (~610,000 km²). At this scale, you see the whole war at a glance — continental force distributions, strategic commitments, resource flows. Terrain is broadly categorized: ocean, land, forest, mountain, desert, arctic. The global map is always visible as a minimap and serves as the default planning surface.
 
-**Theatre level (H3 resolution 4).** ~343 hexes per global hex, each ~1,770 km² (~42 km edge-to-edge). This is division-scale command. Terrain gains tactical significance — mountain passes, river crossings, coastal approaches, defensible ridgelines. Individual unit types interact differently with terrain. A complete theatre view (one zoomed global hex) fits within the ~400-hex rendering performance budget.
+**Tactical level (H3 resolution 4).** ~343 hexes per global hex, each ~1,770 km² (~42 km edge-to-edge). This is division-scale combat. Terrain gains tactical significance — mountain passes through ranges, river crossings, coastal approaches, forested regions. The tactical map is visible only during a tactical battle within one global hex.
 
-The jump from res 1 to res 4 spans three H3 hierarchy levels, giving a natural parent-child relationship between global hexes and their theatre-level children. This clean mapping means the zoom transition is architecturally simple: select a global hex, render its res-4 children.
+The jump from res 1 to res 4 spans three H3 hierarchy levels, giving a natural parent-child relationship between global hexes and their tactical-level children. This clean mapping means the zoom transition is architecturally simple: select a global hex with contested units, render its res-4 children, and inject forces.
 
 ## Unit Roster: Design Approach
 
-The two zoom levels call for two distinct but related unit rosters, each designed for the decisions that matter at that scale.
-
 ### Design Process
 
-The unit mix at each level follows the same validation process:
+The unit mix follows a consistent validation process:
 
 1. **Start from the hex scale.** What real-world military formation operates at this geographic resolution? What moves through one hex in one turn? The answer anchors the roster in physical plausibility and sets the pacing of the game.
 
@@ -54,47 +54,51 @@ The unit mix at each level follows the same validation process:
 
 ### Global Level Roster (H3 Res 1)
 
-At ~610,000 km² per hex, individual divisions don't exist. Units at this scale represent large aggregate formations — army groups, naval task forces, air commands. The global roster should be simple (3–5 types) because the decisions at this level are about where to commit force, not how to compose it.
+At ~610,000 km² per hex, individual divisions don't exist. Units at this scale represent large aggregate formations — army groups, naval task forces, air commands. The global roster is simple (4 types) because the decisions at this level are about where to commit force, not how to compose it.
 
-**Candidate roles to fill** (not a final roster — to be validated through prototyping):
+| Unit type | Move | Attack | Defense | Range | Domain | Cost |
+|-----------|------|--------|---------|-------|--------|------|
+| **Infantry** | 1 | 1 | 2 | 0 (melee only) | Land | 10 |
+| **Armor** | 2 | 3 | 2 | 1 (adjacent hex) | Land | 20 |
+| **Naval** | 2 | 2 | 2 | 2 hexes | Water | 50 |
+| **Air** | 0 (ferry only) | 3 | 1 | 3 (strike radius) | Air | 30 |
 
-- A land force that holds and takes territory (army group equivalent, move 1 hex/turn — one major region per turn, matching a realistic strategic redeployment pace)
-- A naval force that controls sea lanes and projects power to coastal hexes (fleet equivalent, move 2, range 2)
-- An air/ranged force that strikes at distance but can't hold ground (air command equivalent, high mobility, fragile)
-- Possibly a logistics/supply unit if the economy system demands visible supply chains at the global level
+Unit caps: 10 infantry, 5 armor, 5 naval, 3 air (23 total). Fallback if playtesting shows 23 is too many for LLM briefing quality: 8 infantry, 4 armor, 4 naval, 2 air (18 total).
 
 The global roster is validated when: the LLM reasons clearly about force allocation, production decisions feel meaningful, and games at this level alone produce interesting strategic tension for 15–30 turns.
 
-### Theatre Level Roster (H3 Res 4)
+### Tactical Level: Unit Multiplication
 
-At ~1,770 km² per hex (~42 km edge), individual divisions and brigades operate. This is where the full unit variety lives. Movement rates map to historically plausible operational tempos: infantry at 1 hex/turn is a day's march for a WW2-era division (~42 km); armor at 2 hexes/turn is a fast mechanized exploitation (~84 km).
+The tactical level does not have a separate unit roster. Instead, strategic units entering a tactical battle are decomposed into sub-units that share the same type identity but operate independently on the res4 hex grid.
 
-**Candidate roles to fill** (starting set — expand through playtesting):
+| Strategic Unit | Tactical Sub-Units | Rationale |
+|---------------|-------------------|-----------|
+| 1 Infantry | 12 sub-units | Large formations, many divisions to maneuver |
+| 1 Armor | 6 sub-units | Fewer but more powerful formations |
+| 1 Air | 3 sub-units | Small number of air wings |
+| 1 Naval | 2 sub-units | Major task force components |
 
-- Infantry: holds ground, defends well in terrain, cheap, slow
-- Armor: offensive punch, fast, strong on open ground, weak in mountains/forest
-- Mechanized infantry: balanced mobile force, moves with armor, fights like infantry
-- Artillery: ranged fire support, can't move and fire same turn, force multiplier
-- Fighter aircraft: fast, limited range from airbases, air superiority and interdiction
-- Naval surface: sea control, coastal bombardment, range 2
-- Submarine: invisible until adjacent, area denial, anti-shipping
-- Transport: carries land units across water, vulnerable, essential for amphibious operations
+Sub-units inherit their parent's type identity for purposes of terrain interaction, combat, and movement. The multiplication ratios are starting values subject to playtesting — the goal is enough sub-units to create interesting maneuver decisions without overwhelming the player or the LLM.
 
-This roster is validated when: no single unit type dominates, terrain creates meaningful deployment decisions, and the LLM builds varied force compositions that adapt to geography.
+When a tactical battle ends (all opponents eliminated or the player bails out), surviving sub-units are mapped back to their parent strategic unit's effective strength for the bail-out resolution modifier or, if the battle concluded decisively, the parent unit is either destroyed or survives at full strength. The mapping-back mechanic is deliberately simple: the sub-unit ratio determines proportional loss. If 8 of 12 infantry sub-units survive, the parent infantry unit survives; if fewer than half survive and the battle is resolved by bail-out, the modifier reflects severe attrition.
 
-### The Zoom Transition Question
+### The Zoom Transition
 
-When a player zooms from a global hex into its theatre view, how do global-level units relate to theatre-level units? This is a Phase 3 design decision with several viable approaches:
+When units from opposing sides share a res1 hex, the player may choose to fight a tactical battle. The transition works as follows:
 
-- **Decomposition:** A global "Army" breaks into a fixed or player-configured mix of theatre-level units when you zoom in. This is the most realistic but most complex.
-- **Abstraction boundary:** Global and theatre units are separate systems. The global level tracks aggregate strength; the theatre level has its own units that exist independently. Simpler to implement, but the zoom feels like switching games.
-- **Unified with aggregation:** Theatre-level units are the "real" units. The global view aggregates them into summary markers. Zooming in reveals the actual composition. Most elegant, but requires theatre-level units to exist everywhere, which has storage and AI complexity implications.
+1. **Entry-side injection.** Each strategic unit's sub-units are placed on the res4 hex grid at the edge corresponding to the direction from which the unit entered the res1 hex. The engine tracks which hex side each unit crossed during strategic movement. This rewards strategic positioning — approaching from multiple directions creates tactical advantages.
 
-The right answer will emerge from prototyping in Phase 3. For Phase 1 (global level only), design the global roster as an independent system. For Phase 3 (adding theatre zoom), evaluate these approaches based on which one makes the zoom transition feel like assuming a different level of command rather than switching games.
+2. **Tactical play.** The player maneuvers sub-units across the res4 grid using movement budgets, terrain interactions, and ranged fire (see Combat Rules §12 for details). The strategic game is paused.
+
+3. **Resolution.** The tactical battle ends when all enemy sub-units are eliminated or the player bails out. On bail-out, remaining sub-units resolve via automatic dice rolls with modifiers that converge toward strategic-level combat odds when no tactical losses have occurred. This prevents the exploit of entering tactical mode for an advantage and immediately bailing out.
+
+**Visibility in tactical battles is universal** — all sub-units on both sides are visible regardless of terrain. This is a deliberate simplification that keeps the tactical layer playable and keeps the LLM's decision space tractable.
 
 ## The Interface
 
 The UI is a conventional desktop application dominated by the map view, not a full-screen game engine display. Think Command: Modern Operations or the old Harpoon series, but significantly stripped down to drive map-focused decision making with a simpler unit mix. Interaction is mouse-driven with keyboard accelerators for common actions, supporting more fluid play for experienced players. Information panels are collapsible and subordinate to the map. This is a deliberate choice — it plays to web technology's strengths for complex information-dense layouts and keeps the player's attention on geography and spatial decisions.
+
+When a tactical battle is triggered, the map view zooms smoothly into the res4 grid of the contested hex. A "return to strategic" button allows the player to bail out at any time. The transition should feel like a general leaning over a regional map — assuming a different level of command, not switching games.
 
 ## Who This Is For
 
@@ -118,12 +122,14 @@ Community building starts early — Discord server and devlog from the first rea
 
 ## What Success Looks Like
 
-A shipped game that people want to play more than once against AI opponents that feel like they're thinking. A small but engaged community. My name associated with a real, finished product in a space I care about. Everything else — the theatre zoom level, expanded multiplayer, additional scenarios — is expansion on that foundation, not a prerequisite for it.
+A shipped game that people want to play more than once against AI opponents that feel like they're thinking. A small but engaged community. My name associated with a real, finished product in a space I care about. Everything else — the tactical zoom level, expanded multiplayer, additional scenarios — is expansion on that foundation, not a prerequisite for it.
 
 ## Development Approach
 
-The game develops in phases. Phase 0 is a throwaway prototype that validates whether LLM opponents produce interesting play on a tiny hex map. Phase 1 builds the real single-player game at the global zoom level on a real-Earth map. Phase 2 polishes the UI, deepens the AI, and adds Early Access features. Phase 3 adds the theatre zoom level with the attention mechanic. Phase 4 ships it.
+The game develops in phases. Phase 0 is a throwaway prototype that validates whether LLM opponents produce interesting play on a tiny hex map. Phase 1 builds the real single-player game at the global zoom level on a real-Earth map. Phase 2 polishes the UI, deepens the AI, and adds Early Access features. Phase 3 adds the optional tactical battle layer. Phase 4 ships it.
 
 Every milestone produces something playable and includes a hypothesis about what the player experience should feel like. The architectural validation matters, but the experience validation is the point. If it doesn't feel like a game worth playing, the code quality is irrelevant.
+
+The tactical layer (Phase 3) is deferrable to post-launch if the global-level game is strong enough on its own. The optional bail-out design ensures the strategic game is complete without it. If players consistently express a desire to zoom in and fight battles directly, that's strong signal to prioritize Phase 3. If the strategic game satisfies on its own, the tactical layer becomes a post-launch expansion.
 
 The most important checkpoint is the first complete game against an LLM opponent. If that's not fun, nothing else matters until I understand why.
