@@ -62,11 +62,11 @@ jobs:
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
-        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --linux AppImage --publish never
+        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --linux dir --publish never
 
       - name: Build (macOS)
         if: runner.os == 'macOS'
-        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --mac zip --publish never
+        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --mac dir --publish never
 
       - name: Remove intermediate build outputs
         shell: bash
@@ -84,10 +84,18 @@ jobs:
           name: agent-wars-${{ steps.app_version.outputs.value }}-${{ runner.os }}
           path: release/win-unpacked/*
 
-      - name: Upload release artifacts (Linux/macOS)
-        if: runner.os != 'Windows'
+      - name: Upload release artifacts (Linux)
+        if: runner.os == 'Linux'
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: agent-wars-${{ steps.app_version.outputs.value }}-${{ runner.os }}
-          path: release/
+          path: release/linux-unpacked/*
+
+      - name: Upload release artifacts (macOS)
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-wars-${{ steps.app_version.outputs.value }}-${{ runner.os }}
+          path: release/mac*/*
