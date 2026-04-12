@@ -5,6 +5,7 @@ import type {
   ReadyResult,
   RemovedUnitSnapshot,
 } from '../../shared/ipcTypes';
+import type { MeleeInterceptModalOpenArgs, MeleeInterceptModalOutcome } from './meleeInterceptModal';
 import { buildTurnUpdateBullets } from './turnUpdateSummary';
 import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
 import { rendererSharedState as S } from '../core/state';
@@ -276,7 +277,34 @@ startBackgroundRequestIfAllowed: () => void;
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-redraw: () => void;
+  redraw: () => void;
+    /**
+   * Specifies the contract for the `buildMeleeInterceptHexPopupHtml` member (buildMeleeInterceptHexPopupHtml: (h3Index: string) => Promise<string>;).
+
+   * Contract: Tooltip-equivalent HTML for a res1 hex used in the melee intercept modal.
+   * When to use: Each candidate row while the modal is open.
+   * Expected outcome: Safe HTML suitable for `innerHTML` in a table cell.
+   * Exceptions: None.
+   */
+buildMeleeInterceptHexPopupHtml: (h3Index: string) => Promise<string>;
+    /**
+   * Specifies the contract for the `openMeleeInterceptModal` member (openMeleeInterceptModal: (args: MeleeInterceptModalOpenArgs) => Promise<MeleeInterceptModalOutcome>;).
+
+   * Contract: Blocks until the player chooses Fight (with selection) or Ignore (or Escape/backdrop).
+   * When to use: Only when ready returned `awaitingMeleeDecision`.
+   * Expected outcome: Outcome feeds `resolveMeleeIntercept`.
+   * Exceptions: None.
+   */
+openMeleeInterceptModal: (args: MeleeInterceptModalOpenArgs) => Promise<MeleeInterceptModalOutcome>;
+    /**
+   * Specifies the contract for the `startTacticalBattleFromInterceptHex` member (startTacticalBattleFromInterceptHex: (h3Index: string) => Promise<void>;).
+
+   * Contract: Enters tactical combat for the given res1 hex after strategic resolution completes.
+   * When to use: When `ReadyResult.tacticalAutoStartRes1H3Index` is set after Fight.
+   * Expected outcome: Same UX as magnifier tactical entry; failures surface as map toasts only.
+   * Exceptions: None.
+   */
+startTacticalBattleFromInterceptHex: (h3Index: string) => Promise<void>;
 }
 
 /**
@@ -315,6 +343,15 @@ useEventDriven: boolean;
    * Exceptions: None.
    */
 usePrecomputed: boolean;
+    /**
+   * Specifies the contract for the `aiPlanningRunEnabled` member (aiPlanningRunEnabled?: boolean;).
+
+   * Contract: Mirrors the Run/AI planning toggle into ready and resolve payloads.
+   * When to use: Ready and melee-intercept resolve IPC.
+   * Expected outcome: Defaults to renderer `runButtonOn` when omitted.
+   * Exceptions: None.
+   */
+aiPlanningRunEnabled?: boolean;
 }
 
 /**
@@ -326,10 +363,10 @@ usePrecomputed: boolean;
  * Exceptions: None.
  */
 function buildReadyPayload(args: ReadyPayloadBuildArgs): GameReadyIpcPayload {
-  const { enabledToolGroupsPayload, useEventDriven, usePrecomputed } = args;
+  const { enabledToolGroupsPayload, useEventDriven, usePrecomputed, aiPlanningRunEnabled } = args;
   const base: GameReadyIpcPayload = {
     enabledToolGroups: enabledToolGroupsPayload,
-    aiPlanningRunEnabled: false,
+    aiPlanningRunEnabled: aiPlanningRunEnabled ?? S.runButtonOn,
   };
   if (useEventDriven) {
     base.useEventDrivenConsultation = true;
@@ -569,12 +606,54 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     const cachedPrecomputedToolCounts = S.precomputedToolInvocationCounts
       ? { ...S.precomputedToolInvocationCounts }
       : null;
-    const readyPayload = buildReadyPayload({ enabledToolGroupsPayload, useEventDriven, usePrecomputed });
-    const readyResult = await deps.callReadyWithTimeout(readyPayload);
+    const readyPayload = buildReadyPayload({
+      enabledToolGroupsPayload,
+      useEventDriven,
+      usePrecomputed,
+      aiPlanningRunEnabled: S.runButtonOn,
+    });
+    let readyResult = await deps.callReadyWithTimeout(readyPayload);
     if (!readyResult.success) {
       deps.showSidebarError(readyResult.reason ?? 'Ready failed');
       deps.updateReadyButtonState();
       return;
+    }
+
+    if (readyResult.awaitingMeleeDecision) {
+      if (!window.gameApi.resolveMeleeIntercept) {
+        deps.showSidebarError('Melee intercept resolve is not available in this build.');
+        deps.updateReadyButtonState();
+        return;
+      }
+      await deps.refreshRes4TerrainOverridesForRenderer();
+      const pausedState = (await window.gameApi.getGameState()) as GameStateSnapshot;
+      await deps.applyGameStateSnapshot(pausedState, {
+        refreshStandingOrders: false,
+        updateGameStateSidebarUi: false,
+        updateSelectionUi: false,
+        updateGameOverUi: false,
+        updateReadyButton: false,
+        refreshBuildPopup: false,
+        redraw: false,
+      });
+      const outcome = await deps.openMeleeInterceptModal({
+        candidates: readyResult.meleeInterceptCandidates ?? [],
+        buildHexPopupHtml: deps.buildMeleeInterceptHexPopupHtml,
+      });
+      const resolveResult = await window.gameApi.resolveMeleeIntercept({
+        meleeDecisionToken: readyResult.meleeDecisionToken ?? '',
+        decision: outcome.decision,
+        selectedH3Index: outcome.decision === 'fight' ? outcome.selectedH3Index : undefined,
+        useEventDrivenConsultation: useEventDriven,
+        aiPlanningRunEnabled: S.runButtonOn,
+        enabledToolGroups: enabledToolGroupsPayload,
+      });
+      if (!resolveResult.success) {
+        deps.showSidebarError(resolveResult.reason ?? 'Melee resolve failed');
+        deps.updateReadyButtonState();
+        return;
+      }
+      readyResult = resolveResult;
     }
 
     resetPrecomputedAiState('null');
@@ -713,6 +792,9 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     deps.updateReadyButtonState();
     if (S.runButtonOn) deps.startBackgroundRequestIfAllowed();
     deps.redraw();
+    if (readyResult.tacticalAutoStartRes1H3Index) {
+      await deps.startTacticalBattleFromInterceptHex(readyResult.tacticalAutoStartRes1H3Index);
+    }
   } catch (err) {
     deps.showSidebarError(String(err));
     deps.updateReadyButtonState();

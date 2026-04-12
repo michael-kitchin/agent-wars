@@ -5,11 +5,30 @@ import type {
 } from '../../shared/tacticalBattleTypes';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
 import { tacticalBoundaryConcurrentSessionAllowed } from '../../shared/tacticalStateAssertions';
+import { getActiveTacticalBattleSnapshotRef, setActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
+import {
+  clearTacticalBattleSnapshotFromGameConfig,
+  loadPersistedTacticalBattleSnapshotIfConsistent,
+  writeTacticalBattleSnapshotToGameConfig,
+} from './tacticalBattlePersistence';
 import { computeTacticalBattleSnapshot } from './computeTacticalBattleSnapshot';
 import { projectTacticalSnapshotAfterValidatedOpponentOrders } from './tacticalCompositeOrdersApply';
 import { tacticalLogError, tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 
-let activeTacticalBattle: TacticalBattleSnapshot | null = null;
+/**
+ * Writes the active tactical snapshot to memory and SQLite, or clears both when ending a session.
+ *
+ * Purpose: Keeps durable persistence aligned with every tactical session mutation in one place.
+ * When to use: After successful start/apply/advance and when tearing the session down.
+ * Expected outcome: `getActiveTacticalBattleSnapshot` matches disk until the next commit.
+ * Exceptions: Persistence helpers log internally; this function does not throw.
+ */
+function commitActiveTacticalBattle(snapshot: TacticalBattleSnapshot | null): void {
+  tacticalLogMutate('commitActiveTacticalBattle', { hasBattle: !!snapshot });
+  setActiveTacticalBattleSnapshotRef(snapshot);
+  if (snapshot) writeTacticalBattleSnapshotToGameConfig(snapshot);
+  else clearTacticalBattleSnapshotFromGameConfig();
+}
 
 /**
  * Returns whether a tactical battle session is currently active in the main process.
@@ -20,8 +39,8 @@ let activeTacticalBattle: TacticalBattleSnapshot | null = null;
  * Exceptions: None.
  */
 export function isTacticalBattleActive(): boolean {
-  tacticalLogQuery('isTacticalBattleActive', { active: !!activeTacticalBattle });
-  return activeTacticalBattle !== null;
+  tacticalLogQuery('isTacticalBattleActive', { active: !!getActiveTacticalBattleSnapshotRef() });
+  return getActiveTacticalBattleSnapshotRef() !== null;
 }
 
 /**
@@ -33,8 +52,9 @@ export function isTacticalBattleActive(): boolean {
  * Exceptions: None.
  */
 export function getActiveTacticalBattleSnapshot(): TacticalBattleSnapshot | null {
-  tacticalLogQuery('getActiveTacticalBattleSnapshot', { hasBattle: !!activeTacticalBattle });
-  return activeTacticalBattle;
+  const s = getActiveTacticalBattleSnapshotRef();
+  tacticalLogQuery('getActiveTacticalBattleSnapshot', { hasBattle: !!s });
+  return s;
 }
 
 /**
@@ -48,7 +68,7 @@ export function getActiveTacticalBattleSnapshot(): TacticalBattleSnapshot | null
 export function startTacticalBattleForEnclosingRes1Hex(enclosingRes1H3Index: string): StartTacticalBattleIpcResult {
   tacticalLogMutate('startTacticalBattleForEnclosingRes1Hex', { enclosingRes1H3Index });
   try {
-    const concurrent = tacticalBoundaryConcurrentSessionAllowed(activeTacticalBattle !== null);
+    const concurrent = tacticalBoundaryConcurrentSessionAllowed(getActiveTacticalBattleSnapshotRef() !== null);
     if (!concurrent.ok) {
       return { success: false, reason: 'A tactical battle is already in progress.' };
     }
@@ -60,7 +80,7 @@ export function startTacticalBattleForEnclosingRes1Hex(enclosingRes1H3Index: str
     if (!snapshot) {
       return { success: false, reason: failureReason ?? 'Could not start tactical battle.' };
     }
-    activeTacticalBattle = snapshot;
+    commitActiveTacticalBattle(snapshot);
     if (skippedParentDisplayNames.length > 0) {
       tacticalLogMutate('startTacticalBattleForEnclosingRes1Hex skipped parents', { skippedParentDisplayNames });
     }
@@ -84,8 +104,8 @@ export function startTacticalBattleForEnclosingRes1Hex(enclosingRes1H3Index: str
  * Exceptions: None.
  */
 export function endTacticalBattleSession(): void {
-  tacticalLogMutate('endTacticalBattleSession', { hadBattle: !!activeTacticalBattle });
-  activeTacticalBattle = null;
+  tacticalLogMutate('endTacticalBattleSession', { hadBattle: !!getActiveTacticalBattleSnapshotRef() });
+  commitActiveTacticalBattle(null);
 }
 
 /**
@@ -111,7 +131,8 @@ export function applyValidatedOpponentTacticalOrders(args: {
     embarkCount: args.embarkOrders?.length ?? 0,
   });
   try {
-    if (!activeTacticalBattle) {
+    const cur = getActiveTacticalBattleSnapshotRef();
+    if (!cur) {
       tacticalLogQuery('applyValidatedOpponentTacticalOrders rejected', { reason: 'no_active_session' });
       return { success: false, reason: 'No tactical battle is active.' };
     }
@@ -122,10 +143,10 @@ export function applyValidatedOpponentTacticalOrders(args: {
       (args.ferryOrders?.length ?? 0) > 0 ||
       (args.embarkOrders?.length ?? 0) > 0;
     if (!hasWork) {
-      return { success: true, battle: activeTacticalBattle };
+      return { success: true, battle: cur };
     }
-    const next = projectTacticalSnapshotAfterValidatedOpponentOrders(activeTacticalBattle, args);
-    activeTacticalBattle = next;
+    const next = projectTacticalSnapshotAfterValidatedOpponentOrders(cur, args);
+    commitActiveTacticalBattle(next);
     tacticalLogMutate('applyValidatedOpponentTacticalOrders applied', {
       battleId: next.battleId,
       subUnitCount: next.subUnits.length,
@@ -148,20 +169,40 @@ export function applyValidatedOpponentTacticalOrders(args: {
 export function advanceActiveTacticalTurn(): AdvanceTacticalTurnIpcResult {
   tacticalLogMutate('advanceActiveTacticalTurn invoked', {});
   try {
-    if (!activeTacticalBattle) {
+    const cur = getActiveTacticalBattleSnapshotRef();
+    if (!cur) {
       tacticalLogQuery('advanceActiveTacticalTurn rejected', { reason: 'no_active_session' });
       return { success: false, reason: 'No tactical battle is active.' };
     }
-    const prev = activeTacticalBattle.tacticalTurnNumber;
+    const prev = cur.tacticalTurnNumber;
     const next: TacticalBattleSnapshot = {
-      ...activeTacticalBattle,
+      ...cur,
       tacticalTurnNumber: prev + 1,
     };
-    activeTacticalBattle = next;
+    commitActiveTacticalBattle(next);
     tacticalLogMutate('advanceActiveTacticalTurn applied', { battleId: next.battleId, tacticalTurnNumber: next.tacticalTurnNumber });
     return { success: true, battle: next };
   } catch (err) {
     tacticalLogError('advanceActiveTacticalTurn failed', { err });
     return { success: false, reason: 'Could not advance tactical turn.' };
   }
+}
+
+/**
+ * Restores a persisted tactical battle from SQLite into the active in-memory ref when validation succeeds.
+ *
+ * Purpose: Centralizes bootstrap restore next to other session transitions (`commitActiveTacticalBattle`, `endTacticalBattleSession`).
+ * When to use: Once from `main.ts` immediately after `initDatabase` completes.
+ * Expected outcome: Active ref matches durable JSON when turn/parent checks pass; stale JSON is cleared without installing.
+ * Exceptions: None; persistence read/validate helpers log internally.
+ */
+export function restorePersistedTacticalBattleSession(): void {
+  tacticalLogMutate('restorePersistedTacticalBattleSession', {});
+  const snap = loadPersistedTacticalBattleSnapshotIfConsistent();
+  if (!snap) return;
+  setActiveTacticalBattleSnapshotRef(snap);
+  tacticalLogMutate('restorePersistedTacticalBattleSession installed', {
+    battleId: snap.battleId,
+    subUnitCount: snap.subUnits.length,
+  });
 }

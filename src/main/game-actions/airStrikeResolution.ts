@@ -1,4 +1,5 @@
 import { dbGetAll, dbGetOne, dbRun, getRes1InfrastructureForHex, listBuildQueueRowsForHex, listRes4FeatureOverridesForGame, replaceBuildQueueForHex, clearBuildQueueAndProgressForHex, updateRes4FeatureOverrideRow } from '../gameDb';
+import { logDebug } from '../logger';
 import { getAvailableBuildUnitTypes } from '../productionRules';
 import { casualtyPriorityIndex, getAttack, getDefense, getRange } from '../combatConstants';
 import type { AirStrikeAnimationMove, AirStrikeOrder, AirStrikeTargetType, InfrastructureDestroyedEvent } from '../../shared/ipcTypes';
@@ -325,6 +326,7 @@ export function resolveAirStrikePhase(
   failedCount: number;
   attackerLossCount: number;
 } {
+  logDebug('resolveAirStrikePhase', { orderCount: airOrders.length });
   const acc: AirStrikePhaseAccumulator = {
     removedSet: new Set<string>(),
     removedUnitIds: [],
@@ -410,3 +412,13 @@ export function resolveAirStrikePhase(
     attackerLossCount,
   };
 }
+
+/**
+ * Documents the `AirStrikePhaseResult` type alias (export type AirStrikePhaseResult).
+
+ * Purpose: Names the return shape of `resolveAirStrikePhase` so melee-intercept pause snapshots can store it without circular imports.
+ * When to use: Typing fields that mirror the air strike phase outcome between ready pause and resolve.
+ * Expected outcome: Structural compatibility with `resolveAirStrikePhase` return value.
+ * Exceptions: None.
+ */
+export type AirStrikePhaseResult = ReturnType<typeof resolveAirStrikePhase>;

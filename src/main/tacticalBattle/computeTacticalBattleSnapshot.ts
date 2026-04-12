@@ -9,7 +9,12 @@ const WORLD_H3_RESOLUTION = 1;
 const TACTICAL_H3_RESOLUTION = 4;
 
 /**
- * Returns how many tactical sub-units a strategic parent unit expands into for milestone 2.1 ratios.
+ * Maps each strategic parent unit type to how many tactical sub-units are synthesized for milestone 2.1.
+ *
+ * Purpose: Single source for placement counts so snapshot sizing and annihilation rules stay aligned.
+ * When to use: From `computeTacticalBattleSnapshot` when expanding each parent into tactical rows.
+ * Expected outcome: Positive counts for infantry/armor/air/naval; zero for unknown types.
+ * Exceptions: None.
  */
 export function tacticalSubUnitCountForStrategicUnitType(unitType: string): number {
   switch (unitType) {
@@ -191,16 +196,24 @@ function orderRes4CellsForPlacement(args: {
  * Builds a complete tactical battle snapshot for the given enclosing res1 hex, or returns null with reasons on failure.
  *
  * Contract: Read-only against SQLite and in-memory previous-hex memory; synthesizes temporary sub-units without writing strategic unit rows.
- * When to use: `startTacticalBattleForEnclosingRes1Hex` after IPC confirms contested res1 during strategic planning.
+ * When to use: `startTacticalBattleForEnclosingRes1Hex` after IPC confirms contested res1 during strategic planning, or melee-intercept probes with `allowDuringStrategicResolution` during `ready` resolution pause.
  * Expected outcome: On success, snapshot includes all res4 children, `tacticalTurnNumber: 1`, and both sides have at least one placed sub-unit; skipped parents are listed when some sub-units could not be placed.
  * Exceptions: Catches unexpected errors, logs at error, and returns `failureReason` suitable for user-facing failure (no throw across IPC boundary).
  */
-export function computeTacticalBattleSnapshot(enclosingRes1H3Index: string, battleId: string): {
+export function computeTacticalBattleSnapshot(
+  enclosingRes1H3Index: string,
+  battleId: string,
+  options?: { allowDuringStrategicResolution?: boolean }
+): {
   snapshot: TacticalBattleSnapshot | null;
   skippedParentDisplayNames: string[];
   failureReason?: string;
 } {
-  tacticalLogQuery('computeTacticalBattleSnapshot', { enclosingRes1H3Index, battleId });
+  tacticalLogQuery('computeTacticalBattleSnapshot', {
+    enclosingRes1H3Index,
+    battleId,
+    allowDuringStrategicResolution: !!options?.allowDuringStrategicResolution,
+  });
   try {
     if (getResolution(enclosingRes1H3Index) !== WORLD_H3_RESOLUTION) {
       return { snapshot: null, skippedParentDisplayNames: [], failureReason: 'Not a res1 hex index.' };
@@ -208,7 +221,13 @@ export function computeTacticalBattleSnapshot(enclosingRes1H3Index: string, batt
     const turnRow = dbGetOne<{ phase: string; turn_number: number }>(
       'SELECT phase, turn_number FROM turn_state WHERE id = 1'
     );
-    if (!turnRow || turnRow.phase !== 'planning') {
+    if (!turnRow) {
+      return { snapshot: null, skippedParentDisplayNames: [], failureReason: 'Missing turn state.' };
+    }
+    const phaseOk =
+      turnRow.phase === 'planning' ||
+      (options?.allowDuringStrategicResolution === true && turnRow.phase === 'resolution');
+    if (!phaseOk) {
       return { snapshot: null, skippedParentDisplayNames: [], failureReason: 'Tactical battles can only start during strategic planning.' };
     }
     const hexRow = dbGetOne<{ terrain: string; terrain_kind: string }>(

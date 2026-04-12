@@ -482,9 +482,10 @@ export function runRangedPhase(
 export function runMeleePhase(
   units: CombatUnit[],
   hexList: string[],
-  next: () => number
+  next: () => number,
+  options?: { skipMeleeHexes?: ReadonlySet<string> }
 ): CombatResolutionResult {
-  logDebug('runMeleePhase', { unitCount: units.length });
+  logDebug('runMeleePhase', { unitCount: units.length, skipCount: options?.skipMeleeHexes?.size ?? 0 });
   const removed = new Set<string>();
   const removedUnits: CombatUnit[] = [];
   const kills: KillRecord[] = [];
@@ -512,6 +513,7 @@ export function runMeleePhase(
   });
 
   for (const hex of hexList) {
+    if (options?.skipMeleeHexes?.has(hex)) continue;
     const unitsHere = getUnitsAtHex(hex);
     const sides = new Set(unitsHere.map((u) => u.player));
     if (sides.size < 2) continue;

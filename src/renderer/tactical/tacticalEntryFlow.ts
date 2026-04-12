@@ -1,0 +1,183 @@
+/**
+ * Tactical battle entry from strategic magnifier clicks, restored main snapshots, exit/advance IPC wiring.
+ *
+ * Purpose: Keeps `renderer.ts` as composition while preserving milestone-2.1 tactical activation sequencing.
+ * When to use: Renderer bootstraps these helpers with renderer-local overlays (build popup, Ready pipeline).
+ * Expected outcome: Same toasts, map mode transitions, and HUD updates as the pre-extraction inline paths.
+ * Exceptions: IPC failures surface through injected `showMapToast` contracts from tactical exit helpers.
+ */
+
+import type { GameApi } from '../../shared/ipcTypes';
+import type { StartTacticalBattleIpcResult, TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { rendererSharedState as S } from '../core/state';
+import { enterTacticalMapView } from '../map/tacticalMapView';
+import {
+  tacticalPerformAdvanceTurn,
+  tacticalPerformBattleExit,
+  type TacticalAdvanceTurnIo,
+  type TacticalBattleExitIo,
+  type TacticalExitSessionAccessor,
+} from './tacticalExitFlow';
+import {
+  tacticalRendererActivateRestoredBattleSnapshot,
+  tacticalRendererApplyStartBattleIpcResult,
+  type TacticalRendererStartBattleSideEffects,
+} from './tacticalIpcHandlers';
+import {
+  tacticalApplyStrategicSidebarForTacticalMode,
+  tacticalUpdateExitButtonVisibility,
+} from './tacticalUiOrchestration';
+
+/**
+ * Renderer-owned controls that still vary per bootstrap (overlay sync, redraw, Ready label, annihilation hook).
+ *
+ * Contract: All callbacks must be safe to invoke immediately after a successful tactical IPC or restore.
+ * When to use: Passed to `buildDefaultTacticalBattleActivationSideEffects` from `renderer.ts` closures.
+ * Expected outcome: `TacticalRendererStartBattleSideEffects` suitable for start and restore activation paths.
+ * Exceptions: None; `scheduleAnnihilationExit` must tolerate being invoked when roster is not annihilated.
+ */
+export type TacticalBattleActivationBindings = {
+  showMapToast: TacticalRendererStartBattleSideEffects['showMapToast'];
+  syncTacticalEntryOverlay: TacticalRendererStartBattleSideEffects['syncTacticalEntryOverlay'];
+  redraw: TacticalRendererStartBattleSideEffects['redraw'];
+  refreshReadyButton: TacticalRendererStartBattleSideEffects['refreshReadyButton'];
+  scheduleAnnihilationExit: TacticalRendererStartBattleSideEffects['scheduleAnnihilationExit'];
+};
+
+/**
+ * Builds the shared side-effect bundle for tactical battle activation (IPC start success and snapshot restore).
+ *
+ * Contract: Mutates `S.tacticalBattleSnapshot` / `S.tacticalPhasePlanning` and drives tactical map entry.
+ * When to use: Whenever `tacticalRendererApplyStartBattleIpcResult` or `tacticalRendererActivateRestoredBattleSnapshot` runs.
+ * Expected outcome: One object identity pattern shared by magnifier entry and `applyGameStateSnapshot` restore.
+ * Exceptions: None; invalid IPC outcomes never reach this helper.
+ */
+export function buildDefaultTacticalBattleActivationSideEffects(
+  bindings: TacticalBattleActivationBindings
+): TacticalRendererStartBattleSideEffects {
+  return {
+    showMapToast: bindings.showMapToast,
+    assignBattleSnapshot: (battle) => {
+      S.tacticalBattleSnapshot = battle;
+    },
+    setPhasePlanning: (planning) => {
+      S.tacticalPhasePlanning = planning;
+    },
+    enterRes4View: enterTacticalMapView,
+    setStrategicSidebarTactical: tacticalApplyStrategicSidebarForTacticalMode,
+    refreshTacticalExitHud: tacticalUpdateExitButtonVisibility,
+    scheduleAnnihilationExit: bindings.scheduleAnnihilationExit,
+    refreshReadyButton: bindings.refreshReadyButton,
+    syncTacticalEntryOverlay: bindings.syncTacticalEntryOverlay,
+    redraw: bindings.redraw,
+  };
+}
+
+/**
+ * Dependency bundle for `startTacticalBattleFromEntryHex` so parameter parsing tools see a single function-body `{`.
+ *
+ * Contract: Mirrors the renderer bootstrap wiring for magnifier-driven tactical IPC without importing `renderer.ts`.
+ * When to use: Passed from `renderer.ts` when launching tactical battles from contested res1 hexes.
+ * Expected outcome: IPC availability, popup suppression, and activation side-effect factory are all explicit.
+ * Exceptions: None.
+ */
+export type StartTacticalBattleFromEntryHexDeps = {
+  hideBuildPopup: () => void;
+  invokeStartTacticalBattle?: GameApi['startTacticalBattle'];
+  getActivationSideEffects: () => TacticalRendererStartBattleSideEffects;
+  onMissingStartTacticalBattleIpc: () => void;
+};
+
+/**
+ * IPC + UI preflight for starting tactical battle from a contested res1 magnifier target.
+ *
+ * Contract: Invokes `tacticalRendererApplyStartBattleIpcResult` with fresh activation side effects.
+ * When to use: Map hit-testing and direct `.tactical-entry-btn` clicks after `hideBuildPopup` is appropriate.
+ * Expected outcome: Tactical res4 mode on success; error toasts preserve milestone-2.1 messaging.
+ * Exceptions: None; missing IPC short-circuits through `onMissingStartTacticalBattleIpc`.
+ */
+export async function startTacticalBattleFromEntryHex(
+  enclosingRes1H3Index: string,
+  deps: StartTacticalBattleFromEntryHexDeps
+): Promise<void> {
+  const ipc = deps.invokeStartTacticalBattle;
+  if (!ipc) {
+    deps.onMissingStartTacticalBattleIpc();
+    return;
+  }
+  deps.hideBuildPopup();
+  const result: StartTacticalBattleIpcResult = await ipc({ enclosingRes1H3Index });
+  tacticalRendererApplyStartBattleIpcResult(result, deps.getActivationSideEffects());
+}
+
+/**
+ * Applies a main-process restored tactical snapshot using the same activation side effects as magnifier entry.
+ *
+ * Contract: Does not perform IPC; assumes strategic `getGameState` already validated the snapshot.
+ * When to use: `applyGameStateSnapshot` when `nextState.tacticalBattleSession` attaches a battle the renderer lacked.
+ * Expected outcome: Tactical HUD and res4 bounds match a freshly started tactical session.
+ * Exceptions: None.
+ */
+export function activateRestoredTacticalBattleFromMainSnapshot(
+  battle: TacticalBattleSnapshot,
+  getActivationSideEffects: () => TacticalRendererStartBattleSideEffects
+): void {
+  tacticalRendererActivateRestoredBattleSnapshot(battle, getActivationSideEffects());
+}
+
+/**
+ * Ends the tactical session in the main process then resumes strategic Ready handling.
+ *
+ * Contract: Injects current `window.gameApi.endTacticalBattle` per call like the renderer button handler did.
+ * When to use: Tactical HUD exit button and annihilation auto-exit path.
+ * Expected outcome: Clears renderer tactical snapshot and invokes Ready pipeline on success.
+ * Exceptions: Surfaces toasts when IPC fails per `tacticalPerformBattleExit` contract.
+ */
+export async function performTacticalBattleExitWithGameApi(
+  session: TacticalExitSessionAccessor,
+  io: Omit<TacticalBattleExitIo, 'endTacticalBattle'>
+): Promise<void> {
+  await tacticalPerformBattleExit(session, {
+    endTacticalBattle: window.gameApi?.endTacticalBattle,
+    showMapToast: io.showMapToast,
+    redraw: io.redraw,
+    runReadyAfterExit: io.runReadyAfterExit,
+  });
+}
+
+/**
+ * Dependency bundle for `performTacticalAdvanceTurnWhenAvailable` (named for reliable `getFunctionSource` extraction).
+ *
+ * Contract: Separates IPC resolution from the shared `TacticalAdvanceTurnIo` surface passed into `tacticalPerformAdvanceTurn`.
+ * When to use: Renderer advance button wiring supplies game API polling plus static IO callbacks.
+ * Expected outcome: Missing advance IPC short-circuits without touching tactical session phase flags.
+ * Exceptions: None.
+ */
+export type PerformTacticalAdvanceTurnWhenAvailableDeps = {
+  resolveAdvanceTacticalTurn: () => GameApi['advanceTacticalTurn'] | undefined;
+  onMissingAdvanceTacticalTurn: () => void;
+  advanceIo: Omit<TacticalAdvanceTurnIo, 'advanceTacticalTurn'>;
+};
+
+/**
+ * Advances the tactical turn after verifying `advanceTacticalTurn` exists on the current `GameApi`.
+ *
+ * Contract: Preserves renderer preflight toast when IPC surface is missing.
+ * When to use: Tactical advance HUD button wiring from `renderer.ts`.
+ * Expected outcome: Same snapshot and background-wait behavior as the pre-extraction implementation.
+ * Exceptions: Delegates error handling to `tacticalPerformAdvanceTurn`.
+ */
+export async function performTacticalAdvanceTurnWhenAvailable(
+  session: TacticalExitSessionAccessor,
+  deps: PerformTacticalAdvanceTurnWhenAvailableDeps
+): Promise<void> {
+  const advance = deps.resolveAdvanceTacticalTurn();
+  if (!advance) {
+    deps.onMissingAdvanceTacticalTurn();
+    return;
+  }
+  await tacticalPerformAdvanceTurn(session, {
+    advanceTacticalTurn: () => advance(),
+    ...deps.advanceIo,
+  });
+}

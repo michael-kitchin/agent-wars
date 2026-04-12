@@ -55,3 +55,26 @@ export function tacticalRendererApplyStartBattleIpcResult(
   fx.syncTacticalEntryOverlay();
   fx.redraw();
 }
+
+/**
+ * Enters tactical res4 mode from a snapshot supplied by strategic `getGameState` (e.g. after app restart).
+ *
+ * Purpose: Reuses the same renderer sequencing as `tacticalRendererApplyStartBattleIpcResult` without an IPC round-trip.
+ * When to use: `applyGameStateSnapshot` when `nextState.tacticalBattleSession` is present and differs from local state.
+ * Expected outcome: Tactical HUD, sidebar suppression, and map bounds match a freshly started tactical session.
+ * Exceptions: None; assumes `battle` was validated in the main process before attachment.
+ */
+export function tacticalRendererActivateRestoredBattleSnapshot(
+  battle: TacticalBattleSnapshot,
+  fx: TacticalRendererStartBattleSideEffects
+): void {
+  fx.assignBattleSnapshot(battle);
+  fx.setPhasePlanning(true);
+  fx.enterRes4View(battle.res4ChildH3Indexes);
+  fx.setStrategicSidebarTactical(true);
+  fx.refreshTacticalExitHud();
+  fx.scheduleAnnihilationExit();
+  fx.refreshReadyButton();
+  fx.syncTacticalEntryOverlay();
+  fx.redraw();
+}

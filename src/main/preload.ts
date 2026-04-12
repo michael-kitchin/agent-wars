@@ -21,6 +21,7 @@ import type {
   AirStrikeTargetType,
   HexBuildQueueSnapshot,
   NewGameIpcPayload,
+  ResolveMeleeInterceptIpcPayload,
 } from '../shared/ipcTypes';
 import type {
   AdvanceTacticalTurnIpcResult,
@@ -128,6 +129,16 @@ submitOrders: (payload: SubmitOrdersIpcPayload): Promise<{ success: boolean; rea
    * Exceptions: None.
    */
 ready: (payload?: GameReadyIpcPayload): Promise<ReadyResult> => ipcRenderer.invoke('game:ready', payload),
+    /**
+   * Documents the object literal property `resolveMeleeIntercept` (resolveMeleeIntercept: (payload: ResolveMeleeInterceptIpcPayload): Promise<ReadyResult> => ipcRenderer.invoke('game:resolveMeleeIntercept', payload)).
+
+   * Purpose: Resumes strategic turn resolution after the melee intercept modal submits Fight or Ignore.
+   * When to use: Only after `ready` returned `awaitingMeleeDecision`.
+   * Expected outcome: Same completion shape as an uninterrupted ready; Fight may request tactical auto-start.
+   * Exceptions: None.
+   */
+resolveMeleeIntercept: (payload: ResolveMeleeInterceptIpcPayload): Promise<ReadyResult> =>
+    ipcRenderer.invoke('game:resolveMeleeIntercept', payload),
     /**
    * Documents the object literal property `startTacticalBattle` (startTacticalBattle: (payload: { enclosingRes1H3Index: string }): Promise<StartTacticalBattleIpcResult> => ipcRenderer.invoke('game:startTacticalBattle', payload)).
 

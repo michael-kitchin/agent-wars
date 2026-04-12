@@ -73,6 +73,15 @@ import {
   getGameStateForPlayer as getGameStateForPlayerFromModule,
   refreshFogOfWarIntelFromCurrentState as refreshFogOfWarIntelFromCurrentStateFromModule,
 } from './game-db/fogState';
+import { mergeMeleeCandidateHexesIntoHumanFogSnapshot } from './game-actions/meleeInterceptPendingState';
+import { mergeActiveTacticalSessionIntoGameStateSnapshot } from './game-db/attachTacticalSessionToGameState';
+import {
+  allocateNextUnitDisplayOrderWithOps,
+  clearGameOverWithOps,
+  getGameSeedWithOps,
+  seedGameSeedIfMissingWithOps,
+  setGameOverWithOps,
+} from './game-db/gameConfigKv';
 import { resetGameForNewMatch as resetGameForNewMatchFromModule } from './game-db/resetGame';
 import {
   getScenarioHomeRegionHexes as getScenarioHomeRegionHexesFromModule,
@@ -504,23 +513,7 @@ export async function initDatabase(): Promise<void> {
  * Exceptions: None.
  */
 function seedGameSeedIfMissing(): void {
-  if (db === null) return;
-  const row = getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'game_seed'");
-  if (row) return;
-  const seed = Math.floor(Math.random() * 2 ** 31);
-  run("INSERT INTO game_config (key, value) VALUES ('game_seed', ?)", [String(seed)]);
-}
-
-/**
- * Defines the `unitDisplaySequenceKey` function shape (function unitDisplaySequenceKey(unitType: BuildUnitType): string).
-
- * Purpose: Supports maintainability by documenting why `unitDisplaySequenceKey` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function unitDisplaySequenceKey(unitType: BuildUnitType): string {
-  return `unit_display_sequence_${unitType}`;
+  seedGameSeedIfMissingWithOps({ hasDb: () => db !== null, run, getOne });
 }
 
 /**
@@ -532,14 +525,7 @@ function unitDisplaySequenceKey(unitType: BuildUnitType): string {
  * Exceptions: None.
  */
 export function allocateNextUnitDisplayOrder(unitType: BuildUnitType): number {
-  logDebug('gameDb allocateNextUnitDisplayOrder', { unitType });
-  if (!db) return 1;
-  const key = unitDisplaySequenceKey(unitType);
-  const row = getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [key]);
-  const current = row ? Number.parseInt(row.value, 10) : 0;
-  const next = Number.isFinite(current) && current > 0 ? current + 1 : 1;
-  run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [key, String(next)]);
-  return next;
+  return allocateNextUnitDisplayOrderWithOps({ hasDb: () => db !== null, run, getOne }, unitType);
 }
 
 /**
@@ -551,12 +537,7 @@ export function allocateNextUnitDisplayOrder(unitType: BuildUnitType): number {
  * Exceptions: None.
  */
 export function getGameSeed(): number {
-  logTrace('getGameSeed');
-  if (db === null) return 0;
-  const row = getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'game_seed'");
-  if (!row) return 0;
-  const n = parseInt(row.value, 10);
-  return Number.isNaN(n) ? 0 : n;
+  return getGameSeedWithOps({ hasDb: () => db !== null, run, getOne });
 }
 
 /**
@@ -925,7 +906,8 @@ export function consumeFogNewContactsForPlayer(playerId: 'human' | 'opponent'): 
  * Exceptions: None.
  */
 export function getGameState(): GameStateSnapshot {
-  return getGameStateSnapshotFromModule(getFogDeps());
+  const base = getGameStateSnapshotFromModule(getFogDeps());
+  return mergeActiveTacticalSessionIntoGameStateSnapshot(base, { scope: 'getGameState' });
 }
 
 /**
@@ -940,7 +922,11 @@ export function getGameStateForPlayer(
   playerId: 'human' | 'opponent',
   options?: { maskUnexploredTerrain?: boolean }
 ): GameStateSnapshot {
-  return getGameStateForPlayerFromModule(getFogDeps(), playerId, options);
+  let base = getGameStateForPlayerFromModule(getFogDeps(), playerId, options);
+  if (playerId === 'human') {
+    base = mergeMeleeCandidateHexesIntoHumanFogSnapshot(base);
+  }
+  return mergeActiveTacticalSessionIntoGameStateSnapshot(base, { scope: 'getGameStateForPlayer', playerId });
 }
 
 /**
@@ -1236,9 +1222,7 @@ export function isDbReady(): boolean {
  * Exceptions: None.
  */
 export function setGameOver(winner: string): void {
-  if (!db) return;
-  run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('game_over', '1')");
-  run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('winner', ?)", [winner]);
+  setGameOverWithOps({ hasDb: () => db !== null, run, getOne }, winner);
 }
 
 /**
@@ -1250,8 +1234,7 @@ export function setGameOver(winner: string): void {
  * Exceptions: None.
  */
 export function clearGameOver(): void {
-  if (!db) return;
-  run("DELETE FROM game_config WHERE key IN ('game_over', 'winner')");
+  clearGameOverWithOps({ hasDb: () => db !== null, run, getOne });
 }
 
 /**

@@ -32,6 +32,7 @@ import {
   removeHexBuildQueueEntry,
   getSealiftStackState,
   updateSealiftSlot,
+  resolveMeleeIntercept,
 } from './gameActions';
 import { clearStrategicPreviousHexMemory } from './strategicUnitPreviousHex';
 import {
@@ -39,6 +40,7 @@ import {
   endTacticalBattleSession,
   startTacticalBattleForEnclosingRes1Hex,
 } from './tacticalBattle/tacticalBattleSession';
+import { restorePersistedTacticalBattleSession } from './tacticalBattle/tacticalBattleSession';
 import { normalizeSubmitOrdersPayload } from './submitOrdersPayload';
 import {
   parseGroupedTargetPayload,
@@ -67,6 +69,7 @@ import {
   handleRequestAiOrders,
   cancelRequestAiOrders,
   handleGameReady,
+  handleResolveMeleeIntercept,
 } from './gameIpcHandlers';
 import type {
   SubmitOrdersPayload,
@@ -74,6 +77,7 @@ import type {
   GameReadyIpcPayload,
   RequestAiOrdersResult,
   NewGameIpcPayload,
+  ResolveMeleeInterceptIpcPayload,
 } from '../shared/ipcTypes';
 
 /**
@@ -182,7 +186,7 @@ function createWindow(): void {
 
   const rendererPath = path.join(__dirname, '..', '..', 'static', 'index.html');
   mainWindow.loadFile(rendererPath).catch((err) => {
-    console.error('Failed to load renderer:', err);
+    logError('main: failed to load renderer index', err);
   });
 
   mainWindow.on('closed', () => {
@@ -423,6 +427,22 @@ function registerIpcHandlers(): void {
       });
     }
   );
+  ipcMain.handle(
+    'game:resolveMeleeIntercept',
+    async (_event, payload?: ResolveMeleeInterceptIpcPayload): Promise<ReadyResult> => {
+      return handleResolveMeleeIntercept(payload, {
+        getGameState,
+        getGameStateForPlayer: (playerId: 'human' | 'opponent') =>
+          getGameStateForPlayer(playerId, { maskUnexploredTerrain: playerId !== 'opponent' }),
+        getSelectedModel,
+        hasKey,
+        getToolNamesForEnabledGroups,
+        defaultGroupIds: TOOL_GROUP_REGISTRY.map((g) => g.id),
+        requestOrders: requestOrdersWithLog,
+        resolveMeleeIntercept,
+      });
+    }
+  );
 
   ipcMain.handle(
     'game:requestAiOrders',
@@ -474,6 +494,7 @@ process.on('unhandledRejection', (reason) => {
 
 app.whenReady().then(async () => {
   await initDatabase();
+  restorePersistedTacticalBattleSession();
   registerIpcHandlers();
   createWindow();
   app.on('child-process-gone', (_event, details) => {

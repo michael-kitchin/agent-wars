@@ -53,7 +53,6 @@ import {
   shouldRenderRes4Hexes,
   shouldShowBuildEntryZoom,
 } from './map/terrainView';
-import { enterTacticalMapView } from './map/tacticalMapView';
 import { tryHandleTacticalEntryAtClientXY as tryHandleTacticalEntryAtClientXYFromModule } from './map/tacticalEntryLayer';
 import {
   drawLineArrow,
@@ -101,13 +100,17 @@ import {
 import { rendererSharedState as S } from './core/state';
 import {
   tacticalMaybeScheduleAnnihilationExit,
-  tacticalPerformAdvanceTurn,
-  tacticalPerformBattleExit,
   type TacticalExitSessionAccessor,
 } from './tactical/tacticalExitFlow';
-import { tacticalRendererApplyStartBattleIpcResult } from './tactical/tacticalIpcHandlers';
 import {
-  tacticalApplyStrategicSidebarForTacticalMode,
+  activateRestoredTacticalBattleFromMainSnapshot,
+  buildDefaultTacticalBattleActivationSideEffects,
+  performTacticalAdvanceTurnWhenAvailable,
+  performTacticalBattleExitWithGameApi,
+  startTacticalBattleFromEntryHex as startTacticalBattleFromEntryHexFromModule,
+} from './tactical/tacticalEntryFlow';
+import type { TacticalRendererStartBattleSideEffects } from './tactical/tacticalIpcHandlers';
+import {
   tacticalReconcileBattleAfterStrategicSnapshot,
   tacticalSyncTacticalEntryButtonOverlay,
   tacticalUpdateExitButtonVisibility,
@@ -147,6 +150,8 @@ import {
   handleReadyButtonClick as handleReadyButtonClickFromModule,
   type ReadyHandlerDeps,
 } from './gameplay/readyHandler';
+import { openMeleeInterceptModal } from './gameplay/meleeInterceptModal';
+import { buildMeleeInterceptHexPopupHtmlForRes1 as buildMeleeInterceptHexPopupHtmlForRes1FromModule } from './gameplay/meleeInterceptHexTooltip';
 import type { NamingLookupTarget, TerrainTooltipState } from './map/terrainTooltipTypes';
 import { wireMainMapInteractions as wireMainMapInteractionsFromModule } from './map/mainMapInteractions';
 import { wireInitCore as wireInitCoreFromModule } from './map/initCore';
@@ -180,7 +185,7 @@ import {
  * Bridges renderer shared tactical fields into tactical exit/advance helpers without those modules importing `renderer.ts`.
  *
  * Contract: Read/write `S.tacticalBattleSnapshot` and `S.tacticalPhasePlanning` only.
- * When to use: Passed to `tacticalPerformBattleExit`, `tacticalPerformAdvanceTurn`, and annihilation scheduling.
+ * When to use: Passed to tactical exit/advance helpers and annihilation scheduling.
  * Expected outcome: Same session semantics as the pre-refactor direct `S` mutations.
  * Exceptions: None.
  */
@@ -1790,6 +1795,24 @@ function syncTacticalEntryButtonOverlay(): void {
 }
 
 /**
+ * Supplies activation side effects shared by magnifier tactical start and main-process snapshot restore.
+ *
+ * Purpose: Deduplicates the `TacticalRendererStartBattleSideEffects` literal previously repeated in `applyGameStateSnapshot`.
+ * When to use: Passed to `startTacticalBattleFromEntryHexFromModule` and `activateRestoredTacticalBattleFromMainSnapshot`.
+ * Expected outcome: Identical sequencing for sidebar suppression, res4 entry, HUD refresh, and redraw.
+ * Exceptions: None.
+ */
+function getTacticalBattleActivationSideEffects(): TacticalRendererStartBattleSideEffects {
+  return buildDefaultTacticalBattleActivationSideEffects({
+    showMapToast,
+    syncTacticalEntryOverlay: syncTacticalEntryButtonOverlay,
+    redraw,
+    refreshReadyButton: updateReadyButtonState,
+    scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
+  });
+}
+
+/**
  * Defines the `refreshGameStateAfterBuildQueueChange` function shape (async function refreshGameStateAfterBuildQueueChange(): Promise<void>).
 
  * Purpose: Supports maintainability by documenting why `refreshGameStateAfterBuildQueueChange` exists.
@@ -1837,6 +1860,9 @@ async function applyGameStateSnapshot(
       redraw,
       refreshBuildPopupIfOpen,
       reconcileTacticalBattleAfterStrategicSnapshot: tacticalReconcileBattleAfterStrategicSnapshot,
+      applyRestoredTacticalBattleFromMain: (battle) => {
+        activateRestoredTacticalBattleFromMainSnapshot(battle, getTacticalBattleActivationSideEffects);
+      },
     },
     nextState,
     options
@@ -2648,35 +2674,21 @@ function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number): boolea
 }
 
 /**
- * Starts a tactical battle from a contested res1 hex and applies renderer side effects.
+ * Renderer-local entry point for magnifier-driven tactical start; delegates IPC and activation to `tacticalEntryFlow`.
  *
- * Purpose: Centralizes tactical-entry launch logic so both map hit-testing and direct magnifier button clicks share one path.
- * When to use: Any strategic UI interaction that targets a `data-h3-index` tactical-entry button.
- * Expected outcome: Tactical snapshot is assigned and the renderer enters res4 tactical mode, or a toast explains why start failed.
- * Exceptions: None.
+ * Purpose: Preserves the historical `startTacticalBattleFromEntryHex` symbol for map wiring while shrinking `renderer.ts`.
+ * When to use: Tactical entry layer hit tests and `#tactical-entry-layer` button handlers.
+ * Expected outcome: Same toasts and res4 transition as `startTacticalBattleFromEntryHexFromModule`.
+ * Exceptions: None; missing IPC surfaces through the shared unavailable toast.
  */
 async function startTacticalBattleFromEntryHex(h3: string): Promise<void> {
-  if (!window.gameApi?.startTacticalBattle) {
-    showMapToast('Tactical battle is not available.', { isError: true });
-    return;
-  }
-  hideBuildPopup();
-  const result = await window.gameApi.startTacticalBattle({ enclosingRes1H3Index: h3 });
-  tacticalRendererApplyStartBattleIpcResult(result, {
-    showMapToast,
-    assignBattleSnapshot: (battle) => {
-      S.tacticalBattleSnapshot = battle;
+  await startTacticalBattleFromEntryHexFromModule(h3, {
+    hideBuildPopup,
+    invokeStartTacticalBattle: window.gameApi?.startTacticalBattle,
+    getActivationSideEffects: getTacticalBattleActivationSideEffects,
+    onMissingStartTacticalBattleIpc: () => {
+      showMapToast('Tactical battle is not available.', { isError: true });
     },
-    setPhasePlanning: (planning) => {
-      S.tacticalPhasePlanning = planning;
-    },
-    enterRes4View: enterTacticalMapView,
-    setStrategicSidebarTactical: tacticalApplyStrategicSidebarForTacticalMode,
-    refreshTacticalExitHud: tacticalUpdateExitButtonVisibility,
-    scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
-    refreshReadyButton: updateReadyButtonState,
-    syncTacticalEntryOverlay: syncTacticalEntryButtonOverlay,
-    redraw,
   });
 }
 
@@ -2690,6 +2702,22 @@ async function startTacticalBattleFromEntryHex(h3: string): Promise<void> {
  */
 async function tryHandleTacticalEntryAtClientXY(clientX: number, clientY: number): Promise<boolean> {
   return tryHandleTacticalEntryAtClientXYFromModule(clientX, clientY, startTacticalBattleFromEntryHex);
+}
+
+/**
+ * Bridges renderer tooltip helpers into the shared melee-intercept hex HTML builder.
+ *
+ * Purpose: Keeps `ReadyHandlerDeps.buildMeleeInterceptHexPopupHtml` stable without duplicating tooltip assembly in `renderer.ts`.
+ * When to use: Only from `createReadyHandlerDeps`.
+ * Expected outcome: Delegates to `meleeInterceptHexTooltip` with live naming/terrain readers.
+ * Exceptions: None.
+ */
+async function buildMeleeInterceptHexPopupHtmlForRes1(h3Index: string): Promise<string> {
+  return buildMeleeInterceptHexPopupHtmlForRes1FromModule(h3Index, {
+    getCachedNamingLineForTarget,
+    terrainTooltipStateForRes1Hex,
+    getCachedTerrainTooltipHtml,
+  });
 }
 
 /**
@@ -2729,6 +2757,9 @@ function createReadyHandlerDeps(): ReadyHandlerDeps {
     updateGameOverUI,
     startBackgroundRequestIfAllowed,
     redraw,
+    buildMeleeInterceptHexPopupHtml: buildMeleeInterceptHexPopupHtmlForRes1,
+    openMeleeInterceptModal,
+    startTacticalBattleFromInterceptHex: startTacticalBattleFromEntryHex,
   };
 }
 
@@ -2758,8 +2789,7 @@ function maybeScheduleTacticalAnnihilationExit(): void {
  * Exceptions: Surfaces toasts when IPC fails per tactical helper contract.
  */
 async function performTacticalBattleExit(): Promise<void> {
-  await tacticalPerformBattleExit(tacticalExitSessionAccessor, {
-    endTacticalBattle: window.gameApi?.endTacticalBattle,
+  await performTacticalBattleExitWithGameApi(tacticalExitSessionAccessor, {
     showMapToast,
     redraw,
     runReadyAfterExit: () => handleReadyButtonClickFromModule(createReadyHandlerDeps()),
@@ -2769,24 +2799,24 @@ async function performTacticalBattleExit(): Promise<void> {
 /**
  * Advances the tactical turn in the main process and waits briefly for background AI loading to settle.
  *
- * Purpose: Preflights `advanceTacticalTurn` IPC availability before delegating to `tacticalPerformAdvanceTurn`.
+ * Purpose: Preflights `advanceTacticalTurn` IPC availability before delegating to `performTacticalAdvanceTurnWhenAvailable`.
  * When to use: Tactical advance HUD button.
  * Expected outcome: Snapshot updates; background wait behavior matches milestone-2.1 contract.
  * Exceptions: Toasts on missing IPC or failures; restores planning phase via helper.
  */
 async function performTacticalAdvanceTurn(): Promise<void> {
-  const api = window.gameApi;
-  if (!api?.advanceTacticalTurn) {
-    showMapToast('Advance tactical turn is unavailable.', { isError: true });
-    return;
-  }
-  await tacticalPerformAdvanceTurn(tacticalExitSessionAccessor, {
-    advanceTacticalTurn: () => api.advanceTacticalTurn(),
-    showMapToast,
-    redraw,
-    startBackgroundRequestIfAllowed,
-    isBackgroundRequestInFlight: () => S.backgroundRequestInFlight,
-    scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
+  await performTacticalAdvanceTurnWhenAvailable(tacticalExitSessionAccessor, {
+    resolveAdvanceTacticalTurn: () => window.gameApi?.advanceTacticalTurn,
+    onMissingAdvanceTacticalTurn: () => {
+      showMapToast('Advance tactical turn is unavailable.', { isError: true });
+    },
+    advanceIo: {
+      showMapToast,
+      redraw,
+      startBackgroundRequestIfAllowed,
+      isBackgroundRequestInFlight: () => S.backgroundRequestInFlight,
+      scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
+    },
   });
 }
 

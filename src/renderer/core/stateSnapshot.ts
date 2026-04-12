@@ -1,4 +1,5 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { applyInitialCameraForState } from '../map/mapUtils';
 import { rendererSharedState as S } from './state';
 
@@ -136,7 +137,16 @@ refreshBuildPopupIfOpen: () => void;
    * Expected outcome: Prevents stale tactical res4 mode after new game, ready-advanced turns, or phase changes.
    * Exceptions: None.
    */
-reconcileTacticalBattleAfterStrategicSnapshot: (nextState: GameStateSnapshot) => void;
+  reconcileTacticalBattleAfterStrategicSnapshot: (nextState: GameStateSnapshot) => void;
+    /**
+   * Specifies the contract for the `applyRestoredTacticalBattleFromMain` member (applyRestoredTacticalBattleFromMain?: (battle: TacticalBattleSnapshot) => void;).
+
+   * Contract: Enters tactical res4 mode when the main process attached `tacticalBattleSession` to `getGameState` (restart restore).
+   * When to use: Optional; omitted in tests that do not model tactical UI.
+   * Expected outcome: Renderer tactical snapshot and map chrome match the restored main-process session.
+   * Exceptions: None; implementation should be defensive and avoid duplicate activation for the same `battleId`.
+   */
+applyRestoredTacticalBattleFromMain?: (battle: TacticalBattleSnapshot) => void;
 }
 
 /**
@@ -220,6 +230,17 @@ export async function applyGameStateSnapshot(
   const previousState = S.gameState;
   S.gameState = nextState;
   deps.reconcileTacticalBattleAfterStrategicSnapshot(nextState);
+  const restored = nextState.tacticalBattleSession;
+  if (restored && deps.applyRestoredTacticalBattleFromMain) {
+    const cur = S.tacticalBattleSnapshot;
+    const materiallyDifferent =
+      !cur ||
+      cur.battleId !== restored.battleId ||
+      cur.tacticalTurnNumber !== restored.tacticalTurnNumber;
+    if (materiallyDifferent) {
+      deps.applyRestoredTacticalBattleFromMain(restored);
+    }
+  }
   deps.rebuildUnitDisplayNameLookup(nextState);
   deps.reconcileSelectionToCurrentState();
   deps.updateClientStaleEnemyIntel(previousState, nextState);

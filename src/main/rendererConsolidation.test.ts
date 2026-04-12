@@ -604,14 +604,6 @@ function testRes4RubbleTooltipAndTerrainVariantContracts(): void {
 }
 
 /**
- * Defines the `testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves` function shape (function testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves(): void).
-
- * Purpose: Supports maintainability by documenting why `testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-/**
  * Defines the `testTacticalDrawBranchSkipsStrategicStaleIntel` function shape (function testTacticalDrawBranchSkipsStrategicStaleIntel(): void).
 
  * Purpose: Guards milestone-2.1 no-fog tactical rendering against strategic stale-intel overlays.
@@ -648,8 +640,15 @@ function testTacticalAdvanceTurnUsesResolutionGate(): void {
   const rendererSource = fs.readFileSync(rendererPath, 'utf8');
   const rendererFn = getFunctionSource(rendererSource, 'performTacticalAdvanceTurn');
   assert.ok(
-    rendererFn.includes('tacticalPerformAdvanceTurn'),
-    'performTacticalAdvanceTurn should delegate tactical beat sequencing to tacticalPerformAdvanceTurn'
+    rendererFn.includes('performTacticalAdvanceTurnWhenAvailable'),
+    'performTacticalAdvanceTurn should delegate to tacticalEntryFlow advance-turn wiring'
+  );
+  const entryFlowPath = path.resolve(process.cwd(), 'src', 'renderer', 'tactical', 'tacticalEntryFlow.ts');
+  const entryFlowSource = fs.readFileSync(entryFlowPath, 'utf8');
+  const entryFlowFn = getFunctionSource(entryFlowSource, 'performTacticalAdvanceTurnWhenAvailable');
+  assert.ok(
+    entryFlowFn.includes('tacticalPerformAdvanceTurn'),
+    'performTacticalAdvanceTurnWhenAvailable should delegate tactical beat sequencing to tacticalPerformAdvanceTurn'
   );
   const exitFlowPath = path.resolve(process.cwd(), 'src', 'renderer', 'tactical', 'tacticalExitFlow.ts');
   const exitFlowSource = fs.readFileSync(exitFlowPath, 'utf8');
@@ -755,6 +754,14 @@ function testTacticalMapViewLocksZoomPanAndRestoresWorld(): void {
   );
 }
 
+/**
+ * Defines the `testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves` function shape (function testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves(): void).
+
+ * Purpose: Static regression tests for resolution-phase movement stacks (naval + embarked cargo grouped animation).
+ * When to use: CI guard when refactoring `drawMovingUnits` in `pathDrawing.ts`.
+ * Expected outcome: Source encodes groupKey, aggregation, mixed-type label, and count badge layout for stacked moves.
+ * Exceptions: None.
+ */
 function testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves(): void {
   const pathDrawingPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'pathDrawing.ts');
   const source = fs.readFileSync(pathDrawingPath, 'utf8');

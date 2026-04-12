@@ -190,6 +190,7 @@ export function resetGameForNewMatch(
   run('DELETE FROM ai_loss_events_since_consultation');
   run("DELETE FROM game_config WHERE key = 'ai_last_consultation_turn'");
   run("DELETE FROM game_config WHERE key IN ('fog_new_contacts_human', 'fog_new_contacts_opponent')");
+  run("DELETE FROM game_config WHERE key = 'tactical_battle_snapshot_json_v1'");
   run('DELETE FROM standing_orders');
   run('DELETE FROM ai_memory');
   run('DELETE FROM player_hex_intel');

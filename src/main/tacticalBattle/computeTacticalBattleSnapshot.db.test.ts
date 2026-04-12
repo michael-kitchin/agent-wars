@@ -6,10 +6,17 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { latLngToCell } from 'h3-js';
-import { dbRun } from '../gameDb';
+import type { CombatUnit } from '../combatUnitTypes';
+import { filterMeleeCandidateHexesWithTacticalEntry, listMeleeCandidateHexes } from '../game-actions/meleeInterceptCandidates';
+import { dbGetOne, dbRun, listUnitsForSnapshot } from '../gameDb';
+import { getOrderedHexList } from '../mapData';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import { computeTacticalBattleSnapshot } from './computeTacticalBattleSnapshot';
-import { applyValidatedOpponentTacticalOrders, startTacticalBattleForEnclosingRes1Hex } from './tacticalBattleSession';
+import {
+  applyValidatedOpponentTacticalOrders,
+  endTacticalBattleSession,
+  startTacticalBattleForEnclosingRes1Hex,
+} from './tacticalBattleSession';
 import {
   tacticalDbFixtureRegisterDefaultAfterEach,
   tacticalDbFixtureSetStrategicPlanningPhase,
@@ -34,6 +41,16 @@ test('computeTacticalBattleSnapshot returns null when strategic phase is not pla
     const r = computeTacticalBattleSnapshot(targetRes1H3, 'battle-wrong-phase');
     assert.equal(r.snapshot, null);
     assert.ok(r.failureReason && /planning/i.test(r.failureReason));
+  });
+});
+
+test('computeTacticalBattleSnapshot succeeds in resolution when allowDuringStrategicResolution is true', () => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-snap-phase-allow-', ({ targetRes1H3 }) => {
+    dbRun(`UPDATE turn_state SET phase = 'resolution' WHERE id = 1`);
+    const r = computeTacticalBattleSnapshot(targetRes1H3, 'battle-resolution-probe', {
+      allowDuringStrategicResolution: true,
+    });
+    assert.ok(r.snapshot, r.failureReason ?? 'expected snapshot');
   });
 });
 
@@ -65,4 +82,39 @@ test('applyValidatedOpponentTacticalOrders fails when no tactical session is act
   });
   assert.equal(r.success, false);
   assert.ok(r.reason);
+});
+
+test('active tactical session writes game_config and clears on endTacticalBattleSession', () => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-persist-key-', ({ targetRes1H3 }) => {
+    const started = startTacticalBattleForEnclosingRes1Hex(targetRes1H3);
+    assert.equal(started.success, true);
+    const row = dbGetOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'tactical_battle_snapshot_json_v1'");
+    assert.ok(row?.value);
+    const parsed = JSON.parse(row.value) as { battleId?: string };
+    assert.ok(parsed.battleId && parsed.battleId.length > 0);
+    endTacticalBattleSession();
+    const gone = dbGetOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'tactical_battle_snapshot_json_v1'");
+    assert.equal(gone, undefined);
+  });
+});
+
+test('Phase E: melee tactical-entry filter keeps contested res1 during resolution pause', () => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-melee-filter-phasee-', ({ targetRes1H3 }) => {
+    dbRun(`UPDATE turn_state SET phase = 'resolution' WHERE id = 1`);
+    const hexList = getOrderedHexList();
+    const combatUnitsAfter: CombatUnit[] = listUnitsForSnapshot().map((u) => ({
+      id: u.id,
+      player: u.player,
+      unitType: u.unitType,
+      h3Index: u.h3Index,
+      displayOrder: u.displayOrder ?? 0,
+    }));
+    const raw = listMeleeCandidateHexes(combatUnitsAfter, hexList);
+    assert.ok(raw.includes(targetRes1H3), `expected raw melee candidate at ${targetRes1H3}`);
+    const filtered = filterMeleeCandidateHexesWithTacticalEntry(raw, { allowDuringStrategicResolution: true });
+    assert.ok(
+      filtered.includes(targetRes1H3),
+      `tactical probe should retain fixture hex; raw=${JSON.stringify(raw)} filtered=${JSON.stringify(filtered)}`
+    );
+  });
 });

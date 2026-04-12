@@ -9,23 +9,12 @@ import {
   dbRun,
   dbGetAll,
   isDbReady,
-  saveDatabase,
-  getGameSeed,
-  setGameOver,
   getMapHexSet,
-  refreshFogOfWarIntelFromCurrentState,
-  addAiLossEventsSinceConsultation,
-  getHexController,
-  listAllHexControls,
-  listUnitsForSnapshot,
   getRes1InfrastructureForHex,
   getGameStateForPlayer,
-  getScenarioHomeRegionHexes,
 } from './gameDb';
-import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from './game-db/scenarioState';
-import { buildLatLngCoordinateMap, getOrderedHexList } from './mapData';
+import { buildLatLngCoordinateMap } from './mapData';
 import { getRange } from './combatConstants';
-import { runRangedPhase, runMeleePhase, createCombatRng, type CombatUnit } from './combatResolution';
 import { logDebug, logError, logTrace } from './logger';
 import type {
   MovementOrder,
@@ -36,8 +25,9 @@ import type {
   FerryOrder,
   AirStrikeTargetType,
   ReadyResult,
-  FerryAnimationMove,
+  ResolveMeleeInterceptIpcPayload,
   SealiftStackState,
+  GameStateSnapshot,
 } from '../shared/ipcTypes';
 import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
 import { executePlanRoute } from './tools/tool1Pathfinding';
@@ -51,18 +41,12 @@ import {
 import {
   assignHumanMarchStandingOrder,
   cancelHumanStandingOrder,
-  generateOrdersForStandingOrders,
   queryHumanStandingOrders,
 } from './tools/tool5StandingOrders';
 import type { BuildUnitType } from './productionRules';
-import {
-  AIR_FERRY_RANGE_HEXES,
-  MOVEMENT_RANGE_BY_UNIT_TYPE,
-  formatTargetOutOfRangeReason,
-} from '../shared/tacticalRanges';
+import { MOVEMENT_RANGE_BY_UNIT_TYPE, formatTargetOutOfRangeReason } from '../shared/tacticalRanges';
 import { validateAirStrikeOrder, validateFerryOrder } from './game-actions/airValidation';
 import { isWithinGridRangeSafe } from './game-actions/gridRange';
-import { resolveAirStrikePhase } from './game-actions/airStrikeResolution';
 import {
   addHexBuildQueueEntryImpl,
   getHexBuildQueueImpl,
@@ -80,49 +64,22 @@ import {
   getLandMovementBlockReason,
   isLandUnitType,
 } from './game-actions/landMovementConstraints';
-import {
-  collectTraversedHexesByPlayer,
-  processProductionAfterControlResolution,
-  resolveRes1ControlAfterCombatAndMovement,
-} from './game-actions/controlAndProduction';
 import { submitOrdersImpl } from './game-actions/submitOrders';
 import {
-  applyTransportLossForRemovedNavalUnits,
-  applyEmbarkOrdersForPlayer,
-  autoDisembarkIndependentLandMoves,
-  deleteTransportAssignmentsForRemovedUnits,
   getSealiftStackStateImpl,
   isEmbarkedLandUnitOnWater,
-  syncEmbarkedLandUnitPositionsWithNaval,
   updateSealiftSlotImpl,
 } from './game-actions/sealift';
-import { rememberStrategicHexBeforeMove } from './strategicUnitPreviousHex';
 import { isTacticalBattleActive } from './tacticalBattle/tacticalBattleSession';
+import { executeResolveMeleeIntercept } from './game-actions/meleeInterceptStrategicResolve';
+import { executeReadyStrategicTurn } from './game-actions/readyStrategicResolutionPipeline';
+import {
+  failIfDatabaseNotReady,
+  failIfMeleeInterceptDecisionPending,
+  failIfTacticalBattleActive,
+} from './game-actions/readyStrategicGuards';
 
-/**
- * Defines the `evaluateRegionControlWinnerAtEndOfTurn` function shape (export function evaluateRegionControlWinnerAtEndOfTurn(): 'human' | 'opponent' | null { logTrace('gameActions evaluateRegionControlWinnerAtEndOfTurn'); co).
-
- * Purpose: Supports maintainability by documenting why `evaluateRegionControlWinnerAtEndOfTurn` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function evaluateRegionControlWinnerAtEndOfTurn(): 'human' | 'opponent' | null {
-  logTrace('gameActions evaluateRegionControlWinnerAtEndOfTurn');
-  const scenario = loadScenarioState({ getOne: dbGetOne });
-  if (scenario.scenarioId !== REGION_VS_REGION_SCENARIO_ID) return null;
-  const humanHomeRegion = scenario.humanHomeRegion;
-  const aiHomeRegion = scenario.aiHomeRegion;
-  const humanRegionHexes = getScenarioHomeRegionHexes(humanHomeRegion);
-  const aiRegionHexes = getScenarioHomeRegionHexes(aiHomeRegion);
-  if (humanRegionHexes.length <= 0 || aiRegionHexes.length <= 0) return null;
-  const controlByHex = new Map(listAllHexControls().map((row) => [row.h3Index, row.controllerPlayerId]));
-  const humanControlsAiRegion = aiRegionHexes.every((h3Index) => controlByHex.get(h3Index) === 'human');
-  const aiControlsHumanRegion = humanRegionHexes.every((h3Index) => controlByHex.get(h3Index) === 'opponent');
-  if (humanControlsAiRegion && !aiControlsHumanRegion) return 'human';
-  if (aiControlsHumanRegion && !humanControlsAiRegion) return 'opponent';
-  return null;
-}
+export { evaluateRegionControlWinnerAtEndOfTurn } from './game-actions/regionControlWinner';
 
 export type { MovementOrder, RangedAttackOrder, SubmitOrdersPayload };
 export type { HexBuildQueueEntryView, HexBuildQueueView } from './game-actions/buildQueue';
@@ -408,38 +365,14 @@ function hexSupportsMixedLandAndNaval(hex: { h3Index: string; terrain: string; t
 }
 
 /**
- * Defines the `dbBackedStateSnapshot` function shape (function dbBackedStateSnapshot()).
-
- * Purpose: Supports maintainability by documenting why `dbBackedStateSnapshot` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function dbBackedStateSnapshot() {
-  return {
-    hexes: dbGetAll<{ h3Index: string; terrain: string; terrainKind: string }>(
-      'SELECT h3_index AS h3Index, terrain, terrain_kind AS terrainKind FROM hexes'
-    ),
-    units: dbGetAll<{ id: string; player: string; unitType: string; h3Index: string }>(
-      'SELECT id, player, unit_type AS unitType, h3_index AS h3Index FROM units'
-    ),
-    phase: dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1')?.phase ?? 'planning',
-    turnNumber: dbGetOne<{ turnNumber: number }>('SELECT turn_number AS turnNumber FROM turn_state WHERE id = 1')?.turnNumber ?? 1,
-    pendingOrders: dbGetAll<{ unitId: string; toH3Index: string }>(
-      'SELECT unit_id AS unitId, to_h3_index AS toH3Index FROM pending_orders'
-    ),
-  };
-}
-
-/**
- * Defines the `humanPerspectiveStateSnapshot` function shape (function humanPerspectiveStateSnapshot(): ReturnType<typeof dbBackedStateSnapshot>).
+ * Defines the `humanPerspectiveStateSnapshot` function shape (function humanPerspectiveStateSnapshot(): GameStateSnapshot).
 
  * Purpose: Supports maintainability by documenting why `humanPerspectiveStateSnapshot` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function humanPerspectiveStateSnapshot(): ReturnType<typeof dbBackedStateSnapshot> {
+function humanPerspectiveStateSnapshot(): GameStateSnapshot {
   return getGameStateForPlayer(HUMAN_PLAYER_ID, { maskUnexploredTerrain: false });
 }
 
@@ -931,36 +864,6 @@ export function validateGroupFerryTarget(unitIds: string[], destinationH3Index: 
 }
 
 /**
- * Defines the `destroyAirUnitsWithInvalidBase` function shape (function destroyAirUnitsWithInvalidBase(): CombatUnit[]).
-
- * Purpose: Supports maintainability by documenting why `destroyAirUnitsWithInvalidBase` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function destroyAirUnitsWithInvalidBase(): CombatUnit[] {
-  const rows = dbGetAll<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }>(
-    'SELECT id, player, unit_type, h3_index, display_order FROM units WHERE unit_type = ?',
-    ['air']
-  );
-  const removed: CombatUnit[] = [];
-  for (const row of rows) {
-    const infra = getRes1InfrastructureForHex(row.h3_index);
-    const controller = getHexController(row.h3_index);
-    if (infra.airportCount > 0 && controller === row.player) continue;
-    dbRun('DELETE FROM units WHERE id = ?', [row.id]);
-    removed.push({
-      id: row.id,
-      player: row.player,
-      unitType: row.unit_type,
-      h3Index: row.h3_index,
-      displayOrder: row.display_order ?? undefined,
-    });
-  }
-  return removed;
-}
-
-/**
  * Defines the `getHexBuildQueue` function shape (export function getHexBuildQueue(h3Index: string, requestingPlayerId = HUMAN_PLAYER_ID): HexBuildQueueView).
 
  * Purpose: Supports maintainability by documenting why `getHexBuildQueue` exists.
@@ -1129,14 +1032,12 @@ export function ready(
     aiEmbarkCount: aiEmbarkOrders.length,
   });
   try {
-    if (!isDbReady()) {
-      logError('ready: database not initialized');
-      return { success: false, reason: 'Database not initialized' };
-    }
-    if (isTacticalBattleActive()) {
-      logError('ready: tactical battle active');
-      return { success: false, reason: 'Finish or exit the tactical battle before resolving the strategic turn.' };
-    }
+    const failDb = failIfDatabaseNotReady('ready');
+    if (failDb) return failDb;
+    const failTac = failIfTacticalBattleActive('ready');
+    if (failTac) return failTac;
+    const failMelee = failIfMeleeInterceptDecisionPending();
+    if (failMelee) return failMelee;
 
     const turnRow = dbGetOne<{ phase: string; turn_number: number }>(
       'SELECT phase, turn_number FROM turn_state WHERE id = 1'
@@ -1146,335 +1047,37 @@ export function ready(
       return { success: false, reason: 'Not in planning phase' };
     }
 
-    dbRun('UPDATE turn_state SET phase = ? WHERE id = 1', ['resolution']);
-
-    const hexList = getOrderedHexList();
-    const unitsBeforeMove = listUnitsForSnapshot();
-    const combatUnitsBefore: CombatUnit[] = unitsBeforeMove.map((u) => ({
-      id: u.id,
-      player: u.player,
-      unitType: u.unitType,
-      h3Index: u.h3Index,
-      displayOrder: u.displayOrder,
-    }));
-
-    const humanRanged = dbGetAll<{ unit_id: string; target_h3_index: string }>(
-      'SELECT unit_id, target_h3_index FROM pending_ranged_orders ORDER BY unit_id, target_h3_index'
-    ).map((r) => ({ unitId: r.unit_id, targetH3Index: r.target_h3_index }));
-    const humanAirStrikes = dbGetAll<{ unit_id: string; target_h3_index: string; target_type: AirStrikeTargetType }>(
-      'SELECT unit_id, target_h3_index, target_type FROM pending_air_orders ORDER BY unit_id, target_h3_index'
-    ).map((r) => ({ unitId: r.unit_id, targetH3Index: r.target_h3_index, targetType: r.target_type }));
-    const humanFerryOrders = dbGetAll<{ unit_id: string; destination_h3_index: string }>(
-      'SELECT unit_id, destination_h3_index FROM pending_ferry_orders ORDER BY unit_id, destination_h3_index'
-    ).map((r) => ({ unitId: r.unit_id, destinationH3Index: r.destination_h3_index }));
-    const allAirStrikes = [...humanAirStrikes, ...aiAirStrikeOrders];
-    const allFerryOrders = [...humanFerryOrders, ...aiFerryOrders];
-    applyEmbarkOrdersForPlayer(aiEmbarkOrders, 'opponent');
-    const allRanged = [...humanRanged, ...aiRangedOrders];
-
-    const turnNumber = turnRow?.turn_number ?? 1;
-    const gameSeed = getGameSeed();
-    // Per-turn seed so the same two units get different dice outcomes each turn; replay stays deterministic for same orders.
-    const seed = (gameSeed + turnNumber * 7919) >>> 0;
-    const next = createCombatRng(seed);
-    logDebug('ready: combat resolution', { turnNumber, gameSeed, combatSeed: seed });
-    const applyTransportOutcomeForPhase = (removedUnitIds: string[], removedUnits: CombatUnit[]): CombatUnit[] => {
-      const transportLosses = applyTransportLossForRemovedNavalUnits(removedUnits);
-      deleteTransportAssignmentsForRemovedUnits(removedUnitIds);
-      if (transportLosses.length > 0) {
-        deleteTransportAssignmentsForRemovedUnits(transportLosses.map((unit) => unit.id));
+    return executeReadyStrategicTurn(
+      aiOrders,
+      aiRangedOrders,
+      aiAirStrikeOrders,
+      aiFerryOrders,
+      aiEmbarkOrders,
+      {
+        humanPlayerId: HUMAN_PLAYER_ID,
+        validPhase: VALID_PHASE,
+        turnNumber: turnRow?.turn_number ?? 1,
       }
-      return transportLosses;
-    };
-
-    const airStrikeResult = resolveAirStrikePhase(allAirStrikes, next);
-    const airStrikeTransportLosses = applyTransportOutcomeForPhase(airStrikeResult.removedUnitIds, airStrikeResult.removedUnits);
-    const rangedInputUnits = listUnitsForSnapshot()
-      .filter((u) => {
-        if (u.unitType !== 'infantry' && u.unitType !== 'armor') return true;
-        return !isEmbarkedLandUnitOnWater(u.id);
-      })
-      .map((u) => ({
-        id: u.id,
-        player: u.player,
-        unitType: u.unitType,
-        h3Index: u.h3Index,
-        displayOrder: u.displayOrder,
-      }));
-    const rangedResult = runRangedPhase(rangedInputUnits, hexList, allRanged, next);
-    for (const id of rangedResult.removedUnitIds) {
-      dbRun('DELETE FROM units WHERE id = ?', [id]);
-    }
-    const rangedTransportLosses = applyTransportOutcomeForPhase(rangedResult.removedUnitIds, rangedResult.removedUnits);
-
-    const humanOrders = dbGetAll<{ unit_id: string; to_h3_index: string }>('SELECT unit_id, to_h3_index FROM pending_orders');
-    const preMoveState = dbBackedStateSnapshot();
-    const preMoveHexList = preMoveState.hexes.map((h) => h.h3Index);
-    const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(preMoveHexList);
-    const preMoveStateForHuman = getGameStateForPlayer(HUMAN_PLAYER_ID, { maskUnexploredTerrain: false });
-    const generatedHuman = generateOrdersForStandingOrders(HUMAN_PLAYER_ID, preMoveStateForHuman, latLngByH3, resolveToH3);
-    const mergedHuman = new Map<string, string>();
-    for (const o of generatedHuman.movementOrders) mergedHuman.set(o.unitId, o.toH3Index);
-    for (const o of humanOrders) mergedHuman.set(o.unit_id, o.to_h3_index);
-    const humanMoves = Array.from(mergedHuman.entries())
-      .map(([unitId, toH3Index]) => {
-        const fromH3Index = unitsBeforeMove.find((u) => u.id === unitId)?.h3Index;
-        if (!fromH3Index || fromH3Index === toH3Index) return null;
-        return { unitId, fromH3Index, toH3Index };
-      })
-      .filter((m): m is { unitId: string; fromH3Index: string; toH3Index: string } => m !== null);
-    const allOrders = [
-      ...Array.from(mergedHuman.entries()).map(([unitId, toH3Index]) => ({ unitId, toH3Index })),
-      ...aiOrders,
-    ];
-    autoDisembarkIndependentLandMoves(allOrders);
-    const orderDestinationByUnitId = new Map(allOrders.map((order) => [order.unitId, order.toH3Index]));
-    const movingNavalUnitIds = allOrders
-      .filter((order) => unitsBeforeMove.find((unit) => unit.id === order.unitId)?.unitType === 'naval')
-      .map((order) => order.unitId);
-    const embarkedFollowMoves: Array<{ unitId: string; fromH3Index: string; toH3Index: string }> = [];
-    if (movingNavalUnitIds.length > 0) {
-      const placeholders = movingNavalUnitIds.map(() => '?').join(', ');
-      const embarkedRows = dbGetAll<{ landUnitId: string; landH3Index: string; navalUnitId: string }>(
-        `SELECT uta.land_unit_id AS landUnitId,
-                lu.h3_index AS landH3Index,
-                uta.naval_unit_id AS navalUnitId
-         FROM unit_transport_assignments uta
-         JOIN units lu ON lu.id = uta.land_unit_id
-         WHERE uta.naval_unit_id IN (${placeholders})`,
-        movingNavalUnitIds
-      );
-      for (const row of embarkedRows) {
-        const destination = orderDestinationByUnitId.get(row.navalUnitId);
-        if (!destination || destination === row.landH3Index) continue;
-        embarkedFollowMoves.push({
-          unitId: row.landUnitId,
-          fromH3Index: row.landH3Index,
-          toH3Index: destination,
-        });
-      }
-    }
-    const traversedHexesByPlayer = collectTraversedHexesByPlayer(
-      allOrders,
-      preMoveState.units.map((u) => ({ id: u.id, player: u.player, h3Index: u.h3Index, unitType: u.unitType }))
     );
-    for (const order of allOrders) {
-      const prevUnit = unitsBeforeMove.find((u) => u.id === order.unitId);
-      if (prevUnit && prevUnit.h3Index !== order.toH3Index) {
-        rememberStrategicHexBeforeMove(order.unitId, prevUnit.h3Index, order.toH3Index);
-      }
-      dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [order.toH3Index, order.unitId]);
-    }
-    syncEmbarkedLandUnitPositionsWithNaval();
-
-    const resolvedFerryMoves: FerryAnimationMove[] = [];
-    for (const ferry of allFerryOrders) {
-      const unit = dbGetOne<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }>(
-        'SELECT id, player, unit_type, h3_index, display_order FROM units WHERE id = ?',
-        [ferry.unitId]
-      );
-      if (!unit || unit.unit_type !== 'air') continue;
-      const originH3Index = unit.h3_index;
-      const withinFerryRange = isWithinGridRangeSafe(originH3Index, ferry.destinationH3Index, AIR_FERRY_RANGE_HEXES, 'ready ferry');
-      if (!withinFerryRange) continue;
-      const destinationInfra = getRes1InfrastructureForHex(ferry.destinationH3Index);
-      const destinationController = getHexController(ferry.destinationH3Index);
-      if (destinationInfra.airportCount > 0 && destinationController === unit.player) {
-        rememberStrategicHexBeforeMove(ferry.unitId, originH3Index, ferry.destinationH3Index);
-        dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [ferry.destinationH3Index, ferry.unitId]);
-        resolvedFerryMoves.push({
-          unitId: ferry.unitId,
-          player: unit.player,
-          fromH3Index: originH3Index,
-          toH3Index: ferry.destinationH3Index,
-        });
-        continue;
-      }
-      const originInfra = getRes1InfrastructureForHex(originH3Index);
-      const originController = getHexController(originH3Index);
-      if (!(originInfra.airportCount > 0 && originController === unit.player)) {
-        dbRun('DELETE FROM units WHERE id = ?', [ferry.unitId]);
-      }
-    }
-
-    const unitsAfterMove = listUnitsForSnapshot();
-    const rangedRemovedSet = new Set(rangedResult.removedUnitIds);
-    // Melee must not see units removed in ranged phase; exclude them explicitly so attackers cannot engage dead defenders.
-    const combatUnitsAfter: CombatUnit[] = unitsAfterMove
-      .filter((u) => !rangedRemovedSet.has(u.id))
-      .filter((u) => {
-        if (u.unitType !== 'infantry' && u.unitType !== 'armor') return true;
-        return !isEmbarkedLandUnitOnWater(u.id);
-      })
-      .map((u) => ({
-        id: u.id,
-        player: u.player,
-        unitType: u.unitType,
-        h3Index: u.h3Index,
-        displayOrder: u.displayOrder,
-      }));
-
-    const meleeResult = runMeleePhase(combatUnitsAfter, hexList, next);
-    for (const id of meleeResult.removedUnitIds) {
-      dbRun('DELETE FROM units WHERE id = ?', [id]);
-    }
-    const meleeTransportLosses = applyTransportOutcomeForPhase(meleeResult.removedUnitIds, meleeResult.removedUnits);
-
-    const controlTransitions = resolveRes1ControlAfterCombatAndMovement(traversedHexesByPlayer);
-    const baseLossRemovedAir = destroyAirUnitsWithInvalidBase();
-    const airStrikeDestroyedFeatures = { urban: 0, airport: 0, seaport: 0 };
-    let airStrikeDestroyedBasedAirUnits = 0;
-    for (const event of airStrikeResult.infrastructureDestroyedEvents) {
-      airStrikeDestroyedFeatures[event.targetType] += 1;
-      airStrikeDestroyedBasedAirUnits += event.destroyedAirUnitsCount ?? 0;
-    }
-    const airStrikeDestroyedUnitsByType = { infantry: 0, armor: 0, naval: 0, air: 0 };
-    const airStrikeLostAirUnitIds: string[] = [];
-    for (const removed of airStrikeResult.removedUnits) {
-      if (removed.unitType === 'infantry') airStrikeDestroyedUnitsByType.infantry += 1;
-      else if (removed.unitType === 'armor') airStrikeDestroyedUnitsByType.armor += 1;
-      else if (removed.unitType === 'naval') airStrikeDestroyedUnitsByType.naval += 1;
-      else if (removed.unitType === 'air') {
-        airStrikeDestroyedUnitsByType.air += 1;
-        airStrikeLostAirUnitIds.push(removed.id);
-      }
-    }
-    if (airStrikeResult.attemptCount > 0 || baseLossRemovedAir.length > 0) {
-      logDebug('ready: airStrikeSummary', {
-        attemptCount: airStrikeResult.attemptCount,
-        successfulCount: airStrikeResult.successfulCount,
-        failedCount: airStrikeResult.failedCount,
-        attackerLossCount: airStrikeResult.attackerLossCount,
-        destroyedFeatures: airStrikeDestroyedFeatures,
-        destroyedBasedAirUnits: airStrikeDestroyedBasedAirUnits,
-        destroyedUnitsByType: airStrikeDestroyedUnitsByType,
-        airLossUnitIds: [...new Set(airStrikeLostAirUnitIds)],
-        strandedAirLossCount: baseLossRemovedAir.length,
-        strandedAirLossUnitIds: baseLossRemovedAir.map((unit) => unit.id),
-      });
-    }
-    const productionSummary = processProductionAfterControlResolution();
-    const deployedUnitsByType = productionSummary.deployedByPlayer.human;
-    const finalUnits = listUnitsForSnapshot();
-    const humanHexesLost = controlTransitions.filter(
-      (t) => t.fromControllerPlayerId === 'human' && t.toControllerPlayerId === 'opponent'
-    );
-    const controlLossLightningHexes = humanHexesLost
-      .filter((t) => !finalUnits.some((u) => u.player === 'human' && u.h3Index === t.h3Index))
-      .map((t) => t.h3Index);
-
-    const humanCount = dbGetAll<{ c: number }>('SELECT COUNT(*) AS c FROM units WHERE player = ?', ['human'])[0]?.c ?? 0;
-    const opponentCount = dbGetAll<{ c: number }>('SELECT COUNT(*) AS c FROM units WHERE player = ?', ['opponent'])[0]?.c ?? 0;
-    const regionWinner = evaluateRegionControlWinnerAtEndOfTurn();
-    if (regionWinner) setGameOver(regionWinner);
-    else if (humanCount === 0 && opponentCount > 0) setGameOver('opponent');
-    else if (opponentCount === 0 && humanCount > 0) setGameOver('human');
-
-    dbRun('DELETE FROM pending_orders');
-    dbRun('DELETE FROM pending_ranged_orders');
-    dbRun('DELETE FROM pending_air_orders');
-    dbRun('DELETE FROM pending_ferry_orders');
-    dbRun('UPDATE turn_state SET phase = ?, turn_number = ? WHERE id = 1', [
-      'planning',
-      turnNumber + 1,
-    ]);
-    refreshFogOfWarIntelFromCurrentState({
-      traversedHexesByPlayer: {
-        human: [...traversedHexesByPlayer.human],
-        opponent: [...traversedHexesByPlayer.opponent],
-      },
-    });
-
-    saveDatabase();
-    const allRemovedIds = [
-      ...airStrikeResult.removedUnitIds,
-      ...airStrikeTransportLosses.map((unit) => unit.id),
-      ...rangedResult.removedUnitIds,
-      ...rangedTransportLosses.map((unit) => unit.id),
-      ...meleeResult.removedUnitIds,
-      ...meleeTransportLosses.map((unit) => unit.id),
-      ...baseLossRemovedAir.map((u) => u.id),
-    ];
-    const allRemovedUnits = [
-      ...airStrikeResult.removedUnits,
-      ...airStrikeTransportLosses,
-      ...rangedResult.removedUnits,
-      ...rangedTransportLosses,
-      ...meleeResult.removedUnits,
-      ...meleeTransportLosses,
-      ...baseLossRemovedAir,
-    ];
-    const allKills = [...rangedResult.kills, ...meleeResult.kills];
-    const allCombatHexes = [...rangedResult.combatHexes, ...meleeResult.combatHexes];
-    const allCasualtyHexes = [
-      ...airStrikeResult.casualtyHexes,
-      ...rangedResult.casualtyHexes,
-      ...meleeResult.casualtyHexes,
-      ...baseLossRemovedAir.map((u) => u.h3Index),
-    ];
-
-    const opponentRangedAttackers = aiRangedOrders.map((o) => o.unitId);
-    const defenderHexes = new Set(allRanged.map((o) => o.targetH3Index));
-    const opponentRangedDefenders = combatUnitsBefore
-      .filter((u) => u.player === 'opponent' && defenderHexes.has(u.h3Index))
-      .map((u) => u.id);
-    const meleeHexSet = new Set(meleeResult.combatHexes);
-    const opponentMeleeParticipants = combatUnitsAfter
-      .filter((u) => u.player === 'opponent' && meleeHexSet.has(u.h3Index))
-      .map((u) => u.id);
-    const opponentCombatParticipantUnitIds = [
-      ...new Set([...opponentRangedAttackers, ...opponentRangedDefenders, ...opponentMeleeParticipants]),
-    ];
-    const removedOpponentUnitIds = allRemovedUnits.filter((u) => u.player === 'opponent').map((u) => u.id);
-    addAiLossEventsSinceConsultation(
-      'opponent',
-      turnNumber,
-      allRemovedUnits.map((u) => ({ id: u.id, player: u.player })),
-      allKills,
-      rangedResult.killsByDirectFire,
-      rangedResult.killsByReturnFire
-    );
-
-    return {
-      success: true,
-      combatHexes: allCombatHexes.length > 0 ? allCombatHexes : undefined,
-      removedUnitIds: allRemovedIds.length > 0 ? allRemovedIds : undefined,
-      casualtyHexes: allCasualtyHexes.length > 0 ? allCasualtyHexes : undefined,
-      removedUnits: allRemovedUnits.length > 0 ? allRemovedUnits : undefined,
-      kills: allKills.length > 0 ? allKills : undefined,
-      killsByDirectFire: rangedResult.killsByDirectFire?.length ? rangedResult.killsByDirectFire : undefined,
-      killsByReturnFire: rangedResult.killsByReturnFire?.length ? rangedResult.killsByReturnFire : undefined,
-      rangedCombatHexes: rangedResult.combatHexes.length > 0 ? rangedResult.combatHexes : undefined,
-      rangedCasualtyHexes: rangedResult.casualtyHexes.length > 0 ? rangedResult.casualtyHexes : undefined,
-      rangedRemovedUnits: rangedResult.removedUnits.length > 0 ? rangedResult.removedUnits : undefined,
-      airStrikeHexes: airStrikeResult.strikeHexes.length > 0 ? airStrikeResult.strikeHexes : undefined,
-      airStrikeCasualtyHexes: airStrikeResult.casualtyHexes.length > 0 ? airStrikeResult.casualtyHexes : undefined,
-      airStrikeRemovedUnits: airStrikeResult.removedUnits.length > 0 ? airStrikeResult.removedUnits : undefined,
-      airStrikeMoves: airStrikeResult.strikeMoves.length > 0 ? airStrikeResult.strikeMoves : undefined,
-      airStrikeAttemptCount: airStrikeResult.attemptCount > 0 ? airStrikeResult.attemptCount : undefined,
-      airStrikeSuccessfulCount: airStrikeResult.successfulCount > 0 ? airStrikeResult.successfulCount : undefined,
-      airStrikeFailedCount: airStrikeResult.failedCount > 0 ? airStrikeResult.failedCount : undefined,
-      airStrikeAttackerLossCount: airStrikeResult.attackerLossCount > 0 ? airStrikeResult.attackerLossCount : undefined,
-      baseInvalidAirLossCount: baseLossRemovedAir.length > 0 ? baseLossRemovedAir.length : undefined,
-      infrastructureDestroyedEvents:
-        airStrikeResult.infrastructureDestroyedEvents.length > 0 ? airStrikeResult.infrastructureDestroyedEvents : undefined,
-      resolvedFerryMoves: resolvedFerryMoves.length > 0 ? resolvedFerryMoves : undefined,
-      meleeCombatHexes: meleeResult.combatHexes.length > 0 ? meleeResult.combatHexes : undefined,
-      meleeCasualtyHexes: meleeResult.casualtyHexes.length > 0 ? meleeResult.casualtyHexes : undefined,
-      meleeRemovedUnits: meleeResult.removedUnits.length > 0 ? meleeResult.removedUnits : undefined,
-      humanMoves: humanMoves.length + embarkedFollowMoves.length > 0 ? [...humanMoves, ...embarkedFollowMoves] : undefined,
-      deployedUnitsByType: Object.keys(deployedUnitsByType).length > 0 ? deployedUnitsByType : undefined,
-      humanHexesLostCount: humanHexesLost.length > 0 ? humanHexesLost.length : undefined,
-      controlLossLightningHexes: controlLossLightningHexes.length > 0 ? controlLossLightningHexes : undefined,
-      humanDeploymentCapReachedUnitTypes:
-        productionSummary.capReachedByPlayer.human.length > 0 ? productionSummary.capReachedByPlayer.human : undefined,
-      opponentDeploymentCapReachedUnitTypes:
-        productionSummary.capReachedByPlayer.opponent.length > 0 ? productionSummary.capReachedByPlayer.opponent : undefined,
-      opponentCombatParticipantUnitIds,
-      removedOpponentUnitIds,
-    };
   } catch (err) {
     logError('ready: exception', err);
+    return { success: false, reason: String(err) };
+  }
+}
+
+/**
+ * Resumes strategic turn resolution after the human submits Fight or Ignore for a paused pre-melee intercept.
+ *
+ * Purpose: Applies selective melee skips and reuses `finalizeReadyTurnAfterMelee` so dice and DB effects match stock ready.
+ * When to use: Renderer IPC only after `ready` returned `awaitingMeleeDecision`.
+ * Expected outcome: Full `ReadyResult` for a completed turn; Fight adds `tacticalAutoStartRes1H3Index`.
+ * Exceptions: Invalid token, phase drift, or bad payload return `success: false` with a reason string.
+ */
+export function resolveMeleeIntercept(payload: ResolveMeleeInterceptIpcPayload): ReadyResult {
+  try {
+    return executeResolveMeleeIntercept(payload);
+  } catch (err) {
+    logError('resolveMeleeIntercept: exception', err);
     return { success: false, reason: String(err) };
   }
 }

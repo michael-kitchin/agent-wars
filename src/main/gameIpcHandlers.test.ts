@@ -8,10 +8,11 @@ import {
   handleRequestAiOrders,
   cancelRequestAiOrders,
   handleGameReady,
+  handleResolveMeleeIntercept,
   type RequestAiOrdersResult,
   type ReadyResultMinimal,
 } from './gameIpcHandlers';
-import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../shared/ipcTypes';
+import type { AirStrikeOrder, EmbarkOrder, FerryOrder, ReadyResult } from '../shared/ipcTypes';
 
 /**
  * Documents the module-scope binding `minimalPlanningState` (minimalPlanningState).
@@ -418,6 +419,136 @@ async function testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders(): Promise<v
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+async function testGameReadyAwaitingMeleeDecisionSurfacesFields(): Promise<void> {
+  const deps = {
+    getGameState: () => minimalPlanningState,
+    getGameStateForPlayer: () => minimalPlanningState,
+    getSelectedModel: () => 'test-model',
+    hasKey: () => true,
+    getToolNamesForEnabledGroups: () => ['planning'],
+    defaultGroupIds: ['planning'],
+    requestOrders: async (): Promise<RequestAiOrdersResult> => ({ success: false, error: 'unused' }),
+    ready: (): ReadyResultMinimal & { success: boolean } => ({
+      success: true,
+      awaitingMeleeDecision: true,
+      meleeDecisionToken: 'decision-token-1',
+      meleeInterceptCandidates: [
+        { h3Index: '891f1d48b9fffff', humanUnitSummary: '1 infantry', aiUnitSummary: '1 armor' },
+      ],
+    }),
+  };
+  const result = await handleGameReady({ enabledToolGroups: ['planning'], aiPlanningRunEnabled: false }, deps);
+  assert.strictEqual(result.success, true);
+  assert.strictEqual(result.awaitingMeleeDecision, true);
+  assert.strictEqual(result.meleeDecisionToken, 'decision-token-1');
+  assert.strictEqual(result.meleeInterceptCandidates?.length, 1);
+}
+
+/**
+ * Defines the `testHandleResolveMeleeInterceptRejectsInvalidPayload` function shape (async function testHandleResolveMeleeInterceptRejectsInvalidPayload(): Promise<void>).
+
+ * Purpose: Contract that `handleResolveMeleeIntercept` rejects missing token or invalid decision before calling game actions.
+ * When to use: Regression guard for melee modal IPC wiring.
+ * Expected outcome: `{ success: false }` without invoking `resolveMeleeIntercept` for malformed payloads.
+ * Exceptions: None.
+ */
+async function testHandleResolveMeleeInterceptRejectsInvalidPayload(): Promise<void> {
+  const deps = {
+    getGameState: () => minimalPlanningState,
+    getGameStateForPlayer: () => minimalPlanningState,
+    getSelectedModel: () => 'test-model',
+    hasKey: () => true,
+    getToolNamesForEnabledGroups: () => ['planning'],
+    defaultGroupIds: ['planning'],
+    requestOrders: async (): Promise<RequestAiOrdersResult> => ({ success: false, error: 'unused' }),
+    resolveMeleeIntercept: (): ReadyResultMinimal & { success: boolean } => ({
+      success: false,
+      reason: 'resolveMeleeIntercept should not run for invalid payload',
+    }),
+  };
+  const result = await handleResolveMeleeIntercept(undefined, deps);
+  assert.strictEqual(result.success, false);
+}
+
+const minimalResolvedReady: ReadyResult = {
+  success: true,
+  humanMoves: [],
+  combatHexes: [],
+  removedUnitIds: [],
+  casualtyHexes: [],
+};
+
+/**
+ * Defines the `testHandleResolveMeleeInterceptForwardsTacticalAutoStartOnFight` function shape (async function testHandleResolveMeleeInterceptForwardsTacticalAutoStartOnFight(): Promise<void>).
+
+ * Purpose: Locks Phase E contract that IPC mirrors `tacticalAutoStartRes1H3Index` only when the resolve layer returns it (Fight path).
+ * When to use: Regression guard for melee intercept completion wiring.
+ * Expected outcome: Handler output includes the same res1 index the mocked `resolveMeleeIntercept` returned.
+ * Exceptions: None.
+ */
+async function testHandleResolveMeleeInterceptForwardsTacticalAutoStartOnFight(): Promise<void> {
+  const fightHex = '891f1d48b9fffff';
+  const deps = {
+    getGameState: () => minimalPlanningState,
+    getGameStateForPlayer: () => minimalPlanningState,
+    getSelectedModel: () => 'test-model',
+    hasKey: () => true,
+    getToolNamesForEnabledGroups: () => ['planning'],
+    defaultGroupIds: ['planning'],
+    requestOrders: async (): Promise<RequestAiOrdersResult> => ({ success: false, error: 'unused' }),
+    resolveMeleeIntercept: (): ReadyResult => ({
+      ...minimalResolvedReady,
+      tacticalAutoStartRes1H3Index: fightHex,
+    }),
+  };
+  const result = await handleResolveMeleeIntercept(
+    {
+      meleeDecisionToken: 'tok',
+      decision: 'fight',
+      selectedH3Index: fightHex,
+      useEventDrivenConsultation: false,
+      aiPlanningRunEnabled: false,
+      enabledToolGroups: ['planning'],
+    },
+    deps
+  );
+  assert.strictEqual(result.success, true);
+  assert.strictEqual((result as { tacticalAutoStartRes1H3Index?: string }).tacticalAutoStartRes1H3Index, fightHex);
+}
+
+/**
+ * Defines the `testHandleResolveMeleeInterceptOmitsTacticalAutoStartOnIgnore` function shape (async function testHandleResolveMeleeInterceptOmitsTacticalAutoStartOnIgnore(): Promise<void>).
+
+ * Purpose: Locks Phase E contract that Ignore does not surface tactical auto-start on the IPC completion payload.
+ * When to use: Regression guard paired with the Fight forwarding test.
+ * Expected outcome: `tacticalAutoStartRes1H3Index` is absent when the mocked resolve result omits it.
+ * Exceptions: None.
+ */
+async function testHandleResolveMeleeInterceptOmitsTacticalAutoStartOnIgnore(): Promise<void> {
+  const deps = {
+    getGameState: () => minimalPlanningState,
+    getGameStateForPlayer: () => minimalPlanningState,
+    getSelectedModel: () => 'test-model',
+    hasKey: () => true,
+    getToolNamesForEnabledGroups: () => ['planning'],
+    defaultGroupIds: ['planning'],
+    requestOrders: async (): Promise<RequestAiOrdersResult> => ({ success: false, error: 'unused' }),
+    resolveMeleeIntercept: (): ReadyResult => ({ ...minimalResolvedReady }),
+  };
+  const result = await handleResolveMeleeIntercept(
+    {
+      meleeDecisionToken: 'tok',
+      decision: 'ignore',
+      useEventDrivenConsultation: false,
+      aiPlanningRunEnabled: false,
+      enabledToolGroups: ['planning'],
+    },
+    deps
+  );
+  assert.strictEqual(result.success, true);
+  assert.strictEqual((result as { tacticalAutoStartRes1H3Index?: string }).tacticalAutoStartRes1H3Index, undefined);
+}
+
 async function runAll(): Promise<void> {
   const tests: { name: string; fn: () => void | Promise<void> }[] = [
     { name: 'requestAiOrders not in planning phase', fn: testRequestAiOrdersNotInPlanningPhase },
@@ -434,6 +565,16 @@ async function runAll(): Promise<void> {
     {
       name: 'game:ready forwards AI air strike, ferry, and embark orders',
       fn: testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders,
+    },
+    { name: 'game:ready awaiting melee decision surfaces token and rows', fn: testGameReadyAwaitingMeleeDecisionSurfacesFields },
+    { name: 'game:resolveMeleeIntercept rejects invalid payload', fn: testHandleResolveMeleeInterceptRejectsInvalidPayload },
+    {
+      name: 'game:resolveMeleeIntercept forwards tacticalAutoStart on Fight',
+      fn: testHandleResolveMeleeInterceptForwardsTacticalAutoStartOnFight,
+    },
+    {
+      name: 'game:resolveMeleeIntercept omits tacticalAutoStart on Ignore',
+      fn: testHandleResolveMeleeInterceptOmitsTacticalAutoStartOnIgnore,
     },
   ];
   for (const t of tests) {

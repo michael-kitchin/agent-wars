@@ -16029,68 +16029,6 @@
     return Math.max(1, Math.min(maxX - minX, maxY - minY));
   }
 
-  // src/renderer/map/tacticalMapView.ts
-  function enterTacticalMapView(childRes4H3Indexes) {
-    const map = getMainLeafletMap();
-    const L = getLeafletGlobal();
-    if (!map || !L || typeof map.fitBounds !== "function") return;
-    let minLat = 90;
-    let maxLat = -90;
-    let minLng = 180;
-    let maxLng = -180;
-    for (const h3 of childRes4H3Indexes) {
-      const boundary = getHexBoundaryLatLngForLeafletOverlay(h3);
-      for (const [lat, lng] of boundary) {
-        if (lat < minLat) minLat = lat;
-        if (lat > maxLat) maxLat = lat;
-        if (lng < minLng) minLng = lng;
-        if (lng > maxLng) maxLng = lng;
-      }
-    }
-    if (minLat > maxLat) return;
-    const padLat = Math.max(5e-4, (maxLat - minLat) * 0.08);
-    const padLng = Math.max(5e-4, (maxLng - minLng) * 0.08);
-    const sw = { lat: Math.max(-WEB_MERCATOR_MAX_ABS_LAT, minLat - padLat), lng: minLng - padLng };
-    const ne = { lat: Math.min(WEB_MERCATOR_MAX_ABS_LAT, maxLat + padLat), lng: maxLng + padLng };
-    const tacticalBounds = L.latLngBounds(L.latLng(sw.lat, sw.lng), L.latLng(ne.lat, ne.lng));
-    if (rendererSharedState.preTacticalLeafletMinZoom == null && typeof map.getMinZoom === "function") {
-      rendererSharedState.preTacticalLeafletMinZoom = map.getMinZoom();
-    }
-    if (rendererSharedState.preTacticalLeafletMaxZoom == null && typeof map.getMaxZoom === "function") {
-      rendererSharedState.preTacticalLeafletMaxZoom = map.getMaxZoom();
-    }
-    if (typeof map.setMinZoom === "function") map.setMinZoom(4);
-    if (typeof map.setMaxZoom === "function") map.setMaxZoom(12);
-    if (typeof map.setMaxBounds === "function") map.setMaxBounds(tacticalBounds);
-    if (typeof map.flyToBounds === "function") {
-      map.flyToBounds(tacticalBounds, { padding: [24, 24], duration: 0.55, maxZoom: 12 });
-    } else {
-      map.fitBounds?.(tacticalBounds, { padding: [24, 24], animate: true });
-    }
-  }
-  function exitTacticalMapView() {
-    const map = getMainLeafletMap();
-    const L = getLeafletGlobal();
-    if (!map || !L) {
-      rendererSharedState.preTacticalLeafletMinZoom = null;
-      rendererSharedState.preTacticalLeafletMaxZoom = null;
-      return;
-    }
-    const worldBounds = L.latLngBounds(
-      L.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
-      L.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
-    );
-    if (typeof map.setMaxBounds === "function") map.setMaxBounds(worldBounds);
-    if (typeof map.setMinZoom === "function" && rendererSharedState.preTacticalLeafletMinZoom != null) {
-      map.setMinZoom(rendererSharedState.preTacticalLeafletMinZoom);
-    }
-    if (typeof map.setMaxZoom === "function" && rendererSharedState.preTacticalLeafletMaxZoom != null) {
-      map.setMaxZoom(rendererSharedState.preTacticalLeafletMaxZoom);
-    }
-    rendererSharedState.preTacticalLeafletMinZoom = null;
-    rendererSharedState.preTacticalLeafletMaxZoom = null;
-  }
-
   // src/shared/homeRegionRules.ts
   function uniqueSortedHexes(hexes) {
     return [...new Set(hexes)].sort();
@@ -17943,6 +17881,68 @@
     return human === 0 || opponent === 0;
   }
 
+  // src/renderer/map/tacticalMapView.ts
+  function enterTacticalMapView(childRes4H3Indexes) {
+    const map = getMainLeafletMap();
+    const L = getLeafletGlobal();
+    if (!map || !L || typeof map.fitBounds !== "function") return;
+    let minLat = 90;
+    let maxLat = -90;
+    let minLng = 180;
+    let maxLng = -180;
+    for (const h3 of childRes4H3Indexes) {
+      const boundary = getHexBoundaryLatLngForLeafletOverlay(h3);
+      for (const [lat, lng] of boundary) {
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+        if (lng < minLng) minLng = lng;
+        if (lng > maxLng) maxLng = lng;
+      }
+    }
+    if (minLat > maxLat) return;
+    const padLat = Math.max(5e-4, (maxLat - minLat) * 0.08);
+    const padLng = Math.max(5e-4, (maxLng - minLng) * 0.08);
+    const sw = { lat: Math.max(-WEB_MERCATOR_MAX_ABS_LAT, minLat - padLat), lng: minLng - padLng };
+    const ne = { lat: Math.min(WEB_MERCATOR_MAX_ABS_LAT, maxLat + padLat), lng: maxLng + padLng };
+    const tacticalBounds = L.latLngBounds(L.latLng(sw.lat, sw.lng), L.latLng(ne.lat, ne.lng));
+    if (rendererSharedState.preTacticalLeafletMinZoom == null && typeof map.getMinZoom === "function") {
+      rendererSharedState.preTacticalLeafletMinZoom = map.getMinZoom();
+    }
+    if (rendererSharedState.preTacticalLeafletMaxZoom == null && typeof map.getMaxZoom === "function") {
+      rendererSharedState.preTacticalLeafletMaxZoom = map.getMaxZoom();
+    }
+    if (typeof map.setMinZoom === "function") map.setMinZoom(4);
+    if (typeof map.setMaxZoom === "function") map.setMaxZoom(12);
+    if (typeof map.setMaxBounds === "function") map.setMaxBounds(tacticalBounds);
+    if (typeof map.flyToBounds === "function") {
+      map.flyToBounds(tacticalBounds, { padding: [24, 24], duration: 0.55, maxZoom: 12 });
+    } else {
+      map.fitBounds?.(tacticalBounds, { padding: [24, 24], animate: true });
+    }
+  }
+  function exitTacticalMapView() {
+    const map = getMainLeafletMap();
+    const L = getLeafletGlobal();
+    if (!map || !L) {
+      rendererSharedState.preTacticalLeafletMinZoom = null;
+      rendererSharedState.preTacticalLeafletMaxZoom = null;
+      return;
+    }
+    const worldBounds = L.latLngBounds(
+      L.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
+      L.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
+    );
+    if (typeof map.setMaxBounds === "function") map.setMaxBounds(worldBounds);
+    if (typeof map.setMinZoom === "function" && rendererSharedState.preTacticalLeafletMinZoom != null) {
+      map.setMinZoom(rendererSharedState.preTacticalLeafletMinZoom);
+    }
+    if (typeof map.setMaxZoom === "function" && rendererSharedState.preTacticalLeafletMaxZoom != null) {
+      map.setMaxZoom(rendererSharedState.preTacticalLeafletMaxZoom);
+    }
+    rendererSharedState.preTacticalLeafletMinZoom = null;
+    rendererSharedState.preTacticalLeafletMaxZoom = null;
+  }
+
   // src/renderer/tactical/tacticalUiOrchestration.ts
   function tacticalApplyStrategicSidebarForTacticalMode(tactical) {
     document.getElementById("sidebar")?.classList.toggle("tactical-strategic-suppress", tactical);
@@ -18080,6 +18080,69 @@
     fx.refreshReadyButton();
     fx.syncTacticalEntryOverlay();
     fx.redraw();
+  }
+  function tacticalRendererActivateRestoredBattleSnapshot(battle, fx) {
+    fx.assignBattleSnapshot(battle);
+    fx.setPhasePlanning(true);
+    fx.enterRes4View(battle.res4ChildH3Indexes);
+    fx.setStrategicSidebarTactical(true);
+    fx.refreshTacticalExitHud();
+    fx.scheduleAnnihilationExit();
+    fx.refreshReadyButton();
+    fx.syncTacticalEntryOverlay();
+    fx.redraw();
+  }
+
+  // src/renderer/tactical/tacticalEntryFlow.ts
+  function buildDefaultTacticalBattleActivationSideEffects(bindings) {
+    return {
+      showMapToast: bindings.showMapToast,
+      assignBattleSnapshot: (battle) => {
+        rendererSharedState.tacticalBattleSnapshot = battle;
+      },
+      setPhasePlanning: (planning) => {
+        rendererSharedState.tacticalPhasePlanning = planning;
+      },
+      enterRes4View: enterTacticalMapView,
+      setStrategicSidebarTactical: tacticalApplyStrategicSidebarForTacticalMode,
+      refreshTacticalExitHud: tacticalUpdateExitButtonVisibility,
+      scheduleAnnihilationExit: bindings.scheduleAnnihilationExit,
+      refreshReadyButton: bindings.refreshReadyButton,
+      syncTacticalEntryOverlay: bindings.syncTacticalEntryOverlay,
+      redraw: bindings.redraw
+    };
+  }
+  async function startTacticalBattleFromEntryHex(enclosingRes1H3Index, deps) {
+    const ipc = deps.invokeStartTacticalBattle;
+    if (!ipc) {
+      deps.onMissingStartTacticalBattleIpc();
+      return;
+    }
+    deps.hideBuildPopup();
+    const result = await ipc({ enclosingRes1H3Index });
+    tacticalRendererApplyStartBattleIpcResult(result, deps.getActivationSideEffects());
+  }
+  function activateRestoredTacticalBattleFromMainSnapshot(battle, getActivationSideEffects) {
+    tacticalRendererActivateRestoredBattleSnapshot(battle, getActivationSideEffects());
+  }
+  async function performTacticalBattleExitWithGameApi(session, io) {
+    await tacticalPerformBattleExit(session, {
+      endTacticalBattle: window.gameApi?.endTacticalBattle,
+      showMapToast: io.showMapToast,
+      redraw: io.redraw,
+      runReadyAfterExit: io.runReadyAfterExit
+    });
+  }
+  async function performTacticalAdvanceTurnWhenAvailable(session, deps) {
+    const advance = deps.resolveAdvanceTacticalTurn();
+    if (!advance) {
+      deps.onMissingAdvanceTacticalTurn();
+      return;
+    }
+    await tacticalPerformAdvanceTurn(session, {
+      advanceTacticalTurn: () => advance(),
+      ...deps.advanceIo
+    });
   }
 
   // src/renderer/gameplay/buildQueuePopup.ts
@@ -19231,10 +19294,10 @@
 
   // src/renderer/gameplay/readyHandler.ts
   function buildReadyPayload(args) {
-    const { enabledToolGroupsPayload, useEventDriven, usePrecomputed } = args;
+    const { enabledToolGroupsPayload, useEventDriven, usePrecomputed, aiPlanningRunEnabled } = args;
     const base = {
       enabledToolGroups: enabledToolGroupsPayload,
-      aiPlanningRunEnabled: false
+      aiPlanningRunEnabled: aiPlanningRunEnabled ?? rendererSharedState.runButtonOn
     };
     if (useEventDriven) {
       base.useEventDrivenConsultation = true;
@@ -19358,12 +19421,53 @@
       const useEventDriven = rendererSharedState.useEventDrivenConsultation;
       const usePrecomputed = rendererSharedState.runButtonOn && rendererSharedState.precomputedAiOrders !== null;
       const cachedPrecomputedToolCounts = rendererSharedState.precomputedToolInvocationCounts ? { ...rendererSharedState.precomputedToolInvocationCounts } : null;
-      const readyPayload = buildReadyPayload({ enabledToolGroupsPayload, useEventDriven, usePrecomputed });
-      const readyResult = await deps.callReadyWithTimeout(readyPayload);
+      const readyPayload = buildReadyPayload({
+        enabledToolGroupsPayload,
+        useEventDriven,
+        usePrecomputed,
+        aiPlanningRunEnabled: rendererSharedState.runButtonOn
+      });
+      let readyResult = await deps.callReadyWithTimeout(readyPayload);
       if (!readyResult.success) {
         deps.showSidebarError(readyResult.reason ?? "Ready failed");
         deps.updateReadyButtonState();
         return;
+      }
+      if (readyResult.awaitingMeleeDecision) {
+        if (!window.gameApi.resolveMeleeIntercept) {
+          deps.showSidebarError("Melee intercept resolve is not available in this build.");
+          deps.updateReadyButtonState();
+          return;
+        }
+        await deps.refreshRes4TerrainOverridesForRenderer();
+        const pausedState = await window.gameApi.getGameState();
+        await deps.applyGameStateSnapshot(pausedState, {
+          refreshStandingOrders: false,
+          updateGameStateSidebarUi: false,
+          updateSelectionUi: false,
+          updateGameOverUi: false,
+          updateReadyButton: false,
+          refreshBuildPopup: false,
+          redraw: false
+        });
+        const outcome = await deps.openMeleeInterceptModal({
+          candidates: readyResult.meleeInterceptCandidates ?? [],
+          buildHexPopupHtml: deps.buildMeleeInterceptHexPopupHtml
+        });
+        const resolveResult = await window.gameApi.resolveMeleeIntercept({
+          meleeDecisionToken: readyResult.meleeDecisionToken ?? "",
+          decision: outcome.decision,
+          selectedH3Index: outcome.decision === "fight" ? outcome.selectedH3Index : void 0,
+          useEventDrivenConsultation: useEventDriven,
+          aiPlanningRunEnabled: rendererSharedState.runButtonOn,
+          enabledToolGroups: enabledToolGroupsPayload
+        });
+        if (!resolveResult.success) {
+          deps.showSidebarError(resolveResult.reason ?? "Melee resolve failed");
+          deps.updateReadyButtonState();
+          return;
+        }
+        readyResult = resolveResult;
       }
       resetPrecomputedAiState("null");
       const humanMoves = readyResult.humanMoves ?? [];
@@ -19485,6 +19589,9 @@
       deps.updateReadyButtonState();
       if (rendererSharedState.runButtonOn) deps.startBackgroundRequestIfAllowed();
       deps.redraw();
+      if (readyResult.tacticalAutoStartRes1H3Index) {
+        await deps.startTacticalBattleFromInterceptHex(readyResult.tacticalAutoStartRes1H3Index);
+      }
     } catch (err) {
       deps.showSidebarError(String(err));
       deps.updateReadyButtonState();
@@ -19492,6 +19599,135 @@
       rendererSharedState.readyRequestInFlight = false;
       deps.updateReadyButtonState();
     }
+  }
+
+  // src/renderer/gameplay/meleeInterceptModal.ts
+  function openMeleeInterceptModal(args) {
+    return new Promise((resolve, reject) => {
+      const overlay = document.createElement("div");
+      overlay.setAttribute("role", "dialog");
+      overlay.setAttribute("aria-modal", "true");
+      overlay.setAttribute("aria-label", "Melee intercept");
+      overlay.style.cssText = "position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;padding:12px;";
+      const panel = document.createElement("div");
+      panel.style.cssText = "max-width:min(920px,96vw);max-height:88vh;overflow:auto;background:#f4f2ee;border:1px solid #555;border-radius:4px;padding:10px 12px;font:13px/1.35 system-ui,sans-serif;color:#222;box-shadow:0 4px 18px rgba(0,0,0,0.25);";
+      const title = document.createElement("div");
+      title.textContent = "Melee combat this turn \u2014 choose tactical intercept (optional)";
+      title.style.cssText = "font-weight:600;margin-bottom:8px;";
+      panel.appendChild(title);
+      const help = document.createElement("div");
+      help.textContent = "Select one hex to skip strategic melee there and open tactical battle after the turn. Ignore resolves melee normally everywhere.";
+      help.style.cssText = "font-size:12px;color:#444;margin-bottom:10px;";
+      panel.appendChild(help);
+      const table = document.createElement("table");
+      table.style.cssText = "width:100%;border-collapse:collapse;font-size:12px;";
+      const thead = document.createElement("thead");
+      const hr = document.createElement("tr");
+      for (const label of ["", "Hex (tooltip view)", "Your units", "Enemy units"]) {
+        const th = document.createElement("th");
+        th.textContent = label;
+        th.style.cssText = "text-align:left;border-bottom:1px solid #aaa;padding:4px 6px;vertical-align:bottom;";
+        hr.appendChild(th);
+      }
+      thead.appendChild(hr);
+      table.appendChild(thead);
+      const tbody = document.createElement("tbody");
+      table.appendChild(tbody);
+      panel.appendChild(table);
+      let selectedH3 = null;
+      const radios = [];
+      const fightBtn = document.createElement("button");
+      fightBtn.type = "button";
+      fightBtn.textContent = "Fight";
+      fightBtn.disabled = true;
+      fightBtn.style.cssText = "margin-right:8px;padding:4px 14px;";
+      const ignoreBtn = document.createElement("button");
+      ignoreBtn.type = "button";
+      ignoreBtn.textContent = "Ignore";
+      ignoreBtn.style.cssText = "padding:4px 14px;";
+      const btnRow = document.createElement("div");
+      btnRow.style.cssText = "margin-top:12px;display:flex;justify-content:flex-end;align-items:center;gap:8px;";
+      btnRow.appendChild(fightBtn);
+      btnRow.appendChild(ignoreBtn);
+      panel.appendChild(btnRow);
+      overlay.appendChild(panel);
+      const cleanup = () => {
+        overlay.remove();
+        window.removeEventListener("keydown", onKey);
+      };
+      const finishIgnore = () => {
+        cleanup();
+        resolve({ decision: "ignore" });
+      };
+      const finishFight = () => {
+        if (!selectedH3) return;
+        cleanup();
+        resolve({ decision: "fight", selectedH3Index: selectedH3 });
+      };
+      const onKey = (ev) => {
+        if (ev.key === "Escape") {
+          ev.preventDefault();
+          finishIgnore();
+        }
+      };
+      overlay.addEventListener("click", (ev) => {
+        if (ev.target === overlay) finishIgnore();
+      });
+      fightBtn.addEventListener("click", () => finishFight());
+      ignoreBtn.addEventListener("click", () => finishIgnore());
+      for (const row of args.candidates) {
+        const tr = document.createElement("tr");
+        tr.style.cssText = "border-bottom:1px solid #ddd;vertical-align:top;";
+        const tdRadio = document.createElement("td");
+        tdRadio.style.padding = "6px";
+        const radio = document.createElement("input");
+        radio.type = "radio";
+        radio.name = "melee-intercept-hex";
+        radio.value = row.h3Index;
+        radio.addEventListener("change", () => {
+          selectedH3 = row.h3Index;
+          fightBtn.disabled = false;
+        });
+        radios.push(radio);
+        tdRadio.appendChild(radio);
+        tr.appendChild(tdRadio);
+        const tdHex = document.createElement("td");
+        tdHex.style.padding = "6px";
+        tr.appendChild(tdHex);
+        void args.buildHexPopupHtml(row.h3Index).then(
+          (html) => {
+            tdHex.innerHTML = html;
+          },
+          () => {
+            tdHex.textContent = row.h3Index;
+          }
+        );
+        const tdHuman = document.createElement("td");
+        tdHuman.style.padding = "6px";
+        tdHuman.textContent = row.humanUnitSummary || "\u2014";
+        tr.appendChild(tdHuman);
+        const tdAi = document.createElement("td");
+        tdAi.style.padding = "6px";
+        tdAi.textContent = row.aiUnitSummary || "\u2014";
+        tr.appendChild(tdAi);
+        tbody.appendChild(tr);
+      }
+      window.addEventListener("keydown", onKey);
+      if (!document.body) {
+        reject(new Error("document.body missing"));
+        return;
+      }
+      document.body.appendChild(overlay);
+      radios[0]?.focus();
+    });
+  }
+
+  // src/renderer/gameplay/meleeInterceptHexTooltip.ts
+  async function buildMeleeInterceptHexPopupHtmlForRes1(h3Index, deps) {
+    const namingTarget = { h3Index, resolution: 1 };
+    const namingLine = await deps.getCachedNamingLineForTarget(namingTarget);
+    const state = deps.terrainTooltipStateForRes1Hex(h3Index);
+    return deps.getCachedTerrainTooltipHtml(state, namingLine);
   }
 
   // src/renderer/map/mainMapInteractions.ts
@@ -20046,6 +20282,14 @@
     const previousState = rendererSharedState.gameState;
     rendererSharedState.gameState = nextState;
     deps.reconcileTacticalBattleAfterStrategicSnapshot(nextState);
+    const restored = nextState.tacticalBattleSession;
+    if (restored && deps.applyRestoredTacticalBattleFromMain) {
+      const cur = rendererSharedState.tacticalBattleSnapshot;
+      const materiallyDifferent = !cur || cur.battleId !== restored.battleId || cur.tacticalTurnNumber !== restored.tacticalTurnNumber;
+      if (materiallyDifferent) {
+        deps.applyRestoredTacticalBattleFromMain(restored);
+      }
+    }
     deps.rebuildUnitDisplayNameLookup(nextState);
     deps.reconcileSelectionToCurrentState();
     deps.updateClientStaleEnemyIntel(previousState, nextState);
@@ -21073,6 +21317,15 @@
       hasRes1OverlayOffsetFeatures: (h3Index, visibleUnitHexes) => hasVisibleRes1InfrastructureGlyphs2(h3Index, shouldRenderRes4Hexes(), visibleUnitHexes)
     });
   }
+  function getTacticalBattleActivationSideEffects() {
+    return buildDefaultTacticalBattleActivationSideEffects({
+      showMapToast,
+      syncTacticalEntryOverlay: syncTacticalEntryButtonOverlay,
+      redraw,
+      refreshReadyButton: updateReadyButtonState,
+      scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit
+    });
+  }
   async function refreshGameStateAfterBuildQueueChange2() {
     return refreshGameStateAfterBuildQueueChange({ applyGameStateSnapshot: applyGameStateSnapshot2 });
   }
@@ -21092,7 +21345,10 @@
         updateReadyButtonState,
         redraw,
         refreshBuildPopupIfOpen,
-        reconcileTacticalBattleAfterStrategicSnapshot: tacticalReconcileBattleAfterStrategicSnapshot
+        reconcileTacticalBattleAfterStrategicSnapshot: tacticalReconcileBattleAfterStrategicSnapshot,
+        applyRestoredTacticalBattleFromMain: (battle) => {
+          activateRestoredTacticalBattleFromMainSnapshot(battle, getTacticalBattleActivationSideEffects);
+        }
       },
       nextState,
       options
@@ -21479,32 +21735,25 @@
       showBuildPopup
     });
   }
-  async function startTacticalBattleFromEntryHex(h3) {
-    if (!window.gameApi?.startTacticalBattle) {
-      showMapToast("Tactical battle is not available.", { isError: true });
-      return;
-    }
-    hideBuildPopup();
-    const result = await window.gameApi.startTacticalBattle({ enclosingRes1H3Index: h3 });
-    tacticalRendererApplyStartBattleIpcResult(result, {
-      showMapToast,
-      assignBattleSnapshot: (battle) => {
-        rendererSharedState.tacticalBattleSnapshot = battle;
-      },
-      setPhasePlanning: (planning) => {
-        rendererSharedState.tacticalPhasePlanning = planning;
-      },
-      enterRes4View: enterTacticalMapView,
-      setStrategicSidebarTactical: tacticalApplyStrategicSidebarForTacticalMode,
-      refreshTacticalExitHud: tacticalUpdateExitButtonVisibility,
-      scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
-      refreshReadyButton: updateReadyButtonState,
-      syncTacticalEntryOverlay: syncTacticalEntryButtonOverlay,
-      redraw
+  async function startTacticalBattleFromEntryHex2(h3) {
+    await startTacticalBattleFromEntryHex(h3, {
+      hideBuildPopup,
+      invokeStartTacticalBattle: window.gameApi?.startTacticalBattle,
+      getActivationSideEffects: getTacticalBattleActivationSideEffects,
+      onMissingStartTacticalBattleIpc: () => {
+        showMapToast("Tactical battle is not available.", { isError: true });
+      }
     });
   }
   async function tryHandleTacticalEntryAtClientXY2(clientX, clientY) {
-    return tryHandleTacticalEntryAtClientXY(clientX, clientY, startTacticalBattleFromEntryHex);
+    return tryHandleTacticalEntryAtClientXY(clientX, clientY, startTacticalBattleFromEntryHex2);
+  }
+  async function buildMeleeInterceptHexPopupHtmlForRes12(h3Index) {
+    return buildMeleeInterceptHexPopupHtmlForRes1(h3Index, {
+      getCachedNamingLineForTarget,
+      terrainTooltipStateForRes1Hex,
+      getCachedTerrainTooltipHtml
+    });
   }
   function createReadyHandlerDeps() {
     return {
@@ -21534,7 +21783,10 @@
       updateSidebar: updateSidebar2,
       updateGameOverUI: updateGameOverUI2,
       startBackgroundRequestIfAllowed: startBackgroundRequestIfAllowed2,
-      redraw
+      redraw,
+      buildMeleeInterceptHexPopupHtml: buildMeleeInterceptHexPopupHtmlForRes12,
+      openMeleeInterceptModal,
+      startTacticalBattleFromInterceptHex: startTacticalBattleFromEntryHex2
     };
   }
   function maybeScheduleTacticalAnnihilationExit() {
@@ -21546,26 +21798,25 @@
     });
   }
   async function performTacticalBattleExit() {
-    await tacticalPerformBattleExit(tacticalExitSessionAccessor, {
-      endTacticalBattle: window.gameApi?.endTacticalBattle,
+    await performTacticalBattleExitWithGameApi(tacticalExitSessionAccessor, {
       showMapToast,
       redraw,
       runReadyAfterExit: () => handleReadyButtonClick(createReadyHandlerDeps())
     });
   }
   async function performTacticalAdvanceTurn() {
-    const api = window.gameApi;
-    if (!api?.advanceTacticalTurn) {
-      showMapToast("Advance tactical turn is unavailable.", { isError: true });
-      return;
-    }
-    await tacticalPerformAdvanceTurn(tacticalExitSessionAccessor, {
-      advanceTacticalTurn: () => api.advanceTacticalTurn(),
-      showMapToast,
-      redraw,
-      startBackgroundRequestIfAllowed: startBackgroundRequestIfAllowed2,
-      isBackgroundRequestInFlight: () => rendererSharedState.backgroundRequestInFlight,
-      scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit
+    await performTacticalAdvanceTurnWhenAvailable(tacticalExitSessionAccessor, {
+      resolveAdvanceTacticalTurn: () => window.gameApi?.advanceTacticalTurn,
+      onMissingAdvanceTacticalTurn: () => {
+        showMapToast("Advance tactical turn is unavailable.", { isError: true });
+      },
+      advanceIo: {
+        showMapToast,
+        redraw,
+        startBackgroundRequestIfAllowed: startBackgroundRequestIfAllowed2,
+        isBackgroundRequestInFlight: () => rendererSharedState.backgroundRequestInFlight,
+        scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit
+      }
     });
   }
   function updateMapInteractionCursor2(clientX, clientY) {
@@ -22024,7 +22275,7 @@
       e.stopPropagation();
       const h3 = btn.dataset.h3Index;
       if (!h3) return;
-      void startTacticalBattleFromEntryHex(h3);
+      void startTacticalBattleFromEntryHex2(h3);
     });
     const readyBtn = document.getElementById("ready-btn");
     if (readyBtn) {
