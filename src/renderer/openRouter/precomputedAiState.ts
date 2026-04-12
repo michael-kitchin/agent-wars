@@ -46,4 +46,7 @@ export function applySuccessfulPrecomputedAiResult(result: Extract<RequestAiOrde
   S.precomputedAiRangedOrders = result.rangedAttacks ?? [];
   S.precomputedAiEmbarkOrders = result.embarkOrders ?? [];
   S.precomputedAiStrategy = result.strategy ?? null;
+  if (result.tacticalBattle) {
+    S.tacticalBattleSnapshot = result.tacticalBattle;
+  }
 }

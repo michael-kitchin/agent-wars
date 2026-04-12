@@ -46,7 +46,14 @@ export function isBuildPopupOrEntryTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Node)) return false;
   const popup = document.getElementById('build-popup');
   const layer = document.getElementById('build-entry-layer');
-  return !!(popup?.contains(target) || layer?.contains(target));
+  const tacticalLayer = document.getElementById('tactical-entry-layer');
+  const tacticalHud = document.getElementById('tactical-battle-hud');
+  return !!(
+    popup?.contains(target) ||
+    layer?.contains(target) ||
+    tacticalLayer?.contains(target) ||
+    tacticalHud?.contains(target)
+  );
 }
 
 /**

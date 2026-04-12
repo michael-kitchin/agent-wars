@@ -1,5 +1,12 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
-import { UNIT_ICON_HIT_PAD_PX, UNIT_RADIUS, STACK_OFFSET_X, STACK_OFFSET_Y, BUILD_ENTRY_HIT_PAD_PX } from '../core/constants';
+import {
+  UNIT_ICON_HIT_PAD_PX,
+  UNIT_RADIUS,
+  STACK_OFFSET_X,
+  STACK_OFFSET_Y,
+  BUILD_ENTRY_HIT_PAD_PX,
+  TACTICAL_ENTRY_HIT_PAD_PX,
+} from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import type { ResolutionPlaybackState } from '../rendering/resolutionPlayback';
 import { hexCenterPx, hitTestHexAtContainerPixel } from './mapUtils';
@@ -246,6 +253,17 @@ export function updateMapInteractionCursor(clientX: number, clientY: number, dep
     for (const btn of buttons) {
       const br = btn.getBoundingClientRect();
       if (pointInExpandedClientRect(clientX, clientY, br, BUILD_ENTRY_HIT_PAD_PX)) {
+        want = 'default';
+        break;
+      }
+    }
+  }
+  const tacticalLayer = document.getElementById('tactical-entry-layer');
+  if (want === '' && tacticalLayer && !tacticalLayer.classList.contains('hidden')) {
+    const tacticalBtns = Array.from(tacticalLayer.querySelectorAll<HTMLButtonElement>('.tactical-entry-btn'));
+    for (const btn of tacticalBtns) {
+      const br = btn.getBoundingClientRect();
+      if (pointInExpandedClientRect(clientX, clientY, br, TACTICAL_ENTRY_HIT_PAD_PX)) {
         want = 'default';
         break;
       }

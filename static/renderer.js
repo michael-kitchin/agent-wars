@@ -14018,6 +14018,15 @@
     var upper = ref[1];
     return Boolean(H3.isValidCell(lower, upper));
   }
+  function getResolution(h3Index) {
+    var ref = h3IndexToSplitLong(h3Index);
+    var lower = ref[0];
+    var upper = ref[1];
+    if (!H3.isValidCell(lower, upper)) {
+      return -1;
+    }
+    return H3.getResolution(lower, upper);
+  }
   function latLngToCell(lat, lng, res) {
     var latLng = libh3._malloc(SZ_LATLNG);
     libh3.HEAPF64.set([lat, lng].map(degsToRads), latLng / SZ_DBL);
@@ -14912,8 +14921,11 @@
   var UNIT_DESELECT_GLYPH = "-";
   var TOAST_DURATION_MS = 24e3;
   var READY_REQUEST_TIMEOUT_MS = 12e4;
+  var TACTICAL_ADVANCE_BACKGROUND_AI_POLL_MS = 50;
+  var TACTICAL_ADVANCE_BACKGROUND_AI_TIMEOUT_MS = 8e4;
   var UNIT_ICON_HIT_PAD_PX = 2;
   var BUILD_ENTRY_HIT_PAD_PX = 2;
+  var TACTICAL_ENTRY_HIT_PAD_PX = 6;
   var STACK_OFFSET_X = 6;
   var STACK_OFFSET_Y = -3;
   var COUNT_BADGE_OFFSET = 16;
@@ -14978,6 +14990,60 @@
        * Exceptions: None.
        */
     lastBuildEntryLayerKey: null,
+    /**
+       * Documents the object literal property `tacticalBattleSnapshot` (tacticalBattleSnapshot: null as TacticalBattleSnapshot | null).
+    
+       * Purpose: Holds the active tactical battle layout and sub-units while the renderer is in tactical map mode.
+       * When to use: Set after a successful `startTacticalBattle` IPC; cleared when the tactical session ends.
+       * Expected outcome: When non-null, terrain and unit drawing use tactical res4 constraints instead of global strategic view.
+       * Exceptions: None.
+       */
+    tacticalBattleSnapshot: null,
+    /**
+       * Documents the object literal property `lastTacticalEntryLayerKey` (lastTacticalEntryLayerKey: null as string | null).
+    
+       * Purpose: Avoids rebuilding tactical-entry DOM when the derived overlay key is unchanged between frames.
+       * When to use: Updated alongside `tactical-entry-layer` innerHTML synchronization.
+       * Expected outcome: Fewer DOM writes during pan/zoom redraws.
+       * Exceptions: None.
+       */
+    lastTacticalEntryLayerKey: null,
+    /**
+       * Documents the object literal property `tacticalEntryButtonPointerInside` (tacticalEntryButtonPointerInside: false).
+    
+       * Purpose: Tracks whether the pointer is over a tactical-entry button for consistent click hit-testing with build-entry.
+       * When to use: Pointer handlers on the tactical-entry layer update this flag.
+       * Expected outcome: Map dragging does not steal clicks intended for tactical entry.
+       * Exceptions: None.
+       */
+    tacticalEntryButtonPointerInside: false,
+    /**
+       * Documents the object literal property `tacticalPhasePlanning` (tacticalPhasePlanning: true).
+    
+       * Purpose: Separates milestone-2.1 tactical planning beats from tactical resolution (AI / async work after advancing the tactical turn).
+       * When to use: `true` while the human may exit tactical mode or press Advance; `false` while `performTacticalAdvanceTurn` waits on IPC and optional background `requestAiOrders`.
+       * Expected outcome: `#tactical-exit-btn` and `#tactical-advance-turn-btn` stay disabled whenever this flag is `false` with an active tactical snapshot.
+       * Exceptions: Reconciling snapshots or ending tactical always resets this to `true` once the renderer returns to a coherent tactical or strategic mode.
+       */
+    tacticalPhasePlanning: true,
+    /**
+       * Documents the object literal property `preTacticalLeafletMinZoom` (preTacticalLeafletMinZoom: null as number | null).
+    
+       * Purpose: Stores the main map min zoom before tactical constraints so it can be restored after tactical exit.
+       * When to use: Captured when entering tactical mode; consumed when leaving tactical mode.
+       * Expected outcome: Strategic zoom limits return unchanged after tactical battles.
+       * Exceptions: None.
+       */
+    preTacticalLeafletMinZoom: null,
+    /**
+       * Documents the object literal property `preTacticalLeafletMaxZoom` (preTacticalLeafletMaxZoom: null as number | null).
+    
+       * Purpose: Stores the main map max zoom before tactical constraints so it can be restored after tactical exit.
+       * When to use: Captured when entering tactical mode; consumed when leaving tactical mode.
+       * Expected outcome: Strategic zoom limits return unchanged after tactical battles.
+       * Exceptions: None.
+       */
+    preTacticalLeafletMaxZoom: null,
     /**
        * Documents the object literal property `res1DominantTerrainKindByH3` (res1DominantTerrainKindByH3: new Map<string, string>()).
     
@@ -15565,6 +15631,24 @@
     lastAppliedMapInteractionCursor: ""
   };
 
+  // src/renderer/tactical/tacticalUiGuards.ts
+  function tacticalRendererIsBattleActive(state) {
+    return !!state.tacticalBattleSnapshot;
+  }
+  function tacticalRendererHitInsideBattleFootprint(hit, tb) {
+    if (!tb || !hit) return true;
+    if (hit === tb.enclosingRes1H3Index) return true;
+    if (tb.res4ChildH3Indexes.includes(hit)) return true;
+    try {
+      if (getResolution(hit) === 4) {
+        return cellToParent(hit, 1) === tb.enclosingRes1H3Index;
+      }
+    } catch {
+      return false;
+    }
+    return false;
+  }
+
   // src/renderer/openRouter/aiPlanningState.ts
   function isWaitingForPrecomputedAiOrders() {
     return rendererSharedState.runButtonOn && rendererSharedState.precomputedAiOrders === null;
@@ -15592,7 +15676,8 @@
     if (!readyBtn) return;
     const gameOver = rendererSharedState.gameState?.gameOver ?? false;
     const waitingOnAi = isWaitingForPrecomputedAiOrders();
-    readyBtn.disabled = gameOver || waitingOnAi;
+    const tacticalActive = tacticalRendererIsBattleActive(rendererSharedState);
+    readyBtn.disabled = gameOver || waitingOnAi || tacticalActive;
     if (waitingOnAi) {
       const now = Date.now();
       if (rendererSharedState.readyBtnAiWaitStartTime === null) {
@@ -15879,6 +15964,7 @@
     return Math.max((maxX - minX) / viewW, (maxY - minY) / viewH);
   }
   function shouldRenderRes4Hexes() {
+    if (rendererSharedState.tacticalBattleSnapshot) return true;
     const fillFraction = computeRes1HexFillFraction();
     if (rendererSharedState.res4Visible) {
       if (fillFraction <= RES4_HIDE_THRESHOLD_VIEW_FRACTION) rendererSharedState.res4Visible = false;
@@ -15941,6 +16027,1015 @@
       if (p.y > maxY) maxY = p.y;
     }
     return Math.max(1, Math.min(maxX - minX, maxY - minY));
+  }
+
+  // src/renderer/map/tacticalMapView.ts
+  function enterTacticalMapView(childRes4H3Indexes) {
+    const map = getMainLeafletMap();
+    const L = getLeafletGlobal();
+    if (!map || !L || typeof map.fitBounds !== "function") return;
+    let minLat = 90;
+    let maxLat = -90;
+    let minLng = 180;
+    let maxLng = -180;
+    for (const h3 of childRes4H3Indexes) {
+      const boundary = getHexBoundaryLatLngForLeafletOverlay(h3);
+      for (const [lat, lng] of boundary) {
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+        if (lng < minLng) minLng = lng;
+        if (lng > maxLng) maxLng = lng;
+      }
+    }
+    if (minLat > maxLat) return;
+    const padLat = Math.max(5e-4, (maxLat - minLat) * 0.08);
+    const padLng = Math.max(5e-4, (maxLng - minLng) * 0.08);
+    const sw = { lat: Math.max(-WEB_MERCATOR_MAX_ABS_LAT, minLat - padLat), lng: minLng - padLng };
+    const ne = { lat: Math.min(WEB_MERCATOR_MAX_ABS_LAT, maxLat + padLat), lng: maxLng + padLng };
+    const tacticalBounds = L.latLngBounds(L.latLng(sw.lat, sw.lng), L.latLng(ne.lat, ne.lng));
+    if (rendererSharedState.preTacticalLeafletMinZoom == null && typeof map.getMinZoom === "function") {
+      rendererSharedState.preTacticalLeafletMinZoom = map.getMinZoom();
+    }
+    if (rendererSharedState.preTacticalLeafletMaxZoom == null && typeof map.getMaxZoom === "function") {
+      rendererSharedState.preTacticalLeafletMaxZoom = map.getMaxZoom();
+    }
+    if (typeof map.setMinZoom === "function") map.setMinZoom(4);
+    if (typeof map.setMaxZoom === "function") map.setMaxZoom(12);
+    if (typeof map.setMaxBounds === "function") map.setMaxBounds(tacticalBounds);
+    if (typeof map.flyToBounds === "function") {
+      map.flyToBounds(tacticalBounds, { padding: [24, 24], duration: 0.55, maxZoom: 12 });
+    } else {
+      map.fitBounds?.(tacticalBounds, { padding: [24, 24], animate: true });
+    }
+  }
+  function exitTacticalMapView() {
+    const map = getMainLeafletMap();
+    const L = getLeafletGlobal();
+    if (!map || !L) {
+      rendererSharedState.preTacticalLeafletMinZoom = null;
+      rendererSharedState.preTacticalLeafletMaxZoom = null;
+      return;
+    }
+    const worldBounds = L.latLngBounds(
+      L.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
+      L.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
+    );
+    if (typeof map.setMaxBounds === "function") map.setMaxBounds(worldBounds);
+    if (typeof map.setMinZoom === "function" && rendererSharedState.preTacticalLeafletMinZoom != null) {
+      map.setMinZoom(rendererSharedState.preTacticalLeafletMinZoom);
+    }
+    if (typeof map.setMaxZoom === "function" && rendererSharedState.preTacticalLeafletMaxZoom != null) {
+      map.setMaxZoom(rendererSharedState.preTacticalLeafletMaxZoom);
+    }
+    rendererSharedState.preTacticalLeafletMinZoom = null;
+    rendererSharedState.preTacticalLeafletMaxZoom = null;
+  }
+
+  // src/shared/homeRegionRules.ts
+  function uniqueSortedHexes(hexes) {
+    return [...new Set(hexes)].sort();
+  }
+  function computeIntersectingHomeRegionHexes(humanHomeRegionHexes, aiHomeRegionHexes) {
+    const aiSet = new Set(aiHomeRegionHexes);
+    return uniqueSortedHexes(humanHomeRegionHexes.filter((h3Index) => aiSet.has(h3Index)));
+  }
+  function computeContestedHomeRegionHexes(units, homeRegionHexes) {
+    const homeHexSet = new Set(homeRegionHexes);
+    const playersByHomeHex = /* @__PURE__ */ new Map();
+    for (const unit of units) {
+      if (!homeHexSet.has(unit.h3Index)) continue;
+      let players = playersByHomeHex.get(unit.h3Index);
+      if (!players) {
+        players = /* @__PURE__ */ new Set();
+        playersByHomeHex.set(unit.h3Index, players);
+      }
+      players.add(unit.player);
+    }
+    return uniqueSortedHexes(
+      [...playersByHomeHex.entries()].filter(([, players]) => players.size > 1).map(([h3Index]) => h3Index)
+    );
+  }
+  function classifyHomeRegionOutlineState(h3Index, intersectionHexes, contestedHexes, controllerPlayerId) {
+    if (intersectionHexes.has(h3Index)) return "intersection";
+    if (contestedHexes.has(h3Index)) return "contested";
+    if (controllerPlayerId === "human") return "controlledByHuman";
+    if (controllerPlayerId === "opponent") return "controlledByOpponent";
+    return "unknown";
+  }
+
+  // src/shared/pipelineTerrain.ts
+  var PIPELINE_TERRAIN_KINDS = [
+    "water",
+    "coastal",
+    "wetlands",
+    "plains",
+    "forest",
+    "mountain",
+    "desert",
+    "arctic"
+  ];
+  var KIND_SET = new Set(PIPELINE_TERRAIN_KINDS);
+
+  // src/renderer/rendering/terrainVisualStyles.ts
+  var patternCache = /* @__PURE__ */ new Map();
+  var UNKNOWN_FILL = "rgba(140, 140, 140, 0.075)";
+  var DEFAULT_HEX_STROKE_COLOR = "rgba(36,38,42,0.4)";
+  var DEFAULT_HEX_STROKE_WIDTH = 0.5;
+  var WARGAME_HEX_STROKE_COLOR = "rgba(210, 216, 228, 0.077)";
+  var WARGAME_HEX_STROKE_WIDTH = 0.72;
+  var LAND_HOVER_FILL_BASE = "rgba(155, 168, 128, 0.42)";
+  var TERRAIN_STYLE_PRESETS = {
+    /**
+       * Documents the object literal property `default` (default: { label: 'Default', basemapId: 'carto_light_nolabels', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
+    
+       * Purpose: Supports maintainability by documenting why `default` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    default: {
+      label: "Default",
+      basemapId: "carto_light_nolabels",
+      fillAlphaMultiplier: 0.55,
+      hatchAlphaMultiplier: 0.375,
+      fills: {
+        water: "rgba(42, 117, 214, 0.28)",
+        coastal: "rgba(59, 186, 194, 0.24)",
+        wetlands: "rgba(59, 186, 194, 0.24)",
+        plains: "rgba(186, 208, 160, 0.2)",
+        forest: "rgba(50, 142, 74, 0.43)",
+        mountain: "rgba(154, 77, 122, 0.54)",
+        desert: "rgba(214, 182, 120, 0.44)",
+        arctic: "rgba(234, 245, 255, 0.5)"
+      },
+      hatches: {
+        mountain: { color: "rgba(95, 24, 74, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+        forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
+        coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
+        wetlands: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: true },
+        desert: { color: "rgba(150, 104, 43, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
+      },
+      urbanOverlayFill: "rgba(137, 117, 98, 0.46)",
+      urbanOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.85, reverseDiagonal: false, pattern: "orthogonal" },
+      rubbleOverlayFill: "rgba(137, 117, 98, 0.46)",
+      rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
+    },
+    /**
+       * Documents the object literal property `atlas` (atlas: { label: 'Atlas', basemapId: 'carto_voyager_nolabels', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: { w).
+    
+       * Purpose: Supports maintainability by documenting why `atlas` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    atlas: {
+      label: "Atlas",
+      basemapId: "carto_voyager_nolabels",
+      fillAlphaMultiplier: 0.55,
+      hatchAlphaMultiplier: 0.375,
+      fills: {
+        water: "rgba(56, 128, 214, 0.28)",
+        coastal: "rgba(76, 173, 188, 0.24)",
+        wetlands: "rgba(76, 173, 188, 0.24)",
+        plains: "rgba(193, 211, 165, 0.2)",
+        forest: "rgba(70, 146, 86, 0.43)",
+        mountain: "rgba(168, 70, 96, 0.55)",
+        desert: "rgba(220, 189, 128, 0.44)",
+        arctic: "rgba(235, 244, 255, 0.5)"
+      },
+      hatches: {
+        mountain: { color: "rgba(114, 26, 50, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+        forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
+        coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
+        wetlands: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: true },
+        desert: { color: "rgba(152, 109, 47, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
+      },
+      urbanOverlayFill: "rgba(141, 122, 103, 0.46)",
+      urbanOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.85, reverseDiagonal: false, pattern: "orthogonal" },
+      rubbleOverlayFill: "rgba(141, 122, 103, 0.46)",
+      rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
+    },
+    /**
+       * Documents the object literal property `wargame` (wargame: { label: 'Wargame', basemapId: 'carto_dark_nolabels', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
+    
+       * Purpose: Supports maintainability by documenting why `wargame` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    wargame: {
+      label: "Wargame",
+      basemapId: "carto_dark_nolabels",
+      fillAlphaMultiplier: 0.55,
+      hatchAlphaMultiplier: 0.375,
+      fills: {
+        water: "rgba(38, 118, 206, 0.28)",
+        coastal: "rgba(70, 176, 192, 0.24)",
+        wetlands: "rgba(70, 176, 192, 0.24)",
+        plains: "rgba(170, 188, 136, 0.2)",
+        forest: "rgba(58, 150, 86, 0.43)",
+        mountain: "rgba(218, 76, 146, 0.5)",
+        desert: "rgba(221, 171, 88, 0.46)",
+        arctic: "rgba(221, 236, 255, 0.5)"
+      },
+      hatches: {
+        mountain: { color: "rgba(255, 162, 214, 0.68)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+        forest: { color: "rgba(130, 245, 190, 0.58)", spacing: 7, lineWidth: 0.9, reverseDiagonal: true },
+        coastal: { color: "rgba(110, 220, 235, 0.42)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
+        wetlands: { color: "rgba(110, 220, 235, 0.42)", spacing: 8, lineWidth: 0.72, reverseDiagonal: true },
+        desert: { color: "rgba(255, 207, 130, 0.5)", spacing: 7, lineWidth: 1.05, reverseDiagonal: false, pattern: "dots" }
+      },
+      urbanOverlayFill: "rgba(132, 112, 97, 0.46)",
+      urbanOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.88, reverseDiagonal: false, pattern: "orthogonal" },
+      rubbleOverlayFill: "rgba(132, 112, 97, 0.46)",
+      rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.88, reverseDiagonal: true, crosshatch: true }
+    },
+    /**
+       * Documents the object literal property `scientific` (scientific: { label: 'Scientific', basemapId: 'esri_world_shaded_relief', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills).
+    
+       * Purpose: Supports maintainability by documenting why `scientific` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    scientific: {
+      label: "Scientific",
+      basemapId: "esri_world_shaded_relief",
+      fillAlphaMultiplier: 0.55,
+      hatchAlphaMultiplier: 0.375,
+      fills: {
+        water: "rgba(52, 120, 204, 0.28)",
+        coastal: "rgba(69, 165, 186, 0.24)",
+        wetlands: "rgba(69, 165, 186, 0.24)",
+        plains: "rgba(188, 205, 162, 0.2)",
+        forest: "rgba(52, 136, 84, 0.43)",
+        mountain: "rgba(127, 83, 171, 0.55)",
+        desert: "rgba(206, 176, 118, 0.44)",
+        arctic: "rgba(234, 244, 255, 0.5)"
+      },
+      hatches: {
+        mountain: { color: "rgba(74, 35, 116, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+        forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
+        coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
+        wetlands: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: true },
+        desert: { color: "rgba(145, 104, 42, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
+      },
+      urbanOverlayFill: "rgba(130, 112, 96, 0.46)",
+      urbanOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.85, reverseDiagonal: false, pattern: "orthogonal" },
+      rubbleOverlayFill: "rgba(130, 112, 96, 0.46)",
+      rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
+    }
+  };
+  var activeTerrainStyleId = "default";
+  function makeDiagonalHatchPattern(color, spacing, lineWidth, reverseDiagonal, crosshatch = false) {
+    const c = document.createElement("canvas");
+    const s = spacing * 2;
+    c.width = s;
+    c.height = s;
+    const p = c.getContext("2d");
+    if (!p) return null;
+    p.strokeStyle = color;
+    p.lineWidth = lineWidth;
+    p.beginPath();
+    if (reverseDiagonal) {
+      p.moveTo(0, 0);
+      p.lineTo(s, s);
+    } else {
+      p.moveTo(0, s);
+      p.lineTo(s, 0);
+    }
+    if (crosshatch) {
+      if (reverseDiagonal) {
+        p.moveTo(0, s);
+        p.lineTo(s, 0);
+      } else {
+        p.moveTo(0, 0);
+        p.lineTo(s, s);
+      }
+    }
+    p.stroke();
+    return p.createPattern(c, "repeat");
+  }
+  function makeDotPattern(color, spacing, diameter) {
+    const c = document.createElement("canvas");
+    const s = Math.max(2, spacing);
+    c.width = s;
+    c.height = s;
+    const p = c.getContext("2d");
+    if (!p) return null;
+    const r = Math.max(0.5, diameter * 0.5);
+    p.fillStyle = color;
+    p.beginPath();
+    p.arc(s * 0.5, s * 0.5, r, 0, Math.PI * 2);
+    p.fill();
+    return p.createPattern(c, "repeat");
+  }
+  function makeOrthogonalHatchPattern(color, spacing, lineWidth) {
+    const c = document.createElement("canvas");
+    const s = spacing * 2;
+    c.width = s;
+    c.height = s;
+    const p = c.getContext("2d");
+    if (!p) return null;
+    p.strokeStyle = color;
+    p.lineWidth = lineWidth;
+    p.beginPath();
+    p.moveTo(0, s * 0.5);
+    p.lineTo(s, s * 0.5);
+    p.moveTo(s * 0.5, 0);
+    p.lineTo(s * 0.5, s);
+    p.stroke();
+    return p.createPattern(c, "repeat");
+  }
+  function boostRgbaAlpha(color, factor) {
+    const m = color.match(/^rgba\(\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^)]+)\s*\)$/i);
+    if (!m) return color;
+    const r = m[1].trim();
+    const g = m[2].trim();
+    const b = m[3].trim();
+    const a = Number(m[4].trim());
+    if (!Number.isFinite(a)) return color;
+    const boosted = Math.max(0, Math.min(1, a * factor));
+    const aStr = String(Number(boosted.toFixed(3)));
+    return `rgba(${r}, ${g}, ${b}, ${aStr})`;
+  }
+  function activePreset() {
+    return TERRAIN_STYLE_PRESETS[activeTerrainStyleId];
+  }
+  function getTerrainStyleOptions() {
+    return Object.keys(TERRAIN_STYLE_PRESETS).map((id) => ({
+      id,
+      label: TERRAIN_STYLE_PRESETS[id].label
+    }));
+  }
+  function getActiveTerrainStyleId() {
+    return activeTerrainStyleId;
+  }
+  function getActiveTerrainStyleBasemapId() {
+    return activePreset().basemapId;
+  }
+  function getActiveHexStrokeStyle() {
+    if (activeTerrainStyleId === "wargame") {
+      return { color: WARGAME_HEX_STROKE_COLOR, width: WARGAME_HEX_STROKE_WIDTH };
+    }
+    return { color: DEFAULT_HEX_STROKE_COLOR, width: DEFAULT_HEX_STROKE_WIDTH };
+  }
+  function setActiveTerrainStyle(id) {
+    if (activeTerrainStyleId === id) return;
+    activeTerrainStyleId = id;
+    patternCache.clear();
+  }
+  function terrainKindFillStyle(kind, options) {
+    const k = kind;
+    const p = activePreset();
+    const base = options?.urbanOverlay ? p.urbanOverlayFill : p.fills[k] ?? UNKNOWN_FILL;
+    return boostRgbaAlpha(base, p.fillAlphaMultiplier);
+  }
+  function landHoverFillStyle() {
+    return boostRgbaAlpha(LAND_HOVER_FILL_BASE, activePreset().fillAlphaMultiplier);
+  }
+  function terrainKindPattern(ctx, kind, fillAndHatchAlphaScale = 1, options) {
+    const k = kind;
+    const overlayKey = options?.rubbleOverlay ? "rubble" : options?.urbanOverlay ? "urban" : "base";
+    const key = `${activeTerrainStyleId}:${k}:${fillAndHatchAlphaScale}:${overlayKey}`;
+    if (patternCache.has(key)) return patternCache.get(key) ?? null;
+    const p = activePreset();
+    const spec = options?.rubbleOverlay ? p.rubbleOverlayHatch : options?.urbanOverlay ? p.urbanOverlayHatch : p.hatches[k];
+    const pat = spec ? spec.pattern === "dots" ? makeDotPattern(
+      boostRgbaAlpha(boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier), fillAndHatchAlphaScale),
+      spec.spacing,
+      spec.lineWidth * 2
+    ) : spec.pattern === "orthogonal" ? makeOrthogonalHatchPattern(
+      boostRgbaAlpha(boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier), fillAndHatchAlphaScale),
+      spec.spacing,
+      spec.lineWidth
+    ) : makeDiagonalHatchPattern(
+      boostRgbaAlpha(boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier), fillAndHatchAlphaScale),
+      spec.spacing,
+      spec.lineWidth,
+      spec.reverseDiagonal,
+      spec.crosshatch ?? false
+    ) : null;
+    patternCache.set(key, pat);
+    return pat;
+  }
+  function fillHexTerrain(ctx, terrainKind, drawPath, options) {
+    const scale = options?.fillAndHatchAlphaScale ?? 1;
+    const k = terrainKind;
+    const isRubble = options?.isRubble === true;
+    const isUrban = !isRubble && options?.isUrban === true;
+    if (!isUrban && options?.landHoverFill && k === "plains") {
+      drawPath();
+      ctx.fillStyle = boostRgbaAlpha(landHoverFillStyle(), scale);
+      ctx.fill();
+      return;
+    }
+    drawPath();
+    const fillBase = isRubble ? boostRgbaAlpha(activePreset().rubbleOverlayFill, activePreset().fillAlphaMultiplier) : terrainKindFillStyle(terrainKind, { urbanOverlay: isUrban });
+    ctx.fillStyle = boostRgbaAlpha(fillBase, scale);
+    ctx.fill();
+    const pat = terrainKindPattern(ctx, terrainKind, scale, { urbanOverlay: isUrban, rubbleOverlay: isRubble });
+    if (pat) {
+      drawPath();
+      ctx.fillStyle = pat;
+      ctx.fill();
+    }
+  }
+  var TERRAIN_LEGEND_ORDER = [...PIPELINE_TERRAIN_KINDS];
+  function renderTerrainLegend(container, options) {
+    container.innerHTML = "";
+    container.style.fontSize = "11px";
+    container.style.lineHeight = "1.3";
+    container.style.pointerEvents = "auto";
+    const header = document.createElement("div");
+    header.style.display = "flex";
+    header.style.alignItems = "center";
+    header.style.justifyContent = "space-between";
+    header.style.gap = "8px";
+    header.style.marginBottom = "4px";
+    const title = document.createElement("div");
+    title.textContent = "Terrain";
+    title.style.fontWeight = "600";
+    title.style.color = "#333";
+    header.appendChild(title);
+    const styleSelect = document.createElement("select");
+    styleSelect.setAttribute("aria-label", "Terrain style");
+    styleSelect.style.fontSize = "11px";
+    styleSelect.style.padding = "1px 3px";
+    styleSelect.style.border = "1px solid #aaa";
+    styleSelect.style.borderRadius = "2px";
+    styleSelect.style.background = "#f6f3ee";
+    const opts = getTerrainStyleOptions();
+    for (const o of opts) {
+      const opt = document.createElement("option");
+      opt.value = o.id;
+      opt.textContent = o.label;
+      styleSelect.appendChild(opt);
+    }
+    styleSelect.value = getActiveTerrainStyleId();
+    styleSelect.addEventListener("change", () => {
+      setActiveTerrainStyle(styleSelect.value);
+      if (options?.onStyleChanged) options.onStyleChanged(getActiveTerrainStyleId());
+      renderTerrainLegend(container, options);
+    });
+    header.appendChild(styleSelect);
+    container.appendChild(header);
+    for (const kind of TERRAIN_LEGEND_ORDER) {
+      const row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.alignItems = "center";
+      row.style.gap = "6px";
+      row.style.marginBottom = "2px";
+      const sw = document.createElement("span");
+      sw.style.display = "inline-block";
+      sw.style.width = "18px";
+      sw.style.height = "12px";
+      sw.style.border = "1px solid #888";
+      sw.style.borderRadius = "2px";
+      sw.style.background = terrainKindFillStyle(kind);
+      row.appendChild(sw);
+      const lab = document.createElement("span");
+      lab.textContent = kind;
+      lab.style.color = "#444";
+      row.appendChild(lab);
+      container.appendChild(row);
+    }
+  }
+
+  // src/renderer/rendering/terrainInfrastructureIconPaths.ts
+  var AIRPLANE_VIEWBOX_SIZE = 16;
+  var AIRPLANE_VIEWBOX_CENTER = {
+    /**
+     * Documents the object literal property `x` (x: 8).
+    
+     * Purpose: Supports maintainability by documenting why `x` exists.
+     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+     * Exceptions: None.
+     */
+    x: 8,
+    /**
+     * Documents the object literal property `y` (y: 8).
+    
+     * Purpose: Supports maintainability by documenting why `y` exists.
+     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+     * Exceptions: None.
+     */
+    y: 8
+  };
+  var ANCHOR_VIEWBOX = {
+    /**
+     * Documents the object literal property `x` (x: 0).
+    
+     * Purpose: Supports maintainability by documenting why `x` exists.
+     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+     * Exceptions: None.
+     */
+    x: 0,
+    /**
+     * Documents the object literal property `y` (y: -960).
+    
+     * Purpose: Supports maintainability by documenting why `y` exists.
+     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+     * Exceptions: None.
+     */
+    y: -960,
+    /**
+     * Documents the object literal property `w` (w: 960).
+    
+     * Purpose: Supports maintainability by documenting why `w` exists.
+     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+     * Exceptions: None.
+     */
+    w: 960,
+    /**
+     * Documents the object literal property `h` (h: 960).
+    
+     * Purpose: Supports maintainability by documenting why `h` exists.
+     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+     * Exceptions: None.
+     */
+    h: 960
+  };
+  var ANCHOR_VIEWBOX_CENTER = {
+    /**
+     * Documents the object literal property `x` (x: 480).
+    
+     * Purpose: Supports maintainability by documenting why `x` exists.
+     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+     * Exceptions: None.
+     */
+    x: 480,
+    /**
+     * Documents the object literal property `y` (y: -480).
+    
+     * Purpose: Supports maintainability by documenting why `y` exists.
+     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+     * Exceptions: None.
+     */
+    y: -480
+  };
+  var BOOTSTRAP_AIRPLANE_FILL_PATH = "M6.428 1.151C6.708.591 7.213 0 8 0s1.292.592 1.572 1.151C9.861 1.73 10 2.431 10 3v3.691l5.17 2.585a1.5 1.5 0 0 1 .83 1.342V12a.5.5 0 0 1-.582.493l-5.507-.918-.375 2.253 1.318 1.318A.5.5 0 0 1 10.5 16h-5a.5.5 0 0 1-.354-.854l1.319-1.318-.376-2.253-5.507.918A.5.5 0 0 1 0 12v-1.382a1.5 1.5 0 0 1 .83-1.342L6 6.691V3c0-.568.14-1.271.428-1.849";
+  var MATERIAL_SYMBOLS_ANCHOR_PATH = "M355-102q-64-22-116-60t-85.5-89Q120-302 120-360v-120l160 120-62 62q29 51 92 88t130 47v-357H320v-80h120v-47q-35-13-57.5-43.5T360-760q0-50 35-85t85-35q50 0 85 35t35 85q0 39-22.5 69.5T520-647v47h120v80H520v357q67-10 130-47t92-88l-62-62 160-120v120q0 58-33.5 109T721-162q-52 38-116 60T480-80q-61 0-125-22Zm125-618q17 0 28.5-11.5T520-760q0-17-11.5-28.5T480-800q-17 0-28.5 11.5T440-760q0 17 11.5 28.5T480-720Z";
+  var cachedAirplanePath = null;
+  var cachedAnchorPath = null;
+  function getAirplanePath2D() {
+    if (!cachedAirplanePath) cachedAirplanePath = new Path2D(BOOTSTRAP_AIRPLANE_FILL_PATH);
+    return cachedAirplanePath;
+  }
+  function getAnchorPath2D() {
+    if (!cachedAnchorPath) cachedAnchorPath = new Path2D(MATERIAL_SYMBOLS_ANCHOR_PATH);
+    return cachedAnchorPath;
+  }
+
+  // src/renderer/rendering/terrainInfrastructureOverlay.ts
+  function centroidAndSpan(pts) {
+    if (pts.length === 0) return { cx: 0, cy: 0, span: 1 };
+    let sx = 0;
+    let sy = 0;
+    let minX = pts[0].x;
+    let maxX = pts[0].x;
+    let minY = pts[0].y;
+    let maxY = pts[0].y;
+    for (const p of pts) {
+      sx += p.x;
+      sy += p.y;
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const w = Math.max(1e-6, maxX - minX);
+    const h = Math.max(1e-6, maxY - minY);
+    return { cx: sx / pts.length, cy: sy / pts.length, span: Math.min(w, h) };
+  }
+  function drawFilledSvgPath(ctx, path, screenCx, screenCy, pixelSize, outlineScreenPx, fillStyle, strokeStyle, viewBox) {
+    const s = pixelSize / Math.max(viewBox.width, viewBox.height);
+    ctx.save();
+    ctx.translate(screenCx, screenCy);
+    ctx.scale(s, s);
+    ctx.translate(-viewBox.originX, -viewBox.originY);
+    ctx.fillStyle = fillStyle;
+    ctx.fill(path);
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = outlineScreenPx / s;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.miterLimit = 1.6;
+    ctx.stroke(path);
+    ctx.restore();
+  }
+  var AIRPLANE_WIDTH_SCALE = 0.74;
+  var AIRPLANE_HEIGHT_SCALE = 1 - (1 - AIRPLANE_WIDTH_SCALE) / 2;
+  function drawAirplaneAt(ctx, cx, cy, pixelSize, outlineScreenPx, fillStyle, strokeStyle) {
+    const vb = Math.max(AIRPLANE_VIEWBOX_SIZE, AIRPLANE_VIEWBOX_SIZE);
+    const s = pixelSize / vb;
+    const sx = s * AIRPLANE_WIDTH_SCALE;
+    const sy = s * AIRPLANE_HEIGHT_SCALE;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(sx, sy);
+    ctx.translate(-AIRPLANE_VIEWBOX_CENTER.x, -AIRPLANE_VIEWBOX_CENTER.y);
+    const path = getAirplanePath2D();
+    ctx.fillStyle = fillStyle;
+    ctx.fill(path);
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = outlineScreenPx / Math.max(sx, sy * 0.92);
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.miterLimit = 1.6;
+    ctx.stroke(path);
+    ctx.restore();
+  }
+  function drawAnchorAt(ctx, cx, cy, pixelSize, outlineScreenPx, fillStyle, strokeStyle) {
+    drawFilledSvgPath(ctx, getAnchorPath2D(), cx, cy, pixelSize, outlineScreenPx, fillStyle, strokeStyle, {
+      width: ANCHOR_VIEWBOX.w,
+      height: ANCHOR_VIEWBOX.h,
+      originX: ANCHOR_VIEWBOX_CENTER.x,
+      originY: ANCHOR_VIEWBOX_CENTER.y
+    });
+  }
+  var AIRPORT_FILL = "#e8eef6";
+  var AIRPORT_STROKE = "#1a1f28";
+  var PORT_FILL = "#6eb6f0";
+  var PORT_STROKE = "#0d1f35";
+  var GLYPH_OUTLINE_MULT = 1.58;
+  var GLYPH_AIR_PIXEL_FACTOR = 0.22;
+  var GLYPH_ANCHOR_TO_AIR_RATIO = 1.03;
+  var RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE = 1.2;
+  var SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE = 1.2;
+  function drawTerrainInfrastructureGlyphs(ctx, pts, options) {
+    const { showAirport, showSeaport, outlineScreenPx, glyphAreaScale = 1, centerYOffsetPx = 0 } = options;
+    if (!showAirport && !showSeaport) return;
+    const lin = Math.sqrt(glyphAreaScale);
+    const glyphOutline = Math.max(0.92, outlineScreenPx * GLYPH_OUTLINE_MULT * lin);
+    const { cx, cy, span } = centroidAndSpan(pts);
+    const centerY = cy + centerYOffsetPx;
+    const pxAir = span * GLYPH_AIR_PIXEL_FACTOR * lin;
+    const pxAnchor = pxAir * GLYPH_ANCHOR_TO_AIR_RATIO;
+    const both = showAirport && showSeaport;
+    if (both) {
+      const off = span * 0.1 * lin;
+      drawAirplaneAt(ctx, cx - off, centerY - off, pxAir, glyphOutline, AIRPORT_FILL, AIRPORT_STROKE);
+      drawAnchorAt(ctx, cx + off, centerY + off, pxAnchor, glyphOutline, PORT_FILL, PORT_STROKE);
+      return;
+    }
+    const soloLin = Math.sqrt(SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE);
+    const soloOutline = glyphOutline * soloLin;
+    if (showAirport) {
+      drawAirplaneAt(ctx, cx, centerY, pxAir * soloLin, soloOutline, AIRPORT_FILL, AIRPORT_STROKE);
+    } else {
+      drawAnchorAt(ctx, cx, centerY, pxAnchor * soloLin, soloOutline, PORT_FILL, PORT_STROKE);
+    }
+  }
+
+  // src/renderer/rendering/polygonOutline.ts
+  function drawClosedPolygonPath(ctx, points) {
+    ctx.beginPath();
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath();
+  }
+  function strokeDualClosedPolygon(ctx, points, styles) {
+    drawClosedPolygonPath(ctx, points);
+    ctx.strokeStyle = styles.underStrokeColor;
+    ctx.lineWidth = styles.underStrokeWidth;
+    ctx.stroke();
+    ctx.strokeStyle = styles.topStrokeColor;
+    ctx.lineWidth = styles.topStrokeWidth;
+    ctx.stroke();
+  }
+
+  // src/renderer/rendering/terrainRendering.ts
+  function withOpacity(color, alpha) {
+    const normalizedAlpha = Math.max(0, Math.min(1, alpha));
+    if (color.startsWith("#")) {
+      const hex = color.slice(1);
+      if (hex.length === 3) {
+        const r = Number.parseInt(`${hex[0]}${hex[0]}`, 16);
+        const g = Number.parseInt(`${hex[1]}${hex[1]}`, 16);
+        const b = Number.parseInt(`${hex[2]}${hex[2]}`, 16);
+        return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
+      }
+      if (hex.length === 6) {
+        const r = Number.parseInt(hex.slice(0, 2), 16);
+        const g = Number.parseInt(hex.slice(2, 4), 16);
+        const b = Number.parseInt(hex.slice(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
+      }
+    }
+    return color;
+  }
+  function buildControlByHex(state) {
+    return new Map((state.res1Control ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
+  }
+  function drawTerrainHexes(ctx, deps) {
+    if (!rendererSharedState.gameState) return;
+    if (rendererSharedState.tacticalBattleSnapshot) return;
+    const exploredHexes = deps.getExploredHexSet(rendererSharedState.gameState);
+    const res4Active = shouldRenderRes4Hexes();
+    if (res4Active) return;
+    const map = getMainLeafletMap();
+    if (!map) return;
+    const mapWithZoom = map;
+    const zoom = typeof mapWithZoom.getZoom === "function" ? mapWithZoom.getZoom() : 4;
+    const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
+    const L = getLeafletGlobal();
+    for (const hx of rendererSharedState.gameState.hexes) {
+      const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
+      const pts = boundary.map(([lat, lng]) => {
+        const p = map.latLngToContainerPoint(L.latLng(lat, lng));
+        return { x: p.x, y: p.y };
+      });
+      const kind = deps.getRes1DominantTerrainKind(
+        hx.h3Index,
+        hx.terrainKind ?? (hx.terrain === "water" ? "water" : hx.terrain === "coastal" ? "coastal" : hx.terrain === "wetlands" ? "wetlands" : "plains")
+      );
+      const drawClosedPath = () => {
+        ctx.beginPath();
+        for (let i = 0; i < pts.length; i++) {
+          const p = pts[i];
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+      };
+      const explored = exploredHexes.has(hx.h3Index);
+      if (explored && !deps.isMapInspectionModeHeld()) {
+        fillHexTerrain(ctx, kind, drawClosedPath, {
+          fillAndHatchAlphaScale: !res4Active && rendererSharedState.hoveredHexH3 === hx.h3Index ? 2 : 1,
+          landHoverFill: !res4Active && rendererSharedState.hoveredHexH3 === hx.h3Index && kind === "plains",
+          isUrban: false
+        });
+      }
+      const stroke = getActiveHexStrokeStyle();
+      ctx.strokeStyle = stroke.color;
+      ctx.lineWidth = stroke.width * zoomStrokeScale;
+      drawClosedPath();
+      ctx.stroke();
+      if (rendererSharedState.selectedHexIndex === hx.h3Index) {
+        drawClosedPath();
+        ctx.strokeStyle = "#2e5a7b";
+        ctx.lineWidth = Math.max(1.8, 2.2 * zoomStrokeScale);
+        ctx.stroke();
+      }
+    }
+  }
+  function drawRes4TerrainHexes(ctx, deps) {
+    if (!rendererSharedState.gameState || !shouldRenderRes4Hexes()) return;
+    const exploredHexes = deps.getExploredHexSet(rendererSharedState.gameState);
+    const map = getMainLeafletMap();
+    if (!map) return;
+    const L = getLeafletGlobal();
+    const container = map.getContainer();
+    const viewportWidth = Math.max(1, container.clientWidth);
+    const viewportHeight = Math.max(1, container.clientHeight);
+    const stroke = getActiveHexStrokeStyle();
+    const tactical = rendererSharedState.tacticalBattleSnapshot;
+    for (const parent of rendererSharedState.gameState.hexes) {
+      if (tactical && parent.h3Index !== tactical.enclosingRes1H3Index) continue;
+      if (!tactical && !exploredHexes.has(parent.h3Index)) continue;
+      const parentPts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
+      if (!projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight)) continue;
+      const parentKind = parent.terrainKind ?? (parent.terrain === "water" ? "water" : parent.terrain === "coastal" ? "coastal" : parent.terrain === "wetlands" ? "wetlands" : "plains");
+      let children = rendererSharedState.res4ChildrenByParent.get(parent.h3Index);
+      if (!children) {
+        children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
+        rendererSharedState.res4ChildrenByParent.set(parent.h3Index, children);
+      }
+      for (const child of children) {
+        const override = rendererSharedState.res4TerrainOverridesByH3.get(child);
+        const terrainKind = override?.terrainKind ?? parentKind;
+        const isUrban = override?.isUrban ?? false;
+        const isRubble = override?.isRubble ?? false;
+        const pts = projectHexBoundaryToContainerPoints(child, map, L);
+        if (!projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight)) continue;
+        const drawClosedPath = () => {
+          ctx.beginPath();
+          for (let i = 0; i < pts.length; i++) {
+            const p = pts[i];
+            if (i === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+          }
+          ctx.closePath();
+        };
+        if (!deps.isMapInspectionModeHeld()) {
+          fillHexTerrain(ctx, terrainKind, drawClosedPath, {
+            fillAndHatchAlphaScale: rendererSharedState.hoveredDetailHexH3 === child ? 2 : 1,
+            landHoverFill: rendererSharedState.hoveredDetailHexH3 === child && terrainKind === "plains",
+            isUrban,
+            isRubble
+          });
+        }
+        ctx.strokeStyle = stroke.color;
+        ctx.lineWidth = Math.max(0.28, stroke.width * 0.62);
+        drawClosedPath();
+        ctx.stroke();
+      }
+    }
+  }
+  function drawScenarioHomeRegionOutlines(ctx) {
+    const state = rendererSharedState.gameState;
+    if (!state || state.scenarioId !== "region_vs_region") return;
+    const map = getMainLeafletMap();
+    if (!map) return;
+    const L = getLeafletGlobal();
+    const zoom = typeof map.getZoom === "function" ? map.getZoom() : 4;
+    const zoomScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
+    const humanColor = PLAYER_COLORS.human ?? "#2e5a7b";
+    const aiColor = PLAYER_COLORS.opponent ?? "#7b4a2e";
+    const intersectionHexes = new Set(
+      state.intersectingHomeRegionHexes ?? computeIntersectingHomeRegionHexes(state.humanHomeRegionHexes ?? [], state.aiHomeRegionHexes ?? [])
+    );
+    const contestedHomeHexes = new Set(
+      state.contestedHomeRegionHexes ?? computeContestedHomeRegionHexes(state.units, [...state.humanHomeRegionHexes ?? [], ...state.aiHomeRegionHexes ?? []])
+    );
+    const controlByHex = buildControlByHex(state);
+    const resolveHexOutlineColor = (h3Index, fallbackColor) => {
+      const outlineState = classifyHomeRegionOutlineState(
+        h3Index,
+        intersectionHexes,
+        contestedHomeHexes,
+        controlByHex.get(h3Index)
+      );
+      if (outlineState === "intersection" || outlineState === "contested") return MULTI_PLAYER_FILL;
+      if (outlineState === "controlledByHuman") return humanColor;
+      if (outlineState === "controlledByOpponent") return aiColor;
+      return fallbackColor;
+    };
+    const drawRegion = (hexes, fallbackColor) => {
+      if (!Array.isArray(hexes) || hexes.length <= 0) return;
+      for (const h3Index of hexes) {
+        const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
+        const pts = boundary.map(([lat, lng]) => {
+          const p = map.latLngToContainerPoint(L.latLng(lat, lng));
+          return { x: p.x, y: p.y };
+        });
+        const outlineColor = resolveHexOutlineColor(h3Index, fallbackColor);
+        strokeDualClosedPolygon(ctx, pts, {
+          underStrokeColor: "rgba(0, 0, 0, 0.25)",
+          underStrokeWidth: Math.max(1.2, 2.2 * zoomScale),
+          topStrokeColor: withOpacity(outlineColor, 0.5),
+          topStrokeWidth: Math.max(0.75, 1.25 * zoomScale) * 0.75 * 1.5
+        });
+      }
+    };
+    drawRegion(state.humanHomeRegionHexes, humanColor);
+    drawRegion(state.aiHomeRegionHexes, aiColor);
+  }
+  function hasVisibleRes1InfrastructureGlyphs(h3Index, res4On, unitHexes, deps) {
+    void unitHexes;
+    return !res4On && deps.infraGlyphsAllowedForRes1Hex(h3Index) && (rendererSharedState.terrainInfraRes1Airport.has(h3Index) || rendererSharedState.terrainInfraRes1Seaport.has(h3Index));
+  }
+  function computeRes1OverlayTextY(h3Index, map, L, hasOffsetFeatures) {
+    const center = hexCenterPx(h3Index);
+    if (!hasOffsetFeatures) return center.y;
+    const pts = projectHexBoundaryToContainerPoints(h3Index, map, L);
+    return center.y + spanForProjectedHex(pts) * 0.24;
+  }
+  function drawTerrainInfrastructureOverlays(ctx, deps) {
+    if (!rendererSharedState.gameState) return;
+    const map = getMainLeafletMap();
+    if (!map) return;
+    const mapWithZoom = map;
+    const zoom = typeof mapWithZoom.getZoom === "function" ? mapWithZoom.getZoom() : 4;
+    const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
+    const outlineScreenPx = Math.max(0.5, 0.58 * zoomStrokeScale);
+    const L = getLeafletGlobal();
+    const res4On = shouldRenderRes4Hexes();
+    if (!res4On) {
+      for (const hx of rendererSharedState.gameState.hexes) {
+        if (!deps.infraGlyphsAllowedForRes1Hex(hx.h3Index)) continue;
+        const ap = rendererSharedState.terrainInfraRes1Airport.has(hx.h3Index);
+        const pt = rendererSharedState.terrainInfraRes1Seaport.has(hx.h3Index);
+        if (!ap && !pt) continue;
+        const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
+        const pts = boundary.map(([lat, lng]) => {
+          const p = map.latLngToContainerPoint(L.latLng(lat, lng));
+          return { x: p.x, y: p.y };
+        });
+        drawTerrainInfrastructureGlyphs(ctx, pts, {
+          showAirport: ap,
+          showSeaport: pt,
+          outlineScreenPx,
+          centerYOffsetPx: spanForProjectedHex(pts) * -0.14
+        });
+      }
+      return;
+    }
+    const container = map.getContainer();
+    const viewportWidth = Math.max(1, container.clientWidth);
+    const viewportHeight = Math.max(1, container.clientHeight);
+    for (const parent of rendererSharedState.gameState.hexes) {
+      let children = rendererSharedState.res4ChildrenByParent.get(parent.h3Index);
+      if (!children) {
+        children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
+        rendererSharedState.res4ChildrenByParent.set(parent.h3Index, children);
+      }
+      const parentPts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
+      if (!projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight)) continue;
+      for (const child of children) {
+        if (!deps.infraGlyphsAllowedForRes4Child(parent.h3Index, child)) continue;
+        const ap = rendererSharedState.terrainInfraRes4Airport.has(child);
+        const pt = rendererSharedState.terrainInfraRes4Seaport.has(child);
+        if (!ap && !pt) continue;
+        const pts = projectHexBoundaryToContainerPoints(child, map, L);
+        if (!projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight)) continue;
+        drawTerrainInfrastructureGlyphs(ctx, pts, {
+          showAirport: ap,
+          showSeaport: pt,
+          outlineScreenPx,
+          glyphAreaScale: RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE
+        });
+      }
+    }
+  }
+
+  // src/renderer/map/tacticalEntryLayer.ts
+  function hideTacticalEntryLayer(layer, clearHtml = true) {
+    layer.classList.add("hidden");
+    layer.setAttribute("aria-hidden", "true");
+    if (clearHtml) {
+      layer.innerHTML = "";
+    }
+    rendererSharedState.tacticalEntryButtonPointerInside = false;
+    rendererSharedState.lastTacticalEntryLayerKey = null;
+  }
+  function isContestedRes1Hex(state, h3Index) {
+    const here = state.units.filter((u) => u.h3Index === h3Index);
+    return here.some((u) => u.player === "human") && here.some((u) => u.player === "opponent");
+  }
+  function syncTacticalEntryButton(deps) {
+    const layer = document.getElementById("tactical-entry-layer");
+    if (!layer || !rendererSharedState.gameState) {
+      if (layer) hideTacticalEntryLayer(layer, false);
+      return;
+    }
+    if (rendererSharedState.gameState.phase !== "planning" || rendererSharedState.tacticalBattleSnapshot) {
+      hideTacticalEntryLayer(layer);
+      return;
+    }
+    if (!shouldShowBuildEntryZoom()) {
+      hideTacticalEntryLayer(layer);
+      return;
+    }
+    const map = getMainLeafletMap();
+    const L = getLeafletGlobal();
+    if (!map || !L) {
+      hideTacticalEntryLayer(layer);
+      return;
+    }
+    const visibleUnitHexes = new Set(rendererSharedState.gameState.units.map((u) => u.h3Index));
+    const rows = [];
+    for (const hx of rendererSharedState.gameState.hexes) {
+      if (!deps.isHexExploredByPlayer(hx.h3Index)) continue;
+      if (!isContestedRes1Hex(rendererSharedState.gameState, hx.h3Index)) continue;
+      const center = hexCenterPx(hx.h3Index);
+      const hasOffset = deps.hasRes1OverlayOffsetFeatures(hx.h3Index, visibleUnitHexes) || visibleUnitHexes.has(hx.h3Index);
+      const textY = computeRes1OverlayTextY(hx.h3Index, map, L, hasOffset);
+      const magnifyTop = Math.round(2 * center.y - textY);
+      rows.push({ h3: hx.h3Index, left: Math.round(center.x), top: magnifyTop });
+    }
+    if (rows.length === 0) {
+      hideTacticalEntryLayer(layer);
+      return;
+    }
+    rows.sort((a, b) => a.h3.localeCompare(b.h3));
+    const layerKey = rows.map((r) => `${r.h3}|${r.left}|${r.top}`).join(";");
+    if (layerKey !== rendererSharedState.lastTacticalEntryLayerKey) {
+      const html = rows.map(
+        (r) => `<button type="button" class="tactical-entry-btn" data-h3-index="${r.h3}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" title="Tactical battle" aria-label="Start tactical battle in ${r.h3}">&#128269;</button>`
+      ).join("");
+      layer.innerHTML = html;
+      rendererSharedState.lastTacticalEntryLayerKey = layerKey;
+    }
+    layer.classList.remove("hidden");
+    layer.setAttribute("aria-hidden", "false");
+  }
+  async function tryHandleTacticalEntryAtClientXY(clientX, clientY, onStart) {
+    const layer = document.getElementById("tactical-entry-layer");
+    if (!layer || layer.classList.contains("hidden")) return false;
+    const buttons = Array.from(layer.querySelectorAll(".tactical-entry-btn"));
+    const pad = TACTICAL_ENTRY_HIT_PAD_PX;
+    for (const btn of buttons) {
+      const r = btn.getBoundingClientRect();
+      if (clientX < r.left - pad || clientX > r.right + pad || clientY < r.top - pad || clientY > r.bottom + pad) continue;
+      const h3 = btn.dataset.h3Index;
+      if (!h3) continue;
+      await onStart(h3);
+      return true;
+    }
+    return false;
   }
 
   // src/renderer/rendering/unitDrawing.ts
@@ -16628,6 +17723,9 @@
     rendererSharedState.precomputedAiRangedOrders = result.rangedAttacks ?? [];
     rendererSharedState.precomputedAiEmbarkOrders = result.embarkOrders ?? [];
     rendererSharedState.precomputedAiStrategy = result.strategy ?? null;
+    if (result.tacticalBattle) {
+      rendererSharedState.tacticalBattleSnapshot = result.tacticalBattle;
+    }
   }
 
   // src/renderer/gameplay/newGame.ts
@@ -16817,6 +17915,166 @@
     }));
   }
 
+  // src/shared/tacticalStateAssertions.ts
+  function tacticalBoundaryPlanningExitAllowed(tacticalSnapshot, tacticalPhasePlanning) {
+    if (!tacticalSnapshot || !tacticalPhasePlanning) return { ok: false, code: "not_planning_exit" };
+    return { ok: true };
+  }
+  function tacticalBoundaryPlanningAdvanceAllowed(tacticalSnapshot, tacticalPhasePlanning) {
+    if (!tacticalSnapshot || !tacticalPhasePlanning) return { ok: false, code: "not_planning_advance" };
+    return { ok: true };
+  }
+
+  // src/shared/tacticalAnnihilation.ts
+  function shouldEndTacticalBattleForAnnihilation(subUnits) {
+    let human = 0;
+    let opponent = 0;
+    for (const u of subUnits) {
+      if (u.player === "human") human += 1;
+      else opponent += 1;
+    }
+    return human === 0 || opponent === 0;
+  }
+
+  // src/renderer/tactical/tacticalUiOrchestration.ts
+  function tacticalApplyStrategicSidebarForTacticalMode(tactical) {
+    document.getElementById("sidebar")?.classList.toggle("tactical-strategic-suppress", tactical);
+  }
+  function tacticalUpdateExitButtonVisibility() {
+    const hud = document.getElementById("tactical-battle-hud");
+    const exitBtn = document.getElementById("tactical-exit-btn");
+    const advanceBtn = document.getElementById("tactical-advance-turn-btn");
+    const turnLabel = document.getElementById("tactical-turn-label");
+    const active = !!rendererSharedState.tacticalBattleSnapshot;
+    hud?.classList.toggle("hidden", !active);
+    if (turnLabel) {
+      turnLabel.textContent = active && rendererSharedState.tacticalBattleSnapshot ? `Tactical turn ${rendererSharedState.tacticalBattleSnapshot.tacticalTurnNumber}` : "";
+    }
+    const disabled = !active || !rendererSharedState.tacticalPhasePlanning;
+    if (exitBtn) exitBtn.disabled = disabled;
+    if (advanceBtn) advanceBtn.disabled = disabled;
+  }
+  function tacticalReconcileBattleAfterStrategicSnapshot(nextState) {
+    const snap = rendererSharedState.tacticalBattleSnapshot;
+    if (!snap) return;
+    if (nextState.phase !== "planning" || nextState.turnNumber !== snap.strategicTurnNumber) {
+      rendererSharedState.tacticalBattleSnapshot = null;
+      rendererSharedState.tacticalPhasePlanning = true;
+      exitTacticalMapView();
+      tacticalApplyStrategicSidebarForTacticalMode(false);
+      const el = document.getElementById("tactical-entry-layer");
+      if (el) hideTacticalEntryLayer(el, true);
+      tacticalUpdateExitButtonVisibility();
+    }
+  }
+  function tacticalSyncTacticalEntryButtonOverlay(deps) {
+    syncTacticalEntryButton(deps);
+  }
+
+  // src/renderer/tactical/tacticalExitFlow.ts
+  var tacticalAnnihilationExitInFlight = false;
+  function tacticalMaybeScheduleAnnihilationExit(session, io) {
+    if (tacticalAnnihilationExitInFlight) return;
+    const snap = session.getBattleSnapshot();
+    if (!snap || !session.getPhasePlanning()) return;
+    if (!shouldEndTacticalBattleForAnnihilation(snap.subUnits)) return;
+    tacticalAnnihilationExitInFlight = true;
+    void (async () => {
+      try {
+        io.showMapToast("Tactical battle ended \u2014 one side has no remaining sub-units.", {});
+        await tacticalPerformBattleExit(session, io);
+      } finally {
+        tacticalAnnihilationExitInFlight = false;
+      }
+    })();
+  }
+  async function tacticalPerformBattleExit(session, io) {
+    const boundary = tacticalBoundaryPlanningExitAllowed(session.getBattleSnapshot(), session.getPhasePlanning());
+    if (!boundary.ok) return;
+    try {
+      if (io.endTacticalBattle) {
+        await io.endTacticalBattle();
+      }
+    } catch (err) {
+      console.error("endTacticalBattle failed:", err);
+      io.showMapToast("Could not exit tactical battle.", { isError: true });
+      return;
+    }
+    session.setBattleSnapshot(null);
+    session.setPhasePlanning(true);
+    exitTacticalMapView();
+    tacticalApplyStrategicSidebarForTacticalMode(false);
+    const tel = document.getElementById("tactical-entry-layer");
+    if (tel) hideTacticalEntryLayer(tel, false);
+    tacticalUpdateExitButtonVisibility();
+    io.redraw();
+    await io.runReadyAfterExit();
+  }
+  async function tacticalPerformAdvanceTurn(session, io) {
+    const boundary = tacticalBoundaryPlanningAdvanceAllowed(session.getBattleSnapshot(), session.getPhasePlanning());
+    if (!boundary.ok) return;
+    session.setPhasePlanning(false);
+    tacticalUpdateExitButtonVisibility();
+    io.redraw();
+    try {
+      const result = await io.advanceTacticalTurn();
+      if (!result.success || !result.battle) {
+        io.showMapToast(result.reason ?? "Could not advance tactical turn.", { isError: true });
+        session.setPhasePlanning(true);
+        tacticalUpdateExitButtonVisibility();
+        io.redraw();
+        return;
+      }
+      session.setBattleSnapshot(result.battle);
+      tacticalUpdateExitButtonVisibility();
+      io.redraw();
+      io.startBackgroundRequestIfAllowed();
+      await new Promise((resolve) => {
+        queueMicrotask(() => resolve());
+      });
+      const deadline = Date.now() + TACTICAL_ADVANCE_BACKGROUND_AI_TIMEOUT_MS;
+      while (io.isBackgroundRequestInFlight() && Date.now() < deadline) {
+        await new Promise((resolve) => {
+          setTimeout(resolve, TACTICAL_ADVANCE_BACKGROUND_AI_POLL_MS);
+        });
+      }
+      if (io.isBackgroundRequestInFlight()) {
+        io.showMapToast("Tactical AI planning is still running; controls unlocked.", {});
+      }
+      session.setPhasePlanning(true);
+      tacticalUpdateExitButtonVisibility();
+      io.scheduleAnnihilationExit();
+      io.redraw();
+    } catch (err) {
+      console.error("advanceTacticalTurn failed:", err);
+      io.showMapToast("Could not advance tactical turn.", { isError: true });
+      session.setPhasePlanning(true);
+      tacticalUpdateExitButtonVisibility();
+      io.redraw();
+    }
+  }
+
+  // src/renderer/tactical/tacticalIpcHandlers.ts
+  function tacticalRendererApplyStartBattleIpcResult(result, fx) {
+    if (!result.success || !result.battle) {
+      fx.showMapToast(result.reason ?? "Could not start tactical battle.", { isError: true });
+      return;
+    }
+    fx.assignBattleSnapshot(result.battle);
+    fx.setPhasePlanning(true);
+    const skipped = result.skippedParentDisplayNames;
+    if (skipped && skipped.length > 0) {
+      fx.showMapToast(`Some units could not be placed tactically: ${skipped.join(", ")}.`, { isError: true });
+    }
+    fx.enterRes4View(result.battle.res4ChildH3Indexes);
+    fx.setStrategicSidebarTactical(true);
+    fx.refreshTacticalExitHud();
+    fx.scheduleAnnihilationExit();
+    fx.refreshReadyButton();
+    fx.syncTacticalEntryOverlay();
+    fx.redraw();
+  }
+
   // src/renderer/gameplay/buildQueuePopup.ts
   function sanitizeBuildCountInputText(raw) {
     const digitsOnly = raw.replaceAll(/\D/g, "").slice(0, 2);
@@ -16835,7 +18093,9 @@
     if (!(target instanceof Node)) return false;
     const popup = document.getElementById("build-popup");
     const layer = document.getElementById("build-entry-layer");
-    return !!(popup?.contains(target) || layer?.contains(target));
+    const tacticalLayer = document.getElementById("tactical-entry-layer");
+    const tacticalHud = document.getElementById("tactical-battle-hud");
+    return !!(popup?.contains(target) || layer?.contains(target) || tacticalLayer?.contains(target) || tacticalHud?.contains(target));
   }
   function escapeHtml(text) {
     return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
@@ -17311,6 +18571,9 @@
         }
         if (rendererSharedState.runButtonOn && result.success) {
           applySuccessfulPrecomputedAiResult(result);
+          if (result.tacticalBattle) {
+            deps.requestRedraw?.();
+          }
           if (result.toolInvocationCounts) {
             rendererSharedState.precomputedToolInvocationCounts = { ...result.toolInvocationCounts };
             for (const [groupId, count] of Object.entries(result.toolInvocationCounts)) {
@@ -17517,6 +18780,17 @@
       for (const btn of buttons) {
         const br = btn.getBoundingClientRect();
         if (pointInExpandedClientRect(clientX, clientY, br, BUILD_ENTRY_HIT_PAD_PX)) {
+          want = "default";
+          break;
+        }
+      }
+    }
+    const tacticalLayer = document.getElementById("tactical-entry-layer");
+    if (want === "" && tacticalLayer && !tacticalLayer.classList.contains("hidden")) {
+      const tacticalBtns = Array.from(tacticalLayer.querySelectorAll(".tactical-entry-btn"));
+      for (const btn of tacticalBtns) {
+        const br = btn.getBoundingClientRect();
+        if (pointInExpandedClientRect(clientX, clientY, br, TACTICAL_ENTRY_HIT_PAD_PX)) {
           want = "default";
           break;
         }
@@ -18302,7 +19576,8 @@
       if (next instanceof Node) {
         const buildEntry = document.getElementById("build-entry-layer");
         const buildPopup = document.getElementById("build-popup");
-        if (buildEntry && buildEntry.contains(next) || buildPopup && buildPopup.contains(next)) {
+        const tacticalEntry = document.getElementById("tactical-entry-layer");
+        if (buildEntry && buildEntry.contains(next) || buildPopup && buildPopup.contains(next) || tacticalEntry && tacticalEntry.contains(next)) {
           return;
         }
       }
@@ -18325,6 +19600,12 @@
       const hit = clientXYToHit(e.clientX, e.clientY);
       rendererSharedState.selectedHexIndex = hit;
       deps.clearSidebarError();
+      if (rendererSharedState.tacticalBattleSnapshot && !tacticalRendererHitInsideBattleFootprint(hit, rendererSharedState.tacticalBattleSnapshot)) {
+        if (hit) {
+          deps.showMapToast("That hex is outside the active tactical battle.", { isError: true });
+        }
+        return;
+      }
       if (hit && rendererSharedState.airStrikeModeActive && rendererSharedState.selectedUnitIds.length > 0 && rendererSharedState.gameState) {
         if (!window.gameApi?.validateGroupAirStrikeTarget) return;
         const selectedIds = [...rendererSharedState.selectedUnitIds];
@@ -18386,6 +19667,12 @@
       const px = clickRect ? e.clientX - clickRect.left : 0;
       const py = clickRect ? e.clientY - clickRect.top : 0;
       const { unitsToDraw, movingIds } = rendererSharedState.gameState ? deps.getUnitsForDrawWithMovingIds(rendererSharedState.gameState) : { unitsToDraw: [], movingIds: void 0 };
+      if (await deps.tryHandleTacticalEntryAtClientXY(e.clientX, e.clientY)) {
+        deps.updateSidebar();
+        deps.updateRangedSidebar();
+        deps.redraw();
+        return;
+      }
       if (deps.tryHandleBuildEntryAtClientXY(e.clientX, e.clientY)) {
         deps.updateSidebar();
         deps.updateRangedSidebar();
@@ -18499,385 +19786,6 @@
       deps.updateRangedSidebar();
       deps.redraw();
     });
-  }
-
-  // src/shared/pipelineTerrain.ts
-  var PIPELINE_TERRAIN_KINDS = [
-    "water",
-    "coastal",
-    "wetlands",
-    "plains",
-    "forest",
-    "mountain",
-    "desert",
-    "arctic"
-  ];
-  var KIND_SET = new Set(PIPELINE_TERRAIN_KINDS);
-
-  // src/renderer/rendering/terrainVisualStyles.ts
-  var patternCache = /* @__PURE__ */ new Map();
-  var UNKNOWN_FILL = "rgba(140, 140, 140, 0.075)";
-  var DEFAULT_HEX_STROKE_COLOR = "rgba(36,38,42,0.4)";
-  var DEFAULT_HEX_STROKE_WIDTH = 0.5;
-  var WARGAME_HEX_STROKE_COLOR = "rgba(210, 216, 228, 0.077)";
-  var WARGAME_HEX_STROKE_WIDTH = 0.72;
-  var LAND_HOVER_FILL_BASE = "rgba(155, 168, 128, 0.42)";
-  var TERRAIN_STYLE_PRESETS = {
-    /**
-       * Documents the object literal property `default` (default: { label: 'Default', basemapId: 'carto_light_nolabels', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
-    
-       * Purpose: Supports maintainability by documenting why `default` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    default: {
-      label: "Default",
-      basemapId: "carto_light_nolabels",
-      fillAlphaMultiplier: 0.55,
-      hatchAlphaMultiplier: 0.375,
-      fills: {
-        water: "rgba(42, 117, 214, 0.28)",
-        coastal: "rgba(59, 186, 194, 0.24)",
-        wetlands: "rgba(59, 186, 194, 0.24)",
-        plains: "rgba(186, 208, 160, 0.2)",
-        forest: "rgba(50, 142, 74, 0.43)",
-        mountain: "rgba(154, 77, 122, 0.54)",
-        desert: "rgba(214, 182, 120, 0.44)",
-        arctic: "rgba(234, 245, 255, 0.5)"
-      },
-      hatches: {
-        mountain: { color: "rgba(95, 24, 74, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
-        forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
-        coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
-        wetlands: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: true },
-        desert: { color: "rgba(150, 104, 43, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
-      },
-      urbanOverlayFill: "rgba(137, 117, 98, 0.46)",
-      urbanOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.85, reverseDiagonal: false, pattern: "orthogonal" },
-      rubbleOverlayFill: "rgba(137, 117, 98, 0.46)",
-      rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
-    },
-    /**
-       * Documents the object literal property `atlas` (atlas: { label: 'Atlas', basemapId: 'carto_voyager_nolabels', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: { w).
-    
-       * Purpose: Supports maintainability by documenting why `atlas` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    atlas: {
-      label: "Atlas",
-      basemapId: "carto_voyager_nolabels",
-      fillAlphaMultiplier: 0.55,
-      hatchAlphaMultiplier: 0.375,
-      fills: {
-        water: "rgba(56, 128, 214, 0.28)",
-        coastal: "rgba(76, 173, 188, 0.24)",
-        wetlands: "rgba(76, 173, 188, 0.24)",
-        plains: "rgba(193, 211, 165, 0.2)",
-        forest: "rgba(70, 146, 86, 0.43)",
-        mountain: "rgba(168, 70, 96, 0.55)",
-        desert: "rgba(220, 189, 128, 0.44)",
-        arctic: "rgba(235, 244, 255, 0.5)"
-      },
-      hatches: {
-        mountain: { color: "rgba(114, 26, 50, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
-        forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
-        coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
-        wetlands: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: true },
-        desert: { color: "rgba(152, 109, 47, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
-      },
-      urbanOverlayFill: "rgba(141, 122, 103, 0.46)",
-      urbanOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.85, reverseDiagonal: false, pattern: "orthogonal" },
-      rubbleOverlayFill: "rgba(141, 122, 103, 0.46)",
-      rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
-    },
-    /**
-       * Documents the object literal property `wargame` (wargame: { label: 'Wargame', basemapId: 'carto_dark_nolabels', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
-    
-       * Purpose: Supports maintainability by documenting why `wargame` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    wargame: {
-      label: "Wargame",
-      basemapId: "carto_dark_nolabels",
-      fillAlphaMultiplier: 0.55,
-      hatchAlphaMultiplier: 0.375,
-      fills: {
-        water: "rgba(38, 118, 206, 0.28)",
-        coastal: "rgba(70, 176, 192, 0.24)",
-        wetlands: "rgba(70, 176, 192, 0.24)",
-        plains: "rgba(170, 188, 136, 0.2)",
-        forest: "rgba(58, 150, 86, 0.43)",
-        mountain: "rgba(218, 76, 146, 0.5)",
-        desert: "rgba(221, 171, 88, 0.46)",
-        arctic: "rgba(221, 236, 255, 0.5)"
-      },
-      hatches: {
-        mountain: { color: "rgba(255, 162, 214, 0.68)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
-        forest: { color: "rgba(130, 245, 190, 0.58)", spacing: 7, lineWidth: 0.9, reverseDiagonal: true },
-        coastal: { color: "rgba(110, 220, 235, 0.42)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
-        wetlands: { color: "rgba(110, 220, 235, 0.42)", spacing: 8, lineWidth: 0.72, reverseDiagonal: true },
-        desert: { color: "rgba(255, 207, 130, 0.5)", spacing: 7, lineWidth: 1.05, reverseDiagonal: false, pattern: "dots" }
-      },
-      urbanOverlayFill: "rgba(132, 112, 97, 0.46)",
-      urbanOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.88, reverseDiagonal: false, pattern: "orthogonal" },
-      rubbleOverlayFill: "rgba(132, 112, 97, 0.46)",
-      rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.88, reverseDiagonal: true, crosshatch: true }
-    },
-    /**
-       * Documents the object literal property `scientific` (scientific: { label: 'Scientific', basemapId: 'esri_world_shaded_relief', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills).
-    
-       * Purpose: Supports maintainability by documenting why `scientific` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    scientific: {
-      label: "Scientific",
-      basemapId: "esri_world_shaded_relief",
-      fillAlphaMultiplier: 0.55,
-      hatchAlphaMultiplier: 0.375,
-      fills: {
-        water: "rgba(52, 120, 204, 0.28)",
-        coastal: "rgba(69, 165, 186, 0.24)",
-        wetlands: "rgba(69, 165, 186, 0.24)",
-        plains: "rgba(188, 205, 162, 0.2)",
-        forest: "rgba(52, 136, 84, 0.43)",
-        mountain: "rgba(127, 83, 171, 0.55)",
-        desert: "rgba(206, 176, 118, 0.44)",
-        arctic: "rgba(234, 244, 255, 0.5)"
-      },
-      hatches: {
-        mountain: { color: "rgba(74, 35, 116, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
-        forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
-        coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
-        wetlands: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: true },
-        desert: { color: "rgba(145, 104, 42, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
-      },
-      urbanOverlayFill: "rgba(130, 112, 96, 0.46)",
-      urbanOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.85, reverseDiagonal: false, pattern: "orthogonal" },
-      rubbleOverlayFill: "rgba(130, 112, 96, 0.46)",
-      rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
-    }
-  };
-  var activeTerrainStyleId = "default";
-  function makeDiagonalHatchPattern(color, spacing, lineWidth, reverseDiagonal, crosshatch = false) {
-    const c = document.createElement("canvas");
-    const s = spacing * 2;
-    c.width = s;
-    c.height = s;
-    const p = c.getContext("2d");
-    if (!p) return null;
-    p.strokeStyle = color;
-    p.lineWidth = lineWidth;
-    p.beginPath();
-    if (reverseDiagonal) {
-      p.moveTo(0, 0);
-      p.lineTo(s, s);
-    } else {
-      p.moveTo(0, s);
-      p.lineTo(s, 0);
-    }
-    if (crosshatch) {
-      if (reverseDiagonal) {
-        p.moveTo(0, s);
-        p.lineTo(s, 0);
-      } else {
-        p.moveTo(0, 0);
-        p.lineTo(s, s);
-      }
-    }
-    p.stroke();
-    return p.createPattern(c, "repeat");
-  }
-  function makeDotPattern(color, spacing, diameter) {
-    const c = document.createElement("canvas");
-    const s = Math.max(2, spacing);
-    c.width = s;
-    c.height = s;
-    const p = c.getContext("2d");
-    if (!p) return null;
-    const r = Math.max(0.5, diameter * 0.5);
-    p.fillStyle = color;
-    p.beginPath();
-    p.arc(s * 0.5, s * 0.5, r, 0, Math.PI * 2);
-    p.fill();
-    return p.createPattern(c, "repeat");
-  }
-  function makeOrthogonalHatchPattern(color, spacing, lineWidth) {
-    const c = document.createElement("canvas");
-    const s = spacing * 2;
-    c.width = s;
-    c.height = s;
-    const p = c.getContext("2d");
-    if (!p) return null;
-    p.strokeStyle = color;
-    p.lineWidth = lineWidth;
-    p.beginPath();
-    p.moveTo(0, s * 0.5);
-    p.lineTo(s, s * 0.5);
-    p.moveTo(s * 0.5, 0);
-    p.lineTo(s * 0.5, s);
-    p.stroke();
-    return p.createPattern(c, "repeat");
-  }
-  function boostRgbaAlpha(color, factor) {
-    const m = color.match(/^rgba\(\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^)]+)\s*\)$/i);
-    if (!m) return color;
-    const r = m[1].trim();
-    const g = m[2].trim();
-    const b = m[3].trim();
-    const a = Number(m[4].trim());
-    if (!Number.isFinite(a)) return color;
-    const boosted = Math.max(0, Math.min(1, a * factor));
-    const aStr = String(Number(boosted.toFixed(3)));
-    return `rgba(${r}, ${g}, ${b}, ${aStr})`;
-  }
-  function activePreset() {
-    return TERRAIN_STYLE_PRESETS[activeTerrainStyleId];
-  }
-  function getTerrainStyleOptions() {
-    return Object.keys(TERRAIN_STYLE_PRESETS).map((id) => ({
-      id,
-      label: TERRAIN_STYLE_PRESETS[id].label
-    }));
-  }
-  function getActiveTerrainStyleId() {
-    return activeTerrainStyleId;
-  }
-  function getActiveTerrainStyleBasemapId() {
-    return activePreset().basemapId;
-  }
-  function getActiveHexStrokeStyle() {
-    if (activeTerrainStyleId === "wargame") {
-      return { color: WARGAME_HEX_STROKE_COLOR, width: WARGAME_HEX_STROKE_WIDTH };
-    }
-    return { color: DEFAULT_HEX_STROKE_COLOR, width: DEFAULT_HEX_STROKE_WIDTH };
-  }
-  function setActiveTerrainStyle(id) {
-    if (activeTerrainStyleId === id) return;
-    activeTerrainStyleId = id;
-    patternCache.clear();
-  }
-  function terrainKindFillStyle(kind, options) {
-    const k = kind;
-    const p = activePreset();
-    const base = options?.urbanOverlay ? p.urbanOverlayFill : p.fills[k] ?? UNKNOWN_FILL;
-    return boostRgbaAlpha(base, p.fillAlphaMultiplier);
-  }
-  function landHoverFillStyle() {
-    return boostRgbaAlpha(LAND_HOVER_FILL_BASE, activePreset().fillAlphaMultiplier);
-  }
-  function terrainKindPattern(ctx, kind, fillAndHatchAlphaScale = 1, options) {
-    const k = kind;
-    const overlayKey = options?.rubbleOverlay ? "rubble" : options?.urbanOverlay ? "urban" : "base";
-    const key = `${activeTerrainStyleId}:${k}:${fillAndHatchAlphaScale}:${overlayKey}`;
-    if (patternCache.has(key)) return patternCache.get(key) ?? null;
-    const p = activePreset();
-    const spec = options?.rubbleOverlay ? p.rubbleOverlayHatch : options?.urbanOverlay ? p.urbanOverlayHatch : p.hatches[k];
-    const pat = spec ? spec.pattern === "dots" ? makeDotPattern(
-      boostRgbaAlpha(boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier), fillAndHatchAlphaScale),
-      spec.spacing,
-      spec.lineWidth * 2
-    ) : spec.pattern === "orthogonal" ? makeOrthogonalHatchPattern(
-      boostRgbaAlpha(boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier), fillAndHatchAlphaScale),
-      spec.spacing,
-      spec.lineWidth
-    ) : makeDiagonalHatchPattern(
-      boostRgbaAlpha(boostRgbaAlpha(spec.color, p.hatchAlphaMultiplier), fillAndHatchAlphaScale),
-      spec.spacing,
-      spec.lineWidth,
-      spec.reverseDiagonal,
-      spec.crosshatch ?? false
-    ) : null;
-    patternCache.set(key, pat);
-    return pat;
-  }
-  function fillHexTerrain(ctx, terrainKind, drawPath, options) {
-    const scale = options?.fillAndHatchAlphaScale ?? 1;
-    const k = terrainKind;
-    const isRubble = options?.isRubble === true;
-    const isUrban = !isRubble && options?.isUrban === true;
-    if (!isUrban && options?.landHoverFill && k === "plains") {
-      drawPath();
-      ctx.fillStyle = boostRgbaAlpha(landHoverFillStyle(), scale);
-      ctx.fill();
-      return;
-    }
-    drawPath();
-    const fillBase = isRubble ? boostRgbaAlpha(activePreset().rubbleOverlayFill, activePreset().fillAlphaMultiplier) : terrainKindFillStyle(terrainKind, { urbanOverlay: isUrban });
-    ctx.fillStyle = boostRgbaAlpha(fillBase, scale);
-    ctx.fill();
-    const pat = terrainKindPattern(ctx, terrainKind, scale, { urbanOverlay: isUrban, rubbleOverlay: isRubble });
-    if (pat) {
-      drawPath();
-      ctx.fillStyle = pat;
-      ctx.fill();
-    }
-  }
-  var TERRAIN_LEGEND_ORDER = [...PIPELINE_TERRAIN_KINDS];
-  function renderTerrainLegend(container, options) {
-    container.innerHTML = "";
-    container.style.fontSize = "11px";
-    container.style.lineHeight = "1.3";
-    container.style.pointerEvents = "auto";
-    const header = document.createElement("div");
-    header.style.display = "flex";
-    header.style.alignItems = "center";
-    header.style.justifyContent = "space-between";
-    header.style.gap = "8px";
-    header.style.marginBottom = "4px";
-    const title = document.createElement("div");
-    title.textContent = "Terrain";
-    title.style.fontWeight = "600";
-    title.style.color = "#333";
-    header.appendChild(title);
-    const styleSelect = document.createElement("select");
-    styleSelect.setAttribute("aria-label", "Terrain style");
-    styleSelect.style.fontSize = "11px";
-    styleSelect.style.padding = "1px 3px";
-    styleSelect.style.border = "1px solid #aaa";
-    styleSelect.style.borderRadius = "2px";
-    styleSelect.style.background = "#f6f3ee";
-    const opts = getTerrainStyleOptions();
-    for (const o of opts) {
-      const opt = document.createElement("option");
-      opt.value = o.id;
-      opt.textContent = o.label;
-      styleSelect.appendChild(opt);
-    }
-    styleSelect.value = getActiveTerrainStyleId();
-    styleSelect.addEventListener("change", () => {
-      setActiveTerrainStyle(styleSelect.value);
-      if (options?.onStyleChanged) options.onStyleChanged(getActiveTerrainStyleId());
-      renderTerrainLegend(container, options);
-    });
-    header.appendChild(styleSelect);
-    container.appendChild(header);
-    for (const kind of TERRAIN_LEGEND_ORDER) {
-      const row = document.createElement("div");
-      row.style.display = "flex";
-      row.style.alignItems = "center";
-      row.style.gap = "6px";
-      row.style.marginBottom = "2px";
-      const sw = document.createElement("span");
-      sw.style.display = "inline-block";
-      sw.style.width = "18px";
-      sw.style.height = "12px";
-      sw.style.border = "1px solid #888";
-      sw.style.borderRadius = "2px";
-      sw.style.background = terrainKindFillStyle(kind);
-      row.appendChild(sw);
-      const lab = document.createElement("span");
-      lab.textContent = kind;
-      lab.style.color = "#444";
-      row.appendChild(lab);
-      container.appendChild(row);
-    }
   }
 
   // src/renderer/map/initCore.ts
@@ -19079,6 +19987,21 @@
       }
       deps.showBuildPopup(h3, e.clientX, e.clientY);
     });
+    const tacticalEntryLayer = document.getElementById("tactical-entry-layer");
+    tacticalEntryLayer?.addEventListener("pointerover", (e) => {
+      const target = e.target;
+      if (!target?.closest(".tactical-entry-btn")) return;
+      rendererSharedState.tacticalEntryButtonPointerInside = true;
+      deps.clearTerrainTooltipTimer();
+      deps.hideTerrainTooltipVisual();
+    });
+    tacticalEntryLayer?.addEventListener("pointerout", (e) => {
+      const target = e.target;
+      if (!target?.closest(".tactical-entry-btn")) return;
+      const next = e.relatedTarget;
+      if (next?.closest(".tactical-entry-btn")) return;
+      rendererSharedState.tacticalEntryButtonPointerInside = false;
+    });
     const canvasContainer = document.getElementById("canvas-container");
     canvasContainer?.addEventListener("pointermove", (e) => {
       deps.updateMapInteractionCursor(e.clientX, e.clientY);
@@ -19088,494 +20011,6 @@
       const map = getMainLeafletMap();
       map?.getContainer?.()?.style.removeProperty("cursor");
     });
-  }
-
-  // src/shared/homeRegionRules.ts
-  function uniqueSortedHexes(hexes) {
-    return [...new Set(hexes)].sort();
-  }
-  function computeIntersectingHomeRegionHexes(humanHomeRegionHexes, aiHomeRegionHexes) {
-    const aiSet = new Set(aiHomeRegionHexes);
-    return uniqueSortedHexes(humanHomeRegionHexes.filter((h3Index) => aiSet.has(h3Index)));
-  }
-  function computeContestedHomeRegionHexes(units, homeRegionHexes) {
-    const homeHexSet = new Set(homeRegionHexes);
-    const playersByHomeHex = /* @__PURE__ */ new Map();
-    for (const unit of units) {
-      if (!homeHexSet.has(unit.h3Index)) continue;
-      let players = playersByHomeHex.get(unit.h3Index);
-      if (!players) {
-        players = /* @__PURE__ */ new Set();
-        playersByHomeHex.set(unit.h3Index, players);
-      }
-      players.add(unit.player);
-    }
-    return uniqueSortedHexes(
-      [...playersByHomeHex.entries()].filter(([, players]) => players.size > 1).map(([h3Index]) => h3Index)
-    );
-  }
-  function classifyHomeRegionOutlineState(h3Index, intersectionHexes, contestedHexes, controllerPlayerId) {
-    if (intersectionHexes.has(h3Index)) return "intersection";
-    if (contestedHexes.has(h3Index)) return "contested";
-    if (controllerPlayerId === "human") return "controlledByHuman";
-    if (controllerPlayerId === "opponent") return "controlledByOpponent";
-    return "unknown";
-  }
-
-  // src/renderer/rendering/terrainInfrastructureIconPaths.ts
-  var AIRPLANE_VIEWBOX_SIZE = 16;
-  var AIRPLANE_VIEWBOX_CENTER = {
-    /**
-     * Documents the object literal property `x` (x: 8).
-    
-     * Purpose: Supports maintainability by documenting why `x` exists.
-     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-     * Exceptions: None.
-     */
-    x: 8,
-    /**
-     * Documents the object literal property `y` (y: 8).
-    
-     * Purpose: Supports maintainability by documenting why `y` exists.
-     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-     * Exceptions: None.
-     */
-    y: 8
-  };
-  var ANCHOR_VIEWBOX = {
-    /**
-     * Documents the object literal property `x` (x: 0).
-    
-     * Purpose: Supports maintainability by documenting why `x` exists.
-     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-     * Exceptions: None.
-     */
-    x: 0,
-    /**
-     * Documents the object literal property `y` (y: -960).
-    
-     * Purpose: Supports maintainability by documenting why `y` exists.
-     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-     * Exceptions: None.
-     */
-    y: -960,
-    /**
-     * Documents the object literal property `w` (w: 960).
-    
-     * Purpose: Supports maintainability by documenting why `w` exists.
-     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-     * Exceptions: None.
-     */
-    w: 960,
-    /**
-     * Documents the object literal property `h` (h: 960).
-    
-     * Purpose: Supports maintainability by documenting why `h` exists.
-     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-     * Exceptions: None.
-     */
-    h: 960
-  };
-  var ANCHOR_VIEWBOX_CENTER = {
-    /**
-     * Documents the object literal property `x` (x: 480).
-    
-     * Purpose: Supports maintainability by documenting why `x` exists.
-     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-     * Exceptions: None.
-     */
-    x: 480,
-    /**
-     * Documents the object literal property `y` (y: -480).
-    
-     * Purpose: Supports maintainability by documenting why `y` exists.
-     * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-     * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-     * Exceptions: None.
-     */
-    y: -480
-  };
-  var BOOTSTRAP_AIRPLANE_FILL_PATH = "M6.428 1.151C6.708.591 7.213 0 8 0s1.292.592 1.572 1.151C9.861 1.73 10 2.431 10 3v3.691l5.17 2.585a1.5 1.5 0 0 1 .83 1.342V12a.5.5 0 0 1-.582.493l-5.507-.918-.375 2.253 1.318 1.318A.5.5 0 0 1 10.5 16h-5a.5.5 0 0 1-.354-.854l1.319-1.318-.376-2.253-5.507.918A.5.5 0 0 1 0 12v-1.382a1.5 1.5 0 0 1 .83-1.342L6 6.691V3c0-.568.14-1.271.428-1.849";
-  var MATERIAL_SYMBOLS_ANCHOR_PATH = "M355-102q-64-22-116-60t-85.5-89Q120-302 120-360v-120l160 120-62 62q29 51 92 88t130 47v-357H320v-80h120v-47q-35-13-57.5-43.5T360-760q0-50 35-85t85-35q50 0 85 35t35 85q0 39-22.5 69.5T520-647v47h120v80H520v357q67-10 130-47t92-88l-62-62 160-120v120q0 58-33.5 109T721-162q-52 38-116 60T480-80q-61 0-125-22Zm125-618q17 0 28.5-11.5T520-760q0-17-11.5-28.5T480-800q-17 0-28.5 11.5T440-760q0 17 11.5 28.5T480-720Z";
-  var cachedAirplanePath = null;
-  var cachedAnchorPath = null;
-  function getAirplanePath2D() {
-    if (!cachedAirplanePath) cachedAirplanePath = new Path2D(BOOTSTRAP_AIRPLANE_FILL_PATH);
-    return cachedAirplanePath;
-  }
-  function getAnchorPath2D() {
-    if (!cachedAnchorPath) cachedAnchorPath = new Path2D(MATERIAL_SYMBOLS_ANCHOR_PATH);
-    return cachedAnchorPath;
-  }
-
-  // src/renderer/rendering/terrainInfrastructureOverlay.ts
-  function centroidAndSpan(pts) {
-    if (pts.length === 0) return { cx: 0, cy: 0, span: 1 };
-    let sx = 0;
-    let sy = 0;
-    let minX = pts[0].x;
-    let maxX = pts[0].x;
-    let minY = pts[0].y;
-    let maxY = pts[0].y;
-    for (const p of pts) {
-      sx += p.x;
-      sy += p.y;
-      if (p.x < minX) minX = p.x;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.y > maxY) maxY = p.y;
-    }
-    const w = Math.max(1e-6, maxX - minX);
-    const h = Math.max(1e-6, maxY - minY);
-    return { cx: sx / pts.length, cy: sy / pts.length, span: Math.min(w, h) };
-  }
-  function drawFilledSvgPath(ctx, path, screenCx, screenCy, pixelSize, outlineScreenPx, fillStyle, strokeStyle, viewBox) {
-    const s = pixelSize / Math.max(viewBox.width, viewBox.height);
-    ctx.save();
-    ctx.translate(screenCx, screenCy);
-    ctx.scale(s, s);
-    ctx.translate(-viewBox.originX, -viewBox.originY);
-    ctx.fillStyle = fillStyle;
-    ctx.fill(path);
-    ctx.strokeStyle = strokeStyle;
-    ctx.lineWidth = outlineScreenPx / s;
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    ctx.miterLimit = 1.6;
-    ctx.stroke(path);
-    ctx.restore();
-  }
-  var AIRPLANE_WIDTH_SCALE = 0.74;
-  var AIRPLANE_HEIGHT_SCALE = 1 - (1 - AIRPLANE_WIDTH_SCALE) / 2;
-  function drawAirplaneAt(ctx, cx, cy, pixelSize, outlineScreenPx, fillStyle, strokeStyle) {
-    const vb = Math.max(AIRPLANE_VIEWBOX_SIZE, AIRPLANE_VIEWBOX_SIZE);
-    const s = pixelSize / vb;
-    const sx = s * AIRPLANE_WIDTH_SCALE;
-    const sy = s * AIRPLANE_HEIGHT_SCALE;
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.scale(sx, sy);
-    ctx.translate(-AIRPLANE_VIEWBOX_CENTER.x, -AIRPLANE_VIEWBOX_CENTER.y);
-    const path = getAirplanePath2D();
-    ctx.fillStyle = fillStyle;
-    ctx.fill(path);
-    ctx.strokeStyle = strokeStyle;
-    ctx.lineWidth = outlineScreenPx / Math.max(sx, sy * 0.92);
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    ctx.miterLimit = 1.6;
-    ctx.stroke(path);
-    ctx.restore();
-  }
-  function drawAnchorAt(ctx, cx, cy, pixelSize, outlineScreenPx, fillStyle, strokeStyle) {
-    drawFilledSvgPath(ctx, getAnchorPath2D(), cx, cy, pixelSize, outlineScreenPx, fillStyle, strokeStyle, {
-      width: ANCHOR_VIEWBOX.w,
-      height: ANCHOR_VIEWBOX.h,
-      originX: ANCHOR_VIEWBOX_CENTER.x,
-      originY: ANCHOR_VIEWBOX_CENTER.y
-    });
-  }
-  var AIRPORT_FILL = "#e8eef6";
-  var AIRPORT_STROKE = "#1a1f28";
-  var PORT_FILL = "#6eb6f0";
-  var PORT_STROKE = "#0d1f35";
-  var GLYPH_OUTLINE_MULT = 1.58;
-  var GLYPH_AIR_PIXEL_FACTOR = 0.22;
-  var GLYPH_ANCHOR_TO_AIR_RATIO = 1.03;
-  var RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE = 1.2;
-  var SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE = 1.2;
-  function drawTerrainInfrastructureGlyphs(ctx, pts, options) {
-    const { showAirport, showSeaport, outlineScreenPx, glyphAreaScale = 1, centerYOffsetPx = 0 } = options;
-    if (!showAirport && !showSeaport) return;
-    const lin = Math.sqrt(glyphAreaScale);
-    const glyphOutline = Math.max(0.92, outlineScreenPx * GLYPH_OUTLINE_MULT * lin);
-    const { cx, cy, span } = centroidAndSpan(pts);
-    const centerY = cy + centerYOffsetPx;
-    const pxAir = span * GLYPH_AIR_PIXEL_FACTOR * lin;
-    const pxAnchor = pxAir * GLYPH_ANCHOR_TO_AIR_RATIO;
-    const both = showAirport && showSeaport;
-    if (both) {
-      const off = span * 0.1 * lin;
-      drawAirplaneAt(ctx, cx - off, centerY - off, pxAir, glyphOutline, AIRPORT_FILL, AIRPORT_STROKE);
-      drawAnchorAt(ctx, cx + off, centerY + off, pxAnchor, glyphOutline, PORT_FILL, PORT_STROKE);
-      return;
-    }
-    const soloLin = Math.sqrt(SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE);
-    const soloOutline = glyphOutline * soloLin;
-    if (showAirport) {
-      drawAirplaneAt(ctx, cx, centerY, pxAir * soloLin, soloOutline, AIRPORT_FILL, AIRPORT_STROKE);
-    } else {
-      drawAnchorAt(ctx, cx, centerY, pxAnchor * soloLin, soloOutline, PORT_FILL, PORT_STROKE);
-    }
-  }
-
-  // src/renderer/rendering/polygonOutline.ts
-  function drawClosedPolygonPath(ctx, points) {
-    ctx.beginPath();
-    for (let i = 0; i < points.length; i++) {
-      const p = points[i];
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    }
-    ctx.closePath();
-  }
-  function strokeDualClosedPolygon(ctx, points, styles) {
-    drawClosedPolygonPath(ctx, points);
-    ctx.strokeStyle = styles.underStrokeColor;
-    ctx.lineWidth = styles.underStrokeWidth;
-    ctx.stroke();
-    ctx.strokeStyle = styles.topStrokeColor;
-    ctx.lineWidth = styles.topStrokeWidth;
-    ctx.stroke();
-  }
-
-  // src/renderer/rendering/terrainRendering.ts
-  function withOpacity(color, alpha) {
-    const normalizedAlpha = Math.max(0, Math.min(1, alpha));
-    if (color.startsWith("#")) {
-      const hex = color.slice(1);
-      if (hex.length === 3) {
-        const r = Number.parseInt(`${hex[0]}${hex[0]}`, 16);
-        const g = Number.parseInt(`${hex[1]}${hex[1]}`, 16);
-        const b = Number.parseInt(`${hex[2]}${hex[2]}`, 16);
-        return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
-      }
-      if (hex.length === 6) {
-        const r = Number.parseInt(hex.slice(0, 2), 16);
-        const g = Number.parseInt(hex.slice(2, 4), 16);
-        const b = Number.parseInt(hex.slice(4, 6), 16);
-        return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
-      }
-    }
-    return color;
-  }
-  function buildControlByHex(state) {
-    return new Map((state.res1Control ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
-  }
-  function drawTerrainHexes(ctx, deps) {
-    if (!rendererSharedState.gameState) return;
-    const exploredHexes = deps.getExploredHexSet(rendererSharedState.gameState);
-    const res4Active = shouldRenderRes4Hexes();
-    if (res4Active) return;
-    const map = getMainLeafletMap();
-    if (!map) return;
-    const mapWithZoom = map;
-    const zoom = typeof mapWithZoom.getZoom === "function" ? mapWithZoom.getZoom() : 4;
-    const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
-    const L = getLeafletGlobal();
-    for (const hx of rendererSharedState.gameState.hexes) {
-      const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
-      const pts = boundary.map(([lat, lng]) => {
-        const p = map.latLngToContainerPoint(L.latLng(lat, lng));
-        return { x: p.x, y: p.y };
-      });
-      const kind = deps.getRes1DominantTerrainKind(
-        hx.h3Index,
-        hx.terrainKind ?? (hx.terrain === "water" ? "water" : hx.terrain === "coastal" ? "coastal" : hx.terrain === "wetlands" ? "wetlands" : "plains")
-      );
-      const drawClosedPath = () => {
-        ctx.beginPath();
-        for (let i = 0; i < pts.length; i++) {
-          const p = pts[i];
-          if (i === 0) ctx.moveTo(p.x, p.y);
-          else ctx.lineTo(p.x, p.y);
-        }
-        ctx.closePath();
-      };
-      const explored = exploredHexes.has(hx.h3Index);
-      if (explored && !deps.isMapInspectionModeHeld()) {
-        fillHexTerrain(ctx, kind, drawClosedPath, {
-          fillAndHatchAlphaScale: !res4Active && rendererSharedState.hoveredHexH3 === hx.h3Index ? 2 : 1,
-          landHoverFill: !res4Active && rendererSharedState.hoveredHexH3 === hx.h3Index && kind === "plains",
-          isUrban: false
-        });
-      }
-      const stroke = getActiveHexStrokeStyle();
-      ctx.strokeStyle = stroke.color;
-      ctx.lineWidth = stroke.width * zoomStrokeScale;
-      drawClosedPath();
-      ctx.stroke();
-      if (rendererSharedState.selectedHexIndex === hx.h3Index) {
-        drawClosedPath();
-        ctx.strokeStyle = "#2e5a7b";
-        ctx.lineWidth = Math.max(1.8, 2.2 * zoomStrokeScale);
-        ctx.stroke();
-      }
-    }
-  }
-  function drawRes4TerrainHexes(ctx, deps) {
-    if (!rendererSharedState.gameState || !shouldRenderRes4Hexes()) return;
-    const exploredHexes = deps.getExploredHexSet(rendererSharedState.gameState);
-    const map = getMainLeafletMap();
-    if (!map) return;
-    const L = getLeafletGlobal();
-    const container = map.getContainer();
-    const viewportWidth = Math.max(1, container.clientWidth);
-    const viewportHeight = Math.max(1, container.clientHeight);
-    const stroke = getActiveHexStrokeStyle();
-    for (const parent of rendererSharedState.gameState.hexes) {
-      if (!exploredHexes.has(parent.h3Index)) continue;
-      const parentPts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
-      if (!projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight)) continue;
-      const parentKind = parent.terrainKind ?? (parent.terrain === "water" ? "water" : parent.terrain === "coastal" ? "coastal" : parent.terrain === "wetlands" ? "wetlands" : "plains");
-      let children = rendererSharedState.res4ChildrenByParent.get(parent.h3Index);
-      if (!children) {
-        children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
-        rendererSharedState.res4ChildrenByParent.set(parent.h3Index, children);
-      }
-      for (const child of children) {
-        const override = rendererSharedState.res4TerrainOverridesByH3.get(child);
-        const terrainKind = override?.terrainKind ?? parentKind;
-        const isUrban = override?.isUrban ?? false;
-        const isRubble = override?.isRubble ?? false;
-        const pts = projectHexBoundaryToContainerPoints(child, map, L);
-        if (!projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight)) continue;
-        const drawClosedPath = () => {
-          ctx.beginPath();
-          for (let i = 0; i < pts.length; i++) {
-            const p = pts[i];
-            if (i === 0) ctx.moveTo(p.x, p.y);
-            else ctx.lineTo(p.x, p.y);
-          }
-          ctx.closePath();
-        };
-        if (!deps.isMapInspectionModeHeld()) {
-          fillHexTerrain(ctx, terrainKind, drawClosedPath, {
-            fillAndHatchAlphaScale: rendererSharedState.hoveredDetailHexH3 === child ? 2 : 1,
-            landHoverFill: rendererSharedState.hoveredDetailHexH3 === child && terrainKind === "plains",
-            isUrban,
-            isRubble
-          });
-        }
-        ctx.strokeStyle = stroke.color;
-        ctx.lineWidth = Math.max(0.28, stroke.width * 0.62);
-        drawClosedPath();
-        ctx.stroke();
-      }
-    }
-  }
-  function drawScenarioHomeRegionOutlines(ctx) {
-    const state = rendererSharedState.gameState;
-    if (!state || state.scenarioId !== "region_vs_region") return;
-    const map = getMainLeafletMap();
-    if (!map) return;
-    const L = getLeafletGlobal();
-    const zoom = typeof map.getZoom === "function" ? map.getZoom() : 4;
-    const zoomScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
-    const humanColor = PLAYER_COLORS.human ?? "#2e5a7b";
-    const aiColor = PLAYER_COLORS.opponent ?? "#7b4a2e";
-    const intersectionHexes = new Set(
-      state.intersectingHomeRegionHexes ?? computeIntersectingHomeRegionHexes(state.humanHomeRegionHexes ?? [], state.aiHomeRegionHexes ?? [])
-    );
-    const contestedHomeHexes = new Set(
-      state.contestedHomeRegionHexes ?? computeContestedHomeRegionHexes(state.units, [...state.humanHomeRegionHexes ?? [], ...state.aiHomeRegionHexes ?? []])
-    );
-    const controlByHex = buildControlByHex(state);
-    const resolveHexOutlineColor = (h3Index, fallbackColor) => {
-      const outlineState = classifyHomeRegionOutlineState(
-        h3Index,
-        intersectionHexes,
-        contestedHomeHexes,
-        controlByHex.get(h3Index)
-      );
-      if (outlineState === "intersection" || outlineState === "contested") return MULTI_PLAYER_FILL;
-      if (outlineState === "controlledByHuman") return humanColor;
-      if (outlineState === "controlledByOpponent") return aiColor;
-      return fallbackColor;
-    };
-    const drawRegion = (hexes, fallbackColor) => {
-      if (!Array.isArray(hexes) || hexes.length <= 0) return;
-      for (const h3Index of hexes) {
-        const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
-        const pts = boundary.map(([lat, lng]) => {
-          const p = map.latLngToContainerPoint(L.latLng(lat, lng));
-          return { x: p.x, y: p.y };
-        });
-        const outlineColor = resolveHexOutlineColor(h3Index, fallbackColor);
-        strokeDualClosedPolygon(ctx, pts, {
-          underStrokeColor: "rgba(0, 0, 0, 0.25)",
-          underStrokeWidth: Math.max(1.2, 2.2 * zoomScale),
-          topStrokeColor: withOpacity(outlineColor, 0.5),
-          topStrokeWidth: Math.max(0.75, 1.25 * zoomScale) * 0.75 * 1.5
-        });
-      }
-    };
-    drawRegion(state.humanHomeRegionHexes, humanColor);
-    drawRegion(state.aiHomeRegionHexes, aiColor);
-  }
-  function hasVisibleRes1InfrastructureGlyphs(h3Index, res4On, unitHexes, deps) {
-    void unitHexes;
-    return !res4On && deps.infraGlyphsAllowedForRes1Hex(h3Index) && (rendererSharedState.terrainInfraRes1Airport.has(h3Index) || rendererSharedState.terrainInfraRes1Seaport.has(h3Index));
-  }
-  function computeRes1OverlayTextY(h3Index, map, L, hasOffsetFeatures) {
-    const center = hexCenterPx(h3Index);
-    if (!hasOffsetFeatures) return center.y;
-    const pts = projectHexBoundaryToContainerPoints(h3Index, map, L);
-    return center.y + spanForProjectedHex(pts) * 0.24;
-  }
-  function drawTerrainInfrastructureOverlays(ctx, deps) {
-    if (!rendererSharedState.gameState) return;
-    const map = getMainLeafletMap();
-    if (!map) return;
-    const mapWithZoom = map;
-    const zoom = typeof mapWithZoom.getZoom === "function" ? mapWithZoom.getZoom() : 4;
-    const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
-    const outlineScreenPx = Math.max(0.5, 0.58 * zoomStrokeScale);
-    const L = getLeafletGlobal();
-    const res4On = shouldRenderRes4Hexes();
-    if (!res4On) {
-      for (const hx of rendererSharedState.gameState.hexes) {
-        if (!deps.infraGlyphsAllowedForRes1Hex(hx.h3Index)) continue;
-        const ap = rendererSharedState.terrainInfraRes1Airport.has(hx.h3Index);
-        const pt = rendererSharedState.terrainInfraRes1Seaport.has(hx.h3Index);
-        if (!ap && !pt) continue;
-        const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
-        const pts = boundary.map(([lat, lng]) => {
-          const p = map.latLngToContainerPoint(L.latLng(lat, lng));
-          return { x: p.x, y: p.y };
-        });
-        drawTerrainInfrastructureGlyphs(ctx, pts, {
-          showAirport: ap,
-          showSeaport: pt,
-          outlineScreenPx,
-          centerYOffsetPx: spanForProjectedHex(pts) * -0.14
-        });
-      }
-      return;
-    }
-    const container = map.getContainer();
-    const viewportWidth = Math.max(1, container.clientWidth);
-    const viewportHeight = Math.max(1, container.clientHeight);
-    for (const parent of rendererSharedState.gameState.hexes) {
-      let children = rendererSharedState.res4ChildrenByParent.get(parent.h3Index);
-      if (!children) {
-        children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
-        rendererSharedState.res4ChildrenByParent.set(parent.h3Index, children);
-      }
-      const parentPts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
-      if (!projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight)) continue;
-      for (const child of children) {
-        if (!deps.infraGlyphsAllowedForRes4Child(parent.h3Index, child)) continue;
-        const ap = rendererSharedState.terrainInfraRes4Airport.has(child);
-        const pt = rendererSharedState.terrainInfraRes4Seaport.has(child);
-        if (!ap && !pt) continue;
-        const pts = projectHexBoundaryToContainerPoints(child, map, L);
-        if (!projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight)) continue;
-        drawTerrainInfrastructureGlyphs(ctx, pts, {
-          showAirport: ap,
-          showSeaport: pt,
-          outlineScreenPx,
-          glyphAreaScale: RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE
-        });
-      }
-    }
   }
 
   // src/renderer/core/stateSnapshot.ts
@@ -19599,6 +20034,7 @@
   async function applyGameStateSnapshot(deps, nextState, options = {}) {
     const previousState = rendererSharedState.gameState;
     rendererSharedState.gameState = nextState;
+    deps.reconcileTacticalBattleAfterStrategicSnapshot(nextState);
     deps.rebuildUnitDisplayNameLookup(nextState);
     deps.reconcileSelectionToCurrentState();
     deps.updateClientStaleEnemyIntel(previousState, nextState);
@@ -19792,6 +20228,16 @@
   }
 
   // src/renderer/renderer.ts
+  var tacticalExitSessionAccessor = {
+    getBattleSnapshot: () => rendererSharedState.tacticalBattleSnapshot,
+    getPhasePlanning: () => rendererSharedState.tacticalPhasePlanning,
+    setBattleSnapshot: (next) => {
+      rendererSharedState.tacticalBattleSnapshot = next;
+    },
+    setPhasePlanning: (next) => {
+      rendererSharedState.tacticalPhasePlanning = next;
+    }
+  };
   var stackCalloutNonSelectableUnitIds = /* @__PURE__ */ new Set();
   function buildResolutionPlaybackState2(anim, elapsed) {
     return buildResolutionPlaybackState(anim, elapsed);
@@ -19828,7 +20274,7 @@
     return !!stack && !stack.classList.contains("hidden") || !!build && !build.classList.contains("hidden");
   }
   function shouldSuppressTerrainTooltip() {
-    return isStackOrBuildMapPopoverOpen() || rendererSharedState.buildEntryButtonPointerInside;
+    return isStackOrBuildMapPopoverOpen() || rendererSharedState.buildEntryButtonPointerInside || rendererSharedState.tacticalEntryButtonPointerInside;
   }
   function applyModifierDrivenPopoverCloseRules(reason) {
     if (reason === "ctrl_pressed") {
@@ -20600,6 +21046,12 @@
     const callout = document.getElementById("stack-callout");
     return !!callout && callout.contains(target);
   }
+  function syncTacticalEntryButtonOverlay() {
+    tacticalSyncTacticalEntryButtonOverlay({
+      isHexExploredByPlayer: isHexExploredByPlayer2,
+      hasRes1OverlayOffsetFeatures: (h3Index, visibleUnitHexes) => hasVisibleRes1InfrastructureGlyphs2(h3Index, shouldRenderRes4Hexes(), visibleUnitHexes)
+    });
+  }
   async function refreshGameStateAfterBuildQueueChange2() {
     return refreshGameStateAfterBuildQueueChange({ applyGameStateSnapshot: applyGameStateSnapshot2 });
   }
@@ -20618,7 +21070,8 @@
         updateGameOverUI: updateGameOverUI2,
         updateReadyButtonState,
         redraw,
-        refreshBuildPopupIfOpen
+        refreshBuildPopupIfOpen,
+        tacticalReconcileBattleAfterStrategicSnapshot
       },
       nextState,
       options
@@ -20645,6 +21098,11 @@
       const atPointer = document.elementFromPoint(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY);
       const stillInsideBuildEntry = atPointer instanceof Element && !!atPointer.closest(".build-entry-btn");
       if (!stillInsideBuildEntry) rendererSharedState.buildEntryButtonPointerInside = false;
+    }
+    if (rendererSharedState.tacticalEntryButtonPointerInside) {
+      const atPointerT = document.elementFromPoint(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY);
+      const stillInsideTacticalEntry = atPointerT instanceof Element && !!atPointerT.closest(".tactical-entry-btn");
+      if (!stillInsideTacticalEntry) rendererSharedState.tacticalEntryButtonPointerInside = false;
     }
     if (shouldSuppressTerrainTooltip()) return;
     let hoverH3 = rendererSharedState.hoveredHexH3;
@@ -20949,7 +21407,8 @@
       updateReadyButtonState,
       updateOpenRouterToolCountLabels,
       updateOpenRouterCostLabel,
-      showSidebarError: showSidebarError2
+      showSidebarError: showSidebarError2,
+      requestRedraw
     });
   }
   function renderOpenRouterToolsList2() {
@@ -20988,6 +21447,94 @@
       showBuildPopup
     });
   }
+  async function tryHandleTacticalEntryAtClientXY2(clientX, clientY) {
+    return tryHandleTacticalEntryAtClientXY(clientX, clientY, async (h3) => {
+      if (!window.gameApi?.startTacticalBattle) {
+        showMapToast("Tactical battle is not available.", { isError: true });
+        return;
+      }
+      hideBuildPopup();
+      const result = await window.gameApi.startTacticalBattle({ enclosingRes1H3Index: h3 });
+      tacticalRendererApplyStartBattleIpcResult(result, {
+        showMapToast,
+        assignBattleSnapshot: (battle) => {
+          rendererSharedState.tacticalBattleSnapshot = battle;
+        },
+        setPhasePlanning: (planning) => {
+          rendererSharedState.tacticalPhasePlanning = planning;
+        },
+        enterRes4View: enterTacticalMapView,
+        setStrategicSidebarTactical: tacticalApplyStrategicSidebarForTacticalMode,
+        refreshTacticalExitHud: tacticalUpdateExitButtonVisibility,
+        scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
+        refreshReadyButton: updateReadyButtonState,
+        syncTacticalEntryOverlay: syncTacticalEntryButtonOverlay,
+        redraw
+      });
+    });
+  }
+  function createReadyHandlerDeps() {
+    return {
+      clearSidebarError: clearSidebarError2,
+      updateReadyButtonState,
+      updateOpenRouterToolCountLabels,
+      showSidebarError: showSidebarError2,
+      callReadyWithTimeout,
+      refreshRes4TerrainOverridesForRenderer,
+      applyGameStateSnapshot: applyGameStateSnapshot2,
+      buildAirStrikeOutboundPlaybackMoves,
+      buildAirStrikeReturnPlaybackMoves,
+      showAiStrategyToast,
+      hideAiStrategyToast,
+      updateOpenRouterCostLabel,
+      appendOpenRouterLog,
+      showMapToast,
+      getVisibleHexSet: getVisibleHexSet2,
+      buildKillToastFormatterBundle: buildKillToastFormatterBundle2,
+      formatUnknownBattleAnnouncement,
+      tickResolutionMoveAnimation,
+      clearPendingTacticalOrders: clearPendingTacticalOrders2,
+      refreshHumanStandingOrders: refreshHumanStandingOrders2,
+      updateGameStateSidebar: updateGameStateSidebar2,
+      updatePendingOrdersSidebar: updatePendingOrdersSidebar2,
+      updateRangedSidebar: updateRangedSidebar2,
+      updateSidebar: updateSidebar2,
+      updateGameOverUI: updateGameOverUI2,
+      startBackgroundRequestIfAllowed: startBackgroundRequestIfAllowed2,
+      redraw
+    };
+  }
+  function maybeScheduleTacticalAnnihilationExit() {
+    tacticalMaybeScheduleAnnihilationExit(tacticalExitSessionAccessor, {
+      endTacticalBattle: window.gameApi?.endTacticalBattle,
+      showMapToast,
+      redraw,
+      runReadyAfterExit: () => handleReadyButtonClick(createReadyHandlerDeps())
+    });
+  }
+  async function performTacticalBattleExit() {
+    await tacticalPerformBattleExit(tacticalExitSessionAccessor, {
+      endTacticalBattle: window.gameApi?.endTacticalBattle,
+      showMapToast,
+      redraw,
+      runReadyAfterExit: () => handleReadyButtonClick(createReadyHandlerDeps())
+    });
+  }
+  async function performTacticalAdvanceTurn() {
+    const api = window.gameApi;
+    if (!api?.advanceTacticalTurn) {
+      showMapToast("Advance tactical turn is unavailable.", { isError: true });
+      return;
+    }
+    await tacticalPerformAdvanceTurn(tacticalExitSessionAccessor, {
+      advanceTacticalTurn: () => api.advanceTacticalTurn(),
+      showMapToast,
+      redraw,
+      startBackgroundRequestIfAllowed: startBackgroundRequestIfAllowed2,
+      isBackgroundRequestInFlight: () => rendererSharedState.backgroundRequestInFlight,
+      scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit
+    });
+  }
   function updateMapInteractionCursor2(clientX, clientY) {
     return updateMapInteractionCursor(clientX, clientY, {
       backgroundColor: BACKGROUND_COLOR,
@@ -20998,6 +21545,19 @@
   }
   function drawGameScene(ctx, width, height, state) {
     ctx.clearRect(0, 0, width, height);
+    if (rendererSharedState.tacticalBattleSnapshot) {
+      maybeScheduleTacticalAnnihilationExit();
+      drawTerrainHexes2(ctx);
+      drawRes4TerrainHexes2(ctx);
+      const tacticalUnits = rendererSharedState.tacticalBattleSnapshot.subUnits.map((u) => ({
+        id: u.id,
+        player: u.player,
+        unitType: u.unitType,
+        h3Index: u.h3Index
+      }));
+      if (tacticalUnits.length) drawUnits(ctx, tacticalUnits, void 0);
+      return;
+    }
     drawTerrainHexes2(ctx);
     drawRes4TerrainHexes2(ctx);
     drawScenarioHomeRegionOutlines2(ctx);
@@ -21118,10 +21678,16 @@
     if (!rendererSharedState.gameState) {
       drawLoadingScene2(ctx, w, h);
       syncBuildEntryButton();
+      syncTacticalEntryButtonOverlay();
+      tacticalUpdateExitButtonVisibility();
+      updateReadyButtonState();
       return;
     }
     drawGameScene(ctx, w, h, rendererSharedState.gameState);
     syncBuildEntryButton();
+    syncTacticalEntryButtonOverlay();
+    tacticalUpdateExitButtonVisibility();
+    updateReadyButtonState();
   }
   function drawHoverRoutePreview2(ctx) {
     if (!shouldDrawHoveredPathPreview()) return;
@@ -21141,10 +21707,16 @@
     if (!rendererSharedState.gameState) {
       drawLoadingScene2(ctx, w, h);
       syncBuildEntryButton();
+      syncTacticalEntryButtonOverlay();
+      tacticalUpdateExitButtonVisibility();
+      updateReadyButtonState();
       return;
     }
     drawGameScene(ctx, w, h, rendererSharedState.gameState);
     syncBuildEntryButton();
+    syncTacticalEntryButtonOverlay();
+    tacticalUpdateExitButtonVisibility();
+    updateReadyButtonState();
   }
   function tickResolutionMoveAnimation() {
     if (!rendererSharedState.resolutionMoveAnimation) return;
@@ -21367,6 +21939,15 @@
       updateMapInteractionCursor: updateMapInteractionCursor2,
       redraw
     });
+    const tacticalExitBtn = document.getElementById("tactical-exit-btn");
+    tacticalExitBtn?.addEventListener("click", () => {
+      void performTacticalBattleExit();
+    });
+    const tacticalAdvanceBtn = document.getElementById("tactical-advance-turn-btn");
+    tacticalAdvanceBtn?.addEventListener("click", () => {
+      void performTacticalAdvanceTurn();
+    });
+    tacticalUpdateExitButtonVisibility();
     wireMainMapInteractions({
       clearTerrainTooltipTimer,
       hideTerrainTooltipVisual,
@@ -21388,6 +21969,7 @@
       updateRangedSidebar: updateRangedSidebar2,
       redraw,
       getUnitsForDrawWithMovingIds: getUnitsForDrawWithMovingIds2,
+      tryHandleTacticalEntryAtClientXY: tryHandleTacticalEntryAtClientXY2,
       tryHandleBuildEntryAtClientXY: tryHandleBuildEntryAtClientXY2,
       containerPixelHitsDrawnUnitIcon: containerPixelHitsDrawnUnitIcon2,
       showStackCallout,
@@ -21403,36 +21985,7 @@
     const readyBtn = document.getElementById("ready-btn");
     if (readyBtn) {
       readyBtn.addEventListener("click", async () => {
-        const deps = {
-          clearSidebarError: clearSidebarError2,
-          updateReadyButtonState,
-          updateOpenRouterToolCountLabels,
-          showSidebarError: showSidebarError2,
-          callReadyWithTimeout,
-          refreshRes4TerrainOverridesForRenderer,
-          applyGameStateSnapshot: applyGameStateSnapshot2,
-          buildAirStrikeOutboundPlaybackMoves,
-          buildAirStrikeReturnPlaybackMoves,
-          showAiStrategyToast,
-          hideAiStrategyToast,
-          updateOpenRouterCostLabel,
-          appendOpenRouterLog,
-          showMapToast,
-          getVisibleHexSet: getVisibleHexSet2,
-          buildKillToastFormatterBundle: buildKillToastFormatterBundle2,
-          formatUnknownBattleAnnouncement,
-          tickResolutionMoveAnimation,
-          clearPendingTacticalOrders: clearPendingTacticalOrders2,
-          refreshHumanStandingOrders: refreshHumanStandingOrders2,
-          updateGameStateSidebar: updateGameStateSidebar2,
-          updatePendingOrdersSidebar: updatePendingOrdersSidebar2,
-          updateRangedSidebar: updateRangedSidebar2,
-          updateSidebar: updateSidebar2,
-          updateGameOverUI: updateGameOverUI2,
-          startBackgroundRequestIfAllowed: startBackgroundRequestIfAllowed2,
-          redraw
-        };
-        await handleReadyButtonClick(deps);
+        await handleReadyButtonClick(createReadyHandlerDeps());
       });
     }
   }

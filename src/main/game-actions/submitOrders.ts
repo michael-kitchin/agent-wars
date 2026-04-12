@@ -1,6 +1,7 @@
 import { dbGetOne, dbRun, isDbReady } from '../gameDb';
 import type { SubmitOrdersPayload } from '../../shared/ipcTypes';
 import { logDebug, logError } from '../logger';
+import { isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession';
 import { validateAirStrikeOrder, validateFerryOrder } from './airValidation';
 
 /**
@@ -106,6 +107,10 @@ export function submitOrdersImpl(payload: SubmitOrdersPayload, deps: SubmitOrder
     if (!isDbReady()) {
       logError('submitOrders: database not initialized');
       return { success: false, reason: 'Database not initialized' };
+    }
+    if (isTacticalBattleActive()) {
+      logError('submitOrders: blocked while tactical battle active');
+      return { success: false, reason: 'Cannot change strategic orders during a tactical battle.' };
     }
 
     const turnRow = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1');

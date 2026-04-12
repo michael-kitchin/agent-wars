@@ -611,6 +611,150 @@ function testRes4RubbleTooltipAndTerrainVariantContracts(): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * Defines the `testTacticalDrawBranchSkipsStrategicStaleIntel` function shape (function testTacticalDrawBranchSkipsStrategicStaleIntel(): void).
+
+ * Purpose: Guards milestone-2.1 no-fog tactical rendering against strategic stale-intel overlays.
+ * When to use: Regression signal when refactoring `drawGameScene` tactical early return.
+ * Expected outcome: The tactical-only slice of `drawGameScene` never calls `drawStaleEnemyIntel`.
+ * Exceptions: None.
+ */
+function testTacticalDrawBranchSkipsStrategicStaleIntel(): void {
+  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const source = fs.readFileSync(rendererPath, 'utf8');
+  const drawSceneFn = getFunctionSource(source, 'drawGameScene');
+  const tacticalIdx = drawSceneFn.indexOf('if (S.tacticalBattleSnapshot)');
+  assert.ok(tacticalIdx >= 0, 'drawGameScene should branch on tactical snapshot');
+  const tacticalReturnIdx = drawSceneFn.indexOf('return;', tacticalIdx);
+  assert.ok(tacticalReturnIdx > tacticalIdx, 'tactical branch should return before strategic-only overlays');
+  const tacticalSlice = drawSceneFn.slice(tacticalIdx, tacticalReturnIdx);
+  assert.ok(
+    !tacticalSlice.includes('drawStaleEnemyIntel'),
+    'tactical draw branch must not apply strategic fog-of-war stale intel rendering'
+  );
+  assert.ok(tacticalSlice.includes('drawUnits('), 'tactical branch should still draw tactical unit markers');
+}
+
+/**
+ * Defines the `testTacticalAdvanceTurnUsesResolutionGate` function shape (function testTacticalAdvanceTurnUsesResolutionGate(): void).
+
+ * Purpose: Ensures tactical Exit stays disabled during async resolution after advancing the tactical turn (milestone 2.1 Phase I).
+ * When to use: Regression guard when refactoring `tacticalPerformAdvanceTurn` or renderer advance-turn wiring.
+ * Expected outcome: Shared helper flips planning off before IPC, waits on `backgroundRequestInFlight`, then restores planning on exit paths.
+ * Exceptions: None.
+ */
+function testTacticalAdvanceTurnUsesResolutionGate(): void {
+  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const rendererSource = fs.readFileSync(rendererPath, 'utf8');
+  const rendererFn = getFunctionSource(rendererSource, 'performTacticalAdvanceTurn');
+  assert.ok(
+    rendererFn.includes('tacticalPerformAdvanceTurn'),
+    'performTacticalAdvanceTurn should delegate tactical beat sequencing to tacticalPerformAdvanceTurn'
+  );
+  const exitFlowPath = path.resolve(process.cwd(), 'src', 'renderer', 'tactical', 'tacticalExitFlow.ts');
+  const exitFlowSource = fs.readFileSync(exitFlowPath, 'utf8');
+  const fn = getFunctionSource(exitFlowSource, 'tacticalPerformAdvanceTurn');
+  assert.ok(
+    fn.includes('session.setPhasePlanning(false)'),
+    'tacticalPerformAdvanceTurn should enter tactical resolution before advancing the tactical turn'
+  );
+  assert.ok(
+    fn.includes('io.isBackgroundRequestInFlight()'),
+    'tacticalPerformAdvanceTurn should observe backgroundRequestInFlight while optional AI runs'
+  );
+  assert.ok(
+    /session\.setPhasePlanning\(true\)/.test(fn),
+    'tacticalPerformAdvanceTurn should restore tactical planning after resolution completes or fails'
+  );
+}
+
+/**
+ * Defines the `testTacticalRes4DrawingSkipsExploredGateWhenTactical` function shape (function testTacticalRes4DrawingSkipsExploredGateWhenTactical(): void).
+
+ * Purpose: Confirms res4 terrain drawing does not hide the enclosing tactical parent behind strategic exploration fog (milestone 2.1 Phase K).
+ * When to use: Regression guard when refactoring `drawRes4TerrainHexes` parent filtering.
+ * Expected outcome: Tactical branch uses `!tactical && !exploredHexes.has(parent.h3Index)` so explored is ignored when tactical is active.
+ * Exceptions: None.
+ */
+function testTacticalRes4DrawingSkipsExploredGateWhenTactical(): void {
+  const terrainPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'terrainRendering.ts');
+  const source = fs.readFileSync(terrainPath, 'utf8');
+  const fn = getFunctionSource(source, 'drawRes4TerrainHexes');
+  assert.ok(
+    fn.includes('if (!tactical && !exploredHexes.has(parent.h3Index)) continue;'),
+    'drawRes4TerrainHexes should skip exploredHexes gating for the tactical enclosing res1 parent'
+  );
+}
+
+/**
+ * Defines the `testTacticalEntryLayerPlanningAndContestedContracts` function shape (function testTacticalEntryLayerPlanningAndContestedContracts(): void).
+
+ * Purpose: Static regression tests for milestone-2.1 Phase B tactical magnifier visibility rules (planning-only, contested res1, mirrored vertical offset).
+ * When to use: CI guard when refactoring `syncTacticalEntryButton` or overlay layout.
+ * Expected outcome: Source encodes planning+tactical-active gate, co-presence contest check, and magnifyTop mirror formula.
+ * Exceptions: None.
+ */
+function testTacticalEntryLayerPlanningAndContestedContracts(): void {
+  const entryPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'tacticalEntryLayer.ts');
+  const source = fs.readFileSync(entryPath, 'utf8');
+  assert.ok(
+    source.includes("if (S.gameState.phase !== 'planning' || S.tacticalBattleSnapshot)"),
+    'syncTacticalEntryButton should hide overlays outside strategic planning or while a tactical snapshot is active'
+  );
+  assert.ok(
+    source.includes('if (!isContestedRes1Hex(S.gameState, hx.h3Index)) continue;'),
+    'syncTacticalEntryButton should only place buttons on contested res1 hexes'
+  );
+  assert.ok(
+    source.includes("u.player === 'human'") && source.includes("u.player === 'opponent'"),
+    'tactical entry eligibility should require both human and opponent parent units in the same hex'
+  );
+  assert.ok(
+    source.includes('const magnifyTop = Math.round(2 * center.y - textY);'),
+    'syncTacticalEntryButton should mirror build-label vertical offset using 2*center.y - textY'
+  );
+  assert.ok(
+    source.includes('class="tactical-entry-btn"') && source.includes('&#128269;'),
+    'syncTacticalEntryButton should emit magnifying-glass tactical entry buttons'
+  );
+}
+
+/**
+ * Defines the `testTacticalMapViewLocksZoomPanAndRestoresWorld` function shape (function testTacticalMapViewLocksZoomPanAndRestoresWorld(): void).
+
+ * Purpose: Static regression tests for milestone-2.1 Phase C Leaflet tactical camera constraints and exit restoration.
+ * When to use: CI guard when refactoring `enterTacticalMapView` / `exitTacticalMapView`.
+ * Expected outcome: Enter clamps min/max zoom and maxBounds to the tactical footprint with animated bounds; exit restores world maxBounds and saved zoom limits.
+ * Exceptions: None.
+ */
+function testTacticalMapViewLocksZoomPanAndRestoresWorld(): void {
+  const tacticalMapPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'tacticalMapView.ts');
+  const source = fs.readFileSync(tacticalMapPath, 'utf8');
+  const enterFn = getFunctionSource(source, 'enterTacticalMapView');
+  assert.ok(
+    enterFn.includes('map.setMaxBounds(tacticalBounds)') || enterFn.includes('map.setMaxBounds?.(tacticalBounds)'),
+    'enterTacticalMapView should clamp Leaflet pan to the tactical footprint bounds'
+  );
+  assert.ok(
+    enterFn.includes('map.setMinZoom(4)') && enterFn.includes('map.setMaxZoom(12)'),
+    'enterTacticalMapView should lock tactical min/max zoom levels'
+  );
+  assert.ok(
+    enterFn.includes('map.flyToBounds') || enterFn.includes('map.fitBounds'),
+    'enterTacticalMapView should animate or fit bounds into the tactical footprint'
+  );
+  const exitFn = getFunctionSource(source, 'exitTacticalMapView');
+  assert.ok(
+    exitFn.includes('map.setMaxBounds(worldBounds)'),
+    'exitTacticalMapView should restore world maxBounds after tactical mode'
+  );
+  assert.ok(
+    exitFn.includes('map.setMinZoom(S.preTacticalLeafletMinZoom)') &&
+      exitFn.includes('map.setMaxZoom(S.preTacticalLeafletMaxZoom)'),
+    'exitTacticalMapView should restore pre-tactical min/max zoom when captured'
+  );
+}
+
 function testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves(): void {
   const pathDrawingPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'pathDrawing.ts');
   const source = fs.readFileSync(pathDrawingPath, 'utf8');
@@ -660,6 +804,11 @@ function run(): void {
   testKillUpdateTextOmitsPlayerSuffixes();
   testRes4RubbleTooltipAndTerrainVariantContracts();
   testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves();
+  testTacticalDrawBranchSkipsStrategicStaleIntel();
+  testTacticalAdvanceTurnUsesResolutionGate();
+  testTacticalRes4DrawingSkipsExploredGateWhenTactical();
+  testTacticalEntryLayerPlanningAndContestedContracts();
+  testTacticalMapViewLocksZoomPanAndRestoresWorld();
   console.log('rendererConsolidation.test.ts passed');
 }
 

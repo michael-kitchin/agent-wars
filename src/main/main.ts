@@ -33,6 +33,12 @@ import {
   getSealiftStackState,
   updateSealiftSlot,
 } from './gameActions';
+import { clearStrategicPreviousHexMemory } from './strategicUnitPreviousHex';
+import {
+  advanceActiveTacticalTurn,
+  endTacticalBattleSession,
+  startTacticalBattleForEnclosingRes1Hex,
+} from './tacticalBattle/tacticalBattleSession';
 import { normalizeSubmitOrdersPayload } from './submitOrdersPayload';
 import {
   parseGroupedTargetPayload,
@@ -248,6 +254,8 @@ function registerIpcHandlers(): void {
       humanHomeRegion: payload?.humanHomeRegion,
       aiHomeRegion: payload?.aiHomeRegion,
     });
+    clearStrategicPreviousHexMemory();
+    endTacticalBattleSession();
     return getGameStateForPlayer('human', { maskUnexploredTerrain: false });
   });
   ipcMain.handle('game:submitOrders', (_event, payload: SubmitOrdersPayload | { unitId: string; toH3Index: string }[]) => {
@@ -388,6 +396,17 @@ function registerIpcHandlers(): void {
       return updateSealiftSlot(payload.h3Index, payload.navalUnitId, payload.slotIndex, landUnitId);
     }
   );
+  ipcMain.handle('game:startTacticalBattle', (_event, payload: { enclosingRes1H3Index?: string }) => {
+    if (typeof payload?.enclosingRes1H3Index !== 'string') {
+      return { success: false, reason: 'Invalid tactical start payload.' };
+    }
+    return startTacticalBattleForEnclosingRes1Hex(payload.enclosingRes1H3Index);
+  });
+  ipcMain.handle('game:endTacticalBattle', () => {
+    endTacticalBattleSession();
+    return { success: true as const };
+  });
+  ipcMain.handle('game:advanceTacticalTurn', () => advanceActiveTacticalTurn());
   ipcMain.handle(
     'game:ready',
     async (_event, payload?: GameReadyIpcPayload): Promise<ReadyResult> => {

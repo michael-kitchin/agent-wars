@@ -14,6 +14,7 @@ import type {
   AirStrikeTargetType,
   RemovedUnitSnapshot,
 } from '../../shared/ipcTypes';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { OPENROUTER_TOOL_GROUPS } from './constants';
 import type { HoverRoutePreviewState, ResolutionMove, ResolutionPlaybackMove } from './types';
 
@@ -245,6 +246,61 @@ buildEntryDefaultMapZoom: null as number | null,
    * Exceptions: None.
    */
 lastBuildEntryLayerKey: null as string | null,
+
+    /**
+   * Documents the object literal property `tacticalBattleSnapshot` (tacticalBattleSnapshot: null as TacticalBattleSnapshot | null).
+
+   * Purpose: Holds the active tactical battle layout and sub-units while the renderer is in tactical map mode.
+   * When to use: Set after a successful `startTacticalBattle` IPC; cleared when the tactical session ends.
+   * Expected outcome: When non-null, terrain and unit drawing use tactical res4 constraints instead of global strategic view.
+   * Exceptions: None.
+   */
+tacticalBattleSnapshot: null as TacticalBattleSnapshot | null,
+    /**
+   * Documents the object literal property `lastTacticalEntryLayerKey` (lastTacticalEntryLayerKey: null as string | null).
+
+   * Purpose: Avoids rebuilding tactical-entry DOM when the derived overlay key is unchanged between frames.
+   * When to use: Updated alongside `tactical-entry-layer` innerHTML synchronization.
+   * Expected outcome: Fewer DOM writes during pan/zoom redraws.
+   * Exceptions: None.
+   */
+lastTacticalEntryLayerKey: null as string | null,
+    /**
+   * Documents the object literal property `tacticalEntryButtonPointerInside` (tacticalEntryButtonPointerInside: false).
+
+   * Purpose: Tracks whether the pointer is over a tactical-entry button for consistent click hit-testing with build-entry.
+   * When to use: Pointer handlers on the tactical-entry layer update this flag.
+   * Expected outcome: Map dragging does not steal clicks intended for tactical entry.
+   * Exceptions: None.
+   */
+tacticalEntryButtonPointerInside: false,
+    /**
+   * Documents the object literal property `tacticalPhasePlanning` (tacticalPhasePlanning: true).
+
+   * Purpose: Separates milestone-2.1 tactical planning beats from tactical resolution (AI / async work after advancing the tactical turn).
+   * When to use: `true` while the human may exit tactical mode or press Advance; `false` while `performTacticalAdvanceTurn` waits on IPC and optional background `requestAiOrders`.
+   * Expected outcome: `#tactical-exit-btn` and `#tactical-advance-turn-btn` stay disabled whenever this flag is `false` with an active tactical snapshot.
+   * Exceptions: Reconciling snapshots or ending tactical always resets this to `true` once the renderer returns to a coherent tactical or strategic mode.
+   */
+tacticalPhasePlanning: true,
+    /**
+   * Documents the object literal property `preTacticalLeafletMinZoom` (preTacticalLeafletMinZoom: null as number | null).
+
+   * Purpose: Stores the main map min zoom before tactical constraints so it can be restored after tactical exit.
+   * When to use: Captured when entering tactical mode; consumed when leaving tactical mode.
+   * Expected outcome: Strategic zoom limits return unchanged after tactical battles.
+   * Exceptions: None.
+   */
+preTacticalLeafletMinZoom: null as number | null,
+    /**
+   * Documents the object literal property `preTacticalLeafletMaxZoom` (preTacticalLeafletMaxZoom: null as number | null).
+
+   * Purpose: Stores the main map max zoom before tactical constraints so it can be restored after tactical exit.
+   * When to use: Captured when entering tactical mode; consumed when leaving tactical mode.
+   * Expected outcome: Strategic zoom limits return unchanged after tactical battles.
+   * Exceptions: None.
+   */
+preTacticalLeafletMaxZoom: null as number | null,
 
     /**
    * Documents the object literal property `res1DominantTerrainKindByH3` (res1DominantTerrainKindByH3: new Map<string, string>()).

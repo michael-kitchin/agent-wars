@@ -1,6 +1,7 @@
 import type { GameApi, GameReadyIpcPayload } from '../../shared/ipcTypes';
 import { READY_REQUEST_TIMEOUT_MS, TOAST_DURATION_MS } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
+import { tacticalRendererIsBattleActive } from '../tactical/tacticalUiGuards';
 import { isWaitingForPrecomputedAiOrders } from './aiPlanningState';
 
 /**
@@ -59,7 +60,8 @@ export function updateReadyButtonState(): void {
   if (!readyBtn) return;
   const gameOver = S.gameState?.gameOver ?? false;
   const waitingOnAi = isWaitingForPrecomputedAiOrders();
-  readyBtn.disabled = gameOver || waitingOnAi;
+  const tacticalActive = tacticalRendererIsBattleActive(S);
+  readyBtn.disabled = gameOver || waitingOnAi || tacticalActive;
 
   if (waitingOnAi) {
     const now = Date.now();

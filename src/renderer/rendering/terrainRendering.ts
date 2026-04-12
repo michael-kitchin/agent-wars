@@ -127,6 +127,7 @@ function buildControlByHex(state: GameStateSnapshot): Map<string, string | null>
  */
 export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void {
   if (!S.gameState) return;
+  if (S.tacticalBattleSnapshot) return;
   const exploredHexes = deps.getExploredHexSet(S.gameState);
   const res4Active = shouldRenderRes4Hexes();
   if (res4Active) return;
@@ -201,8 +202,10 @@ export function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D, deps: Terrai
   const viewportWidth = Math.max(1, container.clientWidth);
   const viewportHeight = Math.max(1, container.clientHeight);
   const stroke = getActiveHexStrokeStyle();
+  const tactical = S.tacticalBattleSnapshot;
   for (const parent of S.gameState.hexes) {
-    if (!exploredHexes.has(parent.h3Index)) continue;
+    if (tactical && parent.h3Index !== tactical.enclosingRes1H3Index) continue;
+    if (!tactical && !exploredHexes.has(parent.h3Index)) continue;
     const parentPts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
     if (!projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight)) continue;
     const parentKind =

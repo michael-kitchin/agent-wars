@@ -22,6 +22,11 @@ import type {
   HexBuildQueueSnapshot,
   NewGameIpcPayload,
 } from '../shared/ipcTypes';
+import type {
+  AdvanceTacticalTurnIpcResult,
+  EndTacticalBattleIpcResult,
+  StartTacticalBattleIpcResult,
+} from '../shared/tacticalBattleTypes';
 
 /**
  * Documents the module-scope binding `openRouterLogListener` (openRouterLogListener: ((payload: { line: string; isError?: boolean })).
@@ -123,6 +128,35 @@ submitOrders: (payload: SubmitOrdersIpcPayload): Promise<{ success: boolean; rea
    * Exceptions: None.
    */
 ready: (payload?: GameReadyIpcPayload): Promise<ReadyResult> => ipcRenderer.invoke('game:ready', payload),
+    /**
+   * Documents the object literal property `startTacticalBattle` (startTacticalBattle: (payload: { enclosingRes1H3Index: string }): Promise<StartTacticalBattleIpcResult> => ipcRenderer.invoke('game:startTacticalBattle', payload)).
+
+   * Purpose: Exposes milestone-2.1 tactical battle entry to the renderer with the same contract as the main-process handler.
+   * When to use: After the player activates a contested-hex tactical entry control during strategic planning.
+   * Expected outcome: Returns a tactical snapshot on success for res4-scoped rendering and interaction.
+   * Exceptions: None.
+   */
+startTacticalBattle: (payload: { enclosingRes1H3Index: string }): Promise<StartTacticalBattleIpcResult> =>
+    ipcRenderer.invoke('game:startTacticalBattle', payload),
+    /**
+   * Documents the object literal property `endTacticalBattle` (endTacticalBattle: (): Promise<EndTacticalBattleIpcResult> => ipcRenderer.invoke('game:endTacticalBattle')).
+
+   * Purpose: Clears the in-main tactical session so strategic planning actions (`ready`, orders, build queue) work again.
+   * When to use: When the player leaves tactical view and returns to the strategic map without resolving tactical combat.
+   * Expected outcome: Main process drops the active tactical snapshot; renderer should refresh game state afterward.
+   * Exceptions: None.
+   */
+endTacticalBattle: (): Promise<EndTacticalBattleIpcResult> => ipcRenderer.invoke('game:endTacticalBattle'),
+    /**
+   * Documents the object literal property `advanceTacticalTurn` (advanceTacticalTurn: (): Promise<AdvanceTacticalTurnIpcResult> => ipcRenderer.invoke('game:advanceTacticalTurn')).
+
+   * Purpose: Bumps the main-process tactical turn counter for the active res4 battle session.
+   * When to use: After the player finishes one tactical planning slice and should see the next tactical turn label before Ready.
+   * Expected outcome: Returns an updated snapshot with `tacticalTurnNumber` incremented, or `success: false` when no session exists.
+   * Exceptions: None.
+   */
+advanceTacticalTurn: (): Promise<AdvanceTacticalTurnIpcResult> =>
+    ipcRenderer.invoke('game:advanceTacticalTurn'),
     /**
    * Documents the object literal property `listHumanStandingOrders` (listHumanStandingOrders: (): Promise<HumanStandingOrderSnapshot[]> => ipcRenderer.invoke('game:listHumanStandingOrders')).
 

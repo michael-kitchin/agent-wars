@@ -10,6 +10,7 @@ import { createPathfindingSession, executePlanRouteWithSession } from '../tools/
 import { terrainIsPassableForDomain } from '../pathfinding';
 import { buildNormalizedTerrainByH3 } from '../movementTerrain';
 import { logDebug, logError, logTrace } from '../logger';
+import { isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession';
 import { AIR_FERRY_RANGE_HEXES, MOVEMENT_RANGE_BY_UNIT_TYPE, formatFerryOutOfRangeReason } from '../../shared/tacticalRanges';
 import { isWithinGridRangeSafe } from './gridRange';
 import { isEmbarkedLandUnitOnWater } from './sealift';
@@ -1075,6 +1076,9 @@ export function previewHumanMarchOrderImpl(unitId: string, hoveredH3Index: strin
   try {
     previewDiagnostics.requestCount += 1;
     if (!isDbReady()) return { valid: false, showInvalidMarker: false, invalidReason: 'Database not initialized', segments: [] };
+    if (isTacticalBattleActive()) {
+      return { valid: false, showInvalidMarker: false, invalidReason: 'March preview is unavailable during a tactical battle.', segments: [] };
+    }
     const context = getOrCreateHoverSessionContext('human', [unitId]);
     return buildHumanMarchPreviewForUnit(context, unitId, hoveredH3Index);
   } catch (err) {
@@ -1100,6 +1104,15 @@ export function previewHumanMarchOrdersImpl(unitIds: string[], hoveredH3Index: s
         validForAll: false,
         showInvalidMarker: false,
         invalidReason: 'Database not initialized',
+        slowestMovementRange: 0,
+        previews: [],
+      };
+    }
+    if (isTacticalBattleActive()) {
+      return {
+        validForAll: false,
+        showInvalidMarker: false,
+        invalidReason: 'March preview is unavailable during a tactical battle.',
         slowestMovementRange: 0,
         previews: [],
       };

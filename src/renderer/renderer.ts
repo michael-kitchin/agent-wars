@@ -53,6 +53,8 @@ import {
   shouldRenderRes4Hexes,
   shouldShowBuildEntryZoom,
 } from './map/terrainView';
+import { enterTacticalMapView } from './map/tacticalMapView';
+import { tryHandleTacticalEntryAtClientXY as tryHandleTacticalEntryAtClientXYFromModule } from './map/tacticalEntryLayer';
 import {
   drawLineArrow,
   drawMovingUnits,
@@ -97,6 +99,19 @@ import {
   drawUnknownBattleMarkers,
 } from './rendering/unitDrawing';
 import { rendererSharedState as S } from './core/state';
+import {
+  tacticalMaybeScheduleAnnihilationExit,
+  tacticalPerformAdvanceTurn,
+  tacticalPerformBattleExit,
+  type TacticalExitSessionAccessor,
+} from './tactical/tacticalExitFlow';
+import { tacticalRendererApplyStartBattleIpcResult } from './tactical/tacticalIpcHandlers';
+import {
+  tacticalApplyStrategicSidebarForTacticalMode,
+  tacticalReconcileBattleAfterStrategicSnapshot,
+  tacticalSyncTacticalEntryButtonOverlay,
+  tacticalUpdateExitButtonVisibility,
+} from './tactical/tacticalUiOrchestration';
 import {
   createBuildQueuePopupController,
   isBuildPopupOrEntryTarget,
@@ -160,6 +175,25 @@ import {
   syncUiAfterSelectionChange as syncUiAfterSelectionChangeFromModule,
   updatePendingOrdersSidebar as updatePendingOrdersSidebarFromModule,
 } from './gameplay/sidebarSupport';
+
+/**
+ * Bridges renderer shared tactical fields into tactical exit/advance helpers without those modules importing `renderer.ts`.
+ *
+ * Contract: Read/write `S.tacticalBattleSnapshot` and `S.tacticalPhasePlanning` only.
+ * When to use: Passed to `tacticalPerformBattleExit`, `tacticalPerformAdvanceTurn`, and annihilation scheduling.
+ * Expected outcome: Same session semantics as the pre-refactor direct `S` mutations.
+ * Exceptions: None.
+ */
+const tacticalExitSessionAccessor: TacticalExitSessionAccessor = {
+  getBattleSnapshot: () => S.tacticalBattleSnapshot,
+  getPhasePlanning: () => S.tacticalPhasePlanning,
+  setBattleSnapshot: (next) => {
+    S.tacticalBattleSnapshot = next;
+  },
+  setPhasePlanning: (next) => {
+    S.tacticalPhasePlanning = next;
+  },
+};
 
 /**
  * Documents the module-scope binding `stackCalloutNonSelectableUnitIds` (stackCalloutNonSelectableUnitIds: ReadonlySet<string>).
@@ -289,7 +323,9 @@ function isStackOrBuildMapPopoverOpen(): boolean {
  * Exceptions: None.
  */
 function shouldSuppressTerrainTooltip(): boolean {
-  return isStackOrBuildMapPopoverOpen() || S.buildEntryButtonPointerInside;
+  return (
+    isStackOrBuildMapPopoverOpen() || S.buildEntryButtonPointerInside || S.tacticalEntryButtonPointerInside
+  );
 }
 
 /**
@@ -1728,6 +1764,22 @@ function isStackCalloutTargetInsideDialog(target: EventTarget | null): boolean {
 }
 
 /**
+ * Rebuilds contested-hex tactical magnifier controls during strategic planning at zoom levels where they are meaningful.
+ *
+ * Purpose: Centralizes dependency wiring for `syncTacticalEntryButton` beside build-entry sync.
+ * When to use: Each canvas resize/redraw while strategic planning may show tactical entry.
+ * Expected outcome: DOM under `#tactical-entry-layer` matches contested explored res1 hexes.
+ * Exceptions: None.
+ */
+function syncTacticalEntryButtonOverlay(): void {
+  tacticalSyncTacticalEntryButtonOverlay({
+    isHexExploredByPlayer,
+    hasRes1OverlayOffsetFeatures: (h3Index, visibleUnitHexes) =>
+      hasVisibleRes1InfrastructureGlyphs(h3Index, shouldRenderRes4Hexes(), visibleUnitHexes),
+  });
+}
+
+/**
  * Defines the `refreshGameStateAfterBuildQueueChange` function shape (async function refreshGameStateAfterBuildQueueChange(): Promise<void>).
 
  * Purpose: Supports maintainability by documenting why `refreshGameStateAfterBuildQueueChange` exists.
@@ -1774,6 +1826,7 @@ async function applyGameStateSnapshot(
       updateReadyButtonState,
       redraw,
       refreshBuildPopupIfOpen,
+      tacticalReconcileBattleAfterStrategicSnapshot,
     },
     nextState,
     options
@@ -1823,6 +1876,11 @@ async function restoreTerrainTooltipAfterPopoverClose(): Promise<void> {
     const atPointer = document.elementFromPoint(S.lastPointerClientX, S.lastPointerClientY);
     const stillInsideBuildEntry = atPointer instanceof Element && !!atPointer.closest('.build-entry-btn');
     if (!stillInsideBuildEntry) S.buildEntryButtonPointerInside = false;
+  }
+  if (S.tacticalEntryButtonPointerInside) {
+    const atPointerT = document.elementFromPoint(S.lastPointerClientX, S.lastPointerClientY);
+    const stillInsideTacticalEntry = atPointerT instanceof Element && !!atPointerT.closest('.tactical-entry-btn');
+    if (!stillInsideTacticalEntry) S.tacticalEntryButtonPointerInside = false;
   }
   if (shouldSuppressTerrainTooltip()) return;
   let hoverH3 = S.hoveredHexH3;
@@ -2471,6 +2529,7 @@ function startBackgroundRequestIfAllowed(): void {
     updateOpenRouterToolCountLabels,
     updateOpenRouterCostLabel,
     showSidebarError,
+    requestRedraw,
   });
 }
 
@@ -2568,6 +2627,139 @@ function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number): boolea
 }
 
 /**
+ * Starts a tactical battle when the player clicks a contested-hex magnifier during strategic planning.
+ *
+ * Purpose: Bridges map overlay clicks to `startTacticalBattle` IPC and tactical map entry.
+ * When to use: Main map interactions before build-entry handling returns.
+ * Expected outcome: On success, renderer enters tactical res4 view; on failure, shows a toast.
+ * Exceptions: None.
+ */
+async function tryHandleTacticalEntryAtClientXY(clientX: number, clientY: number): Promise<boolean> {
+  return tryHandleTacticalEntryAtClientXYFromModule(clientX, clientY, async (h3) => {
+    if (!window.gameApi?.startTacticalBattle) {
+      showMapToast('Tactical battle is not available.', { isError: true });
+      return;
+    }
+    hideBuildPopup();
+    const result = await window.gameApi.startTacticalBattle({ enclosingRes1H3Index: h3 });
+    tacticalRendererApplyStartBattleIpcResult(result, {
+      showMapToast,
+      assignBattleSnapshot: (battle) => {
+        S.tacticalBattleSnapshot = battle;
+      },
+      setPhasePlanning: (planning) => {
+        S.tacticalPhasePlanning = planning;
+      },
+      enterRes4View: enterTacticalMapView,
+      setStrategicSidebarTactical: tacticalApplyStrategicSidebarForTacticalMode,
+      refreshTacticalExitHud: tacticalUpdateExitButtonVisibility,
+      scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
+      refreshReadyButton: updateReadyButtonState,
+      syncTacticalEntryOverlay: syncTacticalEntryButtonOverlay,
+      redraw,
+    });
+  });
+}
+
+/**
+ * Builds the shared dependency bundle for strategic Ready handling (also used after tactical exit).
+ *
+ * Purpose: Keeps Ready and tactical-exit paths identical so milestone-2.1 “Ready-equivalent” behavior stays centralized.
+ * When to use: Ready button clicks and tactical exit after `endTacticalBattle` IPC succeeds.
+ * Expected outcome: A fully populated `ReadyHandlerDeps` object referencing live renderer helpers.
+ * Exceptions: None.
+ */
+function createReadyHandlerDeps(): ReadyHandlerDeps {
+  return {
+    clearSidebarError,
+    updateReadyButtonState,
+    updateOpenRouterToolCountLabels,
+    showSidebarError,
+    callReadyWithTimeout,
+    refreshRes4TerrainOverridesForRenderer,
+    applyGameStateSnapshot,
+    buildAirStrikeOutboundPlaybackMoves,
+    buildAirStrikeReturnPlaybackMoves,
+    showAiStrategyToast,
+    hideAiStrategyToast,
+    updateOpenRouterCostLabel,
+    appendOpenRouterLog,
+    showMapToast,
+    getVisibleHexSet,
+    buildKillToastFormatterBundle,
+    formatUnknownBattleAnnouncement,
+    tickResolutionMoveAnimation,
+    clearPendingTacticalOrders,
+    refreshHumanStandingOrders,
+    updateGameStateSidebar,
+    updatePendingOrdersSidebar,
+    updateRangedSidebar,
+    updateSidebar,
+    updateGameOverUI,
+    startBackgroundRequestIfAllowed,
+    redraw,
+  };
+}
+
+/**
+ * Coordinates annihilation-driven tactical teardown with the shared exit IPC and Ready-equivalent continuation.
+ *
+ * Purpose: Wraps `tacticalMaybeScheduleAnnihilationExit` so renderer scheduling matches the shared in-flight guard.
+ * When to use: Tactical redraw after snapshots that may eliminate a full side roster.
+ * Expected outcome: At most one queued exit while planning-phase annihilation is detected.
+ * Exceptions: None.
+ */
+function maybeScheduleTacticalAnnihilationExit(): void {
+  tacticalMaybeScheduleAnnihilationExit(tacticalExitSessionAccessor, {
+    endTacticalBattle: window.gameApi?.endTacticalBattle,
+    showMapToast,
+    redraw,
+    runReadyAfterExit: () => handleReadyButtonClickFromModule(createReadyHandlerDeps()),
+  });
+}
+
+/**
+ * Ends the tactical session in the main process then resumes strategic Ready handling.
+ *
+ * Purpose: Delegates boundary checks and DOM restoration to `tacticalPerformBattleExit` while preserving renderer IPC wiring.
+ * When to use: Tactical HUD exit button and annihilation auto-exit path.
+ * Expected outcome: Clears renderer tactical snapshot and invokes Ready pipeline on success.
+ * Exceptions: Surfaces toasts when IPC fails per tactical helper contract.
+ */
+async function performTacticalBattleExit(): Promise<void> {
+  await tacticalPerformBattleExit(tacticalExitSessionAccessor, {
+    endTacticalBattle: window.gameApi?.endTacticalBattle,
+    showMapToast,
+    redraw,
+    runReadyAfterExit: () => handleReadyButtonClickFromModule(createReadyHandlerDeps()),
+  });
+}
+
+/**
+ * Advances the tactical turn in the main process and waits briefly for background AI loading to settle.
+ *
+ * Purpose: Preflights `advanceTacticalTurn` IPC availability before delegating to `tacticalPerformAdvanceTurn`.
+ * When to use: Tactical advance HUD button.
+ * Expected outcome: Snapshot updates; background wait behavior matches milestone-2.1 contract.
+ * Exceptions: Toasts on missing IPC or failures; restores planning phase via helper.
+ */
+async function performTacticalAdvanceTurn(): Promise<void> {
+  const api = window.gameApi;
+  if (!api?.advanceTacticalTurn) {
+    showMapToast('Advance tactical turn is unavailable.', { isError: true });
+    return;
+  }
+  await tacticalPerformAdvanceTurn(tacticalExitSessionAccessor, {
+    advanceTacticalTurn: () => api.advanceTacticalTurn(),
+    showMapToast,
+    redraw,
+    startBackgroundRequestIfAllowed,
+    isBackgroundRequestInFlight: () => S.backgroundRequestInFlight,
+    scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
+  });
+}
+
+/**
  * Defines the `updateMapInteractionCursor` function shape (function updateMapInteractionCursor(clientX: number, clientY: number): void).
 
  * Purpose: Supports maintainability by documenting why `updateMapInteractionCursor` exists.
@@ -2599,6 +2791,19 @@ function drawGameScene(
   state: GameStateSnapshot
 ): void {
   ctx.clearRect(0, 0, width, height);
+  if (S.tacticalBattleSnapshot) {
+    maybeScheduleTacticalAnnihilationExit();
+    drawTerrainHexes(ctx);
+    drawRes4TerrainHexes(ctx);
+    const tacticalUnits = S.tacticalBattleSnapshot.subUnits.map((u) => ({
+      id: u.id,
+      player: u.player,
+      unitType: u.unitType,
+      h3Index: u.h3Index,
+    })) as GameStateSnapshot['units'];
+    if (tacticalUnits.length) drawUnits(ctx, tacticalUnits, undefined);
+    return;
+  }
   drawTerrainHexes(ctx);
   drawRes4TerrainHexes(ctx);
   drawScenarioHomeRegionOutlines(ctx);
@@ -2779,10 +2984,16 @@ function resizeAndRedraw(): void {
   if (!S.gameState) {
     drawLoadingScene(ctx, w, h);
     syncBuildEntryButton();
+    syncTacticalEntryButtonOverlay();
+    tacticalUpdateExitButtonVisibility();
+    updateReadyButtonState();
     return;
   }
   drawGameScene(ctx, w, h, S.gameState);
   syncBuildEntryButton();
+  syncTacticalEntryButtonOverlay();
+  tacticalUpdateExitButtonVisibility();
+  updateReadyButtonState();
 }
 
 /**
@@ -2823,10 +3034,16 @@ function redraw(): void {
   if (!S.gameState) {
     drawLoadingScene(ctx, w, h);
     syncBuildEntryButton();
+    syncTacticalEntryButtonOverlay();
+    tacticalUpdateExitButtonVisibility();
+    updateReadyButtonState();
     return;
   }
   drawGameScene(ctx, w, h, S.gameState);
   syncBuildEntryButton();
+  syncTacticalEntryButtonOverlay();
+  tacticalUpdateExitButtonVisibility();
+  updateReadyButtonState();
 }
 
 /**
@@ -3356,6 +3573,16 @@ function init(): void {
     redraw,
   });
 
+  const tacticalExitBtn = document.getElementById('tactical-exit-btn');
+  tacticalExitBtn?.addEventListener('click', () => {
+    void performTacticalBattleExit();
+  });
+  const tacticalAdvanceBtn = document.getElementById('tactical-advance-turn-btn');
+  tacticalAdvanceBtn?.addEventListener('click', () => {
+    void performTacticalAdvanceTurn();
+  });
+  tacticalUpdateExitButtonVisibility();
+
   // Contract anchors retained after extraction:
   // const hasAirSelection = selectedAtMouseDown.some((unit) => unit.unitType === 'air');
   // const hasNonAirSelection = selectedAtMouseDown.some((unit) => unit.unitType !== 'air');
@@ -3388,6 +3615,7 @@ function init(): void {
     updateRangedSidebar,
     redraw,
     getUnitsForDrawWithMovingIds,
+    tryHandleTacticalEntryAtClientXY,
     tryHandleBuildEntryAtClientXY,
     containerPixelHitsDrawnUnitIcon,
     showStackCallout,
@@ -3413,36 +3641,7 @@ function init(): void {
       // buildTurnUpdateBullets({})
       // formatKillLine: killToastFormatter.formatKillLine
       // ferryOrders: S.pendingFerryOrders,
-      const deps: ReadyHandlerDeps = {
-        clearSidebarError,
-        updateReadyButtonState,
-        updateOpenRouterToolCountLabels,
-        showSidebarError,
-        callReadyWithTimeout,
-        refreshRes4TerrainOverridesForRenderer,
-        applyGameStateSnapshot,
-        buildAirStrikeOutboundPlaybackMoves,
-        buildAirStrikeReturnPlaybackMoves,
-        showAiStrategyToast,
-        hideAiStrategyToast,
-        updateOpenRouterCostLabel,
-        appendOpenRouterLog,
-        showMapToast,
-        getVisibleHexSet,
-        buildKillToastFormatterBundle,
-        formatUnknownBattleAnnouncement,
-        tickResolutionMoveAnimation,
-        clearPendingTacticalOrders,
-        refreshHumanStandingOrders,
-        updateGameStateSidebar,
-        updatePendingOrdersSidebar,
-        updateRangedSidebar,
-        updateSidebar,
-        updateGameOverUI,
-        startBackgroundRequestIfAllowed,
-        redraw,
-      };
-      await handleReadyButtonClickFromModule(deps);
+      await handleReadyButtonClickFromModule(createReadyHandlerDeps());
     });
   }
 }

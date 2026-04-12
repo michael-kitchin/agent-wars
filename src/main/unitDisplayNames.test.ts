@@ -4,7 +4,11 @@
  */
 
 import * as assert from 'assert';
-import { buildUnitDisplayNameLookup, fallbackDisplayNameFromUnitId } from '../shared/unitDisplayNames';
+import {
+  buildUnitDisplayNameLookup,
+  fallbackDisplayNameFromUnitId,
+  formatTacticalSubUnitDisplayName,
+} from '../shared/unitDisplayNames';
 
 /**
  * Defines the `testBuildLookupUsesRomanNumeralsForAiAndOrdinalsForHuman` function shape (function testBuildLookupUsesRomanNumeralsForAiAndOrdinalsForHuman(): void).
@@ -53,6 +57,19 @@ function testFallbackUsesRomanNumeralsForAiAndLeavesUnknownIdsUntouched(): void 
 }
 
 /**
+ * Defines the `testFormatTacticalSubUnitDisplayName` function shape (function testFormatTacticalSubUnitDisplayName(): void).
+
+ * Purpose: Locks milestone-2.1 tactical sub-label formatting to the shared strategic parent display string plus two-digit ordinal.
+ * When to use: Regression guard when editing `formatTacticalSubUnitDisplayName` or tactical snapshot synthesis.
+ * Expected outcome: Human ordinals and AI roman parent labels compose with zero-padded tactical indices.
+ * Exceptions: None.
+ */
+function testFormatTacticalSubUnitDisplayName(): void {
+  assert.strictEqual(formatTacticalSubUnitDisplayName('23rd Infantry', 1), '23rd Infantry (01)');
+  assert.strictEqual(formatTacticalSubUnitDisplayName('IV Fleet', 12), 'IV Fleet (12)');
+}
+
+/**
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Supports maintainability by documenting why `run` exists.
@@ -63,6 +80,7 @@ function testFallbackUsesRomanNumeralsForAiAndLeavesUnknownIdsUntouched(): void 
 function run(): void {
   testBuildLookupUsesRomanNumeralsForAiAndOrdinalsForHuman();
   testFallbackUsesRomanNumeralsForAiAndLeavesUnknownIdsUntouched();
+  testFormatTacticalSubUnitDisplayName();
   console.log('unitDisplayNames tests passed');
 }
 

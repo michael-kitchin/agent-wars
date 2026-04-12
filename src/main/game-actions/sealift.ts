@@ -2,6 +2,8 @@ import type { EmbarkOrder, SealiftContextMode, SealiftLandUnitOption, SealiftNav
 import { dbGetAll, dbGetOne, dbRun, isDbReady } from '../gameDb';
 import type { CombatUnit } from '../combatUnitTypes';
 import { normalizeMovementTerrain } from '../movementTerrain';
+import { rememberStrategicHexBeforeMove } from '../strategicUnitPreviousHex';
+import { isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession';
 
 /**
  * Documents the `UnitRow` interface as a named contract surface (interface UnitRow).
@@ -494,6 +496,7 @@ export function updateSealiftSlotImpl(args: {
   landUnitId: string | null;
 }): { success: boolean; reason?: string; state?: SealiftStackState } {
   if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
+  if (isTacticalBattleActive()) return { success: false, reason: 'Sealift cannot be changed during a tactical battle.' };
   const state = getSealiftStackStateImpl(args.h3Index);
   const navalIds = state.navalRows.map((row) => row.navalUnitId);
   if (!navalIds.includes(args.navalUnitId)) return { success: false, reason: 'Selected naval unit is not in this stack.' };
@@ -628,6 +631,7 @@ export function syncEmbarkedLandUnitPositionsWithNaval(): void {
   );
   for (const row of rows) {
     if (row.landH3Index === row.navalH3Index) continue;
+    rememberStrategicHexBeforeMove(row.landUnitId, row.landH3Index, row.navalH3Index);
     dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [row.navalH3Index, row.landUnitId]);
   }
 }

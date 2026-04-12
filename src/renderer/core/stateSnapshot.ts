@@ -128,6 +128,15 @@ redraw: () => void;
    * Exceptions: None.
    */
 refreshBuildPopupIfOpen: () => void;
+    /**
+   * Specifies the contract for the `reconcileTacticalBattleAfterStrategicSnapshot` member (reconcileTacticalBattleAfterStrategicSnapshot: (nextState: GameStateSnapshot) => void;).
+
+   * Contract: Drops renderer tactical overlay state when the main strategic snapshot no longer matches the active tactical session anchor turn/phase.
+   * When to use: Immediately after every `S.gameState` replacement from the main process.
+   * Expected outcome: Prevents stale tactical res4 mode after new game, ready-advanced turns, or phase changes.
+   * Exceptions: None.
+   */
+reconcileTacticalBattleAfterStrategicSnapshot: (nextState: GameStateSnapshot) => void;
 }
 
 /**
@@ -210,6 +219,7 @@ export async function applyGameStateSnapshot(
 ): Promise<void> {
   const previousState = S.gameState;
   S.gameState = nextState;
+  deps.reconcileTacticalBattleAfterStrategicSnapshot(nextState);
   deps.rebuildUnitDisplayNameLookup(nextState);
   deps.reconcileSelectionToCurrentState();
   deps.updateClientStaleEnemyIntel(previousState, nextState);

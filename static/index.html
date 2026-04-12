@@ -498,6 +498,88 @@
       font-weight: 700;
     }
     .build-entry-btn.hidden { display: none; }
+    .tactical-entry-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 5100;
+      pointer-events: none;
+    }
+    .tactical-entry-layer.hidden { display: none; }
+    .tactical-entry-btn {
+      position: absolute;
+      pointer-events: auto;
+      margin: 0;
+      padding: 0;
+      width: 2rem;
+      height: 2rem;
+      min-width: 2rem;
+      min-height: 2rem;
+      box-sizing: border-box;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: system-ui, sans-serif;
+      color: #111;
+      background: rgba(232, 244, 255, 0.95);
+      border: 1px solid #335;
+      border-radius: 3px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+      cursor: default;
+    }
+    .tactical-entry-btn:hover {
+      background: rgba(248, 252, 255, 0.98);
+      border-color: #112;
+    }
+    .tactical-battle-hud {
+      position: absolute;
+      left: 50%;
+      bottom: 14px;
+      transform: translateX(-50%);
+      z-index: 6600;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 0.45rem;
+      pointer-events: auto;
+      max-width: calc(100vw - 24px);
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .tactical-battle-hud.hidden { display: none; }
+    .tactical-turn-label {
+      font-size: 12px;
+      font-weight: 600;
+      font-family: system-ui, sans-serif;
+      color: #1a1a1a;
+      text-shadow: 0 0 3px rgba(255,255,255,0.85);
+      white-space: nowrap;
+    }
+    .tactical-advance-turn-btn,
+    .tactical-exit-btn {
+      margin: 0;
+      padding: 0.4rem 0.9rem;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: system-ui, sans-serif;
+      color: #111;
+      background: rgba(248, 246, 243, 0.96);
+      border: 1px solid #555;
+      border-radius: 3px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      cursor: default;
+    }
+    .tactical-advance-turn-btn:disabled,
+    .tactical-exit-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    aside#sidebar.tactical-strategic-suppress {
+      visibility: hidden;
+      pointer-events: none;
+    }
     .build-popup {
       position: fixed;
       pointer-events: auto;
@@ -731,6 +813,7 @@
     <div id="terrain-legend" aria-label="Terrain legend"></div>
     <div id="hex-tooltip" class="hex-tooltip hidden" aria-hidden="true"></div>
     <div id="build-entry-layer" class="build-entry-layer hidden" aria-hidden="true"></div>
+    <div id="tactical-entry-layer" class="tactical-entry-layer hidden" aria-hidden="true"></div>
     <div id="build-popup" class="build-popup hidden" aria-hidden="true" role="dialog" aria-label="Build queue">
       <div id="build-popup-body"></div>
     </div>
@@ -770,6 +853,11 @@
     <div id="ai-strategy-toast" class="map-toast ai-strategy-toast hidden" aria-live="polite">
       <p id="ai-strategy-toast-text"></p>
       <button type="button" id="ai-strategy-toast-dismiss" aria-label="Dismiss">×</button>
+    </div>
+    <div id="tactical-battle-hud" class="tactical-battle-hud hidden" role="group" aria-label="Tactical battle controls">
+      <span id="tactical-turn-label" class="tactical-turn-label"></span>
+      <button type="button" id="tactical-advance-turn-btn" class="tactical-advance-turn-btn" aria-label="Advance to next tactical turn">Next tactical turn</button>
+      <button type="button" id="tactical-exit-btn" class="tactical-exit-btn" aria-label="Exit tactical view">Exit tactical</button>
     </div>
   </div>
   <aside id="sidebar">

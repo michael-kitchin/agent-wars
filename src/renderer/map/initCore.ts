@@ -471,6 +471,22 @@ export function wireInitCore(deps: InitCoreDeps): void {
     deps.showBuildPopup(h3, e.clientX, e.clientY);
   });
 
+  const tacticalEntryLayer = document.getElementById('tactical-entry-layer');
+  tacticalEntryLayer?.addEventListener('pointerover', (e) => {
+    const target = e.target as Element | null;
+    if (!target?.closest('.tactical-entry-btn')) return;
+    S.tacticalEntryButtonPointerInside = true;
+    deps.clearTerrainTooltipTimer();
+    deps.hideTerrainTooltipVisual();
+  });
+  tacticalEntryLayer?.addEventListener('pointerout', (e) => {
+    const target = e.target as Element | null;
+    if (!target?.closest('.tactical-entry-btn')) return;
+    const next = e.relatedTarget as Element | null;
+    if (next?.closest('.tactical-entry-btn')) return;
+    S.tacticalEntryButtonPointerInside = false;
+  });
+
   const canvasContainer = document.getElementById('canvas-container');
   canvasContainer?.addEventListener('pointermove', (e) => {
     deps.updateMapInteractionCursor(e.clientX, e.clientY);

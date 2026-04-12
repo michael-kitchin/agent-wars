@@ -270,6 +270,26 @@ export const TOAST_DURATION_MS = 24_000;
 export const READY_REQUEST_TIMEOUT_MS = 120_000;
 
 /**
+ * Poll interval while waiting for `S.backgroundRequestInFlight` to clear after a tactical advance turn.
+ *
+ * Purpose: Keeps the renderer responsive while milestone-2.1 tactical “resolution” waits on background `requestAiOrders`.
+ * When to use: Only from `performTacticalAdvanceTurn` while tactical mode is active and Run may trigger AI.
+ * Expected outcome: Small sleeps between checks until the in-flight flag clears or timeout elapses.
+ * Exceptions: None.
+ */
+export const TACTICAL_ADVANCE_BACKGROUND_AI_POLL_MS = 50;
+
+/**
+ * Upper bound for waiting on background AI after advancing the tactical turn counter.
+ *
+ * Purpose: Slightly exceeds `BACKGROUND_AI_REQUEST_TIMEOUT_MS` in `openRouterRuntime` so the advance-turn waiter does not give up first.
+ * When to use: Paired with `TACTICAL_ADVANCE_BACKGROUND_AI_POLL_MS` in tactical advance resolution.
+ * Expected outcome: If AI still runs past this window, tactical planning re-enables anyway to avoid a soft-locked Exit control.
+ * Exceptions: None.
+ */
+export const TACTICAL_ADVANCE_BACKGROUND_AI_TIMEOUT_MS = 80_000;
+
+/**
  * Documents the module-scope binding `UNIT_ICON_HIT_PAD_PX` (UNIT_ICON_HIT_PAD_PX).
 
  * Purpose: Supports maintainability by documenting why `UNIT_ICON_HIT_PAD_PX` exists.
@@ -287,6 +307,16 @@ export const UNIT_ICON_HIT_PAD_PX = 2;
  * Exceptions: None.
  */
 export const BUILD_ENTRY_HIT_PAD_PX = 2;
+
+/**
+ * Documents the module-scope binding `TACTICAL_ENTRY_HIT_PAD_PX` (TACTICAL_ENTRY_HIT_PAD_PX).
+
+ * Purpose: Expands tactical-entry button hit targets on the map to match the larger magnifier affordance.
+ * When to use: Pointer hit-tests and hover cursors for `#tactical-entry-layer` buttons.
+ * Expected outcome: Clicks register slightly outside the visible button bounds for usability.
+ * Exceptions: None.
+ */
+export const TACTICAL_ENTRY_HIT_PAD_PX = 6;
 
 /**
  * Documents the module-scope binding `STACK_OFFSET_X` (STACK_OFFSET_X).

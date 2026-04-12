@@ -203,6 +203,20 @@ export function getUnitDisplayNoun(unitType: string): string {
 }
 
 /**
+ * Formats a tactical sub-unit label as `N1 Type (N2)` using the parent’s strategic display name plus a two-digit sub-index.
+ *
+ * Purpose: Keeps milestone-2.1 tactical naming aligned with the execution plan while reusing strategic ordinals/roman labels.
+ * When to use: When synthesizing `TacticalSubUnitSnapshot.displayName` from `buildUnitDisplayNameLookup` parent strings.
+ * Expected outcome: Strings like `23rd Infantry (01)` or `IV Fleet (12)` for the given parent label and ordinal.
+ * Exceptions: None.
+ */
+export function formatTacticalSubUnitDisplayName(parentStrategicDisplayName: string, subUnitOrdinal1Based: number): string {
+  const normalized = Math.max(1, Math.trunc(subUnitOrdinal1Based));
+  const two = String(normalized).padStart(2, '0');
+  return `${parentStrategicDisplayName} (${two})`;
+}
+
+/**
  * Defines the `buildUnitDisplayNameLookup` function shape (export function buildUnitDisplayNameLookup().
 
  * Purpose: Supports maintainability by documenting why `buildUnitDisplayNameLookup` exists.

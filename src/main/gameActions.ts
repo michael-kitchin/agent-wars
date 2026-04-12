@@ -96,6 +96,8 @@ import {
   syncEmbarkedLandUnitPositionsWithNaval,
   updateSealiftSlotImpl,
 } from './game-actions/sealift';
+import { rememberStrategicHexBeforeMove } from './strategicUnitPreviousHex';
+import { isTacticalBattleActive } from './tacticalBattle/tacticalBattleSession';
 
 /**
  * Defines the `evaluateRegionControlWinnerAtEndOfTurn` function shape (export function evaluateRegionControlWinnerAtEndOfTurn(): 'human' | 'opponent' | null { logTrace('gameActions evaluateRegionControlWinnerAtEndOfTurn'); co).
@@ -714,6 +716,7 @@ export function assignHumanMarchOrder(unitId: string, destinationH3Index: string
   logDebug('gameActions assignHumanMarchOrder', { unitId, destinationH3Index });
   try {
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
+    if (isTacticalBattleActive()) return { success: false, reason: 'Movement orders are unavailable during a tactical battle.' };
     const state = humanPerspectiveStateSnapshot();
     const turnRow = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1');
     if (turnRow?.phase !== VALID_PHASE) return { success: false, reason: 'Not in planning phase' };
@@ -768,6 +771,7 @@ export function assignHumanMarchOrders(unitIds: string[], destinationH3Index: st
   logDebug('gameActions assignHumanMarchOrders', { unitCount: unitIds.length, destinationH3Index });
   try {
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
+    if (isTacticalBattleActive()) return { success: false, reason: 'Movement orders are unavailable during a tactical battle.' };
     const uniqueUnitIds = getUniqueNonEmptyIds(unitIds);
     if (uniqueUnitIds.length === 0) return { success: false, reason: 'No selected units to assign' };
     const state = humanPerspectiveStateSnapshot();
@@ -832,6 +836,7 @@ export function cancelHumanOrder(unitId: string): SubmitOrdersResult {
   logDebug('gameActions cancelHumanOrder', { unitId });
   try {
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
+    if (isTacticalBattleActive()) return { success: false, reason: 'Standing orders cannot be cancelled during a tactical battle.' };
     const state = humanPerspectiveStateSnapshot();
     const hexList = state.hexes.map((h) => h.h3Index);
     const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
@@ -1128,6 +1133,10 @@ export function ready(
       logError('ready: database not initialized');
       return { success: false, reason: 'Database not initialized' };
     }
+    if (isTacticalBattleActive()) {
+      logError('ready: tactical battle active');
+      return { success: false, reason: 'Finish or exit the tactical battle before resolving the strategic turn.' };
+    }
 
     const turnRow = dbGetOne<{ phase: string; turn_number: number }>(
       'SELECT phase, turn_number FROM turn_state WHERE id = 1'
@@ -1250,6 +1259,10 @@ export function ready(
       preMoveState.units.map((u) => ({ id: u.id, player: u.player, h3Index: u.h3Index, unitType: u.unitType }))
     );
     for (const order of allOrders) {
+      const prevUnit = unitsBeforeMove.find((u) => u.id === order.unitId);
+      if (prevUnit && prevUnit.h3Index !== order.toH3Index) {
+        rememberStrategicHexBeforeMove(order.unitId, prevUnit.h3Index, order.toH3Index);
+      }
       dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [order.toH3Index, order.unitId]);
     }
     syncEmbarkedLandUnitPositionsWithNaval();
@@ -1267,6 +1280,7 @@ export function ready(
       const destinationInfra = getRes1InfrastructureForHex(ferry.destinationH3Index);
       const destinationController = getHexController(ferry.destinationH3Index);
       if (destinationInfra.airportCount > 0 && destinationController === unit.player) {
+        rememberStrategicHexBeforeMove(ferry.unitId, originH3Index, ferry.destinationH3Index);
         dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [ferry.destinationH3Index, ferry.unitId]);
         resolvedFerryMoves.push({
           unitId: ferry.unitId,

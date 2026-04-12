@@ -4,6 +4,7 @@ import { TERRAIN_TOOLTIP_DELAY_MS } from '../core/constants';
 import { hitTestHexAtContainerPixel } from './mapUtils';
 import { rendererSharedState as S } from '../core/state';
 import { getMainLeafletMap } from './worldLeafletMap';
+import { tacticalRendererHitInsideBattleFootprint } from '../tactical/tacticalUiGuards';
 
 /**
  * Documents the `MainMapInteractionDeps` interface as a named contract surface (interface MainMapInteractionDeps).
@@ -216,6 +217,15 @@ getUnitsForDrawWithMovingIds: (state: GameStateSnapshot) => {
    */
 tryHandleBuildEntryAtClientXY: (clientX: number, clientY: number) => boolean;
     /**
+   * Specifies the contract for the `tryHandleTacticalEntryAtClientXY` member (tryHandleTacticalEntryAtClientXY: (clientX: number, clientY: number) => Promise<boolean>;).
+
+   * Contract: Runs before build-entry hit-testing so magnifier controls win when overlapping production entry buttons.
+   * When to use: Main-map click routing during strategic planning when contested-hex tactical entry may be visible.
+   * Expected outcome: Returns true when a tactical entry click was consumed (including failed async starts that still ate the click).
+   * Exceptions: None.
+   */
+tryHandleTacticalEntryAtClientXY: (clientX: number, clientY: number) => Promise<boolean>;
+    /**
    * Specifies the contract for the `containerPixelHitsDrawnUnitIcon` member (containerPixelHitsDrawnUnitIcon: (px: number, py: number, h3Index: string, unitCount: number) => boolean;).
 
    * Contract: Describes stable behavior for callers of `containerPixelHitsDrawnUnitIcon` in this codebase.
@@ -422,7 +432,12 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     if (next instanceof Node) {
       const buildEntry = document.getElementById('build-entry-layer');
       const buildPopup = document.getElementById('build-popup');
-      if ((buildEntry && buildEntry.contains(next)) || (buildPopup && buildPopup.contains(next))) {
+      const tacticalEntry = document.getElementById('tactical-entry-layer');
+      if (
+        (buildEntry && buildEntry.contains(next)) ||
+        (buildPopup && buildPopup.contains(next)) ||
+        (tacticalEntry && tacticalEntry.contains(next))
+      ) {
         return;
       }
     }
@@ -447,6 +462,13 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     const hit = clientXYToHit(e.clientX, e.clientY);
     S.selectedHexIndex = hit;
     deps.clearSidebarError();
+
+    if (S.tacticalBattleSnapshot && !tacticalRendererHitInsideBattleFootprint(hit, S.tacticalBattleSnapshot)) {
+      if (hit) {
+        deps.showMapToast('That hex is outside the active tactical battle.', { isError: true });
+      }
+      return;
+    }
 
     if (hit && S.airStrikeModeActive && S.selectedUnitIds.length > 0 && S.gameState) {
       if (!window.gameApi?.validateGroupAirStrikeTarget) return;
@@ -513,6 +535,13 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     const { unitsToDraw, movingIds } = S.gameState
       ? deps.getUnitsForDrawWithMovingIds(S.gameState)
       : { unitsToDraw: [] as GameStateSnapshot['units'], movingIds: undefined as Set<string> | undefined };
+
+    if (await deps.tryHandleTacticalEntryAtClientXY(e.clientX, e.clientY)) {
+      deps.updateSidebar();
+      deps.updateRangedSidebar();
+      deps.redraw();
+      return;
+    }
 
     if (deps.tryHandleBuildEntryAtClientXY(e.clientX, e.clientY)) {
       deps.updateSidebar();

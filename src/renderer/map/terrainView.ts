@@ -72,6 +72,7 @@ export function computeRes1HexFillFraction(): number {
  * Exceptions: None.
  */
 export function shouldRenderRes4Hexes(): boolean {
+  if (S.tacticalBattleSnapshot) return true;
   const fillFraction = computeRes1HexFillFraction();
   if (S.res4Visible) {
     if (fillFraction <= RES4_HIDE_THRESHOLD_VIEW_FRACTION) S.res4Visible = false;

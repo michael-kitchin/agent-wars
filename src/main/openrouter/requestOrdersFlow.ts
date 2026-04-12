@@ -25,6 +25,16 @@ import { buildProductionBriefingBlock } from './briefingSections';
 import { getInitialUserMessage } from './promptText';
 import { TOOL2_NAMES } from '../tools/tool2Assessment';
 import { TOOL3_NAMES } from '../tools/tool3CombatEstimation';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { buildTacticalAiPlanState } from '../tacticalBattle/buildTacticalAiPlanState';
+import { applyMovementOrdersToPlanState } from '../tacticalBattle/tacticalPlanStateMovement';
+import { projectTacticalSnapshotAfterOpponentMovementOrders } from '../tacticalBattle/tacticalMovementApply';
+import {
+  validateTacticalOpponentAirStrikeOrder,
+  validateTacticalOpponentEmbarkOrder,
+  validateTacticalOpponentFerryOrder,
+} from '../tacticalBattle/tacticalOpponentOrderValidation';
+import { buildTacticalAiOrdersContextBlock } from './tacticalPromptProjection';
 
 /**
  * Documents the `ChatMessage` type alias (type ChatMessage).
@@ -330,7 +340,16 @@ onLog?: (line: string, isError?: boolean) => void;
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-usePrecomputation?: boolean;
+  usePrecomputation?: boolean;
+    /**
+   * Specifies the contract for the `tacticalAiBattle` member (tacticalAiBattle?: TacticalBattleSnapshot;).
+
+   * Contract: When set, requestOrders runs against a res4-only plan state and omits strategic production/memory tooling from the prompt.
+   * When to use: `game:requestAiOrders` while a milestone-2.1 tactical session is active in the main process.
+   * Expected outcome: Movement validation targets tactical sub-unit ids and res4 destinations only.
+   * Exceptions: None.
+   */
+tacticalAiBattle?: TacticalBattleSnapshot;
 }
 
 /**
@@ -828,17 +847,34 @@ export async function requestOrdersFlow(
     formatLatLng,
   } = deps;
 
+  const tacticalBattle = options?.tacticalAiBattle;
   const requestedToolNames = options?.enabledToolNames;
   const signal = options?.signal;
   const onLog = options?.onLog;
-  const usePrecomputation = options?.usePrecomputation === true;
+  const usePrecomputation = tacticalBattle ? false : options?.usePrecomputation === true;
   const precomputationExcluded = new Set<string>([...TOOL2_NAMES, ...TOOL3_NAMES]);
-  const enabledToolNames =
+  let enabledToolNames: string[] | undefined =
     usePrecomputation && requestedToolNames !== undefined
       ? requestedToolNames.filter((n) => !precomputationExcluded.has(n))
       : usePrecomputation && requestedToolNames === undefined
         ? toolGroupRegistry.flatMap((g) => [...g.toolNames]).filter((n) => !precomputationExcluded.has(n))
         : requestedToolNames;
+  if (tacticalBattle) {
+    const stripStrategicOnlyTools = (names: string[]): string[] =>
+      names.filter((n) => {
+        const g = getGroupIdForToolName(n);
+        return g !== 'memory' && g !== 'production';
+      });
+    enabledToolNames =
+      enabledToolNames !== undefined
+        ? stripStrategicOnlyTools(enabledToolNames)
+        : stripStrategicOnlyTools(toolGroupRegistry.flatMap((g) => [...g.toolNames]));
+    logDebug('openRouter requestOrders tactical tool filter applied', {
+      battleId: tacticalBattle.battleId,
+      enabledToolCount: enabledToolNames.length,
+    });
+  }
+  const planState = tacticalBattle ? buildTacticalAiPlanState(state, tacticalBattle) : state;
   if (onLog) onLog('Requesting AI orders…');
   logDebug('openRouter requestOrders', {
     modelId,
@@ -847,6 +883,7 @@ export async function requestOrdersFlow(
     enabledToolsEffective: enabledToolNames === undefined ? 'all' : enabledToolNames.length,
     usePrecomputation,
     filteredForPrecomputation: usePrecomputation,
+    tacticalAiBattle: tacticalBattle ? tacticalBattle.battleId : null,
   });
   const key = loadKey();
   const failRequest = (error: string): RequestOrdersError => {
@@ -863,14 +900,14 @@ export async function requestOrdersFlow(
     return failRequest('No model selected');
   }
 
-  const opponentUnits = state.units.filter((u) => u.player === 'opponent');
+  const opponentUnits = planState.units.filter((u) => u.player === 'opponent');
   if (opponentUnits.length === 0) {
     logDebug('openRouter requestOrders: no opponent units remain, skipping LLM call');
     if (onLog) onLog('No opponent units remain.');
     return { success: true, orders: [] };
   }
 
-  const hexList = state.hexes.map((h) => h.h3Index);
+  const hexList = planState.hexes.map((h) => h.h3Index);
   const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
   const coordMap = {
     latLngByH3,
@@ -895,7 +932,7 @@ export async function requestOrdersFlow(
       aiPathfindingSessionMetrics.reused += 1;
       return aiPlanningPathfindingSession;
     }
-    aiPlanningPathfindingSession = createPathfindingSession(state, latLngByH3, resolveToH3);
+    aiPlanningPathfindingSession = createPathfindingSession(planState, latLngByH3, resolveToH3);
     aiPathfindingSessionMetrics.created += 1;
     return aiPlanningPathfindingSession;
   };
@@ -948,7 +985,10 @@ export async function requestOrdersFlow(
       precomputationCount: toolInvocationCounts['precomputation'],
     });
   }
-  const systemPrompt = buildSystemPromptForTools(state, coordMap, enabledToolNames, briefingOverride);
+  let systemPrompt = buildSystemPromptForTools(planState, coordMap, enabledToolNames, briefingOverride);
+  if (tacticalBattle) {
+    systemPrompt = `${buildTacticalAiOrdersContextBlock(tacticalBattle)}\n\n${systemPrompt}`;
+  }
   const userMessage = getInitialUserMessage(flags, briefingOverride != null && briefingOverride.length > 0);
 
   const tools = buildToolDefinitions(enabledToolNames);
@@ -1069,20 +1109,21 @@ export async function requestOrdersFlow(
           if (toolName === 'plan_route') aiPathfindingSessionMetrics.planRouteToolCalls += 1;
           if (toolName === 'check_distance') aiPathfindingSessionMetrics.checkDistanceToolCalls += 1;
           aiPathfindingSessionMetrics.totalToolCalls += 1;
+          const toolState = tacticalBattle ? planState : state;
           const result = (toolName.includes('order') || toolName.includes('standing'))
-            ? executeTool5(toolName, args, state, latLngByH3, resolveToH3)
+            ? executeTool5(toolName, args, toolState, latLngByH3, resolveToH3)
             : (toolName.includes('build') || toolName.includes('production') || toolName.includes('query_production'))
-              ? executeTool6(toolName, args, state, latLngByH3, resolveToH3)
+              ? executeTool6(toolName, args, toolState, latLngByH3, resolveToH3)
               : toolName.includes('memory')
-                ? executeTool4(toolName, args, state, latLngByH3, resolveToH3)
+                ? executeTool4(toolName, args, toolState, latLngByH3, resolveToH3)
                 : toolName.includes('estimate')
-                  ? executeTool3(toolName, args, state, latLngByH3, resolveToH3)
+                  ? executeTool3(toolName, args, toolState, latLngByH3, resolveToH3)
                   : toolName.includes('assess')
-                    ? executeTool2(toolName, args, state, latLngByH3, resolveToH3)
+                    ? executeTool2(toolName, args, toolState, latLngByH3, resolveToH3)
                     : executeTool1(
                         toolName,
                         args,
-                        state,
+                        toolState,
                         latLngByH3,
                         resolveToH3,
                         isPathfindingTool ? getOrCreateAiPlanningPathfindingSession() : undefined
@@ -1099,7 +1140,8 @@ export async function requestOrdersFlow(
       if (typeof content !== 'string' || !content.trim()) {
         return failRequest('Invalid response: no content');
       }
-      let parsed = parseOrdersResponse(content, resolveToH3, state, latLngByH3, flags.productionEnabled);
+      const productionEnabledForParse = tacticalBattle ? false : flags.productionEnabled;
+      let parsed = parseOrdersResponse(content, resolveToH3, planState, latLngByH3, productionEnabledForParse);
       if (!parsed && !parseRepairAttempted) {
         parseRepairAttempted = true;
         const repairMessages: ChatMessage[] = [
@@ -1108,7 +1150,7 @@ export async function requestOrdersFlow(
           {
             role: 'user',
             content:
-              `Your previous response was not parseable JSON. Reply now with JSON only (no prose, no markdown, no code fences) using exactly this top-level object schema (orders[] only; no movementOrders/rangedAttacks; never a top-level array): ${buildJsonAssistantRepairSchema(flags.productionEnabled)}. Omit optional arrays when empty.`,
+              `Your previous response was not parseable JSON. Reply now with JSON only (no prose, no markdown, no code fences) using exactly this top-level object schema (orders[] only; no movementOrders/rangedAttacks; never a top-level array): ${buildJsonAssistantRepairSchema(productionEnabledForParse)}. Omit optional arrays when empty.`,
           },
         ];
         const repairResponse = await postOpenRouterChatWithTimeoutAndRetry({
@@ -1130,7 +1172,7 @@ export async function requestOrdersFlow(
           totalOutputTokens += repairJson.usage?.completion_tokens ?? 0;
           const repairContent = repairJson.choices?.[0]?.message?.content;
           if (typeof repairContent === 'string' && repairContent.trim()) {
-            parsed = parseOrdersResponse(repairContent, resolveToH3, state, latLngByH3, flags.productionEnabled);
+            parsed = parseOrdersResponse(repairContent, resolveToH3, planState, latLngByH3, productionEnabledForParse);
           }
         }
       }
@@ -1139,9 +1181,10 @@ export async function requestOrdersFlow(
       if (parsed.callbacks?.length) replaceSubscriptions('opponent', parsed.callbacks, state.turnNumber);
       toolInvocationCounts['events'] = parsed.callbacks?.length ?? 0;
 
-      const { movementOrders: standingOrderMovement, rangedAttacks: standingOrderRanged } = flags.ordersEnabled
-        ? generateOrdersForStandingOrders('opponent', state, latLngByH3, resolveToH3)
-        : { movementOrders: [] as { unitId: string; toH3Index: string }[], rangedAttacks: [] as { unitId: string; targetH3Index: string }[] };
+      const { movementOrders: standingOrderMovement, rangedAttacks: standingOrderRanged } =
+        flags.ordersEnabled && !tacticalBattle
+          ? generateOrdersForStandingOrders('opponent', state, latLngByH3, resolveToH3)
+          : { movementOrders: [] as { unitId: string; toH3Index: string }[], rangedAttacks: [] as { unitId: string; targetH3Index: string }[] };
       const llmMovementOrders = dedupeByUnitKeepLast(parsed.movementOrders ?? []);
       const llmRangedOrders = dedupeByUnitKeepLast(parsed.rangedAttacks ?? []);
       const llmAirStrikes = dedupeByUnitKeepLast(parsed.airStrikes ?? []);
@@ -1162,7 +1205,7 @@ export async function requestOrdersFlow(
           dropReasons.push(`Duplicate order for ${order.unitId}`);
           continue;
         }
-        const result = validateAiOrder(order, state);
+        const result = validateAiOrder(order, planState);
         if (result.valid) {
           validated.push(order);
           seenUnits.add(order.unitId);
@@ -1176,25 +1219,31 @@ export async function requestOrdersFlow(
           dropReasons.push(`${order.unitId} -> ${order.toH3Index}: ${result.reason}`);
         }
       }
-      if (flags.ordersEnabled && invalidStandingMovementUnits.size > 0) {
+      if (flags.ordersEnabled && invalidStandingMovementUnits.size > 0 && !tacticalBattle) {
         for (const unitId of invalidStandingMovementUnits) {
           executeTool5('cancel_order', { unitId }, state, latLngByH3, resolveToH3);
         }
       }
 
+      const planAfterMove =
+        tacticalBattle && validated.length > 0
+          ? applyMovementOrdersToPlanState(planState, validated)
+          : planState;
+
       const validatedRanged: { unitId: string; targetH3Index: string }[] = [];
       const seenRanged = new Set<string>();
+      const rangedState = tacticalBattle ? planAfterMove : planState;
       for (const r of mergedRanged) {
         if (seenRanged.has(r.unitId)) {
           dropReasons.push(`Duplicate ranged for ${r.unitId}`);
           continue;
         }
-        const result = validateAiRangedOrder(r, state);
+        const result = validateAiRangedOrder(r, rangedState);
         if (result.valid) {
           validatedRanged.push(r);
           seenRanged.add(r.unitId);
         } else {
-          if (result.reason === 'Target out of range') {
+          if (!tacticalBattle && result.reason === 'Target out of range') {
             const movedTo = llmMovementByUnit.get(r.unitId);
             if (movedTo && movedTo === r.targetH3Index) continue;
           }
@@ -1202,14 +1251,77 @@ export async function requestOrdersFlow(
         }
       }
 
+      let outAir = llmAirStrikes;
+      let outFerry = llmFerryOrders;
+      let outEmbark = llmEmbarkOrders;
+      if (tacticalBattle) {
+        const movementProjected =
+          validated.length > 0
+            ? projectTacticalSnapshotAfterOpponentMovementOrders(tacticalBattle, validated)
+            : tacticalBattle;
+        const validatedAir: AirStrikeOrder[] = [];
+        const seenStrike = new Set<string>();
+        for (const s of llmAirStrikes) {
+          if (seenStrike.has(s.unitId)) {
+            dropReasons.push(`Duplicate air strike for ${s.unitId}`);
+            continue;
+          }
+          const vr = validateTacticalOpponentAirStrikeOrder(s, planAfterMove);
+          if (vr.valid) {
+            validatedAir.push(s);
+            seenStrike.add(s.unitId);
+          } else {
+            dropReasons.push(`Air strike ${s.unitId}: ${vr.reason}`);
+          }
+        }
+        const strikeIds = new Set(validatedAir.map((s) => s.unitId));
+        const validatedFerry: FerryOrder[] = [];
+        const seenFerry = new Set<string>();
+        for (const f of llmFerryOrders) {
+          if (seenFerry.has(f.unitId)) {
+            dropReasons.push(`Duplicate ferry for ${f.unitId}`);
+            continue;
+          }
+          if (strikeIds.has(f.unitId)) {
+            dropReasons.push(`Air unit ${f.unitId} cannot strike and ferry in the same tactical turn`);
+            continue;
+          }
+          const fr = validateTacticalOpponentFerryOrder(f, planAfterMove);
+          if (fr.valid) {
+            validatedFerry.push(f);
+            seenFerry.add(f.unitId);
+          } else {
+            dropReasons.push(`Ferry ${f.unitId}: ${fr.reason}`);
+          }
+        }
+        const validatedEmb: EmbarkOrder[] = [];
+        const seenEmbarkLand = new Set<string>();
+        for (const e of llmEmbarkOrders) {
+          if (seenEmbarkLand.has(e.unitId)) {
+            dropReasons.push(`Duplicate embark for ${e.unitId}`);
+            continue;
+          }
+          const er = validateTacticalOpponentEmbarkOrder(e, movementProjected.subUnits);
+          if (er.valid) {
+            validatedEmb.push(e);
+            seenEmbarkLand.add(e.unitId);
+          } else {
+            dropReasons.push(`Embark ${e.unitId}: ${er.reason}`);
+          }
+        }
+        outAir = validatedAir;
+        outFerry = validatedFerry;
+        outEmbark = validatedEmb;
+      }
+
       markSuccessfulConsultation();
       return {
         success: true,
         orders: validated,
         rangedAttacks: validatedRanged.length > 0 ? validatedRanged : undefined,
-        airStrikes: llmAirStrikes.length > 0 ? llmAirStrikes : undefined,
-        ferryOrders: llmFerryOrders.length > 0 ? llmFerryOrders : undefined,
-        embarkOrders: llmEmbarkOrders.length > 0 ? llmEmbarkOrders : undefined,
+        airStrikes: outAir.length > 0 ? outAir : undefined,
+        ferryOrders: outFerry.length > 0 ? outFerry : undefined,
+        embarkOrders: outEmbark.length > 0 ? outEmbark : undefined,
         strategy: parsed.strategy,
         dropped: dropReasons.length,
         dropReasons: dropReasons.length > 0 ? dropReasons : undefined,

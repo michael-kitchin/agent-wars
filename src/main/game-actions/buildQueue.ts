@@ -17,6 +17,7 @@ import {
   type BuildUnitType,
 } from '../productionRules';
 import type { Res1ProductionContextSnapshot } from '../../shared/ipcTypes';
+import { isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession';
 
 /**
  * Documents the `HexBuildQueueEntryView` interface as a named contract surface (export interface HexBuildQueueEntryView).
@@ -286,6 +287,9 @@ function validateBuildQueueMutationContext(args: {
   const phase = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1')?.phase ?? 'planning';
   if (phase !== 'planning') {
     return { valid: false, reason: 'Build queue can only be edited during planning phase.' };
+  }
+  if (isTacticalBattleActive()) {
+    return { valid: false, reason: 'Build queue is unavailable during a tactical battle.' };
   }
   const queueView = buildQueueViewForRequester(args.h3Index, args.requestingPlayerId);
   if (!queueView.controlledByRequester) {

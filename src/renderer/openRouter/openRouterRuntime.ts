@@ -65,7 +65,16 @@ updateOpenRouterCostLabel: () => void;
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-showSidebarError: (message: string) => void;
+  showSidebarError: (message: string) => void;
+    /**
+   * Specifies the contract for the `requestRedraw` member (requestRedraw?: () => void;).
+
+   * Contract: Optional canvas refresh after AI results that only touch renderer state (e.g. tactical snapshot updates).
+   * When to use: Wired from the main renderer so background `requestAiOrders` can repaint the tactical map.
+   * Expected outcome: No-op when omitted; invoked after `applySuccessfulPrecomputedAiResult` when `tacticalBattle` is present.
+   * Exceptions: None.
+   */
+requestRedraw?: () => void;
 }
 
 /**
@@ -119,6 +128,9 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
         }
         if (S.runButtonOn && result.success) {
           applySuccessfulPrecomputedAiResult(result);
+          if (result.tacticalBattle) {
+            deps.requestRedraw?.();
+          }
           if (result.toolInvocationCounts) {
             S.precomputedToolInvocationCounts = { ...result.toolInvocationCounts };
             for (const [groupId, count] of Object.entries(result.toolInvocationCounts)) {

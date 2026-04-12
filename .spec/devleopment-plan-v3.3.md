@@ -18,7 +18,7 @@ These observations align with every other LLM game AI project's findings. The so
 
 This plan begins after milestone 0.5 and incorporates the hybrid AI architecture as a foundational design decision rather than a future optimization.
 
-**Map resolution decision (settled).** The game uses two H3 zoom levels: global (H3 resolution 1, ~842 hexes at ~610,000 km² each) and tactical (H3 resolution 4, ~343 hexes per global hex at ~1,770 km² each, ~42 km edge-to-edge). This was determined by a rendering performance budget of ~400 hexes on screen. Phase 1 builds the complete game at the global level. Phase 2 adds session persistence and optional tactical battles at res 4 when opposing units share a res1 hex. The earlier goal of 1 km² hex resolution has been set aside — res 4's ~42 km hexes provide division-scale tactical play, which is the right grain for the Axis & Allies-inspired unit interactions in the game vision.
+**Map resolution decision (settled).** The game uses two H3 zoom levels: global (H3 resolution 1, ~842 hexes at ~610,000 km² each) and tactical (H3 resolution 4, ~343 hexes per global hex at ~1,770 km² each, ~42 km edge-to-edge). This was determined by a rendering performance budget of ~400 hexes on screen. Phase 1 builds the complete game at the global level. Phase 2 adds optional tactical battles at res 4 when opposing units share a res1 hex, plus session persistence. The earlier goal of 1 km² hex resolution has been set aside — res 4's ~42 km hexes provide division-scale tactical play, which is the right grain for the Axis & Allies-inspired unit interactions in the game vision.
 
 ---
 
@@ -365,7 +365,7 @@ Scenarios should vary in how much infrastructure is available at start — a sce
 
 ## Phase 2: Tactical Battles (Milestones 2.1–2.5)
 
-**Goal:** Add session persistence and the optional tactical battle layer. Save/load comes first because long playtesting sessions — especially those involving tactical battles — need crash protection. The tactical battle layer at H3 res 4 lets players zoom into contested res1 hexes and fight division-scale battles on ~343 child hexes, or skip them and resolve via standard strategic dice rolls. The strategic game pauses while a tactical battle is in progress. This is the Total War model: optional zoom-in battles that enhance the strategic game without being required.
+**Goal:** Add the optional tactical battle layer and session persistence. The tactical battle layer at H3 res 4 lets players zoom into contested res1 hexes and fight division-scale battles on ~343 child hexes, or skip them and resolve via standard strategic dice rolls. The strategic game pauses while a tactical battle is in progress. This is the Total War model: optional zoom-in battles that enhance the strategic game without being required. Save/load comes last in this phase so it can handle both strategic and tactical game state from the start.
 
 **Why Phase 2 and not later:** UI, sound, and art design are more effective when applied to the complete gameplay experience rather than an incomplete slice. Polishing the strategic game first and then retrofitting polish onto the tactical layer means doing presentation work twice. Building all gameplay systems first — then polishing everything in one pass — is more efficient and produces a more cohesive result.
 
@@ -383,17 +383,7 @@ Scenarios should vary in how much infrastructure is available at start — a sce
 
 These resolved decisions significantly reduce Phase 2 risk and scope compared to earlier estimates that included open-ended prototyping of the unit relationship model.
 
-### Milestone 2.1 — Save/Load and Session Management
-
-**Build:** Full save and load. Since game state is in SQLite, this is largely about serializing the complete database state — including per-player subjective views, pending orders, AI memory, standing orders, active callback subscriptions, infrastructure state (which urban hexes/airports/seaports have been destroyed), embarked cargo assignments, and turn counter — to a save file and restoring it cleanly. Auto-save at the start of each turn. Add turn replay: step through any previous turn's resolution, including the AI's briefing and response for turns where it was consulted.
-
-**AI architecture impact:** The callback subscription state must be persisted and restored. On load, the engine must re-evaluate whether any callback conditions are already satisfied in the loaded game state (e.g., if the game was saved mid-crisis, the loaded state might immediately trigger a consultation). AI strategic memory (Tool 4) is already in SQLite and persists naturally.
-
-**Why first:** Tactical battle development involves long playtesting sessions. Losing a 90-minute game to a crash during tactical development is the kind of thing that kills motivation for weeks. Session persistence also enables meaningful playtesting of scenarios end-to-end, which is essential context for evaluating whether the tactical layer adds value.
-
-**Playtest hypothesis:** You should be able to close the game mid-session, reopen it days later, and resume with full context. The turn replay with AI briefing review should help you remember your strategic situation.
-
-### Milestone 2.2 — Tactical Rendering and Zoom Transition
+### Milestone 2.1 — Tactical Rendering and Zoom Transition
 
 **Build:** Implement the zoom transition from a contested res1 hex to its res4 child hexes. When opposing units share a res1 hex after strategic resolution, the UI presents a "Fight Tactical Battle" button. Clicking it zooms smoothly into the res4 hex grid with terrain data (already generated and stored since milestone 1.2). The tactical view renders with finer terrain detail — at ~42 km per hex, terrain types that were aggregated at global level now show distinct features: mountain passes through ranges, coastal approaches, forested regions within a broadly "land" global hex.
 
@@ -403,7 +393,7 @@ Place sub-units on the map using entry-side injection. Implement the multiplicat
 
 **Playtest hypothesis:** The zoom transition should feel like assuming a different level of command — like a general leaning over a regional map after studying the global one. The terrain at res 4 should reveal geographic detail that was invisible at res 1: the Strait of Gibraltar as a narrow passage, the Swiss Alps as a barrier with passable valleys, coastal approaches that invite flanking maneuvers. Entry-side injection should visually confirm strategic positioning decisions — approaching from two sides should look like a two-pronged advance on the tactical map.
 
-### Milestone 2.3 — Tactical Movement and Combat
+### Milestone 2.2 — Tactical Movement and Combat
 
 **Build:** Implement the tactical gameplay systems: movement budgets with terrain costs, ranged combat, and melee resolution.
 
@@ -417,7 +407,7 @@ Place sub-units on the map using entry-side injection. Implement the multiplicat
 
 **Playtest hypothesis:** Tactical combat should feel meaningfully different from strategic resolution while retaining the same core rhythm of plan-commit-resolve. Terrain should create interesting approach problems — armor can't cross those mountains, so infantry needs to clear the pass. Ranged fire should create standoff dynamics where positioning matters. The WEGO structure should produce the same suspenseful moment of resolution as the strategic game — you commit your tactical maneuvers, the AI commits its, and you see what happens.
 
-### Milestone 2.4 — Bail-Out Resolution and AI Tactical Play
+### Milestone 2.3 — Bail-Out Resolution and AI Tactical Play
 
 **Build:** Implement the bail-out system and the AI's ability to play tactical battles.
 
@@ -433,7 +423,7 @@ The AI may also choose to bail out of a tactical battle if it determines continu
 
 **Playtest hypothesis:** The bail-out system should feel fair — a player who fought well tactically before bailing should see a better result than one who bailed immediately. The AI should make reasonable tactical decisions: advancing toward objectives, concentrating fire, using terrain advantages. If the AI's tactical play is noticeably weak but its strategic play is strong, that's acceptable — the tactical layer is optional and the AI can bail out when it's losing.
 
-### Milestone 2.5 — Tactical Integration and Balance
+### Milestone 2.4 — Tactical Integration and Balance
 
 **Build:** Full integration pass. Tactical battles triggered from all scenario types. Bail-out resolution verified against strategic resolution for consistency. Test edge cases: tactical battle with only air units, tactical battle where one side has naval and the other doesn't, tactical battle where all units entered from the same side.
 
@@ -441,9 +431,15 @@ Balance pass on: multiplication ratios (do 12 infantry sub-units produce interes
 
 Ensure scenarios from milestone 1.7 work correctly with tactical battles available. The end-game summary gains tactical battle statistics: how many were fought, how many were bailed out of, average sub-unit losses per battle.
 
-Save/load must handle tactical battle state: if the game is saved mid-tactical-battle, restoring it must resume the tactical battle at the correct sub-unit positions and turn state. Verify this works.
-
 **Playtest hypothesis:** A complete game using both strategic and tactical layers should feel richer than the strategic-only experience, not more tedious. The tactical battle should be something you want to use when you have a positional advantage or want finer control, not something you feel obligated to engage with every time. If players consistently skip tactical battles, the tactical layer needs more compelling differentiation from strategic resolution — but that's a balance problem, not an architectural one.
+
+### Milestone 2.5 — Save/Load and Session Management
+
+**Build:** Full save and load. Since game state is in SQLite, this is largely about serializing the complete database state — including per-player subjective views, pending orders, AI memory, standing orders, active callback subscriptions, infrastructure state (which urban hexes/airports/seaports have been destroyed), embarked cargo assignments, tactical battle state (sub-unit positions, tactical turn count, which res1 hex is in tactical mode), and turn counter — to a save file and restoring it cleanly. Auto-save at the start of each strategic turn and at the start of each tactical turn. Add turn replay: step through any previous turn's resolution, including the AI's briefing and response for turns where it was consulted.
+
+**AI architecture impact:** The callback subscription state must be persisted and restored. On load, the engine must re-evaluate whether any callback conditions are already satisfied in the loaded game state (e.g., if the game was saved mid-crisis, the loaded state might immediately trigger a consultation). AI strategic memory (Tool 4) is already in SQLite and persists naturally. If the game is saved mid-tactical-battle, restoring it must resume the tactical battle at the correct sub-unit positions and turn state.
+
+**Playtest hypothesis:** You should be able to close the game mid-session — whether during strategic play or mid-tactical-battle — reopen it days later, and resume with full context. The turn replay with AI briefing review should help you remember your strategic situation.
 
 ---
 
@@ -574,7 +570,7 @@ Assuming 2-week milestones at 10–15 hours per week:
 
 **Total estimated range from current position: 9–14 months to launch.**
 
-Phase 2 (tactical battles) remains deferrable to post-launch if the global-level game is strong enough on its own. If deferred, Phase 3 (polish) follows Phase 1 directly and the range compresses to 7–11 months. That's a legitimate shipping strategy — launch the game that works, expand it once it has an audience. If Phase 2 is deferred, save/load (milestone 2.1) should still be pulled into Phase 1 or early Phase 3, since session persistence is essential for any serious playtesting.
+Phase 2 (tactical battles) remains deferrable to post-launch if the global-level game is strong enough on its own. If deferred, Phase 3 (polish) follows Phase 1 directly and the range compresses to 7–11 months. That's a legitimate shipping strategy — launch the game that works, expand it once it has an audience. If Phase 2 is deferred, save/load (milestone 2.5) should still be pulled into Phase 1 or early Phase 3, since session persistence is essential for any serious playtesting.
 
 Phase 2 carries significantly less risk than earlier estimates because the key design decisions (unit relationship, visibility model, bail-out mechanic) are already resolved. The highest-risk element is AI tactical reasoning quality — if the LLM can't play tactically at an acceptable level, the fallback is human-only tactical battles with AI auto-resolve, which is still a valuable feature.
 

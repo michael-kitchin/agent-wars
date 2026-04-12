@@ -13,9 +13,15 @@ import {
 } from './gameDb';
 import { buildLatLngCoordinateMap } from './mapData';
 import { generateOrdersForStandingOrders } from './tools/tool5StandingOrders';
+import {
+  applyValidatedOpponentTacticalOrders,
+  getActiveTacticalBattleSnapshot,
+} from './tacticalBattle/tacticalBattleSession';
 import { afterResolution } from './openrouter/afterResolution';
 import { logError } from './logger';
+import { tacticalLogError, tacticalLogMutate } from './tacticalBattle/tacticalLogging';
 import { logHybridPipelineBoundary } from './hybridTurnPipeline';
+import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
 import type {
   GameReadyIpcPayload,
   RequestAiOrdersResult,
@@ -112,7 +118,12 @@ defaultGroupIds: string[];
 requestOrders: (
     state: GameStateSnapshot,
     modelId: string,
-    options: { enabledToolNames: string[]; signal?: AbortSignal; usePrecomputation?: boolean }
+    options: {
+      enabledToolNames: string[];
+      signal?: AbortSignal;
+      usePrecomputation?: boolean;
+      tacticalAiBattle?: import('../shared/tacticalBattleTypes').TacticalBattleSnapshot;
+    }
   ) => Promise<RequestAiOrdersResult>;
     /**
    * Specifies the contract for the `controllerRef` member (controllerRef: { current: AbortController | null };).
@@ -157,12 +168,55 @@ export async function handleRequestAiOrders(
   deps.controllerRef.current = new AbortController();
   const signal = deps.controllerRef.current.signal;
   try {
-    const result = await deps.requestOrders(state, modelId, {
+    const tacticalSnap = getActiveTacticalBattleSnapshot();
+    const raw = await deps.requestOrders(state, modelId, {
       enabledToolNames,
       signal,
-      usePrecomputation,
+      usePrecomputation: tacticalSnap ? false : usePrecomputation,
+      tacticalAiBattle: tacticalSnap ?? undefined,
     });
-    return result;
+    if (tacticalSnap && raw.success === true) {
+      let tacticalBattle: TacticalBattleSnapshot | undefined;
+      const hasTacticalApply =
+        raw.orders.length > 0 ||
+        (raw.rangedAttacks?.length ?? 0) > 0 ||
+        (raw.airStrikes?.length ?? 0) > 0 ||
+        (raw.ferryOrders?.length ?? 0) > 0 ||
+        (raw.embarkOrders?.length ?? 0) > 0;
+      if (hasTacticalApply) {
+        const applied = applyValidatedOpponentTacticalOrders({
+          movementOrders: raw.orders,
+          rangedAttacks: raw.rangedAttacks,
+          airStrikes: raw.airStrikes,
+          ferryOrders: raw.ferryOrders,
+          embarkOrders: raw.embarkOrders,
+        });
+        if (applied.success) {
+          tacticalBattle = applied.battle;
+        } else {
+          tacticalLogError('handleRequestAiOrders tactical order apply failed', { reason: applied.reason });
+        }
+      }
+      tacticalLogMutate('handleRequestAiOrders tactical consultation completed', {
+        strippedMovementOrders: raw.orders.length,
+        strippedRanged: raw.rangedAttacks?.length ?? 0,
+        strippedAir: raw.airStrikes?.length ?? 0,
+        tacticalSnapshotReturned: !!tacticalBattle,
+      });
+      const tacticalNote =
+        '(tactical) Opponent orders update the tactical res4 snapshot only; they are not queued as strategic actions in milestone 2.1.';
+      return {
+        ...raw,
+        orders: [],
+        rangedAttacks: undefined,
+        airStrikes: undefined,
+        ferryOrders: undefined,
+        embarkOrders: undefined,
+        dropReasons: [...(raw.dropReasons ?? []), tacticalNote],
+        tacticalBattle,
+      };
+    }
+    return raw;
   } finally {
     if (deps.controllerRef.current?.signal === signal) {
       deps.controllerRef.current = null;

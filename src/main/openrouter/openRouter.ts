@@ -1621,7 +1621,16 @@ onLog?: (line: string, isError?: boolean) => void;
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-usePrecomputation?: boolean;
+  usePrecomputation?: boolean;
+    /**
+   * Specifies the contract for the `tacticalAiBattle` member (tacticalAiBattle?: import('../../shared/tacticalBattleTypes').TacticalBattleSnapshot;).
+
+   * Contract: When set, the request uses res4 tactical plan state and strips strategic-only tools from the prompt.
+   * When to use: IPC `game:requestAiOrders` while `tacticalBattleSession` has an active tactical snapshot.
+   * Expected outcome: Validated movement orders reference tactical sub-unit ids and res4 destinations.
+   * Exceptions: None.
+   */
+tacticalAiBattle?: import('../../shared/tacticalBattleTypes').TacticalBattleSnapshot;
 }
 
 /**

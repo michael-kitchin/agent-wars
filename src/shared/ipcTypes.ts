@@ -1,3 +1,10 @@
+import type {
+  AdvanceTacticalTurnIpcResult,
+  EndTacticalBattleIpcResult,
+  StartTacticalBattleIpcResult,
+  TacticalBattleSnapshot,
+} from './tacticalBattleTypes';
+
 /**
  * Documents the `HexNamingTooltipLineRequest` interface as a named contract surface (export interface HexNamingTooltipLineRequest).
 
@@ -131,14 +138,29 @@ export interface GameStateSnapshot {
    */
 hexes: { h3Index: string; terrain: string; terrainKind: string }[];
     /**
-   * Specifies the contract for the `units` member (units: { id: string; player: string; unitType: string; h3Index: string; displayOrder?: number }[];).
+   * Specifies the contract for the `units` member (units: tactical-capable unit rows including optional embarkedOnSubUnitId).
 
    * Contract: Describes stable behavior for callers of `units` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-units: { id: string; player: string; unitType: string; h3Index: string; displayOrder?: number }[];
+units: {
+    id: string;
+    player: string;
+    unitType: string;
+    h3Index: string;
+    displayOrder?: number;
+    /**
+     * Tactical-only: land unit embarked on a naval sub-unit id for in-memory sealift parity.
+     *
+     * Contract: Present only on snapshots built from an active tactical battle for AI validation.
+     * When to use: Reject independent march orders for cargo while keeping carrier hex alignment.
+     * Expected outcome: When set, validators treat the unit as occupying its carrier's cell.
+     * Exceptions: None.
+     */
+    embarkedOnSubUnitId?: string | null;
+  }[];
     /**
    * Specifies the contract for the `visibleHexes` member (visibleHexes?: string[];).
 
@@ -976,6 +998,15 @@ inputTokens?: number;
        * Exceptions: None.
        */
 outputTokens?: number;
+            /**
+       * Specifies the contract for the `tacticalBattle` member (tacticalBattle?: TacticalBattleSnapshot;).
+
+       * Contract: Present after a successful `requestAiOrders` during an active tactical session when the main process updated in-memory tactical sub-unit positions.
+       * When to use: Renderer replaces `S.tacticalBattleSnapshot` so the canvas reflects opponent AI march orders without touching strategic units.
+       * Expected outcome: Omitted when no tactical session or when the consultation returned no applicable tactical movement updates.
+       * Exceptions: None.
+       */
+tacticalBattle?: TacticalBattleSnapshot;
     }
   | {   /**
    * Specifies the contract for the `success` member (success: false;).
@@ -2446,6 +2477,33 @@ updateSealiftSlot: (payload: {
    * Exceptions: None.
    */
 requestAiOrders: (payload?: { enabledToolGroups?: string[] }) => Promise<RequestAiOrdersResult>;
+    /**
+   * Specifies the contract for the `startTacticalBattle` member (startTacticalBattle: (payload: { enclosingRes1H3Index: string }) => Promise<StartTacticalBattleIpcResult>;).
+
+   * Contract: Starts a milestone-2.1 tactical battle for a contested res1 hex during strategic planning; fails if prerequisites are not met.
+   * When to use: Renderer invokes this after the player confirms tactical entry from the map overlay.
+   * Expected outcome: On success, returns a tactical snapshot the renderer stores for res4-focused drawing and interaction.
+   * Exceptions: None.
+   */
+startTacticalBattle: (payload: { enclosingRes1H3Index: string }) => Promise<StartTacticalBattleIpcResult>;
+    /**
+   * Specifies the contract for the `endTacticalBattle` member (endTacticalBattle: () => Promise<EndTacticalBattleIpcResult>;).
+
+   * Contract: Clears the active tactical session in the main process without applying strategic combat outcomes.
+   * When to use: Renderer invokes this when the player exits tactical planning and returns to the strategic map.
+   * Expected outcome: Strategic `ready` and order mutations become eligible again after this succeeds.
+   * Exceptions: None.
+   */
+endTacticalBattle: () => Promise<EndTacticalBattleIpcResult>;
+    /**
+   * Specifies the contract for the `advanceTacticalTurn` member (advanceTacticalTurn: () => Promise<AdvanceTacticalTurnIpcResult>;).
+
+   * Contract: Increments `tacticalTurnNumber` on the active main-process tactical snapshot when a battle is in progress.
+   * When to use: Renderer tactical HUD “next tactical turn” control during strategic planning with an active tactical session.
+   * Expected outcome: Returns `battle` with incremented turn on success; `success: false` when no tactical session exists.
+   * Exceptions: None.
+   */
+advanceTacticalTurn: () => Promise<AdvanceTacticalTurnIpcResult>;
     /**
    * Specifies the contract for the `cancelRequestAiOrders` member (cancelRequestAiOrders: () => Promise<void>;).
 
