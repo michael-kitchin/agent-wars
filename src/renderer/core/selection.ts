@@ -10,6 +10,15 @@ import { rendererSharedState as S } from './state';
  * Exceptions: None.
  */
 export function reconcileSelectionToCurrentState(): void {
+  if (S.tacticalBattleSnapshot) {
+    const validHumanUnitIds = new Set(
+      S.tacticalBattleSnapshot.subUnits
+        .filter((u) => u.player === 'human')
+        .map((u) => u.id)
+    );
+    S.selectedUnitIds = S.selectedUnitIds.filter((id) => validHumanUnitIds.has(id));
+    return;
+  }
   if (!S.gameState) {
     S.selectedUnitIds = [];
     return;
@@ -38,7 +47,9 @@ export function replaceSelection(unitIds: string[]): void {
     S.airStrikeModeActive = false;
     return;
   }
-  const primary = S.gameState?.units.find((u) => u.id === S.selectedUnitIds[0]);
+  const primary = S.tacticalBattleSnapshot
+    ? S.tacticalBattleSnapshot.subUnits.find((u) => u.id === S.selectedUnitIds[0])
+    : S.gameState?.units.find((u) => u.id === S.selectedUnitIds[0]);
   S.selectedHexIndex = primary?.h3Index ?? null;
 }
 

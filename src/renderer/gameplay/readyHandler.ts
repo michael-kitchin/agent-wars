@@ -533,6 +533,7 @@ function buildCombatActivityFallbackBullets(readyResult: ReadyResult): string[] 
 export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<void> {
   if (!window.gameApi) return;
   if (S.gameState?.gameOver) return;
+  if (S.readyRequestInFlight) return;
   deps.clearSidebarError();
   S.readyRequestInFlight = true;
   S.toolInvocationCounts = Object.fromEntries(S.openRouterToolGroups.map((g) => [g.id, 0]));
@@ -545,16 +546,22 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       deps.updateReadyButtonState();
       return;
     }
-    const submitResult = (await window.gameApi.submitOrders({
-      movementOrders: [],
-      rangedAttacks: S.pendingRangedAttacks,
-      airStrikes: S.pendingAirStrikes,
-      ferryOrders: S.pendingFerryOrders,
-    })) as { success: boolean; reason?: string };
-    if (!submitResult.success) {
-      deps.showSidebarError(submitResult.reason ?? 'Submit failed');
-      deps.updateReadyButtonState();
-      return;
+    const hasPendingDraftOrders =
+      S.pendingRangedAttacks.length > 0 ||
+      S.pendingAirStrikes.length > 0 ||
+      S.pendingFerryOrders.length > 0;
+    if (hasPendingDraftOrders) {
+      const submitResult = (await window.gameApi.submitOrders({
+        movementOrders: [],
+        rangedAttacks: S.pendingRangedAttacks,
+        airStrikes: S.pendingAirStrikes,
+        ferryOrders: S.pendingFerryOrders,
+      })) as { success: boolean; reason?: string };
+      if (!submitResult.success) {
+        deps.showSidebarError(submitResult.reason ?? 'Submit failed');
+        deps.updateReadyButtonState();
+        return;
+      }
     }
     const enabledToolGroupsPayload = Array.from(S.enabledToolGroups).filter((id) => id !== 'events');
     const useEventDriven = S.useEventDrivenConsultation;

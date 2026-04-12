@@ -17535,6 +17535,13 @@
 
   // src/renderer/core/selection.ts
   function reconcileSelectionToCurrentState() {
+    if (rendererSharedState.tacticalBattleSnapshot) {
+      const validHumanUnitIds2 = new Set(
+        rendererSharedState.tacticalBattleSnapshot.subUnits.filter((u) => u.player === "human").map((u) => u.id)
+      );
+      rendererSharedState.selectedUnitIds = rendererSharedState.selectedUnitIds.filter((id) => validHumanUnitIds2.has(id));
+      return;
+    }
     if (!rendererSharedState.gameState) {
       rendererSharedState.selectedUnitIds = [];
       return;
@@ -17554,7 +17561,7 @@
       rendererSharedState.airStrikeModeActive = false;
       return;
     }
-    const primary = rendererSharedState.gameState?.units.find((u) => u.id === rendererSharedState.selectedUnitIds[0]);
+    const primary = rendererSharedState.tacticalBattleSnapshot ? rendererSharedState.tacticalBattleSnapshot.subUnits.find((u) => u.id === rendererSharedState.selectedUnitIds[0]) : rendererSharedState.gameState?.units.find((u) => u.id === rendererSharedState.selectedUnitIds[0]);
     rendererSharedState.selectedHexIndex = primary?.h3Index ?? null;
   }
   function addUnitsToSelection(unitIds) {
@@ -19320,6 +19327,7 @@
   async function handleReadyButtonClick(deps) {
     if (!window.gameApi) return;
     if (rendererSharedState.gameState?.gameOver) return;
+    if (rendererSharedState.readyRequestInFlight) return;
     deps.clearSidebarError();
     rendererSharedState.readyRequestInFlight = true;
     rendererSharedState.toolInvocationCounts = Object.fromEntries(rendererSharedState.openRouterToolGroups.map((g) => [g.id, 0]));
@@ -19332,16 +19340,19 @@
         deps.updateReadyButtonState();
         return;
       }
-      const submitResult = await window.gameApi.submitOrders({
-        movementOrders: [],
-        rangedAttacks: rendererSharedState.pendingRangedAttacks,
-        airStrikes: rendererSharedState.pendingAirStrikes,
-        ferryOrders: rendererSharedState.pendingFerryOrders
-      });
-      if (!submitResult.success) {
-        deps.showSidebarError(submitResult.reason ?? "Submit failed");
-        deps.updateReadyButtonState();
-        return;
+      const hasPendingDraftOrders = rendererSharedState.pendingRangedAttacks.length > 0 || rendererSharedState.pendingAirStrikes.length > 0 || rendererSharedState.pendingFerryOrders.length > 0;
+      if (hasPendingDraftOrders) {
+        const submitResult = await window.gameApi.submitOrders({
+          movementOrders: [],
+          rangedAttacks: rendererSharedState.pendingRangedAttacks,
+          airStrikes: rendererSharedState.pendingAirStrikes,
+          ferryOrders: rendererSharedState.pendingFerryOrders
+        });
+        if (!submitResult.success) {
+          deps.showSidebarError(submitResult.reason ?? "Submit failed");
+          deps.updateReadyButtonState();
+          return;
+        }
       }
       const enabledToolGroupsPayload = Array.from(rendererSharedState.enabledToolGroups).filter((id) => id !== "events");
       const useEventDriven = rendererSharedState.useEventDrivenConsultation;
@@ -20243,6 +20254,16 @@
     return buildResolutionPlaybackState(anim, elapsed);
   }
   function getUnitAtHex(h3Index) {
+    if (rendererSharedState.tacticalBattleSnapshot) {
+      const tacticalUnit = rendererSharedState.tacticalBattleSnapshot.subUnits.find((u) => u.h3Index === h3Index);
+      if (!tacticalUnit) return null;
+      return {
+        id: tacticalUnit.id,
+        player: tacticalUnit.player,
+        unitType: tacticalUnit.unitType,
+        h3Index: tacticalUnit.h3Index
+      };
+    }
     if (!rendererSharedState.gameState) return null;
     return rendererSharedState.gameState.units.find((u) => u.h3Index === h3Index) ?? null;
   }
@@ -21071,7 +21092,7 @@
         updateReadyButtonState,
         redraw,
         refreshBuildPopupIfOpen,
-        tacticalReconcileBattleAfterStrategicSnapshot
+        reconcileTacticalBattleAfterStrategicSnapshot: tacticalReconcileBattleAfterStrategicSnapshot
       },
       nextState,
       options
@@ -21429,6 +21450,17 @@
     });
   }
   function getUnitsForDrawWithMovingIds2(state) {
+    if (rendererSharedState.tacticalBattleSnapshot) {
+      return {
+        unitsToDraw: rendererSharedState.tacticalBattleSnapshot.subUnits.map((u) => ({
+          id: u.id,
+          player: u.player,
+          unitType: u.unitType,
+          h3Index: u.h3Index
+        })),
+        movingIds: void 0
+      };
+    }
     return getUnitsForDrawWithMovingIds(state, {
       backgroundColor: BACKGROUND_COLOR,
       buildResolutionPlaybackState: buildResolutionPlaybackState2,
@@ -21447,31 +21479,32 @@
       showBuildPopup
     });
   }
-  async function tryHandleTacticalEntryAtClientXY2(clientX, clientY) {
-    return tryHandleTacticalEntryAtClientXY(clientX, clientY, async (h3) => {
-      if (!window.gameApi?.startTacticalBattle) {
-        showMapToast("Tactical battle is not available.", { isError: true });
-        return;
-      }
-      hideBuildPopup();
-      const result = await window.gameApi.startTacticalBattle({ enclosingRes1H3Index: h3 });
-      tacticalRendererApplyStartBattleIpcResult(result, {
-        showMapToast,
-        assignBattleSnapshot: (battle) => {
-          rendererSharedState.tacticalBattleSnapshot = battle;
-        },
-        setPhasePlanning: (planning) => {
-          rendererSharedState.tacticalPhasePlanning = planning;
-        },
-        enterRes4View: enterTacticalMapView,
-        setStrategicSidebarTactical: tacticalApplyStrategicSidebarForTacticalMode,
-        refreshTacticalExitHud: tacticalUpdateExitButtonVisibility,
-        scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
-        refreshReadyButton: updateReadyButtonState,
-        syncTacticalEntryOverlay: syncTacticalEntryButtonOverlay,
-        redraw
-      });
+  async function startTacticalBattleFromEntryHex(h3) {
+    if (!window.gameApi?.startTacticalBattle) {
+      showMapToast("Tactical battle is not available.", { isError: true });
+      return;
+    }
+    hideBuildPopup();
+    const result = await window.gameApi.startTacticalBattle({ enclosingRes1H3Index: h3 });
+    tacticalRendererApplyStartBattleIpcResult(result, {
+      showMapToast,
+      assignBattleSnapshot: (battle) => {
+        rendererSharedState.tacticalBattleSnapshot = battle;
+      },
+      setPhasePlanning: (planning) => {
+        rendererSharedState.tacticalPhasePlanning = planning;
+      },
+      enterRes4View: enterTacticalMapView,
+      setStrategicSidebarTactical: tacticalApplyStrategicSidebarForTacticalMode,
+      refreshTacticalExitHud: tacticalUpdateExitButtonVisibility,
+      scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
+      refreshReadyButton: updateReadyButtonState,
+      syncTacticalEntryOverlay: syncTacticalEntryButtonOverlay,
+      redraw
     });
+  }
+  async function tryHandleTacticalEntryAtClientXY2(clientX, clientY) {
+    return tryHandleTacticalEntryAtClientXY(clientX, clientY, startTacticalBattleFromEntryHex);
   }
   function createReadyHandlerDeps() {
     return {
@@ -21981,6 +22014,17 @@
       replacePendingFerryOrdersForSelected: replacePendingFerryOrdersForSelected2,
       clearCommittedOrderDraftState: clearCommittedOrderDraftState2,
       refreshHumanStandingOrders: refreshHumanStandingOrders2
+    });
+    const tacticalEntryLayer = document.getElementById("tactical-entry-layer");
+    tacticalEntryLayer?.addEventListener("click", (e) => {
+      const target = e.target;
+      const btn = target?.closest(".tactical-entry-btn");
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const h3 = btn.dataset.h3Index;
+      if (!h3) return;
+      void startTacticalBattleFromEntryHex(h3);
     });
     const readyBtn = document.getElementById("ready-btn");
     if (readyBtn) {

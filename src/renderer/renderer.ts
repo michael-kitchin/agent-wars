@@ -251,6 +251,16 @@ function buildResolutionPlaybackState(
  * Exceptions: None.
  */
 function getUnitAtHex(h3Index: string): GameStateSnapshot['units'][0] | null {
+  if (S.tacticalBattleSnapshot) {
+    const tacticalUnit = S.tacticalBattleSnapshot.subUnits.find((u) => u.h3Index === h3Index);
+    if (!tacticalUnit) return null;
+    return {
+      id: tacticalUnit.id,
+      player: tacticalUnit.player,
+      unitType: tacticalUnit.unitType,
+      h3Index: tacticalUnit.h3Index,
+    };
+  }
   if (!S.gameState) return null;
   return S.gameState.units.find((u) => u.h3Index === h3Index) ?? null;
 }
@@ -1826,7 +1836,7 @@ async function applyGameStateSnapshot(
       updateReadyButtonState,
       redraw,
       refreshBuildPopupIfOpen,
-      tacticalReconcileBattleAfterStrategicSnapshot,
+      reconcileTacticalBattleAfterStrategicSnapshot: tacticalReconcileBattleAfterStrategicSnapshot,
     },
     nextState,
     options
@@ -2580,6 +2590,17 @@ function getUnitsForDrawWithMovingIds(state: GameStateSnapshot): {
   unitsToDraw: GameStateSnapshot['units'];
   movingIds: Set<string> | undefined;
 } {
+  if (S.tacticalBattleSnapshot) {
+    return {
+      unitsToDraw: S.tacticalBattleSnapshot.subUnits.map((u) => ({
+        id: u.id,
+        player: u.player,
+        unitType: u.unitType,
+        h3Index: u.h3Index,
+      })),
+      movingIds: undefined,
+    };
+  }
   // Contract anchors retained for rendererConsolidation tests after extraction:
   // phase.inAirStrikeLightning || phase.inAirStrikeCasualty
   // h3Index: move.toH3Index
@@ -2627,6 +2648,39 @@ function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number): boolea
 }
 
 /**
+ * Starts a tactical battle from a contested res1 hex and applies renderer side effects.
+ *
+ * Purpose: Centralizes tactical-entry launch logic so both map hit-testing and direct magnifier button clicks share one path.
+ * When to use: Any strategic UI interaction that targets a `data-h3-index` tactical-entry button.
+ * Expected outcome: Tactical snapshot is assigned and the renderer enters res4 tactical mode, or a toast explains why start failed.
+ * Exceptions: None.
+ */
+async function startTacticalBattleFromEntryHex(h3: string): Promise<void> {
+  if (!window.gameApi?.startTacticalBattle) {
+    showMapToast('Tactical battle is not available.', { isError: true });
+    return;
+  }
+  hideBuildPopup();
+  const result = await window.gameApi.startTacticalBattle({ enclosingRes1H3Index: h3 });
+  tacticalRendererApplyStartBattleIpcResult(result, {
+    showMapToast,
+    assignBattleSnapshot: (battle) => {
+      S.tacticalBattleSnapshot = battle;
+    },
+    setPhasePlanning: (planning) => {
+      S.tacticalPhasePlanning = planning;
+    },
+    enterRes4View: enterTacticalMapView,
+    setStrategicSidebarTactical: tacticalApplyStrategicSidebarForTacticalMode,
+    refreshTacticalExitHud: tacticalUpdateExitButtonVisibility,
+    scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
+    refreshReadyButton: updateReadyButtonState,
+    syncTacticalEntryOverlay: syncTacticalEntryButtonOverlay,
+    redraw,
+  });
+}
+
+/**
  * Starts a tactical battle when the player clicks a contested-hex magnifier during strategic planning.
  *
  * Purpose: Bridges map overlay clicks to `startTacticalBattle` IPC and tactical map entry.
@@ -2635,30 +2689,7 @@ function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number): boolea
  * Exceptions: None.
  */
 async function tryHandleTacticalEntryAtClientXY(clientX: number, clientY: number): Promise<boolean> {
-  return tryHandleTacticalEntryAtClientXYFromModule(clientX, clientY, async (h3) => {
-    if (!window.gameApi?.startTacticalBattle) {
-      showMapToast('Tactical battle is not available.', { isError: true });
-      return;
-    }
-    hideBuildPopup();
-    const result = await window.gameApi.startTacticalBattle({ enclosingRes1H3Index: h3 });
-    tacticalRendererApplyStartBattleIpcResult(result, {
-      showMapToast,
-      assignBattleSnapshot: (battle) => {
-        S.tacticalBattleSnapshot = battle;
-      },
-      setPhasePlanning: (planning) => {
-        S.tacticalPhasePlanning = planning;
-      },
-      enterRes4View: enterTacticalMapView,
-      setStrategicSidebarTactical: tacticalApplyStrategicSidebarForTacticalMode,
-      refreshTacticalExitHud: tacticalUpdateExitButtonVisibility,
-      scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
-      refreshReadyButton: updateReadyButtonState,
-      syncTacticalEntryOverlay: syncTacticalEntryButtonOverlay,
-      redraw,
-    });
-  });
+  return tryHandleTacticalEntryAtClientXYFromModule(clientX, clientY, startTacticalBattleFromEntryHex);
 }
 
 /**
@@ -3627,6 +3658,17 @@ function init(): void {
     replacePendingFerryOrdersForSelected,
     clearCommittedOrderDraftState,
     refreshHumanStandingOrders,
+  });
+  const tacticalEntryLayer = document.getElementById('tactical-entry-layer');
+  tacticalEntryLayer?.addEventListener('click', (e) => {
+    const target = e.target as Element | null;
+    const btn = target?.closest('.tactical-entry-btn') as HTMLButtonElement | null;
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const h3 = btn.dataset.h3Index;
+    if (!h3) return;
+    void startTacticalBattleFromEntryHex(h3);
   });
 
   const readyBtn = document.getElementById('ready-btn');

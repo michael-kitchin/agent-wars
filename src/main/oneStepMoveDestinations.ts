@@ -38,7 +38,7 @@ export function getValidDestinations(
   const range = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
   const wantLand = unit.unitType === 'infantry' || unit.unitType === 'armor';
   const seaportCountByHex = new Map((state.res1Infrastructure ?? []).map((row) => [row.h3Index, row.seaportCount] as const));
-  const valid: string[] = [];
+  const valid: string[] = [unit.h3Index];
   for (const h of state.hexes) {
     if (h.h3Index === unit.h3Index) continue;
     let dist: number;
@@ -50,7 +50,7 @@ export function getValidDestinations(
     if (dist < 1 || dist > range) continue;
     const movementTerrain = resolveMovementTerrainForHex(h, seaportCountByHex);
     if (unit.unitType === 'naval' && !passabilityAllowsNavalUnit(movementTerrain)) continue;
-    if (wantLand && !passabilityAllowsLandUnit(h.terrain)) continue;
+    if (wantLand && !passabilityAllowsLandUnit(movementTerrain)) continue;
     valid.push(h.h3Index);
   }
   return valid;
