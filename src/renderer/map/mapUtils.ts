@@ -10,6 +10,7 @@ import { DETAIL_H3_RESOLUTION, INITIAL_CAMERA_ZOOM_IN_LEVELS, WORLD_H3_RESOLUTIO
 import { rendererSharedState as S } from '../core/state';
 import type { PanDirection } from '../core/types';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 
 /**
  * Defines the `shouldIgnoreGlobalKeydown` function shape (export function shouldIgnoreGlobalKeydown(e: KeyboardEvent): boolean).
@@ -201,4 +202,42 @@ export function hitTestHexAtContainerPixel(x: number, y: number, mapHexSet: Set<
   } catch {
     return null;
   }
+}
+
+/**
+ * Resolves a main-map container pixel to a res4 tactical cell in the active battle footprint (or its enclosing res1).
+ *
+ * Purpose: `hitTestHexAtContainerPixel` maps res4 clicks onto strategic res1 parents using `gameState.hexes`, but tactical
+ * sub-units use res4 `h3Index` values; without this helper, `drawnAtHit` stays empty and human unit clicks no-op.
+ * When to use: While `tacticalBattleSnapshot` is non-null for click hit-testing and hover cursor hints over tactical units.
+ * Expected outcome: Returns a res4 id from `res4ChildH3Indexes` when the pointer snaps inside that cell; may return
+ * `enclosingRes1H3Index` when the pointer resolves to that res1 cell; null when outside the tactical footprint.
+ * Exceptions: `latLngToCell` failures return null.
+ */
+export function hitTestTacticalRes4HexAtContainerPixel(
+  x: number,
+  y: number,
+  tactical: TacticalBattleSnapshot
+): string | null {
+  const map = getMainLeafletMap() as
+    | { containerPointToLatLng: (pt: unknown) => { lat: number; lng: number } }
+    | null;
+  if (!map) return null;
+  const L = getLeafletGlobal();
+  if (!L) return null;
+  const latlng = map.containerPointToLatLng(L.point(x, y));
+  let res4: string;
+  try {
+    res4 = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
+  } catch {
+    return null;
+  }
+  if (tactical.res4ChildH3Indexes.includes(res4)) return res4;
+  try {
+    const res1 = latLngToCell(latlng.lat, latlng.lng, WORLD_H3_RESOLUTION);
+    if (res1 === tactical.enclosingRes1H3Index) return tactical.enclosingRes1H3Index;
+  } catch {
+    return null;
+  }
+  return null;
 }

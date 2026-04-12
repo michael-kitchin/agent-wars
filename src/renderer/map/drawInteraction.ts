@@ -9,7 +9,7 @@ import {
 } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import type { ResolutionPlaybackState } from '../rendering/resolutionPlayback';
-import { hexCenterPx, hitTestHexAtContainerPixel } from './mapUtils';
+import { hexCenterPx, hitTestHexAtContainerPixel, hitTestTacticalRes4HexAtContainerPixel } from './mapUtils';
 import { getMainLeafletMap } from './worldLeafletMap';
 
 /**
@@ -273,7 +273,10 @@ export function updateMapInteractionCursor(clientX: number, clientY: number, dep
     const px = clientX - rect.left;
     const py = clientY - rect.top;
     const hexSet = new Set(S.gameState.hexes.map((h) => h.h3Index));
-    const hit = hitTestHexAtContainerPixel(px, py, hexSet);
+    const tb = S.tacticalBattleSnapshot;
+    const hit = tb
+      ? hitTestTacticalRes4HexAtContainerPixel(px, py, tb) ?? hitTestHexAtContainerPixel(px, py, hexSet)
+      : hitTestHexAtContainerPixel(px, py, hexSet);
     if (hit) {
       const { unitsToDraw, movingIds } = getUnitsForDrawWithMovingIds(S.gameState, deps);
       const drawnAtHit = unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id));

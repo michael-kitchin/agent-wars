@@ -5,6 +5,7 @@ import type {
   ReadyResult,
   RemovedUnitSnapshot,
 } from '../../shared/ipcTypes';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { MeleeInterceptModalOpenArgs, MeleeInterceptModalOutcome } from './meleeInterceptModal';
 import { buildTurnUpdateBullets } from './turnUpdateSummary';
 import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
@@ -305,6 +306,15 @@ openMeleeInterceptModal: (args: MeleeInterceptModalOpenArgs) => Promise<MeleeInt
    * Exceptions: None.
    */
 startTacticalBattleFromInterceptHex: (h3Index: string) => Promise<void>;
+    /**
+   * Schedules tactical annihilation auto-exit when a post-commit snapshot leaves one side with zero sub-units.
+   *
+   * Contract: Optional; renderer supplies the same hook used after tactical draw updates.
+   * When to use: Immediately after tactical Ready successfully commits march drafts to the main snapshot.
+   * Expected outcome: Annihilation toast/exit runs when roster rules demand it.
+   * Exceptions: None.
+   */
+scheduleTacticalAnnihilationExit?: () => void;
 }
 
 /**
@@ -581,6 +591,45 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       deps.startBackgroundRequestIfAllowed();
       deps.showMapToast('AI planning is still running. Ready will unlock once precomputed orders are available.', { isError: false });
       deps.updateReadyButtonState();
+      return;
+    }
+    if (S.tacticalBattleSnapshot && S.tacticalPhasePlanning) {
+      const commit = window.gameApi.commitHumanTacticalDraftOrders;
+      if (!commit) {
+        deps.showSidebarError('Tactical commit is not available in this build.');
+        deps.updateReadyButtonState();
+        return;
+      }
+      const movementOrders = S.tacticalPendingMarches.map((r) => ({ unitId: r.subUnitId, toH3Index: r.destinationH3Index }));
+      const commitResult = (await commit({
+        movementOrders,
+        rangedAttacks: [...S.pendingRangedAttacks],
+        airStrikes: [...S.pendingAirStrikes],
+        ferryOrders: [...S.pendingFerryOrders],
+      })) as {
+        success: boolean;
+        reason?: string;
+        tacticalBattle?: TacticalBattleSnapshot;
+      };
+      if (!commitResult.success) {
+        deps.showSidebarError(commitResult.reason ?? 'Tactical commit failed');
+        deps.updateReadyButtonState();
+        return;
+      }
+      if (commitResult.tacticalBattle) {
+        S.tacticalBattleSnapshot = commitResult.tacticalBattle;
+      }
+      S.tacticalPendingMarches = [];
+      S.pendingRangedAttacks = [];
+      S.pendingAirStrikes = [];
+      S.pendingFerryOrders = [];
+      S.rangedModeActive = false;
+      S.airStrikeModeActive = false;
+      deps.updatePendingOrdersSidebar();
+      deps.updateRangedSidebar();
+      deps.updateSidebar();
+      deps.redraw();
+      deps.scheduleTacticalAnnihilationExit?.();
       return;
     }
     const hasPendingDraftOrders =

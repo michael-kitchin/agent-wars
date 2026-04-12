@@ -1,4 +1,5 @@
 import type { GameStateSnapshot, HumanStandingOrderSnapshot, RemovedUnitSnapshot } from '../../shared/ipcTypes';
+import { formatTacticalMarchPendingDistanceLabel } from '../../shared/tacticalMarchHoverPreview';
 import { buildUnitDisplayNameLookup, fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
 import { formatPendingFerryOrderSidebarLabel } from './orderLabelFormatting';
 import { UNIT_DESELECT_GLYPH, UNIT_SELECT_GLYPH } from '../core/constants';
@@ -185,6 +186,24 @@ cancelFerryForUnit: (unitId: string) => void;
    * Exceptions: None.
    */
 formatUnitArrowLabel: (unitId: string, targetLabel: string) => string;
+    /**
+   * Redraws the map after tactical draft rows change from sidebar cancel actions.
+   *
+   * Contract: Optional hook invoked after mutating `S.tacticalPendingMarches` from tactical pending-order cancel buttons.
+   * When to use: Tactical pending sidebar rows only; omit when tests inject a minimal `PendingOrdersDeps` bundle.
+   * Expected outcome: Canvas reflects removed draft destinations on the next draw pass.
+   * Exceptions: None.
+   */
+redraw?: () => void;
+    /**
+   * Re-renders pending order rows after tactical draft cancellation mutates `S.tacticalPendingMarches`.
+   *
+   * Contract: Optional callback to avoid circular dependencies in test stubs.
+   * When to use: Tactical pending row `onCancel` after deleting one draft.
+   * Expected outcome: `#pending-orders-list` reflects the new list immediately.
+   * Exceptions: None.
+   */
+updatePendingOrdersSidebar?: () => void;
 }
 
 /**
@@ -385,6 +404,33 @@ export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
   const container = document.getElementById('pending-orders-list');
   if (!container) return;
   container.innerHTML = '';
+  if (S.tacticalBattleSnapshot) {
+    if (S.tacticalPendingMarches.length === 0) {
+      const span = document.createElement('span');
+      span.textContent = 'None';
+      span.style.color = '#666';
+      container.appendChild(span);
+      return;
+    }
+    for (const row of S.tacticalPendingMarches) {
+      const rowEl = deps.createSidebarOrderRow({
+        labelText: deps.formatUnitArrowLabel(
+          row.subUnitId,
+          formatTacticalMarchPendingDistanceLabel(S.tacticalBattleSnapshot, row.subUnitId, row.destinationH3Index)
+        ),
+        selected: S.selectedUnitIds.includes(row.subUnitId),
+        onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(row.subUnitId, event),
+        onCancel: () => {
+          S.tacticalPendingMarches = S.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
+          deps.updatePendingOrdersSidebar?.();
+          deps.redraw?.();
+        },
+        compactBlueButtons: true,
+      });
+      container.appendChild(rowEl);
+    }
+    return;
+  }
   const pendingOrders = S.humanStandingOrders.filter((order) => deps.isPendingMovementOrderForDisplay(order));
   if (pendingOrders.length === 0 && S.pendingFerryOrders.length === 0) {
     const span = document.createElement('span');

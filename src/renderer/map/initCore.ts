@@ -295,9 +295,14 @@ export function wireInitCore(deps: InitCoreDeps): void {
       void deps.refreshHoverRoutePreview();
     } else if (S.selectedUnitIds.length > 0 && S.gameState) {
       const state = S.gameState;
-      const selectedUnits = S.selectedUnitIds
-        .map((id) => state.units.find((u) => u.id === id))
-        .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
+      const tb = S.tacticalBattleSnapshot;
+      const selectedUnits = tb
+        ? S.selectedUnitIds
+            .map((id) => tb.subUnits.find((u) => u.id === id))
+            .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human')
+        : S.selectedUnitIds
+            .map((id) => state.units.find((u) => u.id === id))
+            .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
       const allAir = selectedUnits.length > 0 && selectedUnits.every((unit) => unit.unitType === 'air');
       const allHaveRanged =
         selectedUnits.length > 0 && selectedUnits.every((unit) => (RANGED_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 0) >= 1);

@@ -77,11 +77,11 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', 'Melee intercept');
     overlay.style.cssText =
-      'position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;padding:12px;';
+      'position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,0.35);display:flex;align-items:flex-start;justify-content:center;padding:12px;overflow-y:auto;';
 
     const panel = document.createElement('div');
     panel.style.cssText =
-      'max-width:min(920px,96vw);max-height:88vh;overflow:auto;background:#f4f2ee;border:1px solid #555;border-radius:4px;padding:10px 12px;font:13px/1.35 system-ui,sans-serif;color:#222;box-shadow:0 4px 18px rgba(0,0,0,0.25);';
+      'max-width:min(460px,48vw);width:100%;max-height:none;overflow:visible;background:#f4f2ee;border:1px solid #555;border-radius:4px;padding:10px 12px;font:13px/1.35 system-ui,sans-serif;color:#222;box-shadow:0 4px 18px rgba(0,0,0,0.25);margin:12px auto 24px;';
 
     const title = document.createElement('div');
     title.textContent = 'Melee combat this turn — choose tactical intercept (optional)';

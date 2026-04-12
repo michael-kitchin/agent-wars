@@ -5,6 +5,7 @@ import { drawArrowheadOnly, strokePolylineSkippingWrap } from './pathDrawing';
 import { rendererSharedState as S } from '../core/state';
 import { getLeafletGlobal, hexCenterPx } from '../map/mapUtils';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
+import { tacticalEffectiveH3ForSubUnit } from '../tactical/tacticalDraftMarchOverlay';
 
 /**
  * Defines the `drawHoverRoutePreview` function shape (export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void).
@@ -17,33 +18,48 @@ import { getMainLeafletMap } from '../map/worldLeafletMap';
 export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
   if (!S.hoverRoutePreview || !S.gameState) return;
   const state = S.gameState;
+  const tb = S.tacticalBattleSnapshot;
   const previewGroup = S.hoverRoutePreview.data;
   const map = getMainLeafletMap() as { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } } | null;
   if (!map) return;
   const L = getLeafletGlobal();
-  const selectedHumanUnits = S.selectedUnitIds
-    .map((id) => state.units.find((u) => u.id === id))
-    .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
   const slowestMovementRangeByOriginH3 = new Map<string, number>();
-  for (const unit of selectedHumanUnits) {
-    const movementRange = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
-    const prior = slowestMovementRangeByOriginH3.get(unit.h3Index);
-    if (prior === undefined || movementRange < prior) {
-      slowestMovementRangeByOriginH3.set(unit.h3Index, movementRange);
+  if (tb) {
+    for (const id of S.selectedUnitIds) {
+      const u = tb.subUnits.find((s) => s.id === id);
+      if (!u || u.player !== 'human') continue;
+      const eff = tacticalEffectiveH3ForSubUnit(tb, id);
+      const movementRange = MOVEMENT_RANGE_BY_UNIT_TYPE[u.unitType] ?? 1;
+      const prior = slowestMovementRangeByOriginH3.get(eff);
+      if (prior === undefined || movementRange < prior) {
+        slowestMovementRangeByOriginH3.set(eff, movementRange);
+      }
+    }
+  } else {
+    const selectedHumanUnits = S.selectedUnitIds
+      .map((id) => state.units.find((u) => u.id === id))
+      .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
+    for (const unit of selectedHumanUnits) {
+      const movementRange = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
+      const prior = slowestMovementRangeByOriginH3.get(unit.h3Index);
+      if (prior === undefined || movementRange < prior) {
+        slowestMovementRangeByOriginH3.set(unit.h3Index, movementRange);
+      }
     }
   }
   const drawnOrigins = new Set<string>();
   for (const perUnit of previewGroup.previews) {
     const preview = perUnit.preview;
     if (preview.segments.length === 0) continue;
-    const previewUnit = state.units.find((u) => u.id === perUnit.unitId);
-    if (previewUnit) {
-      if (drawnOrigins.has(previewUnit.h3Index)) continue;
-      drawnOrigins.add(previewUnit.h3Index);
+    const previewUnit = tb ? tb.subUnits.find((s) => s.id === perUnit.unitId) : state.units.find((u) => u.id === perUnit.unitId);
+    const originH3 = previewUnit && tb ? tacticalEffectiveH3ForSubUnit(tb, perUnit.unitId) : previewUnit?.h3Index;
+    if (previewUnit && originH3) {
+      if (drawnOrigins.has(originH3)) continue;
+      drawnOrigins.add(originH3);
     }
     const perStackSolidCap =
-      previewUnit && slowestMovementRangeByOriginH3.has(previewUnit.h3Index)
-        ? slowestMovementRangeByOriginH3.get(previewUnit.h3Index)!
+      previewUnit && originH3 && slowestMovementRangeByOriginH3.has(originH3)
+        ? slowestMovementRangeByOriginH3.get(originH3)!
         : previewGroup.slowestMovementRange;
     let lastSegmentPenultimate: { x: number; y: number } | null = null;
     let lastSegmentLast: { x: number; y: number } | null = null;

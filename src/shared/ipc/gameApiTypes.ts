@@ -2,9 +2,9 @@ import type { AirStrikeTargetType } from './ordersTypes';
 import type { BuildUnitType, HexBuildQueueSnapshot } from './productionTypes';
 import type { GameStateSnapshot } from './gameStateTypes';
 import type {
-  AdvanceTacticalTurnIpcResult,
   EndTacticalBattleIpcResult,
   StartTacticalBattleIpcResult,
+  TacticalBattleSnapshot,
 } from './tacticalTypes';
 import type { HexContinentNamesRequest, HexNamingTooltipLineRequest, Res4TerrainOverrideRow } from './terrainHexTypes';
 import type { HumanOrderGroupPreviewResult, HumanOrderPreviewResult, HumanStandingOrderSnapshot } from './humanOrderPreviewTypes';
@@ -131,23 +131,44 @@ previewHumanMarchOrder: (payload: { unitId: string; hoveredH3Index: string }) =>
    */
 previewHumanMarchOrders: (payload: { unitIds: string[]; hoveredH3Index: string }) => Promise<HumanOrderGroupPreviewResult>;
     /**
-   * Specifies the contract for the `assignHumanMarchOrder` member (assignHumanMarchOrder: (payload: { unitId: string; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;).
+   * Specifies the contract for the `assignHumanMarchOrder` member (assignHumanMarchOrder: (payload: { unitId: string; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string; tacticalBattle?: TacticalBattleSnapshot }>;).
 
    * Contract: Describes stable behavior for callers of `assignHumanMarchOrder` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-assignHumanMarchOrder: (payload: { unitId: string; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
+assignHumanMarchOrder: (payload: {
+    unitId: string;
+    destinationH3Index: string;
+  }) => Promise<{ success: boolean; reason?: string; tacticalBattle?: TacticalBattleSnapshot }>;
     /**
-   * Specifies the contract for the `assignHumanMarchOrders` member (assignHumanMarchOrders: (payload: { unitIds: string[]; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;).
+   * Specifies the contract for the `assignHumanMarchOrders` member (assignHumanMarchOrders: (payload: { unitIds: string[]; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string; tacticalBattle?: TacticalBattleSnapshot }>;).
 
    * Contract: Describes stable behavior for callers of `assignHumanMarchOrders` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-assignHumanMarchOrders: (payload: { unitIds: string[]; destinationH3Index: string }) => Promise<{ success: boolean; reason?: string }>;
+assignHumanMarchOrders: (payload: {
+    unitIds: string[];
+    destinationH3Index: string;
+  }) => Promise<{ success: boolean; reason?: string; tacticalBattle?: TacticalBattleSnapshot }>;
+    /**
+   * Specifies the contract for the `commitHumanTacticalDraftOrders` member (commitHumanTacticalDraftOrders: (payload: { movementOrders: { unitId: string; toH3Index: string }[]; rangedAttacks?: ... }) => Promise<{ success: boolean; reason?: string; tacticalBattle?: TacticalBattleSnapshot }>;).
+
+   * Contract: Applies renderer tactical draft rows (movement, ranged, air, ferry, embark) to the main-process snapshot on tactical Ready.
+   * When to use: Renderer tactical planning phase when the human clicks Ready with zero or more pending draft rows.
+   * Expected outcome: Returns the updated tactical snapshot on success for immediate redraw.
+   * Exceptions: None; failures return `success: false` with a reason string.
+   */
+commitHumanTacticalDraftOrders: (payload: {
+    movementOrders: { unitId: string; toH3Index: string }[];
+    rangedAttacks?: { unitId: string; targetH3Index: string }[];
+    airStrikes?: { unitId: string; targetH3Index: string; targetType: AirStrikeTargetType }[];
+    ferryOrders?: { unitId: string; destinationH3Index: string }[];
+    embarkOrders?: { unitId: string; navalUnitId: string }[];
+  }) => Promise<{ success: boolean; reason?: string; tacticalBattle?: TacticalBattleSnapshot }>;
     /**
    * Specifies the contract for the `validateGroupRangedTarget` member (validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }) => Promise<{ success: boolean; reason?: string }>;).
 
@@ -282,15 +303,6 @@ startTacticalBattle: (payload: { enclosingRes1H3Index: string }) => Promise<Star
    * Exceptions: None.
    */
 endTacticalBattle: () => Promise<EndTacticalBattleIpcResult>;
-    /**
-   * Specifies the contract for the `advanceTacticalTurn` member (advanceTacticalTurn: () => Promise<AdvanceTacticalTurnIpcResult>;).
-
-   * Contract: Increments `tacticalTurnNumber` on the active main-process tactical snapshot when a battle is in progress.
-   * When to use: Renderer tactical HUD “next tactical turn” control during strategic planning with an active tactical session.
-   * Expected outcome: Returns `battle` with incremented turn on success; `success: false` when no tactical session exists.
-   * Exceptions: None.
-   */
-advanceTacticalTurn: () => Promise<AdvanceTacticalTurnIpcResult>;
     /**
    * Specifies the contract for the `cancelRequestAiOrders` member (cancelRequestAiOrders: () => Promise<void>;).
 

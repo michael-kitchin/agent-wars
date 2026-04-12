@@ -14140,6 +14140,28 @@
       libh3._free(countPtr);
     }
   }
+  function gridPathCells(origin, destination) {
+    var ref = h3IndexToSplitLong(origin);
+    var oLower = ref[0];
+    var oUpper = ref[1];
+    var ref$1 = h3IndexToSplitLong(destination);
+    var dLower = ref$1[0];
+    var dUpper = ref$1[1];
+    var countPtr = libh3._malloc(SZ_INT64);
+    try {
+      throwIfError(H3.gridPathCellsSize(oLower, oUpper, dLower, dUpper, countPtr));
+      var count = validateArrayLength(readInt64AsDoubleFromPointer(countPtr));
+      var hexagons = libh3._calloc(count, SZ_H3INDEX);
+      try {
+        H3.gridPathCells(oLower, oUpper, dLower, dUpper, hexagons);
+        return readArrayOfH3Indexes(hexagons, count);
+      } finally {
+        libh3._free(hexagons);
+      }
+    } finally {
+      libh3._free(countPtr);
+    }
+  }
   function degsToRads(deg) {
     return deg * Math.PI / 180;
   }
@@ -14921,8 +14943,6 @@
   var UNIT_DESELECT_GLYPH = "-";
   var TOAST_DURATION_MS = 24e3;
   var READY_REQUEST_TIMEOUT_MS = 12e4;
-  var TACTICAL_ADVANCE_BACKGROUND_AI_POLL_MS = 50;
-  var TACTICAL_ADVANCE_BACKGROUND_AI_TIMEOUT_MS = 8e4;
   var UNIT_ICON_HIT_PAD_PX = 2;
   var BUILD_ENTRY_HIT_PAD_PX = 2;
   var TACTICAL_ENTRY_HIT_PAD_PX = 6;
@@ -15022,7 +15042,7 @@
     
        * Purpose: Separates milestone-2.1 tactical planning beats from tactical resolution (AI / async work after advancing the tactical turn).
        * When to use: `true` while the human may exit tactical mode or press Advance; `false` while `performTacticalAdvanceTurn` waits on IPC and optional background `requestAiOrders`.
-       * Expected outcome: `#tactical-exit-btn` and `#tactical-advance-turn-btn` stay disabled whenever this flag is `false` with an active tactical snapshot.
+       * Expected outcome: `#tactical-exit-btn` stays disabled whenever this flag is `false` with an active tactical snapshot.
        * Exceptions: Reconciling snapshots or ending tactical always resets this to `true` once the renderer returns to a coherent tactical or strategic mode.
        */
     tacticalPhasePlanning: true,
@@ -15242,6 +15262,15 @@
        * Exceptions: None.
        */
     pendingFerryOrders: [],
+    /**
+       * Documents the object literal property `tacticalPendingMarches` (tacticalPendingMarches: [] as { subUnitId: string; destinationH3Index: string }[]).
+    
+       * Purpose: Holds human tactical march rows shown in the pending-orders sidebar while a tactical battle is active; distinct from strategic standing orders.
+       * When to use: Append after tactical march validation succeeds (draft, before Ready); clear on tactical Ready commit, advance turn, exit, stash, or new game.
+       * Expected outcome: Sidebar lists res4 destinations keyed by tactical sub-unit ids until the next tactical beat boundary clears them.
+       * Exceptions: None.
+       */
+    tacticalPendingMarches: [],
     /**
        * Documents the object literal property `hideCommittedOrderLinesAfterReady` (hideCommittedOrderLinesAfterReady: false).
     
@@ -15631,24 +15660,6 @@
     lastAppliedMapInteractionCursor: ""
   };
 
-  // src/renderer/tactical/tacticalUiGuards.ts
-  function tacticalRendererIsBattleActive(state) {
-    return !!state.tacticalBattleSnapshot;
-  }
-  function tacticalRendererHitInsideBattleFootprint(hit, tb) {
-    if (!tb || !hit) return true;
-    if (hit === tb.enclosingRes1H3Index) return true;
-    if (tb.res4ChildH3Indexes.includes(hit)) return true;
-    try {
-      if (getResolution(hit) === 4) {
-        return cellToParent(hit, 1) === tb.enclosingRes1H3Index;
-      }
-    } catch {
-      return false;
-    }
-    return false;
-  }
-
   // src/renderer/openRouter/aiPlanningState.ts
   function isWaitingForPrecomputedAiOrders() {
     return rendererSharedState.runButtonOn && rendererSharedState.precomputedAiOrders === null;
@@ -15676,8 +15687,7 @@
     if (!readyBtn) return;
     const gameOver = rendererSharedState.gameState?.gameOver ?? false;
     const waitingOnAi = isWaitingForPrecomputedAiOrders();
-    const tacticalActive = tacticalRendererIsBattleActive(rendererSharedState);
-    readyBtn.disabled = gameOver || waitingOnAi || tacticalActive;
+    readyBtn.disabled = gameOver || waitingOnAi;
     if (waitingOnAi) {
       const now = Date.now();
       if (rendererSharedState.readyBtnAiWaitStartTime === null) {
@@ -15923,6 +15933,27 @@
     } catch {
       return null;
     }
+  }
+  function hitTestTacticalRes4HexAtContainerPixel(x, y, tactical) {
+    const map = getMainLeafletMap();
+    if (!map) return null;
+    const L = getLeafletGlobal();
+    if (!L) return null;
+    const latlng = map.containerPointToLatLng(L.point(x, y));
+    let res4;
+    try {
+      res4 = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
+    } catch {
+      return null;
+    }
+    if (tactical.res4ChildH3Indexes.includes(res4)) return res4;
+    try {
+      const res1 = latLngToCell(latlng.lat, latlng.lng, WORLD_H3_RESOLUTION2);
+      if (res1 === tactical.enclosingRes1H3Index) return tactical.enclosingRes1H3Index;
+    } catch {
+      return null;
+    }
+    return null;
   }
 
   // src/renderer/map/terrainView.ts
@@ -17375,6 +17406,45 @@
       }
     }
   }
+  function drawTacticalPendingMarchPlanLines(ctx, battle, pendingMarches) {
+    if (pendingMarches.length === 0) return;
+    const map = getMainLeafletMap();
+    if (!map) return;
+    const L = getLeafletGlobal();
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    for (const row of pendingMarches) {
+      const sub = battle.subUnits.find((u) => u.id === row.subUnitId && u.player === "human");
+      if (!sub) continue;
+      const fromH3 = sub.h3Index;
+      const toH3 = row.destinationH3Index;
+      if (fromH3 === toH3) continue;
+      let pathCells;
+      try {
+        pathCells = gridPathCells(fromH3, toH3);
+      } catch {
+        continue;
+      }
+      if (pathCells.length < 2) continue;
+      const points = pathCells.map((h) => {
+        const [lat, lng] = cellToLatLng(h);
+        const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
+        return { x: p.x, y: p.y };
+      });
+      ctx.setLineDash([]);
+      ctx.strokeStyle = ORDER_LINE_COLOR;
+      ctx.lineWidth = ORDER_LINE_WIDTH;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
+      const penultimate = points[points.length - 2];
+      const last = points[points.length - 1];
+      if (penultimate && last) {
+        drawArrowheadOnly(ctx, penultimate, last, ORDER_LINE_COLOR, { tipAtTargetCenter: true });
+      }
+    }
+    ctx.restore();
+  }
   function drawResolutionMoveLines(ctx, canvasWidth, canvasHeight, moves, hexList, opacity, options) {
     void canvasWidth;
     void canvasHeight;
@@ -17471,6 +17541,19 @@
     }
   }
 
+  // src/renderer/tactical/tacticalDraftMarchOverlay.ts
+  function tacticalEffectiveH3ForSubUnit(tb, subUnitId) {
+    const draft = rendererSharedState.tacticalPendingMarches.find((r) => r.subUnitId === subUnitId);
+    if (draft) return draft.destinationH3Index;
+    return tb.subUnits.find((u) => u.id === subUnitId)?.h3Index ?? "";
+  }
+  function tacticalSubUnitsWithDraftOverlay(tb) {
+    return tb.subUnits.map((u) => {
+      const draft = rendererSharedState.tacticalPendingMarches.find((r) => r.subUnitId === u.id);
+      return draft ? { ...u, h3Index: draft.destinationH3Index } : u;
+    });
+  }
+
   // src/renderer/core/selection.ts
   function reconcileSelectionToCurrentState() {
     if (rendererSharedState.tacticalBattleSnapshot) {
@@ -17499,8 +17582,13 @@
       rendererSharedState.airStrikeModeActive = false;
       return;
     }
-    const primary = rendererSharedState.tacticalBattleSnapshot ? rendererSharedState.tacticalBattleSnapshot.subUnits.find((u) => u.id === rendererSharedState.selectedUnitIds[0]) : rendererSharedState.gameState?.units.find((u) => u.id === rendererSharedState.selectedUnitIds[0]);
-    rendererSharedState.selectedHexIndex = primary?.h3Index ?? null;
+    const tb = rendererSharedState.tacticalBattleSnapshot;
+    const primary = tb ? tb.subUnits.find((u) => u.id === rendererSharedState.selectedUnitIds[0]) : rendererSharedState.gameState?.units.find((u) => u.id === rendererSharedState.selectedUnitIds[0]);
+    if (tb && primary) {
+      rendererSharedState.selectedHexIndex = tacticalEffectiveH3ForSubUnit(tb, primary.id);
+    } else {
+      rendererSharedState.selectedHexIndex = primary?.h3Index ?? null;
+    }
   }
   function addUnitsToSelection(unitIds) {
     replaceSelection([...rendererSharedState.selectedUnitIds, ...unitIds]);
@@ -17673,6 +17761,37 @@
     }
   }
 
+  // src/renderer/tactical/tacticalStrategicOrderUiStash.ts
+  var strategicOrderDraftStash = null;
+  function stashStrategicOrderDraftsForTacticalSession() {
+    if (strategicOrderDraftStash) return;
+    strategicOrderDraftStash = {
+      humanStandingOrders: [...rendererSharedState.humanStandingOrders],
+      pendingRangedAttacks: [...rendererSharedState.pendingRangedAttacks],
+      pendingAirStrikes: [...rendererSharedState.pendingAirStrikes],
+      pendingFerryOrders: [...rendererSharedState.pendingFerryOrders]
+    };
+    rendererSharedState.humanStandingOrders = [];
+    rendererSharedState.pendingRangedAttacks = [];
+    rendererSharedState.pendingAirStrikes = [];
+    rendererSharedState.pendingFerryOrders = [];
+    rendererSharedState.tacticalPendingMarches = [];
+    rendererSharedState.rangedModeActive = false;
+    rendererSharedState.airStrikeModeActive = false;
+  }
+  function restoreStrategicOrderDraftsAfterTacticalSession() {
+    if (!strategicOrderDraftStash) return;
+    rendererSharedState.humanStandingOrders = strategicOrderDraftStash.humanStandingOrders;
+    rendererSharedState.pendingRangedAttacks = strategicOrderDraftStash.pendingRangedAttacks;
+    rendererSharedState.pendingAirStrikes = strategicOrderDraftStash.pendingAirStrikes;
+    rendererSharedState.pendingFerryOrders = strategicOrderDraftStash.pendingFerryOrders;
+    strategicOrderDraftStash = null;
+    rendererSharedState.tacticalPendingMarches = [];
+  }
+  function discardStrategicOrderUiStash() {
+    strategicOrderDraftStash = null;
+  }
+
   // src/renderer/gameplay/newGame.ts
   function registerRegionRandomizeButtons() {
     document.getElementById("new-game-human-region-randomize")?.addEventListener("click", () => {
@@ -17711,6 +17830,7 @@
         rendererSharedState.humanStandingOrders = [];
         rendererSharedState.hoverRoutePreview = null;
         deps.clearPendingTacticalOrders();
+        discardStrategicOrderUiStash();
         rendererSharedState.selectedUnitIds = [];
         rendererSharedState.selectedUnitIdsAtMouseDown = [];
         rendererSharedState.selectedHexIndex = null;
@@ -17865,10 +17985,6 @@
     if (!tacticalSnapshot || !tacticalPhasePlanning) return { ok: false, code: "not_planning_exit" };
     return { ok: true };
   }
-  function tacticalBoundaryPlanningAdvanceAllowed(tacticalSnapshot, tacticalPhasePlanning) {
-    if (!tacticalSnapshot || !tacticalPhasePlanning) return { ok: false, code: "not_planning_advance" };
-    return { ok: true };
-  }
 
   // src/shared/tacticalAnnihilation.ts
   function shouldEndTacticalBattleForAnnihilation(subUnits) {
@@ -17945,12 +18061,12 @@
 
   // src/renderer/tactical/tacticalUiOrchestration.ts
   function tacticalApplyStrategicSidebarForTacticalMode(tactical) {
-    document.getElementById("sidebar")?.classList.toggle("tactical-strategic-suppress", tactical);
+    void tactical;
+    document.getElementById("sidebar")?.classList.remove("tactical-strategic-suppress");
   }
   function tacticalUpdateExitButtonVisibility() {
     const hud = document.getElementById("tactical-battle-hud");
     const exitBtn = document.getElementById("tactical-exit-btn");
-    const advanceBtn = document.getElementById("tactical-advance-turn-btn");
     const turnLabel = document.getElementById("tactical-turn-label");
     const active = !!rendererSharedState.tacticalBattleSnapshot;
     hud?.classList.toggle("hidden", !active);
@@ -17959,7 +18075,6 @@
     }
     const disabled = !active || !rendererSharedState.tacticalPhasePlanning;
     if (exitBtn) exitBtn.disabled = disabled;
-    if (advanceBtn) advanceBtn.disabled = disabled;
   }
   function tacticalReconcileBattleAfterStrategicSnapshot(nextState) {
     const snap = rendererSharedState.tacticalBattleSnapshot;
@@ -17967,8 +18082,10 @@
     if (nextState.phase !== "planning" || nextState.turnNumber !== snap.strategicTurnNumber) {
       rendererSharedState.tacticalBattleSnapshot = null;
       rendererSharedState.tacticalPhasePlanning = true;
+      rendererSharedState.tacticalPendingMarches = [];
       exitTacticalMapView();
       tacticalApplyStrategicSidebarForTacticalMode(false);
+      restoreStrategicOrderDraftsAfterTacticalSession();
       const el = document.getElementById("tactical-entry-layer");
       if (el) hideTacticalEntryLayer(el, true);
       tacticalUpdateExitButtonVisibility();
@@ -18014,51 +18131,9 @@
     const tel = document.getElementById("tactical-entry-layer");
     if (tel) hideTacticalEntryLayer(tel, false);
     tacticalUpdateExitButtonVisibility();
+    restoreStrategicOrderDraftsAfterTacticalSession();
     io.redraw();
     await io.runReadyAfterExit();
-  }
-  async function tacticalPerformAdvanceTurn(session, io) {
-    const boundary = tacticalBoundaryPlanningAdvanceAllowed(session.getBattleSnapshot(), session.getPhasePlanning());
-    if (!boundary.ok) return;
-    session.setPhasePlanning(false);
-    tacticalUpdateExitButtonVisibility();
-    io.redraw();
-    try {
-      const result = await io.advanceTacticalTurn();
-      if (!result.success || !result.battle) {
-        io.showMapToast(result.reason ?? "Could not advance tactical turn.", { isError: true });
-        session.setPhasePlanning(true);
-        tacticalUpdateExitButtonVisibility();
-        io.redraw();
-        return;
-      }
-      session.setBattleSnapshot(result.battle);
-      tacticalUpdateExitButtonVisibility();
-      io.redraw();
-      io.startBackgroundRequestIfAllowed();
-      await new Promise((resolve) => {
-        queueMicrotask(() => resolve());
-      });
-      const deadline = Date.now() + TACTICAL_ADVANCE_BACKGROUND_AI_TIMEOUT_MS;
-      while (io.isBackgroundRequestInFlight() && Date.now() < deadline) {
-        await new Promise((resolve) => {
-          setTimeout(resolve, TACTICAL_ADVANCE_BACKGROUND_AI_POLL_MS);
-        });
-      }
-      if (io.isBackgroundRequestInFlight()) {
-        io.showMapToast("Tactical AI planning is still running; controls unlocked.", {});
-      }
-      session.setPhasePlanning(true);
-      tacticalUpdateExitButtonVisibility();
-      io.scheduleAnnihilationExit();
-      io.redraw();
-    } catch (err) {
-      console.error("advanceTacticalTurn failed:", err);
-      io.showMapToast("Could not advance tactical turn.", { isError: true });
-      session.setPhasePlanning(true);
-      tacticalUpdateExitButtonVisibility();
-      io.redraw();
-    }
   }
 
   // src/renderer/tactical/tacticalIpcHandlers.ts
@@ -18067,6 +18142,7 @@
       fx.showMapToast(result.reason ?? "Could not start tactical battle.", { isError: true });
       return;
     }
+    stashStrategicOrderDraftsForTacticalSession();
     fx.assignBattleSnapshot(result.battle);
     fx.setPhasePlanning(true);
     const skipped = result.skippedParentDisplayNames;
@@ -18082,6 +18158,7 @@
     fx.redraw();
   }
   function tacticalRendererActivateRestoredBattleSnapshot(battle, fx) {
+    stashStrategicOrderDraftsForTacticalSession();
     fx.assignBattleSnapshot(battle);
     fx.setPhasePlanning(true);
     fx.enterRes4View(battle.res4ChildH3Indexes);
@@ -18099,6 +18176,7 @@
       showMapToast: bindings.showMapToast,
       assignBattleSnapshot: (battle) => {
         rendererSharedState.tacticalBattleSnapshot = battle;
+        bindings.rebuildUnitDisplayNameLookup?.();
       },
       setPhasePlanning: (planning) => {
         rendererSharedState.tacticalPhasePlanning = planning;
@@ -18131,17 +18209,6 @@
       showMapToast: io.showMapToast,
       redraw: io.redraw,
       runReadyAfterExit: io.runReadyAfterExit
-    });
-  }
-  async function performTacticalAdvanceTurnWhenAvailable(session, deps) {
-    const advance = deps.resolveAdvanceTacticalTurn();
-    if (!advance) {
-      deps.onMissingAdvanceTacticalTurn();
-      return;
-    }
-    await tacticalPerformAdvanceTurn(session, {
-      advanceTacticalTurn: () => advance(),
-      ...deps.advanceIo
     });
   }
 
@@ -18870,7 +18937,8 @@
       const px = clientX - rect.left;
       const py = clientY - rect.top;
       const hexSet = new Set(rendererSharedState.gameState.hexes.map((h) => h.h3Index));
-      const hit = hitTestHexAtContainerPixel(px, py, hexSet);
+      const tb = rendererSharedState.tacticalBattleSnapshot;
+      const hit = tb ? hitTestTacticalRes4HexAtContainerPixel(px, py, tb) ?? hitTestHexAtContainerPixel(px, py, hexSet) : hitTestHexAtContainerPixel(px, py, hexSet);
       if (hit) {
         const { unitsToDraw, movingIds } = getUnitsForDrawWithMovingIds(rendererSharedState.gameState, deps);
         const drawnAtHit = unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id));
@@ -18899,6 +18967,127 @@
     naval: 2,
     air: 0
   });
+
+  // src/shared/tacticalMarchHoverPreview.ts
+  var TACTICAL_H3_RESOLUTION = 4;
+  function tacticalMarchEffectiveOriginH3(battle, pendingMarches, subUnitId) {
+    const draft = pendingMarches.find((r) => r.subUnitId === subUnitId);
+    if (draft) return draft.destinationH3Index;
+    return battle.subUnits.find((u) => u.id === subUnitId)?.h3Index ?? "";
+  }
+  function formatTacticalMarchPendingDistanceLabel(battle, subUnitId, destinationH3Index) {
+    const origin = battle.subUnits.find((u) => u.id === subUnitId)?.h3Index;
+    if (!origin) return "0h (Pending)";
+    try {
+      const steps = gridDistance(origin, destinationH3Index);
+      return `${steps}h (Pending)`;
+    } catch {
+      return "0h (Pending)";
+    }
+  }
+  function uniqueNonEmptyIds(unitIds) {
+    const out = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const id of unitIds) {
+      const t = id.trim();
+      if (!t || seen.has(t)) continue;
+      seen.add(t);
+      out.push(t);
+    }
+    return out;
+  }
+  function buildPreviewForSubUnit(args) {
+    const sub = args.battle.subUnits.find((u) => u.id === args.unitId);
+    if (!sub || sub.player !== "human") {
+      return { valid: false, showInvalidMarker: false, invalidReason: "Not a human tactical sub-unit", segments: [] };
+    }
+    const origin = tacticalMarchEffectiveOriginH3(args.battle, args.pendingMarches, args.unitId);
+    const maxSteps = MOVEMENT_RANGE_BY_UNIT_TYPE[sub.unitType] ?? 1;
+    let resOk = true;
+    try {
+      resOk = getResolution(origin) === TACTICAL_H3_RESOLUTION && getResolution(args.hoveredH3Index) === TACTICAL_H3_RESOLUTION;
+    } catch {
+      resOk = false;
+    }
+    if (!resOk) {
+      return { valid: false, showInvalidMarker: true, invalidReason: "Invalid tactical cell", segments: [] };
+    }
+    if (!args.res4Set.has(args.hoveredH3Index)) {
+      return { valid: false, showInvalidMarker: true, invalidReason: "Outside tactical footprint", segments: [] };
+    }
+    let distance = Number.POSITIVE_INFINITY;
+    try {
+      distance = gridDistance(origin, args.hoveredH3Index);
+    } catch {
+      return { valid: false, showInvalidMarker: true, invalidReason: "Could not measure distance", segments: [] };
+    }
+    if (distance > maxSteps) {
+      return {
+        valid: false,
+        showInvalidMarker: true,
+        invalidReason: "Beyond movement range",
+        segments: []
+      };
+    }
+    if (origin === args.hoveredH3Index) {
+      return { valid: true, showInvalidMarker: false, segments: [] };
+    }
+    let pathCells;
+    try {
+      pathCells = gridPathCells(origin, args.hoveredH3Index);
+    } catch {
+      return { valid: false, showInvalidMarker: true, invalidReason: "No path", segments: [] };
+    }
+    const hexes = pathCells.map((h) => {
+      const [lat, lng] = cellToLatLng(h);
+      return [lat, lng];
+    });
+    const [destLat, destLng] = cellToLatLng(args.hoveredH3Index);
+    return {
+      valid: true,
+      showInvalidMarker: false,
+      arrowLatLng: [destLat, destLng],
+      segments: [{ turn: 1, hexes }]
+    };
+  }
+  function buildTacticalMarchHoverPreview(battle, pendingMarches, unitIds, hoveredH3Index) {
+    const res4Set = new Set(battle.res4ChildH3Indexes);
+    const uniqueIds = uniqueNonEmptyIds(unitIds);
+    const selectedHuman = uniqueIds.map((id) => battle.subUnits.find((u) => u.id === id && u.player === "human")).filter((u) => !!u);
+    if (!hoveredH3Index || selectedHuman.length === 0) {
+      return {
+        validForAll: false,
+        showInvalidMarker: false,
+        slowestMovementRange: 0,
+        previews: []
+      };
+    }
+    const representativeUnitIdsByOrigin = /* @__PURE__ */ new Map();
+    for (const u of selectedHuman) {
+      const origin = tacticalMarchEffectiveOriginH3(battle, pendingMarches, u.id);
+      if (!representativeUnitIdsByOrigin.has(origin)) representativeUnitIdsByOrigin.set(origin, u.id);
+    }
+    const previewUnitIds = Array.from(representativeUnitIdsByOrigin.values());
+    const previews = previewUnitIds.map((unitId) => ({
+      unitId,
+      preview: buildPreviewForSubUnit({
+        battle,
+        pendingMarches,
+        unitId,
+        hoveredH3Index,
+        res4Set
+      })
+    }));
+    const invalid = previews.find((e) => !e.preview.valid);
+    const slowestMovementRange = selectedHuman.length > 0 ? Math.min(...selectedHuman.map((u) => MOVEMENT_RANGE_BY_UNIT_TYPE[u.unitType] ?? 1)) : 0;
+    return {
+      validForAll: invalid === void 0,
+      showInvalidMarker: invalid !== void 0,
+      invalidReason: invalid?.preview.invalidReason,
+      slowestMovementRange,
+      previews
+    };
+  }
 
   // src/renderer/gameplay/orderLabelFormatting.ts
   function computeGridDistanceForLabel(originH3, targetH3) {
@@ -18963,6 +19152,7 @@
     rendererSharedState.pendingAirStrikes = [];
     rendererSharedState.airStrikeModeActive = false;
     rendererSharedState.pendingFerryOrders = [];
+    rendererSharedState.tacticalPendingMarches = [];
   }
   function clearCommittedOrderDraftState(deps) {
     deps.clearSelection();
@@ -18975,6 +19165,22 @@
     const unitIds = [...rendererSharedState.selectedUnitIds];
     const hoveredH3 = rendererSharedState.hoveredHexH3;
     const seq = ++rendererSharedState.hoverPreviewRequestSeq;
+    if (rendererSharedState.tacticalBattleSnapshot) {
+      if (rendererSharedState.rangedModeActive || rendererSharedState.airStrikeModeActive || unitIds.length === 0 || !hoveredH3) {
+        rendererSharedState.hoverRoutePreview = null;
+        deps.requestRedraw();
+        return;
+      }
+      const data2 = buildTacticalMarchHoverPreview(rendererSharedState.tacticalBattleSnapshot, rendererSharedState.tacticalPendingMarches, unitIds, hoveredH3);
+      if (seq !== rendererSharedState.hoverPreviewRequestSeq) return;
+      if (rendererSharedState.hoveredHexH3 !== hoveredH3) return;
+      const currentSelected2 = [...rendererSharedState.selectedUnitIds].sort().join("|");
+      const requestedSelected2 = [...unitIds].sort().join("|");
+      if (currentSelected2 !== requestedSelected2) return;
+      rendererSharedState.hoverRoutePreview = { hoveredH3Index: hoveredH3, data: data2 };
+      deps.requestRedraw();
+      return;
+    }
     if (rendererSharedState.rangedModeActive || rendererSharedState.airStrikeModeActive || !window.gameApi?.previewHumanMarchOrders || unitIds.length === 0 || !hoveredH3 || !rendererSharedState.gameState) {
       rendererSharedState.hoverRoutePreview = null;
       deps.requestRedraw();
@@ -19072,7 +19278,8 @@
       }
     }
     if (btnEl) {
-      const selectedUnits = rendererSharedState.selectedUnitIds.map((id) => rendererSharedState.gameState?.units.find((u) => u.id === id)).filter((unit) => !!unit);
+      const tb = rendererSharedState.tacticalBattleSnapshot;
+      const selectedUnits = tb ? rendererSharedState.selectedUnitIds.map((id) => tb.subUnits.find((u) => u.id === id)).filter((unit) => !!unit) : rendererSharedState.selectedUnitIds.map((id) => rendererSharedState.gameState?.units.find((u) => u.id === id)).filter((unit) => !!unit);
       const allAir = selectedUnits.length > 0 && selectedUnits.every((unit) => unit.unitType === "air");
       const allHaveRanged = selectedUnits.length > 0 && selectedUnits.every((unit) => (RANGED_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 0) >= 1);
       if (allAir) {
@@ -19104,29 +19311,44 @@
   function drawHoverRoutePreview(ctx) {
     if (!rendererSharedState.hoverRoutePreview || !rendererSharedState.gameState) return;
     const state = rendererSharedState.gameState;
+    const tb = rendererSharedState.tacticalBattleSnapshot;
     const previewGroup = rendererSharedState.hoverRoutePreview.data;
     const map = getMainLeafletMap();
     if (!map) return;
     const L = getLeafletGlobal();
-    const selectedHumanUnits = rendererSharedState.selectedUnitIds.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human");
     const slowestMovementRangeByOriginH3 = /* @__PURE__ */ new Map();
-    for (const unit of selectedHumanUnits) {
-      const movementRange = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
-      const prior = slowestMovementRangeByOriginH3.get(unit.h3Index);
-      if (prior === void 0 || movementRange < prior) {
-        slowestMovementRangeByOriginH3.set(unit.h3Index, movementRange);
+    if (tb) {
+      for (const id of rendererSharedState.selectedUnitIds) {
+        const u = tb.subUnits.find((s) => s.id === id);
+        if (!u || u.player !== "human") continue;
+        const eff = tacticalEffectiveH3ForSubUnit(tb, id);
+        const movementRange = MOVEMENT_RANGE_BY_UNIT_TYPE[u.unitType] ?? 1;
+        const prior = slowestMovementRangeByOriginH3.get(eff);
+        if (prior === void 0 || movementRange < prior) {
+          slowestMovementRangeByOriginH3.set(eff, movementRange);
+        }
+      }
+    } else {
+      const selectedHumanUnits = rendererSharedState.selectedUnitIds.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human");
+      for (const unit of selectedHumanUnits) {
+        const movementRange = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
+        const prior = slowestMovementRangeByOriginH3.get(unit.h3Index);
+        if (prior === void 0 || movementRange < prior) {
+          slowestMovementRangeByOriginH3.set(unit.h3Index, movementRange);
+        }
       }
     }
     const drawnOrigins = /* @__PURE__ */ new Set();
     for (const perUnit of previewGroup.previews) {
       const preview = perUnit.preview;
       if (preview.segments.length === 0) continue;
-      const previewUnit = state.units.find((u) => u.id === perUnit.unitId);
-      if (previewUnit) {
-        if (drawnOrigins.has(previewUnit.h3Index)) continue;
-        drawnOrigins.add(previewUnit.h3Index);
+      const previewUnit = tb ? tb.subUnits.find((s) => s.id === perUnit.unitId) : state.units.find((u) => u.id === perUnit.unitId);
+      const originH3 = previewUnit && tb ? tacticalEffectiveH3ForSubUnit(tb, perUnit.unitId) : previewUnit?.h3Index;
+      if (previewUnit && originH3) {
+        if (drawnOrigins.has(originH3)) continue;
+        drawnOrigins.add(originH3);
       }
-      const perStackSolidCap = previewUnit && slowestMovementRangeByOriginH3.has(previewUnit.h3Index) ? slowestMovementRangeByOriginH3.get(previewUnit.h3Index) : previewGroup.slowestMovementRange;
+      const perStackSolidCap = previewUnit && originH3 && slowestMovementRangeByOriginH3.has(originH3) ? slowestMovementRangeByOriginH3.get(originH3) : previewGroup.slowestMovementRange;
       let lastSegmentPenultimate = null;
       let lastSegmentLast = null;
       let remainingSolidEdges = perStackSolidCap;
@@ -19403,6 +19625,41 @@
         deps.updateReadyButtonState();
         return;
       }
+      if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning) {
+        const commit = window.gameApi.commitHumanTacticalDraftOrders;
+        if (!commit) {
+          deps.showSidebarError("Tactical commit is not available in this build.");
+          deps.updateReadyButtonState();
+          return;
+        }
+        const movementOrders = rendererSharedState.tacticalPendingMarches.map((r) => ({ unitId: r.subUnitId, toH3Index: r.destinationH3Index }));
+        const commitResult = await commit({
+          movementOrders,
+          rangedAttacks: [...rendererSharedState.pendingRangedAttacks],
+          airStrikes: [...rendererSharedState.pendingAirStrikes],
+          ferryOrders: [...rendererSharedState.pendingFerryOrders]
+        });
+        if (!commitResult.success) {
+          deps.showSidebarError(commitResult.reason ?? "Tactical commit failed");
+          deps.updateReadyButtonState();
+          return;
+        }
+        if (commitResult.tacticalBattle) {
+          rendererSharedState.tacticalBattleSnapshot = commitResult.tacticalBattle;
+        }
+        rendererSharedState.tacticalPendingMarches = [];
+        rendererSharedState.pendingRangedAttacks = [];
+        rendererSharedState.pendingAirStrikes = [];
+        rendererSharedState.pendingFerryOrders = [];
+        rendererSharedState.rangedModeActive = false;
+        rendererSharedState.airStrikeModeActive = false;
+        deps.updatePendingOrdersSidebar();
+        deps.updateRangedSidebar();
+        deps.updateSidebar();
+        deps.redraw();
+        deps.scheduleTacticalAnnihilationExit?.();
+        return;
+      }
       const hasPendingDraftOrders = rendererSharedState.pendingRangedAttacks.length > 0 || rendererSharedState.pendingAirStrikes.length > 0 || rendererSharedState.pendingFerryOrders.length > 0;
       if (hasPendingDraftOrders) {
         const submitResult = await window.gameApi.submitOrders({
@@ -19608,9 +19865,9 @@
       overlay.setAttribute("role", "dialog");
       overlay.setAttribute("aria-modal", "true");
       overlay.setAttribute("aria-label", "Melee intercept");
-      overlay.style.cssText = "position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;padding:12px;";
+      overlay.style.cssText = "position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,0.35);display:flex;align-items:flex-start;justify-content:center;padding:12px;overflow-y:auto;";
       const panel = document.createElement("div");
-      panel.style.cssText = "max-width:min(920px,96vw);max-height:88vh;overflow:auto;background:#f4f2ee;border:1px solid #555;border-radius:4px;padding:10px 12px;font:13px/1.35 system-ui,sans-serif;color:#222;box-shadow:0 4px 18px rgba(0,0,0,0.25);";
+      panel.style.cssText = "max-width:min(460px,48vw);width:100%;max-height:none;overflow:visible;background:#f4f2ee;border:1px solid #555;border-radius:4px;padding:10px 12px;font:13px/1.35 system-ui,sans-serif;color:#222;box-shadow:0 4px 18px rgba(0,0,0,0.25);margin:12px auto 24px;";
       const title = document.createElement("div");
       title.textContent = "Melee combat this turn \u2014 choose tactical intercept (optional)";
       title.style.cssText = "font-weight:600;margin-bottom:8px;";
@@ -19730,6 +19987,21 @@
     return deps.getCachedTerrainTooltipHtml(state, namingLine);
   }
 
+  // src/renderer/tactical/tacticalUiGuards.ts
+  function tacticalRendererHitInsideBattleFootprint(hit, tb) {
+    if (!tb || !hit) return true;
+    if (hit === tb.enclosingRes1H3Index) return true;
+    if (tb.res4ChildH3Indexes.includes(hit)) return true;
+    try {
+      if (getResolution(hit) === 4) {
+        return cellToParent(hit, 1) === tb.enclosingRes1H3Index;
+      }
+    } catch {
+      return false;
+    }
+    return false;
+  }
+
   // src/renderer/map/mainMapInteractions.ts
   function wireMainMapInteractions(deps) {
     const mainMapEl = document.getElementById("main-map");
@@ -19741,11 +20013,35 @@
       const rect = map.getContainer().getBoundingClientRect();
       const x = clientX - rect.left;
       const y = clientY - rect.top;
+      const tb = rendererSharedState.tacticalBattleSnapshot;
+      if (tb) {
+        const tacticalHit = hitTestTacticalRes4HexAtContainerPixel(x, y, tb);
+        if (tacticalHit) return tacticalHit;
+      }
       const set = new Set(rendererSharedState.gameState.hexes.map((h) => h.h3Index));
       return hitTestHexAtContainerPixel(x, y, set);
     }
     function getSelectedHumanUnitsAtMouseDown(state) {
+      const tb = rendererSharedState.tacticalBattleSnapshot;
+      if (tb) {
+        return rendererSharedState.selectedUnitIdsAtMouseDown.map((id) => tb.subUnits.find((u) => u.id === id)).filter((u) => !!u && u.player === "human").map((u) => ({
+          id: u.id,
+          h3Index: tacticalEffectiveH3ForSubUnit(tb, u.id),
+          player: "human",
+          unitType: u.unitType
+        }));
+      }
       return rendererSharedState.selectedUnitIdsAtMouseDown.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human");
+    }
+    function primarySelectedUnitHex(state) {
+      const primaryId = deps.getPrimarySelectedUnitId();
+      if (!primaryId) return null;
+      const tb = rendererSharedState.tacticalBattleSnapshot;
+      if (tb) {
+        const row = tb.subUnits.find((u) => u.id === primaryId);
+        return row ? tacticalEffectiveH3ForSubUnit(tb, primaryId) : null;
+      }
+      return state.units.find((u) => u.id === primaryId)?.h3Index ?? null;
     }
     async function commitGroupedAirFerryOrders(selectedIds, destinationH3) {
       if (!window.gameApi?.validateGroupFerryTarget) return false;
@@ -19774,8 +20070,17 @@
         deps.showMapToast(assign.reason ?? "Failed to assign movement order.", { isError: true });
         return true;
       }
+      if (rendererSharedState.tacticalBattleSnapshot) {
+        for (const subUnitId of selectedIds) {
+          const idx = rendererSharedState.tacticalPendingMarches.findIndex((row) => row.subUnitId === subUnitId);
+          if (idx >= 0) rendererSharedState.tacticalPendingMarches.splice(idx, 1);
+          rendererSharedState.tacticalPendingMarches.push({ subUnitId, destinationH3Index: destinationH3 });
+        }
+      }
       deps.clearCommittedOrderDraftState();
-      await deps.refreshHumanStandingOrders();
+      if (!rendererSharedState.tacticalBattleSnapshot) {
+        await deps.refreshHumanStandingOrders();
+      }
       deps.updatePendingOrdersSidebar();
       deps.updateSidebar();
       deps.redraw();
@@ -19954,6 +20259,8 @@
           } else if (rendererSharedState.pendingSelectTimeout !== null) {
             clearTimeout(rendererSharedState.pendingSelectTimeout);
             rendererSharedState.pendingSelectTimeout = null;
+            deps.replaceSelection([unit.id]);
+            void deps.refreshHoverRoutePreview();
           } else {
             const unitIdToSelect = unit.id;
             rendererSharedState.pendingSelectTimeout = setTimeout(() => {
@@ -19970,7 +20277,7 @@
             clearTimeout(rendererSharedState.pendingSelectTimeout);
             rendererSharedState.pendingSelectTimeout = null;
           }
-        } else if (deps.getPrimarySelectedUnitId() && hit !== rendererSharedState.gameState?.units.find((u) => u.id === deps.getPrimarySelectedUnitId())?.h3Index) {
+        } else if (deps.getPrimarySelectedUnitId() && rendererSharedState.gameState && hit !== primarySelectedUnitHex(rendererSharedState.gameState)) {
           if (rendererSharedState.pendingSelectTimeout !== null) {
             clearTimeout(rendererSharedState.pendingSelectTimeout);
             rendererSharedState.pendingSelectTimeout = null;
@@ -20070,7 +20377,8 @@
         void deps.refreshHoverRoutePreview();
       } else if (rendererSharedState.selectedUnitIds.length > 0 && rendererSharedState.gameState) {
         const state = rendererSharedState.gameState;
-        const selectedUnits = rendererSharedState.selectedUnitIds.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human");
+        const tb = rendererSharedState.tacticalBattleSnapshot;
+        const selectedUnits = tb ? rendererSharedState.selectedUnitIds.map((id) => tb.subUnits.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human") : rendererSharedState.selectedUnitIds.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human");
         const allAir = selectedUnits.length > 0 && selectedUnits.every((unit) => unit.unitType === "air");
         const allHaveRanged = selectedUnits.length > 0 && selectedUnits.every((unit) => (RANGED_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 0) >= 1);
         if (allAir) {
@@ -20442,6 +20750,33 @@
     const container = document.getElementById("pending-orders-list");
     if (!container) return;
     container.innerHTML = "";
+    if (rendererSharedState.tacticalBattleSnapshot) {
+      if (rendererSharedState.tacticalPendingMarches.length === 0) {
+        const span = document.createElement("span");
+        span.textContent = "None";
+        span.style.color = "#666";
+        container.appendChild(span);
+        return;
+      }
+      for (const row of rendererSharedState.tacticalPendingMarches) {
+        const rowEl = deps.createSidebarOrderRow({
+          labelText: deps.formatUnitArrowLabel(
+            row.subUnitId,
+            formatTacticalMarchPendingDistanceLabel(rendererSharedState.tacticalBattleSnapshot, row.subUnitId, row.destinationH3Index)
+          ),
+          selected: rendererSharedState.selectedUnitIds.includes(row.subUnitId),
+          onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(row.subUnitId, event),
+          onCancel: () => {
+            rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
+            deps.updatePendingOrdersSidebar?.();
+            deps.redraw?.();
+          },
+          compactBlueButtons: true
+        });
+        container.appendChild(rowEl);
+      }
+      return;
+    }
     const pendingOrders = rendererSharedState.humanStandingOrders.filter((order) => deps.isPendingMovementOrderForDisplay(order));
     if (pendingOrders.length === 0 && rendererSharedState.pendingFerryOrders.length === 0) {
       const span = document.createElement("span");
@@ -20499,8 +20834,10 @@
   }
   function getUnitAtHex(h3Index) {
     if (rendererSharedState.tacticalBattleSnapshot) {
-      const tacticalUnit = rendererSharedState.tacticalBattleSnapshot.subUnits.find((u) => u.h3Index === h3Index);
-      if (!tacticalUnit) return null;
+      const overlay = tacticalSubUnitsWithDraftOverlay(rendererSharedState.tacticalBattleSnapshot);
+      const atHex = overlay.filter((u) => u.h3Index === h3Index);
+      if (atHex.length === 0) return null;
+      const tacticalUnit = atHex.find((u) => u.player === "human") ?? atHex[0];
       return {
         id: tacticalUnit.id,
         player: tacticalUnit.player,
@@ -21323,7 +21660,8 @@
       syncTacticalEntryOverlay: syncTacticalEntryButtonOverlay,
       redraw,
       refreshReadyButton: updateReadyButtonState,
-      scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit
+      scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
+      rebuildUnitDisplayNameLookup: () => rebuildUnitDisplayNameLookup(rendererSharedState.gameState)
     });
   }
   async function refreshGameStateAfterBuildQueueChange2() {
@@ -21413,7 +21751,14 @@
     return rendererSharedState.selectedUnitIds[0] ?? null;
   }
   function rebuildUnitDisplayNameLookup(state) {
-    rendererSharedState.unitDisplayNameById = state ? buildUnitDisplayNameLookup(state.units) : /* @__PURE__ */ new Map();
+    const base = state ? buildUnitDisplayNameLookup(state.units) : /* @__PURE__ */ new Map();
+    const tb = rendererSharedState.tacticalBattleSnapshot;
+    if (tb) {
+      for (const su of tb.subUnits) {
+        base.set(su.id, su.displayName);
+      }
+    }
+    rendererSharedState.unitDisplayNameById = base;
   }
   function applyRes4TerrainOverrides(rows) {
     const nextState = deriveInfrastructureOverlayState(rows);
@@ -21708,7 +22053,7 @@
   function getUnitsForDrawWithMovingIds2(state) {
     if (rendererSharedState.tacticalBattleSnapshot) {
       return {
-        unitsToDraw: rendererSharedState.tacticalBattleSnapshot.subUnits.map((u) => ({
+        unitsToDraw: tacticalSubUnitsWithDraftOverlay(rendererSharedState.tacticalBattleSnapshot).map((u) => ({
           id: u.id,
           player: u.player,
           unitType: u.unitType,
@@ -21786,7 +22131,8 @@
       redraw,
       buildMeleeInterceptHexPopupHtml: buildMeleeInterceptHexPopupHtmlForRes12,
       openMeleeInterceptModal,
-      startTacticalBattleFromInterceptHex: startTacticalBattleFromEntryHex2
+      startTacticalBattleFromInterceptHex: startTacticalBattleFromEntryHex2,
+      scheduleTacticalAnnihilationExit: maybeScheduleTacticalAnnihilationExit
     };
   }
   function maybeScheduleTacticalAnnihilationExit() {
@@ -21804,21 +22150,6 @@
       runReadyAfterExit: () => handleReadyButtonClick(createReadyHandlerDeps())
     });
   }
-  async function performTacticalAdvanceTurn() {
-    await performTacticalAdvanceTurnWhenAvailable(tacticalExitSessionAccessor, {
-      resolveAdvanceTacticalTurn: () => window.gameApi?.advanceTacticalTurn,
-      onMissingAdvanceTacticalTurn: () => {
-        showMapToast("Advance tactical turn is unavailable.", { isError: true });
-      },
-      advanceIo: {
-        showMapToast,
-        redraw,
-        startBackgroundRequestIfAllowed: startBackgroundRequestIfAllowed2,
-        isBackgroundRequestInFlight: () => rendererSharedState.backgroundRequestInFlight,
-        scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit
-      }
-    });
-  }
   function updateMapInteractionCursor2(clientX, clientY) {
     return updateMapInteractionCursor(clientX, clientY, {
       backgroundColor: BACKGROUND_COLOR,
@@ -21833,7 +22164,23 @@
       maybeScheduleTacticalAnnihilationExit();
       drawTerrainHexes2(ctx);
       drawRes4TerrainHexes2(ctx);
-      const tacticalUnits = rendererSharedState.tacticalBattleSnapshot.subUnits.map((u) => ({
+      const tb = rendererSharedState.tacticalBattleSnapshot;
+      const hexList2 = state.hexes.map((h) => h.h3Index);
+      drawTacticalPendingMarchPlanLines(ctx, tb, rendererSharedState.tacticalPendingMarches);
+      const shouldDrawPathPreview2 = shouldDrawHoveredPathPreview();
+      if (shouldDrawPathPreview2 && !rendererSharedState.resolutionMoveAnimation) {
+        drawHoverRoutePreview2(ctx);
+      }
+      if (rendererSharedState.pendingRangedAttacks.length > 0 && state.units.length && hexList2) {
+        drawRangedAttackLines(ctx, width, height, rendererSharedState.pendingRangedAttacks, state.units, hexList2);
+      }
+      if (rendererSharedState.pendingAirStrikes.length > 0 && state.units.length && hexList2) {
+        drawAirStrikeLines(ctx, rendererSharedState.pendingAirStrikes, state.units, hexList2);
+      }
+      if (rendererSharedState.pendingFerryOrders.length > 0 && state.units.length && hexList2) {
+        drawPendingFerryLines(ctx, rendererSharedState.pendingFerryOrders, state.units, hexList2, drawLineArrow);
+      }
+      const tacticalUnits = tacticalSubUnitsWithDraftOverlay(tb).map((u) => ({
         id: u.id,
         player: u.player,
         unitType: u.unitType,
@@ -22145,7 +22492,9 @@
       applySelectionFromSidebarUnitButton: applySelectionFromSidebarUnitButton2,
       cancelOrderForUnit: cancelOrderForUnit2,
       cancelFerryForUnit: cancelFerryForUnit2,
-      formatUnitArrowLabel: formatUnitArrowLabel2
+      formatUnitArrowLabel: formatUnitArrowLabel2,
+      redraw,
+      updatePendingOrdersSidebar: updatePendingOrdersSidebar2
     });
   }
   function showSidebarError2(message) {
@@ -22226,10 +22575,6 @@
     const tacticalExitBtn = document.getElementById("tactical-exit-btn");
     tacticalExitBtn?.addEventListener("click", () => {
       void performTacticalBattleExit();
-    });
-    const tacticalAdvanceBtn = document.getElementById("tactical-advance-turn-btn");
-    tacticalAdvanceBtn?.addEventListener("click", () => {
-      void performTacticalAdvanceTurn();
     });
     tacticalUpdateExitButtonVisibility();
     wireMainMapInteractions({

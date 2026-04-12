@@ -279,7 +279,7 @@ tacticalEntryButtonPointerInside: false,
 
    * Purpose: Separates milestone-2.1 tactical planning beats from tactical resolution (AI / async work after advancing the tactical turn).
    * When to use: `true` while the human may exit tactical mode or press Advance; `false` while `performTacticalAdvanceTurn` waits on IPC and optional background `requestAiOrders`.
-   * Expected outcome: `#tactical-exit-btn` and `#tactical-advance-turn-btn` stay disabled whenever this flag is `false` with an active tactical snapshot.
+   * Expected outcome: `#tactical-exit-btn` stays disabled whenever this flag is `false` with an active tactical snapshot.
    * Exceptions: Reconciling snapshots or ending tactical always resets this to `true` once the renderer returns to a coherent tactical or strategic mode.
    */
 tacticalPhasePlanning: true,
@@ -506,6 +506,15 @@ pendingAirStrikes: [] as AirStrikeOrder[],
    * Exceptions: None.
    */
 pendingFerryOrders: [] as FerryOrder[],
+    /**
+   * Documents the object literal property `tacticalPendingMarches` (tacticalPendingMarches: [] as { subUnitId: string; destinationH3Index: string }[]).
+
+   * Purpose: Holds human tactical march rows shown in the pending-orders sidebar while a tactical battle is active; distinct from strategic standing orders.
+   * When to use: Append after tactical march validation succeeds (draft, before Ready); clear on tactical Ready commit, advance turn, exit, stash, or new game.
+   * Expected outcome: Sidebar lists res4 destinations keyed by tactical sub-unit ids until the next tactical beat boundary clears them.
+   * Exceptions: None.
+   */
+tacticalPendingMarches: [] as { subUnitId: string; destinationH3Index: string }[],
     /**
    * Documents the object literal property `hideCommittedOrderLinesAfterReady` (hideCommittedOrderLinesAfterReady: false).
 

@@ -6,7 +6,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gridDisk, latLngToCell } from 'h3-js';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import { projectTacticalSnapshotAfterOpponentMovementOrders } from './tacticalMovementApply';
+import {
+  projectTacticalSnapshotAfterHumanMovementOrders,
+  projectTacticalSnapshotAfterOpponentMovementOrders,
+} from './tacticalMovementApply';
 
 test('projectTacticalSnapshot moves opponent sub-unit within res4 range', () => {
   const res1 = latLngToCell(10, 20, 1);
@@ -135,4 +138,31 @@ test('projectTacticalSnapshot ignores human-controlled sub-units', () => {
   };
   const next = projectTacticalSnapshotAfterOpponentMovementOrders(snap, [{ unitId: 'hum-su-1', toH3Index: dest! }]);
   assert.equal(next.subUnits[0]!.h3Index, center);
+});
+
+test('projectTacticalSnapshotAfterHumanMovementOrders moves human sub-unit within res4 range', () => {
+  const res1 = latLngToCell(8, 9, 1);
+  const center = latLngToCell(8.02, 9, 4);
+  const ring = gridDisk(center, 1);
+  const dest = [...ring].find((h) => h !== center);
+  assert.ok(dest, 'need neighbor res4');
+  const snap: TacticalBattleSnapshot = {
+    battleId: 'tb-hum-move',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: [...ring],
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits: [
+      {
+        id: 'hum-su-move',
+        parentUnitId: 'ph',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: center,
+        displayName: '1st Infantry (mv)',
+      },
+    ],
+  };
+  const next = projectTacticalSnapshotAfterHumanMovementOrders(snap, [{ unitId: 'hum-su-move', toH3Index: dest }]);
+  assert.equal(next.subUnits[0]!.h3Index, dest);
 });

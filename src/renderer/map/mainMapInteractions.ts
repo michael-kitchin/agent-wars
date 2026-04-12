@@ -1,10 +1,21 @@
 import type { AirStrikeTargetType, GameStateSnapshot } from '../../shared/ipcTypes';
 import type { NamingLookupTarget, TerrainTooltipState } from './terrainTooltipTypes';
 import { TERRAIN_TOOLTIP_DELAY_MS } from '../core/constants';
-import { hitTestHexAtContainerPixel } from './mapUtils';
+import { hitTestHexAtContainerPixel, hitTestTacticalRes4HexAtContainerPixel } from './mapUtils';
 import { rendererSharedState as S } from '../core/state';
 import { getMainLeafletMap } from './worldLeafletMap';
+import { tacticalEffectiveH3ForSubUnit } from '../tactical/tacticalDraftMarchOverlay';
 import { tacticalRendererHitInsideBattleFootprint } from '../tactical/tacticalUiGuards';
+
+/**
+ * Minimal unit row shape used for grouped march / ferry preflight on the map (strategic units or tactical sub-units).
+ *
+ * Contract: Matches the fields read by dblclick march handling (`id`, `h3Index`, `player`, `unitType`).
+ * When to use: `getSelectedHumanUnitsAtMouseDown` so tactical selections do not require synthetic `GameStateSnapshot.units` rows.
+ * Expected outcome: Human-owned ids suitable for `assignHumanMarchOrders` IPC in both strategic and tactical modes.
+ * Exceptions: None.
+ */
+type GroupedMarchSelectedUnit = Pick<GameStateSnapshot['units'][number], 'id' | 'h3Index' | 'player' | 'unitType'>;
 
 /**
  * Documents the `MainMapInteractionDeps` interface as a named contract surface (interface MainMapInteractionDeps).
@@ -336,14 +347,50 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     const rect = map.getContainer().getBoundingClientRect();
     const x = clientX - rect.left;
     const y = clientY - rect.top;
+    const tb = S.tacticalBattleSnapshot;
+    if (tb) {
+      const tacticalHit = hitTestTacticalRes4HexAtContainerPixel(x, y, tb);
+      if (tacticalHit) return tacticalHit;
+    }
     const set = new Set(S.gameState.hexes.map((h) => h.h3Index));
     return hitTestHexAtContainerPixel(x, y, set);
   }
 
-  function getSelectedHumanUnitsAtMouseDown(state: GameStateSnapshot): GameStateSnapshot['units'] {
+  function getSelectedHumanUnitsAtMouseDown(state: GameStateSnapshot): GroupedMarchSelectedUnit[] {
+    const tb = S.tacticalBattleSnapshot;
+    if (tb) {
+      return S.selectedUnitIdsAtMouseDown
+        .map((id) => tb.subUnits.find((u) => u.id === id))
+        .filter((u): u is NonNullable<typeof u> => !!u && u.player === 'human')
+        .map((u) => ({
+          id: u.id,
+          h3Index: tacticalEffectiveH3ForSubUnit(tb, u.id),
+          player: 'human' as const,
+          unitType: u.unitType,
+        }));
+    }
     return S.selectedUnitIdsAtMouseDown
       .map((id) => state.units.find((u) => u.id === id))
       .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
+  }
+
+  /**
+   * Resolves the res4/res1 hex of the primary selected unit for click-vs-selection clearing logic.
+   *
+   * Contract: Uses tactical sub-units when `S.tacticalBattleSnapshot` is set; otherwise strategic `state.units`.
+   * When to use: Single-click map handler when comparing `hit` to the selected unit's current cell.
+   * Expected outcome: `null` when nothing is selected or the id is unknown.
+   * Exceptions: None.
+   */
+  function primarySelectedUnitHex(state: GameStateSnapshot): string | null {
+    const primaryId = deps.getPrimarySelectedUnitId();
+    if (!primaryId) return null;
+    const tb = S.tacticalBattleSnapshot;
+    if (tb) {
+      const row = tb.subUnits.find((u) => u.id === primaryId);
+      return row ? tacticalEffectiveH3ForSubUnit(tb, primaryId) : null;
+    }
+    return state.units.find((u) => u.id === primaryId)?.h3Index ?? null;
   }
 
   async function commitGroupedAirFerryOrders(selectedIds: string[], destinationH3: string): Promise<boolean> {
@@ -374,8 +421,17 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       deps.showMapToast(assign.reason ?? 'Failed to assign movement order.', { isError: true });
       return true;
     }
+    if (S.tacticalBattleSnapshot) {
+      for (const subUnitId of selectedIds) {
+        const idx = S.tacticalPendingMarches.findIndex((row) => row.subUnitId === subUnitId);
+        if (idx >= 0) S.tacticalPendingMarches.splice(idx, 1);
+        S.tacticalPendingMarches.push({ subUnitId, destinationH3Index: destinationH3 });
+      }
+    }
     deps.clearCommittedOrderDraftState();
-    await deps.refreshHumanStandingOrders();
+    if (!S.tacticalBattleSnapshot) {
+      await deps.refreshHumanStandingOrders();
+    }
     deps.updatePendingOrdersSidebar();
     deps.updateSidebar();
     deps.redraw();
@@ -579,6 +635,8 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
         } else if (S.pendingSelectTimeout !== null) {
           clearTimeout(S.pendingSelectTimeout);
           S.pendingSelectTimeout = null;
+          deps.replaceSelection([unit.id]);
+          void deps.refreshHoverRoutePreview();
         } else {
           const unitIdToSelect = unit.id;
           S.pendingSelectTimeout = setTimeout(() => {
@@ -595,7 +653,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
           clearTimeout(S.pendingSelectTimeout);
           S.pendingSelectTimeout = null;
         }
-      } else if (deps.getPrimarySelectedUnitId() && hit !== S.gameState?.units.find((u) => u.id === deps.getPrimarySelectedUnitId())?.h3Index) {
+      } else if (deps.getPrimarySelectedUnitId() && S.gameState && hit !== primarySelectedUnitHex(S.gameState)) {
         if (S.pendingSelectTimeout !== null) {
           clearTimeout(S.pendingSelectTimeout);
           S.pendingSelectTimeout = null;

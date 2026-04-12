@@ -1,4 +1,4 @@
-import { cellToLatLng } from 'h3-js';
+import { cellToLatLng, gridPathCells } from 'h3-js';
 import { alignLngToReference, clampLatForWebMercatorDisplay } from '../map/hexGrid';
 import {
   AI_ORDER_LINE_COLOR,
@@ -15,6 +15,7 @@ import {
 import { getLeafletGlobal, hexCenterPx, hexCenterPxRelativeTo } from '../map/mapUtils';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
 import type { GameStateSnapshot, HumanStandingOrderSnapshot } from '../../shared/ipcTypes';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { ResolutionPlaybackMove } from '../core/types';
 import { drawOneUnitMarker } from './unitDrawing';
 
@@ -187,6 +188,58 @@ export function drawStandingOrderLines(
       drawArrowheadOnly(ctx, lastPenultimate, lastPoint, ORDER_LINE_COLOR, { tipAtTargetCenter: true });
     }
   }
+}
+
+/**
+ * Draws semi-transparent planned march polylines for human tactical draft orders (Ready not yet pressed).
+ *
+ * Purpose: Mirrors strategic `drawStandingOrderLines` / hover styling so drafted res4 moves remain visible under units.
+ * When to use: Only from the tactical `drawGameScene` branch while `S.tacticalPendingMarches` is non-empty.
+ * Expected outcome: One route per draft row from snapshot `h3Index` to `destinationH3Index` at ~50% opacity with arrowhead.
+ * Exceptions: Skips rows when pathfinding throws or the sub-unit row is missing.
+ */
+export function drawTacticalPendingMarchPlanLines(
+  ctx: CanvasRenderingContext2D,
+  battle: TacticalBattleSnapshot,
+  pendingMarches: readonly { subUnitId: string; destinationH3Index: string }[]
+): void {
+  if (pendingMarches.length === 0) return;
+  const map = getMainLeafletMap() as { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } } | null;
+  if (!map) return;
+  const L = getLeafletGlobal();
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  for (const row of pendingMarches) {
+    const sub = battle.subUnits.find((u) => u.id === row.subUnitId && u.player === 'human');
+    if (!sub) continue;
+    const fromH3 = sub.h3Index;
+    const toH3 = row.destinationH3Index;
+    if (fromH3 === toH3) continue;
+    let pathCells: string[];
+    try {
+      pathCells = gridPathCells(fromH3, toH3);
+    } catch {
+      continue;
+    }
+    if (pathCells.length < 2) continue;
+    const points = pathCells.map((h) => {
+      const [lat, lng] = cellToLatLng(h);
+      const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
+      return { x: p.x, y: p.y };
+    });
+    ctx.setLineDash([]);
+    ctx.strokeStyle = ORDER_LINE_COLOR;
+    ctx.lineWidth = ORDER_LINE_WIDTH;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
+    const penultimate = points[points.length - 2];
+    const last = points[points.length - 1];
+    if (penultimate && last) {
+      drawArrowheadOnly(ctx, penultimate, last, ORDER_LINE_COLOR, { tipAtTargetCenter: true });
+    }
+  }
+  ctx.restore();
 }
 
 /**

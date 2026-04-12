@@ -4,14 +4,12 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { advanceActiveTacticalTurn, endTacticalBattleSession } from './tacticalBattleSession';
+import { endTacticalBattleSession, isTacticalBattleActive } from './tacticalBattleSession';
 import { tacticalDbFixtureRegisterDefaultAfterEach } from './testSupport/tacticalDbFixture';
 
 tacticalDbFixtureRegisterDefaultAfterEach();
 
-test('advanceActiveTacticalTurn fails when no tactical session is active', () => {
+test('endTacticalBattleSession keeps tactical session inactive when none exists', () => {
   endTacticalBattleSession();
-  const r = advanceActiveTacticalTurn();
-  assert.equal(r.success, false);
-  assert.ok(r.reason);
+  assert.equal(isTacticalBattleActive(), false);
 });

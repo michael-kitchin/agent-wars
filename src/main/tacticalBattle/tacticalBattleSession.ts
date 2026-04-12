@@ -1,5 +1,4 @@
 import type {
-  AdvanceTacticalTurnIpcResult,
   StartTacticalBattleIpcResult,
   TacticalBattleSnapshot,
 } from '../../shared/tacticalBattleTypes';
@@ -12,7 +11,13 @@ import {
   writeTacticalBattleSnapshotToGameConfig,
 } from './tacticalBattlePersistence';
 import { computeTacticalBattleSnapshot } from './computeTacticalBattleSnapshot';
-import { projectTacticalSnapshotAfterValidatedOpponentOrders } from './tacticalCompositeOrdersApply';
+import {
+  projectTacticalSnapshotAfterValidatedHumanSupportOrders,
+  projectTacticalSnapshotAfterValidatedOpponentOrders,
+} from './tacticalCompositeOrdersApply';
+import { projectTacticalSnapshotAfterHumanMovementOrders } from './tacticalMovementApply';
+import type { TacticalMovementBlockReason } from './tacticalSnapshotGuards';
+import { tacticalComputeHumanMovementOrderOutcome } from './tacticalSnapshotGuards';
 import { tacticalLogError, tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 
 /**
@@ -100,12 +105,167 @@ export function startTacticalBattleForEnclosingRes1Hex(enclosingRes1H3Index: str
  *
  * Contract: Idempotent; sets `activeTacticalBattle` to null; does not write SQLite strategic state.
  * When to use: Tactical exit IPC, annihilation cleanup, test teardown, and error recovery paths.
- * Expected outcome: `isTacticalBattleActive()` becomes false; subsequent `advanceActiveTacticalTurn` / apply calls fail until a new start.
+ * Expected outcome: `isTacticalBattleActive()` becomes false; subsequent apply calls fail until a new start.
  * Exceptions: None.
  */
 export function endTacticalBattleSession(): void {
   tacticalLogMutate('endTacticalBattleSession', { hadBattle: !!getActiveTacticalBattleSnapshotRef() });
   commitActiveTacticalBattle(null);
+}
+
+/**
+ * Maps a tactical human march validation failure to a short user-facing reason string.
+ *
+ * Purpose: Keeps IPC failure wording consistent for tactical march validation without exposing internal codes.
+ * When to use: `applyHumanTacticalMarchOrders` when pre-projection validation fails for any row.
+ * Expected outcome: English clause suitable for map toasts without leaking internal ids unnecessarily.
+ * Exceptions: None.
+ */
+function humanTacticalMarchBlockMessage(reason: TacticalMovementBlockReason): string {
+  switch (reason) {
+    case 'unknown_unit':
+      return 'One or more selected units are not part of this tactical battle.';
+    case 'non_human':
+      return 'Only your tactical sub-units can receive march orders here.';
+    case 'outside_footprint':
+      return 'That destination lies outside the tactical battle footprint.';
+    case 'out_of_range':
+      return 'That destination is out of movement range for one or more selected units.';
+    default:
+      return `Movement order rejected (${reason}).`;
+  }
+}
+
+/**
+ * Returns a user-facing validation error string when any human tactical march order is illegal, or null when all pass.
+ *
+ * Purpose: Centralizes the all-or-nothing guard shared by draft validation IPC and snapshot application.
+ * When to use: `validateHumanTacticalMarchOrders` and `applyHumanTacticalMarchOrders` before mutating the snapshot.
+ * Expected outcome: First failure reason wins; empty `orders` yields null (vacuously valid).
+ * Exceptions: None; invalid H3 indexes may propagate from distance helpers as before.
+ */
+function humanTacticalMarchValidationFailure(
+  cur: TacticalBattleSnapshot,
+  orders: readonly { unitId: string; toH3Index: string }[]
+): string | null {
+  if (orders.length === 0) return null;
+  const res4Set = new Set(cur.res4ChildH3Indexes);
+  const sub = [...cur.subUnits];
+  const byId = new Map(sub.map((u, i) => [u.id, i] as const));
+  for (const o of orders) {
+    const outcome = tacticalComputeHumanMovementOrderOutcome({ byId, sub, order: o, res4Set });
+    if (!outcome.ok) {
+      tacticalLogQuery('humanTacticalMarchValidationFailure', {
+        reason: outcome.reason,
+        ...outcome.context,
+      });
+      return humanTacticalMarchBlockMessage(outcome.reason);
+    }
+  }
+  return null;
+}
+
+/**
+ * Validates human tactical march orders against the active snapshot without mutating it.
+ *
+ * Purpose: Supports draft-only march UX where the renderer stores orders until tactical Ready commits them.
+ * When to use: `assignHumanMarchOrders` / `assignHumanMarchOrder` while a tactical session is active (pre-commit IPC).
+ * Expected outcome: `success: true` when every order is legal on the current committed snapshot.
+ * Exceptions: None; returns `success: false` with reason when no session exists or validation fails.
+ */
+export function validateHumanTacticalMarchOrders(
+  orders: readonly { unitId: string; toH3Index: string }[]
+): { success: true } | { success: false; reason: string } {
+  tacticalLogQuery('validateHumanTacticalMarchOrders', { orderCount: orders.length });
+  const cur = getActiveTacticalBattleSnapshotRef();
+  if (!cur) {
+    tacticalLogQuery('validateHumanTacticalMarchOrders rejected', { reason: 'no_active_session' });
+    return { success: false, reason: 'No tactical battle is active.' };
+  }
+  const fail = humanTacticalMarchValidationFailure(cur, orders);
+  if (fail) return { success: false, reason: fail };
+  return { success: true };
+}
+
+/**
+ * Applies validated human tactical march orders to the active snapshot (milestone 2.1+ human parity).
+ *
+ * Purpose: Mutates the in-memory tactical footprint for human player marches with the same guards as AI projection.
+ * When to use: `commitHumanTacticalDraftOrders` IPC after tactical Ready aggregates draft rows from the renderer only.
+ * Expected outcome: Updated snapshot with human `h3Index` changes and synced embark-on-naval positions.
+ * Exceptions: Logs at error and returns failure when projection throws unexpectedly.
+ */
+export function applyHumanTacticalMarchOrders(
+  orders: readonly { unitId: string; toH3Index: string }[]
+): { success: true; battle: TacticalBattleSnapshot } | { success: false; reason: string } {
+  tacticalLogMutate('applyHumanTacticalMarchOrders', { orderCount: orders.length });
+  try {
+    const cur = getActiveTacticalBattleSnapshotRef();
+    if (!cur) {
+      tacticalLogQuery('applyHumanTacticalMarchOrders rejected', { reason: 'no_active_session' });
+      return { success: false, reason: 'No tactical battle is active.' };
+    }
+    if (orders.length === 0) {
+      return { success: true, battle: cur };
+    }
+    const fail = humanTacticalMarchValidationFailure(cur, orders);
+    if (fail) {
+      return { success: false, reason: fail };
+    }
+    const next = projectTacticalSnapshotAfterHumanMovementOrders(cur, orders);
+    commitActiveTacticalBattle(next);
+    tacticalLogMutate('applyHumanTacticalMarchOrders applied', {
+      battleId: next.battleId,
+      subUnitCount: next.subUnits.length,
+    });
+    return { success: true, battle: next };
+  } catch (err) {
+    tacticalLogError('applyHumanTacticalMarchOrders failed', { err });
+    return { success: false, reason: 'Could not apply tactical movement orders.' };
+  }
+}
+
+/**
+ * Applies validated human tactical support drafts (ranged, air, ferry, embark) to the active snapshot.
+ *
+ * Purpose: Completes tactical Ready parity so non-march drafts commit on main exactly once per Ready click.
+ * When to use: `commitHumanTacticalDraftOrders` after movement projection succeeds for the same tactical beat.
+ * Expected outcome: Active snapshot mutates and persists with support-order effects; returns updated `battle`.
+ * Exceptions: Logs at error and returns `success: false` with reason if no session exists or projection fails.
+ */
+export function applyValidatedHumanTacticalSupportOrders(args: {
+  rangedAttacks?: readonly { unitId: string; targetH3Index: string }[];
+  airStrikes?: readonly AirStrikeOrder[];
+  ferryOrders?: readonly FerryOrder[];
+  embarkOrders?: readonly EmbarkOrder[];
+}): { success: true; battle: TacticalBattleSnapshot } | { success: false; reason: string } {
+  tacticalLogMutate('applyValidatedHumanTacticalSupportOrders', {
+    rangedCount: args.rangedAttacks?.length ?? 0,
+    airCount: args.airStrikes?.length ?? 0,
+    ferryCount: args.ferryOrders?.length ?? 0,
+    embarkCount: args.embarkOrders?.length ?? 0,
+  });
+  try {
+    const cur = getActiveTacticalBattleSnapshotRef();
+    if (!cur) {
+      tacticalLogQuery('applyValidatedHumanTacticalSupportOrders rejected', { reason: 'no_active_session' });
+      return { success: false, reason: 'No tactical battle is active.' };
+    }
+    const hasWork =
+      (args.rangedAttacks?.length ?? 0) > 0 ||
+      (args.airStrikes?.length ?? 0) > 0 ||
+      (args.ferryOrders?.length ?? 0) > 0 ||
+      (args.embarkOrders?.length ?? 0) > 0;
+    if (!hasWork) {
+      return { success: true, battle: cur };
+    }
+    const next = projectTacticalSnapshotAfterValidatedHumanSupportOrders(cur, args);
+    commitActiveTacticalBattle(next);
+    return { success: true, battle: next };
+  } catch (err) {
+    tacticalLogError('applyValidatedHumanTacticalSupportOrders failed', { err });
+    return { success: false, reason: 'Could not apply tactical support orders.' };
+  }
 }
 
 /**
@@ -155,36 +315,6 @@ export function applyValidatedOpponentTacticalOrders(args: {
   } catch (err) {
     tacticalLogError('applyValidatedOpponentTacticalOrders failed', { err });
     return { success: false, reason: 'Could not apply tactical opponent orders.' };
-  }
-}
-
-/**
- * Increments the tactical turn counter on the active in-memory tactical battle snapshot.
- *
- * Contract: On success returns a new snapshot object with `tacticalTurnNumber` increased by one; on failure returns `success: false` with `reason`.
- * When to use: `game:advanceTacticalTurn` IPC while milestone 2.1+ keeps multiple tactical planning beats before strategic Ready.
- * Expected outcome: Main and renderer stay aligned when the renderer replaces `S.tacticalBattleSnapshot` with `battle` from the result.
- * Exceptions: Surfaces `logError` and a generic reason if an unexpected error occurs while cloning the snapshot.
- */
-export function advanceActiveTacticalTurn(): AdvanceTacticalTurnIpcResult {
-  tacticalLogMutate('advanceActiveTacticalTurn invoked', {});
-  try {
-    const cur = getActiveTacticalBattleSnapshotRef();
-    if (!cur) {
-      tacticalLogQuery('advanceActiveTacticalTurn rejected', { reason: 'no_active_session' });
-      return { success: false, reason: 'No tactical battle is active.' };
-    }
-    const prev = cur.tacticalTurnNumber;
-    const next: TacticalBattleSnapshot = {
-      ...cur,
-      tacticalTurnNumber: prev + 1,
-    };
-    commitActiveTacticalBattle(next);
-    tacticalLogMutate('advanceActiveTacticalTurn applied', { battleId: next.battleId, tacticalTurnNumber: next.tacticalTurnNumber });
-    return { success: true, battle: next };
-  } catch (err) {
-    tacticalLogError('advanceActiveTacticalTurn failed', { err });
-    return { success: false, reason: 'Could not advance tactical turn.' };
   }
 }
 

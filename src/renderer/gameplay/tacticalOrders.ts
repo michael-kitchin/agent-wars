@@ -1,4 +1,5 @@
 import type { AirStrikeTargetType } from '../../shared/ipcTypes';
+import { buildTacticalMarchHoverPreview } from '../../shared/tacticalMarchHoverPreview';
 import { RANGED_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
 import {
   formatPendingAirStrikeSidebarLabel,
@@ -141,6 +142,20 @@ applySelectionFromSidebarUnitButton: (unitId: string, event: MouseEvent) => void
  */
 export function getRepresentativeSelectedUnitIdsByOrigin(): string[] {
   if (!S.gameState) return [...S.selectedUnitIds];
+  const tb = S.tacticalBattleSnapshot;
+  if (tb) {
+    const byId = new Map(tb.subUnits.map((u) => [u.id, u]));
+    const seenOrigins = new Set<string>();
+    const representatives: string[] = [];
+    for (const unitId of S.selectedUnitIds) {
+      const unit = byId.get(unitId);
+      if (!unit || unit.player !== 'human') continue;
+      if (seenOrigins.has(unit.h3Index)) continue;
+      seenOrigins.add(unit.h3Index);
+      representatives.push(unitId);
+    }
+    return representatives;
+  }
   const byId = new Map(S.gameState.units.map((u) => [u.id, u]));
   const seenOrigins = new Set<string>();
   const representatives: string[] = [];
@@ -217,6 +232,7 @@ export function clearPendingTacticalOrders(): void {
   S.pendingAirStrikes = [];
   S.airStrikeModeActive = false;
   S.pendingFerryOrders = [];
+  S.tacticalPendingMarches = [];
 }
 
 /**
@@ -247,6 +263,22 @@ export async function refreshHoverRoutePreview(deps: TacticalOrderDeps): Promise
   const unitIds = [...S.selectedUnitIds];
   const hoveredH3 = S.hoveredHexH3;
   const seq = ++S.hoverPreviewRequestSeq;
+  if (S.tacticalBattleSnapshot) {
+    if (S.rangedModeActive || S.airStrikeModeActive || unitIds.length === 0 || !hoveredH3) {
+      S.hoverRoutePreview = null;
+      deps.requestRedraw();
+      return;
+    }
+    const data = buildTacticalMarchHoverPreview(S.tacticalBattleSnapshot, S.tacticalPendingMarches, unitIds, hoveredH3);
+    if (seq !== S.hoverPreviewRequestSeq) return;
+    if (S.hoveredHexH3 !== hoveredH3) return;
+    const currentSelected = [...S.selectedUnitIds].sort().join('|');
+    const requestedSelected = [...unitIds].sort().join('|');
+    if (currentSelected !== requestedSelected) return;
+    S.hoverRoutePreview = { hoveredH3Index: hoveredH3, data };
+    deps.requestRedraw();
+    return;
+  }
   if (
     S.rangedModeActive ||
     S.airStrikeModeActive ||
@@ -398,9 +430,14 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
   }
 
   if (btnEl) {
-    const selectedUnits = S.selectedUnitIds
-      .map((id) => S.gameState?.units.find((u) => u.id === id))
-      .filter((unit): unit is NonNullable<typeof unit> => !!unit);
+    const tb = S.tacticalBattleSnapshot;
+    const selectedUnits = tb
+      ? S.selectedUnitIds
+          .map((id) => tb.subUnits.find((u) => u.id === id))
+          .filter((unit): unit is NonNullable<typeof unit> => !!unit)
+      : S.selectedUnitIds
+          .map((id) => S.gameState?.units.find((u) => u.id === id))
+          .filter((unit): unit is NonNullable<typeof unit> => !!unit);
     const allAir = selectedUnits.length > 0 && selectedUnits.every((unit) => unit.unitType === 'air');
     const allHaveRanged =
       selectedUnits.length > 0 && selectedUnits.every((unit) => (RANGED_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 0) >= 1);

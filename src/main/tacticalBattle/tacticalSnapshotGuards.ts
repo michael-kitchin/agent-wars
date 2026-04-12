@@ -17,6 +17,7 @@ import { tacticalMarchWithinRes4GridSteps } from './tacticalRulesAdapter';
 export type TacticalMovementBlockReason =
   | 'unknown_unit'
   | 'non_opponent'
+  | 'non_human'
   | 'outside_footprint'
   | 'out_of_range';
 
@@ -43,6 +44,48 @@ export function tacticalComputeMovementOrderOutcome(args: {
   const u = args.sub[idx]!;
   if (u.player !== 'opponent') {
     return { ok: false, reason: 'non_opponent', context: { unitId: args.order.unitId } };
+  }
+  if (!args.res4Set.has(args.order.toH3Index)) {
+    return {
+      ok: false,
+      reason: 'outside_footprint',
+      context: { unitId: args.order.unitId, toH3Index: args.order.toH3Index },
+    };
+  }
+  const maxSteps = MOVEMENT_RANGE_BY_UNIT_TYPE[u.unitType] ?? 1;
+  if (!tacticalMarchWithinRes4GridSteps(u.h3Index, args.order.toH3Index, maxSteps)) {
+    return {
+      ok: false,
+      reason: 'out_of_range',
+      context: { unitId: args.order.unitId, from: u.h3Index, to: args.order.toH3Index, maxSteps },
+    };
+  }
+  return { ok: true, idx };
+}
+
+/**
+ * Decides whether a single human movement order may mutate a tactical sub-unit row in the snapshot clone.
+ *
+ * Purpose: Mirrors `tacticalComputeMovementOrderOutcome` for opponent rows but requires `player === 'human'`.
+ * When to use: `projectTacticalSnapshotAfterHumanMovementOrders` before applying `h3Index` updates for the human player.
+ * Expected outcome: Same success/failure shape as the opponent helper with `non_human` instead of `non_opponent`.
+ * Exceptions: None; invalid H3 indexes propagate from `tacticalMarchWithinRes4GridSteps` as before.
+ */
+export function tacticalComputeHumanMovementOrderOutcome(args: {
+  byId: ReadonlyMap<string, number>;
+  sub: readonly TacticalSubUnitSnapshot[];
+  order: { unitId: string; toH3Index: string };
+  res4Set: ReadonlySet<string>;
+}):
+  | { ok: true; idx: number }
+  | { ok: false; reason: TacticalMovementBlockReason; context: Record<string, unknown> } {
+  const idx = args.byId.get(args.order.unitId);
+  if (idx === undefined) {
+    return { ok: false, reason: 'unknown_unit', context: { unitId: args.order.unitId } };
+  }
+  const u = args.sub[idx]!;
+  if (u.player !== 'human') {
+    return { ok: false, reason: 'non_human', context: { unitId: args.order.unitId } };
   }
   if (!args.res4Set.has(args.order.toH3Index)) {
     return {

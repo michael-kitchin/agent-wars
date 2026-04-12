@@ -1,5 +1,4 @@
 export type {
-  AdvanceTacticalTurnIpcResult,
   EndTacticalBattleIpcResult,
   StartTacticalBattleIpcResult,
   TacticalBattleSnapshot,

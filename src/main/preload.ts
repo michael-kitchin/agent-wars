@@ -24,9 +24,9 @@ import type {
   ResolveMeleeInterceptIpcPayload,
 } from '../shared/ipcTypes';
 import type {
-  AdvanceTacticalTurnIpcResult,
   EndTacticalBattleIpcResult,
   StartTacticalBattleIpcResult,
+  TacticalBattleSnapshot,
 } from '../shared/tacticalBattleTypes';
 
 /**
@@ -159,16 +159,6 @@ startTacticalBattle: (payload: { enclosingRes1H3Index: string }): Promise<StartT
    */
 endTacticalBattle: (): Promise<EndTacticalBattleIpcResult> => ipcRenderer.invoke('game:endTacticalBattle'),
     /**
-   * Documents the object literal property `advanceTacticalTurn` (advanceTacticalTurn: (): Promise<AdvanceTacticalTurnIpcResult> => ipcRenderer.invoke('game:advanceTacticalTurn')).
-
-   * Purpose: Bumps the main-process tactical turn counter for the active res4 battle session.
-   * When to use: After the player finishes one tactical planning slice and should see the next tactical turn label before Ready.
-   * Expected outcome: Returns an updated snapshot with `tacticalTurnNumber` incremented, or `success: false` when no session exists.
-   * Exceptions: None.
-   */
-advanceTacticalTurn: (): Promise<AdvanceTacticalTurnIpcResult> =>
-    ipcRenderer.invoke('game:advanceTacticalTurn'),
-    /**
    * Documents the object literal property `listHumanStandingOrders` (listHumanStandingOrders: (): Promise<HumanStandingOrderSnapshot[]> => ipcRenderer.invoke('game:listHumanStandingOrders')).
 
    * Purpose: Supports maintainability by documenting why `listHumanStandingOrders` exists.
@@ -206,7 +196,10 @@ previewHumanMarchOrders: (payload: { unitIds: string[]; hoveredH3Index: string }
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-assignHumanMarchOrder: (payload: { unitId: string; destinationH3Index: string }): Promise<{ success: boolean; reason?: string }> =>
+assignHumanMarchOrder: (payload: {
+    unitId: string;
+    destinationH3Index: string;
+  }): Promise<{ success: boolean; reason?: string; tacticalBattle?: TacticalBattleSnapshot }> =>
     ipcRenderer.invoke('game:assignHumanMarchOrder', payload),
     /**
    * Documents the object literal property `assignHumanMarchOrders` (assignHumanMarchOrders: (payload: { unitIds: string[]; destinationH3Index: string }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke().
@@ -216,8 +209,27 @@ assignHumanMarchOrder: (payload: { unitId: string; destinationH3Index: string })
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-assignHumanMarchOrders: (payload: { unitIds: string[]; destinationH3Index: string }): Promise<{ success: boolean; reason?: string }> =>
+assignHumanMarchOrders: (payload: {
+    unitIds: string[];
+    destinationH3Index: string;
+  }): Promise<{ success: boolean; reason?: string; tacticalBattle?: TacticalBattleSnapshot }> =>
     ipcRenderer.invoke('game:assignHumanMarchOrders', payload),
+    /**
+   * Documents the object literal property `commitHumanTacticalDraftOrders` (commitHumanTacticalDraftOrders: (payload: { movementOrders: ...; rangedAttacks?: ... }) => Promise<...> => ipcRenderer.invoke()).
+
+   * Purpose: Exposes tactical Ready commit for all tactical draft rows held in renderer state until confirmed.
+   * When to use: Tactical planning sidebar Ready click after the human has edited pending drafts.
+   * Expected outcome: Main returns the updated tactical snapshot JSON on success.
+   * Exceptions: IPC errors propagate as promise rejections.
+   */
+commitHumanTacticalDraftOrders: (payload: {
+    movementOrders: { unitId: string; toH3Index: string }[];
+    rangedAttacks?: { unitId: string; targetH3Index: string }[];
+    airStrikes?: { unitId: string; targetH3Index: string; targetType: AirStrikeTargetType }[];
+    ferryOrders?: { unitId: string; destinationH3Index: string }[];
+    embarkOrders?: { unitId: string; navalUnitId: string }[];
+  }): Promise<{ success: boolean; reason?: string; tacticalBattle?: TacticalBattleSnapshot }> =>
+    ipcRenderer.invoke('game:commitHumanTacticalDraftOrders', payload),
     /**
    * Documents the object literal property `validateGroupRangedTarget` (validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke('g).
 

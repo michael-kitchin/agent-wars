@@ -59,6 +59,7 @@ import {
   drawMovingUnits,
   drawResolutionMoveLines,
   drawStandingOrderLines,
+  drawTacticalPendingMarchPlanLines,
 } from './rendering/pathDrawing';
 import {
   addUnitsToSelection as addUnitsToSelectionFromModule,
@@ -105,7 +106,6 @@ import {
 import {
   activateRestoredTacticalBattleFromMainSnapshot,
   buildDefaultTacticalBattleActivationSideEffects,
-  performTacticalAdvanceTurnWhenAvailable,
   performTacticalBattleExitWithGameApi,
   startTacticalBattleFromEntryHex as startTacticalBattleFromEntryHexFromModule,
 } from './tactical/tacticalEntryFlow';
@@ -115,6 +115,7 @@ import {
   tacticalSyncTacticalEntryButtonOverlay,
   tacticalUpdateExitButtonVisibility,
 } from './tactical/tacticalUiOrchestration';
+import { tacticalSubUnitsWithDraftOverlay } from './tactical/tacticalDraftMarchOverlay';
 import {
   createBuildQueuePopupController,
   isBuildPopupOrEntryTarget,
@@ -257,8 +258,10 @@ function buildResolutionPlaybackState(
  */
 function getUnitAtHex(h3Index: string): GameStateSnapshot['units'][0] | null {
   if (S.tacticalBattleSnapshot) {
-    const tacticalUnit = S.tacticalBattleSnapshot.subUnits.find((u) => u.h3Index === h3Index);
-    if (!tacticalUnit) return null;
+    const overlay = tacticalSubUnitsWithDraftOverlay(S.tacticalBattleSnapshot);
+    const atHex = overlay.filter((u) => u.h3Index === h3Index);
+    if (atHex.length === 0) return null;
+    const tacticalUnit = atHex.find((u) => u.player === 'human') ?? atHex[0];
     return {
       id: tacticalUnit.id,
       player: tacticalUnit.player,
@@ -1809,6 +1812,7 @@ function getTacticalBattleActivationSideEffects(): TacticalRendererStartBattleSi
     redraw,
     refreshReadyButton: updateReadyButtonState,
     scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
+    rebuildUnitDisplayNameLookup: () => rebuildUnitDisplayNameLookup(S.gameState),
   });
 }
 
@@ -1977,7 +1981,14 @@ function getPrimarySelectedUnitId(): string | null {
  * Exceptions: None.
  */
 function rebuildUnitDisplayNameLookup(state: GameStateSnapshot | null): void {
-  S.unitDisplayNameById = state ? buildUnitDisplayNameLookup(state.units) : new Map<string, string>();
+  const base = state ? buildUnitDisplayNameLookup(state.units) : new Map<string, string>();
+  const tb = S.tacticalBattleSnapshot;
+  if (tb) {
+    for (const su of tb.subUnits) {
+      base.set(su.id, su.displayName);
+    }
+  }
+  S.unitDisplayNameById = base;
 }
 
 /**
@@ -2618,7 +2629,7 @@ function getUnitsForDrawWithMovingIds(state: GameStateSnapshot): {
 } {
   if (S.tacticalBattleSnapshot) {
     return {
-      unitsToDraw: S.tacticalBattleSnapshot.subUnits.map((u) => ({
+      unitsToDraw: tacticalSubUnitsWithDraftOverlay(S.tacticalBattleSnapshot).map((u) => ({
         id: u.id,
         player: u.player,
         unitType: u.unitType,
@@ -2760,6 +2771,7 @@ function createReadyHandlerDeps(): ReadyHandlerDeps {
     buildMeleeInterceptHexPopupHtml: buildMeleeInterceptHexPopupHtmlForRes1,
     openMeleeInterceptModal,
     startTacticalBattleFromInterceptHex: startTacticalBattleFromEntryHex,
+    scheduleTacticalAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
   };
 }
 
@@ -2793,30 +2805,6 @@ async function performTacticalBattleExit(): Promise<void> {
     showMapToast,
     redraw,
     runReadyAfterExit: () => handleReadyButtonClickFromModule(createReadyHandlerDeps()),
-  });
-}
-
-/**
- * Advances the tactical turn in the main process and waits briefly for background AI loading to settle.
- *
- * Purpose: Preflights `advanceTacticalTurn` IPC availability before delegating to `performTacticalAdvanceTurnWhenAvailable`.
- * When to use: Tactical advance HUD button.
- * Expected outcome: Snapshot updates; background wait behavior matches milestone-2.1 contract.
- * Exceptions: Toasts on missing IPC or failures; restores planning phase via helper.
- */
-async function performTacticalAdvanceTurn(): Promise<void> {
-  await performTacticalAdvanceTurnWhenAvailable(tacticalExitSessionAccessor, {
-    resolveAdvanceTacticalTurn: () => window.gameApi?.advanceTacticalTurn,
-    onMissingAdvanceTacticalTurn: () => {
-      showMapToast('Advance tactical turn is unavailable.', { isError: true });
-    },
-    advanceIo: {
-      showMapToast,
-      redraw,
-      startBackgroundRequestIfAllowed,
-      isBackgroundRequestInFlight: () => S.backgroundRequestInFlight,
-      scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
-    },
   });
 }
 
@@ -2856,7 +2844,23 @@ function drawGameScene(
     maybeScheduleTacticalAnnihilationExit();
     drawTerrainHexes(ctx);
     drawRes4TerrainHexes(ctx);
-    const tacticalUnits = S.tacticalBattleSnapshot.subUnits.map((u) => ({
+    const tb = S.tacticalBattleSnapshot;
+    const hexList = state.hexes.map((h) => h.h3Index);
+    drawTacticalPendingMarchPlanLines(ctx, tb, S.tacticalPendingMarches);
+    const shouldDrawPathPreview = shouldDrawHoveredPathPreview();
+    if (shouldDrawPathPreview && !S.resolutionMoveAnimation) {
+      drawHoverRoutePreview(ctx);
+    }
+    if (S.pendingRangedAttacks.length > 0 && state.units.length && hexList) {
+      drawRangedAttackLines(ctx, width, height, S.pendingRangedAttacks, state.units, hexList);
+    }
+    if (S.pendingAirStrikes.length > 0 && state.units.length && hexList) {
+      drawAirStrikeLines(ctx, S.pendingAirStrikes, state.units, hexList);
+    }
+    if (S.pendingFerryOrders.length > 0 && state.units.length && hexList) {
+      drawPendingFerryLines(ctx, S.pendingFerryOrders, state.units, hexList, drawLineArrow);
+    }
+    const tacticalUnits = tacticalSubUnitsWithDraftOverlay(tb).map((u) => ({
       id: u.id,
       player: u.player,
       unitType: u.unitType,
@@ -3508,6 +3512,8 @@ function updatePendingOrdersSidebar(): void {
     cancelOrderForUnit,
     cancelFerryForUnit,
     formatUnitArrowLabel,
+    redraw,
+    updatePendingOrdersSidebar,
   });
 }
 
@@ -3637,10 +3643,6 @@ function init(): void {
   const tacticalExitBtn = document.getElementById('tactical-exit-btn');
   tacticalExitBtn?.addEventListener('click', () => {
     void performTacticalBattleExit();
-  });
-  const tacticalAdvanceBtn = document.getElementById('tactical-advance-turn-btn');
-  tacticalAdvanceBtn?.addEventListener('click', () => {
-    void performTacticalAdvanceTurn();
   });
   tacticalUpdateExitButtonVisibility();
 

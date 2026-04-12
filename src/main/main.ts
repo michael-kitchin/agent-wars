@@ -22,6 +22,7 @@ import {
   previewHumanMarchOrders,
   assignHumanMarchOrder,
   assignHumanMarchOrders,
+  commitHumanTacticalDraftOrders,
   validateGroupRangedTarget,
   validateGroupAirStrikeTarget,
   validateGroupFerryTarget,
@@ -36,7 +37,6 @@ import {
 } from './gameActions';
 import { clearStrategicPreviousHexMemory } from './strategicUnitPreviousHex';
 import {
-  advanceActiveTacticalTurn,
   endTacticalBattleSession,
   startTacticalBattleForEnclosingRes1Hex,
 } from './tacticalBattle/tacticalBattleSession';
@@ -72,6 +72,9 @@ import {
   handleResolveMeleeIntercept,
 } from './gameIpcHandlers';
 import type {
+  AirStrikeOrder,
+  EmbarkOrder,
+  FerryOrder,
   SubmitOrdersPayload,
   ReadyResult,
   GameReadyIpcPayload,
@@ -312,6 +315,76 @@ function registerIpcHandlers(): void {
     }
   );
   ipcMain.handle(
+    'game:commitHumanTacticalDraftOrders',
+    (
+      _event,
+      payload: {
+        movementOrders?: { unitId?: string; toH3Index?: string }[];
+        rangedAttacks?: { unitId?: string; targetH3Index?: string }[];
+        airStrikes?: { unitId?: string; targetH3Index?: string; targetType?: 'units' | 'urban' | 'airport' | 'seaport' }[];
+        ferryOrders?: { unitId?: string; destinationH3Index?: string }[];
+        embarkOrders?: { unitId?: string; navalUnitId?: string }[];
+      }
+    ) => {
+      const movementRaw = payload?.movementOrders;
+      if (!Array.isArray(movementRaw)) return { success: false, reason: 'Invalid tactical commit payload' };
+      const movementOrders: { unitId: string; toH3Index: string }[] = [];
+      for (const row of movementRaw) {
+        if (typeof row?.unitId !== 'string' || typeof row?.toH3Index !== 'string') {
+          return { success: false, reason: 'Invalid tactical commit payload' };
+        }
+        movementOrders.push({ unitId: row.unitId, toH3Index: row.toH3Index });
+      }
+      const rangedRaw = payload?.rangedAttacks ?? [];
+      if (!Array.isArray(rangedRaw)) return { success: false, reason: 'Invalid tactical commit payload' };
+      const rangedAttacks: { unitId: string; targetH3Index: string }[] = [];
+      for (const row of rangedRaw) {
+        if (typeof row?.unitId !== 'string' || typeof row?.targetH3Index !== 'string') {
+          return { success: false, reason: 'Invalid tactical commit payload' };
+        }
+        rangedAttacks.push({ unitId: row.unitId, targetH3Index: row.targetH3Index });
+      }
+      const airRaw = payload?.airStrikes ?? [];
+      if (!Array.isArray(airRaw)) return { success: false, reason: 'Invalid tactical commit payload' };
+      const airStrikes: AirStrikeOrder[] = [];
+      for (const row of airRaw) {
+        if (
+          typeof row?.unitId !== 'string' ||
+          typeof row?.targetH3Index !== 'string' ||
+          (row?.targetType !== 'units' && row?.targetType !== 'urban' && row?.targetType !== 'airport' && row?.targetType !== 'seaport')
+        ) {
+          return { success: false, reason: 'Invalid tactical commit payload' };
+        }
+        airStrikes.push({ unitId: row.unitId, targetH3Index: row.targetH3Index, targetType: row.targetType });
+      }
+      const ferryRaw = payload?.ferryOrders ?? [];
+      if (!Array.isArray(ferryRaw)) return { success: false, reason: 'Invalid tactical commit payload' };
+      const ferryOrders: FerryOrder[] = [];
+      for (const row of ferryRaw) {
+        if (typeof row?.unitId !== 'string' || typeof row?.destinationH3Index !== 'string') {
+          return { success: false, reason: 'Invalid tactical commit payload' };
+        }
+        ferryOrders.push({ unitId: row.unitId, destinationH3Index: row.destinationH3Index });
+      }
+      const embarkRaw = payload?.embarkOrders ?? [];
+      if (!Array.isArray(embarkRaw)) return { success: false, reason: 'Invalid tactical commit payload' };
+      const embarkOrders: EmbarkOrder[] = [];
+      for (const row of embarkRaw) {
+        if (typeof row?.unitId !== 'string' || typeof row?.navalUnitId !== 'string') {
+          return { success: false, reason: 'Invalid tactical commit payload' };
+        }
+        embarkOrders.push({ unitId: row.unitId, navalUnitId: row.navalUnitId });
+      }
+      return commitHumanTacticalDraftOrders({
+        movementOrders,
+        rangedAttacks,
+        airStrikes,
+        ferryOrders,
+        embarkOrders,
+      });
+    }
+  );
+  ipcMain.handle(
     'game:validateGroupRangedTarget',
     (_event, payload: { unitIds?: string[]; targetH3Index?: string }) => {
       const parsed = parseGroupedTargetPayload(payload);
@@ -410,7 +483,6 @@ function registerIpcHandlers(): void {
     endTacticalBattleSession();
     return { success: true as const };
   });
-  ipcMain.handle('game:advanceTacticalTurn', () => advanceActiveTacticalTurn());
   ipcMain.handle(
     'game:ready',
     async (_event, payload?: GameReadyIpcPayload): Promise<ReadyResult> => {

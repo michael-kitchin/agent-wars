@@ -6,31 +6,32 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
 import { exitTacticalMapView } from '../map/tacticalMapView';
 import { hideTacticalEntryLayer, syncTacticalEntryButton } from '../map/tacticalEntryLayer';
+import { restoreStrategicOrderDraftsAfterTacticalSession } from './tacticalStrategicOrderUiStash';
 
 /**
- * Toggles strategic sidebar chrome suppression while tactical res4 mode is active.
+ * Keeps the strategic sidebar visible during tactical play; legacy hook remains for callers that toggled suppression.
  *
- * Contract: Adds/removes `tactical-strategic-suppress` on `#sidebar` without touching other layout classes.
- * When to use: Tactical entry success and tactical exit / reconciliation teardown.
- * Expected outcome: Sidebar styling matches milestone-2.1 strategic pause contract.
- * Exceptions: None when `#sidebar` is missing (no-op toggle).
+ * Contract: Always removes `tactical-strategic-suppress` so Ready, pending orders, and LLM panels stay usable in res4 mode.
+ * When to use: Tactical entry success and tactical exit / reconciliation teardown (parameter ignored for compatibility).
+ * Expected outcome: Full `#sidebar` visibility regardless of tactical flag.
+ * Exceptions: None when `#sidebar` is missing (no-op).
  */
 export function tacticalApplyStrategicSidebarForTacticalMode(tactical: boolean): void {
-  document.getElementById('sidebar')?.classList.toggle('tactical-strategic-suppress', tactical);
+  void tactical;
+  document.getElementById('sidebar')?.classList.remove('tactical-strategic-suppress');
 }
 
 /**
- * Updates tactical HUD visibility, turn label text, and exit/advance disabled state from renderer shared state.
+ * Updates tactical HUD visibility, turn label text, and exit button disabled state from renderer shared state.
  *
  * Contract: Reads `S.tacticalBattleSnapshot` and `S.tacticalPhasePlanning` only; mutates DOM button disabled flags.
  * When to use: After tactical snapshot changes, phase flips, and redraw passes that affect tactical controls.
- * Expected outcome: Exit/advance disabled whenever not in tactical planning or no snapshot.
+ * Expected outcome: Exit button disabled whenever not in tactical planning or no snapshot.
  * Exceptions: None.
  */
 export function tacticalUpdateExitButtonVisibility(): void {
   const hud = document.getElementById('tactical-battle-hud');
   const exitBtn = document.getElementById('tactical-exit-btn') as HTMLButtonElement | null;
-  const advanceBtn = document.getElementById('tactical-advance-turn-btn') as HTMLButtonElement | null;
   const turnLabel = document.getElementById('tactical-turn-label');
   const active = !!S.tacticalBattleSnapshot;
   hud?.classList.toggle('hidden', !active);
@@ -41,7 +42,6 @@ export function tacticalUpdateExitButtonVisibility(): void {
   }
   const disabled = !active || !S.tacticalPhasePlanning;
   if (exitBtn) exitBtn.disabled = disabled;
-  if (advanceBtn) advanceBtn.disabled = disabled;
 }
 
 /**
@@ -58,8 +58,10 @@ export function tacticalReconcileBattleAfterStrategicSnapshot(nextState: GameSta
   if (nextState.phase !== 'planning' || nextState.turnNumber !== snap.strategicTurnNumber) {
     S.tacticalBattleSnapshot = null;
     S.tacticalPhasePlanning = true;
+    S.tacticalPendingMarches = [];
     exitTacticalMapView();
     tacticalApplyStrategicSidebarForTacticalMode(false);
+    restoreStrategicOrderDraftsAfterTacticalSession();
     const el = document.getElementById('tactical-entry-layer');
     if (el) hideTacticalEntryLayer(el, true);
     tacticalUpdateExitButtonVisibility();

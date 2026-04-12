@@ -628,46 +628,6 @@ function testTacticalDrawBranchSkipsStrategicStaleIntel(): void {
 }
 
 /**
- * Defines the `testTacticalAdvanceTurnUsesResolutionGate` function shape (function testTacticalAdvanceTurnUsesResolutionGate(): void).
-
- * Purpose: Ensures tactical Exit stays disabled during async resolution after advancing the tactical turn (milestone 2.1 Phase I).
- * When to use: Regression guard when refactoring `tacticalPerformAdvanceTurn` or renderer advance-turn wiring.
- * Expected outcome: Shared helper flips planning off before IPC, waits on `backgroundRequestInFlight`, then restores planning on exit paths.
- * Exceptions: None.
- */
-function testTacticalAdvanceTurnUsesResolutionGate(): void {
-  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
-  const rendererSource = fs.readFileSync(rendererPath, 'utf8');
-  const rendererFn = getFunctionSource(rendererSource, 'performTacticalAdvanceTurn');
-  assert.ok(
-    rendererFn.includes('performTacticalAdvanceTurnWhenAvailable'),
-    'performTacticalAdvanceTurn should delegate to tacticalEntryFlow advance-turn wiring'
-  );
-  const entryFlowPath = path.resolve(process.cwd(), 'src', 'renderer', 'tactical', 'tacticalEntryFlow.ts');
-  const entryFlowSource = fs.readFileSync(entryFlowPath, 'utf8');
-  const entryFlowFn = getFunctionSource(entryFlowSource, 'performTacticalAdvanceTurnWhenAvailable');
-  assert.ok(
-    entryFlowFn.includes('tacticalPerformAdvanceTurn'),
-    'performTacticalAdvanceTurnWhenAvailable should delegate tactical beat sequencing to tacticalPerformAdvanceTurn'
-  );
-  const exitFlowPath = path.resolve(process.cwd(), 'src', 'renderer', 'tactical', 'tacticalExitFlow.ts');
-  const exitFlowSource = fs.readFileSync(exitFlowPath, 'utf8');
-  const fn = getFunctionSource(exitFlowSource, 'tacticalPerformAdvanceTurn');
-  assert.ok(
-    fn.includes('session.setPhasePlanning(false)'),
-    'tacticalPerformAdvanceTurn should enter tactical resolution before advancing the tactical turn'
-  );
-  assert.ok(
-    fn.includes('io.isBackgroundRequestInFlight()'),
-    'tacticalPerformAdvanceTurn should observe backgroundRequestInFlight while optional AI runs'
-  );
-  assert.ok(
-    /session\.setPhasePlanning\(true\)/.test(fn),
-    'tacticalPerformAdvanceTurn should restore tactical planning after resolution completes or fails'
-  );
-}
-
-/**
  * Defines the `testTacticalRes4DrawingSkipsExploredGateWhenTactical` function shape (function testTacticalRes4DrawingSkipsExploredGateWhenTactical(): void).
 
  * Purpose: Confirms res4 terrain drawing does not hide the enclosing tactical parent behind strategic exploration fog (milestone 2.1 Phase K).
@@ -812,7 +772,6 @@ function run(): void {
   testRes4RubbleTooltipAndTerrainVariantContracts();
   testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves();
   testTacticalDrawBranchSkipsStrategicStaleIntel();
-  testTacticalAdvanceTurnUsesResolutionGate();
   testTacticalRes4DrawingSkipsExploredGateWhenTactical();
   testTacticalEntryLayerPlanningAndContestedContracts();
   testTacticalMapViewLocksZoomPanAndRestoresWorld();

@@ -12,9 +12,7 @@ import type { StartTacticalBattleIpcResult, TacticalBattleSnapshot } from '../..
 import { rendererSharedState as S } from '../core/state';
 import { enterTacticalMapView } from '../map/tacticalMapView';
 import {
-  tacticalPerformAdvanceTurn,
   tacticalPerformBattleExit,
-  type TacticalAdvanceTurnIo,
   type TacticalBattleExitIo,
   type TacticalExitSessionAccessor,
 } from './tacticalExitFlow';
@@ -42,6 +40,15 @@ export type TacticalBattleActivationBindings = {
   redraw: TacticalRendererStartBattleSideEffects['redraw'];
   refreshReadyButton: TacticalRendererStartBattleSideEffects['refreshReadyButton'];
   scheduleAnnihilationExit: TacticalRendererStartBattleSideEffects['scheduleAnnihilationExit'];
+  /**
+   * Rebuilds unit display-name lookup after `S.tacticalBattleSnapshot` changes so sidebar and tooltips resolve tactical ids.
+   *
+   * Contract: Safe to omit when tests inject minimal side effects; renderer supplies a real implementation in production.
+   * When to use: Immediately after `assignBattleSnapshot` during tactical activation.
+   * Expected outcome: `S.unitDisplayNameById` includes tactical sub-unit labels.
+   * Exceptions: None.
+   */
+  rebuildUnitDisplayNameLookup?: () => void;
 };
 
 /**
@@ -59,6 +66,7 @@ export function buildDefaultTacticalBattleActivationSideEffects(
     showMapToast: bindings.showMapToast,
     assignBattleSnapshot: (battle) => {
       S.tacticalBattleSnapshot = battle;
+      bindings.rebuildUnitDisplayNameLookup?.();
     },
     setPhasePlanning: (planning) => {
       S.tacticalPhasePlanning = planning;
@@ -145,39 +153,3 @@ export async function performTacticalBattleExitWithGameApi(
   });
 }
 
-/**
- * Dependency bundle for `performTacticalAdvanceTurnWhenAvailable` (named for reliable `getFunctionSource` extraction).
- *
- * Contract: Separates IPC resolution from the shared `TacticalAdvanceTurnIo` surface passed into `tacticalPerformAdvanceTurn`.
- * When to use: Renderer advance button wiring supplies game API polling plus static IO callbacks.
- * Expected outcome: Missing advance IPC short-circuits without touching tactical session phase flags.
- * Exceptions: None.
- */
-export type PerformTacticalAdvanceTurnWhenAvailableDeps = {
-  resolveAdvanceTacticalTurn: () => GameApi['advanceTacticalTurn'] | undefined;
-  onMissingAdvanceTacticalTurn: () => void;
-  advanceIo: Omit<TacticalAdvanceTurnIo, 'advanceTacticalTurn'>;
-};
-
-/**
- * Advances the tactical turn after verifying `advanceTacticalTurn` exists on the current `GameApi`.
- *
- * Contract: Preserves renderer preflight toast when IPC surface is missing.
- * When to use: Tactical advance HUD button wiring from `renderer.ts`.
- * Expected outcome: Same snapshot and background-wait behavior as the pre-extraction implementation.
- * Exceptions: Delegates error handling to `tacticalPerformAdvanceTurn`.
- */
-export async function performTacticalAdvanceTurnWhenAvailable(
-  session: TacticalExitSessionAccessor,
-  deps: PerformTacticalAdvanceTurnWhenAvailableDeps
-): Promise<void> {
-  const advance = deps.resolveAdvanceTacticalTurn();
-  if (!advance) {
-    deps.onMissingAdvanceTacticalTurn();
-    return;
-  }
-  await tacticalPerformAdvanceTurn(session, {
-    advanceTacticalTurn: () => advance(),
-    ...deps.advanceIo,
-  });
-}

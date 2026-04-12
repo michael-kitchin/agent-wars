@@ -29,6 +29,7 @@ import type {
   SealiftStackState,
   GameStateSnapshot,
 } from '../shared/ipcTypes';
+import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
 import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
 import { executePlanRoute } from './tools/tool1Pathfinding';
 import { terrainIsPassableForDomain } from './pathfinding';
@@ -70,7 +71,13 @@ import {
   isEmbarkedLandUnitOnWater,
   updateSealiftSlotImpl,
 } from './game-actions/sealift';
-import { isTacticalBattleActive } from './tacticalBattle/tacticalBattleSession';
+import {
+  applyHumanTacticalMarchOrders,
+  applyValidatedHumanTacticalSupportOrders,
+  getActiveTacticalBattleSnapshot,
+  isTacticalBattleActive,
+  validateHumanTacticalMarchOrders,
+} from './tacticalBattle/tacticalBattleSession';
 import { executeResolveMeleeIntercept } from './game-actions/meleeInterceptStrategicResolve';
 import { executeReadyStrategicTurn } from './game-actions/readyStrategicResolutionPipeline';
 import {
@@ -116,6 +123,15 @@ success: boolean;
    * Exceptions: None.
    */
 reason?: string;
+  /**
+   * Specifies the contract for the `tacticalBattle` member (tacticalBattle?: TacticalBattleSnapshot;).
+
+   * Contract: Present only after a successful tactical human march mutation so the renderer can refresh res4 state without an extra round-trip.
+   * When to use: Consumers of `commitHumanTacticalDraftOrders` after tactical Ready; not used for draft validation IPC.
+   * Expected outcome: Deep snapshot suitable for JSON IPC when set.
+   * Exceptions: None.
+   */
+  tacticalBattle?: TacticalBattleSnapshot;
 }
 
 /**
@@ -638,6 +654,92 @@ function clearEmbarkAssignmentForIndependentLandMove(unitId: string, destination
 }
 
 /**
+ * Validates grouped human march IPC for tactical drafts without mutating the committed tactical snapshot.
+ *
+ * Purpose: Lets the renderer store march targets locally until tactical Ready calls `commitHumanTacticalDraftOrders`.
+ * When to use: `assignHumanMarchOrder(s)` after `isTacticalBattleActive()` succeeds and unit ids are de-duplicated.
+ * Expected outcome: `success: true` when every move is legal on the current snapshot; never returns `tacticalBattle`.
+ * Exceptions: Caught and logged at error; returned as `success: false` with stringified message.
+ */
+function validateHumanMarchOrdersWhenTacticalActive(uniqueUnitIds: string[], destinationH3Index: string): SubmitOrdersResult {
+  logDebug('gameActions validateHumanMarchOrdersWhenTacticalActive', {
+    unitCount: uniqueUnitIds.length,
+    destinationH3Index,
+  });
+  try {
+    const orders = uniqueUnitIds.map((unitId) => ({ unitId, toH3Index: destinationH3Index }));
+    const checked = validateHumanTacticalMarchOrders(orders);
+    if (!checked.success) {
+      logDebug('gameActions validateHumanMarchOrdersWhenTacticalActive rejected', { reason: checked.reason });
+      return { success: false, reason: checked.reason };
+    }
+    return { success: true };
+  } catch (err) {
+    logError('validateHumanMarchOrdersWhenTacticalActive: exception', err);
+    return { success: false, reason: String(err) };
+  }
+}
+
+/**
+ * Commits queued human tactical draft orders from the renderer into the active tactical snapshot.
+ *
+ * Purpose: Tactical parity with strategic Ready by applying all tactical draft types in one commit boundary.
+ * When to use: `game:commitHumanTacticalDraftOrders` IPC with renderer draft lists at tactical Ready time.
+ * Expected outcome: `success: true` with `tacticalBattle` snapshot for immediate redraw, or failure with reason.
+ * Exceptions: Caught and logged at error; returns `success: false` with stringified message.
+ */
+export function commitHumanTacticalDraftOrders(args: {
+  movementOrders: readonly { unitId: string; toH3Index: string }[];
+  rangedAttacks?: readonly { unitId: string; targetH3Index: string }[];
+  airStrikes?: readonly AirStrikeOrder[];
+  ferryOrders?: readonly FerryOrder[];
+  embarkOrders?: readonly EmbarkOrder[];
+}): SubmitOrdersResult {
+  logDebug('gameActions commitHumanTacticalDraftOrders', {
+    movementCount: args.movementOrders.length,
+    rangedCount: args.rangedAttacks?.length ?? 0,
+    airCount: args.airStrikes?.length ?? 0,
+    ferryCount: args.ferryOrders?.length ?? 0,
+    embarkCount: args.embarkOrders?.length ?? 0,
+  });
+  try {
+    if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
+    if (!isTacticalBattleActive()) return { success: false, reason: 'No tactical battle is active.' };
+    for (const r of args.rangedAttacks ?? []) {
+      const checked = validateGroupRangedTarget([r.unitId], r.targetH3Index);
+      if (!checked.success) return checked;
+    }
+    for (const a of args.airStrikes ?? []) {
+      const checked = validateGroupAirStrikeTarget([a.unitId], a.targetH3Index, a.targetType);
+      if (!checked.success) return checked;
+    }
+    for (const f of args.ferryOrders ?? []) {
+      const checked = validateGroupFerryTarget([f.unitId], f.destinationH3Index);
+      if (!checked.success) return checked;
+    }
+    const applied = applyHumanTacticalMarchOrders(args.movementOrders);
+    if (!applied.success) {
+      logDebug('gameActions commitHumanTacticalDraftOrders rejected movement', { reason: applied.reason });
+      return { success: false, reason: applied.reason };
+    }
+    const support = applyValidatedHumanTacticalSupportOrders({
+      rangedAttacks: args.rangedAttacks,
+      airStrikes: args.airStrikes,
+      ferryOrders: args.ferryOrders,
+      embarkOrders: args.embarkOrders,
+    });
+    if (!support.success) {
+      logDebug('gameActions commitHumanTacticalDraftOrders rejected support', { reason: support.reason });
+      return { success: false, reason: support.reason };
+    }
+    return { success: true, tacticalBattle: support.battle };
+  } catch (err) {
+    logError('commitHumanTacticalDraftOrders: exception', err);
+    return { success: false, reason: String(err) };
+  }
+}
+
+/**
  * Defines the `assignHumanMarchOrder` function shape (export function assignHumanMarchOrder(unitId: string, destinationH3Index: string): SubmitOrdersResult).
 
  * Purpose: Supports maintainability by documenting why `assignHumanMarchOrder` exists.
@@ -649,7 +751,7 @@ export function assignHumanMarchOrder(unitId: string, destinationH3Index: string
   logDebug('gameActions assignHumanMarchOrder', { unitId, destinationH3Index });
   try {
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
-    if (isTacticalBattleActive()) return { success: false, reason: 'Movement orders are unavailable during a tactical battle.' };
+    if (isTacticalBattleActive()) return validateHumanMarchOrdersWhenTacticalActive([unitId], destinationH3Index);
     const state = humanPerspectiveStateSnapshot();
     const turnRow = dbGetOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1');
     if (turnRow?.phase !== VALID_PHASE) return { success: false, reason: 'Not in planning phase' };
@@ -704,9 +806,9 @@ export function assignHumanMarchOrders(unitIds: string[], destinationH3Index: st
   logDebug('gameActions assignHumanMarchOrders', { unitCount: unitIds.length, destinationH3Index });
   try {
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
-    if (isTacticalBattleActive()) return { success: false, reason: 'Movement orders are unavailable during a tactical battle.' };
     const uniqueUnitIds = getUniqueNonEmptyIds(unitIds);
     if (uniqueUnitIds.length === 0) return { success: false, reason: 'No selected units to assign' };
+    if (isTacticalBattleActive()) return validateHumanMarchOrdersWhenTacticalActive(uniqueUnitIds, destinationH3Index);
     const state = humanPerspectiveStateSnapshot();
     const destinationHex = state.hexes.find((h) => h.h3Index === destinationH3Index);
     if (!destinationHex) return { success: false, reason: 'Destination not on map' };
@@ -796,6 +898,22 @@ export function validateGroupRangedTarget(unitIds: string[], targetH3Index: stri
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
     const uniqueUnitIds = getUniqueNonEmptyIds(unitIds);
     if (uniqueUnitIds.length === 0) return { success: false, reason: 'No selected units for ranged targeting' };
+    if (isTacticalBattleActive()) {
+      const snap = getActiveTacticalBattleSnapshot();
+      if (!snap) return { success: false, reason: 'No tactical battle is active.' };
+      const footprint = new Set(snap.res4ChildH3Indexes);
+      if (!footprint.has(targetH3Index)) return { success: false, reason: 'Target is outside the tactical battle.' };
+      for (const unitId of uniqueUnitIds) {
+        const unit = snap.subUnits.find((u) => u.id === unitId);
+        if (!unit || unit.player !== HUMAN_PLAYER_ID) return { success: false, reason: `${unitId}: Unit not in tactical battle.` };
+        const range = getRange(unit.unitType);
+        if (range < 1) return { success: false, reason: `${unitId}: Unit has no ranged attack.` };
+        if (!isWithinGridRangeSafe(unit.h3Index, targetH3Index, range, 'validateGroupRangedTarget tactical')) {
+          return { success: false, reason: `${unitId}: Target out of range.` };
+        }
+      }
+      return { success: true };
+    }
     for (const unitId of uniqueUnitIds) {
       const result = validateRangedAttack(unitId, targetH3Index, { allowedPlayer: HUMAN_PLAYER_ID });
       if (!result.valid) {
@@ -827,6 +945,19 @@ export function validateGroupAirStrikeTarget(
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
     const uniqueUnitIds = getUniqueNonEmptyIds(unitIds);
     if (uniqueUnitIds.length === 0) return { success: false, reason: 'No selected units for strike targeting' };
+    if (isTacticalBattleActive()) {
+      if (targetType !== 'units') return { success: false, reason: 'Tactical air strikes currently support enemy units only.' };
+      const snap = getActiveTacticalBattleSnapshot();
+      if (!snap) return { success: false, reason: 'No tactical battle is active.' };
+      const footprint = new Set(snap.res4ChildH3Indexes);
+      if (!footprint.has(targetH3Index)) return { success: false, reason: 'Target is outside the tactical battle.' };
+      for (const unitId of uniqueUnitIds) {
+        const unit = snap.subUnits.find((u) => u.id === unitId);
+        if (!unit || unit.player !== HUMAN_PLAYER_ID) return { success: false, reason: `${unitId}: Unit not in tactical battle.` };
+        if (unit.unitType !== 'air') return { success: false, reason: `${unitId}: Only air units can strike.` };
+      }
+      return { success: true };
+    }
     for (const unitId of uniqueUnitIds) {
       const result = validateAirStrikeOrder(unitId, targetH3Index, targetType, { allowedPlayer: HUMAN_PLAYER_ID });
       if (!result.valid) return { success: false, reason: `${unitId}: ${result.reason}` };
@@ -852,6 +983,18 @@ export function validateGroupFerryTarget(unitIds: string[], destinationH3Index: 
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
     const uniqueUnitIds = getUniqueNonEmptyIds(unitIds);
     if (uniqueUnitIds.length === 0) return { success: false, reason: 'No selected units for ferry targeting' };
+    if (isTacticalBattleActive()) {
+      const snap = getActiveTacticalBattleSnapshot();
+      if (!snap) return { success: false, reason: 'No tactical battle is active.' };
+      const footprint = new Set(snap.res4ChildH3Indexes);
+      if (!footprint.has(destinationH3Index)) return { success: false, reason: 'Destination is outside the tactical battle.' };
+      for (const unitId of uniqueUnitIds) {
+        const unit = snap.subUnits.find((u) => u.id === unitId);
+        if (!unit || unit.player !== HUMAN_PLAYER_ID) return { success: false, reason: `${unitId}: Unit not in tactical battle.` };
+        if (unit.unitType !== 'air') return { success: false, reason: `${unitId}: Only air units can ferry.` };
+      }
+      return { success: true };
+    }
     for (const unitId of uniqueUnitIds) {
       const result = validateFerryOrder(unitId, destinationH3Index, { allowedPlayer: HUMAN_PLAYER_ID });
       if (!result.valid) return { success: false, reason: `${unitId}: ${result.reason}` };

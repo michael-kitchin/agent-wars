@@ -3,6 +3,7 @@
  */
 
 import type { StartTacticalBattleIpcResult, TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { stashStrategicOrderDraftsForTacticalSession } from './tacticalStrategicOrderUiStash';
 
 /**
  * Side-effect surface used after a successful `startTacticalBattle` IPC call to update renderer DOM and shared state.
@@ -41,6 +42,7 @@ export function tacticalRendererApplyStartBattleIpcResult(
     fx.showMapToast(result.reason ?? 'Could not start tactical battle.', { isError: true });
     return;
   }
+  stashStrategicOrderDraftsForTacticalSession();
   fx.assignBattleSnapshot(result.battle);
   fx.setPhasePlanning(true);
   const skipped = result.skippedParentDisplayNames;
@@ -68,6 +70,7 @@ export function tacticalRendererActivateRestoredBattleSnapshot(
   battle: TacticalBattleSnapshot,
   fx: TacticalRendererStartBattleSideEffects
 ): void {
+  stashStrategicOrderDraftsForTacticalSession();
   fx.assignBattleSnapshot(battle);
   fx.setPhasePlanning(true);
   fx.enterRes4View(battle.res4ChildH3Indexes);

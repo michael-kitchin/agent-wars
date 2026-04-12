@@ -1,6 +1,7 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
 import { resetPrecomputedAiState } from '../openRouter/precomputedAiState';
+import { discardStrategicOrderUiStash } from '../tactical/tacticalStrategicOrderUiStash';
 import {
   getSelectedScenarioRegions,
   initializeScenarioRegionSelectorsOnOverlayOpen,
@@ -243,6 +244,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       S.humanStandingOrders = [];
       S.hoverRoutePreview = null;
       deps.clearPendingTacticalOrders();
+      discardStrategicOrderUiStash();
       S.selectedUnitIds = [];
       S.selectedUnitIdsAtMouseDown = [];
       S.selectedHexIndex = null;

@@ -148,3 +148,87 @@ export function projectTacticalSnapshotAfterValidatedOpponentOrders(
   }
   return { ...next, subUnits: sub };
 }
+
+/**
+ * Returns a new tactical snapshot after applying validated human support drafts (embark, ferry, air strikes, ranged).
+ *
+ * Purpose: Mirrors tactical opponent support-order projection so human tactical Ready can commit non-march drafts.
+ * When to use: Main tactical Ready commit after movement projection has already been validated/applied.
+ * Expected outcome: Human embark/ferry rows mutate positions, then human fire rows remove one enemy unit per target hex.
+ * Exceptions: None; inconsistent rows are skipped defensively with trace logs.
+ */
+export function projectTacticalSnapshotAfterValidatedHumanSupportOrders(
+  battle: TacticalBattleSnapshot,
+  opts: {
+    rangedAttacks?: readonly { unitId: string; targetH3Index: string }[];
+    airStrikes?: readonly AirStrikeOrder[];
+    ferryOrders?: readonly FerryOrder[];
+    embarkOrders?: readonly EmbarkOrder[];
+  }
+): TacticalBattleSnapshot {
+  tacticalLogQuery('projectTacticalSnapshotAfterValidatedHumanSupportOrders', {
+    battleId: battle.battleId,
+    rangedCount: opts.rangedAttacks?.length ?? 0,
+    airCount: opts.airStrikes?.length ?? 0,
+    ferryCount: opts.ferryOrders?.length ?? 0,
+    embarkCount: opts.embarkOrders?.length ?? 0,
+  });
+  let sub: TacticalSubUnitSnapshot[] = battle.subUnits.map((u) => ({ ...u }));
+  const res4Set = new Set(battle.res4ChildH3Indexes);
+
+  const syncCargoToNavalHex = (): void => {
+    const idTo = new Map(sub.map((u) => [u.id, u] as const));
+    sub = sub.map((u) => {
+      const e = u.embarkedOnSubUnitId;
+      if (!e) return u;
+      const n = idTo.get(e);
+      return n && n.unitType === 'naval' ? { ...u, h3Index: n.h3Index } : u;
+    });
+  };
+
+  for (const e of opts.embarkOrders ?? []) {
+    const li = tacticalFindSubUnitIndexById(sub, e.unitId);
+    if (li < 0) continue;
+    const land = sub[li]!;
+    if (land.player !== 'human') continue;
+    sub[li] = { ...land, embarkedOnSubUnitId: e.navalUnitId };
+  }
+  syncCargoToNavalHex();
+
+  for (const f of opts.ferryOrders ?? []) {
+    const fi = tacticalFindSubUnitIndexById(sub, f.unitId);
+    if (fi < 0) continue;
+    const air = sub[fi]!;
+    if (air.player !== 'human' || air.unitType !== 'air') continue;
+    if (!tacticalRes4FootprintContains(res4Set, f.destinationH3Index)) continue;
+    sub[fi] = { ...air, h3Index: f.destinationH3Index };
+  }
+  syncCargoToNavalHex();
+
+  const toRemove = new Set<string>();
+  const markEnemyKillAtHex = (targetH3: string, attackerPlayer: string): void => {
+    const vid = pickEnemySubUnitIdAtHex(sub, targetH3, attackerPlayer);
+    if (!vid) return;
+    for (const id of expandedRemovalIdsForVictim(sub, vid)) {
+      toRemove.add(id);
+    }
+  };
+
+  for (const s of opts.airStrikes ?? []) {
+    if (s.targetType !== 'units') continue;
+    const attacker = sub.find((u) => u.id === s.unitId);
+    if (!attacker || attacker.player !== 'human') continue;
+    markEnemyKillAtHex(s.targetH3Index, attacker.player);
+  }
+
+  for (const r of opts.rangedAttacks ?? []) {
+    const attacker = sub.find((u) => u.id === r.unitId);
+    if (!attacker || attacker.player !== 'human') continue;
+    markEnemyKillAtHex(r.targetH3Index, attacker.player);
+  }
+
+  if (toRemove.size > 0) {
+    sub = sub.filter((u) => !toRemove.has(u.id));
+  }
+  return { ...battle, subUnits: sub };
+}
