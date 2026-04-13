@@ -9,6 +9,7 @@ import type {
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { MeleeInterceptModalOpenArgs, MeleeInterceptModalOutcome } from './meleeInterceptModal';
 import { buildTurnUpdateBullets } from './turnUpdateSummary';
+import { readTacticalBattlesInterceptPromptEnabled } from './tacticalBattlePromptPreference';
 import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
 import { rendererSharedState as S } from '../core/state';
 import { resetPrecomputedAiState } from '../openRouter/precomputedAiState';
@@ -170,7 +171,7 @@ showMapToast: (message: string, options?: { isError?: boolean }) => void;
    */
 getVisibleHexSet: (state: GameStateSnapshot | null) => Set<string>;
     /**
-   * Specifies the contract for the `buildKillToastFormatterBundle` member (buildKillToastFormatterBundle: ( state: GameStateSnapshot, removedUnits?: RemovedUnitSnapshot[] ) => { formatKillLine: (entry: { victimId: string;).
+   * Specifies the contract for the `buildKillToastFormatterBundle` member (buildKillToastFormatterBundle: ( state: GameStateSnapshot, removedUnits?: RemovedUnitSnapshot[], tacticalSubUnitsForKillLabels?: readonly { id: string; displayName: string }[] ) => { formatKillLine: (entry: { victimId: string;).
 
    * Contract: Describes stable behavior for callers of `buildKillToastFormatterBundle` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -179,7 +180,8 @@ getVisibleHexSet: (state: GameStateSnapshot | null) => Set<string>;
    */
 buildKillToastFormatterBundle: (
     state: GameStateSnapshot,
-    removedUnits?: RemovedUnitSnapshot[]
+    removedUnits?: RemovedUnitSnapshot[],
+    tacticalSubUnitsForKillLabels?: readonly { id: string; displayName: string }[]
   ) => { formatKillLine: (entry: { victimId: string; killerIds: string[] }) => string; formatUnitName: (unitId: string) => string };
     /**
    * Specifies the contract for the `formatUnknownBattleAnnouncement` member (formatUnknownBattleAnnouncement: (continentNames: string[]) => string;).
@@ -537,6 +539,31 @@ function deriveCombatVisibilityClassification(
 }
 
 /**
+ * Adapts tactical Ready playback into a `ReadyResult`-shaped slice so kill lines and visibility reuse strategic helpers.
+ *
+ * Purpose: Avoids a second toast pipeline in the renderer while tactical combat remains snapshot-simulated on the main process.
+ * When to use: Only after a successful `commitHumanTacticalDraftOrders` when `tacticalResolutionPlayback` is present.
+ * Expected outcome: `deriveCombatVisibilityClassification` and `buildTurnUpdateBullets` see the same kill and casualty fields they expect from strategic Ready.
+ * Exceptions: None; omits optional arrays when empty to match typical `ReadyResult` payloads.
+ */
+function buildTacticalCommitReadyResultForToast(playback: TacticalCommitResolutionPlayback): ReadyResult {
+  const killsByDirectFire = playback.killsByDirectFire ?? [];
+  const killsByReturnFire = playback.killsByReturnFire ?? [];
+  const kills = [...killsByDirectFire, ...killsByReturnFire];
+  return {
+    success: true,
+    kills: kills.length > 0 ? kills : undefined,
+    killsByDirectFire: killsByDirectFire.length > 0 ? killsByDirectFire : undefined,
+    killsByReturnFire: killsByReturnFire.length > 0 ? killsByReturnFire : undefined,
+    removedUnits: playback.rangedRemovedUnits,
+    humanMoves: playback.humanMoves,
+    rangedCombatHexes: playback.rangedCombatHexes,
+    rangedCasualtyHexes: playback.rangedCasualtyHexes,
+    rangedRemovedUnits: playback.rangedRemovedUnits,
+  };
+}
+
+/**
  * Defines the `formatHexCount` function shape (function formatHexCount(label: string, count: number): string).
 
  * Purpose: Supports maintainability by documenting why `formatHexCount` exists.
@@ -548,6 +575,11 @@ function formatHexCount(label: string, count: number): string {
   return `• ${label} at ${count.toLocaleString()} ${count === 1 ? 'hex' : 'hexes'}.`;
 }
 
+type CombatActivityFallbackSource = Pick<
+  ReadyResult,
+  'rangedCombatHexes' | 'rangedCasualtyHexes' | 'meleeCombatHexes' | 'meleeCasualtyHexes' | 'airStrikeCasualtyHexes'
+>;
+
 /**
  * Defines the `buildCombatActivityFallbackBullets` function shape (function buildCombatActivityFallbackBullets(readyResult: ReadyResult): string[]).
 
@@ -556,7 +588,7 @@ function formatHexCount(label: string, count: number): string {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function buildCombatActivityFallbackBullets(readyResult: ReadyResult): string[] {
+function buildCombatActivityFallbackBullets(readyResult: CombatActivityFallbackSource): string[] {
   const bullets: string[] = [];
   const rangedHexCount = readyResult.rangedCombatHexes?.length ?? 0;
   if (rangedHexCount > 0) bullets.push(formatHexCount('Ranged engagements', rangedHexCount));
@@ -636,7 +668,10 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         (playback?.rangedCombatHexes?.length ?? 0) > 0 ||
         (playback?.rangedCasualtyHexes?.length ?? 0) > 0 ||
         (playback?.rangedRemovedUnits?.length ?? 0) > 0;
-      if (playback && (hasMoves || hasRangedPlayback)) {
+      const hasKillPlayback =
+        (playback?.killsByDirectFire?.length ?? 0) > 0 || (playback?.killsByReturnFire?.length ?? 0) > 0;
+      const needsResolutionPlayback = hasMoves || hasRangedPlayback || hasKillPlayback;
+      if (playback && needsResolutionPlayback) {
         if (S.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
         S.resolutionMoveAnimation = {
           moves: playback.humanMoves,
@@ -646,6 +681,56 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
           rangedRemovedUnits: playback.rangedRemovedUnits,
         };
         S.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);
+      }
+      if (playback && S.gameState && needsResolutionPlayback) {
+        const tacticalReadySlice = buildTacticalCommitReadyResultForToast(playback);
+        const visibleHexes = deps.getVisibleHexSet(S.gameState);
+        const { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds } =
+          deriveCombatVisibilityClassification(tacticalReadySlice, visibleHexes);
+        const directFire = tacticalReadySlice.killsByDirectFire ?? [];
+        const returnFire = tacticalReadySlice.killsByReturnFire ?? [];
+        const allKills = tacticalReadySlice.kills ?? [];
+        const directSet = new Set(directFire.map((k) => k.victimId));
+        const returnSet = new Set(returnFire.map((k) => k.victimId));
+        const meleeKills = allKills.filter((k) => !directSet.has(k.victimId) && !returnSet.has(k.victimId));
+        const knownDirectFire = directFire.filter((k) => knownVictimIds.has(k.victimId));
+        const knownReturnFire = returnFire.filter((k) => knownVictimIds.has(k.victimId));
+        const knownMeleeKills = meleeKills.filter((k) => knownVictimIds.has(k.victimId));
+        const killToastFormatter = deps.buildKillToastFormatterBundle(
+          S.gameState,
+          tacticalReadySlice.removedUnits,
+          S.tacticalBattleSnapshot?.subUnits
+        );
+        const bullets = buildTurnUpdateBullets({
+          readyResult: tacticalReadySlice as Parameters<typeof buildTurnUpdateBullets>[0]['readyResult'],
+          knownDirectFire,
+          knownReturnFire,
+          knownMeleeKills,
+          formatKillLine: killToastFormatter.formatKillLine,
+          formatUnitName: killToastFormatter.formatUnitName,
+        });
+        const combatFallbackBullets = buildCombatActivityFallbackBullets(tacticalReadySlice);
+        const updateBullets = bullets.length > 0 ? bullets : combatFallbackBullets;
+        if (updateBullets.length > 0) {
+          const updateText = updateBullets.join('\n');
+          deps.showMapToast(updateText, { isError: false });
+          deps.appendOpenRouterLog(`Update: ${updateBullets.join(' | ')}`);
+        }
+        const hasUnknownBattle =
+          unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
+        if (hasUnknownBattle) {
+          const unknownContinentNames: string[] = [];
+          if (window.gameApi?.getHexContinentNames) {
+            const unknownHexes = [...unknownCombatHexes, ...unknownCasualtyHexes].filter((h3, idx, arr) => arr.indexOf(h3) === idx);
+            for (const h3 of unknownHexes) {
+              const names = await window.gameApi.getHexContinentNames({ h3Index: h3 });
+              for (const n of names) {
+                if (!unknownContinentNames.includes(n)) unknownContinentNames.push(n);
+              }
+            }
+          }
+          deps.showMapToast(deps.formatUnknownBattleAnnouncement(unknownContinentNames), { isError: false });
+        }
       }
       deps.updatePendingOrdersSidebar();
       deps.updateRangedSidebar();
@@ -708,10 +793,12 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         refreshBuildPopup: false,
         redraw: false,
       });
-      const outcome = await deps.openMeleeInterceptModal({
-        candidates: readyResult.meleeInterceptCandidates ?? [],
-        buildHexPopupHtml: deps.buildMeleeInterceptHexPopupHtml,
-      });
+      const outcome: MeleeInterceptModalOutcome = readTacticalBattlesInterceptPromptEnabled()
+        ? await deps.openMeleeInterceptModal({
+            candidates: readyResult.meleeInterceptCandidates ?? [],
+            buildHexPopupHtml: deps.buildMeleeInterceptHexPopupHtml,
+          })
+        : { decision: 'ignore' };
       const resolveResult = await window.gameApi.resolveMeleeIntercept({
         meleeDecisionToken: readyResult.meleeDecisionToken ?? '',
         decision: outcome.decision,

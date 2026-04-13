@@ -121,6 +121,15 @@ hoveredH3Index: string;
    * Exceptions: None.
    */
 data: HumanOrderGroupPreviewResult;
+    /**
+   * Specifies the contract for the `renderAsSupportTargeting` member (renderAsSupportTargeting?: 'ranged' | 'air';).
+
+   * Contract: When set, hover drawing uses pending ranged or air-stroke styling instead of march path caps and movement-range dashes.
+   * When to use: Only while ranged or air-strike targeting mode is active and a hover preview envelope has been built.
+   * Expected outcome: `drawHoverRoutePreview` applies the same colors and dash patterns as pending order lines at reduced opacity.
+   * Exceptions: None.
+   */
+renderAsSupportTargeting?: 'ranged' | 'air';
 }
 
 /**

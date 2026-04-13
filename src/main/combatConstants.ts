@@ -112,14 +112,14 @@ air: 1,
  */
 const RANGE: Record<UnitType, number> = {
     /**
-   * Documents the object literal property `infantry` (infantry: 0).
+   * Documents the object literal property `infantry` (infantry: 1).
 
    * Purpose: Supports maintainability by documenting why `infantry` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Expected outcome: One res1 hex of standoff ranged on the strategic map, matching tactical sub-map ranged feel and the renderer ranged-mode gate (`RANGED_RANGE_BY_UNIT_TYPE`).
    * Exceptions: None.
    */
-infantry: 0,
+infantry: 1,
     /**
    * Documents the object literal property `armor` (armor: 1).
 

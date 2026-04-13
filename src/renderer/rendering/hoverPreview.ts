@@ -1,9 +1,14 @@
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
-import { ORDER_LINE_COLOR, ORDER_LINE_WIDTH } from '../core/constants';
+import {
+  ORDER_LINE_COLOR,
+  ORDER_LINE_WIDTH,
+  PENDING_AIR_STRIKE_ORDER_LINE_COLOR,
+  PENDING_RANGED_ORDER_LINE_COLOR,
+} from '../core/constants';
 import { clampLatForWebMercatorDisplay } from '../map/hexGrid';
 import { drawArrowheadOnly, strokePolylineSkippingWrap } from './pathDrawing';
 import { rendererSharedState as S } from '../core/state';
-import { getLeafletGlobal, hexCenterPx } from '../map/mapUtils';
+import { getLeafletGlobal, hexCenterPx, hexCenterPxRelativeTo } from '../map/mapUtils';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
 
 /**
@@ -15,13 +20,46 @@ import { getMainLeafletMap } from '../map/worldLeafletMap';
  * Exceptions: None.
  */
 export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
-  if (!S.hoverRoutePreview || !S.gameState) return;
+  if (!S.hoverRoutePreview) return;
   const state = S.gameState;
   const tb = S.tacticalBattleSnapshot;
   const previewGroup = S.hoverRoutePreview.data;
   const map = getMainLeafletMap() as { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } } | null;
   if (!map) return;
   const L = getLeafletGlobal();
+  const supportMode = S.hoverRoutePreview.renderAsSupportTargeting;
+  if (supportMode) {
+    if (!state && !tb) return;
+    const dash: number[] = supportMode === 'ranged' ? [6, 4] : [2, 6];
+    const targetH3 = S.hoverRoutePreview.hoveredH3Index;
+    const paletteColor =
+      supportMode === 'ranged' ? PENDING_RANGED_ORDER_LINE_COLOR : PENDING_AIR_STRIKE_ORDER_LINE_COLOR;
+    for (const perUnit of previewGroup.previews) {
+      const preview = perUnit.preview;
+      if (!preview.valid || preview.segments.length === 0) continue;
+      const originH3 =
+        perUnit.originH3Index ??
+        (tb
+          ? tb.subUnits.find((s) => s.id === perUnit.unitId)?.h3Index
+          : state?.units.find((u) => u.id === perUnit.unitId)?.h3Index);
+      if (!originH3 || !targetH3 || originH3 === targetH3) continue;
+      const from = hexCenterPx(originH3);
+      const to = hexCenterPxRelativeTo(originH3, targetH3);
+      ctx.save();
+      ctx.globalAlpha = 0.38;
+      ctx.setLineDash(dash);
+      ctx.strokeStyle = paletteColor;
+      ctx.lineWidth = ORDER_LINE_WIDTH;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+  } else {
+  if (!state) return;
   const slowestMovementRangeByOriginH3 = new Map<string, number>();
   if (tb) {
     for (const id of S.selectedUnitIds) {
@@ -133,6 +171,7 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
       }
     }
     ctx.restore();
+  }
   }
   if (previewGroup.showInvalidMarker && S.hoveredHexH3) {
     const at = hexCenterPx(S.hoveredHexH3);

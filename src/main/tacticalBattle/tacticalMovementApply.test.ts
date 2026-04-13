@@ -16,6 +16,29 @@ import {
   tacticalRes4UnderRes1Corner,
 } from './testSupport/tacticalRes4HexFixtures';
 
+/**
+ * Supplies §12.4 terrain so ring-based fixtures are passable for infantry and naval without SQLite.
+ *
+ * Purpose: Marks every footprint cell `coastal` so land and naval sub-units share a littoral test neighborhood.
+ * When to use: Tactical movement projection tests that synthesize `res4ChildH3Indexes` from `gridDisk` alone.
+ * Expected outcome: `strategicHexTerrain` / `res4TerrainKindByH3` populated for `planTacticalRes4March` consumers.
+ * Exceptions: None.
+ */
+function coastalFootprintTerrain(ringCells: readonly string[]): Pick<
+  TacticalBattleSnapshot,
+  'strategicHexTerrain' | 'strategicHexTerrainKind' | 'res4TerrainKindByH3'
+> {
+  const res4TerrainKindByH3: Record<string, string> = {};
+  for (const h of ringCells) {
+    res4TerrainKindByH3[h] = 'coastal';
+  }
+  return {
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'coastal',
+    res4TerrainKindByH3,
+  };
+}
+
 test('projectTacticalSnapshot moves opponent sub-unit within res4 range', () => {
   const res1 = tacticalRes1Cell(10, 20);
   const center = tacticalRes4UnderRes1Corner(10, 20);
@@ -25,6 +48,7 @@ test('projectTacticalSnapshot moves opponent sub-unit within res4 range', () => 
     battleId: 'tb-move',
     enclosingRes1H3Index: res1,
     res4ChildH3Indexes: [...ring],
+    ...coastalFootprintTerrain([...ring]),
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [
@@ -51,6 +75,7 @@ test('projectTacticalSnapshot clears embark when opponent land disembarks to ano
     battleId: 'tb-dis',
     enclosingRes1H3Index: res1,
     res4ChildH3Indexes: [...ring],
+    ...coastalFootprintTerrain([...ring]),
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [
@@ -88,6 +113,7 @@ test('projectTacticalSnapshot moves embarked opponent land with its naval carrie
     battleId: 'tb-emb',
     enclosingRes1H3Index: res1,
     res4ChildH3Indexes: [...ring],
+    ...coastalFootprintTerrain([...ring]),
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [
@@ -124,6 +150,7 @@ test('projectTacticalSnapshot ignores human-controlled sub-units', () => {
     battleId: 'tb-h',
     enclosingRes1H3Index: res1,
     res4ChildH3Indexes: [...ring],
+    ...coastalFootprintTerrain([...ring]),
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [
@@ -148,10 +175,17 @@ test('projectTacticalSnapshotAfterHumanMovementOrders moves human sub-unit along
   const ring1 = new Set(gridDisk(center, 1));
   const far = disk.find((h) => h !== center && !ring1.has(h));
   assert.ok(far);
+  const res4TerrainKindByH3: Record<string, string> = {};
+  for (const h of disk) {
+    res4TerrainKindByH3[h] = 'plains';
+  }
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-hum-far',
     enclosingRes1H3Index: res1,
     res4ChildH3Indexes: disk,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [
@@ -178,6 +212,7 @@ test('projectTacticalSnapshotAfterHumanMovementOrders moves human sub-unit withi
     battleId: 'tb-hum-move',
     enclosingRes1H3Index: res1,
     res4ChildH3Indexes: [...ring],
+    ...coastalFootprintTerrain([...ring]),
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [

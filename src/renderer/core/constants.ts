@@ -110,6 +110,26 @@ export const ORDER_LINE_COLOR = '#2e5a7b';
  * Exceptions: None.
  */
 export const ORDER_LINE_WIDTH = 2.5;
+
+/**
+ * Stroke color for pending human ranged-attack overlay lines (matches `drawRangedAttackLines`).
+ *
+ * Purpose: Keeps hover targeting previews visually aligned with committed ranged order graphics.
+ * When to use: `orderDrawing.drawRangedAttackLines` and `hoverPreview` ranged targeting hover.
+ * Expected outcome: Same `#a06020` tone everywhere ranged pending geometry is drawn.
+ * Exceptions: None.
+ */
+export const PENDING_RANGED_ORDER_LINE_COLOR = '#a06020';
+
+/**
+ * Stroke color for pending human air-strike overlay lines (matches `drawAirStrikeLines`).
+ *
+ * Purpose: Keeps hover targeting previews visually aligned with committed air-strike order graphics.
+ * When to use: `orderDrawing.drawAirStrikeLines` and `hoverPreview` air targeting hover.
+ * Expected outcome: Same `#7a3db5` tone everywhere air-strike pending geometry is drawn.
+ * Exceptions: None.
+ */
+export const PENDING_AIR_STRIKE_ORDER_LINE_COLOR = '#7a3db5';
 /**
  * Documents the module-scope binding `ORDER_ARROW_SIZE` (ORDER_ARROW_SIZE).
 
@@ -139,11 +159,11 @@ export const AI_ORDER_LINE_COLOR = '#7b4a2e';
  */
 export const TOOLTIP_OFFSET_PX = 12;
 /**
- * Documents the module-scope binding `TERRAIN_TOOLTIP_DELAY_MS` (TERRAIN_TOOLTIP_DELAY_MS).
-
- * Purpose: Supports maintainability by documenting why `TERRAIN_TOOLTIP_DELAY_MS` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Millisecond hover dwell before the terrain tooltip appears on the main map (res1 and tactical res4).
+ *
+ * Purpose: Shared delay for strategic hex inspection and tactical battle cells so neither mode feels snappier.
+ * When to use: `mainMapInteractions` deferred `showTerrainTooltip` timer after the pointer settles.
+ * Expected outcome: Same disclosure timing when zoomed to res4 in strategy or when a tactical session is active.
  * Exceptions: None.
  */
 export const TERRAIN_TOOLTIP_DELAY_MS = 750;

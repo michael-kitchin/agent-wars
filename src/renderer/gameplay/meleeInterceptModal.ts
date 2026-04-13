@@ -84,7 +84,8 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
       'max-width:min(520px,92vw);width:100%;max-height:calc(100vh - 28px);display:flex;flex-direction:column;min-height:0;overflow:hidden;background:#f4f2ee;border:1px solid #555;border-radius:4px;padding:10px 12px;font:13px/1.35 system-ui,sans-serif;color:#222;box-shadow:0 4px 18px rgba(0,0,0,0.25);margin:12px auto 24px;';
 
     const title = document.createElement('div');
-    title.textContent = 'Tactical Battles';
+    const n = args.candidates.length;
+    title.textContent = `Tactical Battles (${n})`;
     title.style.cssText = 'font-weight:600;margin-bottom:8px;flex-shrink:0;';
     panel.appendChild(title);
 

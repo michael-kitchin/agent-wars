@@ -1,4 +1,8 @@
 import { rendererSharedState as S } from '../core/state';
+import {
+  readTacticalBattlesInterceptPromptEnabled,
+  writeTacticalBattlesInterceptPromptEnabled,
+} from '../gameplay/tacticalBattlePromptPreference';
 import { resetPrecomputedAiState } from './precomputedAiState';
 
 /**
@@ -271,6 +275,14 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       api.setSelectedModel(modelSelect.value);
       if (modelSelect.value) deps.hideMapToast();
       void deps.syncOpenRouterRunToggleInteractable();
+    });
+  }
+
+  const tacticalBattlesCb = document.getElementById('openrouter-tactical-battles') as HTMLInputElement | null;
+  if (tacticalBattlesCb) {
+    tacticalBattlesCb.checked = readTacticalBattlesInterceptPromptEnabled();
+    tacticalBattlesCb.addEventListener('change', () => {
+      writeTacticalBattlesInterceptPromptEnabled(tacticalBattlesCb.checked);
     });
   }
 

@@ -253,6 +253,33 @@ redraw: () => void;
 }
 
 /**
+ * Clears terrain tooltip timers/visuals and map hover state when the pointer leaves the map panel or the window loses focus.
+ *
+ * Purpose: `#hex-tooltip` sits in `#canvas-container`; `pointerleave` on `#main-map` misses moves onto the sidebar or OS chrome.
+ * When to use: `canvas-container` pointer routing and `window` blur handling in `wireInitCore`.
+ * Expected outcome: Tooltip hides and res4 hover highlights clear the same way as leaving `#main-map` toward excluded overlays.
+ * Exceptions: None.
+ */
+function dismissTerrainTooltipWhenPointerLeavesMapPanel(deps: InitCoreDeps): void {
+  deps.clearTerrainTooltipTimer();
+  deps.hideTerrainTooltipVisual();
+  const hadHexHover = S.hoveredHexH3 !== null || S.hoveredDetailHexH3 !== null;
+  const hadRoutePreview = S.hoverRoutePreview !== null;
+  if (hadHexHover) {
+    S.hoveredHexH3 = null;
+    S.hoveredDetailHexH3 = null;
+  }
+  if (hadRoutePreview) {
+    S.hoverRoutePreview = null;
+  }
+  if (hadHexHover || hadRoutePreview) {
+    S.hoverPreviewRequestSeq++;
+    void deps.refreshHoverRoutePreview();
+    deps.requestRedraw();
+  }
+}
+
+/**
  * Defines the `wireInitCore` function shape (export function wireInitCore(deps: InitCoreDeps): void).
 
  * Purpose: Supports maintainability by documenting why `wireInitCore` exists.
@@ -408,6 +435,7 @@ export function wireInitCore(deps: InitCoreDeps): void {
     }
   });
   window.addEventListener('blur', () => {
+    dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
     S.ctrlKeyActive = false;
     deps.applyModifierDrivenPopoverCloseRules('window_blur');
     if (!deps.isMapInspectionModeHeld()) return;
@@ -496,7 +524,12 @@ export function wireInitCore(deps: InitCoreDeps): void {
   canvasContainer?.addEventListener('pointermove', (e) => {
     deps.updateMapInteractionCursor(e.clientX, e.clientY);
   });
-  canvasContainer?.addEventListener('pointerleave', () => {
+  canvasContainer?.addEventListener('pointerleave', (e) => {
+    const next = e.relatedTarget;
+    if (next instanceof Node && e.currentTarget instanceof Node && e.currentTarget.contains(next)) {
+      return;
+    }
+    dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
     S.lastAppliedMapInteractionCursor = '';
     const map = getMainLeafletMap() as { getContainer?: () => HTMLElement } | null;
     map?.getContainer?.()?.style.removeProperty('cursor');

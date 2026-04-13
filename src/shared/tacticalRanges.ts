@@ -6,10 +6,18 @@
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * Per-turn tactical movement point budgets (combat rules §12.4, flat-terrain pacing).
+ *
+ * Contract: These are movement points consumed by §12.4 enter-hex costs, not raw H3 edge counts.
+ * When to use: Tactical march validation, hover preview, and Ready first-leg truncation.
+ * Expected outcome: Infantry 2, armor 4, naval 3, air 0 (air does not use the tactical march system).
+ * Exceptions: None.
+ */
 export const MOVEMENT_RANGE_BY_UNIT_TYPE: Readonly<Record<string, number>> = Object.freeze({
-  infantry: 1,
-  armor: 2,
-  naval: 2,
+  infantry: 2,
+  armor: 4,
+  naval: 3,
   air: 0,
 });
 
@@ -21,11 +29,19 @@ export const MOVEMENT_RANGE_BY_UNIT_TYPE: Readonly<Record<string, number>> = Obj
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * Tactical ranged attack ranges in res4 grid steps (combat rules §12.5).
+ *
+ * Contract: Air uses a large within-footprint cap because strikes are allowed anywhere inside the parent res1 cell.
+ * When to use: Tactical ranged targeting validation and UI gating.
+ * Expected outcome: Infantry 5, armor 10, naval 20, air 99 (effectively unlimited within the tactical map).
+ * Exceptions: None.
+ */
 export const RANGED_RANGE_BY_UNIT_TYPE: Readonly<Record<string, number>> = Object.freeze({
-  infantry: 0,
-  armor: 1,
-  naval: 2,
-  air: 0,
+  infantry: 5,
+  armor: 10,
+  naval: 20,
+  air: 99,
 });
 
 /**

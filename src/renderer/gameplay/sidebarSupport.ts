@@ -304,7 +304,7 @@ export function formatKillToastLine(
 }
 
 /**
- * Defines the `buildKillToastFormatterBundle` function shape (export function buildKillToastFormatterBundle( state: GameStateSnapshot, removedUnits: RemovedUnitSnapshot[] | undefined ): { formatUnitName: (unitId: st).
+ * Defines the `buildKillToastFormatterBundle` function shape (export function buildKillToastFormatterBundle( state: GameStateSnapshot, removedUnits: RemovedUnitSnapshot[] | undefined, tacticalSubUnitsForKillLabels?: readonly { id: string; displayName: string }[] ): { formatUnitName: (unitId: st).
 
  * Purpose: Supports maintainability by documenting why `buildKillToastFormatterBundle` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -313,19 +313,26 @@ export function formatKillToastLine(
  */
 export function buildKillToastFormatterBundle(
   state: GameStateSnapshot,
-  removedUnits: RemovedUnitSnapshot[] | undefined
+  removedUnits: RemovedUnitSnapshot[] | undefined,
+  tacticalSubUnitsForKillLabels?: readonly { id: string; displayName: string }[]
 ): { formatUnitName: (unitId: string) => string; formatKillLine: (kill: { victimId: string; killerIds: string[] }) => string } {
   const removedUnitsForDisplay = removedUnits ?? [];
-  const rosterForDisplay = [
-    ...(state.units ?? []),
-    ...removedUnitsForDisplay.map((u) => ({
+  const rosterFromRemoved = removedUnitsForDisplay
+    .filter((u) => !u.displayName)
+    .map((u) => ({
       id: u.id,
       player: u.player,
       unitType: u.unitType,
       displayOrder: u.displayOrder,
-    })),
-  ];
+    }));
+  const rosterForDisplay = [...(state.units ?? []), ...rosterFromRemoved];
   const displayNameById = buildUnitDisplayNameLookup(rosterForDisplay);
+  for (const u of removedUnitsForDisplay) {
+    if (u.displayName) displayNameById.set(u.id, u.displayName);
+  }
+  for (const row of tacticalSubUnitsForKillLabels ?? []) {
+    displayNameById.set(row.id, row.displayName);
+  }
   const formatDisplayUnitName = (unitId: string) =>
     displayNameById.get(unitId) ?? S.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
   const formatKillLine = (kill: { victimId: string; killerIds: string[] }): string =>

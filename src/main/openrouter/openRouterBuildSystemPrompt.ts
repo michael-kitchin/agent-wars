@@ -179,7 +179,7 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
 
 ${buildLatLngPreamble(H3_RESOLUTION, LATLNG_DECIMAL_PLACES)}
 
-Combat: d6 per shot — attack hits on roll ≤ attack stat; defense hits on roll ≤ defense. ${combatSummary}. Ranged uses pre-move positions. At most one ranged_attack per unit from turn-start range; targetHex is enemy [lat,lng] or enemy unit id (not your move destination)${combatTargetHint}. Infantry are melee-only: do not emit ranged_attack for infantry; close distance and use movement/standing orders to enter melee. If a legal ranged_attack or air strike is available this turn, take it — these attacks resolve from turn-start positions and do not prevent movement in the same turn. Drop invalid attacks before submit.${navalCoaching}${combatAssessHint}
+Combat: d6 per shot — attack hits on roll ≤ attack stat; defense hits on roll ≤ defense. ${combatSummary}. Ranged uses pre-move positions. At most one ranged_attack per unit from turn-start range; targetHex is enemy [lat,lng] or enemy unit id (not your move destination)${combatTargetHint}. Infantry may use ranged_attack only at strategic range 1 (adjacent res1 hex); use movement and melee when that is not enough. If a legal ranged_attack or air strike is available this turn, take it — these attacks resolve from turn-start positions and do not prevent movement in the same turn. Drop invalid attacks before submit.${navalCoaching}${combatAssessHint}
 
 ${mainBlock}
 

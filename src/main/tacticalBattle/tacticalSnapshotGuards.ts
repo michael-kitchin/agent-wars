@@ -2,9 +2,10 @@
  * Pure tactical snapshot guard helpers shared by movement projection and composite order application.
  */
 
-import type { TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
+import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
+import { planTacticalRes4MarchWithSessionCache } from './tacticalMovementPlanningCache';
+import { tacticalMovementUnitTypeForPathfinding } from '../../shared/tacticalTerrainMovement';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
-import { tacticalMarchReachableAlongRes4Footprint, tacticalMarchWithinRes4GridSteps } from './tacticalRulesAdapter';
 
 /**
  * Enumerates why an opponent tactical march order may be ignored during snapshot projection.
@@ -19,21 +20,31 @@ export type TacticalMovementBlockReason =
   | 'non_opponent'
   | 'non_human'
   | 'outside_footprint'
-  | 'out_of_range';
+  | 'out_of_range'
+  | 'air_no_march';
 
 /**
  * Decides whether a single opponent movement order may mutate a tactical sub-unit row in the snapshot clone.
  *
- * Contract: Pure; does not log; does not mutate arrays; uses inclusive res4 grid-step distance identical to prior inline checks.
+ * Contract: Pure; does not log; does not mutate arrays; uses §12.4 terrain-weighted reachability inside the tactical footprint.
  * When to use: `projectTacticalSnapshotAfterOpponentMovementOrders` loop before applying `h3Index` updates.
  * Expected outcome: Returns `ok: true` with `idx` into the mutable `sub` clone, or `ok: false` with a reason and diagnostic context.
- * Exceptions: Invalid H3 indexes may yield `out_of_range` when distance and footprint path checks cannot succeed.
+ * Exceptions: Invalid H3 indexes may yield `out_of_range` when the tactical march planner cannot find a finite-cost path.
  */
 export function tacticalComputeMovementOrderOutcome(args: {
   byId: ReadonlyMap<string, number>;
   sub: readonly TacticalSubUnitSnapshot[];
   order: { unitId: string; toH3Index: string };
   res4Set: ReadonlySet<string>;
+  battle: Pick<
+    TacticalBattleSnapshot,
+    | 'battleId'
+    | 'tacticalTurnNumber'
+    | 'subUnits'
+    | 'res4TerrainKindByH3'
+    | 'strategicHexTerrain'
+    | 'strategicHexTerrainKind'
+  >;
 }):
   | { ok: true; idx: number }
   | { ok: false; reason: TacticalMovementBlockReason; context: Record<string, unknown> } {
@@ -52,15 +63,29 @@ export function tacticalComputeMovementOrderOutcome(args: {
       context: { unitId: args.order.unitId, toH3Index: args.order.toH3Index },
     };
   }
-  const maxSteps = MOVEMENT_RANGE_BY_UNIT_TYPE[u.unitType] ?? 1;
-  const withinOneTurn = tacticalMarchWithinRes4GridSteps(u.h3Index, args.order.toH3Index, maxSteps);
-  const reachableMultiTurn =
-    !withinOneTurn && tacticalMarchReachableAlongRes4Footprint(u.h3Index, args.order.toH3Index, args.res4Set);
-  if (!withinOneTurn && !reachableMultiTurn) {
+  const moveType = tacticalMovementUnitTypeForPathfinding(u, args.order.toH3Index);
+  if (moveType === 'air') {
+    return { ok: false, reason: 'air_no_march', context: { unitId: args.order.unitId } };
+  }
+  const budget = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[u.unitType] ?? 1;
+  const plan = planTacticalRes4MarchWithSessionCache(args.battle, {
+    fromH3: u.h3Index,
+    toH3: args.order.toH3Index,
+    res4Set: args.res4Set,
+    unitTypeForMovement: moveType,
+    movementPointBudget: Math.max(0, budget),
+  });
+  if (!plan.reachable) {
     return {
       ok: false,
       reason: 'out_of_range',
-      context: { unitId: args.order.unitId, from: u.h3Index, to: args.order.toH3Index, maxSteps },
+      context: {
+        unitId: args.order.unitId,
+        from: u.h3Index,
+        to: args.order.toH3Index,
+        budget,
+        plannerReason: plan.failureReason,
+      },
     };
   }
   return { ok: true, idx };
@@ -72,13 +97,22 @@ export function tacticalComputeMovementOrderOutcome(args: {
  * Purpose: Mirrors `tacticalComputeMovementOrderOutcome` for opponent rows but requires `player === 'human'`.
  * When to use: `projectTacticalSnapshotAfterHumanMovementOrders` before applying `h3Index` updates for the human player.
  * Expected outcome: Same success/failure shape as the opponent helper with `non_human` instead of `non_opponent`.
- * Exceptions: Invalid H3 indexes may yield `out_of_range` when distance and footprint path checks cannot succeed.
+ * Exceptions: Invalid H3 indexes may yield `out_of_range` when the tactical march planner cannot find a finite-cost path.
  */
 export function tacticalComputeHumanMovementOrderOutcome(args: {
   byId: ReadonlyMap<string, number>;
   sub: readonly TacticalSubUnitSnapshot[];
   order: { unitId: string; toH3Index: string };
   res4Set: ReadonlySet<string>;
+  battle: Pick<
+    TacticalBattleSnapshot,
+    | 'battleId'
+    | 'tacticalTurnNumber'
+    | 'subUnits'
+    | 'res4TerrainKindByH3'
+    | 'strategicHexTerrain'
+    | 'strategicHexTerrainKind'
+  >;
 }):
   | { ok: true; idx: number }
   | { ok: false; reason: TacticalMovementBlockReason; context: Record<string, unknown> } {
@@ -97,15 +131,29 @@ export function tacticalComputeHumanMovementOrderOutcome(args: {
       context: { unitId: args.order.unitId, toH3Index: args.order.toH3Index },
     };
   }
-  const maxSteps = MOVEMENT_RANGE_BY_UNIT_TYPE[u.unitType] ?? 1;
-  const withinOneTurn = tacticalMarchWithinRes4GridSteps(u.h3Index, args.order.toH3Index, maxSteps);
-  const reachableMultiTurn =
-    !withinOneTurn && tacticalMarchReachableAlongRes4Footprint(u.h3Index, args.order.toH3Index, args.res4Set);
-  if (!withinOneTurn && !reachableMultiTurn) {
+  const moveType = tacticalMovementUnitTypeForPathfinding(u, args.order.toH3Index);
+  if (moveType === 'air') {
+    return { ok: false, reason: 'air_no_march', context: { unitId: args.order.unitId } };
+  }
+  const budget = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[u.unitType] ?? 1;
+  const plan = planTacticalRes4MarchWithSessionCache(args.battle, {
+    fromH3: u.h3Index,
+    toH3: args.order.toH3Index,
+    res4Set: args.res4Set,
+    unitTypeForMovement: moveType,
+    movementPointBudget: Math.max(0, budget),
+  });
+  if (!plan.reachable) {
     return {
       ok: false,
       reason: 'out_of_range',
-      context: { unitId: args.order.unitId, from: u.h3Index, to: args.order.toH3Index, maxSteps },
+      context: {
+        unitId: args.order.unitId,
+        from: u.h3Index,
+        to: args.order.toH3Index,
+        budget,
+        plannerReason: plan.failureReason,
+      },
     };
   }
   return { ok: true, idx };

@@ -2722,7 +2722,7 @@ function formatPendingOrderSidebarLabel(order: HumanStandingOrderSnapshot): stri
 }
 
 /**
- * Defines the `buildKillToastFormatterBundle` function shape (function buildKillToastFormatterBundle( state: GameStateSnapshot, removedUnits: RemovedUnitSnapshot[] | undefined ): { formatKillLine: (kill: { victim).
+ * Defines the `buildKillToastFormatterBundle` function shape (function buildKillToastFormatterBundle( state: GameStateSnapshot, removedUnits: RemovedUnitSnapshot[] | undefined, tacticalSubUnitsForKillLabels?: readonly { id: string; displayName: string }[] ): { formatKillLine: (kill: { victim).
 
  * Purpose: Supports maintainability by documenting why `buildKillToastFormatterBundle` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -2731,12 +2731,13 @@ function formatPendingOrderSidebarLabel(order: HumanStandingOrderSnapshot): stri
  */
 function buildKillToastFormatterBundle(
   state: GameStateSnapshot,
-  removedUnits: RemovedUnitSnapshot[] | undefined
+  removedUnits: RemovedUnitSnapshot[] | undefined,
+  tacticalSubUnitsForKillLabels?: readonly { id: string; displayName: string }[]
 ): {
   formatKillLine: (kill: { victimId: string; killerIds: string[] }) => string;
   formatUnitName: (unitId: string) => string;
 } {
-  return buildKillToastFormatterBundleFromModule(state, removedUnits);
+  return buildKillToastFormatterBundleFromModule(state, removedUnits, tacticalSubUnitsForKillLabels);
 }
 
 /**

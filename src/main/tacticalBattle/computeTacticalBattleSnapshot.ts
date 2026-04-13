@@ -314,12 +314,19 @@ export function computeTacticalBattleSnapshot(
             : 'One side has no tactical sub-units on the map; the battle cannot start until both sides can fight.',
       };
     }
+    const res4TerrainKindByH3: Record<string, string> = {};
+    for (const cell of children) {
+      res4TerrainKindByH3[cell] = res4KindByH3.get(cell) ?? hexRow.terrain_kind;
+    }
     const snapshot: TacticalBattleSnapshot = {
       battleId,
       enclosingRes1H3Index,
       res4ChildH3Indexes: children,
       strategicTurnNumber: turnRow.turn_number,
       tacticalTurnNumber: 1,
+      strategicHexTerrain: hexRow.terrain,
+      strategicHexTerrainKind: hexRow.terrain_kind,
+      res4TerrainKindByH3,
       subUnits,
     };
     tacticalLogQuery('computeTacticalBattleSnapshot result', {

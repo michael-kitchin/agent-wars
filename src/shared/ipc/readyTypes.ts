@@ -147,6 +147,15 @@ h3Index: string;
    * Exceptions: None.
    */
 displayOrder?: number;
+    /**
+   * Specifies the contract for the `displayName` member (displayName?: string;).
+
+   * Contract: When present, toast and log formatters must show this exact tactical sub-unit label instead of inferring from `id`.
+   * When to use: Main-process tactical casualty rows copied from `TacticalSubUnitSnapshot.displayName` (Roman ordinals and `(NN)` suffix).
+   * Expected outcome: Kill lines match in-battle stack labels, including for ids that are not strategic `opponent-*` / `human-*` shapes.
+   * Exceptions: Omitted for strategic-only removals where lookup uses `units` roster rules.
+   */
+displayName?: string;
 }
 
 /**
@@ -162,6 +171,24 @@ export type TacticalCommitResolutionPlayback = {
   rangedCombatHexes?: string[];
   rangedCasualtyHexes?: string[];
   rangedRemovedUnits?: RemovedUnitSnapshot[];
+  /**
+   * Direct-fire kill edges from tactical ranged/air-vs-units resolution (mirrors `ReadyResult.killsByDirectFire`).
+   *
+   * Purpose: Lets the renderer reuse `buildTurnUpdateBullets` kill lines after a tactical Ready commit.
+   * When to use: Populated by `commitHumanTacticalDraftOrders` when support projection removes enemy sub-units.
+   * Expected outcome: One entry per removed sub-unit id with the firing attacker id in `killerIds`.
+   * Exceptions: Omitted when no support kills occurred.
+   */
+  killsByDirectFire?: { victimId: string; killerIds: string[] }[];
+  /**
+   * Reserved for future tactical return-fire bookkeeping; always omitted today.
+   *
+   * Purpose: Keeps the playback shape aligned with `ReadyResult` for shared toast helpers.
+   * When to use: Not used yet; include only when tactical simulation emits return-fire kills.
+   * Expected outcome: Same semantics as strategic `killsByReturnFire` when populated.
+   * Exceptions: None.
+   */
+  killsByReturnFire?: { victimId: string; killerIds: string[] }[];
 };
 
 /**

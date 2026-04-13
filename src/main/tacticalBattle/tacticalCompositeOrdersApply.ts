@@ -3,6 +3,7 @@
  */
 
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
+import type { RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { tacticalLogQuery } from './tacticalLogging';
 import {
@@ -150,6 +151,20 @@ export function projectTacticalSnapshotAfterValidatedOpponentOrders(
 }
 
 /**
+ * Result of applying human tactical support orders: updated snapshot plus kill metadata for renderer turn summaries.
+ *
+ * Purpose: Lets `commitHumanTacticalDraftOrders` feed the same `buildTurnUpdateBullets` inputs as strategic `ReadyResult` without re-simulating combat in the renderer.
+ * When to use: Return value from `projectTacticalSnapshotAfterValidatedHumanSupportOrders` only.
+ * Expected outcome: `removedUnits` matches every id removed from `battle.subUnits` after support resolution; `killsByDirectFire` lists attacker→victim edges (including embarked cargo removals).
+ * Exceptions: None.
+ */
+export type TacticalHumanSupportProjectionResult = {
+  battle: TacticalBattleSnapshot;
+  killsByDirectFire: { victimId: string; killerIds: string[] }[];
+  removedUnits: RemovedUnitSnapshot[];
+};
+
+/**
  * Returns a new tactical snapshot after applying validated human support drafts (embark, ferry, air strikes, ranged).
  *
  * Purpose: Mirrors tactical opponent support-order projection so human tactical Ready can commit non-march drafts.
@@ -165,7 +180,7 @@ export function projectTacticalSnapshotAfterValidatedHumanSupportOrders(
     ferryOrders?: readonly FerryOrder[];
     embarkOrders?: readonly EmbarkOrder[];
   }
-): TacticalBattleSnapshot {
+): TacticalHumanSupportProjectionResult {
   tacticalLogQuery('projectTacticalSnapshotAfterValidatedHumanSupportOrders', {
     battleId: battle.battleId,
     rangedCount: opts.rangedAttacks?.length ?? 0,
@@ -206,11 +221,15 @@ export function projectTacticalSnapshotAfterValidatedHumanSupportOrders(
   syncCargoToNavalHex();
 
   const toRemove = new Set<string>();
-  const markEnemyKillAtHex = (targetH3: string, attackerPlayer: string): void => {
+  const killsByDirectFire: { victimId: string; killerIds: string[] }[] = [];
+
+  const markEnemyKillAtHex = (targetH3: string, attackerPlayer: string, attackerId: string): void => {
     const vid = pickEnemySubUnitIdAtHex(sub, targetH3, attackerPlayer);
     if (!vid) return;
     for (const id of expandedRemovalIdsForVictim(sub, vid)) {
+      if (toRemove.has(id)) continue;
       toRemove.add(id);
+      killsByDirectFire.push({ victimId: id, killerIds: [attackerId] });
     }
   };
 
@@ -218,17 +237,30 @@ export function projectTacticalSnapshotAfterValidatedHumanSupportOrders(
     if (s.targetType !== 'units') continue;
     const attacker = sub.find((u) => u.id === s.unitId);
     if (!attacker || attacker.player !== 'human') continue;
-    markEnemyKillAtHex(s.targetH3Index, attacker.player);
+    markEnemyKillAtHex(s.targetH3Index, attacker.player, attacker.id);
   }
 
   for (const r of opts.rangedAttacks ?? []) {
     const attacker = sub.find((u) => u.id === r.unitId);
     if (!attacker || attacker.player !== 'human') continue;
-    markEnemyKillAtHex(r.targetH3Index, attacker.player);
+    markEnemyKillAtHex(r.targetH3Index, attacker.player, attacker.id);
   }
 
+  const removedUnits: RemovedUnitSnapshot[] = [];
   if (toRemove.size > 0) {
+    for (const id of toRemove) {
+      const row = sub.find((u) => u.id === id);
+      if (row) {
+        removedUnits.push({
+          id: row.id,
+          player: row.player,
+          unitType: row.unitType,
+          h3Index: row.h3Index,
+          displayName: row.displayName,
+        });
+      }
+    }
     sub = sub.filter((u) => !toRemove.has(u.id));
   }
-  return { ...battle, subUnits: sub };
+  return { battle: { ...battle, subUnits: sub }, killsByDirectFire, removedUnits };
 }

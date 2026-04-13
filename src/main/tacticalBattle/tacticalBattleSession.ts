@@ -3,6 +3,7 @@ import type {
   TacticalBattleSnapshot,
 } from '../../shared/tacticalBattleTypes';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
+import type { RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import { tacticalBoundaryConcurrentSessionAllowed } from '../../shared/tacticalStateAssertions';
 import { getActiveTacticalBattleSnapshotRef, setActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import {
@@ -131,6 +132,8 @@ function humanTacticalMarchBlockMessage(reason: TacticalMovementBlockReason): st
       return 'That destination lies outside the tactical battle footprint.';
     case 'out_of_range':
       return 'That destination is out of movement range for one or more selected units.';
+    case 'air_no_march':
+      return 'Air units cannot receive tactical march orders.';
     default:
       return `Movement order rejected (${reason}).`;
   }
@@ -153,7 +156,7 @@ function humanTacticalMarchValidationFailure(
   const sub = [...cur.subUnits];
   const byId = new Map(sub.map((u, i) => [u.id, i] as const));
   for (const o of orders) {
-    const outcome = tacticalComputeHumanMovementOrderOutcome({ byId, sub, order: o, res4Set });
+    const outcome = tacticalComputeHumanMovementOrderOutcome({ byId, sub, order: o, res4Set, battle: cur });
     if (!outcome.ok) {
       tacticalLogQuery('humanTacticalMarchValidationFailure', {
         reason: outcome.reason,
@@ -238,7 +241,14 @@ export function applyValidatedHumanTacticalSupportOrders(args: {
   airStrikes?: readonly AirStrikeOrder[];
   ferryOrders?: readonly FerryOrder[];
   embarkOrders?: readonly EmbarkOrder[];
-}): { success: true; battle: TacticalBattleSnapshot } | { success: false; reason: string } {
+}):
+  | {
+      success: true;
+      battle: TacticalBattleSnapshot;
+      killsByDirectFire: { victimId: string; killerIds: string[] }[];
+      removedUnits: RemovedUnitSnapshot[];
+    }
+  | { success: false; reason: string } {
   tacticalLogMutate('applyValidatedHumanTacticalSupportOrders', {
     rangedCount: args.rangedAttacks?.length ?? 0,
     airCount: args.airStrikes?.length ?? 0,
@@ -257,11 +267,16 @@ export function applyValidatedHumanTacticalSupportOrders(args: {
       (args.ferryOrders?.length ?? 0) > 0 ||
       (args.embarkOrders?.length ?? 0) > 0;
     if (!hasWork) {
-      return { success: true, battle: cur };
+      return { success: true, battle: cur, killsByDirectFire: [], removedUnits: [] };
     }
-    const next = projectTacticalSnapshotAfterValidatedHumanSupportOrders(cur, args);
-    commitActiveTacticalBattle(next);
-    return { success: true, battle: next };
+    const projection = projectTacticalSnapshotAfterValidatedHumanSupportOrders(cur, args);
+    commitActiveTacticalBattle(projection.battle);
+    return {
+      success: true,
+      battle: projection.battle,
+      killsByDirectFire: projection.killsByDirectFire,
+      removedUnits: projection.removedUnits,
+    };
   } catch (err) {
     tacticalLogError('applyValidatedHumanTacticalSupportOrders failed', { err });
     return { success: false, reason: 'Could not apply tactical support orders.' };

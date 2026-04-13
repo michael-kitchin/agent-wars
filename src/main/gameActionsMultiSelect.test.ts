@@ -4,7 +4,7 @@
  */
 
 import * as assert from 'assert';
-import { gridDistance } from 'h3-js';
+import { gridDisk, gridDistance } from 'h3-js';
 import {
   dbGetOne,
   getGameState,
@@ -337,22 +337,29 @@ function testAssignGroupedHappyPathSingleUnit(): void {
 }
 
 /**
- * Defines the `testValidateGroupedRangedRejectsMeleeUnit` function shape (function testValidateGroupedRangedRejectsMeleeUnit(): void).
+ * Defines the `testValidateGroupedRangedInfantryFailsWhenAdjacentHexHasNoEnemies` function shape (function testValidateGroupedRangedInfantryFailsWhenAdjacentHexHasNoEnemies(): void).
 
- * Purpose: Supports maintainability by documenting why `testValidateGroupedRangedRejectsMeleeUnit` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Ensures strategic infantry (range 1) still requires an enemy stack on the target hex after range checks pass.
+ * When to use: Regression guard paired with tactical/strategic ranged UX parity for infantry.
+ * Expected outcome: Clearing a neighbor res1 cell of units yields a reason mentioning no enemy units on the target hex.
  * Exceptions: None.
  */
-function testValidateGroupedRangedRejectsMeleeUnit(): void {
+function testValidateGroupedRangedInfantryFailsWhenAdjacentHexHasNoEnemies(): void {
   withTempDb(() => {
     const state = getGameState();
     const infantry = state.units.find((u) => u.player === 'human' && u.unitType === 'infantry');
     assert.ok(infantry, 'expected seeded human infantry unit');
-    const target = state.hexes[0]?.h3Index ?? '';
+    const mapHex = new Set(state.hexes.map((h) => h.h3Index));
+    const neighbors = [...gridDisk(infantry!.h3Index, 1)].filter((h) => h !== infantry!.h3Index && mapHex.has(h));
+    assert.ok(neighbors.length > 0, 'expected at least one on-map neighbor for seeded infantry');
+    const target = neighbors[0]!;
+    dbRun('DELETE FROM units WHERE h3_index = ?', [target]);
     const result = validateGroupRangedTarget([infantry!.id], target);
     assert.strictEqual(result.success, false);
-    assert.ok(result.reason?.includes('has no ranged attack'));
+    assert.ok(
+      result.reason?.includes('no enemy'),
+      `expected no-enemy failure, got: ${result.reason ?? '(none)'}`
+    );
   });
 }
 
@@ -815,7 +822,7 @@ function run(): void {
   testPreviewGroupedFailsForUnknownUnit();
   testAssignGroupedRejectsEmptySelection();
   testAssignGroupedHappyPathSingleUnit();
-  testValidateGroupedRangedRejectsMeleeUnit();
+  testValidateGroupedRangedInfantryFailsWhenAdjacentHexHasNoEnemies();
   testNavalOrdersCanEgressFromLandSeaportToAdjacentWaterOrCoastal();
   testPreviewGroupedRejectsAirUnitsForMarchPlanning();
   testPreviewGroupedAcceptsAirFerryDestinationWithinRange();

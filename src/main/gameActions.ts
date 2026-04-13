@@ -44,7 +44,8 @@ import {
   queryHumanStandingOrders,
 } from './tools/tool5StandingOrders';
 import type { BuildUnitType } from './productionRules';
-import { MOVEMENT_RANGE_BY_UNIT_TYPE, formatTargetOutOfRangeReason } from '../shared/tacticalRanges';
+import { MOVEMENT_RANGE_BY_UNIT_TYPE, RANGED_RANGE_BY_UNIT_TYPE, formatTargetOutOfRangeReason } from '../shared/tacticalRanges';
+import { tacticalMovementUnitTypeForPathfinding } from '../shared/tacticalTerrainMovement';
 import { validateAirStrikeOrder, validateFerryOrder } from './game-actions/airValidation';
 import { isWithinGridRangeSafe } from './game-actions/gridRange';
 import {
@@ -734,6 +735,14 @@ export function commitHumanTacticalDraftOrders(args: {
       return { success: false, reason: 'No tactical battle is active.' };
     }
     const res4Set = new Set(preBattle.res4ChildH3Indexes);
+    const terrainBattle = {
+      battleId: preBattle.battleId,
+      tacticalTurnNumber: preBattle.tacticalTurnNumber,
+      subUnits: preBattle.subUnits,
+      res4TerrainKindByH3: preBattle.res4TerrainKindByH3,
+      strategicHexTerrain: preBattle.strategicHexTerrain,
+      strategicHexTerrainKind: preBattle.strategicHexTerrainKind,
+    };
     const appliedMovementOrders: { unitId: string; toH3Index: string }[] = [];
     const tacticalMarchContinuations: { subUnitId: string; destinationH3Index: string }[] = [];
     for (const o of args.movementOrders) {
@@ -741,12 +750,20 @@ export function commitHumanTacticalDraftOrders(args: {
       if (!sub || sub.player !== 'human') continue;
       const from = sub.h3Index;
       if (from === o.toH3Index) continue;
-      const maxEdges = MOVEMENT_RANGE_BY_UNIT_TYPE[sub.unitType] ?? 1;
+      const moveType = tacticalMovementUnitTypeForPathfinding(sub, o.toH3Index);
+      const maxEdges = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[sub.unitType] ?? 1;
       if (maxEdges <= 0) {
         appliedMovementOrders.push({ unitId: o.unitId, toH3Index: o.toH3Index });
         continue;
       }
-      const { stopH3, consumedFullPath } = tacticalMarchFirstStopAlongPath(from, o.toH3Index, maxEdges, res4Set);
+      const { stopH3, consumedFullPath } = tacticalMarchFirstStopAlongPath(
+        from,
+        o.toH3Index,
+        maxEdges,
+        res4Set,
+        terrainBattle,
+        moveType
+      );
       if (stopH3 !== from) {
         appliedMovementOrders.push({ unitId: o.unitId, toH3Index: stopH3 });
       }
@@ -777,12 +794,20 @@ export function commitHumanTacticalDraftOrders(args: {
       if (!sub || sub.player !== 'human') continue;
       const from = sub.h3Index;
       if (from === o.toH3Index) continue;
-      const maxEdges = MOVEMENT_RANGE_BY_UNIT_TYPE[sub.unitType] ?? 1;
+      const moveType = tacticalMovementUnitTypeForPathfinding(sub, o.toH3Index);
+      const maxEdges = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[sub.unitType] ?? 1;
       if (maxEdges <= 0) {
         humanMoves.push({ unitId: o.unitId, fromH3Index: from, toH3Index: o.toH3Index });
         continue;
       }
-      const { stopH3 } = tacticalMarchFirstStopAlongPath(from, o.toH3Index, maxEdges, res4Set);
+      const { stopH3 } = tacticalMarchFirstStopAlongPath(
+        from,
+        o.toH3Index,
+        maxEdges,
+        res4Set,
+        terrainBattle,
+        moveType
+      );
       if (stopH3 === from) continue;
       humanMoves.push({ unitId: o.unitId, fromH3Index: from, toH3Index: stopH3 });
     }
@@ -792,15 +817,7 @@ export function commitHumanTacticalDraftOrders(args: {
       if (u.h3Index === f.destinationH3Index) continue;
       humanMoves.push({ unitId: f.unitId, fromH3Index: u.h3Index, toH3Index: f.destinationH3Index });
     }
-    const idsAfterSupport = new Set(finalBattle.subUnits.map((u) => u.id));
-    const rangedRemovedUnits = postMovementBattle.subUnits
-      .filter((u) => !idsAfterSupport.has(u.id))
-      .map((u) => ({
-        id: u.id,
-        player: u.player,
-        unitType: u.unitType,
-        h3Index: u.h3Index,
-      }));
+    const rangedRemovedUnits = support.removedUnits;
     const rangedCombatHexSet = new Set<string>();
     for (const r of args.rangedAttacks ?? []) {
       rangedCombatHexSet.add(r.targetH3Index);
@@ -816,11 +833,13 @@ export function commitHumanTacticalDraftOrders(args: {
       rangedCombatHexes: rangedCombatHexes.length > 0 ? rangedCombatHexes : undefined,
       rangedCasualtyHexes: rangedCasualtyHexes.length > 0 ? rangedCasualtyHexes : undefined,
       rangedRemovedUnits: rangedRemovedUnits.length > 0 ? rangedRemovedUnits : undefined,
+      killsByDirectFire: support.killsByDirectFire.length > 0 ? support.killsByDirectFire : undefined,
     };
     logDebug('gameActions commitHumanTacticalDraftOrders playback', {
       humanMoveCount: humanMoves.length,
       rangedCombatHexCount: rangedCombatHexes.length,
       rangedRemovedCount: rangedRemovedUnits.length,
+      killEdgeCount: support.killsByDirectFire.length,
       marchContinuationCount: tacticalMarchContinuations.length,
     });
     return {
@@ -1003,11 +1022,17 @@ export function validateGroupRangedTarget(unitIds: string[], targetH3Index: stri
       for (const unitId of uniqueUnitIds) {
         const unit = snap.subUnits.find((u) => u.id === unitId);
         if (!unit || unit.player !== HUMAN_PLAYER_ID) return { success: false, reason: `${unitId}: Unit not in tactical battle.` };
-        const range = getRange(unit.unitType);
+        const range = RANGED_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 0;
         if (range < 1) return { success: false, reason: `${unitId}: Unit has no ranged attack.` };
         if (!isWithinGridRangeSafe(unit.h3Index, targetH3Index, range, 'validateGroupRangedTarget tactical')) {
           return { success: false, reason: `${unitId}: Target out of range.` };
         }
+      }
+      const enemiesAtTarget = snap.subUnits.filter(
+        (u) => u.h3Index === targetH3Index && u.player !== HUMAN_PLAYER_ID
+      );
+      if (enemiesAtTarget.length === 0) {
+        return { success: false, reason: 'Target hex has no enemy units' };
       }
       return { success: true };
     }

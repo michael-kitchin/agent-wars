@@ -12,7 +12,7 @@ import {
 /**
  * Returns a new tactical snapshot with opponent sub-unit positions updated from validated movement orders.
  *
- * Contract: Only `player === 'opponent'` sub-units move; destinations must lie in `battle.res4ChildH3Indexes`; range uses `MOVEMENT_RANGE_BY_UNIT_TYPE` as inclusive res4 grid steps.
+ * Contract: Only `player === 'opponent'` sub-units move; destinations must lie in `battle.res4ChildH3Indexes`; reachability uses §12.4 terrain-weighted paths and `MOVEMENT_RANGE_BY_UNIT_TYPE` movement-point budgets.
  * When to use: After `requestOrders` returns movement orders for tactical AI, before mutating `activeTacticalBattle` in the main process.
  * Expected outcome: Immutable copy of `battle` with at most one position change per matched order (later duplicate `unitId` entries in `orders` overwrite earlier ones).
  * Exceptions: None; unknown unit ids or invalid destinations are skipped with trace logs.
@@ -29,7 +29,7 @@ export function projectTacticalSnapshotAfterOpponentMovementOrders(
   const sub: TacticalSubUnitSnapshot[] = battle.subUnits.map((u) => ({ ...u }));
   const byId = new Map(sub.map((u, i) => [u.id, i] as const));
   for (const o of orders) {
-    const outcome = tacticalComputeMovementOrderOutcome({ byId, sub, order: o, res4Set });
+    const outcome = tacticalComputeMovementOrderOutcome({ byId, sub, order: o, res4Set, battle });
     if (!outcome.ok) {
       tacticalLogQuery('projectTacticalSnapshotAfterOpponentMovementOrders skip', {
         reason: outcome.reason,
@@ -80,7 +80,7 @@ export function projectTacticalSnapshotAfterHumanMovementOrders(
   const sub: TacticalSubUnitSnapshot[] = battle.subUnits.map((u) => ({ ...u }));
   const byId = new Map(sub.map((u, i) => [u.id, i] as const));
   for (const o of orders) {
-    const outcome = tacticalComputeHumanMovementOrderOutcome({ byId, sub, order: o, res4Set });
+    const outcome = tacticalComputeHumanMovementOrderOutcome({ byId, sub, order: o, res4Set, battle });
     if (!outcome.ok) {
       tacticalLogQuery('projectTacticalSnapshotAfterHumanMovementOrders skip', {
         reason: outcome.reason,

@@ -377,6 +377,15 @@ export interface HumanOrderGroupPreviewUnitResult {
    */
 unitId: string;
     /**
+   * Specifies the contract for the `originH3Index` member (originH3Index?: string;).
+
+   * Contract: Parity field with `HumanOrderGroupPreviewUnitResult` in `humanOrderPreviewTypes.ts` for support-targeting hover rows.
+   * When to use: When this module emits grouped previews that include ranged/air stroke metadata.
+   * Expected outcome: Optional; march-only rows omit it.
+   * Exceptions: None.
+   */
+originH3Index?: string;
+    /**
    * Specifies the contract for the `preview` member (preview: HumanOrderPreviewResult;).
 
    * Contract: Describes stable behavior for callers of `preview` in this codebase.

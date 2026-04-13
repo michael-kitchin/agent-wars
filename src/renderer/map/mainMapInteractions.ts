@@ -453,34 +453,56 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     const hit = clientXYToHit(e.clientX, e.clientY);
     const detailHit = deps.detailHitAtClientPixel(e.clientX, e.clientY, mapHexSet);
 
-    if (hit !== S.hoveredHexH3 || detailHit !== S.hoveredDetailHexH3) {
-      deps.clearTerrainTooltipTimer();
-      deps.hideTerrainTooltipVisual();
-      S.hoveredHexH3 = hit;
-      S.hoveredDetailHexH3 = detailHit;
-      void deps.refreshHoverRoutePreview();
-      deps.requestRedraw();
-      if (hit && !deps.shouldSuppressTerrainTooltip()) {
-        const targetHex = hit;
-        S.terrainTooltipDelayTimer = setTimeout(() => {
-          S.terrainTooltipDelayTimer = null;
-          if (S.hoveredHexH3 !== targetHex || !S.gameState) return;
-          if (deps.shouldSuppressTerrainTooltip()) return;
-          const state = deps.terrainStateForPointer(S.lastPointerClientX, S.lastPointerClientY, targetHex);
-          const namingTarget = deps.namingLookupTargetForPointer(S.lastPointerClientX, S.lastPointerClientY, targetHex);
-          void deps.showTerrainTooltip(S.lastPointerClientX, S.lastPointerClientY, state, namingTarget);
-        }, TERRAIN_TOOLTIP_DELAY_MS);
+    const prevHit = S.hoveredHexH3;
+    const prevDetail = S.hoveredDetailHexH3;
+    const hitChanged = hit !== prevHit;
+    const detailChanged = detailHit !== prevDetail;
+
+    if (!hitChanged && !detailChanged) {
+      const tipFollow = document.getElementById('hex-tooltip');
+      if (
+        !deps.shouldSuppressTerrainTooltip() &&
+        tipFollow &&
+        !tipFollow.classList.contains('hidden') &&
+        hit
+      ) {
+        const state = deps.terrainStateForPointer(S.lastPointerClientX, S.lastPointerClientY, hit);
+        const namingTarget = deps.namingLookupTargetForPointer(S.lastPointerClientX, S.lastPointerClientY, hit);
+        void deps.showTerrainTooltip(S.lastPointerClientX, S.lastPointerClientY, state, namingTarget);
       }
       return;
     }
 
+    S.hoveredHexH3 = hit;
+    S.hoveredDetailHexH3 = detailHit;
+    void deps.refreshHoverRoutePreview();
+    deps.requestRedraw();
+
+    const tooltipDelayShouldReset = S.tacticalBattleSnapshot ? hitChanged : hitChanged || detailChanged;
+    if (tooltipDelayShouldReset) {
+      deps.clearTerrainTooltipTimer();
+      deps.hideTerrainTooltipVisual();
+    }
+
+    if (!hit || deps.shouldSuppressTerrainTooltip()) {
+      return;
+    }
+
+    if (tooltipDelayShouldReset) {
+      const targetHex = hit;
+      S.terrainTooltipDelayTimer = setTimeout(() => {
+        S.terrainTooltipDelayTimer = null;
+        if (S.hoveredHexH3 !== targetHex || !S.gameState) return;
+        if (deps.shouldSuppressTerrainTooltip()) return;
+        const state = deps.terrainStateForPointer(S.lastPointerClientX, S.lastPointerClientY, targetHex);
+        const namingTarget = deps.namingLookupTargetForPointer(S.lastPointerClientX, S.lastPointerClientY, targetHex);
+        void deps.showTerrainTooltip(S.lastPointerClientX, S.lastPointerClientY, state, namingTarget);
+      }, TERRAIN_TOOLTIP_DELAY_MS);
+      return;
+    }
+
     const tipFollow = document.getElementById('hex-tooltip');
-    if (
-      !deps.shouldSuppressTerrainTooltip() &&
-      tipFollow &&
-      !tipFollow.classList.contains('hidden') &&
-      hit
-    ) {
+    if (tipFollow && !tipFollow.classList.contains('hidden')) {
       const state = deps.terrainStateForPointer(S.lastPointerClientX, S.lastPointerClientY, hit);
       const namingTarget = deps.namingLookupTargetForPointer(S.lastPointerClientX, S.lastPointerClientY, hit);
       void deps.showTerrainTooltip(S.lastPointerClientX, S.lastPointerClientY, state, namingTarget);

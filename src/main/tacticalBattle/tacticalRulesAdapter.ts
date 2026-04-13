@@ -3,6 +3,10 @@
  */
 
 import { gridPathCells } from 'h3-js';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { planTacticalRes4March } from '../../shared/tacticalRes4MovementPlanner';
+import { buildTacticalTerrainKindResolverFromSnapshot } from '../../shared/tacticalTerrainMovement';
+import { planTacticalRes4MarchWithSessionCache } from './tacticalMovementPlanningCache';
 import { tacticalLogQuery } from './tacticalLogging';
 import { tacticalRes4GridDistance } from './tacticalSpatialAdapter';
 
@@ -55,40 +59,56 @@ export function tacticalMarchReachableAlongRes4Footprint(
 }
 
 /**
- * Returns the res4 cell reached after at most `maxEdges` H3 grid steps toward `toRes4H3Index` along the shortest path.
+ * Returns the res4 cell reached after spending at most `movementPointBudget` movement points toward `toRes4H3Index` along the cheapest valid tactical path.
  *
- * Purpose: Lets tactical Ready apply and animate only the first leg of a multi-hex planned march (matching per-turn movement range).
- * When to use: `commitHumanTacticalDraftOrders` before `applyHumanTacticalMarchOrders`, using the same footprint as validation.
- * Expected outcome: `stopH3` is an element of the path from origin (inclusive) to destination; `consumedFullPath` is true when the stop equals the ordered destination.
- * Exceptions: On path failure or a cell outside `res4Set`, returns the ordered destination and `consumedFullPath: true` so commit does not truncate incorrectly.
+ * Purpose: Lets tactical Ready apply only the first leg of a multi-turn march using §12.4 terrain costs (milestone 2.2).
+ * When to use: `commitHumanTacticalDraftOrders` before `applyHumanTacticalMarchOrders`, using the same footprint and terrain snapshot as validation.
+ * Expected outcome: `stopH3` lies on the minimum movement-point path; `consumedFullPath` is true when the ordered destination is reached within budget.
+ * Exceptions: When no finite-cost path exists, returns `{ stopH3: from, consumedFullPath: false }` so callers do not advance illegally.
  */
 export function tacticalMarchFirstStopAlongPath(
   fromRes4H3Index: string,
   toRes4H3Index: string,
-  maxEdges: number,
-  res4Set: ReadonlySet<string>
+  movementPointBudget: number,
+  res4Set: ReadonlySet<string>,
+  battle?: Pick<
+    TacticalBattleSnapshot,
+    | 'battleId'
+    | 'tacticalTurnNumber'
+    | 'subUnits'
+    | 'res4TerrainKindByH3'
+    | 'strategicHexTerrain'
+    | 'strategicHexTerrainKind'
+  >,
+  unitTypeForMovement = 'infantry'
 ): { stopH3: string; consumedFullPath: boolean } {
-  tacticalLogQuery('tacticalMarchFirstStopAlongPath', { fromRes4H3Index, toRes4H3Index, maxEdges });
-  if (fromRes4H3Index === toRes4H3Index) {
-    return { stopH3: toRes4H3Index, consumedFullPath: true };
-  }
-  if (maxEdges <= 0) {
+  tacticalLogQuery('tacticalMarchFirstStopAlongPath', {
+    fromRes4H3Index,
+    toRes4H3Index,
+    movementPointBudget,
+    unitTypeForMovement,
+  });
+  if (movementPointBudget <= 0) {
     return { stopH3: fromRes4H3Index, consumedFullPath: false };
   }
-  let pathCells: string[];
-  try {
-    pathCells = gridPathCells(fromRes4H3Index, toRes4H3Index);
-  } catch {
-    tacticalLogQuery('tacticalMarchFirstStopAlongPath noPath');
-    return { stopH3: toRes4H3Index, consumedFullPath: true };
+  const planArgs = {
+    fromH3: fromRes4H3Index,
+    toH3: toRes4H3Index,
+    res4Set,
+    unitTypeForMovement,
+    movementPointBudget,
+  };
+  const plan =
+    battle && battle.battleId && battle.subUnits
+      ? planTacticalRes4MarchWithSessionCache(battle, planArgs)
+      : planTacticalRes4March({
+          ...planArgs,
+          terrain: buildTacticalTerrainKindResolverFromSnapshot(battle ?? {}),
+        });
+  if (!plan.reachable) {
+    tacticalLogQuery('tacticalMarchFirstStopAlongPath unreachable', { failureReason: plan.failureReason });
+    return { stopH3: fromRes4H3Index, consumedFullPath: false };
   }
-  if (!pathCells.every((h) => res4Set.has(h))) {
-    tacticalLogQuery('tacticalMarchFirstStopAlongPath pathLeavesFootprint');
-    return { stopH3: toRes4H3Index, consumedFullPath: true };
-  }
-  const idx = Math.min(pathCells.length - 1, maxEdges);
-  const stopH3 = pathCells[idx]!;
-  const consumedFullPath = idx >= pathCells.length - 1;
-  tacticalLogQuery('tacticalMarchFirstStopAlongPath result', { idx, consumedFullPath });
-  return { stopH3, consumedFullPath };
+  tacticalLogQuery('tacticalMarchFirstStopAlongPath result', plan.firstStopWithinBudget);
+  return plan.firstStopWithinBudget;
 }

@@ -1,4 +1,9 @@
+import { cellToLatLng } from 'h3-js';
 import type { AirStrikeTargetType } from '../../shared/ipcTypes';
+import {
+  buildHumanOrderGroupPreviewEnvelope,
+  representativeMarchPreviewUnitIdsByOriginH3,
+} from '../../shared/humanMarchPreviewGroupAssembly';
 import { buildTacticalMarchHoverPreview } from '../../shared/tacticalMarchHoverPreview';
 import { RANGED_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
 import {
@@ -264,12 +269,119 @@ export async function refreshHoverRoutePreview(deps: TacticalOrderDeps): Promise
   const hoveredH3 = S.hoveredHexH3;
   const seq = ++S.hoverPreviewRequestSeq;
   if (S.tacticalBattleSnapshot) {
-    if (S.rangedModeActive || S.airStrikeModeActive || unitIds.length === 0 || !hoveredH3) {
+    if (unitIds.length === 0 || !hoveredH3) {
       S.hoverRoutePreview = null;
       deps.requestRedraw();
       return;
     }
-    const data = buildTacticalMarchHoverPreview(S.tacticalBattleSnapshot, unitIds, hoveredH3);
+    const tb = S.tacticalBattleSnapshot;
+    if (S.rangedModeActive && !S.airStrikeModeActive) {
+      if (!window.gameApi?.validateGroupRangedTarget) {
+        S.hoverRoutePreview = null;
+        deps.requestRedraw();
+        return;
+      }
+      const validation = await window.gameApi.validateGroupRangedTarget({ unitIds, targetH3Index: hoveredH3 });
+      if (seq !== S.hoverPreviewRequestSeq) return;
+      if (S.hoveredHexH3 !== hoveredH3) return;
+      const currentSelected = [...S.selectedUnitIds].sort().join('|');
+      const requestedSelected = [...unitIds].sort().join('|');
+      if (currentSelected !== requestedSelected) return;
+      const valid = validation.success;
+      const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
+        unitIds.map((id) => ({
+          unitId: id,
+          originH3: tb.subUnits.find((s) => s.id === id)?.h3Index ?? '',
+        }))
+      );
+      const previews = previewUnitIds.map((unitId) => {
+        const sub = tb.subUnits.find((s) => s.id === unitId && s.player === 'human');
+        if (!sub) {
+          return {
+            unitId,
+            preview: {
+              valid: false,
+              showInvalidMarker: true,
+              invalidReason: 'Unknown unit',
+              segments: [],
+            },
+          };
+        }
+        const [lat1, lng1] = cellToLatLng(sub.h3Index);
+        const [lat2, lng2] = cellToLatLng(hoveredH3);
+        return {
+          unitId,
+          originH3Index: sub.h3Index,
+          preview: {
+            valid,
+            showInvalidMarker: !valid,
+            invalidReason: valid ? '' : (validation.reason ?? 'Invalid target'),
+            segments: [{ turn: 1, hexes: [[lat1, lng1], [lat2, lng2]] as [number, number][] }],
+            arrowLatLng: [lat2, lng2] as [number, number],
+          },
+        };
+      });
+      const data = buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange: 99 });
+      S.hoverRoutePreview = { hoveredH3Index: hoveredH3, data, renderAsSupportTargeting: 'ranged' };
+      deps.requestRedraw();
+      return;
+    }
+    if (S.airStrikeModeActive) {
+      if (!window.gameApi?.validateGroupAirStrikeTarget) {
+        S.hoverRoutePreview = null;
+        deps.requestRedraw();
+        return;
+      }
+      const validation = await window.gameApi.validateGroupAirStrikeTarget({
+        unitIds,
+        targetH3Index: hoveredH3,
+        targetType: S.airStrikeTargetType,
+      });
+      if (seq !== S.hoverPreviewRequestSeq) return;
+      if (S.hoveredHexH3 !== hoveredH3) return;
+      const currentSelected = [...S.selectedUnitIds].sort().join('|');
+      const requestedSelected = [...unitIds].sort().join('|');
+      if (currentSelected !== requestedSelected) return;
+      const valid = validation.success;
+      const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
+        unitIds.map((id) => ({
+          unitId: id,
+          originH3: tb.subUnits.find((s) => s.id === id)?.h3Index ?? '',
+        }))
+      );
+      const previews = previewUnitIds.map((unitId) => {
+        const sub = tb.subUnits.find((s) => s.id === unitId && s.player === 'human');
+        if (!sub) {
+          return {
+            unitId,
+            preview: {
+              valid: false,
+              showInvalidMarker: true,
+              invalidReason: 'Unknown unit',
+              segments: [],
+            },
+          };
+        }
+        const [lat1, lng1] = cellToLatLng(sub.h3Index);
+        const [lat2, lng2] = cellToLatLng(hoveredH3);
+        return {
+          unitId,
+          originH3Index: sub.h3Index,
+          preview: {
+            valid,
+            showInvalidMarker: !valid,
+            invalidReason: valid ? '' : (validation.reason ?? 'Invalid target'),
+            segments: [{ turn: 1, hexes: [[lat1, lng1], [lat2, lng2]] as [number, number][] }],
+            arrowLatLng: [lat2, lng2] as [number, number],
+          },
+        };
+      });
+      const data = buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange: 99 });
+      S.hoverRoutePreview = { hoveredH3Index: hoveredH3, data, renderAsSupportTargeting: 'air' };
+      deps.requestRedraw();
+      return;
+    }
+    const data = buildTacticalMarchHoverPreview(tb, unitIds, hoveredH3);
     if (seq !== S.hoverPreviewRequestSeq) return;
     if (S.hoveredHexH3 !== hoveredH3) return;
     const currentSelected = [...S.selectedUnitIds].sort().join('|');
@@ -279,14 +391,119 @@ export async function refreshHoverRoutePreview(deps: TacticalOrderDeps): Promise
     deps.requestRedraw();
     return;
   }
-  if (
-    S.rangedModeActive ||
-    S.airStrikeModeActive ||
-    !window.gameApi?.previewHumanMarchOrders ||
-    unitIds.length === 0 ||
-    !hoveredH3 ||
-    !S.gameState
-  ) {
+  if (unitIds.length === 0 || !hoveredH3 || !S.gameState) {
+    S.hoverRoutePreview = null;
+    deps.requestRedraw();
+    return;
+  }
+  const gs = S.gameState;
+  if (S.rangedModeActive && !S.airStrikeModeActive) {
+    if (!window.gameApi?.validateGroupRangedTarget) {
+      S.hoverRoutePreview = null;
+      deps.requestRedraw();
+      return;
+    }
+    const validation = await window.gameApi.validateGroupRangedTarget({ unitIds, targetH3Index: hoveredH3 });
+    if (seq !== S.hoverPreviewRequestSeq) return;
+    if (S.hoveredHexH3 !== hoveredH3) return;
+    const currentSelected = [...S.selectedUnitIds].sort().join('|');
+    const requestedSelected = [...unitIds].sort().join('|');
+    if (currentSelected !== requestedSelected) return;
+    const valid = validation.success;
+    const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
+      unitIds.map((id) => ({
+        unitId: id,
+        originH3: gs.units.find((u) => u.id === id)?.h3Index ?? '',
+      }))
+    );
+    const previews = previewUnitIds.map((unitId) => {
+      const unit = gs.units.find((u) => u.id === unitId && u.player === 'human');
+      if (!unit) {
+        return {
+          unitId,
+          preview: {
+            valid: false,
+            showInvalidMarker: true,
+            invalidReason: 'Unknown unit',
+            segments: [],
+          },
+        };
+      }
+      const [lat1, lng1] = cellToLatLng(unit.h3Index);
+      const [lat2, lng2] = cellToLatLng(hoveredH3);
+      return {
+        unitId,
+        originH3Index: unit.h3Index,
+        preview: {
+          valid,
+          showInvalidMarker: !valid,
+          invalidReason: valid ? '' : (validation.reason ?? 'Invalid target'),
+          segments: [{ turn: 1, hexes: [[lat1, lng1], [lat2, lng2]] as [number, number][] }],
+          arrowLatLng: [lat2, lng2] as [number, number],
+        },
+      };
+    });
+    const data = buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange: 99 });
+    S.hoverRoutePreview = { hoveredH3Index: hoveredH3, data, renderAsSupportTargeting: 'ranged' };
+    deps.requestRedraw();
+    return;
+  }
+  if (S.airStrikeModeActive) {
+    if (!window.gameApi?.validateGroupAirStrikeTarget) {
+      S.hoverRoutePreview = null;
+      deps.requestRedraw();
+      return;
+    }
+    const validation = await window.gameApi.validateGroupAirStrikeTarget({
+      unitIds,
+      targetH3Index: hoveredH3,
+      targetType: S.airStrikeTargetType,
+    });
+    if (seq !== S.hoverPreviewRequestSeq) return;
+    if (S.hoveredHexH3 !== hoveredH3) return;
+    const currentSelected = [...S.selectedUnitIds].sort().join('|');
+    const requestedSelected = [...unitIds].sort().join('|');
+    if (currentSelected !== requestedSelected) return;
+    const valid = validation.success;
+    const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
+      unitIds.map((id) => ({
+        unitId: id,
+        originH3: gs.units.find((u) => u.id === id)?.h3Index ?? '',
+      }))
+    );
+    const previews = previewUnitIds.map((unitId) => {
+      const unit = gs.units.find((u) => u.id === unitId && u.player === 'human');
+      if (!unit) {
+        return {
+          unitId,
+          preview: {
+            valid: false,
+            showInvalidMarker: true,
+            invalidReason: 'Unknown unit',
+            segments: [],
+          },
+        };
+      }
+      const [lat1, lng1] = cellToLatLng(unit.h3Index);
+      const [lat2, lng2] = cellToLatLng(hoveredH3);
+      return {
+        unitId,
+        originH3Index: unit.h3Index,
+        preview: {
+          valid,
+          showInvalidMarker: !valid,
+          invalidReason: valid ? '' : (validation.reason ?? 'Invalid target'),
+          segments: [{ turn: 1, hexes: [[lat1, lng1], [lat2, lng2]] as [number, number][] }],
+          arrowLatLng: [lat2, lng2] as [number, number],
+        },
+      };
+    });
+    const data = buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange: 99 });
+    S.hoverRoutePreview = { hoveredH3Index: hoveredH3, data, renderAsSupportTargeting: 'air' };
+    deps.requestRedraw();
+    return;
+  }
+  if (!window.gameApi?.previewHumanMarchOrders) {
     S.hoverRoutePreview = null;
     deps.requestRedraw();
     return;

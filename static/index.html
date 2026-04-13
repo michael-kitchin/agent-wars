@@ -276,6 +276,20 @@
       flex: 1;
       min-width: 0;
     }
+    .openrouter-inline-checkbox {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 0.45rem;
+    }
+    .openrouter-inline-checkbox input[type="checkbox"] {
+      margin: 0;
+      flex-shrink: 0;
+    }
+    .openrouter-inline-checkbox label {
+      margin: 0;
+      font-weight: normal;
+    }
     .openrouter-refresh-btn {
       flex-shrink: 0;
       width: 2rem;
@@ -897,6 +911,17 @@
             <button type="button" id="openrouter-refresh-models" class="openrouter-refresh-btn" title="Refresh model list" aria-label="Refresh model list"></button>
             <button type="button" id="openrouter-run-btn" class="openrouter-tool-toggle" aria-pressed="false" disabled title="Set API key and model to enable">Run</button>
             <button type="button" id="openrouter-new-btn" class="openrouter-tool-toggle" aria-label="Start a new game">New</button>
+          </div>
+        </div>
+        <div class="openrouter-row">
+          <div class="openrouter-inline-checkbox">
+            <input
+              type="checkbox"
+              id="openrouter-tactical-battles"
+              checked
+              title="When unchecked, the tactical battles list does not appear; melee resolves as if you chose Ignore every time."
+            />
+            <label for="openrouter-tactical-battles">Tactical battles</label>
           </div>
         </div>
       </div>

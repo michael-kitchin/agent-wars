@@ -142,6 +142,33 @@ export interface TacticalBattleSnapshot {
    */
   tacticalTurnNumber: number;
   /**
+   * Strategic `terrain` column for the enclosing res1 hex when the battle was opened.
+   *
+   * Contract: Same vocabulary as strategic `hexes.terrain` (`land`, `water`, …).
+   * When to use: Tactical movement §12.4 normalization when a res4 child has no override row.
+   * Expected outcome: Present on newly built snapshots; optional on older persisted JSON (defaults to `land` in planners).
+   * Exceptions: None.
+   */
+  strategicHexTerrain?: string;
+  /**
+   * Strategic `terrain_kind` for the enclosing res1 hex when the battle was opened.
+   *
+   * Contract: Typical values include `plains`, `forest`, `mountain`, … matching GIS pipeline output.
+   * When to use: Fallback tactical terrain for res4 cells without per-cell override in `res4TerrainKindByH3`.
+   * Expected outcome: Present on newly built snapshots; optional on older persisted JSON (defaults to `plains` in planners).
+   * Exceptions: None.
+   */
+  strategicHexTerrainKind?: string;
+  /**
+   * Per-res4 effective `terrain_kind` inside the tactical footprint (override or parent fallback at snapshot build).
+   *
+   * Contract: Keys are a subset of `res4ChildH3Indexes`; omitted keys inherit `strategicHexTerrainKind` in movement code.
+   * When to use: Renderer hover preview and main-process march planning without re-querying SQLite.
+   * Expected outcome: Omitted or empty when absent (legacy saves); populated for new `computeTacticalBattleSnapshot` results.
+   * Exceptions: None.
+   */
+  res4TerrainKindByH3?: Record<string, string>;
+  /**
    * All tactical sub-units spawned for this battle.
    *
    * Contract: May be shorter than theoretical totals when parents are unplaceable.

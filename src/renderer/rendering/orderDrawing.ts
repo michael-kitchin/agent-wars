@@ -1,7 +1,22 @@
 import type { AirStrikeAnimationMove, AirStrikeOrder, FerryOrder, GameStateSnapshot, RangedAttackOrder } from '../../shared/ipcTypes';
-import { ORDER_LINE_COLOR, ORDER_LINE_WIDTH } from '../core/constants';
+import {
+  ORDER_LINE_COLOR,
+  ORDER_LINE_WIDTH,
+  PENDING_AIR_STRIKE_ORDER_LINE_COLOR,
+  PENDING_RANGED_ORDER_LINE_COLOR,
+} from '../core/constants';
 import { hexCenterPx, hexCenterPxRelativeTo } from '../map/mapUtils';
 import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
+
+/**
+ * Minimal attacker row for drawing pending ranged, air, and ferry order lines on the map canvas.
+ *
+ * Purpose: Lets tactical res4 sub-units supply `id` + `h3Index` without pretending they are full strategic `units` rows.
+ * When to use: Pass strategic `state.units` or tactical `subUnits` mapped to `{ id, h3Index }` into order overlay drawers.
+ * Expected outcome: Same stroke geometry as the legacy strategic-only path when ids match pending order payloads.
+ * Exceptions: None.
+ */
+export type PendingOrderLineUnit = { id: string; h3Index: string };
 
 /**
  * Defines the `drawRangedAttackLines` function shape (export function drawRangedAttackLines( ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, ranged: RangedAttackOrder[], uni).
@@ -16,7 +31,7 @@ export function drawRangedAttackLines(
   canvasWidth: number,
   canvasHeight: number,
   ranged: RangedAttackOrder[],
-  units: GameStateSnapshot['units'],
+  units: readonly PendingOrderLineUnit[],
   hexList: string[] | undefined
 ): void {
   void canvasWidth;
@@ -24,7 +39,7 @@ export function drawRangedAttackLines(
   if (ranged.length === 0 || !hexList) return;
   ctx.save();
   ctx.setLineDash([6, 4]);
-  ctx.strokeStyle = '#a06020';
+  ctx.strokeStyle = PENDING_RANGED_ORDER_LINE_COLOR;
   ctx.lineWidth = ORDER_LINE_WIDTH;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -52,13 +67,13 @@ export function drawRangedAttackLines(
 export function drawAirStrikeLines(
   ctx: CanvasRenderingContext2D,
   airStrikes: AirStrikeOrder[],
-  units: GameStateSnapshot['units'],
+  units: readonly PendingOrderLineUnit[],
   hexList: string[] | undefined
 ): void {
   if (airStrikes.length === 0 || !hexList) return;
   ctx.save();
   ctx.setLineDash([2, 6]);
-  ctx.strokeStyle = '#7a3db5';
+  ctx.strokeStyle = PENDING_AIR_STRIKE_ORDER_LINE_COLOR;
   ctx.lineWidth = ORDER_LINE_WIDTH;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -86,7 +101,7 @@ export function drawAirStrikeLines(
 export function drawPendingFerryLines(
   ctx: CanvasRenderingContext2D,
   ferryOrders: FerryOrder[],
-  units: GameStateSnapshot['units'],
+  units: readonly PendingOrderLineUnit[],
   hexList: string[] | undefined,
   drawLineArrow: (
     ctx: CanvasRenderingContext2D,

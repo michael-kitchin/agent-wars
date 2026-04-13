@@ -27,14 +27,16 @@ export function drawPendingSupportOrderOverlays(
   state: GameStateSnapshot,
   hexList: string[]
 ): void {
-  if (S.pendingRangedAttacks.length > 0 && state.units.length && hexList) {
-    drawRangedAttackLines(ctx, width, height, S.pendingRangedAttacks, state.units, hexList);
+  const unitsForOrderLines =
+    S.tacticalBattleSnapshot?.subUnits.map((u) => ({ id: u.id, h3Index: u.h3Index })) ?? state.units;
+  if (S.pendingRangedAttacks.length > 0 && unitsForOrderLines.length > 0 && hexList.length > 0) {
+    drawRangedAttackLines(ctx, width, height, S.pendingRangedAttacks, unitsForOrderLines, hexList);
   }
-  if (S.pendingAirStrikes.length > 0 && state.units.length && hexList) {
-    drawAirStrikeLines(ctx, S.pendingAirStrikes, state.units, hexList);
+  if (S.pendingAirStrikes.length > 0 && unitsForOrderLines.length > 0 && hexList.length > 0) {
+    drawAirStrikeLines(ctx, S.pendingAirStrikes, unitsForOrderLines, hexList);
   }
-  if (S.pendingFerryOrders.length > 0 && state.units.length && hexList) {
-    drawPendingFerryLines(ctx, S.pendingFerryOrders, state.units, hexList, drawLineArrow);
+  if (S.pendingFerryOrders.length > 0 && unitsForOrderLines.length > 0 && hexList.length > 0) {
+    drawPendingFerryLines(ctx, S.pendingFerryOrders, unitsForOrderLines, hexList, drawLineArrow);
   }
 }
 
