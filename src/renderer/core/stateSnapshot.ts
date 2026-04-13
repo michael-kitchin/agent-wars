@@ -1,6 +1,7 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { applyInitialCameraForState } from '../map/mapUtils';
+import { tacticalReleaseRendererSessionForNewStrategicMatch } from '../tactical/tacticalUiOrchestration';
 import { rendererSharedState as S } from './state';
 
 /**
@@ -230,6 +231,14 @@ export async function applyGameStateSnapshot(
   const previousState = S.gameState;
   S.gameState = nextState;
   deps.reconcileTacticalBattleAfterStrategicSnapshot(nextState);
+  if (
+    !nextState.tacticalBattleSession &&
+    (S.tacticalBattleSnapshot != null ||
+      S.preTacticalLeafletMinZoom != null ||
+      S.preTacticalLeafletMaxZoom != null)
+  ) {
+    tacticalReleaseRendererSessionForNewStrategicMatch(nextState);
+  }
   const restored = nextState.tacticalBattleSession;
   if (restored && deps.applyRestoredTacticalBattleFromMain) {
     const cur = S.tacticalBattleSnapshot;
@@ -245,7 +254,12 @@ export async function applyGameStateSnapshot(
   deps.reconcileSelectionToCurrentState();
   deps.updateClientStaleEnemyIntel(previousState, nextState);
   if (!S.initialCameraApplied && nextState.hexes.length > 0) {
-    applyInitialCameraForState(nextState);
+    if (nextState.tacticalBattleSession) {
+      // Skip strategic initial camera so restored tactical `enterTacticalMapView` framing is not overwritten.
+      S.initialCameraApplied = true;
+    } else {
+      applyInitialCameraForState(nextState);
+    }
   }
   deps.clearRes1TooltipSummaryCaches();
   if (options.refreshStandingOrders) await deps.refreshHumanStandingOrders();

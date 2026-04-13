@@ -150,6 +150,21 @@ displayOrder?: number;
 }
 
 /**
+ * Playback payload returned with a successful tactical Ready commit so the renderer can run the same resolution animation pipeline as strategic turns.
+ *
+ * Purpose: Bridges tactical snapshot-only commits with `S.resolutionMoveAnimation` without duplicating combat simulation in the renderer.
+ * When to use: Main-process `commitHumanTacticalDraftOrders` success path after movement and support projection complete.
+ * Expected outcome: `humanMoves` lists sub-unit position deltas; ranged fields mirror strategic `ReadyResult` subsets when support orders remove units.
+ * Exceptions: None; empty `humanMoves` is valid when only non-move effects occur.
+ */
+export type TacticalCommitResolutionPlayback = {
+  humanMoves: Array<{ unitId: string; fromH3Index: string; toH3Index: string }>;
+  rangedCombatHexes?: string[];
+  rangedCasualtyHexes?: string[];
+  rangedRemovedUnits?: RemovedUnitSnapshot[];
+};
+
+/**
  * Documents the `InfrastructureDestroyedEvent` interface as a named contract surface (export interface InfrastructureDestroyedEvent).
 
  * Purpose: Supports maintainability by documenting why `InfrastructureDestroyedEvent` exists.

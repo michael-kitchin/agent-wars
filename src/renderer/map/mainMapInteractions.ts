@@ -4,8 +4,12 @@ import { TERRAIN_TOOLTIP_DELAY_MS } from '../core/constants';
 import { hitTestHexAtContainerPixel, hitTestTacticalRes4HexAtContainerPixel } from './mapUtils';
 import { rendererSharedState as S } from '../core/state';
 import { getMainLeafletMap } from './worldLeafletMap';
-import { tacticalEffectiveH3ForSubUnit } from '../tactical/tacticalDraftMarchOverlay';
 import { tacticalRendererHitInsideBattleFootprint } from '../tactical/tacticalUiGuards';
+import {
+  applyHumanUnitIconClickSelectionPolicy,
+  clearDeferredHumanUnitSingleSelectTimer,
+} from './mapClickSelectionPolicy';
+import { emitParityDiagnosticsBreadcrumb } from '../core/parityDiagnostics';
 
 /**
  * Minimal unit row shape used for grouped march / ferry preflight on the map (strategic units or tactical sub-units).
@@ -364,7 +368,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
         .filter((u): u is NonNullable<typeof u> => !!u && u.player === 'human')
         .map((u) => ({
           id: u.id,
-          h3Index: tacticalEffectiveH3ForSubUnit(tb, u.id),
+          h3Index: u.h3Index,
           player: 'human' as const,
           unitType: u.unitType,
         }));
@@ -388,7 +392,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     const tb = S.tacticalBattleSnapshot;
     if (tb) {
       const row = tb.subUnits.find((u) => u.id === primaryId);
-      return row ? tacticalEffectiveH3ForSubUnit(tb, primaryId) : null;
+      return row?.h3Index ?? null;
     }
     return state.units.find((u) => u.id === primaryId)?.h3Index ?? null;
   }
@@ -625,52 +629,29 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       const drawnAtHit = unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id));
       const unitIconHit = drawnAtHit.length > 0 && deps.containerPixelHitsDrawnUnitIcon(px, py, hit, drawnAtHit.length);
       if (unit?.player === 'human' && unitIconHit) {
-        if (e.ctrlKey) {
-          if (S.pendingSelectTimeout !== null) {
-            clearTimeout(S.pendingSelectTimeout);
-            S.pendingSelectTimeout = null;
-          }
-          deps.toggleUnitSelection(unit.id);
-          void deps.refreshHoverRoutePreview();
-        } else if (S.pendingSelectTimeout !== null) {
-          clearTimeout(S.pendingSelectTimeout);
-          S.pendingSelectTimeout = null;
-          deps.replaceSelection([unit.id]);
-          void deps.refreshHoverRoutePreview();
-        } else {
-          const unitIdToSelect = unit.id;
-          S.pendingSelectTimeout = setTimeout(() => {
-            deps.replaceSelection([unitIdToSelect]);
-            void deps.refreshHoverRoutePreview();
-            S.pendingSelectTimeout = null;
-            deps.updateSidebar();
-            deps.updateRangedSidebar();
-            deps.redraw();
-          }, 250);
-        }
+        applyHumanUnitIconClickSelectionPolicy({
+          ctrlKey: e.ctrlKey,
+          unitId: unit.id,
+          deps: {
+            replaceSelection: deps.replaceSelection,
+            toggleUnitSelection: deps.toggleUnitSelection,
+            refreshHoverRoutePreview: deps.refreshHoverRoutePreview,
+            updateSidebar: deps.updateSidebar,
+            updateRangedSidebar: deps.updateRangedSidebar,
+            redraw: deps.redraw,
+          },
+        });
       } else if (unit?.player === 'human' && !unitIconHit) {
-        if (S.pendingSelectTimeout !== null) {
-          clearTimeout(S.pendingSelectTimeout);
-          S.pendingSelectTimeout = null;
-        }
+        clearDeferredHumanUnitSingleSelectTimer();
       } else if (deps.getPrimarySelectedUnitId() && S.gameState && hit !== primarySelectedUnitHex(S.gameState)) {
-        if (S.pendingSelectTimeout !== null) {
-          clearTimeout(S.pendingSelectTimeout);
-          S.pendingSelectTimeout = null;
-        }
+        clearDeferredHumanUnitSingleSelectTimer();
       } else {
-        if (S.pendingSelectTimeout !== null) {
-          clearTimeout(S.pendingSelectTimeout);
-          S.pendingSelectTimeout = null;
-        }
+        clearDeferredHumanUnitSingleSelectTimer();
         deps.clearSelection();
         S.hoverRoutePreview = null;
       }
     } else {
-      if (S.pendingSelectTimeout !== null) {
-        clearTimeout(S.pendingSelectTimeout);
-        S.pendingSelectTimeout = null;
-      }
+      clearDeferredHumanUnitSingleSelectTimer();
       deps.clearSelection();
       S.hoverRoutePreview = null;
     }
@@ -681,28 +662,63 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
   });
 
   mainMapEl.addEventListener('dblclick', async (e) => {
-    if (S.pendingSelectTimeout !== null) {
-      clearTimeout(S.pendingSelectTimeout);
-      S.pendingSelectTimeout = null;
+    clearDeferredHumanUnitSingleSelectTimer();
+    if (!S.gameState) {
+      emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', { reason: 'missing_game_state' });
+      return;
     }
-    if (!S.gameState) return;
     const state = S.gameState;
-    if (S.rangedModeActive || S.airStrikeModeActive) return;
+    if (S.rangedModeActive || S.airStrikeModeActive) {
+      emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', {
+        reason: 'targeting_mode_active',
+        rangedModeActive: S.rangedModeActive,
+        airStrikeModeActive: S.airStrikeModeActive,
+      });
+      return;
+    }
     const hit = clientXYToHit(e.clientX, e.clientY);
     const destinationH3 = S.selectedHexIndex ?? S.hoveredHexH3 ?? hit;
-    if (!destinationH3 || S.selectedUnitIdsAtMouseDown.length === 0) return;
+    if (!destinationH3 || S.selectedUnitIdsAtMouseDown.length === 0) {
+      emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', {
+        reason: !destinationH3 ? 'missing_destination' : 'missing_selection_at_mouse_down',
+        selectedAtMouseDownCount: S.selectedUnitIdsAtMouseDown.length,
+      });
+      return;
+    }
 
     const selectedAtMouseDown = getSelectedHumanUnitsAtMouseDown(state);
-    if (selectedAtMouseDown.length === 0) return;
+    if (selectedAtMouseDown.length === 0) {
+      emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', {
+        reason: 'selection_not_human_units',
+        selectedAtMouseDownCount: 0,
+      });
+      return;
+    }
     const selectedIds = selectedAtMouseDown.map((unit) => unit.id);
-    if (selectedAtMouseDown.every((unit) => unit.h3Index === destinationH3)) return;
+    if (selectedAtMouseDown.every((unit) => unit.h3Index === destinationH3)) {
+      emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', {
+        reason: 'destination_equals_current_positions',
+        selectedCount: selectedAtMouseDown.length,
+      });
+      return;
+    }
     const hasAirSelection = selectedAtMouseDown.some((unit) => unit.unitType === 'air');
     const hasNonAirSelection = selectedAtMouseDown.some((unit) => unit.unitType !== 'air');
     if (hasAirSelection && hasNonAirSelection) {
+      emitParityDiagnosticsBreadcrumb('planning.doubleClickRejected', {
+        reason: 'mixed_air_non_air_selection',
+        selectedCount: selectedAtMouseDown.length,
+      });
       deps.showMapToast('Cannot issue grouped movement for mixed air and non-air units.', { isError: true });
       return;
     }
 
+    emitParityDiagnosticsBreadcrumb('planning.doubleClickAccepted', {
+      tacticalModeActive: !!S.tacticalBattleSnapshot,
+      selectedCount: selectedAtMouseDown.length,
+      destinationH3,
+      hasAirSelection,
+    });
     if (hasAirSelection) {
       if (await commitGroupedAirFerryOrders(selectedIds, destinationH3)) return;
       return;

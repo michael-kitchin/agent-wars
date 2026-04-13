@@ -4,19 +4,23 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { gridDisk, latLngToCell } from 'h3-js';
+import { gridDisk } from 'h3-js';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import {
   projectTacticalSnapshotAfterHumanMovementOrders,
   projectTacticalSnapshotAfterOpponentMovementOrders,
 } from './tacticalMovementApply';
+import {
+  firstRingCellDistinctFrom,
+  tacticalRes1Cell,
+  tacticalRes4UnderRes1Corner,
+} from './testSupport/tacticalRes4HexFixtures';
 
 test('projectTacticalSnapshot moves opponent sub-unit within res4 range', () => {
-  const res1 = latLngToCell(10, 20, 1);
-  const center = latLngToCell(10.02, 20, 4);
+  const res1 = tacticalRes1Cell(10, 20);
+  const center = tacticalRes4UnderRes1Corner(10, 20);
   const ring = gridDisk(center, 1);
-  const dest = [...ring].find((h) => h !== center);
-  assert.ok(dest, 'need neighbor res4');
+  const dest = firstRingCellDistinctFrom(center);
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-move',
     enclosingRes1H3Index: res1,
@@ -39,11 +43,10 @@ test('projectTacticalSnapshot moves opponent sub-unit within res4 range', () => 
 });
 
 test('projectTacticalSnapshot clears embark when opponent land disembarks to another res4 hex', () => {
-  const res1 = latLngToCell(11, 12, 1);
-  const navalCell = latLngToCell(11.02, 12, 4);
+  const res1 = tacticalRes1Cell(11, 12);
+  const navalCell = tacticalRes4UnderRes1Corner(11, 12);
   const ring = gridDisk(navalCell, 1);
-  const landDest = [...ring].find((h) => h !== navalCell);
-  assert.ok(landDest);
+  const landDest = firstRingCellDistinctFrom(navalCell);
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-dis',
     enclosingRes1H3Index: res1,
@@ -70,18 +73,17 @@ test('projectTacticalSnapshot clears embark when opponent land disembarks to ano
       },
     ],
   };
-  const next = projectTacticalSnapshotAfterOpponentMovementOrders(snap, [{ unitId: 'land2', toH3Index: landDest! }]);
+  const next = projectTacticalSnapshotAfterOpponentMovementOrders(snap, [{ unitId: 'land2', toH3Index: landDest }]);
   const land = next.subUnits.find((u) => u.id === 'land2');
   assert.equal(land?.h3Index, landDest);
   assert.ok(!land?.embarkedOnSubUnitId);
 });
 
 test('projectTacticalSnapshot moves embarked opponent land with its naval carrier', () => {
-  const res1 = latLngToCell(3, 4, 1);
-  const center = latLngToCell(3.02, 4, 4);
+  const res1 = tacticalRes1Cell(3, 4);
+  const center = tacticalRes4UnderRes1Corner(3, 4);
   const ring = gridDisk(center, 1);
-  const dest = [...ring].find((h) => h !== center);
-  assert.ok(dest);
+  const dest = firstRingCellDistinctFrom(center);
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-emb',
     enclosingRes1H3Index: res1,
@@ -108,17 +110,16 @@ test('projectTacticalSnapshot moves embarked opponent land with its naval carrie
       },
     ],
   };
-  const next = projectTacticalSnapshotAfterOpponentMovementOrders(snap, [{ unitId: 'nav-su', toH3Index: dest! }]);
+  const next = projectTacticalSnapshotAfterOpponentMovementOrders(snap, [{ unitId: 'nav-su', toH3Index: dest }]);
   const land = next.subUnits.find((u) => u.id === 'land-su');
   assert.equal(land?.h3Index, dest);
 });
 
 test('projectTacticalSnapshot ignores human-controlled sub-units', () => {
-  const res1 = latLngToCell(5, 6, 1);
-  const center = latLngToCell(5.01, 6, 4);
+  const res1 = tacticalRes1Cell(5, 6);
+  const center = tacticalRes4UnderRes1Corner(5, 6, { latEpsilon: 0.01 });
   const ring = gridDisk(center, 1);
-  const dest = [...ring].find((h) => h !== center);
-  assert.ok(dest);
+  const dest = firstRingCellDistinctFrom(center);
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-h',
     enclosingRes1H3Index: res1,
@@ -136,16 +137,43 @@ test('projectTacticalSnapshot ignores human-controlled sub-units', () => {
       },
     ],
   };
-  const next = projectTacticalSnapshotAfterOpponentMovementOrders(snap, [{ unitId: 'hum-su-1', toH3Index: dest! }]);
+  const next = projectTacticalSnapshotAfterOpponentMovementOrders(snap, [{ unitId: 'hum-su-1', toH3Index: dest }]);
   assert.equal(next.subUnits[0]!.h3Index, center);
 });
 
+test('projectTacticalSnapshotAfterHumanMovementOrders moves human sub-unit along multi-step res4 path beyond one-turn range', () => {
+  const res1 = tacticalRes1Cell(20, 30);
+  const center = tacticalRes4UnderRes1Corner(20, 30);
+  const disk = [...gridDisk(center, 3)];
+  const ring1 = new Set(gridDisk(center, 1));
+  const far = disk.find((h) => h !== center && !ring1.has(h));
+  assert.ok(far);
+  const snap: TacticalBattleSnapshot = {
+    battleId: 'tb-hum-far',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: disk,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits: [
+      {
+        id: 'hum-su-far',
+        parentUnitId: 'ph',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: center,
+        displayName: '1st Infantry (far)',
+      },
+    ],
+  };
+  const next = projectTacticalSnapshotAfterHumanMovementOrders(snap, [{ unitId: 'hum-su-far', toH3Index: far! }]);
+  assert.equal(next.subUnits[0]!.h3Index, far);
+});
+
 test('projectTacticalSnapshotAfterHumanMovementOrders moves human sub-unit within res4 range', () => {
-  const res1 = latLngToCell(8, 9, 1);
-  const center = latLngToCell(8.02, 9, 4);
+  const res1 = tacticalRes1Cell(8, 9);
+  const center = tacticalRes4UnderRes1Corner(8, 9);
   const ring = gridDisk(center, 1);
-  const dest = [...ring].find((h) => h !== center);
-  assert.ok(dest, 'need neighbor res4');
+  const dest = firstRingCellDistinctFrom(center);
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-hum-move',
     enclosingRes1H3Index: res1,

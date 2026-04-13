@@ -1,6 +1,7 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
 import { resetPrecomputedAiState } from '../openRouter/precomputedAiState';
+import { tacticalReleaseRendererSessionForNewStrategicMatch } from '../tactical/tacticalUiOrchestration';
 import { discardStrategicOrderUiStash } from '../tactical/tacticalStrategicOrderUiStash';
 import {
   getSelectedScenarioRegions,
@@ -230,6 +231,8 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       })) as GameStateSnapshot;
       await deps.refreshRes4TerrainOverridesForRenderer();
       S.gameState = state;
+      S.strategicScenarioInitialLeafletView = null;
+      tacticalReleaseRendererSessionForNewStrategicMatch(state);
       deps.rebuildUnitDisplayNameLookup(state);
       deps.reconcileSelectionToCurrentState();
       S.clientStaleEnemyIntelByUnitId.clear();

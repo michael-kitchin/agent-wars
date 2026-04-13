@@ -16,6 +16,8 @@ import { getLeafletGlobal, hexCenterPx, hexCenterPxRelativeTo } from '../map/map
 import { getMainLeafletMap } from '../map/worldLeafletMap';
 import type { GameStateSnapshot, HumanStandingOrderSnapshot } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { minMovementRangeAmongUnitTypes } from '../../shared/humanMarchPreviewGroupAssembly';
+import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
 import type { ResolutionPlaybackMove } from '../core/types';
 import { drawOneUnitMarker } from './unitDrawing';
 
@@ -195,7 +197,7 @@ export function drawStandingOrderLines(
  *
  * Purpose: Mirrors strategic `drawStandingOrderLines` / hover styling so drafted res4 moves remain visible under units.
  * When to use: Only from the tactical `drawGameScene` branch while `S.tacticalPendingMarches` is non-empty.
- * Expected outcome: One route per draft row from snapshot `h3Index` to `destinationH3Index` at ~50% opacity with arrowhead.
+ * Expected outcome: One route per draft row from snapshot `h3Index` to `destinationH3Index` at full opacity (matching strategic standing-order lines), solid for current-turn movement and dashed for future-turn continuation.
  * Exceptions: Skips rows when pathfinding throws or the sub-unit row is missing.
  */
 export function drawTacticalPendingMarchPlanLines(
@@ -208,7 +210,6 @@ export function drawTacticalPendingMarchPlanLines(
   if (!map) return;
   const L = getLeafletGlobal();
   ctx.save();
-  ctx.globalAlpha = 0.5;
   for (const row of pendingMarches) {
     const sub = battle.subUnits.find((u) => u.id === row.subUnitId && u.player === 'human');
     if (!sub) continue;
@@ -227,12 +228,43 @@ export function drawTacticalPendingMarchPlanLines(
       const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
       return { x: p.x, y: p.y };
     });
-    ctx.setLineDash([]);
-    ctx.strokeStyle = ORDER_LINE_COLOR;
-    ctx.lineWidth = ORDER_LINE_WIDTH;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
+    const edgeCount = Math.max(0, points.length - 1);
+    const movementRange = minMovementRangeAmongUnitTypes([sub.unitType], MOVEMENT_RANGE_BY_UNIT_TYPE, 1);
+    if (movementRange <= 0) {
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = ORDER_LINE_COLOR;
+      ctx.lineWidth = ORDER_LINE_WIDTH;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
+    } else if (movementRange >= edgeCount) {
+      ctx.setLineDash([]);
+      ctx.strokeStyle = ORDER_LINE_COLOR;
+      ctx.lineWidth = ORDER_LINE_WIDTH;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
+    } else {
+      const splitIndex = Math.min(points.length - 1, movementRange);
+      const solidPoints = points.slice(0, splitIndex + 1);
+      if (solidPoints.length >= 2) {
+        ctx.setLineDash([]);
+        ctx.strokeStyle = ORDER_LINE_COLOR;
+        ctx.lineWidth = ORDER_LINE_WIDTH;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        strokePolylineSkippingWrap(ctx, solidPoints, ctx.canvas.width * 0.5);
+      }
+      const dashedPoints = points.slice(splitIndex);
+      if (dashedPoints.length >= 2) {
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = ORDER_LINE_COLOR;
+        ctx.lineWidth = ORDER_LINE_WIDTH;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        strokePolylineSkippingWrap(ctx, dashedPoints, ctx.canvas.width * 0.5);
+      }
+    }
     const penultimate = points[points.length - 2];
     const last = points[points.length - 1];
     if (penultimate && last) {

@@ -59,7 +59,7 @@ function testSessionInvalidatesOnSelectionChange(): void {
 function testCacheEvictionRespectsConfiguredBounds(): void {
   withTempDb(() => {
     resetHumanMarchPreviewDiagnosticsForTests();
-    configureHumanMarchPreviewCacheLimitsForTests({ route: 3, result: 4, throttle: 2 });
+    configureHumanMarchPreviewCacheLimitsForTests({ route: 3, result: 4 });
     const state = getGameState();
     const unit = state.units.find((u) => u.player === 'human');
     assert.ok(unit, 'expected a seeded human unit');
@@ -73,7 +73,6 @@ function testCacheEvictionRespectsConfiguredBounds(): void {
     const diagnostics = getHumanMarchPreviewDiagnostics();
     assert.ok(diagnostics.routeCacheSize <= 3, `route cache exceeded bound: ${diagnostics.routeCacheSize}`);
     assert.ok(diagnostics.resultCacheSize <= 4, `result cache exceeded bound: ${diagnostics.resultCacheSize}`);
-    assert.ok(diagnostics.throttleCacheSize <= 2, `throttle cache exceeded bound: ${diagnostics.throttleCacheSize}`);
     configureHumanMarchPreviewCacheLimitsForTests();
   });
 }

@@ -4,7 +4,7 @@
 
 import type { TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
-import { tacticalMarchWithinRes4GridSteps } from './tacticalRulesAdapter';
+import { tacticalMarchReachableAlongRes4Footprint, tacticalMarchWithinRes4GridSteps } from './tacticalRulesAdapter';
 
 /**
  * Enumerates why an opponent tactical march order may be ignored during snapshot projection.
@@ -27,7 +27,7 @@ export type TacticalMovementBlockReason =
  * Contract: Pure; does not log; does not mutate arrays; uses inclusive res4 grid-step distance identical to prior inline checks.
  * When to use: `projectTacticalSnapshotAfterOpponentMovementOrders` loop before applying `h3Index` updates.
  * Expected outcome: Returns `ok: true` with `idx` into the mutable `sub` clone, or `ok: false` with a reason and diagnostic context.
- * Exceptions: None; invalid H3 indexes propagate from `tacticalMarchWithinRes4GridSteps` as before.
+ * Exceptions: Invalid H3 indexes may yield `out_of_range` when distance and footprint path checks cannot succeed.
  */
 export function tacticalComputeMovementOrderOutcome(args: {
   byId: ReadonlyMap<string, number>;
@@ -53,7 +53,10 @@ export function tacticalComputeMovementOrderOutcome(args: {
     };
   }
   const maxSteps = MOVEMENT_RANGE_BY_UNIT_TYPE[u.unitType] ?? 1;
-  if (!tacticalMarchWithinRes4GridSteps(u.h3Index, args.order.toH3Index, maxSteps)) {
+  const withinOneTurn = tacticalMarchWithinRes4GridSteps(u.h3Index, args.order.toH3Index, maxSteps);
+  const reachableMultiTurn =
+    !withinOneTurn && tacticalMarchReachableAlongRes4Footprint(u.h3Index, args.order.toH3Index, args.res4Set);
+  if (!withinOneTurn && !reachableMultiTurn) {
     return {
       ok: false,
       reason: 'out_of_range',
@@ -69,7 +72,7 @@ export function tacticalComputeMovementOrderOutcome(args: {
  * Purpose: Mirrors `tacticalComputeMovementOrderOutcome` for opponent rows but requires `player === 'human'`.
  * When to use: `projectTacticalSnapshotAfterHumanMovementOrders` before applying `h3Index` updates for the human player.
  * Expected outcome: Same success/failure shape as the opponent helper with `non_human` instead of `non_opponent`.
- * Exceptions: None; invalid H3 indexes propagate from `tacticalMarchWithinRes4GridSteps` as before.
+ * Exceptions: Invalid H3 indexes may yield `out_of_range` when distance and footprint path checks cannot succeed.
  */
 export function tacticalComputeHumanMovementOrderOutcome(args: {
   byId: ReadonlyMap<string, number>;
@@ -95,7 +98,10 @@ export function tacticalComputeHumanMovementOrderOutcome(args: {
     };
   }
   const maxSteps = MOVEMENT_RANGE_BY_UNIT_TYPE[u.unitType] ?? 1;
-  if (!tacticalMarchWithinRes4GridSteps(u.h3Index, args.order.toH3Index, maxSteps)) {
+  const withinOneTurn = tacticalMarchWithinRes4GridSteps(u.h3Index, args.order.toH3Index, maxSteps);
+  const reachableMultiTurn =
+    !withinOneTurn && tacticalMarchReachableAlongRes4Footprint(u.h3Index, args.order.toH3Index, args.res4Set);
+  if (!withinOneTurn && !reachableMultiTurn) {
     return {
       ok: false,
       reason: 'out_of_range',

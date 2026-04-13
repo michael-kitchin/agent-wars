@@ -108,6 +108,7 @@ export function panMapOneRes1Hex(direction: PanDirection): void {
 export function applyInitialCameraForState(state: GameStateSnapshot): void {
   const map = getMainLeafletMap() as {
     getZoom: () => number;
+    getCenter?: () => { lat: number; lng: number };
     getMaxZoom?: () => number;
     setView: (center: unknown, zoom: number) => unknown;
   } | null;
@@ -133,6 +134,10 @@ export function applyInitialCameraForState(state: GameStateSnapshot): void {
   const maxZoom = typeof map.getMaxZoom === 'function' ? map.getMaxZoom() : 12;
   const targetZoom = Math.min(maxZoom, map.getZoom() + INITIAL_CAMERA_ZOOM_IN_LEVELS);
   map.setView(Lref.latLng(clampLatForWebMercatorDisplay(centerLat), centerLng), targetZoom);
+  const ctr = typeof map.getCenter === 'function' ? map.getCenter() : null;
+  if (ctr) {
+    S.strategicScenarioInitialLeafletView = { lat: ctr.lat, lng: ctr.lng, zoom: map.getZoom() };
+  }
   S.initialCameraApplied = true;
 }
 

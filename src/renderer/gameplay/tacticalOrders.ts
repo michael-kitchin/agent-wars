@@ -269,7 +269,7 @@ export async function refreshHoverRoutePreview(deps: TacticalOrderDeps): Promise
       deps.requestRedraw();
       return;
     }
-    const data = buildTacticalMarchHoverPreview(S.tacticalBattleSnapshot, S.tacticalPendingMarches, unitIds, hoveredH3);
+    const data = buildTacticalMarchHoverPreview(S.tacticalBattleSnapshot, unitIds, hoveredH3);
     if (seq !== S.hoverPreviewRequestSeq) return;
     if (S.hoveredHexH3 !== hoveredH3) return;
     const currentSelected = [...S.selectedUnitIds].sort().join('|');

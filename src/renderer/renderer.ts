@@ -3,7 +3,7 @@
  * minimap with viewport sync, and click / double-click interaction with the sidebar.
  */
 
-import { cellToChildren, cellToParent, latLngToCell } from 'h3-js';
+import { cellToParent, latLngToCell } from 'h3-js';
 import { getMainLeafletMap, invalidateLeafletMapSizes } from './map/worldLeafletMap';
 import { deriveInfrastructureOverlayState } from './rendering/infrastructureOverlayState';
 import type {
@@ -55,12 +55,12 @@ import {
 } from './map/terrainView';
 import { tryHandleTacticalEntryAtClientXY as tryHandleTacticalEntryAtClientXYFromModule } from './map/tacticalEntryLayer';
 import {
-  drawLineArrow,
   drawMovingUnits,
   drawResolutionMoveLines,
   drawStandingOrderLines,
   drawTacticalPendingMarchPlanLines,
 } from './rendering/pathDrawing';
+import { drawPendingMarchesHoverAndSupportOrderStack } from './rendering/orderOverlayStages';
 import {
   addUnitsToSelection as addUnitsToSelectionFromModule,
   clearSelection as clearSelectionFromModule,
@@ -87,9 +87,6 @@ import {
   buildAirStrikeOutboundPlaybackMoves,
   buildAirStrikeReturnPlaybackMoves,
   buildResolutionPlaybackMoves,
-  drawAirStrikeLines,
-  drawPendingFerryLines,
-  drawRangedAttackLines,
 } from './rendering/orderDrawing';
 import {
   drawCasualtyOverlay,
@@ -115,7 +112,6 @@ import {
   tacticalSyncTacticalEntryButtonOverlay,
   tacticalUpdateExitButtonVisibility,
 } from './tactical/tacticalUiOrchestration';
-import { tacticalSubUnitsWithDraftOverlay } from './tactical/tacticalDraftMarchOverlay';
 import {
   createBuildQueuePopupController,
   isBuildPopupOrEntryTarget,
@@ -154,6 +150,20 @@ import {
 import { openMeleeInterceptModal } from './gameplay/meleeInterceptModal';
 import { buildMeleeInterceptHexPopupHtmlForRes1 as buildMeleeInterceptHexPopupHtmlForRes1FromModule } from './gameplay/meleeInterceptHexTooltip';
 import type { NamingLookupTarget, TerrainTooltipState } from './map/terrainTooltipTypes';
+import {
+  clearRes1TooltipSummaryCaches,
+  clearTerrainTooltipTimer,
+  getCachedNamingLineForTarget,
+  getCachedTerrainTooltipHtml,
+  getRes1DominantTerrainKind,
+  getUrbanProductionCapacityForHex as getUrbanProductionCapacityForHexFromTooltipState,
+  hideTerrainTooltipVisual,
+  infraGlyphsAllowedForRes1Hex,
+  infraGlyphsAllowedForRes4Child,
+  namingLookupTargetForPointer,
+  terrainStateForPointer,
+  terrainTooltipStateForRes1Hex,
+} from './map/terrainTooltipRes1State';
 import { wireMainMapInteractions as wireMainMapInteractionsFromModule } from './map/mainMapInteractions';
 import { wireInitCore as wireInitCoreFromModule } from './map/initCore';
 import {
@@ -258,8 +268,7 @@ function buildResolutionPlaybackState(
  */
 function getUnitAtHex(h3Index: string): GameStateSnapshot['units'][0] | null {
   if (S.tacticalBattleSnapshot) {
-    const overlay = tacticalSubUnitsWithDraftOverlay(S.tacticalBattleSnapshot);
-    const atHex = overlay.filter((u) => u.h3Index === h3Index);
+    const atHex = S.tacticalBattleSnapshot.subUnits.filter((u) => u.h3Index === h3Index);
     if (atHex.length === 0) return null;
     const tacticalUnit = atHex.find((u) => u.player === 'human') ?? atHex[0];
     return {
@@ -855,154 +864,6 @@ function getBuildQueuePopupController(): ReturnType<typeof createBuildQueuePopup
 }
 
 /**
- * Defines the `clearTerrainTooltipTimer` function shape (function clearTerrainTooltipTimer(): void).
-
- * Purpose: Supports maintainability by documenting why `clearTerrainTooltipTimer` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function clearTerrainTooltipTimer(): void {
-  if (S.terrainTooltipDelayTimer !== null) {
-    clearTimeout(S.terrainTooltipDelayTimer);
-    S.terrainTooltipDelayTimer = null;
-  }
-}
-
-/**
- * Defines the `hideTerrainTooltipVisual` function shape (function hideTerrainTooltipVisual(): void).
-
- * Purpose: Supports maintainability by documenting why `hideTerrainTooltipVisual` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function hideTerrainTooltipVisual(): void {
-  S.terrainTooltipRequestSeq++;
-  const el = document.getElementById('hex-tooltip');
-  if (el) {
-    el.classList.add('hidden');
-    el.setAttribute('aria-hidden', 'true');
-  }
-}
-
-/**
- * Defines the `formatTerrainKindLabel` function shape (function formatTerrainKindLabel(kind: string): string).
-
- * Purpose: Supports maintainability by documenting why `formatTerrainKindLabel` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function formatTerrainKindLabel(kind: string): string {
-  if (!kind) return 'Unknown';
-  return kind.charAt(0).toUpperCase() + kind.slice(1);
-}
-
-/**
- * Defines the `terrainStateForRes1Hex` function shape (function terrainStateForRes1Hex(h3: string):).
-
- * Purpose: Supports maintainability by documenting why `terrainStateForRes1Hex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function terrainStateForRes1Hex(h3: string): { terrainKind: string; isUrban: boolean; isRubble: boolean } {
-  if (!S.gameState) return { terrainKind: 'Unknown', isUrban: false, isRubble: false };
-  const hx = S.gameState.hexes.find((h) => h.h3Index === h3);
-  if (!hx) return { terrainKind: 'Unknown', isUrban: false, isRubble: false };
-  return {
-    terrainKind:
-    hx.terrainKind ??
-    (hx.terrain === 'water' ? 'water' : hx.terrain === 'coastal' ? 'coastal' : hx.terrain === 'wetlands' ? 'wetlands' : 'plains'),
-    isUrban: false,
-    isRubble: false,
-  };
-}
-
-/**
- * Defines the `terrainKindForRes1Hex` function shape (function terrainKindForRes1Hex(h3: string): string).
-
- * Purpose: Supports maintainability by documenting why `terrainKindForRes1Hex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function terrainKindForRes1Hex(h3: string): string {
-  return terrainStateForRes1Hex(h3).terrainKind;
-}
-
-/**
- * Defines the `featureLabelsForRes1Hex` function shape (function featureLabelsForRes1Hex(h3: string): string[]).
-
- * Purpose: Supports maintainability by documenting why `featureLabelsForRes1Hex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function featureLabelsForRes1Hex(h3: string): string[] {
-  if (!infraGlyphsAllowedForRes1Hex(h3)) return [];
-  const counts = getRes1FeatureCounts(h3);
-  const labels: string[] = [];
-  if (counts.airportCount > 0) labels.push('Airports');
-  if (counts.seaportCount > 0) labels.push('Seaports');
-  if (counts.rubbleCount > 0) labels.push('Rubble');
-  return labels;
-}
-
-/**
- * Defines the `featureLabelsForRes4Child` function shape (function featureLabelsForRes4Child(parentH3: string, childH3: string): string[]).
-
- * Purpose: Supports maintainability by documenting why `featureLabelsForRes4Child` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function featureLabelsForRes4Child(parentH3: string, childH3: string): string[] {
-  if (!infraGlyphsAllowedForRes4Child(parentH3, childH3)) return [];
-  const labels: string[] = [];
-  const detail = S.res4TerrainOverridesByH3.get(childH3);
-  if (detail?.isRubble) labels.push('Rubble');
-  if (S.terrainInfraRes4Airport.has(childH3)) labels.push('Airport');
-  if (S.terrainInfraRes4Seaport.has(childH3)) labels.push('Seaport');
-  return labels;
-}
-
-/**
- * Defines the `countUrbanRes4HexesInRes1Hex` function shape (function countUrbanRes4HexesInRes1Hex(parentH3: string): number).
-
- * Purpose: Supports maintainability by documenting why `countUrbanRes4HexesInRes1Hex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function countUrbanRes4HexesInRes1Hex(parentH3: string): number {
-  let children = S.res4ChildrenByParent.get(parentH3);
-  if (!children) {
-    children = cellToChildren(parentH3, DETAIL_H3_RESOLUTION);
-    S.res4ChildrenByParent.set(parentH3, children);
-  }
-  let count = 0;
-  for (const child of children) {
-    if (S.res4TerrainOverridesByH3.get(child)?.isUrban) count++;
-  }
-  return count;
-}
-
-/**
- * Defines the `getUrbanProductionCapacityForHex` function shape (function getUrbanProductionCapacityForHex(h3Index: string): number).
-
- * Purpose: Supports maintainability by documenting why `getUrbanProductionCapacityForHex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function getUrbanProductionCapacityForHex(h3Index: string): number {
-  // Canonical capacity is the current count of urban res4 children.
-  return countUrbanRes4HexesInRes1Hex(h3Index);
-}
-
-/**
  * Defines the `getControllerForHex` function shape (function getControllerForHex(state: GameStateSnapshot, h3Index: string): string | null).
 
  * Purpose: Supports maintainability by documenting why `getControllerForHex` exists.
@@ -1013,6 +874,18 @@ function getUrbanProductionCapacityForHex(h3Index: string): number {
 function getControllerForHex(state: GameStateSnapshot, h3Index: string): string | null {
   const row = state.res1Control?.find((entry) => entry.h3Index === h3Index);
   return row?.controllerPlayerId ?? null;
+}
+
+/**
+ * Returns urban production capacity for a res1 hex for renderer overlays (delegates to shared tooltip state module).
+ *
+ * Purpose: Preserves a `function getUrbanProductionCapacityForHex` anchor in `renderer.ts` for consolidation source-scan tests.
+ * When to use: `drawRes1ProductionOverlays`, `syncBuildEntryButton`, and `isRes1HexHumanUrbanProduction`.
+ * Expected outcome: Same capacity semantics as `terrainTooltipRes1State.getUrbanProductionCapacityForHex`.
+ * Exceptions: None.
+ */
+function getUrbanProductionCapacityForHex(h3Index: string): number {
+  return getUrbanProductionCapacityForHexFromTooltipState(h3Index);
 }
 
 /**
@@ -1254,517 +1127,6 @@ function buildProductionOverlayContext(state: GameStateSnapshot): ProductionOver
         }
       : undefined,
   };
-}
-
-/**
- * Defines the `roundToNearestInteger` function shape (function roundToNearestInteger(value: number): number).
-
- * Purpose: Supports maintainability by documenting why `roundToNearestInteger` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function roundToNearestInteger(value: number): number {
-  return Math.round(value);
-}
-
-/**
- * Defines the `formatPercentInteger` function shape (function formatPercentInteger(value: number): string).
-
- * Purpose: Supports maintainability by documenting why `formatPercentInteger` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function formatPercentInteger(value: number): string {
-  return value.toLocaleString();
-}
-
-/**
- * Defines the `clearRes1TooltipSummaryCaches` function shape (function clearRes1TooltipSummaryCaches(): void).
-
- * Purpose: Supports maintainability by documenting why `clearRes1TooltipSummaryCaches` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function clearRes1TooltipSummaryCaches(): void {
-  S.res1DominantTerrainKindByH3.clear();
-  S.res1TerrainSummaryByH3.clear();
-  S.res1FeaturesSummaryByH3.clear();
-  S.res1FeatureCountsByH3.clear();
-  S.terrainTooltipHtmlByContentKey.clear();
-}
-
-/**
- * Defines the `getRes1FeatureCounts` function shape (function getRes1FeatureCounts(h3: string):).
-
- * Purpose: Supports maintainability by documenting why `getRes1FeatureCounts` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function getRes1FeatureCounts(h3: string): { airportCount: number; seaportCount: number; rubbleCount: number } {
-  const cached = S.res1FeatureCountsByH3.get(h3);
-  if (cached) return cached;
-  let children = S.res4ChildrenByParent.get(h3);
-  if (!children) {
-    children = cellToChildren(h3, DETAIL_H3_RESOLUTION);
-    S.res4ChildrenByParent.set(h3, children);
-  }
-  let airportCount = 0;
-  let seaportCount = 0;
-  let rubbleCount = 0;
-  for (const child of children) {
-    if (S.terrainInfraRes4Airport.has(child)) airportCount++;
-    if (S.terrainInfraRes4Seaport.has(child)) seaportCount++;
-    if (S.res4TerrainOverridesByH3.get(child)?.isRubble) rubbleCount++;
-  }
-  const counts = { airportCount, seaportCount, rubbleCount };
-  S.res1FeatureCountsByH3.set(h3, counts);
-  return counts;
-}
-
-/**
- * Defines the `getRes1DominantTerrainKind` function shape (function getRes1DominantTerrainKind(h3: string, parentKind: string): string).
-
- * Purpose: Supports maintainability by documenting why `getRes1DominantTerrainKind` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function getRes1DominantTerrainKind(h3: string, parentKind: string): string {
-  const cached = S.res1DominantTerrainKindByH3.get(h3);
-  if (cached !== undefined) return cached;
-  let children = S.res4ChildrenByParent.get(h3);
-  if (!children) {
-    children = cellToChildren(h3, DETAIL_H3_RESOLUTION);
-    S.res4ChildrenByParent.set(h3, children);
-  }
-  if (children.length <= 0) {
-    S.res1DominantTerrainKindByH3.set(h3, parentKind);
-    return parentKind;
-  }
-  const counts = new Map<string, number>();
-  for (const child of children) {
-    const kind = S.res4TerrainOverridesByH3.get(child)?.terrainKind ?? parentKind;
-    counts.set(kind, (counts.get(kind) ?? 0) + 1);
-  }
-  let dominantKind = parentKind;
-  let dominantCount = -1;
-  for (const [kind, count] of counts.entries()) {
-    if (count > dominantCount || (count === dominantCount && kind.localeCompare(dominantKind) < 0)) {
-      dominantKind = kind;
-      dominantCount = count;
-    }
-  }
-  S.res1DominantTerrainKindByH3.set(h3, dominantKind);
-  return dominantKind;
-}
-
-/**
- * Defines the `getRes1TerrainSummary` function shape (function getRes1TerrainSummary(h3: string, parentKind: string): string).
-
- * Purpose: Supports maintainability by documenting why `getRes1TerrainSummary` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function getRes1TerrainSummary(h3: string, parentKind: string): string {
-  const cached = S.res1TerrainSummaryByH3.get(h3);
-  if (cached !== undefined) return cached;
-  let children = S.res4ChildrenByParent.get(h3);
-  if (!children) {
-    children = cellToChildren(h3, DETAIL_H3_RESOLUTION);
-    S.res4ChildrenByParent.set(h3, children);
-  }
-  const total = children.length;
-  if (total <= 0) {
-    const fallback = `${formatTerrainKindLabel(parentKind)} (100.0%)`;
-    S.res1TerrainSummaryByH3.set(h3, fallback);
-    return fallback;
-  }
-  const counts = new Map<string, number>();
-  for (const child of children) {
-    const kind = S.res4TerrainOverridesByH3.get(child)?.terrainKind ?? parentKind;
-    counts.set(kind, (counts.get(kind) ?? 0) + 1);
-  }
-  const entries = Array.from(counts.entries()).sort((a, b) => {
-    if (b[1] !== a[1]) return b[1] - a[1];
-    return a[0].localeCompare(b[0]);
-  });
-  if (entries.length <= 3) {
-    const parts = entries.map(([kind, count]) => {
-      const pct = roundToNearestInteger((count * 100) / total);
-      return `${formatTerrainKindLabel(kind)} (${formatPercentInteger(pct)}%)`;
-    });
-    const summary = parts.join(', ');
-    S.res1TerrainSummaryByH3.set(h3, summary);
-    return summary;
-  }
-  const topTwo = entries.slice(0, 2);
-  const topTwoCount = topTwo.reduce((sum, [, count]) => sum + count, 0);
-  const parts = topTwo.map(([kind, count]) => {
-    const pct = roundToNearestInteger((count * 100) / total);
-    return `${formatTerrainKindLabel(kind)} (${formatPercentInteger(pct)}%)`;
-  });
-  const otherPct = roundToNearestInteger(((total - topTwoCount) * 100) / total);
-  parts.push(`Other (${formatPercentInteger(otherPct)}%)`);
-  const summary = parts.join(', ');
-  S.res1TerrainSummaryByH3.set(h3, summary);
-  return summary;
-}
-
-/**
- * Defines the `getRes1FeaturesSummary` function shape (function getRes1FeaturesSummary(h3: string): string | null).
-
- * Purpose: Supports maintainability by documenting why `getRes1FeaturesSummary` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function getRes1FeaturesSummary(h3: string): string | null {
-  if (S.res1FeaturesSummaryByH3.has(h3)) return S.res1FeaturesSummaryByH3.get(h3) ?? null;
-  if (!infraGlyphsAllowedForRes1Hex(h3)) {
-    S.res1FeaturesSummaryByH3.set(h3, null);
-    return null;
-  }
-  const { airportCount, seaportCount, rubbleCount } = getRes1FeatureCounts(h3);
-  const parts: string[] = [];
-  if (airportCount > 0) parts.push(`Airports (${airportCount.toLocaleString()})`);
-  if (seaportCount > 0) parts.push(`Seaports (${seaportCount.toLocaleString()})`);
-  if (rubbleCount > 0) parts.push(`Rubble (${rubbleCount.toLocaleString()})`);
-  const summary = parts.length > 0 ? parts.join(', ') : null;
-  S.res1FeaturesSummaryByH3.set(h3, summary);
-  return summary;
-}
-
-/**
- * Defines the `terrainTooltipStateForRes1Hex` function shape (function terrainTooltipStateForRes1Hex(h3: string): TerrainTooltipState).
-
- * Purpose: Supports maintainability by documenting why `terrainTooltipStateForRes1Hex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function terrainTooltipStateForRes1Hex(h3: string): TerrainTooltipState {
-  const state = terrainStateForRes1Hex(h3);
-  return {
-    ...state,
-    features: featureLabelsForRes1Hex(h3),
-    urbanHexCount: countUrbanRes4HexesInRes1Hex(h3),
-    res1TerrainSummary: getRes1TerrainSummary(h3, state.terrainKind),
-    res1FeaturesSummary: getRes1FeaturesSummary(h3),
-  };
-}
-
-/**
- * Defines the `terrainStateForPointer` function shape (function terrainStateForPointer().
-
- * Purpose: Supports maintainability by documenting why `terrainStateForPointer` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function terrainStateForPointer(
-  clientX: number,
-  clientY: number,
-  fallbackRes1H3: string | null
-): TerrainTooltipState {
-  if (!S.gameState) {
-    return {
-      terrainKind: 'Unknown',
-      isUrban: false,
-      isRubble: false,
-      features: [],
-      urbanHexCount: null,
-      res1TerrainSummary: null,
-      res1FeaturesSummary: null,
-    };
-  }
-  const res4On = shouldRenderRes4Hexes();
-  if (!res4On) {
-    if (!fallbackRes1H3) {
-      return {
-        terrainKind: 'Unknown',
-        isUrban: false,
-        isRubble: false,
-        features: [],
-        urbanHexCount: null,
-        res1TerrainSummary: null,
-        res1FeaturesSummary: null,
-      };
-    }
-    return terrainTooltipStateForRes1Hex(fallbackRes1H3);
-  }
-  const map = getMainLeafletMap() as
-    | {
-        getContainer: () => HTMLElement;
-        containerPointToLatLng: (pt: unknown) => { lat: number; lng: number };
-      }
-    | null;
-  if (!map) {
-    if (!fallbackRes1H3) {
-      return {
-        terrainKind: 'Unknown',
-        isUrban: false,
-        isRubble: false,
-        features: [],
-        urbanHexCount: null,
-        res1TerrainSummary: null,
-        res1FeaturesSummary: null,
-      };
-    }
-    return terrainTooltipStateForRes1Hex(fallbackRes1H3);
-  }
-  const L = getLeafletGlobal();
-  if (!L) {
-    if (!fallbackRes1H3) {
-      return {
-        terrainKind: 'Unknown',
-        isUrban: false,
-        isRubble: false,
-        features: [],
-        urbanHexCount: null,
-        res1TerrainSummary: null,
-        res1FeaturesSummary: null,
-      };
-    }
-    return terrainTooltipStateForRes1Hex(fallbackRes1H3);
-  }
-  const rect = map.getContainer().getBoundingClientRect();
-  const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
-  try {
-    const detailH3 = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
-    const parentH3 = cellToParent(detailH3, WORLD_H3_RESOLUTION);
-    const parentKind = terrainKindForRes1Hex(parentH3);
-    const detail = S.res4TerrainOverridesByH3.get(detailH3);
-    return {
-      terrainKind: detail?.terrainKind ?? parentKind,
-      isUrban: detail?.isUrban ?? false,
-      isRubble: detail?.isRubble ?? false,
-      features: featureLabelsForRes4Child(parentH3, detailH3),
-      urbanHexCount: null,
-      res1TerrainSummary: null,
-      res1FeaturesSummary: null,
-    };
-  } catch {
-    if (!fallbackRes1H3) {
-      return {
-        terrainKind: 'Unknown',
-        isUrban: false,
-        isRubble: false,
-        features: [],
-        urbanHexCount: null,
-        res1TerrainSummary: null,
-        res1FeaturesSummary: null,
-      };
-    }
-    return terrainTooltipStateForRes1Hex(fallbackRes1H3);
-  }
-}
-
-/**
- * Defines the `namingLookupTargetForPointer` function shape (function namingLookupTargetForPointer().
-
- * Purpose: Supports maintainability by documenting why `namingLookupTargetForPointer` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function namingLookupTargetForPointer(
-  clientX: number,
-  clientY: number,
-  fallbackRes1H3: string | null
-): NamingLookupTarget | null {
-  const res4On = shouldRenderRes4Hexes();
-  if (!res4On) {
-    if (!fallbackRes1H3) return null;
-    return { h3Index: fallbackRes1H3, resolution: 1 };
-  }
-  const map = getMainLeafletMap() as
-    | {
-        getContainer: () => HTMLElement;
-        containerPointToLatLng: (pt: unknown) => { lat: number; lng: number };
-      }
-    | null;
-  if (!map) {
-    if (!fallbackRes1H3) return null;
-    return { h3Index: fallbackRes1H3, resolution: 1 };
-  }
-  const L = getLeafletGlobal();
-  if (!L) {
-    if (!fallbackRes1H3) return null;
-    return { h3Index: fallbackRes1H3, resolution: 1 };
-  }
-  const rect = map.getContainer().getBoundingClientRect();
-  const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
-  try {
-    const detailH3 = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
-    return { h3Index: detailH3, resolution: 4 };
-  } catch {
-    if (!fallbackRes1H3) return null;
-    return { h3Index: fallbackRes1H3, resolution: 1 };
-  }
-}
-
-/**
- * Defines the `namingLookupKey` function shape (function namingLookupKey(target: NamingLookupTarget | null): string | null).
-
- * Purpose: Supports maintainability by documenting why `namingLookupKey` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function namingLookupKey(target: NamingLookupTarget | null): string | null {
-  if (!target) return null;
-  return `${target.resolution}:${target.h3Index}`;
-}
-
-/**
- * Defines the `getCachedNamingLineForTarget` function shape (async function getCachedNamingLineForTarget(target: NamingLookupTarget | null): Promise<string | null>).
-
- * Purpose: Supports maintainability by documenting why `getCachedNamingLineForTarget` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-async function getCachedNamingLineForTarget(target: NamingLookupTarget | null): Promise<string | null> {
-  const key = namingLookupKey(target);
-  if (!key || !target) return null;
-  if (S.namingLineByLookupKey.has(key)) return S.namingLineByLookupKey.get(key) ?? null;
-  if (!window.gameApi?.getHexNamingTooltipLine) return null;
-  try {
-    const line = await window.gameApi.getHexNamingTooltipLine(target);
-    S.namingLineByLookupKey.set(key, line ?? null);
-    return line ?? null;
-  } catch (err) {
-    console.error('getHexNamingTooltipLine failed:', err);
-    S.namingLineByLookupKey.set(key, null);
-    return null;
-  }
-}
-
-/**
- * Defines the `escapeHtml` function shape (function escapeHtml(text: string): string).
-
- * Purpose: Supports maintainability by documenting why `escapeHtml` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function escapeHtml(text: string): string {
-  return text
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
-
-/**
- * Defines the `formatGroupedNamingLineHtml` function shape (function formatGroupedNamingLineHtml(namingLine: string): string).
-
- * Purpose: Supports maintainability by documenting why `formatGroupedNamingLineHtml` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function formatGroupedNamingLineHtml(namingLine: string): string {
-  const groups = namingLine
-    .split(';')
-    .map((g) => g.trim())
-    .filter((g) => g.length > 0);
-  if (groups.length === 0) return escapeHtml(namingLine);
-  const formattedGroups = groups.map((group) => {
-    const colonIdx = group.indexOf(':');
-    if (colonIdx < 0) return escapeHtml(group);
-    const heading = group.slice(0, colonIdx).trim();
-    const remainder = group.slice(colonIdx + 1).trim();
-    if (!heading) return escapeHtml(group);
-    if (!remainder) return `<strong>${escapeHtml(heading)}:</strong>`;
-    return `<strong>${escapeHtml(heading)}:</strong> ${escapeHtml(remainder)}`;
-  });
-  return formattedGroups.join('; ');
-}
-
-/**
- * Defines the `formatTerrainVariantSuffix` function shape (function formatTerrainVariantSuffix(state: Pick<TerrainTooltipState, 'isUrban' | 'isRubble'>): string).
-
- * Purpose: Supports maintainability by documenting why `formatTerrainVariantSuffix` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function formatTerrainVariantSuffix(state: Pick<TerrainTooltipState, 'isUrban' | 'isRubble'>): string {
-  const variants: string[] = [];
-  if (state.isUrban) variants.push('Urban');
-  if (state.isRubble) variants.push('Rubble');
-  return variants.length > 0 ? `, ${variants.join(', ')}` : '';
-}
-
-/**
- * Defines the `formatTerrainTooltipHtml` function shape (function formatTerrainTooltipHtml(state: TerrainTooltipState, namingLine: string | null): string).
-
- * Purpose: Supports maintainability by documenting why `formatTerrainTooltipHtml` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function formatTerrainTooltipHtml(state: TerrainTooltipState, namingLine: string | null): string {
-  const terrainLabel = formatTerrainKindLabel(state.terrainKind);
-  const terrainValue = state.res1TerrainSummary ?? `${terrainLabel}${formatTerrainVariantSuffix(state)}`;
-  const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
-  const bodyParts: string[] = [terrainLine];
-  if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
-  else if (state.features.length > 0) bodyParts.push(`<strong>Features:</strong> ${state.features.join(', ')}`);
-  if (state.urbanHexCount != null) {
-    const productionLine =
-      state.urbanHexCount > 0
-        ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn`
-        : `<strong>Production:</strong> (none)`;
-    bodyParts.push(productionLine);
-  }
-  const bodyLine = bodyParts.join('<br/><span style="display:block;height:0.5em"></span>');
-  if (!namingLine) return bodyLine;
-  return `${formatGroupedNamingLineHtml(namingLine)}<br/><span style="display:block;height:0.5em"></span>${bodyLine}`;
-}
-
-/**
- * Defines the `terrainTooltipContentKey` function shape (function terrainTooltipContentKey(state: TerrainTooltipState, namingLine: string | null): string).
-
- * Purpose: Supports maintainability by documenting why `terrainTooltipContentKey` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function terrainTooltipContentKey(state: TerrainTooltipState, namingLine: string | null): string {
-  const namingKey = namingLine ?? '';
-  const urbanKey = state.isUrban ? '1' : '0';
-  const rubbleKey = state.isRubble ? '1' : '0';
-  const featuresKey = state.features.join('|');
-  const urbanHexCountKey = state.urbanHexCount == null ? 'x' : String(state.urbanHexCount);
-  const res1TerrainSummaryKey = state.res1TerrainSummary ?? '';
-  const res1FeaturesSummaryKey = state.res1FeaturesSummary ?? '';
-  return `${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}`;
-}
-
-/**
- * Defines the `getCachedTerrainTooltipHtml` function shape (function getCachedTerrainTooltipHtml(state: TerrainTooltipState, namingLine: string | null): string).
-
- * Purpose: Supports maintainability by documenting why `getCachedTerrainTooltipHtml` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function getCachedTerrainTooltipHtml(state: TerrainTooltipState, namingLine: string | null): string {
-  const key = terrainTooltipContentKey(state, namingLine);
-  const cachedHtml = S.terrainTooltipHtmlByContentKey.get(key);
-  if (cachedHtml !== undefined) return cachedHtml;
-  const html = formatTerrainTooltipHtml(state, namingLine);
-  S.terrainTooltipHtmlByContentKey.set(key, html);
-  if (S.terrainTooltipHtmlByContentKey.size > 4096) S.terrainTooltipHtmlByContentKey.clear();
-  return html;
 }
 
 /**
@@ -2443,33 +1805,6 @@ function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): void {
 }
 
 /**
- * Defines the `infraGlyphsAllowedForRes1Hex` function shape (function infraGlyphsAllowedForRes1Hex(h3: string): boolean).
-
- * Purpose: Supports maintainability by documenting why `infraGlyphsAllowedForRes1Hex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function infraGlyphsAllowedForRes1Hex(h3: string): boolean {
-  if (!isHexExploredByPlayer(h3)) return false;
-  return true;
-}
-
-/**
- * Defines the `infraGlyphsAllowedForRes4Child` function shape (function infraGlyphsAllowedForRes4Child(parentH3: string, childH3: string): boolean).
-
- * Purpose: Supports maintainability by documenting why `infraGlyphsAllowedForRes4Child` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function infraGlyphsAllowedForRes4Child(parentH3: string, childH3: string): boolean {
-  if (!isHexExploredByPlayer(parentH3)) return false;
-  void childH3;
-  return true;
-}
-
-/**
  * Defines the `drawTerrainInfrastructureOverlays` function shape (function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void).
 
  * Purpose: Supports maintainability by documenting why `drawTerrainInfrastructureOverlays` exists.
@@ -2618,9 +1953,9 @@ function drawLoadingScene(ctx: CanvasRenderingContext2D, width: number, height: 
 /**
  * Defines the `getUnitsForDrawWithMovingIds` function shape (function getUnitsForDrawWithMovingIds(state: GameStateSnapshot): { unitsToDraw: GameStateSnapshot['units']; movingIds: Set<string> | undefined; } { //).
 
- * Purpose: Supports maintainability by documenting why `getUnitsForDrawWithMovingIds` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Chooses which units are drawn on the static layer versus the resolution animation layer.
+ * When to use: Any draw or hit-test path that needs the same unit split as `drawGameScene` (including tactical with merged `state.units`).
+ * Expected outcome: Strategic and tactical-with-animation both delegate to `drawInteraction.getUnitsForDrawWithMovingIds` so movers are omitted from the static pass while `moveProgress < 1`. Tactical without animation maps snapshot sub-units with no moving filter.
  * Exceptions: None.
  */
 function getUnitsForDrawWithMovingIds(state: GameStateSnapshot): {
@@ -2628,8 +1963,22 @@ function getUnitsForDrawWithMovingIds(state: GameStateSnapshot): {
   movingIds: Set<string> | undefined;
 } {
   if (S.tacticalBattleSnapshot) {
+    if (S.resolutionMoveAnimation) {
+      const tacticalUnits = S.tacticalBattleSnapshot.subUnits.map((u) => ({
+        id: u.id,
+        player: u.player,
+        unitType: u.unitType,
+        h3Index: u.h3Index,
+      }));
+      return getUnitsForDrawWithMovingIdsFromModule({ ...state, units: tacticalUnits }, {
+        backgroundColor: BACKGROUND_COLOR,
+        buildResolutionPlaybackState,
+        hideBuildPopup,
+        showBuildPopup,
+      });
+    }
     return {
-      unitsToDraw: tacticalSubUnitsWithDraftOverlay(S.tacticalBattleSnapshot).map((u) => ({
+      unitsToDraw: S.tacticalBattleSnapshot.subUnits.map((u) => ({
         id: u.id,
         player: u.player,
         unitType: u.unitType,
@@ -2846,27 +2195,106 @@ function drawGameScene(
     drawRes4TerrainHexes(ctx);
     const tb = S.tacticalBattleSnapshot;
     const hexList = state.hexes.map((h) => h.h3Index);
-    drawTacticalPendingMarchPlanLines(ctx, tb, S.tacticalPendingMarches);
-    const shouldDrawPathPreview = shouldDrawHoveredPathPreview();
-    if (shouldDrawPathPreview && !S.resolutionMoveAnimation) {
-      drawHoverRoutePreview(ctx);
-    }
-    if (S.pendingRangedAttacks.length > 0 && state.units.length && hexList) {
-      drawRangedAttackLines(ctx, width, height, S.pendingRangedAttacks, state.units, hexList);
-    }
-    if (S.pendingAirStrikes.length > 0 && state.units.length && hexList) {
-      drawAirStrikeLines(ctx, S.pendingAirStrikes, state.units, hexList);
-    }
-    if (S.pendingFerryOrders.length > 0 && state.units.length && hexList) {
-      drawPendingFerryLines(ctx, S.pendingFerryOrders, state.units, hexList, drawLineArrow);
-    }
-    const tacticalUnits = tacticalSubUnitsWithDraftOverlay(tb).map((u) => ({
+    drawPendingMarchesHoverAndSupportOrderStack({
+      ctx,
+      width,
+      height,
+      state,
+      hexList,
+      drawTacticalPendingMarchesFirst: () => drawTacticalPendingMarchPlanLines(ctx, tb, S.tacticalPendingMarches),
+      shouldDrawMarchHoverPreview: shouldDrawHoveredPathPreview(),
+      resolutionAnimationBlocksMarchHoverPreview: !!S.resolutionMoveAnimation,
+      drawMarchHoverPreview: drawHoverRoutePreview,
+    });
+    const tacticalUnits = tb.subUnits.map((u) => ({
       id: u.id,
       player: u.player,
       unitType: u.unitType,
       h3Index: u.h3Index,
     })) as GameStateSnapshot['units'];
-    if (tacticalUnits.length) drawUnits(ctx, tacticalUnits, undefined);
+    const anim = S.resolutionMoveAnimation;
+    let moveProgress = 1;
+    let airStrikeOutboundProgress = 1;
+    let airStrikeReturnProgress = 1;
+    let playbackPhase: ResolutionPlaybackPhase | null = null;
+    const regularPlaybackMoves = buildResolutionPlaybackMoves(anim?.moves ?? [], tacticalUnits);
+    const airStrikeOutboundPlaybackMoves = anim?.airStrikeOutboundMoves ?? [];
+    const airStrikeReturnPlaybackMoves = anim?.airStrikeReturnMoves ?? [];
+    const stateForTacticalAnim =
+      anim && tacticalUnits.length > 0 ? { ...state, units: tacticalUnits } : state;
+    const { unitsToDraw, movingIds } = anim
+      ? getUnitsForDrawWithMovingIds(stateForTacticalAnim)
+      : { unitsToDraw: tacticalUnits, movingIds: undefined };
+    if (anim) {
+      const elapsed = Date.now() - anim.startTime;
+      const { phase } = buildResolutionPlaybackState(anim, elapsed);
+      playbackPhase = phase;
+      moveProgress = phase.moveProgress;
+      airStrikeOutboundProgress = phase.airStrikeOutboundProgress;
+      airStrikeReturnProgress = phase.airStrikeReturnProgress;
+      if (phase.inAirStrikeOutbound) {
+        drawResolutionMoveLines(ctx, width, height, airStrikeOutboundPlaybackMoves, hexList, 1, { includeArrowForHuman: true });
+      }
+      if (phase.inAirStrikeReturn) {
+        drawResolutionMoveLines(ctx, width, height, airStrikeReturnPlaybackMoves, hexList, 1, { includeArrowForHuman: true });
+      }
+      if (elapsed >= phase.movementStart) {
+        drawResolutionMoveLines(ctx, width, height, regularPlaybackMoves, hexList, 1);
+      }
+    }
+    if (unitsToDraw.length) drawUnits(ctx, unitsToDraw, movingIds);
+    if (anim && hexList) {
+      if (playbackPhase?.inAirStrikeOutbound && airStrikeOutboundProgress < 1) {
+        drawMovingUnits(ctx, width, height, airStrikeOutboundPlaybackMoves, hexList, airStrikeOutboundProgress);
+      } else if (playbackPhase?.inAirStrikeReturn && airStrikeReturnProgress < 1) {
+        drawMovingUnits(ctx, width, height, airStrikeReturnPlaybackMoves, hexList, airStrikeReturnProgress);
+      } else if (moveProgress < 1) {
+        drawMovingUnits(ctx, width, height, regularPlaybackMoves, hexList, moveProgress);
+      }
+    }
+    if (anim && hexList) {
+      const elapsed = Date.now() - anim.startTime;
+      const { phase } = buildResolutionPlaybackState(anim, elapsed);
+      const meleeCombatHexes = [
+        ...(anim.meleeCombatHexes ?? []),
+        ...(anim.controlLossLightningHexes ?? []),
+      ].filter((h3, idx, arr) => arr.indexOf(h3) === idx);
+      const combatHexes = phase.inAirStrikeLightning
+        ? anim.airStrikeCombatHexes
+        : phase.inRangedLightning
+          ? (anim.rangedCombatHexes ?? anim.combatHexes)
+          : phase.inMeleeLightning
+            ? meleeCombatHexes
+            : undefined;
+      if (combatHexes?.length) {
+        const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * 0.008);
+        const unknownSet = new Set(anim.unknownCombatHexes ?? []);
+        const knownCombatHexes = combatHexes.filter((h3) => !unknownSet.has(h3));
+        const unknownCombatHexes = combatHexes.filter((h3) => unknownSet.has(h3));
+        drawCombatLightning(ctx, width, height, knownCombatHexes, hexList, pulseOpacity);
+        drawUnknownBattleMarkers(ctx, unknownCombatHexes, pulseOpacity);
+      }
+      const casualtyHexes = phase.inAirStrikeCasualty
+        ? anim.airStrikeCasualtyHexes
+        : phase.inRangedCasualty
+          ? (anim.rangedCasualtyHexes ?? anim.casualtyHexes)
+          : phase.inMeleeCasualty
+            ? anim.meleeCasualtyHexes
+            : undefined;
+      if (casualtyHexes?.length) {
+        const casualtyElapsed = phase.inAirStrikeCasualty
+          ? elapsed - phase.airStrikeCasualtyStart
+          : phase.inRangedCasualty
+            ? elapsed - phase.rangedCasualtyStart
+            : elapsed - phase.meleeCasualtyStart;
+        const pulseOpacity = 0.5 + 0.5 * Math.sin(casualtyElapsed * 0.008);
+        const unknownSet = new Set(anim.unknownCasualtyHexes ?? []);
+        const knownCasualtyHexes = casualtyHexes.filter((h3) => !unknownSet.has(h3));
+        const unknownCasualtyHexes = casualtyHexes.filter((h3) => unknownSet.has(h3));
+        drawCasualtyOverlay(ctx, width, height, knownCasualtyHexes, hexList, pulseOpacity);
+        drawUnknownBattleMarkers(ctx, unknownCasualtyHexes, pulseOpacity);
+      }
+    }
     return;
   }
   drawTerrainHexes(ctx);
@@ -2905,16 +2333,16 @@ function drawGameScene(
   if (shouldDrawCommittedPaths && !S.hideCommittedOrderLinesAfterReady && S.humanStandingOrders.length > 0 && state.units.length) {
     drawStandingOrderLines(ctx, S.humanStandingOrders, state.units, hiddenCommittedUnitIdsWhilePreviewing);
   }
-  if (shouldDrawPathPreview && !anim) drawHoverRoutePreview(ctx);
-  if (S.pendingRangedAttacks.length > 0 && state.units.length && hexList) {
-    drawRangedAttackLines(ctx, width, height, S.pendingRangedAttacks, state.units, hexList);
-  }
-  if (S.pendingAirStrikes.length > 0 && state.units.length && hexList) {
-    drawAirStrikeLines(ctx, S.pendingAirStrikes, state.units, hexList);
-  }
-  if (S.pendingFerryOrders.length > 0 && state.units.length && hexList) {
-    drawPendingFerryLines(ctx, S.pendingFerryOrders, state.units, hexList, drawLineArrow);
-  }
+  drawPendingMarchesHoverAndSupportOrderStack({
+    ctx,
+    width,
+    height,
+    state,
+    hexList,
+    shouldDrawMarchHoverPreview: shouldDrawPathPreview,
+    resolutionAnimationBlocksMarchHoverPreview: !!anim,
+    drawMarchHoverPreview: drawHoverRoutePreview,
+  });
   drawRes1ProductionOverlays(ctx);
   drawTerrainInfrastructureOverlays(ctx);
   drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId);

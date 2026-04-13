@@ -301,6 +301,15 @@ preTacticalLeafletMinZoom: null as number | null,
    * Exceptions: None.
    */
 preTacticalLeafletMaxZoom: null as number | null,
+    /**
+   * Documents the object literal property `strategicScenarioInitialLeafletView` (strategicScenarioInitialLeafletView: null as { lat: number; lng: number; zoom: number } | null).
+
+   * Purpose: Remembers the main-map center and zoom from the first `applyInitialCameraForState` of the current match so leaving tactical mode can restore that framing instead of fitting the entire world.
+   * When to use: Written when the scenario initial camera is applied; read in `exitTacticalMapView`; cleared on new game alongside `initialCameraApplied`.
+   * Expected outcome: Post-tactical strategic view matches the opening scenario extent when available.
+   * Exceptions: When null (before first camera apply), tactical exit falls back to world `fitBounds`.
+   */
+strategicScenarioInitialLeafletView: null as { lat: number; lng: number; zoom: number } | null,
 
     /**
    * Documents the object literal property `res1DominantTerrainKindByH3` (res1DominantTerrainKindByH3: new Map<string, string>()).

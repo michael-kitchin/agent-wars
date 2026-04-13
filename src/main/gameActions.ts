@@ -24,8 +24,7 @@ import type {
   EmbarkOrder,
   FerryOrder,
   AirStrikeTargetType,
-  ReadyResult,
-  ResolveMeleeInterceptIpcPayload,
+  TacticalCommitResolutionPlayback,
   SealiftStackState,
   GameStateSnapshot,
 } from '../shared/ipcTypes';
@@ -78,13 +77,8 @@ import {
   isTacticalBattleActive,
   validateHumanTacticalMarchOrders,
 } from './tacticalBattle/tacticalBattleSession';
-import { executeResolveMeleeIntercept } from './game-actions/meleeInterceptStrategicResolve';
-import { executeReadyStrategicTurn } from './game-actions/readyStrategicResolutionPipeline';
-import {
-  failIfDatabaseNotReady,
-  failIfMeleeInterceptDecisionPending,
-  failIfTacticalBattleActive,
-} from './game-actions/readyStrategicGuards';
+import { tacticalMarchFirstStopAlongPath } from './tacticalBattle/tacticalRulesAdapter';
+import { ready as readyImpl, resolveMeleeIntercept as resolveMeleeInterceptImpl } from './game-actions/gameActionsReadyEntrypoints';
 
 export { evaluateRegionControlWinnerAtEndOfTurn } from './game-actions/regionControlWinner';
 
@@ -132,6 +126,24 @@ reason?: string;
    * Exceptions: None.
    */
   tacticalBattle?: TacticalBattleSnapshot;
+  /**
+   * Specifies the contract for the `tacticalResolutionPlayback` member (tacticalResolutionPlayback?: TacticalCommitResolutionPlayback;).
+
+   * Contract: Present after successful tactical Ready commit when the renderer should play movement/combat overlays before the next interaction frame.
+   * When to use: `commitHumanTacticalDraftOrders` success only; ignored for other `SubmitOrdersResult` producers.
+   * Expected outcome: Structured deltas compatible with `S.resolutionMoveAnimation` population in the renderer.
+   * Exceptions: None.
+   */
+  tacticalResolutionPlayback?: TacticalCommitResolutionPlayback;
+  /**
+   * Specifies the contract for the `tacticalMarchContinuations` member (tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];).
+
+   * Contract: Present when human march drafts were truncated to per-turn range; renderer re-queues these as pending marches for later tactical turns.
+   * When to use: Successful `commitHumanTacticalDraftOrders` only, alongside `tacticalBattle` refresh.
+   * Expected outcome: Each row is a human sub-unit id plus the original ordered destination still to reach.
+   * Exceptions: None; omit when every march completed in one apply step.
+   */
+  tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
 }
 
 /**
@@ -685,7 +697,7 @@ function validateHumanMarchOrdersWhenTacticalActive(uniqueUnitIds: string[], des
  *
  * Purpose: Tactical parity with strategic Ready by applying all tactical draft types in one commit boundary.
  * When to use: `game:commitHumanTacticalDraftOrders` IPC with renderer draft lists at tactical Ready time.
- * Expected outcome: `success: true` with `tacticalBattle` snapshot for immediate redraw, or failure with reason.
+ * Expected outcome: `success: true` with `tacticalBattle` snapshot for immediate redraw, or failure with reason. Human marches apply at most one range-limited leg per commit; any remaining distance returns as `tacticalMarchContinuations` for the renderer pending list.
  * Exceptions: Caught and logged at error; returns `success: false` with stringified message.
  */
 export function commitHumanTacticalDraftOrders(args: {
@@ -717,11 +729,37 @@ export function commitHumanTacticalDraftOrders(args: {
       const checked = validateGroupFerryTarget([f.unitId], f.destinationH3Index);
       if (!checked.success) return checked;
     }
-    const applied = applyHumanTacticalMarchOrders(args.movementOrders);
+    const preBattle = getActiveTacticalBattleSnapshot();
+    if (!preBattle) {
+      return { success: false, reason: 'No tactical battle is active.' };
+    }
+    const res4Set = new Set(preBattle.res4ChildH3Indexes);
+    const appliedMovementOrders: { unitId: string; toH3Index: string }[] = [];
+    const tacticalMarchContinuations: { subUnitId: string; destinationH3Index: string }[] = [];
+    for (const o of args.movementOrders) {
+      const sub = preBattle.subUnits.find((u) => u.id === o.unitId);
+      if (!sub || sub.player !== 'human') continue;
+      const from = sub.h3Index;
+      if (from === o.toH3Index) continue;
+      const maxEdges = MOVEMENT_RANGE_BY_UNIT_TYPE[sub.unitType] ?? 1;
+      if (maxEdges <= 0) {
+        appliedMovementOrders.push({ unitId: o.unitId, toH3Index: o.toH3Index });
+        continue;
+      }
+      const { stopH3, consumedFullPath } = tacticalMarchFirstStopAlongPath(from, o.toH3Index, maxEdges, res4Set);
+      if (stopH3 !== from) {
+        appliedMovementOrders.push({ unitId: o.unitId, toH3Index: stopH3 });
+      }
+      if (!consumedFullPath && o.toH3Index !== stopH3) {
+        tacticalMarchContinuations.push({ subUnitId: o.unitId, destinationH3Index: o.toH3Index });
+      }
+    }
+    const applied = applyHumanTacticalMarchOrders(appliedMovementOrders);
     if (!applied.success) {
       logDebug('gameActions commitHumanTacticalDraftOrders rejected movement', { reason: applied.reason });
       return { success: false, reason: applied.reason };
     }
+    const postMovementBattle = applied.battle;
     const support = applyValidatedHumanTacticalSupportOrders({
       rangedAttacks: args.rangedAttacks,
       airStrikes: args.airStrikes,
@@ -732,7 +770,66 @@ export function commitHumanTacticalDraftOrders(args: {
       logDebug('gameActions commitHumanTacticalDraftOrders rejected support', { reason: support.reason });
       return { success: false, reason: support.reason };
     }
-    return { success: true, tacticalBattle: support.battle };
+    const finalBattle = support.battle;
+    const humanMoves: TacticalCommitResolutionPlayback['humanMoves'] = [];
+    for (const o of args.movementOrders) {
+      const sub = preBattle.subUnits.find((u) => u.id === o.unitId);
+      if (!sub || sub.player !== 'human') continue;
+      const from = sub.h3Index;
+      if (from === o.toH3Index) continue;
+      const maxEdges = MOVEMENT_RANGE_BY_UNIT_TYPE[sub.unitType] ?? 1;
+      if (maxEdges <= 0) {
+        humanMoves.push({ unitId: o.unitId, fromH3Index: from, toH3Index: o.toH3Index });
+        continue;
+      }
+      const { stopH3 } = tacticalMarchFirstStopAlongPath(from, o.toH3Index, maxEdges, res4Set);
+      if (stopH3 === from) continue;
+      humanMoves.push({ unitId: o.unitId, fromH3Index: from, toH3Index: stopH3 });
+    }
+    for (const f of args.ferryOrders ?? []) {
+      const u = postMovementBattle.subUnits.find((x) => x.id === f.unitId);
+      if (!u || u.unitType !== 'air' || u.player !== 'human') continue;
+      if (u.h3Index === f.destinationH3Index) continue;
+      humanMoves.push({ unitId: f.unitId, fromH3Index: u.h3Index, toH3Index: f.destinationH3Index });
+    }
+    const idsAfterSupport = new Set(finalBattle.subUnits.map((u) => u.id));
+    const rangedRemovedUnits = postMovementBattle.subUnits
+      .filter((u) => !idsAfterSupport.has(u.id))
+      .map((u) => ({
+        id: u.id,
+        player: u.player,
+        unitType: u.unitType,
+        h3Index: u.h3Index,
+      }));
+    const rangedCombatHexSet = new Set<string>();
+    for (const r of args.rangedAttacks ?? []) {
+      rangedCombatHexSet.add(r.targetH3Index);
+    }
+    for (const a of args.airStrikes ?? []) {
+      if (a.targetType === 'units') rangedCombatHexSet.add(a.targetH3Index);
+    }
+    const rangedCombatHexes = [...rangedCombatHexSet];
+    const casualtyHexSet = new Set(rangedRemovedUnits.map((v) => v.h3Index));
+    const rangedCasualtyHexes = rangedCombatHexes.filter((h) => casualtyHexSet.has(h));
+    const tacticalResolutionPlayback: TacticalCommitResolutionPlayback = {
+      humanMoves,
+      rangedCombatHexes: rangedCombatHexes.length > 0 ? rangedCombatHexes : undefined,
+      rangedCasualtyHexes: rangedCasualtyHexes.length > 0 ? rangedCasualtyHexes : undefined,
+      rangedRemovedUnits: rangedRemovedUnits.length > 0 ? rangedRemovedUnits : undefined,
+    };
+    logDebug('gameActions commitHumanTacticalDraftOrders playback', {
+      humanMoveCount: humanMoves.length,
+      rangedCombatHexCount: rangedCombatHexes.length,
+      rangedRemovedCount: rangedRemovedUnits.length,
+      marchContinuationCount: tacticalMarchContinuations.length,
+    });
+    return {
+      success: true,
+      tacticalBattle: finalBattle,
+      tacticalResolutionPlayback,
+      tacticalMarchContinuations:
+        tacticalMarchContinuations.length > 0 ? tacticalMarchContinuations : undefined,
+    };
   } catch (err) {
     logError('commitHumanTacticalDraftOrders: exception', err);
     return { success: false, reason: String(err) };
@@ -1152,75 +1249,5 @@ export function submitOrders(payload: SubmitOrdersPayload): SubmitOrdersResult {
   });
 }
 
-/**
- * Defines the `ready` function shape (export function ready( aiOrders: MovementOrder[] = [], aiRangedOrders: RangedAttackOrder[] = [], aiAirStrikeOrders: AirStrikeOrder[] = [], aiFerryOr).
-
- * Purpose: Supports maintainability by documenting why `ready` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function ready(
-  aiOrders: MovementOrder[] = [],
-  aiRangedOrders: RangedAttackOrder[] = [],
-  aiAirStrikeOrders: AirStrikeOrder[] = [],
-  aiFerryOrders: FerryOrder[] = [],
-  aiEmbarkOrders: EmbarkOrder[] = []
-): ReadyResult {
-  logDebug('ready', {
-    aiOrderCount: aiOrders.length,
-    aiRangedCount: aiRangedOrders.length,
-    aiAirStrikeCount: aiAirStrikeOrders.length,
-    aiFerryCount: aiFerryOrders.length,
-    aiEmbarkCount: aiEmbarkOrders.length,
-  });
-  try {
-    const failDb = failIfDatabaseNotReady('ready');
-    if (failDb) return failDb;
-    const failTac = failIfTacticalBattleActive('ready');
-    if (failTac) return failTac;
-    const failMelee = failIfMeleeInterceptDecisionPending();
-    if (failMelee) return failMelee;
-
-    const turnRow = dbGetOne<{ phase: string; turn_number: number }>(
-      'SELECT phase, turn_number FROM turn_state WHERE id = 1'
-    );
-    if (turnRow?.phase !== VALID_PHASE) {
-      logError('ready: not in planning phase', turnRow?.phase);
-      return { success: false, reason: 'Not in planning phase' };
-    }
-
-    return executeReadyStrategicTurn(
-      aiOrders,
-      aiRangedOrders,
-      aiAirStrikeOrders,
-      aiFerryOrders,
-      aiEmbarkOrders,
-      {
-        humanPlayerId: HUMAN_PLAYER_ID,
-        validPhase: VALID_PHASE,
-        turnNumber: turnRow?.turn_number ?? 1,
-      }
-    );
-  } catch (err) {
-    logError('ready: exception', err);
-    return { success: false, reason: String(err) };
-  }
-}
-
-/**
- * Resumes strategic turn resolution after the human submits Fight or Ignore for a paused pre-melee intercept.
- *
- * Purpose: Applies selective melee skips and reuses `finalizeReadyTurnAfterMelee` so dice and DB effects match stock ready.
- * When to use: Renderer IPC only after `ready` returned `awaitingMeleeDecision`.
- * Expected outcome: Full `ReadyResult` for a completed turn; Fight adds `tacticalAutoStartRes1H3Index`.
- * Exceptions: Invalid token, phase drift, or bad payload return `success: false` with a reason string.
- */
-export function resolveMeleeIntercept(payload: ResolveMeleeInterceptIpcPayload): ReadyResult {
-  try {
-    return executeResolveMeleeIntercept(payload);
-  } catch (err) {
-    logError('resolveMeleeIntercept: exception', err);
-    return { success: false, reason: String(err) };
-  }
-}
+export const ready = readyImpl;
+export const resolveMeleeIntercept = resolveMeleeInterceptImpl;

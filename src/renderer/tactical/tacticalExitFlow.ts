@@ -7,6 +7,8 @@ import {
 } from '../../shared/tacticalStateAssertions';
 import { shouldEndTacticalBattleForAnnihilation } from '../../shared/tacticalAnnihilation';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { rendererSharedState as S } from '../core/state';
+import { updateGameStateSidebar } from '../core/uiState';
 import { exitTacticalMapView } from '../map/tacticalMapView';
 import { hideTacticalEntryLayer } from '../map/tacticalEntryLayer';
 import { restoreStrategicOrderDraftsAfterTacticalSession } from './tacticalStrategicOrderUiStash';
@@ -98,6 +100,7 @@ export async function tacticalPerformBattleExit(session: TacticalExitSessionAcce
   const tel = document.getElementById('tactical-entry-layer');
   if (tel) hideTacticalEntryLayer(tel, false);
   tacticalUpdateExitButtonVisibility();
+  updateGameStateSidebar(S.gameState);
   restoreStrategicOrderDraftsAfterTacticalSession();
   io.redraw();
   await io.runReadyAfterExit();

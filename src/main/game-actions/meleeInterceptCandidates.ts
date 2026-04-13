@@ -89,14 +89,17 @@ export function formatMeleeUnitCategorySummary(units: CombatUnit[], playerId: st
  *
  * Purpose: Centralizes row assembly for ready pause and unit tests.
  * When to use: After `listMeleeCandidateHexes` returns a non-empty list.
- * Expected outcome: One `MeleeCandidateRow` per candidate hex with paired summaries.
+ * Expected outcome: One `MeleeCandidateRow` per candidate hex with human/AI summaries counting only units **on that hex** (not global totals repeated per row).
  * Exceptions: None.
  */
 export function buildMeleeInterceptCandidateRows(candidateHexes: string[], combatUnitsAfter: CombatUnit[]): MeleeCandidateRow[] {
   logTrace('buildMeleeInterceptCandidateRows', { candidateCount: candidateHexes.length, unitCount: combatUnitsAfter.length });
-  return candidateHexes.map((h3Index) => ({
-    h3Index,
-    humanUnitSummary: formatMeleeUnitCategorySummary(combatUnitsAfter, 'human'),
-    aiUnitSummary: formatMeleeUnitCategorySummary(combatUnitsAfter, 'opponent'),
-  }));
+  return candidateHexes.map((h3Index) => {
+    const atHex = combatUnitsAfter.filter((u) => u.h3Index === h3Index);
+    return {
+      h3Index,
+      humanUnitSummary: formatMeleeUnitCategorySummary(atHex, 'human'),
+      aiUnitSummary: formatMeleeUnitCategorySummary(atHex, 'opponent'),
+    };
+  });
 }

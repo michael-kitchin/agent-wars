@@ -22,6 +22,7 @@ import type {
   HexBuildQueueSnapshot,
   NewGameIpcPayload,
   ResolveMeleeInterceptIpcPayload,
+  TacticalCommitResolutionPlayback,
 } from '../shared/ipcTypes';
 import type {
   EndTacticalBattleIpcResult,
@@ -228,8 +229,13 @@ commitHumanTacticalDraftOrders: (payload: {
     airStrikes?: { unitId: string; targetH3Index: string; targetType: AirStrikeTargetType }[];
     ferryOrders?: { unitId: string; destinationH3Index: string }[];
     embarkOrders?: { unitId: string; navalUnitId: string }[];
-  }): Promise<{ success: boolean; reason?: string; tacticalBattle?: TacticalBattleSnapshot }> =>
-    ipcRenderer.invoke('game:commitHumanTacticalDraftOrders', payload),
+  }): Promise<{
+    success: boolean;
+    reason?: string;
+    tacticalBattle?: TacticalBattleSnapshot;
+    tacticalResolutionPlayback?: TacticalCommitResolutionPlayback;
+    tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
+  }> => ipcRenderer.invoke('game:commitHumanTacticalDraftOrders', payload),
     /**
    * Documents the object literal property `validateGroupRangedTarget` (validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke('g).
 

@@ -133,8 +133,13 @@ function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void {
     'shouldDrawHoveredPathPreview should gate hover path preview by ctrl and active selection'
   );
   assert.ok(
-    drawSceneFn.includes('if (shouldDrawPathPreview && !anim) drawHoverRoutePreview(ctx);'),
-    'drawGameScene should only draw hover path preview when preview rendering is enabled'
+    drawSceneFn.includes('drawPendingMarchesHoverAndSupportOrderStack({') &&
+      drawSceneFn.includes('shouldDrawMarchHoverPreview: shouldDrawPathPreview,') &&
+      drawSceneFn.includes('resolutionAnimationBlocksMarchHoverPreview: !!anim,') &&
+      drawSceneFn.includes('drawMarchHoverPreview: drawHoverRoutePreview,') &&
+      drawSceneFn.includes('shouldDrawMarchHoverPreview: shouldDrawHoveredPathPreview(),') &&
+      drawSceneFn.includes('resolutionAnimationBlocksMarchHoverPreview: !!S.resolutionMoveAnimation,'),
+    'drawGameScene should delegate hover path preview to shared staging with policy gating and animation suppression'
   );
   assert.ok(
     drawSceneFn.includes(
@@ -173,10 +178,13 @@ function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void {
  */
 function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const terrainTooltipStatePath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'terrainTooltipRes1State.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
+  const terrainTooltipSource = fs.readFileSync(terrainTooltipStatePath, 'utf8');
   const drawProductionFn = getFunctionSource(source, 'drawRes1ProductionOverlays');
   const syncBuildEntryFn = getFunctionSource(source, 'syncBuildEntryButton');
   const getUrbanProductionCapacityForHexFn = getFunctionSource(source, 'getUrbanProductionCapacityForHex');
+  const canonicalUrbanCapacityFn = getFunctionSource(terrainTooltipSource, 'getUrbanProductionCapacityForHex');
   const isRes1HexHumanUrbanProductionFn = getFunctionSource(source, 'isRes1HexHumanUrbanProduction');
   const drawHoverPreviewFn = getFunctionSource(source, 'drawHoverRoutePreview');
   const shouldDrawHoveredPathPreviewFn = getFunctionSource(source, 'shouldDrawHoveredPathPreview');
@@ -253,8 +261,12 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
     'isRes1HexHumanUrbanProduction should use canonical urban-res4 count for build eligibility'
   );
   assert.ok(
-    getUrbanProductionCapacityForHexFn.includes('countUrbanRes4HexesInRes1Hex(h3Index)'),
-    'getUrbanProductionCapacityForHex should compute from live urban res4-child count'
+    getUrbanProductionCapacityForHexFn.includes('getUrbanProductionCapacityForHexFromTooltipState'),
+    'renderer should delegate urban capacity to the shared terrain tooltip / res1 cache module'
+  );
+  assert.ok(
+    canonicalUrbanCapacityFn.includes('countUrbanRes4HexesInRes1Hex(h3Index)'),
+    'shared getUrbanProductionCapacityForHex should compute from live urban res4-child count'
   );
   assert.ok(
     drawHoverPreviewFn.includes('if (!shouldDrawHoveredPathPreview()) return;') &&
@@ -439,12 +451,16 @@ function testAirFerryDoubleClickContracts(): void {
       !formatPendingFerryOrderSidebarLabelFn.includes('destinationH3Index} (ferry)'),
     'ferry sidebar labels should avoid raw H3 fallback and stay in Nh notation'
   );
+  const overlayStagesPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'orderOverlayStages.ts');
+  const overlayStagesSource = fs.readFileSync(overlayStagesPath, 'utf8');
   assert.ok(
-    source.includes("from './rendering/orderDrawing'") &&
-      source.includes('drawPendingFerryLines(ctx, S.pendingFerryOrders, state.units, hexList, drawLineArrow);') &&
+    source.includes("from './rendering/orderOverlayStages'") &&
+      source.includes('drawPendingMarchesHoverAndSupportOrderStack({') &&
+      overlayStagesSource.includes('drawPendingSupportOrderOverlays(') &&
+      overlayStagesSource.includes('drawPendingFerryLines(ctx, S.pendingFerryOrders, state.units, hexList, drawLineArrow);') &&
       orderDrawingSource.includes('function drawPendingFerryLines(') &&
       orderDrawingSource.includes('drawLineArrow('),
-    'pending ferry planning should render filled map arrows like other planned movement'
+    'pending ferry planning should render filled map arrows via shared overlay stage like other planned movement'
   );
 }
 
@@ -567,12 +583,14 @@ function testKillUpdateTextOmitsPlayerSuffixes(): void {
 function testRes4RubbleTooltipAndTerrainVariantContracts(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const rendererSource = fs.readFileSync(rendererPath, 'utf8');
+  const terrainTooltipStatePath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'terrainTooltipRes1State.ts');
+  const terrainTooltipStateSource = fs.readFileSync(terrainTooltipStatePath, 'utf8');
   const terrainStylesPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'terrainVisualStyles.ts');
   const terrainStylesSource = fs.readFileSync(terrainStylesPath, 'utf8');
   const drawTerrainHexesFn = getFunctionSource(rendererSource, 'drawTerrainHexes');
-  const featureLabelsForRes4ChildFn = getFunctionSource(rendererSource, 'featureLabelsForRes4Child');
-  const terrainStateForPointerFn = getFunctionSource(rendererSource, 'terrainStateForPointer');
-  const formatTerrainTooltipHtmlFn = getFunctionSource(rendererSource, 'formatTerrainTooltipHtml');
+  const featureLabelsForRes4ChildFn = getFunctionSource(terrainTooltipStateSource, 'featureLabelsForRes4Child');
+  const terrainStateForPointerFn = getFunctionSource(terrainTooltipStateSource, 'terrainStateForPointer');
+  const formatTerrainTooltipHtmlFn = getFunctionSource(terrainTooltipStateSource, 'formatTerrainTooltipHtml');
 
   assert.ok(
     drawTerrainHexesFn.includes('if (res4Active) return;'),
@@ -686,6 +704,80 @@ function testTacticalEntryLayerPlanningAndContestedContracts(): void {
  * Expected outcome: Enter clamps min/max zoom and maxBounds to the tactical footprint with animated bounds; exit restores world maxBounds and saved zoom limits.
  * Exceptions: None.
  */
+/**
+ * Defines the `testStrategicAndTacticalBranchesShareOrderOverlayPipeline` function shape.
+
+ * Purpose: Guards Phase 5 overlay consolidation so tactical/strategic `drawGameScene` paths cannot drop pending support overlays independently.
+ * When to use: Regression signal when refactoring `drawGameScene` or `orderOverlayStages`.
+ * Expected outcome: Both branches call `drawPendingMarchesHoverAndSupportOrderStack` from the shared module (which stages hover preview then support overlays).
+ * Exceptions: None.
+ */
+function testStrategicAndTacticalBranchesShareOrderOverlayPipeline(): void {
+  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const source = fs.readFileSync(rendererPath, 'utf8');
+  const drawSceneFn = getFunctionSource(source, 'drawGameScene');
+  assert.ok(
+    source.includes("from './rendering/orderOverlayStages'") && source.includes('drawPendingMarchesHoverAndSupportOrderStack'),
+    'renderer should import shared order overlay stack helper'
+  );
+  const stackCalls = drawSceneFn.match(/drawPendingMarchesHoverAndSupportOrderStack\(/g) ?? [];
+  assert.ok(stackCalls.length >= 2, 'drawGameScene should invoke shared pending march/hover/support stack in tactical and strategic paths');
+}
+
+/**
+ * Defines the `testMainMapInteractionsDelegatesHumanUnitIconSelectionToPolicyModule` function shape.
+
+ * Purpose: Guards Phase 4 click-selection consolidation for human unit icon hits on the main map.
+ * When to use: Regression signal when refactoring `mainMapInteractions` selection branches.
+ * Expected outcome: Icon hit path delegates to `applyHumanUnitIconClickSelectionPolicy` and clears use the shared timer helper.
+ * Exceptions: None.
+ */
+function testMainMapInteractionsDelegatesHumanUnitIconSelectionToPolicyModule(): void {
+  const interactionsPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'mainMapInteractions.ts');
+  const source = fs.readFileSync(interactionsPath, 'utf8');
+  assert.ok(
+    source.includes("from './mapClickSelectionPolicy'") &&
+      source.includes('applyHumanUnitIconClickSelectionPolicy(') &&
+      source.includes('clearDeferredHumanUnitSingleSelectTimer()'),
+    'main map interactions should delegate human unit icon selection to shared policy helpers'
+  );
+}
+
+/**
+ * Defines the `testParityDiagnosticsBreadcrumbsCoverPlanningAndPositionSourceBoundaries` function shape.
+
+ * Purpose: Guards Phase 7 parity diagnostics instrumentation around double-click planning and tactical draft-vs-committed source selection.
+ * When to use: Regression signal when refactoring `mainMapInteractions`, `mapClickSelectionPolicy`, or `tacticalDraftMarchOverlay`.
+ * Expected outcome: Breadcrumb helper imports and event keys remain wired at the parity-sensitive boundaries.
+ * Exceptions: None.
+ */
+function testParityDiagnosticsBreadcrumbsCoverPlanningAndPositionSourceBoundaries(): void {
+  const interactionsPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'mainMapInteractions.ts');
+  const selectionPolicyPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'mapClickSelectionPolicy.ts');
+  const tacticalOverlayPath = path.resolve(process.cwd(), 'src', 'renderer', 'tactical', 'tacticalDraftMarchOverlay.ts');
+  const interactionsSource = fs.readFileSync(interactionsPath, 'utf8');
+  const selectionPolicySource = fs.readFileSync(selectionPolicyPath, 'utf8');
+  const tacticalOverlaySource = fs.readFileSync(tacticalOverlayPath, 'utf8');
+  assert.ok(
+    interactionsSource.includes('emitParityDiagnosticsBreadcrumb') &&
+      interactionsSource.includes("'planning.doubleClickAccepted'") &&
+      interactionsSource.includes("'planning.doubleClickIgnored'") &&
+      interactionsSource.includes("'planning.doubleClickRejected'"),
+    'main map interactions should emit parity breadcrumbs for double-click planning decisions'
+  );
+  assert.ok(
+    selectionPolicySource.includes('emitParityDiagnosticsBreadcrumb') &&
+      selectionPolicySource.includes("'selection.deferSingleSelect'") &&
+      selectionPolicySource.includes("'selection.applyDeferredSingleSelect'"),
+    'main map click-selection policy should emit parity breadcrumbs for deferred single-select behavior'
+  );
+  assert.ok(
+    tacticalOverlaySource.includes('emitParityDiagnosticsBreadcrumb') &&
+      tacticalOverlaySource.includes("'tactical.positionSourceSelection'"),
+    'tactical draft overlay helpers should emit parity breadcrumbs for draft-vs-committed position source selection'
+  );
+}
+
 function testTacticalMapViewLocksZoomPanAndRestoresWorld(): void {
   const tacticalMapPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'tacticalMapView.ts');
   const source = fs.readFileSync(tacticalMapPath, 'utf8');
@@ -695,8 +787,12 @@ function testTacticalMapViewLocksZoomPanAndRestoresWorld(): void {
     'enterTacticalMapView should clamp Leaflet pan to the tactical footprint bounds'
   );
   assert.ok(
-    enterFn.includes('map.setMinZoom(4)') && enterFn.includes('map.setMaxZoom(12)'),
-    'enterTacticalMapView should lock tactical min/max zoom levels'
+    enterFn.includes('setMinZoom(map.getZoom())') || enterFn.includes('map.setMinZoom(map.getZoom())'),
+    'enterTacticalMapView should lock tactical min zoom to the level reached after fitting the footprint'
+  );
+  assert.ok(
+    enterFn.includes('tacticalFlyMaxZoom') || enterFn.includes('maxZoom: tacticalFlyMaxZoom'),
+    'enterTacticalMapView should use a raised tactical fly max zoom for a closer default view'
   );
   assert.ok(
     enterFn.includes('map.flyToBounds') || enterFn.includes('map.fitBounds'),
@@ -706,6 +802,10 @@ function testTacticalMapViewLocksZoomPanAndRestoresWorld(): void {
   assert.ok(
     exitFn.includes('map.setMaxBounds(worldBounds)'),
     'exitTacticalMapView should restore world maxBounds after tactical mode'
+  );
+  assert.ok(
+    exitFn.includes('map.fitBounds(worldBounds') || exitFn.includes('map.fitBounds?.(worldBounds'),
+    'exitTacticalMapView should fit the default strategic world view after restoring zoom limits'
   );
   assert.ok(
     exitFn.includes('map.setMinZoom(S.preTacticalLeafletMinZoom)') &&
@@ -774,6 +874,9 @@ function run(): void {
   testTacticalDrawBranchSkipsStrategicStaleIntel();
   testTacticalRes4DrawingSkipsExploredGateWhenTactical();
   testTacticalEntryLayerPlanningAndContestedContracts();
+  testStrategicAndTacticalBranchesShareOrderOverlayPipeline();
+  testMainMapInteractionsDelegatesHumanUnitIconSelectionToPolicyModule();
+  testParityDiagnosticsBreadcrumbsCoverPlanningAndPositionSourceBoundaries();
   testTacticalMapViewLocksZoomPanAndRestoresWorld();
   console.log('rendererConsolidation.test.ts passed');
 }

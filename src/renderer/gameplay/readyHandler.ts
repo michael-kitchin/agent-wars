@@ -4,6 +4,7 @@ import type {
   GameStateSnapshot,
   ReadyResult,
   RemovedUnitSnapshot,
+  TacticalCommitResolutionPlayback,
 } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { MeleeInterceptModalOpenArgs, MeleeInterceptModalOutcome } from './meleeInterceptModal';
@@ -610,6 +611,8 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         success: boolean;
         reason?: string;
         tacticalBattle?: TacticalBattleSnapshot;
+        tacticalResolutionPlayback?: TacticalCommitResolutionPlayback;
+        tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
       };
       if (!commitResult.success) {
         deps.showSidebarError(commitResult.reason ?? 'Tactical commit failed');
@@ -619,15 +622,35 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       if (commitResult.tacticalBattle) {
         S.tacticalBattleSnapshot = commitResult.tacticalBattle;
       }
-      S.tacticalPendingMarches = [];
+      S.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length
+        ? [...commitResult.tacticalMarchContinuations]
+        : [];
       S.pendingRangedAttacks = [];
       S.pendingAirStrikes = [];
       S.pendingFerryOrders = [];
       S.rangedModeActive = false;
       S.airStrikeModeActive = false;
+      const playback = commitResult.tacticalResolutionPlayback;
+      const hasMoves = (playback?.humanMoves?.length ?? 0) > 0;
+      const hasRangedPlayback =
+        (playback?.rangedCombatHexes?.length ?? 0) > 0 ||
+        (playback?.rangedCasualtyHexes?.length ?? 0) > 0 ||
+        (playback?.rangedRemovedUnits?.length ?? 0) > 0;
+      if (playback && (hasMoves || hasRangedPlayback)) {
+        if (S.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
+        S.resolutionMoveAnimation = {
+          moves: playback.humanMoves,
+          startTime: Date.now(),
+          rangedCombatHexes: playback.rangedCombatHexes,
+          rangedCasualtyHexes: playback.rangedCasualtyHexes,
+          rangedRemovedUnits: playback.rangedRemovedUnits,
+        };
+        S.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);
+      }
       deps.updatePendingOrdersSidebar();
       deps.updateRangedSidebar();
       deps.updateSidebar();
+      deps.updateGameStateSidebar(S.gameState);
       deps.redraw();
       deps.scheduleTacticalAnnihilationExit?.();
       return;

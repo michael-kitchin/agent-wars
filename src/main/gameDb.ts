@@ -30,6 +30,12 @@ import {
 } from './game-db/recovery/corruptRecovery';
 import { getFullDdl } from './game-db/schema';
 import {
+  applyGameDbPragmas as applyGameDbPragmasCore,
+  validateGameDatabaseOrThrow as validateGameDatabaseOrThrowCore,
+} from './game-db/databaseValidation';
+import { getMapHexSetWithGetAll } from './game-db/mapHexRead';
+import { listUnitsForSnapshotWithGetAll } from './game-db/unitSnapshotRead';
+import {
   clearBuildQueueAndProgressForHex as clearBuildQueueAndProgressForHexFromModule,
   getBuildProgressPointsForHex as getBuildProgressPointsForHexFromModule,
   getHexController as getHexControllerFromModule,
@@ -123,39 +129,6 @@ export const GAME_DB_FILE_NAME = 'game-baseline-v11.sqlite';
 let db: InstanceType<typeof Database> | null = null;
 
 /**
- * Documents the module-scope binding `REQUIRED_TABLES` (REQUIRED_TABLES).
-
- * Purpose: Supports maintainability by documenting why `REQUIRED_TABLES` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const REQUIRED_TABLES = [
-  'hexes',
-  'units',
-  'turn_state',
-  'pending_orders',
-  'pending_ranged_orders',
-  'pending_air_orders',
-  'pending_ferry_orders',
-  'unit_transport_assignments',
-  'game_config',
-  'ai_memory',
-  'standing_orders',
-  'ai_callback_subscriptions',
-  'ai_pending_orders',
-  'ai_combat_since_consultation',
-  'ai_loss_events_since_consultation',
-  'player_hex_intel',
-  'player_unit_intel',
-  'res1_control',
-  'res1_build_queue',
-  'res1_build_progress',
-  'res1_infrastructure',
-  'res4_feature_overrides',
-] as const;
-
-/**
  * Documents the module-scope binding `INFRASTRUCTURE_SYNC_TRIGGER_NAMES` (INFRASTRUCTURE_SYNC_TRIGGER_NAMES).
 
  * Purpose: Supports maintainability by documenting why `INFRASTRUCTURE_SYNC_TRIGGER_NAMES` exists.
@@ -178,10 +151,7 @@ const INFRASTRUCTURE_SYNC_TRIGGER_NAMES = [
  * Exceptions: None.
  */
 export function applyGameDbPragmas(database: InstanceType<typeof Database>): void {
-  database.pragma('journal_mode = MEMORY');
-  database.pragma('foreign_keys = ON');
-  database.pragma('defer_foreign_keys = ON');
-  database.pragma('synchronous = OFF');
+  applyGameDbPragmasCore(database);
 }
 
 /**
@@ -193,14 +163,7 @@ export function applyGameDbPragmas(database: InstanceType<typeof Database>): voi
  * Exceptions: None.
  */
 export function validateGameDatabaseOrThrow(database: InstanceType<typeof Database>): void {
-  const uv = database.pragma('user_version', { simple: true }) as number;
-  if (uv !== EXPECTED_USER_VERSION) {
-    throw new Error(`Invalid user_version: expected ${EXPECTED_USER_VERSION}, got ${uv}`);
-  }
-  for (const t of REQUIRED_TABLES) {
-    const row = database.prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`).get(t);
-    if (!row) throw new Error(`Missing required table: ${t}`);
-  }
+  validateGameDatabaseOrThrowCore(database, EXPECTED_USER_VERSION);
 }
 
 /**
@@ -262,80 +225,6 @@ function getAll<T extends Record<string, unknown>>(sql: string, params: unknown[
 }
 
 /**
- * Documents the `DbUnitSnapshotRow` interface as a named contract surface (interface DbUnitSnapshotRow extends Record<string, unknown>).
-
- * Purpose: Supports maintainability by documenting why `DbUnitSnapshotRow` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-interface DbUnitSnapshotRow extends Record<string, unknown> {
-    /**
-   * Specifies the contract for the `id` member (id: string;).
-
-   * Contract: Describes stable behavior for callers of `id` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-id: string;
-    /**
-   * Specifies the contract for the `player` member (player: string;).
-
-   * Contract: Describes stable behavior for callers of `player` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-player: string;
-    /**
-   * Specifies the contract for the `unit_type` member (unit_type: string;).
-
-   * Contract: Describes stable behavior for callers of `unit_type` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-unit_type: string;
-    /**
-   * Specifies the contract for the `h3_index` member (h3_index: string;).
-
-   * Contract: Describes stable behavior for callers of `h3_index` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-h3_index: string;
-    /**
-   * Specifies the contract for the `display_order` member (display_order: number | null;).
-
-   * Contract: Describes stable behavior for callers of `display_order` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-display_order: number | null;
-}
-
-/**
- * Defines the `mapDbUnitSnapshotRow` function shape (function mapDbUnitSnapshotRow(row: DbUnitSnapshotRow): GameStateSnapshot['units'][number]).
-
- * Purpose: Supports maintainability by documenting why `mapDbUnitSnapshotRow` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function mapDbUnitSnapshotRow(row: DbUnitSnapshotRow): GameStateSnapshot['units'][number] {
-  return {
-    id: row.id,
-    player: row.player,
-    unitType: row.unit_type,
-    h3Index: row.h3_index,
-    displayOrder: typeof row.display_order === 'number' ? row.display_order : undefined,
-  };
-}
-
-/**
  * Defines the `getCanonicalDbPath` function shape (function getCanonicalDbPath(): string).
 
  * Purpose: Supports maintainability by documenting why `getCanonicalDbPath` exists.
@@ -361,6 +250,24 @@ function ensureTurnStateRow(): void {
   if (!row) {
     run('INSERT INTO turn_state (id, phase, turn_number) VALUES (1, ?, ?)', ['planning', 1]);
   }
+}
+
+/**
+ * Defines the `repairStrandedStrategicResolutionPhaseOnDbBootstrap` function shape (export function repairStrandedStrategicResolutionPhaseOnDbBootstrap(): void).
+
+ * Purpose: After a process restart, `turn_state.phase` may still be `resolution` while the melee-intercept resume snapshot lived only in memory, which blocks `ready()` with "Not in planning phase". Tactical restore also requires planning phase.
+ * When to use: Once per successful `initDatabase` open of an existing database file, after `ensureTurnStateRow`.
+ * Expected outcome: Any persisted `resolution` row becomes `planning` so the player can issue orders again; idempotent when already planning.
+ * Exceptions: None; skips work when the DB handle is missing.
+ */
+export function repairStrandedStrategicResolutionPhaseOnDbBootstrap(): void {
+  if (!db) return;
+  const row = getOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1');
+  if (!row || row.phase !== 'resolution') return;
+  run('UPDATE turn_state SET phase = ? WHERE id = 1', ['planning']);
+  logDebug('gameDb repairStrandedStrategicResolutionPhaseOnDbBootstrap: reset phase planning after interrupted resolution', {
+    priorPhase: row.phase,
+  });
 }
 
 /**
@@ -479,6 +386,7 @@ export async function initDatabase(): Promise<void> {
     d = null;
     runInfrastructureStartupConsistencyPass({ includeReconciliation: false });
     ensureTurnStateRow();
+    repairStrandedStrategicResolutionPhaseOnDbBootstrap();
     seedGameSeedIfMissing();
     ensureTerrainClassificationCacheLoaded();
     backfillInfrastructureStateFromMetadataIfMissing();
@@ -831,8 +739,7 @@ function seedUnits(): void {
  */
 export function getMapHexSet(): Set<string> {
   logTrace('getMapHexSet');
-  const rows = getAll<{ h3_index: string }>('SELECT h3_index FROM hexes');
-  return new Set(rows.map((r) => r.h3_index));
+  return getMapHexSetWithGetAll(getAll);
 }
 
 /**
@@ -975,10 +882,7 @@ export function dbGetAll<T extends Record<string, unknown>>(sql: string, params:
  */
 export function listUnitsForSnapshot(): GameStateSnapshot['units'] {
   logTrace('gameDb listUnitsForSnapshot');
-  const rows = getAll<DbUnitSnapshotRow>(
-    'SELECT id, player, unit_type, h3_index, display_order FROM units'
-  );
-  return rows.map(mapDbUnitSnapshotRow);
+  return listUnitsForSnapshotWithGetAll(getAll);
 }
 
 /**

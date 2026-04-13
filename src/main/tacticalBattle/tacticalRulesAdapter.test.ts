@@ -4,19 +4,40 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { gridDisk, latLngToCell } from 'h3-js';
-import { tacticalMarchWithinRes4GridSteps } from './tacticalRulesAdapter';
+import { gridDisk } from 'h3-js';
+import { tacticalMarchFirstStopAlongPath, tacticalMarchWithinRes4GridSteps } from './tacticalRulesAdapter';
+import { firstRingCellDistinctFrom, tacticalRes4Cell } from './testSupport/tacticalRes4HexFixtures';
 
 test('tacticalMarchWithinRes4GridSteps allows same cell within limit zero', () => {
-  const cell = latLngToCell(10, 20, 4);
+  const cell = tacticalRes4Cell(10, 20);
   assert.equal(tacticalMarchWithinRes4GridSteps(cell, cell, 0), true);
 });
 
 test('tacticalMarchWithinRes4GridSteps matches grid distance for a res4 neighbor', () => {
-  const center = latLngToCell(10, 20, 4);
-  const ring = gridDisk(center, 1);
-  const neighbor = [...ring].find((h) => h !== center);
-  assert.ok(neighbor, 'expected a distinct res4 neighbor');
+  const center = tacticalRes4Cell(10, 20);
+  const neighbor = firstRingCellDistinctFrom(center);
   assert.equal(tacticalMarchWithinRes4GridSteps(center, neighbor, 0), false);
   assert.equal(tacticalMarchWithinRes4GridSteps(center, neighbor, 1), true);
+});
+
+test('tacticalMarchFirstStopAlongPath stops at maxEdges when the path is longer', () => {
+  const center = tacticalRes4Cell(5, 6);
+  const ring1 = [...gridDisk(center, 1)];
+  const ring2 = [...gridDisk(center, 2)];
+  const footprint = new Set([...ring2]);
+  const far = ring2.find((h) => !ring1.includes(h) && h !== center);
+  assert.ok(far, 'need a res4 cell two steps from center');
+  const { stopH3, consumedFullPath } = tacticalMarchFirstStopAlongPath(center, far, 1, footprint);
+  assert.notEqual(stopH3, far);
+  assert.equal(consumedFullPath, false);
+  assert.ok(footprint.has(stopH3));
+});
+
+test('tacticalMarchFirstStopAlongPath reaches destination when within maxEdges', () => {
+  const center = tacticalRes4Cell(7, 8);
+  const neighbor = firstRingCellDistinctFrom(center);
+  const footprint = new Set(gridDisk(center, 1));
+  const { stopH3, consumedFullPath } = tacticalMarchFirstStopAlongPath(center, neighbor, 2, footprint);
+  assert.equal(stopH3, neighbor);
+  assert.equal(consumedFullPath, true);
 });

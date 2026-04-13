@@ -4,14 +4,15 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { cellToParent, latLngToCell } from 'h3-js';
+import { cellToParent } from 'h3-js';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildTacticalAiPlanState } from './buildTacticalAiPlanState';
+import { tacticalRes1Cell, tacticalRes4UnderRes1Corner } from './testSupport/tacticalRes4HexFixtures';
 
 test('buildTacticalAiPlanState narrows hexes and units to tactical footprint', () => {
-  const res1 = latLngToCell(12, 34, 1);
-  const res4a = latLngToCell(12.01, 34, 4);
+  const res1 = tacticalRes1Cell(12, 34);
+  const res4a = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01 });
   const strategic: GameStateSnapshot = {
     turnNumber: 1,
     phase: 'planning',

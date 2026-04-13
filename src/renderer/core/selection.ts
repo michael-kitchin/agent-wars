@@ -1,5 +1,4 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
-import { tacticalEffectiveH3ForSubUnit } from '../tactical/tacticalDraftMarchOverlay';
 import { rendererSharedState as S } from './state';
 
 /**
@@ -50,11 +49,7 @@ export function replaceSelection(unitIds: string[]): void {
   }
   const tb = S.tacticalBattleSnapshot;
   const primary = tb ? tb.subUnits.find((u) => u.id === S.selectedUnitIds[0]) : S.gameState?.units.find((u) => u.id === S.selectedUnitIds[0]);
-  if (tb && primary) {
-    S.selectedHexIndex = tacticalEffectiveH3ForSubUnit(tb, primary.id);
-  } else {
-    S.selectedHexIndex = primary?.h3Index ?? null;
-  }
+  S.selectedHexIndex = primary?.h3Index ?? null;
 }
 
 /**

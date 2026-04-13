@@ -75,30 +75,34 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
     const overlay = document.createElement('div');
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', 'Melee intercept');
+    overlay.setAttribute('aria-label', 'Tactical battles');
     overlay.style.cssText =
       'position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,0.35);display:flex;align-items:flex-start;justify-content:center;padding:12px;overflow-y:auto;';
 
     const panel = document.createElement('div');
     panel.style.cssText =
-      'max-width:min(460px,48vw);width:100%;max-height:none;overflow:visible;background:#f4f2ee;border:1px solid #555;border-radius:4px;padding:10px 12px;font:13px/1.35 system-ui,sans-serif;color:#222;box-shadow:0 4px 18px rgba(0,0,0,0.25);margin:12px auto 24px;';
+      'max-width:min(520px,92vw);width:100%;max-height:calc(100vh - 28px);display:flex;flex-direction:column;min-height:0;overflow:hidden;background:#f4f2ee;border:1px solid #555;border-radius:4px;padding:10px 12px;font:13px/1.35 system-ui,sans-serif;color:#222;box-shadow:0 4px 18px rgba(0,0,0,0.25);margin:12px auto 24px;';
 
     const title = document.createElement('div');
-    title.textContent = 'Melee combat this turn — choose tactical intercept (optional)';
-    title.style.cssText = 'font-weight:600;margin-bottom:8px;';
+    title.textContent = 'Tactical Battles';
+    title.style.cssText = 'font-weight:600;margin-bottom:8px;flex-shrink:0;';
     panel.appendChild(title);
 
-    const help = document.createElement('div');
-    help.textContent =
-      'Select one hex to skip strategic melee there and open tactical battle after the turn. Ignore resolves melee normally everywhere.';
-    help.style.cssText = 'font-size:12px;color:#444;margin-bottom:10px;';
-    panel.appendChild(help);
+    const tableScroll = document.createElement('div');
+    tableScroll.style.cssText = 'flex:1;min-height:0;overflow-y:auto;overflow-x:auto;margin-bottom:8px;border:1px solid #ccc;border-radius:2px;background:#faf9f7;';
 
     const table = document.createElement('table');
-    table.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;';
+    table.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;';
+    const colgroup = document.createElement('colgroup');
+    for (const w of ['2.75rem', '50%', '25%', '25%']) {
+      const col = document.createElement('col');
+      col.style.width = w;
+      colgroup.appendChild(col);
+    }
+    table.appendChild(colgroup);
     const thead = document.createElement('thead');
     const hr = document.createElement('tr');
-    for (const label of ['', 'Hex (tooltip view)', 'Your units', 'Enemy units']) {
+    for (const label of ['', 'Hex', 'Human', 'AI']) {
       const th = document.createElement('th');
       th.textContent = label;
       th.style.cssText = 'text-align:left;border-bottom:1px solid #aaa;padding:4px 6px;vertical-align:bottom;';
@@ -108,7 +112,8 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
     table.appendChild(thead);
     const tbody = document.createElement('tbody');
     table.appendChild(tbody);
-    panel.appendChild(table);
+    tableScroll.appendChild(table);
+    panel.appendChild(tableScroll);
 
     let selectedH3: string | null = null;
     const radios: HTMLInputElement[] = [];
@@ -125,7 +130,7 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
     ignoreBtn.style.cssText = 'padding:4px 14px;';
 
     const btnRow = document.createElement('div');
-    btnRow.style.cssText = 'margin-top:12px;display:flex;justify-content:flex-end;align-items:center;gap:8px;';
+    btnRow.style.cssText = 'margin-top:4px;display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-shrink:0;';
     btnRow.appendChild(fightBtn);
     btnRow.appendChild(ignoreBtn);
     panel.appendChild(btnRow);
@@ -181,6 +186,7 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
 
       const tdHex = document.createElement('td');
       tdHex.style.padding = '6px';
+      tdHex.style.overflowWrap = 'anywhere';
       tr.appendChild(tdHex);
       void args.buildHexPopupHtml(row.h3Index).then(
         (html) => {
@@ -193,11 +199,13 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
 
       const tdHuman = document.createElement('td');
       tdHuman.style.padding = '6px';
+      tdHuman.style.overflowWrap = 'anywhere';
       tdHuman.textContent = row.humanUnitSummary || '—';
       tr.appendChild(tdHuman);
 
       const tdAi = document.createElement('td');
       tdAi.style.padding = '6px';
+      tdAi.style.overflowWrap = 'anywhere';
       tdAi.textContent = row.aiUnitSummary || '—';
       tr.appendChild(tdAi);
 

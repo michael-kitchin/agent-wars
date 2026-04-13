@@ -6,7 +6,34 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
 import { exitTacticalMapView } from '../map/tacticalMapView';
 import { hideTacticalEntryLayer, syncTacticalEntryButton } from '../map/tacticalEntryLayer';
+import { updateGameStateSidebar } from '../core/uiState';
 import { restoreStrategicOrderDraftsAfterTacticalSession } from './tacticalStrategicOrderUiStash';
+
+/**
+ * Clears renderer tactical mode and map constraints when the main process has no tactical session (e.g. new game).
+ *
+ * Purpose: `newGame` IPC clears the active battle in main but does not run tactical exit UI; this mirrors that teardown on the renderer.
+ * When to use: After a fresh `GameStateSnapshot` with no `tacticalBattleSession`, including `newGame` and any `getGameState` apply where main dropped the session.
+ * Expected outcome: Tactical HUD hidden, res4 map bounds released, resolution animation cancelled, `S.tacticalBattleSnapshot` null; sidebar turn uses `nextState`.
+ * Exceptions: None; safe when already strategic (no-op aside from `exitTacticalMapView` if pre-tactical zoom was captured).
+ */
+export function tacticalReleaseRendererSessionForNewStrategicMatch(nextState: GameStateSnapshot): void {
+  if (S.resolutionMoveAnimationFrameId !== null) {
+    cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
+  }
+  S.resolutionMoveAnimationFrameId = null;
+  S.resolutionMoveAnimation = null;
+  S.tacticalBattleSnapshot = null;
+  S.tacticalPhasePlanning = true;
+  S.tacticalPendingMarches = [];
+  S.hideCommittedOrderLinesAfterReady = false;
+  exitTacticalMapView();
+  tacticalApplyStrategicSidebarForTacticalMode(false);
+  const el = document.getElementById('tactical-entry-layer');
+  if (el) hideTacticalEntryLayer(el, true);
+  tacticalUpdateExitButtonVisibility();
+  updateGameStateSidebar(nextState);
+}
 
 /**
  * Keeps the strategic sidebar visible during tactical play; legacy hook remains for callers that toggled suppression.
@@ -22,7 +49,7 @@ export function tacticalApplyStrategicSidebarForTacticalMode(tactical: boolean):
 }
 
 /**
- * Updates tactical HUD visibility, turn label text, and exit button disabled state from renderer shared state.
+ * Updates tactical HUD visibility and exit button disabled state from renderer shared state.
  *
  * Contract: Reads `S.tacticalBattleSnapshot` and `S.tacticalPhasePlanning` only; mutates DOM button disabled flags.
  * When to use: After tactical snapshot changes, phase flips, and redraw passes that affect tactical controls.
@@ -32,14 +59,8 @@ export function tacticalApplyStrategicSidebarForTacticalMode(tactical: boolean):
 export function tacticalUpdateExitButtonVisibility(): void {
   const hud = document.getElementById('tactical-battle-hud');
   const exitBtn = document.getElementById('tactical-exit-btn') as HTMLButtonElement | null;
-  const turnLabel = document.getElementById('tactical-turn-label');
   const active = !!S.tacticalBattleSnapshot;
   hud?.classList.toggle('hidden', !active);
-  if (turnLabel) {
-    turnLabel.textContent = active && S.tacticalBattleSnapshot
-      ? `Tactical turn ${S.tacticalBattleSnapshot.tacticalTurnNumber}`
-      : '';
-  }
   const disabled = !active || !S.tacticalPhasePlanning;
   if (exitBtn) exitBtn.disabled = disabled;
 }
@@ -65,6 +86,7 @@ export function tacticalReconcileBattleAfterStrategicSnapshot(nextState: GameSta
     const el = document.getElementById('tactical-entry-layer');
     if (el) hideTacticalEntryLayer(el, true);
     tacticalUpdateExitButtonVisibility();
+    updateGameStateSidebar(nextState);
   }
 }
 

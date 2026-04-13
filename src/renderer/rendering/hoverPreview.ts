@@ -5,7 +5,6 @@ import { drawArrowheadOnly, strokePolylineSkippingWrap } from './pathDrawing';
 import { rendererSharedState as S } from '../core/state';
 import { getLeafletGlobal, hexCenterPx } from '../map/mapUtils';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
-import { tacticalEffectiveH3ForSubUnit } from '../tactical/tacticalDraftMarchOverlay';
 
 /**
  * Defines the `drawHoverRoutePreview` function shape (export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void).
@@ -28,7 +27,7 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
     for (const id of S.selectedUnitIds) {
       const u = tb.subUnits.find((s) => s.id === id);
       if (!u || u.player !== 'human') continue;
-      const eff = tacticalEffectiveH3ForSubUnit(tb, id);
+      const eff = u.h3Index;
       const movementRange = MOVEMENT_RANGE_BY_UNIT_TYPE[u.unitType] ?? 1;
       const prior = slowestMovementRangeByOriginH3.get(eff);
       if (prior === undefined || movementRange < prior) {
@@ -52,7 +51,7 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
     const preview = perUnit.preview;
     if (preview.segments.length === 0) continue;
     const previewUnit = tb ? tb.subUnits.find((s) => s.id === perUnit.unitId) : state.units.find((u) => u.id === perUnit.unitId);
-    const originH3 = previewUnit && tb ? tacticalEffectiveH3ForSubUnit(tb, perUnit.unitId) : previewUnit?.h3Index;
+    const originH3 = previewUnit?.h3Index;
     if (previewUnit && originH3) {
       if (drawnOrigins.has(originH3)) continue;
       drawnOrigins.add(originH3);

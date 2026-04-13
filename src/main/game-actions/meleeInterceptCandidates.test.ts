@@ -11,9 +11,7 @@ import {
   formatMeleeUnitCategorySummary,
   listMeleeCandidateHexes,
 } from './meleeInterceptCandidates';
-
-const hexA = '8a1f1d48b9fffff';
-const hexB = '8a1f1d48b8fffff';
+import { hexA, hexB } from './testSupport/meleeInterceptTestHexes';
 
 test('listMeleeCandidateHexes returns hexes with two or more players', () => {
   const units: CombatUnit[] = [
@@ -47,6 +45,22 @@ test('buildMeleeInterceptCandidateRows produces paired summaries', () => {
   assert.strictEqual(rows[0]?.h3Index, hexA);
   assert.strictEqual(rows[0]?.humanUnitSummary, '1 naval');
   assert.strictEqual(rows[0]?.aiUnitSummary, '2 armor');
+});
+
+test('buildMeleeInterceptCandidateRows counts units per hex only', () => {
+  const units: CombatUnit[] = [
+    { id: 'h1', player: 'human', unitType: 'infantry', h3Index: hexA, displayOrder: 0 },
+    { id: 'o1', player: 'opponent', unitType: 'armor', h3Index: hexA, displayOrder: 0 },
+    { id: 'h2', player: 'human', unitType: 'armor', h3Index: hexB, displayOrder: 0 },
+    { id: 'o2', player: 'opponent', unitType: 'infantry', h3Index: hexB, displayOrder: 0 },
+    { id: 'o3', player: 'opponent', unitType: 'infantry', h3Index: hexB, displayOrder: 0 },
+  ];
+  const rows = buildMeleeInterceptCandidateRows([hexA, hexB], units);
+  assert.strictEqual(rows.length, 2);
+  assert.strictEqual(rows[0]?.humanUnitSummary, '1 infantry');
+  assert.strictEqual(rows[0]?.aiUnitSummary, '1 armor');
+  assert.strictEqual(rows[1]?.humanUnitSummary, '1 armor');
+  assert.strictEqual(rows[1]?.aiUnitSummary, '2 infantry');
 });
 
 test('Phase E: single-player hex yields no melee candidates so ready bypasses intercept modal', () => {

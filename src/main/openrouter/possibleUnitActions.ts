@@ -9,9 +9,12 @@ import { getRange } from '../combatConstants';
 import { getValidDestinations } from '../oneStepMoveDestinations';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { isWithinGridRangeSafe } from '../game-actions/gridRange';
-import { logDebug, logTrace } from '../logger';
+import { logDebug } from '../logger';
 import { logHexControllerParityMismatch } from '../snapshotDbParity';
 import { buildPromptTableLines } from '../promptTableUtils';
+import { compareHexIds, partitionHomelandNearestOther } from './possibleUnitActionsPartition';
+
+export { partitionHomelandNearestOther };
 
 /**
  * Documents the module-scope binding `ENEMY_PLAYER` (ENEMY_PLAYER).
@@ -364,75 +367,6 @@ function buildIndexedState(state: GameStateSnapshot): IndexedState {
 
 function enemyHomelandHexSet(state: GameStateSnapshot): Set<string> {
   return new Set(state.humanHomeRegionHexes ?? []);
-}
-/**
- * Defines the `minDistanceToHomeland` function shape (function minDistanceToHomeland(h3: string, homeland: Set<string>): number | null).
-
- * Purpose: Supports maintainability by documenting why `minDistanceToHomeland` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-
-function minDistanceToHomeland(h3: string, homeland: Set<string>): number | null {
-  if (homeland.size === 0) return null;
-  let min = Infinity;
-  for (const t of homeland) {
-    try {
-      const d = gridDistance(h3, t);
-      if (d < min) min = d;
-    } catch {
-      continue;
-    }
-  }
-  return min === Infinity ? null : min;
-}
-
-/**
- * Defines the `partitionHomelandNearestOther` function shape (export function partitionHomelandNearestOther(legalHexes: string[], homelandSet: Set<string>): { homeland: string[]; nearest: string[]; other: string[]).
-
- * Purpose: Supports maintainability by documenting why `partitionHomelandNearestOther` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-
-export function partitionHomelandNearestOther(legalHexes: string[], homelandSet: Set<string>): {
-  homeland: string[];
-  nearest: string[];
-  other: string[];
-} {
-  logTrace('possibleUnitActions partitionHomelandNearestOther', {
-    legalHexCount: legalHexes.length,
-    homelandHexCount: homelandSet.size,
-  });
-  const unique = [...new Set(legalHexes)];
-  if (homelandSet.size === 0) return { homeland: [], nearest: [], other: unique.sort(compareHexIds) };
-  const inHomeland = unique.filter((h) => homelandSet.has(h));
-  if (inHomeland.length > 0) {
-    const other = unique.filter((h) => !homelandSet.has(h)).sort(compareHexIds);
-    return { homeland: inHomeland.sort(compareHexIds), nearest: [], other };
-  }
-  const withDist = unique
-    .map((h) => ({ h, d: minDistanceToHomeland(h, homelandSet) }))
-    .filter((x): x is { h: string; d: number } => x.d !== null);
-  if (withDist.length === 0) return { homeland: [], nearest: [], other: unique.sort(compareHexIds) };
-  const minD = Math.min(...withDist.map((x) => x.d));
-  const nearest = withDist.filter((x) => x.d === minD).map((x) => x.h).sort(compareHexIds);
-  const other = withDist.filter((x) => x.d > minD).map((x) => x.h).sort(compareHexIds);
-  return { homeland: [], nearest, other };
-}
-/**
- * Defines the `compareHexIds` function shape (function compareHexIds(a: string, b: string): number).
-
- * Purpose: Supports maintainability by documenting why `compareHexIds` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-
-function compareHexIds(a: string, b: string): number {
-  return a.localeCompare(b);
 }
 /**
  * Defines the `sortHexesByLatLng` function shape (function sortHexesByLatLng(hexes: string[], latLngByH3: Map<string, [number, number]>): string[]).

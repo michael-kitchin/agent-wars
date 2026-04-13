@@ -10,7 +10,12 @@ import type { HexContinentNamesRequest, HexNamingTooltipLineRequest, Res4Terrain
 import type { HumanOrderGroupPreviewResult, HumanOrderPreviewResult, HumanStandingOrderSnapshot } from './humanOrderPreviewTypes';
 import type { NewGameIpcPayload, SubmitOrdersIpcPayload } from './ordersTypes';
 import type { OpenRouterModel, RequestAiOrdersResult } from './openRouterTypes';
-import type { GameReadyIpcPayload, ReadyResult, ResolveMeleeInterceptIpcPayload } from './readyTypes';
+import type {
+  GameReadyIpcPayload,
+  ReadyResult,
+  ResolveMeleeInterceptIpcPayload,
+  TacticalCommitResolutionPlayback,
+} from './readyTypes';
 import type { SealiftStackState } from './sealiftTypes';
 
 /**
@@ -168,7 +173,13 @@ commitHumanTacticalDraftOrders: (payload: {
     airStrikes?: { unitId: string; targetH3Index: string; targetType: AirStrikeTargetType }[];
     ferryOrders?: { unitId: string; destinationH3Index: string }[];
     embarkOrders?: { unitId: string; navalUnitId: string }[];
-  }) => Promise<{ success: boolean; reason?: string; tacticalBattle?: TacticalBattleSnapshot }>;
+  }) => Promise<{
+    success: boolean;
+    reason?: string;
+    tacticalBattle?: TacticalBattleSnapshot;
+    tacticalResolutionPlayback?: TacticalCommitResolutionPlayback;
+    tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
+  }>;
     /**
    * Specifies the contract for the `validateGroupRangedTarget` member (validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }) => Promise<{ success: boolean; reason?: string }>;).
 

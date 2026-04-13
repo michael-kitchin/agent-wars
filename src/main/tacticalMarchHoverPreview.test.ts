@@ -5,10 +5,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gridDisk, latLngToCell } from 'h3-js';
-import {
-  buildTacticalMarchHoverPreview,
-  formatTacticalMarchPendingDistanceLabel,
-} from '../shared/tacticalMarchHoverPreview';
+import { formatTacticalDraftMarchPendingOrderTargetLabel } from '../shared/pendingMovementSidebarLabels';
+import { buildTacticalMarchHoverPreview } from '../shared/tacticalMarchHoverPreview';
 import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
 
 test('buildTacticalMarchHoverPreview marks in-range neighbor as valid', () => {
@@ -33,7 +31,7 @@ test('buildTacticalMarchHoverPreview marks in-range neighbor as valid', () => {
       },
     ],
   };
-  const result = buildTacticalMarchHoverPreview(battle, [], ['su-human'], neighbor);
+  const result = buildTacticalMarchHoverPreview(battle, ['su-human'], neighbor);
   assert.equal(result.validForAll, true);
   assert.ok(result.previews.length >= 1);
   assert.equal(result.previews[0]?.preview.valid, true);
@@ -62,11 +60,39 @@ test('buildTacticalMarchHoverPreview rejects destinations outside the footprint'
       },
     ],
   };
-  const result = buildTacticalMarchHoverPreview(battle, [], ['su-human'], outside);
+  const result = buildTacticalMarchHoverPreview(battle, ['su-human'], outside);
   assert.equal(result.validForAll, false);
 });
 
-test('formatTacticalMarchPendingDistanceLabel reports res4 grid steps', () => {
+test('buildTacticalMarchHoverPreview keeps distant in-footprint destination valid and previewed', () => {
+  const center = latLngToCell(12, 22, 4);
+  const ringCells = [...gridDisk(center, 4)];
+  const far = ringCells.find((h) => h !== center && [...gridDisk(center, 1)].includes(h) === false);
+  assert.ok(far);
+  const battle: TacticalBattleSnapshot = {
+    battleId: 'b4',
+    enclosingRes1H3Index: center,
+    res4ChildH3Indexes: ringCells,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits: [
+      {
+        id: 'su-human',
+        parentUnitId: 'parent-1',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: center,
+        displayName: 'Inf A',
+      },
+    ],
+  };
+  const result = buildTacticalMarchHoverPreview(battle, ['su-human'], far!);
+  assert.equal(result.validForAll, true);
+  assert.equal(result.previews[0]?.preview.valid, true);
+  assert.ok((result.previews[0]?.preview.segments[0]?.hexes.length ?? 0) > 2);
+});
+
+test('formatTacticalDraftMarchPendingOrderTargetLabel reports res4 grid steps with strategic-style status', () => {
   const a = latLngToCell(5, 5, 4);
   const b = [...gridDisk(a, 1)].find((h) => h !== a);
   assert.ok(b);
@@ -87,6 +113,6 @@ test('formatTacticalMarchPendingDistanceLabel reports res4 grid steps', () => {
       },
     ],
   };
-  const label = formatTacticalMarchPendingDistanceLabel(battle, 'su1', b!);
-  assert.match(label, /^1h \(Pending\)$/);
+  const label = formatTacticalDraftMarchPendingOrderTargetLabel(battle, 'su1', b!);
+  assert.match(label, /^1h \(en_route\)$/);
 });

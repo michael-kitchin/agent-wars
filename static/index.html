@@ -549,14 +549,6 @@
       justify-content: center;
     }
     .tactical-battle-hud.hidden { display: none; }
-    .tactical-turn-label {
-      font-size: 12px;
-      font-weight: 600;
-      font-family: system-ui, sans-serif;
-      color: #1a1a1a;
-      text-shadow: 0 0 3px rgba(255,255,255,0.85);
-      white-space: nowrap;
-    }
     .tactical-exit-btn {
       margin: 0;
       padding: 0.4rem 0.9rem;
@@ -853,8 +845,7 @@
       <button type="button" id="ai-strategy-toast-dismiss" aria-label="Dismiss">×</button>
     </div>
     <div id="tactical-battle-hud" class="tactical-battle-hud hidden" role="group" aria-label="Tactical battle controls">
-      <span id="tactical-turn-label" class="tactical-turn-label"></span>
-      <button type="button" id="tactical-exit-btn" class="tactical-exit-btn" aria-label="Exit tactical view">Exit tactical</button>
+      <button type="button" id="tactical-exit-btn" class="tactical-exit-btn" aria-label="Exit battle">Exit Battle</button>
     </div>
   </div>
   <aside id="sidebar">

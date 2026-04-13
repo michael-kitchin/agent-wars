@@ -1,27 +1,30 @@
 import { cellToLatLng, gridDisk } from 'h3-js';
-import { buildLatLngCoordinateMap } from '../mapData';
 import {
   getGameStateForPlayer,
   getHexController,
   getRes1InfrastructureForHex,
   isDbReady,
 } from '../gameDb';
-import { createPathfindingSession, executePlanRouteWithSession } from '../tools/tool1Pathfinding';
+import { executePlanRouteWithSession } from '../tools/tool1Pathfinding';
 import { terrainIsPassableForDomain } from '../pathfinding';
 import { buildNormalizedTerrainByH3 } from '../movementTerrain';
 import { logDebug, logError, logTrace } from '../logger';
 import { isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession';
 import { AIR_FERRY_RANGE_HEXES, MOVEMENT_RANGE_BY_UNIT_TYPE, formatFerryOutOfRangeReason } from '../../shared/tacticalRanges';
+import {
+  buildHumanOrderGroupPreviewEnvelope,
+  minMovementRangeAmongUnitTypes,
+  representativeMarchPreviewUnitIdsByOriginH3,
+  uniqueStrategicMarchPreviewUnitIds,
+} from '../../shared/humanMarchPreviewGroupAssembly';
 import { isWithinGridRangeSafe } from './gridRange';
 import { isEmbarkedLandUnitOnWater } from './sealift';
 import {
-  buildTerrainMapsFromHexRows,
   EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON,
   getLandMovementBlockReason,
   isLandUnitType,
 } from './landMovementConstraints';
 import type { PlanRouteError, PlanRouteOk } from '../tools/tool1Pathfinding';
-import type { PathfindingSession } from '../tools/tool1Pathfinding';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import {
   buildEnvironmentSignature,
@@ -31,6 +34,9 @@ import {
   createEmptyHumanMarchPreviewDiagnostics,
   type HumanMarchPreviewDiagnostics,
 } from './humanMarchPreviewDiagnostics';
+import type { HumanMarchPreviewComputationContext } from './humanMarchPreviewComputationContext';
+import { buildHumanMarchPreviewComputationContextFromState } from './humanMarchPreviewComputationContext';
+import { cacheSetBounded } from './humanMarchPreviewCache';
 /**
  * Documents the `HumanOwnedUnit` type alias (type HumanOwnedUnit).
 
@@ -98,80 +104,7 @@ type PlanRouteResult = PlanRouteOk | PlanRouteError;
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-type PreviewComputationContext = {
-    /**
-   * Specifies the contract for the `state` member (state: GameStateSnapshot;).
-
-   * Contract: Describes stable behavior for callers of `state` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-state: GameStateSnapshot;
-    /**
-   * Specifies the contract for the `latLngByH3` member (latLngByH3: Map<string, [number, number]>;).
-
-   * Contract: Describes stable behavior for callers of `latLngByH3` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-latLngByH3: Map<string, [number, number]>;
-    /**
-   * Specifies the contract for the `resolveToH3` member (resolveToH3: (lat: number, lng: number) => string | undefined;).
-
-   * Contract: Describes stable behavior for callers of `resolveToH3` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-resolveToH3: (lat: number, lng: number) => string | undefined;
-    /**
-   * Specifies the contract for the `passabilityByH3` member (passabilityByH3: Map<string, string>;).
-
-   * Contract: Describes stable behavior for callers of `passabilityByH3` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-passabilityByH3: Map<string, string>;
-    /**
-   * Specifies the contract for the `terrainByH3` member (terrainByH3: Map<string, string>;).
-
-   * Contract: Describes stable behavior for callers of `terrainByH3` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-terrainByH3: Map<string, string>;
-    /**
-   * Specifies the contract for the `terrainKindByH3` member (terrainKindByH3: Map<string, string>;).
-
-   * Contract: Describes stable behavior for callers of `terrainKindByH3` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-terrainKindByH3: Map<string, string>;
-    /**
-   * Specifies the contract for the `stateCacheKey` member (stateCacheKey: string;).
-
-   * Contract: Describes stable behavior for callers of `stateCacheKey` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-stateCacheKey: string;
-    /**
-   * Specifies the contract for the `pathfindingSession` member (pathfindingSession: PathfindingSession;).
-
-   * Contract: Describes stable behavior for callers of `pathfindingSession` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-pathfindingSession: PathfindingSession;
-};
+type PreviewComputationContext = HumanMarchPreviewComputationContext;
 
 /**
  * Documents the `ActiveHoverPathfindingSession` interface as a named contract surface (interface ActiveHoverPathfindingSession).
@@ -257,15 +190,6 @@ const DEFAULT_MAX_PREVIEW_ROUTE_CACHE_ENTRIES = 2048;
  */
 const DEFAULT_MAX_PREVIEW_RESULT_CACHE_ENTRIES = 2048;
 /**
- * Documents the module-scope binding `DEFAULT_MAX_PREVIEW_THROTTLE_ENTRIES` (DEFAULT_MAX_PREVIEW_THROTTLE_ENTRIES).
-
- * Purpose: Supports maintainability by documenting why `DEFAULT_MAX_PREVIEW_THROTTLE_ENTRIES` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const DEFAULT_MAX_PREVIEW_THROTTLE_ENTRIES = 1024;
-/**
  * Documents the module-scope binding `maxPreviewRouteCacheEntries` (maxPreviewRouteCacheEntries).
 
  * Purpose: Supports maintainability by documenting why `maxPreviewRouteCacheEntries` exists.
@@ -283,15 +207,6 @@ let maxPreviewRouteCacheEntries = DEFAULT_MAX_PREVIEW_ROUTE_CACHE_ENTRIES;
  * Exceptions: None.
  */
 let maxPreviewResultCacheEntries = DEFAULT_MAX_PREVIEW_RESULT_CACHE_ENTRIES;
-/**
- * Documents the module-scope binding `maxPreviewThrottleEntries` (maxPreviewThrottleEntries).
-
- * Purpose: Supports maintainability by documenting why `maxPreviewThrottleEntries` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-let maxPreviewThrottleEntries = DEFAULT_MAX_PREVIEW_THROTTLE_ENTRIES;
 /**
  * Documents the module-scope binding `MAX_NEARBY_FALLBACK_ATTEMPTS` (MAX_NEARBY_FALLBACK_ATTEMPTS).
 
@@ -319,15 +234,6 @@ const MAX_NEARBY_FALLBACK_RADIUS = 6;
  * Exceptions: None.
  */
 const MAX_NEARBY_FALLBACK_BUDGET_MS = 20;
-/**
- * Documents the module-scope binding `PREVIEW_THROTTLE_WINDOW_MS` (PREVIEW_THROTTLE_WINDOW_MS).
-
- * Purpose: Supports maintainability by documenting why `PREVIEW_THROTTLE_WINDOW_MS` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const PREVIEW_THROTTLE_WINDOW_MS = 20;
 
 /**
  * Documents the module-scope binding `previewDiagnostics` (previewDiagnostics: HumanMarchPreviewDiagnostics).
@@ -357,18 +263,6 @@ const previewRouteCache = new Map<string, PlanRouteResult>();
  * Exceptions: None.
  */
 const previewResultCache = new Map<string, HumanOrderPreviewResult>();
-/**
- * Documents the module-scope binding `previewThrottleCache` (previewThrottleCache).
-
- * Purpose: Supports maintainability by documenting why `previewThrottleCache` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const previewThrottleCache = new Map<
-  string,
-  { computedAtMs: number; hoveredH3Index: string; preview: HumanOrderPreviewResult }
->();
 /**
  * Documents the module-scope binding `activeHoverPathfindingSessionByPlayer` (activeHoverPathfindingSessionByPlayer).
 
@@ -550,7 +444,7 @@ previews: HumanOrderGroupPreviewUnitResult[];
 }
 
 /**
- * Defines the `logPreviewOutcome` function shape (function logPreviewOutcome( unitId: string, hoveredH3Index: string, preview: HumanOrderPreviewResult, source: 'computed' | 'result_cache' | 'throttl).
+ * Defines the `logPreviewOutcome` function shape (function logPreviewOutcome( unitId: string, hoveredH3Index: string, preview: HumanOrderPreviewResult, source: 'computed' | 'result_cache').
 
  * Purpose: Supports maintainability by documenting why `logPreviewOutcome` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -561,7 +455,7 @@ function logPreviewOutcome(
   unitId: string,
   hoveredH3Index: string,
   preview: HumanOrderPreviewResult,
-  source: 'computed' | 'result_cache' | 'throttle_reuse'
+  source: 'computed' | 'result_cache'
 ): void {
   logDebug('gameActions previewHumanMarchOrder: outcome', {
     unitId,
@@ -587,18 +481,6 @@ function snapshotStateForPlayer(playerId: 'human' | 'opponent'): GameStateSnapsh
 }
 
 /**
- * Defines the `getUniqueNonEmptyIds` function shape (function getUniqueNonEmptyIds(ids: string[]): string[]).
-
- * Purpose: Supports maintainability by documenting why `getUniqueNonEmptyIds` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function getUniqueNonEmptyIds(ids: string[]): string[] {
-  return [...new Set(ids.filter((id) => id.length > 0))];
-}
-
-/**
  * Defines the `selectionHasMixedLandAndNaval` function shape (function selectionHasMixedLandAndNaval(units: HumanOwnedUnit[]): boolean).
 
  * Purpose: Supports maintainability by documenting why `selectionHasMixedLandAndNaval` exists.
@@ -610,64 +492,6 @@ function selectionHasMixedLandAndNaval(units: HumanOwnedUnit[]): boolean {
   const hasNaval = units.some((unit) => unit.unitType === 'naval');
   const hasLand = units.some((unit) => unit.unitType === 'infantry' || unit.unitType === 'armor');
   return hasNaval && hasLand;
-}
-
-/**
- * Defines the `cacheSetBounded` function shape (function cacheSetBounded<T>(cache: Map<string, T>, key: string, value: T, maxEntries: number): void).
-
- * Purpose: Supports maintainability by documenting why `cacheSetBounded` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function cacheSetBounded<T>(cache: Map<string, T>, key: string, value: T, maxEntries: number): void {
-  if (cache.has(key)) cache.delete(key);
-  cache.set(key, value);
-  while (cache.size > maxEntries) {
-    const oldestKey = cache.keys().next().value;
-    if (!oldestKey) break;
-    cache.delete(oldestKey);
-  }
-}
-
-/**
- * Defines the `buildStateCacheKey` function shape (function buildStateCacheKey(state: GameStateSnapshot): string).
-
- * Purpose: Supports maintainability by documenting why `buildStateCacheKey` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function buildStateCacheKey(state: GameStateSnapshot): string {
-  const unitSignature = state.units
-    .map((u) => `${u.id}:${u.h3Index}`)
-    .sort()
-    .join('|');
-  return `u:${unitSignature}`;
-}
-
-/**
- * Defines the `buildPreviewContextFromState` function shape (function buildPreviewContextFromState(state: GameStateSnapshot): PreviewComputationContext).
-
- * Purpose: Supports maintainability by documenting why `buildPreviewContextFromState` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function buildPreviewContextFromState(state: GameStateSnapshot): PreviewComputationContext {
-  const hexList = state.hexes.map((h) => h.h3Index);
-  const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
-  const { terrainByH3, terrainKindByH3 } = buildTerrainMapsFromHexRows(state.hexes);
-  return {
-    state,
-    latLngByH3,
-    resolveToH3,
-    passabilityByH3: buildNormalizedTerrainByH3(state.hexes),
-    terrainByH3,
-    terrainKindByH3,
-    stateCacheKey: buildStateCacheKey(state),
-    pathfindingSession: createPathfindingSession(state, latLngByH3, resolveToH3),
-  };
 }
 
 /**
@@ -718,7 +542,7 @@ function getOrCreateHoverSessionContext(
     });
   }
   const state = snapshotStateForPlayer(playerId);
-  const context = buildPreviewContextFromState(state);
+  const context = buildHumanMarchPreviewComputationContextFromState(state);
   activeHoverPathfindingSessionByPlayer.set(playerId, {
     playerId,
     selectionSignature,
@@ -1023,9 +847,9 @@ function computeHumanMarchPreviewForUnit(
 /**
  * Defines the `buildHumanMarchPreviewForUnit` function shape (function buildHumanMarchPreviewForUnit().
 
- * Purpose: Supports maintainability by documenting why `buildHumanMarchPreviewForUnit` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Thin wrapper so single-unit and grouped preview callers share one entry point into `computeHumanMarchPreviewForUnit` (route/result caches only; no time-based reuse of stale hovers).
+ * When to use: From `previewHumanMarchOrderImpl` and grouped preview assembly after session/context validation.
+ * Expected outcome: Always reflects the requested `hoveredH3Index` for the given `unitId`.
  * Exceptions: None.
  */
 function buildHumanMarchPreviewForUnit(
@@ -1033,34 +857,7 @@ function buildHumanMarchPreviewForUnit(
   unitId: string,
   hoveredH3Index: string
 ): HumanOrderPreviewResult {
-  const throttleKey = `${context.stateCacheKey}|${unitId}`;
-  const throttleEntry = previewThrottleCache.get(throttleKey);
-  const nowMs = Date.now();
-  if (throttleEntry) {
-    const ageMs = nowMs - throttleEntry.computedAtMs;
-    // Coalesce rapid hover updates by reusing the latest preview inside a short time window.
-    if (throttleEntry.hoveredH3Index === hoveredH3Index || ageMs < PREVIEW_THROTTLE_WINDOW_MS) {
-      if (throttleEntry.hoveredH3Index !== hoveredH3Index) {
-        logDebug('gameActions previewHumanMarchOrder: throttle reuse', {
-          unitId,
-          requestedHoveredH3Index: hoveredH3Index,
-          reusedFromHoveredH3Index: throttleEntry.hoveredH3Index,
-          ageMs,
-          throttleWindowMs: PREVIEW_THROTTLE_WINDOW_MS,
-        });
-      }
-      logPreviewOutcome(unitId, hoveredH3Index, throttleEntry.preview, 'throttle_reuse');
-      return throttleEntry.preview;
-    }
-  }
-  const preview = computeHumanMarchPreviewForUnit(context, unitId, hoveredH3Index);
-  cacheSetBounded(
-    previewThrottleCache,
-    throttleKey,
-    { computedAtMs: nowMs, hoveredH3Index, preview },
-    maxPreviewThrottleEntries
-  );
-  return preview;
+  return computeHumanMarchPreviewForUnit(context, unitId, hoveredH3Index);
 }
 
 /**
@@ -1117,7 +914,7 @@ export function previewHumanMarchOrdersImpl(unitIds: string[], hoveredH3Index: s
         previews: [],
       };
     }
-    const uniqueUnitIds = getUniqueNonEmptyIds(unitIds);
+    const uniqueUnitIds = uniqueStrategicMarchPreviewUnitIds(unitIds);
     if (uniqueUnitIds.length === 0) {
       if (activeHoverPathfindingSessionByPlayer.has('human')) {
         previewDiagnostics.sessionInvalidateCount += 1;
@@ -1136,6 +933,12 @@ export function previewHumanMarchOrdersImpl(unitIds: string[], hoveredH3Index: s
     const selectedUnits = uniqueUnitIds
       .map((unitId) => state.units.find((u) => u.id === unitId && u.player === 'human'))
       .filter((unit): unit is HumanOwnedUnit => !!unit);
+    logDebug('gameActions parity previewBuild: strategic request', {
+      requestedUnitCount: unitIds.length,
+      uniqueUnitCount: uniqueUnitIds.length,
+      selectedHumanUnitCount: selectedUnits.length,
+      hoveredH3Index,
+    });
     if (selectedUnits.length === 0) {
       return {
         validForAll: false,
@@ -1145,11 +948,9 @@ export function previewHumanMarchOrdersImpl(unitIds: string[], hoveredH3Index: s
         previews: [],
       };
     }
-    const representativeUnitIdsByOrigin = new Map<string, string>();
-    for (const unit of selectedUnits) {
-      if (!representativeUnitIdsByOrigin.has(unit.h3Index)) representativeUnitIdsByOrigin.set(unit.h3Index, unit.id);
-    }
-    const previewUnitIds = Array.from(representativeUnitIdsByOrigin.values());
+    const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
+      selectedUnits.map((unit) => ({ unitId: unit.id, originH3: unit.h3Index }))
+    );
     logDebug('gameActions previewHumanMarchOrders: unique source/destination checks', {
       selectedUnits: selectedUnits.length,
       uniqueOrigins: previewUnitIds.length,
@@ -1159,16 +960,22 @@ export function previewHumanMarchOrdersImpl(unitIds: string[], hoveredH3Index: s
       unitId,
       preview: buildHumanMarchPreviewForUnit(context, unitId, hoveredH3Index),
     }));
-    const invalid = previews.find((entry) => !entry.preview.valid);
     const hoveredHex = state.hexes.find((h) => h.h3Index === hoveredH3Index);
     const hasMixedSelection = selectionHasMixedLandAndNaval(selectedUnits);
-    const slowestMovementRange =
-      selectedUnits.length > 0
-        ? Math.min(...selectedUnits.map((unit) => MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1))
-        : 0;
+    const slowestMovementRange = minMovementRangeAmongUnitTypes(
+      selectedUnits.map((unit) => unit.unitType),
+      MOVEMENT_RANGE_BY_UNIT_TYPE,
+      1
+    );
     const sharedMixedTerrain = !!hoveredHex && hexSupportsMixedLandAndNaval(hoveredHex);
     if (hasMixedSelection && !sharedMixedTerrain) {
       const reason = 'Mixed land/naval stacks can only move to coastal hexes.';
+      logDebug('gameActions parity previewBuild: mixed-domain rejection', {
+        selectedHumanUnitCount: selectedUnits.length,
+        representativeOriginCount: previewUnitIds.length,
+        hoveredH3Index,
+        invalidReason: reason,
+      });
       return {
         validForAll: false,
         showInvalidMarker: true,
@@ -1185,13 +992,16 @@ export function previewHumanMarchOrdersImpl(unitIds: string[], hoveredH3Index: s
         })),
       };
     }
-    return {
-      validForAll: invalid === undefined,
-      showInvalidMarker: invalid !== undefined,
-      invalidReason: invalid?.preview.invalidReason,
-      slowestMovementRange,
-      previews,
-    };
+    const groupPreview = buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange });
+    logDebug('gameActions parity previewBuild: strategic outcome', {
+      selectedHumanUnitCount: selectedUnits.length,
+      representativeOriginCount: previewUnitIds.length,
+      hoveredH3Index,
+      validForAll: groupPreview.validForAll,
+      showInvalidMarker: groupPreview.showInvalidMarker,
+      invalidReason: groupPreview.invalidReason ?? null,
+    });
+    return groupPreview;
   } catch (err) {
     logError('previewHumanMarchOrders: exception', err);
     return {
@@ -1205,7 +1015,7 @@ export function previewHumanMarchOrdersImpl(unitIds: string[], hoveredH3Index: s
 }
 
 /**
- * Defines the `getHumanMarchPreviewDiagnostics` function shape (export function getHumanMarchPreviewDiagnostics(): HumanMarchPreviewDiagnostics & { routeCacheSize: number; resultCacheSize: number; throttleCacheSize:).
+ * Defines the `getHumanMarchPreviewDiagnostics` function shape (export function getHumanMarchPreviewDiagnostics(): HumanMarchPreviewDiagnostics & { routeCacheSize: number; resultCacheSize: number; activeSessionCount:).
 
  * Purpose: Supports maintainability by documenting why `getHumanMarchPreviewDiagnostics` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -1215,7 +1025,6 @@ export function previewHumanMarchOrdersImpl(unitIds: string[], hoveredH3Index: s
 export function getHumanMarchPreviewDiagnostics(): HumanMarchPreviewDiagnostics & {
   routeCacheSize: number;
   resultCacheSize: number;
-  throttleCacheSize: number;
   activeSessionCount: number;
 } {
   logTrace('gameActions getHumanMarchPreviewDiagnostics');
@@ -1223,7 +1032,6 @@ export function getHumanMarchPreviewDiagnostics(): HumanMarchPreviewDiagnostics 
     ...previewDiagnostics,
     routeCacheSize: previewRouteCache.size,
     resultCacheSize: previewResultCache.size,
-    throttleCacheSize: previewThrottleCache.size,
     activeSessionCount: activeHoverPathfindingSessionByPlayer.size,
   };
 }
@@ -1240,7 +1048,6 @@ export function resetHumanMarchPreviewDiagnosticsForTests(): void {
   logDebug('gameActions resetHumanMarchPreviewDiagnosticsForTests');
   previewRouteCache.clear();
   previewResultCache.clear();
-  previewThrottleCache.clear();
   activeHoverPathfindingSessionByPlayer.clear();
   Object.assign(previewDiagnostics, createEmptyHumanMarchPreviewDiagnostics());
 }
@@ -1256,10 +1063,8 @@ export function resetHumanMarchPreviewDiagnosticsForTests(): void {
 export function configureHumanMarchPreviewCacheLimitsForTests(limits?: {
   route?: number;
   result?: number;
-  throttle?: number;
 }): void {
   logDebug('gameActions configureHumanMarchPreviewCacheLimitsForTests', { limits });
   maxPreviewRouteCacheEntries = limits?.route ?? DEFAULT_MAX_PREVIEW_ROUTE_CACHE_ENTRIES;
   maxPreviewResultCacheEntries = limits?.result ?? DEFAULT_MAX_PREVIEW_RESULT_CACHE_ENTRIES;
-  maxPreviewThrottleEntries = limits?.throttle ?? DEFAULT_MAX_PREVIEW_THROTTLE_ENTRIES;
 }

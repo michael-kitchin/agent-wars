@@ -1,5 +1,8 @@
 import type { GameStateSnapshot, HumanStandingOrderSnapshot, RemovedUnitSnapshot } from '../../shared/ipcTypes';
-import { formatTacticalMarchPendingDistanceLabel } from '../../shared/tacticalMarchHoverPreview';
+import {
+  formatPendingMovementSidebarTargetLabel,
+  formatTacticalDraftMarchPendingOrderTargetLabel,
+} from '../../shared/pendingMovementSidebarLabels';
 import { buildUnitDisplayNameLookup, fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
 import { formatPendingFerryOrderSidebarLabel } from './orderLabelFormatting';
 import { UNIT_DESELECT_GLYPH, UNIT_SELECT_GLYPH } from '../core/constants';
@@ -278,7 +281,10 @@ export function formatPendingOrderSidebarLabel(
   order: HumanStandingOrderSnapshot,
   formatUnitArrowLabelFn: (unitId: string, targetLabel: string) => string
 ): string {
-  return formatUnitArrowLabelFn(order.unitId, `${estimateHexesLeftForOrder(order)}h (${order.status})`);
+  return formatUnitArrowLabelFn(
+    order.unitId,
+    formatPendingMovementSidebarTargetLabel(estimateHexesLeftForOrder(order), order.status)
+  );
 }
 
 /**
@@ -416,7 +422,7 @@ export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
       const rowEl = deps.createSidebarOrderRow({
         labelText: deps.formatUnitArrowLabel(
           row.subUnitId,
-          formatTacticalMarchPendingDistanceLabel(S.tacticalBattleSnapshot, row.subUnitId, row.destinationH3Index)
+          formatTacticalDraftMarchPendingOrderTargetLabel(S.tacticalBattleSnapshot, row.subUnitId, row.destinationH3Index)
         ),
         selected: S.selectedUnitIds.includes(row.subUnitId),
         onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(row.subUnitId, event),

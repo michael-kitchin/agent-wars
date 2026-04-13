@@ -5,7 +5,6 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { latLngToCell } from 'h3-js';
 import type { CombatUnit } from '../combatUnitTypes';
 import { filterMeleeCandidateHexesWithTacticalEntry, listMeleeCandidateHexes } from '../game-actions/meleeInterceptCandidates';
 import { dbGetOne, dbRun, listUnitsForSnapshot } from '../gameDb';
@@ -22,13 +21,14 @@ import {
   tacticalDbFixtureSetStrategicPlanningPhase,
   tacticalDbFixtureWithTempDbContestedPlanning,
 } from './testSupport/tacticalDbFixture';
+import { tacticalRes4Cell } from './testSupport/tacticalRes4HexFixtures';
 
 tacticalDbFixtureRegisterDefaultAfterEach();
 
 test('computeTacticalBattleSnapshot rejects non-res1 enclosing index', () => {
   withTempGameDb('aw-tactical-snap-r1-', () => {
     tacticalDbFixtureSetStrategicPlanningPhase();
-    const res4 = latLngToCell(40.7, -74.0, 4);
+    const res4 = tacticalRes4Cell(40.7, -74.0);
     const r = computeTacticalBattleSnapshot(res4, 'battle-non-r1');
     assert.equal(r.snapshot, null);
     assert.ok(r.failureReason && /res1/i.test(r.failureReason));

@@ -3,6 +3,8 @@
  */
 
 import type { StartTacticalBattleIpcResult, TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { updateGameStateSidebar } from '../core/uiState';
+import { rendererSharedState as S } from '../core/state';
 import { stashStrategicOrderDraftsForTacticalSession } from './tacticalStrategicOrderUiStash';
 
 /**
@@ -56,6 +58,7 @@ export function tacticalRendererApplyStartBattleIpcResult(
   fx.refreshReadyButton();
   fx.syncTacticalEntryOverlay();
   fx.redraw();
+  updateGameStateSidebar(S.gameState);
 }
 
 /**
@@ -80,4 +83,5 @@ export function tacticalRendererActivateRestoredBattleSnapshot(
   fx.refreshReadyButton();
   fx.syncTacticalEntryOverlay();
   fx.redraw();
+  updateGameStateSidebar(S.gameState);
 }
