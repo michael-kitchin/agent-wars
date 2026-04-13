@@ -31,7 +31,6 @@ import type {
 import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
 import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
 import { executePlanRoute } from './tools/tool1Pathfinding';
-import { terrainIsPassableForDomain } from './pathfinding';
 import { normalizeMovementTerrain, isLandSeaportSpawnHex } from './movementTerrain';
 import {
   NAVAL_DESTINATION_MUST_BE_WATER_COASTAL,
@@ -61,6 +60,7 @@ import {
   type HumanOrderGroupPreviewResult,
   type HumanOrderPreviewResult,
 } from './game-actions/humanMarchPreview';
+import { hexSupportsMixedLandAndNaval, selectionHasMixedLandAndNaval } from './game-actions/humanMarchPreviewMixedSelection';
 import {
   getLandMovementBlockReason,
   isLandUnitType,
@@ -76,10 +76,10 @@ import {
   applyValidatedHumanTacticalSupportOrders,
   getActiveTacticalBattleSnapshot,
   isTacticalBattleActive,
-  validateHumanTacticalMarchOrders,
 } from './tacticalBattle/tacticalBattleSession';
 import { tacticalMarchFirstStopAlongPath } from './tacticalBattle/tacticalRulesAdapter';
 import { ready as readyImpl, resolveMeleeIntercept as resolveMeleeInterceptImpl } from './game-actions/gameActionsReadyEntrypoints';
+import { validateHumanMarchOrdersWhenTacticalActive } from './game-actions/tacticalMarchOrderGuards';
 
 export { evaluateRegionControlWinnerAtEndOfTurn } from './game-actions/regionControlWinner';
 
@@ -364,36 +364,6 @@ function getUniqueNonEmptyIds(ids: string[]): string[] {
 }
 
 /**
- * Defines the `selectionHasMixedLandAndNaval` function shape (function selectionHasMixedLandAndNaval(units: HumanOwnedUnit[]): boolean).
-
- * Purpose: Supports maintainability by documenting why `selectionHasMixedLandAndNaval` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function selectionHasMixedLandAndNaval(units: HumanOwnedUnit[]): boolean {
-  const hasNaval = units.some((unit) => unit.unitType === 'naval');
-  const hasLand = units.some((unit) => unit.unitType === 'infantry' || unit.unitType === 'armor');
-  return hasNaval && hasLand;
-}
-
-/**
- * Defines the `hexSupportsMixedLandAndNaval` function shape (function hexSupportsMixedLandAndNaval(hex:).
-
- * Purpose: Supports maintainability by documenting why `hexSupportsMixedLandAndNaval` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function hexSupportsMixedLandAndNaval(hex: { h3Index: string; terrain: string; terrainKind?: string }): boolean {
-  const passabilityTerrain = effectiveHexPassabilityTerrain(hex);
-  return (
-    terrainIsPassableForDomain(passabilityTerrain, 'land') &&
-    terrainIsPassableForDomain(passabilityTerrain, 'water')
-  );
-}
-
-/**
  * Defines the `humanPerspectiveStateSnapshot` function shape (function humanPerspectiveStateSnapshot(): GameStateSnapshot).
 
  * Purpose: Supports maintainability by documenting why `humanPerspectiveStateSnapshot` exists.
@@ -664,33 +634,6 @@ function clearEmbarkAssignmentForIndependentLandMove(unitId: string, destination
     navalUnitId: assignment.navalUnitId,
     navalH3Index: assignment.navalH3Index,
   });
-}
-
-/**
- * Validates grouped human march IPC for tactical drafts without mutating the committed tactical snapshot.
- *
- * Purpose: Lets the renderer store march targets locally until tactical Ready calls `commitHumanTacticalDraftOrders`.
- * When to use: `assignHumanMarchOrder(s)` after `isTacticalBattleActive()` succeeds and unit ids are de-duplicated.
- * Expected outcome: `success: true` when every move is legal on the current snapshot; never returns `tacticalBattle`.
- * Exceptions: Caught and logged at error; returned as `success: false` with stringified message.
- */
-function validateHumanMarchOrdersWhenTacticalActive(uniqueUnitIds: string[], destinationH3Index: string): SubmitOrdersResult {
-  logDebug('gameActions validateHumanMarchOrdersWhenTacticalActive', {
-    unitCount: uniqueUnitIds.length,
-    destinationH3Index,
-  });
-  try {
-    const orders = uniqueUnitIds.map((unitId) => ({ unitId, toH3Index: destinationH3Index }));
-    const checked = validateHumanTacticalMarchOrders(orders);
-    if (!checked.success) {
-      logDebug('gameActions validateHumanMarchOrdersWhenTacticalActive rejected', { reason: checked.reason });
-      return { success: false, reason: checked.reason };
-    }
-    return { success: true };
-  } catch (err) {
-    logError('validateHumanMarchOrdersWhenTacticalActive: exception', err);
-    return { success: false, reason: String(err) };
-  }
 }
 
 /**

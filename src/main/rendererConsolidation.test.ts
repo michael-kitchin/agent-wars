@@ -104,11 +104,13 @@ function testSharedSceneStillRendersStaleIntel(): void {
  */
 function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const policyPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'canvasPreviewPolicy.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
+  const policySource = fs.readFileSync(policyPath, 'utf8');
   const drawSceneFn = getFunctionSource(source, 'drawGameScene');
-  const shouldDrawCommittedOrderPathsFn = getFunctionSource(source, 'shouldDrawCommittedOrderPaths');
-  const shouldDrawHoveredPathPreviewFn = getFunctionSource(source, 'shouldDrawHoveredPathPreview');
-  const hiddenDuringPreviewFn = getFunctionSource(source, 'getCommittedOrderUnitsHiddenDuringPreview');
+  const shouldDrawCommittedOrderPathsFn = getFunctionSource(policySource, 'shouldDrawCommittedOrderPaths');
+  const shouldDrawHoveredPathPreviewFn = getFunctionSource(policySource, 'shouldDrawHoveredPathPreview');
+  const hiddenDuringPreviewFn = getFunctionSource(policySource, 'getCommittedOrderUnitsHiddenDuringPreview');
 
   assert.ok(
     drawSceneFn.includes('const shouldDrawCommittedPaths = shouldDrawCommittedOrderPaths();'),
@@ -136,10 +138,13 @@ function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void {
     drawSceneFn.includes('drawPendingMarchesHoverAndSupportOrderStack({') &&
       drawSceneFn.includes('shouldDrawMarchHoverPreview: shouldDrawPathPreview,') &&
       drawSceneFn.includes('resolutionAnimationBlocksMarchHoverPreview: !!anim,') &&
-      drawSceneFn.includes('drawMarchHoverPreview: drawHoverRoutePreview,') &&
-      drawSceneFn.includes('shouldDrawMarchHoverPreview: shouldDrawHoveredPathPreview(),') &&
+      drawSceneFn.includes('drawMarchHoverPreview: drawHoverRoutePreview,'),
+    'drawGameScene strategic branch should delegate pending stack with path preview gate'
+  );
+  assert.ok(
+    drawSceneFn.includes('shouldDrawMarchHoverPreview: shouldDrawHoveredPathPreview(),') &&
       drawSceneFn.includes('resolutionAnimationBlocksMarchHoverPreview: !!S.resolutionMoveAnimation,'),
-    'drawGameScene should delegate hover path preview to shared staging with policy gating and animation suppression'
+    'drawGameScene tactical branch should delegate pending stack with hover policy gating'
   );
   assert.ok(
     drawSceneFn.includes(
@@ -179,7 +184,9 @@ function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void {
 function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const terrainTooltipStatePath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'terrainTooltipRes1State.ts');
+  const policyPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'canvasPreviewPolicy.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
+  const policySource = fs.readFileSync(policyPath, 'utf8');
   const terrainTooltipSource = fs.readFileSync(terrainTooltipStatePath, 'utf8');
   const drawProductionFn = getFunctionSource(source, 'drawRes1ProductionOverlays');
   const syncBuildEntryFn = getFunctionSource(source, 'syncBuildEntryButton');
@@ -187,7 +194,7 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   const canonicalUrbanCapacityFn = getFunctionSource(terrainTooltipSource, 'getUrbanProductionCapacityForHex');
   const isRes1HexHumanUrbanProductionFn = getFunctionSource(source, 'isRes1HexHumanUrbanProduction');
   const drawHoverPreviewFn = getFunctionSource(source, 'drawHoverRoutePreview');
-  const shouldDrawHoveredPathPreviewFn = getFunctionSource(source, 'shouldDrawHoveredPathPreview');
+  const shouldDrawHoveredPathPreviewFn = getFunctionSource(policySource, 'shouldDrawHoveredPathPreview');
 
   assert.ok(
     drawProductionFn.includes('if (shouldRenderRes4Hexes()) return'),
@@ -457,7 +464,9 @@ function testAirFerryDoubleClickContracts(): void {
     source.includes("from './rendering/orderOverlayStages'") &&
       source.includes('drawPendingMarchesHoverAndSupportOrderStack({') &&
       overlayStagesSource.includes('drawPendingSupportOrderOverlays(') &&
-      overlayStagesSource.includes('drawPendingFerryLines(ctx, S.pendingFerryOrders, state.units, hexList, drawLineArrow);') &&
+      overlayStagesSource.includes(
+        'drawPendingFerryLines(ctx, S.pendingFerryOrders, unitsForOrderLines, hexList, drawLineArrow);'
+      ) &&
       orderDrawingSource.includes('function drawPendingFerryLines(') &&
       orderDrawingSource.includes('drawLineArrow('),
     'pending ferry planning should render filled map arrows via shared overlay stage like other planned movement'

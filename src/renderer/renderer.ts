@@ -47,6 +47,7 @@ import {
   getLeafletGlobal,
   hexCenterPx,
   hitTestHexAtContainerPixel,
+  hitTestTacticalRes4HexAtContainerPixel,
 } from './map/mapUtils';
 import {
   hideBuildEntryLayer,
@@ -61,6 +62,11 @@ import {
   drawTacticalPendingMarchPlanLines,
 } from './rendering/pathDrawing';
 import { drawPendingMarchesHoverAndSupportOrderStack } from './rendering/orderOverlayStages';
+import {
+  getCommittedOrderUnitsHiddenDuringPreview,
+  shouldDrawCommittedOrderPaths,
+  shouldDrawHoveredPathPreview,
+} from './rendering/canvasPreviewPolicy';
 import {
   addUnitsToSelection as addUnitsToSelectionFromModule,
   clearSelection as clearSelectionFromModule,
@@ -353,6 +359,22 @@ function shouldSuppressTerrainTooltip(): boolean {
   return (
     isStackOrBuildMapPopoverOpen() || S.buildEntryButtonPointerInside || S.tacticalEntryButtonPointerInside
   );
+}
+
+/**
+ * Returns whether the given viewport coordinates still lie over the main Leaflet map container.
+ *
+ * Purpose: After async naming work in `showTerrainTooltip`, the pointer may have moved to the sidebar
+ * or other chrome; we must not resurrect the tooltip over non-map UI.
+ * When to use: Immediately before revealing `#hex-tooltip` after an `await` in `showTerrainTooltip`.
+ * Expected outcome: `true` only when `(clientX, clientY)` intersects the main map `getBoundingClientRect()`.
+ * Exceptions: Returns `false` when the map is not initialized.
+ */
+function isClientPointInsideMainMapLeafletContainer(clientX: number, clientY: number): boolean {
+  const map = getMainLeafletMap() as { getContainer: () => HTMLElement } | null;
+  if (!map) return false;
+  const r = map.getContainer().getBoundingClientRect();
+  return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
 }
 
 /**
@@ -1254,6 +1276,7 @@ async function showTerrainTooltip(
   const namingLine = await getCachedNamingLineForTarget(namingTarget);
   if (requestSeq !== S.terrainTooltipRequestSeq) return;
   if (shouldSuppressTerrainTooltip()) return;
+  if (!isClientPointInsideMainMapLeafletContainer(S.lastPointerClientX, S.lastPointerClientY)) return;
   const el = document.getElementById('hex-tooltip');
   if (!el) return;
   el.innerHTML = getCachedTerrainTooltipHtml(state, namingLine);
@@ -1292,8 +1315,13 @@ async function restoreTerrainTooltipAfterPopoverClose(): Promise<void> {
     const rect = map.getContainer().getBoundingClientRect();
     const x = S.lastPointerClientX - rect.left;
     const y = S.lastPointerClientY - rect.top;
-    const set = new Set(S.gameState.hexes.map((h) => h.h3Index));
-    hoverH3 = hitTestHexAtContainerPixel(x, y, set);
+    const tb = S.tacticalBattleSnapshot;
+    if (tb) {
+      hoverH3 = hitTestTacticalRes4HexAtContainerPixel(x, y, tb);
+    } else {
+      const set = new Set(S.gameState.hexes.map((h) => h.h3Index));
+      hoverH3 = hitTestHexAtContainerPixel(x, y, set);
+    }
     if (!hoverH3) return;
     S.hoveredHexH3 = hoverH3;
   }
@@ -2401,45 +2429,6 @@ function drawGameScene(
       drawUnknownBattleMarkers(ctx, unknownCasualtyHexes, pulseOpacity);
     }
   }
-}
-
-/**
- * Defines the `shouldDrawCommittedOrderPaths` function shape (function shouldDrawCommittedOrderPaths(): boolean).
-
- * Purpose: Supports maintainability by documenting why `shouldDrawCommittedOrderPaths` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function shouldDrawCommittedOrderPaths(): boolean {
-  return !S.ctrlKeyActive;
-}
-
-/**
- * Defines the `shouldDrawHoveredPathPreview` function shape (function shouldDrawHoveredPathPreview(): boolean).
-
- * Purpose: Supports maintainability by documenting why `shouldDrawHoveredPathPreview` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function shouldDrawHoveredPathPreview(): boolean {
-  return !S.ctrlKeyActive && S.selectedUnitIds.length > 0;
-}
-
-/**
- * Defines the `getCommittedOrderUnitsHiddenDuringPreview` function shape (function getCommittedOrderUnitsHiddenDuringPreview().
-
- * Purpose: Supports maintainability by documenting why `getCommittedOrderUnitsHiddenDuringPreview` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function getCommittedOrderUnitsHiddenDuringPreview(
-  shouldDrawPathPreview: boolean
-): ReadonlySet<string> | null {
-  if (!shouldDrawPathPreview || !S.hoverRoutePreview) return null;
-  return new Set(S.selectedUnitIds);
 }
 
 /**

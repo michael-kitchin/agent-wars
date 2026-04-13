@@ -44,6 +44,7 @@ export function tacticalComputeMovementOrderOutcome(args: {
     | 'res4TerrainKindByH3'
     | 'strategicHexTerrain'
     | 'strategicHexTerrainKind'
+    | 'res4IsSeaportByH3'
   >;
 }):
   | { ok: true; idx: number }
@@ -112,6 +113,7 @@ export function tacticalComputeHumanMovementOrderOutcome(args: {
     | 'res4TerrainKindByH3'
     | 'strategicHexTerrain'
     | 'strategicHexTerrainKind'
+    | 'res4IsSeaportByH3'
   >;
 }):
   | { ok: true; idx: number }

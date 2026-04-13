@@ -161,6 +161,8 @@ function humanTacticalMarchValidationFailure(
       tacticalLogQuery('humanTacticalMarchValidationFailure', {
         reason: outcome.reason,
         ...outcome.context,
+        unitId: o.unitId,
+        toH3Index: o.toH3Index,
       });
       return humanTacticalMarchBlockMessage(outcome.reason);
     }

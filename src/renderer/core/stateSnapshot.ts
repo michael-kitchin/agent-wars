@@ -242,10 +242,16 @@ export async function applyGameStateSnapshot(
   const restored = nextState.tacticalBattleSession;
   if (restored && deps.applyRestoredTacticalBattleFromMain) {
     const cur = S.tacticalBattleSnapshot;
+    // Re-run tactical activation when the snapshot matches but `enterTacticalMapView` never finalized (e.g. map not
+    // ready on first paint, or a second `getGameState` arrived before `finalizeTacticalViewZoomAndPan` captured zoom).
     const materiallyDifferent =
       !cur ||
       cur.battleId !== restored.battleId ||
-      cur.tacticalTurnNumber !== restored.tacticalTurnNumber;
+      cur.tacticalTurnNumber !== restored.tacticalTurnNumber ||
+      (!!cur &&
+        cur.battleId === restored.battleId &&
+        cur.tacticalTurnNumber === restored.tacticalTurnNumber &&
+        S.preTacticalLeafletMinZoom == null);
     if (materiallyDifferent) {
       deps.applyRestoredTacticalBattleFromMain(restored);
     }

@@ -48,7 +48,9 @@ import {
   parseGroupedDestinationPayload,
   parseBuildQueueUpdatePayload,
   parseUnitIdList,
+  parseHumanTacticalCommitPayload,
 } from './ipcPayloadGuards';
+import { IPC_GAME, IPC_OPENROUTER } from '../shared/ipc/channels';
 import {
   saveKey,
   hasKey,
@@ -70,11 +72,9 @@ import {
   cancelRequestAiOrders,
   handleGameReady,
   handleResolveMeleeIntercept,
+  type ReadyDeps,
 } from './gameIpcHandlers';
 import type {
-  AirStrikeOrder,
-  EmbarkOrder,
-  FerryOrder,
   SubmitOrdersPayload,
   ReadyResult,
   GameReadyIpcPayload,
@@ -217,9 +217,32 @@ function requestOrdersWithLog(
   options?: Parameters<typeof requestOrders>[2]
 ): ReturnType<typeof requestOrders> {
   const onLog = (line: string, isError?: boolean) => {
-    mainWindow?.webContents?.send('openRouter:log', { line, isError: !!isError });
+    mainWindow?.webContents?.send(IPC_OPENROUTER.log, { line, isError: !!isError });
   };
   return requestOrders(state, modelId, { ...options, onLog });
+}
+
+/**
+ * Builds the shared dependency object wired into both `game:ready` and `game:resolveMeleeIntercept` IPC handlers.
+ *
+ * Purpose: Prevents drift when consultation hooks gain new fields — both paths stay aligned.
+ * When to use: Only from `registerIpcHandlers` when binding ready and melee-intercept handlers.
+ * Expected outcome: An `Omit<ReadyDeps, 'ready'>` suitable for spreading with the action-specific entrypoint.
+ * Exceptions: None.
+ */
+function buildSharedHumanReadyConsultationDeps(
+  requestOrdersFn: ReadyDeps['requestOrders']
+): Omit<ReadyDeps, 'ready'> {
+  return {
+    getGameState,
+    getGameStateForPlayer: (playerId: 'human' | 'opponent') =>
+      getGameStateForPlayer(playerId, { maskUnexploredTerrain: playerId !== 'opponent' }),
+    getSelectedModel,
+    hasKey,
+    getToolNamesForEnabledGroups,
+    defaultGroupIds: TOOL_GROUP_REGISTRY.map((g) => g.id),
+    requestOrders: requestOrdersFn,
+  };
 }
 
 /**
@@ -231,10 +254,10 @@ function requestOrdersWithLog(
  * Exceptions: None.
  */
 function registerIpcHandlers(): void {
-  ipcMain.handle('game:getState', () => getGameStateForPlayer('human', { maskUnexploredTerrain: false }));
-  ipcMain.handle('game:getRes4TerrainOverrides', () => getRes4TerrainOverridesForRendererFromGame());
+  ipcMain.handle(IPC_GAME.getState, () => getGameStateForPlayer('human', { maskUnexploredTerrain: false }));
+  ipcMain.handle(IPC_GAME.getRes4TerrainOverrides, () => getRes4TerrainOverridesForRendererFromGame());
   ipcMain.handle(
-    'game:getHexNamingTooltipLine',
+    IPC_GAME.getHexNamingTooltipLine,
     (_event, payload: { h3Index?: string; resolution?: number }) => {
       if (typeof payload?.h3Index !== 'string') return null;
       if (payload?.resolution !== 1 && payload?.resolution !== 4) return null;
@@ -244,12 +267,12 @@ function registerIpcHandlers(): void {
       });
     }
   );
-  ipcMain.handle('game:getHexContinentNames', (_event, payload: { h3Index?: string }) => {
+  ipcMain.handle(IPC_GAME.getHexContinentNames, (_event, payload: { h3Index?: string }) => {
     if (typeof payload?.h3Index !== 'string') return [];
     return getHexContinentNamesForRenderer({ h3Index: payload.h3Index });
   });
-  ipcMain.handle('game:listScenarioHomeRegions', () => listScenarioHomeRegions());
-  ipcMain.handle('game:newGame', (_event, payload: NewGameIpcPayload | undefined) => {
+  ipcMain.handle(IPC_GAME.listScenarioHomeRegions, () => listScenarioHomeRegions());
+  ipcMain.handle(IPC_GAME.newGame, (_event, payload: NewGameIpcPayload | undefined) => {
     const fogOfWarEnabled = payload?.fogOfWarEnabled !== false;
     logDebug('main game:newGame', {
       fogOfWarEnabled,
@@ -265,13 +288,13 @@ function registerIpcHandlers(): void {
     endTacticalBattleSession();
     return getGameStateForPlayer('human', { maskUnexploredTerrain: false });
   });
-  ipcMain.handle('game:submitOrders', (_event, payload: SubmitOrdersPayload | { unitId: string; toH3Index: string }[]) => {
+  ipcMain.handle(IPC_GAME.submitOrders, (_event, payload: SubmitOrdersPayload | { unitId: string; toH3Index: string }[]) => {
     const normalized: SubmitOrdersPayload = normalizeSubmitOrdersPayload(payload);
     return submitOrders(normalized);
   });
-  ipcMain.handle('game:listHumanStandingOrders', () => listHumanStandingOrders());
+  ipcMain.handle(IPC_GAME.listHumanStandingOrders, () => listHumanStandingOrders());
   ipcMain.handle(
-    'game:previewHumanMarchOrder',
+    IPC_GAME.previewHumanMarchOrder,
     (_event, payload: { unitId?: string; hoveredH3Index?: string }) => {
       if (typeof payload?.unitId !== 'string' || typeof payload?.hoveredH3Index !== 'string') {
         return { valid: false, showInvalidMarker: false, invalidReason: 'Invalid preview payload', segments: [] };
@@ -280,7 +303,7 @@ function registerIpcHandlers(): void {
     }
   );
   ipcMain.handle(
-    'game:previewHumanMarchOrders',
+    IPC_GAME.previewHumanMarchOrders,
     (_event, payload: { unitIds?: string[]; hoveredH3Index?: string }) => {
       if (!Array.isArray(payload?.unitIds) || typeof payload?.hoveredH3Index !== 'string') {
         return {
@@ -296,7 +319,7 @@ function registerIpcHandlers(): void {
     }
   );
   ipcMain.handle(
-    'game:assignHumanMarchOrder',
+    IPC_GAME.assignHumanMarchOrder,
     (_event, payload: { unitId?: string; destinationH3Index?: string }) => {
       if (typeof payload?.unitId !== 'string' || typeof payload?.destinationH3Index !== 'string') {
         return { success: false, reason: 'Invalid assign payload' };
@@ -305,7 +328,7 @@ function registerIpcHandlers(): void {
     }
   );
   ipcMain.handle(
-    'game:assignHumanMarchOrders',
+    IPC_GAME.assignHumanMarchOrders,
     (_event, payload: { unitIds?: string[]; destinationH3Index?: string }) => {
       const parsed = parseGroupedDestinationPayload(payload);
       if (!parsed) {
@@ -314,78 +337,13 @@ function registerIpcHandlers(): void {
       return assignHumanMarchOrders(parsed.unitIds, parsed.destinationH3Index);
     }
   );
+  ipcMain.handle(IPC_GAME.commitHumanTacticalDraftOrders, (_event, payload: unknown) => {
+    const parsed = parseHumanTacticalCommitPayload(payload);
+    if (!parsed.ok) return { success: false, reason: parsed.reason };
+    return commitHumanTacticalDraftOrders(parsed.value);
+  });
   ipcMain.handle(
-    'game:commitHumanTacticalDraftOrders',
-    (
-      _event,
-      payload: {
-        movementOrders?: { unitId?: string; toH3Index?: string }[];
-        rangedAttacks?: { unitId?: string; targetH3Index?: string }[];
-        airStrikes?: { unitId?: string; targetH3Index?: string; targetType?: 'units' | 'urban' | 'airport' | 'seaport' }[];
-        ferryOrders?: { unitId?: string; destinationH3Index?: string }[];
-        embarkOrders?: { unitId?: string; navalUnitId?: string }[];
-      }
-    ) => {
-      const movementRaw = payload?.movementOrders;
-      if (!Array.isArray(movementRaw)) return { success: false, reason: 'Invalid tactical commit payload' };
-      const movementOrders: { unitId: string; toH3Index: string }[] = [];
-      for (const row of movementRaw) {
-        if (typeof row?.unitId !== 'string' || typeof row?.toH3Index !== 'string') {
-          return { success: false, reason: 'Invalid tactical commit payload' };
-        }
-        movementOrders.push({ unitId: row.unitId, toH3Index: row.toH3Index });
-      }
-      const rangedRaw = payload?.rangedAttacks ?? [];
-      if (!Array.isArray(rangedRaw)) return { success: false, reason: 'Invalid tactical commit payload' };
-      const rangedAttacks: { unitId: string; targetH3Index: string }[] = [];
-      for (const row of rangedRaw) {
-        if (typeof row?.unitId !== 'string' || typeof row?.targetH3Index !== 'string') {
-          return { success: false, reason: 'Invalid tactical commit payload' };
-        }
-        rangedAttacks.push({ unitId: row.unitId, targetH3Index: row.targetH3Index });
-      }
-      const airRaw = payload?.airStrikes ?? [];
-      if (!Array.isArray(airRaw)) return { success: false, reason: 'Invalid tactical commit payload' };
-      const airStrikes: AirStrikeOrder[] = [];
-      for (const row of airRaw) {
-        if (
-          typeof row?.unitId !== 'string' ||
-          typeof row?.targetH3Index !== 'string' ||
-          (row?.targetType !== 'units' && row?.targetType !== 'urban' && row?.targetType !== 'airport' && row?.targetType !== 'seaport')
-        ) {
-          return { success: false, reason: 'Invalid tactical commit payload' };
-        }
-        airStrikes.push({ unitId: row.unitId, targetH3Index: row.targetH3Index, targetType: row.targetType });
-      }
-      const ferryRaw = payload?.ferryOrders ?? [];
-      if (!Array.isArray(ferryRaw)) return { success: false, reason: 'Invalid tactical commit payload' };
-      const ferryOrders: FerryOrder[] = [];
-      for (const row of ferryRaw) {
-        if (typeof row?.unitId !== 'string' || typeof row?.destinationH3Index !== 'string') {
-          return { success: false, reason: 'Invalid tactical commit payload' };
-        }
-        ferryOrders.push({ unitId: row.unitId, destinationH3Index: row.destinationH3Index });
-      }
-      const embarkRaw = payload?.embarkOrders ?? [];
-      if (!Array.isArray(embarkRaw)) return { success: false, reason: 'Invalid tactical commit payload' };
-      const embarkOrders: EmbarkOrder[] = [];
-      for (const row of embarkRaw) {
-        if (typeof row?.unitId !== 'string' || typeof row?.navalUnitId !== 'string') {
-          return { success: false, reason: 'Invalid tactical commit payload' };
-        }
-        embarkOrders.push({ unitId: row.unitId, navalUnitId: row.navalUnitId });
-      }
-      return commitHumanTacticalDraftOrders({
-        movementOrders,
-        rangedAttacks,
-        airStrikes,
-        ferryOrders,
-        embarkOrders,
-      });
-    }
-  );
-  ipcMain.handle(
-    'game:validateGroupRangedTarget',
+    IPC_GAME.validateGroupRangedTarget,
     (_event, payload: { unitIds?: string[]; targetH3Index?: string }) => {
       const parsed = parseGroupedTargetPayload(payload);
       if (!parsed) {
@@ -395,7 +353,7 @@ function registerIpcHandlers(): void {
     }
   );
   ipcMain.handle(
-    'game:validateGroupAirStrikeTarget',
+    IPC_GAME.validateGroupAirStrikeTarget,
     (_event, payload: { unitIds?: string[]; targetH3Index?: string; targetType?: 'units' | 'urban' | 'airport' | 'seaport' }) => {
       const parsed = parseGroupedStrikePayload(payload);
       if (!parsed) {
@@ -405,7 +363,7 @@ function registerIpcHandlers(): void {
     }
   );
   ipcMain.handle(
-    'game:validateGroupFerryTarget',
+    IPC_GAME.validateGroupFerryTarget,
     (_event, payload: { unitIds?: string[]; destinationH3Index?: string }) => {
       const parsed = parseGroupedDestinationPayload(payload);
       if (!parsed) {
@@ -414,20 +372,20 @@ function registerIpcHandlers(): void {
       return validateGroupFerryTarget(parsed.unitIds, parsed.destinationH3Index);
     }
   );
-  ipcMain.handle('game:cancelHumanStandingOrder', (_event, payload: { unitId?: string }) => {
+  ipcMain.handle(IPC_GAME.cancelHumanStandingOrder, (_event, payload: { unitId?: string }) => {
     if (typeof payload?.unitId !== 'string') return { success: false, reason: 'Invalid cancel payload' };
     return cancelHumanOrder(payload.unitId);
   });
-  ipcMain.handle('game:getHexBuildQueue', (_event, payload: { h3Index?: string }) => {
+  ipcMain.handle(IPC_GAME.getHexBuildQueue, (_event, payload: { h3Index?: string }) => {
     if (typeof payload?.h3Index !== 'string') return null;
     return getHexBuildQueue(payload.h3Index, 'human');
   });
-  ipcMain.handle('game:addHexBuildQueueEntry', (_event, payload: { h3Index?: string }) => {
+  ipcMain.handle(IPC_GAME.addHexBuildQueueEntry, (_event, payload: { h3Index?: string }) => {
     if (typeof payload?.h3Index !== 'string') return { success: false, reason: 'Invalid build-queue payload' };
     return addHexBuildQueueEntry(payload.h3Index, 'human');
   });
   ipcMain.handle(
-    'game:updateHexBuildQueueEntry',
+    IPC_GAME.updateHexBuildQueueEntry,
     (_event, payload: { h3Index?: string; entryId?: number; unitType?: 'infantry' | 'armor' | 'naval' | 'air'; count?: number }) => {
       const parsed = parseBuildQueueUpdatePayload(payload);
       if (!parsed) {
@@ -436,13 +394,13 @@ function registerIpcHandlers(): void {
       return updateHexBuildQueueEntry(parsed.h3Index, parsed.entryId, parsed.unitType, parsed.count, 'human');
     }
   );
-  ipcMain.handle('game:removeHexBuildQueueEntry', (_event, payload: { h3Index?: string; entryId?: number }) => {
+  ipcMain.handle(IPC_GAME.removeHexBuildQueueEntry, (_event, payload: { h3Index?: string; entryId?: number }) => {
     if (typeof payload?.h3Index !== 'string' || typeof payload?.entryId !== 'number') {
       return { success: false, reason: 'Invalid build-queue payload' };
     }
     return removeHexBuildQueueEntry(payload.h3Index, payload.entryId, 'human');
   });
-  ipcMain.handle('game:getSealiftStackState', (_event, payload: { h3Index?: string }) => {
+  ipcMain.handle(IPC_GAME.getSealiftStackState, (_event, payload: { h3Index?: string }) => {
     if (typeof payload?.h3Index !== 'string') {
       return {
         h3Index: '',
@@ -457,7 +415,7 @@ function registerIpcHandlers(): void {
     return getSealiftStackState(payload.h3Index);
   });
   ipcMain.handle(
-    'game:updateSealiftSlot',
+    IPC_GAME.updateSealiftSlot,
     (_event, payload: { h3Index?: string; navalUnitId?: string; slotIndex?: number; landUnitId?: string | null }) => {
       if (
         typeof payload?.h3Index !== 'string' ||
@@ -473,51 +431,29 @@ function registerIpcHandlers(): void {
       return updateSealiftSlot(payload.h3Index, payload.navalUnitId, payload.slotIndex, landUnitId);
     }
   );
-  ipcMain.handle('game:startTacticalBattle', (_event, payload: { enclosingRes1H3Index?: string }) => {
+  ipcMain.handle(IPC_GAME.startTacticalBattle, (_event, payload: { enclosingRes1H3Index?: string }) => {
     if (typeof payload?.enclosingRes1H3Index !== 'string') {
       return { success: false, reason: 'Invalid tactical start payload.' };
     }
     return startTacticalBattleForEnclosingRes1Hex(payload.enclosingRes1H3Index);
   });
-  ipcMain.handle('game:endTacticalBattle', () => {
+  ipcMain.handle(IPC_GAME.endTacticalBattle, () => {
     endTacticalBattleSession();
     return { success: true as const };
   });
+  const sharedReadyConsultationDeps = buildSharedHumanReadyConsultationDeps(requestOrdersWithLog);
+  ipcMain.handle(IPC_GAME.ready, async (_event, payload?: GameReadyIpcPayload): Promise<ReadyResult> => {
+    return handleGameReady(payload, { ...sharedReadyConsultationDeps, ready });
+  });
   ipcMain.handle(
-    'game:ready',
-    async (_event, payload?: GameReadyIpcPayload): Promise<ReadyResult> => {
-      return handleGameReady(payload, {
-        getGameState,
-        getGameStateForPlayer: (playerId: 'human' | 'opponent') =>
-          getGameStateForPlayer(playerId, { maskUnexploredTerrain: playerId !== 'opponent' }),
-        getSelectedModel,
-        hasKey,
-        getToolNamesForEnabledGroups,
-        defaultGroupIds: TOOL_GROUP_REGISTRY.map((g) => g.id),
-        requestOrders: requestOrdersWithLog,
-        ready,
-      });
-    }
-  );
-  ipcMain.handle(
-    'game:resolveMeleeIntercept',
+    IPC_GAME.resolveMeleeIntercept,
     async (_event, payload?: ResolveMeleeInterceptIpcPayload): Promise<ReadyResult> => {
-      return handleResolveMeleeIntercept(payload, {
-        getGameState,
-        getGameStateForPlayer: (playerId: 'human' | 'opponent') =>
-          getGameStateForPlayer(playerId, { maskUnexploredTerrain: playerId !== 'opponent' }),
-        getSelectedModel,
-        hasKey,
-        getToolNamesForEnabledGroups,
-        defaultGroupIds: TOOL_GROUP_REGISTRY.map((g) => g.id),
-        requestOrders: requestOrdersWithLog,
-        resolveMeleeIntercept,
-      });
+      return handleResolveMeleeIntercept(payload, { ...sharedReadyConsultationDeps, resolveMeleeIntercept });
     }
   );
 
   ipcMain.handle(
-    'game:requestAiOrders',
+    IPC_GAME.requestAiOrders,
     async (
       _event,
       payload?: { enabledToolGroups?: string[] }
@@ -538,19 +474,19 @@ function registerIpcHandlers(): void {
     }
   );
 
-  ipcMain.handle('game:cancelRequestAiOrders', () => {
+  ipcMain.handle(IPC_GAME.cancelRequestAiOrders, () => {
     logDebug('main game:cancelRequestAiOrders');
     cancelRequestAiOrders(requestAiOrdersControllerRef);
   });
 
-  ipcMain.handle('openRouter:getToolGroupList', () => getToolGroupList());
-  ipcMain.handle('openRouter:getKey', () => ({ hasKey: hasKey() }));
-  ipcMain.handle('openRouter:getSelectedModel', () => getSelectedModel());
-  ipcMain.handle('openRouter:setKey', (_event, key: string) => {
+  ipcMain.handle(IPC_OPENROUTER.getToolGroupList, () => getToolGroupList());
+  ipcMain.handle(IPC_OPENROUTER.getKey, () => ({ hasKey: hasKey() }));
+  ipcMain.handle(IPC_OPENROUTER.getSelectedModel, () => getSelectedModel());
+  ipcMain.handle(IPC_OPENROUTER.setKey, (_event, key: string) => {
     saveKey(typeof key === 'string' ? key : '');
   });
-  ipcMain.handle('openRouter:listModels', () => listModels());
-  ipcMain.handle('openRouter:setSelectedModel', (_event, modelId: string) => {
+  ipcMain.handle(IPC_OPENROUTER.listModels, () => listModels());
+  ipcMain.handle(IPC_OPENROUTER.setSelectedModel, (_event, modelId: string) => {
     setSelectedModel(typeof modelId === 'string' ? modelId : '');
   });
 }

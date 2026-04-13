@@ -521,6 +521,20 @@ export function wireInitCore(deps: InitCoreDeps): void {
   });
 
   const canvasContainer = document.getElementById('canvas-container');
+  /**
+   * Dismisses map hover tooltip state when the pointer enters the fixed sidebar.
+   *
+   * Purpose: `#hex-tooltip` uses `position: fixed` with a higher z-index than `#sidebar`, so the tooltip can
+   * paint over the panel while the pointer is already over sidebar targets; `pointerleave` on `#main-map`
+   * may not correlate with that visual in all paths (especially after tactical hover fixes).
+   * When to use: Wired once at init; runs on every `pointerenter` into the primary right-hand UI column.
+   * Expected outcome: Tooltip timer cleared, `#hex-tooltip` hidden, and map hover preview state cleared.
+   * Exceptions: None.
+   */
+  const sidebarPanel = document.getElementById('sidebar');
+  sidebarPanel?.addEventListener('pointerenter', () => {
+    dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
+  });
   canvasContainer?.addEventListener('pointermove', (e) => {
     deps.updateMapInteractionCursor(e.clientX, e.clientY);
   });

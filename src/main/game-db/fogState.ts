@@ -284,6 +284,13 @@ function refreshFogOfWarIntelForPlayer(
     ops.run(`INSERT OR IGNORE INTO player_hex_intel (player_id, h3_index, seen_state, last_seen_turn) VALUES (?, ?, 'visible', ?)`, [playerId, h3, currentTurn]);
     ops.run(`UPDATE player_hex_intel SET seen_state = 'visible', last_seen_turn = ? WHERE player_id = ? AND h3_index = ?`, [currentTurn, playerId, h3]);
   }
+  // Persist every hex currently in unit vision disks (armor/naval radius > 1, etc.) so `exploredHexes` drives terrain
+  // and production overlays, not only own-occupancy cells and march trajectories.
+  for (const h3 of visibleHexes) {
+    if (!mapHexSet.has(h3)) continue;
+    ops.run(`INSERT OR IGNORE INTO player_hex_intel (player_id, h3_index, seen_state, last_seen_turn) VALUES (?, ?, 'visible', ?)`, [playerId, h3, currentTurn]);
+    ops.run(`UPDATE player_hex_intel SET seen_state = 'visible', last_seen_turn = ? WHERE player_id = ? AND h3_index = ?`, [currentTurn, playerId, h3]);
+  }
   const exploredRows = ops.getAll<{ h3_index: string; last_seen_turn: number | null }>('SELECT h3_index, last_seen_turn FROM player_hex_intel WHERE player_id = ?', [playerId]);
   for (const row of exploredRows) {
     if (visibleHexes.has(row.h3_index)) ops.run(`UPDATE player_hex_intel SET seen_state = 'visible', last_seen_turn = ? WHERE player_id = ? AND h3_index = ?`, [currentTurn, playerId, row.h3_index]);

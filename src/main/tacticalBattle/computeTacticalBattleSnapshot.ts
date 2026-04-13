@@ -3,6 +3,7 @@ import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shar
 import { buildUnitDisplayNameLookup, formatTacticalSubUnitDisplayName } from '../../shared/unitDisplayNames';
 import { getPreviousStrategicH3IndexForUnit } from '../strategicUnitPreviousHex';
 import { dbGetOne, getRes4TerrainOverridesForRendererFromGame, listUnitsForSnapshot } from '../gameDb';
+import { isNavalRes4TacticalCellNavigable } from '../../shared/tacticalTerrainMovement';
 import { tacticalLogError, tacticalLogQuery } from './tacticalLogging';
 
 const WORLD_H3_RESOLUTION = 1;
@@ -135,16 +136,24 @@ function dot(a: { lat: number; lng: number }, b: { lat: number; lng: number }): 
  * When to use: Before assigning sub-units to res4 children during snapshot build.
  * Expected outcome: Naval favors water/coastal; air forbids pure water; land forbids water.
  * Exceptions: None.
+ *
+ * @param isSeaportCell When true, the res4 child hosts a seaport facility so naval may spawn there even if the terrain kind is land-like.
  */
 function isRes4CellPassableForUnitType(
   unitType: string,
   effectiveKind: string,
   parentTerrain: string,
-  parentTerrainKind: string
+  parentTerrainKind: string,
+  isSeaportCell: boolean
 ): boolean {
   const kind = effectiveKind || parentTerrainKind;
   if (unitType === 'naval') {
-    return kind === 'water' || kind === 'coastal' || parentTerrain === 'water' || parentTerrain === 'coastal';
+    return isNavalRes4TacticalCellNavigable({
+      resolvedKindForCell: kind,
+      parentTerrain,
+      parentTerrainKind,
+      isSeaportCell,
+    });
   }
   if (unitType === 'air') {
     return kind !== 'water';
@@ -248,11 +257,18 @@ export function computeTacticalBattleSnapshot(
     const res4Rows = getRes4TerrainOverridesForRendererFromGame();
     const res4UrbanByH3 = new Map<string, boolean>();
     const res4KindByH3 = new Map<string, string>();
+    const res4IsSeaportByH3: Record<string, boolean> = {};
     for (const row of res4Rows) {
       res4UrbanByH3.set(row.h3Index, !!row.isUrban);
       res4KindByH3.set(row.h3Index, row.terrainKind);
     }
     const children = cellToChildren(enclosingRes1H3Index, TACTICAL_H3_RESOLUTION);
+    const childSet = new Set(children);
+    for (const row of res4Rows) {
+      if (row.isSeaport && childSet.has(row.h3Index)) {
+        res4IsSeaportByH3[row.h3Index] = true;
+      }
+    }
     const orderedCells = orderRes4CellsForPlacement({
       enclosingRes1: enclosingRes1H3Index,
       children,
@@ -288,7 +304,10 @@ export function computeTacticalBattleSnapshot(
         const cell = orderedForParent[cellCursor % orderedForParent.length]!;
         cellCursor += 1;
         const effKind = res4KindByH3.get(cell) ?? hexRow.terrain_kind;
-        if (!isRes4CellPassableForUnitType(parent.unitType, effKind, hexRow.terrain, hexRow.terrain_kind)) continue;
+        const seaportHere = !!res4IsSeaportByH3[cell];
+        if (!isRes4CellPassableForUnitType(parent.unitType, effKind, hexRow.terrain, hexRow.terrain_kind, seaportHere)) {
+          continue;
+        }
         placed += 1;
         const two = String(placed).padStart(2, '0');
         subUnits.push({
@@ -327,6 +346,7 @@ export function computeTacticalBattleSnapshot(
       strategicHexTerrain: hexRow.terrain,
       strategicHexTerrainKind: hexRow.terrain_kind,
       res4TerrainKindByH3,
+      ...(Object.keys(res4IsSeaportByH3).length > 0 ? { res4IsSeaportByH3 } : {}),
       subUnits,
     };
     tacticalLogQuery('computeTacticalBattleSnapshot result', {

@@ -7,7 +7,6 @@ import {
 } from '../gameDb';
 import { executePlanRouteWithSession } from '../tools/tool1Pathfinding';
 import { terrainIsPassableForDomain } from '../pathfinding';
-import { buildNormalizedTerrainByH3 } from '../movementTerrain';
 import { logDebug, logError, logTrace } from '../logger';
 import { isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession';
 import { AIR_FERRY_RANGE_HEXES, MOVEMENT_RANGE_BY_UNIT_TYPE, formatFerryOutOfRangeReason } from '../../shared/tacticalRanges';
@@ -37,6 +36,7 @@ import {
 import type { HumanMarchPreviewComputationContext } from './humanMarchPreviewComputationContext';
 import { buildHumanMarchPreviewComputationContextFromState } from './humanMarchPreviewComputationContext';
 import { cacheSetBounded } from './humanMarchPreviewCache';
+import { hexSupportsMixedLandAndNaval, selectionHasMixedLandAndNaval } from './humanMarchPreviewMixedSelection';
 /**
  * Documents the `HumanOwnedUnit` type alias (type HumanOwnedUnit).
 
@@ -490,20 +490,6 @@ function snapshotStateForPlayer(playerId: 'human' | 'opponent'): GameStateSnapsh
 }
 
 /**
- * Defines the `selectionHasMixedLandAndNaval` function shape (function selectionHasMixedLandAndNaval(units: HumanOwnedUnit[]): boolean).
-
- * Purpose: Supports maintainability by documenting why `selectionHasMixedLandAndNaval` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function selectionHasMixedLandAndNaval(units: HumanOwnedUnit[]): boolean {
-  const hasNaval = units.some((unit) => unit.unitType === 'naval');
-  const hasLand = units.some((unit) => unit.unitType === 'infantry' || unit.unitType === 'armor');
-  return hasNaval && hasLand;
-}
-
-/**
  * Defines the `getOrCreateHoverSessionContext` function shape (function getOrCreateHoverSessionContext().
 
  * Purpose: Supports maintainability by documenting why `getOrCreateHoverSessionContext` exists.
@@ -662,23 +648,6 @@ function findNearbyReachablePreview(
     }
   }
   return null;
-}
-
-/**
- * Defines the `hexSupportsMixedLandAndNaval` function shape (function hexSupportsMixedLandAndNaval(hex:).
-
- * Purpose: Supports maintainability by documenting why `hexSupportsMixedLandAndNaval` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function hexSupportsMixedLandAndNaval(hex: { h3Index: string; terrain: string; terrainKind?: string }): boolean {
-  const passabilityByH3 = buildNormalizedTerrainByH3([hex]);
-  const passabilityTerrain = passabilityByH3.get(hex.h3Index) ?? 'land';
-  return (
-    terrainIsPassableForDomain(passabilityTerrain, 'land') &&
-    terrainIsPassableForDomain(passabilityTerrain, 'water')
-  );
 }
 
 /**

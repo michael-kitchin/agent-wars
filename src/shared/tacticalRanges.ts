@@ -34,13 +34,13 @@ export const MOVEMENT_RANGE_BY_UNIT_TYPE: Readonly<Record<string, number>> = Obj
  *
  * Contract: Air uses a large within-footprint cap because strikes are allowed anywhere inside the parent res1 cell.
  * When to use: Tactical ranged targeting validation and UI gating.
- * Expected outcome: Infantry 5, armor 10, naval 20, air 99 (effectively unlimited within the tactical map).
+ * Expected outcome: Infantry 2, armor 5, naval 10, air 99 (effectively unlimited within the tactical map).
  * Exceptions: None.
  */
 export const RANGED_RANGE_BY_UNIT_TYPE: Readonly<Record<string, number>> = Object.freeze({
-  infantry: 5,
-  armor: 10,
-  naval: 20,
+  infantry: 2,
+  armor: 5,
+  naval: 10,
   air: 99,
 });
 

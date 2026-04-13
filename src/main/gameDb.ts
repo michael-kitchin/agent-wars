@@ -7,7 +7,6 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { app } from 'electron';
 import Database from 'better-sqlite3';
 import { getOrderedHexList } from './mapData';
 import {
@@ -81,6 +80,7 @@ import {
 } from './game-db/fogState';
 import { mergeMeleeCandidateHexesIntoHumanFogSnapshot } from './game-actions/meleeInterceptPendingState';
 import { mergeActiveTacticalSessionIntoGameStateSnapshot } from './game-db/attachTacticalSessionToGameState';
+import { resolveGameDbFileUnderUserData } from './game-db/canonicalDbPath';
 import {
   allocateNextUnitDisplayOrderWithOps,
   clearGameOverWithOps,
@@ -227,13 +227,13 @@ function getAll<T extends Record<string, unknown>>(sql: string, params: unknown[
 /**
  * Defines the `getCanonicalDbPath` function shape (function getCanonicalDbPath(): string).
 
- * Purpose: Supports maintainability by documenting why `getCanonicalDbPath` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Delegates canonical DB location to `resolveGameDbFileUnderUserData` for reuse across modules.
+ * When to use: Internal `gameDb` helpers that open, seed, or recover the primary SQLite file.
+ * Expected outcome: Same path as previously returned for `GAME_DB_FILE_NAME`.
  * Exceptions: None.
  */
 function getCanonicalDbPath(): string {
-  return path.join(app.getPath('userData'), GAME_DB_FILE_NAME);
+  return resolveGameDbFileUnderUserData(GAME_DB_FILE_NAME);
 }
 
 /**

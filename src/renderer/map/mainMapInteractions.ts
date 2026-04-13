@@ -353,8 +353,10 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     const y = clientY - rect.top;
     const tb = S.tacticalBattleSnapshot;
     if (tb) {
-      const tacticalHit = hitTestTacticalRes4HexAtContainerPixel(x, y, tb);
-      if (tacticalHit) return tacticalHit;
+      // Do not fall back to strategic res1 hit-testing while tactical is active: `gameState.hexes`
+      // still covers the globe at res1, so coordinates outside the battle footprint would keep a
+      // stale res1 `hit` and the hex tooltip would never clear when the pointer leaves the res4 grid.
+      return hitTestTacticalRes4HexAtContainerPixel(x, y, tb);
     }
     const set = new Set(S.gameState.hexes.map((h) => h.h3Index));
     return hitTestHexAtContainerPixel(x, y, set);

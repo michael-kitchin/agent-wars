@@ -31,6 +31,65 @@ import type {
 } from '../shared/tacticalBattleTypes';
 
 /**
+ * Preload-local IPC channel map for game handlers.
+ *
+ * Purpose: Sandbox preload scripts cannot import arbitrary local modules at runtime, so this keeps
+ * the invoke channel literals available without requiring `../shared/ipc/channels`.
+ * When to use: Only for `ipcRenderer.invoke` calls in this preload bridge.
+ * Expected outcome: Channel names stay aligned with main-process handlers and preload loads reliably.
+ * Exceptions: None.
+ */
+const IPC_GAME = {
+  getState: 'game:getState',
+  getRes4TerrainOverrides: 'game:getRes4TerrainOverrides',
+  getHexNamingTooltipLine: 'game:getHexNamingTooltipLine',
+  getHexContinentNames: 'game:getHexContinentNames',
+  listScenarioHomeRegions: 'game:listScenarioHomeRegions',
+  newGame: 'game:newGame',
+  submitOrders: 'game:submitOrders',
+  listHumanStandingOrders: 'game:listHumanStandingOrders',
+  previewHumanMarchOrder: 'game:previewHumanMarchOrder',
+  previewHumanMarchOrders: 'game:previewHumanMarchOrders',
+  assignHumanMarchOrder: 'game:assignHumanMarchOrder',
+  assignHumanMarchOrders: 'game:assignHumanMarchOrders',
+  commitHumanTacticalDraftOrders: 'game:commitHumanTacticalDraftOrders',
+  validateGroupRangedTarget: 'game:validateGroupRangedTarget',
+  validateGroupAirStrikeTarget: 'game:validateGroupAirStrikeTarget',
+  validateGroupFerryTarget: 'game:validateGroupFerryTarget',
+  cancelHumanStandingOrder: 'game:cancelHumanStandingOrder',
+  getHexBuildQueue: 'game:getHexBuildQueue',
+  addHexBuildQueueEntry: 'game:addHexBuildQueueEntry',
+  updateHexBuildQueueEntry: 'game:updateHexBuildQueueEntry',
+  removeHexBuildQueueEntry: 'game:removeHexBuildQueueEntry',
+  getSealiftStackState: 'game:getSealiftStackState',
+  updateSealiftSlot: 'game:updateSealiftSlot',
+  startTacticalBattle: 'game:startTacticalBattle',
+  endTacticalBattle: 'game:endTacticalBattle',
+  ready: 'game:ready',
+  resolveMeleeIntercept: 'game:resolveMeleeIntercept',
+  requestAiOrders: 'game:requestAiOrders',
+  cancelRequestAiOrders: 'game:cancelRequestAiOrders',
+} as const;
+
+/**
+ * Preload-local IPC channel map for OpenRouter settings and log streaming.
+ *
+ * Purpose: Keeps preload runtime free of non-Electron module imports in sandbox mode.
+ * When to use: For invoke/listener channel names in this preload bridge.
+ * Expected outcome: Renderer receives OpenRouter logs and settings operations through stable channels.
+ * Exceptions: None.
+ */
+const IPC_OPENROUTER = {
+  log: 'openRouter:log',
+  getToolGroupList: 'openRouter:getToolGroupList',
+  getKey: 'openRouter:getKey',
+  getSelectedModel: 'openRouter:getSelectedModel',
+  setKey: 'openRouter:setKey',
+  listModels: 'openRouter:listModels',
+  setSelectedModel: 'openRouter:setSelectedModel',
+} as const;
+
+/**
  * Documents the module-scope binding `openRouterLogListener` (openRouterLogListener: ((payload: { line: string; isError?: boolean })).
 
  * Purpose: Supports maintainability by documenting why `openRouterLogListener` exists.
@@ -39,7 +98,7 @@ import type {
  * Exceptions: None.
  */
 let openRouterLogListener: ((payload: { line: string; isError?: boolean }) => void) | null = null;
-ipcRenderer.on('openRouter:log', (_event, payload: { line: string; isError?: boolean }) => {
+ipcRenderer.on(IPC_OPENROUTER.log, (_event, payload: { line: string; isError?: boolean }) => {
   openRouterLogListener?.(payload);
 });
 
@@ -61,7 +120,7 @@ const gameApi = {
    * Exceptions: None.
    */
 getGameState: (): Promise<GameStateSnapshot> =>
-    ipcRenderer.invoke('game:getState'),
+    ipcRenderer.invoke(IPC_GAME.getState),
     /**
    * Documents the object literal property `getRes4TerrainOverrides` (getRes4TerrainOverrides: (): Promise<Res4TerrainOverrideRow[]> => ipcRenderer.invoke('game:getRes4TerrainOverrides')).
 
@@ -71,7 +130,7 @@ getGameState: (): Promise<GameStateSnapshot> =>
    * Exceptions: None.
    */
 getRes4TerrainOverrides: (): Promise<Res4TerrainOverrideRow[]> =>
-    ipcRenderer.invoke('game:getRes4TerrainOverrides'),
+    ipcRenderer.invoke(IPC_GAME.getRes4TerrainOverrides),
     /**
    * Documents the object literal property `getHexNamingTooltipLine` (getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest): Promise<string | null> => ipcRenderer.invoke('game:getHexNamingTooltipLine', payload)).
 
@@ -81,7 +140,7 @@ getRes4TerrainOverrides: (): Promise<Res4TerrainOverrideRow[]> =>
    * Exceptions: None.
    */
 getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest): Promise<string | null> =>
-    ipcRenderer.invoke('game:getHexNamingTooltipLine', payload),
+    ipcRenderer.invoke(IPC_GAME.getHexNamingTooltipLine, payload),
     /**
    * Documents the object literal property `getHexContinentNames` (getHexContinentNames: (payload: HexContinentNamesRequest): Promise<string[]> => ipcRenderer.invoke('game:getHexContinentNames', payload)).
 
@@ -91,7 +150,7 @@ getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest): Promise<string 
    * Exceptions: None.
    */
 getHexContinentNames: (payload: HexContinentNamesRequest): Promise<string[]> =>
-    ipcRenderer.invoke('game:getHexContinentNames', payload),
+    ipcRenderer.invoke(IPC_GAME.getHexContinentNames, payload),
     /**
    * Documents the object literal property `listScenarioHomeRegions` (listScenarioHomeRegions: (): Promise<string[]> => ipcRenderer.invoke('game:listScenarioHomeRegions')).
 
@@ -101,7 +160,7 @@ getHexContinentNames: (payload: HexContinentNamesRequest): Promise<string[]> =>
    * Exceptions: None.
    */
 listScenarioHomeRegions: (): Promise<string[]> =>
-    ipcRenderer.invoke('game:listScenarioHomeRegions'),
+    ipcRenderer.invoke(IPC_GAME.listScenarioHomeRegions),
     /**
    * Documents the object literal property `newGame` (newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRenderer.invoke('game:newGame', payload)).
 
@@ -120,7 +179,7 @@ newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRendere
    * Exceptions: None.
    */
 submitOrders: (payload: SubmitOrdersIpcPayload): Promise<{ success: boolean; reason?: string }> =>
-    ipcRenderer.invoke('game:submitOrders', payload),
+    ipcRenderer.invoke(IPC_GAME.submitOrders, payload),
     /**
    * Documents the object literal property `ready` (ready: (payload?: GameReadyIpcPayload): Promise<ReadyResult> => ipcRenderer.invoke('game:ready', payload)).
 
@@ -129,7 +188,7 @@ submitOrders: (payload: SubmitOrdersIpcPayload): Promise<{ success: boolean; rea
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-ready: (payload?: GameReadyIpcPayload): Promise<ReadyResult> => ipcRenderer.invoke('game:ready', payload),
+ready: (payload?: GameReadyIpcPayload): Promise<ReadyResult> => ipcRenderer.invoke(IPC_GAME.ready, payload),
     /**
    * Documents the object literal property `resolveMeleeIntercept` (resolveMeleeIntercept: (payload: ResolveMeleeInterceptIpcPayload): Promise<ReadyResult> => ipcRenderer.invoke('game:resolveMeleeIntercept', payload)).
 
@@ -139,7 +198,7 @@ ready: (payload?: GameReadyIpcPayload): Promise<ReadyResult> => ipcRenderer.invo
    * Exceptions: None.
    */
 resolveMeleeIntercept: (payload: ResolveMeleeInterceptIpcPayload): Promise<ReadyResult> =>
-    ipcRenderer.invoke('game:resolveMeleeIntercept', payload),
+    ipcRenderer.invoke(IPC_GAME.resolveMeleeIntercept, payload),
     /**
    * Documents the object literal property `startTacticalBattle` (startTacticalBattle: (payload: { enclosingRes1H3Index: string }): Promise<StartTacticalBattleIpcResult> => ipcRenderer.invoke('game:startTacticalBattle', payload)).
 
@@ -149,7 +208,7 @@ resolveMeleeIntercept: (payload: ResolveMeleeInterceptIpcPayload): Promise<Ready
    * Exceptions: None.
    */
 startTacticalBattle: (payload: { enclosingRes1H3Index: string }): Promise<StartTacticalBattleIpcResult> =>
-    ipcRenderer.invoke('game:startTacticalBattle', payload),
+    ipcRenderer.invoke(IPC_GAME.startTacticalBattle, payload),
     /**
    * Documents the object literal property `endTacticalBattle` (endTacticalBattle: (): Promise<EndTacticalBattleIpcResult> => ipcRenderer.invoke('game:endTacticalBattle')).
 
@@ -158,7 +217,7 @@ startTacticalBattle: (payload: { enclosingRes1H3Index: string }): Promise<StartT
    * Expected outcome: Main process drops the active tactical snapshot; renderer should refresh game state afterward.
    * Exceptions: None.
    */
-endTacticalBattle: (): Promise<EndTacticalBattleIpcResult> => ipcRenderer.invoke('game:endTacticalBattle'),
+endTacticalBattle: (): Promise<EndTacticalBattleIpcResult> => ipcRenderer.invoke(IPC_GAME.endTacticalBattle),
     /**
    * Documents the object literal property `listHumanStandingOrders` (listHumanStandingOrders: (): Promise<HumanStandingOrderSnapshot[]> => ipcRenderer.invoke('game:listHumanStandingOrders')).
 
@@ -168,7 +227,7 @@ endTacticalBattle: (): Promise<EndTacticalBattleIpcResult> => ipcRenderer.invoke
    * Exceptions: None.
    */
 listHumanStandingOrders: (): Promise<HumanStandingOrderSnapshot[]> =>
-    ipcRenderer.invoke('game:listHumanStandingOrders'),
+    ipcRenderer.invoke(IPC_GAME.listHumanStandingOrders),
     /**
    * Documents the object literal property `previewHumanMarchOrder` (previewHumanMarchOrder: (payload: { unitId: string; hoveredH3Index: string }): Promise<HumanOrderPreviewResult> => ipcRenderer.invoke('game:previewHumanMar).
 
@@ -178,7 +237,7 @@ listHumanStandingOrders: (): Promise<HumanStandingOrderSnapshot[]> =>
    * Exceptions: None.
    */
 previewHumanMarchOrder: (payload: { unitId: string; hoveredH3Index: string }): Promise<HumanOrderPreviewResult> =>
-    ipcRenderer.invoke('game:previewHumanMarchOrder', payload),
+    ipcRenderer.invoke(IPC_GAME.previewHumanMarchOrder, payload),
     /**
    * Documents the object literal property `previewHumanMarchOrders` (previewHumanMarchOrders: (payload: { unitIds: string[]; hoveredH3Index: string }): Promise<HumanOrderGroupPreviewResult> => ipcRenderer.invoke('game:previe).
 
@@ -188,7 +247,7 @@ previewHumanMarchOrder: (payload: { unitId: string; hoveredH3Index: string }): P
    * Exceptions: None.
    */
 previewHumanMarchOrders: (payload: { unitIds: string[]; hoveredH3Index: string }): Promise<HumanOrderGroupPreviewResult> =>
-    ipcRenderer.invoke('game:previewHumanMarchOrders', payload),
+    ipcRenderer.invoke(IPC_GAME.previewHumanMarchOrders, payload),
     /**
    * Documents the object literal property `assignHumanMarchOrder` (assignHumanMarchOrder: (payload: { unitId: string; destinationH3Index: string }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke('gam).
 
@@ -201,7 +260,7 @@ assignHumanMarchOrder: (payload: {
     unitId: string;
     destinationH3Index: string;
   }): Promise<{ success: boolean; reason?: string; tacticalBattle?: TacticalBattleSnapshot }> =>
-    ipcRenderer.invoke('game:assignHumanMarchOrder', payload),
+    ipcRenderer.invoke(IPC_GAME.assignHumanMarchOrder, payload),
     /**
    * Documents the object literal property `assignHumanMarchOrders` (assignHumanMarchOrders: (payload: { unitIds: string[]; destinationH3Index: string }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke().
 
@@ -214,7 +273,7 @@ assignHumanMarchOrders: (payload: {
     unitIds: string[];
     destinationH3Index: string;
   }): Promise<{ success: boolean; reason?: string; tacticalBattle?: TacticalBattleSnapshot }> =>
-    ipcRenderer.invoke('game:assignHumanMarchOrders', payload),
+    ipcRenderer.invoke(IPC_GAME.assignHumanMarchOrders, payload),
     /**
    * Documents the object literal property `commitHumanTacticalDraftOrders` (commitHumanTacticalDraftOrders: (payload: { movementOrders: ...; rangedAttacks?: ... }) => Promise<...> => ipcRenderer.invoke()).
 
@@ -235,7 +294,7 @@ commitHumanTacticalDraftOrders: (payload: {
     tacticalBattle?: TacticalBattleSnapshot;
     tacticalResolutionPlayback?: TacticalCommitResolutionPlayback;
     tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
-  }> => ipcRenderer.invoke('game:commitHumanTacticalDraftOrders', payload),
+  }> => ipcRenderer.invoke(IPC_GAME.commitHumanTacticalDraftOrders, payload),
     /**
    * Documents the object literal property `validateGroupRangedTarget` (validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke('g).
 
@@ -245,7 +304,7 @@ commitHumanTacticalDraftOrders: (payload: {
    * Exceptions: None.
    */
 validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }): Promise<{ success: boolean; reason?: string }> =>
-    ipcRenderer.invoke('game:validateGroupRangedTarget', payload),
+    ipcRenderer.invoke(IPC_GAME.validateGroupRangedTarget, payload),
     /**
    * Documents the object literal property `validateGroupAirStrikeTarget` (validateGroupAirStrikeTarget: (payload: { unitIds: string[]; targetH3Index: string; targetType: AirStrikeTargetType; }): Promise<{ success: bo).
 
@@ -258,7 +317,7 @@ validateGroupAirStrikeTarget: (payload: {
     unitIds: string[];
     targetH3Index: string;
     targetType: AirStrikeTargetType;
-  }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke('game:validateGroupAirStrikeTarget', payload),
+  }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke(IPC_GAME.validateGroupAirStrikeTarget, payload),
     /**
    * Documents the object literal property `validateGroupFerryTarget` (validateGroupFerryTarget: (payload: { unitIds: string[]; destinationH3Index: string; }): Promise<{ success: boolean; reason?: string }> => ipcRende).
 
@@ -270,7 +329,7 @@ validateGroupAirStrikeTarget: (payload: {
 validateGroupFerryTarget: (payload: {
     unitIds: string[];
     destinationH3Index: string;
-  }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke('game:validateGroupFerryTarget', payload),
+  }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke(IPC_GAME.validateGroupFerryTarget, payload),
     /**
    * Documents the object literal property `cancelHumanStandingOrder` (cancelHumanStandingOrder: (payload: { unitId: string }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke('game:cancelHumanStandingOrde).
 
@@ -280,7 +339,7 @@ validateGroupFerryTarget: (payload: {
    * Exceptions: None.
    */
 cancelHumanStandingOrder: (payload: { unitId: string }): Promise<{ success: boolean; reason?: string }> =>
-    ipcRenderer.invoke('game:cancelHumanStandingOrder', payload),
+    ipcRenderer.invoke(IPC_GAME.cancelHumanStandingOrder, payload),
     /**
    * Documents the object literal property `getHexBuildQueue` (getHexBuildQueue: (payload: { h3Index: string }): Promise<HexBuildQueueSnapshot | null> => ipcRenderer.invoke('game:getHexBuildQueue', payload)).
 
@@ -290,7 +349,7 @@ cancelHumanStandingOrder: (payload: { unitId: string }): Promise<{ success: bool
    * Exceptions: None.
    */
 getHexBuildQueue: (payload: { h3Index: string }): Promise<HexBuildQueueSnapshot | null> =>
-    ipcRenderer.invoke('game:getHexBuildQueue', payload),
+    ipcRenderer.invoke(IPC_GAME.getHexBuildQueue, payload),
     /**
    * Documents the object literal property `addHexBuildQueueEntry` (addHexBuildQueueEntry: (payload: { h3Index: string }): Promise<{ success: boolean; reason?: string; queue?: HexBuildQueueSnapshot }> => ipcRenderer.invoke().
 
@@ -300,7 +359,7 @@ getHexBuildQueue: (payload: { h3Index: string }): Promise<HexBuildQueueSnapshot 
    * Exceptions: None.
    */
 addHexBuildQueueEntry: (payload: { h3Index: string }): Promise<{ success: boolean; reason?: string; queue?: HexBuildQueueSnapshot }> =>
-    ipcRenderer.invoke('game:addHexBuildQueueEntry', payload),
+    ipcRenderer.invoke(IPC_GAME.addHexBuildQueueEntry, payload),
     /**
    * Documents the object literal property `updateHexBuildQueueEntry` (updateHexBuildQueueEntry: (payload: { h3Index: string; entryId: number; unitType: BuildUnitType; count: number }): Promise<{ success: boolean; reason?).
 
@@ -313,7 +372,7 @@ updateHexBuildQueueEntry: (payload: { h3Index: string; entryId: number; unitType
     success: boolean;
     reason?: string;
     queue?: HexBuildQueueSnapshot;
-  }> => ipcRenderer.invoke('game:updateHexBuildQueueEntry', payload),
+  }> => ipcRenderer.invoke(IPC_GAME.updateHexBuildQueueEntry, payload),
     /**
    * Documents the object literal property `removeHexBuildQueueEntry` (removeHexBuildQueueEntry: (payload: { h3Index: string; entryId: number }): Promise<{ success: boolean; reason?: string; queue?: HexBuildQueueSnap).
 
@@ -326,7 +385,7 @@ removeHexBuildQueueEntry: (payload: { h3Index: string; entryId: number }): Promi
     success: boolean;
     reason?: string;
     queue?: HexBuildQueueSnapshot;
-  }> => ipcRenderer.invoke('game:removeHexBuildQueueEntry', payload),
+  }> => ipcRenderer.invoke(IPC_GAME.removeHexBuildQueueEntry, payload),
     /**
    * Documents the object literal property `getSealiftStackState` (getSealiftStackState: (payload: { h3Index: string }) => ipcRenderer.invoke('game:getSealiftStackState', payload)).
 
@@ -336,7 +395,7 @@ removeHexBuildQueueEntry: (payload: { h3Index: string; entryId: number }): Promi
    * Exceptions: None.
    */
 getSealiftStackState: (payload: { h3Index: string }) =>
-    ipcRenderer.invoke('game:getSealiftStackState', payload),
+    ipcRenderer.invoke(IPC_GAME.getSealiftStackState, payload),
     /**
    * Documents the object literal property `updateSealiftSlot` (updateSealiftSlot: (payload: { h3Index: string; navalUnitId: string; slotIndex: 1 | 2; landUnitId: string | null }) => ipcRenderer.invoke('game:updateSeali).
 
@@ -346,7 +405,7 @@ getSealiftStackState: (payload: { h3Index: string }) =>
    * Exceptions: None.
    */
 updateSealiftSlot: (payload: { h3Index: string; navalUnitId: string; slotIndex: 1 | 2; landUnitId: string | null }) =>
-    ipcRenderer.invoke('game:updateSealiftSlot', payload),
+    ipcRenderer.invoke(IPC_GAME.updateSealiftSlot, payload),
     /**
    * Documents the object literal property `requestAiOrders` (requestAiOrders: (payload?: { enabledToolGroups?: string[] }): Promise<RequestAiOrdersResult> => ipcRenderer.invoke('game:requestAiOrders', payload)).
 
@@ -356,7 +415,7 @@ updateSealiftSlot: (payload: { h3Index: string; navalUnitId: string; slotIndex: 
    * Exceptions: None.
    */
 requestAiOrders: (payload?: { enabledToolGroups?: string[] }): Promise<RequestAiOrdersResult> =>
-    ipcRenderer.invoke('game:requestAiOrders', payload),
+    ipcRenderer.invoke(IPC_GAME.requestAiOrders, payload),
     /**
    * Documents the object literal property `cancelRequestAiOrders` (cancelRequestAiOrders: (): Promise<void> => ipcRenderer.invoke('game:cancelRequestAiOrders')).
 
@@ -366,7 +425,7 @@ requestAiOrders: (payload?: { enabledToolGroups?: string[] }): Promise<RequestAi
    * Exceptions: None.
    */
 cancelRequestAiOrders: (): Promise<void> =>
-    ipcRenderer.invoke('game:cancelRequestAiOrders'),
+    ipcRenderer.invoke(IPC_GAME.cancelRequestAiOrders),
     /**
    * Documents the object literal property `registerOpenRouterLogListener` (registerOpenRouterLogListener: (callback: (payload: { line: string; isError?: boolean }) => void): void => { openRouterLogListener = callback; }).
 
@@ -388,17 +447,17 @@ registerOpenRouterLogListener: (callback: (payload: { line: string; isError?: bo
    */
 openRouter: {
     getKey: (): Promise<{ hasKey: boolean }> =>
-      ipcRenderer.invoke('openRouter:getKey'),
+      ipcRenderer.invoke(IPC_OPENROUTER.getKey),
     getSelectedModel: (): Promise<string> =>
-      ipcRenderer.invoke('openRouter:getSelectedModel'),
+      ipcRenderer.invoke(IPC_OPENROUTER.getSelectedModel),
     setKey: (key: string): Promise<void> =>
-      ipcRenderer.invoke('openRouter:setKey', key),
+      ipcRenderer.invoke(IPC_OPENROUTER.setKey, key),
     listModels: (): Promise<{ models?: OpenRouterModel[]; error?: string }> =>
-      ipcRenderer.invoke('openRouter:listModels'),
+      ipcRenderer.invoke(IPC_OPENROUTER.listModels),
     setSelectedModel: (modelId: string): Promise<void> =>
-      ipcRenderer.invoke('openRouter:setSelectedModel', modelId),
+      ipcRenderer.invoke(IPC_OPENROUTER.setSelectedModel, modelId),
     getToolGroupList: (): Promise<{ id: string; label: string }[]> =>
-      ipcRenderer.invoke('openRouter:getToolGroupList'),
+      ipcRenderer.invoke(IPC_OPENROUTER.getToolGroupList),
   },
 };
 

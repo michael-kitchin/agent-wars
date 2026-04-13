@@ -5,6 +5,7 @@
 import { gridDisk } from 'h3-js';
 import type { TacticalTerrainKindResolver } from './tacticalTerrainMovement';
 import {
+  isNavalRes4TacticalCellNavigable,
   normalizeDbTerrainKindToTacticalCategory,
   tacticalEnterHexMovementCost,
 } from './tacticalTerrainMovement';
@@ -125,8 +126,25 @@ function neighborsInFootprint(h: string, res4Set: ReadonlySet<string>): string[]
 function enterCostForHex(
   h: string,
   unitTypeForMovement: string,
-  terrain: TacticalTerrainKindResolver
+  terrain: TacticalTerrainKindResolver,
+  fromH3: string | null
 ): number {
+  if (unitTypeForMovement === 'naval') {
+    const resolved = terrain.effectiveKindForRes4Hex(h);
+    const seaport = terrain.isSeaportRes4?.(h) ?? false;
+    if (
+      !isNavalRes4TacticalCellNavigable({
+        resolvedKindForCell: resolved,
+        parentTerrain: terrain.parentTerrain,
+        parentTerrainKind: terrain.parentTerrainKind,
+        isSeaportCell: seaport,
+      })
+    ) {
+      return Infinity;
+    }
+    if (seaport && fromH3 != null && (terrain.isSeaportRes4?.(fromH3) ?? false)) return Infinity;
+    return 1;
+  }
   const raw = terrain.effectiveKindForRes4Hex(h);
   const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
   return tacticalEnterHexMovementCost(unitTypeForMovement, cat);
@@ -212,7 +230,7 @@ export function planTacticalRes4March(args: {
     if (d !== dist.get(h)) continue;
     if (h === toH3) break;
     for (const nb of neighborsInFootprint(h, res4Set)) {
-      const w = enterCostForHex(nb, unitTypeForMovement, terrain);
+      const w = enterCostForHex(nb, unitTypeForMovement, terrain, h);
       if (!Number.isFinite(w) || w <= 0) continue;
       const nd = d + w;
       const prev = dist.get(nb);
@@ -248,7 +266,7 @@ export function planTacticalRes4March(args: {
   let cum = 0;
   let stopIdx = 0;
   for (let i = 1; i < path.length; i++) {
-    const stepCost = enterCostForHex(path[i]!, unitTypeForMovement, terrain);
+    const stepCost = enterCostForHex(path[i]!, unitTypeForMovement, terrain, path[i - 1]!);
     if (!Number.isFinite(stepCost)) {
       return {
         reachable: false,

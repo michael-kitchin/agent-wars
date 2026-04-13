@@ -81,6 +81,7 @@ export function planTacticalRes4MarchWithSessionCache(
     | 'res4TerrainKindByH3'
     | 'strategicHexTerrain'
     | 'strategicHexTerrainKind'
+    | 'res4IsSeaportByH3'
   >,
   args: {
     fromH3: string;

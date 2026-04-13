@@ -274,9 +274,7 @@ export function updateMapInteractionCursor(clientX: number, clientY: number, dep
     const py = clientY - rect.top;
     const hexSet = new Set(S.gameState.hexes.map((h) => h.h3Index));
     const tb = S.tacticalBattleSnapshot;
-    const hit = tb
-      ? hitTestTacticalRes4HexAtContainerPixel(px, py, tb) ?? hitTestHexAtContainerPixel(px, py, hexSet)
-      : hitTestHexAtContainerPixel(px, py, hexSet);
+    const hit = tb ? hitTestTacticalRes4HexAtContainerPixel(px, py, tb) : hitTestHexAtContainerPixel(px, py, hexSet);
     if (hit) {
       const { unitsToDraw, movingIds } = getUnitsForDrawWithMovingIds(S.gameState, deps);
       const drawnAtHit = unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id));

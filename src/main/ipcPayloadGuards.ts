@@ -1,3 +1,5 @@
+import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../shared/ipcTypes';
+
 /**
  * Documents the `GroupTargetType` type alias (type GroupTargetType).
 
@@ -117,4 +119,110 @@ export function parseBuildQueueUpdatePayload(payload: {
     return null;
   }
   return { h3Index: payload.h3Index, entryId: payload.entryId, unitType: payload.unitType, count: payload.count };
+}
+
+/**
+ * Normalized tactical Ready commit rows after IPC `unknown` validation.
+ *
+ * Purpose: Gives `commitHumanTacticalDraftOrders` typed inputs without duplicating guard loops in `main.ts`.
+ * When to use: Only from the `game:commitHumanTacticalDraftOrders` handler after parsing the renderer payload.
+ * Expected outcome: All arrays are concrete (possibly empty); movement rows are fully validated.
+ * Exceptions: Returns `ok: false` with a stable reason string instead of throwing.
+ */
+export type ParsedHumanTacticalCommitOrders = {
+  movementOrders: { unitId: string; toH3Index: string }[];
+  rangedAttacks: { unitId: string; targetH3Index: string }[];
+  airStrikes: AirStrikeOrder[];
+  ferryOrders: FerryOrder[];
+  embarkOrders: EmbarkOrder[];
+};
+
+/**
+ * Validates and normalizes the renderer tactical draft commit payload for IPC.
+ *
+ * Purpose: Keeps tactical commit validation unit-testable and identical to the prior inline `main.ts` checks.
+ * When to use: `ipcMain.handle` for tactical Ready commit before calling `commitHumanTacticalDraftOrders`.
+ * Expected outcome: `ok: true` with normalized order arrays, or `ok: false` with reason `Invalid tactical commit payload`.
+ * Exceptions: None; invalid shapes return `ok: false`.
+ */
+export function parseHumanTacticalCommitPayload(
+  payload: unknown
+): { ok: true; value: ParsedHumanTacticalCommitOrders } | { ok: false; reason: string } {
+  const invalid = 'Invalid tactical commit payload';
+  if (payload === null || typeof payload !== 'object') {
+    return { ok: false, reason: invalid };
+  }
+  const p = payload as {
+    movementOrders?: unknown;
+    rangedAttacks?: unknown;
+    airStrikes?: unknown;
+    ferryOrders?: unknown;
+    embarkOrders?: unknown;
+  };
+  const movementRaw = p.movementOrders;
+  if (!Array.isArray(movementRaw)) return { ok: false, reason: invalid };
+  const movementOrders: { unitId: string; toH3Index: string }[] = [];
+  for (const row of movementRaw) {
+    if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
+    const r = row as { unitId?: unknown; toH3Index?: unknown };
+    if (typeof r.unitId !== 'string' || typeof r.toH3Index !== 'string') {
+      return { ok: false, reason: invalid };
+    }
+    movementOrders.push({ unitId: r.unitId, toH3Index: r.toH3Index });
+  }
+  const rangedRaw = p.rangedAttacks ?? [];
+  if (!Array.isArray(rangedRaw)) return { ok: false, reason: invalid };
+  const rangedAttacks: { unitId: string; targetH3Index: string }[] = [];
+  for (const row of rangedRaw) {
+    if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
+    const r = row as { unitId?: unknown; targetH3Index?: unknown };
+    if (typeof r.unitId !== 'string' || typeof r.targetH3Index !== 'string') {
+      return { ok: false, reason: invalid };
+    }
+    rangedAttacks.push({ unitId: r.unitId, targetH3Index: r.targetH3Index });
+  }
+  const airRaw = p.airStrikes ?? [];
+  if (!Array.isArray(airRaw)) return { ok: false, reason: invalid };
+  const airStrikes: AirStrikeOrder[] = [];
+  for (const row of airRaw) {
+    if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
+    const r = row as { unitId?: unknown; targetH3Index?: unknown; targetType?: unknown };
+    if (
+      typeof r.unitId !== 'string' ||
+      typeof r.targetH3Index !== 'string' ||
+      (r.targetType !== 'units' &&
+        r.targetType !== 'urban' &&
+        r.targetType !== 'airport' &&
+        r.targetType !== 'seaport')
+    ) {
+      return { ok: false, reason: invalid };
+    }
+    airStrikes.push({ unitId: r.unitId, targetH3Index: r.targetH3Index, targetType: r.targetType });
+  }
+  const ferryRaw = p.ferryOrders ?? [];
+  if (!Array.isArray(ferryRaw)) return { ok: false, reason: invalid };
+  const ferryOrders: FerryOrder[] = [];
+  for (const row of ferryRaw) {
+    if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
+    const r = row as { unitId?: unknown; destinationH3Index?: unknown };
+    if (typeof r.unitId !== 'string' || typeof r.destinationH3Index !== 'string') {
+      return { ok: false, reason: invalid };
+    }
+    ferryOrders.push({ unitId: r.unitId, destinationH3Index: r.destinationH3Index });
+  }
+  const embarkRaw = p.embarkOrders ?? [];
+  if (!Array.isArray(embarkRaw)) return { ok: false, reason: invalid };
+  const embarkOrders: EmbarkOrder[] = [];
+  for (const row of embarkRaw) {
+    if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
+    const r = row as { unitId?: unknown; navalUnitId?: unknown };
+    if (typeof r.unitId !== 'string' || typeof r.navalUnitId !== 'string') {
+      return { ok: false, reason: invalid };
+    }
+    embarkOrders.push({ unitId: r.unitId, navalUnitId: r.navalUnitId });
+  }
+  return {
+    ok: true,
+    value: { movementOrders, rangedAttacks, airStrikes, ferryOrders, embarkOrders },
+  };
 }

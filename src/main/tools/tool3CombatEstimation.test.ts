@@ -71,7 +71,7 @@ function testResolveOneRangedNoReturnFire(): void {
   const rollAlways1 = () => 1;
   const atk = [makeUnit('a1', 'p1', 'armor', 'hexA')];
   const def = [makeUnit('d1', 'p2', 'infantry', 'hexD')];
-  const out = resolveOneRangedEngagement(atk, def, 'hexD', rollAlways1, {});
+  const out = resolveOneRangedEngagement(atk, def, 'hexD', rollAlways1, { skipReturnFire: true });
   assert.strictEqual(out.defenderRemovedIds.length, 1);
   assert.strictEqual(out.attackerRemovedIds.length, 0);
 }
