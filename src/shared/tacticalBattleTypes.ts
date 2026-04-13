@@ -169,9 +169,9 @@ export interface TacticalBattleSnapshot {
    */
   res4TerrainKindByH3?: Record<string, string>;
   /**
-   * Per-res4 seaport facility flags inside the footprint (from `res4_feature_overrides.is_seaport` at snapshot build).
+   * Per-res4 seaport facility flags inside the footprint (only rows where `res4_feature_overrides.is_seaport` is set at snapshot build).
    *
-   * Contract: Keys are a subset of `res4ChildH3Indexes`; omitted keys mean the cell is not a seaport tile.
+   * Contract: Keys are a subset of `res4ChildH3Indexes`; omitted keys mean the cell is not a seaport facility tile. Populated from the game DB, not from merged renderer/GIS convenience rows.
    * When to use: Tactical naval movement — ships may enter seaport cells from water, but not chain adjacent seaport→seaport steps.
    * Expected outcome: Omitted or empty on legacy saves; populated for new `computeTacticalBattleSnapshot` results.
    * Exceptions: None.

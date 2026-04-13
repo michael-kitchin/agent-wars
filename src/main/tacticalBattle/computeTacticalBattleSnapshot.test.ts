@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { isInfantryOrArmorTacticalSpawnCell } from '../../shared/tacticalTerrainMovement';
 import {
   tacticalSnapshotHasPlacedUnitsForBothSides,
   tacticalSubUnitCountForStrategicUnitType,
@@ -15,6 +16,33 @@ test('tacticalSubUnitCountForStrategicUnitType maps known strategic types to pos
 
 test('tacticalSubUnitCountForStrategicUnitType returns zero for unknown types', () => {
   assert.equal(tacticalSubUnitCountForStrategicUnitType('unknown'), 0);
+});
+
+test('isInfantryOrArmorTacticalSpawnCell rejects water and arctic normalized tiles', () => {
+  assert.equal(
+    isInfantryOrArmorTacticalSpawnCell({
+      resolvedKindForCell: 'water',
+      parentTerrain: 'land',
+      parentTerrainKind: 'plains',
+    }),
+    false
+  );
+  assert.equal(
+    isInfantryOrArmorTacticalSpawnCell({
+      resolvedKindForCell: 'arctic',
+      parentTerrain: 'land',
+      parentTerrainKind: 'plains',
+    }),
+    false
+  );
+  assert.equal(
+    isInfantryOrArmorTacticalSpawnCell({
+      resolvedKindForCell: 'forest',
+      parentTerrain: 'land',
+      parentTerrainKind: 'plains',
+    }),
+    true
+  );
 });
 
 test('tacticalSnapshotHasPlacedUnitsForBothSides requires at least one human and one opponent sub-unit', () => {

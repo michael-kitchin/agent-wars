@@ -63,6 +63,36 @@ export function representativeMarchPreviewUnitIdsByOriginH3(
   return Array.from(byOrigin.values());
 }
 
+const TACTICAL_MARCH_PREVIEW_TYPE_PRIORITY: Readonly<Record<string, number>> = {
+  naval: 0,
+  armor: 1,
+  infantry: 2,
+  air: 3,
+};
+
+/**
+ * Picks one representative tactical sub-unit id per origin for march hover previews.
+ *
+ * Purpose: When infantry/armor share a res4 with a naval carrier, first-id-wins would often pick land units and
+ * run §12.4 pathfinding as infantry/armor (land costs), producing long land previews and blocking water — the inverse of naval rules.
+ * When to use: `buildTacticalMarchHoverPreview` only; strategic previews keep `representativeMarchPreviewUnitIdsByOriginH3`.
+ * Expected outcome: Lowest numeric priority among `naval` → `armor` → `infantry` → `air` per `originH3`; ties keep the first seen id.
+ * Exceptions: None; unknown `unitType` sorts after `air`.
+ */
+export function representativeTacticalMarchPreviewUnitIdsByOriginH3(
+  rows: readonly { unitId: string; originH3: string; unitType: string }[]
+): string[] {
+  const best = new Map<string, { unitId: string; p: number }>();
+  for (const row of rows) {
+    const p = TACTICAL_MARCH_PREVIEW_TYPE_PRIORITY[row.unitType] ?? 99;
+    const cur = best.get(row.originH3);
+    if (!cur || p < cur.p) {
+      best.set(row.originH3, { unitId: row.unitId, p });
+    }
+  }
+  return Array.from(best.values()).map((v) => v.unitId);
+}
+
 /**
  * Computes the slowest per-turn movement range across a set of unit types using a shared range table.
  *

@@ -17041,6 +17041,23 @@
     }
     return Array.from(byOrigin.values());
   }
+  var TACTICAL_MARCH_PREVIEW_TYPE_PRIORITY = {
+    naval: 0,
+    armor: 1,
+    infantry: 2,
+    air: 3
+  };
+  function representativeTacticalMarchPreviewUnitIdsByOriginH3(rows) {
+    const best = /* @__PURE__ */ new Map();
+    for (const row of rows) {
+      const p = TACTICAL_MARCH_PREVIEW_TYPE_PRIORITY[row.unitType] ?? 99;
+      const cur = best.get(row.originH3);
+      if (!cur || p < cur.p) {
+        best.set(row.originH3, { unitId: row.unitId, p });
+      }
+    }
+    return Array.from(best.values()).map((v) => v.unitId);
+  }
   function minMovementRangeAmongUnitTypes(unitTypes, rangeByType, fallbackPerType) {
     if (unitTypes.length === 0) return 0;
     return Math.min(...unitTypes.map((t) => rangeByType[t] ?? fallbackPerType));
@@ -19154,6 +19171,7 @@
   // src/shared/tacticalTerrainMovement.ts
   function normalizeDbTerrainKindToTacticalCategory(effectiveKind, parentTerrain) {
     const k = (effectiveKind || "").toLowerCase();
+    const pt = (parentTerrain || "").toLowerCase();
     if (k === "water") return "water";
     if (k === "coastal") return "coastal";
     if (k === "forest" || k === "forests") return "forests";
@@ -19163,7 +19181,7 @@
     if (k === "arctic") return "arctic";
     if (k === "plains" || k === "land") return "plains";
     if (k.length > 0) return "plains";
-    if (parentTerrain === "water") return "water";
+    if (pt === "water" || pt === "sea" || pt === "ocean") return "water";
     return "plains";
   }
   var NAVAL_LITTORAL_TACTICAL_LAND_CATEGORIES = /* @__PURE__ */ new Set([
@@ -19173,19 +19191,26 @@
     "desert",
     "arctic"
   ]);
+  function nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(kind) {
+    const k = (kind || "").toLowerCase();
+    return k === "water" || k === "coastal" || k === "ocean" || k === "sea";
+  }
+  function strategicParentTerrainSupportsNavalOpenWaterFootprint(parentTerrain) {
+    const t = (parentTerrain || "").toLowerCase();
+    return t === "water" || t === "coastal" || t === "sea" || t === "ocean";
+  }
   function isNavalRes4TacticalCellNavigable(args) {
     const { resolvedKindForCell, parentTerrain, parentTerrainKind, isSeaportCell } = args;
     if (isSeaportCell) return true;
-    const k = (resolvedKindForCell || "").toLowerCase();
-    if (k === "water" || k === "coastal") return true;
+    if (nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(resolvedKindForCell)) return true;
     const pk = (parentTerrainKind || "").toLowerCase();
     if (parentTerrain === "land" && pk === "coastal") {
       const cat2 = normalizeDbTerrainKindToTacticalCategory(resolvedKindForCell, parentTerrain);
       return cat2 !== "mountains";
     }
-    if (parentTerrain !== "water" && parentTerrain !== "coastal") return false;
+    if (!strategicParentTerrainSupportsNavalOpenWaterFootprint(parentTerrain)) return false;
     const cat = normalizeDbTerrainKindToTacticalCategory(resolvedKindForCell, parentTerrain);
-    return NAVAL_LITTORAL_TACTICAL_LAND_CATEGORIES.has(cat);
+    return NAVAL_LITTORAL_TACTICAL_LAND_CATEGORIES.has(cat) || cat === "water" || cat === "coastal";
   }
   function tacticalEnterHexMovementCost(unitType, category) {
     if (unitType === "infantry") {
@@ -19242,7 +19267,10 @@
       parentTerrain,
       parentTerrainKind: parentKind,
       effectiveKindForRes4Hex(h3) {
-        return map[h3] ?? parentKind;
+        const raw = map[h3];
+        if (raw == null) return parentKind;
+        const trimmed = String(raw).trim();
+        return trimmed.length > 0 ? trimmed : parentKind;
       },
       isSeaportRes4(h3) {
         return !!seaportMap[h3];
@@ -19319,20 +19347,28 @@
     }
     return out;
   }
-  function enterCostForHex(h, unitTypeForMovement, terrain, fromH3) {
-    if (unitTypeForMovement === "naval") {
-      const resolved = terrain.effectiveKindForRes4Hex(h);
-      const seaport = terrain.isSeaportRes4?.(h) ?? false;
-      if (!isNavalRes4TacticalCellNavigable({
-        resolvedKindForCell: resolved,
-        parentTerrain: terrain.parentTerrain,
-        parentTerrainKind: terrain.parentTerrainKind,
-        isSeaportCell: seaport
-      })) {
+  function tacticalNavalEnterNeighborCost(fromH3, toH3, terrain) {
+    const resolved = terrain.effectiveKindForRes4Hex(toH3);
+    const seaportTo = terrain.isSeaportRes4?.(toH3) ?? false;
+    if (!isNavalRes4TacticalCellNavigable({
+      resolvedKindForCell: resolved,
+      parentTerrain: terrain.parentTerrain,
+      parentTerrainKind: terrain.parentTerrainKind,
+      isSeaportCell: seaportTo
+    })) {
+      return Infinity;
+    }
+    if (seaportTo && fromH3 != null && (terrain.isSeaportRes4?.(fromH3) ?? false)) {
+      const fromResolved = terrain.effectiveKindForRes4Hex(fromH3);
+      if (!nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(fromResolved) && !nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(resolved)) {
         return Infinity;
       }
-      if (seaport && fromH3 != null && (terrain.isSeaportRes4?.(fromH3) ?? false)) return Infinity;
-      return 1;
+    }
+    return 1;
+  }
+  function enterCostForHex(h, unitTypeForMovement, terrain, fromH3) {
+    if (unitTypeForMovement === "naval") {
+      return tacticalNavalEnterNeighborCost(fromH3, h, terrain);
     }
     const raw = terrain.effectiveKindForRes4Hex(h);
     const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
@@ -19574,8 +19610,12 @@
         previews: []
       };
     }
-    const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
-      selectedHuman.map((u) => ({ unitId: u.id, originH3: tacticalMarchCommittedOriginH3(battle, u.id) }))
+    const previewUnitIds = representativeTacticalMarchPreviewUnitIdsByOriginH3(
+      selectedHuman.map((u) => ({
+        unitId: u.id,
+        originH3: tacticalMarchCommittedOriginH3(battle, u.id),
+        unitType: u.unitType
+      }))
     );
     const previews = previewUnitIds.map((unitId) => ({
       unitId,
@@ -19587,7 +19627,10 @@
       })
     }));
     const slowestMovementRange = minMovementRangeAmongUnitTypes(
-      selectedHuman.map((u) => tacticalMovementUnitTypeForPathfinding(u, hoveredH3Index)),
+      previewUnitIds.map((id) => {
+        const u = battle.subUnits.find((s) => s.id === id);
+        return u ? tacticalMovementUnitTypeForPathfinding(u, hoveredH3Index) : "infantry";
+      }),
       MOVEMENT_RANGE_BY_UNIT_TYPE,
       1
     );

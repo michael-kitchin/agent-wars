@@ -7,7 +7,7 @@ import { cellToLatLng, getResolution, gridDistance } from 'h3-js';
 import {
   buildHumanOrderGroupPreviewEnvelope,
   minMovementRangeAmongUnitTypes,
-  representativeMarchPreviewUnitIdsByOriginH3,
+  representativeTacticalMarchPreviewUnitIdsByOriginH3,
   uniqueTacticalMarchPreviewUnitIds,
 } from './humanMarchPreviewGroupAssembly';
 import type { TacticalBattleSnapshot } from './tacticalBattleTypes';
@@ -197,8 +197,12 @@ export function buildTacticalMarchHoverPreview(
       previews: [],
     };
   }
-  const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
-    selectedHuman.map((u) => ({ unitId: u.id, originH3: tacticalMarchCommittedOriginH3(battle, u.id) }))
+  const previewUnitIds = representativeTacticalMarchPreviewUnitIdsByOriginH3(
+    selectedHuman.map((u) => ({
+      unitId: u.id,
+      originH3: tacticalMarchCommittedOriginH3(battle, u.id),
+      unitType: u.unitType,
+    }))
   );
   const previews: HumanOrderGroupPreviewUnitResult[] = previewUnitIds.map((unitId) => ({
     unitId,
@@ -210,7 +214,10 @@ export function buildTacticalMarchHoverPreview(
     }),
   }));
   const slowestMovementRange = minMovementRangeAmongUnitTypes(
-    selectedHuman.map((u) => tacticalMovementUnitTypeForPathfinding(u, hoveredH3Index)),
+    previewUnitIds.map((id) => {
+      const u = battle.subUnits.find((s) => s.id === id);
+      return u ? tacticalMovementUnitTypeForPathfinding(u, hoveredH3Index) : 'infantry';
+    }),
     MOVEMENT_RANGE_BY_UNIT_TYPE,
     1
   );

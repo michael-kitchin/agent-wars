@@ -219,8 +219,11 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     const childKind = classifyRes4TerrainKind(row, t, nodata);
     const isUrban = isRes4UrbanOverlayHex(row);
     const parentH3 = cellToParent(row.h3_index, METADATA_PARENT_RESOLUTION);
-    const isAirport = row.airport_count_total > 0;
-    const isSeaport = row.seaport_count_total > 0;
+    // Point infrastructure: use major-feature scalerank gates (not raw totals). Totals are noisy and
+    // mark many res4 children when a res1 hosts port/airport influence, which breaks tactical rules
+    // that must treat only true facility tiles as seaport/airport res4 cells.
+    const isAirport = recordHasMajorAirport(row);
+    const isSeaport = recordHasMajorSeaport(row);
     let parentCounts = childKindCountsByParent.get(parentH3);
     if (!parentCounts) {
       parentCounts = new Map<PipelineTerrainKind, number>();

@@ -6,6 +6,7 @@ import { gridDisk } from 'h3-js';
 import type { TacticalTerrainKindResolver } from './tacticalTerrainMovement';
 import {
   isNavalRes4TacticalCellNavigable,
+  nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting,
   normalizeDbTerrainKindToTacticalCategory,
   tacticalEnterHexMovementCost,
 } from './tacticalTerrainMovement';
@@ -116,6 +117,64 @@ function neighborsInFootprint(h: string, res4Set: ReadonlySet<string>): string[]
 }
 
 /**
+ * Movement cost for a naval unit to step from `fromH3` into `toH3` (§12.4 naval footprint rules).
+ *
+ * Purpose: Single implementation shared by Dijkstra relaxation and tactical spawn checks so “navigable” matches “can leave this cell”.
+ * When to use: `enterCostForHex` for naval, and `tacticalNavalHasMovableNeighborInFootprint` when filtering snapshot spawns.
+ * Expected outcome: `1` for a legal enter; `Infinity` when the destination is not navigable or when the move is adjacent land-berth→land-berth seaport (both endpoints lack native water/coastal kinds even if `is_seaport` is set on channel tiles).
+ * Exceptions: None; `fromH3` null skips the seaport adjacency guard (unused by pathfinding today).
+ */
+function tacticalNavalEnterNeighborCost(
+  fromH3: string | null,
+  toH3: string,
+  terrain: TacticalTerrainKindResolver
+): number {
+  const resolved = terrain.effectiveKindForRes4Hex(toH3);
+  const seaportTo = terrain.isSeaportRes4?.(toH3) ?? false;
+  if (
+    !isNavalRes4TacticalCellNavigable({
+      resolvedKindForCell: resolved,
+      parentTerrain: terrain.parentTerrain,
+      parentTerrainKind: terrain.parentTerrainKind,
+      isSeaportCell: seaportTo,
+    })
+  ) {
+    return Infinity;
+  }
+  if (seaportTo && fromH3 != null && (terrain.isSeaportRes4?.(fromH3) ?? false)) {
+    const fromResolved = terrain.effectiveKindForRes4Hex(fromH3);
+    if (
+      !nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(fromResolved) &&
+      !nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(resolved)
+    ) {
+      return Infinity;
+    }
+  }
+  return 1;
+}
+
+/**
+ * Returns true when a naval unit on `fromH3` has at least one footprint neighbor it may enter this turn.
+ *
+ * Purpose: Prevents tactical spawns on res4 cells that are “navigable” in isolation but isolated by plains or other blocked tiles under the same strategic parent.
+ * When to use: `computeTacticalBattleSnapshot` greedy placement for `naval` parents only, after base navigability passes.
+ * Expected outcome: True iff some ring neighbor inside `res4Set` receives finite `tacticalNavalEnterNeighborCost` from `fromH3`.
+ * Exceptions: None; malformed H3 yields no neighbors from `gridDisk` catch paths.
+ */
+export function tacticalNavalHasMovableNeighborInFootprint(args: {
+  fromH3: string;
+  res4Set: ReadonlySet<string>;
+  terrain: TacticalTerrainKindResolver;
+}): boolean {
+  const { fromH3, res4Set, terrain } = args;
+  for (const nb of neighborsInFootprint(fromH3, res4Set)) {
+    const w = tacticalNavalEnterNeighborCost(fromH3, nb, terrain);
+    if (Number.isFinite(w) && w > 0) return true;
+  }
+  return false;
+}
+
+/**
  * Computes movement points spent to enter a single res4 cell for the active unit type.
  *
  * Purpose: Centralizes the §12.4 enter-hex cost lookup for both search and first-stop truncation.
@@ -130,20 +189,7 @@ function enterCostForHex(
   fromH3: string | null
 ): number {
   if (unitTypeForMovement === 'naval') {
-    const resolved = terrain.effectiveKindForRes4Hex(h);
-    const seaport = terrain.isSeaportRes4?.(h) ?? false;
-    if (
-      !isNavalRes4TacticalCellNavigable({
-        resolvedKindForCell: resolved,
-        parentTerrain: terrain.parentTerrain,
-        parentTerrainKind: terrain.parentTerrainKind,
-        isSeaportCell: seaport,
-      })
-    ) {
-      return Infinity;
-    }
-    if (seaport && fromH3 != null && (terrain.isSeaportRes4?.(fromH3) ?? false)) return Infinity;
-    return 1;
+    return tacticalNavalEnterNeighborCost(fromH3, h, terrain);
   }
   const raw = terrain.effectiveKindForRes4Hex(h);
   const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);

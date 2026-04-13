@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { planTacticalRes4March } from '../../shared/tacticalRes4MovementPlanner';
+import { planTacticalRes4March, tacticalNavalHasMovableNeighborInFootprint } from '../../shared/tacticalRes4MovementPlanner';
 import { buildTacticalTerrainKindResolverFromSnapshot } from '../../shared/tacticalTerrainMovement';
 import { firstRingCellDistinctFrom, tacticalRes4Cell } from './testSupport/tacticalRes4HexFixtures';
 
@@ -119,6 +119,48 @@ test('naval can march between adjacent water res4 cells', () => {
   assert.equal(plan.totalCostToDestination, 1);
 });
 
+test('tacticalNavalHasMovableNeighborInFootprint is false when the only footprint neighbor is plains from forest under water', () => {
+  const center = tacticalRes4Cell(44, 54);
+  const plainsNeighbor = firstRingCellDistinctFrom(center);
+  const terrain = buildTacticalTerrainKindResolverFromSnapshot({
+    strategicHexTerrain: 'water',
+    strategicHexTerrainKind: 'water',
+    res4TerrainKindByH3: {
+      [center]: 'forest',
+      [plainsNeighbor]: 'plains',
+    },
+  });
+  assert.equal(
+    tacticalNavalHasMovableNeighborInFootprint({
+      fromH3: center,
+      res4Set: new Set([center, plainsNeighbor]),
+      terrain,
+    }),
+    false
+  );
+});
+
+test('tacticalNavalHasMovableNeighborInFootprint is true between adjacent littoral forest cells under water', () => {
+  const center = tacticalRes4Cell(43, 53);
+  const neighbor = firstRingCellDistinctFrom(center);
+  const terrain = buildTacticalTerrainKindResolverFromSnapshot({
+    strategicHexTerrain: 'water',
+    strategicHexTerrainKind: 'water',
+    res4TerrainKindByH3: {
+      [center]: 'forest',
+      [neighbor]: 'forest',
+    },
+  });
+  assert.equal(
+    tacticalNavalHasMovableNeighborInFootprint({
+      fromH3: center,
+      res4Set: new Set([center, neighbor]),
+      terrain,
+    }),
+    true
+  );
+});
+
 test('naval cannot move from coastal res4 into plains under water strategic parent', () => {
   const center = tacticalRes4Cell(44, 54);
   const plainsNeighbor = firstRingCellDistinctFrom(center);
@@ -226,6 +268,27 @@ test('naval cannot enter mountain res4 on coastal strategic land hex', () => {
   assert.equal(plan.reachable, false);
 });
 
+test('naval can step between adjacent water cells even when both carry seaport DB flags (channel markers)', () => {
+  const a = tacticalRes4Cell(42, 52);
+  const b = firstRingCellDistinctFrom(a);
+  const terrain = buildTacticalTerrainKindResolverFromSnapshot({
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'coastal',
+    res4TerrainKindByH3: { [a]: 'water', [b]: 'water' },
+    res4IsSeaportByH3: { [a]: true, [b]: true },
+  });
+  const plan = planTacticalRes4March({
+    fromH3: a,
+    toH3: b,
+    res4Set: new Set([a, b]),
+    unitTypeForMovement: 'naval',
+    movementPointBudget: 3,
+    terrain,
+  });
+  assert.equal(plan.reachable, true);
+  assert.equal(plan.totalCostToDestination, 1);
+});
+
 test('naval can enter a seaport res4 from water but not chain seaport to adjacent seaport', () => {
   const water = tacticalRes4Cell(46, 56);
   const port = firstRingCellDistinctFrom(water);
@@ -266,4 +329,43 @@ test('naval can enter a seaport res4 from water but not chain seaport to adjacen
     terrain: terrainPorts,
   });
   assert.equal(pToP.reachable, false);
+});
+
+test('naval can march between adjacent ocean-kind res4 cells on strategic water parent', () => {
+  const a = tacticalRes4Cell(48, 58);
+  const b = firstRingCellDistinctFrom(a);
+  const terrain = buildTacticalTerrainKindResolverFromSnapshot({
+    strategicHexTerrain: 'water',
+    strategicHexTerrainKind: 'water',
+    res4TerrainKindByH3: { [a]: 'ocean', [b]: 'ocean' },
+  });
+  const plan = planTacticalRes4March({
+    fromH3: a,
+    toH3: b,
+    res4Set: new Set([a, b]),
+    unitTypeForMovement: 'naval',
+    movementPointBudget: 3,
+    terrain,
+  });
+  assert.equal(plan.reachable, true);
+  assert.equal(plan.totalCostToDestination, 1);
+});
+
+test('naval treats blank res4 terrain override as strategic terrain_kind fallback (matches spawn coalescing)', () => {
+  const a = tacticalRes4Cell(50, 60);
+  const b = firstRingCellDistinctFrom(a);
+  const terrain = buildTacticalTerrainKindResolverFromSnapshot({
+    strategicHexTerrain: 'water',
+    strategicHexTerrainKind: 'water',
+    res4TerrainKindByH3: { [a]: '   ', [b]: 'water' },
+  });
+  const plan = planTacticalRes4March({
+    fromH3: a,
+    toH3: b,
+    res4Set: new Set([a, b]),
+    unitTypeForMovement: 'naval',
+    movementPointBudget: 3,
+    terrain,
+  });
+  assert.equal(plan.reachable, true);
 });

@@ -64,6 +64,49 @@ test('buildTacticalMarchHoverPreview rejects destinations outside the footprint'
   assert.equal(result.validForAll, false);
 });
 
+test('buildTacticalMarchHoverPreview prefers naval path when infantry is selected first on the same res4', () => {
+  const center = latLngToCell(14, 24, 4);
+  const ring = [...gridDisk(center, 1)];
+  const neighbor = ring.find((h) => h !== center);
+  assert.ok(neighbor);
+  const battle: TacticalBattleSnapshot = {
+    battleId: 'b-naval-stack',
+    enclosingRes1H3Index: center,
+    res4ChildH3Indexes: ring,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'coastal',
+    res4TerrainKindByH3: {
+      [center]: 'plains',
+      [neighbor]: 'water',
+    },
+    subUnits: [
+      {
+        id: 'inf-same-hex',
+        parentUnitId: 'p-inf',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: center,
+        displayName: 'Inf',
+      },
+      {
+        id: 'nav-same-hex',
+        parentUnitId: 'p-nav',
+        player: 'human',
+        unitType: 'naval',
+        h3Index: center,
+        displayName: 'Nav',
+      },
+    ],
+  };
+  const result = buildTacticalMarchHoverPreview(battle, ['inf-same-hex', 'nav-same-hex'], neighbor);
+  assert.equal(result.validForAll, true);
+  assert.equal(result.previews.length, 1);
+  assert.equal(result.previews[0]?.unitId, 'nav-same-hex');
+  assert.equal(result.previews[0]?.preview.valid, true);
+});
+
 test('buildTacticalMarchHoverPreview keeps distant in-footprint destination valid and previewed', () => {
   const center = latLngToCell(12, 22, 4);
   const ringCells = [...gridDisk(center, 4)];

@@ -685,6 +685,7 @@ export function commitHumanTacticalDraftOrders(args: {
       res4TerrainKindByH3: preBattle.res4TerrainKindByH3,
       strategicHexTerrain: preBattle.strategicHexTerrain,
       strategicHexTerrainKind: preBattle.strategicHexTerrainKind,
+      ...(preBattle.res4IsSeaportByH3 ? { res4IsSeaportByH3: preBattle.res4IsSeaportByH3 } : {}),
     };
     const appliedMovementOrders: { unitId: string; toH3Index: string }[] = [];
     const tacticalMarchContinuations: { subUnitId: string; destinationH3Index: string }[] = [];
