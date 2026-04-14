@@ -32,6 +32,7 @@ import {
   validateTacticalOpponentFerryOrder,
 } from '../tacticalBattle/tacticalOpponentOrderValidation';
 import { buildTacticalAiOrdersContextBlock } from './tacticalPromptProjection';
+import { buildStrategicUnitDisplayLabelResolver, tacticalSubUnitLabelForUserMessage } from '../../shared/unitDisplayNames';
 import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
 import type { RequestOrdersError, RequestOrdersOptions, RequestOrdersResult } from './requestOrdersFlowTypes';
 import {
@@ -194,6 +195,10 @@ export async function requestOrdersFlow(
     });
   }
   const planState = tacticalBattle ? buildTacticalAiPlanState(state, tacticalBattle) : state;
+  const aiOrderUnitLabel = (unitId: string) =>
+    tacticalBattle
+      ? tacticalSubUnitLabelForUserMessage(tacticalBattle.subUnits, unitId)
+      : buildStrategicUnitDisplayLabelResolver(planState.units)(unitId);
   if (onLog) onLog('Requesting AI orders…');
   logDebug('openRouter requestOrders', {
     modelId,
@@ -521,10 +526,10 @@ export async function requestOrdersFlow(
       const seenUnits = new Set<string>();
       for (const order of mergedMovement) {
         if (seenUnits.has(order.unitId)) {
-          dropReasons.push(`Duplicate order for ${order.unitId}`);
+          dropReasons.push(`Duplicate order for ${aiOrderUnitLabel(order.unitId)}`);
           continue;
         }
-        const result = validateAiOrder(order, planState);
+        const result = validateAiOrder(order, planState, { labelForUnitId: aiOrderUnitLabel });
         if (result.valid) {
           validated.push(order);
           seenUnits.add(order.unitId);
@@ -535,7 +540,7 @@ export async function requestOrdersFlow(
             invalidStandingMovementUnits.add(order.unitId);
             continue;
           }
-          dropReasons.push(`${order.unitId} -> ${order.toH3Index}: ${result.reason}`);
+          dropReasons.push(`${aiOrderUnitLabel(order.unitId)} -> ${order.toH3Index}: ${result.reason}`);
         }
       }
       if (flags.ordersEnabled && invalidStandingMovementUnits.size > 0 && !tacticalBattle) {
@@ -554,10 +559,10 @@ export async function requestOrdersFlow(
       const rangedState = tacticalBattle ? planAfterMove : planState;
       for (const r of mergedRanged) {
         if (seenRanged.has(r.unitId)) {
-          dropReasons.push(`Duplicate ranged for ${r.unitId}`);
+          dropReasons.push(`Duplicate ranged for ${aiOrderUnitLabel(r.unitId)}`);
           continue;
         }
-        const result = validateAiRangedOrder(r, rangedState);
+        const result = validateAiRangedOrder(r, rangedState, { labelForUnitId: aiOrderUnitLabel });
         if (result.valid) {
           validatedRanged.push(r);
           seenRanged.add(r.unitId);
@@ -566,7 +571,7 @@ export async function requestOrdersFlow(
             const movedTo = llmMovementByUnit.get(r.unitId);
             if (movedTo && movedTo === r.targetH3Index) continue;
           }
-          dropReasons.push(`Ranged ${r.unitId} -> ${r.targetH3Index}: ${result.reason}`);
+          dropReasons.push(`Ranged ${aiOrderUnitLabel(r.unitId)} -> ${r.targetH3Index}: ${result.reason}`);
         }
       }
 
@@ -582,15 +587,15 @@ export async function requestOrdersFlow(
         const seenStrike = new Set<string>();
         for (const s of llmAirStrikes) {
           if (seenStrike.has(s.unitId)) {
-            dropReasons.push(`Duplicate air strike for ${s.unitId}`);
+            dropReasons.push(`Duplicate air strike for ${aiOrderUnitLabel(s.unitId)}`);
             continue;
           }
-          const vr = validateTacticalOpponentAirStrikeOrder(s, planAfterMove);
+          const vr = validateTacticalOpponentAirStrikeOrder(s, planAfterMove, aiOrderUnitLabel);
           if (vr.valid) {
             validatedAir.push(s);
             seenStrike.add(s.unitId);
           } else {
-            dropReasons.push(`Air strike ${s.unitId}: ${vr.reason}`);
+            dropReasons.push(`Air strike ${aiOrderUnitLabel(s.unitId)}: ${vr.reason}`);
           }
         }
         const strikeIds = new Set(validatedAir.map((s) => s.unitId));
@@ -598,26 +603,26 @@ export async function requestOrdersFlow(
         const seenFerry = new Set<string>();
         for (const f of llmFerryOrders) {
           if (seenFerry.has(f.unitId)) {
-            dropReasons.push(`Duplicate ferry for ${f.unitId}`);
+            dropReasons.push(`Duplicate ferry for ${aiOrderUnitLabel(f.unitId)}`);
             continue;
           }
           if (strikeIds.has(f.unitId)) {
-            dropReasons.push(`Air unit ${f.unitId} cannot strike and ferry in the same tactical turn`);
+            dropReasons.push(`Air unit ${aiOrderUnitLabel(f.unitId)} cannot strike and ferry in the same tactical turn`);
             continue;
           }
-          const fr = validateTacticalOpponentFerryOrder(f, planAfterMove);
+          const fr = validateTacticalOpponentFerryOrder(f, planAfterMove, aiOrderUnitLabel);
           if (fr.valid) {
             validatedFerry.push(f);
             seenFerry.add(f.unitId);
           } else {
-            dropReasons.push(`Ferry ${f.unitId}: ${fr.reason}`);
+            dropReasons.push(`Ferry ${aiOrderUnitLabel(f.unitId)}: ${fr.reason}`);
           }
         }
         const validatedEmb: EmbarkOrder[] = [];
         const seenEmbarkLand = new Set<string>();
         for (const e of llmEmbarkOrders) {
           if (seenEmbarkLand.has(e.unitId)) {
-            dropReasons.push(`Duplicate embark for ${e.unitId}`);
+            dropReasons.push(`Duplicate embark for ${aiOrderUnitLabel(e.unitId)}`);
             continue;
           }
           const er = validateTacticalOpponentEmbarkOrder(e, movementProjected.subUnits);
@@ -625,7 +630,7 @@ export async function requestOrdersFlow(
             validatedEmb.push(e);
             seenEmbarkLand.add(e.unitId);
           } else {
-            dropReasons.push(`Embark ${e.unitId}: ${er.reason}`);
+            dropReasons.push(`Embark ${aiOrderUnitLabel(e.unitId)}: ${er.reason}`);
           }
         }
         outAir = validatedAir;

@@ -172,14 +172,41 @@ export type TacticalCommitResolutionPlayback = {
   rangedCasualtyHexes?: string[];
   rangedRemovedUnits?: RemovedUnitSnapshot[];
   /**
-   * Direct-fire kill edges from tactical ranged/air-vs-units resolution (mirrors `ReadyResult.killsByDirectFire`).
+   * Kill edges from human tactical **ranged** orders only (mirrors `ReadyResult.killsByDirectFire`).
    *
-   * Purpose: Lets the renderer reuse `buildTurnUpdateBullets` kill lines after a tactical Ready commit.
-   * When to use: Populated by `commitHumanTacticalDraftOrders` when support projection removes enemy sub-units.
-   * Expected outcome: One entry per removed sub-unit id with the firing attacker id in `killerIds`.
-   * Exceptions: Omitted when no support kills occurred.
+   * Purpose: Keeps ranged casualties on the “Direct fire” toast line separate from air-strike casualties.
+   * When to use: Populated by `commitHumanTacticalDraftOrders` when ranged projection removes enemy sub-units.
+   * Expected outcome: One entry per removed sub-unit id with the firing ranged attacker id in `killerIds`.
+   * Exceptions: Omitted when no ranged kills occurred.
    */
   killsByDirectFire?: { victimId: string; killerIds: string[] }[];
+  /**
+   * Kill edges from human tactical **air vs units** (and air-strike follow-on sub-unit losses), not ranged fire.
+   *
+   * Purpose: Lets `buildTacticalCommitReadyResultForToast` populate `airStrikeRemovedUnits` / air-strike summary without mislabeling strikes as direct fire.
+   * When to use: Populated alongside `killsByDirectFire` when air sub-units remove enemies or infrastructure strikes remove based aircraft sub-rows.
+   * Expected outcome: Same `{ victimId, killerIds }` shape as strategic air strike kill metadata.
+   * Exceptions: Omitted when empty.
+   */
+  killsByAirStrike?: { victimId: string; killerIds: string[] }[];
+  /**
+   * Res1 infrastructure damage events from tactical human air strikes against urban/airport/seaport targets.
+   *
+   * Purpose: Surfaces “Air strikes: … destroyed N airports” in the same toast field as strategic Ready.
+   * When to use: After `applyInfrastructureDestructionEffects` runs for non-`units` tactical strike orders.
+   * Expected outcome: Same contract as `ReadyResult.infrastructureDestroyedEvents` with `h3Index` on the parent res1 cell.
+   * Exceptions: Omitted when empty.
+   */
+  infrastructureDestroyedEvents?: InfrastructureDestroyedEvent[];
+  /**
+   * Count of tactical human air strike **orders** that entered resolution (including infrastructure strikes).
+   *
+   * Purpose: Drives `formatAirStrikeOutcomeLine` attempt counts after tactical Ready.
+   * When to use: Set to the number of validated `airStrikes` rows processed on the commit path.
+   * Expected outcome: Non-negative; zero when `airStrikes` was empty or all rows skipped.
+   * Exceptions: None.
+   */
+  airStrikeAttemptCount?: number;
   /**
    * Reserved for future tactical return-fire bookkeeping; always omitted today.
    *

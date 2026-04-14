@@ -395,7 +395,9 @@ export function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D,
   const container = map.getContainer();
   const viewportWidth = Math.max(1, container.clientWidth);
   const viewportHeight = Math.max(1, container.clientHeight);
+  const tactical = S.tacticalBattleSnapshot;
   for (const parent of S.gameState.hexes) {
+    if (tactical && parent.h3Index !== tactical.enclosingRes1H3Index) continue;
     let children = S.res4ChildrenByParent.get(parent.h3Index);
     if (!children) {
       children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
@@ -404,7 +406,7 @@ export function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D,
     const parentPts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
     if (!projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight)) continue;
     for (const child of children) {
-      if (!deps.infraGlyphsAllowedForRes4Child(parent.h3Index, child)) continue;
+      if (!tactical && !deps.infraGlyphsAllowedForRes4Child(parent.h3Index, child)) continue;
       const ap = S.terrainInfraRes4Airport.has(child);
       const pt = S.terrainInfraRes4Seaport.has(child);
       if (!ap && !pt) continue;

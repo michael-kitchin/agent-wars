@@ -2905,8 +2905,8 @@ function cancelFerryForUnit(unitId: string): void {
 function updateRangedSidebar(): void {
   // Contract anchors retained for rendererConsolidation tests after extraction:
   // btnEl.style.display = S.airStrikeModeActive ? 'none' : 'inline-block';
-  // formatPendingRangedAttackSidebarLabel(S.gameState, r)
-  // formatPendingAirStrikeSidebarLabel(S.gameState, strike)
+  // formatPendingRangedAttackSidebarLabel(S.gameState, r, tacticalPositions)
+  // formatPendingAirStrikeSidebarLabel(S.gameState, strike, tacticalPositions)
   // formatPendingFerryOrderSidebarLabel(S.gameState, ferry)
   return updateRangedSidebarFromModule(createTacticalSidebarDeps());
 }

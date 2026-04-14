@@ -2,9 +2,14 @@
  * Applies validated opponent tactical orders (movement, embark, ferry, air vs units, ranged) onto a tactical battle snapshot.
  */
 
+import { cellToParent } from 'h3-js';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
-import type { RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
+import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
+import { getAttack } from '../combatConstants';
+import { dbRun } from '../gameDb';
+import { applyInfrastructureDestructionEffects } from '../game-actions/airStrikeResolution';
+import { refreshTacticalBattleRes4TerrainFromGameDb } from './computeTacticalBattleSnapshot';
 import { tacticalLogQuery } from './tacticalLogging';
 import {
   tacticalFindSubUnitIndexById,
@@ -155,13 +160,16 @@ export function projectTacticalSnapshotAfterValidatedOpponentOrders(
  *
  * Purpose: Lets `commitHumanTacticalDraftOrders` feed the same `buildTurnUpdateBullets` inputs as strategic `ReadyResult` without re-simulating combat in the renderer.
  * When to use: Return value from `projectTacticalSnapshotAfterValidatedHumanSupportOrders` only.
- * Expected outcome: `removedUnits` matches every id removed from `battle.subUnits` after support resolution; `killsByDirectFire` lists attacker→victim edges (including embarked cargo removals).
+ * Expected outcome: `removedUnits` lists every sub-unit removed; `killsByDirectFire` is ranged-only; `killsByAirStrike` covers air-vs-units and infrastructure-based removals.
  * Exceptions: None.
  */
 export type TacticalHumanSupportProjectionResult = {
   battle: TacticalBattleSnapshot;
   killsByDirectFire: { victimId: string; killerIds: string[] }[];
+  killsByAirStrike: { victimId: string; killerIds: string[] }[];
   removedUnits: RemovedUnitSnapshot[];
+  infrastructureDestroyedEvents: InfrastructureDestroyedEvent[];
+  airStrikeAttemptCount: number;
 };
 
 /**
@@ -222,28 +230,37 @@ export function projectTacticalSnapshotAfterValidatedHumanSupportOrders(
 
   const toRemove = new Set<string>();
   const killsByDirectFire: { victimId: string; killerIds: string[] }[] = [];
+  const killsByAirStrike: { victimId: string; killerIds: string[] }[] = [];
 
-  const markEnemyKillAtHex = (targetH3: string, attackerPlayer: string, attackerId: string): void => {
+  const markEnemyKillAtHex = (
+    targetH3: string,
+    attackerPlayer: string,
+    attackerId: string,
+    killBucket: 'ranged' | 'air'
+  ): void => {
     const vid = pickEnemySubUnitIdAtHex(sub, targetH3, attackerPlayer);
     if (!vid) return;
+    const edgeList = killBucket === 'ranged' ? killsByDirectFire : killsByAirStrike;
     for (const id of expandedRemovalIdsForVictim(sub, vid)) {
       if (toRemove.has(id)) continue;
       toRemove.add(id);
-      killsByDirectFire.push({ victimId: id, killerIds: [attackerId] });
+      edgeList.push({ victimId: id, killerIds: [attackerId] });
     }
   };
 
+  let airStrikeAttemptCount = 0;
   for (const s of opts.airStrikes ?? []) {
     if (s.targetType !== 'units') continue;
     const attacker = sub.find((u) => u.id === s.unitId);
     if (!attacker || attacker.player !== 'human') continue;
-    markEnemyKillAtHex(s.targetH3Index, attacker.player, attacker.id);
+    airStrikeAttemptCount += 1;
+    markEnemyKillAtHex(s.targetH3Index, attacker.player, attacker.id, 'air');
   }
 
   for (const r of opts.rangedAttacks ?? []) {
     const attacker = sub.find((u) => u.id === r.unitId);
     if (!attacker || attacker.player !== 'human') continue;
-    markEnemyKillAtHex(r.targetH3Index, attacker.player, attacker.id);
+    markEnemyKillAtHex(r.targetH3Index, attacker.player, attacker.id, 'ranged');
   }
 
   const removedUnits: RemovedUnitSnapshot[] = [];
@@ -262,5 +279,79 @@ export function projectTacticalSnapshotAfterValidatedHumanSupportOrders(
     }
     sub = sub.filter((u) => !toRemove.has(u.id));
   }
-  return { battle: { ...battle, subUnits: sub }, killsByDirectFire, removedUnits };
+
+  const infrastructureDestroyedEvents: InfrastructureDestroyedEvent[] = [];
+  const rng = (): number => Math.random();
+  const rollD6 = (): number => Math.floor(rng() * 6) + 1;
+  const infraRemove = new Set<string>();
+
+  for (const s of opts.airStrikes ?? []) {
+    if (s.targetType === 'units') continue;
+    const attacker = sub.find((u) => u.id === s.unitId);
+    if (!attacker || attacker.player !== 'human' || attacker.unitType !== 'air') continue;
+    airStrikeAttemptCount += 1;
+    const parent = cellToParent(s.targetH3Index, 1);
+    if (parent !== battle.enclosingRes1H3Index) {
+      tacticalLogQuery('projectTacticalSnapshotAfterValidatedHumanSupportOrders skip infra strike outside enclosing res1', {
+        parent,
+        enclosing: battle.enclosingRes1H3Index,
+      });
+      continue;
+    }
+    if (rollD6() > getAttack('air')) continue;
+    const destruction = applyInfrastructureDestructionEffects(parent, s.targetType, rng, {
+      tacticalUrbanStrikeTargetRes4H3: s.targetType === 'urban' ? s.targetH3Index : undefined,
+    });
+    if (destruction.changedRubbleCount > 0 || destruction.destroyedAirUnits.length > 0) {
+      infrastructureDestroyedEvents.push({
+        h3Index: parent,
+        targetType: s.targetType,
+        changedRubbleCount: destruction.changedRubbleCount,
+        destroyedAirUnitsCount: destruction.destroyedAirUnits.length,
+      });
+    }
+    for (const row of destruction.destroyedAirUnits) {
+      for (const su of sub) {
+        if (su.parentUnitId !== row.id) continue;
+        if (infraRemove.has(su.id)) continue;
+        infraRemove.add(su.id);
+        killsByAirStrike.push({ victimId: su.id, killerIds: [attacker.id] });
+      }
+    }
+    const counterThreshold = s.targetType === 'airport' ? 2 : 1;
+    if (rollD6() <= counterThreshold) {
+      dbRun('DELETE FROM units WHERE id = ?', [attacker.parentUnitId]);
+      infraRemove.add(attacker.id);
+    }
+  }
+
+  if (infraRemove.size > 0) {
+    for (const id of infraRemove) {
+      const row = sub.find((u) => u.id === id);
+      if (row) {
+        removedUnits.push({
+          id: row.id,
+          player: row.player,
+          unitType: row.unitType,
+          h3Index: row.h3Index,
+          displayName: row.displayName,
+        });
+      }
+    }
+    sub = sub.filter((u) => !infraRemove.has(u.id));
+  }
+
+  let outBattle: TacticalBattleSnapshot = { ...battle, subUnits: sub };
+  if (infrastructureDestroyedEvents.length > 0) {
+    outBattle = refreshTacticalBattleRes4TerrainFromGameDb(outBattle);
+  }
+
+  return {
+    battle: outBattle,
+    killsByDirectFire,
+    killsByAirStrike,
+    removedUnits,
+    infrastructureDestroyedEvents,
+    airStrikeAttemptCount,
+  };
 }

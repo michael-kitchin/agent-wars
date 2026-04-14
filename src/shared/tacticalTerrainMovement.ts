@@ -97,14 +97,6 @@ export function normalizeDbTerrainKindToTacticalCategory(
   return 'plains';
 }
 
-const NAVAL_LITTORAL_TACTICAL_LAND_CATEGORIES = new Set<TacticalMovementCategory>([
-  'forests',
-  'mountains',
-  'wetlands',
-  'desert',
-  'arctic',
-]);
-
 /**
  * Returns true when a per-res4 `terrain_kind` string should be treated as open water or surf for naval §12.4 routing.
  *
@@ -116,19 +108,6 @@ const NAVAL_LITTORAL_TACTICAL_LAND_CATEGORIES = new Set<TacticalMovementCategory
 export function nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(kind: string): boolean {
   const k = (kind || '').toLowerCase();
   return k === 'water' || k === 'coastal' || k === 'ocean' || k === 'sea';
-}
-
-/**
- * Returns true when strategic `hexes.terrain` allows naval littoral routing on non-inland res1 parents.
- *
- * Purpose: Aligns the “water/coastal strategic parent” branch with DB vocabulary while excluding pure `land` rows handled earlier.
- * When to use: Gate the open-water littoral branch in `isNavalRes4TacticalCellNavigable` after shoreline rules.
- * Expected outcome: True for `water`, `coastal`, `sea`, and `ocean` (case-insensitive).
- * Exceptions: None.
- */
-function strategicParentTerrainSupportsNavalOpenWaterFootprint(parentTerrain: string): boolean {
-  const t = (parentTerrain || '').toLowerCase();
-  return t === 'water' || t === 'coastal' || t === 'sea' || t === 'ocean';
 }
 
 /**
@@ -150,11 +129,11 @@ export function isInfantryOrArmorTacticalSpawnCell(args: {
 }
 
 /**
- * Returns whether a tactical res4 cell may host or receive a naval march (water/coastal tile, seaport, littoral land under ocean parents, or shoreline cells on coastal strategic res1 hexes).
+ * Returns whether a tactical res4 cell may host or receive a naval march (water/coastal tile or seaport facility).
  *
  * Contract: Aligns snapshot placement with `planTacticalRes4March` naval edges; does **not** encode seaport→seaport step blocking (handled in the planner with `fromH3`) or “has a legal first step” (handled by `tacticalNavalHasMovableNeighborInFootprint` at spawn).
  * When to use: `computeTacticalBattleSnapshot` base navigability and naval `enterCostForHex` eligibility before the port-consecutive guard.
- * Expected outcome: True for seaport tiles, res4 kinds `water`/`coastal` (plus legacy `ocean`/`sea`), cells whose normalized category is `water`/`coastal` on open-water strategic parents (covers blank kinds), littoral land categories under open-water parents, and (when strategic `terrain` is `land` but `terrain_kind` is `coastal`) any non-mountain res4 so shoreline tactical fights stay playable; false for inland `land`/`plains` parents without water/coastal/seaport tiles.
+ * Expected outcome: True for seaport tiles, res4 kinds `water`/`coastal` (plus legacy `ocean`/`sea`), and cells that normalize to `water` when strategic `terrain` is open water and kind strings are blank; false for land-like categories (`plains`, `forests`, `desert`, etc.) unless the cell is explicitly marked as seaport.
  * Exceptions: None.
  */
 export function isNavalRes4TacticalCellNavigable(args: {
@@ -167,16 +146,9 @@ export function isNavalRes4TacticalCellNavigable(args: {
   const { resolvedKindForCell, parentTerrain, parentTerrainKind, isSeaportCell } = args;
   if (isSeaportCell) return true;
   if (nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(resolvedKindForCell)) return true;
-  const pk = (parentTerrainKind || '').toLowerCase();
-  // Contested hex is strategic `land` but GIS `terrain_kind` marks the res1 shoreline as coastal — allow naval
-  // maneuver on the full littoral footprint except impassable mountains (matches real coastal battle UX).
-  if (parentTerrain === 'land' && pk === 'coastal') {
-    const cat = normalizeDbTerrainKindToTacticalCategory(resolvedKindForCell, parentTerrain);
-    return cat !== 'mountains';
-  }
-  if (!strategicParentTerrainSupportsNavalOpenWaterFootprint(parentTerrain)) return false;
+  void parentTerrainKind;
   const cat = normalizeDbTerrainKindToTacticalCategory(resolvedKindForCell, parentTerrain);
-  return NAVAL_LITTORAL_TACTICAL_LAND_CATEGORIES.has(cat) || cat === 'water' || cat === 'coastal';
+  return cat === 'water' || cat === 'coastal';
 }
 
 /**

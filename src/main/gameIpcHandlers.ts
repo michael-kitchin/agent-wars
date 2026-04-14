@@ -37,6 +37,7 @@ import type {
   ReadyResult,
   ResolveMeleeInterceptIpcPayload,
 } from '../shared/ipcTypes';
+import { buildStrategicUnitDisplayLabelResolver } from '../shared/unitDisplayNames';
 export type { RequestAiOrdersResult } from '../shared/ipcTypes';
 
 /**
@@ -375,6 +376,9 @@ export async function handleGameReady(
   // afterResolution consultation and POST_RESOLUTION_CONSULT_TIMEOUT_MS — unchanged by 1.1 DB/LLM contract work.
   const state = deps.getGameState();
   const aiState = deps.getGameStateForPlayer('opponent');
+  const opponentUnitDisplayLabel = buildStrategicUnitDisplayLabelResolver(aiState.units);
+  const formatAiMoveLogLine = (o: { unitId: string; toH3Index: string }) =>
+    `${opponentUnitDisplayLabel(o.unitId)} → ${o.toH3Index}`;
   logHybridPipelineBoundary('handleGameReady', { turnNumber: state.turnNumber, phase: state.phase });
   const modelId = deps.getSelectedModel();
   const enabledGroupIds =
@@ -490,7 +494,7 @@ export async function handleGameReady(
   if (readyResult.awaitingMeleeDecision) {
     const aiRangedByTypeAwait = computeAiRangedByTypeCounts(state, aiRangedOrders);
     const aiMovesAwait = buildDistinctAiMovesFromPlanningOrders(state, aiOrders);
-    const aiMovesLogAwait = aiOrders.length > 0 ? aiOrders.map((o) => `${o.unitId} → ${o.toH3Index}`) : undefined;
+    const aiMovesLogAwait = aiOrders.length > 0 ? aiOrders.map(formatAiMoveLogLine) : undefined;
     logHybridPipelineBoundary('handleGameReady awaitingMeleeDecision', { turnNumber: state.turnNumber });
     return {
       success: true,
@@ -545,8 +549,7 @@ export async function handleGameReady(
   }
 
   const aiRangedByType = computeAiRangedByTypeCounts(state, aiRangedOrders);
-  const aiMovesLog =
-    aiOrders.length > 0 ? aiOrders.map((o) => `${o.unitId} → ${o.toH3Index}`) : undefined;
+  const aiMovesLog = aiOrders.length > 0 ? aiOrders.map(formatAiMoveLogLine) : undefined;
 
   return {
     success: true,

@@ -607,6 +607,7 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
   const strikeCancelEl = document.getElementById('air-strike-cancel-btn') as HTMLButtonElement | null;
   if (!listEl) return;
 
+  const tacticalPositions = S.tacticalBattleSnapshot?.subUnits;
   listEl.innerHTML = '';
   if (S.pendingRangedAttacks.length === 0) {
     const span = document.createElement('span');
@@ -616,7 +617,10 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
   } else {
     for (const r of S.pendingRangedAttacks) {
       const row = deps.createSidebarOrderRow({
-        labelText: deps.formatUnitArrowLabel(r.unitId, formatPendingRangedAttackSidebarLabel(S.gameState, r)),
+        labelText: deps.formatUnitArrowLabel(
+          r.unitId,
+          formatPendingRangedAttackSidebarLabel(S.gameState, r, tacticalPositions)
+        ),
         selected: S.selectedUnitIds.includes(r.unitId),
         onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(r.unitId, event),
         onCancel: () => cancelRangedForUnit(r.unitId, deps),
@@ -635,7 +639,10 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
     } else {
       for (const strike of S.pendingAirStrikes) {
         const row = deps.createSidebarOrderRow({
-          labelText: deps.formatUnitArrowLabel(strike.unitId, formatPendingAirStrikeSidebarLabel(S.gameState, strike)),
+          labelText: deps.formatUnitArrowLabel(
+            strike.unitId,
+            formatPendingAirStrikeSidebarLabel(S.gameState, strike, tacticalPositions)
+          ),
           selected: S.selectedUnitIds.includes(strike.unitId),
           onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(strike.unitId, event),
           onCancel: () => cancelAirStrikeForUnit(strike.unitId, deps),

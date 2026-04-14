@@ -71,7 +71,7 @@ test('naval cannot leave water or coastal cells into plains', () => {
   assert.equal(plan.reachable, false);
 });
 
-test('naval can march between littoral land-ish res4 cells under a water strategic parent (forest child kinds)', () => {
+test('naval cannot march between non-water forest res4 cells under a water strategic parent', () => {
   const center = tacticalRes4Cell(43, 53);
   const neighbor = firstRingCellDistinctFrom(center);
   const res4Set = new Set([center, neighbor]);
@@ -91,8 +91,7 @@ test('naval can march between littoral land-ish res4 cells under a water strateg
     movementPointBudget: 3,
     terrain,
   });
-  assert.equal(plan.reachable, true);
-  assert.equal(plan.totalCostToDestination, 1);
+  assert.equal(plan.reachable, false);
 });
 
 test('naval can march between adjacent water res4 cells', () => {
@@ -140,7 +139,7 @@ test('tacticalNavalHasMovableNeighborInFootprint is false when the only footprin
   );
 });
 
-test('tacticalNavalHasMovableNeighborInFootprint is true between adjacent littoral forest cells under water', () => {
+test('tacticalNavalHasMovableNeighborInFootprint is false between adjacent forest cells under water', () => {
   const center = tacticalRes4Cell(43, 53);
   const neighbor = firstRingCellDistinctFrom(center);
   const terrain = buildTacticalTerrainKindResolverFromSnapshot({
@@ -157,7 +156,7 @@ test('tacticalNavalHasMovableNeighborInFootprint is true between adjacent littor
       res4Set: new Set([center, neighbor]),
       terrain,
     }),
-    true
+    false
   );
 });
 
@@ -206,7 +205,7 @@ test('naval cannot march between plains-only res4 cells without seaport flags', 
   assert.equal(plan.reachable, false);
 });
 
-test('naval can march between plains res4 on strategic land when res1 terrain_kind is coastal', () => {
+test('naval cannot march between plains res4 on strategic land even when res1 terrain_kind is coastal', () => {
   const center = tacticalRes4Cell(49, 59);
   const neighbor = firstRingCellDistinctFrom(center);
   const res4Set = new Set([center, neighbor]);
@@ -226,8 +225,7 @@ test('naval can march between plains res4 on strategic land when res1 terrain_ki
     movementPointBudget: 3,
     terrain,
   });
-  assert.equal(plan.reachable, true);
-  assert.equal(plan.totalCostToDestination, 1);
+  assert.equal(plan.reachable, false);
 });
 
 test('naval cannot march between plains res4 on inland strategic land (terrain_kind plains)', () => {

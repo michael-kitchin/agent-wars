@@ -7,6 +7,7 @@ import {
   isDbReady,
 } from '../gameDb';
 import type { AirStrikeTargetType } from '../../shared/ipcTypes';
+import { fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES, formatFerryOutOfRangeReason, formatTargetOutOfRangeReason } from '../../shared/tacticalRanges';
 import { logTrace } from '../logger';
 import { isWithinGridRangeSafe } from './gridRange';
@@ -57,16 +58,17 @@ export function validateAirStrikeOrder(
   unitId: string,
   targetH3Index: string,
   targetType: AirStrikeTargetType,
-  options?: { allowedPlayer?: string }
+  options?: { allowedPlayer?: string; displayLabelForUnit?: (id: string) => string }
 ): ValidationResult {
   logTrace('airValidation validateAirStrikeOrder', { unitId, targetH3Index, targetType, allowedPlayer: options?.allowedPlayer });
   const allowedPlayer = options?.allowedPlayer ?? 'human';
+  const labelFor = options?.displayLabelForUnit ?? fallbackDisplayNameFromUnitId;
   if (!isDbReady()) return { valid: false, reason: 'Database not initialized' };
   const unit = dbGetOne<{ player: string; unit_type: string; h3_index: string }>(
     'SELECT player, unit_type, h3_index FROM units WHERE id = ?',
     [unitId]
   );
-  if (!unit) return { valid: false, reason: `Unit not found: ${unitId}` };
+  if (!unit) return { valid: false, reason: `Unit not found: ${labelFor(unitId)}` };
   if (unit.player !== allowedPlayer) return { valid: false, reason: `Unit must belong to ${allowedPlayer}` };
   if (unit.unit_type !== 'air') return { valid: false, reason: 'Only air units can execute strikes' };
   if (!getMapHexSet().has(targetH3Index)) return { valid: false, reason: 'Target hex not on map' };
@@ -112,16 +114,17 @@ export function validateAirStrikeOrder(
 export function validateFerryOrder(
   unitId: string,
   destinationH3Index: string,
-  options?: { allowedPlayer?: string }
+  options?: { allowedPlayer?: string; displayLabelForUnit?: (id: string) => string }
 ): ValidationResult {
   logTrace('airValidation validateFerryOrder', { unitId, destinationH3Index, allowedPlayer: options?.allowedPlayer });
   const allowedPlayer = options?.allowedPlayer ?? 'human';
+  const labelFor = options?.displayLabelForUnit ?? fallbackDisplayNameFromUnitId;
   if (!isDbReady()) return { valid: false, reason: 'Database not initialized' };
   const unit = dbGetOne<{ player: string; unit_type: string; h3_index: string }>(
     'SELECT player, unit_type, h3_index FROM units WHERE id = ?',
     [unitId]
   );
-  if (!unit) return { valid: false, reason: `Unit not found: ${unitId}` };
+  if (!unit) return { valid: false, reason: `Unit not found: ${labelFor(unitId)}` };
   if (unit.player !== allowedPlayer) return { valid: false, reason: `Unit must belong to ${allowedPlayer}` };
   if (unit.unit_type !== 'air') return { valid: false, reason: 'Only air units can ferry' };
   if (!getMapHexSet().has(destinationH3Index)) return { valid: false, reason: 'Destination hex not on map' };

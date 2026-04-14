@@ -18,6 +18,7 @@ import {
   resolveMovementTerrainForHex,
 } from '../oneStepMoveDestinations';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
+import { buildStrategicUnitDisplayLabelResolver } from '../../shared/unitDisplayNames';
 import { formatLatLng as formatLatLngWithPrecision } from './promptText';
 import { requestOrdersFlow } from './requestOrdersFlow';
 import { NAVAL_DESTINATION_MUST_BE_WATER_COASTAL } from '../navalMovementMessages';
@@ -345,10 +346,12 @@ export async function listModels(): Promise<{ models: ModelItem[] } | { error: s
  */
 function validateAiOrder(
   order: { unitId: string; toH3Index: string },
-  state: GameStateSnapshot
+  state: GameStateSnapshot,
+  opts?: { labelForUnitId?: (unitId: string) => string }
 ): { valid: true } | { valid: false; reason: string } {
+  const resolveLabel = opts?.labelForUnitId ?? ((id: string) => buildStrategicUnitDisplayLabelResolver(state.units)(id));
   const unit = state.units.find((u) => u.id === order.unitId);
-  if (!unit) return { valid: false, reason: `Unit not found: ${order.unitId}` };
+  if (!unit) return { valid: false, reason: `Unit not found: ${resolveLabel(order.unitId)}` };
   if (unit.player !== 'opponent') return { valid: false, reason: 'Only opponent units can receive AI orders' };
 
   const hexIds = new Set(state.hexes.map((h) => h.h3Index));
@@ -394,10 +397,12 @@ function validateAiOrder(
  */
 function validateAiRangedOrder(
   order: { unitId: string; targetH3Index: string },
-  state: GameStateSnapshot
+  state: GameStateSnapshot,
+  opts?: { labelForUnitId?: (unitId: string) => string }
 ): { valid: true } | { valid: false; reason: string } {
+  const resolveLabel = opts?.labelForUnitId ?? ((id: string) => buildStrategicUnitDisplayLabelResolver(state.units)(id));
   const unit = state.units.find((u) => u.id === order.unitId);
-  if (!unit) return { valid: false, reason: `Unit not found: ${order.unitId}` };
+  if (!unit) return { valid: false, reason: `Unit not found: ${resolveLabel(order.unitId)}` };
   if (unit.player !== 'opponent') return { valid: false, reason: 'Only opponent units can have AI ranged orders' };
   if (getRange(unit.unitType) < 1) return { valid: false, reason: `${unit.unitType} has no ranged attack` };
   const hexIds = new Set(state.hexes.map((h) => h.h3Index));

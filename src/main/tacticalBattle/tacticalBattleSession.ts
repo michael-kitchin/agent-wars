@@ -3,7 +3,7 @@ import type {
   TacticalBattleSnapshot,
 } from '../../shared/tacticalBattleTypes';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
-import type { RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
+import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import { tacticalBoundaryConcurrentSessionAllowed } from '../../shared/tacticalStateAssertions';
 import { getActiveTacticalBattleSnapshotRef, setActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import {
@@ -248,7 +248,10 @@ export function applyValidatedHumanTacticalSupportOrders(args: {
       success: true;
       battle: TacticalBattleSnapshot;
       killsByDirectFire: { victimId: string; killerIds: string[] }[];
+      killsByAirStrike: { victimId: string; killerIds: string[] }[];
       removedUnits: RemovedUnitSnapshot[];
+      infrastructureDestroyedEvents: InfrastructureDestroyedEvent[];
+      airStrikeAttemptCount: number;
     }
   | { success: false; reason: string } {
   tacticalLogMutate('applyValidatedHumanTacticalSupportOrders', {
@@ -269,7 +272,15 @@ export function applyValidatedHumanTacticalSupportOrders(args: {
       (args.ferryOrders?.length ?? 0) > 0 ||
       (args.embarkOrders?.length ?? 0) > 0;
     if (!hasWork) {
-      return { success: true, battle: cur, killsByDirectFire: [], removedUnits: [] };
+      return {
+        success: true,
+        battle: cur,
+        killsByDirectFire: [],
+        killsByAirStrike: [],
+        removedUnits: [],
+        infrastructureDestroyedEvents: [],
+        airStrikeAttemptCount: 0,
+      };
     }
     const projection = projectTacticalSnapshotAfterValidatedHumanSupportOrders(cur, args);
     commitActiveTacticalBattle(projection.battle);
@@ -277,7 +288,10 @@ export function applyValidatedHumanTacticalSupportOrders(args: {
       success: true,
       battle: projection.battle,
       killsByDirectFire: projection.killsByDirectFire,
+      killsByAirStrike: projection.killsByAirStrike,
       removedUnits: projection.removedUnits,
+      infrastructureDestroyedEvents: projection.infrastructureDestroyedEvents,
+      airStrikeAttemptCount: projection.airStrikeAttemptCount,
     };
   } catch (err) {
     tacticalLogError('applyValidatedHumanTacticalSupportOrders failed', { err });

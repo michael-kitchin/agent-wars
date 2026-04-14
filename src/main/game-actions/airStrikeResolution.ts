@@ -1,3 +1,4 @@
+import { cellToParent } from 'h3-js';
 import { dbGetAll, dbGetOne, dbRun, getRes1InfrastructureForHex, listBuildQueueRowsForHex, listRes4FeatureOverridesForGame, replaceBuildQueueForHex, clearBuildQueueAndProgressForHex, updateRes4FeatureOverrideRow } from '../gameDb';
 import { logDebug } from '../logger';
 import { getAvailableBuildUnitTypes } from '../productionRules';
@@ -92,17 +93,36 @@ function destroyBasedAirUnitsAtHex(
 }
 
 /**
- * Defines the `applyInfrastructureDestructionEffects` function shape (function applyInfrastructureDestructionEffects( h3Index: string, targetType: AirStrikeTargetType, next: () => number ): { destroyedAirUnits: Array<).
+ * Documents optional behavior flags for `applyInfrastructureDestructionEffects` as a named contract surface.
+ *
+ * Purpose: Lets tactical urban strikes convert a single targeted res4 cell to rubble while strategic strikes keep random multi-cell destruction under the parent res1.
+ * When to use: Pass from tactical projection when resolving urban infrastructure strikes at res4 resolution; omit for strategic resolution and non-urban strikes.
+ * Expected outcome: When `tacticalUrbanStrikeTargetRes4H3` is set with `targetType === 'urban'`, at most that res4 urban override becomes rubble if it belongs to `h3Index` and is eligible.
+ * Exceptions: None.
+ */
+export type ApplyInfrastructureDestructionOptions = {
+  /**
+   * Explains why this field exists: pins tactical urban rubble conversion to the res4 cell the player selected.
+   * When to use: Set only for tactical human urban strikes (pass the clicked res4 H3 id); omit for strategic strikes and other target types.
+   * What to expect: The res1 `h3Index` argument must equal `cellToParent` of this value; the matching override row must be urban and not already rubble, or no change occurs.
+   * Exceptions: None.
+   */
+  tacticalUrbanStrikeTargetRes4H3?: string;
+};
+
+/**
+ * Defines the `applyInfrastructureDestructionEffects` function shape (function applyInfrastructureDestructionEffects( h3Index: string, targetType: AirStrikeTargetType, next: () => number, options?: ApplyInfrastructureDestructionOptions ): { destroyedAirUnits: Array<...>; changedRubbleCount: number }).
 
  * Purpose: Supports maintainability by documenting why `applyInfrastructureDestructionEffects` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function applyInfrastructureDestructionEffects(
+export function applyInfrastructureDestructionEffects(
   h3Index: string,
   targetType: AirStrikeTargetType,
-  next: () => number
+  next: () => number,
+  options?: ApplyInfrastructureDestructionOptions
 ): {
   destroyedAirUnits: Array<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }>;
   changedRubbleCount: number;
@@ -113,6 +133,33 @@ function applyInfrastructureDestructionEffects(
     changedRubbleCount: 0,
   };
   if (targetType === 'urban') {
+    const tacticalRes4 = options?.tacticalUrbanStrikeTargetRes4H3?.trim();
+    if (tacticalRes4) {
+      if (cellToParent(tacticalRes4, 1) !== h3Index) {
+        logDebug('applyInfrastructureDestructionEffects tactical urban parent mismatch', { tacticalRes4, h3Index });
+        return result;
+      }
+      const match = listRes4FeatureOverridesForGame().find(
+        (row) => row.h3Index === tacticalRes4 && row.parentH3Index === h3Index && row.isUrban && !row.isRubble
+      );
+      if (!match) {
+        logDebug('applyInfrastructureDestructionEffects tactical urban no eligible res4 row', { tacticalRes4, h3Index });
+        return result;
+      }
+      logDebug('applyInfrastructureDestructionEffects tactical urban converting targeted res4 to rubble', {
+        tacticalRes4,
+        h3Index,
+      });
+      updateRes4FeatureOverrideRow(match.h3Index, {
+        isRubble: true,
+        isUrban: false,
+        isAirport: match.isAirport,
+        isSeaport: match.isSeaport,
+      });
+      result.changedRubbleCount = 1;
+      pruneBuildQueueForInfrastructureState(h3Index);
+      return result;
+    }
     const destroyCount = Math.min(3, current.urbanHexCount);
     if (destroyCount <= 0) return result;
     result.changedRubbleCount = replaceRandomRes4FeaturesWithRubble(h3Index, 'urban', destroyCount, next);

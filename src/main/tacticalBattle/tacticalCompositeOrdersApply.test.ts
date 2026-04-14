@@ -6,7 +6,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gridDisk } from 'h3-js';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import { projectTacticalSnapshotAfterValidatedOpponentOrders } from './tacticalCompositeOrdersApply';
+import {
+  projectTacticalSnapshotAfterValidatedHumanSupportOrders,
+  projectTacticalSnapshotAfterValidatedOpponentOrders,
+} from './tacticalCompositeOrdersApply';
 import {
   firstRingCellDistinctFrom,
   tacticalRes1Cell,
@@ -87,4 +90,68 @@ test('composite embark assigns embarkedOnSubUnitId and syncs land hex to naval',
   const land = next.subUnits.find((u) => u.id === 'land');
   assert.equal(land?.embarkedOnSubUnitId, 'nav');
   assert.equal(land?.h3Index, hx);
+});
+
+test('human support separates ranged kill edges from air strike kill edges', () => {
+  const res1 = tacticalRes1Cell(5, 6);
+  const h0 = tacticalRes4UnderRes1Corner(5, 6);
+  const ring = [...gridDisk(h0, 1)];
+  const h1 = ring.find((h) => h !== h0);
+  const h2 = ring.find((h) => h !== h0 && h !== h1);
+  if (!h1 || !h2) {
+    throw new Error('expected two distinct ring neighbors');
+  }
+  const snap: TacticalBattleSnapshot = {
+    battleId: 'tb-hsplit',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: ring,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits: [
+      {
+        id: 'hum-air',
+        parentUnitId: 'human-air-1',
+        player: 'human',
+        unitType: 'air',
+        h3Index: h0,
+        displayName: '1st Squadron (01)',
+      },
+      {
+        id: 'hum-inf',
+        parentUnitId: 'human-infantry-1',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: h2,
+        displayName: '1st Infantry (01)',
+      },
+      {
+        id: 'op1',
+        parentUnitId: 'opponent-infantry-1',
+        player: 'opponent',
+        unitType: 'infantry',
+        h3Index: h1,
+        displayName: 'I Infantry (01)',
+      },
+      {
+        id: 'op2',
+        parentUnitId: 'opponent-infantry-2',
+        player: 'opponent',
+        unitType: 'infantry',
+        h3Index: h2,
+        displayName: 'II Infantry (01)',
+      },
+    ],
+  };
+  const out = projectTacticalSnapshotAfterValidatedHumanSupportOrders(snap, {
+    airStrikes: [{ unitId: 'hum-air', targetH3Index: h1, targetType: 'units' }],
+    rangedAttacks: [{ unitId: 'hum-inf', targetH3Index: h2 }],
+  });
+  assert.equal(
+    out.killsByAirStrike.some((k) => k.killerIds[0] === 'hum-air' && k.victimId === 'op1'),
+    true
+  );
+  assert.equal(
+    out.killsByDirectFire.some((k) => k.killerIds[0] === 'hum-inf' && k.victimId === 'op2'),
+    true
+  );
 });

@@ -5,12 +5,8 @@
 import { cellToParent } from 'h3-js';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, GameStateSnapshot } from '../../shared/ipcTypes';
 import type { TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
-import {
-  AIR_FERRY_RANGE_HEXES,
-  AIR_STRIKE_RANGE_HEXES,
-  formatFerryOutOfRangeReason,
-  formatTargetOutOfRangeReason,
-} from '../../shared/tacticalRanges';
+import { AIR_FERRY_RANGE_HEXES, formatFerryOutOfRangeReason } from '../../shared/tacticalRanges';
+import { tacticalSubUnitLabelForUserMessage } from '../../shared/unitDisplayNames';
 import { dbGetOne, getHexController, getRes1InfrastructureForHex, isDbReady } from '../gameDb';
 import { normalizeMovementTerrain } from '../movementTerrain';
 import { isWithinGridRangeSafe } from '../game-actions/gridRange';
@@ -54,27 +50,26 @@ function canPlayerEmbarkFromTacticalRes4Hex(h3Index: string, playerId: string): 
 /**
  * Validates an opponent air strike order against a post-move tactical plan state and res1 infrastructure.
  *
- * Contract: Mirrors `validateAirStrikeOrder` airport/range/enemy rules without reading `units` from SQLite.
+ * Contract: Mirrors `validateAirStrikeOrder` airport and enemy rules without reading `units` from SQLite; tactical strikes may target any hex on the projected tactical map (no strategic 3-step strike cap).
  * When to use: Tactical branch of `requestOrdersFlow` after movement orders are applied to the plan snapshot.
  * Expected outcome: Valid only for opponent air units with intact home airport and legal targets inside the tactical hex list.
  * Exceptions: Returns invalid when DB is unavailable for infrastructure reads.
+ * Parameters: `displayLabelForUnit` must resolve tactical sub-unit ids to `displayName` strings (never raw ids in `reason` text).
  */
 export function validateTacticalOpponentAirStrikeOrder(
   order: AirStrikeOrder,
-  state: GameStateSnapshot
+  state: GameStateSnapshot,
+  displayLabelForUnit: (unitId: string) => string
 ): TacticalValidationResult {
   tacticalLogQuery('validateTacticalOpponentAirStrikeOrder', { unitId: order.unitId, targetType: order.targetType });
   if (!isDbReady()) return tacticalInvalidResult('Database not initialized');
   const unit = state.units.find((u) => u.id === order.unitId);
-  if (!unit) return tacticalInvalidResult(`Unit not found: ${order.unitId}`);
+  if (!unit) return tacticalInvalidResult(`Unit not found: ${displayLabelForUnit(order.unitId)}`);
   if (unit.player !== 'opponent') return tacticalInvalidResult('Only opponent units can execute tactical AI strikes');
   if (unit.unitType !== 'air') return tacticalInvalidResult('Only air units can execute strikes');
   const hexIds = new Set(state.hexes.map((h) => h.h3Index));
   if (!hexIds.has(order.targetH3Index)) return tacticalInvalidResult('Target not on tactical map');
-  const withinStrikeRange = isWithinGridRangeSafe(unit.h3Index, order.targetH3Index, AIR_STRIKE_RANGE_HEXES, 'tacticalAirStrike');
-  if (!withinStrikeRange) {
-    return tacticalInvalidResult(formatTargetOutOfRangeReason(unit.unitType, AIR_STRIKE_RANGE_HEXES));
-  }
+  if (!hexIds.has(unit.h3Index)) return tacticalInvalidResult('Air unit not on tactical map');
   const baseInfra = getRes1InfrastructureForHex(cellToParent(unit.h3Index, 1));
   if (baseInfra.airportCount <= 0) {
     return tacticalInvalidResult('Air unit must be based at an intact airport to strike');
@@ -105,12 +100,17 @@ export function validateTacticalOpponentAirStrikeOrder(
  * When to use: Tactical AI flow after movement projection.
  * Expected outcome: Valid when origin/destination airports exist, range holds, and destination airport is opponent-controlled.
  * Exceptions: Returns invalid when DB reads fail or destination is outside the tactical hex list.
+ * Parameters: `displayLabelForUnit` must resolve tactical sub-unit ids to `displayName` strings (never raw ids in `reason` text).
  */
-export function validateTacticalOpponentFerryOrder(order: FerryOrder, state: GameStateSnapshot): TacticalValidationResult {
+export function validateTacticalOpponentFerryOrder(
+  order: FerryOrder,
+  state: GameStateSnapshot,
+  displayLabelForUnit: (unitId: string) => string
+): TacticalValidationResult {
   tacticalLogQuery('validateTacticalOpponentFerryOrder', { unitId: order.unitId });
   if (!isDbReady()) return tacticalInvalidResult('Database not initialized');
   const unit = state.units.find((u) => u.id === order.unitId);
-  if (!unit) return tacticalInvalidResult(`Unit not found: ${order.unitId}`);
+  if (!unit) return tacticalInvalidResult(`Unit not found: ${displayLabelForUnit(order.unitId)}`);
   if (unit.player !== 'opponent') return tacticalInvalidResult('Only opponent units can ferry in tactical AI flow');
   if (unit.unitType !== 'air') return tacticalInvalidResult('Only air units can ferry');
   const hexIds = new Set(state.hexes.map((h) => h.h3Index));
@@ -143,7 +143,11 @@ export function validateTacticalOpponentEmbarkOrder(
   tacticalLogQuery('validateTacticalOpponentEmbarkOrder', { unitId: order.unitId, navalUnitId: order.navalUnitId });
   const land = subUnits.find((u) => u.id === order.unitId);
   const naval = subUnits.find((u) => u.id === order.navalUnitId);
-  if (!land || !naval) return tacticalInvalidResult('Embark units not found on tactical snapshot');
+  if (!land || !naval) {
+    return tacticalInvalidResult(
+      `Embark units not found on tactical snapshot (${tacticalSubUnitLabelForUserMessage(subUnits, order.unitId)} / ${tacticalSubUnitLabelForUserMessage(subUnits, order.navalUnitId)})`
+    );
+  }
   if (land.player !== 'opponent' || naval.player !== 'opponent') {
     return tacticalInvalidResult('Embark orders must target opponent units');
   }

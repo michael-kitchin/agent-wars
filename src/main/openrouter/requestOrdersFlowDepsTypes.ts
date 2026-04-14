@@ -115,7 +115,11 @@ export interface RequestOrdersFlowDeps {
    * Expected outcome: `{ valid: true }` or `{ valid: false, reason }` with a short reason string.
    * Exceptions: None.
    */
-  validateAiOrder: (order: { unitId: string; toH3Index: string }, state: GameStateSnapshot) => { valid: true } | { valid: false; reason: string };
+  validateAiOrder: (
+    order: { unitId: string; toH3Index: string },
+    state: GameStateSnapshot,
+    opts?: { labelForUnitId?: (unitId: string) => string }
+  ) => { valid: true } | { valid: false; reason: string };
   /**
    * Validates a single AI ranged attack order against the authoritative snapshot.
    *
@@ -126,7 +130,8 @@ export interface RequestOrdersFlowDeps {
    */
   validateAiRangedOrder: (
     order: { unitId: string; targetH3Index: string },
-    state: GameStateSnapshot
+    state: GameStateSnapshot,
+    opts?: { labelForUnitId?: (unitId: string) => string }
   ) => { valid: true } | { valid: false; reason: string };
   /**
    * Formats a lat/lng pair for human-readable prompts and logs.

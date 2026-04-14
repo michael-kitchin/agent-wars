@@ -7,6 +7,38 @@ import type {
 } from '../../shared/ipcTypes';
 
 /**
+ * Minimal id→hex rows for resolving an attacker's cell when `GameStateSnapshot.units` keys strategic ids only.
+ *
+ * Purpose: Tactical pending orders reference `TacticalSubUnitSnapshot.id` while `S.gameState.units` stays on the strategic roster.
+ * When to use: Pass `tacticalBattleSnapshot.subUnits` from the renderer when formatting tactical draft order labels.
+ * Expected outcome: Same `h3Index` resolution the map uses for sub-units (res4 during tactical play).
+ * Exceptions: None.
+ */
+export type UnitH3PositionLookup = readonly { id: string; h3Index: string }[];
+
+/**
+ * Defines the `resolveAttackerH3ForOrderLabel` function shape (function resolveAttackerH3ForOrderLabel(unitId: string, state: GameStateSnapshot | null, tacticalPositions?: UnitH3PositionLookup | null): string | null).
+
+ * Purpose: Picks the origin hex for grid-distance labels whether the unit is keyed on the strategic snapshot or tactical sub-units.
+ * When to use: Before calling `computeGridDistanceForLabel` for ranged, strike, or ferry sidebar strings.
+ * Expected outcome: Tactical rows win when present and contain `unitId`; otherwise falls back to `state.units`.
+ * Exceptions: None.
+ */
+function resolveAttackerH3ForOrderLabel(
+  unitId: string,
+  state: GameStateSnapshot | null,
+  tacticalPositions?: UnitH3PositionLookup | null
+): string | null {
+  if (tacticalPositions && tacticalPositions.length > 0) {
+    const tactical = tacticalPositions.find((u) => u.id === unitId);
+    if (tactical) return tactical.h3Index;
+  }
+  if (!state) return null;
+  const strategic = state.units.find((u) => u.id === unitId);
+  return strategic?.h3Index ?? null;
+}
+
+/**
  * Defines the `computeGridDistanceForLabel` function shape (function computeGridDistanceForLabel(originH3: string, targetH3: string): number | null).
 
  * Purpose: Supports maintainability by documenting why `computeGridDistanceForLabel` exists.
@@ -19,7 +51,8 @@ function computeGridDistanceForLabel(originH3: string, targetH3: string): number
     return Math.max(0, gridDistance(originH3, targetH3));
   } catch {
     // gridDistance may throw for some valid far-apart pairs; probe by rings as a label-only fallback.
-    for (let radius = 0; radius <= 12; radius++) {
+    const maxRadius = 128;
+    for (let radius = 0; radius <= maxRadius; radius++) {
       try {
         const ring = gridDisk(originH3, radius);
         if (ring.includes(targetH3)) return radius;
@@ -32,18 +65,22 @@ function computeGridDistanceForLabel(originH3: string, targetH3: string): number
 }
 
 /**
- * Defines the `formatDistanceLabelForPlannedAttack` function shape (function formatDistanceLabelForPlannedAttack(state: GameStateSnapshot | null, unitId: string, targetH3Index: string): string).
+ * Defines the `formatDistanceLabelForPlannedAttack` function shape (function formatDistanceLabelForPlannedAttack(state: GameStateSnapshot | null, unitId: string, targetH3Index: string, tacticalPositions?: UnitH3PositionLookup | null): string).
 
  * Purpose: Supports maintainability by documenting why `formatDistanceLabelForPlannedAttack` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Expected outcome: `Nh` where `N` is H3 grid edge count at the snapshot resolution (res1 strategic or res4 tactical).
  * Exceptions: None.
  */
-function formatDistanceLabelForPlannedAttack(state: GameStateSnapshot | null, unitId: string, targetH3Index: string): string {
-  if (!state) return '?h';
-  const attacker = state.units.find((u) => u.id === unitId);
-  if (!attacker) return '?h';
-  const distance = computeGridDistanceForLabel(attacker.h3Index, targetH3Index);
+function formatDistanceLabelForPlannedAttack(
+  state: GameStateSnapshot | null,
+  unitId: string,
+  targetH3Index: string,
+  tacticalPositions?: UnitH3PositionLookup | null
+): string {
+  const originH3 = resolveAttackerH3ForOrderLabel(unitId, state, tacticalPositions);
+  if (!originH3) return '?h';
+  const distance = computeGridDistanceForLabel(originH3, targetH3Index);
   return distance == null ? '?h' : `${distance}h`;
 }
 
@@ -57,9 +94,10 @@ function formatDistanceLabelForPlannedAttack(state: GameStateSnapshot | null, un
  */
 export function formatPendingRangedAttackSidebarLabel(
   state: GameStateSnapshot | null,
-  order: RangedAttackOrder
+  order: RangedAttackOrder,
+  tacticalPositions?: UnitH3PositionLookup | null
 ): string {
-  return formatDistanceLabelForPlannedAttack(state, order.unitId, order.targetH3Index);
+  return formatDistanceLabelForPlannedAttack(state, order.unitId, order.targetH3Index, tacticalPositions);
 }
 
 /**
@@ -72,7 +110,8 @@ export function formatPendingRangedAttackSidebarLabel(
  */
 export function formatPendingAirStrikeSidebarLabel(
   state: GameStateSnapshot | null,
-  order: AirStrikeOrder
+  order: AirStrikeOrder,
+  tacticalPositions?: UnitH3PositionLookup | null
 ): string {
   const targetTypeLabel =
     order.targetType === 'units'
@@ -82,7 +121,7 @@ export function formatPendingAirStrikeSidebarLabel(
         : order.targetType === 'airport'
           ? 'airport'
           : 'seaport';
-  return `${formatDistanceLabelForPlannedAttack(state, order.unitId, order.targetH3Index)} (${targetTypeLabel})`;
+  return `${formatDistanceLabelForPlannedAttack(state, order.unitId, order.targetH3Index, tacticalPositions)} (${targetTypeLabel})`;
 }
 
 /**
@@ -95,11 +134,11 @@ export function formatPendingAirStrikeSidebarLabel(
  */
 export function formatPendingFerryOrderSidebarLabel(
   state: GameStateSnapshot | null,
-  order: FerryOrder
+  order: FerryOrder,
+  tacticalPositions?: UnitH3PositionLookup | null
 ): string {
-  if (!state) return '?h (ferry)';
-  const unit = state.units.find((u) => u.id === order.unitId);
-  if (!unit) return '?h (ferry)';
-  const ferryDistance = computeGridDistanceForLabel(unit.h3Index, order.destinationH3Index);
+  const originH3 = resolveAttackerH3ForOrderLabel(order.unitId, state, tacticalPositions);
+  if (!originH3) return '?h (ferry)';
+  const ferryDistance = computeGridDistanceForLabel(originH3, order.destinationH3Index);
   return `${ferryDistance == null ? '?' : ferryDistance}h (ferry)`;
 }

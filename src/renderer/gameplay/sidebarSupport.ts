@@ -304,6 +304,34 @@ export function formatKillToastLine(
 }
 
 /**
+ * Merges tactical sub-unit display names from before commit, after commit, and casualty rows for kill toast resolution.
+ *
+ * Purpose: After tactical commit the live battle snapshot drops removed sub-units, but kill edges still reference those ids;
+ * combining snapshots preserves the same Roman labels the player saw in the tactical UI, mirroring strategic roster names.
+ * When to use: Only when calling `buildKillToastFormatterBundle` for post-commit tactical Ready toasts.
+ * Expected outcome: Stable `{ id, displayName }` rows for every sub-unit id involved in formatting; removed-unit `displayName`
+ * overrides earlier rows when the engine attached an explicit casualty label.
+ * Exceptions: None.
+ */
+export function buildTacticalSubUnitKillLabelOverlay(args: {
+  subUnitsBeforeCommit?: readonly { id: string; displayName: string }[];
+  subUnitsAfterCommit?: readonly { id: string; displayName: string }[];
+  removedUnits?: readonly RemovedUnitSnapshot[];
+}): { id: string; displayName: string }[] {
+  const byId = new Map<string, string>();
+  for (const row of args.subUnitsBeforeCommit ?? []) {
+    byId.set(row.id, row.displayName);
+  }
+  for (const row of args.subUnitsAfterCommit ?? []) {
+    byId.set(row.id, row.displayName);
+  }
+  for (const u of args.removedUnits ?? []) {
+    if (u.displayName) byId.set(u.id, u.displayName);
+  }
+  return [...byId.entries()].map(([id, displayName]) => ({ id, displayName }));
+}
+
+/**
  * Defines the `buildKillToastFormatterBundle` function shape (export function buildKillToastFormatterBundle( state: GameStateSnapshot, removedUnits: RemovedUnitSnapshot[] | undefined, tacticalSubUnitsForKillLabels?: readonly { id: string; displayName: string }[] ): { formatUnitName: (unitId: st).
 
  * Purpose: Supports maintainability by documenting why `buildKillToastFormatterBundle` exists.

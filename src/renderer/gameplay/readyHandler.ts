@@ -8,8 +8,10 @@ import type {
 } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { MeleeInterceptModalOpenArgs, MeleeInterceptModalOutcome } from './meleeInterceptModal';
+import { buildTacticalSubUnitKillLabelOverlay } from './sidebarSupport';
 import { buildTurnUpdateBullets } from './turnUpdateSummary';
 import { readTacticalBattlesInterceptPromptEnabled } from './tacticalBattlePromptPreference';
+import { tacticalKillEdgesForStrategicStyleTurnUpdate } from '../../shared/tacticalToastKillSlice';
 import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
 import { rendererSharedState as S } from '../core/state';
 import { resetPrecomputedAiState } from '../openRouter/precomputedAiState';
@@ -543,23 +545,40 @@ function deriveCombatVisibilityClassification(
  *
  * Purpose: Avoids a second toast pipeline in the renderer while tactical combat remains snapshot-simulated on the main process.
  * When to use: Only after a successful `commitHumanTacticalDraftOrders` when `tacticalResolutionPlayback` is present.
- * Expected outcome: `deriveCombatVisibilityClassification` and `buildTurnUpdateBullets` see the same kill and casualty fields they expect from strategic Ready.
+ * Expected outcome: `deriveCombatVisibilityClassification` and `buildTurnUpdateBullets` see the same kill and casualty fields they expect from strategic Ready, including `kills` without air-strike edges (air stays on the air strike summary line).
  * Exceptions: None; omits optional arrays when empty to match typical `ReadyResult` payloads.
  */
 function buildTacticalCommitReadyResultForToast(playback: TacticalCommitResolutionPlayback): ReadyResult {
   const killsByDirectFire = playback.killsByDirectFire ?? [];
+  const killsByAirStrike = playback.killsByAirStrike ?? [];
   const killsByReturnFire = playback.killsByReturnFire ?? [];
-  const kills = [...killsByDirectFire, ...killsByReturnFire];
+  const killsWithoutAirStrike = tacticalKillEdgesForStrategicStyleTurnUpdate(playback);
+  const kills = killsWithoutAirStrike.length > 0 ? killsWithoutAirStrike : undefined;
+  const removedAll = playback.rangedRemovedUnits ?? [];
+  const airStrikeVictimIds = new Set(killsByAirStrike.map((k) => k.victimId));
+  const rangedVictimIds = new Set(killsByDirectFire.map((k) => k.victimId));
+  const airStrikeRemovedUnits = removedAll.filter((u) => {
+    if (airStrikeVictimIds.has(u.id)) return true;
+    if (u.player === 'human' && u.unitType === 'air' && !rangedVictimIds.has(u.id)) return true;
+    return false;
+  });
   return {
     success: true,
-    kills: kills.length > 0 ? kills : undefined,
+    kills,
     killsByDirectFire: killsByDirectFire.length > 0 ? killsByDirectFire : undefined,
+    killsByAirStrike: killsByAirStrike.length > 0 ? killsByAirStrike : undefined,
     killsByReturnFire: killsByReturnFire.length > 0 ? killsByReturnFire : undefined,
-    removedUnits: playback.rangedRemovedUnits,
+    removedUnits: removedAll.length > 0 ? removedAll : undefined,
     humanMoves: playback.humanMoves,
     rangedCombatHexes: playback.rangedCombatHexes,
     rangedCasualtyHexes: playback.rangedCasualtyHexes,
     rangedRemovedUnits: playback.rangedRemovedUnits,
+    airStrikeRemovedUnits: airStrikeRemovedUnits.length > 0 ? airStrikeRemovedUnits : undefined,
+    infrastructureDestroyedEvents:
+      playback.infrastructureDestroyedEvents && playback.infrastructureDestroyedEvents.length > 0
+        ? playback.infrastructureDestroyedEvents
+        : undefined,
+    airStrikeAttemptCount: playback.airStrikeAttemptCount,
   };
 }
 
@@ -651,6 +670,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         deps.updateReadyButtonState();
         return;
       }
+      const tacticalSubUnitsBeforeCommit = S.tacticalBattleSnapshot?.subUnits;
       if (commitResult.tacticalBattle) {
         S.tacticalBattleSnapshot = commitResult.tacticalBattle;
       }
@@ -662,6 +682,22 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       S.pendingFerryOrders = [];
       S.rangedModeActive = false;
       S.airStrikeModeActive = false;
+      if (window.gameApi?.getGameState) {
+        try {
+          const refreshedStrategic = (await window.gameApi.getGameState()) as GameStateSnapshot;
+          await deps.applyGameStateSnapshot(refreshedStrategic, {
+            refreshStandingOrders: false,
+            updateGameStateSidebarUi: false,
+            updateSelectionUi: false,
+            updateGameOverUi: false,
+            updateReadyButton: false,
+            refreshBuildPopup: false,
+            redraw: false,
+          });
+        } catch (err) {
+          console.error('tactical commit: failed to refresh strategic game state snapshot', err);
+        }
+      }
       const playback = commitResult.tacticalResolutionPlayback;
       const hasMoves = (playback?.humanMoves?.length ?? 0) > 0;
       const hasRangedPlayback =
@@ -669,7 +705,9 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         (playback?.rangedCasualtyHexes?.length ?? 0) > 0 ||
         (playback?.rangedRemovedUnits?.length ?? 0) > 0;
       const hasKillPlayback =
-        (playback?.killsByDirectFire?.length ?? 0) > 0 || (playback?.killsByReturnFire?.length ?? 0) > 0;
+        (playback?.killsByDirectFire?.length ?? 0) > 0 ||
+        (playback?.killsByAirStrike?.length ?? 0) > 0 ||
+        (playback?.killsByReturnFire?.length ?? 0) > 0;
       const needsResolutionPlayback = hasMoves || hasRangedPlayback || hasKillPlayback;
       if (playback && needsResolutionPlayback) {
         if (S.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
@@ -699,7 +737,11 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         const killToastFormatter = deps.buildKillToastFormatterBundle(
           S.gameState,
           tacticalReadySlice.removedUnits,
-          S.tacticalBattleSnapshot?.subUnits
+          buildTacticalSubUnitKillLabelOverlay({
+            subUnitsBeforeCommit: tacticalSubUnitsBeforeCommit,
+            subUnitsAfterCommit: S.tacticalBattleSnapshot?.subUnits,
+            removedUnits: tacticalReadySlice.removedUnits,
+          })
         );
         const bullets = buildTurnUpdateBullets({
           readyResult: tacticalReadySlice as Parameters<typeof buildTurnUpdateBullets>[0]['readyResult'],
@@ -732,6 +774,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
           deps.showMapToast(deps.formatUnknownBattleAnnouncement(unknownContinentNames), { isError: false });
         }
       }
+      await deps.refreshRes4TerrainOverridesForRenderer();
       deps.updatePendingOrdersSidebar();
       deps.updateRangedSidebar();
       deps.updateSidebar();

@@ -406,7 +406,10 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       destinationH3Index: destinationH3,
     });
     if (!validation.success) {
-      deps.showMapToast(validation.reason ?? 'Selected air units cannot ferry to that destination.', { isError: true });
+      deps.showMapToast(
+        deps.formatTargetingValidationReason(validation.reason, 'Selected air units cannot ferry to that destination.'),
+        { isError: true }
+      );
       return true;
     }
     deps.replacePendingFerryOrdersForSelected(selectedIds, destinationH3);
@@ -424,7 +427,10 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       destinationH3Index: destinationH3,
     });
     if (!assign.success) {
-      deps.showMapToast(assign.reason ?? 'Failed to assign movement order.', { isError: true });
+      deps.showMapToast(
+        deps.formatTargetingValidationReason(assign.reason, 'Failed to assign movement order.'),
+        { isError: true }
+      );
       return true;
     }
     if (S.tacticalBattleSnapshot) {

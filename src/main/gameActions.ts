@@ -12,6 +12,7 @@ import {
   getMapHexSet,
   getRes1InfrastructureForHex,
   getGameStateForPlayer,
+  reconcileRes1InfrastructureCountsFromRes4Overrides,
 } from './gameDb';
 import { buildLatLngCoordinateMap } from './mapData';
 import { getRange } from './combatConstants';
@@ -45,7 +46,13 @@ import {
 import type { BuildUnitType } from './productionRules';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE, RANGED_RANGE_BY_UNIT_TYPE, formatTargetOutOfRangeReason } from '../shared/tacticalRanges';
 import { tacticalMovementUnitTypeForPathfinding } from '../shared/tacticalTerrainMovement';
+import {
+  buildStrategicUnitDisplayLabelResolver,
+  fallbackDisplayNameFromUnitId,
+  tacticalSubUnitLabelForUserMessage,
+} from '../shared/unitDisplayNames';
 import { validateAirStrikeOrder, validateFerryOrder } from './game-actions/airValidation';
+import { validateTacticalHumanAirStrikeGroup } from './game-actions/tacticalHumanAirStrikeValidation';
 import { isWithinGridRangeSafe } from './game-actions/gridRange';
 import {
   addHexBuildQueueEntryImpl,
@@ -385,7 +392,8 @@ function humanPerspectiveStateSnapshot(): GameStateSnapshot {
  */
 function validateOrder(
   unitId: string,
-  toH3Index: string
+  toH3Index: string,
+  displayLabelForUnit: (id: string) => string
 ): { valid: true } | { valid: false; reason: string } {
   if (!isDbReady()) return { valid: false, reason: 'Database not initialized' };
 
@@ -393,7 +401,7 @@ function validateOrder(
     'SELECT player, unit_type, h3_index FROM units WHERE id = ?',
     [unitId]
   );
-  if (!unit) return { valid: false, reason: `Unit not found: ${unitId}` };
+  if (!unit) return { valid: false, reason: `Unit not found: ${displayLabelForUnit(unitId)}` };
   if (unit.player !== 'human') return { valid: false, reason: 'Only human units can receive orders' };
 
   const mapHexes = getMapHexSet();
@@ -460,7 +468,7 @@ function validateOrder(
 }
 
 /**
- * Defines the `validateRangedAttack` function shape (export function validateRangedAttack( unitId: string, targetH3Index: string, options?: { allowedPlayer?: string } ): { valid: true } | { valid: false;).
+ * Defines the `validateRangedAttack` function shape (export function validateRangedAttack( unitId: string, targetH3Index: string, options?: { allowedPlayer?: string; displayLabelForUnit?: (id: string) => string } ): { valid: true } | { valid: false;).
 
  * Purpose: Supports maintainability by documenting why `validateRangedAttack` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -470,16 +478,18 @@ function validateOrder(
 export function validateRangedAttack(
   unitId: string,
   targetH3Index: string,
-  options?: { allowedPlayer?: string }
+  options?: { allowedPlayer?: string; displayLabelForUnit?: (id: string) => string }
 ): { valid: true } | { valid: false; reason: string } {
+  logDebug('gameActions validateRangedAttack', { unitId, targetH3Index, allowedPlayer: options?.allowedPlayer });
   const allowedPlayer = options?.allowedPlayer ?? 'human';
+  const labelFor = options?.displayLabelForUnit ?? fallbackDisplayNameFromUnitId;
   if (!isDbReady()) return { valid: false, reason: 'Database not initialized' };
 
   const unit = dbGetOne<{ player: string; unit_type: string; h3_index: string }>(
     'SELECT player, unit_type, h3_index FROM units WHERE id = ?',
     [unitId]
   );
-  if (!unit) return { valid: false, reason: `Unit not found: ${unitId}` };
+  if (!unit) return { valid: false, reason: `Unit not found: ${labelFor(unitId)}` };
   if (unit.player !== allowedPlayer) {
     return { valid: false, reason: `Unit must belong to ${allowedPlayer}` };
   }
@@ -731,6 +741,13 @@ export function commitHumanTacticalDraftOrders(args: {
       logDebug('gameActions commitHumanTacticalDraftOrders rejected support', { reason: support.reason });
       return { success: false, reason: support.reason };
     }
+    if ((support.infrastructureDestroyedEvents?.length ?? 0) > 0) {
+      const { changedHexCount } = reconcileRes1InfrastructureCountsFromRes4Overrides();
+      logDebug('gameActions commitHumanTacticalDraftOrders reconciled res1 infrastructure after tactical strikes', {
+        changedHexCount,
+        eventCount: support.infrastructureDestroyedEvents.length,
+      });
+    }
     const finalBattle = support.battle;
     const humanMoves: TacticalCommitResolutionPlayback['humanMoves'] = [];
     for (const o of args.movementOrders) {
@@ -767,7 +784,7 @@ export function commitHumanTacticalDraftOrders(args: {
       rangedCombatHexSet.add(r.targetH3Index);
     }
     for (const a of args.airStrikes ?? []) {
-      if (a.targetType === 'units') rangedCombatHexSet.add(a.targetH3Index);
+      rangedCombatHexSet.add(a.targetH3Index);
     }
     const rangedCombatHexes = [...rangedCombatHexSet];
     const casualtyHexSet = new Set(rangedRemovedUnits.map((v) => v.h3Index));
@@ -778,12 +795,17 @@ export function commitHumanTacticalDraftOrders(args: {
       rangedCasualtyHexes: rangedCasualtyHexes.length > 0 ? rangedCasualtyHexes : undefined,
       rangedRemovedUnits: rangedRemovedUnits.length > 0 ? rangedRemovedUnits : undefined,
       killsByDirectFire: support.killsByDirectFire.length > 0 ? support.killsByDirectFire : undefined,
+      killsByAirStrike: support.killsByAirStrike.length > 0 ? support.killsByAirStrike : undefined,
+      infrastructureDestroyedEvents:
+        support.infrastructureDestroyedEvents.length > 0 ? support.infrastructureDestroyedEvents : undefined,
+      airStrikeAttemptCount: support.airStrikeAttemptCount > 0 ? support.airStrikeAttemptCount : undefined,
     };
     logDebug('gameActions commitHumanTacticalDraftOrders playback', {
       humanMoveCount: humanMoves.length,
       rangedCombatHexCount: rangedCombatHexes.length,
       rangedRemovedCount: rangedRemovedUnits.length,
-      killEdgeCount: support.killsByDirectFire.length,
+      rangedKillEdgeCount: support.killsByDirectFire.length,
+      airStrikeKillEdgeCount: support.killsByAirStrike.length,
       marchContinuationCount: tacticalMarchContinuations.length,
     });
     return {
@@ -909,7 +931,12 @@ export function assignHumanMarchOrders(unitIds: string[], destinationH3Index: st
           destinationH3Index,
           reason: result.reason ?? `Failed to assign movement order for ${unitId}`,
         });
-        return { success: false, reason: result.reason ?? `Failed to assign movement order for ${unitId}` };
+        return {
+          success: false,
+          reason:
+            result.reason ??
+            `Failed to assign movement order for ${buildStrategicUnitDisplayLabelResolver(state.units)(unitId)}`,
+        };
       }
     }
     return { success: true };
@@ -964,12 +991,15 @@ export function validateGroupRangedTarget(unitIds: string[], targetH3Index: stri
       const footprint = new Set(snap.res4ChildH3Indexes);
       if (!footprint.has(targetH3Index)) return { success: false, reason: 'Target is outside the tactical battle.' };
       for (const unitId of uniqueUnitIds) {
+        const label = tacticalSubUnitLabelForUserMessage(snap.subUnits, unitId);
         const unit = snap.subUnits.find((u) => u.id === unitId);
-        if (!unit || unit.player !== HUMAN_PLAYER_ID) return { success: false, reason: `${unitId}: Unit not in tactical battle.` };
+        if (!unit || unit.player !== HUMAN_PLAYER_ID) {
+          return { success: false, reason: `${label}: Unit not in tactical battle.` };
+        }
         const range = RANGED_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 0;
-        if (range < 1) return { success: false, reason: `${unitId}: Unit has no ranged attack.` };
+        if (range < 1) return { success: false, reason: `${label}: Unit has no ranged attack.` };
         if (!isWithinGridRangeSafe(unit.h3Index, targetH3Index, range, 'validateGroupRangedTarget tactical')) {
-          return { success: false, reason: `${unitId}: Target out of range.` };
+          return { success: false, reason: `${label}: Target out of range.` };
         }
       }
       const enemiesAtTarget = snap.subUnits.filter(
@@ -980,10 +1010,14 @@ export function validateGroupRangedTarget(unitIds: string[], targetH3Index: stri
       }
       return { success: true };
     }
+    const strategicLabel = buildStrategicUnitDisplayLabelResolver(humanPerspectiveStateSnapshot().units);
     for (const unitId of uniqueUnitIds) {
-      const result = validateRangedAttack(unitId, targetH3Index, { allowedPlayer: HUMAN_PLAYER_ID });
+      const result = validateRangedAttack(unitId, targetH3Index, {
+        allowedPlayer: HUMAN_PLAYER_ID,
+        displayLabelForUnit: strategicLabel,
+      });
       if (!result.valid) {
-        return { success: false, reason: `${unitId}: ${result.reason}` };
+        return { success: false, reason: `${strategicLabel(unitId)}: ${result.reason}` };
       }
     }
     return { success: true };
@@ -1012,21 +1046,19 @@ export function validateGroupAirStrikeTarget(
     const uniqueUnitIds = getUniqueNonEmptyIds(unitIds);
     if (uniqueUnitIds.length === 0) return { success: false, reason: 'No selected units for strike targeting' };
     if (isTacticalBattleActive()) {
-      if (targetType !== 'units') return { success: false, reason: 'Tactical air strikes currently support enemy units only.' };
       const snap = getActiveTacticalBattleSnapshot();
       if (!snap) return { success: false, reason: 'No tactical battle is active.' };
-      const footprint = new Set(snap.res4ChildH3Indexes);
-      if (!footprint.has(targetH3Index)) return { success: false, reason: 'Target is outside the tactical battle.' };
-      for (const unitId of uniqueUnitIds) {
-        const unit = snap.subUnits.find((u) => u.id === unitId);
-        if (!unit || unit.player !== HUMAN_PLAYER_ID) return { success: false, reason: `${unitId}: Unit not in tactical battle.` };
-        if (unit.unitType !== 'air') return { success: false, reason: `${unitId}: Only air units can strike.` };
-      }
+      const tacticalCheck = validateTacticalHumanAirStrikeGroup(snap, uniqueUnitIds, targetH3Index, targetType);
+      if (!tacticalCheck.success) return tacticalCheck;
       return { success: true };
     }
+    const strategicAirLabel = buildStrategicUnitDisplayLabelResolver(humanPerspectiveStateSnapshot().units);
     for (const unitId of uniqueUnitIds) {
-      const result = validateAirStrikeOrder(unitId, targetH3Index, targetType, { allowedPlayer: HUMAN_PLAYER_ID });
-      if (!result.valid) return { success: false, reason: `${unitId}: ${result.reason}` };
+      const result = validateAirStrikeOrder(unitId, targetH3Index, targetType, {
+        allowedPlayer: HUMAN_PLAYER_ID,
+        displayLabelForUnit: strategicAirLabel,
+      });
+      if (!result.valid) return { success: false, reason: `${strategicAirLabel(unitId)}: ${result.reason}` };
     }
     return { success: true };
   } catch (err) {
@@ -1055,15 +1087,22 @@ export function validateGroupFerryTarget(unitIds: string[], destinationH3Index: 
       const footprint = new Set(snap.res4ChildH3Indexes);
       if (!footprint.has(destinationH3Index)) return { success: false, reason: 'Destination is outside the tactical battle.' };
       for (const unitId of uniqueUnitIds) {
+        const label = tacticalSubUnitLabelForUserMessage(snap.subUnits, unitId);
         const unit = snap.subUnits.find((u) => u.id === unitId);
-        if (!unit || unit.player !== HUMAN_PLAYER_ID) return { success: false, reason: `${unitId}: Unit not in tactical battle.` };
-        if (unit.unitType !== 'air') return { success: false, reason: `${unitId}: Only air units can ferry.` };
+        if (!unit || unit.player !== HUMAN_PLAYER_ID) {
+          return { success: false, reason: `${label}: Unit not in tactical battle.` };
+        }
+        if (unit.unitType !== 'air') return { success: false, reason: `${label}: Only air units can ferry.` };
       }
       return { success: true };
     }
+    const strategicFerryLabel = buildStrategicUnitDisplayLabelResolver(humanPerspectiveStateSnapshot().units);
     for (const unitId of uniqueUnitIds) {
-      const result = validateFerryOrder(unitId, destinationH3Index, { allowedPlayer: HUMAN_PLAYER_ID });
-      if (!result.valid) return { success: false, reason: `${unitId}: ${result.reason}` };
+      const result = validateFerryOrder(unitId, destinationH3Index, {
+        allowedPlayer: HUMAN_PLAYER_ID,
+        displayLabelForUnit: strategicFerryLabel,
+      });
+      if (!result.valid) return { success: false, reason: `${strategicFerryLabel(unitId)}: ${result.reason}` };
     }
     return { success: true };
   } catch (err) {
@@ -1210,9 +1249,12 @@ export function updateSealiftSlot(
  * Exceptions: None.
  */
 export function submitOrders(payload: SubmitOrdersPayload): SubmitOrdersResult {
+  const displayLabelForUnit = buildStrategicUnitDisplayLabelResolver(humanPerspectiveStateSnapshot().units);
   return submitOrdersImpl(payload, {
-    validateOrder,
-    validateRangedAttack,
+    validateOrder: (unitId, toH3Index) => validateOrder(unitId, toH3Index, displayLabelForUnit),
+    validateRangedAttack: (unitId, targetH3Index, options) =>
+      validateRangedAttack(unitId, targetH3Index, { ...options, displayLabelForUnit }),
+    displayLabelForUnit,
     humanPlayerId: HUMAN_PLAYER_ID,
     validPhase: VALID_PHASE,
   });

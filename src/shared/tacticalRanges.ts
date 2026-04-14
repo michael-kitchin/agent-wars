@@ -47,9 +47,9 @@ export const RANGED_RANGE_BY_UNIT_TYPE: Readonly<Record<string, number>> = Objec
 /**
  * Documents the module-scope binding `AIR_STRIKE_RANGE_HEXES` (AIR_STRIKE_RANGE_HEXES).
 
- * Purpose: Supports maintainability by documenting why `AIR_STRIKE_RANGE_HEXES` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Strategic air strike distance from the unit’s home res1 hex; tactical human/opponent strikes ignore this cap and allow any target in the tactical res4 footprint.
+ * When to use: Strategic `validateAirStrikeOrder`, AI strike envelopes, and briefing text — not tactical battle validation.
+ * Expected outcome: Three res4 grid steps from base for strategic strikes.
  * Exceptions: None.
  */
 export const AIR_STRIKE_RANGE_HEXES = 3;

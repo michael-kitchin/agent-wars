@@ -162,7 +162,10 @@ function formatAirStrikeOutcomeLine(readyResult: ReadyResult, formatUnitName: (u
   if (attempts <= 0) return null;
   const destroyedByFeature = { urban: 0, airport: 0, seaport: 0 };
   for (const event of readyResult.infrastructureDestroyedEvents ?? []) {
-    destroyedByFeature[event.targetType] += 1;
+    const rubbleCells = event.changedRubbleCount ?? 0;
+    if (event.targetType === 'urban') destroyedByFeature.urban += rubbleCells;
+    else if (event.targetType === 'airport') destroyedByFeature.airport += rubbleCells;
+    else if (event.targetType === 'seaport') destroyedByFeature.seaport += rubbleCells;
   }
 
   const destroyedUnitsByType = { infantry: 0, armor: 0, naval: 0, air: 0 };

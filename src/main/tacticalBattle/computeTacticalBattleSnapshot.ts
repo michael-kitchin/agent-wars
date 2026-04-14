@@ -14,7 +14,7 @@ import {
   isInfantryOrArmorTacticalSpawnCell,
   isNavalRes4TacticalCellNavigable,
 } from '../../shared/tacticalTerrainMovement';
-import { tacticalLogError, tacticalLogQuery } from './tacticalLogging';
+import { tacticalLogError, tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 
 const WORLD_H3_RESOLUTION = 1;
 const TACTICAL_H3_RESOLUTION = 4;
@@ -40,6 +40,45 @@ export function tacticalSubUnitCountForStrategicUnitType(unitType: string): numb
     default:
       return 0;
   }
+}
+
+/**
+ * Rebuilds per-res4 terrain kinds and seaport facility flags on a tactical snapshot from the live game database.
+ *
+ * Purpose: Snapshot `res4TerrainKindByH3` / `res4IsSeaportByH3` are frozen at battle start; tactical air infrastructure strikes
+ * mutate `res4_feature_overrides` and `res1_infrastructure`, so march planners and the renderer must see rubble and removed ports without exiting tactical mode.
+ * When to use: After `applyInfrastructureDestructionEffects` succeeds during human tactical support projection.
+ * Expected outcome: Footprint cells match `getRes4TerrainOverridesForRendererFromGame` and `listRes4FeatureOverridesForGame`; stale seaport keys are dropped when no facility rows remain.
+ * Exceptions: None; assumes `battle.res4ChildH3Indexes` still matches the active enclosing res1 cell.
+ */
+export function refreshTacticalBattleRes4TerrainFromGameDb(battle: TacticalBattleSnapshot): TacticalBattleSnapshot {
+  tacticalLogMutate('refreshTacticalBattleRes4TerrainFromGameDb', {
+    battleId: battle.battleId,
+    res4CellCount: battle.res4ChildH3Indexes.length,
+  });
+  const childSet = new Set(battle.res4ChildH3Indexes);
+  const res4Rows = getRes4TerrainOverridesForRendererFromGame();
+  const res4KindByH3 = new Map<string, string>();
+  for (const row of res4Rows) {
+    if (!childSet.has(row.h3Index)) continue;
+    res4KindByH3.set(row.h3Index, row.terrainKind);
+  }
+  const parentKind = battle.strategicHexTerrainKind ?? 'plains';
+  const res4TerrainKindByH3: Record<string, string> = {};
+  for (const cell of battle.res4ChildH3Indexes) {
+    res4TerrainKindByH3[cell] = res4KindByH3.get(cell) ?? parentKind;
+  }
+  const res4IsSeaportByH3: Record<string, boolean> = {};
+  for (const row of listRes4FeatureOverridesForGame()) {
+    if (!childSet.has(row.h3Index)) continue;
+    if (row.isSeaport) res4IsSeaportByH3[row.h3Index] = true;
+  }
+  const next: TacticalBattleSnapshot = { ...battle, res4TerrainKindByH3 };
+  delete next.res4IsSeaportByH3;
+  if (Object.keys(res4IsSeaportByH3).length > 0) {
+    next.res4IsSeaportByH3 = res4IsSeaportByH3;
+  }
+  return next;
 }
 
 /**
@@ -274,7 +313,7 @@ export function computeTacticalBattleSnapshot(
       return { snapshot: null, skippedParentDisplayNames: [], failureReason: 'Tactical battles can only start during strategic planning.' };
     }
     const hexRow = dbGetOne<{ terrain: string; terrain_kind: string }>(
-      'SELECT terrain, terrain_kind AS terrainKind FROM hexes WHERE h3_index = ?',
+      'SELECT terrain, terrain_kind FROM hexes WHERE h3_index = ?',
       [enclosingRes1H3Index]
     );
     if (!hexRow) {

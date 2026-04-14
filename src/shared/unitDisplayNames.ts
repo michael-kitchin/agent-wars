@@ -217,6 +217,39 @@ export function formatTacticalSubUnitDisplayName(parentStrategicDisplayName: str
 }
 
 /**
+ * Resolves the player-facing label for a tactical sub-unit when composing validation or status strings.
+ *
+ * Purpose: Tactical orders and IPC payloads key sub-units by opaque ids (`battleId:parentUnitId:ordinal`); surfaced errors should match sidebar/tooltip naming via `displayName`.
+ * When to use: Tactical-mode branches in main-process validation that prefix a unit key in `reason` text (ranged, air, ferry, etc.).
+ * Expected outcome: Trims and returns the snapshot row’s `displayName` when present; otherwise returns `subUnitId` for diagnostics.
+ * Exceptions: None.
+ */
+export function tacticalSubUnitLabelForUserMessage(
+  subUnits: readonly { id: string; displayName: string }[],
+  subUnitId: string
+): string {
+  const row = subUnits.find((u) => u.id === subUnitId);
+  const name = row?.displayName?.trim() ?? '';
+  return name.length > 0 ? name : subUnitId;
+}
+
+/**
+ * Builds a stable `(unitId) => label` resolver for strategic roster rows (ordinal + type noun display names).
+ *
+ * Purpose: User-facing validation and IPC reasons should never echo raw `human-infantry-1` ids when a proper label exists on the snapshot.
+ * When to use: Once per request boundary (submit orders, grouped validation) before iterating units; reuse the returned function for each id.
+ * Expected outcome: Same strings as `buildUnitDisplayNameLookup` for known ids; `fallbackDisplayNameFromUnitId` when the id is absent from `units`.
+ * Exceptions: None.
+ */
+export function buildStrategicUnitDisplayLabelResolver(
+  units: readonly UnitDisplayIdentity[],
+  locale?: Intl.LocalesArgument
+): (unitId: string) => string {
+  const lookup = buildUnitDisplayNameLookup(units, locale);
+  return (unitId: string) => lookup.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId, locale);
+}
+
+/**
  * Defines the `buildUnitDisplayNameLookup` function shape (export function buildUnitDisplayNameLookup().
 
  * Purpose: Supports maintainability by documenting why `buildUnitDisplayNameLookup` exists.

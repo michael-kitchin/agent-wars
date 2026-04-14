@@ -14947,7 +14947,7 @@
   var READY_REQUEST_TIMEOUT_MS = 12e4;
   var UNIT_ICON_HIT_PAD_PX = 2;
   var BUILD_ENTRY_HIT_PAD_PX = 2;
-  var TACTICAL_ENTRY_HIT_PAD_PX = 6;
+  var TACTICAL_ENTRY_HIT_PAD_PX = 3;
   var STACK_OFFSET_X = 6;
   var STACK_OFFSET_Y = -3;
   var COUNT_BADGE_OFFSET = 16;
@@ -16920,7 +16920,9 @@
     const container = map.getContainer();
     const viewportWidth = Math.max(1, container.clientWidth);
     const viewportHeight = Math.max(1, container.clientHeight);
+    const tactical = rendererSharedState.tacticalBattleSnapshot;
     for (const parent of rendererSharedState.gameState.hexes) {
+      if (tactical && parent.h3Index !== tactical.enclosingRes1H3Index) continue;
       let children = rendererSharedState.res4ChildrenByParent.get(parent.h3Index);
       if (!children) {
         children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
@@ -16929,7 +16931,7 @@
       const parentPts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
       if (!projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight)) continue;
       for (const child of children) {
-        if (!deps.infraGlyphsAllowedForRes4Child(parent.h3Index, child)) continue;
+        if (!tactical && !deps.infraGlyphsAllowedForRes4Child(parent.h3Index, child)) continue;
         const ap = rendererSharedState.terrainInfraRes4Airport.has(child);
         const pt = rendererSharedState.terrainInfraRes4Seaport.has(child);
         if (!ap && !pt) continue;
@@ -19184,33 +19186,17 @@
     if (pt === "water" || pt === "sea" || pt === "ocean") return "water";
     return "plains";
   }
-  var NAVAL_LITTORAL_TACTICAL_LAND_CATEGORIES = /* @__PURE__ */ new Set([
-    "forests",
-    "mountains",
-    "wetlands",
-    "desert",
-    "arctic"
-  ]);
   function nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(kind) {
     const k = (kind || "").toLowerCase();
     return k === "water" || k === "coastal" || k === "ocean" || k === "sea";
-  }
-  function strategicParentTerrainSupportsNavalOpenWaterFootprint(parentTerrain) {
-    const t = (parentTerrain || "").toLowerCase();
-    return t === "water" || t === "coastal" || t === "sea" || t === "ocean";
   }
   function isNavalRes4TacticalCellNavigable(args) {
     const { resolvedKindForCell, parentTerrain, parentTerrainKind, isSeaportCell } = args;
     if (isSeaportCell) return true;
     if (nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(resolvedKindForCell)) return true;
-    const pk = (parentTerrainKind || "").toLowerCase();
-    if (parentTerrain === "land" && pk === "coastal") {
-      const cat2 = normalizeDbTerrainKindToTacticalCategory(resolvedKindForCell, parentTerrain);
-      return cat2 !== "mountains";
-    }
-    if (!strategicParentTerrainSupportsNavalOpenWaterFootprint(parentTerrain)) return false;
+    void parentTerrainKind;
     const cat = normalizeDbTerrainKindToTacticalCategory(resolvedKindForCell, parentTerrain);
-    return NAVAL_LITTORAL_TACTICAL_LAND_CATEGORIES.has(cat) || cat === "water" || cat === "coastal";
+    return cat === "water" || cat === "coastal";
   }
   function tacticalEnterHexMovementCost(unitType, category) {
     if (unitType === "infantry") {
@@ -19638,11 +19624,21 @@
   }
 
   // src/renderer/gameplay/orderLabelFormatting.ts
+  function resolveAttackerH3ForOrderLabel(unitId, state, tacticalPositions) {
+    if (tacticalPositions && tacticalPositions.length > 0) {
+      const tactical = tacticalPositions.find((u) => u.id === unitId);
+      if (tactical) return tactical.h3Index;
+    }
+    if (!state) return null;
+    const strategic = state.units.find((u) => u.id === unitId);
+    return strategic?.h3Index ?? null;
+  }
   function computeGridDistanceForLabel(originH3, targetH3) {
     try {
       return Math.max(0, gridDistance(originH3, targetH3));
     } catch {
-      for (let radius = 0; radius <= 12; radius++) {
+      const maxRadius = 128;
+      for (let radius = 0; radius <= maxRadius; radius++) {
         try {
           const ring = gridDisk(originH3, radius);
           if (ring.includes(targetH3)) return radius;
@@ -19653,25 +19649,23 @@
       return null;
     }
   }
-  function formatDistanceLabelForPlannedAttack(state, unitId, targetH3Index) {
-    if (!state) return "?h";
-    const attacker = state.units.find((u) => u.id === unitId);
-    if (!attacker) return "?h";
-    const distance = computeGridDistanceForLabel(attacker.h3Index, targetH3Index);
+  function formatDistanceLabelForPlannedAttack(state, unitId, targetH3Index, tacticalPositions) {
+    const originH3 = resolveAttackerH3ForOrderLabel(unitId, state, tacticalPositions);
+    if (!originH3) return "?h";
+    const distance = computeGridDistanceForLabel(originH3, targetH3Index);
     return distance == null ? "?h" : `${distance}h`;
   }
-  function formatPendingRangedAttackSidebarLabel(state, order) {
-    return formatDistanceLabelForPlannedAttack(state, order.unitId, order.targetH3Index);
+  function formatPendingRangedAttackSidebarLabel(state, order, tacticalPositions) {
+    return formatDistanceLabelForPlannedAttack(state, order.unitId, order.targetH3Index, tacticalPositions);
   }
-  function formatPendingAirStrikeSidebarLabel(state, order) {
+  function formatPendingAirStrikeSidebarLabel(state, order, tacticalPositions) {
     const targetTypeLabel = order.targetType === "units" ? "units" : order.targetType === "urban" ? "urban" : order.targetType === "airport" ? "airport" : "seaport";
-    return `${formatDistanceLabelForPlannedAttack(state, order.unitId, order.targetH3Index)} (${targetTypeLabel})`;
+    return `${formatDistanceLabelForPlannedAttack(state, order.unitId, order.targetH3Index, tacticalPositions)} (${targetTypeLabel})`;
   }
-  function formatPendingFerryOrderSidebarLabel(state, order) {
-    if (!state) return "?h (ferry)";
-    const unit = state.units.find((u) => u.id === order.unitId);
-    if (!unit) return "?h (ferry)";
-    const ferryDistance = computeGridDistanceForLabel(unit.h3Index, order.destinationH3Index);
+  function formatPendingFerryOrderSidebarLabel(state, order, tacticalPositions) {
+    const originH3 = resolveAttackerH3ForOrderLabel(order.unitId, state, tacticalPositions);
+    if (!originH3) return "?h (ferry)";
+    const ferryDistance = computeGridDistanceForLabel(originH3, order.destinationH3Index);
     return `${ferryDistance == null ? "?" : ferryDistance}h (ferry)`;
   }
 
@@ -20006,6 +20000,7 @@
     const strikeTypeEl = document.getElementById("air-strike-target-type");
     const strikeCancelEl = document.getElementById("air-strike-cancel-btn");
     if (!listEl) return;
+    const tacticalPositions = rendererSharedState.tacticalBattleSnapshot?.subUnits;
     listEl.innerHTML = "";
     if (rendererSharedState.pendingRangedAttacks.length === 0) {
       const span = document.createElement("span");
@@ -20015,7 +20010,10 @@
     } else {
       for (const r of rendererSharedState.pendingRangedAttacks) {
         const row = deps.createSidebarOrderRow({
-          labelText: deps.formatUnitArrowLabel(r.unitId, formatPendingRangedAttackSidebarLabel(rendererSharedState.gameState, r)),
+          labelText: deps.formatUnitArrowLabel(
+            r.unitId,
+            formatPendingRangedAttackSidebarLabel(rendererSharedState.gameState, r, tacticalPositions)
+          ),
           selected: rendererSharedState.selectedUnitIds.includes(r.unitId),
           onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(r.unitId, event),
           onCancel: () => cancelRangedForUnit(r.unitId, deps),
@@ -20034,7 +20032,10 @@
       } else {
         for (const strike of rendererSharedState.pendingAirStrikes) {
           const row = deps.createSidebarOrderRow({
-            labelText: deps.formatUnitArrowLabel(strike.unitId, formatPendingAirStrikeSidebarLabel(rendererSharedState.gameState, strike)),
+            labelText: deps.formatUnitArrowLabel(
+              strike.unitId,
+              formatPendingAirStrikeSidebarLabel(rendererSharedState.gameState, strike, tacticalPositions)
+            ),
             selected: rendererSharedState.selectedUnitIds.includes(strike.unitId),
             onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(strike.unitId, event),
             onCancel: () => cancelAirStrikeForUnit(strike.unitId, deps),
@@ -20233,6 +20234,202 @@
     }
   }
 
+  // src/shared/pendingMovementSidebarLabels.ts
+  var TACTICAL_DRAFT_MARCH_DISPLAY_STATUS = "en_route";
+  function formatPendingMovementSidebarTargetLabel(distanceHexSteps, orderStatus) {
+    return `${distanceHexSteps}h (${orderStatus})`;
+  }
+  function formatTacticalDraftMarchPendingOrderTargetLabel(battle, subUnitId, destinationH3Index) {
+    const origin = battle.subUnits.find((u) => u.id === subUnitId)?.h3Index;
+    if (!origin) return formatPendingMovementSidebarTargetLabel(0, TACTICAL_DRAFT_MARCH_DISPLAY_STATUS);
+    try {
+      const steps = gridDistance(origin, destinationH3Index);
+      return formatPendingMovementSidebarTargetLabel(steps, TACTICAL_DRAFT_MARCH_DISPLAY_STATUS);
+    } catch {
+      return formatPendingMovementSidebarTargetLabel(0, TACTICAL_DRAFT_MARCH_DISPLAY_STATUS);
+    }
+  }
+
+  // src/renderer/gameplay/sidebarSupport.ts
+  function estimateHexesLeftForOrder(order) {
+    if (!Array.isArray(order.routeSegments) || order.routeSegments.length === 0) return 0;
+    let total = 0;
+    for (const segment of order.routeSegments) {
+      if (!Array.isArray(segment.hexes) || segment.hexes.length < 2) continue;
+      total += Math.max(0, segment.hexes.length - 1);
+    }
+    return total;
+  }
+  function isPendingMovementOrderForDisplay(order) {
+    return estimateHexesLeftForOrder(order) > 0;
+  }
+  function applySelectionFromSidebarUnitButton(unitId, event, deps) {
+    const useMultiSelect = event.ctrlKey || rendererSharedState.ctrlKeyActive;
+    if (useMultiSelect) {
+      deps.toggleUnitSelection(unitId);
+    } else {
+      deps.replaceSelection([unitId]);
+    }
+    deps.syncUiAfterSelectionChange();
+  }
+  function formatUnitArrowLabel(unitId, targetLabel, formatUnitDisplayName2) {
+    return `${formatUnitDisplayName2(unitId)} \u2192 ${targetLabel}`;
+  }
+  function formatPendingOrderSidebarLabel(order, formatUnitArrowLabelFn) {
+    return formatUnitArrowLabelFn(
+      order.unitId,
+      formatPendingMovementSidebarTargetLabel(estimateHexesLeftForOrder(order), order.status)
+    );
+  }
+  function formatKillToastLine(kill, formatDisplayUnitName) {
+    const killers = kill.killerIds.map((unitId) => formatDisplayUnitName(unitId)).join(", ");
+    return `${killers} destroyed ${formatDisplayUnitName(kill.victimId)}`;
+  }
+  function buildTacticalSubUnitKillLabelOverlay(args) {
+    const byId = /* @__PURE__ */ new Map();
+    for (const row of args.subUnitsBeforeCommit ?? []) {
+      byId.set(row.id, row.displayName);
+    }
+    for (const row of args.subUnitsAfterCommit ?? []) {
+      byId.set(row.id, row.displayName);
+    }
+    for (const u of args.removedUnits ?? []) {
+      if (u.displayName) byId.set(u.id, u.displayName);
+    }
+    return [...byId.entries()].map(([id, displayName]) => ({ id, displayName }));
+  }
+  function buildKillToastFormatterBundle(state, removedUnits, tacticalSubUnitsForKillLabels) {
+    const removedUnitsForDisplay = removedUnits ?? [];
+    const rosterFromRemoved = removedUnitsForDisplay.filter((u) => !u.displayName).map((u) => ({
+      id: u.id,
+      player: u.player,
+      unitType: u.unitType,
+      displayOrder: u.displayOrder
+    }));
+    const rosterForDisplay = [...state.units ?? [], ...rosterFromRemoved];
+    const displayNameById = buildUnitDisplayNameLookup(rosterForDisplay);
+    for (const u of removedUnitsForDisplay) {
+      if (u.displayName) displayNameById.set(u.id, u.displayName);
+    }
+    for (const row of tacticalSubUnitsForKillLabels ?? []) {
+      displayNameById.set(row.id, row.displayName);
+    }
+    const formatDisplayUnitName = (unitId) => displayNameById.get(unitId) ?? rendererSharedState.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
+    const formatKillLine = (kill) => formatKillToastLine(kill, formatDisplayUnitName);
+    return { formatUnitName: formatDisplayUnitName, formatKillLine };
+  }
+  function syncUiAfterSelectionChange(deps, options = {}) {
+    if (options.refreshHoverPreview !== false) {
+      void deps.refreshHoverRoutePreview();
+    }
+    deps.updateSidebar();
+    deps.updatePendingOrdersSidebar();
+    deps.updateRangedSidebar();
+    deps.refreshStackCalloutIfOpen();
+    deps.redraw();
+  }
+  function createSidebarOrderRow(args) {
+    const row = document.createElement("div");
+    row.style.display = "flex";
+    row.style.alignItems = "center";
+    row.style.gap = "0.5rem";
+    row.style.marginBottom = "0.35rem";
+    const label = document.createElement("span");
+    label.textContent = args.labelText;
+    label.style.flex = "1";
+    label.style.fontSize = "0.9em";
+    const selectBtn = document.createElement("button");
+    selectBtn.type = "button";
+    selectBtn.className = args.compactBlueButtons ? "unit-select compact-blue-btn compact-square-btn" : "unit-select";
+    selectBtn.textContent = args.selected ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
+    selectBtn.style.flexShrink = "0";
+    selectBtn.style.fontSize = "0.8em";
+    selectBtn.addEventListener("click", (event) => {
+      args.onToggleSelect(event);
+    });
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = args.compactBlueButtons ? "unit-select compact-blue-btn compact-square-btn" : "unit-select";
+    cancelBtn.textContent = "\xD7";
+    cancelBtn.style.flexShrink = "0";
+    cancelBtn.style.fontSize = "0.8em";
+    cancelBtn.addEventListener("click", args.onCancel);
+    row.appendChild(label);
+    row.appendChild(selectBtn);
+    row.appendChild(cancelBtn);
+    return row;
+  }
+  function updatePendingOrdersSidebar(deps) {
+    const container = document.getElementById("pending-orders-list");
+    if (!container) return;
+    container.innerHTML = "";
+    if (rendererSharedState.tacticalBattleSnapshot) {
+      if (rendererSharedState.tacticalPendingMarches.length === 0) {
+        const span = document.createElement("span");
+        span.textContent = "None";
+        span.style.color = "#666";
+        container.appendChild(span);
+        return;
+      }
+      for (const row of rendererSharedState.tacticalPendingMarches) {
+        const rowEl = deps.createSidebarOrderRow({
+          labelText: deps.formatUnitArrowLabel(
+            row.subUnitId,
+            formatTacticalDraftMarchPendingOrderTargetLabel(rendererSharedState.tacticalBattleSnapshot, row.subUnitId, row.destinationH3Index)
+          ),
+          selected: rendererSharedState.selectedUnitIds.includes(row.subUnitId),
+          onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(row.subUnitId, event),
+          onCancel: () => {
+            rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
+            deps.updatePendingOrdersSidebar?.();
+            deps.redraw?.();
+          },
+          compactBlueButtons: true
+        });
+        container.appendChild(rowEl);
+      }
+      return;
+    }
+    const pendingOrders = rendererSharedState.humanStandingOrders.filter((order) => deps.isPendingMovementOrderForDisplay(order));
+    if (pendingOrders.length === 0 && rendererSharedState.pendingFerryOrders.length === 0) {
+      const span = document.createElement("span");
+      span.textContent = "None";
+      span.style.color = "#666";
+      container.appendChild(span);
+      return;
+    }
+    for (const order of pendingOrders) {
+      const row = deps.createSidebarOrderRow({
+        labelText: deps.formatPendingOrderSidebarLabel(order),
+        selected: rendererSharedState.selectedUnitIds.includes(order.unitId),
+        onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(order.unitId, event),
+        onCancel: () => {
+          void deps.cancelOrderForUnit(order.unitId);
+        },
+        compactBlueButtons: true
+      });
+      container.appendChild(row);
+    }
+    for (const ferry of rendererSharedState.pendingFerryOrders) {
+      const row = deps.createSidebarOrderRow({
+        labelText: deps.formatUnitArrowLabel(ferry.unitId, formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry)),
+        selected: rendererSharedState.selectedUnitIds.includes(ferry.unitId),
+        onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(ferry.unitId, event),
+        onCancel: () => deps.cancelFerryForUnit(ferry.unitId),
+        compactBlueButtons: true
+      });
+      container.appendChild(row);
+    }
+  }
+  function showSidebarError(message, showMapToast2, clearSidebarError3) {
+    showMapToast2(message, { isError: true });
+    clearSidebarError3();
+  }
+  function clearSidebarError() {
+    const el = document.getElementById("sidebar-error");
+    if (el) el.style.display = "none";
+  }
+
   // src/renderer/gameplay/turnUpdateSummary.ts
   function formatCountLabel(value, singular, plural) {
     return `${value.toLocaleString()} ${value === 1 ? singular : plural}`;
@@ -20265,7 +20462,10 @@
     if (attempts <= 0) return null;
     const destroyedByFeature = { urban: 0, airport: 0, seaport: 0 };
     for (const event of readyResult.infrastructureDestroyedEvents ?? []) {
-      destroyedByFeature[event.targetType] += 1;
+      const rubbleCells = event.changedRubbleCount ?? 0;
+      if (event.targetType === "urban") destroyedByFeature.urban += rubbleCells;
+      else if (event.targetType === "airport") destroyedByFeature.airport += rubbleCells;
+      else if (event.targetType === "seaport") destroyedByFeature.seaport += rubbleCells;
     }
     const destroyedUnitsByType = { infantry: 0, armor: 0, naval: 0, air: 0 };
     const airLossUnitIds = [];
@@ -20308,6 +20508,11 @@
     if (knownReturnFire.length > 0) bullets.push(`\u2022 Return fire: ${knownReturnFire.map(formatKillLine).join("; ")}`);
     if (knownMeleeKills.length > 0) bullets.push(knownMeleeKills.map(formatKillLine).join("\n"));
     return bullets;
+  }
+
+  // src/shared/tacticalToastKillSlice.ts
+  function tacticalKillEdgesForStrategicStyleTurnUpdate(playback) {
+    return [...playback.killsByDirectFire ?? [], ...playback.killsByReturnFire ?? []];
   }
 
   // src/renderer/gameplay/readyHandler.ts
@@ -20394,18 +20599,32 @@
   }
   function buildTacticalCommitReadyResultForToast(playback) {
     const killsByDirectFire = playback.killsByDirectFire ?? [];
+    const killsByAirStrike = playback.killsByAirStrike ?? [];
     const killsByReturnFire = playback.killsByReturnFire ?? [];
-    const kills = [...killsByDirectFire, ...killsByReturnFire];
+    const killsWithoutAirStrike = tacticalKillEdgesForStrategicStyleTurnUpdate(playback);
+    const kills = killsWithoutAirStrike.length > 0 ? killsWithoutAirStrike : void 0;
+    const removedAll = playback.rangedRemovedUnits ?? [];
+    const airStrikeVictimIds = new Set(killsByAirStrike.map((k) => k.victimId));
+    const rangedVictimIds = new Set(killsByDirectFire.map((k) => k.victimId));
+    const airStrikeRemovedUnits = removedAll.filter((u) => {
+      if (airStrikeVictimIds.has(u.id)) return true;
+      if (u.player === "human" && u.unitType === "air" && !rangedVictimIds.has(u.id)) return true;
+      return false;
+    });
     return {
       success: true,
-      kills: kills.length > 0 ? kills : void 0,
+      kills,
       killsByDirectFire: killsByDirectFire.length > 0 ? killsByDirectFire : void 0,
+      killsByAirStrike: killsByAirStrike.length > 0 ? killsByAirStrike : void 0,
       killsByReturnFire: killsByReturnFire.length > 0 ? killsByReturnFire : void 0,
-      removedUnits: playback.rangedRemovedUnits,
+      removedUnits: removedAll.length > 0 ? removedAll : void 0,
       humanMoves: playback.humanMoves,
       rangedCombatHexes: playback.rangedCombatHexes,
       rangedCasualtyHexes: playback.rangedCasualtyHexes,
-      rangedRemovedUnits: playback.rangedRemovedUnits
+      rangedRemovedUnits: playback.rangedRemovedUnits,
+      airStrikeRemovedUnits: airStrikeRemovedUnits.length > 0 ? airStrikeRemovedUnits : void 0,
+      infrastructureDestroyedEvents: playback.infrastructureDestroyedEvents && playback.infrastructureDestroyedEvents.length > 0 ? playback.infrastructureDestroyedEvents : void 0,
+      airStrikeAttemptCount: playback.airStrikeAttemptCount
     };
   }
   function formatHexCount(label, count) {
@@ -20456,6 +20675,7 @@
           deps.updateReadyButtonState();
           return;
         }
+        const tacticalSubUnitsBeforeCommit = rendererSharedState.tacticalBattleSnapshot?.subUnits;
         if (commitResult.tacticalBattle) {
           rendererSharedState.tacticalBattleSnapshot = commitResult.tacticalBattle;
         }
@@ -20465,10 +20685,26 @@
         rendererSharedState.pendingFerryOrders = [];
         rendererSharedState.rangedModeActive = false;
         rendererSharedState.airStrikeModeActive = false;
+        if (window.gameApi?.getGameState) {
+          try {
+            const refreshedStrategic = await window.gameApi.getGameState();
+            await deps.applyGameStateSnapshot(refreshedStrategic, {
+              refreshStandingOrders: false,
+              updateGameStateSidebarUi: false,
+              updateSelectionUi: false,
+              updateGameOverUi: false,
+              updateReadyButton: false,
+              refreshBuildPopup: false,
+              redraw: false
+            });
+          } catch (err) {
+            console.error("tactical commit: failed to refresh strategic game state snapshot", err);
+          }
+        }
         const playback = commitResult.tacticalResolutionPlayback;
         const hasMoves = (playback?.humanMoves?.length ?? 0) > 0;
         const hasRangedPlayback = (playback?.rangedCombatHexes?.length ?? 0) > 0 || (playback?.rangedCasualtyHexes?.length ?? 0) > 0 || (playback?.rangedRemovedUnits?.length ?? 0) > 0;
-        const hasKillPlayback = (playback?.killsByDirectFire?.length ?? 0) > 0 || (playback?.killsByReturnFire?.length ?? 0) > 0;
+        const hasKillPlayback = (playback?.killsByDirectFire?.length ?? 0) > 0 || (playback?.killsByAirStrike?.length ?? 0) > 0 || (playback?.killsByReturnFire?.length ?? 0) > 0;
         const needsResolutionPlayback = hasMoves || hasRangedPlayback || hasKillPlayback;
         if (playback && needsResolutionPlayback) {
           if (rendererSharedState.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
@@ -20497,7 +20733,11 @@
           const killToastFormatter = deps.buildKillToastFormatterBundle(
             rendererSharedState.gameState,
             tacticalReadySlice.removedUnits,
-            rendererSharedState.tacticalBattleSnapshot?.subUnits
+            buildTacticalSubUnitKillLabelOverlay({
+              subUnitsBeforeCommit: tacticalSubUnitsBeforeCommit,
+              subUnitsAfterCommit: rendererSharedState.tacticalBattleSnapshot?.subUnits,
+              removedUnits: tacticalReadySlice.removedUnits
+            })
           );
           const bullets = buildTurnUpdateBullets({
             readyResult: tacticalReadySlice,
@@ -20529,6 +20769,7 @@
             deps.showMapToast(deps.formatUnknownBattleAnnouncement(unknownContinentNames), { isError: false });
           }
         }
+        await deps.refreshRes4TerrainOverridesForRenderer();
         deps.updatePendingOrdersSidebar();
         deps.updateRangedSidebar();
         deps.updateSidebar();
@@ -21389,7 +21630,10 @@
         destinationH3Index: destinationH3
       });
       if (!validation.success) {
-        deps.showMapToast(validation.reason ?? "Selected air units cannot ferry to that destination.", { isError: true });
+        deps.showMapToast(
+          deps.formatTargetingValidationReason(validation.reason, "Selected air units cannot ferry to that destination."),
+          { isError: true }
+        );
         return true;
       }
       deps.replacePendingFerryOrdersForSelected(selectedIds, destinationH3);
@@ -21406,7 +21650,10 @@
         destinationH3Index: destinationH3
       });
       if (!assign.success) {
-        deps.showMapToast(assign.reason ?? "Failed to assign movement order.", { isError: true });
+        deps.showMapToast(
+          deps.formatTargetingValidationReason(assign.reason, "Failed to assign movement order."),
+          { isError: true }
+        );
         return true;
       }
       if (rendererSharedState.tacticalBattleSnapshot) {
@@ -22058,189 +22305,6 @@
         rendererSharedState.lastRenderedVisibleEnemyByUnitId.delete(unitId);
       }
     }
-  }
-
-  // src/shared/pendingMovementSidebarLabels.ts
-  var TACTICAL_DRAFT_MARCH_DISPLAY_STATUS = "en_route";
-  function formatPendingMovementSidebarTargetLabel(distanceHexSteps, orderStatus) {
-    return `${distanceHexSteps}h (${orderStatus})`;
-  }
-  function formatTacticalDraftMarchPendingOrderTargetLabel(battle, subUnitId, destinationH3Index) {
-    const origin = battle.subUnits.find((u) => u.id === subUnitId)?.h3Index;
-    if (!origin) return formatPendingMovementSidebarTargetLabel(0, TACTICAL_DRAFT_MARCH_DISPLAY_STATUS);
-    try {
-      const steps = gridDistance(origin, destinationH3Index);
-      return formatPendingMovementSidebarTargetLabel(steps, TACTICAL_DRAFT_MARCH_DISPLAY_STATUS);
-    } catch {
-      return formatPendingMovementSidebarTargetLabel(0, TACTICAL_DRAFT_MARCH_DISPLAY_STATUS);
-    }
-  }
-
-  // src/renderer/gameplay/sidebarSupport.ts
-  function estimateHexesLeftForOrder(order) {
-    if (!Array.isArray(order.routeSegments) || order.routeSegments.length === 0) return 0;
-    let total = 0;
-    for (const segment of order.routeSegments) {
-      if (!Array.isArray(segment.hexes) || segment.hexes.length < 2) continue;
-      total += Math.max(0, segment.hexes.length - 1);
-    }
-    return total;
-  }
-  function isPendingMovementOrderForDisplay(order) {
-    return estimateHexesLeftForOrder(order) > 0;
-  }
-  function applySelectionFromSidebarUnitButton(unitId, event, deps) {
-    const useMultiSelect = event.ctrlKey || rendererSharedState.ctrlKeyActive;
-    if (useMultiSelect) {
-      deps.toggleUnitSelection(unitId);
-    } else {
-      deps.replaceSelection([unitId]);
-    }
-    deps.syncUiAfterSelectionChange();
-  }
-  function formatUnitArrowLabel(unitId, targetLabel, formatUnitDisplayName2) {
-    return `${formatUnitDisplayName2(unitId)} \u2192 ${targetLabel}`;
-  }
-  function formatPendingOrderSidebarLabel(order, formatUnitArrowLabelFn) {
-    return formatUnitArrowLabelFn(
-      order.unitId,
-      formatPendingMovementSidebarTargetLabel(estimateHexesLeftForOrder(order), order.status)
-    );
-  }
-  function formatKillToastLine(kill, formatDisplayUnitName) {
-    const killers = kill.killerIds.map((unitId) => formatDisplayUnitName(unitId)).join(", ");
-    return `${killers} destroyed ${formatDisplayUnitName(kill.victimId)}`;
-  }
-  function buildKillToastFormatterBundle(state, removedUnits, tacticalSubUnitsForKillLabels) {
-    const removedUnitsForDisplay = removedUnits ?? [];
-    const rosterFromRemoved = removedUnitsForDisplay.filter((u) => !u.displayName).map((u) => ({
-      id: u.id,
-      player: u.player,
-      unitType: u.unitType,
-      displayOrder: u.displayOrder
-    }));
-    const rosterForDisplay = [...state.units ?? [], ...rosterFromRemoved];
-    const displayNameById = buildUnitDisplayNameLookup(rosterForDisplay);
-    for (const u of removedUnitsForDisplay) {
-      if (u.displayName) displayNameById.set(u.id, u.displayName);
-    }
-    for (const row of tacticalSubUnitsForKillLabels ?? []) {
-      displayNameById.set(row.id, row.displayName);
-    }
-    const formatDisplayUnitName = (unitId) => displayNameById.get(unitId) ?? rendererSharedState.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
-    const formatKillLine = (kill) => formatKillToastLine(kill, formatDisplayUnitName);
-    return { formatUnitName: formatDisplayUnitName, formatKillLine };
-  }
-  function syncUiAfterSelectionChange(deps, options = {}) {
-    if (options.refreshHoverPreview !== false) {
-      void deps.refreshHoverRoutePreview();
-    }
-    deps.updateSidebar();
-    deps.updatePendingOrdersSidebar();
-    deps.updateRangedSidebar();
-    deps.refreshStackCalloutIfOpen();
-    deps.redraw();
-  }
-  function createSidebarOrderRow(args) {
-    const row = document.createElement("div");
-    row.style.display = "flex";
-    row.style.alignItems = "center";
-    row.style.gap = "0.5rem";
-    row.style.marginBottom = "0.35rem";
-    const label = document.createElement("span");
-    label.textContent = args.labelText;
-    label.style.flex = "1";
-    label.style.fontSize = "0.9em";
-    const selectBtn = document.createElement("button");
-    selectBtn.type = "button";
-    selectBtn.className = args.compactBlueButtons ? "unit-select compact-blue-btn compact-square-btn" : "unit-select";
-    selectBtn.textContent = args.selected ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
-    selectBtn.style.flexShrink = "0";
-    selectBtn.style.fontSize = "0.8em";
-    selectBtn.addEventListener("click", (event) => {
-      args.onToggleSelect(event);
-    });
-    const cancelBtn = document.createElement("button");
-    cancelBtn.type = "button";
-    cancelBtn.className = args.compactBlueButtons ? "unit-select compact-blue-btn compact-square-btn" : "unit-select";
-    cancelBtn.textContent = "\xD7";
-    cancelBtn.style.flexShrink = "0";
-    cancelBtn.style.fontSize = "0.8em";
-    cancelBtn.addEventListener("click", args.onCancel);
-    row.appendChild(label);
-    row.appendChild(selectBtn);
-    row.appendChild(cancelBtn);
-    return row;
-  }
-  function updatePendingOrdersSidebar(deps) {
-    const container = document.getElementById("pending-orders-list");
-    if (!container) return;
-    container.innerHTML = "";
-    if (rendererSharedState.tacticalBattleSnapshot) {
-      if (rendererSharedState.tacticalPendingMarches.length === 0) {
-        const span = document.createElement("span");
-        span.textContent = "None";
-        span.style.color = "#666";
-        container.appendChild(span);
-        return;
-      }
-      for (const row of rendererSharedState.tacticalPendingMarches) {
-        const rowEl = deps.createSidebarOrderRow({
-          labelText: deps.formatUnitArrowLabel(
-            row.subUnitId,
-            formatTacticalDraftMarchPendingOrderTargetLabel(rendererSharedState.tacticalBattleSnapshot, row.subUnitId, row.destinationH3Index)
-          ),
-          selected: rendererSharedState.selectedUnitIds.includes(row.subUnitId),
-          onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(row.subUnitId, event),
-          onCancel: () => {
-            rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
-            deps.updatePendingOrdersSidebar?.();
-            deps.redraw?.();
-          },
-          compactBlueButtons: true
-        });
-        container.appendChild(rowEl);
-      }
-      return;
-    }
-    const pendingOrders = rendererSharedState.humanStandingOrders.filter((order) => deps.isPendingMovementOrderForDisplay(order));
-    if (pendingOrders.length === 0 && rendererSharedState.pendingFerryOrders.length === 0) {
-      const span = document.createElement("span");
-      span.textContent = "None";
-      span.style.color = "#666";
-      container.appendChild(span);
-      return;
-    }
-    for (const order of pendingOrders) {
-      const row = deps.createSidebarOrderRow({
-        labelText: deps.formatPendingOrderSidebarLabel(order),
-        selected: rendererSharedState.selectedUnitIds.includes(order.unitId),
-        onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(order.unitId, event),
-        onCancel: () => {
-          void deps.cancelOrderForUnit(order.unitId);
-        },
-        compactBlueButtons: true
-      });
-      container.appendChild(row);
-    }
-    for (const ferry of rendererSharedState.pendingFerryOrders) {
-      const row = deps.createSidebarOrderRow({
-        labelText: deps.formatUnitArrowLabel(ferry.unitId, formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry)),
-        selected: rendererSharedState.selectedUnitIds.includes(ferry.unitId),
-        onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(ferry.unitId, event),
-        onCancel: () => deps.cancelFerryForUnit(ferry.unitId),
-        compactBlueButtons: true
-      });
-      container.appendChild(row);
-    }
-  }
-  function showSidebarError(message, showMapToast2, clearSidebarError3) {
-    showMapToast2(message, { isError: true });
-    clearSidebarError3();
-  }
-  function clearSidebarError() {
-    const el = document.getElementById("sidebar-error");
-    if (el) el.style.display = "none";
   }
 
   // src/renderer/renderer.ts

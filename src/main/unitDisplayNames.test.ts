@@ -5,9 +5,11 @@
 
 import * as assert from 'assert';
 import {
+  buildStrategicUnitDisplayLabelResolver,
   buildUnitDisplayNameLookup,
   fallbackDisplayNameFromUnitId,
   formatTacticalSubUnitDisplayName,
+  tacticalSubUnitLabelForUserMessage,
 } from '../shared/unitDisplayNames';
 
 /**
@@ -70,6 +72,39 @@ function testFormatTacticalSubUnitDisplayName(): void {
 }
 
 /**
+ * Defines the `testBuildStrategicResolverMatchesLookupAndFallback` function shape (function testBuildStrategicResolverMatchesLookupAndFallback(): void).
+
+ * Purpose: Locks `buildStrategicUnitDisplayLabelResolver` to the same labels as `buildUnitDisplayNameLookup`, with id-safe fallback for unknown roster rows.
+ * When to use: Regression guard when changing resolver wiring in submit-order or AI validation paths.
+ * Expected outcome: Known ids match lookup strings; unknown ids use `fallbackDisplayNameFromUnitId`.
+ * Exceptions: None.
+ */
+function testBuildStrategicResolverMatchesLookupAndFallback(): void {
+  const units = [{ id: 'human-infantry-1', unitType: 'infantry', displayOrder: 1 }];
+  const resolve = buildStrategicUnitDisplayLabelResolver(units);
+  assert.strictEqual(resolve('human-infantry-1'), '1st Infantry');
+  assert.strictEqual(resolve('human-infantry-99'), fallbackDisplayNameFromUnitId('human-infantry-99'));
+}
+
+/**
+ * Defines the `testTacticalSubUnitLabelForUserMessage` function shape (function testTacticalSubUnitLabelForUserMessage(): void).
+
+ * Purpose: Ensures tactical IPC/status strings can resolve `displayName` instead of raw sub-unit ids.
+ * When to use: Regression guard for `tacticalSubUnitLabelForUserMessage` used by tactical validation reasons.
+ * Expected outcome: Known id maps to display name; unknown id falls back to the id string.
+ * Exceptions: None.
+ */
+function testTacticalSubUnitLabelForUserMessage(): void {
+  const subUnits = [
+    { id: 'tb-x:human-naval-1:01', displayName: '1st Fleet (01)' },
+    { id: 'tb-x:human-naval-1:02', displayName: '  ' },
+  ];
+  assert.strictEqual(tacticalSubUnitLabelForUserMessage(subUnits, 'tb-x:human-naval-1:01'), '1st Fleet (01)');
+  assert.strictEqual(tacticalSubUnitLabelForUserMessage(subUnits, 'tb-x:human-naval-1:02'), 'tb-x:human-naval-1:02');
+  assert.strictEqual(tacticalSubUnitLabelForUserMessage(subUnits, 'missing'), 'missing');
+}
+
+/**
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Supports maintainability by documenting why `run` exists.
@@ -81,6 +116,8 @@ function run(): void {
   testBuildLookupUsesRomanNumeralsForAiAndOrdinalsForHuman();
   testFallbackUsesRomanNumeralsForAiAndLeavesUnknownIdsUntouched();
   testFormatTacticalSubUnitDisplayName();
+  testBuildStrategicResolverMatchesLookupAndFallback();
+  testTacticalSubUnitLabelForUserMessage();
   console.log('unitDisplayNames tests passed');
 }
 

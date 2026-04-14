@@ -514,8 +514,12 @@ function testAirStrikeAndAirGlyphContracts(): void {
   );
   assert.ok(
     tacticalOrdersSource.includes("from './orderLabelFormatting'") &&
-      tacticalOrdersSource.includes('formatPendingRangedAttackSidebarLabel(S.gameState, r)') &&
-      tacticalOrdersSource.includes('formatPendingAirStrikeSidebarLabel(S.gameState, strike)') &&
+      tacticalOrdersSource.includes(
+        'formatPendingRangedAttackSidebarLabel(S.gameState, r, tacticalPositions)'
+      ) &&
+      tacticalOrdersSource.includes(
+        'formatPendingAirStrikeSidebarLabel(S.gameState, strike, tacticalPositions)'
+      ) &&
       sidebarSupportSource.includes("from './orderLabelFormatting'") &&
       sidebarSupportSource.includes('formatPendingFerryOrderSidebarLabel(S.gameState, ferry)'),
     'planned order list labels should use shared order label formatting helpers'

@@ -5,6 +5,16 @@ import { isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession'
 import { validateAirStrikeOrder, validateFerryOrder } from './airValidation';
 
 /**
+ * Resolves a roster id to the same display label the renderer uses for tooltips and pending-order UI.
+ *
+ * Purpose: Duplicate-order and conflict reasons are shown to the player; they must not echo raw `human-infantry-1` ids.
+ * When to use: Injected once per `submitOrdersImpl` call alongside movement/ranged validators.
+ * Expected outcome: Stable per-turn labels derived from the same snapshot rows as strategic `buildUnitDisplayNameLookup`.
+ * Exceptions: None.
+ */
+type UnitDisplayLabelFn = (unitId: string) => string;
+
+/**
  * Documents the `SubmitOrdersResult` interface as a named contract surface (export interface SubmitOrdersResult).
 
  * Purpose: Supports maintainability by documenting why `SubmitOrdersResult` exists.
@@ -52,18 +62,27 @@ interface SubmitOrdersDeps {
    */
 validateOrder: (unitId: string, toH3Index: string) => { valid: true } | { valid: false; reason: string };
     /**
-   * Specifies the contract for the `validateRangedAttack` member (validateRangedAttack: ( unitId: string, targetH3Index: string, options?: { allowedPlayer?: 'human' | 'opponent' } ) => { valid: true } | { val).
+   * Specifies the contract for the `validateRangedAttack` member (validateRangedAttack: ( unitId: string, targetH3Index: string, options?: { allowedPlayer?: 'human' | 'opponent'; displayLabelForUnit?: (unitId: string) => string } ) => { valid: true } | { val).
 
    * Contract: Describes stable behavior for callers of `validateRangedAttack` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Expected outcome: `displayLabelForUnit` is forwarded so `Unit not found` reasons never echo raw roster ids.
    * Exceptions: None.
    */
 validateRangedAttack: (
     unitId: string,
     targetH3Index: string,
-    options?: { allowedPlayer?: 'human' | 'opponent' }
+    options?: { allowedPlayer?: 'human' | 'opponent'; displayLabelForUnit?: (unitId: string) => string }
   ) => { valid: true } | { valid: false; reason: string };
+    /**
+   * Specifies the contract for the `displayLabelForUnit` member (displayLabelForUnit: UnitDisplayLabelFn;).
+
+   * Contract: Maps strategic unit ids to player-facing labels for any user-visible reason string assembled in this module.
+   * When to use: Always supplied by `submitOrders` in `gameActions` from the current human-perspective roster.
+   * Expected outcome: Ordinal + type noun strings; never raw ids in duplicate or air/ferry conflict messages.
+   * Exceptions: None.
+   */
+displayLabelForUnit: UnitDisplayLabelFn;
     /**
    * Specifies the contract for the `humanPlayerId` member (humanPlayerId: string;).
 
@@ -121,7 +140,9 @@ export function submitOrdersImpl(payload: SubmitOrdersPayload, deps: SubmitOrder
 
     const seen = new Set<string>();
     for (const order of orders) {
-      if (seen.has(order.unitId)) return { success: false, reason: `Duplicate order for unit ${order.unitId}` };
+      if (seen.has(order.unitId)) {
+        return { success: false, reason: `Duplicate order for ${deps.displayLabelForUnit(order.unitId)}` };
+      }
       seen.add(order.unitId);
       const result = deps.validateOrder(order.unitId, order.toH3Index);
       if (!result.valid) return { success: false, reason: result.reason };
@@ -129,31 +150,49 @@ export function submitOrdersImpl(payload: SubmitOrdersPayload, deps: SubmitOrder
 
     const seenRanged = new Set<string>();
     for (const r of ranged) {
-      if (seenRanged.has(r.unitId)) return { success: false, reason: `Duplicate ranged order for unit ${r.unitId}` };
+      if (seenRanged.has(r.unitId)) {
+        return { success: false, reason: `Duplicate ranged order for ${deps.displayLabelForUnit(r.unitId)}` };
+      }
       seenRanged.add(r.unitId);
-      const result = deps.validateRangedAttack(r.unitId, r.targetH3Index, { allowedPlayer: 'human' });
+      const result = deps.validateRangedAttack(r.unitId, r.targetH3Index, {
+        allowedPlayer: 'human',
+        displayLabelForUnit: deps.displayLabelForUnit,
+      });
       if (!result.valid) return { success: false, reason: result.reason };
     }
 
     const seenAirStrike = new Set<string>();
     for (const s of airStrikes) {
-      if (seenAirStrike.has(s.unitId)) return { success: false, reason: `Duplicate strike order for unit ${s.unitId}` };
+      if (seenAirStrike.has(s.unitId)) {
+        return { success: false, reason: `Duplicate strike order for ${deps.displayLabelForUnit(s.unitId)}` };
+      }
       seenAirStrike.add(s.unitId);
-      const result = validateAirStrikeOrder(s.unitId, s.targetH3Index, s.targetType, { allowedPlayer: deps.humanPlayerId });
+      const result = validateAirStrikeOrder(s.unitId, s.targetH3Index, s.targetType, {
+        allowedPlayer: deps.humanPlayerId,
+        displayLabelForUnit: deps.displayLabelForUnit,
+      });
       if (!result.valid) return { success: false, reason: result.reason };
     }
 
     const seenFerry = new Set<string>();
     for (const f of ferryOrders) {
-      if (seenFerry.has(f.unitId)) return { success: false, reason: `Duplicate ferry order for unit ${f.unitId}` };
+      if (seenFerry.has(f.unitId)) {
+        return { success: false, reason: `Duplicate ferry order for ${deps.displayLabelForUnit(f.unitId)}` };
+      }
       seenFerry.add(f.unitId);
-      const result = validateFerryOrder(f.unitId, f.destinationH3Index, { allowedPlayer: deps.humanPlayerId });
+      const result = validateFerryOrder(f.unitId, f.destinationH3Index, {
+        allowedPlayer: deps.humanPlayerId,
+        displayLabelForUnit: deps.displayLabelForUnit,
+      });
       if (!result.valid) return { success: false, reason: result.reason };
     }
 
     for (const unitId of seenAirStrike) {
       if (seenFerry.has(unitId)) {
-        return { success: false, reason: `Air unit ${unitId} cannot strike and ferry in the same turn` };
+        return {
+          success: false,
+          reason: `Air unit ${deps.displayLabelForUnit(unitId)} cannot strike and ferry in the same turn`,
+        };
       }
     }
 
