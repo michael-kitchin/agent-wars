@@ -21,7 +21,6 @@ import type {
   ReadyResult,
   AirStrikeTargetType,
 } from '../../shared/ipcTypes';
-import { AIR_FERRY_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { resolveAirStrikePhase } from './airStrikeResolution';
 import {
   applyEmbarkOrdersForPlayer,
@@ -44,7 +43,7 @@ import {
 } from './meleeInterceptPendingState';
 import { collectTraversedHexesByPlayer } from './controlAndProduction';
 import { generateOrdersForStandingOrders } from '../tools/tool5StandingOrders';
-import { isWithinGridRangeSafe } from './gridRange';
+import { isWithinAirFerryGridRange } from './gridRange';
 
 /**
  * Planning identity constants injected from `gameActions` so this module stays free of duplicate literals.
@@ -254,7 +253,7 @@ export function executeReadyStrategicTurn(
     );
     if (!unit || unit.unit_type !== 'air') continue;
     const originH3Index = unit.h3_index;
-    const withinFerryRange = isWithinGridRangeSafe(originH3Index, ferry.destinationH3Index, AIR_FERRY_RANGE_HEXES, 'ready ferry');
+    const withinFerryRange = isWithinAirFerryGridRange(originH3Index, ferry.destinationH3Index, 'ready ferry');
     if (!withinFerryRange) continue;
     const destinationInfra = getRes1InfrastructureForHex(ferry.destinationH3Index);
     const destinationController = getHexController(ferry.destinationH3Index);

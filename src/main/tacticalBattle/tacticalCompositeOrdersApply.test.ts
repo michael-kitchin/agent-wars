@@ -10,13 +10,61 @@ import {
   projectTacticalSnapshotAfterValidatedHumanSupportOrders,
   projectTacticalSnapshotAfterValidatedOpponentOrders,
 } from './tacticalCompositeOrdersApply';
-import {
-  firstRingCellDistinctFrom,
-  tacticalRes1Cell,
-  tacticalRes4UnderRes1Corner,
-} from './testSupport/tacticalRes4HexFixtures';
+import { tacticalRes1Cell, tacticalRes4UnderRes1Corner } from './testSupport/tacticalRes4HexFixtures';
 import { dbRun } from '../gameDb';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
+
+test('composite apply strips naval ranged orders when implicit LOS crosses mountain res4', () => {
+  const res1 = tacticalRes1Cell(8, 9);
+  const h0 = tacticalRes4UnderRes1Corner(8, 9);
+  const ring = [...gridDisk(h0, 2)];
+  const inner = new Set(gridDisk(h0, 1));
+  const hFar = ring.find((h) => !inner.has(h));
+  if (!hFar) {
+    throw new Error('expected annulus cell in disk(h0,2) outside disk(h0,1)');
+  }
+  const terrain: Record<string, string> = {};
+  for (const h of ring) {
+    terrain[h] = 'mountain';
+  }
+  const navalCount = 3;
+  const snap: TacticalBattleSnapshot = {
+    battleId: 'tb-r-mtn',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: ring,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: terrain,
+    subUnits: [
+      ...Array.from({ length: navalCount }, (_, i) => ({
+        id: `opp-nm${i}`,
+        parentUnitId: `pnm${i}`,
+        player: 'opponent' as const,
+        unitType: 'naval' as const,
+        h3Index: h0,
+        displayName: `Fleet ${i + 1} (01)`,
+      })),
+      {
+        id: 'hum-m1',
+        parentUnitId: 'phm',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: hFar,
+        displayName: '1st Infantry (01)',
+      },
+    ],
+  };
+  const next = projectTacticalSnapshotAfterValidatedOpponentOrders(snap, {
+    movementOrders: [],
+    rangedAttacks: Array.from({ length: navalCount }, (_, i) => ({
+      unitId: `opp-nm${i}`,
+      targetH3Index: hFar,
+    })),
+  });
+  assert.equal(next.subUnits.some((u) => u.id === 'hum-m1'), true);
+});
 
 test('composite apply removes one human sub-unit per opponent ranged order', () => {
   const res1 = tacticalRes1Cell(8, 9);

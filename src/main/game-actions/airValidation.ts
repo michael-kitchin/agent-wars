@@ -10,7 +10,7 @@ import type { AirStrikeTargetType } from '../../shared/ipcTypes';
 import { fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES, formatFerryOutOfRangeReason, formatTargetOutOfRangeReason } from '../../shared/tacticalRanges';
 import { logTrace } from '../logger';
-import { isWithinGridRangeSafe } from './gridRange';
+import { isWithinAirFerryGridRange, isWithinAirStrikeGridRange } from './gridRange';
 
 /**
  * Documents the `ValidationResult` type alias (export type ValidationResult).
@@ -73,7 +73,7 @@ export function validateAirStrikeOrder(
   if (unit.unit_type !== 'air') return { valid: false, reason: 'Only air units can execute strikes' };
   if (!getMapHexSet().has(targetH3Index)) return { valid: false, reason: 'Target hex not on map' };
 
-  const withinStrikeRange = isWithinGridRangeSafe(unit.h3_index, targetH3Index, AIR_STRIKE_RANGE_HEXES, 'validateAirStrikeOrder');
+  const withinStrikeRange = isWithinAirStrikeGridRange(unit.h3_index, targetH3Index, 'validateAirStrikeOrder');
   if (!withinStrikeRange) return { valid: false, reason: formatTargetOutOfRangeReason(unit.unit_type, AIR_STRIKE_RANGE_HEXES) };
 
   const baseInfrastructure = getRes1InfrastructureForHex(unit.h3_index);
@@ -128,7 +128,7 @@ export function validateFerryOrder(
   if (unit.player !== allowedPlayer) return { valid: false, reason: `Unit must belong to ${allowedPlayer}` };
   if (unit.unit_type !== 'air') return { valid: false, reason: 'Only air units can ferry' };
   if (!getMapHexSet().has(destinationH3Index)) return { valid: false, reason: 'Destination hex not on map' };
-  const withinFerryRange = isWithinGridRangeSafe(unit.h3_index, destinationH3Index, AIR_FERRY_RANGE_HEXES, 'validateFerryOrder');
+  const withinFerryRange = isWithinAirFerryGridRange(unit.h3_index, destinationH3Index, 'validateFerryOrder');
   if (!withinFerryRange) return { valid: false, reason: formatFerryOutOfRangeReason(AIR_FERRY_RANGE_HEXES) };
   const origin = getRes1InfrastructureForHex(unit.h3_index);
   if (origin.airportCount <= 0) return { valid: false, reason: 'Origin airport is not intact' };

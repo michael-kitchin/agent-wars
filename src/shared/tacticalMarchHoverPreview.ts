@@ -6,7 +6,6 @@
 import { cellToLatLng, getResolution, gridDistance } from 'h3-js';
 import {
   buildHumanOrderGroupPreviewEnvelope,
-  minMovementRangeAmongUnitTypes,
   representativeTacticalMarchPreviewUnitIdsByOriginH3,
   uniqueTacticalMarchPreviewUnitIds,
 } from './humanMarchPreviewGroupAssembly';
@@ -17,7 +16,7 @@ import type {
   HumanOrderPreviewResult,
 } from './ipc/humanOrderPreviewTypes';
 import { planTacticalRes4March } from './tacticalRes4MovementPlanner';
-import { MOVEMENT_RANGE_BY_UNIT_TYPE } from './tacticalRanges';
+import { effectiveTacticalMovementPointBudgetForMarchLeg } from './tacticalTerrainCombatModifiers';
 import {
   buildTacticalTerrainKindResolverFromSnapshot,
   tacticalMovementUnitTypeForPathfinding,
@@ -118,7 +117,7 @@ function buildPreviewForSubUnit(args: {
   if (moveType === 'air') {
     return { valid: false, showInvalidMarker: true, invalidReason: 'Air units do not use tactical march', segments: [] };
   }
-  const budget = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[sub.unitType] ?? 1;
+  const budget = effectiveTacticalMovementPointBudgetForMarchLeg(args.battle, sub, args.battle.subUnits, moveType);
   const terrain = buildTacticalTerrainKindResolverFromSnapshot(args.battle);
   ensureTacticalHoverPlanMemo(args.battle);
   const memoKey = `${args.unitId}|${origin}|${args.hoveredH3Index}|${moveType}|${budget}`;
@@ -213,13 +212,35 @@ export function buildTacticalMarchHoverPreview(
       res4Set,
     }),
   }));
-  const slowestMovementRange = minMovementRangeAmongUnitTypes(
-    previewUnitIds.map((id) => {
-      const u = battle.subUnits.find((s) => s.id === id);
-      return u ? tacticalMovementUnitTypeForPathfinding(u, hoveredH3Index) : 'infantry';
-    }),
-    MOVEMENT_RANGE_BY_UNIT_TYPE,
-    1
-  );
+  const budgets = previewUnitIds.map((id) => {
+    const u = battle.subUnits.find((s) => s.id === id);
+    if (!u) return 1;
+    const moveType = tacticalMovementUnitTypeForPathfinding(u, hoveredH3Index);
+    return effectiveTacticalMovementPointBudgetForMarchLeg(battle, u, battle.subUnits, moveType);
+  });
+  const slowestMovementRange = budgets.length > 0 ? Math.min(...budgets) : 0;
   return buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange });
+}
+
+/**
+ * Builds a single human sub-unit march preview toward a drafted destination cell for tactical overlay rendering.
+ *
+ * Purpose: Reuses the same res4 terrain-aware planner as hover (`planTacticalRes4March`) so solid pending-Ready
+ * march lines match the route execution and hover preview; avoids geometric `gridPathCells` polylines that ignore terrain costs.
+ * When to use: Renderer only (e.g. `drawTacticalPendingMarchPlanLines`); main-process commit validation remains authoritative.
+ * Expected outcome: `segments` mirror `buildTacticalMarchHoverPreview` for one unit and destination; unreachable legs yield `valid: false` with empty segments.
+ * Exceptions: None; non-marchable units and out-of-footprint targets return invalid previews without throwing.
+ */
+export function buildTacticalMarchDraftDestinationPreview(
+  battle: TacticalBattleSnapshot,
+  subUnitId: string,
+  destinationH3Index: string
+): HumanOrderPreviewResult {
+  const res4Set = new Set(battle.res4ChildH3Indexes);
+  return buildPreviewForSubUnit({
+    battle,
+    unitId: subUnitId,
+    hoveredH3Index: destinationH3Index,
+    res4Set,
+  });
 }

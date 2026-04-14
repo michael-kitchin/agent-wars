@@ -480,6 +480,9 @@
       box-shadow: 0 1px 4px rgba(0,0,0,0.15);
     }
     .hex-tooltip.hidden { display: none; }
+    #order-block-tooltip {
+      z-index: 6450;
+    }
     .build-entry-layer {
       position: absolute;
       inset: 0;
@@ -816,6 +819,7 @@
     <div id="minimap" aria-label="World overview"></div>
     <div id="terrain-legend" aria-label="Terrain legend"></div>
     <div id="hex-tooltip" class="hex-tooltip hidden" aria-hidden="true"></div>
+    <div id="order-block-tooltip" class="hex-tooltip order-block-hex-tooltip hidden" aria-hidden="true"></div>
     <div id="build-entry-layer" class="build-entry-layer hidden" aria-hidden="true"></div>
     <div id="tactical-entry-layer" class="tactical-entry-layer hidden" aria-hidden="true"></div>
     <div id="build-popup" class="build-popup hidden" aria-hidden="true" role="dialog" aria-label="Build queue">

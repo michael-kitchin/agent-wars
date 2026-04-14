@@ -26,6 +26,7 @@ import type {
   FerryOrder,
   AirStrikeTargetType,
   TacticalCommitResolutionPlayback,
+  TacticalOpponentPlanPayload,
   SealiftStackState,
   GameStateSnapshot,
 } from '../shared/ipcTypes';
@@ -43,14 +44,18 @@ import {
   cancelHumanStandingOrder,
   queryHumanStandingOrders,
 } from './tools/tool5StandingOrders';
+import { mergeHumanStandingOrdersIntoTacticalMarchOrders } from './tacticalBattle/tacticalStandingOrderMarchMerge';
+import { validateHumanTacticalMarchOrders } from './tacticalBattle/tacticalBattleSession';
 import type { BuildUnitType } from './productionRules';
-import { MOVEMENT_RANGE_BY_UNIT_TYPE, RANGED_RANGE_BY_UNIT_TYPE, formatTargetOutOfRangeReason } from '../shared/tacticalRanges';
+import { MOVEMENT_RANGE_BY_UNIT_TYPE, formatTargetOutOfRangeReason } from '../shared/tacticalRanges';
+import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../shared/tacticalTerrainCombatModifiers';
 import { tacticalMovementUnitTypeForPathfinding } from '../shared/tacticalTerrainMovement';
 import {
   buildStrategicUnitDisplayLabelResolver,
   fallbackDisplayNameFromUnitId,
   tacticalSubUnitLabelForUserMessage,
 } from '../shared/unitDisplayNames';
+import { validateTacticalGroupRangedTarget } from './game-actions/tacticalGroupRangedTargetValidation';
 import { validateAirStrikeOrder, validateFerryOrder } from './game-actions/airValidation';
 import { validateTacticalHumanAirStrikeGroup } from './game-actions/tacticalHumanAirStrikeValidation';
 import { isWithinGridRangeSafe } from './game-actions/gridRange';
@@ -87,6 +92,9 @@ import {
   isTacticalBattleActive,
 } from './tacticalBattle/tacticalBattleSession';
 import { tacticalMarchFirstStopAlongPath } from './tacticalBattle/tacticalRulesAdapter';
+import { validateTacticalOpponentEmbarkOrder } from './tacticalBattle/tacticalOpponentOrderValidation';
+import { projectTacticalSnapshotAfterOpponentMovementOrders } from './tacticalBattle/tacticalMovementApply';
+import { tacticalComputeMovementOrderOutcome } from './tacticalBattle/tacticalSnapshotGuards';
 import { ready as readyImpl, resolveMeleeIntercept as resolveMeleeInterceptImpl } from './game-actions/gameActionsReadyEntrypoints';
 import { validateHumanMarchOrdersWhenTacticalActive } from './game-actions/tacticalMarchOrderGuards';
 
@@ -662,6 +670,73 @@ function clearEmbarkAssignmentForIndependentLandMove(unitId: string, destination
 }
 
 /**
+ * Re-validates a buffered opponent tactical draft against the current committed snapshot before merging it into a Ready beat.
+ *
+ * Purpose: Prevents applying AI orders that were valid at consultation time but are illegal after human sealift edits or snapshot drift; mirrors tactical branch checks in `requestOrdersFlow` without re-invoking the model.
+ * When to use: `commitHumanTacticalDraftOrders` after human targeting validation and before `applyHumanTacticalDraftBeatInStrategicOrder`.
+ * Expected outcome: `success: true` when every opponent row passes the same tactical footprint and strike rules as group validation helpers.
+ * Exceptions: None; returns `success: false` with a human-readable reason on first failure.
+ */
+function validateOpponentTacticalDraftForReadyCommit(
+  preBattle: TacticalBattleSnapshot,
+  draft: TacticalOpponentPlanPayload | undefined
+): SubmitOrdersResult {
+  logDebug('gameActions validateOpponentTacticalDraftForReadyCommit', {
+    movementCount: draft?.movementOrders.length ?? 0,
+    rangedCount: draft?.rangedAttacks.length ?? 0,
+    airCount: draft?.airStrikes.length ?? 0,
+    ferryCount: draft?.ferryOrders.length ?? 0,
+    embarkCount: draft?.embarkOrders.length ?? 0,
+  });
+  if (!draft) return { success: true };
+  const res4Set = new Set(preBattle.res4ChildH3Indexes);
+  const sub = [...preBattle.subUnits];
+  const byId = new Map(sub.map((u, i) => [u.id, i] as const));
+  for (const o of draft.movementOrders) {
+    const outcome = tacticalComputeMovementOrderOutcome({
+      byId,
+      sub,
+      order: o,
+      res4Set,
+      battle: preBattle,
+    });
+    if (!outcome.ok) {
+      return {
+        success: false,
+        reason: `Opponent march is no longer valid (${outcome.reason}). Request fresh AI orders.`,
+      };
+    }
+  }
+  for (const r of draft.rangedAttacks) {
+    const checked = validateGroupRangedTarget([r.unitId], r.targetH3Index, { tacticalAttackerPlayer: 'opponent' });
+    if (!checked.success) return checked;
+  }
+  const strikeUnitIds = new Set(draft.airStrikes.map((a) => a.unitId));
+  for (const a of draft.airStrikes) {
+    const checked = validateGroupAirStrikeTarget([a.unitId], a.targetH3Index, a.targetType, {
+      tacticalAttackerPlayer: 'opponent',
+    });
+    if (!checked.success) return checked;
+  }
+  for (const f of draft.ferryOrders) {
+    if (strikeUnitIds.has(f.unitId)) {
+      return { success: false, reason: 'Opponent cannot strike and ferry the same air unit in one tactical turn.' };
+    }
+    const checked = validateGroupFerryTarget([f.unitId], f.destinationH3Index, { tacticalAttackerPlayer: 'opponent' });
+    if (!checked.success) return checked;
+  }
+  const projected =
+    draft.movementOrders.length > 0
+      ? projectTacticalSnapshotAfterOpponentMovementOrders(preBattle, draft.movementOrders)
+      : preBattle;
+  for (const e of draft.embarkOrders) {
+    const er = validateTacticalOpponentEmbarkOrder(e, projected.subUnits);
+    if (!er.valid) return { success: false, reason: er.reason };
+  }
+  return { success: true };
+}
+
+/**
  * Commits queued human tactical draft orders from the renderer into the active tactical snapshot.
  *
  * Purpose: Tactical parity with strategic Ready by applying all tactical draft types in one commit boundary.
@@ -675,6 +750,7 @@ export function commitHumanTacticalDraftOrders(args: {
   airStrikes?: readonly AirStrikeOrder[];
   ferryOrders?: readonly FerryOrder[];
   embarkOrders?: readonly EmbarkOrder[];
+  opponentTacticalDraft?: TacticalOpponentPlanPayload;
 }): SubmitOrdersResult {
   logDebug('gameActions commitHumanTacticalDraftOrders', {
     movementCount: args.movementOrders.length,
@@ -682,6 +758,7 @@ export function commitHumanTacticalDraftOrders(args: {
     airCount: args.airStrikes?.length ?? 0,
     ferryCount: args.ferryOrders?.length ?? 0,
     embarkCount: args.embarkOrders?.length ?? 0,
+    opponentMovementCount: args.opponentTacticalDraft?.movementOrders.length ?? 0,
   });
   try {
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
@@ -702,6 +779,18 @@ export function commitHumanTacticalDraftOrders(args: {
     if (!preBattle) {
       return { success: false, reason: 'No tactical battle is active.' };
     }
+    const oppDraftCheck = validateOpponentTacticalDraftForReadyCommit(preBattle, args.opponentTacticalDraft);
+    if (!oppDraftCheck.success) return oppDraftCheck;
+    const effectiveHumanMarches = mergeHumanStandingOrdersIntoTacticalMarchOrders(preBattle, args.movementOrders);
+    logDebug('gameActions commitHumanTacticalDraftOrders standing-order march merge', {
+      explicitMarchCount: args.movementOrders.length,
+      effectiveMarchCount: effectiveHumanMarches.length,
+    });
+    const mergedMarchCheck = validateHumanTacticalMarchOrders(effectiveHumanMarches);
+    if (!mergedMarchCheck.success) {
+      logDebug('gameActions commitHumanTacticalDraftOrders rejected merged marches', { reason: mergedMarchCheck.reason });
+      return mergedMarchCheck;
+    }
     const res4Set = new Set(preBattle.res4ChildH3Indexes);
     const terrainBattle = {
       battleId: preBattle.battleId,
@@ -711,16 +800,18 @@ export function commitHumanTacticalDraftOrders(args: {
       strategicHexTerrain: preBattle.strategicHexTerrain,
       strategicHexTerrainKind: preBattle.strategicHexTerrainKind,
       ...(preBattle.res4IsSeaportByH3 ? { res4IsSeaportByH3: preBattle.res4IsSeaportByH3 } : {}),
+      ...(preBattle.res4IsUrbanByH3 ? { res4IsUrbanByH3: preBattle.res4IsUrbanByH3 } : {}),
+      ...(preBattle.res4IsRubbleByH3 ? { res4IsRubbleByH3: preBattle.res4IsRubbleByH3 } : {}),
     };
     const appliedMovementOrders: { unitId: string; toH3Index: string }[] = [];
     const tacticalMarchContinuations: { subUnitId: string; destinationH3Index: string }[] = [];
-    for (const o of args.movementOrders) {
+    for (const o of effectiveHumanMarches) {
       const sub = preBattle.subUnits.find((u) => u.id === o.unitId);
       if (!sub || sub.player !== 'human') continue;
       const from = sub.h3Index;
       if (from === o.toH3Index) continue;
       const moveType = tacticalMovementUnitTypeForPathfinding(sub, o.toH3Index);
-      const maxEdges = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[sub.unitType] ?? 1;
+      const maxEdges = effectiveTacticalMovementPointBudgetForMarchLeg(terrainBattle, sub, preBattle.subUnits, moveType);
       if (maxEdges <= 0) {
         appliedMovementOrders.push({ unitId: o.unitId, toH3Index: o.toH3Index });
         continue;
@@ -746,6 +837,7 @@ export function commitHumanTacticalDraftOrders(args: {
       airStrikes: args.airStrikes,
       ferryOrders: args.ferryOrders,
       embarkOrders: args.embarkOrders,
+      opponentTacticalDraft: args.opponentTacticalDraft,
     });
     if (!beat.success) {
       logDebug('gameActions commitHumanTacticalDraftOrders rejected beat', { reason: beat.reason });
@@ -763,13 +855,13 @@ export function commitHumanTacticalDraftOrders(args: {
     const meleePack = beat.meleePack;
     const finalBattle = beat.battle;
     const humanMoves: TacticalCommitResolutionPlayback['humanMoves'] = [];
-    for (const o of args.movementOrders) {
+    for (const o of effectiveHumanMarches) {
       const sub = preBattle.subUnits.find((u) => u.id === o.unitId);
       if (!sub || sub.player !== 'human') continue;
       const from = sub.h3Index;
       if (from === o.toH3Index) continue;
       const moveType = tacticalMovementUnitTypeForPathfinding(sub, o.toH3Index);
-      const maxEdges = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[sub.unitType] ?? 1;
+      const maxEdges = effectiveTacticalMovementPointBudgetForMarchLeg(terrainBattle, sub, preBattle.subUnits, moveType);
       if (maxEdges <= 0) {
         humanMoves.push({ unitId: o.unitId, fromH3Index: from, toH3Index: o.toH3Index });
         continue;
@@ -791,6 +883,25 @@ export function commitHumanTacticalDraftOrders(args: {
       if (u.h3Index === f.destinationH3Index) continue;
       humanMoves.push({ unitId: f.unitId, fromH3Index: u.h3Index, toH3Index: f.destinationH3Index });
     }
+    const od = args.opponentTacticalDraft;
+    const opponentMoves: NonNullable<TacticalCommitResolutionPlayback['opponentMoves']> = [];
+    if (od) {
+      for (const o of od.movementOrders) {
+        const su = preBattle.subUnits.find((u) => u.id === o.unitId);
+        if (!su || su.player !== 'opponent') continue;
+        const from = su.h3Index;
+        if (from === o.toH3Index) continue;
+        const after = postMovementBattle.subUnits.find((u) => u.id === o.unitId);
+        const to = after?.h3Index ?? o.toH3Index;
+        if (from !== to) opponentMoves.push({ unitId: o.unitId, fromH3Index: from, toH3Index: to });
+      }
+      for (const f of od.ferryOrders) {
+        const u = postMovementBattle.subUnits.find((x) => x.id === f.unitId);
+        if (!u || u.unitType !== 'air' || u.player !== 'opponent') continue;
+        if (u.h3Index === f.destinationH3Index) continue;
+        opponentMoves.push({ unitId: f.unitId, fromH3Index: u.h3Index, toH3Index: f.destinationH3Index });
+      }
+    }
     const rangedRemovedUnits = support.removedUnits;
     const rangedCombatHexSet = new Set<string>();
     for (const r of args.rangedAttacks ?? []) {
@@ -799,11 +910,18 @@ export function commitHumanTacticalDraftOrders(args: {
     for (const a of args.airStrikes ?? []) {
       rangedCombatHexSet.add(a.targetH3Index);
     }
+    for (const r of od?.rangedAttacks ?? []) {
+      rangedCombatHexSet.add(r.targetH3Index);
+    }
+    for (const a of od?.airStrikes ?? []) {
+      rangedCombatHexSet.add(a.targetH3Index);
+    }
     const rangedCombatHexes = [...rangedCombatHexSet];
     const casualtyHexSet = new Set(rangedRemovedUnits.map((v) => v.h3Index));
     const rangedCasualtyHexes = rangedCombatHexes.filter((h) => casualtyHexSet.has(h));
     const tacticalResolutionPlayback: TacticalCommitResolutionPlayback = {
       humanMoves,
+      opponentMoves: opponentMoves.length > 0 ? opponentMoves : undefined,
       rangedCombatHexes: rangedCombatHexes.length > 0 ? rangedCombatHexes : undefined,
       rangedCasualtyHexes: rangedCasualtyHexes.length > 0 ? rangedCasualtyHexes : undefined,
       rangedRemovedUnits: rangedRemovedUnits.length > 0 ? rangedRemovedUnits : undefined,
@@ -1014,8 +1132,17 @@ export function cancelHumanOrder(unitId: string): SubmitOrdersResult {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function validateGroupRangedTarget(unitIds: string[], targetH3Index: string): SubmitOrdersResult {
-  logDebug('gameActions validateGroupRangedTarget', { unitCount: unitIds.length, targetH3Index });
+export function validateGroupRangedTarget(
+  unitIds: string[],
+  targetH3Index: string,
+  opts?: { tacticalAttackerPlayer?: 'human' | 'opponent' }
+): SubmitOrdersResult {
+  const tacticalAttackerPlayer = opts?.tacticalAttackerPlayer ?? 'human';
+  logDebug('gameActions validateGroupRangedTarget', {
+    unitCount: unitIds.length,
+    targetH3Index,
+    tacticalAttackerPlayer,
+  });
   try {
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
     const uniqueUnitIds = getUniqueNonEmptyIds(unitIds);
@@ -1023,27 +1150,12 @@ export function validateGroupRangedTarget(unitIds: string[], targetH3Index: stri
     if (isTacticalBattleActive()) {
       const snap = getActiveTacticalBattleSnapshot();
       if (!snap) return { success: false, reason: 'No tactical battle is active.' };
-      const footprint = new Set(snap.res4ChildH3Indexes);
-      if (!footprint.has(targetH3Index)) return { success: false, reason: 'Target is outside the tactical battle.' };
-      for (const unitId of uniqueUnitIds) {
-        const label = tacticalSubUnitLabelForUserMessage(snap.subUnits, unitId);
-        const unit = snap.subUnits.find((u) => u.id === unitId);
-        if (!unit || unit.player !== HUMAN_PLAYER_ID) {
-          return { success: false, reason: `${label}: Unit not in tactical battle.` };
-        }
-        const range = RANGED_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 0;
-        if (range < 1) return { success: false, reason: `${label}: Unit has no ranged attack.` };
-        if (!isWithinGridRangeSafe(unit.h3Index, targetH3Index, range, 'validateGroupRangedTarget tactical')) {
-          return { success: false, reason: `${label}: Target out of range.` };
-        }
-      }
-      const enemiesAtTarget = snap.subUnits.filter(
-        (u) => u.h3Index === targetH3Index && u.player !== HUMAN_PLAYER_ID
-      );
-      if (enemiesAtTarget.length === 0) {
-        return { success: false, reason: 'Target hex has no enemy units' };
-      }
-      return { success: true };
+      return validateTacticalGroupRangedTarget({
+        snap,
+        uniqueUnitIds,
+        targetH3Index,
+        tacticalAttackerPlayer,
+      }) as SubmitOrdersResult;
     }
     const strategicLabel = buildStrategicUnitDisplayLabelResolver(humanPerspectiveStateSnapshot().units);
     for (const unitId of uniqueUnitIds) {
@@ -1073,9 +1185,16 @@ export function validateGroupRangedTarget(unitIds: string[], targetH3Index: stri
 export function validateGroupAirStrikeTarget(
   unitIds: string[],
   targetH3Index: string,
-  targetType: AirStrikeTargetType
+  targetType: AirStrikeTargetType,
+  opts?: { tacticalAttackerPlayer?: 'human' | 'opponent' }
 ): SubmitOrdersResult {
-  logDebug('gameActions validateGroupAirStrikeTarget', { unitCount: unitIds.length, targetH3Index, targetType });
+  const tacticalAttackerPlayer = opts?.tacticalAttackerPlayer ?? 'human';
+  logDebug('gameActions validateGroupAirStrikeTarget', {
+    unitCount: unitIds.length,
+    targetH3Index,
+    targetType,
+    tacticalAttackerPlayer,
+  });
   try {
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
     const uniqueUnitIds = getUniqueNonEmptyIds(unitIds);
@@ -1083,7 +1202,13 @@ export function validateGroupAirStrikeTarget(
     if (isTacticalBattleActive()) {
       const snap = getActiveTacticalBattleSnapshot();
       if (!snap) return { success: false, reason: 'No tactical battle is active.' };
-      const tacticalCheck = validateTacticalHumanAirStrikeGroup(snap, uniqueUnitIds, targetH3Index, targetType);
+      const tacticalCheck = validateTacticalHumanAirStrikeGroup(
+        snap,
+        uniqueUnitIds,
+        targetH3Index,
+        targetType,
+        tacticalAttackerPlayer
+      );
       if (!tacticalCheck.success) return tacticalCheck;
       return { success: true };
     }
@@ -1110,8 +1235,17 @@ export function validateGroupAirStrikeTarget(
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function validateGroupFerryTarget(unitIds: string[], destinationH3Index: string): SubmitOrdersResult {
-  logDebug('gameActions validateGroupFerryTarget', { unitCount: unitIds.length, destinationH3Index });
+export function validateGroupFerryTarget(
+  unitIds: string[],
+  destinationH3Index: string,
+  opts?: { tacticalAttackerPlayer?: 'human' | 'opponent' }
+): SubmitOrdersResult {
+  const tacticalAttackerPlayer = opts?.tacticalAttackerPlayer ?? 'human';
+  logDebug('gameActions validateGroupFerryTarget', {
+    unitCount: unitIds.length,
+    destinationH3Index,
+    tacticalAttackerPlayer,
+  });
   try {
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
     const uniqueUnitIds = getUniqueNonEmptyIds(unitIds);
@@ -1124,7 +1258,7 @@ export function validateGroupFerryTarget(unitIds: string[], destinationH3Index: 
       for (const unitId of uniqueUnitIds) {
         const label = tacticalSubUnitLabelForUserMessage(snap.subUnits, unitId);
         const unit = snap.subUnits.find((u) => u.id === unitId);
-        if (!unit || unit.player !== HUMAN_PLAYER_ID) {
+        if (!unit || unit.player !== tacticalAttackerPlayer) {
           return { success: false, reason: `${label}: Unit not in tactical battle.` };
         }
         if (unit.unitType !== 'air') return { success: false, reason: `${label}: Only air units can ferry.` };

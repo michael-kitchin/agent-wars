@@ -20,6 +20,8 @@ This plan begins after milestone 0.5 and incorporates the hybrid AI architecture
 
 **Map resolution decision (settled).** The game uses two H3 zoom levels: global (H3 resolution 1, ~842 hexes at ~610,000 km² each) and tactical (H3 resolution 4, ~343 hexes per global hex at ~1,770 km² each, ~42 km edge-to-edge). This was determined by a rendering performance budget of ~400 hexes on screen. Phase 1 builds the complete game at the global level. Phase 2 adds optional tactical battles at res 4 when opposing units share a res1 hex, plus session persistence. The earlier goal of 1 km² hex resolution has been set aside — res 4's ~42 km hexes provide division-scale tactical play, which is the right grain for the Axis & Allies-inspired unit interactions in the game vision.
 
+**Tactical vs strategic turn resolution.** Ordering, playback parity, reconciliation, and **Phase 5** human march merge (standing orders previewed without DB mutation, then merged at tactical Ready) are documented in [tactical-strategic-turn-resolution-alignment-plan.md](tactical-strategic-turn-resolution-alignment-plan.md), with a focused audit of res1/res4 infrastructure reconciliation in [tactical-infra-reconciliation-audit.md](tactical-infra-reconciliation-audit.md).
+
 ---
 
 ## Planning Assumptions

@@ -9,7 +9,7 @@ import { AIR_FERRY_RANGE_HEXES, formatFerryOutOfRangeReason } from '../../shared
 import { tacticalSubUnitLabelForUserMessage } from '../../shared/unitDisplayNames';
 import { dbGetOne, getHexController, getRes1InfrastructureForHex, isDbReady } from '../gameDb';
 import { normalizeMovementTerrain } from '../movementTerrain';
-import { isWithinGridRangeSafe } from '../game-actions/gridRange';
+import { isWithinAirFerryGridRange } from '../game-actions/gridRange';
 import { tacticalLogQuery } from './tacticalLogging';
 import { tacticalInvalidResult, tacticalValidResult, type TacticalValidationResult } from './tacticalValidationResult';
 
@@ -115,7 +115,7 @@ export function validateTacticalOpponentFerryOrder(
   if (unit.unitType !== 'air') return tacticalInvalidResult('Only air units can ferry');
   const hexIds = new Set(state.hexes.map((h) => h.h3Index));
   if (!hexIds.has(order.destinationH3Index)) return tacticalInvalidResult('Destination not on tactical map');
-  const withinFerryRange = isWithinGridRangeSafe(unit.h3Index, order.destinationH3Index, AIR_FERRY_RANGE_HEXES, 'tacticalFerry');
+  const withinFerryRange = isWithinAirFerryGridRange(unit.h3Index, order.destinationH3Index, 'tacticalFerry');
   if (!withinFerryRange) return tacticalInvalidResult(formatFerryOutOfRangeReason(AIR_FERRY_RANGE_HEXES));
   const originInfra = getRes1InfrastructureForHex(cellToParent(unit.h3Index, 1));
   if (originInfra.airportCount <= 0) return tacticalInvalidResult('Origin airport is not intact');

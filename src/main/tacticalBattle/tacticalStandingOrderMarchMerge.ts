@@ -1,0 +1,111 @@
+/**
+ * Phase 5 — merges human strategic standing-order march previews into tactical res4 march rows before Ready applies them.
+ *
+ * Contract: Standing-derived rows use the same Tool 5 preview as strategic merge (`mutateProgress: false`); explicit renderer marches win per parent stack when any sub-unit of that parent is listed.
+ * When to use: Only `commitHumanTacticalDraftOrders` after validation and before range-limited march expansion.
+ * Expected outcome: Deterministic superset of `explicitMovementOrders` that may add sub-unit rows toward the strategic next hex projected into the battle footprint.
+ * Exceptions: None; failures fall back to explicit-only (caller should not throw here).
+ */
+
+import { cellToLatLng } from 'h3-js';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { buildLatLngCoordinateMap } from '../mapData';
+import { getGameStateForPlayer } from '../gameDb';
+import { logDebug } from '../logger';
+import { generateOrdersForStandingOrders } from '../tools/tool5StandingOrders';
+
+/**
+ * Picks the footprint res4 cell whose centroid is closest to the strategic H3 destination centroid.
+ *
+ * Purpose: Tactical battles only animate res4 legs; this maps a strategic `orderToH3` onto a plausible first-step target inside `battle.res4ChildH3Indexes`.
+ * When to use: From `mergeHumanStandingOrdersIntoTacticalMarchOrders` for each standing parent movement row.
+ * Expected outcome: Returns a res4 id in the footprint, or `undefined` when lat/lng math fails or the footprint is empty.
+ * Exceptions: None; invalid indexes are caught and treated as undefined.
+ */
+export function pickTacticalRes4TowardStrategicH3(
+  battle: TacticalBattleSnapshot,
+  strategicTargetH3Index: string
+): string | undefined {
+  const footprint = battle.res4ChildH3Indexes;
+  if (footprint.length === 0) return undefined;
+  try {
+    const [tLat, tLng] = cellToLatLng(strategicTargetH3Index);
+    let best: { h: string; d: number } | null = null;
+    for (const h of footprint) {
+      const [aLat, aLng] = cellToLatLng(h);
+      const d = (aLat - tLat) ** 2 + (aLng - tLng) ** 2;
+      if (!best || d < best.d) best = { h, d };
+    }
+    return best?.h;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Merges Tool 5 human standing movement into tactical sub-unit march orders (strategic-style precedence: standing first, explicit overwrites per parent).
+ *
+ * Purpose: Phase 5 parity with `executeReadyStrategicTurn` merged human movement without double-mutating standing_orders during tactical Ready.
+ * When to use: Tactical commit path only; requires an active battle snapshot and DB-backed human `GameStateSnapshot`.
+ * Expected outcome: Stable ordered list of `{ unitId, toH3Index }` res4 destinations; explicit rows for a parent suppress standing expansion for that parent's entire tactical stack.
+ * Exceptions: None.
+ */
+export function mergeHumanStandingOrdersIntoTacticalMarchOrders(
+  battle: TacticalBattleSnapshot,
+  explicitMovementOrders: readonly { unitId: string; toH3Index: string }[]
+): { unitId: string; toH3Index: string }[] {
+  const humanSubs = battle.subUnits.filter((u) => u.player === 'human');
+  if (humanSubs.length === 0) {
+    return [...explicitMovementOrders];
+  }
+
+  const parentsWithExplicitMarch = new Set<string>();
+  for (const o of explicitMovementOrders) {
+    const su = battle.subUnits.find((u) => u.id === o.unitId);
+    if (su?.player === 'human') parentsWithExplicitMarch.add(su.parentUnitId);
+  }
+
+  const state = getGameStateForPlayer('human', { maskUnexploredTerrain: false });
+  const hexList = state.hexes.map((h) => h.h3Index);
+  const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
+  const { movementOrders: standingParentMoves } = generateOrdersForStandingOrders(
+    'human',
+    state,
+    latLngByH3,
+    resolveToH3,
+    { mutateProgress: false }
+  );
+
+  const parentsInBattle = new Set(humanSubs.map((u) => u.parentUnitId));
+  const merged = new Map<string, string>();
+
+  for (const o of standingParentMoves) {
+    if (!parentsInBattle.has(o.unitId)) continue;
+    if (parentsWithExplicitMarch.has(o.unitId)) continue;
+    const res4Dest = pickTacticalRes4TowardStrategicH3(battle, o.toH3Index);
+    if (!res4Dest) continue;
+    for (const su of humanSubs) {
+      if (su.parentUnitId !== o.unitId) continue;
+      if (su.h3Index === res4Dest) continue;
+      merged.set(su.id, res4Dest);
+    }
+  }
+
+  for (const o of explicitMovementOrders) {
+    merged.set(o.unitId, o.toH3Index);
+  }
+
+  const out = [...merged.entries()]
+    .map(([unitId, toH3Index]) => ({ unitId, toH3Index }))
+    .filter((o) => battle.subUnits.some((s) => s.id === o.unitId && s.h3Index !== o.toH3Index));
+
+  logDebug('tacticalStandingOrderMarchMerge mergeHumanStandingOrdersIntoTacticalMarchOrders', {
+    battleId: battle.battleId,
+    explicitCount: explicitMovementOrders.length,
+    standingParentMoveCount: standingParentMoves.length,
+    mergedMarchCount: out.length,
+    suppressedParentCount: parentsWithExplicitMarch.size,
+  });
+
+  return out;
+}

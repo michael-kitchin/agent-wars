@@ -173,6 +173,7 @@ commitHumanTacticalDraftOrders: (payload: {
     airStrikes?: { unitId: string; targetH3Index: string; targetType: AirStrikeTargetType }[];
     ferryOrders?: { unitId: string; destinationH3Index: string }[];
     embarkOrders?: { unitId: string; navalUnitId: string }[];
+    opponentTacticalDraft?: import('./readyTypes').TacticalOpponentPlanPayload;
   }) => Promise<{
     success: boolean;
     reason?: string;

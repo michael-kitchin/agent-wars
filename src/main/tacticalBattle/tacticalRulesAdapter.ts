@@ -80,6 +80,8 @@ export function tacticalMarchFirstStopAlongPath(
     | 'strategicHexTerrain'
     | 'strategicHexTerrainKind'
     | 'res4IsSeaportByH3'
+    | 'res4IsUrbanByH3'
+    | 'res4IsRubbleByH3'
   >,
   unitTypeForMovement = 'infantry'
 ): { stopH3: string; consumedFullPath: boolean } {

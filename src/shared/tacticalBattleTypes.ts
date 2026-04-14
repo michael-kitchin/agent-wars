@@ -178,6 +178,24 @@ export interface TacticalBattleSnapshot {
    */
   res4IsSeaportByH3?: Record<string, boolean>;
   /**
+   * Per-res4 urban **infrastructure** cells (not rubble) inside the footprint at snapshot build / refresh.
+   *
+   * Contract: Keys are a subset of `res4ChildH3Indexes`; true means merged `getRes4TerrainOverridesForRendererFromGame` row has `isUrban` and not `isRubble`.
+   * When to use: Tactical movement and ranged caps that treat urban tiles like dense terrain without inferring from `terrain_kind` alone.
+   * Expected outcome: Omitted or empty on legacy saves; refreshed with terrain after tactical infrastructure strikes.
+   * Exceptions: None.
+   */
+  res4IsUrbanByH3?: Record<string, boolean>;
+  /**
+   * Per-res4 rubble cells inside the footprint (infrastructure destroyed to rubble).
+   *
+   * Contract: Keys from merged override rows with `isRubble`; authoritative even when `res4TerrainKindByH3` still shows a base pipeline kind.
+   * When to use: Same combat/movement modifiers as urban for armor/infantry budgets and ranged range cap.
+   * Expected outcome: Omitted when no rubble child exists; may grow after urban air strikes refresh the snapshot.
+   * Exceptions: None.
+   */
+  res4IsRubbleByH3?: Record<string, boolean>;
+  /**
    * All tactical sub-units spawned for this battle.
    *
    * Contract: May be shorter than theoretical totals when parents are unplaceable.

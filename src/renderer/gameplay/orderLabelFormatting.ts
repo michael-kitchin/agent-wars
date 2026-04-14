@@ -39,12 +39,16 @@ function resolveAttackerH3ForOrderLabel(
 }
 
 /**
- * Defines the `computeGridDistanceForLabel` function shape (function computeGridDistanceForLabel(originH3: string, targetH3: string): number | null).
-
- * Purpose: Supports maintainability by documenting why `computeGridDistanceForLabel` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Renderer-only H3 edge count for **sidebar / UI distance labels** (strategic or tactical resolution of the hex ids).
+ *
+ * Purpose: Keeps label formatting lightweight in the renderer bundle: uses `h3-js` `gridDistance` with a small
+ * `gridDisk` ring probe when `gridDistance` throws (far-apart or awkward pairs), and intentionally does **not** import
+ * main-process helpers or `computeGridDistancePure` from `src/shared/h3GridRangePure.ts`.
+ * When to use: Pending-order labels (`…Nh`) next to ranged, ferry, and strike rows in the tactical UI.
+ * Expected outcome: A non-negative step count or `null` when neither direct distance nor disk probe resolves the pair.
+ * **Not used for order legality:** validation and AI briefings use main-process range checks (`isWithinGridRangeSafe`,
+ * `isWithinGridRangePure`, tactical terrain caps, etc.); those paths may log disk fallbacks and must stay authoritative.
+ * Exceptions: Returns `null` if every probe ring throws (rare).
  */
 function computeGridDistanceForLabel(originH3: string, targetH3: string): number | null {
   try {

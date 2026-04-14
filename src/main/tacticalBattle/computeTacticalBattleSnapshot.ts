@@ -9,6 +9,7 @@ import {
   listUnitsForSnapshot,
 } from '../gameDb';
 import { tacticalNavalHasMovableNeighborInFootprint } from '../../shared/tacticalRes4MovementPlanner';
+import { tacticalRes4UrbanRubbleFlagRecordsForFootprint } from '../../shared/tacticalTerrainCombatModifiers';
 import type { TacticalTerrainKindResolver } from '../../shared/tacticalTerrainMovement';
 import {
   isInfantryOrArmorTacticalSpawnCell,
@@ -73,11 +74,16 @@ export function refreshTacticalBattleRes4TerrainFromGameDb(battle: TacticalBattl
     if (!childSet.has(row.h3Index)) continue;
     if (row.isSeaport) res4IsSeaportByH3[row.h3Index] = true;
   }
-  const next: TacticalBattleSnapshot = { ...battle, res4TerrainKindByH3 };
+  const urbanRubble = tacticalRes4UrbanRubbleFlagRecordsForFootprint(battle.res4ChildH3Indexes, res4Rows);
+  const next: TacticalBattleSnapshot = { ...battle, res4TerrainKindByH3, ...urbanRubble };
   delete next.res4IsSeaportByH3;
+  delete next.res4IsUrbanByH3;
+  delete next.res4IsRubbleByH3;
   if (Object.keys(res4IsSeaportByH3).length > 0) {
     next.res4IsSeaportByH3 = res4IsSeaportByH3;
   }
+  if (urbanRubble.res4IsUrbanByH3) next.res4IsUrbanByH3 = urbanRubble.res4IsUrbanByH3;
+  if (urbanRubble.res4IsRubbleByH3) next.res4IsRubbleByH3 = urbanRubble.res4IsRubbleByH3;
   return next;
 }
 
@@ -436,6 +442,7 @@ export function computeTacticalBattleSnapshot(
     for (const cell of children) {
       res4TerrainKindByH3[cell] = res4KindByH3.get(cell) ?? hexRow.terrain_kind;
     }
+    const urbanRubble = tacticalRes4UrbanRubbleFlagRecordsForFootprint(children, res4Rows);
     const snapshot: TacticalBattleSnapshot = {
       battleId,
       enclosingRes1H3Index,
@@ -446,6 +453,8 @@ export function computeTacticalBattleSnapshot(
       strategicHexTerrainKind: hexRow.terrain_kind,
       res4TerrainKindByH3,
       ...(Object.keys(res4IsSeaportByH3).length > 0 ? { res4IsSeaportByH3 } : {}),
+      ...(urbanRubble.res4IsUrbanByH3 ? { res4IsUrbanByH3: urbanRubble.res4IsUrbanByH3 } : {}),
+      ...(urbanRubble.res4IsRubbleByH3 ? { res4IsRubbleByH3: urbanRubble.res4IsRubbleByH3 } : {}),
       subUnits,
     };
     tacticalLogQuery('computeTacticalBattleSnapshot result', {

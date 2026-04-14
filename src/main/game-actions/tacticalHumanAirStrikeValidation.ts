@@ -22,12 +22,17 @@ export function validateTacticalHumanAirStrikeGroup(
   snap: TacticalBattleSnapshot,
   unitIds: readonly string[],
   targetH3Index: string,
-  targetType: AirStrikeTargetType
+  targetType: AirStrikeTargetType,
+  /**
+   * Which tactical player owns the striking air sub-units (`human` for human drafts, `opponent` for buffered AI plans).
+   */
+  attackerPlayer: 'human' | 'opponent' = 'human'
 ): { success: true } | { success: false; reason: string } {
   logDebug('tacticalHumanAirStrikeValidation validateTacticalHumanAirStrikeGroup', {
     unitCount: unitIds.length,
     targetH3Index,
     targetType,
+    attackerPlayer,
   });
   if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
   const footprint = new Set(snap.res4ChildH3Indexes);
@@ -42,7 +47,7 @@ export function validateTacticalHumanAirStrikeGroup(
   for (const unitId of unitIds) {
     const label = tacticalSubUnitLabelForUserMessage(snap.subUnits, unitId);
     const unit = snap.subUnits.find((u) => u.id === unitId);
-    if (!unit || unit.player !== 'human') {
+    if (!unit || unit.player !== attackerPlayer) {
       return { success: false, reason: `${label}: Unit not in tactical battle.` };
     }
     if (unit.unitType !== 'air') return { success: false, reason: `${label}: Only air units can strike.` };

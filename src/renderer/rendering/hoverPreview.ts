@@ -1,3 +1,5 @@
+import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
+import { tacticalMovementUnitTypeForPathfinding } from '../../shared/tacticalTerrainMovement';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
 import {
   ORDER_LINE_COLOR,
@@ -62,11 +64,13 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
   if (!state) return;
   const slowestMovementRangeByOriginH3 = new Map<string, number>();
   if (tb) {
+    const hovered = S.hoverRoutePreview?.hoveredH3Index;
     for (const id of S.selectedUnitIds) {
       const u = tb.subUnits.find((s) => s.id === id);
       if (!u || u.player !== 'human') continue;
       const eff = u.h3Index;
-      const movementRange = MOVEMENT_RANGE_BY_UNIT_TYPE[u.unitType] ?? 1;
+      const moveType = hovered ? tacticalMovementUnitTypeForPathfinding(u, hovered) : u.unitType;
+      const movementRange = effectiveTacticalMovementPointBudgetForMarchLeg(tb, u, tb.subUnits, moveType);
       const prior = slowestMovementRangeByOriginH3.get(eff);
       if (prior === undefined || movementRange < prior) {
         slowestMovementRangeByOriginH3.set(eff, movementRange);

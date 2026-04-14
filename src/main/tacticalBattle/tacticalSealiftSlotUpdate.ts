@@ -4,7 +4,7 @@
 
 import type { EmbarkOrder, SealiftStackState } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import { getSealiftStackContextModeForHex, syncStrategicSealiftFromTacticalHexEmbarkPairs } from '../game-actions/sealift';
+import { syncStrategicSealiftFromTacticalHexEmbarkPairs } from '../game-actions/sealift';
 import { isDbReady } from '../gameDb';
 import { getActiveTacticalBattleSnapshotRef, setActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import { writeTacticalBattleSnapshotToGameConfig } from './tacticalBattlePersistence';
@@ -33,7 +33,6 @@ function clearHumanLandEmbarksAtHex(snap: TacticalBattleSnapshot, h3Index: strin
   const subUnits = snap.subUnits.map((u) => {
     if (u.h3Index !== h3Index || u.player !== 'human') return u;
     if (u.unitType !== 'infantry' && u.unitType !== 'armor') return u;
-    const { embarkedOnSubUnitId: _e, ...rest } = u;
     return { ...u, embarkedOnSubUnitId: undefined };
   });
   return { ...snap, subUnits };

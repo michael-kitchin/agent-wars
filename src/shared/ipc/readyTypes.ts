@@ -166,8 +166,33 @@ displayName?: string;
  * Expected outcome: `humanMoves` lists sub-unit position deltas; ranged fields mirror strategic `ReadyResult` subsets when support orders remove units.
  * Exceptions: None; empty `humanMoves` is valid when only non-move effects occur.
  */
+/**
+ * Normalized opponent tactical orders buffered in the renderer until tactical Ready; mirrors strategic “AI orders held until ready” scheduling.
+ *
+ * Purpose: Single IPC shape for `tacticalOpponentPlan` on `requestAiOrders` and optional `opponentTacticalDraft` on tactical commit payloads.
+ * When to use: Renderer state after a successful tactical AI consultation; echoed back on `commitHumanTacticalDraftOrders` for the combined beat.
+ * Expected outcome: Arrays are always present (possibly empty); movement uses tactical sub-unit ids.
+ * Exceptions: None.
+ */
+export type TacticalOpponentPlanPayload = {
+  movementOrders: { unitId: string; toH3Index: string }[];
+  rangedAttacks: { unitId: string; targetH3Index: string }[];
+  airStrikes: AirStrikeOrder[];
+  ferryOrders: FerryOrder[];
+  embarkOrders: EmbarkOrder[];
+};
+
 export type TacticalCommitResolutionPlayback = {
   humanMoves: Array<{ unitId: string; fromH3Index: string; toH3Index: string }>;
+  /**
+   * Opponent sub-unit march deltas applied on the same Ready beat after human marches (strategic `allOrders` orders human rows before AI).
+   *
+   * Purpose: Lets `S.resolutionMoveAnimation.moves` include AI tactical marches without re-fetching the snapshot mid-playback.
+   * When to use: Populated when `opponentTacticalDraft.movementOrders` committed non-noop opponent legs this beat.
+   * Expected outcome: Same `{ unitId, fromH3Index, toH3Index }` shape as `humanMoves`.
+   * Exceptions: Omitted when empty.
+   */
+  opponentMoves?: Array<{ unitId: string; fromH3Index: string; toH3Index: string }>;
   rangedCombatHexes?: string[];
   rangedCasualtyHexes?: string[];
   rangedRemovedUnits?: RemovedUnitSnapshot[];

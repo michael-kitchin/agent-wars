@@ -223,9 +223,9 @@ export function getDefense(unitType: string): number {
 /**
  * Defines the `getRange` function shape (export function getRange(unitType: string): number).
 
- * Purpose: Supports maintainability by documenting why `getRange` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: **Strategic (res1) combat** max ranged distance in H3 hex steps for dice resolution, pre-computation, and strategic order validation (`validateRangedAttack`, tool assessments, etc.).
+ * When to use: Any **strategic** path that must stay aligned with the small `RANGE` table in this file—not res4 tactical battles.
+ * Expected outcome: Values intentionally differ from tactical baselines in `src/shared/tacticalRanges.ts` (`RANGED_RANGE_BY_UNIT_TYPE`); for tactical ranged legality use `effectiveTacticalRangedMaxRangeForAttacker` and related helpers in `src/shared/tacticalTerrainCombatModifiers.ts`.
  * Exceptions: None.
  */
 export function getRange(unitType: string): number {

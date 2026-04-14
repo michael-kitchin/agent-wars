@@ -278,7 +278,12 @@ export function tacticalMovementUnitTypeForPathfinding(
 export function tacticalTerrainLayerSignature(
   battle: Pick<
     TacticalBattleSnapshot,
-    'res4TerrainKindByH3' | 'strategicHexTerrain' | 'strategicHexTerrainKind' | 'res4IsSeaportByH3'
+    | 'res4TerrainKindByH3'
+    | 'strategicHexTerrain'
+    | 'strategicHexTerrainKind'
+    | 'res4IsSeaportByH3'
+    | 'res4IsUrbanByH3'
+    | 'res4IsRubbleByH3'
   >
 ): string {
   const parentTerrain = battle.strategicHexTerrain ?? '';
@@ -292,12 +297,28 @@ export function tacticalTerrainLayerSignature(
         .map(([h3]) => h3)
         .sort((a, b) => a.localeCompare(b))
         .join(';');
+  const urban = battle.res4IsUrbanByH3;
+  const urbanBody = !urban
+    ? ''
+    : Object.entries(urban)
+        .filter(([, v]) => v)
+        .map(([h3]) => h3)
+        .sort((a, b) => a.localeCompare(b))
+        .join(';');
+  const rubble = battle.res4IsRubbleByH3;
+  const rubbleBody = !rubble
+    ? ''
+    : Object.entries(rubble)
+        .filter(([, v]) => v)
+        .map(([h3]) => h3)
+        .sort((a, b) => a.localeCompare(b))
+        .join(';');
   if (!map || Object.keys(map).length === 0) {
-    return `${parentTerrain}|${parentKind}||sp:${spBody}`;
+    return `${parentTerrain}|${parentKind}||sp:${spBody}|u:${urbanBody}|rb:${rubbleBody}`;
   }
   const body = Object.entries(map)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([h3, kind]) => `${h3}:${kind}`)
     .join(';');
-  return `${parentTerrain}|${parentKind}|${body}|sp:${spBody}`;
+  return `${parentTerrain}|${parentKind}|${body}|sp:${spBody}|u:${urbanBody}|rb:${rubbleBody}`;
 }

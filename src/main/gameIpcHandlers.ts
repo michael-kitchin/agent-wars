@@ -13,17 +13,14 @@ import {
 } from './gameDb';
 import { buildLatLngCoordinateMap } from './mapData';
 import { generateOrdersForStandingOrders } from './tools/tool5StandingOrders';
-import {
-  applyValidatedOpponentTacticalOrders,
-  getActiveTacticalBattleSnapshot,
-} from './tacticalBattle/tacticalBattleSession';
+import { getActiveTacticalBattleSnapshot } from './tacticalBattle/tacticalBattleSession';
 import {
   buildDistinctAiMovesFromPlanningOrders,
   computeAiRangedByTypeCounts,
   pickReadyResolutionIpcMirrorFields,
   runEventDrivenAfterResolutionConsultation,
 } from './ipc/readyIpcResolutionMapping';
-import { tacticalLogError, tacticalLogMutate } from './tacticalBattle/tacticalLogging';
+import { tacticalLogMutate } from './tacticalBattle/tacticalLogging';
 import { logHybridPipelineBoundary } from './hybridTurnPipeline';
 import { logDebug } from './logger';
 import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
@@ -36,6 +33,7 @@ import type {
   FerryOrder,
   ReadyResult,
   ResolveMeleeInterceptIpcPayload,
+  TacticalOpponentPlanPayload,
 } from '../shared/ipcTypes';
 import { buildStrategicUnitDisplayLabelResolver } from '../shared/unitDisplayNames';
 export type { RequestAiOrdersResult } from '../shared/ipcTypes';
@@ -183,35 +181,28 @@ export async function handleRequestAiOrders(
       tacticalAiBattle: tacticalSnap ?? undefined,
     });
     if (tacticalSnap && raw.success === true) {
-      let tacticalBattle: TacticalBattleSnapshot | undefined;
-      const hasTacticalApply =
-        raw.orders.length > 0 ||
-        (raw.rangedAttacks?.length ?? 0) > 0 ||
-        (raw.airStrikes?.length ?? 0) > 0 ||
-        (raw.ferryOrders?.length ?? 0) > 0 ||
-        (raw.embarkOrders?.length ?? 0) > 0;
-      if (hasTacticalApply) {
-        const applied = applyValidatedOpponentTacticalOrders({
-          movementOrders: raw.orders,
-          rangedAttacks: raw.rangedAttacks,
-          airStrikes: raw.airStrikes,
-          ferryOrders: raw.ferryOrders,
-          embarkOrders: raw.embarkOrders,
-        });
-        if (applied.success) {
-          tacticalBattle = applied.battle;
-        } else {
-          tacticalLogError('handleRequestAiOrders tactical order apply failed', { reason: applied.reason });
-        }
-      }
+      const tacticalOpponentPlan: TacticalOpponentPlanPayload = {
+        movementOrders: [...raw.orders],
+        rangedAttacks: [...(raw.rangedAttacks ?? [])],
+        airStrikes: [...(raw.airStrikes ?? [])],
+        ferryOrders: [...(raw.ferryOrders ?? [])],
+        embarkOrders: [...(raw.embarkOrders ?? [])],
+      };
+      logDebug('handleRequestAiOrders tactical opponent plan buffered', {
+        movementCount: tacticalOpponentPlan.movementOrders.length,
+        rangedCount: tacticalOpponentPlan.rangedAttacks.length,
+        airCount: tacticalOpponentPlan.airStrikes.length,
+        ferryCount: tacticalOpponentPlan.ferryOrders.length,
+        embarkCount: tacticalOpponentPlan.embarkOrders.length,
+      });
       tacticalLogMutate('handleRequestAiOrders tactical consultation completed', {
         strippedMovementOrders: raw.orders.length,
         strippedRanged: raw.rangedAttacks?.length ?? 0,
         strippedAir: raw.airStrikes?.length ?? 0,
-        tacticalSnapshotReturned: !!tacticalBattle,
+        tacticalSnapshotReturned: true,
       });
       const tacticalNote =
-        '(tactical) Opponent orders update the tactical res4 snapshot only; they are not queued as strategic actions in milestone 2.1.';
+        '(tactical) Opponent orders are buffered until Ready; they are not queued as strategic actions.';
       return {
         ...raw,
         orders: [],
@@ -220,7 +211,8 @@ export async function handleRequestAiOrders(
         ferryOrders: undefined,
         embarkOrders: undefined,
         dropReasons: [...(raw.dropReasons ?? []), tacticalNote],
-        tacticalBattle,
+        tacticalBattle: tacticalSnap,
+        tacticalOpponentPlan,
       };
     }
     return raw;

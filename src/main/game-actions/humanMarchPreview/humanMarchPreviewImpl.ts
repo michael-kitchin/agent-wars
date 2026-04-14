@@ -4,27 +4,27 @@ import {
   getHexController,
   getRes1InfrastructureForHex,
   isDbReady,
-} from '../gameDb';
-import { executePlanRouteWithSession } from '../tools/tool1Pathfinding';
-import { terrainIsPassableForDomain } from '../pathfinding';
-import { logDebug, logError, logTrace } from '../logger';
-import { isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession';
-import { AIR_FERRY_RANGE_HEXES, MOVEMENT_RANGE_BY_UNIT_TYPE, formatFerryOutOfRangeReason } from '../../shared/tacticalRanges';
+} from '../../gameDb';
+import { executePlanRouteWithSession } from '../../tools/tool1Pathfinding';
+import { terrainIsPassableForDomain } from '../../pathfinding';
+import { logDebug, logError, logTrace } from '../../logger';
+import { isTacticalBattleActive } from '../../tacticalBattle/tacticalBattleSession';
+import { AIR_FERRY_RANGE_HEXES, MOVEMENT_RANGE_BY_UNIT_TYPE, formatFerryOutOfRangeReason } from '../../../shared/tacticalRanges';
 import {
   buildHumanOrderGroupPreviewEnvelope,
   minMovementRangeAmongUnitTypes,
   representativeMarchPreviewUnitIdsByOriginH3,
   uniqueStrategicMarchPreviewUnitIds,
-} from '../../shared/humanMarchPreviewGroupAssembly';
-import { isWithinGridRangeSafe } from './gridRange';
-import { isEmbarkedLandUnitOnWater } from './sealift';
+} from '../../../shared/humanMarchPreviewGroupAssembly';
+import { isWithinAirFerryGridRange } from '../gridRange';
+import { isEmbarkedLandUnitOnWater } from '../sealift';
 import {
   EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON,
   getLandMovementBlockReason,
   isLandUnitType,
-} from './landMovementConstraints';
-import type { PlanRouteError, PlanRouteOk } from '../tools/tool1Pathfinding';
-import type { GameStateSnapshot } from '../../shared/ipcTypes';
+} from '../landMovementConstraints';
+import type { PlanRouteError, PlanRouteOk } from '../../tools/tool1Pathfinding';
+import type { GameStateSnapshot } from '../../../shared/ipcTypes';
 import {
   buildEnvironmentSignature,
   buildHoverSessionCacheKey,
@@ -32,11 +32,11 @@ import {
   buildSelectionSignature,
   createEmptyHumanMarchPreviewDiagnostics,
   type HumanMarchPreviewDiagnostics,
-} from './humanMarchPreviewDiagnostics';
-import type { HumanMarchPreviewComputationContext } from './humanMarchPreviewComputationContext';
-import { buildHumanMarchPreviewComputationContextFromState } from './humanMarchPreviewComputationContext';
-import { cacheSetBounded } from './humanMarchPreviewCache';
-import { hexSupportsMixedLandAndNaval, selectionHasMixedLandAndNaval } from './humanMarchPreviewMixedSelection';
+} from '../humanMarchPreviewDiagnostics';
+import type { HumanMarchPreviewComputationContext } from '../humanMarchPreviewComputationContext';
+import { buildHumanMarchPreviewComputationContextFromState } from '../humanMarchPreviewComputationContext';
+import { cacheSetBounded } from '../humanMarchPreviewCache';
+import { hexSupportsMixedLandAndNaval, selectionHasMixedLandAndNaval } from '../humanMarchPreviewMixedSelection';
 /**
  * Documents the `HumanOwnedUnit` type alias (type HumanOwnedUnit).
 
@@ -693,7 +693,7 @@ function computeHumanMarchPreviewForUnit(
         segments: [],
       };
     }
-    const withinFerryRange = isWithinGridRangeSafe(unit.h3Index, hoveredH3Index, AIR_FERRY_RANGE_HEXES, 'preview ferry');
+    const withinFerryRange = isWithinAirFerryGridRange(unit.h3Index, hoveredH3Index, 'preview ferry');
     if (!withinFerryRange) {
       return {
         valid: false,

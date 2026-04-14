@@ -20,6 +20,39 @@ function testHappyPathMinimalMovement(): void {
   assert.deepStrictEqual(r.value.airStrikes, []);
   assert.deepStrictEqual(r.value.ferryOrders, []);
   assert.deepStrictEqual(r.value.embarkOrders, []);
+  assert.strictEqual(r.value.opponentTacticalDraft, undefined);
+}
+
+/**
+ * Verifies optional `opponentTacticalDraft` parses into normalized tactical opponent plan rows.
+ *
+ * Purpose: Locks the combined Ready IPC shape for buffered AI tactical orders.
+ * When to use: Regression coverage after tactical–strategic scheduling changes.
+ * Expected outcome: Nested movement and support arrays match input shapes.
+ * Exceptions: Assertion failure on contract drift.
+ */
+function testOpponentDraftRoundTrip(): void {
+  const r = parseHumanTacticalCommitPayload({
+    movementOrders: [],
+    opponentTacticalDraft: {
+      movementOrders: [{ unitId: 'o1', toH3Index: '8f283082dcb519f' }],
+      rangedAttacks: [{ unitId: 'o1', targetH3Index: '8f283082dcb519f' }],
+      airStrikes: [{ unitId: 'a1', targetH3Index: '8f283082dcb519f', targetType: 'units' as const }],
+      ferryOrders: [{ unitId: 'a1', destinationH3Index: '8f283082dcb519f' }],
+      embarkOrders: [{ unitId: 'l1', navalUnitId: 'n1' }],
+    },
+  });
+  assert.strictEqual(r.ok, true);
+  if (!r.ok) return;
+  const d = r.value.opponentTacticalDraft;
+  assert.ok(d);
+  assert.deepStrictEqual(d!.movementOrders, [{ unitId: 'o1', toH3Index: '8f283082dcb519f' }]);
+  assert.deepStrictEqual(d!.rangedAttacks, [{ unitId: 'o1', targetH3Index: '8f283082dcb519f' }]);
+  assert.deepStrictEqual(d!.airStrikes, [
+    { unitId: 'a1', targetH3Index: '8f283082dcb519f', targetType: 'units' },
+  ]);
+  assert.deepStrictEqual(d!.ferryOrders, [{ unitId: 'a1', destinationH3Index: '8f283082dcb519f' }]);
+  assert.deepStrictEqual(d!.embarkOrders, [{ unitId: 'l1', navalUnitId: 'n1' }]);
 }
 
 /**
@@ -54,6 +87,7 @@ function testRejectsNullPayload(): void {
 
 const tests: { name: string; fn: () => void }[] = [
   { name: 'parseHumanTacticalCommitPayload happy path', fn: testHappyPathMinimalMovement },
+  { name: 'parseHumanTacticalCommitPayload opponent draft round trip', fn: testOpponentDraftRoundTrip },
   { name: 'parseHumanTacticalCommitPayload rejects bad movement', fn: testRejectsBadMovementRow },
   { name: 'parseHumanTacticalCommitPayload rejects null', fn: testRejectsNullPayload },
 ];

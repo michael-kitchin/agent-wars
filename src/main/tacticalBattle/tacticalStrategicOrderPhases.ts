@@ -7,6 +7,10 @@ import { cellToParent } from 'h3-js';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, RangedAttackOrder } from '../../shared/ipcTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
+import {
+  tacticalMovementTerrainAnchorH3,
+  tacticalRangedDirectFirePassesTerrainAndRange,
+} from '../../shared/tacticalTerrainCombatModifiers';
 import { casualtyPriorityIndex, getAttack, getDefense, getRange } from '../combatConstants';
 import { runRangedPhase } from '../combatResolution';
 import type { CombatUnit } from '../combatUnitTypes';
@@ -241,10 +245,15 @@ export type TacticalAirRangedPhaseAccum = {
 };
 
 /**
+ * Whether tactical air+ranged resolution filters orders to one player or merges both like strategic Ready.
+ */
+export type TacticalAirRangedResolutionScope = 'singlePlayer' | 'mergedHumanThenOpponent';
+
+/**
  * Applies tactical air strikes (units + infrastructure in one sorted pass) then ranged combat via `runRangedPhase`.
  *
  * Purpose: Matches strategic `executeReadyStrategicTurn` ordering: full air strike phase, then ranged, before movement.
- * When to use: After any opponent embark on the same snapshot clone, or on the unembarked clone for human strikes; callers apply human embark afterward when needed.
+ * When to use: After opponent embark on the same snapshot clone; use `mergedHumanThenOpponent` when concatenating human-then-opponent air and ranged lists like strategic `allAirStrikes` / `allRanged`.
  * Expected outcome: Snapshot reflects air and ranged casualties; kill buckets match strategic toast semantics.
  * Exceptions: None; consumes `next` draws for air infra rolls and ranged/melee downstream callers must continue the same PRNG.
  */
@@ -253,13 +262,15 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
   airStrikes: readonly AirStrikeOrder[] | undefined,
   rangedAttacks: readonly { unitId: string; targetH3Index: string }[] | undefined,
   rangedPlayer: 'human' | 'opponent',
-  next: () => number
+  next: () => number,
+  resolutionScope: TacticalAirRangedResolutionScope = 'singlePlayer'
 ): TacticalAirRangedPhaseAccum {
   tacticalLogQuery('applyTacticalAirStrikeThenRangedPhaseOnBattle', {
     battleId: battle.battleId,
     airCount: airStrikes?.length ?? 0,
     rangedCount: rangedAttacks?.length ?? 0,
     rangedPlayer,
+    resolutionScope,
   });
   let sub = battle.subUnits.map((u) => ({ ...u }));
   const infrastructureDestroyedEvents: InfrastructureDestroyedEvent[] = [];
@@ -290,10 +301,12 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     toRemove.clear();
   };
   const sortedAir = sortTacticalAirStrikesForStrategicPhaseOrder(airStrikes ?? [], sub);
+  const airPlayerOk = (attacker: TacticalSubUnitSnapshot): boolean =>
+    resolutionScope === 'mergedHumanThenOpponent' || attacker.player === rangedPlayer;
   for (const s of sortedAir) {
     if (toRemove.has(s.unitId)) continue;
     const attacker = sub.find((u) => u.id === s.unitId);
-    if (!attacker || attacker.player !== rangedPlayer) continue;
+    if (!attacker || !airPlayerOk(attacker)) continue;
     if (s.targetType === 'units') {
       airStrikeAttemptCount += 1;
       const rollD6Strike = (): number => Math.floor(next() * 6) + 1;
@@ -343,10 +356,32 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
   }
   flushAirCasualties();
   let workBattle: TacticalBattleSnapshot = { ...battle, subUnits: sub };
-  const rangedOrders: RangedAttackOrder[] = (rangedAttacks ?? []).filter((r) => {
+  const footprint = new Set(workBattle.res4ChildH3Indexes);
+  const rangedPlayerFiltered = (rangedAttacks ?? []).filter((r) => {
     const a = workBattle.subUnits.find((u) => u.id === r.unitId);
-    return a && a.player === rangedPlayer;
+    if (!a) return false;
+    if (resolutionScope === 'mergedHumanThenOpponent') return true;
+    return a.player === rangedPlayer;
   });
+  let rangedTerrainStripped = 0;
+  const rangedOrders: RangedAttackOrder[] = [];
+  for (const r of rangedPlayerFiltered) {
+    const a = workBattle.subUnits.find((u) => u.id === r.unitId);
+    if (!a) continue;
+    const anchor = tacticalMovementTerrainAnchorH3(a, workBattle.subUnits);
+    if (!tacticalRangedDirectFirePassesTerrainAndRange(workBattle, footprint, a.unitType, anchor, r.targetH3Index)) {
+      rangedTerrainStripped += 1;
+      continue;
+    }
+    rangedOrders.push({ unitId: r.unitId, targetH3Index: r.targetH3Index });
+  }
+  if (rangedTerrainStripped > 0) {
+    tacticalLogQuery('applyTacticalAirStrikeThenRangedPhaseOnBattle stripped invalid tactical ranged orders', {
+      battleId: battle.battleId,
+      rangedTerrainStripped,
+      rangedPlayer,
+    });
+  }
   if (rangedOrders.length > 0) {
     const rangedInput = tacticalSubUnitsToRangedCombatUnits(workBattle, workBattle.subUnits);
     const rangedResult = runRangedPhase(rangedInput, workBattle.res4ChildH3Indexes, rangedOrders, next);

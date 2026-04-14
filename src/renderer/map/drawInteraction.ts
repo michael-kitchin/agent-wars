@@ -8,7 +8,10 @@ import {
   TACTICAL_ENTRY_HIT_PAD_PX,
 } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
-import type { ResolutionPlaybackState } from '../rendering/resolutionPlayback';
+import {
+  resolutionAnimationElapsedMs,
+  type ResolutionPlaybackState,
+} from '../rendering/resolutionPlayback';
 import { hexCenterPx, hitTestHexAtContainerPixel, hitTestTacticalRes4HexAtContainerPixel } from './mapUtils';
 import { getMainLeafletMap } from './worldLeafletMap';
 
@@ -96,7 +99,7 @@ export function getUnitsForDrawWithMovingIds(
   let movingIds: Set<string> | undefined;
   const anim = S.resolutionMoveAnimation;
   if (anim) {
-    const elapsed = Date.now() - anim.startTime;
+    const elapsed = resolutionAnimationElapsedMs(anim);
     const { phase } = deps.buildResolutionPlaybackState(anim, elapsed);
     const moveProgress = phase.moveProgress;
     const rangedRemovedIds = new Set((anim.rangedRemovedUnits ?? []).map((u) => u.id));
@@ -136,6 +139,14 @@ export function getUnitsForDrawWithMovingIds(
     } else if (phase.inMovement) {
       unitsToDraw = state.units;
       movingIds = moveProgress < 1 ? new Set(anim.moves.map((m) => m.unitId)) : undefined;
+    } else if (anim.moves.length > 0 && moveProgress < 1) {
+      // Snapshot already lists march destinations during pre-move phases; draw movers at playback origins until movement anim hides them.
+      const moveById = new Map(anim.moves.map((m) => [m.unitId, m] as const));
+      unitsToDraw = state.units.map((u) => {
+        const m = moveById.get(u.id);
+        return m ? { ...u, h3Index: m.fromH3Index } : u;
+      });
+      movingIds = undefined;
     } else if (phase.inMeleeLightning || phase.inMeleeCasualty) {
       unitsToDraw = [...state.units, ...(anim.meleeRemovedUnits ?? [])];
       movingIds = undefined;

@@ -1,11 +1,34 @@
 /**
  * Removes air units that no longer have a valid friendly airport controller at their current hex.
  * Extracted from strategic ready resolution so melee-intercept finalize can share the same behavior.
+ *
+ * **Contested hexes:** While two or more players still have combat-class units on the same res1 hex, `res1_control`
+ * intentionally does not flip to a sole owner; `getHexController` can still read the pre-fight owner. Skipping base
+ * cleanup in that state prevents human (or opponent) air from being deleted as “stranded” immediately before a
+ * Fight→tactical handoff when armor marches into an enemy-controlled co-occupied hex.
  */
 
-import { dbGetAll, dbRun, getHexController, getRes1InfrastructureForHex } from '../gameDb';
+import { dbGetAll, dbGetOne, dbRun, getHexController, getRes1InfrastructureForHex } from '../gameDb';
 import { logDebug } from '../logger';
 import type { CombatUnit } from '../combatUnitTypes';
+
+/**
+ * Detects multi-player combat occupancy on a res1 hex so air-base cleanup can defer until the contest clears.
+ *
+ * Purpose: Mirrors `resolveRes1ControlAfterCombatAndMovement`’s “distinctPlayers” notion for infantry/armor/naval/air.
+ * When to use: Only from `destroyAirUnitsWithInvalidBase` before applying the airport+controller strand rule.
+ * Expected outcome: True when `COUNT(DISTINCT player) >= 2` among combat unit rows sharing `h3_index`.
+ * Exceptions: None; invalid `h3_index` yields false from empty counts.
+ */
+function hexHasMultiPlayerCombatPresence(h3Index: string): boolean {
+  const row = dbGetOne<{ c: number }>(
+    `SELECT COUNT(DISTINCT player) AS c
+     FROM units
+     WHERE h3_index = ? AND unit_type IN ('infantry', 'armor', 'naval', 'air')`,
+    [h3Index]
+  );
+  return (row?.c ?? 0) >= 2;
+}
 
 /**
  * Deletes stranded air units and returns lightweight snapshots suitable for casualty accounting.
@@ -23,6 +46,10 @@ export function destroyAirUnitsWithInvalidBase(): CombatUnit[] {
   );
   const removed: CombatUnit[] = [];
   for (const row of rows) {
+    if (hexHasMultiPlayerCombatPresence(row.h3_index)) {
+      logDebug('destroyAirUnitsWithInvalidBase skip contested hex', { unitId: row.id, h3Index: row.h3_index });
+      continue;
+    }
     const infra = getRes1InfrastructureForHex(row.h3_index);
     const controller = getHexController(row.h3_index);
     if (infra.airportCount > 0 && controller === row.player) continue;

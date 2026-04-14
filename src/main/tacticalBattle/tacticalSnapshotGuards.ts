@@ -5,7 +5,7 @@
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { planTacticalRes4MarchWithSessionCache } from './tacticalMovementPlanningCache';
 import { tacticalMovementUnitTypeForPathfinding } from '../../shared/tacticalTerrainMovement';
-import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
+import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
 
 /**
  * Enumerates why an opponent tactical march order may be ignored during snapshot projection.
@@ -45,6 +45,8 @@ export function tacticalComputeMovementOrderOutcome(args: {
     | 'strategicHexTerrain'
     | 'strategicHexTerrainKind'
     | 'res4IsSeaportByH3'
+    | 'res4IsUrbanByH3'
+    | 'res4IsRubbleByH3'
   >;
 }):
   | { ok: true; idx: number }
@@ -68,7 +70,7 @@ export function tacticalComputeMovementOrderOutcome(args: {
   if (moveType === 'air') {
     return { ok: false, reason: 'air_no_march', context: { unitId: args.order.unitId } };
   }
-  const budget = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[u.unitType] ?? 1;
+  const budget = effectiveTacticalMovementPointBudgetForMarchLeg(args.battle, u, args.sub, moveType);
   const plan = planTacticalRes4MarchWithSessionCache(args.battle, {
     fromH3: u.h3Index,
     toH3: args.order.toH3Index,
@@ -114,6 +116,8 @@ export function tacticalComputeHumanMovementOrderOutcome(args: {
     | 'strategicHexTerrain'
     | 'strategicHexTerrainKind'
     | 'res4IsSeaportByH3'
+    | 'res4IsUrbanByH3'
+    | 'res4IsRubbleByH3'
   >;
 }):
   | { ok: true; idx: number }
@@ -137,7 +141,7 @@ export function tacticalComputeHumanMovementOrderOutcome(args: {
   if (moveType === 'air') {
     return { ok: false, reason: 'air_no_march', context: { unitId: args.order.unitId } };
   }
-  const budget = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[u.unitType] ?? 1;
+  const budget = effectiveTacticalMovementPointBudgetForMarchLeg(args.battle, u, args.sub, moveType);
   const plan = planTacticalRes4MarchWithSessionCache(args.battle, {
     fromH3: u.h3Index,
     toH3: args.order.toH3Index,

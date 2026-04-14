@@ -31,6 +31,7 @@ import {
   validateTacticalOpponentEmbarkOrder,
   validateTacticalOpponentFerryOrder,
 } from '../tacticalBattle/tacticalOpponentOrderValidation';
+import { buildPossibleUnitActionsMarkdown } from './possibleUnitActions';
 import { buildTacticalAiOrdersContextBlock } from './tacticalPromptProjection';
 import { buildStrategicUnitDisplayLabelResolver, tacticalSubUnitLabelForUserMessage } from '../../shared/unitDisplayNames';
 import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
@@ -308,6 +309,27 @@ export async function requestOrdersFlow(
       unitAssessments: precomputed.unitAssessments.length,
       precomputationCount: toolInvocationCounts['precomputation'],
     });
+  }
+  if (tacticalBattle) {
+    const tHexIds = planState.hexes.map((h) => h.h3Index);
+    const { latLngByH3: latLngTactical } = buildLatLngCoordinateMap(tHexIds);
+    const tacticalActionsMd = buildPossibleUnitActionsMarkdown({
+      state: planState,
+      latLngByH3: latLngTactical,
+      formatLatLng,
+      tacticalBattle,
+    });
+    if (tacticalActionsMd.trim().length > 0) {
+      const tacticalBlock = `## Tactical res4 — Possible Unit Actions\n\n${tacticalActionsMd.trim()}`;
+      briefingOverride =
+        briefingOverride && briefingOverride.trim().length > 0
+          ? `${briefingOverride}\n\n${tacticalBlock}`
+          : tacticalBlock;
+      logDebug('openRouter requestOrders: tactical possible-actions briefing appended', {
+        battleId: tacticalBattle.battleId,
+        tacticalBriefChars: tacticalBlock.length,
+      });
+    }
   }
   let systemPrompt = buildSystemPromptForTools(planState, coordMap, enabledToolNames, briefingOverride);
   if (tacticalBattle) {

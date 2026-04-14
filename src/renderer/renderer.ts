@@ -22,6 +22,7 @@ import {
 } from '../shared/unitDisplayNames';
 import {
   buildResolutionPlaybackState as buildResolutionPlaybackStateFromModule,
+  resolutionAnimationElapsedMs as resolutionAnimationElapsedMsFromModule,
   type ResolutionPlaybackPhase,
 } from './rendering/resolutionPlayback';
 import {
@@ -172,6 +173,7 @@ import {
   terrainStateForPointer,
   terrainTooltipStateForRes1Hex,
 } from './map/terrainTooltipRes1State';
+import { isOrderBlockHexTooltipVisible } from './map/orderBlockHexTooltip';
 import { wireMainMapInteractions as wireMainMapInteractionsFromModule } from './map/mainMapInteractions';
 import { wireInitCore as wireInitCoreFromModule } from './map/initCore';
 import {
@@ -267,6 +269,18 @@ function buildResolutionPlaybackState(
 }
 
 /**
+ * Defines the `resolutionAnimationElapsedMs` function shape (function resolutionAnimationElapsedMs( anim: NonNullable<typeof S.resolutionMoveAnimation> ): number).
+
+ * Purpose: Delegates to shared playback clock math so tactical Ready can freeze elapsed during post-commit awaits.
+ * When to use: Any renderer path that previously subtracted `anim.startTime` from `Date.now()` for resolution playback.
+ * Expected outcome: Same ms timeline as `resolutionPlayback.resolutionAnimationElapsedMs` for the current anim object.
+ * Exceptions: None.
+ */
+function resolutionAnimationElapsedMs(anim: NonNullable<typeof S.resolutionMoveAnimation>): number {
+  return resolutionAnimationElapsedMsFromModule(anim);
+}
+
+/**
  * Defines the `getUnitAtHex` function shape (function getUnitAtHex(h3Index: string): GameStateSnapshot['units'][0] | null).
 
  * Purpose: Supports maintainability by documenting why `getUnitAtHex` exists.
@@ -359,7 +373,10 @@ function isStackOrBuildMapPopoverOpen(): boolean {
  */
 function shouldSuppressTerrainTooltip(): boolean {
   return (
-    isStackOrBuildMapPopoverOpen() || S.buildEntryButtonPointerInside || S.tacticalEntryButtonPointerInside
+    isStackOrBuildMapPopoverOpen() ||
+    S.buildEntryButtonPointerInside ||
+    S.tacticalEntryButtonPointerInside ||
+    isOrderBlockHexTooltipVisible()
   );
 }
 
@@ -2326,7 +2343,7 @@ function drawGameScene(
       ? getUnitsForDrawWithMovingIds(stateForTacticalAnim)
       : { unitsToDraw: tacticalUnits, movingIds: undefined };
     if (anim) {
-      const elapsed = Date.now() - anim.startTime;
+      const elapsed = resolutionAnimationElapsedMs(anim);
       const { phase } = buildResolutionPlaybackState(anim, elapsed);
       playbackPhase = phase;
       moveProgress = phase.moveProgress;
@@ -2353,7 +2370,7 @@ function drawGameScene(
       }
     }
     if (anim && hexList) {
-      const elapsed = Date.now() - anim.startTime;
+      const elapsed = resolutionAnimationElapsedMs(anim);
       const { phase } = buildResolutionPlaybackState(anim, elapsed);
       const meleeCombatHexes = [
         ...(anim.meleeCombatHexes ?? []),
@@ -2411,7 +2428,7 @@ function drawGameScene(
   const airStrikeReturnPlaybackMoves = anim?.airStrikeReturnMoves ?? [];
   const { unitsToDraw, movingIds } = getUnitsForDrawWithMovingIds(state);
   if (anim) {
-    const elapsed = Date.now() - anim.startTime;
+    const elapsed = resolutionAnimationElapsedMs(anim);
     const { phase } = buildResolutionPlaybackState(anim, elapsed);
     playbackPhase = phase;
     moveProgress = phase.moveProgress;
@@ -2459,7 +2476,7 @@ function drawGameScene(
     }
   }
   if (anim && hexList) {
-    const elapsed = Date.now() - anim.startTime;
+    const elapsed = resolutionAnimationElapsedMs(anim);
     const { phase } = buildResolutionPlaybackState(anim, elapsed);
     const meleeCombatHexes = [
       ...(anim.meleeCombatHexes ?? []),
@@ -2468,10 +2485,10 @@ function drawGameScene(
     const combatHexes = phase.inAirStrikeLightning
       ? anim.airStrikeCombatHexes
       : phase.inRangedLightning
-      ? (anim.rangedCombatHexes ?? anim.combatHexes)
-      : phase.inMeleeLightning
-        ? meleeCombatHexes
-        : undefined;
+        ? (anim.rangedCombatHexes ?? anim.combatHexes)
+        : phase.inMeleeLightning
+          ? meleeCombatHexes
+          : undefined;
     if (combatHexes?.length) {
       const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * 0.008);
       const unknownSet = new Set(anim.unknownCombatHexes ?? []);
@@ -2611,7 +2628,7 @@ function redraw(): void {
 function tickResolutionMoveAnimation(): void {
   if (!S.resolutionMoveAnimation) return;
   const anim = S.resolutionMoveAnimation;
-  const elapsed = Date.now() - anim.startTime;
+  const elapsed = resolutionAnimationElapsedMs(anim);
   const { phase } = buildResolutionPlaybackState(anim, elapsed);
   const { totalMs } = phase;
   redraw();

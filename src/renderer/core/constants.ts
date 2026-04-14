@@ -169,6 +169,17 @@ export const TOOLTIP_OFFSET_PX = 12;
 export const TERRAIN_TOOLTIP_DELAY_MS = 750;
 
 /**
+ * Wall-clock visibility for the transient “Blocked: …” order-preview tooltip that follows the pointer.
+ *
+ * Purpose: Shorter than map toasts so the hint reads as a lightweight affordance; set to **half** of the normal hex
+ * tooltip dwell (`TERRAIN_TOOLTIP_DELAY_MS`) per product UX for invalid march / ranged hover targets.
+ * When to use: `orderBlockHexTooltip` auto-hide timer after revealing `#order-block-tooltip`.
+ * Expected outcome: Tooltip dismisses after this interval unless refreshed by a new invalid hover evaluation.
+ * Exceptions: None.
+ */
+export const ORDER_BLOCK_HEX_TOOLTIP_TTL_MS = Math.floor(TERRAIN_TOOLTIP_DELAY_MS / 2);
+
+/**
  * Documents the module-scope binding `WORLD_H3_RESOLUTION` (WORLD_H3_RESOLUTION).
 
  * Purpose: Supports maintainability by documenting why `WORLD_H3_RESOLUTION` exists.

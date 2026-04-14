@@ -19,7 +19,10 @@ import {
   projectTacticalSnapshotAfterValidatedOpponentOrders,
 } from './tacticalCompositeOrdersApply';
 import { applyTacticalMeleeAfterSupportOrders, tacticalSubUnitLayoutSeed32 } from './tacticalMeleeApply';
-import { projectTacticalSnapshotAfterHumanMovementOrders } from './tacticalMovementApply';
+import {
+  projectTacticalSnapshotAfterHumanMovementOrders,
+  projectTacticalSnapshotAfterOpponentMovementOrders,
+} from './tacticalMovementApply';
 import {
   applyTacticalAirStrikeThenRangedPhaseOnBattle,
   applyTacticalEmbarkPhaseOnBattle,
@@ -27,7 +30,7 @@ import {
   tacticalBattleWithSyncedEmbarkCargo,
 } from './tacticalStrategicOrderPhases';
 import type { TacticalMovementBlockReason } from './tacticalSnapshotGuards';
-import { tacticalComputeHumanMovementOrderOutcome } from './tacticalSnapshotGuards';
+import { tacticalComputeHumanMovementOrderOutcome, tacticalComputeMovementOrderOutcome } from './tacticalSnapshotGuards';
 import { applyTacticalEmbarkCommittedOrdersToStrategicDb } from '../game-actions/sealift';
 import { tacticalLogError, tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 import { validateTacticalHumanEmbarkOrder } from './tacticalOpponentOrderValidation';
@@ -37,6 +40,38 @@ import {
   tacticalTransportBaselineConfigExists,
 } from './tacticalTransportBaseline';
 import { TacticalEmbarkValidationRejected } from './tacticalValidationResult';
+import type { TacticalOpponentPlanPayload } from '../../shared/ipc/readyTypes';
+
+/**
+ * Returns a user-facing validation error when any opponent tactical march order is illegal on the current snapshot, or null when all pass.
+ *
+ * Purpose: Mirrors `humanTacticalMarchValidationFailure` for opponent sub-units so Ready commits reject stale or tampered buffered AI marches before combat phases run.
+ * When to use: `applyHumanTacticalDraftBeatInStrategicOrder` when `opponentTacticalDraft` includes movement rows.
+ * Expected outcome: First failure reason wins; empty `orders` yields null.
+ * Exceptions: None.
+ */
+function opponentTacticalMarchValidationFailure(
+  cur: TacticalBattleSnapshot,
+  orders: readonly { unitId: string; toH3Index: string }[]
+): string | null {
+  if (orders.length === 0) return null;
+  const res4Set = new Set(cur.res4ChildH3Indexes);
+  const sub = [...cur.subUnits];
+  const byId = new Map(sub.map((u, i) => [u.id, i] as const));
+  for (const o of orders) {
+    const outcome = tacticalComputeMovementOrderOutcome({ byId, sub, order: o, res4Set, battle: cur });
+    if (!outcome.ok) {
+      tacticalLogQuery('opponentTacticalMarchValidationFailure', {
+        reason: outcome.reason,
+        ...outcome.context,
+        unitId: o.unitId,
+        toH3Index: o.toH3Index,
+      });
+      return humanTacticalMarchBlockMessage(outcome.reason);
+    }
+  }
+  return null;
+}
 
 /**
  * Writes the active tactical snapshot to memory and SQLite, or clears both when ending a session.
@@ -265,6 +300,10 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
   airStrikes?: readonly AirStrikeOrder[];
   ferryOrders?: readonly FerryOrder[];
   embarkOrders?: readonly EmbarkOrder[];
+  /**
+   * Buffered opponent tactical plan (movement, support, embark) applied only on this Ready beat after merged air+ranged, in strategic order relative to human slices.
+   */
+  opponentTacticalDraft?: TacticalOpponentPlanPayload;
 }):
   | {
       success: true;
@@ -279,12 +318,16 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
       meleePack: ReturnType<typeof applyTacticalMeleeAfterSupportOrders>;
     }
   | { success: false; reason: string } {
+  const opp = args.opponentTacticalDraft;
   tacticalLogMutate('applyHumanTacticalDraftBeatInStrategicOrder', {
     movementCount: args.movementOrders.length,
     rangedCount: args.rangedAttacks?.length ?? 0,
     airCount: args.airStrikes?.length ?? 0,
     ferryCount: args.ferryOrders?.length ?? 0,
     embarkCount: args.embarkOrders?.length ?? 0,
+    opponentMovementCount: opp?.movementOrders.length ?? 0,
+    opponentRangedCount: opp?.rangedAttacks.length ?? 0,
+    opponentAirCount: opp?.airStrikes.length ?? 0,
   });
   try {
     const cur = getActiveTacticalBattleSnapshotRef();
@@ -297,6 +340,14 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
       tacticalLogQuery('applyHumanTacticalDraftBeatInStrategicOrder rejected', { reason: 'march_validation', detail: marchFail });
       return { success: false, reason: marchFail };
     }
+    const oppMarchFail = opponentTacticalMarchValidationFailure(cur, opp?.movementOrders ?? []);
+    if (oppMarchFail) {
+      tacticalLogQuery('applyHumanTacticalDraftBeatInStrategicOrder rejected', {
+        reason: 'opponent_march_validation',
+        detail: oppMarchFail,
+      });
+      return { success: false, reason: oppMarchFail };
+    }
     const seed =
       (getGameSeed() +
         cur.strategicTurnNumber * 7919 +
@@ -304,44 +355,62 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
         tacticalSubUnitLayoutSeed32(cur.subUnits)) >>>
       0;
     const rawNext = createCombatRng(seed);
+    const afterOpponentEmbark = applyTacticalEmbarkPhaseOnBattle(cur, opp?.embarkOrders, 'opponent');
+    const mergedAir = [...(args.airStrikes ?? []), ...(opp?.airStrikes ?? [])];
+    const mergedRanged = [...(args.rangedAttacks ?? []), ...(opp?.rangedAttacks ?? [])];
     const acc = applyTacticalAirStrikeThenRangedPhaseOnBattle(
-      cur,
-      args.airStrikes,
-      args.rangedAttacks,
+      afterOpponentEmbark,
+      mergedAir,
+      mergedRanged,
       'human',
-      rawNext
+      rawNext,
+      'mergedHumanThenOpponent'
     );
-    const bAfterMove =
+    const bAfterHumanMove =
       args.movementOrders.length > 0
         ? projectTacticalSnapshotAfterHumanMovementOrders(acc.battle, args.movementOrders)
         : acc.battle;
+    const oppMarch = opp?.movementOrders ?? [];
+    const bAfterBothMoves =
+      oppMarch.length > 0
+        ? projectTacticalSnapshotAfterOpponentMovementOrders(bAfterHumanMove, oppMarch)
+        : bAfterHumanMove;
     for (const e of args.embarkOrders ?? []) {
-      const emb = validateTacticalHumanEmbarkOrder(e, bAfterMove.subUnits);
+      const emb = validateTacticalHumanEmbarkOrder(e, bAfterBothMoves.subUnits);
       if (!emb.valid) {
         tacticalLogQuery('applyHumanTacticalDraftBeatInStrategicOrder rejected', { reason: 'embark_validation', detail: emb.reason });
         return { success: false, reason: emb.reason };
       }
     }
-    const bAfterHumanEmbark = applyTacticalEmbarkPhaseOnBattle(bAfterMove, args.embarkOrders, 'human');
-    const bAfterFerry = applyTacticalFerryPhaseOnBattle(bAfterHumanEmbark, args.ferryOrders, 'human');
-    const bSynced = tacticalBattleWithSyncedEmbarkCargo(bAfterFerry);
+    const bAfterHumanEmbark = applyTacticalEmbarkPhaseOnBattle(bAfterBothMoves, args.embarkOrders, 'human');
+    const bAfterHumanFerry = applyTacticalFerryPhaseOnBattle(bAfterHumanEmbark, args.ferryOrders, 'human');
+    const bAfterOppFerry = applyTacticalFerryPhaseOnBattle(bAfterHumanFerry, opp?.ferryOrders, 'opponent');
+    const bSynced = tacticalBattleWithSyncedEmbarkCargo(bAfterOppFerry);
     const meleePack = applyTacticalMeleeAfterSupportOrders(bSynced, rawNext);
-    commitActiveTacticalBattle(meleePack.battle);
+    const battleAdvancedTurn: TacticalBattleSnapshot = {
+      ...meleePack.battle,
+      tacticalTurnNumber: cur.tacticalTurnNumber + 1,
+    };
+    commitActiveTacticalBattle(battleAdvancedTurn);
     tacticalLogMutate('applyHumanTacticalDraftBeatInStrategicOrder applied', {
-      battleId: meleePack.battle.battleId,
-      subUnitCount: meleePack.battle.subUnits.length,
+      battleId: battleAdvancedTurn.battleId,
+      subUnitCount: battleAdvancedTurn.subUnits.length,
+      tacticalTurnNumber: battleAdvancedTurn.tacticalTurnNumber,
     });
     return {
       success: true,
-      battle: meleePack.battle,
-      battleAfterMovementBeforeFerry: bAfterMove,
+      battle: battleAdvancedTurn,
+      battleAfterMovementBeforeFerry: bAfterBothMoves,
       killsByDirectFire: acc.killsByDirectFire,
       killsByAirStrike: acc.killsByAirStrike,
       killsByReturnFire: acc.killsByReturnFire,
       removedUnits: acc.removedUnits,
       infrastructureDestroyedEvents: acc.infrastructureDestroyedEvents,
       airStrikeAttemptCount: acc.airStrikeAttemptCount,
-      meleePack,
+      meleePack: {
+        ...meleePack,
+        battle: battleAdvancedTurn,
+      },
     };
   } catch (err) {
     tacticalLogError('applyHumanTacticalDraftBeatInStrategicOrder failed', { err });

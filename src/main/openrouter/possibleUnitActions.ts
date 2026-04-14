@@ -1,14 +1,19 @@
 ﻿/**
  * Builds the "Possible unit actions" markdown block for AI Commander's Briefings.
  * Derives legal one-step moves/melee reach, air ferry destinations, ranged attacks, and air strikes from order validation rules.
+ *
+ * When `tacticalBattle` is passed, **ranged** rows use `collectTacticalLegalRangedTargetRes4Hexes` (terrain caps + mountain LOS)
+ * on the res4 footprint; movement and strikes still use the same strategic-style helpers on the projected `state`.
  */
 
 import { gridDistance, gridDisk } from 'h3-js';
 import { type GameStateSnapshot } from '../gameDb';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { getRange } from '../combatConstants';
 import { getValidDestinations } from '../oneStepMoveDestinations';
+import { collectTacticalLegalRangedTargetRes4Hexes } from '../../shared/tacticalTerrainCombatModifiers';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
-import { isWithinGridRangeSafe } from '../game-actions/gridRange';
+import { isWithinAirFerryGridRange, isWithinAirStrikeGridRange } from '../game-actions/gridRange';
 import { logDebug } from '../logger';
 import { logHexControllerParityMismatch } from '../snapshotDbParity';
 import { compareHexIds, partitionHomelandNearestOther } from './possibleUnitActionsPartition';
@@ -27,6 +32,7 @@ import {
   type PossibleActionTableRow,
   type RawPossibleActionRow,
 } from './possibleUnitActionsTableAssembly';
+import { collectRangedTargetHexes } from './possibleUnitActionsStrategicRanged';
 
 export { partitionHomelandNearestOther };
 export type { PossibleActionTableRow } from './possibleUnitActionsTableAssembly';
@@ -390,14 +396,14 @@ function collectLegalFerryDestinationHexes(
     candidates = [];
     for (const h3 of indexed.hexSet) {
       if (h3 === unit.h3Index) continue;
-      if (isWithinGridRangeSafe(unit.h3Index, h3, AIR_FERRY_RANGE_HEXES, 'possibleUnitActions ferry disk fallback')) {
+      if (isWithinAirFerryGridRange(unit.h3Index, h3, 'possibleUnitActions ferry disk fallback')) {
         candidates.push(h3);
       }
     }
   }
   const out = new Set<string>();
   for (const h3 of candidates) {
-    if (!isWithinGridRangeSafe(unit.h3Index, h3, AIR_FERRY_RANGE_HEXES, 'possibleUnitActions ferry')) continue;
+    if (!isWithinAirFerryGridRange(unit.h3Index, h3, 'possibleUnitActions ferry')) continue;
     if (getInfra(indexed, h3).airport <= 0) continue;
     const snapshotController = indexed.controlByHex.get(h3) ?? null;
     if (snapshotController !== unit.player) continue;
@@ -408,29 +414,6 @@ function collectLegalFerryDestinationHexes(
       unitId: unit.id,
     });
     out.add(h3);
-  }
-  return [...out];
-}
-/**
- * Defines the `collectRangedTargetHexes` function shape (function collectRangedTargetHexes(unitH3: string, unitType: string, indexed: IndexedState): string[]).
-
- * Purpose: Supports maintainability by documenting why `collectRangedTargetHexes` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-
-function collectRangedTargetHexes(unitH3: string, unitType: string, indexed: IndexedState): string[] {
-  const r = getRange(unitType);
-  if (r < 1) return [];
-  const out = new Set<string>();
-  for (const enemyHex of indexed.enemyUnitsByHex.keys()) {
-    try {
-      const d = gridDistance(unitH3, enemyHex);
-      if (d >= 0 && d <= r) out.add(enemyHex);
-    } catch {
-      continue;
-    }
   }
   return [...out];
 }
@@ -450,7 +433,7 @@ function collectStrikeHexesForAirUnit(airH3: string, indexed: IndexedState): str
   } catch {
     const out: string[] = [];
     for (const h3 of indexed.hexSet) {
-      if (isWithinGridRangeSafe(airH3, h3, AIR_STRIKE_RANGE_HEXES, 'possibleUnitActions strike scan')) out.push(h3);
+      if (isWithinAirStrikeGridRange(airH3, h3, 'possibleUnitActions strike scan')) out.push(h3);
     }
     return out;
   }
@@ -469,9 +452,21 @@ export function buildPossibleUnitActionsMarkdown(args: {
   state: GameStateSnapshot;
   latLngByH3: Map<string, [number, number]>;
   formatLatLng: (ll: [number, number]) => string;
+  /**
+   * When set, ranged target discovery uses tactical res4 rules (terrain range cap, mountain LOS) for opponent units.
+   *
+   * Contract: `state.hexes` / `state.units` must already match this footprint (e.g. `buildTacticalAiPlanState` output).
+   * When to use: Tactical AI `requestOrdersFlow` briefings.
+   * Expected outcome: Ranged markdown reflects the same legality as `validateGroupRangedTarget` + apply filters.
+   * Exceptions: None.
+   */
+  tacticalBattle?: TacticalBattleSnapshot;
 }): string {
-  logDebug('possibleUnitActions buildPossibleUnitActionsMarkdown', { turnNumber: args.state.turnNumber });
-  const { state, latLngByH3, formatLatLng } = args;
+  logDebug('possibleUnitActions buildPossibleUnitActionsMarkdown', {
+    turnNumber: args.state.turnNumber,
+    tactical: Boolean(args.tacticalBattle),
+  });
+  const { state, latLngByH3, formatLatLng, tacticalBattle } = args;
   const indexed = buildIndexedState(state);
   const homeland = enemyHomelandHexSet(state);
   const opponentUnits = state.units.filter((u) => u.player === FRIENDLY_PLAYER).sort((a, b) => a.id.localeCompare(b.id));
@@ -503,7 +498,7 @@ export function buildPossibleUnitActionsMarkdown(args: {
       const strikeTargets = excludeUnitCurrentHex(
         unit.h3Index,
         collectStrikeHexesForAirUnit(unit.h3Index, indexed)
-          .filter((h3) => isWithinGridRangeSafe(unit.h3Index, h3, AIR_STRIKE_RANGE_HEXES, 'possibleUnitActions air strike'))
+          .filter((h3) => isWithinAirStrikeGridRange(unit.h3Index, h3, 'possibleUnitActions air strike'))
           .filter((h3) => strikeKindsForHex(indexed, h3).length > 0)
       );
       if (strikeTargets.length > 0) {
@@ -523,7 +518,12 @@ export function buildPossibleUnitActionsMarkdown(args: {
     }
 
     if (unit.unitType !== 'air' && getRange(unit.unitType as 'infantry' | 'armor' | 'naval' | 'air') >= 1) {
-      const rangedHexes = excludeUnitCurrentHex(unit.h3Index, collectRangedTargetHexes(unit.h3Index, unit.unitType, indexed));
+      const rangedHexes = excludeUnitCurrentHex(
+        unit.h3Index,
+        tacticalBattle
+          ? collectTacticalLegalRangedTargetRes4Hexes(tacticalBattle, unit.id)
+          : collectRangedTargetHexes(unit.h3Index, unit.unitType, indexed)
+      );
       if (rangedHexes.length > 0) {
         appendRowsForLegalHexes({
           rows: rawRows,

@@ -1,6 +1,10 @@
 /**
  * Contract tests for tactical melee resolution after support orders. Run with:
  * `node dist/main/tacticalBattle/tacticalMeleeApply.test.js`
+ *
+ * **Melee semantics (plan §1.1 / D1):** Tactical has no intercept modal; `applyTacticalMeleeAfterSupportOrders` is the
+ * **automatic** path equivalent to strategic **Ignore** on every melee intercept — one `runMeleePhase` pass per Ready beat.
+ * Playback for toasts/animations uses `TacticalCommitResolutionPlayback` melee fields populated from this helper (`readyHandler.ts`).
  */
 
 import assert from 'node:assert/strict';
@@ -48,6 +52,12 @@ test('tactical melee adjudicates co-located opposing sub-units on the same res4 
       snap.subUnits.length,
       'sub-unit count after melee plus removals must match pre-melee total'
     );
+    if (out.meleeRemovedUnits.length > 0) {
+      assert.ok(
+        out.killsByMelee.length > 0,
+        'playback contract: removals must carry kill edges for tacticalResolutionPlayback / strategic-style toasts'
+      );
+    }
   });
 });
 

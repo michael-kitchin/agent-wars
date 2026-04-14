@@ -6,6 +6,7 @@ import type {
   RangedAttackOrder,
 } from './ordersTypes';
 import type { TacticalBattleSnapshot } from './tacticalTypes';
+import type { TacticalOpponentPlanPayload } from './readyTypes';
 
 /**
  * Documents the `OpenRouterModel` interface as a named contract surface (export interface OpenRouterModel).
@@ -175,12 +176,21 @@ outputTokens?: number;
             /**
        * Specifies the contract for the `tacticalBattle` member (tacticalBattle?: TacticalBattleSnapshot;).
 
-       * Contract: Present after a successful `requestAiOrders` during an active tactical session when the main process updated in-memory tactical sub-unit positions.
-       * When to use: Renderer replaces `S.tacticalBattleSnapshot` so the canvas reflects opponent AI march orders without touching strategic units.
-       * Expected outcome: Omitted when no tactical session or when the consultation returned no applicable tactical movement updates.
+       * Contract: Present after a successful `requestAiOrders` during an active tactical session as the authoritative committed snapshot (unchanged until tactical Ready applies buffered plans).
+       * When to use: Renderer refreshes `S.tacticalBattleSnapshot` when provided; combined with `tacticalOpponentPlan` for strategic-style scheduling.
+       * Expected outcome: Same shape as `getActiveTacticalBattleSnapshot`; may match the pre-request snapshot when only buffering opponent drafts.
        * Exceptions: None.
        */
 tacticalBattle?: TacticalBattleSnapshot;
+            /**
+       * Specifies the contract for the `tacticalOpponentPlan` member (tacticalOpponentPlan?: TacticalOpponentPlanPayload;).
+
+       * Contract: Present on successful tactical AI consultations: opponent orders to apply on the next tactical Ready, replacing any prior buffer (see tactical–strategic alignment plan D5).
+       * When to use: Renderer stores this as `S.tacticalOpponentDraft` until Ready commits it alongside human drafts.
+       * Expected outcome: Normalized arrays; may be all-empty when the model returned no applicable opponent rows.
+       * Exceptions: None.
+       */
+tacticalOpponentPlan?: TacticalOpponentPlanPayload;
     }
   | {   /**
    * Specifies the contract for the `success` member (success: false;).

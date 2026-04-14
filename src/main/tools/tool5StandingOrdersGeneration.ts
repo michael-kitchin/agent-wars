@@ -13,6 +13,18 @@ import {
 } from './tool5StandingOrdersShared';
 
 /**
+ * Options for `generateOrdersForStandingOrders` so tactical resolution can preview routes without advancing DB state.
+ *
+ * Purpose: Keeps tactical Ready merge aligned with strategic standing-order **read** semantics while avoiding double-application of `computed_route` / status mutations before the strategic Ready runs.
+ * When to use: Pass `mutateProgress: false` only from tactical commit merge helpers; omit everywhere else (default mutates like strategic Ready).
+ * Expected outcome: When `mutateProgress` is false, returned movement/ranged rows mirror the live generator while standing_orders rows remain byte-identical aside from concurrent writers.
+ * Exceptions: None.
+ */
+export type GenerateStandingOrdersOptions = {
+  mutateProgress?: boolean;
+};
+
+/**
  * Defines the `deleteStandingOrder` function shape (function deleteStandingOrder(playerId: string, unitId: string): void).
 
  * Purpose: Supports maintainability by documenting why `deleteStandingOrder` exists.
@@ -114,19 +126,27 @@ export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot
 /**
  * Defines the `generateOrdersForStandingOrders` function shape (export function generateOrdersForStandingOrders( playerId: string, state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: num).
 
- * Purpose: Supports maintainability by documenting why `generateOrdersForStandingOrders` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Expires stale rows, runs Tool 1 routes, emits merged movement/ranged rows, and normally persists `computed_route` / deletes like strategic Ready.
+ * When to use: Strategic Ready, AI standing-only paths, and tactical Ready **preview** (`mutateProgress: false`) for parent→sub-unit march merge.
+ * Expected outcome: Default path mutates SQLite like today; preview path returns the same order shapes without touching standing_orders progression.
  * Exceptions: None.
  */
 export function generateOrdersForStandingOrders(
   playerId: string,
   state: GameStateSnapshot,
   latLngByH3: Map<string, LatLng>,
-  resolveToH3: (lat: number, lng: number) => string | undefined
+  resolveToH3: (lat: number, lng: number) => string | undefined,
+  options?: GenerateStandingOrdersOptions
 ): { movementOrders: { unitId: string; toH3Index: string }[]; rangedAttacks: { unitId: string; targetH3Index: string }[] } {
-  logDebug('tool5StandingOrders generateOrdersForStandingOrders', { playerId, turnNumber: state.turnNumber });
-  expireAndUpdateStatus(playerId, state);
+  const mutateProgress = options?.mutateProgress !== false;
+  logDebug('tool5StandingOrders generateOrdersForStandingOrders', {
+    playerId,
+    turnNumber: state.turnNumber,
+    mutateProgress,
+  });
+  if (mutateProgress) {
+    expireAndUpdateStatus(playerId, state);
+  }
   const pathfindingSession = createPathfindingSession(state, latLngByH3, resolveToH3);
 
   const movementOrders: { unitId: string; toH3Index: string }[] = [];
@@ -165,7 +185,9 @@ export function generateOrdersForStandingOrders(
           const toH3 = routeResult.orderToH3;
           if (toH3) movementOrders.push({ unitId: row.unit_id, toH3Index: toH3 });
           const turnsRemaining = Math.max(0, routeResult.turnsRequired - 1);
-          updateStandingOrderComputedRoute(playerId, row.unit_id, { nextMoveHex: endHex, turnsRemaining });
+          if (mutateProgress) {
+            updateStandingOrderComputedRoute(playerId, row.unit_id, { nextMoveHex: endHex, turnsRemaining });
+          }
         }
       } else if (defendH3 && engageRange >= 0) {
         const enemies = state.units.filter((u) => u.player !== playerId);
@@ -183,7 +205,9 @@ export function generateOrdersForStandingOrders(
         if (nearest && getRange(unit.unitType) >= 1 && nearest.dist <= getRange(unit.unitType)) {
           rangedAttacks.push({ unitId: row.unit_id, targetH3Index: nearest.h3Index });
         }
-        updateStandingOrderComputedRoute(playerId, row.unit_id, { turnsRemaining: 0 });
+        if (mutateProgress) {
+          updateStandingOrderComputedRoute(playerId, row.unit_id, { turnsRemaining: 0 });
+        }
       }
       continue;
     }
@@ -199,11 +223,15 @@ export function generateOrdersForStandingOrders(
         pathfindingSession
       );
       if (routeResult.status === 'error') {
-        updateStandingOrderComputedRoute(playerId, row.unit_id, { turnsRemaining: 0 }, 'blocked');
+        if (mutateProgress) {
+          updateStandingOrderComputedRoute(playerId, row.unit_id, { turnsRemaining: 0 }, 'blocked');
+        }
         continue;
       }
       if (routeResult.path.length === 0) {
-        deleteStandingOrder(playerId, row.unit_id);
+        if (mutateProgress) {
+          deleteStandingOrder(playerId, row.unit_id);
+        }
         logDebug('tool5StandingOrders generateOrdersForStandingOrders: removed arrived march order', {
           playerId,
           unitId: row.unit_id,
@@ -214,11 +242,13 @@ export function generateOrdersForStandingOrders(
       if (toH3) {
         movementOrders.push({ unitId: row.unit_id, toH3Index: toH3 });
         const routePayload = toComputedRoutePayload(routeResult);
-        updateStandingOrderComputedRoute(playerId, row.unit_id, {
-          nextMoveHex: routePayload.nextMoveHex,
-          turnsRemaining: Math.max(0, routePayload.turnsRemaining - 1),
-          totalPath: routePayload.totalPath,
-        });
+        if (mutateProgress) {
+          updateStandingOrderComputedRoute(playerId, row.unit_id, {
+            nextMoveHex: routePayload.nextMoveHex,
+            turnsRemaining: Math.max(0, routePayload.turnsRemaining - 1),
+            totalPath: routePayload.totalPath,
+          });
+        }
       }
       if (params.engageEnRoute === true) {
         const enemies = state.units.filter((u) => u.player !== playerId);
@@ -252,7 +282,13 @@ export function generateOrdersForStandingOrders(
         if (originH3) {
           try {
             if (gridDistance(originH3, target.h3Index) > maxDistance) {
-              dbRun('UPDATE standing_orders SET status = ? WHERE player_id = ? AND unit_id = ?', ['target_out_of_range', playerId, row.unit_id]);
+              if (mutateProgress) {
+                dbRun('UPDATE standing_orders SET status = ? WHERE player_id = ? AND unit_id = ?', [
+                  'target_out_of_range',
+                  playerId,
+                  row.unit_id,
+                ]);
+              }
               continue;
             }
           } catch {
@@ -272,18 +308,22 @@ export function generateOrdersForStandingOrders(
         const toH3 = routeResult.orderToH3;
         if (toH3) movementOrders.push({ unitId: row.unit_id, toH3Index: toH3 });
         const routePayload = toComputedRoutePayload(routeResult);
-        updateStandingOrderComputedRoute(
-          playerId,
-          row.unit_id,
-          {
-            nextMoveHex: routePayload.nextMoveHex,
-            turnsRemaining: Math.max(0, routePayload.turnsRemaining - 1),
-            totalPath: routePayload.totalPath,
-          },
-          'closing'
-        );
+        if (mutateProgress) {
+          updateStandingOrderComputedRoute(
+            playerId,
+            row.unit_id,
+            {
+              nextMoveHex: routePayload.nextMoveHex,
+              turnsRemaining: Math.max(0, routePayload.turnsRemaining - 1),
+              totalPath: routePayload.totalPath,
+            },
+            'closing'
+          );
+        }
       } else {
-        updateStandingOrderComputedRoute(playerId, row.unit_id, { turnsRemaining: 0 }, 'closing');
+        if (mutateProgress) {
+          updateStandingOrderComputedRoute(playerId, row.unit_id, { turnsRemaining: 0 }, 'closing');
+        }
       }
       if (getRange(unit.unitType) >= 1) {
         try {
@@ -317,28 +357,34 @@ export function generateOrdersForStandingOrders(
           const arrivesThisTurn = routeResult.turnsRequired <= 1;
           const nextIndex = arrivesThisTurn ? (waypointIndex + 1) % waypoints.length : waypointIndex;
           const turnsRemaining = Math.max(0, routeResult.turnsRequired - 1);
-          updateStandingOrderComputedRoute(
-            playerId,
-            row.unit_id,
-            { waypointIndex: nextIndex, nextMoveHex: endHex, turnsRemaining },
-            'patrolling'
-          );
+          if (mutateProgress) {
+            updateStandingOrderComputedRoute(
+              playerId,
+              row.unit_id,
+              { waypointIndex: nextIndex, nextMoveHex: endHex, turnsRemaining },
+              'patrolling'
+            );
+          }
         }
       } else {
         logDebug('tool5StandingOrders patrol: unit at waypoint with empty path, advancing index', {
           unitId: row.unit_id, waypointIndex, nextIndex: (waypointIndex + 1) % waypoints.length,
         });
         const nextIndex = (waypointIndex + 1) % waypoints.length;
-        updateStandingOrderComputedRoute(playerId, row.unit_id, { waypointIndex: nextIndex, turnsRemaining: 0 }, 'patrolling');
+        if (mutateProgress) {
+          updateStandingOrderComputedRoute(playerId, row.unit_id, { waypointIndex: nextIndex, turnsRemaining: 0 }, 'patrolling');
+        }
       }
       const enemies = state.units.filter((u) => u.player !== playerId);
       for (const e of enemies) {
         try {
           if (gridDistance(unit.h3Index, e.h3Index) === 1) {
-            dbRun(
-              'UPDATE standing_orders SET status = ? WHERE player_id = ? AND unit_id = ?',
-              ['contact', playerId, row.unit_id]
-            );
+            if (mutateProgress) {
+              dbRun(
+                'UPDATE standing_orders SET status = ? WHERE player_id = ? AND unit_id = ?',
+                ['contact', playerId, row.unit_id]
+              );
+            }
             break;
           }
         } catch {
@@ -349,6 +395,8 @@ export function generateOrdersForStandingOrders(
     }
   }
 
-  saveDatabase();
+  if (mutateProgress) {
+    saveDatabase();
+  }
   return { movementOrders, rangedAttacks };
 }

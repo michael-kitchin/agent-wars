@@ -3,7 +3,7 @@
  */
 
 import type { SealiftLandUnitOption, SealiftNavalRow, SealiftStackState } from '../../shared/ipcTypes';
-import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { getSealiftStackContextModeForHex } from '../game-actions/sealift';
 import { getActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import { tacticalLogQuery } from './tacticalLogging';

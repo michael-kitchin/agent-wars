@@ -49,4 +49,15 @@ export function applySuccessfulPrecomputedAiResult(result: Extract<RequestAiOrde
   if (result.tacticalBattle) {
     S.tacticalBattleSnapshot = result.tacticalBattle;
   }
+  if (result.tacticalOpponentPlan) {
+    const replacedPriorDraft = S.tacticalOpponentDraft !== null;
+    if (replacedPriorDraft) {
+      console.debug('[agent-wars] tactical opponent draft replaced by newer AI plan (D5)', {
+        movementCount: result.tacticalOpponentPlan.movementOrders.length,
+        rangedCount: result.tacticalOpponentPlan.rangedAttacks.length,
+        airCount: result.tacticalOpponentPlan.airStrikes.length,
+      });
+    }
+    S.tacticalOpponentDraft = result.tacticalOpponentPlan;
+  }
 }

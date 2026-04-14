@@ -10,6 +10,7 @@ import {
   clearDeferredHumanUnitSingleSelectTimer,
 } from './mapClickSelectionPolicy';
 import { emitParityDiagnosticsBreadcrumb } from '../core/parityDiagnostics';
+import { hideOrderBlockHexTooltip, repositionOrderBlockHexTooltipIfVisible } from './orderBlockHexTooltip';
 
 /**
  * Minimal unit row shape used for grouped march / ferry preflight on the map (strategic units or tactical sub-units).
@@ -454,6 +455,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
   mainMapEl.addEventListener('pointermove', (e) => {
     S.lastPointerClientX = e.clientX;
     S.lastPointerClientY = e.clientY;
+    repositionOrderBlockHexTooltipIfVisible();
     if (deps.shouldSuppressTerrainTooltip()) {
       deps.clearTerrainTooltipTimer();
       deps.hideTerrainTooltipVisual();
@@ -534,6 +536,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     }
     deps.clearTerrainTooltipTimer();
     deps.hideTerrainTooltipVisual();
+    hideOrderBlockHexTooltip();
     if (S.hoveredHexH3 !== null || S.hoveredDetailHexH3 !== null) {
       S.hoveredHexH3 = null;
       S.hoveredDetailHexH3 = null;
@@ -547,6 +550,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     S.selectedUnitIdsAtMouseDown = [...S.selectedUnitIds];
     deps.clearTerrainTooltipTimer();
     deps.hideTerrainTooltipVisual();
+    hideOrderBlockHexTooltip();
   });
 
   mainMapEl.addEventListener('click', async (e) => {

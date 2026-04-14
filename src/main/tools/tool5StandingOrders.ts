@@ -41,6 +41,7 @@ export {
   getInjectionText,
   getStandingOrderForUnit,
 };
+export type { GenerateStandingOrdersOptions } from './tool5StandingOrdersGeneration';
 
 /**
  * Documents the module-scope binding `TOOL5_NAMES` (TOOL5_NAMES).

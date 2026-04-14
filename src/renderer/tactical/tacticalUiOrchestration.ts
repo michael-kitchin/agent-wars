@@ -24,6 +24,7 @@ export function tacticalReleaseRendererSessionForNewStrategicMatch(nextState: Ga
   S.resolutionMoveAnimationFrameId = null;
   S.resolutionMoveAnimation = null;
   S.tacticalBattleSnapshot = null;
+  S.tacticalOpponentDraft = null;
   S.tacticalPhasePlanning = true;
   S.tacticalPendingMarches = [];
   S.pendingEmbarkOrders = [];
@@ -79,6 +80,7 @@ export function tacticalReconcileBattleAfterStrategicSnapshot(nextState: GameSta
   if (!snap) return;
   if (nextState.phase !== 'planning' || nextState.turnNumber !== snap.strategicTurnNumber) {
     S.tacticalBattleSnapshot = null;
+    S.tacticalOpponentDraft = null;
     S.tacticalPhasePlanning = true;
     S.tacticalPendingMarches = [];
     S.pendingEmbarkOrders = [];

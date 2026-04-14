@@ -12,7 +12,9 @@ import {
   type RequestAiOrdersResult,
   type ReadyResultMinimal,
 } from './gameIpcHandlers';
-import type { AirStrikeOrder, EmbarkOrder, FerryOrder, ReadyResult } from '../shared/ipcTypes';
+import type { AirStrikeOrder, EmbarkOrder, FerryOrder, ReadyResult, TacticalOpponentPlanPayload } from '../shared/ipcTypes';
+import { setActiveTacticalBattleSnapshotRef } from './tacticalBattle/activeTacticalBattleRef';
+import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
 
 /**
  * Documents the module-scope binding `minimalPlanningState` (minimalPlanningState).
@@ -190,6 +192,59 @@ async function testRequestAiOrdersSuccess(): Promise<void> {
   assert.strictEqual(result.success, true);
   assert.strictEqual((result as { orders: unknown[] }).orders.length, 1);
   assert.strictEqual((result as { strategy?: string }).strategy, 'hold');
+}
+
+/**
+ * Defines the `testRequestAiOrdersTacticalBuffersOpponentPlan` function shape (async function testRequestAiOrdersTacticalBuffersOpponentPlan(): Promise<void>).
+
+ * Purpose: Locks Phase 4 tactical scheduling — snapshot is not mutated on the AI callback; opponent rows are returned as `tacticalOpponentPlan`.
+ * When to use: Regression when editing `handleRequestAiOrders` tactical branch.
+ * Expected outcome: `tacticalBattle` is the same object reference as the active session; `orders` stripped to [] on the IPC result.
+ * Exceptions: None.
+ */
+async function testRequestAiOrdersTacticalBuffersOpponentPlan(): Promise<void> {
+  const tacticalSnap: TacticalBattleSnapshot = {
+    battleId: 'tb-ipc-test',
+    enclosingRes1H3Index: '891f1d48b9fffff',
+    res4ChildH3Indexes: ['891f1d48b9fffff'],
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits: [],
+  };
+  setActiveTacticalBattleSnapshotRef(tacticalSnap);
+  try {
+    const controllerRef = { current: null as AbortController | null };
+    const deps = {
+      getGameState: () => minimalPlanningState,
+      getGameStateForPlayer: () => minimalPlanningState,
+      getSelectedModel: () => 'test-model',
+      hasKey: () => true,
+      getToolNamesForEnabledGroups: () => ['planning', 'assessment', 'estimation'],
+      defaultGroupIds: ['planning', 'assessment', 'estimation'],
+      requestOrders: async (): Promise<RequestAiOrdersResult> => ({
+        success: true,
+        orders: [{ unitId: 'opp-su-1', toH3Index: '891f1d48b9fffff' }],
+        rangedAttacks: [{ unitId: 'opp-su-1', targetH3Index: '891f1d48b9fffff' }],
+        strategy: 'probe',
+      }),
+      controllerRef,
+    };
+    const result = await handleRequestAiOrders({}, deps);
+    assert.strictEqual(result.success, true);
+    const ok = result as {
+      orders: unknown[];
+      tacticalBattle?: TacticalBattleSnapshot;
+      tacticalOpponentPlan?: TacticalOpponentPlanPayload;
+    };
+    assert.strictEqual(ok.orders.length, 0);
+    assert.strictEqual(ok.tacticalBattle, tacticalSnap);
+    assert.ok(ok.tacticalOpponentPlan);
+    assert.strictEqual(ok.tacticalOpponentPlan!.movementOrders.length, 1);
+    assert.strictEqual(ok.tacticalOpponentPlan!.rangedAttacks.length, 1);
+    assert.strictEqual(ok.tacticalOpponentPlan!.airStrikes.length, 0);
+  } finally {
+    setActiveTacticalBattleSnapshotRef(null);
+  }
 }
 
 /**
@@ -555,6 +610,7 @@ async function runAll(): Promise<void> {
     { name: 'requestAiOrders no model', fn: testRequestAiOrdersNoModel },
     { name: 'requestAiOrders no key', fn: testRequestAiOrdersNoKey },
     { name: 'requestAiOrders success', fn: testRequestAiOrdersSuccess },
+    { name: 'requestAiOrders tactical buffers opponent plan', fn: testRequestAiOrdersTacticalBuffersOpponentPlan },
     { name: 'requestAiOrders cancelled', fn: testRequestAiOrdersCancelled },
     { name: 'game:ready precomputed skips requestOrders', fn: testGameReadyPrecomputedSkipsRequestOrders },
     {

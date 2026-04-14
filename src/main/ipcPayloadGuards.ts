@@ -1,4 +1,5 @@
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../shared/ipcTypes';
+import type { TacticalOpponentPlanPayload } from '../shared/ipc/readyTypes';
 
 /**
  * Documents the `GroupTargetType` type alias (type GroupTargetType).
@@ -135,6 +136,7 @@ export type ParsedHumanTacticalCommitOrders = {
   airStrikes: AirStrikeOrder[];
   ferryOrders: FerryOrder[];
   embarkOrders: EmbarkOrder[];
+  opponentTacticalDraft?: TacticalOpponentPlanPayload;
 };
 
 /**
@@ -221,8 +223,85 @@ export function parseHumanTacticalCommitPayload(
     }
     embarkOrders.push({ unitId: r.unitId, navalUnitId: r.navalUnitId });
   }
+  let opponentTacticalDraft: TacticalOpponentPlanPayload | undefined;
+  const oppRaw = (p as { opponentTacticalDraft?: unknown }).opponentTacticalDraft;
+  if (oppRaw !== undefined) {
+    if (oppRaw === null || typeof oppRaw !== 'object') return { ok: false, reason: invalid };
+    const o = oppRaw as {
+      movementOrders?: unknown;
+      rangedAttacks?: unknown;
+      airStrikes?: unknown;
+      ferryOrders?: unknown;
+      embarkOrders?: unknown;
+    };
+    const omRaw = o.movementOrders ?? [];
+    if (!Array.isArray(omRaw)) return { ok: false, reason: invalid };
+    const om: { unitId: string; toH3Index: string }[] = [];
+    for (const row of omRaw) {
+      if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
+      const r = row as { unitId?: unknown; toH3Index?: unknown };
+      if (typeof r.unitId !== 'string' || typeof r.toH3Index !== 'string') return { ok: false, reason: invalid };
+      om.push({ unitId: r.unitId, toH3Index: r.toH3Index });
+    }
+    const orRaw = o.rangedAttacks ?? [];
+    if (!Array.isArray(orRaw)) return { ok: false, reason: invalid };
+    const ora: { unitId: string; targetH3Index: string }[] = [];
+    for (const row of orRaw) {
+      if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
+      const r = row as { unitId?: unknown; targetH3Index?: unknown };
+      if (typeof r.unitId !== 'string' || typeof r.targetH3Index !== 'string') return { ok: false, reason: invalid };
+      ora.push({ unitId: r.unitId, targetH3Index: r.targetH3Index });
+    }
+    const oaRaw = o.airStrikes ?? [];
+    if (!Array.isArray(oaRaw)) return { ok: false, reason: invalid };
+    const oa: AirStrikeOrder[] = [];
+    for (const row of oaRaw) {
+      if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
+      const r = row as { unitId?: unknown; targetH3Index?: unknown; targetType?: unknown };
+      if (
+        typeof r.unitId !== 'string' ||
+        typeof r.targetH3Index !== 'string' ||
+        (r.targetType !== 'units' &&
+          r.targetType !== 'urban' &&
+          r.targetType !== 'airport' &&
+          r.targetType !== 'seaport')
+      ) {
+        return { ok: false, reason: invalid };
+      }
+      oa.push({ unitId: r.unitId, targetH3Index: r.targetH3Index, targetType: r.targetType });
+    }
+    const ofRaw = o.ferryOrders ?? [];
+    if (!Array.isArray(ofRaw)) return { ok: false, reason: invalid };
+    const ofe: FerryOrder[] = [];
+    for (const row of ofRaw) {
+      if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
+      const r = row as { unitId?: unknown; destinationH3Index?: unknown };
+      if (typeof r.unitId !== 'string' || typeof r.destinationH3Index !== 'string') {
+        return { ok: false, reason: invalid };
+      }
+      ofe.push({ unitId: r.unitId, destinationH3Index: r.destinationH3Index });
+    }
+    const oeRaw = o.embarkOrders ?? [];
+    if (!Array.isArray(oeRaw)) return { ok: false, reason: invalid };
+    const oe: EmbarkOrder[] = [];
+    for (const row of oeRaw) {
+      if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
+      const r = row as { unitId?: unknown; navalUnitId?: unknown };
+      if (typeof r.unitId !== 'string' || typeof r.navalUnitId !== 'string') {
+        return { ok: false, reason: invalid };
+      }
+      oe.push({ unitId: r.unitId, navalUnitId: r.navalUnitId });
+    }
+    opponentTacticalDraft = {
+      movementOrders: om,
+      rangedAttacks: ora,
+      airStrikes: oa,
+      ferryOrders: ofe,
+      embarkOrders: oe,
+    };
+  }
   return {
     ok: true,
-    value: { movementOrders, rangedAttacks, airStrikes, ferryOrders, embarkOrders },
+    value: { movementOrders, rangedAttacks, airStrikes, ferryOrders, embarkOrders, opponentTacticalDraft },
   };
 }

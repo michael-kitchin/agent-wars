@@ -5,12 +5,46 @@ import {
   representativeMarchPreviewUnitIdsByOriginH3,
 } from '../../shared/humanMarchPreviewGroupAssembly';
 import { buildTacticalMarchHoverPreview } from '../../shared/tacticalMarchHoverPreview';
-import { RANGED_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
+import { unitHasTacticalRangedBaseline } from '../../shared/tacticalRanges';
 import {
   formatPendingAirStrikeSidebarLabel,
   formatPendingRangedAttackSidebarLabel,
 } from './orderLabelFormatting';
 import { rendererSharedState as S } from '../core/state';
+import type { HoverRoutePreviewState } from '../core/types';
+import { resolveOrderBlockHexTooltipMessage, showOrderBlockHexTooltip } from '../map/orderBlockHexTooltip';
+
+/**
+ * Publishes `S.hoverRoutePreview` and synchronizes the transient “Blocked: …” hover hint for invalid march/ranged targets.
+ *
+ * Purpose: Keeps tactical and strategic preview paths aligned on when to show terrain vs range blocking copy (air: range only).
+ * When to use: Only from `refreshHoverRoutePreview` after validation / preview envelopes are computed.
+ * Expected outcome: Redraw requested; `#order-block-tooltip` hidden when `preview` is null or no blocking message applies.
+ * Exceptions: None.
+ */
+function publishHoverRoutePreview(
+  deps: TacticalOrderDeps,
+  preview: HoverRoutePreviewState | null,
+  rangedValidationReason: string | null,
+  airStrikeValidationReason: string | null
+): void {
+  S.hoverRoutePreview = preview;
+  if (!preview) {
+    showOrderBlockHexTooltip(null);
+    deps.requestRedraw();
+    return;
+  }
+  const msg = resolveOrderBlockHexTooltipMessage(
+    preview.hoveredH3Index,
+    preview.data,
+    preview.renderAsSupportTargeting === 'ranged',
+    preview.renderAsSupportTargeting === 'air',
+    preview.renderAsSupportTargeting === 'ranged' ? rangedValidationReason : null,
+    preview.renderAsSupportTargeting === 'air' ? airStrikeValidationReason : null
+  );
+  showOrderBlockHexTooltip(msg);
+  deps.requestRedraw();
+}
 
 /**
  * Documents the `TacticalOrderDeps` interface as a named contract surface (interface TacticalOrderDeps).
@@ -255,6 +289,7 @@ export function clearCommittedOrderDraftState(deps: TacticalOrderDeps): void {
   S.selectedHexIndex = null;
   S.hideCommittedOrderLinesAfterReady = false;
   S.hoverRoutePreview = null;
+  showOrderBlockHexTooltip(null);
 }
 
 /**
@@ -271,15 +306,13 @@ export async function refreshHoverRoutePreview(deps: TacticalOrderDeps): Promise
   const seq = ++S.hoverPreviewRequestSeq;
   if (S.tacticalBattleSnapshot) {
     if (unitIds.length === 0 || !hoveredH3) {
-      S.hoverRoutePreview = null;
-      deps.requestRedraw();
+      publishHoverRoutePreview(deps, null, null, null);
       return;
     }
     const tb = S.tacticalBattleSnapshot;
     if (S.rangedModeActive && !S.airStrikeModeActive) {
       if (!window.gameApi?.validateGroupRangedTarget) {
-        S.hoverRoutePreview = null;
-        deps.requestRedraw();
+        publishHoverRoutePreview(deps, null, null, null);
         return;
       }
       const validation = await window.gameApi.validateGroupRangedTarget({ unitIds, targetH3Index: hoveredH3 });
@@ -323,14 +356,17 @@ export async function refreshHoverRoutePreview(deps: TacticalOrderDeps): Promise
         };
       });
       const data = buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange: 99 });
-      S.hoverRoutePreview = { hoveredH3Index: hoveredH3, data, renderAsSupportTargeting: 'ranged' };
-      deps.requestRedraw();
+      publishHoverRoutePreview(
+        deps,
+        { hoveredH3Index: hoveredH3, data, renderAsSupportTargeting: 'ranged' },
+        valid ? null : (validation.reason ?? null),
+        null
+      );
       return;
     }
     if (S.airStrikeModeActive) {
       if (!window.gameApi?.validateGroupAirStrikeTarget) {
-        S.hoverRoutePreview = null;
-        deps.requestRedraw();
+        publishHoverRoutePreview(deps, null, null, null);
         return;
       }
       const validation = await window.gameApi.validateGroupAirStrikeTarget({
@@ -378,8 +414,12 @@ export async function refreshHoverRoutePreview(deps: TacticalOrderDeps): Promise
         };
       });
       const data = buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange: 99 });
-      S.hoverRoutePreview = { hoveredH3Index: hoveredH3, data, renderAsSupportTargeting: 'air' };
-      deps.requestRedraw();
+      publishHoverRoutePreview(
+        deps,
+        { hoveredH3Index: hoveredH3, data, renderAsSupportTargeting: 'air' },
+        null,
+        valid ? null : (validation.reason ?? null)
+      );
       return;
     }
     const data = buildTacticalMarchHoverPreview(tb, unitIds, hoveredH3);
@@ -388,20 +428,17 @@ export async function refreshHoverRoutePreview(deps: TacticalOrderDeps): Promise
     const currentSelected = [...S.selectedUnitIds].sort().join('|');
     const requestedSelected = [...unitIds].sort().join('|');
     if (currentSelected !== requestedSelected) return;
-    S.hoverRoutePreview = { hoveredH3Index: hoveredH3, data };
-    deps.requestRedraw();
+    publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data }, null, null);
     return;
   }
   if (unitIds.length === 0 || !hoveredH3 || !S.gameState) {
-    S.hoverRoutePreview = null;
-    deps.requestRedraw();
+    publishHoverRoutePreview(deps, null, null, null);
     return;
   }
   const gs = S.gameState;
   if (S.rangedModeActive && !S.airStrikeModeActive) {
     if (!window.gameApi?.validateGroupRangedTarget) {
-      S.hoverRoutePreview = null;
-      deps.requestRedraw();
+      publishHoverRoutePreview(deps, null, null, null);
       return;
     }
     const validation = await window.gameApi.validateGroupRangedTarget({ unitIds, targetH3Index: hoveredH3 });
@@ -445,14 +482,17 @@ export async function refreshHoverRoutePreview(deps: TacticalOrderDeps): Promise
       };
     });
     const data = buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange: 99 });
-    S.hoverRoutePreview = { hoveredH3Index: hoveredH3, data, renderAsSupportTargeting: 'ranged' };
-    deps.requestRedraw();
+    publishHoverRoutePreview(
+      deps,
+      { hoveredH3Index: hoveredH3, data, renderAsSupportTargeting: 'ranged' },
+      valid ? null : (validation.reason ?? null),
+      null
+    );
     return;
   }
   if (S.airStrikeModeActive) {
     if (!window.gameApi?.validateGroupAirStrikeTarget) {
-      S.hoverRoutePreview = null;
-      deps.requestRedraw();
+      publishHoverRoutePreview(deps, null, null, null);
       return;
     }
     const validation = await window.gameApi.validateGroupAirStrikeTarget({
@@ -500,13 +540,16 @@ export async function refreshHoverRoutePreview(deps: TacticalOrderDeps): Promise
       };
     });
     const data = buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange: 99 });
-    S.hoverRoutePreview = { hoveredH3Index: hoveredH3, data, renderAsSupportTargeting: 'air' };
-    deps.requestRedraw();
+    publishHoverRoutePreview(
+      deps,
+      { hoveredH3Index: hoveredH3, data, renderAsSupportTargeting: 'air' },
+      null,
+      valid ? null : (validation.reason ?? null)
+    );
     return;
   }
   if (!window.gameApi?.previewHumanMarchOrders) {
-    S.hoverRoutePreview = null;
-    deps.requestRedraw();
+    publishHoverRoutePreview(deps, null, null, null);
     return;
   }
   const data = await window.gameApi.previewHumanMarchOrders({ unitIds, hoveredH3Index: hoveredH3 });
@@ -515,8 +558,7 @@ export async function refreshHoverRoutePreview(deps: TacticalOrderDeps): Promise
   const currentSelected = [...S.selectedUnitIds].sort().join('|');
   const requestedSelected = [...unitIds].sort().join('|');
   if (currentSelected !== requestedSelected) return;
-  S.hoverRoutePreview = { hoveredH3Index: hoveredH3, data };
-  deps.requestRedraw();
+  publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data }, null, null);
 }
 
 /**
@@ -674,7 +716,7 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
           .filter((unit): unit is NonNullable<typeof unit> => !!unit);
     const allAir = selectedUnits.length > 0 && selectedUnits.every((unit) => unit.unitType === 'air');
     const allHaveRanged =
-      selectedUnits.length > 0 && selectedUnits.every((unit) => (RANGED_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 0) >= 1);
+      selectedUnits.length > 0 && selectedUnits.every((unit) => unitHasTacticalRangedBaseline(unit.unitType));
     if (allAir) {
       btnEl.textContent = 'Strike';
       btnEl.style.display = S.airStrikeModeActive ? 'none' : 'inline-block';

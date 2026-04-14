@@ -13,6 +13,7 @@ import type {
   FerryOrder,
   AirStrikeTargetType,
   RemovedUnitSnapshot,
+  TacticalOpponentPlanPayload,
 } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { OPENROUTER_TOOL_GROUPS } from './constants';
@@ -81,6 +82,16 @@ airStrikeCasualtyHexes?: string[];
    * Exceptions: None.
    */
 startTime: number;
+    /**
+   * When true, resolution playback elapsed stays at 0 until tactical Ready clears it and resets `startTime` after IPC.
+   *
+   * Purpose: Prevents `requestAnimationFrame` from advancing the movement timeline during `await getGameState` and
+   * terrain refresh while the canvas is not yet showing the committed frame.
+   * When to use: Only tactical `commitHumanTacticalDraftOrders` success path; omit for strategic Ready animations.
+   * Expected outcome: Hop-free snapshot swap without consuming the movement segment before the first visible paint.
+   * Exceptions: None.
+   */
+tacticalDeferResolutionClock?: boolean;
     /**
    * Specifies the contract for the `combatHexes` member (combatHexes?: string[];).
 
@@ -256,6 +267,15 @@ lastBuildEntryLayerKey: null as string | null,
    * Exceptions: None.
    */
 tacticalBattleSnapshot: null as TacticalBattleSnapshot | null,
+    /**
+   * Documents the object literal property `tacticalOpponentDraft` (tacticalOpponentDraft: null as TacticalOpponentPlanPayload | null).
+
+   * Purpose: Holds the latest buffered opponent tactical plan from `requestAiOrders` until tactical Ready commits it with human drafts.
+   * When to use: Written on successful tactical AI consultation; cleared on successful Ready commit, tactical exit, or session stash.
+   * Expected outcome: Null when no plan buffered yet or after commit; normalized arrays when set.
+   * Exceptions: None.
+   */
+tacticalOpponentDraft: null as TacticalOpponentPlanPayload | null,
     /**
    * Documents the object literal property `lastTacticalEntryLayerKey` (lastTacticalEntryLayerKey: null as string | null).
 

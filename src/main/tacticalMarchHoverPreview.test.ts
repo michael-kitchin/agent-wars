@@ -6,7 +6,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gridDisk, latLngToCell } from 'h3-js';
 import { formatTacticalDraftMarchPendingOrderTargetLabel } from '../shared/pendingMovementSidebarLabels';
-import { buildTacticalMarchHoverPreview } from '../shared/tacticalMarchHoverPreview';
+import {
+  buildTacticalMarchDraftDestinationPreview,
+  buildTacticalMarchHoverPreview,
+} from '../shared/tacticalMarchHoverPreview';
 import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
 
 test('buildTacticalMarchHoverPreview marks in-range neighbor as valid', () => {
@@ -36,6 +39,34 @@ test('buildTacticalMarchHoverPreview marks in-range neighbor as valid', () => {
   assert.ok(result.previews.length >= 1);
   assert.equal(result.previews[0]?.preview.valid, true);
   assert.ok((result.previews[0]?.preview.segments[0]?.hexes.length ?? 0) >= 2);
+});
+
+test('buildTacticalMarchDraftDestinationPreview matches hover path for one pending march row', () => {
+  const center = latLngToCell(12, 22, 4);
+  const ringCells = [...gridDisk(center, 2)];
+  const neighbor = ringCells.find((h) => h !== center);
+  assert.ok(neighbor);
+  const battle: TacticalBattleSnapshot = {
+    battleId: 'b-draft',
+    enclosingRes1H3Index: center,
+    res4ChildH3Indexes: ringCells,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits: [
+      {
+        id: 'su-human',
+        parentUnitId: 'parent-1',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: center,
+        displayName: 'Inf B',
+      },
+    ],
+  };
+  const hover = buildTacticalMarchHoverPreview(battle, ['su-human'], neighbor);
+  const draft = buildTacticalMarchDraftDestinationPreview(battle, 'su-human', neighbor);
+  assert.equal(hover.previews[0]?.preview.valid, draft.valid);
+  assert.deepEqual(hover.previews[0]?.preview.segments, draft.segments);
 });
 
 test('buildTacticalMarchHoverPreview rejects destinations outside the footprint', () => {

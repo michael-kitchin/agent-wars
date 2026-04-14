@@ -3,8 +3,11 @@
  */
 
 import * as assert from 'assert';
-import { cellToLatLng, gridDisk, gridDistance } from 'h3-js';
+import { cellToLatLng, cellToParent, gridDisk, gridDistance } from 'h3-js';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { getOrderedHexList, LATLNG_DECIMAL_PLACES } from '../mapData';
+import { buildTacticalAiPlanState } from '../tacticalBattle/buildTacticalAiPlanState';
+import { tacticalRes1Cell, tacticalRes4UnderRes1Corner } from '../tacticalBattle/testSupport/tacticalRes4HexFixtures';
 import { formatLatLng } from './promptText';
 import { buildPossibleUnitActionsMarkdown, partitionHomelandNearestOther } from './possibleUnitActions';
 import type { GameStateSnapshot } from '../gameDb';
@@ -206,6 +209,101 @@ function testUnitHexAppearsInSingleBucketWithPriority(): void {
 }
 
 /**
+ * Defines the `countOpponentArmorRangedTableRows` function shape (function countOpponentArmorRangedTableRows(md: string): number).
+
+ * Purpose: Counts markdown table rows for opponent armor `ranged attack` actions so tactical vs strategic briefing output can be compared without parsing full tables.
+ * When to use: `testTacticalPossibleActionsMarkdownUsesTacticalRangedLegality` assertions only.
+ * Expected outcome: Returns the number of pipe-delimited lines mentioning both `opp-arm-ranged-cap` and the ranged action label.
+ * Exceptions: None.
+ */
+function countOpponentArmorRangedTableRows(md: string): number {
+  return md.split('\n').filter((line) => line.includes('opp-arm-ranged-cap') && line.includes('ranged attack')).length;
+}
+
+/**
+ * Defines the `testTacticalPossibleActionsMarkdownUsesTacticalRangedLegality` function shape (function testTacticalPossibleActionsMarkdownUsesTacticalRangedLegality(): void).
+
+ * Purpose: Ensures `tacticalBattle` briefings use **tactical** res4 ranged rules (`RANGED_RANGE_BY_UNIT_TYPE` + terrain), not strategic `getRange` alone: opponent armor on plains can reach two res4 steps on the tactical grid while the same projected `GameStateSnapshot` only allows one-step strategic ranged rows.
+ * When to use: Regression guard when changing `collectTacticalLegalRangedTargetRes4Hexes` or strategic `collectRangedTargetHexes` wiring.
+ * Expected outcome: Non-tactical markdown has one armor ranged row (strategic range 1); tactical markdown has two (near and far humans at res4 distances 1 and 2).
+ * Exceptions: None.
+ */
+function testTacticalPossibleActionsMarkdownUsesTacticalRangedLegality(): void {
+  const res1 = tacticalRes1Cell(12, 34);
+  const res4Armor = tacticalRes4UnderRes1Corner(12, 34);
+  const sameParent = [...gridDisk(res4Armor, 6)].filter((h) => cellToParent(h, 1) === res1);
+  const res4NearHuman = sameParent.find((h) => h !== res4Armor && gridDistance(res4Armor, h) === 1);
+  const res4FarHuman = sameParent.find((h) => h !== res4Armor && gridDistance(res4Armor, h) === 2);
+  if (!res4NearHuman || !res4FarHuman) {
+    throw new Error('expected res4 ring neighbors at distances 1 and 2 under the same res1 parent');
+  }
+  const tactical: TacticalBattleSnapshot = {
+    battleId: 't-ranged-cap-md',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: [res4Armor, res4NearHuman, res4FarHuman],
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: {
+      [res4Armor]: 'plains',
+      [res4NearHuman]: 'plains',
+      [res4FarHuman]: 'plains',
+    },
+    subUnits: [
+      {
+        id: 'opp-arm-ranged-cap',
+        parentUnitId: 'parent-arm',
+        player: 'opponent',
+        unitType: 'armor',
+        h3Index: res4Armor,
+        displayName: 'Armor',
+      },
+      {
+        id: 'hum-near',
+        parentUnitId: 'parent-inf-n',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: res4NearHuman,
+        displayName: 'Infantry near',
+      },
+      {
+        id: 'hum-far',
+        parentUnitId: 'parent-inf-f',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: res4FarHuman,
+        displayName: 'Infantry far',
+      },
+    ],
+  };
+  const strategic: GameStateSnapshot = {
+    turnNumber: 1,
+    phase: 'planning',
+    hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+    units: [],
+    pendingOrders: [],
+    humanHomeRegionHexes: [res4FarHuman],
+    res1Control: [{ h3Index: res1, controllerPlayerId: 'opponent' }],
+  };
+  const plan = buildTacticalAiPlanState(strategic, tactical);
+  const latLngByH3 = new Map<string, [number, number]>();
+  for (const h of plan.hexes.map((x) => x.h3Index)) {
+    latLngByH3.set(h, cellToLatLng(h) as [number, number]);
+  }
+  const fmt = (ll: [number, number]) => formatLatLng(ll, LATLNG_DECIMAL_PLACES);
+  const mdStrategic = buildPossibleUnitActionsMarkdown({ state: plan, latLngByH3, formatLatLng: fmt });
+  const mdTactical = buildPossibleUnitActionsMarkdown({
+    state: plan,
+    latLngByH3,
+    formatLatLng: fmt,
+    tacticalBattle: tactical,
+  });
+  assert.strictEqual(countOpponentArmorRangedTableRows(mdStrategic), 1);
+  assert.strictEqual(countOpponentArmorRangedTableRows(mdTactical), 2);
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
 
  * Purpose: Supports maintainability by documenting why `tests` exists.
@@ -220,6 +318,10 @@ const tests = [
   { name: 'partitionHomelandNearestOther tie handling', fn: testPartitionIncludesAllTiesAtMinDistance },
   { name: 'buildPossibleUnitActionsMarkdown emits markdown tables', fn: testBuildPossibleUnitActionsUsesTables },
   { name: 'buildPossibleUnitActionsMarkdown de-duplicates unit+hex across buckets', fn: testUnitHexAppearsInSingleBucketWithPriority },
+  {
+    name: 'buildPossibleUnitActionsMarkdown tacticalBattle uses res4 ranged rules vs strategic getRange',
+    fn: testTacticalPossibleActionsMarkdownUsesTacticalRangedLegality,
+  },
 ];
 
 /**

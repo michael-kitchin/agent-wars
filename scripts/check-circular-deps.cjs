@@ -5,9 +5,12 @@ const path = require('path');
 
 const IMPORT_RE = /import\s+(?:type\s+)?(?:[\s\S]*?)\s+from\s+['"]([^'"]+)['"]/g;
 const EXPORT_RE = /export\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]/g;
-const ALLOWED_BASELINE_CYCLES = new Set([
-  ['src/main/combatResolution.ts', 'src/main/gameActions.ts', 'src/main/combatResolution.ts'].join(' -> '),
-]);
+
+// Frozen baseline of known TypeScript import cycles (main process). CI fails only when a *new*
+// cycle appears or an existing one changes shape. To refresh after an intentional graph change,
+// run: node scripts/dump-circular-deps.cjs scripts/circular-deps-baseline.json
+const BASELINE_PATH = path.join(__dirname, 'circular-deps-baseline.json');
+const ALLOWED_BASELINE_CYCLES = new Set(JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8')));
 
 function walk(dir) {
   const out = [];

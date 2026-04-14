@@ -11,6 +11,7 @@ import type { MeleeInterceptModalOpenArgs, MeleeInterceptModalOutcome } from './
 import { buildTacticalSubUnitKillLabelOverlay } from './sidebarSupport';
 import { buildTurnUpdateBullets } from './turnUpdateSummary';
 import { readTacticalBattlesInterceptPromptEnabled } from './tacticalBattlePromptPreference';
+import { composeResolutionMapToastBullets } from '../../shared/orderPreviewBlockingCopy';
 import { tacticalKillEdgesForStrategicStyleTurnUpdate } from '../../shared/tacticalToastKillSlice';
 import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
 import { rendererSharedState as S } from '../core/state';
@@ -662,6 +663,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         airStrikes: [...S.pendingAirStrikes],
         ferryOrders: [...S.pendingFerryOrders],
         embarkOrders: [...S.pendingEmbarkOrders],
+        ...(S.tacticalOpponentDraft ? { opponentTacticalDraft: S.tacticalOpponentDraft } : {}),
       })) as {
         success: boolean;
         reason?: string;
@@ -675,9 +677,47 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         return;
       }
       const tacticalSubUnitsBeforeCommit = S.tacticalBattleSnapshot?.subUnits;
+      const playback = commitResult.tacticalResolutionPlayback;
+      const hasMoves =
+        (playback?.humanMoves?.length ?? 0) > 0 || (playback?.opponentMoves?.length ?? 0) > 0;
+      const hasRangedPlayback =
+        (playback?.rangedCombatHexes?.length ?? 0) > 0 ||
+        (playback?.rangedCasualtyHexes?.length ?? 0) > 0 ||
+        (playback?.rangedRemovedUnits?.length ?? 0) > 0;
+      const hasMeleePlayback =
+        (playback?.meleeCombatHexes?.length ?? 0) > 0 ||
+        (playback?.meleeCasualtyHexes?.length ?? 0) > 0 ||
+        (playback?.meleeRemovedUnits?.length ?? 0) > 0 ||
+        (playback?.killsByMelee?.length ?? 0) > 0;
+      const hasKillPlayback =
+        (playback?.killsByDirectFire?.length ?? 0) > 0 ||
+        (playback?.killsByAirStrike?.length ?? 0) > 0 ||
+        (playback?.killsByReturnFire?.length ?? 0) > 0 ||
+        (playback?.killsByMelee?.length ?? 0) > 0;
+      const needsResolutionPlayback = hasMoves || hasRangedPlayback || hasMeleePlayback || hasKillPlayback;
+      // Start resolution playback before updating the tactical snapshot or awaiting IPC so no redraw can
+      // paint post-commit cells while `resolutionMoveAnimation` is still null (avoids a one-frame teleport hop).
+      // Defer the playback clock and the first rAF until after post-commit awaits so the movement segment is not
+      // consumed invisibly during `getGameState` / terrain refresh (avoids a short initial glide, pause, then tail).
+      if (playback && needsResolutionPlayback) {
+        if (S.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
+        S.resolutionMoveAnimationFrameId = null;
+        S.resolutionMoveAnimation = {
+          moves: [...playback.humanMoves, ...(playback.opponentMoves ?? [])],
+          startTime: Date.now(),
+          tacticalDeferResolutionClock: true,
+          rangedCombatHexes: playback.rangedCombatHexes,
+          rangedCasualtyHexes: playback.rangedCasualtyHexes,
+          rangedRemovedUnits: playback.rangedRemovedUnits,
+          meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : undefined,
+          meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : undefined,
+          meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : undefined,
+        };
+      }
       if (commitResult.tacticalBattle) {
         S.tacticalBattleSnapshot = commitResult.tacticalBattle;
       }
+      S.tacticalOpponentDraft = null;
       S.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length
         ? [...commitResult.tacticalMarchContinuations]
         : [];
@@ -702,37 +742,6 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         } catch (err) {
           console.error('tactical commit: failed to refresh strategic game state snapshot', err);
         }
-      }
-      const playback = commitResult.tacticalResolutionPlayback;
-      const hasMoves = (playback?.humanMoves?.length ?? 0) > 0;
-      const hasRangedPlayback =
-        (playback?.rangedCombatHexes?.length ?? 0) > 0 ||
-        (playback?.rangedCasualtyHexes?.length ?? 0) > 0 ||
-        (playback?.rangedRemovedUnits?.length ?? 0) > 0;
-      const hasMeleePlayback =
-        (playback?.meleeCombatHexes?.length ?? 0) > 0 ||
-        (playback?.meleeCasualtyHexes?.length ?? 0) > 0 ||
-        (playback?.meleeRemovedUnits?.length ?? 0) > 0 ||
-        (playback?.killsByMelee?.length ?? 0) > 0;
-      const hasKillPlayback =
-        (playback?.killsByDirectFire?.length ?? 0) > 0 ||
-        (playback?.killsByAirStrike?.length ?? 0) > 0 ||
-        (playback?.killsByReturnFire?.length ?? 0) > 0 ||
-        (playback?.killsByMelee?.length ?? 0) > 0;
-      const needsResolutionPlayback = hasMoves || hasRangedPlayback || hasMeleePlayback || hasKillPlayback;
-      if (playback && needsResolutionPlayback) {
-        if (S.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
-        S.resolutionMoveAnimation = {
-          moves: playback.humanMoves,
-          startTime: Date.now(),
-          rangedCombatHexes: playback.rangedCombatHexes,
-          rangedCasualtyHexes: playback.rangedCasualtyHexes,
-          rangedRemovedUnits: playback.rangedRemovedUnits,
-          meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : undefined,
-          meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : undefined,
-          meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : undefined,
-        };
-        S.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);
       }
       if (playback && S.gameState && needsResolutionPlayback) {
         const tacticalReadySlice = buildTacticalCommitReadyResultForToast(playback);
@@ -766,7 +775,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
           formatUnitName: killToastFormatter.formatUnitName,
         });
         const combatFallbackBullets = buildCombatActivityFallbackBullets(tacticalReadySlice);
-        const updateBullets = bullets.length > 0 ? bullets : combatFallbackBullets;
+        const updateBullets = composeResolutionMapToastBullets(bullets, combatFallbackBullets);
         if (updateBullets.length > 0) {
           const updateText = updateBullets.join('\n');
           deps.showMapToast(updateText, { isError: false });
@@ -793,6 +802,13 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       deps.updateRangedSidebar();
       deps.updateSidebar();
       deps.updateGameStateSidebar(S.gameState);
+      if (S.resolutionMoveAnimation?.tacticalDeferResolutionClock) {
+        S.resolutionMoveAnimation.tacticalDeferResolutionClock = false;
+        S.resolutionMoveAnimation.startTime = Date.now();
+      }
+      if (S.resolutionMoveAnimation && needsResolutionPlayback && S.resolutionMoveAnimationFrameId === null) {
+        S.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);
+      }
       deps.redraw();
       deps.scheduleTacticalAnnihilationExit?.();
       return;
@@ -972,9 +988,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         formatUnitName: killToastFormatter.formatUnitName,
       });
       const combatFallbackBullets = buildCombatActivityFallbackBullets(readyResult);
-      const updateBullets = bullets.length > 0
-        ? bullets
-        : combatFallbackBullets;
+      const updateBullets = composeResolutionMapToastBullets(bullets, combatFallbackBullets);
       if (updateBullets.length > 0) {
         const updateText = updateBullets.join('\n');
         deps.showMapToast(updateText, { isError: false });

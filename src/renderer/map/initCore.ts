@@ -1,8 +1,9 @@
 import type { GameStateSnapshot, Res4TerrainOverrideRow } from '../../shared/ipcTypes';
-import { RANGED_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
+import { unitHasTacticalRangedBaseline } from '../../shared/tacticalRanges';
 import { panMapOneRes1Hex, shouldIgnoreGlobalKeydown } from './mapUtils';
 import { rendererSharedState as S } from '../core/state';
 import { getActiveTerrainStyleBasemapId, renderTerrainLegend } from '../rendering/terrainVisualStyles';
+import { hideOrderBlockHexTooltip } from './orderBlockHexTooltip';
 import { getMainLeafletMap, initWorldLeafletMaps, setMainBasemapByProviderId, setMainBasemapFilter } from './worldLeafletMap';
 
 /**
@@ -261,6 +262,7 @@ redraw: () => void;
  * Exceptions: None.
  */
 function dismissTerrainTooltipWhenPointerLeavesMapPanel(deps: InitCoreDeps): void {
+  hideOrderBlockHexTooltip();
   deps.clearTerrainTooltipTimer();
   deps.hideTerrainTooltipVisual();
   const hadHexHover = S.hoveredHexH3 !== null || S.hoveredDetailHexH3 !== null;
@@ -332,7 +334,7 @@ export function wireInitCore(deps: InitCoreDeps): void {
             .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
       const allAir = selectedUnits.length > 0 && selectedUnits.every((unit) => unit.unitType === 'air');
       const allHaveRanged =
-        selectedUnits.length > 0 && selectedUnits.every((unit) => (RANGED_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 0) >= 1);
+        selectedUnits.length > 0 && selectedUnits.every((unit) => unitHasTacticalRangedBaseline(unit.unitType));
       if (allAir) {
         S.airStrikeModeActive = true;
         S.rangedModeActive = false;
