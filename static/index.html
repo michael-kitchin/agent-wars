@@ -232,6 +232,16 @@
       display: flex;
       flex-direction: column;
     }
+    /* Both tabs: no rule line above the shared output log (status row follows both panels in DOM). */
+    #openrouter-tools-panel.active ~ .openrouter-status-row,
+    #openrouter-model-panel.active ~ .openrouter-status-row {
+      border-top: none;
+      margin-top: 0;
+      padding-top: 0;
+    }
+    #openrouter-model-panel.active > .openrouter-row:last-child {
+      margin-bottom: 0;
+    }
     .openrouter-row {
       margin-bottom: 0.6rem;
     }
@@ -930,8 +940,7 @@
         </div>
       </div>
       <div class="openrouter-row openrouter-status-row">
-        <label>Status (AI interactions and errors only)</label>
-        <div id="openrouter-log" class="openrouter-log"></div>
+        <div id="openrouter-log" class="openrouter-log" aria-label="AI interactions and errors"></div>
       </div>
     </div>
   </aside>
