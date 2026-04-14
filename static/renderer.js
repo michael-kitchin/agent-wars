@@ -15274,6 +15274,15 @@
        */
     pendingFerryOrders: [],
     /**
+       * Documents the object literal property `pendingEmbarkOrders` (pendingEmbarkOrders: [] as EmbarkOrder[]).
+    
+       * Purpose: Queues human sealift embark drafts as tactical sub-unit pairs until tactical Ready commits them (strategic `updateSealiftSlot` is blocked during tactical battles).
+       * When to use: Stack callout sealift controls while `tacticalBattleSnapshot` is set; clear on tactical Ready commit, exit, stash, or new game.
+       * Expected outcome: Each row assigns one land sub-unit id to one naval sub-unit id co-located on the same res4 hex.
+       * Exceptions: None.
+       */
+    pendingEmbarkOrders: [],
+    /**
        * Documents the object literal property `tacticalPendingMarches` (tacticalPendingMarches: [] as { subUnitId: string; destinationH3Index: string }[]).
     
        * Purpose: Holds human tactical march rows shown in the pending-orders sidebar while a tactical battle is active; distinct from strategic standing orders.
@@ -18102,6 +18111,7 @@
     rendererSharedState.pendingRangedAttacks = [];
     rendererSharedState.pendingAirStrikes = [];
     rendererSharedState.pendingFerryOrders = [];
+    rendererSharedState.pendingEmbarkOrders = [];
     rendererSharedState.tacticalPendingMarches = [];
     rendererSharedState.rangedModeActive = false;
     rendererSharedState.airStrikeModeActive = false;
@@ -18114,6 +18124,7 @@
     rendererSharedState.pendingFerryOrders = strategicOrderDraftStash.pendingFerryOrders;
     strategicOrderDraftStash = null;
     rendererSharedState.tacticalPendingMarches = [];
+    rendererSharedState.pendingEmbarkOrders = [];
   }
   function discardStrategicOrderUiStash() {
     strategicOrderDraftStash = null;
@@ -18129,6 +18140,7 @@
     rendererSharedState.tacticalBattleSnapshot = null;
     rendererSharedState.tacticalPhasePlanning = true;
     rendererSharedState.tacticalPendingMarches = [];
+    rendererSharedState.pendingEmbarkOrders = [];
     rendererSharedState.hideCommittedOrderLinesAfterReady = false;
     exitTacticalMapView();
     tacticalApplyStrategicSidebarForTacticalMode(false);
@@ -18156,6 +18168,7 @@
       rendererSharedState.tacticalBattleSnapshot = null;
       rendererSharedState.tacticalPhasePlanning = true;
       rendererSharedState.tacticalPendingMarches = [];
+      rendererSharedState.pendingEmbarkOrders = [];
       exitTacticalMapView();
       tacticalApplyStrategicSidebarForTacticalMode(false);
       restoreStrategicOrderDraftsAfterTacticalSession();
@@ -18264,6 +18277,35 @@
     } catch {
       rendererSharedState.humanStandingOrders = [];
     }
+  }
+
+  // src/renderer/tactical/tacticalEmbarkSealiftMerge.ts
+  function mergePendingTacticalEmbarkOrdersIntoSealiftState(base, pendingEmbark) {
+    if (pendingEmbark.length === 0) {
+      return { ...base, navalRows: base.navalRows.map((r) => ({ ...r })) };
+    }
+    const landType = new Map(base.landOptions.map((o) => [o.unitId, o.unitType]));
+    const rows = base.navalRows.map((r) => ({ ...r }));
+    const pendingLand = new Set(pendingEmbark.map((e) => e.unitId));
+    for (const row of rows) {
+      if (row.slot1UnitId && pendingLand.has(row.slot1UnitId)) row.slot1UnitId = null;
+      if (row.slot2UnitId && pendingLand.has(row.slot2UnitId)) row.slot2UnitId = null;
+    }
+    const sorted = [...pendingEmbark].sort((a, b) => a.navalUnitId.localeCompare(b.navalUnitId) || a.unitId.localeCompare(b.unitId));
+    for (const e of sorted) {
+      const row = rows.find((r) => r.navalUnitId === e.navalUnitId);
+      if (!row) continue;
+      const t = landType.get(e.unitId);
+      if (t === "armor") {
+        row.slot1UnitId = e.unitId;
+        row.slot2UnitId = null;
+        continue;
+      }
+      if (!row.slot1UnitId) row.slot1UnitId = e.unitId;
+      else if (!row.slot2UnitId && !row.slot2Disabled) row.slot2UnitId = e.unitId;
+      else row.slot1UnitId = e.unitId;
+    }
+    return { ...base, navalRows: rows };
   }
 
   // src/shared/tacticalStateAssertions.ts
@@ -19694,6 +19736,7 @@
     rendererSharedState.pendingAirStrikes = [];
     rendererSharedState.airStrikeModeActive = false;
     rendererSharedState.pendingFerryOrders = [];
+    rendererSharedState.pendingEmbarkOrders = [];
     rendererSharedState.tacticalPendingMarches = [];
   }
   function clearCommittedOrderDraftState(deps) {
@@ -19968,6 +20011,9 @@
   }
   function cancelRangedForUnit(unitId, deps) {
     rendererSharedState.pendingRangedAttacks = rendererSharedState.pendingRangedAttacks.filter((r) => r.unitId !== unitId);
+    if (rendererSharedState.tacticalBattleSnapshot) {
+      rendererSharedState.pendingEmbarkOrders = rendererSharedState.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
+    }
     rendererSharedState.rangedModeActive = false;
     void refreshHoverRoutePreview(deps);
     deps.updateSidebar();
@@ -19978,6 +20024,9 @@
   }
   function cancelAirStrikeForUnit(unitId, deps) {
     rendererSharedState.pendingAirStrikes = rendererSharedState.pendingAirStrikes.filter((r) => r.unitId !== unitId);
+    if (rendererSharedState.tacticalBattleSnapshot) {
+      rendererSharedState.pendingEmbarkOrders = rendererSharedState.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
+    }
     rendererSharedState.airStrikeModeActive = false;
     void refreshHoverRoutePreview(deps);
     deps.updateSidebar();
@@ -19988,6 +20037,9 @@
   }
   function cancelFerryForUnit(unitId, deps) {
     rendererSharedState.pendingFerryOrders = rendererSharedState.pendingFerryOrders.filter((r) => r.unitId !== unitId);
+    if (rendererSharedState.tacticalBattleSnapshot) {
+      rendererSharedState.pendingEmbarkOrders = rendererSharedState.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
+    }
     void refreshHoverRoutePreview(deps);
     deps.updateSidebar();
     deps.updatePendingOrdersSidebar();
@@ -20364,7 +20416,7 @@
     if (!container) return;
     container.innerHTML = "";
     if (rendererSharedState.tacticalBattleSnapshot) {
-      if (rendererSharedState.tacticalPendingMarches.length === 0) {
+      if (rendererSharedState.tacticalPendingMarches.length === 0 && rendererSharedState.pendingEmbarkOrders.length === 0) {
         const span = document.createElement("span");
         span.textContent = "None";
         span.style.color = "#666";
@@ -20382,6 +20434,21 @@
           onCancel: () => {
             rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
             deps.updatePendingOrdersSidebar?.();
+            deps.redraw?.();
+          },
+          compactBlueButtons: true
+        });
+        container.appendChild(rowEl);
+      }
+      for (const emb of rendererSharedState.pendingEmbarkOrders) {
+        const rowEl = deps.createSidebarOrderRow({
+          labelText: deps.formatUnitArrowLabel(emb.unitId, fallbackDisplayNameFromUnitId(emb.navalUnitId)),
+          selected: rendererSharedState.selectedUnitIds.includes(emb.unitId),
+          onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(emb.unitId, event),
+          onCancel: () => {
+            rendererSharedState.pendingEmbarkOrders = rendererSharedState.pendingEmbarkOrders.filter((e) => e.unitId !== emb.unitId);
+            deps.updatePendingOrdersSidebar?.();
+            deps.refreshStackCalloutIfOpen?.();
             deps.redraw?.();
           },
           compactBlueButtons: true
@@ -20512,7 +20579,11 @@
 
   // src/shared/tacticalToastKillSlice.ts
   function tacticalKillEdgesForStrategicStyleTurnUpdate(playback) {
-    return [...playback.killsByDirectFire ?? [], ...playback.killsByReturnFire ?? []];
+    return [
+      ...playback.killsByDirectFire ?? [],
+      ...playback.killsByReturnFire ?? [],
+      ...playback.killsByMelee ?? []
+    ];
   }
 
   // src/renderer/gameplay/readyHandler.ts
@@ -20603,7 +20674,7 @@
     const killsByReturnFire = playback.killsByReturnFire ?? [];
     const killsWithoutAirStrike = tacticalKillEdgesForStrategicStyleTurnUpdate(playback);
     const kills = killsWithoutAirStrike.length > 0 ? killsWithoutAirStrike : void 0;
-    const removedAll = playback.rangedRemovedUnits ?? [];
+    const removedAll = [...playback.rangedRemovedUnits ?? [], ...playback.meleeRemovedUnits ?? []];
     const airStrikeVictimIds = new Set(killsByAirStrike.map((k) => k.victimId));
     const rangedVictimIds = new Set(killsByDirectFire.map((k) => k.victimId));
     const airStrikeRemovedUnits = removedAll.filter((u) => {
@@ -20624,7 +20695,10 @@
       rangedRemovedUnits: playback.rangedRemovedUnits,
       airStrikeRemovedUnits: airStrikeRemovedUnits.length > 0 ? airStrikeRemovedUnits : void 0,
       infrastructureDestroyedEvents: playback.infrastructureDestroyedEvents && playback.infrastructureDestroyedEvents.length > 0 ? playback.infrastructureDestroyedEvents : void 0,
-      airStrikeAttemptCount: playback.airStrikeAttemptCount
+      airStrikeAttemptCount: playback.airStrikeAttemptCount,
+      meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : void 0,
+      meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : void 0,
+      meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : void 0
     };
   }
   function formatHexCount(label, count) {
@@ -20668,7 +20742,8 @@
           movementOrders,
           rangedAttacks: [...rendererSharedState.pendingRangedAttacks],
           airStrikes: [...rendererSharedState.pendingAirStrikes],
-          ferryOrders: [...rendererSharedState.pendingFerryOrders]
+          ferryOrders: [...rendererSharedState.pendingFerryOrders],
+          embarkOrders: [...rendererSharedState.pendingEmbarkOrders]
         });
         if (!commitResult.success) {
           deps.showSidebarError(commitResult.reason ?? "Tactical commit failed");
@@ -20683,6 +20758,7 @@
         rendererSharedState.pendingRangedAttacks = [];
         rendererSharedState.pendingAirStrikes = [];
         rendererSharedState.pendingFerryOrders = [];
+        rendererSharedState.pendingEmbarkOrders = [];
         rendererSharedState.rangedModeActive = false;
         rendererSharedState.airStrikeModeActive = false;
         if (window.gameApi?.getGameState) {
@@ -20704,8 +20780,9 @@
         const playback = commitResult.tacticalResolutionPlayback;
         const hasMoves = (playback?.humanMoves?.length ?? 0) > 0;
         const hasRangedPlayback = (playback?.rangedCombatHexes?.length ?? 0) > 0 || (playback?.rangedCasualtyHexes?.length ?? 0) > 0 || (playback?.rangedRemovedUnits?.length ?? 0) > 0;
-        const hasKillPlayback = (playback?.killsByDirectFire?.length ?? 0) > 0 || (playback?.killsByAirStrike?.length ?? 0) > 0 || (playback?.killsByReturnFire?.length ?? 0) > 0;
-        const needsResolutionPlayback = hasMoves || hasRangedPlayback || hasKillPlayback;
+        const hasMeleePlayback = (playback?.meleeCombatHexes?.length ?? 0) > 0 || (playback?.meleeCasualtyHexes?.length ?? 0) > 0 || (playback?.meleeRemovedUnits?.length ?? 0) > 0 || (playback?.killsByMelee?.length ?? 0) > 0;
+        const hasKillPlayback = (playback?.killsByDirectFire?.length ?? 0) > 0 || (playback?.killsByAirStrike?.length ?? 0) > 0 || (playback?.killsByReturnFire?.length ?? 0) > 0 || (playback?.killsByMelee?.length ?? 0) > 0;
+        const needsResolutionPlayback = hasMoves || hasRangedPlayback || hasMeleePlayback || hasKillPlayback;
         if (playback && needsResolutionPlayback) {
           if (rendererSharedState.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
           rendererSharedState.resolutionMoveAnimation = {
@@ -20713,7 +20790,10 @@
             startTime: Date.now(),
             rangedCombatHexes: playback.rangedCombatHexes,
             rangedCasualtyHexes: playback.rangedCasualtyHexes,
-            rangedRemovedUnits: playback.rangedRemovedUnits
+            rangedRemovedUnits: playback.rangedRemovedUnits,
+            meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : void 0,
+            meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : void 0,
+            meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : void 0
           };
           rendererSharedState.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);
         }
@@ -21657,6 +21737,7 @@
         return true;
       }
       if (rendererSharedState.tacticalBattleSnapshot) {
+        rendererSharedState.pendingEmbarkOrders = rendererSharedState.pendingEmbarkOrders.filter((e) => !selectedIds.includes(e.unitId));
         for (const subUnitId of selectedIds) {
           const idx = rendererSharedState.tacticalPendingMarches.findIndex((row) => row.subUnitId === subUnitId);
           if (idx >= 0) rendererSharedState.tacticalPendingMarches.splice(idx, 1);
@@ -22456,11 +22537,20 @@
   }
   async function renderSealiftSection(units, calloutEl) {
     removeSealiftSection(calloutEl);
-    if (!window.gameApi?.getSealiftStackState || !window.gameApi?.updateSealiftSlot) return;
     const h3Index = units[0]?.h3Index;
     if (!h3Index) return;
+    const tacticalSealiftMode = !!(rendererSharedState.tacticalBattleSnapshot?.res4ChildH3Indexes.includes(h3Index) && window.gameApi?.getTacticalSealiftStackState && window.gameApi?.updateTacticalSealiftSlot);
+    if (!tacticalSealiftMode && (!window.gameApi?.getSealiftStackState || !window.gameApi?.updateSealiftSlot)) return;
+    if (tacticalSealiftMode && (!window.gameApi?.getTacticalSealiftStackState || !window.gameApi?.updateTacticalSealiftSlot))
+      return;
     try {
-      const state = await window.gameApi.getSealiftStackState({ h3Index });
+      let state;
+      if (tacticalSealiftMode) {
+        state = await window.gameApi.getTacticalSealiftStackState({ h3Index });
+        state = mergePendingTacticalEmbarkOrdersIntoSealiftState(state, rendererSharedState.pendingEmbarkOrders);
+      } else {
+        state = await window.gameApi.getSealiftStackState({ h3Index });
+      }
       if (calloutEl.classList.contains("hidden")) return;
       if (calloutEl.getAttribute("data-h3-index") !== h3Index) return;
       if (!state.showSealiftSection) return;
@@ -22494,8 +22584,41 @@
             select.appendChild(opt);
           }
           select.value = selectedUnitId ?? "";
+          select.dataset.prevLand = selectedUnitId ?? "";
           select.addEventListener("change", async () => {
             const selected = select.value.trim();
+            if (tacticalSealiftMode) {
+              const prev = select.dataset.prevLand ?? "";
+              if (prev) {
+                rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((m) => m.subUnitId !== prev);
+              }
+              if (selected.length > 0) {
+                rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((m) => m.subUnitId !== selected);
+              }
+              const result2 = await window.gameApi.updateTacticalSealiftSlot({
+                h3Index,
+                navalUnitId: row.navalUnitId,
+                slotIndex,
+                landUnitId: selected.length > 0 ? selected : null
+              });
+              if (!result2.success) {
+                showMapToast(formatTargetingValidationReason(result2.reason, "Failed to update sealift assignment."));
+              } else {
+                if (result2.tacticalBattle) {
+                  rendererSharedState.tacticalBattleSnapshot = result2.tacticalBattle;
+                }
+                const navalIds = new Set((result2.state?.navalRows ?? []).map((r) => r.navalUnitId));
+                rendererSharedState.pendingEmbarkOrders = rendererSharedState.pendingEmbarkOrders.filter((e) => !navalIds.has(e.navalUnitId));
+                select.dataset.prevLand = selected;
+                if (selected.length > 0) {
+                  await refreshHumanStandingOrders2();
+                }
+                updatePendingOrdersSidebar2();
+              }
+              refreshStackCalloutIfOpen();
+              requestRedraw();
+              return;
+            }
             const result = await window.gameApi.updateSealiftSlot({
               h3Index,
               navalUnitId: row.navalUnitId,
@@ -22520,6 +22643,30 @@
             debarkBtn.textContent = UNIT_DESELECT_GLYPH;
             debarkBtn.disabled = !debarkEnabled;
             debarkBtn.addEventListener("click", async () => {
+              if (tacticalSealiftMode) {
+                const prev = selectedUnitId ?? "";
+                if (prev) {
+                  const result2 = await window.gameApi.updateTacticalSealiftSlot({
+                    h3Index,
+                    navalUnitId: row.navalUnitId,
+                    slotIndex,
+                    landUnitId: null
+                  });
+                  if (!result2.success) {
+                    showMapToast(formatTargetingValidationReason(result2.reason, "Failed to debark unit."));
+                  } else {
+                    if (result2.tacticalBattle) {
+                      rendererSharedState.tacticalBattleSnapshot = result2.tacticalBattle;
+                    }
+                    const navalIds = new Set((result2.state?.navalRows ?? []).map((r) => r.navalUnitId));
+                    rendererSharedState.pendingEmbarkOrders = rendererSharedState.pendingEmbarkOrders.filter((e) => !navalIds.has(e.navalUnitId));
+                    updatePendingOrdersSidebar2();
+                  }
+                }
+                refreshStackCalloutIfOpen();
+                requestRedraw();
+                return;
+              }
               const result = await window.gameApi.updateSealiftSlot({
                 h3Index,
                 navalUnitId: row.navalUnitId,
@@ -23669,7 +23816,8 @@
       cancelFerryForUnit: cancelFerryForUnit2,
       formatUnitArrowLabel: formatUnitArrowLabel2,
       redraw,
-      updatePendingOrdersSidebar: updatePendingOrdersSidebar2
+      updatePendingOrdersSidebar: updatePendingOrdersSidebar2,
+      refreshStackCalloutIfOpen
     });
   }
   function showSidebarError2(message) {

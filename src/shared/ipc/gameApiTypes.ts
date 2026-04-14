@@ -274,6 +274,34 @@ removeHexBuildQueueEntry: (payload: { h3Index: string; entryId: number }) => Pro
    */
 getSealiftStackState: (payload: { h3Index: string }) => Promise<SealiftStackState>;
     /**
+   * Specifies the contract for the `getTacticalSealiftStackState` member (getTacticalSealiftStackState: (payload: { h3Index: string }) => Promise<SealiftStackState>;).
+
+   * Contract: Describes stable behavior for callers of `getTacticalSealiftStackState` in this codebase.
+   * When to use: Tactical stack callout when human sealift assignments are expressed with tactical sub-unit ids.
+   * Expected outcome: Same `SealiftStackState` shape as `getSealiftStackState`, or an empty section when no tactical session applies to the hex.
+   * Exceptions: None beyond normal IPC failure modes.
+   */
+getTacticalSealiftStackState: (payload: { h3Index: string }) => Promise<SealiftStackState>;
+    /**
+   * Specifies the contract for the `updateTacticalSealiftSlot` member (updateTacticalSealiftSlot: (payload: { h3Index: string; navalUnitId: string; slotIndex: 1 | 2; landUnitId: string | null; }) => Promise<{ success: boolean; reason?: string; state?: SealiftStackState; tacticalBattle?: TacticalBattleSnapshot }>;).
+
+   * Contract: Applies one sealift slot change to the active tactical snapshot and parent-level transport rows immediately (sub-unit ids).
+   * When to use: Tactical stack sealift controls while a tactical battle is active; strategic `updateSealiftSlot` remains blocked in that mode.
+   * Expected outcome: Same shape as `updateSealiftSlot` plus `tacticalBattle` on success for renderer redraw.
+   * Exceptions: None beyond normal IPC failure modes.
+   */
+updateTacticalSealiftSlot: (payload: {
+    h3Index: string;
+    navalUnitId: string;
+    slotIndex: 1 | 2;
+    landUnitId: string | null;
+  }) => Promise<{
+    success: boolean;
+    reason?: string;
+    state?: SealiftStackState;
+    tacticalBattle?: TacticalBattleSnapshot;
+  }>;
+    /**
    * Specifies the contract for the `updateSealiftSlot` member (updateSealiftSlot: (payload: { h3Index: string; navalUnitId: string; slotIndex: 1 | 2; landUnitId: string | null; }) => Promise<{ success).
 
    * Contract: Describes stable behavior for callers of `updateSealiftSlot` in this codebase.

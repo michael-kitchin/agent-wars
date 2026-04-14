@@ -197,12 +197,15 @@ function spawnProducedUnitsForHex(
 }
 
 /**
- * Defines the `resolveRes1ControlAfterCombatAndMovement` function shape (export function resolveRes1ControlAfterCombatAndMovement().
-
- * Purpose: Supports maintainability by documenting why `resolveRes1ControlAfterCombatAndMovement` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Reconciles `res1_control` after combat and movement using per-hex land and air occupancy plus optional traversal hints.
+ *
+ * Purpose: Grants sole-player hexes to that player, preserves contested hexes until co-occupancy clears, and applies
+ * traversal-based capture when a hex ends empty but only one side moved through it this turn.
+ * When to use: End of each strategic `ready` finalize (including melee-intercept resume) after unit positions are final.
+ * Expected outcome: No control flip when two or more players still have combat units (including air) on the same hex;
+ * without that rule, land-only counting would treat e.g. human armor + opponent air as uncontested human land and
+ * `destroyAirUnitsWithInvalidBase` would delete the air before a Fight→tactical handoff.
+ * Exceptions: None; propagates database errors from helpers.
  */
 export function resolveRes1ControlAfterCombatAndMovement(
   traversedHexesByPlayer?: Record<'human' | 'opponent', Set<string>>
@@ -217,7 +220,7 @@ export function resolveRes1ControlAfterCombatAndMovement(
             COUNT(DISTINCT player) AS distinctPlayers,
             CASE WHEN COUNT(DISTINCT player) = 1 THEN MIN(player) ELSE NULL END AS solePlayer
      FROM units
-     WHERE unit_type IN ('infantry', 'armor', 'naval')
+     WHERE unit_type IN ('infantry', 'armor', 'naval', 'air')
      GROUP BY h3_index`
   );
   const occupancyByHex = new Map(occupantRows.map((row) => [row.h3Index, row]));

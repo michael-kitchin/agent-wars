@@ -237,6 +237,7 @@ export function clearPendingTacticalOrders(): void {
   S.pendingAirStrikes = [];
   S.airStrikeModeActive = false;
   S.pendingFerryOrders = [];
+  S.pendingEmbarkOrders = [];
   S.tacticalPendingMarches = [];
 }
 
@@ -547,6 +548,9 @@ export async function cancelOrderForUnit(unitId: string, deps: TacticalOrderDeps
  */
 export function cancelRangedForUnit(unitId: string, deps: TacticalOrderDeps): void {
   S.pendingRangedAttacks = S.pendingRangedAttacks.filter((r) => r.unitId !== unitId);
+  if (S.tacticalBattleSnapshot) {
+    S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
+  }
   S.rangedModeActive = false;
   void refreshHoverRoutePreview(deps);
   deps.updateSidebar();
@@ -566,6 +570,9 @@ export function cancelRangedForUnit(unitId: string, deps: TacticalOrderDeps): vo
  */
 export function cancelAirStrikeForUnit(unitId: string, deps: TacticalOrderDeps): void {
   S.pendingAirStrikes = S.pendingAirStrikes.filter((r) => r.unitId !== unitId);
+  if (S.tacticalBattleSnapshot) {
+    S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
+  }
   S.airStrikeModeActive = false;
   void refreshHoverRoutePreview(deps);
   deps.updateSidebar();
@@ -585,6 +592,9 @@ export function cancelAirStrikeForUnit(unitId: string, deps: TacticalOrderDeps):
  */
 export function cancelFerryForUnit(unitId: string, deps: TacticalOrderDeps): void {
   S.pendingFerryOrders = S.pendingFerryOrders.filter((r) => r.unitId !== unitId);
+  if (S.tacticalBattleSnapshot) {
+    S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
+  }
   void refreshHoverRoutePreview(deps);
   deps.updateSidebar();
   deps.updatePendingOrdersSidebar();

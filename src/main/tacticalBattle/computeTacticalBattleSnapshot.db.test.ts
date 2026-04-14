@@ -10,12 +10,15 @@ import { filterMeleeCandidateHexesWithTacticalEntry, listMeleeCandidateHexes } f
 import { dbGetOne, dbRun, listUnitsForSnapshot } from '../gameDb';
 import { getOrderedHexList } from '../mapData';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
+import { updateTacticalSealiftSlot } from '../gameActions';
 import { computeTacticalBattleSnapshot } from './computeTacticalBattleSnapshot';
 import {
   applyValidatedOpponentTacticalOrders,
   endTacticalBattleSession,
+  getActiveTacticalBattleSnapshot,
   startTacticalBattleForEnclosingRes1Hex,
 } from './tacticalBattleSession';
+import { getTacticalSealiftStackStateForHex } from './tacticalSealiftStackState';
 import {
   tacticalDbFixtureRegisterDefaultAfterEach,
   tacticalDbFixtureSetStrategicPlanningPhase,
@@ -92,9 +95,70 @@ test('active tactical session writes game_config and clears on endTacticalBattle
     assert.ok(row?.value);
     const parsed = JSON.parse(row.value) as { battleId?: string };
     assert.ok(parsed.battleId && parsed.battleId.length > 0);
+    const baseline = dbGetOne<{ value: string }>(
+      "SELECT value FROM game_config WHERE key = 'tactical_transport_baseline_json_v1'"
+    );
+    assert.ok(baseline?.value && baseline.value.length > 0, 'expected transport baseline after tactical start');
     endTacticalBattleSession();
     const gone = dbGetOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'tactical_battle_snapshot_json_v1'");
     assert.equal(gone, undefined);
+    const baselineGone = dbGetOne<{ value: string }>(
+      "SELECT value FROM game_config WHERE key = 'tactical_transport_baseline_json_v1'"
+    );
+    assert.equal(baselineGone, undefined, 'expected transport baseline cleared after tactical end');
+  });
+});
+
+test('updateTacticalSealiftSlot embarks then debarks and syncs strategic transport rows', () => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-sealift-slot-ipc-', ({ targetRes1H3 }) => {
+    const started = startTacticalBattleForEnclosingRes1Hex(targetRes1H3);
+    assert.equal(started.success, true);
+    const snap = started.battle!;
+    let stackHex: string | null = null;
+    for (const h of snap.res4ChildH3Indexes) {
+      const st = getTacticalSealiftStackStateForHex(h);
+      if (st.showSealiftSection && st.navalRows.length > 0 && st.landOptions.length > 0 && !st.controlsDisabled) {
+        stackHex = h;
+        break;
+      }
+    }
+    if (!stackHex) return;
+    const st0 = getTacticalSealiftStackStateForHex(stackHex);
+    const row0 = st0.navalRows[0]!;
+    const navalUnitId = row0.navalUnitId;
+    const landSubId = st0.landOptions[0]!.unitId;
+    if (row0.slot1UnitId === landSubId) {
+      assert.equal(updateTacticalSealiftSlot(stackHex, navalUnitId, 1, null).success, true);
+    } else if (row0.slot2UnitId === landSubId) {
+      assert.equal(updateTacticalSealiftSlot(stackHex, navalUnitId, 2, null).success, true);
+    }
+    const st1 = getTacticalSealiftStackStateForHex(stackHex);
+    const row1 = st1.navalRows[0]!;
+    if (row1.slot1UnitId && row1.slot2UnitId) return;
+    const putSlot: 1 | 2 = row1.slot1UnitId ? 2 : 1;
+    const emb = updateTacticalSealiftSlot(stackHex, navalUnitId, putSlot, landSubId);
+    assert.equal(emb.success, true, emb.reason);
+    const landAfter = getActiveTacticalBattleSnapshot()!.subUnits.find((u) => u.id === landSubId);
+    assert.equal(landAfter?.embarkedOnSubUnitId, navalUnitId);
+    const parent = landAfter?.parentUnitId;
+    if (parent) {
+      const row = dbGetOne<{ navalUnitId: string }>(
+        'SELECT naval_unit_id AS navalUnitId FROM unit_transport_assignments WHERE land_unit_id = ?',
+        [parent]
+      );
+      assert.ok(row?.navalUnitId);
+    }
+    const deb = updateTacticalSealiftSlot(stackHex, navalUnitId, putSlot, null);
+    assert.equal(deb.success, true, deb.reason);
+    const landDeb = getActiveTacticalBattleSnapshot()!.subUnits.find((u) => u.id === landSubId);
+    assert.ok(!landDeb?.embarkedOnSubUnitId);
+    if (parent) {
+      const rowGone = dbGetOne<{ navalUnitId: string }>(
+        'SELECT naval_unit_id AS navalUnitId FROM unit_transport_assignments WHERE land_unit_id = ?',
+        [parent]
+      );
+      assert.equal(rowGone, undefined);
+    }
   });
 });
 

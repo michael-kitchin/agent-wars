@@ -554,7 +554,7 @@ function buildTacticalCommitReadyResultForToast(playback: TacticalCommitResoluti
   const killsByReturnFire = playback.killsByReturnFire ?? [];
   const killsWithoutAirStrike = tacticalKillEdgesForStrategicStyleTurnUpdate(playback);
   const kills = killsWithoutAirStrike.length > 0 ? killsWithoutAirStrike : undefined;
-  const removedAll = playback.rangedRemovedUnits ?? [];
+  const removedAll = [...(playback.rangedRemovedUnits ?? []), ...(playback.meleeRemovedUnits ?? [])];
   const airStrikeVictimIds = new Set(killsByAirStrike.map((k) => k.victimId));
   const rangedVictimIds = new Set(killsByDirectFire.map((k) => k.victimId));
   const airStrikeRemovedUnits = removedAll.filter((u) => {
@@ -579,6 +579,9 @@ function buildTacticalCommitReadyResultForToast(playback: TacticalCommitResoluti
         ? playback.infrastructureDestroyedEvents
         : undefined,
     airStrikeAttemptCount: playback.airStrikeAttemptCount,
+    meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : undefined,
+    meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : undefined,
+    meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : undefined,
   };
 }
 
@@ -658,6 +661,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         rangedAttacks: [...S.pendingRangedAttacks],
         airStrikes: [...S.pendingAirStrikes],
         ferryOrders: [...S.pendingFerryOrders],
+        embarkOrders: [...S.pendingEmbarkOrders],
       })) as {
         success: boolean;
         reason?: string;
@@ -680,6 +684,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       S.pendingRangedAttacks = [];
       S.pendingAirStrikes = [];
       S.pendingFerryOrders = [];
+      S.pendingEmbarkOrders = [];
       S.rangedModeActive = false;
       S.airStrikeModeActive = false;
       if (window.gameApi?.getGameState) {
@@ -704,11 +709,17 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         (playback?.rangedCombatHexes?.length ?? 0) > 0 ||
         (playback?.rangedCasualtyHexes?.length ?? 0) > 0 ||
         (playback?.rangedRemovedUnits?.length ?? 0) > 0;
+      const hasMeleePlayback =
+        (playback?.meleeCombatHexes?.length ?? 0) > 0 ||
+        (playback?.meleeCasualtyHexes?.length ?? 0) > 0 ||
+        (playback?.meleeRemovedUnits?.length ?? 0) > 0 ||
+        (playback?.killsByMelee?.length ?? 0) > 0;
       const hasKillPlayback =
         (playback?.killsByDirectFire?.length ?? 0) > 0 ||
         (playback?.killsByAirStrike?.length ?? 0) > 0 ||
-        (playback?.killsByReturnFire?.length ?? 0) > 0;
-      const needsResolutionPlayback = hasMoves || hasRangedPlayback || hasKillPlayback;
+        (playback?.killsByReturnFire?.length ?? 0) > 0 ||
+        (playback?.killsByMelee?.length ?? 0) > 0;
+      const needsResolutionPlayback = hasMoves || hasRangedPlayback || hasMeleePlayback || hasKillPlayback;
       if (playback && needsResolutionPlayback) {
         if (S.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
         S.resolutionMoveAnimation = {
@@ -717,6 +728,9 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
           rangedCombatHexes: playback.rangedCombatHexes,
           rangedCasualtyHexes: playback.rangedCasualtyHexes,
           rangedRemovedUnits: playback.rangedRemovedUnits,
+          meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : undefined,
+          meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : undefined,
+          meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : undefined,
         };
         S.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);
       }

@@ -207,6 +207,15 @@ redraw?: () => void;
    * Exceptions: None.
    */
 updatePendingOrdersSidebar?: () => void;
+    /**
+   * Refreshes an open stack callout after tactical embark drafts change from the pending-orders sidebar.
+   *
+   * Contract: Optional hook so embark cancel can rebuild sealift `<select>` rows without a hard dependency on `renderer.ts`.
+   * When to use: Tactical `pendingEmbarkOrders` cancel path only.
+   * Expected outcome: Stack popup sealift section matches cleared drafts when the callout is visible.
+   * Exceptions: None.
+   */
+refreshStackCalloutIfOpen?: () => void;
 }
 
 /**
@@ -446,7 +455,7 @@ export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
   if (!container) return;
   container.innerHTML = '';
   if (S.tacticalBattleSnapshot) {
-    if (S.tacticalPendingMarches.length === 0) {
+    if (S.tacticalPendingMarches.length === 0 && S.pendingEmbarkOrders.length === 0) {
       const span = document.createElement('span');
       span.textContent = 'None';
       span.style.color = '#666';
@@ -464,6 +473,21 @@ export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
         onCancel: () => {
           S.tacticalPendingMarches = S.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
           deps.updatePendingOrdersSidebar?.();
+          deps.redraw?.();
+        },
+        compactBlueButtons: true,
+      });
+      container.appendChild(rowEl);
+    }
+    for (const emb of S.pendingEmbarkOrders) {
+      const rowEl = deps.createSidebarOrderRow({
+        labelText: deps.formatUnitArrowLabel(emb.unitId, fallbackDisplayNameFromUnitId(emb.navalUnitId)),
+        selected: S.selectedUnitIds.includes(emb.unitId),
+        onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(emb.unitId, event),
+        onCancel: () => {
+          S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== emb.unitId);
+          deps.updatePendingOrdersSidebar?.();
+          deps.refreshStackCalloutIfOpen?.();
           deps.redraw?.();
         },
         compactBlueButtons: true,

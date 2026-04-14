@@ -74,13 +74,15 @@ import {
 } from './game-actions/landMovementConstraints';
 import { submitOrdersImpl } from './game-actions/submitOrders';
 import {
+  applyTacticalEmbarkCommittedOrdersToStrategicDb,
   getSealiftStackStateImpl,
   isEmbarkedLandUnitOnWater,
   updateSealiftSlotImpl,
 } from './game-actions/sealift';
+import { getTacticalSealiftStackStateForHex } from './tacticalBattle/tacticalSealiftStackState';
+import { applyTacticalSealiftSlotChangeInSession } from './tacticalBattle/tacticalSealiftSlotUpdate';
 import {
-  applyHumanTacticalMarchOrders,
-  applyValidatedHumanTacticalSupportOrders,
+  applyHumanTacticalDraftBeatInStrategicOrder,
   getActiveTacticalBattleSnapshot,
   isTacticalBattleActive,
 } from './tacticalBattle/tacticalBattleSession';
@@ -602,6 +604,24 @@ export function listHumanStandingOrders(): HumanStandingOrderView[] {
 }
 
 /**
+ * Clears human march standing orders and pending orders for one strategic parent `units.id`.
+ *
+ * Purpose: Shared implementation for strategic sealift embark and tactical immediate sealift embark so movement drafts do not survive boarding.
+ * When to use: `updateSealiftSlot` after a successful embark, and `updateTacticalSealiftSlot` after a successful tactical embark with a non-null land sub-unit id.
+ * Expected outcome: No `standing_orders` march row and no `pending_orders` rows remain for that unit id for the human player.
+ * Exceptions: None; SQLite failures surface via `dbRun` behavior.
+ */
+export function cancelHumanStrategicMarchOrdersForParentUnit(unitId: string): void {
+  logDebug('gameActions cancelHumanStrategicMarchOrdersForParentUnit', { unitId });
+  dbRun('DELETE FROM standing_orders WHERE player_id = ? AND unit_id = ? AND order_type = ?', [
+    HUMAN_PLAYER_ID,
+    unitId,
+    'march',
+  ]);
+  dbRun('DELETE FROM pending_orders WHERE unit_id = ?', [unitId]);
+}
+
+/**
  * Defines the `cancelHumanMovementOrdersForUnit` function shape (function cancelHumanMovementOrdersForUnit(unitId: string): void).
 
  * Purpose: Supports maintainability by documenting why `cancelHumanMovementOrdersForUnit` exists.
@@ -610,12 +630,7 @@ export function listHumanStandingOrders(): HumanStandingOrderView[] {
  * Exceptions: None.
  */
 function cancelHumanMovementOrdersForUnit(unitId: string): void {
-  dbRun('DELETE FROM standing_orders WHERE player_id = ? AND unit_id = ? AND order_type = ?', [
-    HUMAN_PLAYER_ID,
-    unitId,
-    'march',
-  ]);
-  dbRun('DELETE FROM pending_orders WHERE unit_id = ?', [unitId]);
+  cancelHumanStrategicMarchOrdersForParentUnit(unitId);
 }
 
 /**
@@ -651,7 +666,7 @@ function clearEmbarkAssignmentForIndependentLandMove(unitId: string, destination
  *
  * Purpose: Tactical parity with strategic Ready by applying all tactical draft types in one commit boundary.
  * When to use: `game:commitHumanTacticalDraftOrders` IPC with renderer draft lists at tactical Ready time.
- * Expected outcome: `success: true` with `tacticalBattle` snapshot for immediate redraw, or failure with reason. Human marches apply at most one range-limited leg per commit; any remaining distance returns as `tacticalMarchContinuations` for the renderer pending list.
+ * Expected outcome: `success: true` with `tacticalBattle` snapshot for immediate redraw, or failure with reason. Human marches apply at most one range-limited leg per commit; any remaining distance returns as `tacticalMarchContinuations` for the renderer pending list. Successful commits with `embarkOrders` also persist parent-level sealift rows in SQLite (same boundary as strategic Ready embark).
  * Exceptions: Caught and logged at error; returns `success: false` with stringified message.
  */
 export function commitHumanTacticalDraftOrders(args: {
@@ -725,22 +740,19 @@ export function commitHumanTacticalDraftOrders(args: {
         tacticalMarchContinuations.push({ subUnitId: o.unitId, destinationH3Index: o.toH3Index });
       }
     }
-    const applied = applyHumanTacticalMarchOrders(appliedMovementOrders);
-    if (!applied.success) {
-      logDebug('gameActions commitHumanTacticalDraftOrders rejected movement', { reason: applied.reason });
-      return { success: false, reason: applied.reason };
-    }
-    const postMovementBattle = applied.battle;
-    const support = applyValidatedHumanTacticalSupportOrders({
+    const beat = applyHumanTacticalDraftBeatInStrategicOrder({
+      movementOrders: appliedMovementOrders,
       rangedAttacks: args.rangedAttacks,
       airStrikes: args.airStrikes,
       ferryOrders: args.ferryOrders,
       embarkOrders: args.embarkOrders,
     });
-    if (!support.success) {
-      logDebug('gameActions commitHumanTacticalDraftOrders rejected support', { reason: support.reason });
-      return { success: false, reason: support.reason };
+    if (!beat.success) {
+      logDebug('gameActions commitHumanTacticalDraftOrders rejected beat', { reason: beat.reason });
+      return { success: false, reason: beat.reason };
     }
+    const support = beat;
+    const postMovementBattle = beat.battleAfterMovementBeforeFerry;
     if ((support.infrastructureDestroyedEvents?.length ?? 0) > 0) {
       const { changedHexCount } = reconcileRes1InfrastructureCountsFromRes4Overrides();
       logDebug('gameActions commitHumanTacticalDraftOrders reconciled res1 infrastructure after tactical strikes', {
@@ -748,7 +760,8 @@ export function commitHumanTacticalDraftOrders(args: {
         eventCount: support.infrastructureDestroyedEvents.length,
       });
     }
-    const finalBattle = support.battle;
+    const meleePack = beat.meleePack;
+    const finalBattle = beat.battle;
     const humanMoves: TacticalCommitResolutionPlayback['humanMoves'] = [];
     for (const o of args.movementOrders) {
       const sub = preBattle.subUnits.find((u) => u.id === o.unitId);
@@ -795,19 +808,41 @@ export function commitHumanTacticalDraftOrders(args: {
       rangedCasualtyHexes: rangedCasualtyHexes.length > 0 ? rangedCasualtyHexes : undefined,
       rangedRemovedUnits: rangedRemovedUnits.length > 0 ? rangedRemovedUnits : undefined,
       killsByDirectFire: support.killsByDirectFire.length > 0 ? support.killsByDirectFire : undefined,
+      killsByReturnFire: support.killsByReturnFire.length > 0 ? support.killsByReturnFire : undefined,
       killsByAirStrike: support.killsByAirStrike.length > 0 ? support.killsByAirStrike : undefined,
       infrastructureDestroyedEvents:
         support.infrastructureDestroyedEvents.length > 0 ? support.infrastructureDestroyedEvents : undefined,
       airStrikeAttemptCount: support.airStrikeAttemptCount > 0 ? support.airStrikeAttemptCount : undefined,
+      killsByMelee: meleePack.killsByMelee.length > 0 ? meleePack.killsByMelee : undefined,
+      meleeCombatHexes: meleePack.meleeCombatHexes.length > 0 ? meleePack.meleeCombatHexes : undefined,
+      meleeCasualtyHexes: meleePack.meleeCasualtyHexes.length > 0 ? meleePack.meleeCasualtyHexes : undefined,
+      meleeRemovedUnits: meleePack.meleeRemovedUnits.length > 0 ? meleePack.meleeRemovedUnits : undefined,
     };
     logDebug('gameActions commitHumanTacticalDraftOrders playback', {
       humanMoveCount: humanMoves.length,
       rangedCombatHexCount: rangedCombatHexes.length,
       rangedRemovedCount: rangedRemovedUnits.length,
       rangedKillEdgeCount: support.killsByDirectFire.length,
+      returnFireKillEdgeCount: support.killsByReturnFire.length,
       airStrikeKillEdgeCount: support.killsByAirStrike.length,
+      meleeKillEdgeCount: meleePack.killsByMelee.length,
+      meleeRemovedCount: meleePack.meleeRemovedUnits.length,
       marchContinuationCount: tacticalMarchContinuations.length,
     });
+    /**
+     * Persists human tactical embark onto strategic `unit_transport_assignments` after the beat succeeded.
+     *
+     * Purpose: Keeps Ready-time tactical embark aligned with strategic sealift persistence (cancel movement is handled in the renderer draft layer).
+     * When to use: Only here, immediately before returning success, when `embarkOrders` were part of this commit.
+     * Expected outcome: Parent ids resolved from `finalBattle.subUnits`; rows inserted or skipped per `applyTacticalEmbarkCommittedOrdersToStrategicDb` rules.
+     * Exceptions: None; the helper logs and skips invalid rows without throwing.
+     */
+    if ((args.embarkOrders?.length ?? 0) > 0) {
+      applyTacticalEmbarkCommittedOrdersToStrategicDb(args.embarkOrders!, (subId) => {
+        const row = finalBattle.subUnits.find((u) => u.id === subId);
+        return row?.parentUnitId ?? null;
+      });
+    }
     return {
       success: true,
       tacticalBattle: finalBattle,
@@ -1211,6 +1246,30 @@ export function getSealiftStackState(h3Index: string): SealiftStackState {
 }
 
 /**
+ * Returns sealift stack UI state for a tactical res4 hex using sub-unit ids from the active tactical snapshot.
+ *
+ * Purpose: Supports stack-callout sealift controls during tactical battles when strategic `getSealiftStackState` does not describe res4 sub-units.
+ * When to use: Renderer invokes `game:getTacticalSealiftStackState` while `isTacticalBattleActive()` is true.
+ * Expected outcome: Same `SealiftStackState` shape as strategic sealift with tactical sub-unit ids, or an empty section when inactive or outside the footprint.
+ * Exceptions: None; delegates to `getTacticalSealiftStackStateForHex` without throwing.
+ */
+export function getTacticalSealiftStackState(h3Index: string): SealiftStackState {
+  logTrace('gameActions getTacticalSealiftStackState', { h3Index });
+  if (!isTacticalBattleActive()) {
+    return {
+      h3Index,
+      showSealiftSection: false,
+      contextMode: 'unsupported',
+      controlsDisabled: true,
+      hasEmbarkedUnitsInStack: false,
+      navalRows: [],
+      landOptions: [],
+    };
+  }
+  return getTacticalSealiftStackStateForHex(h3Index);
+}
+
+/**
  * Defines the `updateSealiftSlot` function shape (export function updateSealiftSlot( h3Index: string, navalUnitId: string, slotIndex: 1 | 2, landUnitId: string | null ): { success: boolean; reason?).
 
  * Purpose: Supports maintainability by documenting why `updateSealiftSlot` exists.
@@ -1226,6 +1285,9 @@ export function updateSealiftSlot(
 ): { success: boolean; reason?: string; state?: SealiftStackState } {
   logDebug('gameActions updateSealiftSlot', { h3Index, navalUnitId, slotIndex, landUnitId });
   try {
+    if (isTacticalBattleActive()) {
+      return { success: false, reason: 'Sealift cannot be changed during a tactical battle.' };
+    }
     const result = updateSealiftSlotImpl({ h3Index, navalUnitId, slotIndex, landUnitId });
     if (result.success && landUnitId) {
       cancelHumanMovementOrdersForUnit(landUnitId);
@@ -1236,6 +1298,59 @@ export function updateSealiftSlot(
     return result;
   } catch (err) {
     logError('updateSealiftSlot: exception', err);
+    return { success: false, reason: String(err) };
+  }
+}
+
+/**
+ * Applies one tactical sealift slot change immediately (snapshot + optional parent-level SQLite), mirroring strategic `updateSealiftSlot` with sub-unit ids.
+ *
+ * Purpose: Lets the human debark, embark, or reassign sealift during an active tactical battle without waiting for Ready.
+ * When to use: Renderer stack callout when `tacticalBattleSnapshot` covers the stack hex and `updateSealiftSlot` is blocked.
+ * Expected outcome: `success: true` with refreshed `tacticalBattle` and `state` for the stack hex, or `success: false` with a human-readable `reason`.
+ * Exceptions: Unexpected errors are caught, logged at error, and returned as `success: false`.
+ */
+export function updateTacticalSealiftSlot(
+  h3Index: string,
+  navalUnitId: string,
+  slotIndex: 1 | 2,
+  landUnitId: string | null
+): {
+  success: boolean;
+  reason?: string;
+  state?: SealiftStackState;
+  tacticalBattle?: TacticalBattleSnapshot;
+} {
+  logDebug('gameActions updateTacticalSealiftSlot', { h3Index, navalUnitId, slotIndex, landUnitId });
+  try {
+    if (!isTacticalBattleActive()) {
+      return { success: false, reason: 'No tactical battle is active.' };
+    }
+    const landKey = landUnitId?.trim() ?? '';
+    const result = applyTacticalSealiftSlotChangeInSession({
+      h3Index,
+      navalUnitId,
+      slotIndex,
+      landUnitId: landKey.length > 0 ? landKey : null,
+    });
+    if (!result.success) return result;
+    if (landKey.length > 0) {
+      const sub = result.tacticalBattle.subUnits.find((u) => u.id === landKey);
+      if (sub?.parentUnitId) {
+        cancelHumanStrategicMarchOrdersForParentUnit(sub.parentUnitId);
+        logDebug('gameActions updateTacticalSealiftSlot: cancelled land parent march orders after embark', {
+          landSubUnitId: landKey,
+          parentUnitId: sub.parentUnitId,
+        });
+      }
+    }
+    return {
+      success: true,
+      state: result.state,
+      tacticalBattle: result.tacticalBattle,
+    };
+  } catch (err) {
+    logError('updateTacticalSealiftSlot: exception', err);
     return { success: false, reason: String(err) };
   }
 }

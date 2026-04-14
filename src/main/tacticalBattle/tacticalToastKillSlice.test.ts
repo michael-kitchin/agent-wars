@@ -7,7 +7,7 @@ import { tacticalKillEdgesForStrategicStyleTurnUpdate } from '../../shared/tacti
  *
  * Purpose: Locks the contract that air strike victims must not appear as pseudo-melee or extra kill lines.
  * When to use: Regression coverage after edits to `tacticalKillEdgesForStrategicStyleTurnUpdate`.
- * Expected outcome: Only ranged direct and return-fire edges are returned.
+ * Expected outcome: Ranged direct and return-fire edges are returned; air strike victims stay out of this list.
  * Exceptions: Assertion failure on contract drift.
  */
 function testOmitsAirStrikeVictims(): void {
@@ -24,8 +24,31 @@ function testOmitsAirStrikeVictims(): void {
   assert.ok(!edges.some((e) => e.victimId === 'v-air'));
 }
 
+/**
+ * Verifies melee kill edges are folded into the tactical toast `kills` edge list like strategic Ready.
+ *
+ * Purpose: Ensures post-support melee casualties surface on melee summary lines in the renderer.
+ * When to use: Regression coverage after edits to `tacticalKillEdgesForStrategicStyleTurnUpdate`.
+ * Expected outcome: `killsByMelee` entries appear in the combined edge list; air strike rows still excluded.
+ * Exceptions: Assertion failure on contract drift.
+ */
+function testIncludesMeleeEdges(): void {
+  const playback: TacticalCommitResolutionPlayback = {
+    humanMoves: [],
+    killsByDirectFire: [{ victimId: 'v-r', killerIds: ['a1'] }],
+    killsByMelee: [{ victimId: 'v-m', killerIds: ['a2'] }],
+    killsByAirStrike: [{ victimId: 'v-air', killerIds: ['a3'] }],
+  };
+  const edges = tacticalKillEdgesForStrategicStyleTurnUpdate(playback);
+  assert.strictEqual(edges.length, 2);
+  assert.ok(edges.some((e) => e.victimId === 'v-r'));
+  assert.ok(edges.some((e) => e.victimId === 'v-m'));
+  assert.ok(!edges.some((e) => e.victimId === 'v-air'));
+}
+
 const tests: { name: string; fn: () => void }[] = [
   { name: 'tacticalKillEdgesForStrategicStyleTurnUpdate omits air strike', fn: testOmitsAirStrikeVictims },
+  { name: 'tacticalKillEdgesForStrategicStyleTurnUpdate includes melee', fn: testIncludesMeleeEdges },
 ];
 
 for (const t of tests) {

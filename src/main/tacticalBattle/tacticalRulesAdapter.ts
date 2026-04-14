@@ -62,7 +62,7 @@ export function tacticalMarchReachableAlongRes4Footprint(
  * Returns the res4 cell reached after spending at most `movementPointBudget` movement points toward `toRes4H3Index` along the cheapest valid tactical path.
  *
  * Purpose: Lets tactical Ready apply only the first leg of a multi-turn march using §12.4 terrain costs (milestone 2.2).
- * When to use: `commitHumanTacticalDraftOrders` before `applyHumanTacticalMarchOrders`, using the same footprint and terrain snapshot as validation.
+ * When to use: `commitHumanTacticalDraftOrders` before `applyHumanTacticalDraftBeatInStrategicOrder`, using the same footprint and terrain snapshot as march validation.
  * Expected outcome: `stopH3` lies on the minimum movement-point path; `consumedFullPath` is true when the ordered destination is reached within budget.
  * Exceptions: When no finite-cost path exists, returns `{ stopH3: from, consumedFullPath: false }` so callers do not advance illegally.
  */

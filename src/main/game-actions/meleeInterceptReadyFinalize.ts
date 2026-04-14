@@ -12,7 +12,7 @@ import {
   setGameOver,
 } from '../gameDb';
 import { processProductionAfterControlResolution, resolveRes1ControlAfterCombatAndMovement } from './controlAndProduction';
-import { applyTransportLossForRemovedNavalUnits, deleteTransportAssignmentsForRemovedUnits } from './sealift';
+import { applyTransportOutcomeForRemovedStrategicUnits } from './sealift';
 import type { CombatResolutionResult } from '../combatResolution';
 import type { CombatUnit } from '../combatUnitTypes';
 import type { AirStrikePhaseResult } from './airStrikeResolution';
@@ -20,23 +20,6 @@ import type { FerryAnimationMove, RangedAttackOrder, ReadyResult } from '../../s
 import { evaluateRegionControlWinnerAtEndOfTurn } from './regionControlWinner';
 import { destroyAirUnitsWithInvalidBase } from './invalidAirBase';
 import { logDebug } from '../logger';
-
-/**
- * Applies transport-side effects for a combat removal list (naval sinks, embarked cleanup).
- *
- * Purpose: Mirrors the ready-phase helper so finalize stays aligned with transport rules.
- * When to use: After deleting units removed in melee during finalize.
- * Expected outcome: Returns any extra transport-derived removals to fold into reporting.
- * Exceptions: None beyond underlying DB helpers.
- */
-function applyTransportOutcomeForPhase(removedUnitIds: string[], removedUnits: CombatUnit[]): CombatUnit[] {
-  const transportLosses = applyTransportLossForRemovedNavalUnits(removedUnits);
-  deleteTransportAssignmentsForRemovedUnits(removedUnitIds);
-  if (transportLosses.length > 0) {
-    deleteTransportAssignmentsForRemovedUnits(transportLosses.map((unit) => unit.id));
-  }
-  return transportLosses;
-}
 
 export interface FinalizeReadyAfterMeleeArgs {
     /**
@@ -197,7 +180,10 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
   for (const id of meleeResult.removedUnitIds) {
     dbRun('DELETE FROM units WHERE id = ?', [id]);
   }
-  const meleeTransportLosses = applyTransportOutcomeForPhase(meleeResult.removedUnitIds, meleeResult.removedUnits);
+  const meleeTransportLosses = applyTransportOutcomeForRemovedStrategicUnits(
+    meleeResult.removedUnitIds,
+    meleeResult.removedUnits
+  );
 
   const controlTransitions = resolveRes1ControlAfterCombatAndMovement(traversedHexesByPlayer);
   const baseLossRemovedAir = destroyAirUnitsWithInvalidBase();

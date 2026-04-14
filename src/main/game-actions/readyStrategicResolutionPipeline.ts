@@ -25,9 +25,8 @@ import { AIR_FERRY_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { resolveAirStrikePhase } from './airStrikeResolution';
 import {
   applyEmbarkOrdersForPlayer,
-  applyTransportLossForRemovedNavalUnits,
+  applyTransportOutcomeForRemovedStrategicUnits,
   autoDisembarkIndependentLandMoves,
-  deleteTransportAssignmentsForRemovedUnits,
   isEmbarkedLandUnitOnWater,
   syncEmbarkedLandUnitPositionsWithNaval,
 } from './sealift';
@@ -160,17 +159,12 @@ export function executeReadyStrategicTurn(
     return rawCombatRng();
   };
   logDebug('ready: combat resolution', { turnNumber, gameSeed, combatSeed: seed });
-  const applyTransportOutcomeForPhase = (removedUnitIds: string[], removedUnits: CombatUnit[]): CombatUnit[] => {
-    const transportLosses = applyTransportLossForRemovedNavalUnits(removedUnits);
-    deleteTransportAssignmentsForRemovedUnits(removedUnitIds);
-    if (transportLosses.length > 0) {
-      deleteTransportAssignmentsForRemovedUnits(transportLosses.map((unit) => unit.id));
-    }
-    return transportLosses;
-  };
 
   const airStrikeResult = resolveAirStrikePhase(allAirStrikes, next);
-  const airStrikeTransportLosses = applyTransportOutcomeForPhase(airStrikeResult.removedUnitIds, airStrikeResult.removedUnits);
+  const airStrikeTransportLosses = applyTransportOutcomeForRemovedStrategicUnits(
+    airStrikeResult.removedUnitIds,
+    airStrikeResult.removedUnits
+  );
   const rangedInputUnits = listUnitsForSnapshot()
     .filter((u) => {
       if (u.unitType !== 'infantry' && u.unitType !== 'armor') return true;
@@ -187,7 +181,10 @@ export function executeReadyStrategicTurn(
   for (const id of rangedResult.removedUnitIds) {
     dbRun('DELETE FROM units WHERE id = ?', [id]);
   }
-  const rangedTransportLosses = applyTransportOutcomeForPhase(rangedResult.removedUnitIds, rangedResult.removedUnits);
+  const rangedTransportLosses = applyTransportOutcomeForRemovedStrategicUnits(
+    rangedResult.removedUnitIds,
+    rangedResult.removedUnits
+  );
 
   const humanOrders = dbGetAll<{ unit_id: string; to_h3_index: string }>('SELECT unit_id, to_h3_index FROM pending_orders');
   const preMoveState = dbBackedStateSnapshot();

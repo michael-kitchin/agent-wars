@@ -516,6 +516,15 @@ pendingAirStrikes: [] as AirStrikeOrder[],
    */
 pendingFerryOrders: [] as FerryOrder[],
     /**
+   * Documents the object literal property `pendingEmbarkOrders` (pendingEmbarkOrders: [] as EmbarkOrder[]).
+
+   * Purpose: Queues human sealift embark drafts as tactical sub-unit pairs until tactical Ready commits them (strategic `updateSealiftSlot` is blocked during tactical battles).
+   * When to use: Stack callout sealift controls while `tacticalBattleSnapshot` is set; clear on tactical Ready commit, exit, stash, or new game.
+   * Expected outcome: Each row assigns one land sub-unit id to one naval sub-unit id co-located on the same res4 hex.
+   * Exceptions: None.
+   */
+pendingEmbarkOrders: [] as EmbarkOrder[],
+    /**
    * Documents the object literal property `tacticalPendingMarches` (tacticalPendingMarches: [] as { subUnitId: string; destinationH3Index: string }[]).
 
    * Purpose: Holds human tactical march rows shown in the pending-orders sidebar while a tactical battle is active; distinct from strategic standing orders.

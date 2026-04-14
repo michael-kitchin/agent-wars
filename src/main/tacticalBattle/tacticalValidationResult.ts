@@ -35,3 +35,18 @@ export function tacticalValidResult(): TacticalValidationResult {
 export function tacticalInvalidResult(reason: string): TacticalValidationResult {
   return { valid: false, reason };
 }
+
+/**
+ * Thrown when human tactical embark drafts fail validation inside support-order projection.
+ *
+ * Purpose: Lets `projectTacticalSnapshotAfterValidatedHumanSupportOrders` abort without changing the return type union while `applyValidatedHumanTacticalSupportOrders` maps this to `success: false`.
+ * When to use: Only from tactical composite projection when `validateTacticalHumanEmbarkOrder` rejects a row.
+ * Expected outcome: Caught at the tactical session boundary with the original user-facing `message`.
+ * Exceptions: None; this is a control-flow error, not an unexpected runtime fault.
+ */
+export class TacticalEmbarkValidationRejected extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TacticalEmbarkValidationRejected';
+  }
+}

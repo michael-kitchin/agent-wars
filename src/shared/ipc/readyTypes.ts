@@ -208,11 +208,47 @@ export type TacticalCommitResolutionPlayback = {
    */
   airStrikeAttemptCount?: number;
   /**
-   * Reserved for future tactical return-fire bookkeeping; always omitted today.
+   * Kill edges from tactical **melee** resolution after movement and support on the same commit (mirrors melee slice of `ReadyResult.kills`).
+   *
+   * Purpose: Lets `buildTacticalCommitReadyResultForToast` classify melee lines separately from ranged and air-strike summaries.
+   * When to use: Populated by `commitHumanTacticalDraftOrders` after `applyTacticalMeleeAfterSupportOrders` removes co-located enemies.
+   * Expected outcome: Same `{ victimId, killerIds }` shape as strategic melee kill metadata; omitted when no res4 hex had opposing survivors after support.
+   * Exceptions: None.
+   */
+  killsByMelee?: { victimId: string; killerIds: string[] }[];
+  /**
+   * Res4 hexes where tactical melee combat was adjudicated this commit.
+   *
+   * Purpose: Drives resolution playback overlays for melee flashes on the tactical map.
+   * When to use: After tactical melee phase runs on the post-support snapshot.
+   * Expected outcome: Subset of `res4ChildH3Indexes` where at least two players had sub-units before melee rolls.
+   * Exceptions: None.
+   */
+  meleeCombatHexes?: string[];
+  /**
+   * Res4 hexes that lost at least one sub-unit to tactical melee this commit.
+   *
+   * Purpose: Aligns tactical casualty highlighting with strategic `meleeCasualtyHexes` semantics.
+   * When to use: Populated alongside `meleeRemovedUnits` from the same melee pass.
+   * Expected outcome: Each entry appears in `meleeCombatHexes` when casualties occurred there.
+   * Exceptions: None.
+   */
+  meleeCasualtyHexes?: string[];
+  /**
+   * Sub-unit rows removed by tactical melee this commit (display names preserved for toasts).
+   *
+   * Purpose: Extends `rangedRemovedUnits` with the same `RemovedUnitSnapshot` contract for merged casualty tables.
+   * When to use: Renderer kill formatters and `buildTacticalCommitReadyResultForToast` merge this with ranged/air removals.
+   * Expected outcome: One row per removed tactical id; stable ordering is not required.
+   * Exceptions: None.
+   */
+  meleeRemovedUnits?: RemovedUnitSnapshot[];
+  /**
+   * Kill edges from human tactical **ranged return fire** when `runRangedPhase` resolves defensive shots (mirrors strategic `killsByReturnFire`).
    *
    * Purpose: Keeps the playback shape aligned with `ReadyResult` for shared toast helpers.
-   * When to use: Not used yet; include only when tactical simulation emits return-fire kills.
-   * Expected outcome: Same semantics as strategic `killsByReturnFire` when populated.
+   * When to use: Populated by `commitHumanTacticalDraftOrders` when tactical ranged combat produces return-fire casualties.
+   * Expected outcome: Same `{ victimId, killerIds }` shape as strategic return-fire metadata; omitted when empty.
    * Exceptions: None.
    */
   killsByReturnFire?: { victimId: string; killerIds: string[] }[];

@@ -45,6 +45,7 @@ export function stashStrategicOrderDraftsForTacticalSession(): void {
   S.pendingRangedAttacks = [];
   S.pendingAirStrikes = [];
   S.pendingFerryOrders = [];
+  S.pendingEmbarkOrders = [];
   S.tacticalPendingMarches = [];
   S.rangedModeActive = false;
   S.airStrikeModeActive = false;
@@ -66,6 +67,7 @@ export function restoreStrategicOrderDraftsAfterTacticalSession(): void {
   S.pendingFerryOrders = strategicOrderDraftStash.pendingFerryOrders;
   strategicOrderDraftStash = null;
   S.tacticalPendingMarches = [];
+  S.pendingEmbarkOrders = [];
 }
 
 /**

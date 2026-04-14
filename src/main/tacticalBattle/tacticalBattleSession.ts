@@ -5,6 +5,8 @@ import type {
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import { tacticalBoundaryConcurrentSessionAllowed } from '../../shared/tacticalStateAssertions';
+import { createCombatRng } from '../combatResolution';
+import { getGameSeed } from '../gameDb';
 import { getActiveTacticalBattleSnapshotRef, setActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import {
   clearTacticalBattleSnapshotFromGameConfig,
@@ -16,10 +18,25 @@ import {
   projectTacticalSnapshotAfterValidatedHumanSupportOrders,
   projectTacticalSnapshotAfterValidatedOpponentOrders,
 } from './tacticalCompositeOrdersApply';
+import { applyTacticalMeleeAfterSupportOrders, tacticalSubUnitLayoutSeed32 } from './tacticalMeleeApply';
 import { projectTacticalSnapshotAfterHumanMovementOrders } from './tacticalMovementApply';
+import {
+  applyTacticalAirStrikeThenRangedPhaseOnBattle,
+  applyTacticalEmbarkPhaseOnBattle,
+  applyTacticalFerryPhaseOnBattle,
+  tacticalBattleWithSyncedEmbarkCargo,
+} from './tacticalStrategicOrderPhases';
 import type { TacticalMovementBlockReason } from './tacticalSnapshotGuards';
 import { tacticalComputeHumanMovementOrderOutcome } from './tacticalSnapshotGuards';
+import { applyTacticalEmbarkCommittedOrdersToStrategicDb } from '../game-actions/sealift';
 import { tacticalLogError, tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
+import { validateTacticalHumanEmbarkOrder } from './tacticalOpponentOrderValidation';
+import {
+  captureTacticalTransportBaselineForParentUnitIds,
+  restoreTacticalTransportBaselineForParentUnitIds,
+  tacticalTransportBaselineConfigExists,
+} from './tacticalTransportBaseline';
+import { TacticalEmbarkValidationRejected } from './tacticalValidationResult';
 
 /**
  * Writes the active tactical snapshot to memory and SQLite, or clears both when ending a session.
@@ -87,6 +104,7 @@ export function startTacticalBattleForEnclosingRes1Hex(enclosingRes1H3Index: str
       return { success: false, reason: failureReason ?? 'Could not start tactical battle.' };
     }
     commitActiveTacticalBattle(snapshot);
+    captureTacticalTransportBaselineForParentUnitIds([...new Set(snapshot.subUnits.map((u) => u.parentUnitId))]);
     if (skippedParentDisplayNames.length > 0) {
       tacticalLogMutate('startTacticalBattleForEnclosingRes1Hex skipped parents', { skippedParentDisplayNames });
     }
@@ -102,15 +120,18 @@ export function startTacticalBattleForEnclosingRes1Hex(enclosingRes1H3Index: str
 }
 
 /**
- * Clears the active tactical battle session without applying strategic outcomes (milestone 2.1).
+ * Clears the active tactical battle session without applying tactical combat outcomes to strategic units.
  *
- * Contract: Idempotent; sets `activeTacticalBattle` to null; does not write SQLite strategic state.
+ * Contract: Idempotent; restores `unit_transport_assignments` for parents in the battle from the captured tactical baseline, then sets `activeTacticalBattle` to null and clears tactical `game_config` keys.
  * When to use: Tactical exit IPC, annihilation cleanup, test teardown, and error recovery paths.
- * Expected outcome: `isTacticalBattleActive()` becomes false; subsequent apply calls fail until a new start.
+ * Expected outcome: `isTacticalBattleActive()` becomes false; strategic transport rows match the pre-battle baseline for involved parents; subsequent apply calls fail until a new start.
  * Exceptions: None.
  */
 export function endTacticalBattleSession(): void {
   tacticalLogMutate('endTacticalBattleSession', { hadBattle: !!getActiveTacticalBattleSnapshotRef() });
+  const snap = getActiveTacticalBattleSnapshotRef();
+  const parentIds = snap ? [...new Set(snap.subUnits.map((u) => u.parentUnitId))] : null;
+  restoreTacticalTransportBaselineForParentUnitIds(parentIds);
   commitActiveTacticalBattle(null);
 }
 
@@ -231,10 +252,108 @@ export function applyHumanTacticalMarchOrders(
 }
 
 /**
+ * Applies one human tactical Ready beat in strategic resolution order (air+ranged, march, optional human embark, ferry, cargo sync, melee) with a single persisted snapshot.
+ *
+ * Purpose: Matches `executeReadyStrategicTurn` combat ordering without production: no human embark before air (strategic has none there); optional `embarkOrders` apply after movement like sealift committed after positions settle; fixes prior drift where melee updated IPC but not the active snapshot.
+ * When to use: `commitHumanTacticalDraftOrders` after target validations and after computing applied march legs.
+ * Expected outcome: One `commitActiveTacticalBattle` with post-melee rows; air/ranged/melee share one `createCombatRng` stream rooted like melee-only `applyTacticalMeleeAfterSupportOrders`.
+ * Exceptions: Returns `success: false` when no session, march validation fails, or projection throws.
+ */
+export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
+  movementOrders: readonly { unitId: string; toH3Index: string }[];
+  rangedAttacks?: readonly { unitId: string; targetH3Index: string }[];
+  airStrikes?: readonly AirStrikeOrder[];
+  ferryOrders?: readonly FerryOrder[];
+  embarkOrders?: readonly EmbarkOrder[];
+}):
+  | {
+      success: true;
+      battle: TacticalBattleSnapshot;
+      battleAfterMovementBeforeFerry: TacticalBattleSnapshot;
+      killsByDirectFire: { victimId: string; killerIds: string[] }[];
+      killsByAirStrike: { victimId: string; killerIds: string[] }[];
+      killsByReturnFire: { victimId: string; killerIds: string[] }[];
+      removedUnits: RemovedUnitSnapshot[];
+      infrastructureDestroyedEvents: InfrastructureDestroyedEvent[];
+      airStrikeAttemptCount: number;
+      meleePack: ReturnType<typeof applyTacticalMeleeAfterSupportOrders>;
+    }
+  | { success: false; reason: string } {
+  tacticalLogMutate('applyHumanTacticalDraftBeatInStrategicOrder', {
+    movementCount: args.movementOrders.length,
+    rangedCount: args.rangedAttacks?.length ?? 0,
+    airCount: args.airStrikes?.length ?? 0,
+    ferryCount: args.ferryOrders?.length ?? 0,
+    embarkCount: args.embarkOrders?.length ?? 0,
+  });
+  try {
+    const cur = getActiveTacticalBattleSnapshotRef();
+    if (!cur) {
+      tacticalLogQuery('applyHumanTacticalDraftBeatInStrategicOrder rejected', { reason: 'no_active_session' });
+      return { success: false, reason: 'No tactical battle is active.' };
+    }
+    const marchFail = humanTacticalMarchValidationFailure(cur, args.movementOrders);
+    if (marchFail) {
+      tacticalLogQuery('applyHumanTacticalDraftBeatInStrategicOrder rejected', { reason: 'march_validation', detail: marchFail });
+      return { success: false, reason: marchFail };
+    }
+    const seed =
+      (getGameSeed() +
+        cur.strategicTurnNumber * 7919 +
+        cur.tacticalTurnNumber * 104729 +
+        tacticalSubUnitLayoutSeed32(cur.subUnits)) >>>
+      0;
+    const rawNext = createCombatRng(seed);
+    const acc = applyTacticalAirStrikeThenRangedPhaseOnBattle(
+      cur,
+      args.airStrikes,
+      args.rangedAttacks,
+      'human',
+      rawNext
+    );
+    const bAfterMove =
+      args.movementOrders.length > 0
+        ? projectTacticalSnapshotAfterHumanMovementOrders(acc.battle, args.movementOrders)
+        : acc.battle;
+    for (const e of args.embarkOrders ?? []) {
+      const emb = validateTacticalHumanEmbarkOrder(e, bAfterMove.subUnits);
+      if (!emb.valid) {
+        tacticalLogQuery('applyHumanTacticalDraftBeatInStrategicOrder rejected', { reason: 'embark_validation', detail: emb.reason });
+        return { success: false, reason: emb.reason };
+      }
+    }
+    const bAfterHumanEmbark = applyTacticalEmbarkPhaseOnBattle(bAfterMove, args.embarkOrders, 'human');
+    const bAfterFerry = applyTacticalFerryPhaseOnBattle(bAfterHumanEmbark, args.ferryOrders, 'human');
+    const bSynced = tacticalBattleWithSyncedEmbarkCargo(bAfterFerry);
+    const meleePack = applyTacticalMeleeAfterSupportOrders(bSynced, rawNext);
+    commitActiveTacticalBattle(meleePack.battle);
+    tacticalLogMutate('applyHumanTacticalDraftBeatInStrategicOrder applied', {
+      battleId: meleePack.battle.battleId,
+      subUnitCount: meleePack.battle.subUnits.length,
+    });
+    return {
+      success: true,
+      battle: meleePack.battle,
+      battleAfterMovementBeforeFerry: bAfterMove,
+      killsByDirectFire: acc.killsByDirectFire,
+      killsByAirStrike: acc.killsByAirStrike,
+      killsByReturnFire: acc.killsByReturnFire,
+      removedUnits: acc.removedUnits,
+      infrastructureDestroyedEvents: acc.infrastructureDestroyedEvents,
+      airStrikeAttemptCount: acc.airStrikeAttemptCount,
+      meleePack,
+    };
+  } catch (err) {
+    tacticalLogError('applyHumanTacticalDraftBeatInStrategicOrder failed', { err });
+    return { success: false, reason: 'Could not apply tactical Ready orders.' };
+  }
+}
+
+/**
  * Applies validated human tactical support drafts (ranged, air, ferry, embark) to the active snapshot.
  *
  * Purpose: Completes tactical Ready parity so non-march drafts commit on main exactly once per Ready click.
- * When to use: `commitHumanTacticalDraftOrders` after movement projection succeeds for the same tactical beat.
+ * When to use: Callers that apply support without marching on the same IPC (rare); prefer `applyHumanTacticalDraftBeatInStrategicOrder` for full Ready beats.
  * Expected outcome: Active snapshot mutates and persists with support-order effects; returns updated `battle`.
  * Exceptions: Logs at error and returns `success: false` with reason if no session exists or projection fails.
  */
@@ -249,6 +368,7 @@ export function applyValidatedHumanTacticalSupportOrders(args: {
       battle: TacticalBattleSnapshot;
       killsByDirectFire: { victimId: string; killerIds: string[] }[];
       killsByAirStrike: { victimId: string; killerIds: string[] }[];
+      killsByReturnFire: { victimId: string; killerIds: string[] }[];
       removedUnits: RemovedUnitSnapshot[];
       infrastructureDestroyedEvents: InfrastructureDestroyedEvent[];
       airStrikeAttemptCount: number;
@@ -277,6 +397,7 @@ export function applyValidatedHumanTacticalSupportOrders(args: {
         battle: cur,
         killsByDirectFire: [],
         killsByAirStrike: [],
+        killsByReturnFire: [],
         removedUnits: [],
         infrastructureDestroyedEvents: [],
         airStrikeAttemptCount: 0,
@@ -284,16 +405,27 @@ export function applyValidatedHumanTacticalSupportOrders(args: {
     }
     const projection = projectTacticalSnapshotAfterValidatedHumanSupportOrders(cur, args);
     commitActiveTacticalBattle(projection.battle);
+    if ((args.embarkOrders?.length ?? 0) > 0) {
+      applyTacticalEmbarkCommittedOrdersToStrategicDb(args.embarkOrders!, (subId) => {
+        const row = projection.battle.subUnits.find((u) => u.id === subId);
+        return row?.parentUnitId ?? null;
+      });
+    }
     return {
       success: true,
       battle: projection.battle,
       killsByDirectFire: projection.killsByDirectFire,
       killsByAirStrike: projection.killsByAirStrike,
+      killsByReturnFire: projection.killsByReturnFire,
       removedUnits: projection.removedUnits,
       infrastructureDestroyedEvents: projection.infrastructureDestroyedEvents,
       airStrikeAttemptCount: projection.airStrikeAttemptCount,
     };
   } catch (err) {
+    if (err instanceof TacticalEmbarkValidationRejected) {
+      tacticalLogQuery('applyValidatedHumanTacticalSupportOrders rejected', { reason: 'embark_validation', detail: err.message });
+      return { success: false, reason: err.message };
+    }
     tacticalLogError('applyValidatedHumanTacticalSupportOrders failed', { err });
     return { success: false, reason: 'Could not apply tactical support orders.' };
   }
@@ -362,6 +494,9 @@ export function restorePersistedTacticalBattleSession(): void {
   const snap = loadPersistedTacticalBattleSnapshotIfConsistent();
   if (!snap) return;
   setActiveTacticalBattleSnapshotRef(snap);
+  if (!tacticalTransportBaselineConfigExists()) {
+    captureTacticalTransportBaselineForParentUnitIds([...new Set(snap.subUnits.map((u) => u.parentUnitId))]);
+  }
   tacticalLogMutate('restorePersistedTacticalBattleSession installed', {
     battleId: snap.battleId,
     subUnitCount: snap.subUnits.length,

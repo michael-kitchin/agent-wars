@@ -15,43 +15,53 @@ import {
   tacticalRes1Cell,
   tacticalRes4UnderRes1Corner,
 } from './testSupport/tacticalRes4HexFixtures';
+import { dbRun } from '../gameDb';
+import { withTempGameDb } from '../testSupport/withTempGameDb';
 
 test('composite apply removes one human sub-unit per opponent ranged order', () => {
   const res1 = tacticalRes1Cell(8, 9);
   const h0 = tacticalRes4UnderRes1Corner(8, 9);
-  const ring = gridDisk(h0, 1);
-  const h1 = firstRingCellDistinctFrom(h0);
+  const ring = [...gridDisk(h0, 2)];
+  const inner = new Set(gridDisk(h0, 1));
+  const hFar = ring.find((h) => !inner.has(h));
+  if (!hFar) {
+    throw new Error('expected annulus cell in disk(h0,2) outside disk(h0,1)');
+  }
+  const navalCount = 15;
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-r',
     enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: [...ring],
+    res4ChildH3Indexes: ring,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [
-      {
-        id: 'opp-nav',
-        parentUnitId: 'pn',
-        player: 'opponent',
-        unitType: 'naval',
+      ...Array.from({ length: navalCount }, (_, i) => ({
+        id: `opp-n${i}`,
+        parentUnitId: `pn${i}`,
+        player: 'opponent' as const,
+        unitType: 'naval' as const,
         h3Index: h0,
-        displayName: 'I Fleet (01)',
-      },
+        displayName: `Fleet ${i + 1} (01)`,
+      })),
       {
         id: 'hum-1',
         parentUnitId: 'ph',
         player: 'human',
         unitType: 'infantry',
-        h3Index: h1,
+        h3Index: hFar,
         displayName: '1st Infantry (01)',
       },
     ],
   };
   const next = projectTacticalSnapshotAfterValidatedOpponentOrders(snap, {
     movementOrders: [],
-    rangedAttacks: [{ unitId: 'opp-nav', targetH3Index: h1 }],
+    rangedAttacks: Array.from({ length: navalCount }, (_, i) => ({
+      unitId: `opp-n${i}`,
+      targetH3Index: hFar,
+    })),
   });
   assert.equal(next.subUnits.some((u) => u.id === 'hum-1'), false);
-  assert.equal(next.subUnits.some((u) => u.id === 'opp-nav'), true);
+  assert.equal(next.subUnits.some((u) => u.id === 'opp-n0'), true);
 });
 
 test('composite embark assigns embarkedOnSubUnitId and syncs land hex to naval', () => {
@@ -93,6 +103,7 @@ test('composite embark assigns embarkedOnSubUnitId and syncs land hex to naval',
 });
 
 test('human support separates ranged kill edges from air strike kill edges', () => {
+  withTempGameDb('aw-tac-composite-human-', () => {
   const res1 = tacticalRes1Cell(5, 6);
   const h0 = tacticalRes4UnderRes1Corner(5, 6);
   const ring = [...gridDisk(h0, 1)];
@@ -125,6 +136,14 @@ test('human support separates ranged kill edges from air strike kill edges', () 
         displayName: '1st Infantry (01)',
       },
       {
+        id: 'hum-inf-b',
+        parentUnitId: 'human-infantry-2',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: h1,
+        displayName: '2nd Infantry (01)',
+      },
+      {
         id: 'op1',
         parentUnitId: 'opponent-infantry-1',
         player: 'opponent',
@@ -142,16 +161,22 @@ test('human support separates ranged kill edges from air strike kill edges', () 
       },
     ],
   };
-  const out = projectTacticalSnapshotAfterValidatedHumanSupportOrders(snap, {
-    airStrikes: [{ unitId: 'hum-air', targetH3Index: h1, targetType: 'units' }],
-    rangedAttacks: [{ unitId: 'hum-inf', targetH3Index: h2 }],
+  const rangedAttacks = [
+    { unitId: 'hum-inf', targetH3Index: h2 },
+    { unitId: 'hum-inf-b', targetH3Index: h2 },
+  ];
+  const airStrikes = [{ unitId: 'hum-air', targetH3Index: h1, targetType: 'units' as const }];
+  let out = projectTacticalSnapshotAfterValidatedHumanSupportOrders(snap, { airStrikes, rangedAttacks });
+  let ok =
+    out.killsByAirStrike.some((k) => k.killerIds[0] === 'hum-air' && k.victimId === 'op1') &&
+    out.killsByDirectFire.some((k) => k.killerIds[0] === 'hum-inf' && k.victimId === 'op2');
+  for (let seed = 0; !ok && seed < 400; seed++) {
+    dbRun(`UPDATE game_config SET value = ? WHERE key = 'game_seed'`, [String(seed)]);
+    out = projectTacticalSnapshotAfterValidatedHumanSupportOrders(snap, { airStrikes, rangedAttacks });
+    ok =
+      out.killsByAirStrike.some((k) => k.killerIds[0] === 'hum-air' && k.victimId === 'op1') &&
+      out.killsByDirectFire.some((k) => k.killerIds[0] === 'hum-inf' && k.victimId === 'op2');
+  }
+  assert.equal(ok, true, 'expected some game_seed to yield air hit on op1 and ranged kills on op2');
   });
-  assert.equal(
-    out.killsByAirStrike.some((k) => k.killerIds[0] === 'hum-air' && k.victimId === 'op1'),
-    true
-  );
-  assert.equal(
-    out.killsByDirectFire.some((k) => k.killerIds[0] === 'hum-inf' && k.victimId === 'op2'),
-    true
-  );
 });

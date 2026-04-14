@@ -434,6 +434,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       return true;
     }
     if (S.tacticalBattleSnapshot) {
+      S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => !selectedIds.includes(e.unitId));
       for (const subUnitId of selectedIds) {
         const idx = S.tacticalPendingMarches.findIndex((row) => row.subUnitId === subUnitId);
         if (idx >= 0) S.tacticalPendingMarches.splice(idx, 1);

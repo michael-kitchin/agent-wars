@@ -32,6 +32,8 @@ import {
   updateHexBuildQueueEntry,
   removeHexBuildQueueEntry,
   getSealiftStackState,
+  getTacticalSealiftStackState,
+  updateTacticalSealiftSlot,
   updateSealiftSlot,
   resolveMeleeIntercept,
 } from './gameActions';
@@ -414,6 +416,37 @@ function registerIpcHandlers(): void {
     }
     return getSealiftStackState(payload.h3Index);
   });
+  ipcMain.handle(IPC_GAME.getTacticalSealiftStackState, (_event, payload: { h3Index?: string }) => {
+    if (typeof payload?.h3Index !== 'string') {
+      return {
+        h3Index: '',
+        showSealiftSection: false,
+        contextMode: 'unsupported',
+        controlsDisabled: true,
+        hasEmbarkedUnitsInStack: false,
+        navalRows: [],
+        landOptions: [],
+      };
+    }
+    return getTacticalSealiftStackState(payload.h3Index);
+  });
+  ipcMain.handle(
+    IPC_GAME.updateTacticalSealiftSlot,
+    (_event, payload: { h3Index?: string; navalUnitId?: string; slotIndex?: number; landUnitId?: string | null }) => {
+      if (
+        typeof payload?.h3Index !== 'string' ||
+        typeof payload?.navalUnitId !== 'string' ||
+        (payload?.slotIndex !== 1 && payload?.slotIndex !== 2)
+      ) {
+        return { success: false, reason: 'Invalid tactical sealift payload' };
+      }
+      const landUnitId =
+        payload.landUnitId === null || typeof payload.landUnitId === 'string'
+          ? payload.landUnitId
+          : null;
+      return updateTacticalSealiftSlot(payload.h3Index, payload.navalUnitId, payload.slotIndex, landUnitId);
+    }
+  );
   ipcMain.handle(
     IPC_GAME.updateSealiftSlot,
     (_event, payload: { h3Index?: string; navalUnitId?: string; slotIndex?: number; landUnitId?: string | null }) => {

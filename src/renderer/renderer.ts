@@ -13,6 +13,7 @@ import type {
   AirStrikeTargetType,
   RemovedUnitSnapshot,
   HumanStandingOrderSnapshot,
+  SealiftStackState,
 } from '../shared/ipcTypes';
 import { estimateTurnsToNextSpawn, MAX_UNITS_PER_TYPE } from '../shared/productionConfig';
 import {
@@ -102,6 +103,7 @@ import {
   drawUnknownBattleMarkers,
 } from './rendering/unitDrawing';
 import { rendererSharedState as S } from './core/state';
+import { mergePendingTacticalEmbarkOrdersIntoSealiftState } from './tactical/tacticalEmbarkSealiftMerge';
 import {
   tacticalMaybeScheduleAnnihilationExit,
   type TacticalExitSessionAccessor,
@@ -561,11 +563,24 @@ function buildSealiftUnitLabel(unitId: string, unitType: string): string {
  */
 async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl: HTMLElement): Promise<void> {
   removeSealiftSection(calloutEl);
-  if (!window.gameApi?.getSealiftStackState || !window.gameApi?.updateSealiftSlot) return;
   const h3Index = units[0]?.h3Index;
   if (!h3Index) return;
+  const tacticalSealiftMode = !!(
+    S.tacticalBattleSnapshot?.res4ChildH3Indexes.includes(h3Index) &&
+    window.gameApi?.getTacticalSealiftStackState &&
+    window.gameApi?.updateTacticalSealiftSlot
+  );
+  if (!tacticalSealiftMode && (!window.gameApi?.getSealiftStackState || !window.gameApi?.updateSealiftSlot)) return;
+  if (tacticalSealiftMode && (!window.gameApi?.getTacticalSealiftStackState || !window.gameApi?.updateTacticalSealiftSlot))
+    return;
   try {
-    const state = await window.gameApi.getSealiftStackState({ h3Index });
+    let state: SealiftStackState;
+    if (tacticalSealiftMode) {
+      state = (await window.gameApi.getTacticalSealiftStackState!({ h3Index })) as SealiftStackState;
+      state = mergePendingTacticalEmbarkOrdersIntoSealiftState(state, S.pendingEmbarkOrders);
+    } else {
+      state = (await window.gameApi.getSealiftStackState!({ h3Index })) as SealiftStackState;
+    }
     if (calloutEl.classList.contains('hidden')) return;
     if (calloutEl.getAttribute('data-h3-index') !== h3Index) return;
     if (!state.showSealiftSection) return;
@@ -613,8 +628,41 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
           select.appendChild(opt);
         }
         select.value = selectedUnitId ?? '';
+        select.dataset.prevLand = selectedUnitId ?? '';
         select.addEventListener('change', async () => {
           const selected = select.value.trim();
+          if (tacticalSealiftMode) {
+            const prev = select.dataset.prevLand ?? '';
+            if (prev) {
+              S.tacticalPendingMarches = S.tacticalPendingMarches.filter((m) => m.subUnitId !== prev);
+            }
+            if (selected.length > 0) {
+              S.tacticalPendingMarches = S.tacticalPendingMarches.filter((m) => m.subUnitId !== selected);
+            }
+            const result = await window.gameApi.updateTacticalSealiftSlot!({
+              h3Index,
+              navalUnitId: row.navalUnitId,
+              slotIndex,
+              landUnitId: selected.length > 0 ? selected : null,
+            });
+            if (!result.success) {
+              showMapToast(formatTargetingValidationReason(result.reason, 'Failed to update sealift assignment.'));
+            } else {
+              if (result.tacticalBattle) {
+                S.tacticalBattleSnapshot = result.tacticalBattle;
+              }
+              const navalIds = new Set((result.state?.navalRows ?? []).map((r) => r.navalUnitId));
+              S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => !navalIds.has(e.navalUnitId));
+              select.dataset.prevLand = selected;
+              if (selected.length > 0) {
+                await refreshHumanStandingOrders();
+              }
+              updatePendingOrdersSidebar();
+            }
+            refreshStackCalloutIfOpen();
+            requestRedraw();
+            return;
+          }
           const result = await window.gameApi!.updateSealiftSlot({
             h3Index,
             navalUnitId: row.navalUnitId,
@@ -641,6 +689,30 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
           debarkBtn.textContent = UNIT_DESELECT_GLYPH;
           debarkBtn.disabled = !debarkEnabled;
           debarkBtn.addEventListener('click', async () => {
+            if (tacticalSealiftMode) {
+              const prev = selectedUnitId ?? '';
+              if (prev) {
+                const result = await window.gameApi.updateTacticalSealiftSlot!({
+                  h3Index,
+                  navalUnitId: row.navalUnitId,
+                  slotIndex,
+                  landUnitId: null,
+                });
+                if (!result.success) {
+                  showMapToast(formatTargetingValidationReason(result.reason, 'Failed to debark unit.'));
+                } else {
+                  if (result.tacticalBattle) {
+                    S.tacticalBattleSnapshot = result.tacticalBattle;
+                  }
+                  const navalIds = new Set((result.state?.navalRows ?? []).map((r) => r.navalUnitId));
+                  S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => !navalIds.has(e.navalUnitId));
+                  updatePendingOrdersSidebar();
+                }
+              }
+              refreshStackCalloutIfOpen();
+              requestRedraw();
+              return;
+            }
             const result = await window.gameApi!.updateSealiftSlot({
               h3Index,
               navalUnitId: row.navalUnitId,
@@ -2932,6 +3004,7 @@ function updatePendingOrdersSidebar(): void {
     formatUnitArrowLabel,
     redraw,
     updatePendingOrdersSidebar,
+    refreshStackCalloutIfOpen,
   });
 }
 

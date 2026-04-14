@@ -338,6 +338,48 @@ function testNavalMixedOccupancyContestsControl(): void {
 }
 
 /**
+ * Defines the `testLandArmorPlusEnemyAirContestsControl` function shape (function testLandArmorPlusEnemyAirContestsControl(): void).
+ *
+ * Purpose: Regression guard for Fight→tactical when human armor shares a res1 hex with opponent air after movement.
+ * When to use: `gameActionsProduction.test.ts` harness.
+ * Expected outcome: Control must not flip to the land-only side while enemy air remains; otherwise finalize removes air
+ * as stranded and tactical start fails with “not contested”.
+ * Exceptions: None.
+ */
+function testLandArmorPlusEnemyAirContestsControl(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const landHex = state.hexes.find((hx) => hx.terrainKind !== 'water' && hx.terrain !== 'water');
+    if (!landHex) throw new Error('Expected a land hex for armor/air co-occupancy test.');
+    const targetHex = landHex.h3Index;
+    dbRun('DELETE FROM units WHERE h3_index = ?', [targetHex]);
+    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [targetHex, 'opponent']);
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
+      'human-armor-air-contest',
+      'human',
+      'armor',
+      targetHex,
+    ]);
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
+      'opponent-air-air-contest',
+      'opponent',
+      'air',
+      targetHex,
+    ]);
+
+    const transitions = resolveRes1ControlAfterCombatAndMovement();
+    const post = getHexBuildQueue(targetHex, 'human');
+
+    assert.strictEqual(post.controllerPlayerId, 'opponent');
+    assert.strictEqual(
+      transitions.some((transition) => transition.h3Index === targetHex),
+      false,
+      'expected no control transition when land and enemy air co-occupy the same hex'
+    );
+  });
+}
+
+/**
  * Defines the `testNavalTraversedIntermediateHexCapturesControl` function shape (function testNavalTraversedIntermediateHexCapturesControl(): void).
 
  * Purpose: Supports maintainability by documenting why `testNavalTraversedIntermediateHexCapturesControl` exists.
@@ -542,6 +584,7 @@ function run(): void {
   testTraversedIntermediateHexCapturesControl();
   testNavalOccupancyGrantsControl();
   testNavalMixedOccupancyContestsControl();
+  testLandArmorPlusEnemyAirContestsControl();
   testNavalTraversedIntermediateHexCapturesControl();
   testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap();
   testAirBuildRequiresAirportInfrastructure();

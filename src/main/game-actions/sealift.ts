@@ -1,9 +1,10 @@
 import type { EmbarkOrder, SealiftContextMode, SealiftLandUnitOption, SealiftNavalRow, SealiftStackState } from '../../shared/ipcTypes';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { dbGetAll, dbGetOne, dbRun, isDbReady } from '../gameDb';
 import type { CombatUnit } from '../combatUnitTypes';
+import { logDebug } from '../logger';
 import { normalizeMovementTerrain } from '../movementTerrain';
 import { rememberStrategicHexBeforeMove } from '../strategicUnitPreviousHex';
-import { isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession';
 
 /**
  * Documents the `UnitRow` interface as a named contract surface (interface UnitRow).
@@ -257,14 +258,14 @@ function canPlayerEmbarkFromHex(h3Index: string, playerId: string): boolean {
 }
 
 /**
- * Defines the `getHexContextMode` function shape (function getHexContextMode(h3Index: string): SealiftContextMode).
+ * Defines the `getSealiftStackContextModeForHex` function shape (export function getSealiftStackContextModeForHex(h3Index: string): SealiftContextMode).
 
- * Purpose: Supports maintainability by documenting why `getHexContextMode` exists.
+ * Purpose: Supports maintainability by documenting why `getSealiftStackContextModeForHex` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function getHexContextMode(h3Index: string): SealiftContextMode {
+export function getSealiftStackContextModeForHex(h3Index: string): SealiftContextMode {
   const context = getHexEmbarkContext(h3Index);
   if (!context) return 'unsupported';
   if (context.normalizedMovementTerrain === 'water') return 'water';
@@ -460,7 +461,7 @@ function buildNavalRows(
  */
 export function getSealiftStackStateImpl(h3Index: string): SealiftStackState {
   const unitsAtHex = getUnitsAtHex(h3Index);
-  const contextMode = getHexContextMode(h3Index);
+  const contextMode = getSealiftStackContextModeForHex(h3Index);
   const navalIds = getHumanNavalIds(unitsAtHex);
   const landOptions = getHumanLandOptions(unitsAtHex);
   const landTypeById = new Map(landOptions.map((option) => [option.unitId, option.unitType] as const));
@@ -496,7 +497,6 @@ export function updateSealiftSlotImpl(args: {
   landUnitId: string | null;
 }): { success: boolean; reason?: string; state?: SealiftStackState } {
   if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
-  if (isTacticalBattleActive()) return { success: false, reason: 'Sealift cannot be changed during a tactical battle.' };
   const state = getSealiftStackStateImpl(args.h3Index);
   const navalIds = state.navalRows.map((row) => row.navalUnitId);
   if (!navalIds.includes(args.navalUnitId)) return { success: false, reason: 'Selected naval unit is not in this stack.' };
@@ -644,6 +644,78 @@ export function syncEmbarkedLandUnitPositionsWithNaval(): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * Writes human sealift rows for tactical sub-unit embark orders using strategic parent ids (no res4 hex co-location check).
+ *
+ * Purpose: Mirrors strategic slot assignment during tactical Ready commits while parent `units.h3_index` may still anchor at res1; tactical validation already ensured legality on the snapshot.
+ * When to use: After a successful human tactical commit or support-only apply that includes `embarkOrders` with tactical sub-unit ids.
+ * Expected outcome: `unit_transport_assignments` rows updated for the involved land parents; other carriers lose exclusive claim on that land row via `DELETE` before insert.
+ * Exceptions: None; skips silently when parent rows or types are missing or not human infantry/armor + naval.
+ */
+export function applyTacticalEmbarkCommittedOrdersToStrategicDb(
+  orders: readonly EmbarkOrder[],
+  resolveParentUnitIdForSubUnit: (subUnitId: string) => string | null
+): void {
+  logDebug('applyTacticalEmbarkCommittedOrdersToStrategicDb', { orderCount: orders.length });
+  if (orders.length <= 0 || !isDbReady()) return;
+  for (const order of orders) {
+    const landParent = resolveParentUnitIdForSubUnit(order.unitId);
+    const navalParent = resolveParentUnitIdForSubUnit(order.navalUnitId);
+    if (!landParent || !navalParent) continue;
+    const land = dbGetOne<{ unitType: string; player: string }>(
+      'SELECT unit_type AS unitType, player FROM units WHERE id = ?',
+      [landParent]
+    );
+    const naval = dbGetOne<{ unitType: string; player: string }>(
+      'SELECT unit_type AS unitType, player FROM units WHERE id = ?',
+      [navalParent]
+    );
+    if (!land || !naval) continue;
+    if (land.player !== 'human' || naval.player !== 'human') continue;
+    if (!((land.unitType === 'infantry' || land.unitType === 'armor') && naval.unitType === 'naval')) continue;
+    dbRun('DELETE FROM unit_transport_assignments WHERE land_unit_id = ?', [landParent]);
+    dbRun(
+      'INSERT OR REPLACE INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)',
+      [landParent, navalParent]
+    );
+  }
+}
+
+/**
+ * Clears strategic sealift rows for all human land parents with infantry/armor sub-units at a tactical res4 hex, then applies sub-unit embark pairs.
+ *
+ * Purpose: Keeps `unit_transport_assignments` aligned with immediate tactical sealift UI edits, mirroring strategic `writeAssignmentsForHex` for that cohort.
+ * When to use: Only after `projectTacticalSealiftSlotChange` succeeds in `applyTacticalSealiftSlotChangeInSession`.
+ * Expected outcome: Prior parent-level assignments for those land units are removed; each valid `embarkPairs` row is written via `applyTacticalEmbarkCommittedOrdersToStrategicDb`.
+ * Exceptions: None; skips all SQLite work when the database handle is missing.
+ */
+export function syncStrategicSealiftFromTacticalHexEmbarkPairs(args: {
+  battle: Pick<TacticalBattleSnapshot, 'subUnits'>;
+  h3Index: string;
+  embarkPairs: readonly EmbarkOrder[];
+}): void {
+  logDebug('syncStrategicSealiftFromTacticalHexEmbarkPairs', {
+    h3Index: args.h3Index,
+    pairCount: args.embarkPairs.length,
+  });
+  if (!isDbReady()) return;
+  const landParents: string[] = [];
+  for (const u of args.battle.subUnits) {
+    if (u.h3Index !== args.h3Index || u.player !== 'human') continue;
+    if (u.unitType !== 'infantry' && u.unitType !== 'armor') continue;
+    landParents.push(u.parentUnitId);
+  }
+  const unique = [...new Set(landParents)];
+  if (unique.length > 0) {
+    const ph = unique.map(() => '?').join(', ');
+    dbRun(`DELETE FROM unit_transport_assignments WHERE land_unit_id IN (${ph})`, unique);
+  }
+  applyTacticalEmbarkCommittedOrdersToStrategicDb(args.embarkPairs, (subId) => {
+    const row = args.battle.subUnits.find((s) => s.id === subId);
+    return row?.parentUnitId ?? null;
+  });
+}
+
 export function applyEmbarkOrdersForPlayer(orders: EmbarkOrder[], playerId: string): void {
   if (orders.length <= 0) return;
   for (const order of orders) {
@@ -697,6 +769,62 @@ export function deleteTransportAssignmentsForRemovedUnits(unitIds: string[]): vo
      WHERE land_unit_id IN (${placeholders}) OR naval_unit_id IN (${placeholders})`,
     [...unitIds, ...unitIds]
   );
+}
+
+/**
+ * Applies sealift transport cleanup after strategic unit rows are deleted from combat (ranged, melee, or tactical parent deletes).
+ *
+ * Purpose: Centralizes the paired `applyTransportLossForRemovedNavalUnits` + `deleteTransportAssignmentsForRemovedUnits` sequence used by Ready resolution and tactical DB parity.
+ * When to use: After callers issue `DELETE FROM units` for every id in `removedUnitIds`, passing the same units as `CombatUnit` rows captured before deletion.
+ * Expected outcome: Returns any extra land units removed because a deleted naval carrier was at sea with embarked cargo.
+ * Exceptions: None; delegates to existing helpers without additional validation.
+ */
+export function applyTransportOutcomeForRemovedStrategicUnits(
+  removedUnitIds: string[],
+  removedUnits: CombatUnit[]
+): CombatUnit[] {
+  logDebug('applyTransportOutcomeForRemovedStrategicUnits', {
+    removedUnitCount: removedUnitIds.length,
+    removedCombatRowCount: removedUnits.length,
+  });
+  const transportLosses = applyTransportLossForRemovedNavalUnits(removedUnits);
+  deleteTransportAssignmentsForRemovedUnits(removedUnitIds);
+  if (transportLosses.length > 0) {
+    deleteTransportAssignmentsForRemovedUnits(transportLosses.map((unit) => unit.id));
+  }
+  return transportLosses;
+}
+
+/**
+ * Deletes one strategic `units` parent row and runs the standard transport follow-up (naval sink / assignment cleanup).
+ *
+ * Purpose: Lets tactical air-vs-units resolution mirror strategic strike DB effects without duplicating transport edge-case logic at each callsite.
+ * When to use: When a tactical strike eliminates an entire strategic parent stack identified by `parentUnitId` and the row may still exist in SQLite.
+ * Expected outcome: Row removed when present; transport tables stay consistent with `applyTransportOutcomeForRemovedStrategicUnits`.
+ * Exceptions: None; no-op when the parent row is already absent.
+ */
+export function deleteStrategicParentUnitAndApplyTransportOutcome(parentUnitId: string): void {
+  logDebug('deleteStrategicParentUnitAndApplyTransportOutcome', { parentUnitId });
+  const row = dbGetOne<{
+    id: string;
+    player: string;
+    unitType: string;
+    h3Index: string;
+    displayOrder: number | null;
+  }>(
+    'SELECT id, player, unit_type AS unitType, h3_index AS h3Index, display_order AS displayOrder FROM units WHERE id = ?',
+    [parentUnitId]
+  );
+  if (!row) return;
+  const cu: CombatUnit = {
+    id: row.id,
+    player: row.player,
+    unitType: row.unitType,
+    h3Index: row.h3Index,
+    displayOrder: row.displayOrder ?? undefined,
+  };
+  dbRun('DELETE FROM units WHERE id = ?', [parentUnitId]);
+  applyTransportOutcomeForRemovedStrategicUnits([parentUnitId], [cu]);
 }
 
 /**
