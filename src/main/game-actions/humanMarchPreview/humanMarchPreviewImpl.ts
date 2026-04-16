@@ -16,6 +16,10 @@ import {
   representativeMarchPreviewUnitIdsByOriginH3,
   uniqueStrategicMarchPreviewUnitIds,
 } from '../../../shared/humanMarchPreviewGroupAssembly';
+import {
+  pickStrategicMarchSlowTerrainDisplayTitle,
+  strategicMarchPathH3IndicesFromPlan,
+} from '../../../shared/orderPreviewSlowTerrainTooltip';
 import { isWithinAirFerryGridRange } from '../gridRange';
 import { isEmbarkedLandUnitOnWater } from '../sealift';
 import {
@@ -96,6 +100,22 @@ displayOrder?: number };
  * Exceptions: None.
  */
 type PlanRouteResult = PlanRouteOk | PlanRouteError;
+
+/**
+ * Resolves the grouped march “slow terrain” label for a successful strategic `PlanRouteOk` path.
+ *
+ * Purpose: Feeds `HumanOrderPreviewResult.slowerTerrainDisplayTitle` without duplicating latLng→H3 conversion rules in multiple branches.
+ * When to use: After `executePlanRouteCached` / nearby fallback returns `status: 'ok'` for land/naval march previews.
+ * Expected outcome: Title-case terrain token or `null` when the planned path does not traverse slower-than-plains cells.
+ * Exceptions: None; malformed plans yield `null`.
+ */
+function strategicMarchSlowerTitleForPlan(unit: HumanOwnedUnit, context: PreviewComputationContext, planned: PlanRouteOk): string | null {
+  logTrace('humanMarchPreview strategicMarchSlowerTitleForPlan', { unitId: unit.id, unitType: unit.unitType });
+  if (unit.unitType === 'air') return null;
+  const pathH3 = strategicMarchPathH3IndicesFromPlan(planned);
+  return pickStrategicMarchSlowTerrainDisplayTitle(unit.unitType, pathH3, context.terrainKindByH3, context.terrainByH3);
+}
+
 /**
  * Documents the `PreviewComputationContext` type alias (type PreviewComputationContext).
 
@@ -356,6 +376,15 @@ arrowLatLng?: [number, number];
    * Exceptions: None.
    */
 segments: HumanOrderPreviewSegment[];
+    /**
+   * Optional title-case terrain word when this preview is valid but terrain throttles movement (parity with `humanOrderPreviewTypes`).
+   *
+   * Contract: Omitted when not applicable.
+   * When to use: Strategic march hover rows after a successful `PlanRouteOk`.
+   * Expected outcome: Matches shared IPC typing for renderer slower tooltips.
+   * Exceptions: None.
+   */
+slowerTerrainDisplayTitle?: string | null;
 }
 
 /**
@@ -450,6 +479,15 @@ slowestMovementRange: number;
    * Exceptions: None.
    */
 previews: HumanOrderGroupPreviewUnitResult[];
+    /**
+   * Aggregated slow-terrain label for grouped march hover (parity with `humanOrderPreviewTypes`).
+   *
+   * Contract: Optional; omitted when no row is slowed.
+   * When to use: Returned from `previewHumanMarchOrdersImpl` after envelope assembly.
+   * Expected outcome: First non-null per-row title or explicit envelope override.
+   * Exceptions: None.
+   */
+slowerTerrainDisplayTitle?: string | null;
 }
 
 /**
@@ -474,6 +512,7 @@ function logPreviewOutcome(
     showInvalidMarker: preview.showInvalidMarker,
     invalidReason: preview.invalidReason ?? null,
     segmentCount: preview.segments.length,
+    slowerTerrainDisplayTitle: preview.slowerTerrainDisplayTitle ?? null,
   });
 }
 
@@ -644,6 +683,7 @@ function findNearbyReachablePreview(
         showInvalidMarker: false,
         arrowLatLng: planned.destination,
         segments: planned.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes })),
+        slowerTerrainDisplayTitle: strategicMarchSlowerTitleForPlan(unit, context, planned),
       };
     }
   }
@@ -796,6 +836,7 @@ function computeHumanMarchPreviewForUnit(
       showInvalidMarker: false,
       arrowLatLng: direct.destination,
       segments: direct.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes })),
+      slowerTerrainDisplayTitle: strategicMarchSlowerTitleForPlan(unit, context, direct),
     };
     cacheSetBounded(previewResultCache, cacheKey, result, maxPreviewResultCacheEntries);
     logPreviewOutcome(unitId, hoveredH3Index, result, 'computed');

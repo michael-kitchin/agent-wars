@@ -121,14 +121,19 @@ export function minMovementRangeAmongUnitTypes(
 export function buildHumanOrderGroupPreviewEnvelope(args: {
   previews: readonly HumanOrderGroupPreviewUnitResult[];
   slowestMovementRange: number;
+  slowerTerrainDisplayTitle?: string | null;
 }): HumanOrderGroupPreviewResult {
   const previews = [...args.previews];
   const invalid = previews.find((e) => !e.preview.valid);
+  const fromRows = previews.map((e) => e.preview.slowerTerrainDisplayTitle).find((t) => t != null && String(t).length > 0);
+  const explicit = args.slowerTerrainDisplayTitle;
+  const slowerTerrainDisplayTitle = explicit !== undefined ? explicit : fromRows ?? null;
   return {
     validForAll: invalid === undefined,
     showInvalidMarker: invalid !== undefined,
     invalidReason: invalid?.preview.invalidReason,
     slowestMovementRange: args.slowestMovementRange,
+    slowerTerrainDisplayTitle: slowerTerrainDisplayTitle ?? null,
     previews,
   };
 }

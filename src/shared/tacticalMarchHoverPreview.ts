@@ -16,6 +16,7 @@ import type {
   HumanOrderPreviewResult,
 } from './ipc/humanOrderPreviewTypes';
 import { planTacticalRes4March } from './tacticalRes4MovementPlanner';
+import { pickTacticalMarchSlowTerrainDisplayTitle } from './orderPreviewSlowTerrainTooltip';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from './tacticalTerrainCombatModifiers';
 import {
   buildTacticalTerrainKindResolverFromSnapshot,
@@ -146,12 +147,19 @@ function buildPreviewForSubUnit(args: {
   }
   const path = plan.pathToDestination;
   const [destLat, destLng] = cellToLatLng(args.hoveredH3Index);
+  const slowTitle = pickTacticalMarchSlowTerrainDisplayTitle({
+    battle: args.battle,
+    subUnit: sub,
+    moveType,
+    pathH3: path,
+  });
   if (plan.reachableThisTurn) {
     return {
       valid: true,
       showInvalidMarker: false,
       arrowLatLng: [destLat, destLng],
       segments: [{ turn: 1, hexes: h3PathToLatLngHexes(path) }],
+      slowerTerrainDisplayTitle: slowTitle,
     };
   }
   const stopH3 = plan.firstStopWithinBudget.stopH3;
@@ -167,6 +175,7 @@ function buildPreviewForSubUnit(args: {
       { turn: 1, hexes: h3PathToLatLngHexes(leg1) },
       { turn: 2, hexes: h3PathToLatLngHexes(leg2) },
     ],
+    slowerTerrainDisplayTitle: slowTitle,
   };
 }
 

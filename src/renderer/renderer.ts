@@ -174,6 +174,7 @@ import {
   terrainTooltipStateForRes1Hex,
 } from './map/terrainTooltipRes1State';
 import { isOrderBlockHexTooltipVisible } from './map/orderBlockHexTooltip';
+import { isOrderSlowerHexTooltipVisible } from './map/orderSlowerHexTooltip';
 import { wireMainMapInteractions as wireMainMapInteractionsFromModule } from './map/mainMapInteractions';
 import { wireInitCore as wireInitCoreFromModule } from './map/initCore';
 import {
@@ -376,7 +377,8 @@ function shouldSuppressTerrainTooltip(): boolean {
     isStackOrBuildMapPopoverOpen() ||
     S.buildEntryButtonPointerInside ||
     S.tacticalEntryButtonPointerInside ||
-    isOrderBlockHexTooltipVisible()
+    isOrderBlockHexTooltipVisible() ||
+    isOrderSlowerHexTooltipVisible()
   );
 }
 

@@ -5,6 +5,7 @@ import {
   representativeMarchPreviewUnitIdsByOriginH3,
 } from '../../shared/humanMarchPreviewGroupAssembly';
 import { buildTacticalMarchHoverPreview } from '../../shared/tacticalMarchHoverPreview';
+import { pickFirstTacticalRangedSlowTerrainDisplayTitle } from '../../shared/orderPreviewSlowTerrainTooltip';
 import { unitHasTacticalRangedBaseline } from '../../shared/tacticalRanges';
 import {
   formatPendingAirStrikeSidebarLabel,
@@ -13,13 +14,14 @@ import {
 import { rendererSharedState as S } from '../core/state';
 import type { HoverRoutePreviewState } from '../core/types';
 import { resolveOrderBlockHexTooltipMessage, showOrderBlockHexTooltip } from '../map/orderBlockHexTooltip';
+import { hideOrderSlowerHexTooltip, showOrderSlowerHexTooltip } from '../map/orderSlowerHexTooltip';
 
 /**
  * Publishes `S.hoverRoutePreview` and synchronizes the transient “Blocked: …” hover hint for invalid march/ranged targets.
  *
  * Purpose: Keeps tactical and strategic preview paths aligned on when to show terrain vs range blocking copy (air: range only).
  * When to use: Only from `refreshHoverRoutePreview` after validation / preview envelopes are computed.
- * Expected outcome: Redraw requested; `#order-block-tooltip` hidden when `preview` is null or no blocking message applies.
+ * Expected outcome: Redraw requested; `#order-block-tooltip` / `#order-slower-tooltip` hidden when `preview` is null or neither hint applies.
  * Exceptions: None.
  */
 function publishHoverRoutePreview(
@@ -31,6 +33,7 @@ function publishHoverRoutePreview(
   S.hoverRoutePreview = preview;
   if (!preview) {
     showOrderBlockHexTooltip(null);
+    hideOrderSlowerHexTooltip();
     deps.requestRedraw();
     return;
   }
@@ -42,7 +45,20 @@ function publishHoverRoutePreview(
     preview.renderAsSupportTargeting === 'ranged' ? rangedValidationReason : null,
     preview.renderAsSupportTargeting === 'air' ? airStrikeValidationReason : null
   );
-  showOrderBlockHexTooltip(msg);
+  let slowTitle: string | null = null;
+  if (!msg && preview.renderAsSupportTargeting === 'ranged' && preview.data.validForAll && S.tacticalBattleSnapshot) {
+    const ids = preview.data.previews.map((p) => p.unitId);
+    slowTitle = pickFirstTacticalRangedSlowTerrainDisplayTitle(S.tacticalBattleSnapshot, ids);
+  } else if (!msg && !preview.renderAsSupportTargeting && preview.data.validForAll) {
+    slowTitle = preview.data.slowerTerrainDisplayTitle ?? null;
+  }
+  if (msg) {
+    hideOrderSlowerHexTooltip();
+    showOrderBlockHexTooltip(msg);
+  } else {
+    showOrderBlockHexTooltip(null);
+    showOrderSlowerHexTooltip(slowTitle);
+  }
   deps.requestRedraw();
 }
 
@@ -290,6 +306,7 @@ export function clearCommittedOrderDraftState(deps: TacticalOrderDeps): void {
   S.hideCommittedOrderLinesAfterReady = false;
   S.hoverRoutePreview = null;
   showOrderBlockHexTooltip(null);
+  hideOrderSlowerHexTooltip();
 }
 
 /**

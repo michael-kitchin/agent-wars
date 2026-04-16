@@ -4,6 +4,7 @@ import { panMapOneRes1Hex, shouldIgnoreGlobalKeydown } from './mapUtils';
 import { rendererSharedState as S } from '../core/state';
 import { getActiveTerrainStyleBasemapId, renderTerrainLegend } from '../rendering/terrainVisualStyles';
 import { hideOrderBlockHexTooltip } from './orderBlockHexTooltip';
+import { hideOrderSlowerHexTooltip } from './orderSlowerHexTooltip';
 import { getMainLeafletMap, initWorldLeafletMaps, setMainBasemapByProviderId, setMainBasemapFilter } from './worldLeafletMap';
 
 /**
@@ -263,6 +264,7 @@ redraw: () => void;
  */
 function dismissTerrainTooltipWhenPointerLeavesMapPanel(deps: InitCoreDeps): void {
   hideOrderBlockHexTooltip();
+  hideOrderSlowerHexTooltip();
   deps.clearTerrainTooltipTimer();
   deps.hideTerrainTooltipVisual();
   const hadHexHover = S.hoveredHexH3 !== null || S.hoveredDetailHexH3 !== null;

@@ -146,6 +146,15 @@ arrowLatLng?: [number, number];
    * Exceptions: None.
    */
 segments: HumanOrderPreviewSegment[];
+    /**
+   * Optional title-case terrain word when this preview is **valid** but terrain throttles movement (e.g. `Forest`, `Urban`).
+   *
+   * Contract: Omitted or `null` when not applicable; never set alongside `valid: false` except transitional payloads.
+   * When to use: March hover envelopes from strategic `previewHumanMarchOrders` and tactical `buildTacticalMarchHoverPreview`.
+   * Expected outcome: Renderer shows `Slower: ${slowerTerrainDisplayTitle}` without re-deriving path costs.
+   * Exceptions: None.
+   */
+slowerTerrainDisplayTitle?: string | null;
 }
 
 /**
@@ -240,4 +249,13 @@ slowestMovementRange: number;
    * Exceptions: None.
    */
 previews: HumanOrderGroupPreviewUnitResult[];
+    /**
+   * Aggregated slow-terrain label for grouped march hover when any representative preview is terrain-throttled.
+   *
+   * Contract: First non-null `preview.slowerTerrainDisplayTitle` among `previews` order, or explicit envelope override.
+   * When to use: Renderer `publishHoverRoutePreview` for march modes after `buildHumanOrderGroupPreviewEnvelope`.
+   * Expected outcome: Title-case word only (no `Slower:` prefix); `null` when no row is slowed.
+   * Exceptions: None.
+   */
+slowerTerrainDisplayTitle?: string | null;
 }
