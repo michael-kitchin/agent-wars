@@ -8,6 +8,7 @@
  */
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import type { CoordinateContext } from '../briefing/map/coordinateContext';
 
 /**
  * Dependency bundle passed into `requestOrdersFlow` for test doubles and production OpenRouter wiring.
@@ -69,7 +70,8 @@ export interface RequestOrdersFlowDeps {
       resolveToH3: (lat: number, lng: number) => string | undefined;
     },
     enabledToolNames?: string[],
-    briefingOverride?: string
+    briefingOverride?: string,
+    coordinateContext?: CoordinateContext
   ) => string;
   /**
    * Builds OpenAI-style tool definitions for the enabled tool names.

@@ -31,8 +31,15 @@ import {
   validateTacticalOpponentEmbarkOrder,
   validateTacticalOpponentFerryOrder,
 } from '../tacticalBattle/tacticalOpponentOrderValidation';
-import { buildPossibleUnitActionsMarkdown } from './possibleUnitActions';
-import { buildTacticalAiOrdersContextBlock } from './tacticalPromptProjection';
+import {
+  buildStrategicOperationalMapSectionMarkdown,
+  buildTacticalOperationalMapSectionMarkdown,
+} from '../briefing/map/briefing-map-section';
+import type { CoordinateContext } from '../briefing/map/coordinateContext';
+import { ensureStrategicCoordinateRegistryInitialized, initTacticalCoordinateRegistry } from '../briefing/map/hex-coordinates';
+import { decodeOpenRouterToolArgsForExecution } from './openRouterToolArgsHex';
+import { encodeOpenRouterToolResultForLlm } from './openRouterToolResultHex';
+import { h3ToCode } from '../briefing/map/hex-code-translator';
 import { buildStrategicUnitDisplayLabelResolver, tacticalSubUnitLabelForUserMessage } from '../../shared/unitDisplayNames';
 import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
 import type { RequestOrdersError, RequestOrdersOptions, RequestOrdersResult } from './requestOrdersFlowTypes';
@@ -40,6 +47,7 @@ import {
   REQUEST_ORDERS_MAX_WALL_CLOCK_MS,
   dedupeByUnitKeepLast,
   getAiPathfindingTurnAggregateMetrics,
+  isAgentWarsFullPromptLoggingEnabled,
   logPromptPreview,
   logResponsePreview,
   type AiPathfindingSessionMetrics,
@@ -234,14 +242,26 @@ export async function requestOrdersFlow(
 
   const hexList = planState.hexes.map((h) => h.h3Index);
   const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
+  const coordinateContext: CoordinateContext = tacticalBattle
+    ? { mode: 'tactical', battleId: tacticalBattle.battleId }
+    : { mode: 'strategic' };
+  if (tacticalBattle) {
+    initTacticalCoordinateRegistry(tacticalBattle.battleId, tacticalBattle.enclosingRes1H3Index);
+  } else {
+    ensureStrategicCoordinateRegistryInitialized();
+  }
   const coordMap = {
     latLngByH3,
     resolveToH3,
     format: (h3: string) => {
-      const ll = latLngByH3.get(h3);
-      if (ll) return formatLatLng(ll);
-      const [lat, lng] = cellToLatLng(h3);
-      return formatLatLng([lat, lng]);
+      try {
+        return h3ToCode(h3, coordinateContext);
+      } catch {
+        const ll = latLngByH3.get(h3);
+        if (ll) return formatLatLng(ll);
+        const [lat, lng] = cellToLatLng(h3);
+        return formatLatLng([lat, lng]);
+      }
     },
   };
   let aiPlanningPathfindingSession: ReturnType<typeof createPathfindingSession> | null = null;
@@ -279,11 +299,14 @@ export async function requestOrdersFlow(
   const lossesSinceLastConsultation = getAiLossEventsSinceConsultation('opponent');
 
   let briefingOverride: string | undefined;
-  if (usePrecomputation) {
+  if (!tacticalBattle) {
+    // Map-first contract: strategic prompts always include the Commander briefing with operational map.
     const precomputed = runPrecomputation(state, { latLngByH3, resolveToH3 });
-    toolInvocationCounts['precomputation'] =
-      precomputed.unitAssessments.length + precomputed.hexAssessments.length;
-    const standingOrderText = getStandingOrderInjectionText('opponent', state);
+    if (usePrecomputation) {
+      toolInvocationCounts['precomputation'] =
+        precomputed.unitAssessments.length + precomputed.hexAssessments.length;
+    }
+    const standingOrderText = getStandingOrderInjectionText('opponent', state, { mode: 'strategic' });
     const memoryText = getInjectionText('opponent', state.turnNumber);
     const subscriptions = getSubscriptions('opponent');
     const productionBriefing = getToolFlags(enabledToolNames).productionEnabled
@@ -292,7 +315,10 @@ export async function requestOrdersFlow(
           state,
           latLngByH3,
           resolveToH3,
-          formatLatLng,
+          formatHexLabel: (ll) => {
+            const h3 = resolveToH3(ll[0], ll[1]);
+            return h3 ? coordMap.format(h3) : formatLatLng(ll);
+          },
         })
       : '';
     briefingOverride = formatBriefing(
@@ -304,37 +330,47 @@ export async function requestOrdersFlow(
       lossesSinceLastConsultation,
       productionBriefing
     );
-    logDebug('openRouter requestOrders: pre-computation ran', {
+    if (!briefingOverride.includes('# Operational Map')) {
+      logError('openRouter requestOrders: strategic map generation missing from briefing');
+      return failRequest('Operational map generation failed for strategic prompt.');
+    }
+    logDebug('openRouter requestOrders: strategic briefing prepared', {
       briefingLength: briefingOverride.length,
       unitAssessments: precomputed.unitAssessments.length,
-      precomputationCount: toolInvocationCounts['precomputation'],
+      hexAssessments: precomputed.hexAssessments.length,
+      precomputationCount: toolInvocationCounts['precomputation'] ?? 0,
     });
   }
   if (tacticalBattle) {
-    const tHexIds = planState.hexes.map((h) => h.h3Index);
-    const { latLngByH3: latLngTactical } = buildLatLngCoordinateMap(tHexIds);
-    const tacticalActionsMd = buildPossibleUnitActionsMarkdown({
+    const tacticalSection = buildTacticalOperationalMapSectionMarkdown({
       state: planState,
-      latLngByH3: latLngTactical,
-      formatLatLng,
+      latLngByH3,
       tacticalBattle,
     });
-    if (tacticalActionsMd.trim().length > 0) {
-      const tacticalBlock = `## Tactical res4 — Possible Unit Actions\n\n${tacticalActionsMd.trim()}`;
-      briefingOverride =
-        briefingOverride && briefingOverride.trim().length > 0
-          ? `${briefingOverride}\n\n${tacticalBlock}`
-          : tacticalBlock;
-      logDebug('openRouter requestOrders: tactical possible-actions briefing appended', {
+    if (tacticalSection.trim().length === 0) {
+      logError('openRouter requestOrders: tactical map generation returned empty section', {
         battleId: tacticalBattle.battleId,
-        tacticalBriefChars: tacticalBlock.length,
       });
+      return failRequest('Operational map generation failed for tactical prompt.');
     }
+    const tacticalBlock = `## Operational Map\n\n${tacticalSection.trim()}`;
+    briefingOverride =
+      briefingOverride && briefingOverride.trim().length > 0
+        ? `${briefingOverride}\n\n${tacticalBlock}`
+        : tacticalBlock;
+    logDebug('openRouter requestOrders: tactical operational map briefing appended', {
+      battleId: tacticalBattle.battleId,
+      tacticalBriefChars: tacticalBlock.length,
+    });
   }
-  let systemPrompt = buildSystemPromptForTools(planState, coordMap, enabledToolNames, briefingOverride);
-  if (tacticalBattle) {
-    systemPrompt = `${buildTacticalAiOrdersContextBlock(tacticalBattle)}\n\n${systemPrompt}`;
+  if (!briefingOverride || !briefingOverride.includes('Operational Map')) {
+    logError('openRouter requestOrders: map-first prompt contract violated', {
+      tacticalBattleId: tacticalBattle?.battleId ?? null,
+      hasBriefingOverride: Boolean(briefingOverride?.length),
+    });
+    return failRequest('Operational map is required for AI prompting and was not generated.');
   }
+  let systemPrompt = buildSystemPromptForTools(planState, coordMap, enabledToolNames, briefingOverride, coordinateContext);
   const userMessage = getInitialUserMessage(flags, briefingOverride != null && briefingOverride.length > 0);
 
   const tools = buildToolDefinitions(enabledToolNames);
@@ -346,7 +382,27 @@ export async function requestOrdersFlow(
 
   logDebug('openRouter requestOrders: system prompt prepared', { chars: systemPrompt.length });
   logDebug('openRouter requestOrders: user message prepared', { chars: userMessage.length });
-  logPromptPreview('openRouter requestOrders: system prompt', systemPrompt);
+  let fullLogOperationalMapSupplement: string | undefined;
+  if (
+    isAgentWarsFullPromptLoggingEnabled() &&
+    !tacticalBattle &&
+    !systemPrompt.includes('Operational Map')
+  ) {
+    try {
+      const precomputedLite = runPrecomputation(planState, { latLngByH3, resolveToH3 }, { skipHexAssessments: true });
+      fullLogOperationalMapSupplement = buildStrategicOperationalMapSectionMarkdown({
+        state: planState,
+        precomputed: precomputedLite,
+        latLngByH3,
+      });
+      logDebug('openRouter requestOrders: full-prompt disk log will include operational map supplement', {
+        supplementChars: fullLogOperationalMapSupplement.length,
+      });
+    } catch (err) {
+      logError('openRouter requestOrders: failed to build operational map for full-prompt disk log', err);
+    }
+  }
+  logPromptPreview('openRouter requestOrders: system prompt', systemPrompt, fullLogOperationalMapSupplement);
   logPromptPreview('openRouter requestOrders: user message', userMessage);
   logDebug('openRouter requestOrders: starting tool loop', { turnNumber: state.turnNumber });
 
@@ -451,30 +507,48 @@ export async function requestOrdersFlow(
           } catch {
             args = {};
           }
+          let execArgs: unknown = args;
+          try {
+            execArgs = decodeOpenRouterToolArgsForExecution(toolName, args, coordinateContext);
+          } catch (err) {
+            logError('openRouter requestOrders: tool args hex decode failed', err);
+            messages.push({
+              role: 'tool',
+              tool_call_id: tc.id,
+              content: JSON.stringify({ status: 'error', error: 'Invalid briefing hex code in tool arguments.' }),
+            });
+            const groupId = getGroupIdForToolName(toolName);
+            if (groupId !== undefined) toolInvocationCounts[groupId] = (toolInvocationCounts[groupId] ?? 0) + 1;
+            continue;
+          }
           const isPathfindingTool = toolName === 'plan_route' || toolName === 'check_distance';
           if (toolName === 'plan_route') aiPathfindingSessionMetrics.planRouteToolCalls += 1;
           if (toolName === 'check_distance') aiPathfindingSessionMetrics.checkDistanceToolCalls += 1;
           aiPathfindingSessionMetrics.totalToolCalls += 1;
           const toolState = tacticalBattle ? planState : state;
           const result = (toolName.includes('order') || toolName.includes('standing'))
-            ? executeTool5(toolName, args, toolState, latLngByH3, resolveToH3)
+            ? executeTool5(toolName, execArgs, toolState, latLngByH3, resolveToH3)
             : (toolName.includes('build') || toolName.includes('production') || toolName.includes('query_production'))
-              ? executeTool6(toolName, args, toolState, latLngByH3, resolveToH3)
+              ? executeTool6(toolName, execArgs, toolState, latLngByH3, resolveToH3)
               : toolName.includes('memory')
-                ? executeTool4(toolName, args, toolState, latLngByH3, resolveToH3)
+                ? executeTool4(toolName, execArgs, toolState, latLngByH3, resolveToH3)
                 : toolName.includes('estimate')
-                  ? executeTool3(toolName, args, toolState, latLngByH3, resolveToH3)
+                  ? executeTool3(toolName, execArgs, toolState, latLngByH3, resolveToH3)
                   : toolName.includes('assess')
-                    ? executeTool2(toolName, args, toolState, latLngByH3, resolveToH3)
+                    ? executeTool2(toolName, execArgs, toolState, latLngByH3, resolveToH3)
                     : executeTool1(
                         toolName,
-                        args,
+                        execArgs,
                         toolState,
                         latLngByH3,
                         resolveToH3,
                         isPathfindingTool ? getOrCreateAiPlanningPathfindingSession() : undefined
                       );
-          const resultStr = JSON.stringify(result);
+          const encoded =
+            typeof result === 'object' && result !== null && !Array.isArray(result)
+              ? encodeOpenRouterToolResultForLlm(toolName, result as Record<string, unknown>, coordinateContext, resolveToH3)
+              : (result as Record<string, unknown>);
+          const resultStr = JSON.stringify(encoded);
           messages.push({ role: 'tool', tool_call_id: tc.id, content: resultStr });
           const groupId = getGroupIdForToolName(toolName);
           if (groupId !== undefined) toolInvocationCounts[groupId] = (toolInvocationCounts[groupId] ?? 0) + 1;
@@ -487,7 +561,7 @@ export async function requestOrdersFlow(
         return failRequest('Invalid response: no content');
       }
       const productionEnabledForParse = tacticalBattle ? false : flags.productionEnabled;
-      let parsed = parseOrdersResponse(content, resolveToH3, planState, latLngByH3, productionEnabledForParse);
+      let parsed = parseOrdersResponse(content, resolveToH3, planState, latLngByH3, productionEnabledForParse, coordinateContext);
       if (!parsed && !parseRepairAttempted) {
         parseRepairAttempted = true;
         const repairMessages: ChatMessage[] = [
@@ -518,7 +592,14 @@ export async function requestOrdersFlow(
           totalOutputTokens += repairJson.usage?.completion_tokens ?? 0;
           const repairContent = repairJson.choices?.[0]?.message?.content;
           if (typeof repairContent === 'string' && repairContent.trim()) {
-            parsed = parseOrdersResponse(repairContent, resolveToH3, planState, latLngByH3, productionEnabledForParse);
+            parsed = parseOrdersResponse(
+              repairContent,
+              resolveToH3,
+              planState,
+              latLngByH3,
+              productionEnabledForParse,
+              coordinateContext
+            );
           }
         }
       }

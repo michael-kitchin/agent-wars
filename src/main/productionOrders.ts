@@ -5,6 +5,9 @@
 
 import { BUILD_ENTRY_MAX_COUNT, BUILD_ENTRY_MIN_COUNT, type BuildUnitType } from './productionRules';
 import { logTrace } from './logger';
+import type { CoordinateContext } from './briefing/map/coordinateContext';
+import { HEX_CODE_PATTERN } from './briefing/map/coordinateContext';
+import { isHexCodeValidForContext } from './briefing/map/hex-coordinates';
 
 /**
  * Documents the `ProductionOrderAction` type alias (export type ProductionOrderAction).
@@ -35,14 +38,14 @@ export interface ProductionOrder {
    */
 action: ProductionOrderAction;
     /**
-   * Specifies the contract for the `hex` member (hex: [number, number];).
+   * Specifies the contract for the `hex` member (hex: string).
 
-   * Contract: Describes stable behavior for callers of `hex` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Contract: Two-character briefing hex code in the active strategic registry.
+   * When to use: LLM `productionOrders` entries for `set_build_queue`.
+   * Expected outcome: Validated against the active coordinate context before execution.
    * Exceptions: None.
    */
-hex: [number, number];
+hex: string;
     /**
    * Specifies the contract for the `unitType` member (unitType: BuildUnitType;).
 
@@ -112,14 +115,6 @@ function isBuildUnitType(value: unknown): value is BuildUnitType {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function parseHex(value: unknown): [number, number] | undefined {
-  if (!Array.isArray(value) || value.length < 2) return undefined;
-  const lat = Number(value[0]);
-  const lng = Number(value[1]);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
-  return [lat, lng];
-}
-
 /**
  * Defines the `parseBuildCount` function shape (function parseBuildCount(value: unknown): number | undefined).
 
@@ -135,15 +130,19 @@ function parseBuildCount(value: unknown): number | undefined {
 }
 
 /**
- * Defines the `normalizeProductionOrders` function shape (export function normalizeProductionOrders(raw: unknown): NormalizeProductionOrdersResult).
+ * Defines the `normalizeProductionOrders` function shape (export function normalizeProductionOrders(raw: unknown, context: CoordinateContext): NormalizeProductionOrdersResult).
 
  * Purpose: Supports maintainability by documenting why `normalizeProductionOrders` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function normalizeProductionOrders(raw: unknown): NormalizeProductionOrdersResult {
-  logTrace('productionOrders normalizeProductionOrders', { hasRaw: raw !== undefined && raw !== null, isArray: Array.isArray(raw) });
+export function normalizeProductionOrders(raw: unknown, context: CoordinateContext): NormalizeProductionOrdersResult {
+  logTrace('productionOrders normalizeProductionOrders', {
+    hasRaw: raw !== undefined && raw !== null,
+    isArray: Array.isArray(raw),
+    mode: context.mode,
+  });
   const validOrders: ProductionOrder[] = [];
   const droppedReasons: string[] = [];
   if (raw == null) return { validOrders, droppedReasons };
@@ -171,11 +170,16 @@ export function normalizeProductionOrders(raw: unknown): NormalizeProductionOrde
       droppedReasons.push(`${prefix}: unknown action.`);
       continue;
     }
-    const hex = parseHex(row.hex);
-    if (!hex) {
-      droppedReasons.push(`${prefix}: hex must be [lat,lng].`);
+    const hexRaw = row.hex;
+    if (typeof hexRaw !== 'string' || !HEX_CODE_PATTERN.test(hexRaw)) {
+      droppedReasons.push(`${prefix}: hex must be a 2-character briefing code.`);
       continue;
     }
+    if (!isHexCodeValidForContext(hexRaw, context)) {
+      droppedReasons.push(`${prefix}: unknown hex code for active context.`);
+      continue;
+    }
+    const hex = hexRaw;
     if (!isBuildUnitType(row.unitType)) {
       droppedReasons.push(`${prefix}: set_build_queue requires unitType.`);
       continue;

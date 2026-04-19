@@ -3,7 +3,29 @@
  */
 
 import * as assert from 'assert';
+import type { CoordinateContext } from './briefing/map/coordinateContext';
+import { ensureStrategicCoordinateRegistryInitialized, listStrategicRes1H3Indexes } from './briefing/map/hex-coordinates';
+import { h3ToCode } from './briefing/map/hex-code-translator';
 import { normalizeProductionOrders } from './productionOrders';
+
+const strategicCtx: CoordinateContext = { mode: 'strategic' };
+
+/**
+ * Resolves two distinct strategic briefing codes for deterministic tests.
+ *
+ * Purpose: `normalizeProductionOrders` validates codes against the live strategic registry.
+ * When to use: Once per test file after `ensureStrategicCoordinateRegistryInitialized`.
+ * Expected outcome: Two uppercase two-character codes.
+ * Exceptions: Throws if the registry is unexpectedly small (build misconfiguration).
+ */
+function twoSampleStrategicHexCodes(): [string, string] {
+  ensureStrategicCoordinateRegistryInitialized();
+  const cells = listStrategicRes1H3Indexes();
+  if (cells.length < 2) throw new Error('productionOrders.test: expected at least two strategic res1 cells');
+  const a = h3ToCode(cells[0]!, strategicCtx);
+  const b = h3ToCode(cells[1]!, strategicCtx);
+  return [a, b];
+}
 
 /**
  * Defines the `testNormalizeProductionOrdersHappyPath` function shape (function testNormalizeProductionOrdersHappyPath(): void).
@@ -14,10 +36,14 @@ import { normalizeProductionOrders } from './productionOrders';
  * Exceptions: None.
  */
 function testNormalizeProductionOrdersHappyPath(): void {
-  const parsed = normalizeProductionOrders([
-    { action: 'set_build_queue', hex: [12.34, 56.78], unitType: 'infantry', count: 3 },
-    { action: 'set_build_queue', hex: [12.35, 56.79], unitType: 'air', count: 2 },
-  ]);
+  const [hx0, hx1] = twoSampleStrategicHexCodes();
+  const parsed = normalizeProductionOrders(
+    [
+      { action: 'set_build_queue', hex: hx0, unitType: 'infantry', count: 3 },
+      { action: 'set_build_queue', hex: hx1, unitType: 'air', count: 2 },
+    ],
+    strategicCtx
+  );
   assert.strictEqual(parsed.validOrders.length, 2);
   assert.strictEqual(parsed.droppedReasons.length, 0);
 }
@@ -31,12 +57,16 @@ function testNormalizeProductionOrdersHappyPath(): void {
  * Exceptions: None.
  */
 function testNormalizeProductionOrdersDropsMalformedEntriesButKeepsValid(): void {
-  const parsed = normalizeProductionOrders([
-    { action: 'set_build_queue', hex: [12.34, 56.78], unitType: 'infantry', count: 1 },
-    { action: 'set_build_queue', hex: [12.34, 56.78], count: 1 },
-    { action: 'unknown_build_action', hex: [12.34, 56.78], entryId: 0 },
-    'not-an-object',
-  ]);
+  const [hx0] = twoSampleStrategicHexCodes();
+  const parsed = normalizeProductionOrders(
+    [
+      { action: 'set_build_queue', hex: hx0, unitType: 'infantry', count: 1 },
+      { action: 'set_build_queue', hex: hx0, count: 1 },
+      { action: 'unknown_build_action', hex: hx0, entryId: 0 },
+      'not-an-object',
+    ],
+    strategicCtx
+  );
   assert.strictEqual(parsed.validOrders.length, 1);
   assert.ok(parsed.droppedReasons.length >= 3);
 }
@@ -50,10 +80,14 @@ function testNormalizeProductionOrdersDropsMalformedEntriesButKeepsValid(): void
  * Exceptions: None.
  */
 function testNormalizeProductionOrdersRejectsOutOfBoundsCount(): void {
-  const parsed = normalizeProductionOrders([
-    { action: 'set_build_queue', hex: [12.34, 56.78], unitType: 'infantry', count: 0 },
-    { action: 'set_build_queue', hex: [12.34, 56.78], unitType: 'naval', count: 100 },
-  ]);
+  const [hx0] = twoSampleStrategicHexCodes();
+  const parsed = normalizeProductionOrders(
+    [
+      { action: 'set_build_queue', hex: hx0, unitType: 'infantry', count: 0 },
+      { action: 'set_build_queue', hex: hx0, unitType: 'naval', count: 100 },
+    ],
+    strategicCtx
+  );
   assert.strictEqual(parsed.validOrders.length, 0);
   assert.strictEqual(parsed.droppedReasons.length, 2);
 }
@@ -67,7 +101,7 @@ function testNormalizeProductionOrdersRejectsOutOfBoundsCount(): void {
  * Exceptions: None.
  */
 function testNormalizeProductionOrdersRequiresArrayWhenPresent(): void {
-  const parsed = normalizeProductionOrders({ action: 'set_build_queue' });
+  const parsed = normalizeProductionOrders({ action: 'set_build_queue' }, strategicCtx);
   assert.strictEqual(parsed.validOrders.length, 0);
   assert.strictEqual(parsed.droppedReasons.length, 1);
 }

@@ -96,7 +96,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
       type: 'object',
       properties: {
         unitId: { type: 'string', description: 'ID of the unit to route (e.g. opponent-armor-1)' },
-        destination: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Target hex as [lat, lng]' },
+        destination: { type: 'string', pattern: '^[A-Z0-9]{2}$', description: 'Target cell as two-character briefing hex code from the operational map' },
         options: {
           type: 'object',
           properties: {
@@ -107,7 +107,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
       },
       required: ['unitId', 'destination'],
     },
-    promptLine: `plan_route(unitId, destination, options?) - Compute the optimal path for a unit to a destination hex. Returns multi-turn route and orderToXY: the exact [lat, lng] for this turn's movement order (copy this into explicit_move.destination for that unit).${NAVAL_PLAN_ROUTE_PROMPT_SUFFIX}`,
+    promptLine: `plan_route(unitId, destination, options?) - Compute the optimal path for a unit to a destination hex. Returns multi-turn route and orderToHexCode: copy that code into explicit_move.destination for that unit.${NAVAL_PLAN_ROUTE_PROMPT_SUFFIX}`,
   },
   {
     name: 'check_distance',
@@ -115,8 +115,8 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
     parameters: {
       type: 'object',
       properties: {
-        from: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Origin hex [lat, lng]' },
-        to: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Destination hex [lat, lng]' },
+        from: { type: 'string', pattern: '^[A-Z0-9]{2}$', description: 'Origin briefing hex code' },
+        to: { type: 'string', pattern: '^[A-Z0-9]{2}$', description: 'Destination briefing hex code' },
         unitType: { type: 'string', enum: ['infantry', 'armor', 'naval', 'air'], description: 'Unit type for movement budget' },
       },
       required: ['from', 'to', 'unitType'],
@@ -142,7 +142,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
     parameters: {
       type: 'object',
       properties: {
-        position: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Hex to assess as [lat, lng]' },
+        position: { type: 'string', pattern: '^[A-Z0-9]{2}$', description: 'Cell to assess as briefing hex code' },
         forUnitType: { type: 'string', enum: ['infantry', 'armor', 'naval', 'air'], description: 'Assess from this unit type perspective (for chokepoint)' },
       },
       required: ['position'],
@@ -168,7 +168,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
           },
           description: 'Attackers: either units (IDs) or assumed (type, count)',
         },
-        targetHex: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Target hex [lat, lng]' },
+        targetHex: { type: 'string', pattern: '^[A-Z0-9]{2}$', description: 'Defender cell as briefing hex code' },
         defenders: {
           type: 'object',
           properties: {
@@ -218,7 +218,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
     parameters: {
       type: 'object',
       properties: {
-        hex: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Optional target hex [lat, lng]' },
+        hex: { type: 'string', pattern: '^[A-Z0-9]{2}$', description: 'Optional briefing hex code for one queue' },
         all: { type: 'boolean', description: 'When true, returns all controlled-hex production queues' },
       },
     },
@@ -230,7 +230,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
     parameters: {
       type: 'object',
       properties: {
-        hex: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Controlled hex [lat, lng]' },
+        hex: { type: 'string', pattern: '^[A-Z0-9]{2}$', description: 'Controlled cell as briefing hex code' },
         unitType: { type: 'string', enum: ['infantry', 'armor', 'naval', 'air'], description: 'Unit type to keep in queue' },
         count: { type: 'number', description: 'Build count (1..99) for the selected unit type' },
       },

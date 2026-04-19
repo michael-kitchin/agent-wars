@@ -173,25 +173,25 @@ hexAssessments: [],
  */
 function testFormatBriefingContainsSections(): void {
   const standingOrderText =
-    '# Standing Order Status\n\n- opponent-infantry-1: MARCH to [1.000, 1.000] — en_route';
+    '# Standing Order Status\n\n- opponent-infantry-1: MARCH to AB — en_route';
   const memoryText = 'Remember: push south.';
   const out = formatBriefing(fixtureState, precomputed, standingOrderText, memoryText);
   assert.ok(out.includes("# Commander's Briefing"), 'title');
   assert.ok(out.includes('Turn 2:'), 'Section 1 narrative');
   assert.ok(out.match(/\.\s+[A-Z]/), 'Section 1 has multiple sentences');
   assert.ok(out.includes('| Unit ID |'), 'unit table header');
-  assert.ok(out.includes('# Possible Unit Actions'), 'possible unit actions section');
+  assert.ok(out.includes('# Operational Map'), 'operational map section');
   assert.ok(out.includes('## Losses Since Last Consultation'), 'losses subsection header');
   assert.ok(out.includes('| Turn | Victim Unit | Side | Cause | Killer IDs |'), 'losses subsection table header');
   assert.ok(out.includes('opponent-armor-1'), 'unit table has unit');
   assert.ok(
-    out.includes('| Unit ID |') || out.includes('## Other Hexes') || out.includes('# Possible Unit Actions'),
-    'possible actions table or section present'
+    out.includes('| Unit ID |') || out.includes('## Other Hexes') || out.includes('# Operational Map'),
+    'possible actions table or operational map present'
   );
   assert.ok(out.includes('## Attention Flags'), 'attention flags header');
   assert.ok(
-    out.indexOf('## Attention Flags') < out.indexOf('# Possible Unit Actions'),
-    'attention flags appear before possible unit actions'
+    out.indexOf('## Attention Flags') < out.indexOf('# Operational Map'),
+    'attention flags appear before operational map'
   );
   assert.ok(out.includes('Your Strategic Memory'), 'memory block');
   assert.ok(out.includes('Remember: push south.'), 'memory text');
@@ -267,7 +267,7 @@ function testFormatBriefingIncludesLossRowsWhenProvided(): void {
 function testFormatBriefingUnitTableRows(): void {
   const out = formatBriefing(fixtureState, precomputed, '', '');
   const unitTableStart = out.indexOf('| Unit ID |');
-  const unitTableEnd = out.indexOf('# Possible Unit Actions');
+  const unitTableEnd = out.indexOf('# Operational Map');
   const unitTable = out.slice(unitTableStart, unitTableEnd);
   assert.ok(unitTable.includes('opponent-armor-1') && unitTable.includes('opponent-infantry-1'));
   assert.ok(unitTable.includes('yes') || unitTable.includes('no'), 'action needed column');
@@ -284,8 +284,8 @@ function testFormatBriefingUnitTableRows(): void {
 function testFormatBriefingPossibleActionsArmorRanged(): void {
   const out = formatBriefing(fixtureState, precomputed, '', '');
   assert.ok(out.includes('opponent-armor-1'));
-  assert.ok(out.includes('ranged attack'));
-  assert.ok(out.includes('| Unit ID | Unit Type | Action Types | Hex | Distance | Enemy Units | Hex Features |'));
+  assert.ok(out.includes('ranged'));
+  assert.ok(out.includes('| Unit ID | Action | Target Hex | Target | Notes |'));
 }
 
 /**

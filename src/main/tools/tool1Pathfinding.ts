@@ -1,7 +1,7 @@
 /**
  * MCP Tool 1: Pathfinding and Movement Planning (plan_route, check_distance).
  * Implements the tool API per the MCP tools spec; uses pathfinding module and game state.
- * All hex positions in tool responses are returned as [lat, lng]; H3 indices are never exposed.
+ * Internal geometry uses lat/lng tuples after the OpenRouter layer decodes briefing hex codes; outbound tool payloads to the model are rewritten to hex codes by `encodeOpenRouterToolResultForLlm`.
  */
 
 import { cellToLatLng } from 'h3-js';
@@ -937,7 +937,11 @@ export function executeTool1(
         ? [Number(a.destination[0]), Number(a.destination[1])] as LatLng
         : undefined;
       if (!dest) {
-        return { status: 'error', error: 'plan_route requires destination as [lat, lng]' };
+        return {
+          status: 'error',
+          error:
+            'plan_route requires destination as a two-character briefing hex code from the operational map (see Available Tools schema); arguments are decoded before routing.',
+        };
       }
       const result = pathfindingSession
         ? executePlanRouteWithSession(a.unitId, dest, a.options, pathfindingSession)
@@ -953,7 +957,11 @@ export function executeTool1(
         ? [Number(a.to[0]), Number(a.to[1])] as LatLng
         : undefined;
       if (!from || !to || typeof a?.unitType !== 'string') {
-        return { status: 'error', error: 'check_distance requires from [lat,lng], to [lat,lng], and unitType (string)' };
+        return {
+          status: 'error',
+          error:
+            'check_distance requires from, to, and unitType. from and to must each be a two-character briefing hex code (decoded to map cells before this tool runs).',
+        };
       }
       const result = executeCheckDistance(from, to, a.unitType, state, latLngByH3, resolveToH3);
       return result as unknown as Record<string, unknown>;

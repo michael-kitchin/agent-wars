@@ -233,7 +233,6 @@ async function run(): Promise<void> {
     const mapData = require('../mapData') as {
       getOrderedHexList: () => string[];
       H3_RESOLUTION: number;
-      LATLNG_DECIMAL_PLACES: number;
     };
 
     openRouter.saveKey('test-key');
@@ -298,7 +297,7 @@ async function run(): Promise<void> {
         `air-strike JSON contract guidance missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('ferryOrders[] entries use { "unitId": "...", "destination": [lat,lng] }'),
+        systemPrompt.includes('ferryOrders[] entries use { "unitId": "...", "destination": "<hex code>" }'),
         `ferry JSON contract guidance missing for mask=${mask}`
       );
       assert.ok(
@@ -365,8 +364,8 @@ async function run(): Promise<void> {
         `human home-region guidance missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes(`at ${mapData.LATLNG_DECIMAL_PLACES} decimal places`),
-        `lat/lng precision guidance missing for mask=${mask}`
+        systemPrompt.includes('Never emit raw H3 strings or latitude/longitude pairs'),
+        `hex-code exclusivity guidance missing for mask=${mask}`
       );
       assert.ok(
         systemPrompt.includes('Example (illustrative only'),
@@ -426,6 +425,14 @@ async function run(): Promise<void> {
     });
     assert.strictEqual(strictResult.success, false, 'strict schema should reject top-level array responses');
 
+    const hexCoordsMod = require('../briefing/map/hex-coordinates') as { ensureStrategicCoordinateRegistryInitialized: () => void };
+    const hexCodeTranslator = require('../briefing/map/hex-code-translator') as {
+      h3ToCode: (h3Index: string, context: { mode: 'strategic' }) => string;
+    };
+    hexCoordsMod.ensureStrategicCoordinateRegistryInitialized();
+    const strategicCtx = { mode: 'strategic' as const };
+    const ferryDestCode = hexCodeTranslator.h3ToCode(allHexes[2]!, strategicCtx);
+
     const airOrdersResponse: ChatResponse = {
       choices: [
         {
@@ -434,11 +441,9 @@ async function run(): Promise<void> {
               strategy: 'air pressure',
               orders: [],
               airStrikes: [
-                { unitId: 'opponent-air-1', targetHex: [83.66, -7.32], targetType: 'units' },
+                { unitId: 'opponent-air-1', targetUnitId: 'human-infantry-1', targetType: 'units' },
               ],
-              ferryOrders: [
-                { unitId: 'opponent-air-2', destination: [79.24, 38.02] },
-              ],
+              ferryOrders: [{ unitId: 'opponent-air-2', destination: ferryDestCode }],
             }),
           },
         },

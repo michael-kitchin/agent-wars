@@ -4,8 +4,11 @@ import { createPathfindingSession, executePlanRouteWithSession } from './tool1Pa
 import type { LatLng } from './tool1Pathfinding';
 import { terrainIsPassableForDomain } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
-import { LATLNG_DECIMAL_PLACES } from '../mapData';
+import { buildLatLngCoordinateMap } from '../mapData';
 import { logDebug, logError, logTrace } from '../logger';
+import type { CoordinateContext } from '../briefing/map/coordinateContext';
+import { ensureStrategicCoordinateRegistryInitialized } from '../briefing/map/hex-coordinates';
+import { h3ToCode } from '../briefing/map/hex-code-translator';
 import { buildPromptTableLines } from '../promptTableUtils';
 import {
   parseComputedRoute,
@@ -117,6 +120,29 @@ attention: 'yes' | 'no';
 }
 
 /**
+ * Resolves a stored lat/lng tuple to the briefing hex code shown alongside rosters and maps.
+ *
+ * Purpose: Keeps standing-order status tables aligned with the JSON hex-code contract while DB rows remain lat/lng.
+ * When to use: Only when formatting `getInjectionText` rows for the active strategic or tactical coordinate context.
+ * Expected outcome: Two-character code when the tuple snaps to a registered cell; em dash when off-registry or unmapped.
+ * Exceptions: None; failures downgrade to an em dash rather than throwing into the prompt builder.
+ */
+function latLngTupleToBriefingHexDisplay(
+  ll: [number, number] | undefined,
+  coordinateContext: CoordinateContext,
+  resolveToH3: (lat: number, lng: number) => string | undefined
+): string {
+  if (!ll || ll.length < 2) return '—';
+  const h3 = resolveToH3(ll[0], ll[1]);
+  if (!h3) return '—';
+  try {
+    return h3ToCode(h3, coordinateContext);
+  } catch {
+    return '—';
+  }
+}
+
+/**
  * Defines the `toStandingOrderPromptRow` function shape (function toStandingOrderPromptRow().
 
  * Purpose: Supports maintainability by documenting why `toStandingOrderPromptRow` exists.
@@ -126,7 +152,9 @@ attention: 'yes' | 'no';
  */
 function toStandingOrderPromptRow(
   row: StandingOrderRow,
-  unitTypeById: Map<string, string>
+  unitTypeById: Map<string, string>,
+  coordinateContext: CoordinateContext,
+  resolveToH3: (lat: number, lng: number) => string | undefined
 ): StandingOrderPromptRow {
   const params = parseOrderParams(row);
   const computed = parseComputedRoute(row);
@@ -134,12 +162,10 @@ function toStandingOrderPromptRow(
   const turnsRemaining = Number(computed?.turnsRemaining ?? 0);
   let destination = '—';
   if (row.order_type === 'march' && params.destination) {
-    const d = params.destination as [number, number];
-    destination = `[${d[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${d[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
+    destination = latLngTupleToBriefingHexDisplay(params.destination as [number, number], coordinateContext, resolveToH3);
   }
   if (row.order_type === 'defend' && params.defendHex) {
-    const d = params.defendHex as [number, number];
-    destination = `[${d[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${d[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
+    destination = latLngTupleToBriefingHexDisplay(params.defendHex as [number, number], coordinateContext, resolveToH3);
   }
   if (row.order_type === 'pursue' && params.targetUnitId) {
     destination = String(params.targetUnitId);
@@ -147,13 +173,11 @@ function toStandingOrderPromptRow(
   let nextMoveText = '—';
   let turnsRemainingText: string | number = '—';
   if (turnsRemaining > 0 && nextMove) {
-    const ll = nextMove as [number, number];
-    nextMoveText = `[${ll[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${ll[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
+    nextMoveText = latLngTupleToBriefingHexDisplay(nextMove as [number, number], coordinateContext, resolveToH3);
     turnsRemainingText = turnsRemaining;
   } else if (row.status === 'en_route' || row.status === 'closing') {
     if (nextMove) {
-      const ll = nextMove as [number, number];
-      nextMoveText = `[${ll[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${ll[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
+      nextMoveText = latLngTupleToBriefingHexDisplay(nextMove as [number, number], coordinateContext, resolveToH3);
     } else {
       nextMoveText = 'pending route refresh';
     }
@@ -218,11 +242,17 @@ function assignOrder(
       if (!Array.isArray(wp) || wp.length < 2) continue;
       const h3 = resolveToH3(Number(wp[0]), Number(wp[1]));
       if (!h3 || !hexSet.has(h3)) {
-        return { status: 'error', error: `Waypoint [${wp[0]}, ${wp[1]}] is off-map` };
+        return {
+          status: 'error',
+          error: `Patrol waypoint ${i + 1} is off the operational map (coordinates do not resolve to a briefing cell).`,
+        };
       }
       const terrain = terrainByH3.get(h3) ?? 'land';
       if (!terrainIsPassableForDomain(terrain, domain)) {
-        return { status: 'error', error: `Waypoint [${wp[0]}, ${wp[1]}] is impassable for ${unit.unitType}` };
+        return {
+          status: 'error',
+          error: `Patrol waypoint ${i + 1} is impassable for ${unit.unitType} on the operational map.`,
+        };
       }
     }
   }
@@ -241,7 +271,10 @@ function assignOrder(
   if (orderType === 'march') {
     const dest = order.destination;
     if (!Array.isArray(dest) || dest.length < 2) {
-      return { status: 'error', error: 'March requires destination as [lat, lng]' };
+      return {
+        status: 'error',
+        error: 'March requires destination coordinates that resolve to an on-map cell.',
+      };
     }
   }
 
@@ -520,15 +553,32 @@ export function getStandingOrderForUnit(
 }
 
 /**
- * Defines the `getInjectionText` function shape (export function getInjectionText(playerId: string, state: GameStateSnapshot): string).
+ * Defines the `getInjectionText` function shape (export function getInjectionText(playerId: string, state: GameStateSnapshot, coordinateContext?: CoordinateContext): string).
 
  * Purpose: Supports maintainability by documenting why `getInjectionText` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getInjectionText(playerId: string, state: GameStateSnapshot): string {
-  logTrace('tool5StandingOrders getInjectionText', { playerId, turnNumber: state.turnNumber });
+export function getInjectionText(
+  playerId: string,
+  state: GameStateSnapshot,
+  coordinateContext?: CoordinateContext
+): string {
+  const ctx: CoordinateContext = coordinateContext ?? { mode: 'strategic' };
+  if (ctx.mode === 'strategic') {
+    ensureStrategicCoordinateRegistryInitialized();
+  }
+  logDebug('tool5StandingOrders getInjectionText', {
+    playerId,
+    turnNumber: state.turnNumber,
+    coordinateMode: ctx.mode,
+    battleId: ctx.battleId ?? null,
+  });
+
+  const hexList = state.hexes.map((h) => h.h3Index);
+  const { resolveToH3 } = buildLatLngCoordinateMap(hexList);
+  logTrace('tool5StandingOrders getInjectionText: map context', { hexCount: hexList.length });
 
   const rows = dbGetAll<StandingOrderRow>(
     'SELECT * FROM standing_orders WHERE player_id = ? ORDER BY unit_id',
@@ -546,7 +596,7 @@ export function getInjectionText(playerId: string, state: GameStateSnapshot): st
   lines.push('');
   const standingOrderRows = rows
     .filter((row) => aiUnitIdSet.has(row.unit_id))
-    .map((row) => toStandingOrderPromptRow(row, aiUnitTypeById))
+    .map((row) => toStandingOrderPromptRow(row, aiUnitTypeById, ctx, resolveToH3))
     .map((row) => [
       row.unitId,
       row.unitType,

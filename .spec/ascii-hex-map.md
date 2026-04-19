@@ -38,6 +38,7 @@ The terrain character tells the LLM definitively where naval vs. land units can 
 | `#`       | Both sides have units here (contested)            | Highest priority    |
 | `*`       | Only AI units here                                | Second priority     |
 | `!`       | Only enemy units here                             | Second priority     |
+| `?`       | Undiscovered: infrastructure/ownership unknown     | Discovery-gated     |
 | `B`       | AI-controlled: airport(s) AND seaport(s) (implies urban) | Feature, no units   |
 | `b`       | Not AI-controlled: airport(s) AND seaport(s) (implies urban) | Feature, no units   |
 | `A`       | AI-controlled: airport(s) present, no seaport (implies urban) | Feature, no units   |
@@ -52,7 +53,14 @@ The terrain character tells the LLM definitively where naval vs. land units can 
 
 When a unit presence marker (`*`, `!`, `#`) displaces a feature code, the displaced feature (with correct casing) is recovered in a footnote below the map (see Phase 4).
 
-**Fog of war and presence markers.** The map shows terrain and infrastructure for all hexes in the bounding box (terrain is always known from the geographic data). However, **presence markers (`*`, `!`, `#`) are populated exclusively from the AI's fog-of-war-filtered observation.** Hexes where the AI has no current visibility show terrain and features but never enemy presence markers — even if enemies are actually there. The AI's own units always show `*` since it always knows where its own forces are. The `enemyUnitCount` field in `HexGameState` must be sourced from the same subjective view that the existing briefing pipeline uses.
+**Fog of war, discovery parity, and presence markers.** Visibility must match the human-player discovery model exactly:
+
+- Terrain uses the same visibility policy used for human players at this game stage.
+- Infrastructure and ownership are discovery-gated: undiscovered hexes render `?` for the overlay (unknown infrastructure/ownership), discovered hexes render normal feature overlays with casing.
+- Presence markers (`*`, `!`, `#`) are populated exclusively from the AI's subjective fog-of-war-filtered view.
+- The AI's own units always show `*` since it always knows where its own forces are.
+
+The `enemyUnitCount` field in `HexGameState` must be sourced from the same subjective view that the existing briefing pipeline uses.
 
 ### Offset Row Convention
 
@@ -86,6 +94,86 @@ Hex codes are the **exclusive** coordinate system across the entire LLM interfac
 - All prompt text (unit positions, standing order destinations, scenario descriptions)
 
 The game engine translates between hex codes and internal H3 indices at the interface boundary. This translation is invisible to the LLM.
+
+### Coordinate Scope by Active Context
+
+Hex codes are interpreted against the **active game context**:
+
+- Strategic context: codes resolve via the global res1 registry.
+- Tactical context: codes resolve via the active battle's res4 registry.
+
+The game is stateful and only in one context at a time, so 2-character codes remain unambiguous. All translation APIs must require context and reject cross-context lookups.
+
+---
+
+## Reliability-First Execution Protocol (For Lower-Capability Agents)
+
+This plan is intentionally structured for deterministic execution by a lower-quality coding agent. Prioritize clarity, small change sets, and strict verification over speed.
+
+### Operating Rules
+
+1. **Strict phase order only.** Implement phases in sequence. Do not run phases in parallel, even where technically possible.
+2. **One phase, one focused change set.** Complete implementation + verification + cleanup for the current phase before touching the next phase.
+3. **Phase gate required.** A phase is complete only when all required verification checks for that phase pass.
+4. **Stop-on-failure.** If a verification check fails, do not proceed; fix the phase until all checks pass.
+5. **No silent behavior changes.** If the implementation deviates from this document, update the plan first, then implement.
+6. **Keep code understandable.** Prefer small functions, explicit names, orienting comments, and predictable control flow.
+
+### Per-Phase Execution Template
+
+For each phase, execute this checklist in order:
+
+1. Read the phase goal and "What to Build" section.
+2. Implement only the files/functions listed for that phase.
+3. Add/adjust tests for happy path + essential failure contracts only.
+4. Run phase-specific verification checks listed in this document.
+5. Confirm cross-cutting contract compliance (logging, orienting comments, maintainability limits).
+6. Record a short "Phase Completion Note" in the PR/working notes:
+   - What changed
+   - Which checks passed
+   - Known risks (if any)
+
+### Phase Exit Criteria (Mandatory)
+
+A phase can be marked complete only if all are true:
+
+- Required behavior is implemented exactly as specified for that phase.
+- Phase tests pass.
+- No contradictory TODOs remain in touched files.
+- Cross-cutting contract requirements are satisfied for touched code.
+- Output is independently verifiable or verifiable with previously completed phases only.
+
+### Phase 0: Readiness Checklist (Before Phase 1)
+
+Complete this checklist before touching implementation code:
+
+1. **Baseline state captured**
+   - Run and record baseline test status for relevant suites.
+   - Generate and save one current-format briefing sample for later comparison.
+
+2. **Environment/tooling verified**
+   - Confirm project installs/builds cleanly in current environment.
+   - Confirm `h3-js` is available and importable in the target package.
+   - Confirm test runner can execute targeted test files in isolation.
+
+3. **Reference fixtures prepared**
+   - Identify one stable strategic scenario fixture (example prompt scenario).
+   - Identify one antimeridian fixture (`+179/-179` span) for wrapped-longitude checks.
+   - Identify one fog/discovery fixture containing discovered and undiscovered hexes.
+
+4. **Contract alignment confirmed**
+   - Confirm logging API usage pattern for debug/error/trace requirements.
+   - Confirm orienting comment style expected by the codebase.
+   - Confirm target files will remain within maintainability limits or pre-plan decomposition.
+
+5. **Schema and prompt baseline audit**
+   - Enumerate all current tool/request/response fields that still use `[lat,lng]` or H3 strings.
+   - Enumerate all prompt template sections containing coordinate text.
+   - Record this inventory as the migration checklist for Phases 5B–5E.
+
+6. **Definition of done acknowledged**
+   - Phase work proceeds only when this checklist is complete.
+   - Any unknowns discovered during Phase 0 are resolved in the plan before coding.
 
 ---
 
@@ -184,7 +272,10 @@ interface HexGrid {
  *    H3 res1 hexes have centers spaced roughly 7–9 degrees apart
  *    in latitude. Use a clustering threshold of ~4 degrees to
  *    group centers into the same row.
- * 3. Within each row, sort by longitude ascending → column index.
+ * 3. Normalize longitudes around the shortest wrapped span for
+ *    this map window (antimeridian-safe).
+ * 4. Within each row, sort by normalized longitude ascending
+ *    → column index.
  * 4. Assign 0-based row indices (0 = northernmost) and 0-based
  *    column indices (0 = westernmost within that row).
  *
@@ -206,7 +297,8 @@ A separate function computes which hexes appear on the map for a given turn.
  * Algorithm:
  * 1. Collect the lat/lng centers of all units on both sides
  *    (AI + observed enemy).
- * 2. Compute the lat/lng bounding box of those positions.
+ * 2. Compute a wrapped longitude window that minimizes span
+ *    (supports antimeridian crossing) plus a latitude range.
  * 3. Expand by a buffer (default: 5 hex-widths, roughly 35–45
  *    degrees of latitude/longitude). This generous buffer
  *    ensures the LLM sees approach corridors, flanking routes,
@@ -231,12 +323,24 @@ H3 res1 hex centers do not fall on a perfectly regular latitude grid because H3 
 
 **Important:** The clustering must be deterministic. Use the same sort order and threshold every time so that row/column assignments are stable across turns for the same set of hexes. Since the set of hexes in the bounding box can change between turns (units move, the box shifts), row/column indices are NOT stable across turns — only the 2-character hex codes from Phase 1 are stable. This is fine because the grid layout is a rendering concern, not a referencing concern.
 
+### Longitude Wrapping Detail
+
+Use wrapped longitude normalization to avoid map discontinuities near `+180/-180`:
+
+1. Convert all longitudes to a circular domain.
+2. Select the shortest arc containing all relevant unit positions.
+3. Expand that arc by the configured buffer.
+4. Normalize candidate hex longitudes into that arc before row-wise sort.
+
+This guarantees that theaters near the antimeridian render as one continuous map region rather than split at the edge.
+
 ### Verification
 
 1. Project the ~122 res1 land hexes onto a grid. Print the grid with hex codes. Visually verify that the layout roughly resembles a Mercator world map — continents should be recognizable, relative positions should be correct.
 2. Verify that no two hexes share the same (row, col).
 3. Verify that the bounding box for the example prompt's unit positions (Western Asia vs. Northern Africa) produces a grid covering the Middle East, North Africa, and Eastern Mediterranean, with water hexes included.
 4. Verify that the bounding box expansion/contraction produces reasonable results: remove a unit from the edge, recompute, and confirm the map shrinks without corrupting the layout. Row/column assignments may shift when the hex set changes — this is expected and acceptable since hex codes (not grid positions) are the stable identifier.
+5. Verify antimeridian behavior with a fixture spanning longitudes near `+179/-179`: output should be continuous and use the shortest wrapped span.
 
 ---
 
@@ -253,6 +357,7 @@ H3 res1 hex centers do not fall on a perfectly regular latitude grid because H3 
 
 interface HexGameState {
   terrain: 'land' | 'water';
+  isDiscovered: boolean; // visibility/discovery state in parity with human player rules
   features: {
     hasAirport: boolean;
     hasSeaport: boolean;
@@ -300,11 +405,12 @@ export function renderMap(
 1. **Top line of each cell:** The 2-character hex code from Phase 1.
 2. **Bottom line of each cell:**
    - First character: `x` if land, `.` if water.
-   - Second character: determined by priority cascade (see overlay table in Design Summary above).
+   - Second character: determined by priority cascade (see overlay table in Design Summary above), including `?` for undiscovered infrastructure/ownership.
 3. **Offset:** Odd display rows (row index 1, 3, 5...) are indented by 1 character.
 4. **Spacing:** One space between cells horizontally. No blank lines between rows vertically.
 5. **Empty cells:** Where the grid has no hex (sparse grid), render as two spaces on both lines.
-6. **Track displaced features:** When a presence marker (`*`, `!`, `#`) replaces a feature code, record the hex code and displaced feature character in the `displacedFeatures` array.
+6. **Discovery handling:** If `isDiscovered` is false and no unit presence marker applies, render `?` as overlay and do not render feature casing.
+7. **Track displaced features:** When a presence marker (`*`, `!`, `#`) replaces a feature code, record the hex code and displaced feature character in the `displacedFeatures` array.
 
 ### Rendering Example
 
@@ -545,36 +651,46 @@ Build a bidirectional translation service that sits at the boundary between the 
 ```typescript
 // hex-code-translator.ts
 
+interface CoordinateContext {
+  mode: 'strategic' | 'tactical';
+  battleId?: string; // required when mode === 'tactical'
+}
+
 /**
  * Translate a hex code to its H3 index.
- * Throws if the code is not in the registry.
+ * Throws if the code is not in the active context registry.
  */
-export function codeToH3(code: string): string;
+export function codeToH3(code: string, context: CoordinateContext): string;
 
 /**
  * Translate a hex code to [lat, lng] at 2 decimal places.
- * Throws if the code is not in the registry.
+ * Throws if the code is not in the active context registry.
  */
-export function codeToLatLng(code: string): [number, number];
+export function codeToLatLng(code: string, context: CoordinateContext): [number, number];
 
 /**
  * Translate an H3 index to its hex code.
- * Throws if the index is not in the registry.
+ * Throws if the index is not in the active context registry.
  */
-export function h3ToCode(h3Index: string): string;
+export function h3ToCode(h3Index: string, context: CoordinateContext): string;
 
 /**
  * Translate a [lat, lng] pair to a hex code by snapping to
- * the nearest res1 hex center first, then looking up the code.
+ * the nearest hex center in the active context first, then
+ * looking up the code.
  * Used during migration to convert existing lat/lng references.
  */
-export function latLngToCode(lat: number, lng: number): string;
+export function latLngToCode(
+  lat: number,
+  lng: number,
+  context: CoordinateContext
+): string;
 
 /**
  * Validate that a string is a known hex code.
- * Returns true if the code exists in the registry.
+ * Returns true if the code exists in the active context registry.
  */
-export function isValidHexCode(code: string): boolean;
+export function isValidHexCode(code: string, context: CoordinateContext): boolean;
 ```
 
 ### 5B: Tool Schema Migration
@@ -607,14 +723,15 @@ Every tool that accepts or returns coordinates changes from `[lat, lng]` to hex 
 ```typescript
 // Example: plan_route wrapper
 async function planRoute(params: { unitId: string; destination: string }) {
-  const destH3 = codeToH3(params.destination);  // translate inbound
+  const context = getActiveCoordinateContext();
+  const destH3 = codeToH3(params.destination, context);  // translate inbound
   const result = await planRouteInternal(params.unitId, destH3);
   return {
     ...result,
-    orderTo: h3ToCode(result.orderToH3),          // translate outbound
+    orderTo: h3ToCode(result.orderToH3, context),          // translate outbound
     path: result.path.map(step => ({
       ...step,
-      hex: h3ToCode(step.h3Index),
+      hex: h3ToCode(step.h3Index, context),
     })),
   };
 }
@@ -622,7 +739,7 @@ async function planRoute(params: { unitId: string; destination: string }) {
 
 ### 5C: Response JSON Schema Migration
 
-The LLM's response JSON changes from lat/lng to hex codes everywhere a hex position appears.
+The LLM's response JSON changes from lat/lng to hex codes everywhere a hex position appears, and target fields become explicit to avoid parser ambiguity.
 
 **Current → New:**
 
@@ -655,10 +772,12 @@ The LLM's response JSON changes from lat/lng to hex codes everywhere a hex posit
     { "action": "explicit_move", "unitId": "opponent-armor-1",
       "destination": "CG" },
     { "action": "ranged_attack", "unitId": "opponent-naval-1",
-      "targetHex": "CH" }
+      "targetHexCode": "CH" },
+    { "action": "ranged_attack", "unitId": "opponent-naval-1",
+      "targetUnitId": "human-armor-1" }
   ],
   "airStrikes": [
-    { "unitId": "opponent-air-1", "targetHex": "CI",
+    { "unitId": "opponent-air-1", "targetHexCode": "CI",
       "targetType": "urban" }
   ],
   "productionOrders": [
@@ -668,7 +787,12 @@ The LLM's response JSON changes from lat/lng to hex codes everywhere a hex posit
 }
 ```
 
-**Disambiguation rule:** `targetHex` fields accept either a hex code or an enemy unit ID. The response parser applies a simple rule: **any value that is exactly 2 uppercase alphanumeric characters (`/^[A-Z0-9]{2}$/`) is a hex code. Everything else is treated as a unit ID.** This means hex codes are the positively identified case — short, tightly formatted, validated against the registry. Unit IDs are the fallback, which is safe because they are structurally distinct (always contain hyphens, always longer than 2 characters, e.g., `"human-armor-1"`). If a value matches the hex code pattern but is not in the registry, the parser should reject it with an error rather than silently treating it as a unit ID. Document this distinction explicitly in the prompt.
+**Explicit-target rule:** Replace polymorphic `targetHex` with explicit optional fields:
+
+- `targetHexCode`: 2-character hex destination/target.
+- `targetUnitId`: unit-designator target.
+
+Validation rule: exactly one of these fields must be present where targeting applies. If both or neither are provided, reject with a clear schema/validation error.
 
 **Callback parameters** that reference hex positions also migrate:
 
@@ -684,9 +808,10 @@ The LLM's response JSON changes from lat/lng to hex codes everywhere a hex posit
 
 The engine's response parser currently extracts `[lat, lng]` arrays from the LLM's JSON and passes them to the order execution pipeline. Update it to:
 
-1. Accept hex code strings where it previously expected `[lat, lng]` arrays.
-2. Translate each hex code to the internal representation (H3 index or lat/lng) using `codeToH3()` or `codeToLatLng()` before passing to the execution pipeline.
-3. Validate each hex code against the registry — reject unknown codes with a clear error message rather than silently failing downstream.
+1. Accept only hex-code-based fields in the new schema (hard cutover; no legacy fallback).
+2. Validate explicit targeting fields (`targetHexCode`, `targetUnitId`) with exactly-one semantics.
+3. Translate each hex code to the internal representation (H3 index or lat/lng) using `codeToH3()` or `codeToLatLng()` before passing to the execution pipeline.
+4. Validate each hex code against the context-specific registry — reject unknown codes with a clear error message rather than silently failing downstream.
 
 ```typescript
 // response-parser.ts (sketch of the translation step)
@@ -694,33 +819,35 @@ The engine's response parser currently extracts `[lat, lng]` arrays from the LLM
 const HEX_CODE_PATTERN = /^[A-Z0-9]{2}$/;
 
 /**
- * Parse a destination or targetHex value from the LLM's JSON.
- * Returns either an H3 index (for hex code values) or the
- * original string (for unit ID values).
+ * Parse explicit targeting fields.
+ * Returns either an H3 index (for hex target) or unit ID target.
  */
-function parseHexOrUnitId(value: unknown): { type: 'hex'; h3: H3Index } | { type: 'unitId'; id: string } {
-  if (typeof value === 'string') {
-    if (HEX_CODE_PATTERN.test(value)) {
-      // Matches hex code format — validate against registry
-      if (!isValidHexCode(value)) {
-        throw new Error(`Hex code format but not in registry: "${value}"`);
-      }
-      return { type: 'hex', h3: codeToH3(value) };
+function parseTarget(
+  input: { targetHexCode?: unknown; targetUnitId?: unknown },
+  context: CoordinateContext
+): { type: 'hex'; h3: H3Index } | { type: 'unitId'; id: string } {
+  const hasHex = input.targetHexCode !== undefined;
+  const hasUnit = input.targetUnitId !== undefined;
+  if (hasHex === hasUnit) {
+    throw new Error('Exactly one of targetHexCode or targetUnitId is required');
+  }
+  if (hasHex) {
+    if (typeof input.targetHexCode !== 'string' || !HEX_CODE_PATTERN.test(input.targetHexCode)) {
+      throw new Error(`Invalid targetHexCode: ${JSON.stringify(input.targetHexCode)}`);
     }
-    // Does not match hex code format — treat as unit ID
-    return { type: 'unitId', id: value };
+    if (!isValidHexCode(input.targetHexCode, context)) {
+      throw new Error(`Unknown hex code in active context: "${input.targetHexCode}"`);
+    }
+    return { type: 'hex', h3: codeToH3(input.targetHexCode, context) };
   }
-  // Legacy fallback during migration: accept [lat, lng] arrays
-  // with a deprecation warning. Remove after migration is verified.
-  if (Array.isArray(value) && value.length === 2) {
-    console.warn('Legacy [lat, lng] coordinate in LLM response — migrate to hex codes');
-    return { type: 'hex', h3: latLngToH3(value[0], value[1]) };
+  if (typeof input.targetUnitId !== 'string' || input.targetUnitId.length === 0) {
+    throw new Error(`Invalid targetUnitId: ${JSON.stringify(input.targetUnitId)}`);
   }
-  throw new Error(`Unexpected destination format: ${JSON.stringify(value)}`);
+  return { type: 'unitId', id: input.targetUnitId };
 }
 ```
 
-**Migration safety:** Keep the legacy `[lat, lng]` fallback in the parser during initial testing. This lets you run the new prompt format while catching any edge case where the LLM reverts to lat/lng. Log a warning when the fallback triggers. Remove the fallback once testing confirms the LLM consistently uses hex codes.
+**Migration safety:** Hard cutover for unreleased software. Reject legacy `[lat, lng]` arrays immediately with a clear error.
 
 ### 5E: Prompt Content Migration
 
@@ -775,8 +902,9 @@ The tool schema definitions (JSON schemas provided to the LLM for tool calling) 
 **5C/5D (Response parsing):**
 1. Parse a well-formed response JSON with hex codes. Verify all coordinates are correctly translated to H3 indices internally.
 2. Parse a response with an invalid hex code. Verify the parser rejects it with a useful error message.
-3. Parse a response with a unit ID in a `targetHex` field. Verify it passes through correctly (not misinterpreted as a hex code).
-4. Parse a legacy response with `[lat, lng]` arrays. Verify the fallback triggers and logs a warning.
+3. Parse a response with `targetUnitId`. Verify it passes through correctly.
+4. Parse a response that sets both `targetHexCode` and `targetUnitId`. Verify parser rejects it.
+5. Parse a legacy response with `[lat, lng]` arrays. Verify parser rejects it with a clear hard-cutover error.
 
 **5E (Prompt content):**
 1. Search the complete generated prompt for any remaining `[lat, lng]` patterns (regex: `\[\s*-?\d+\.\d+\s*,\s*-?\d+\.\d+\s*\]`). The search should return zero matches.
@@ -879,8 +1007,8 @@ Each existing section builder function also needs updating to call `h3ToCode()` 
 
 3. **The "how to use tools" section** — note that the map shows spatial relationships and the LLM should use the map for strategic assessment and the this-turn options table for tactical decisions, rather than calling `assess_hex` or `assess_unit` for information the briefing already provides.
 
-4. **The `targetHex` disambiguation rule:**
-   > *"In `targetHex` fields, use a hex code to target a position, or a unit ID string (e.g., `human-armor-1`) to target a specific unit. Hex codes are exactly 2 uppercase alphanumeric characters (e.g., `CF`, `A3`, `7B`). Anything else is treated as a unit ID."*
+4. **Explicit target fields rule:**
+   > *"Use `targetHexCode` to target a position and `targetUnitId` to target a unit. Provide exactly one where targeting applies. Hex codes are exactly 2 uppercase alphanumeric characters (e.g., `CF`, `A3`, `7B`) and must exist in the active map context."*
 
 ### Verification
 
@@ -917,7 +1045,7 @@ Each existing section builder function also needs updating to call `h3ToCode()` 
 
 1. **Hex count.** A single res1 hex contains ~343 res4 children. The ASCII map for a tactical battle is roughly 20×17 hexes. At 3 characters per cell (2 code chars + 1 space) × 17 columns, each row pair is ~50 characters. 20 rows = 40 lines. This is compact enough for the context window.
 
-2. **Coordinate codes.** With 343 hexes per parent, the existing 2-character alphanumeric scheme (36² = 1,296 codes) covers res4 comfortably. The same `initCoordinateRegistry()` approach works — sort res4 hex centers within the parent res1 hex, assign codes. Codes only need to be stable within a single tactical battle, not globally. The res1 and res4 code spaces are independent — code `A3` at the global level is a different hex than code `A3` within a tactical battle.
+2. **Coordinate codes.** With 343 hexes per parent, the existing 2-character alphanumeric scheme (36² = 1,296 codes) covers res4 comfortably. The same `initCoordinateRegistry()` approach works — sort res4 hex centers within the parent res1 hex, assign codes. Codes only need to be stable within a single tactical battle, not globally. The res1 and res4 code spaces are independent — code `A3` at the global level is a different hex than code `A3` within a tactical battle. This remains safe because all lookups are context-bound (`strategic` global registry vs active tactical battle registry) and cross-context lookups must fail fast.
 
 3. **Unit count.** Tactical sub-units (12 infantry sub-units, 6 armor sub-units, etc.) can exceed 26, so single-letter designators on the map won't work — confirming the design decision to use presence markers (`*`, `!`, `#`) rather than unit designators on the map.
 
@@ -930,9 +1058,42 @@ A short section added to this document (or a separate design note) confirming:
 - The coordinate scheme scales.
 - Any res4-specific rendering decisions (e.g., whether to show terrain type or keep it binary) are documented as deferred decisions with clear criteria for when to revisit.
 
+### Phase 7 review completion (recorded)
+
+Implementation review against the goals above (design-only phase; no new gameplay code required):
+
+- **2×2 cell format at res4:** The shipped renderer (`hex-map-renderer.ts`) keeps the 2×2 code + terrain/overlay layout; tactical consultations use a per-battle res4 registry (`initTacticalCoordinateRegistry` in `hex-coordinates.ts`) so map density stays within the same structural format without a redesign.
+- **Coordinate scheme:** Context-bound lookups (`CoordinateContext`: strategic res1 vs tactical res4 + `battleId`) preserve disjoint code spaces; cross-context misuse is rejected at translator/parser boundaries.
+- **Unit markers:** Presence markers (`*`, `!`, `#`) remain the chosen approach for crowded tactical unit counts rather than per-unit letters on the grid.
+- **Terrain alphabet (deferred):** Binary land/water (`x` / `.`) stays the default until tactical combat modifiers justify a richer terrain symbol set; any expansion must avoid characters already reserved for infrastructure overlays (A/a, S/s, B/b, U/u) and presence markers.
+
 ---
 
 ## Implementation Notes for the Coding Agent
+
+### Cross-Cutting Implementation Contract (Required)
+
+These constraints are mandatory acceptance criteria for all phases:
+
+1. **Logging policy**
+   - Every new or updated public backend method invocation logs at debug level.
+   - Every caught exception logs at error level with actionable context.
+   - Every new or updated getter-style non-mutating method logs at trace level.
+   - Use existing logging APIs directly; do not add redundant level checks unless constructing unusually large inline strings.
+
+2. **Orienting comments**
+   - All new and updated fields and non-overriding methods (any visibility/cardinality) include orienting comments.
+   - Interface/abstract comments describe contract; implementation comments describe high-level behavior and expectations.
+
+3. **Testing scope**
+   - Test happy paths and essential failure contracts only.
+   - Avoid tests for boilerplate accessors/DTO plumbing/controller pass-through behavior.
+   - Remove tests made unnecessary by these scope rules.
+
+4. **Maintainability constraints**
+   - Target source file size under 600 lines (hard limit 1000); decompose before exceeding limits.
+   - Target no more than 6 named parameters (hard limit 10); use decomposition or parameter objects when needed.
+   - Prefer reusable components/utilities where this does not compromise reliability/performance/UX.
 
 ### Dependencies
 
@@ -996,9 +1157,8 @@ Phase 2 (Grid Projection)          — depends on Phase 1 for hex codes
   ↓
 Phase 3 (Map Renderer)             — depends on Phase 2 for grid layout
   ↓
-Phase 4 (Supporting Tables)        — depends on Phase 1 for hex codes
-  ↓                                   (can run in parallel with Phase 3
-  ↓                                    once Phase 1 is complete)
+Phase 4 (Supporting Tables)        — depends on Phases 1–3 outputs
+  ↓
 Phase 5A (Translation Layer)       — depends on Phase 1 for registry
   ↓
 Phase 5B (Tool Schema Migration)   — depends on Phase 5A
@@ -1011,12 +1171,17 @@ Phase 6 (Integration)              — depends on all prior phases
 Phase 7 (Res4 Review)              — design only, no code dependency
 ```
 
-Phases 3, 4, and 5A can be developed in parallel once Phase 2 is complete (all depend on Phase 1, not on each other). Phase 5B–5E can be developed in parallel once 5A is complete. Phase 6 is the integration point. Phase 7 is a review checkpoint with no code output.
+Although some phases are technically parallelizable, this plan must be executed sequentially for maximum reliability with lower-capability agents. Phase 6 remains the integration point. Phase 7 is a review checkpoint with no code output.
 
-**Recommended execution order for a single developer:**
-1. Phase 1 → Phase 2 → Phase 3 (the visual pipeline — produces a visible, testable map)
-2. Phase 5A (translation layer — small, self-contained, heavily tested)
-3. Phase 4 (tables — can now use the translation layer for hex codes)
-4. Phase 5B → 5D (tool and parser migration — mechanical, builds on 5A)
-5. Phase 5E → Phase 6 (prompt migration and integration — the big wiring step)
-6. Phase 7 (design review)
+**Mandatory execution order (reliability-first):**
+1. Phase 1 — Coordinate Registry
+2. Phase 2 — Grid Projection (including wrapped-longitude handling)
+3. Phase 3 — Map Renderer (including discovery-gated `?` overlay)
+4. Phase 4 — Supporting Tables
+5. Phase 5A — Translation Layer (context-bound lookups)
+6. Phase 5B — Tool Schema Migration
+7. Phase 5C — Response Schema Migration
+8. Phase 5D — Response Parser Migration (hard cutover, explicit targets)
+9. Phase 5E — Prompt Content Migration
+10. Phase 6 — Briefing Integration
+11. Phase 7 — Res4 Scalability Review (design only)

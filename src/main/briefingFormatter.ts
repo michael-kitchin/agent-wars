@@ -8,10 +8,16 @@ import type { GameStateSnapshot } from './gameDb';
 import type { AiLossEventSinceConsultation } from './gameDb';
 import type { PrecomputationResult, UnitAssessmentResult, HexAssessmentEntry } from './precomputation';
 import type { CallbackSubscription } from './callbackSubscriptions';
-import { cellToLatLng } from 'h3-js';
+import { cellToLatLng, latLngToCell } from 'h3-js';
 import { LATLNG_DECIMAL_PLACES } from './mapData';
 import { logTrace } from './logger';
-import { buildPossibleUnitActionsMarkdown } from './openrouter/possibleUnitActions';
+import {
+  buildStrategicOperationalMapSectionMarkdown,
+  buildTacticalOperationalMapSectionMarkdown,
+} from './briefing/map/briefing-map-section';
+import { ensureStrategicCoordinateRegistryInitialized } from './briefing/map/hex-coordinates';
+import { h3ToCode } from './briefing/map/hex-code-translator';
+import type { CoordinateContext } from './briefing/map/coordinateContext';
 
 /**
  * Documents the module-scope binding `WARNING_STATUSES` (WARNING_STATUSES).
@@ -38,8 +44,13 @@ const WARNING_STATUSES = new Set([
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function formatPos(ll: [number, number]): string {
-  return `[${ll[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${ll[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
+function formatPosStrategicHex(ll: [number, number], ctx: CoordinateContext): string {
+  try {
+    const h3 = latLngToCell(ll[0], ll[1], ctx.mode === 'strategic' ? 1 : 4);
+    return h3ToCode(h3, ctx);
+  } catch {
+    return `[${ll[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${ll[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
+  }
 }
 
 /**
@@ -86,9 +97,12 @@ function markdownHeading2(title: string): string {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function formatTerritoryTarget(hexId: string, latLngByH3: Map<string, [number, number]>): string {
-  const ll = latLngByH3.get(hexId);
-  return ll ? formatPos(ll) : 'specified territory';
+function formatTerritoryTarget(hexId: string, ctx: CoordinateContext): string {
+  try {
+    return h3ToCode(hexId, ctx);
+  } catch {
+    return 'specified territory';
+  }
 }
 
 /**
@@ -99,20 +113,21 @@ function formatTerritoryTarget(hexId: string, latLngByH3: Map<string, [number, n
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function sanitizeCallbackParamsForPrompt(
-  params: unknown,
-  latLngByH3: Map<string, [number, number]>
-): unknown {
+function sanitizeCallbackParamsForPrompt(params: unknown, ctx: CoordinateContext): unknown {
   if (typeof params === 'string') {
-    return latLngByH3.has(params) ? formatTerritoryTarget(params, latLngByH3) : params;
+    try {
+      return h3ToCode(params, ctx);
+    } catch {
+      return params;
+    }
   }
   if (Array.isArray(params)) {
-    return params.map((x) => sanitizeCallbackParamsForPrompt(x, latLngByH3));
+    return params.map((x) => sanitizeCallbackParamsForPrompt(x, ctx));
   }
   if (params && typeof params === 'object') {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(params as Record<string, unknown>)) {
-      out[k] = sanitizeCallbackParamsForPrompt(v, latLngByH3);
+      out[k] = sanitizeCallbackParamsForPrompt(v, ctx);
     }
     return out;
   }
@@ -158,7 +173,7 @@ function buildStrategicNarrative(
     sentences.push(`${critical} unit(s) face a critical threat and require immediate attention.`);
   }
   sentences.push(
-    'Review the unit status table, attention flags, and possible unit actions below, then issue movement, ranged attacks, and air strikes as permitted this turn.'
+    'Review the unit status table, attention flags, and operational map below, then issue movement, ranged attacks, and air strikes as permitted this turn.'
   );
   return sentences.slice(0, 5).join(' ');
 }
@@ -205,7 +220,7 @@ function isQuiet(assessment: UnitAssessmentResult): boolean {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function formatOrderCell(assessment: UnitAssessmentResult): string {
+function formatOrderCell(assessment: UnitAssessmentResult, ctx: CoordinateContext): string {
   const order = assessment.result.unit?.currentStandingOrder as
     | { type?: string; destination?: [number, number]; defendHex?: [number, number]; status?: string }
     | null
@@ -213,8 +228,8 @@ function formatOrderCell(assessment: UnitAssessmentResult): string {
   if (!order) return '—';
   const type = (order.type ?? '').toUpperCase();
   let dest = '';
-  if (order.destination) dest = ` to ${formatPos(order.destination)}`;
-  if (order.defendHex) dest = ` ${formatPos(order.defendHex)}`;
+  if (order.destination) dest = ` to ${formatPosStrategicHex(order.destination, ctx)}`;
+  if (order.defendHex) dest = ` ${formatPosStrategicHex(order.defendHex, ctx)}`;
   const status = order.status ?? '';
   return `${type}${dest} — ${status}`.trim() || '—';
 }
@@ -228,17 +243,18 @@ function formatOrderCell(assessment: UnitAssessmentResult): string {
  * Exceptions: None.
  */
 function buildUnitStatusTable(
-  unitAssessments: UnitAssessmentResult[]
+  unitAssessments: UnitAssessmentResult[],
+  ctx: CoordinateContext
 ): string {
   const header =
-    '| Unit ID | Position | Standing order + status | Nearest enemy + distance | Threat severity | Action needed |';
-  const sep = '|---------|----------|------------------------|---------------------------|-----------------|---------------|';
+    '| Unit ID | Hex | Standing order + status | Nearest enemy + distance | Threat severity | Action needed |';
+  const sep = '|---------|-----|------------------------|---------------------------|-----------------|---------------|';
   const rows: string[] = [];
   for (const a of unitAssessments) {
     const pos = Array.isArray(a.result.unit?.position)
-      ? formatPos(a.result.unit.position as [number, number])
+      ? formatPosStrategicHex(a.result.unit.position as [number, number], ctx)
       : '—';
-    const orderCell = formatOrderCell(a);
+    const orderCell = formatOrderCell(a, ctx);
     const nearest = a.result.nearbyEnemies?.[0];
     const nearestStr = nearest
       ? `${formatUnitDisplayRef(nearest.unitId)} @ ${nearest.hexDistance} (${nearest.confidence ?? 'current'}${nearest.lastSeen != null ? `, seen t${nearest.lastSeen}` : ''})`
@@ -272,11 +288,11 @@ function buildUnitStatusTable(
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntry[]): string {
+function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntry[], ctx: CoordinateContext): string {
   if (hexAssessments.length === 0) return '';
   const bullets: string[] = [];
   for (const entry of hexAssessments) {
-    const posStr = formatPos(entry.position);
+    const posStr = formatPosStrategicHex(entry.position, ctx);
     const r = entry.result;
     const terrain = typeof r.terrain === 'string' ? r.terrain : 'unknown';
     const passableBy = Array.isArray(r.passableBy) ? (r.passableBy as string[]).join(', ') : '';
@@ -352,7 +368,7 @@ function buildAttentionFlags(
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function formatCallbackLine(sub: CallbackSubscription, latLngByH3: Map<string, [number, number]>): string {
+function formatCallbackLine(sub: CallbackSubscription, ctx: CoordinateContext): string {
   const n = sub.params?.n as number | undefined;
   if (sub.event === 'turns' && typeof n === 'number' && sub.subscribedTurn != null) {
     return `turns(${n}) → fires turn ${sub.subscribedTurn + n}`;
@@ -368,9 +384,9 @@ function formatCallbackLine(sub: CallbackSubscription, latLngByH3: Map<string, [
   }
   if (sub.event === 'territory_changed') {
     const hexId = sub.params?.hexId != null ? String(sub.params.hexId) : '';
-    return hexId ? `territory_changed(${formatTerritoryTarget(hexId, latLngByH3)})` : 'territory_changed';
+    return hexId ? `territory_changed(${formatTerritoryTarget(hexId, ctx)})` : 'territory_changed';
   }
-  const sanitizedParams = sanitizeCallbackParamsForPrompt(sub.params ?? {}, latLngByH3);
+  const sanitizedParams = sanitizeCallbackParamsForPrompt(sub.params ?? {}, ctx);
   return `${sub.event}(${JSON.stringify(sanitizedParams)})`;
 }
 
@@ -382,16 +398,13 @@ function formatCallbackLine(sub: CallbackSubscription, latLngByH3: Map<string, [
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function buildActiveCallbacksSection(
-  subscriptions: CallbackSubscription[],
-  latLngByH3: Map<string, [number, number]>
-): string {
+function buildActiveCallbacksSection(subscriptions: CallbackSubscription[], ctx: CoordinateContext): string {
   const header = '| Event | Details |';
   const sep = '| --- | --- |';
   if (subscriptions.length === 0) {
     return `${header}\n${sep}\n| — | None. You may add callbacks in your response JSON to be consulted on specific events. |`;
   }
-  const rows = subscriptions.map((s) => `| ${s.event} | ${formatCallbackLine(s, latLngByH3)} |`);
+  const rows = subscriptions.map((s) => `| ${s.event} | ${formatCallbackLine(s, ctx)} |`);
   return [header, sep, ...rows].join('\n');
 }
 
@@ -419,6 +432,8 @@ export function formatBriefing(
     callbackCount: subscriptions?.length ?? 0,
     hasProductionText: productionText.trim().length > 0,
   });
+  ensureStrategicCoordinateRegistryInitialized();
+  const coordCtx: CoordinateContext = { mode: 'strategic' };
   const latLngByH3 = new Map<string, [number, number]>();
   for (const hx of state.hexes) {
     const [lat, lng] = cellToLatLng(hx.h3Index);
@@ -428,19 +443,14 @@ export function formatBriefing(
   sections.push(markdownHeading1("Commander's Briefing"));
   sections.push(buildStrategicNarrative(state, precomputed.unitAssessments));
   sections.push(markdownHeading2('Unit Status and Threats'));
-  sections.push(buildUnitStatusTable(precomputed.unitAssessments));
+  sections.push(buildUnitStatusTable(precomputed.unitAssessments, coordCtx));
   sections.push(markdownHeading2('Attention Flags'));
   sections.push(buildAttentionFlags(precomputed.unitAssessments));
-  const possibleActions = buildPossibleUnitActionsMarkdown({
-    state,
-    latLngByH3,
-    formatLatLng: formatPos,
-  });
-  if (possibleActions.trim().length > 0) {
-    sections.push('\n\n' + markdownHeading1('Possible Unit Actions'));
-    sections.push(possibleActions.trim());
+  const operational = buildStrategicOperationalMapSectionMarkdown({ state, precomputed, latLngByH3 });
+  if (operational.trim().length > 0) {
+    sections.push('\n\n' + operational.trim());
   }
-  const supplementalHex = buildSupplementalHexIntelligenceBlock(precomputed.hexAssessments);
+  const supplementalHex = buildSupplementalHexIntelligenceBlock(precomputed.hexAssessments, coordCtx);
   if (supplementalHex.trim().length > 0) {
     sections.push(supplementalHex);
   }
@@ -464,6 +474,6 @@ export function formatBriefing(
   sections.push('\n\n');
   sections.push(standingOrderText || '');
   sections.push(markdownHeading2('Active Callbacks'));
-  sections.push(buildActiveCallbacksSection(subscriptions ?? [], latLngByH3));
+  sections.push(buildActiveCallbacksSection(subscriptions ?? [], coordCtx));
   return sections.join('');
 }

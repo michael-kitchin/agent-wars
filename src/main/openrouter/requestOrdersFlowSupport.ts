@@ -190,6 +190,18 @@ export function getAiPathfindingTurnAggregateMetrics(turnNumber: number): AiPath
  * Expected outcome: True for 1/true/yes/on (case-insensitive) after trim and optional quote strip.
  * Exceptions: None.
  */
+/**
+ * Reports whether full prompt text should be written to disk (`debug-last-*-prompt.txt`).
+ *
+ * Purpose: Lets `requestOrdersFlow` decide when to attach optional diagnostic-only map content without duplicating env parsing.
+ * When to use: Before building a supplemental operational map section for full-disk prompt capture.
+ * Expected outcome: True when `AGENT_WARS_LOG_FULL_PROMPTS` is set to 1/true/yes/on (case-insensitive).
+ * Exceptions: None.
+ */
+export function isAgentWarsFullPromptLoggingEnabled(): boolean {
+  return isFullLogEnvEnabled(FULL_PROMPT_LOG_ENV_FLAG);
+}
+
 function isFullLogEnvEnabled(flagName: string): boolean {
   let v = process.env[flagName]?.trim();
   if (v === undefined || v.length === 0) return false;
@@ -230,14 +242,22 @@ function writeFullLogArtifact(fileName: string, content: string): string | null 
  * Expected outcome: `logDebug` with preview or full metadata; optional file write.
  * Exceptions: None.
  */
-export function logPromptPreview(label: string, content: string): void {
+export function logPromptPreview(label: string, content: string, supplementalDiskOnlyBody?: string): void {
   const fullPromptLoggingEnabled = isFullLogEnvEnabled(FULL_PROMPT_LOG_ENV_FLAG);
   if (fullPromptLoggingEnabled) {
     const fileName = label.includes('user message')
       ? 'debug-last-user-prompt.txt'
       : 'debug-last-system-prompt.txt';
-    const absPath = writeFullLogArtifact(fileName, content);
-    logDebug(`${label} (full)`, { chars: content.length, writtenTo: absPath ?? '(write failed)' });
+    const diskBody =
+      supplementalDiskOnlyBody != null && supplementalDiskOnlyBody.trim().length > 0
+        ? `${content}\n\n---\n\n## Full-prompt log supplement (not sent to the model)\n\n${supplementalDiskOnlyBody.trim()}`
+        : content;
+    const absPath = writeFullLogArtifact(fileName, diskBody);
+    logDebug(`${label} (full)`, {
+      chars: content.length,
+      diskChars: diskBody.length,
+      writtenTo: absPath ?? '(write failed)',
+    });
     return;
   }
   const preview = content.slice(0, FULL_PROMPT_LOG_PREVIEW_CHARS);

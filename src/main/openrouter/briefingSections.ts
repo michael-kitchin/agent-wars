@@ -220,7 +220,7 @@ hasQueuedEntries: boolean;
 }
 
 /**
- * Defines the `normalizeControlledHexQueueRow` function shape (function normalizeControlledHexQueueRow( row: ControlledHexQueueSnapshot, formatLatLng: (ll: [number, number]) => string ): NormalizedControlledHexQueueR).
+ * Defines the `normalizeControlledHexQueueRow` function shape (function normalizeControlledHexQueueRow( row: ControlledHexQueueSnapshot, formatHexLabel: (ll: [number, number]) => string ): NormalizedControlledHexQueueR).
 
  * Purpose: Supports maintainability by documenting why `normalizeControlledHexQueueRow` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -229,10 +229,10 @@ hasQueuedEntries: boolean;
  */
 function normalizeControlledHexQueueRow(
   row: ControlledHexQueueSnapshot,
-  formatLatLng: (ll: [number, number]) => string
+  formatHexLabel: (ll: [number, number]) => string
 ): NormalizedControlledHexQueueRow {
   const hex = Array.isArray(row.hex) ? (row.hex as [number, number]) : null;
-  const hexText = hex ? formatLatLng(hex) : '[unknown]';
+  const hexText = hex ? formatHexLabel(hex) : '[unknown]';
   const urban = Number(row.urbanHexCount ?? 0);
   const airports = Number(row.airportCount ?? 0);
   const seaports = Number(row.seaportCount ?? 0);
@@ -280,7 +280,7 @@ export function buildProductionBriefingBlock(args: {
   state: GameStateSnapshot;
   latLngByH3: Map<string, [number, number]>;
   resolveToH3: (lat: number, lng: number) => string | undefined;
-  formatLatLng: (ll: [number, number]) => string;
+  formatHexLabel: (ll: [number, number]) => string;
 }): string {
   if (!args.productionEnabled) return '';
   const snapshot = executeTool6('query_production', { all: true }, args.state, args.latLngByH3, args.resolveToH3) as {
@@ -322,7 +322,7 @@ export function buildProductionBriefingBlock(args: {
   lines.push('## Controlled Hex Queues');
   lines.push('');
   const normalizedRows = (queues as ControlledHexQueueSnapshot[]).map((row) =>
-    normalizeControlledHexQueueRow(row, args.formatLatLng)
+    normalizeControlledHexQueueRow(row, args.formatHexLabel)
   );
   normalizedRows.sort((a, b) => {
     if (a.urban !== b.urban) return b.urban - a.urban;

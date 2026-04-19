@@ -5,15 +5,15 @@
 
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
+import type { CoordinateContext } from '../briefing/map/coordinateContext';
+import { HEX_CODE_PATTERN } from '../briefing/map/coordinateContext';
+import { codeToH3, codeToLatLngRounded } from '../briefing/map/hex-code-translator';
 import type { CallbackSubscription } from '../callbackSubscriptions';
 import type { LatLng } from '../tools/tool1Pathfinding';
 import { executeTool5 } from '../tools/tool5StandingOrders';
 import { executeTool6 } from '../tools/tool6Production';
 import { normalizeProductionOrders } from '../productionOrders';
 import type { AirStrikeOrder, AirStrikeTargetType, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
-import { formatLatLng } from './promptText';
-import { LATLNG_DECIMAL_PLACES } from '../mapData';
-
 /**
  * Documents the `MemoryUpdateItem` interface as a named contract surface (export interface MemoryUpdateItem).
 
@@ -316,8 +316,8 @@ function normalizeMemoryUpdates(raw: unknown): MemoryUpdateItem[] {
  */
 export function buildJsonAssistantRepairSchema(includeProductionOrders: boolean): string {
   return includeProductionOrders
-    ? `{"strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":[lat,lng]}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":[lat,lng]},{"unitId":"opponent-armor-1","action":"ranged_attack","targetHex":[lat,lng]},{"unitId":"opponent-armor-1","action":"cancel_order"}],"airStrikes":[{"unitId":"opponent-air-1","targetHex":[lat,lng],"targetType":"units"}],"ferryOrders":[{"unitId":"opponent-air-2","destination":[lat,lng]}],"callbacks":[],"memoryUpdates":[],"productionOrders":[{"action":"set_build_queue","hex":[lat,lng],"unitType":"infantry","count":1}]}`
-    : `{"strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":[lat,lng]}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":[lat,lng]},{"unitId":"opponent-armor-1","action":"ranged_attack","targetHex":[lat,lng]},{"unitId":"opponent-armor-1","action":"cancel_order"}],"airStrikes":[{"unitId":"opponent-air-1","targetHex":[lat,lng],"targetType":"units"}],"ferryOrders":[{"unitId":"opponent-air-2","destination":[lat,lng]}],"callbacks":[],"memoryUpdates":[]}`;
+    ? `{"strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":"CF"}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":"CG"},{"unitId":"opponent-armor-1","action":"ranged_attack","targetHexCode":"CH"},{"unitId":"opponent-armor-1","action":"cancel_order"}],"airStrikes":[{"unitId":"opponent-air-1","targetHexCode":"CI","targetType":"units"}],"ferryOrders":[{"unitId":"opponent-air-2","destination":"CJ"}],"callbacks":[],"memoryUpdates":[],"productionOrders":[{"action":"set_build_queue","hex":"CF","unitType":"infantry","count":1}]}`
+    : `{"strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":"CF"}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":"CG"},{"unitId":"opponent-armor-1","action":"ranged_attack","targetHexCode":"CH"},{"unitId":"opponent-armor-1","action":"cancel_order"}],"airStrikes":[{"unitId":"opponent-air-1","targetHexCode":"CI","targetType":"units"}],"ferryOrders":[{"unitId":"opponent-air-2","destination":"CJ"}],"callbacks":[],"memoryUpdates":[]}`;
 }
 
 /**
@@ -342,40 +342,19 @@ function hasNonEmptyLegacyTopLevel(obj: Record<string, unknown>): boolean {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function resolveExplicitRangedTarget(
-  target: unknown,
-  state: GameStateSnapshot,
-  resolveToH3: (lat: number, lng: number) => string | undefined
-): string | undefined {
+function resolveExplicitRangedTarget(target: unknown, state: GameStateSnapshot, context: CoordinateContext): string | undefined {
   if (typeof target === 'string') {
+    if (HEX_CODE_PATTERN.test(target)) {
+      try {
+        return codeToH3(target, context);
+      } catch {
+        return undefined;
+      }
+    }
     const u = state.units.find((x) => x.id === target);
     return u?.h3Index;
   }
-  if (Array.isArray(target) && target.length >= 2) {
-    const lat = Number(target[0]);
-    const lng = Number(target[1]);
-    if (Number.isFinite(lat) && Number.isFinite(lng)) return resolveToH3(lat, lng);
-  }
   return undefined;
-}
-
-/**
- * Defines the `resolveLatLngToH3` function shape (function resolveLatLngToH3().
-
- * Purpose: Supports maintainability by documenting why `resolveLatLngToH3` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function resolveLatLngToH3(
-  point: unknown,
-  resolveToH3: (lat: number, lng: number) => string | undefined
-): string | undefined {
-  if (!Array.isArray(point) || point.length < 2) return undefined;
-  const lat = Number(point[0]);
-  const lng = Number(point[1]);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
-  return resolveToH3(lat, lng);
 }
 
 /**
@@ -422,11 +401,13 @@ function normalizeOrderEntries<T>(
  */
 function normalizeAirStrikeOrders(
   entries: unknown,
-  resolveToH3: (lat: number, lng: number) => string | undefined
+  state: GameStateSnapshot,
+  context: CoordinateContext
 ): { airStrikes: AirStrikeOrder[]; dropReasons: string[] } {
   const normalized = normalizeOrderEntries<AirStrikeOrder>(entries, {
     expectedObjectDropReason: 'airStrikes entry dropped: expected object.',
-    missingFieldsDropReason: 'airStrikes entry dropped: requires unitId, targetType, and valid targetHex [lat,lng].',
+    missingFieldsDropReason:
+      'airStrikes entry dropped: requires unitId, targetType, and exactly one of targetHexCode or targetUnitId.',
     normalizeOne: (raw) => {
       const unitId = typeof raw.unitId === 'string' ? raw.unitId.trim() : '';
       const targetTypeRaw = typeof raw.targetType === 'string' ? raw.targetType.trim().toLowerCase() : '';
@@ -434,7 +415,23 @@ function normalizeAirStrikeOrders(
         targetTypeRaw === 'units' || targetTypeRaw === 'urban' || targetTypeRaw === 'airport' || targetTypeRaw === 'seaport'
           ? targetTypeRaw
           : undefined;
-      const targetH3Index = resolveLatLngToH3(raw.targetHex, resolveToH3);
+      const hexCode = (raw as { targetHexCode?: unknown }).targetHexCode;
+      const unitTarget = (raw as { targetUnitId?: unknown }).targetUnitId;
+      const hasHex = typeof hexCode === 'string' && HEX_CODE_PATTERN.test(hexCode);
+      const hasUnit = typeof unitTarget === 'string' && unitTarget.trim().length > 0;
+      if (hasHex === hasUnit) return null;
+      let targetH3Index: string | undefined;
+      if (hasHex) {
+        try {
+          targetH3Index = codeToH3(hexCode, context);
+        } catch {
+          targetH3Index = undefined;
+        }
+      } else {
+        const tid = (unitTarget as string).trim();
+        const u = state.units.find((x) => x.id === tid);
+        targetH3Index = u?.h3Index;
+      }
       if (!unitId || !targetType || !targetH3Index) return null;
       return { unitId, targetH3Index, targetType };
     },
@@ -452,14 +449,21 @@ function normalizeAirStrikeOrders(
  */
 function normalizeFerryOrders(
   entries: unknown,
-  resolveToH3: (lat: number, lng: number) => string | undefined
+  context: CoordinateContext
 ): { ferryOrders: FerryOrder[]; dropReasons: string[] } {
   const normalized = normalizeOrderEntries<FerryOrder>(entries, {
     expectedObjectDropReason: 'ferryOrders entry dropped: expected object.',
-    missingFieldsDropReason: 'ferryOrders entry dropped: requires unitId and valid destination [lat,lng].',
+    missingFieldsDropReason: 'ferryOrders entry dropped: requires unitId and valid destination hex code.',
     normalizeOne: (raw) => {
       const unitId = typeof raw.unitId === 'string' ? raw.unitId.trim() : '';
-      const destinationH3Index = resolveLatLngToH3(raw.destination, resolveToH3);
+      const dest = raw.destination;
+      if (typeof dest !== 'string' || !HEX_CODE_PATTERN.test(dest)) return null;
+      let destinationH3Index: string | undefined;
+      try {
+        destinationH3Index = codeToH3(dest, context);
+      } catch {
+        destinationH3Index = undefined;
+      }
       if (!unitId || !destinationH3Index) return null;
       return { unitId, destinationH3Index };
     },
@@ -479,7 +483,8 @@ function processV3OrdersArray(
   entries: unknown[],
   state: GameStateSnapshot,
   latLngByH3: Map<string, LatLng>,
-  resolveToH3: (lat: number, lng: number) => string | undefined
+  resolveToH3: (lat: number, lng: number) => string | undefined,
+  context: CoordinateContext
 ): {
   movementOrders: { unitId: string; toH3Index: string }[];
   rangedAttacks: { unitId: string; targetH3Index: string }[];
@@ -496,7 +501,7 @@ function processV3OrdersArray(
       navalUnitId?: unknown;
       order?: unknown;
       destination?: unknown;
-      targetHex?: unknown;
+      targetHexCode?: unknown;
       targetUnitId?: unknown;
     };
     const action = o.action;
@@ -505,7 +510,20 @@ function processV3OrdersArray(
 
     if (action === 'assign_order') {
       logDebug('openRouter processV3OrdersArray: assign_order', { unitId });
-      executeTool5('assign_order', { unitId, order: o.order }, state, latLngByH3, resolveToH3);
+      let orderPayload: unknown = o.order;
+      if (orderPayload && typeof orderPayload === 'object' && !Array.isArray(orderPayload)) {
+        const ord = { ...(orderPayload as Record<string, unknown>) };
+        const dest = ord.destination;
+        if (typeof dest === 'string' && HEX_CODE_PATTERN.test(dest)) {
+          try {
+            ord.destination = codeToLatLngRounded(dest, context);
+          } catch {
+            logDebug('openRouter processV3OrdersArray: assign_order destination code invalid', { unitId, dest });
+          }
+        }
+        orderPayload = ord;
+      }
+      executeTool5('assign_order', { unitId, order: orderPayload }, state, latLngByH3, resolveToH3);
       continue;
     }
     if (action === 'cancel_order') {
@@ -515,21 +533,33 @@ function processV3OrdersArray(
     }
     if (action === 'explicit_move') {
       const dest = o.destination;
-      if (!Array.isArray(dest) || dest.length < 2) {
-        logDebug('openRouter processV3OrdersArray: explicit_move missing destination', { unitId });
+      if (typeof dest !== 'string' || !HEX_CODE_PATTERN.test(dest)) {
+        logDebug('openRouter processV3OrdersArray: explicit_move missing destination code', { unitId });
         continue;
       }
-      const lat = Number(dest[0]);
-      const lng = Number(dest[1]);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-      const h3 = resolveToH3(lat, lng);
+      let h3: string | undefined;
+      try {
+        h3 = codeToH3(dest, context);
+      } catch {
+        h3 = undefined;
+      }
       if (h3) movementOrders.push({ unitId, toH3Index: h3 });
-      else logDebug('openRouter processV3OrdersArray: explicit_move unresolved', { unitId, lat, lng });
+      else logDebug('openRouter processV3OrdersArray: explicit_move unresolved', { unitId, dest });
       continue;
     }
     if (action === 'ranged_attack') {
-      const attackTarget = o.targetHex ?? o.targetUnitId;
-      const targetH3 = resolveExplicitRangedTarget(attackTarget, state, resolveToH3);
+      const hexCode = o.targetHexCode;
+      const unitTarget = o.targetUnitId;
+      const hasHex = typeof hexCode === 'string' && HEX_CODE_PATTERN.test(hexCode);
+      const hasUnit = typeof unitTarget === 'string' && unitTarget.trim().length > 0;
+      if (hasHex === hasUnit) {
+        logDebug('openRouter processV3OrdersArray: ranged_attack requires exactly one target selector', { unitId });
+        continue;
+      }
+      const unitTargetId = typeof unitTarget === 'string' ? unitTarget.trim() : '';
+      const targetH3 = hasHex
+        ? resolveExplicitRangedTarget(hexCode, state, context)
+        : resolveExplicitRangedTarget(unitTargetId, state, context);
       if (targetH3) rangedAttacks.push({ unitId, targetH3Index: targetH3 });
       else logDebug('openRouter processV3OrdersArray: ranged_attack unresolved', { unitId });
       continue;
@@ -537,30 +567,34 @@ function processV3OrdersArray(
     if (action === 'transport_move') {
       const navalUnitId = typeof o.navalUnitId === 'string' ? o.navalUnitId : '';
       const dest = o.destination;
-      if (!navalUnitId || !Array.isArray(dest) || dest.length < 2) {
+      if (!navalUnitId || typeof dest !== 'string' || !HEX_CODE_PATTERN.test(dest)) {
         logDebug('openRouter processV3OrdersArray: transport_move missing fields', { unitId, navalUnitId });
         continue;
       }
-      const lat = Number(dest[0]);
-      const lng = Number(dest[1]);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-      const h3 = resolveToH3(lat, lng);
+      let h3: string | undefined;
+      try {
+        h3 = codeToH3(dest, context);
+      } catch {
+        h3 = undefined;
+      }
       if (h3) movementOrders.push({ unitId: navalUnitId, toH3Index: h3 });
-      else logDebug('openRouter processV3OrdersArray: transport_move unresolved', { navalUnitId, lat, lng });
+      else logDebug('openRouter processV3OrdersArray: transport_move unresolved', { navalUnitId, dest });
       continue;
     }
     if (action === 'disembark') {
       const dest = o.destination;
-      if (!Array.isArray(dest) || dest.length < 2) {
-        logDebug('openRouter processV3OrdersArray: disembark missing destination', { unitId });
+      if (typeof dest !== 'string' || !HEX_CODE_PATTERN.test(dest)) {
+        logDebug('openRouter processV3OrdersArray: disembark missing destination code', { unitId });
         continue;
       }
-      const lat = Number(dest[0]);
-      const lng = Number(dest[1]);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-      const h3 = resolveToH3(lat, lng);
+      let h3: string | undefined;
+      try {
+        h3 = codeToH3(dest, context);
+      } catch {
+        h3 = undefined;
+      }
       if (h3) movementOrders.push({ unitId, toH3Index: h3 });
-      else logDebug('openRouter processV3OrdersArray: disembark unresolved', { unitId, lat, lng });
+      else logDebug('openRouter processV3OrdersArray: disembark unresolved', { unitId, dest });
       continue;
     }
     if (action === 'embark') {
@@ -578,18 +612,6 @@ function processV3OrdersArray(
 }
 
 /**
- * Defines the `formatLatLngForDropMessage` function shape (function formatLatLngForDropMessage(ll: [number, number]): string).
-
- * Purpose: Supports maintainability by documenting why `formatLatLngForDropMessage` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function formatLatLngForDropMessage(ll: [number, number]): string {
-  return formatLatLng(ll, LATLNG_DECIMAL_PLACES);
-}
-
-/**
  * Defines the `processProductionOrdersArray` function shape (function processProductionOrdersArray( entries: unknown, state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: number, lng:).
 
  * Purpose: Supports maintainability by documenting why `processProductionOrdersArray` exists.
@@ -601,25 +623,33 @@ function processProductionOrdersArray(
   entries: unknown,
   state: GameStateSnapshot,
   latLngByH3: Map<string, LatLng>,
-  resolveToH3: (lat: number, lng: number) => string | undefined
+  resolveToH3: (lat: number, lng: number) => string | undefined,
+  context: CoordinateContext
 ): { appliedCount: number; droppedReasons: string[] } {
-  const normalized = normalizeProductionOrders(entries);
+  const normalized = normalizeProductionOrders(entries, context);
   const droppedReasons = [...normalized.droppedReasons];
   let appliedCount = 0;
   for (const order of normalized.validOrders) {
-    const args = { hex: order.hex, unitType: order.unitType, count: order.count };
+    let hexLatLng: [number, number];
+    try {
+      hexLatLng = codeToLatLngRounded(order.hex, context);
+    } catch {
+      droppedReasons.push(`production ${order.action} @ ${order.hex}: hex code could not be translated`);
+      continue;
+    }
+    const args = { hex: hexLatLng, unitType: order.unitType, count: order.count };
     const result = executeTool6(order.action, args, state, latLngByH3, resolveToH3) as { status?: string; error?: string };
     if (result.status === 'ok') {
       appliedCount += 1;
       continue;
     }
-    droppedReasons.push(`production ${order.action} @ ${formatLatLngForDropMessage(order.hex)}: ${result.error ?? 'failed'}`);
+    droppedReasons.push(`production ${order.action} @ ${order.hex}: ${result.error ?? 'failed'}`);
   }
   return { appliedCount, droppedReasons };
 }
 
 /**
- * Defines the `parseOrdersResponse` function shape (export function parseOrdersResponse( content: string, resolveToH3: (lat: number, lng: number) => string | undefined, state: GameStateSnapshot, latLn).
+ * Defines the `parseOrdersResponse` function shape (export function parseOrdersResponse( content, resolveToH3, state, latLngByH3, productionEnabled, context )).
 
  * Purpose: Supports maintainability by documenting why `parseOrdersResponse` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -631,7 +661,8 @@ export function parseOrdersResponse(
   resolveToH3: (lat: number, lng: number) => string | undefined,
   state: GameStateSnapshot,
   latLngByH3: Map<string, LatLng>,
-  productionEnabled: boolean
+  productionEnabled: boolean,
+  context: CoordinateContext
 ): {
   movementOrders: { unitId: string; toH3Index: string }[];
   rangedAttacks: { unitId: string; targetH3Index: string }[];
@@ -680,14 +711,15 @@ export function parseOrdersResponse(
           obj.orders as unknown[],
           state,
           latLngByH3,
-          resolveToH3
+          resolveToH3,
+          context
         );
-        const normalizedAirStrikes = normalizeAirStrikeOrders(obj.airStrikes, resolveToH3);
-        const normalizedFerryOrders = normalizeFerryOrders(obj.ferryOrders, resolveToH3);
+        const normalizedAirStrikes = normalizeAirStrikeOrders(obj.airStrikes, state, context);
+        const normalizedFerryOrders = normalizeFerryOrders(obj.ferryOrders, context);
         let productionDropReasons: string[] = [];
         let productionAppliedCount = 0;
         if (productionEnabled) {
-          const productionResult = processProductionOrdersArray(obj.productionOrders, state, latLngByH3, resolveToH3);
+          const productionResult = processProductionOrdersArray(obj.productionOrders, state, latLngByH3, resolveToH3, context);
           productionAppliedCount = productionResult.appliedCount;
           productionDropReasons = productionResult.droppedReasons;
         } else if (obj.productionOrders !== undefined) {

@@ -95,12 +95,26 @@ function resolveHexArgument(
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): { ok: true; h3Index: string } | { ok: false; error: string } {
   const rawHex = args.hex;
-  if (!Array.isArray(rawHex) || rawHex.length < 2) return { ok: false, error: 'hex must be [lat,lng].' };
+  if (!Array.isArray(rawHex) || rawHex.length < 2) {
+    return {
+      ok: false,
+      error:
+        'hex must be provided as a two-character briefing code from the operational map per the tool schema (decoded to a map cell before this check).',
+    };
+  }
   const lat = Number(rawHex[0]);
   const lng = Number(rawHex[1]);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { ok: false, error: 'hex must contain finite lat/lng values.' };
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return {
+      ok: false,
+      error:
+        'hex argument did not decode to usable numeric coordinates; pass a valid briefing hex code from the map or tables.',
+    };
+  }
   const h3Index = resolveToH3(lat, lng);
-  if (!h3Index) return { ok: false, error: 'hex does not resolve to a known map cell.' };
+  if (!h3Index) {
+    return { ok: false, error: 'hex did not resolve to a known map cell in the current briefing context.' };
+  }
   return { ok: true, h3Index };
 }
 

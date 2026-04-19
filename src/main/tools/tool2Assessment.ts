@@ -1,7 +1,7 @@
 /**
  * MCP Tool 2: Threat and Situation Assessment (assess_unit, assess_hex).
  * Implements the tool API per the MCP tools spec; uses pathfinding, combat constants, and game state.
- * All hex positions in tool responses are returned as [lat, lng]; H3 indices are never exposed.
+ * Internal assessment payloads use lat/lng tuples; values returned to the LLM are redacted to briefing hex codes via `encodeOpenRouterToolResultForLlm`.
  */
 
 import { cellToLatLng, gridDistance, gridDisk } from 'h3-js';
@@ -210,7 +210,7 @@ export function executeTool2(
         ? [Number((a.position as number[])[0]), Number((a.position as number[])[1])]
         : undefined;
       if (!posArr) {
-        return { status: 'error', error: 'assess_hex requires position as [lat, lng]' };
+        return { status: 'error', error: 'assess_hex requires position as a briefing hex code (decoded to a map cell before this tool runs).' };
       }
       const pos: LatLng = [posArr[0]!, posArr[1]!];
       const forUnitType = typeof a?.forUnitType === 'string' ? a.forUnitType : undefined;

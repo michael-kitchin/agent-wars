@@ -26,6 +26,7 @@ import {
 import { getFilteredToolMetadata } from './openRouterToolCatalog';
 import { getToolFlags } from './openRouterToolGroups';
 import { logDebug } from '../logger';
+import type { CoordinateContext } from '../briefing/map/coordinateContext';
 
 export function buildSystemPromptForTools(
   state: GameStateSnapshot,
@@ -35,13 +36,16 @@ export function buildSystemPromptForTools(
     resolveToH3: (lat: number, lng: number) => string | undefined;
   },
   enabledToolNames?: string[],
-  briefingOverride?: string
+  briefingOverride?: string,
+  coordinateContext: CoordinateContext = { mode: 'strategic' }
 ): string {
   logDebug('openRouter buildSystemPromptForTools', {
     turnNumber: state.turnNumber,
     phase: state.phase,
     toolNameCount: enabledToolNames?.length ?? 0,
     hasBriefingOverride: Boolean(briefingOverride?.length),
+    coordinateMode: coordinateContext.mode,
+    battleId: coordinateContext.battleId ?? null,
   });
   const { latLngByH3, format, resolveToH3 } = coordMap;
   const formatLatLng = (ll: [number, number]) => formatLatLngWithPrecision(ll, LATLNG_DECIMAL_PLACES);
@@ -95,14 +99,19 @@ ${toolsIntro}
 ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}`;
 
   const memoryBlock = flags.memoryEnabled ? getInjectionText('opponent', state.turnNumber) + '\n\n' : '';
-  const standingOrderBlock = flags.ordersEnabled ? getStandingOrderInjectionText('opponent', state) + '\n\n' : '';
+  const standingOrderBlock = flags.ordersEnabled
+    ? getStandingOrderInjectionText('opponent', state, coordinateContext) + '\n\n'
+    : '';
   const productionBlock = flags.productionEnabled
     ? buildProductionBriefingBlock({
         productionEnabled: flags.productionEnabled,
         state,
         latLngByH3,
         resolveToH3,
-        formatLatLng,
+        formatHexLabel: (ll) => {
+          const h3 = resolveToH3(ll[0], ll[1]);
+          return h3 ? format(h3) : formatLatLng(ll);
+        },
       }) + '\n\n'
     : '';
   const airOpsBlock = buildAirOperationsBriefingBlock(state, format) + '\n\n';
@@ -116,7 +125,7 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
     ? ` Naval units can attack land units at 1 or 2 hexes (range 2). Add ranged_attack when a naval unit is within 2 hexes of an enemy at turn start. ${NAVAL_MOVEMENT_PROMPT_RULE}${flags.planningEnabled ? NAVAL_PLAN_ROUTE_LAND_TARGET_HINT : ''}`
     : '';
   const combatAssessHint = flags.assessmentEnabled && hasRanged
-    ? ' When assess_unit reports canAttackThisTurn with attackType "ranged" for an enemy, add ranged_attack with targetHex as that enemy\'s [lat,lng] (or unit id).' +
+    ? ' When assess_unit reports canAttackThisTurn with attackType "ranged" for an enemy, add ranged_attack with targetHexCode as that enemy\'s cell code from the operational map (or targetUnitId).' +
       (hasNaval ? ' Naval inRangedRange: add ranged_attack for that naval unit.' : '') +
       ' Note: inEnemyRangedRange = enemy can fire at you; inRangedRange = you can fire at them.'
     : '';
@@ -157,8 +166,8 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
 - ${formatControlProgressLine('Controlled', controlledLandHexes, totalLandHexes, 'land hexes').slice(2)}${homeRegionOwnershipSummary}`;
   const scenarioObjectiveBlock = buildRegionVsRegionScenarioObjectiveBlock(state);
   const mainBlock = briefingOverride != null && briefingOverride.length > 0
-    ? `${briefingOverride}\n\n${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${strategicContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}`
-    : `${memoryBlock}${standingOrderBlock}${productionBlock}${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${strategicContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, position [lat, lng]): ${opponentRoster || 'none'}\n${humanUnitsLine}${adjacentCellsBlock}`;
+    ? `${briefingOverride}\n\n${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${strategicContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, briefing hex): ${opponentRoster || 'none'}\n${humanUnitsLine}`
+    : `${memoryBlock}${standingOrderBlock}${productionBlock}${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${strategicContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, briefing hex): ${opponentRoster || 'none'}\n${humanUnitsLine}${adjacentCellsBlock}`;
 
   const finalJsonContract = buildFinalJsonContractInstruction({
     includeMemoryUpdates: flags.memoryEnabled,
@@ -179,7 +188,7 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
 
 ${buildLatLngPreamble(H3_RESOLUTION, LATLNG_DECIMAL_PLACES)}
 
-Combat: d6 per shot — attack hits on roll ≤ attack stat; defense hits on roll ≤ defense. ${combatSummary}. Ranged uses pre-move positions. At most one ranged_attack per unit from turn-start range; targetHex is enemy [lat,lng] or enemy unit id (not your move destination)${combatTargetHint}. Infantry may use ranged_attack only at strategic range 1 (adjacent res1 hex); use movement and melee when that is not enough. If a legal ranged_attack or air strike is available this turn, take it — these attacks resolve from turn-start positions and do not prevent movement in the same turn. Drop invalid attacks before submit.${navalCoaching}${combatAssessHint}
+Combat: d6 per shot — attack hits on roll ≤ attack stat; defense hits on roll ≤ defense. ${combatSummary}. Ranged uses pre-move positions. At most one ranged_attack per unit from turn-start range; use exactly one of targetHexCode (enemy cell from the map) or targetUnitId (not your move destination)${combatTargetHint}. Infantry may use ranged_attack only at strategic range 1 (adjacent res1 hex); use movement and melee when that is not enough. If a legal ranged_attack or air strike is available this turn, take it — these attacks resolve from turn-start positions and do not prevent movement in the same turn. Drop invalid attacks before submit.${navalCoaching}${combatAssessHint}
 
 ${mainBlock}
 

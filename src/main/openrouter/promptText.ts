@@ -125,9 +125,9 @@ const PRODUCTION_REQUIREMENT_PRIORITY_INITIAL =
  * Exceptions: None.
  */
 export function buildLatLngPreamble(h3Resolution: number, decimalPlaces: number): string {
-  return `Global Earth map, H3 resolution ${h3Resolution}. All positions are [lat, lng] at ${decimalPlaces} decimal places — copy exactly from lists/tables below; never invent coordinates. Distances are hex counts where shown.
+  return `Global Earth map, H3 resolution ${h3Resolution}. Positions are two-character briefing hex codes (A–Z and 0–9) from the operational map and roster tables — copy exactly; never invent codes. Distances are hex counts where shown.
 
-Final JSON: place targets as [lat,lng]; standing-order pursue uses enemy unit id (targetUnitId). Never emit raw H3 strings.`;
+Final JSON: use briefing hex codes for cells; standing-order pursue uses enemy unit id (targetUnitId). Never emit raw H3 strings or latitude/longitude pairs.`;
 }
 
 /**
@@ -170,7 +170,7 @@ export function buildToolUsageGuidance(flags: PromptToolFlags, hasPrecomputedBri
     );
     if (flags.planningEnabled) {
       lines.push(
-        '- Use plan_route only when you need the exact orderToXY for a unit\'s move. Call it sparingly (e.g. one per unit that needs to move); the briefing already summarizes nearest enemies, distances, and legal tactical options. After you have orderToXY for each unit that needs orders, submit — do not re-assess or re-route.'
+        '- Use plan_route only when you need the exact orderToHexCode for a unit\'s move. Call it sparingly (e.g. one per unit that needs to move); the briefing already summarizes nearest enemies, distances, and legal tactical options. After you have orderToHexCode for each unit that needs orders, submit — do not re-assess or re-route.'
       );
     }
     if (flags.ordersEnabled) {
@@ -272,11 +272,11 @@ export function buildAdjacentCellsFallbackBlock(
 export function getMovementOrderInstruction(flags: PromptToolFlags): string {
   const memorySuffix = flags.memoryEnabled ? MOVEMENT_INSTRUCTION_MEMORY_SUFFIX : '';
   if (flags.planningEnabled) {
-    return ' For each explicit_move entry: set "destination" to the exact orderToXY from that unit\'s plan_route result [lat,lng] (copy the two numbers exactly).';
+    return ' For each explicit_move entry: set "destination" to the exact orderToHexCode from that unit\'s plan_route result (copy the two-character code exactly).';
   }
   if (flags.ordersEnabled) {
     return (
-      ' You have no movement planning tools: you cannot compute valid one-step explicit_move destinations yourself. Use assign_order in orders[] for standing missions; leave explicit_move / ranged_attack out unless you can copy valid [lat,lng] from the briefing only.' +
+      ' You have no movement planning tools: you cannot compute valid one-step explicit_move destinations yourself. Use assign_order in orders[] for standing missions; leave explicit_move / ranged_attack out unless you can copy valid briefing hex codes from the operational map only.' +
       memorySuffix
     );
   }
@@ -284,7 +284,7 @@ export function getMovementOrderInstruction(flags: PromptToolFlags): string {
     const memoryHint = flags.memoryEnabled ? ' After your analysis, add memoryUpdates in final JSON if needed. ' : '';
     return (
       memoryHint +
-      'Without planning/standing-order tools, use explicit_move with "destination" [lat,lng] only from the "Adjacent cells (fallback)" list (current cell = hold, or an adjacent listed cell).' +
+      'Without planning/standing-order tools, use explicit_move with "destination" set only to a briefing hex code from the "Adjacent cells (fallback)" list (current cell = hold, or an adjacent listed cell).' +
       memorySuffix
     );
   }
@@ -306,7 +306,7 @@ export function buildProductionSubmitClause(flags: PromptToolFlags): string {
   if (!flags.productionEnabled) return '';
   return (
     ' "productionOrders" entries MUST include "action" on every item. Required forms:' +
-    ' {"action":"set_build_queue","hex":[lat,lng],"unitType":"infantry|armor|naval|air","count":1..99}.' +
+    ' {"action":"set_build_queue","hex":"<two-char code>","unitType":"infantry|armor|naval|air","count":1..99}.' +
     ' Any productionOrders item missing "action" or required fields is dropped.' +
     ` ${PRODUCTION_REQUIREMENT_BASE}, include at least one set_build_queue this turn.` +
     ' Each set_build_queue item fully replaces the chosen hex queue with one unit type/count.'
@@ -352,7 +352,7 @@ export function getInitialUserMessage(flags: PromptToolFlags, hasPrecomputedBrie
       const ordersNudge = flags.ordersEnabled
         ? ' For units without standing orders in the briefing, include assign_order entries in orders[]. Then use plan_route and explicit_move only where needed this turn. '
         : '';
-      return `Use the Commander's Briefing above for unit status, attention flags, possible unit actions, and supplemental hex intelligence.${ordersNudge}Call plan_route for each unit that needs a move (orderToXY).${memoryNote}${productionNote} Then submit final JSON with "strategy", "orders" (assign_order / explicit_move / ranged_attack / cancel_order as needed)${jsonOptionalTail}.`;
+      return `Use the Commander's Briefing above for unit status, attention flags, possible unit actions, and supplemental hex intelligence.${ordersNudge}Call plan_route for each unit that needs a move (orderToHexCode).${memoryNote}${productionNote} Then submit final JSON with "strategy", "orders" (assign_order / explicit_move / ranged_attack / cancel_order as needed)${jsonOptionalTail}.`;
     }
     return `Use the tools as needed to plan movement.${memoryNote}${productionNote} Then submit final JSON with "strategy", "orders"${jsonOptionalTail}.`;
   }

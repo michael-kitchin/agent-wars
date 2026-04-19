@@ -9,6 +9,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { cellToLatLng, gridDisk, latLngToCell } from 'h3-js';
+import { getOrderedHexList } from '../mapData';
 import { executeTool5, getInjectionText } from './tool5StandingOrders';
 import {
   dbGetOne,
@@ -212,11 +213,12 @@ function testCancelOrderWhenNoOrder(): void {
  * Exceptions: None.
  */
 function testGetInjectionTextEmpty(): void {
+  const h3Sample = getOrderedHexList()[0]!;
   const stateWithUnits: GameStateSnapshot = {
     ...emptyState,
-    hexes: [{ h3Index: 'a', terrain: 'land', terrainKind: 'plains' }],
+    hexes: [{ h3Index: h3Sample, terrain: 'land', terrainKind: 'plains' }],
     units: [
-      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: 'a' },
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: h3Sample },
     ],
   };
   const text = getInjectionText('opponent', stateWithUnits);

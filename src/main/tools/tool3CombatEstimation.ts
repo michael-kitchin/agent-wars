@@ -1,8 +1,8 @@
 /**
  * MCP Tool 3: Combat Outcome Estimation (estimate_combat).
  * Exact analytical computation of combat outcome probabilities using the Poisson-Binomial
- * distribution over independent per-unit hit rolls. All hex positions in tool responses are
- * [lat, lng]; H3 indices are internal only.
+ * distribution over independent per-unit hit rolls. Internal payloads use lat/lng tuples; LLM-visible
+ * tool results use briefing hex codes after `encodeOpenRouterToolResultForLlm`.
  */
 
 import { cellToLatLng, gridDistance } from 'h3-js';
@@ -133,7 +133,7 @@ export function executeEstimateCombat(
     ? [Number(a.targetHex[0]), Number(a.targetHex[1])]
     : undefined;
   if (!engagementType || !targetArr || !a?.attackers) {
-    return { status: 'error', error: 'estimate_combat requires engagementType ("ranged"|"melee"), attackers, and targetHex [lat, lng]' };
+    return { status: 'error', error: 'estimate_combat requires engagementType ("ranged"|"melee"), attackers, and targetHex (briefing hex code).' };
   }
 
   const attackersRaw = a.attackers;

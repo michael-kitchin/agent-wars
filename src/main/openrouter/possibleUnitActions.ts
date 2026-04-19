@@ -448,25 +448,17 @@ function collectStrikeHexesForAirUnit(airH3: string, indexed: IndexedState): str
  * Exceptions: None.
  */
 
-export function buildPossibleUnitActionsMarkdown(args: {
+export function collectAggregatedPossibleActionRows(args: {
   state: GameStateSnapshot;
   latLngByH3: Map<string, [number, number]>;
   formatLatLng: (ll: [number, number]) => string;
-  /**
-   * When set, ranged target discovery uses tactical res4 rules (terrain range cap, mountain LOS) for opponent units.
-   *
-   * Contract: `state.hexes` / `state.units` must already match this footprint (e.g. `buildTacticalAiPlanState` output).
-   * When to use: Tactical AI `requestOrdersFlow` briefings.
-   * Expected outcome: Ranged markdown reflects the same legality as `validateGroupRangedTarget` + apply filters.
-   * Exceptions: None.
-   */
   tacticalBattle?: TacticalBattleSnapshot;
-}): string {
-  logDebug('possibleUnitActions buildPossibleUnitActionsMarkdown', {
+}): PossibleActionTableRow[] {
+  logDebug('possibleUnitActions collectAggregatedPossibleActionRows', {
     turnNumber: args.state.turnNumber,
     tactical: Boolean(args.tacticalBattle),
   });
-  const { state, latLngByH3, formatLatLng, tacticalBattle } = args;
+  const { state, latLngByH3, tacticalBattle } = args;
   const indexed = buildIndexedState(state);
   const homeland = enemyHomelandHexSet(state);
   const opponentUnits = state.units.filter((u) => u.player === FRIENDLY_PLAYER).sort((a, b) => a.id.localeCompare(b.id));
@@ -541,8 +533,31 @@ export function buildPossibleUnitActionsMarkdown(args: {
     }
   }
 
-  if (rawRows.length === 0) return '';
-  const rows = aggregateRows(rawRows);
+  if (rawRows.length === 0) return [];
+  return aggregateRows(rawRows);
+}
+
+export function buildPossibleUnitActionsMarkdown(args: {
+  state: GameStateSnapshot;
+  latLngByH3: Map<string, [number, number]>;
+  formatLatLng: (ll: [number, number]) => string;
+  /**
+   * When set, ranged target discovery uses tactical res4 rules (terrain range cap, mountain LOS) for opponent units.
+   *
+   * Contract: `state.hexes` / `state.units` must already match this footprint (e.g. `buildTacticalAiPlanState` output).
+   * When to use: Tactical AI `requestOrdersFlow` briefings.
+   * Expected outcome: Ranged markdown reflects the same legality as `validateGroupRangedTarget` + apply filters.
+   * Exceptions: None.
+   */
+  tacticalBattle?: TacticalBattleSnapshot;
+}): string {
+  logDebug('possibleUnitActions buildPossibleUnitActionsMarkdown', {
+    turnNumber: args.state.turnNumber,
+    tactical: Boolean(args.tacticalBattle),
+  });
+  const { latLngByH3, formatLatLng } = args;
+  const rows = collectAggregatedPossibleActionRows(args);
+  if (rows.length === 0) return '';
 
   const byBucket = groupRowsByBucket(rows);
 
