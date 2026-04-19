@@ -10,6 +10,8 @@ const REQUIRED_GENERATED_JSON_FILES = [
   'terrain_res4_metadata.json',
   'terrain_res1_naming.json',
   'terrain_res4_naming.json',
+  'terrain_res4_road_rail_sides.json',
+  'terrain_res4_road_rail_vectors.json',
 ];
 
 /** Archives named `<basename>.json.zip` (e.g. terrain_res1_metadata.json.zip, terrain_res1_naming.json.zip). */

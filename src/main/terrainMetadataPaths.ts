@@ -42,6 +42,24 @@ const RES1_NAMING_SEGMENTS = ['data', 'generated', 'terrain_res1_naming.json'] a
  * Exceptions: None.
  */
 const RES4_NAMING_SEGMENTS = ['data', 'generated', 'terrain_res4_naming.json'] as const;
+/**
+ * Documents the module-scope binding `RES4_ROAD_RAIL_SIDES_SEGMENTS` (RES4_ROAD_RAIL_SIDES_SEGMENTS).
+
+ * Purpose: Supports maintainability by documenting why `RES4_ROAD_RAIL_SIDES_SEGMENTS` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+const RES4_ROAD_RAIL_SIDES_SEGMENTS = ['data', 'generated', 'terrain_res4_road_rail_sides.json'] as const;
+/**
+ * Documents the module-scope binding `RES4_ROAD_RAIL_VECTORS_SEGMENTS` (RES4_ROAD_RAIL_VECTORS_SEGMENTS).
+
+ * Purpose: Candidate segments for optional Leaflet road/rail display-vector JSON lookup (non-gameplay).
+ * When to use: `resolveTerrainRes4RoadRailVectorsPathOptional` path probing.
+ * Expected outcome: Matches `data/generated/terrain_res4_road_rail_vectors.json`.
+ * Exceptions: None.
+ */
+const RES4_ROAD_RAIL_VECTORS_SEGMENTS = ['data', 'generated', 'terrain_res4_road_rail_vectors.json'] as const;
 
 /**
  * Documents the module-scope binding `testOverrideRoot` (testOverrideRoot: string | null).
@@ -163,6 +181,52 @@ export function resolveTerrainRes1NamingPath(): string {
 export function resolveTerrainRes4NamingPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes4NamingPath');
   return resolveFirstExisting('terrain_res4_naming.json', [...RES4_NAMING_SEGMENTS]);
+}
+
+/**
+ * Defines the `resolveTerrainRes4RoadRailSidesPathOptional` function shape (export function resolveTerrainRes4RoadRailSidesPathOptional(): string | null).
+
+ * Purpose: Locates optional `terrain_res4_road_rail_sides.json` without throwing so packaged/dev trees missing the artifact can still boot.
+ * When to use: While loading res4 transport overlay masks during terrain classification snapshot build.
+ * Expected outcome: Returns an absolute filesystem path when a candidate exists; otherwise null after debug logging.
+ * Exceptions: None.
+ */
+export function resolveTerrainRes4RoadRailSidesPathOptional(): string | null {
+  logDebug('terrainMetadataPaths resolveTerrainRes4RoadRailSidesPathOptional');
+  const candidates = pathCandidates(...RES4_ROAD_RAIL_SIDES_SEGMENTS);
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      logDebug('terrainMetadataPaths resolveTerrainRes4RoadRailSidesPathOptional: found', { path: p });
+      return p;
+    }
+  }
+  logDebug('terrainMetadataPaths resolveTerrainRes4RoadRailSidesPathOptional: missing file', {
+    tried: candidates.join('; '),
+  });
+  return null;
+}
+
+/**
+ * Defines the `resolveTerrainRes4RoadRailVectorsPathOptional` function shape (export function resolveTerrainRes4RoadRailVectorsPathOptional(): string | null).
+
+ * Purpose: Locates optional display-only road/rail vector JSON without forcing the app to fail when absent.
+ * When to use: During terrain cache hydration for Leaflet transport vector overlays.
+ * Expected outcome: Returns absolute path to `terrain_res4_road_rail_vectors.json` when present, else null.
+ * Exceptions: None.
+ */
+export function resolveTerrainRes4RoadRailVectorsPathOptional(): string | null {
+  logDebug('terrainMetadataPaths resolveTerrainRes4RoadRailVectorsPathOptional');
+  const candidates = pathCandidates(...RES4_ROAD_RAIL_VECTORS_SEGMENTS);
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      logDebug('terrainMetadataPaths resolveTerrainRes4RoadRailVectorsPathOptional: found', { path: p });
+      return p;
+    }
+  }
+  logDebug('terrainMetadataPaths resolveTerrainRes4RoadRailVectorsPathOptional: missing file', {
+    tried: candidates.join('; '),
+  });
+  return null;
 }
 
 /**

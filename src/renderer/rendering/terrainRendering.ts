@@ -7,13 +7,15 @@ import {
 } from '../../shared/homeRegionRules';
 import { getHexBoundaryLatLngForLeafletOverlay } from '../map/hexGrid';
 import { getActiveHexStrokeStyle, fillHexTerrain } from './terrainVisualStyles';
+import { withOpacityHex } from './canvasColor';
 import { drawTerrainInfrastructureGlyphs, RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE } from './terrainInfrastructureOverlay';
 import { DETAIL_H3_RESOLUTION } from '../core/constants';
 import { MULTI_PLAYER_FILL, PLAYER_COLORS } from '../core/constants';
 import { getLeafletGlobal, hexCenterPx } from '../map/mapUtils';
 import {
   projectHexBoundaryToContainerPoints,
-  projectedPolygonOverlapsViewport,
+  shouldConsiderRes4ChildrenForViewport,
+  shouldDrawRes4ChildHexInViewport,
   shouldRenderRes4Hexes,
   spanForProjectedHex,
 } from '../map/terrainView';
@@ -75,34 +77,6 @@ infraGlyphsAllowedForRes1Hex: (h3: string) => boolean;
    * Exceptions: None.
    */
 infraGlyphsAllowedForRes4Child: (parentH3: string, childH3: string) => boolean;
-}
-
-/**
- * Defines the `withOpacity` function shape (function withOpacity(color: string, alpha: number): string).
-
- * Purpose: Supports maintainability by documenting why `withOpacity` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function withOpacity(color: string, alpha: number): string {
-  const normalizedAlpha = Math.max(0, Math.min(1, alpha));
-  if (color.startsWith('#')) {
-    const hex = color.slice(1);
-    if (hex.length === 3) {
-      const r = Number.parseInt(`${hex[0]}${hex[0]}`, 16);
-      const g = Number.parseInt(`${hex[1]}${hex[1]}`, 16);
-      const b = Number.parseInt(`${hex[2]}${hex[2]}`, 16);
-      return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
-    }
-    if (hex.length === 6) {
-      const r = Number.parseInt(hex.slice(0, 2), 16);
-      const g = Number.parseInt(hex.slice(2, 4), 16);
-      const b = Number.parseInt(hex.slice(4, 6), 16);
-      return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
-    }
-  }
-  return color;
 }
 
 /**
@@ -206,8 +180,7 @@ export function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D, deps: Terrai
   for (const parent of S.gameState.hexes) {
     if (tactical && parent.h3Index !== tactical.enclosingRes1H3Index) continue;
     if (!tactical && !exploredHexes.has(parent.h3Index)) continue;
-    const parentPts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
-    if (!projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight)) continue;
+    if (!shouldConsiderRes4ChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
     const parentKind =
       parent.terrainKind ??
       (parent.terrain === 'water' ? 'water' : parent.terrain === 'coastal' ? 'coastal' : parent.terrain === 'wetlands' ? 'wetlands' : 'plains');
@@ -222,7 +195,7 @@ export function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D, deps: Terrai
       const isUrban = override?.isUrban ?? false;
       const isRubble = override?.isRubble ?? false;
       const pts = projectHexBoundaryToContainerPoints(child, map, L);
-      if (!projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight)) continue;
+      if (!shouldDrawRes4ChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
       const drawClosedPath = (): void => {
         ctx.beginPath();
         for (let i = 0; i < pts.length; i++) {
@@ -299,7 +272,7 @@ export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): v
       strokeDualClosedPolygon(ctx, pts, {
         underStrokeColor: 'rgba(0, 0, 0, 0.25)',
         underStrokeWidth: Math.max(1.2, 2.2 * zoomScale),
-        topStrokeColor: withOpacity(outlineColor, 0.5),
+        topStrokeColor: withOpacityHex(outlineColor, 0.5),
         topStrokeWidth: Math.max(0.75, 1.25 * zoomScale) * 0.75 * 1.5,
       });
     }
@@ -403,15 +376,14 @@ export function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D,
       children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
       S.res4ChildrenByParent.set(parent.h3Index, children);
     }
-    const parentPts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
-    if (!projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight)) continue;
+    if (!shouldConsiderRes4ChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
     for (const child of children) {
       if (!tactical && !deps.infraGlyphsAllowedForRes4Child(parent.h3Index, child)) continue;
       const ap = S.terrainInfraRes4Airport.has(child);
       const pt = S.terrainInfraRes4Seaport.has(child);
       if (!ap && !pt) continue;
       const pts = projectHexBoundaryToContainerPoints(child, map, L);
-      if (!projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight)) continue;
+      if (!shouldDrawRes4ChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
       drawTerrainInfrastructureGlyphs(ctx, pts, {
         showAirport: ap,
         showSeaport: pt,

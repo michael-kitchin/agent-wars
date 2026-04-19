@@ -6,7 +6,14 @@ import type {
   StartTacticalBattleIpcResult,
   TacticalBattleSnapshot,
 } from './tacticalTypes';
-import type { HexContinentNamesRequest, HexNamingTooltipLineRequest, Res4TerrainOverrideRow } from './terrainHexTypes';
+import type {
+  HexContinentNamesRequest,
+  HexNamingTooltipLineRequest,
+  Res4CityOverlayRow,
+  Res4RoadRailOverlayRow,
+  Res4TransportVectorOverlayRow,
+  Res4TerrainOverrideRow,
+} from './terrainHexTypes';
 import type { HumanOrderGroupPreviewResult, HumanOrderPreviewResult, HumanStandingOrderSnapshot } from './humanOrderPreviewTypes';
 import type { NewGameIpcPayload, SubmitOrdersIpcPayload } from './ordersTypes';
 import type { OpenRouterModel, RequestAiOrdersResult } from './openRouterTypes';
@@ -45,6 +52,33 @@ getGameState: () => Promise<GameStateSnapshot>;
    * Exceptions: None.
    */
 getRes4TerrainOverrides: () => Promise<Res4TerrainOverrideRow[]>;
+    /**
+   * Specifies the contract for the `getRes4CityOverlays` member (getRes4CityOverlays: () => Promise<Res4CityOverlayRow[]>;).
+
+   * Contract: Returns reduced res4 city labels for res4 map overlays; empty when classification cache is unavailable.
+   * When to use: Renderer startup hydration alongside terrain overrides.
+   * Expected outcome: Stable rows keyed by res4 `h3Index` with display-ready `label` strings.
+   * Exceptions: None beyond IPC transport failures.
+   */
+getRes4CityOverlays: () => Promise<Res4CityOverlayRow[]>;
+    /**
+   * Specifies the contract for the `getRes4RoadRailOverlays` member (getRes4RoadRailOverlays: () => Promise<Res4RoadRailOverlayRow[]>;).
+
+   * Contract: Returns parsed road/rail side masks from bundled generated JSON for res4 tactical glyphs.
+   * When to use: Renderer startup hydration when res4 transport/city overlays are needed.
+   * Expected outcome: Each row carries equal-length boolean masks sized to the parent cell edge count.
+   * Exceptions: None beyond IPC transport failures.
+   */
+getRes4RoadRailOverlays: () => Promise<Res4RoadRailOverlayRow[]>;
+    /**
+   * Specifies the contract for the `getRes4TransportVectorOverlays` member (getRes4TransportVectorOverlays: () => Promise<Res4TransportVectorOverlayRow[]>;).
+
+   * Contract: Returns optional display-only WGS84 polylines for Leaflet road/rail overlays (not gameplay transport truth).
+   * When to use: Renderer startup hydration to enable vector-based transport drawing when generated data exists.
+   * Expected outcome: Empty array when the vector artifact is absent or invalid; otherwise style-tagged route rows.
+   * Exceptions: None beyond IPC transport failures.
+   */
+getRes4TransportVectorOverlays: () => Promise<Res4TransportVectorOverlayRow[]>;
     /**
    * Specifies the contract for the `getHexNamingTooltipLine` member (getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest) => Promise<string | null>;).
 

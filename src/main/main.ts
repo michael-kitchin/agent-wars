@@ -68,6 +68,9 @@ import { logDebug, logError } from './logger';
 import {
   getHexNamingTooltipLineForRenderer,
   getHexContinentNamesForRenderer,
+  getRes4CityOverlaysForRenderer,
+  getRes4RoadRailOverlaysForRenderer,
+  getRes4TransportVectorOverlaysForRenderer,
 } from './terrainClassificationCache';
 import {
   handleRequestAiOrders,
@@ -258,6 +261,33 @@ function buildSharedHumanReadyConsultationDeps(
 function registerIpcHandlers(): void {
   ipcMain.handle(IPC_GAME.getState, () => getGameStateForPlayer('human', { maskUnexploredTerrain: false }));
   ipcMain.handle(IPC_GAME.getRes4TerrainOverrides, () => getRes4TerrainOverridesForRendererFromGame());
+  ipcMain.handle(IPC_GAME.getRes4CityOverlays, () => {
+    logDebug('main IPC_GAME.getRes4CityOverlays');
+    try {
+      return getRes4CityOverlaysForRenderer();
+    } catch (err) {
+      logError('main IPC_GAME.getRes4CityOverlays: failed', err);
+      return [];
+    }
+  });
+  ipcMain.handle(IPC_GAME.getRes4RoadRailOverlays, () => {
+    logDebug('main IPC_GAME.getRes4RoadRailOverlays');
+    try {
+      return getRes4RoadRailOverlaysForRenderer();
+    } catch (err) {
+      logError('main IPC_GAME.getRes4RoadRailOverlays: failed', err);
+      return [];
+    }
+  });
+  ipcMain.handle(IPC_GAME.getRes4TransportVectorOverlays, () => {
+    logDebug('main IPC_GAME.getRes4TransportVectorOverlays');
+    try {
+      return getRes4TransportVectorOverlaysForRenderer();
+    } catch (err) {
+      logError('main IPC_GAME.getRes4TransportVectorOverlays: failed', err);
+      return [];
+    }
+  });
   ipcMain.handle(
     IPC_GAME.getHexNamingTooltipLine,
     (_event, payload: { h3Index?: string; resolution?: number }) => {

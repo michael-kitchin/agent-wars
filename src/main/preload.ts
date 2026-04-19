@@ -15,6 +15,9 @@ import type {
   HumanOrderGroupPreviewResult,
   HumanStandingOrderSnapshot,
   Res4TerrainOverrideRow,
+  Res4CityOverlayRow,
+  Res4RoadRailOverlayRow,
+  Res4TransportVectorOverlayRow,
   HexNamingTooltipLineRequest,
   HexContinentNamesRequest,
   BuildUnitType,
@@ -42,6 +45,9 @@ import type {
 const IPC_GAME = {
   getState: 'game:getState',
   getRes4TerrainOverrides: 'game:getRes4TerrainOverrides',
+  getRes4CityOverlays: 'game:getRes4CityOverlays',
+  getRes4RoadRailOverlays: 'game:getRes4RoadRailOverlays',
+  getRes4TransportVectorOverlays: 'game:getRes4TransportVectorOverlays',
   getHexNamingTooltipLine: 'game:getHexNamingTooltipLine',
   getHexContinentNames: 'game:getHexContinentNames',
   listScenarioHomeRegions: 'game:listScenarioHomeRegions',
@@ -133,6 +139,35 @@ getGameState: (): Promise<GameStateSnapshot> =>
    */
 getRes4TerrainOverrides: (): Promise<Res4TerrainOverrideRow[]> =>
     ipcRenderer.invoke(IPC_GAME.getRes4TerrainOverrides),
+    /**
+   * Documents the object literal property `getRes4CityOverlays` (getRes4CityOverlays: (): Promise<Res4CityOverlayRow[]> => ipcRenderer.invoke('game:getRes4CityOverlays')).
+
+   * Purpose: Supports maintainability by documenting why `getRes4CityOverlays` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getRes4CityOverlays: (): Promise<Res4CityOverlayRow[]> => ipcRenderer.invoke(IPC_GAME.getRes4CityOverlays),
+    /**
+   * Documents the object literal property `getRes4RoadRailOverlays` (getRes4RoadRailOverlays: (): Promise<Res4RoadRailOverlayRow[]> => ipcRenderer.invoke('game:getRes4RoadRailOverlays')).
+
+   * Purpose: Supports maintainability by documenting why `getRes4RoadRailOverlays` exists.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
+getRes4RoadRailOverlays: (): Promise<Res4RoadRailOverlayRow[]> =>
+    ipcRenderer.invoke(IPC_GAME.getRes4RoadRailOverlays),
+    /**
+   * Documents the object literal property `getRes4TransportVectorOverlays` (getRes4TransportVectorOverlays: (): Promise<Res4TransportVectorOverlayRow[]> => ipcRenderer.invoke('game:getRes4TransportVectorOverlays')).
+
+   * Purpose: Exposes optional display-only road/rail vectors for the Leaflet transport overlay.
+   * When to use: Renderer startup hydration alongside res4 terrain/city/side-mask overlay data.
+   * Expected outcome: Returns empty when the optional vector artifact is missing.
+   * Exceptions: None.
+   */
+getRes4TransportVectorOverlays: (): Promise<Res4TransportVectorOverlayRow[]> =>
+    ipcRenderer.invoke(IPC_GAME.getRes4TransportVectorOverlays),
     /**
    * Documents the object literal property `getHexNamingTooltipLine` (getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest): Promise<string | null> => ipcRenderer.invoke('game:getHexNamingTooltipLine', payload)).
 

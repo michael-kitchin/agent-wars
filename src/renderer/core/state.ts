@@ -647,6 +647,33 @@ res4TerrainOverridesByH3: new Map<
     { terrainKind: string; isUrban: boolean; isAirport: boolean; isSeaport: boolean; isRubble: boolean }
   >(),
     /**
+   * Documents the object literal property `res4CityOverlayLabelByH3` (res4CityOverlayLabelByH3: new Map<string, string>()).
+
+   * Purpose: Caches reduced res4 city labels for the res4 city overlay while res4 hexes are visible.
+   * When to use: Hydrated at startup from main-process IPC; read only from terrain overlay passes.
+   * Expected outcome: Keys are res4 child indexes; values are display strings already tie-broken per naming rules.
+   * Exceptions: None.
+   */
+res4CityOverlayLabelByH3: new Map<string, string>(),
+    /**
+   * Documents the object literal property `res4RoadRailSidesByH3` (res4RoadRailSidesByH3: new Map<string, { roadSides: boolean[]; railSides: boolean[] }>()).
+
+   * Purpose: Caches road/rail side masks for res4 cells used by the res4 transport overlay renderer (gameplay truth: booleans).
+   * When to use: Hydrated once per session from `game:getRes4RoadRailOverlays` alongside terrain overrides.
+   * Expected outcome: Parallel boolean arrays match the exported JSON contract for each stored cell.
+   * Exceptions: None.
+   */
+res4RoadRailSidesByH3: new Map<string, { roadSides: boolean[]; railSides: boolean[] }>(),
+    /**
+   * Documents the object literal property `res4TransportVectorOverlayRows` (res4TransportVectorOverlayRows: [] as Array<{ kind: 'road' | 'rail'; points: [number, number][] }>).
+
+   * Purpose: Caches optional display-only transport polylines for the Leaflet vector overlay.
+   * When to use: Hydrated from `game:getRes4TransportVectorOverlays`; consumed by the renderer Leaflet layer sync.
+   * Expected outcome: Empty array when vector artifact is absent; populated rows use WGS84 `[lat, lng]` tuples.
+   * Exceptions: None.
+   */
+res4TransportVectorOverlayRows: [] as Array<{ kind: 'road' | 'rail'; points: [number, number][] }>,
+    /**
    * Documents the object literal property `terrainInfraRes1Airport` (terrainInfraRes1Airport: new Set<string>()).
 
    * Purpose: Supports maintainability by documenting why `terrainInfraRes1Airport` exists.

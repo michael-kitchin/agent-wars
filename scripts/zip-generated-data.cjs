@@ -12,6 +12,8 @@ const GENERATED_JSON_TO_ZIP = [
   'terrain_res4_metadata.json',
   'terrain_res1_naming.json',
   'terrain_res4_naming.json',
+  'terrain_res4_road_rail_sides.json',
+  'terrain_res4_road_rail_vectors.json',
 ];
 
 function zipJsonFile(pythonCmd, jsonFilename) {

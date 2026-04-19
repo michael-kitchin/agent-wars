@@ -98,6 +98,50 @@ Debug dry-run with limited res-4 cells:
 python -m scripts.terrain_pipeline.metadata_cli run --max-child-cells 5000 --verbose
 ```
 
+### Road/rail side-mask export (separate CLI)
+
+Per-touched-res4 JSON describing which cell sides are used by Natural Earth roads and railroads (for glyphs and pathfinding). Inputs default to `F:/Data/ne_10m_roads.shp` and `F:/Data/ne_10m_railroads.shp`. Output: `data/generated/terrain_res4_road_rail_sides.json` (naming-style envelope: `schema_version`, `resolution`, `generated_at_utc`, `record_count`, `side_ordering_contract`, `inputs`, `records`). Each record has `h3_index`, `road_sides`, and `rail_sides` (equal-length boolean arrays; length 5 or 6). Side index semantics are defined only by the global `side_ordering_contract` string. The Electron renderer draws these segments together with reduced city labels only while **res4 hexes are visible** and the **`t` inspection key is held**; that path is display-only and does not affect gameplay state.
+
+Validation:
+
+```powershell
+python -m scripts.terrain_pipeline.road_rail_sides_cli validate
+```
+
+Full export (can be long; use `--max-features` for a bounded dry run):
+
+```powershell
+python -m scripts.terrain_pipeline.road_rail_sides_cli run --mode fast --verbose
+```
+
+Debug dry-run (reads at most N features from **each** of road and rail layers):
+
+```powershell
+python -m scripts.terrain_pipeline.road_rail_sides_cli run --max-features 500 --verbose
+```
+
+Optional quality/speed mode:
+
+- `--mode fast` (default): uses segment H3 grid-path candidate discovery; tuned for sub-hour full runs.
+- `--mode high-fidelity`: uses denser arclength interpolation candidate discovery; slower.
+
+### Optional road/rail vector export (Leaflet display-only)
+
+Display-only road/rail vectors for Leaflet overlays (does not change boolean pathfinding contracts):
+
+```powershell
+python -m scripts.terrain_pipeline.road_rail_vectors_cli run --verbose
+```
+
+Output: `data/generated/terrain_res4_road_rail_vectors.json` (rows of `{ kind, points }`, where points are WGS84 `[lat, lng]` tuples).
+
+QA (densified line→cell vs thin-buffer polygon overlap): compares the production sampling method to ``line.buffer(buffer_deg)`` + ``h3shape_to_cells_experimental`` overlap. At default constants, **``cells_only_in_buffered`` should be empty** (no res4 cell in the QA corridor is missed by sampling). ``cells_only_in_densified`` may still be non-zero in high latitudes because production adds a **ring-1 H3 expansion** when ``|lat| >= 55°`` while the QA buffer stays a thin strip. Optional CI gate: ``--fail-on-buffer-miss`` exits 2 when any line part has buffered-only cells.
+
+```powershell
+python -m scripts.terrain_pipeline.road_rail_sides_cli qa-line-coverage --max-features 2000 --verbose
+python -m scripts.terrain_pipeline.road_rail_sides_cli qa-line-coverage --buffer-deg 0.00003 --fail-on-buffer-miss
+```
+
 ## Classification notes
 
 - Pipeline terrain labels (classification CSV path): `water|coastal|plains|urban|forest|mountain|desert|arctic`
@@ -124,6 +168,10 @@ $env:AGENT_WARS_DB_PASSWORD = "your_password"
 ```
 
 Override DB user only if not `postgres` (see `DbConfig.user` in `config.py`).
+
+## Renderer overlays (city / transport display)
+
+Pipeline artifacts feed the Electron **main** terrain classification cache and IPC getters; the **renderer** draws res4 city stars, labels, optional Leaflet vector lines, and canvas transport chords using those payloads. Refactors and file-size work for that side of the stack are planned in [`.spec/maintainability-consolidation-execution-plan-v4.md`](../.spec/maintainability-consolidation-execution-plan-v4.md) (incremental consolidation) and [`.spec/file-size-decomposition-plan-v1.md`](../.spec/file-size-decomposition-plan-v1.md) (broader `renderer.ts` / IPC type decomposition). This README stays focused on **offline generation**; use those specs when changing overlay modules or splitting the renderer entry file.
 
 ## Troubleshooting
 

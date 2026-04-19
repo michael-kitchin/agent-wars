@@ -169,6 +169,41 @@ export function projectedPolygonOverlapsViewport(
 }
 
 /**
+ * Defines the `shouldConsiderRes4ChildrenForViewport` function shape (export function shouldConsiderRes4ChildrenForViewport( parentRes1H3Index: string, map: { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } }, L: { latLng: (lat: number, lng: number) => unknown }, viewportWidth: number, viewportHeight: number ): boolean).
+
+ * Purpose: Single shared **parent** res1 viewport gate before iterating res4 children (terrain fills, infra glyphs, city overlays).
+ * When to use: After tactical/exploration filters on the parent row and before `cellToChildren` / child projection work when the parent ring is fully offscreen.
+ * Expected outcome: `true` iff the parent hex boundary intersects the Leaflet container viewport in screen space (same contract as `projectedPolygonOverlapsViewport`).
+ * Exceptions: None; returns `false` when projection yields an empty ring.
+ */
+export function shouldConsiderRes4ChildrenForViewport(
+  parentRes1H3Index: string,
+  map: { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } },
+  L: { latLng: (lat: number, lng: number) => unknown },
+  viewportWidth: number,
+  viewportHeight: number
+): boolean {
+  const parentPts = projectHexBoundaryToContainerPoints(parentRes1H3Index, map, L);
+  return projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight);
+}
+
+/**
+ * Defines the `shouldDrawRes4ChildHexInViewport` function shape (export function shouldDrawRes4ChildHexInViewport( pts: { x: number; y: number }[], viewportWidth: number, viewportHeight: number ): boolean).
+
+ * Purpose: Named res4 **child** viewport cull that mirrors `shouldConsiderRes4ChildrenForViewport` naming; delegates to `projectedPolygonOverlapsViewport` without re-projecting.
+ * When to use: Right after `projectHexBoundaryToContainerPoints(childH3, map, L)` when branching before fill/glyph/label work.
+ * Expected outcome: `true` iff the child ring intersects the Leaflet container viewport in screen space.
+ * Exceptions: None; empty `pts` yields `false` via `projectedPolygonOverlapsViewport`.
+ */
+export function shouldDrawRes4ChildHexInViewport(
+  pts: { x: number; y: number }[],
+  viewportWidth: number,
+  viewportHeight: number
+): boolean {
+  return projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight);
+}
+
+/**
  * Defines the `spanForProjectedHex` function shape (export function spanForProjectedHex(pts:).
 
  * Purpose: Supports maintainability by documenting why `spanForProjectedHex` exists.

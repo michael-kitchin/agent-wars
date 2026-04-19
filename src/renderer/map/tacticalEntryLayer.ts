@@ -34,6 +34,9 @@ function isContestedRes1Hex(state: GameStateSnapshot, h3Index: string): boolean 
 
 /**
  * Synchronizes tactical-entry magnifying-glass buttons for contested res1 hexes during strategic planning.
+ *
+ * Vertical placement: same horizontal center as the hex; `top` is `center.y + (textY - center.y)` so the icon sits
+ * **below** the hex midpoint by the same distance overlay text sits below it (previously `2 * center.y - textY` mirrored above).
  */
 export function syncTacticalEntryButton(deps: {
   isHexExploredByPlayer: (h3: string) => boolean;
@@ -70,7 +73,8 @@ export function syncTacticalEntryButton(deps: {
     const center = hexCenterPx(hx.h3Index);
     const hasOffset = deps.hasRes1OverlayOffsetFeatures(hx.h3Index, visibleUnitHexes) || visibleUnitHexes.has(hx.h3Index);
     const textY = computeRes1OverlayTextY(hx.h3Index, map, L, hasOffset);
-    const magnifyTop = Math.round(2 * center.y - textY);
+    const offsetFromCenterToOverlayText = textY - center.y;
+    const magnifyTop = Math.round(center.y + offsetFromCenterToOverlayText);
     rows.push({ h3: hx.h3Index, left: Math.round(center.x), top: magnifyTop });
   }
   if (rows.length === 0) {

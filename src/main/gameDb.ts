@@ -27,6 +27,7 @@ import {
   recoverCorruptDatabaseUi as recoverCorruptDatabaseUiWithFs,
   silentRecoverCorruptDatabase as silentRecoverCorruptDatabaseWithFs,
 } from './game-db/recovery/corruptRecovery';
+import { notifyBetterSqliteNativeLoadFailureAndExitIfApplicable } from './game-db/betterSqliteNativeLoad';
 import { getFullDdl } from './game-db/schema';
 import {
   applyGameDbPragmas as applyGameDbPragmasCore,
@@ -368,6 +369,13 @@ function silentRecoverCorruptDatabase(canonicalPath: string): void {
  */
 export async function initDatabase(): Promise<void> {
   logDebug('gameDb initDatabase');
+  try {
+    const probe = new Database(':memory:');
+    probe.close();
+  } catch (err) {
+    if (notifyBetterSqliteNativeLoadFailureAndExitIfApplicable(err)) return;
+    throw err;
+  }
   const canonicalPath = getCanonicalDbPath();
   fs.mkdirSync(path.dirname(canonicalPath), { recursive: true });
 
@@ -401,6 +409,7 @@ export async function initDatabase(): Promise<void> {
       }
     }
     logError('gameDb initDatabase: validation/open failed', err);
+    if (notifyBetterSqliteNativeLoadFailureAndExitIfApplicable(err)) return;
     recoverCorruptDatabaseUiWithFs(canonicalPath, err, {
       closeDbHandle,
       createFreshDatabaseAt: createFreshGameDatabaseAt,

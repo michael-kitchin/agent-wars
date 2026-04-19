@@ -14930,7 +14930,7 @@
   var READY_REQUEST_TIMEOUT_MS = 12e4;
   var UNIT_ICON_HIT_PAD_PX = 2;
   var BUILD_ENTRY_HIT_PAD_PX = 2;
-  var TACTICAL_ENTRY_HIT_PAD_PX = 3;
+  var TACTICAL_ENTRY_HIT_PAD_PX = 6;
   var STACK_OFFSET_X = 6;
   var STACK_OFFSET_Y = -3;
   var COUNT_BADGE_OFFSET = 16;
@@ -15373,6 +15373,33 @@
        * Exceptions: None.
        */
     res4TerrainOverridesByH3: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `res4CityOverlayLabelByH3` (res4CityOverlayLabelByH3: new Map<string, string>()).
+    
+       * Purpose: Caches reduced res4 city labels for the res4 city overlay while res4 hexes are visible.
+       * When to use: Hydrated at startup from main-process IPC; read only from terrain overlay passes.
+       * Expected outcome: Keys are res4 child indexes; values are display strings already tie-broken per naming rules.
+       * Exceptions: None.
+       */
+    res4CityOverlayLabelByH3: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `res4RoadRailSidesByH3` (res4RoadRailSidesByH3: new Map<string, { roadSides: boolean[]; railSides: boolean[] }>()).
+    
+       * Purpose: Caches road/rail side masks for res4 cells used by the res4 transport overlay renderer (gameplay truth: booleans).
+       * When to use: Hydrated once per session from `game:getRes4RoadRailOverlays` alongside terrain overrides.
+       * Expected outcome: Parallel boolean arrays match the exported JSON contract for each stored cell.
+       * Exceptions: None.
+       */
+    res4RoadRailSidesByH3: /* @__PURE__ */ new Map(),
+    /**
+       * Documents the object literal property `res4TransportVectorOverlayRows` (res4TransportVectorOverlayRows: [] as Array<{ kind: 'road' | 'rail'; points: [number, number][] }>).
+    
+       * Purpose: Caches optional display-only transport polylines for the Leaflet vector overlay.
+       * When to use: Hydrated from `game:getRes4TransportVectorOverlays`; consumed by the renderer Leaflet layer sync.
+       * Expected outcome: Empty array when vector artifact is absent; populated rows use WGS84 `[lat, lng]` tuples.
+       * Exceptions: None.
+       */
+    res4TransportVectorOverlayRows: [],
     /**
        * Documents the object literal property `terrainInfraRes1Airport` (terrainInfraRes1Airport: new Set<string>()).
     
@@ -16061,6 +16088,13 @@
     }
     return maxX >= 0 && maxY >= 0 && minX <= viewportWidth && minY <= viewportHeight;
   }
+  function shouldConsiderRes4ChildrenForViewport(parentRes1H3Index, map, L, viewportWidth, viewportHeight) {
+    const parentPts = projectHexBoundaryToContainerPoints(parentRes1H3Index, map, L);
+    return projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight);
+  }
+  function shouldDrawRes4ChildHexInViewport(pts, viewportWidth, viewportHeight) {
+    return projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight);
+  }
   function spanForProjectedHex(pts) {
     if (pts.length === 0) return 1;
     let minX = pts[0].x;
@@ -16140,29 +16174,29 @@
        */
     default: {
       label: "Default",
-      basemapId: "carto_light_nolabels",
+      basemapId: "esri_world_shaded_relief",
       fillAlphaMultiplier: 0.55,
       hatchAlphaMultiplier: 0.375,
       fills: {
-        water: "rgba(42, 117, 214, 0.28)",
-        coastal: "rgba(59, 186, 194, 0.24)",
-        wetlands: "rgba(59, 186, 194, 0.24)",
-        plains: "rgba(186, 208, 160, 0.2)",
-        forest: "rgba(50, 142, 74, 0.43)",
-        mountain: "rgba(154, 77, 122, 0.54)",
-        desert: "rgba(214, 182, 120, 0.44)",
+        water: "rgba(52, 120, 204, 0.28)",
+        coastal: "rgba(69, 165, 186, 0.24)",
+        wetlands: "rgba(69, 165, 186, 0.24)",
+        plains: "rgba(188, 205, 162, 0.2)",
+        forest: "rgba(52, 136, 84, 0.43)",
+        mountain: "rgba(127, 83, 171, 0.55)",
+        desert: "rgba(206, 176, 118, 0.44)",
         arctic: "rgba(234, 245, 255, 0.5)"
       },
       hatches: {
-        mountain: { color: "rgba(95, 24, 74, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+        mountain: { color: "rgba(74, 35, 116, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
         forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
         coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
         wetlands: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: true },
-        desert: { color: "rgba(150, 104, 43, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
+        desert: { color: "rgba(145, 104, 42, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
       },
-      urbanOverlayFill: "rgba(137, 117, 98, 0.46)",
+      urbanOverlayFill: "rgba(130, 112, 96, 0.46)",
       urbanOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.85, reverseDiagonal: false, pattern: "orthogonal" },
-      rubbleOverlayFill: "rgba(137, 117, 98, 0.46)",
+      rubbleOverlayFill: "rgba(130, 112, 96, 0.46)",
       rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
     },
     /**
@@ -16245,29 +16279,29 @@
        */
     scientific: {
       label: "Scientific",
-      basemapId: "esri_world_shaded_relief",
+      basemapId: "carto_light_nolabels",
       fillAlphaMultiplier: 0.55,
       hatchAlphaMultiplier: 0.375,
       fills: {
-        water: "rgba(52, 120, 204, 0.28)",
-        coastal: "rgba(69, 165, 186, 0.24)",
-        wetlands: "rgba(69, 165, 186, 0.24)",
-        plains: "rgba(188, 205, 162, 0.2)",
-        forest: "rgba(52, 136, 84, 0.43)",
-        mountain: "rgba(127, 83, 171, 0.55)",
-        desert: "rgba(206, 176, 118, 0.44)",
-        arctic: "rgba(234, 244, 255, 0.5)"
+        water: "rgba(42, 117, 214, 0.28)",
+        coastal: "rgba(59, 186, 194, 0.24)",
+        wetlands: "rgba(59, 186, 194, 0.24)",
+        plains: "rgba(186, 208, 160, 0.2)",
+        forest: "rgba(50, 142, 74, 0.43)",
+        mountain: "rgba(154, 77, 122, 0.54)",
+        desert: "rgba(214, 182, 120, 0.44)",
+        arctic: "rgba(234, 245, 255, 0.5)"
       },
       hatches: {
-        mountain: { color: "rgba(74, 35, 116, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
+        mountain: { color: "rgba(95, 24, 74, 0.62)", spacing: 7, lineWidth: 0.95, reverseDiagonal: true },
         forest: { color: "rgba(16, 72, 36, 0.44)", spacing: 7, lineWidth: 0.88, reverseDiagonal: true },
         coastal: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: false },
         wetlands: { color: "rgba(40, 130, 155, 0.32)", spacing: 8, lineWidth: 0.72, reverseDiagonal: true },
-        desert: { color: "rgba(145, 104, 42, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
+        desert: { color: "rgba(150, 104, 43, 0.48)", spacing: 7, lineWidth: 1, reverseDiagonal: false, pattern: "dots" }
       },
-      urbanOverlayFill: "rgba(130, 112, 96, 0.46)",
+      urbanOverlayFill: "rgba(137, 117, 98, 0.46)",
       urbanOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 6, lineWidth: 0.85, reverseDiagonal: false, pattern: "orthogonal" },
-      rubbleOverlayFill: "rgba(130, 112, 96, 0.46)",
+      rubbleOverlayFill: "rgba(137, 117, 98, 0.46)",
       rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
     }
   };
@@ -16487,6 +16521,27 @@
     }
   }
 
+  // src/renderer/rendering/canvasColor.ts
+  function withOpacityHex(color, alpha) {
+    const normalizedAlpha = Math.max(0, Math.min(1, alpha));
+    if (color.startsWith("#")) {
+      const hex = color.slice(1);
+      if (hex.length === 3) {
+        const r = Number.parseInt(`${hex[0]}${hex[0]}`, 16);
+        const g = Number.parseInt(`${hex[1]}${hex[1]}`, 16);
+        const b = Number.parseInt(`${hex[2]}${hex[2]}`, 16);
+        return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
+      }
+      if (hex.length === 6) {
+        const r = Number.parseInt(hex.slice(0, 2), 16);
+        const g = Number.parseInt(hex.slice(2, 4), 16);
+        const b = Number.parseInt(hex.slice(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
+      }
+    }
+    return color;
+  }
+
   // src/renderer/rendering/terrainInfrastructureIconPaths.ts
   var AIRPLANE_VIEWBOX_SIZE = 16;
   var AIRPLANE_VIEWBOX_CENTER = {
@@ -16702,25 +16757,6 @@
   }
 
   // src/renderer/rendering/terrainRendering.ts
-  function withOpacity(color, alpha) {
-    const normalizedAlpha = Math.max(0, Math.min(1, alpha));
-    if (color.startsWith("#")) {
-      const hex = color.slice(1);
-      if (hex.length === 3) {
-        const r = Number.parseInt(`${hex[0]}${hex[0]}`, 16);
-        const g = Number.parseInt(`${hex[1]}${hex[1]}`, 16);
-        const b = Number.parseInt(`${hex[2]}${hex[2]}`, 16);
-        return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
-      }
-      if (hex.length === 6) {
-        const r = Number.parseInt(hex.slice(0, 2), 16);
-        const g = Number.parseInt(hex.slice(2, 4), 16);
-        const b = Number.parseInt(hex.slice(4, 6), 16);
-        return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
-      }
-    }
-    return color;
-  }
   function buildControlByHex(state) {
     return new Map((state.res1Control ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
   }
@@ -16790,8 +16826,7 @@
     for (const parent of rendererSharedState.gameState.hexes) {
       if (tactical && parent.h3Index !== tactical.enclosingRes1H3Index) continue;
       if (!tactical && !exploredHexes.has(parent.h3Index)) continue;
-      const parentPts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
-      if (!projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight)) continue;
+      if (!shouldConsiderRes4ChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
       const parentKind = parent.terrainKind ?? (parent.terrain === "water" ? "water" : parent.terrain === "coastal" ? "coastal" : parent.terrain === "wetlands" ? "wetlands" : "plains");
       let children = rendererSharedState.res4ChildrenByParent.get(parent.h3Index);
       if (!children) {
@@ -16804,7 +16839,7 @@
         const isUrban = override?.isUrban ?? false;
         const isRubble = override?.isRubble ?? false;
         const pts = projectHexBoundaryToContainerPoints(child, map, L);
-        if (!projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight)) continue;
+        if (!shouldDrawRes4ChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
         const drawClosedPath = () => {
           ctx.beginPath();
           for (let i = 0; i < pts.length; i++) {
@@ -16870,7 +16905,7 @@
         strokeDualClosedPolygon(ctx, pts, {
           underStrokeColor: "rgba(0, 0, 0, 0.25)",
           underStrokeWidth: Math.max(1.2, 2.2 * zoomScale),
-          topStrokeColor: withOpacity(outlineColor, 0.5),
+          topStrokeColor: withOpacityHex(outlineColor, 0.5),
           topStrokeWidth: Math.max(0.75, 1.25 * zoomScale) * 0.75 * 1.5
         });
       }
@@ -16929,15 +16964,14 @@
         children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
         rendererSharedState.res4ChildrenByParent.set(parent.h3Index, children);
       }
-      const parentPts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
-      if (!projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight)) continue;
+      if (!shouldConsiderRes4ChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
       for (const child of children) {
         if (!tactical && !deps.infraGlyphsAllowedForRes4Child(parent.h3Index, child)) continue;
         const ap = rendererSharedState.terrainInfraRes4Airport.has(child);
         const pt = rendererSharedState.terrainInfraRes4Seaport.has(child);
         if (!ap && !pt) continue;
         const pts = projectHexBoundaryToContainerPoints(child, map, L);
-        if (!projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight)) continue;
+        if (!shouldDrawRes4ChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
         drawTerrainInfrastructureGlyphs(ctx, pts, {
           showAirport: ap,
           showSeaport: pt,
@@ -16990,7 +17024,8 @@
       const center = hexCenterPx(hx.h3Index);
       const hasOffset = deps.hasRes1OverlayOffsetFeatures(hx.h3Index, visibleUnitHexes) || visibleUnitHexes.has(hx.h3Index);
       const textY = computeRes1OverlayTextY(hx.h3Index, map, L, hasOffset);
-      const magnifyTop = Math.round(2 * center.y - textY);
+      const offsetFromCenterToOverlayText = textY - center.y;
+      const magnifyTop = Math.round(center.y + offsetFromCenterToOverlayText);
       rows.push({ h3: hx.h3Index, left: Math.round(center.x), top: magnifyTop });
     }
     if (rows.length === 0) {
@@ -22525,10 +22560,9 @@
           redraw: true
         });
       }).catch((err) => console.error("getGameState failed:", err));
-      window.gameApi.getRes4TerrainOverrides().then((rows) => {
-        deps.applyRes4TerrainOverrides(rows);
-        deps.requestRedraw();
-      }).catch((err) => console.error("getRes4TerrainOverrides failed:", err));
+      void deps.refreshRes4TerrainOverridesForRenderer().catch((err) => {
+        console.error("refreshRes4TerrainOverridesForRenderer failed:", err);
+      });
     }
     window.addEventListener("resize", () => {
       deps.resizeAndRedraw();
@@ -22679,6 +22713,290 @@
       const map = getMainLeafletMap();
       map?.getContainer?.()?.style.removeProperty("cursor");
     });
+  }
+
+  // src/renderer/map/leafletMainMapProjection.ts
+  function getMainLeafletMapForProjection() {
+    return getMainLeafletMap();
+  }
+
+  // src/shared/res4MapOverlayConstants.ts
+  var RES4_MAP_OVERLAY_CITY_HALO_ALPHA = 0.55;
+  var RES4_MAP_OVERLAY_VECTOR_TRANSPORT_HALO_OPACITY = 0.75;
+  var RES4_MAP_OVERLAY_VECTOR_RAIL_HALO_OPACITY = 0.5;
+  var RES4_MAP_OVERLAY_VECTOR_RAIL_CENTER_OPACITY = 0.75;
+  var RES4_MAP_OVERLAY_VECTOR_ROAD_OUTLINE_WEIGHT = 3.3;
+  var RES4_MAP_OVERLAY_VECTOR_ROAD_CENTER_WEIGHT = 2;
+  var RES4_MAP_OVERLAY_VECTOR_RAIL_HALO_WEIGHT = 3;
+  var RES4_MAP_OVERLAY_VECTOR_RAIL_CENTER_WEIGHT = 1.85;
+  var RES4_MAP_OVERLAY_VECTOR_RAIL_DASH_ARRAY = "7 5";
+  var RES4_MAP_OVERLAY_CITY_LABEL_HALO_WIDTH_PX = 2.4;
+  var RES4_MAP_OVERLAY_CITY_DOT_RADIUS_PX = 4.7;
+  var RES4_MAP_OVERLAY_CITY_DOT_HALO_WIDTH_PX = 2.3;
+  var RES4_MAP_OVERLAY_CITY_CIRCLE_RADIUS_FRAC = 0.25;
+  var RES4_MAP_OVERLAY_CITY_LABEL_UPWARD_OFFSET_SPAN_FRAC = 0.155;
+  var RES4_MAP_OVERLAY_CITY_LABEL_UPWARD_EXTRA_PX = 18;
+  var RES4_MAP_OVERLAY_CITY_LABEL_LIFT_SCALE = 0.5;
+  var RES4_MAP_OVERLAY_CITY_LABEL_COLLISION_STEP_PX = 17;
+
+  // src/renderer/rendering/res4CityOverlays.ts
+  function projectedCentroid(pts) {
+    let sx = 0;
+    let sy = 0;
+    for (const p of pts) {
+      sx += p.x;
+      sy += p.y;
+    }
+    const n = pts.length;
+    return { x: sx / n, y: sy / n };
+  }
+  function drawRes4CityCircleMarker(ctx, cx, cy, radiusPx, haloWidthPx, zoomStrokeScale) {
+    const r = Math.max(0.5, radiusPx);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    const halo = Math.max(0.5, haloWidthPx * zoomStrokeScale);
+    ctx.strokeStyle = withOpacityHex("#000000", RES4_MAP_OVERLAY_VECTOR_TRANSPORT_HALO_OPACITY);
+    ctx.lineWidth = halo;
+    ctx.lineJoin = "round";
+    ctx.stroke();
+    ctx.fillStyle = "#f5cc00";
+    ctx.fill();
+  }
+  function drawRes4CityOverlays(ctx, deps) {
+    if (!rendererSharedState.gameState || !shouldRenderRes4Hexes()) return;
+    const map = getMainLeafletMapForProjection();
+    if (!map) return;
+    const L = getLeafletGlobal();
+    if (!L) return;
+    ctx.save();
+    try {
+      const container = map.getContainer();
+      const viewportWidth = Math.max(1, container.clientWidth);
+      const viewportHeight = Math.max(1, container.clientHeight);
+      const zoom = typeof map.getZoom === "function" ? map.getZoom() ?? 4 : 4;
+      const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
+      const exploredHexes = deps.getExploredHexSet(rendererSharedState.gameState);
+      const tactical = rendererSharedState.tacticalBattleSnapshot;
+      const labelJobs = [];
+      for (const parent of rendererSharedState.gameState.hexes) {
+        if (tactical && parent.h3Index !== tactical.enclosingRes1H3Index) continue;
+        if (!tactical && !exploredHexes.has(parent.h3Index)) continue;
+        if (!shouldConsiderRes4ChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
+        const children = rendererSharedState.res4ChildrenByParent.get(parent.h3Index);
+        if (!children) continue;
+        for (const child of children) {
+          const pts = projectHexBoundaryToContainerPoints(child, map, L);
+          if (!shouldDrawRes4ChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
+          const span = spanForProjectedHex(pts);
+          const centerPx = projectedCentroid(pts);
+          const cityLabel = rendererSharedState.res4CityOverlayLabelByH3.get(child);
+          if (cityLabel) {
+            const hasAirportOrSeaport = rendererSharedState.terrainInfraRes4Airport.has(child) || rendererSharedState.terrainInfraRes4Seaport.has(child);
+            if (!hasAirportOrSeaport) {
+              const referenceOuterR = RES4_MAP_OVERLAY_CITY_DOT_RADIUS_PX * 2 * zoomStrokeScale;
+              const circleRadiusPx = referenceOuterR * RES4_MAP_OVERLAY_CITY_CIRCLE_RADIUS_FRAC;
+              drawRes4CityCircleMarker(
+                ctx,
+                centerPx.x,
+                centerPx.y,
+                circleRadiusPx,
+                RES4_MAP_OVERLAY_CITY_DOT_HALO_WIDTH_PX,
+                zoomStrokeScale
+              );
+            }
+            const fontPx = Math.max(14, Math.min(23, span * 0.165));
+            const labelLiftPx = (span * RES4_MAP_OVERLAY_CITY_LABEL_UPWARD_OFFSET_SPAN_FRAC + RES4_MAP_OVERLAY_CITY_LABEL_UPWARD_EXTRA_PX * zoomStrokeScale) * RES4_MAP_OVERLAY_CITY_LABEL_LIFT_SCALE;
+            const labelYBase = centerPx.y - labelLiftPx;
+            labelJobs.push({ x: centerPx.x, y: labelYBase, text: cityLabel, fontPx });
+          }
+        }
+      }
+      if (labelJobs.length > 0) {
+        labelJobs.sort((a, b) => a.y - b.y || a.x - b.x);
+        const placed = [];
+        const haloW = RES4_MAP_OVERLAY_CITY_LABEL_HALO_WIDTH_PX * zoomStrokeScale;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        for (const job of labelJobs) {
+          ctx.font = `${job.fontPx}px sans-serif`;
+          const metrics = ctx.measureText(job.text);
+          const w = metrics.width;
+          const h = job.fontPx;
+          let y = job.y;
+          for (let guard = 0; guard < 8; guard++) {
+            const left = job.x - w * 0.5;
+            const right = job.x + w * 0.5;
+            const top = y - h * 0.5;
+            const bottom = y + h * 0.5;
+            const hit = placed.some(
+              (r) => !(right < r.left || left > r.right || bottom < r.top || top > r.bottom)
+            );
+            if (!hit) break;
+            y += RES4_MAP_OVERLAY_CITY_LABEL_COLLISION_STEP_PX;
+          }
+          ctx.lineJoin = "round";
+          ctx.lineWidth = haloW;
+          ctx.strokeStyle = withOpacityHex("#ffffff", RES4_MAP_OVERLAY_CITY_HALO_ALPHA);
+          ctx.strokeText(job.text, job.x, y);
+          ctx.fillStyle = "#000000";
+          ctx.fillText(job.text, job.x, y);
+          placed.push({
+            left: job.x - w * 0.5 - 1,
+            right: job.x + w * 0.5 + 1,
+            top: y - h * 0.5 - 2,
+            bottom: y + h * 0.5 + 2
+          });
+        }
+      }
+    } finally {
+      ctx.restore();
+    }
+  }
+
+  // src/renderer/rendererRes4Hydration.ts
+  function applyRes4CityOverlayRows(cityRows, roadRailRows, vectorRows) {
+    const nextCities = /* @__PURE__ */ new Map();
+    for (const row of cityRows) {
+      if (row.label) nextCities.set(row.h3Index, row.label);
+    }
+    rendererSharedState.res4CityOverlayLabelByH3 = nextCities;
+    const nextRoadRail = /* @__PURE__ */ new Map();
+    for (const row of roadRailRows) {
+      nextRoadRail.set(row.h3Index, { roadSides: [...row.roadSides], railSides: [...row.railSides] });
+    }
+    rendererSharedState.res4RoadRailSidesByH3 = nextRoadRail;
+    rendererSharedState.res4TransportVectorOverlayRows = vectorRows.map((row) => ({
+      kind: row.kind,
+      points: row.points.map((p) => [p[0], p[1]])
+    }));
+  }
+
+  // src/renderer/map/res4TransportVectorLayer.ts
+  var vectorLayer = null;
+  var vectorLayerAttached = false;
+  var lastRowCount = -1;
+  var cachedRowBounds = null;
+  var lastViewportKey = null;
+  function computeRowBounds(rows) {
+    return rows.map((row) => {
+      let minLat = Infinity;
+      let maxLat = -Infinity;
+      let minLng = Infinity;
+      let maxLng = -Infinity;
+      for (const [lat, lng] of row.points) {
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+        if (lng < minLng) minLng = lng;
+        if (lng > maxLng) maxLng = lng;
+      }
+      return { minLat, maxLat, minLng, maxLng };
+    });
+  }
+  function intersectsViewport(row, viewport) {
+    return !(row.maxLat < viewport.south || row.minLat > viewport.north || row.maxLng < viewport.west || row.minLng > viewport.east);
+  }
+  function quantizedViewportKey(viewport, zoom) {
+    const latSpan = Math.max(1e-6, viewport.north - viewport.south);
+    const lngSpan = Math.max(1e-6, viewport.east - viewport.west);
+    const latStep = Math.max(0.12, latSpan / 16);
+    const lngStep = Math.max(0.12, lngSpan / 16);
+    const q = (v, step) => Math.round(v / step);
+    return [Math.round(zoom * 10), q(viewport.south, latStep), q(viewport.north, latStep), q(viewport.west, lngStep), q(viewport.east, lngStep)].join(":");
+  }
+  function expandedViewport(viewport) {
+    const latPad = Math.max(0.2, (viewport.north - viewport.south) * 0.12);
+    const lngPad = Math.max(0.2, (viewport.east - viewport.west) * 0.12);
+    return {
+      south: viewport.south - latPad,
+      north: viewport.north + latPad,
+      west: viewport.west - lngPad,
+      east: viewport.east + lngPad
+    };
+  }
+  function buildVectorLayerGroup(_map, rows, L) {
+    const layers = [];
+    for (const row of rows) {
+      if (!row.points || row.points.length < 2) continue;
+      const latlngs = row.points.map((p) => [p[0], p[1]]);
+      if (row.kind === "road") {
+        layers.push(
+          L.polyline(latlngs, {
+            color: "#000000",
+            weight: RES4_MAP_OVERLAY_VECTOR_ROAD_OUTLINE_WEIGHT,
+            opacity: RES4_MAP_OVERLAY_VECTOR_TRANSPORT_HALO_OPACITY,
+            interactive: false
+          })
+        );
+        layers.push(
+          L.polyline(latlngs, {
+            color: "#ffffff",
+            weight: RES4_MAP_OVERLAY_VECTOR_ROAD_CENTER_WEIGHT,
+            opacity: 1,
+            interactive: false
+          })
+        );
+      } else {
+        layers.push(
+          L.polyline(latlngs, {
+            color: "#ffffff",
+            weight: RES4_MAP_OVERLAY_VECTOR_RAIL_HALO_WEIGHT,
+            opacity: RES4_MAP_OVERLAY_VECTOR_RAIL_HALO_OPACITY,
+            interactive: false
+          })
+        );
+        layers.push(
+          L.polyline(latlngs, {
+            color: "#000000",
+            weight: RES4_MAP_OVERLAY_VECTOR_RAIL_CENTER_WEIGHT,
+            opacity: RES4_MAP_OVERLAY_VECTOR_RAIL_CENTER_OPACITY,
+            dashArray: RES4_MAP_OVERLAY_VECTOR_RAIL_DASH_ARRAY,
+            interactive: false
+          })
+        );
+      }
+    }
+    return L.layerGroup(layers);
+  }
+  function syncRes4TransportVectorLeafletLayer() {
+    const map = getMainLeafletMapForProjection();
+    const L = getLeafletGlobal();
+    if (!map || !L) return;
+    const shouldShow = shouldRenderRes4Hexes() && rendererSharedState.res4TransportVectorOverlayRows.length > 0;
+    if (!shouldShow) {
+      if (vectorLayer && vectorLayerAttached) {
+        map.removeLayer(vectorLayer);
+        vectorLayerAttached = false;
+      }
+      lastViewportKey = null;
+      return;
+    }
+    const bounds = map.getBounds();
+    const viewport = {
+      south: bounds.getSouth(),
+      north: bounds.getNorth(),
+      west: bounds.getWest(),
+      east: bounds.getEast()
+    };
+    const key = quantizedViewportKey(viewport, typeof map.getZoom === "function" ? map.getZoom() ?? 0 : 0);
+    const rowsChanged = lastRowCount !== rendererSharedState.res4TransportVectorOverlayRows.length;
+    if (rowsChanged || !cachedRowBounds) {
+      cachedRowBounds = computeRowBounds(rendererSharedState.res4TransportVectorOverlayRows);
+    }
+    if (!vectorLayer || rowsChanged || key !== lastViewportKey) {
+      if (vectorLayer && vectorLayerAttached) {
+        map.removeLayer(vectorLayer);
+        vectorLayerAttached = false;
+      }
+      const view = expandedViewport(viewport);
+      const visibleRows = rendererSharedState.res4TransportVectorOverlayRows.filter((_, idx) => intersectsViewport(cachedRowBounds[idx], view));
+      vectorLayer = buildVectorLayerGroup(map, visibleRows, L);
+      lastRowCount = rendererSharedState.res4TransportVectorOverlayRows.length;
+      lastViewportKey = key;
+    }
+    if (vectorLayer && !vectorLayerAttached) {
+      map.addLayer(vectorLayer);
+      vectorLayerAttached = true;
+    }
   }
 
   // src/renderer/core/stateSnapshot.ts
@@ -23429,13 +23747,23 @@
     clearRes1TooltipSummaryCaches();
   }
   async function refreshRes4TerrainOverridesForRenderer() {
-    if (!window.gameApi?.getRes4TerrainOverrides) return;
+    const api = window.gameApi;
+    if (!api?.getRes4TerrainOverrides) return;
     try {
-      const rows = await window.gameApi.getRes4TerrainOverrides();
+      const cityPromise = api.getRes4CityOverlays ? api.getRes4CityOverlays() : Promise.resolve([]);
+      const roadRailPromise = api.getRes4RoadRailOverlays ? api.getRes4RoadRailOverlays() : Promise.resolve([]);
+      const vectorsPromise = api.getRes4TransportVectorOverlays ? api.getRes4TransportVectorOverlays() : Promise.resolve([]);
+      const [rows, cityRows, roadRailRows, vectorRows] = await Promise.all([
+        api.getRes4TerrainOverrides(),
+        cityPromise,
+        roadRailPromise,
+        vectorsPromise
+      ]);
       applyRes4TerrainOverrides(rows);
+      applyRes4CityOverlayRows(cityRows, roadRailRows, vectorRows);
       requestRedraw();
     } catch (err) {
-      console.error("getRes4TerrainOverrides failed:", err);
+      console.error("refreshRes4TerrainOverridesForRenderer failed:", err);
     }
   }
   function formatUnitDisplayName(unitId) {
@@ -23624,13 +23952,18 @@
       infraGlyphsAllowedForRes4Child
     });
   }
+  function drawRes4CityOverlayPass(ctx) {
+    drawRes4CityOverlays(ctx, {
+      getExploredHexSet: getExploredHexSet2
+    });
+  }
   function drawRes1ProductionOverlays(ctx) {
     if (!rendererSharedState.gameState) return;
+    if (shouldRenderRes4Hexes()) return;
     const map = getMainLeafletMap();
     if (!map) return;
     const L = getLeafletGlobal();
     if (!L) return;
-    if (shouldRenderRes4Hexes()) return;
     const overlayContext = buildProductionOverlayContext(rendererSharedState.gameState);
     for (const hx of rendererSharedState.gameState.hexes) {
       const explored = isHexExploredByPlayer2(hx.h3Index);
@@ -23823,11 +24156,15 @@
     });
   }
   function drawGameScene(ctx, width, height, state) {
+    syncRes4TransportVectorLeafletLayer();
     ctx.clearRect(0, 0, width, height);
     if (rendererSharedState.tacticalBattleSnapshot) {
       maybeScheduleTacticalAnnihilationExit();
       drawTerrainHexes2(ctx);
       drawRes4TerrainHexes2(ctx);
+      drawRes1ProductionOverlays(ctx);
+      drawRes4CityOverlayPass(ctx);
+      drawTerrainInfrastructureOverlays2(ctx);
       const tb = rendererSharedState.tacticalBattleSnapshot;
       const hexList2 = state.hexes.map((h) => h.h3Index);
       drawPendingMarchesHoverAndSupportOrderStack({
@@ -23960,6 +24297,7 @@
       drawMarchHoverPreview: drawHoverRoutePreview2
     });
     drawRes1ProductionOverlays(ctx);
+    drawRes4CityOverlayPass(ctx);
     drawTerrainInfrastructureOverlays2(ctx);
     drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId);
     if (unitsToDraw.length) {
@@ -24274,6 +24612,7 @@
       refreshHoverRoutePreview: refreshHoverRoutePreview2,
       applyGameStateSnapshot: applyGameStateSnapshot2,
       applyRes4TerrainOverrides,
+      refreshRes4TerrainOverridesForRenderer,
       hideBuildPopup,
       hideStackCallout,
       applyModifierDrivenPopoverCloseRules,

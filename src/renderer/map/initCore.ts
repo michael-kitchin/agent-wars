@@ -1,4 +1,4 @@
-import type { GameStateSnapshot, Res4TerrainOverrideRow } from '../../shared/ipcTypes';
+import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { unitHasTacticalRangedBaseline } from '../../shared/tacticalRanges';
 import { panMapOneRes1Hex, shouldIgnoreGlobalKeydown } from './mapUtils';
 import { rendererSharedState as S } from '../core/state';
@@ -136,14 +136,23 @@ applyGameStateSnapshot: (
     }
   ) => Promise<void>;
     /**
-   * Specifies the contract for the `applyRes4TerrainOverrides` member (applyRes4TerrainOverrides: (rows: Res4TerrainOverrideRow[]) => void;).
+   * Specifies the contract for the `applyRes4TerrainOverrides` member (applyRes4TerrainOverrides: (rows: import('../../shared/ipcTypes').Res4TerrainOverrideRow[]) => void;).
 
    * Contract: Describes stable behavior for callers of `applyRes4TerrainOverrides` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-applyRes4TerrainOverrides: (rows: Res4TerrainOverrideRow[]) => void;
+applyRes4TerrainOverrides: (rows: import('../../shared/ipcTypes').Res4TerrainOverrideRow[]) => void;
+    /**
+   * Specifies the contract for the `refreshRes4TerrainOverridesForRenderer` member (refreshRes4TerrainOverridesForRenderer: () => Promise<void>;).
+
+   * Contract: Refreshes terrain override rows plus res4 city/road/rail/vector overlay payloads from main.
+   * When to use: Initial window load after `gameApi` is ready and whenever gameplay modules request a resync.
+   * Expected outcome: Renderer maps stay aligned with main-process caches after the promise settles.
+   * Exceptions: None; failures are logged by the implementation without throwing to callers.
+   */
+refreshRes4TerrainOverridesForRenderer: () => Promise<void>;
     /**
    * Specifies the contract for the `hideBuildPopup` member (hideBuildPopup: () => void;).
 
@@ -382,13 +391,9 @@ export function wireInitCore(deps: InitCoreDeps): void {
         });
       })
       .catch((err) => console.error('getGameState failed:', err));
-    window.gameApi
-      .getRes4TerrainOverrides()
-      .then((rows) => {
-        deps.applyRes4TerrainOverrides(rows);
-        deps.requestRedraw();
-      })
-      .catch((err) => console.error('getRes4TerrainOverrides failed:', err));
+    void deps.refreshRes4TerrainOverridesForRenderer().catch((err) => {
+      console.error('refreshRes4TerrainOverridesForRenderer failed:', err);
+    });
   }
 
   window.addEventListener('resize', () => {

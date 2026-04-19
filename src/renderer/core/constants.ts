@@ -342,12 +342,12 @@ export const BUILD_ENTRY_HIT_PAD_PX = 2;
 /**
  * Documents the module-scope binding `TACTICAL_ENTRY_HIT_PAD_PX` (TACTICAL_ENTRY_HIT_PAD_PX).
 
- * Purpose: Expands tactical-entry button hit targets on the map to match the magnifier affordance (half-size control uses half padding).
+ * Purpose: Expands tactical-entry button hit targets on the map to match the magnifier affordance (kept ~2× the prior pad after the tactical button glyph was doubled in `static/index.html`).
  * When to use: Pointer hit-tests and hover cursors for `#tactical-entry-layer` buttons.
  * Expected outcome: Clicks register slightly outside the visible button bounds for usability.
  * Exceptions: None.
  */
-export const TACTICAL_ENTRY_HIT_PAD_PX = 3;
+export const TACTICAL_ENTRY_HIT_PAD_PX = 6;
 
 /**
  * Documents the module-scope binding `STACK_OFFSET_X` (STACK_OFFSET_X).

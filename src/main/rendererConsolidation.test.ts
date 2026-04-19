@@ -681,7 +681,7 @@ function testTacticalRes4DrawingSkipsExploredGateWhenTactical(): void {
 
  * Purpose: Static regression tests for milestone-2.1 Phase B tactical magnifier visibility rules (planning-only, contested res1, mirrored vertical offset).
  * When to use: CI guard when refactoring `syncTacticalEntryButton` or overlay layout.
- * Expected outcome: Source encodes planning+tactical-active gate, co-presence contest check, and magnifyTop mirror formula.
+ * Expected outcome: Source encodes planning+tactical-active gate, co-presence contest check, and magnifyTop symmetric offset below the hex midpoint (same distance as overlay text is below center).
  * Exceptions: None.
  */
 function testTacticalEntryLayerPlanningAndContestedContracts(): void {
@@ -700,8 +700,8 @@ function testTacticalEntryLayerPlanningAndContestedContracts(): void {
     'tactical entry eligibility should require both human and opponent parent units in the same hex'
   );
   assert.ok(
-    source.includes('const magnifyTop = Math.round(2 * center.y - textY);'),
-    'syncTacticalEntryButton should mirror build-label vertical offset using 2*center.y - textY'
+    source.includes('offsetFromCenterToOverlayText') && source.includes('center.y + offsetFromCenterToOverlayText'),
+    'syncTacticalEntryButton should place the magnifier below center by the same |y| offset the overlay text uses from center'
   );
   assert.ok(
     source.includes('class="tactical-entry-btn"') && source.includes('&#128269;'),

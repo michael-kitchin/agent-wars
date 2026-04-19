@@ -23,7 +23,5 @@ coverage/
 __pycache__/
 *.pyc
 data/generated/**/*.json
-data/generated/terrain_res1_naming.json
-data/generated/terrain_res4_naming.json
 data/generated/**/*.csv
 !data/generated/**/*.zip

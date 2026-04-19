@@ -30,6 +30,25 @@ import {
   type TerrainNamingRecordRes1,
   type TerrainNamingRecordRes4,
 } from './terrainNamingLoad';
+import { reduceRes4CityOverlayLabelsByH3 } from './terrainRes4CityOverlayReduce';
+import { loadTerrainRes4RoadRailSidesBundled } from './terrainRoadRailSidesLoad';
+import { loadTerrainRes4RoadRailVectorsBundled } from './terrainRoadRailVectorsLoad';
+import {
+  hexContinentNamesFromSnapshot,
+  hexNamingTooltipLineFromSnapshot,
+  res1ProductionContextFromSnapshot,
+  res4CityOverlayRowsFromSnapshot,
+  res4FeatureRowsForSeedingFromSnapshot,
+  res4RoadRailOverlayRowsFromSnapshot,
+  res4TerrainOverridesRowsForRenderer,
+  res4TransportVectorOverlayRowsFromSnapshot,
+  terrainRes1KindsFromSnapshot,
+} from './terrainClassificationCacheSerialization';
+import type {
+  Res4CityOverlayRow,
+  Res4RoadRailOverlayRow,
+  Res4TransportVectorOverlayRow,
+} from '../shared/ipc/terrainHexTypes';
 
 /**
  * Documents the `TerrainClassificationSnapshot` interface as a named contract surface (export interface TerrainClassificationSnapshot).
@@ -112,6 +131,33 @@ airportCountByRes1H3: ReadonlyMap<string, number>;
    * Exceptions: None.
    */
 seaportCountByRes1H3: ReadonlyMap<string, number>;
+    /**
+   * Specifies the contract for the `res4CityOverlayByH3` member (res4CityOverlayByH3: ReadonlyMap<string, string>;).
+
+   * Contract: Reduced res4 city labels (scalerank 0..4) keyed by child `h3_index` for map inspection overlays.
+   * When to use: Renderer IPC that must not re-parse the full naming JSON each frame.
+   * Expected outcome: Values are non-empty display strings; missing keys mean no city overlay for that hex.
+   * Exceptions: None.
+   */
+res4CityOverlayByH3: ReadonlyMap<string, string>;
+    /**
+   * Specifies the contract for the `res4RoadRailOverlayByH3` member (res4RoadRailOverlayByH3: ReadonlyMap<string, { roadSides: readonly boolean[]; railSides: readonly boolean[] }>;).
+
+   * Contract: Boolean side masks for roads/rails aligned to the exported clockwise side ordering contract; the renderer infers edge-to-edge chord strokes (plus short inward spurs when the active count is odd) from these masks, not exported centerline polylines.
+   * When to use: Renderer IPC for res4 transport overlays when res4 is visible (`drawRes4CityOverlays` + `buildTransportChordSegments`).
+   * Expected outcome: Both arrays share length 5 or 6 for a given cell; absent keys mean no transport overlay.
+   * Exceptions: None.
+   */
+res4RoadRailOverlayByH3: ReadonlyMap<string, { roadSides: readonly boolean[]; railSides: readonly boolean[] }>;
+    /**
+   * Specifies the contract for the `res4TransportVectorOverlayRows` member (res4TransportVectorOverlayRows: ReadonlyArray<Res4TransportVectorOverlayRow>;).
+
+   * Contract: Optional display-only road/rail polylines for Leaflet overlays; empty when vector artifact is absent.
+   * When to use: Renderer IPC for vector transport drawing without touching boolean pathfinding masks.
+   * Expected outcome: Rows contain validated `kind` and WGS84 `points`.
+   * Exceptions: None.
+   */
+res4TransportVectorOverlayRows: ReadonlyArray<Res4TransportVectorOverlayRow>;
     /**
    * Specifies the contract for the `res4FeatureRows` member (res4FeatureRows: ReadonlyArray<{ h3Index: string; parentH3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean; isAirport:).
 
@@ -287,6 +333,9 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     const line = preferredNamingLineForRes4Record(row);
     if (line) namingLinesRes4ByH3.set(row.h3_index, line);
   }
+  const res4CityOverlayByH3 = reduceRes4CityOverlayLabelsByH3(namingRes4Env.records as TerrainNamingRecordRes4[]);
+  const res4RoadRailOverlayByH3 = loadTerrainRes4RoadRailSidesBundled();
+  const res4TransportVectorOverlayRows = loadTerrainRes4RoadRailVectorsBundled();
   const continentNamesRes1ByH3 = new Map<string, string[]>();
   for (const row of namingRes1Env.records as TerrainNamingRecordRes1[]) {
     const names: string[] = [];
@@ -308,6 +357,9 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     res4MajorSeaportHexes: res4MajorSeaports.length,
     res1NamingHexes: namingLinesRes1ByH3.size,
     res4NamingHexes: namingLinesRes4ByH3.size,
+    res4CityOverlayHexes: res4CityOverlayByH3.size,
+    res4RoadRailOverlayHexes: res4RoadRailOverlayByH3.size,
+    res4TransportVectorRows: res4TransportVectorOverlayRows.length,
   });
   return {
     res1KindByH3,
@@ -318,6 +370,9 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     urbanHexCountByRes1H3,
     airportCountByRes1H3,
     seaportCountByRes1H3,
+    res4CityOverlayByH3,
+    res4RoadRailOverlayByH3,
+    res4TransportVectorOverlayRows,
     res4FeatureRows,
   };
 }
@@ -356,7 +411,7 @@ export function getTerrainRes1KindsFromCache(): ReadonlyMap<string, PipelineTerr
     logError('terrainClassificationCache getTerrainRes1KindsFromCache: cache empty', err);
     throw err;
   }
-  return cached.res1KindByH3;
+  return terrainRes1KindsFromSnapshot(cached);
 }
 
 /**
@@ -379,7 +434,7 @@ export function getRes4TerrainOverridesForRenderer(): Array<{
     logError('terrainClassificationCache getRes4TerrainOverridesForRenderer: cache empty', err);
     throw err;
   }
-  return cached.res4OverrideRows.map((row) => ({ ...row, isRubble: false }));
+  return res4TerrainOverridesRowsForRenderer(cached);
 }
 
 /**
@@ -399,10 +454,7 @@ export function getHexNamingTooltipLineForRenderer(
     logError('terrainClassificationCache getHexNamingTooltipLineForRenderer: cache empty', err);
     throw err;
   }
-  if (payload.resolution === 1) {
-    return cached.namingLinesRes1ByH3.get(payload.h3Index) ?? null;
-  }
-  return cached.namingLinesRes4ByH3.get(payload.h3Index) ?? null;
+  return hexNamingTooltipLineFromSnapshot(cached, payload);
 }
 
 /**
@@ -420,7 +472,58 @@ export function getHexContinentNamesForRenderer(payload: { h3Index: string }): s
     logError('terrainClassificationCache getHexContinentNamesForRenderer: cache empty', err);
     throw err;
   }
-  return [...(cached.continentNamesRes1ByH3.get(payload.h3Index) ?? [])];
+  return hexContinentNamesFromSnapshot(cached, payload.h3Index);
+}
+
+/**
+ * Defines the `getRes4CityOverlaysForRenderer` function shape (export function getRes4CityOverlaysForRenderer(): Res4CityOverlayRow[]).
+
+ * Purpose: Serializes reduced res4 city labels for renderer map inspection overlays.
+ * When to use: `game:getRes4CityOverlays` IPC handler after the classification cache is loaded.
+ * Expected outcome: Stable array of `{ h3Index, label }` rows; empty when the cache has not been built yet.
+ * Exceptions: None.
+ */
+export function getRes4CityOverlaysForRenderer(): Res4CityOverlayRow[] {
+  logTrace('terrainClassificationCache getRes4CityOverlaysForRenderer');
+  if (!cached) {
+    logDebug('terrainClassificationCache getRes4CityOverlaysForRenderer: cache empty, returning []');
+    return [];
+  }
+  return res4CityOverlayRowsFromSnapshot(cached);
+}
+
+/**
+ * Defines the `getRes4RoadRailOverlaysForRenderer` function shape (export function getRes4RoadRailOverlaysForRenderer(): Res4RoadRailOverlayRow[]).
+
+ * Purpose: Serializes bundled road/rail side masks for renderer transport glyphs.
+ * When to use: `game:getRes4RoadRailOverlays` IPC handler after the classification cache is loaded.
+ * Expected outcome: Each row includes cloned boolean arrays suitable for immediate renderer caching.
+ * Exceptions: None.
+ */
+export function getRes4RoadRailOverlaysForRenderer(): Res4RoadRailOverlayRow[] {
+  logTrace('terrainClassificationCache getRes4RoadRailOverlaysForRenderer');
+  if (!cached) {
+    logDebug('terrainClassificationCache getRes4RoadRailOverlaysForRenderer: cache empty, returning []');
+    return [];
+  }
+  return res4RoadRailOverlayRowsFromSnapshot(cached);
+}
+
+/**
+ * Defines the `getRes4TransportVectorOverlaysForRenderer` function shape (export function getRes4TransportVectorOverlaysForRenderer(): Res4TransportVectorOverlayRow[]).
+
+ * Purpose: Serializes optional display-only road/rail vector rows for the Leaflet overlay layer.
+ * When to use: `game:getRes4TransportVectorOverlays` IPC handler after cache load.
+ * Expected outcome: Returns cloned point tuples for renderer safety; empty when optional artifact is unavailable.
+ * Exceptions: None.
+ */
+export function getRes4TransportVectorOverlaysForRenderer(): Res4TransportVectorOverlayRow[] {
+  logTrace('terrainClassificationCache getRes4TransportVectorOverlaysForRenderer');
+  if (!cached) {
+    logDebug('terrainClassificationCache getRes4TransportVectorOverlaysForRenderer: cache empty, returning []');
+    return [];
+  }
+  return res4TransportVectorOverlayRowsFromSnapshot(cached);
 }
 
 /**
@@ -438,11 +541,7 @@ export function getRes1ProductionContext(payload: { h3Index: string }): Res1Prod
     logError('terrainClassificationCache getRes1ProductionContext: cache empty', err);
     throw err;
   }
-  return {
-    urbanHexCount: Math.max(0, cached.urbanHexCountByRes1H3.get(payload.h3Index) ?? 0),
-    airportCount: Math.max(0, cached.airportCountByRes1H3.get(payload.h3Index) ?? 0),
-    seaportCount: Math.max(0, cached.seaportCountByRes1H3.get(payload.h3Index) ?? 0),
-  };
+  return res1ProductionContextFromSnapshot(cached, payload.h3Index);
 }
 
 /**
@@ -467,7 +566,7 @@ export function getRes4FeatureRowsForSeeding(): ReadonlyArray<{
     logError('terrainClassificationCache getRes4FeatureRowsForSeeding: cache empty', err);
     throw err;
   }
-  return cached.res4FeatureRows;
+  return res4FeatureRowsForSeedingFromSnapshot(cached);
 }
 
 /**

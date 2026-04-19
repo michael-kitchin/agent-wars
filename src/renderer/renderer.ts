@@ -14,6 +14,9 @@ import type {
   RemovedUnitSnapshot,
   HumanStandingOrderSnapshot,
   SealiftStackState,
+  Res4CityOverlayRow,
+  Res4RoadRailOverlayRow,
+  Res4TransportVectorOverlayRow,
 } from '../shared/ipcTypes';
 import { estimateTurnsToNextSpawn, MAX_UNITS_PER_TYPE } from '../shared/productionConfig';
 import {
@@ -185,6 +188,9 @@ import {
   drawTerrainInfrastructureOverlays as drawTerrainInfrastructureOverlaysFromModule,
   hasVisibleRes1InfrastructureGlyphs as hasVisibleRes1InfrastructureGlyphsFromModule,
 } from './rendering/terrainRendering';
+import { drawRes4CityOverlays } from './rendering/res4CityOverlays';
+import { applyRes4CityOverlayRows } from './rendererRes4Hydration';
+import { syncRes4TransportVectorLeafletLayer } from './map/res4TransportVectorLayer';
 import {
   applyGameStateSnapshot as applyGameStateSnapshotFromModule,
   refreshGameStateAfterBuildQueueChange as refreshGameStateAfterBuildQueueChangeFromModule,
@@ -1506,13 +1512,27 @@ function applyRes4TerrainOverrides(rows: Array<{
  * Exceptions: None.
  */
 async function refreshRes4TerrainOverridesForRenderer(): Promise<void> {
-  if (!window.gameApi?.getRes4TerrainOverrides) return;
+  const api = window.gameApi;
+  if (!api?.getRes4TerrainOverrides) return;
   try {
-    const rows = await window.gameApi.getRes4TerrainOverrides();
+    const cityPromise = api.getRes4CityOverlays ? api.getRes4CityOverlays() : Promise.resolve<Res4CityOverlayRow[]>([]);
+    const roadRailPromise = api.getRes4RoadRailOverlays
+      ? api.getRes4RoadRailOverlays()
+      : Promise.resolve<Res4RoadRailOverlayRow[]>([]);
+    const vectorsPromise = api.getRes4TransportVectorOverlays
+      ? api.getRes4TransportVectorOverlays()
+      : Promise.resolve<Res4TransportVectorOverlayRow[]>([]);
+    const [rows, cityRows, roadRailRows, vectorRows] = await Promise.all([
+      api.getRes4TerrainOverrides(),
+      cityPromise,
+      roadRailPromise,
+      vectorsPromise,
+    ]);
     applyRes4TerrainOverrides(rows);
+    applyRes4CityOverlayRows(cityRows, roadRailRows, vectorRows);
     requestRedraw();
   } catch (err) {
-    console.error('getRes4TerrainOverrides failed:', err);
+    console.error('refreshRes4TerrainOverridesForRenderer failed:', err);
   }
 }
 
@@ -1942,6 +1962,20 @@ function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void 
 }
 
 /**
+ * Paints res4 road/rail segments and city marks before infrastructure glyphs so airport/seaport symbols cover city markers.
+
+ * Purpose: Keeps drawable order stable: terrain strokes, res4 city marker/labels (canvas), then infra glyphs; road/rail lines are on the Leaflet vector layer under this canvas.
+ * When to use: After `drawRes4TerrainHexes` (and res1 production overlays when applicable), before `drawTerrainInfrastructureOverlays`.
+ * Expected outcome: No-op unless res4 is active; visibility follows `drawRes4CityOverlays` (res4 gate + exploration parity with terrain).
+ * Exceptions: None; delegates drawing to `drawRes4CityOverlays`.
+ */
+function drawRes4CityOverlayPass(ctx: CanvasRenderingContext2D): void {
+  drawRes4CityOverlays(ctx, {
+    getExploredHexSet,
+  });
+}
+
+/**
  * Defines the `drawRes1ProductionOverlays` function shape (function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void).
 
  * Purpose: Supports maintainability by documenting why `drawRes1ProductionOverlays` exists.
@@ -1951,13 +1985,13 @@ function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void 
  */
 function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void {
   if (!S.gameState) return;
+  if (shouldRenderRes4Hexes()) return;
   const map = getMainLeafletMap() as
     | { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } }
     | null;
   if (!map) return;
   const L = getLeafletGlobal();
   if (!L) return;
-  if (shouldRenderRes4Hexes()) return;
   const overlayContext = buildProductionOverlayContext(S.gameState);
   for (const hx of S.gameState.hexes) {
     const explored = isHexExploredByPlayer(hx.h3Index);
@@ -2307,11 +2341,15 @@ function drawGameScene(
   height: number,
   state: GameStateSnapshot
 ): void {
+  syncRes4TransportVectorLeafletLayer();
   ctx.clearRect(0, 0, width, height);
   if (S.tacticalBattleSnapshot) {
     maybeScheduleTacticalAnnihilationExit();
     drawTerrainHexes(ctx);
     drawRes4TerrainHexes(ctx);
+    drawRes1ProductionOverlays(ctx);
+    drawRes4CityOverlayPass(ctx);
+    drawTerrainInfrastructureOverlays(ctx);
     const tb = S.tacticalBattleSnapshot;
     const hexList = state.hexes.map((h) => h.h3Index);
     drawPendingMarchesHoverAndSupportOrderStack({
@@ -2463,6 +2501,7 @@ function drawGameScene(
     drawMarchHoverPreview: drawHoverRoutePreview,
   });
   drawRes1ProductionOverlays(ctx);
+  drawRes4CityOverlayPass(ctx);
   drawTerrainInfrastructureOverlays(ctx);
   drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId);
   if (unitsToDraw.length) {
@@ -3136,6 +3175,7 @@ function init(): void {
     refreshHoverRoutePreview,
     applyGameStateSnapshot,
     applyRes4TerrainOverrides,
+    refreshRes4TerrainOverridesForRenderer,
     hideBuildPopup,
     hideStackCallout,
     applyModifierDrivenPopoverCloseRules,
