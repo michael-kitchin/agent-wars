@@ -1,10 +1,10 @@
 # Agent Wars
 
-Grand strategy wargame with LLM opponents. The codebase has grown through milestones **0.5–0.7** (tools, hybrid AI, callbacks); **package version 1.1.0** marks the **production baseline** transition (see [.spec/milestone-1.1-execution-plan.md](.spec/milestone-1.1-execution-plan.md)).
+Grand strategy wargame with LLM opponents. The codebase has grown through milestones **0.5–0.7** (tools, hybrid AI, callbacks); **package version 1.1.0** marked the **production baseline** transition (see [.spec/milestone-1.1-execution-plan.md](.spec/milestone-1.1-execution-plan.md)). The current shipping version is **2.3.0** (`package.json`).
 
 ## Repository status
 
-- **Release version:** **1.1.0** (developer / side-load distribution only; no store or notarization requirements in this milestone)
+- **Release version:** **2.3.0** (developer / side-load distribution only; no store or notarization requirements in this milestone)
 - CI: GitHub Actions matrix build and test on Windows/Linux/macOS
 
 ## Prerequisites
