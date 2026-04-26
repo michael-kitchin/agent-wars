@@ -30,6 +30,18 @@ import {
 } from './briefing-tables';
 
 /**
+ * Builds the optional **Best Options This Turn** markdown subsection for operational map prompts.
+ *
+ * Purpose: Emits the `###` heading only when `renderThisTurnOptionsTableMarkdown` produced body rows so the LLM does not see an empty section.
+ * When to use: After `optionsMd` is computed in strategic and tactical operational map builders.
+ * Expected outcome: Fragment ending with a newline when non-empty, or an empty string when `optionsMd` is blank or whitespace-only.
+ * Exceptions: None.
+ */
+function formatBestOptionsThisTurnSubsection(optionsMd: string): string {
+  return optionsMd.trim().length > 0 ? `### Best Options This Turn\n\n${optionsMd}\n` : '';
+}
+
+/**
  * Builds the strategic operational map section (res1) for the AI Commander briefing.
  *
  * Purpose: Primary entry used by `formatBriefing` when precomputation is enabled.
@@ -91,7 +103,7 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
   return (
     `# Operational Map\n\n${legend}\`\`\`\n${mapString}\n\`\`\`\n\n` +
     `${displacedLine}\n` +
-    `### Best Options This Turn\n\n${optionsMd}\n` +
+    `${formatBestOptionsThisTurnSubsection(optionsMd)}` +
     `### Unit Roster\n\n${rosterMd}\n`
   );
 }
@@ -202,7 +214,7 @@ export function buildTacticalOperationalMapSectionMarkdown(args: {
   return (
     `${legend}\`\`\`\n${mapString}\n\`\`\`\n\n` +
     `${displacedLine}\n` +
-    `### Best Options This Turn\n\n${optionsMd}\n` +
+    `${formatBestOptionsThisTurnSubsection(optionsMd)}` +
     `### Unit Roster\n\n${rosterMd}\n`
   );
 }

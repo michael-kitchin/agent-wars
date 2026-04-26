@@ -132,6 +132,34 @@ function testStrategicOperationalMapNoUnitsFallback(): void {
 }
 
 /**
+ * Defines the `testStrategicOperationalMapOmitsBestOptionsHeadingWhenEmpty` function shape.
+ *
+ * Purpose: Ensures the LLM prompt omits the **Best Options This Turn** subsection title when there are no opponent rows to tabulate.
+ * When to use: Regression guard for empty-table prompt noise (human-only forces still render the ASCII map).
+ * Expected outcome: Markdown includes **Unit Roster** but not `### Best Options This Turn`.
+ * Exceptions: None.
+ */
+function testStrategicOperationalMapOmitsBestOptionsHeadingWhenEmpty(): void {
+  ensureStrategicCoordinateRegistryInitialized();
+  const res1Human = latLngToCell(-15, 120, 1);
+  const [lat, lng] = cellToLatLng(res1Human);
+  const state: GameStateSnapshot = {
+    hexes: [{ h3Index: res1Human, terrain: 'land', terrainKind: 'plains' }],
+    units: [{ id: 'hum-1', player: 'human', unitType: 'infantry', h3Index: res1Human }],
+    phase: 'planning',
+    turnNumber: 1,
+    pendingOrders: [],
+  };
+  const md = buildStrategicOperationalMapSectionMarkdown({
+    state,
+    precomputed: EMPTY_PRECOMPUTED,
+    latLngByH3: new Map([[res1Human, [lat, lng]]]),
+  });
+  assert.ok(md.includes('### Unit Roster'), 'expected roster heading when map renders');
+  assert.ok(!md.includes('### Best Options This Turn'), 'expected no empty Best Options heading');
+}
+
+/**
  * Defines the `testStrategicFogHidesEnemyMarkersOnMap` function shape.
  *
  * Purpose: Ensures changing map extent did not alter fog / enemy visibility inside `buildStrategicHexGameStateMap`.
@@ -274,6 +302,10 @@ function testTacticalAsciiGridUsesManyRowsNotLatitudeRibbon(): void {
 const tests = [
   { name: 'strategic operational map includes all res1 codes', fn: testStrategicOperationalMapIncludesAllRes1Codes },
   { name: 'strategic operational map no-units fallback', fn: testStrategicOperationalMapNoUnitsFallback },
+  {
+    name: 'strategic operational map omits Best Options heading when table empty',
+    fn: testStrategicOperationalMapOmitsBestOptionsHeadingWhenEmpty,
+  },
   { name: 'strategic fog hides enemy markers in fenced map', fn: testStrategicFogHidesEnemyMarkersOnMap },
   { name: 'tactical operational map includes all res4 codes', fn: testTacticalOperationalMapIncludesAllRes4Codes },
   {
