@@ -387,7 +387,7 @@ export async function requestOrdersFlow(
     });
     return failRequest('Operational map is required for AI prompting and was not generated.');
   }
-  let systemPrompt = buildSystemPromptForTools(planState, coordMap, enabledToolNames, briefingOverride, coordinateContext);
+  const systemPrompt = buildSystemPromptForTools(planState, coordMap, enabledToolNames, briefingOverride, coordinateContext);
   const userMessage = getInitialUserMessage(flags, briefingOverride != null && briefingOverride.length > 0);
 
   const tools = buildToolDefinitions(enabledToolNames);

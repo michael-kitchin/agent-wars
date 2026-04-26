@@ -164,11 +164,21 @@ reason?: string;
    */
   tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
   /**
-   * When set by main after an event-driven post-beat consultation, mirrors `requestAiOrders` tactical buffering for the renderer.
+   * Buffered opponent tactical rows produced after an event-driven post-beat consultation.
+   *
+   * Contract: When present, matches the tactical-only plan shape returned by `afterTacticalBeatResolution` for renderer-side draft hydration.
+   * When to use: `commitHumanTacticalDraftOrders` success path after main attached post-beat consultation results.
+   * Expected outcome: Renderer can populate `tacticalOpponentDraft` without a second model round-trip.
+   * Exceptions: None; omit when no consultation ran or the model produced no plan.
    */
   tacticalOpponentPlan?: TacticalOpponentPlanPayload;
   /**
-   * Optional tool invocation counts from the same tactical consultation pass.
+   * Per-tool call counts from the tactical consultation pass that produced `tacticalOpponentPlan`, if any.
+   *
+   * Contract: Keys are tool names; values are non-negative integers counting invocations in that pass only.
+   * When to use: Telemetry and debugging for tactical AI tool usage alongside `tacticalOpponentPlan`.
+   * Expected outcome: Undefined when no tactical consultation ran or counts were not collected.
+   * Exceptions: None.
    */
   toolInvocationCounts?: Record<string, number>;
 }

@@ -19,15 +19,63 @@ import type { HexGrid, GridCell } from './hex-grid-projection';
  * Exceptions: None.
  */
 export interface HexMapCellState {
+  /**
+   * Land vs water classification for the res4 cell backing this map tile.
+   *
+   * Contract: `'water'` suppresses land-only overlays; `'land'` participates in structural and presence overlays when discovered.
+   * When to use: Populated from terrain metadata for each projected grid cell before ASCII rendering.
+   * Expected outcome: Consistent with engine terrain for that H3 child cell.
+   * Exceptions: None.
+   */
   terrain: 'land' | 'water';
+  /**
+   * Whether the active player has discovered this cell for briefing display.
+   *
+   * Contract: When false, renderer uses `?` and skips faction-specific overlays regardless of underlying truth.
+   * When to use: Fog and intel gating for operational map sections.
+   * Expected outcome: Undiscovered cells never leak hidden unit or infrastructure detail in the ASCII map.
+   * Exceptions: None.
+   */
   isDiscovered: boolean;
+  /**
+   * Infrastructure markers that compete for a single structural overlay character per cell.
+   *
+   * Contract: `urbanCount` is a non-negative count; airport/seaport flags are independent booleans used by the overlay priority table.
+   * When to use: After resolving airports, seaports, and urban density for the cell from game state.
+   * Expected outcome: Renderer can choose `A`/`S`/`U`/`B` variants without consulting full `GameStateSnapshot`.
+   * Exceptions: None.
+   */
   features: {
     hasAirport: boolean;
     hasSeaport: boolean;
     urbanCount: number;
   };
+  /**
+   * True when the cell is controlled by the AI side for upper/lower-case structural markers.
+   *
+   * Contract: Only consulted when the cell is discovered and structural overlay applies.
+   * When to use: Territory tint in the operational briefing map.
+   * Expected outcome: Uppercase vs lowercase airport/seaport/urban glyphs per design.
+   * Exceptions: None.
+   */
   controlledByAI: boolean;
+  /**
+   * Count of AI-owned units present in the cell for presence overlay selection.
+   *
+   * Contract: Non-negative integer; zero means no AI units for presence glyphs.
+   * When to use: Stacking friendly markers vs structural infrastructure in dense cells.
+   * Expected outcome: Presence layer defers to structural overlay rules when counts imply hidden infrastructure.
+   * Exceptions: None.
+   */
   aiUnitCount: number;
+  /**
+   * Count of human-side (enemy to AI) units in the cell for presence overlay selection.
+   *
+   * Contract: Non-negative integer; combined with `aiUnitCount` for `x` vs numeric markers.
+   * When to use: Enemy presence visualization on the operational map.
+   * Expected outcome: Deterministic presence character from the renderer’s priority rules.
+   * Exceptions: None.
+   */
   enemyUnitCount: number;
 }
 
@@ -40,7 +88,23 @@ export interface HexMapCellState {
  * Exceptions: None.
  */
 export interface HexAsciiMapResult {
+  /**
+   * Full multi-line ASCII map text for prompt or UI embedding.
+   *
+   * Contract: Newline-separated rows matching `HexGrid` dimensions; no trailing requirements beyond caller display.
+   * When to use: After `renderHexAsciiMap` completes successfully.
+   * Expected outcome: String suitable for markdown code fences or plain-text appendices.
+   * Exceptions: None.
+   */
   mapString: string;
+  /**
+   * Infrastructure labels displaced because unit presence glyphs occupied the cell.
+   *
+   * Contract: Each entry ties a briefing hex `code` to a short `feature` label for footnote recovery text.
+   * When to use: When callers must append footnotes so airports/seaports are not silently dropped.
+   * Expected outcome: Empty array when no displacement occurred.
+   * Exceptions: None.
+   */
   displacedFeatures: Array<{ code: string; feature: string }>;
 }
 

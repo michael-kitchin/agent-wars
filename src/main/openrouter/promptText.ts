@@ -125,6 +125,7 @@ const PRODUCTION_REQUIREMENT_PRIORITY_INITIAL =
  * Exceptions: None.
  */
 export function buildLatLngPreamble(h3Resolution: number, decimalPlaces: number): string {
+  void decimalPlaces;
   return `Global Earth map, H3 resolution ${h3Resolution}. Positions are two-character briefing hex codes (A–Z and 0–9) from the operational map and roster tables — copy exactly; never invent codes. Distances are hex counts where shown.
 
 Final JSON: use briefing hex codes for cells; standing-order pursue uses enemy unit id (targetUnitId). Never emit raw H3 strings or latitude/longitude pairs.`;

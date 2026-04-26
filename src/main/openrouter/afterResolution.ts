@@ -259,9 +259,41 @@ export function buildTacticalBeatResolutionReadyParticipants(
  * Exceptions: None.
  */
 export interface AfterTacticalBeatResolutionDeps {
+  /**
+   * OpenRouter (or adapter) model id used for the tactical consultation call.
+   *
+   * Contract: Non-empty model identifier understood by the shared `requestOrders` path.
+   * When to use: Passed through to `requestOrders` alongside tactical battle context.
+   * Expected outcome: Same model selection semantics as strategic after-resolution flows.
+   * Exceptions: None at this boundary; invalid ids fail inside `requestOrders`.
+   */
   modelId: string;
+  /**
+   * Tool names enabled for the tactical consultation request.
+   *
+   * Contract: Subset of tools the engine allows for tactical AI planning in this build.
+   * When to use: Mirroring the tool allowlist used for strategic orders when reusing `requestOrders`.
+   * Expected outcome: `buildToolDefinitions` receives a consistent list for the tactical prompt.
+   * Exceptions: None.
+   */
   enabledToolNames: string[];
+  /**
+   * Predicate indicating whether an API key is available for outbound LLM calls.
+   *
+   * Contract: When false, consultation must skip network without throwing from this module.
+   * When to use: Gate optional LLM invocation after mandatory tactical rules run.
+   * Expected outcome: Caller observes `consulted: false` when key is missing.
+   * Exceptions: None.
+   */
   hasKey: () => boolean;
+  /**
+   * Shared AI order request entry point reused with tactical options.
+   *
+   * Contract: Must accept `tacticalAiBattle` in `options` when provided and return the same `RequestAiOrdersResult` shape as strategic callers.
+   * When to use: Injected to avoid a circular dependency on the concrete OpenRouter client.
+   * Expected outcome: Buffered tactical rows when the model returns a valid tactical plan payload.
+   * Exceptions: Propagates only when the adapter surfaces structured failures; otherwise swallowed by caller policy.
+   */
   requestOrders: (
     state: GameStateSnapshot,
     modelId: string,
@@ -282,9 +314,41 @@ export interface AfterTacticalBeatResolutionDeps {
  * Exceptions: None.
  */
 export interface AfterTacticalBeatResolutionResult {
+  /**
+   * Whether an LLM-backed tactical consultation was attempted and completed successfully.
+   *
+   * Contract: True only when the optional model call ran to completion without being skipped for missing key or policy.
+   * When to use: Renderer and IPC layers decide whether to trust `tacticalOpponentPlan` as fresh.
+   * Expected outcome: False when skipped, failed softly, or keyless short-circuit after mandatory work.
+   * Exceptions: None.
+   */
   consulted: boolean;
+  /**
+   * Opponent tactical plan rows for renderer buffering when consultation succeeded.
+   *
+   * Contract: When present, payload is validated tactical-only opponent rows compatible with `tacticalOpponentDraft` hydration.
+   * When to use: After `afterTacticalBeatResolution` returns with a model-produced plan.
+   * Expected outcome: Undefined when not consulted or model returned no tactical plan.
+   * Exceptions: None.
+   */
   tacticalOpponentPlan?: TacticalOpponentPlanPayload;
+  /**
+   * Optional short natural-language strategy summary from the tactical consultation.
+   *
+   * Contract: Opaque diagnostic text for logs or UI; not authoritative for game rules.
+   * When to use: When the adapter exposes strategy text alongside tool results.
+   * Expected outcome: Undefined when the model did not emit strategy content.
+   * Exceptions: None.
+   */
   strategy?: string;
+  /**
+   * Tool invocation counts for the tactical consultation pass, when collected.
+   *
+   * Contract: Map of tool name to non-negative invocation count for that single pass.
+   * When to use: Debugging parity with strategic `afterResolution` telemetry.
+   * Expected outcome: Undefined when consultation did not run tools or counts were not captured.
+   * Exceptions: None.
+   */
   toolInvocationCounts?: Record<string, number>;
 }
 

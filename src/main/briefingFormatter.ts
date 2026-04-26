@@ -11,10 +11,7 @@ import type { CallbackSubscription } from './callbackSubscriptions';
 import { cellToLatLng, latLngToCell } from 'h3-js';
 import { LATLNG_DECIMAL_PLACES } from './mapData';
 import { logTrace } from './logger';
-import {
-  buildStrategicOperationalMapSectionMarkdown,
-  buildTacticalOperationalMapSectionMarkdown,
-} from './briefing/map/briefing-map-section';
+import { buildStrategicOperationalMapSectionMarkdown } from './briefing/map/briefing-map-section';
 import { ensureStrategicCoordinateRegistryInitialized } from './briefing/map/hex-coordinates';
 import { h3ToCode } from './briefing/map/hex-code-translator';
 import type { CoordinateContext } from './briefing/map/coordinateContext';
