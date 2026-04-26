@@ -10,8 +10,15 @@
 
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logError, logTrace } from '../logger';
-import { afterResolution } from '../openrouter/afterResolution';
-import type { ReadyResult, RangedAttackOrder, RequestAiOrdersResult } from '../../shared/ipcTypes';
+import { afterResolution, afterTacticalBeatResolution } from '../openrouter/afterResolution';
+import type {
+  ReadyResult,
+  RangedAttackOrder,
+  RequestAiOrdersResult,
+  TacticalCommitResolutionPlayback,
+} from '../../shared/ipcTypes';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import type { TacticalOpponentPlanPayload } from '../../shared/ipc/readyTypes';
 
 /**
  * Subset of `ReadyResult` fields copied verbatim into completed-turn IPC payloads.
@@ -190,6 +197,69 @@ export async function runEventDrivenAfterResolutionConsultation(args: {
     return {
       ...(postResolution.strategy ? { aiStrategy: postResolution.strategy } : {}),
       ...(postResolution.toolInvocationCounts ? { toolInvocationCounts: postResolution.toolInvocationCounts } : {}),
+    };
+  } catch (err) {
+    logError(args.errorLogMessage, err);
+    return {};
+  }
+}
+
+/**
+ * Post–tactical-beat event-driven consultation with the same timeout envelope as strategic Ready follow-up.
+ *
+ * Purpose: Lets the opponent LLM re-plan inside an active tactical session when callbacks or tactical mandatory rules fire.
+ * When to use: `game:commitHumanTacticalDraftOrders` after a successful commit when the renderer passed event-driven flags.
+ * Expected outcome: Optional `tacticalOpponentPlan` plus optional strategy/tool-count telemetry for the IPC payload.
+ * Exceptions: Does not throw; failures are logged at error and swallowed.
+ */
+export async function runEventDrivenAfterTacticalBeatConsultation(args: {
+  useEventDrivenConsultation: boolean;
+  aiPlanningRunEnabled: boolean;
+  opponentState: GameStateSnapshot;
+  tacticalBattle: TacticalBattleSnapshot;
+  tacticalResolutionPlayback: TacticalCommitResolutionPlayback;
+  modelId: string;
+  enabledToolNames: string[];
+  hasKey: () => boolean;
+  requestOrders: (
+    state: GameStateSnapshot,
+    modelId: string,
+    options: {
+      enabledToolNames: string[];
+      usePrecomputation?: boolean;
+      tacticalAiBattle?: TacticalBattleSnapshot;
+    }
+  ) => Promise<RequestAiOrdersResult>;
+  timeoutMs: number;
+  errorLogMessage: string;
+}): Promise<{
+  tacticalOpponentPlan?: TacticalOpponentPlanPayload;
+  aiStrategy?: string;
+  toolInvocationCounts?: Record<string, number>;
+}> {
+  if (!args.useEventDrivenConsultation || !args.aiPlanningRunEnabled) {
+    return {};
+  }
+  logDebug('runEventDrivenAfterTacticalBeatConsultation', { timeoutMs: args.timeoutMs });
+  try {
+    const post = await Promise.race([
+      afterTacticalBeatResolution(args.opponentState, args.tacticalBattle, args.tacticalResolutionPlayback, {
+        modelId: args.modelId ?? '',
+        enabledToolNames: args.enabledToolNames,
+        hasKey: args.hasKey,
+        requestOrders: args.requestOrders,
+      }),
+      new Promise<never>((_resolve, reject) => {
+        setTimeout(
+          () => reject(new Error(`afterTacticalBeatResolution timed out after ${args.timeoutMs}ms`)),
+          args.timeoutMs
+        );
+      }),
+    ]);
+    return {
+      ...(post.tacticalOpponentPlan ? { tacticalOpponentPlan: post.tacticalOpponentPlan } : {}),
+      ...(post.strategy ? { aiStrategy: post.strategy } : {}),
+      ...(post.toolInvocationCounts ? { toolInvocationCounts: post.toolInvocationCounts } : {}),
     };
   } catch (err) {
     logError(args.errorLogMessage, err);

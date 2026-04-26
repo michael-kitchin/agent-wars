@@ -164,9 +164,17 @@ export function buildTacticalOperationalMapSectionMarkdown(args: {
   initTacticalCoordinateRegistry(args.tacticalBattle.battleId, args.tacticalBattle.enclosingRes1H3Index);
   const context: CoordinateContext = { mode: 'tactical', battleId: args.tacticalBattle.battleId };
 
-  const mapHexes = args.state.hexes.map((h) => h.h3Index);
+  const mapHexes = [...args.tacticalBattle.res4ChildH3Indexes];
   if (mapHexes.length === 0) {
     return '_No tactical cells — map not rendered._\n';
+  }
+  const stateHexSet = new Set(args.state.hexes.map((h) => h.h3Index));
+  if (mapHexes.some((h) => !stateHexSet.has(h))) {
+    logDebug('briefing-map-section buildTacticalOperationalMapSectionMarkdown: footprint vs planState.hexes mismatch', {
+      battleId: args.tacticalBattle.battleId,
+      footprintCells: mapHexes.length,
+      stateHexRows: args.state.hexes.length,
+    });
   }
   const grid = projectToGrid(mapHexes, context);
   const gameByH3 = buildTacticalHexGameStateMap(args.state, mapHexes);

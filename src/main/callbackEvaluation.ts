@@ -505,6 +505,26 @@ export function evaluateMandatoryOverrides(
 }
 
 /**
+ * Mandatory re-consult triggers after a tactical WEGO beat (res4 sub-units), without strategic standing-order noise.
+ *
+ * Purpose: Event-driven tactical uses the same subscription machinery as strategic, but `evaluateMandatoryOverrides`
+ * references strategic parent units and DB standing orders that do not apply to sub-unit ids.
+ * When to use: `afterTacticalBeatResolution` only, after building a tactical `ResolutionContext` from playback.
+ * Expected outcome: At least one `unit_destroyed` entry per removed opponent sub-unit so lossy beats can force consultation.
+ * Exceptions: None.
+ */
+export function evaluateTacticalMandatoryOverrides(ctx: ResolutionContext): MandatoryOverrideResult[] {
+  const results: MandatoryOverrideResult[] = [];
+  for (const unitId of ctx.removedOpponentUnitIds) {
+    results.push({ type: 'unit_destroyed', unitId });
+  }
+  if (results.length > 0) {
+    logDebug('callbackEvaluation evaluateTacticalMandatoryOverrides', { count: results.length });
+  }
+  return results;
+}
+
+/**
  * Defines the `evaluateSubscriptionEvents` function shape (export function evaluateSubscriptionEvents( state: GameStateSnapshot, subscriptions: CallbackSubscription[], ctx: ResolutionContext ): SubscriptionEve).
 
  * Purpose: Supports maintainability by documenting why `evaluateSubscriptionEvents` exists.

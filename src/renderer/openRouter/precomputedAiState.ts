@@ -42,9 +42,16 @@ export function resetPrecomputedAiState(mode: PrecomputedResetMode): void {
  * Exceptions: None.
  */
 export function applySuccessfulPrecomputedAiResult(result: Extract<RequestAiOrdersResult, { success: true }>): void {
-  S.precomputedAiOrders = result.orders;
-  S.precomputedAiRangedOrders = result.rangedAttacks ?? [];
-  S.precomputedAiEmbarkOrders = result.embarkOrders ?? [];
+  if (result.tacticalOpponentPlan) {
+    // Tactical IPC clears movement orders; keep precomputed null so the next tactical beat can re-enter the AI wait state.
+    S.precomputedAiOrders = null;
+    S.precomputedAiRangedOrders = [];
+    S.precomputedAiEmbarkOrders = [];
+  } else {
+    S.precomputedAiOrders = result.orders;
+    S.precomputedAiRangedOrders = result.rangedAttacks ?? [];
+    S.precomputedAiEmbarkOrders = result.embarkOrders ?? [];
+  }
   S.precomputedAiStrategy = result.strategy ?? null;
   if (result.tacticalBattle) {
     S.tacticalBattleSnapshot = result.tacticalBattle;

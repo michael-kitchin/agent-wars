@@ -3,7 +3,7 @@
  */
 
 import * as assert from 'assert';
-import { getFinalJsonOrdersExampleBlock } from './promptContracts';
+import { buildFinalJsonContractInstruction, getFinalJsonOrdersExampleBlock } from './promptContracts';
 
 /**
  * Defines the `testExampleBlockParsesWithParser` function shape (function testExampleBlockParsesWithParser(): void).
@@ -31,6 +31,36 @@ function testExampleBlockParsesWithParser(): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * Defines the `testTacticalCallbacksClauseMentionsBeat` function shape.
+ *
+ * Purpose: Ensures tactical mode expands the JSON contract callbacks guidance.
+ * When to use: Regression after edits to `buildFinalJsonContractInstruction`.
+ * Expected outcome: Tactical string mentions tactical beat and event-driven.
+ * Exceptions: Assertion failure on contract drift.
+ */
+function testTacticalCallbacksClauseMentionsBeat(): void {
+  const tactical = buildFinalJsonContractInstruction({
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+    movementOrderInstruction: '',
+    submitMemoryClause: '',
+    productionSubmitClause: '',
+    coordinateMode: 'tactical',
+  });
+  assert.ok(tactical.includes('tactical beat'));
+  assert.ok(tactical.includes('event-driven'));
+  const strategic = buildFinalJsonContractInstruction({
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+    movementOrderInstruction: '',
+    submitMemoryClause: '',
+    productionSubmitClause: '',
+    coordinateMode: 'strategic',
+  });
+  assert.ok(!strategic.includes('tactical beat'));
+}
+
 function testExampleBlockIncludesOptionalTails(): void {
   const block = getFinalJsonOrdersExampleBlock({ includeMemoryUpdates: true, includeProductionOrders: true });
   assert.ok(block.includes('"memoryUpdates"'));
@@ -49,6 +79,7 @@ function testExampleBlockIncludesOptionalTails(): void {
 const tests = [
   { name: 'getFinalJsonOrdersExampleBlock contains parseable JSON', fn: testExampleBlockParsesWithParser },
   { name: 'getFinalJsonOrdersExampleBlock optional tails', fn: testExampleBlockIncludesOptionalTails },
+  { name: 'buildFinalJsonContractInstruction tactical callbacks clause', fn: testTacticalCallbacksClauseMentionsBeat },
 ];
 
 /**

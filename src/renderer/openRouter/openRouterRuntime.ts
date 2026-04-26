@@ -90,6 +90,25 @@ export function syncEventDrivenFromTools(): void {
 }
 
 /**
+ * True when the renderer is in tactical planning with Run-style (non–event-driven) AI so `requestAiOrders` is valid
+ * even if the enclosing strategic turn is still `resolution` (common after melee intercept opens tactical).
+ *
+ * Purpose: `startBackgroundRequestIfAllowed` historically gated on strategic `planning` only, which blocked all
+ * tactical opponent background consultations in that scenario.
+ * When to use: Relax the strategic phase check alongside `isWaitingForPrecomputedAiOrders` for tactical Run.
+ * Expected outcome: Returns false when Events tool drives consultations or tactical planning UI is inactive.
+ * Exceptions: None.
+ */
+function strategicPhaseAllowsBackgroundAi(): boolean {
+  if (S.gameState?.phase === 'planning') return true;
+  return !!(
+    S.tacticalBattleSnapshot &&
+    S.tacticalPhasePlanning &&
+    !S.useEventDrivenConsultation
+  );
+}
+
+/**
  * Defines the `startBackgroundRequestIfAllowed` function shape (export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): void).
 
  * Purpose: Supports maintainability by documenting why `startBackgroundRequestIfAllowed` exists.
@@ -98,7 +117,7 @@ export function syncEventDrivenFromTools(): void {
  * Exceptions: None.
  */
 export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): void {
-  if (S.backgroundRequestInFlight || !isWaitingForPrecomputedAiOrders() || S.gameState?.phase !== 'planning') return;
+  if (S.backgroundRequestInFlight || !isWaitingForPrecomputedAiOrders() || !strategicPhaseAllowsBackgroundAi()) return;
   const keyPromise = window.gameApi?.openRouter?.getKey?.();
   const modelPromise = window.gameApi?.openRouter?.getSelectedModel?.();
   if (!keyPromise || !modelPromise) return;

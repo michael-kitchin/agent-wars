@@ -137,6 +137,14 @@ export type ParsedHumanTacticalCommitOrders = {
   ferryOrders: FerryOrder[];
   embarkOrders: EmbarkOrder[];
   opponentTacticalDraft?: TacticalOpponentPlanPayload;
+  /**
+   * When true, main may run post-beat event-driven AI consultation after a successful tactical commit.
+   */
+  useEventDrivenConsultation?: boolean;
+  /**
+   * When true with `useEventDrivenConsultation`, Run-mode AI hooks are allowed to invoke the model after the beat.
+   */
+  aiPlanningRunEnabled?: boolean;
 };
 
 /**
@@ -160,7 +168,11 @@ export function parseHumanTacticalCommitPayload(
     airStrikes?: unknown;
     ferryOrders?: unknown;
     embarkOrders?: unknown;
+    useEventDrivenConsultation?: unknown;
+    aiPlanningRunEnabled?: unknown;
   };
+  const useEventDrivenConsultation = p.useEventDrivenConsultation === true;
+  const aiPlanningRunEnabled = p.aiPlanningRunEnabled === true;
   const movementRaw = p.movementOrders;
   if (!Array.isArray(movementRaw)) return { ok: false, reason: invalid };
   const movementOrders: { unitId: string; toH3Index: string }[] = [];
@@ -302,6 +314,15 @@ export function parseHumanTacticalCommitPayload(
   }
   return {
     ok: true,
-    value: { movementOrders, rangedAttacks, airStrikes, ferryOrders, embarkOrders, opponentTacticalDraft },
+    value: {
+      movementOrders,
+      rangedAttacks,
+      airStrikes,
+      ferryOrders,
+      embarkOrders,
+      opponentTacticalDraft,
+      useEventDrivenConsultation,
+      aiPlanningRunEnabled,
+    },
   };
 }

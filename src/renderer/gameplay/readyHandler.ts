@@ -7,6 +7,7 @@ import type {
   TacticalCommitResolutionPlayback,
 } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import type { TacticalOpponentPlanPayload } from '../../shared/ipc/readyTypes';
 import type { MeleeInterceptModalOpenArgs, MeleeInterceptModalOutcome } from './meleeInterceptModal';
 import { buildTacticalSubUnitKillLabelOverlay } from './sidebarSupport';
 import { buildTurnUpdateBullets } from './turnUpdateSummary';
@@ -664,12 +665,16 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         ferryOrders: [...S.pendingFerryOrders],
         embarkOrders: [...S.pendingEmbarkOrders],
         ...(S.tacticalOpponentDraft ? { opponentTacticalDraft: S.tacticalOpponentDraft } : {}),
+        useEventDrivenConsultation: S.useEventDrivenConsultation,
+        aiPlanningRunEnabled: S.runButtonOn,
       })) as {
         success: boolean;
         reason?: string;
         tacticalBattle?: TacticalBattleSnapshot;
         tacticalResolutionPlayback?: TacticalCommitResolutionPlayback;
         tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
+        tacticalOpponentPlan?: TacticalOpponentPlanPayload;
+        toolInvocationCounts?: Record<string, number>;
       };
       if (!commitResult.success) {
         deps.showSidebarError(commitResult.reason ?? 'Tactical commit failed');
@@ -717,7 +722,11 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       if (commitResult.tacticalBattle) {
         S.tacticalBattleSnapshot = commitResult.tacticalBattle;
       }
-      S.tacticalOpponentDraft = null;
+      S.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
+      if (commitResult.toolInvocationCounts) {
+        S.toolInvocationCounts = { ...S.toolInvocationCounts, ...commitResult.toolInvocationCounts };
+        deps.updateOpenRouterToolCountLabels();
+      }
       S.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length
         ? [...commitResult.tacticalMarchContinuations]
         : [];
@@ -811,6 +820,11 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       }
       deps.redraw();
       deps.scheduleTacticalAnnihilationExit?.();
+      if (!S.useEventDrivenConsultation && S.runButtonOn) {
+        const oppAlive = S.tacticalBattleSnapshot?.subUnits.some((u) => u.player === 'opponent') ?? false;
+        if (oppAlive) deps.startBackgroundRequestIfAllowed();
+      }
+      deps.updateReadyButtonState();
       return;
     }
     const hasPendingDraftOrders =

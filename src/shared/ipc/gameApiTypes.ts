@@ -208,12 +208,16 @@ commitHumanTacticalDraftOrders: (payload: {
     ferryOrders?: { unitId: string; destinationH3Index: string }[];
     embarkOrders?: { unitId: string; navalUnitId: string }[];
     opponentTacticalDraft?: import('./readyTypes').TacticalOpponentPlanPayload;
+    useEventDrivenConsultation?: boolean;
+    aiPlanningRunEnabled?: boolean;
   }) => Promise<{
     success: boolean;
     reason?: string;
     tacticalBattle?: TacticalBattleSnapshot;
     tacticalResolutionPlayback?: TacticalCommitResolutionPlayback;
     tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
+    tacticalOpponentPlan?: import('./readyTypes').TacticalOpponentPlanPayload;
+    toolInvocationCounts?: Record<string, number>;
   }>;
     /**
    * Specifies the contract for the `validateGroupRangedTarget` member (validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }) => Promise<{ success: boolean; reason?: string }>;).

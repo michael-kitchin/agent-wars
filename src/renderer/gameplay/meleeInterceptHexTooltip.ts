@@ -15,7 +15,11 @@ import type { NamingLookupTarget, TerrainTooltipState } from '../map/terrainTool
 export type MeleeInterceptRes1HexTooltipDeps = {
   getCachedNamingLineForTarget: (target: NamingLookupTarget | null) => Promise<string | null>;
   terrainTooltipStateForRes1Hex: (h3Index: string) => TerrainTooltipState;
-  getCachedTerrainTooltipHtml: (state: TerrainTooltipState, namingLine: string | null) => string;
+  getCachedTerrainTooltipHtml: (
+    state: TerrainTooltipState,
+    namingLine: string | null,
+    namingTarget: NamingLookupTarget | null
+  ) => string;
 };
 
 /**
@@ -33,5 +37,5 @@ export async function buildMeleeInterceptHexPopupHtmlForRes1(
   const namingTarget: NamingLookupTarget = { h3Index, resolution: 1 };
   const namingLine = await deps.getCachedNamingLineForTarget(namingTarget);
   const state = deps.terrainTooltipStateForRes1Hex(h3Index);
-  return deps.getCachedTerrainTooltipHtml(state, namingLine);
+  return deps.getCachedTerrainTooltipHtml(state, namingLine, namingTarget);
 }

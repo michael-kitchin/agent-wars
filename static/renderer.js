@@ -14140,6 +14140,16 @@
       libh3._free(countPtr);
     }
   }
+  function getRes0Cells() {
+    var count = H3.res0CellCount();
+    var hexagons = libh3._malloc(SZ_H3INDEX * count);
+    try {
+      throwIfError(H3.getRes0Cells(hexagons));
+      return readArrayOfH3Indexes(hexagons, count);
+    } finally {
+      libh3._free(hexagons);
+    }
+  }
   function degsToRads(deg) {
     return deg * Math.PI / 180;
   }
@@ -15701,7 +15711,15 @@
 
   // src/renderer/openRouter/aiPlanningState.ts
   function isWaitingForPrecomputedAiOrders() {
-    return rendererSharedState.runButtonOn && rendererSharedState.precomputedAiOrders === null;
+    if (!rendererSharedState.runButtonOn) return false;
+    if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning) {
+      if (rendererSharedState.useEventDrivenConsultation) {
+        return false;
+      }
+      const opponentAlive = rendererSharedState.tacticalBattleSnapshot.subUnits.some((u) => u.player === "opponent");
+      return opponentAlive && rendererSharedState.tacticalOpponentDraft === null;
+    }
+    return rendererSharedState.precomputedAiOrders === null;
   }
 
   // src/renderer/openRouter/openRouterUiHelpers.ts
@@ -19182,9 +19200,15 @@
     rendererSharedState.precomputedToolInvocationCounts = null;
   }
   function applySuccessfulPrecomputedAiResult(result) {
-    rendererSharedState.precomputedAiOrders = result.orders;
-    rendererSharedState.precomputedAiRangedOrders = result.rangedAttacks ?? [];
-    rendererSharedState.precomputedAiEmbarkOrders = result.embarkOrders ?? [];
+    if (result.tacticalOpponentPlan) {
+      rendererSharedState.precomputedAiOrders = null;
+      rendererSharedState.precomputedAiRangedOrders = [];
+      rendererSharedState.precomputedAiEmbarkOrders = [];
+    } else {
+      rendererSharedState.precomputedAiOrders = result.orders;
+      rendererSharedState.precomputedAiRangedOrders = result.rangedAttacks ?? [];
+      rendererSharedState.precomputedAiEmbarkOrders = result.embarkOrders ?? [];
+    }
     rendererSharedState.precomputedAiStrategy = result.strategy ?? null;
     if (result.tacticalBattle) {
       rendererSharedState.tacticalBattleSnapshot = result.tacticalBattle;
@@ -19634,6 +19658,72 @@
     });
   }
 
+  // src/shared/hexLlmCodeAssignment.ts
+  var STRATEGIC_RESOLUTION = 1;
+  var DETAIL_RESOLUTION = 4;
+  var CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  var strategicH3ToCodeSingleton = null;
+  function indexToCode(index) {
+    if (index < 0 || index >= CODE_ALPHABET.length * CODE_ALPHABET.length) {
+      throw new Error(`hexLlmCodeAssignment: code index out of range (${index})`);
+    }
+    const hi = Math.floor(index / CODE_ALPHABET.length);
+    const lo = index % CODE_ALPHABET.length;
+    return `${CODE_ALPHABET[hi]}${CODE_ALPHABET[lo]}`;
+  }
+  function sortCellsForStableLlmCodes(cells) {
+    const decorated = cells.map((h3) => {
+      const [lat, lng] = cellToLatLng(h3);
+      return { h3, lat, lng };
+    });
+    decorated.sort((a, b) => {
+      if (a.lat !== b.lat) return b.lat - a.lat;
+      if (a.lng !== b.lng) return a.lng - b.lng;
+      return a.h3.localeCompare(b.h3);
+    });
+    return decorated.map((d) => d.h3);
+  }
+  function buildStrategicRes1H3ToCodeMap() {
+    const res0 = getRes0Cells();
+    const res1Set = /* @__PURE__ */ new Set();
+    for (const r0 of res0) {
+      for (const child of cellToChildren(r0, STRATEGIC_RESOLUTION)) {
+        res1Set.add(child);
+      }
+    }
+    const sorted = sortCellsForStableLlmCodes([...res1Set]);
+    const h3ToCode = /* @__PURE__ */ new Map();
+    for (let i = 0; i < sorted.length; i++) {
+      h3ToCode.set(sorted[i], indexToCode(i));
+    }
+    return h3ToCode;
+  }
+  function getStrategicRes1H3ToCodeMap() {
+    if (!strategicH3ToCodeSingleton) {
+      strategicH3ToCodeSingleton = buildStrategicRes1H3ToCodeMap();
+    }
+    return strategicH3ToCodeSingleton;
+  }
+  function getStrategicRes1HexCode(h3Index) {
+    return getStrategicRes1H3ToCodeMap().get(h3Index);
+  }
+  function getRes4ChildCodeWithinParent(parentRes1H3Index, childRes4H3Index, childResolution = DETAIL_RESOLUTION) {
+    const children = sortCellsForStableLlmCodes(cellToChildren(parentRes1H3Index, childResolution));
+    const idx = children.indexOf(childRes4H3Index);
+    if (idx < 0) return void 0;
+    return indexToCode(idx);
+  }
+  function getLlmHexLocationParenLabelForNamingTarget(target) {
+    if (target.resolution === 1) {
+      const c = getStrategicRes1HexCode(target.h3Index);
+      return c ? `(${c})` : null;
+    }
+    const parent = cellToParent(target.h3Index, STRATEGIC_RESOLUTION);
+    const parentCode = getStrategicRes1HexCode(parent);
+    const childCode = getRes4ChildCodeWithinParent(parent, target.h3Index);
+    return parentCode && childCode ? `(${parentCode}.${childCode})` : null;
+  }
+
   // src/renderer/gameplay/buildQueuePopup.ts
   function sanitizeBuildCountInputText(raw) {
     const digitsOnly = raw.replaceAll(/\D/g, "").slice(0, 2);
@@ -19716,13 +19806,22 @@
       const section = document.createElement("div");
       section.className = "build-queue-section";
       const trimmedNamingLine = namingLine?.trim() ?? "";
+      const res1Code = getStrategicRes1HexCode(h3Index);
+      const llmPrefixHtml = res1Code ? `<strong>(${escapeHtml(res1Code)})</strong> ` : "";
       if (trimmedNamingLine.length > 0) {
         const descriptionLine = document.createElement("div");
-        descriptionLine.innerHTML = formatGroupedNamingLineHtml(trimmedNamingLine);
+        descriptionLine.innerHTML = `${llmPrefixHtml}${formatGroupedNamingLineHtml(trimmedNamingLine)}`;
         section.appendChild(descriptionLine);
         const descriptionSpacer = document.createElement("div");
         descriptionSpacer.style.height = "0.5em";
         section.appendChild(descriptionSpacer);
+      } else if (llmPrefixHtml) {
+        const codeLine = document.createElement("div");
+        codeLine.innerHTML = llmPrefixHtml;
+        section.appendChild(codeLine);
+        const codeSpacer = document.createElement("div");
+        codeSpacer.style.height = "0.5em";
+        section.appendChild(codeSpacer);
       }
       const pointsLine = document.createElement("div");
       const productionCapacity = snapshot.urbanHexCount;
@@ -20125,8 +20224,12 @@
   function syncEventDrivenFromTools() {
     rendererSharedState.useEventDrivenConsultation = rendererSharedState.enabledToolGroups.has("events");
   }
+  function strategicPhaseAllowsBackgroundAi() {
+    if (rendererSharedState.gameState?.phase === "planning") return true;
+    return !!(rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning && !rendererSharedState.useEventDrivenConsultation);
+  }
   function startBackgroundRequestIfAllowed(deps) {
-    if (rendererSharedState.backgroundRequestInFlight || !isWaitingForPrecomputedAiOrders() || rendererSharedState.gameState?.phase !== "planning") return;
+    if (rendererSharedState.backgroundRequestInFlight || !isWaitingForPrecomputedAiOrders() || !strategicPhaseAllowsBackgroundAi()) return;
     const keyPromise = window.gameApi?.openRouter?.getKey?.();
     const modelPromise = window.gameApi?.openRouter?.getSelectedModel?.();
     if (!keyPromise || !modelPromise) return;
@@ -20844,6 +20947,12 @@
   function escapeHtml2(text) {
     return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
   }
+  function formatLlmLocationBoldPrefixHtml(namingTarget) {
+    if (!namingTarget) return "";
+    const label = getLlmHexLocationParenLabelForNamingTarget(namingTarget);
+    if (!label) return "";
+    return `<strong>${escapeHtml2(label)}</strong> `;
+  }
   function formatGroupedNamingLineHtml2(namingLine) {
     const groups = namingLine.split(";").map((g) => g.trim()).filter((g) => g.length > 0);
     if (groups.length === 0) return escapeHtml2(namingLine);
@@ -20864,7 +20973,8 @@
     if (state.isRubble) variants.push("Rubble");
     return variants.length > 0 ? `, ${variants.join(", ")}` : "";
   }
-  function formatTerrainTooltipHtml(state, namingLine) {
+  function formatTerrainTooltipHtml(state, namingLine, namingTarget) {
+    const prefix = formatLlmLocationBoldPrefixHtml(namingTarget);
     const terrainLabel = formatTerrainKindLabel(state.terrainKind);
     const terrainValue = state.res1TerrainSummary ?? `${terrainLabel}${formatTerrainVariantSuffix(state)}`;
     const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
@@ -20876,10 +20986,11 @@
       bodyParts.push(productionLine);
     }
     const bodyLine = bodyParts.join('<br/><span style="display:block;height:0.5em"></span>');
-    if (!namingLine) return bodyLine;
-    return `${formatGroupedNamingLineHtml2(namingLine)}<br/><span style="display:block;height:0.5em"></span>${bodyLine}`;
+    if (!namingLine) return `${prefix}${bodyLine}`;
+    return `${prefix}${formatGroupedNamingLineHtml2(namingLine)}<br/><span style="display:block;height:0.5em"></span>${bodyLine}`;
   }
-  function terrainTooltipContentKey(state, namingLine) {
+  function terrainTooltipContentKey(state, namingLine, namingTarget) {
+    const targetKey = namingTarget == null ? "none" : `${namingTarget.resolution}:${namingTarget.h3Index}`;
     const namingKey = namingLine ?? "";
     const urbanKey = state.isUrban ? "1" : "0";
     const rubbleKey = state.isRubble ? "1" : "0";
@@ -20887,13 +20998,13 @@
     const urbanHexCountKey = state.urbanHexCount == null ? "x" : String(state.urbanHexCount);
     const res1TerrainSummaryKey = state.res1TerrainSummary ?? "";
     const res1FeaturesSummaryKey = state.res1FeaturesSummary ?? "";
-    return `${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}`;
+    return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}`;
   }
-  function getCachedTerrainTooltipHtml(state, namingLine) {
-    const key = terrainTooltipContentKey(state, namingLine);
+  function getCachedTerrainTooltipHtml(state, namingLine, namingTarget) {
+    const key = terrainTooltipContentKey(state, namingLine, namingTarget);
     const cachedHtml = rendererSharedState.terrainTooltipHtmlByContentKey.get(key);
     if (cachedHtml !== void 0) return cachedHtml;
-    const html = formatTerrainTooltipHtml(state, namingLine);
+    const html = formatTerrainTooltipHtml(state, namingLine, namingTarget);
     rendererSharedState.terrainTooltipHtmlByContentKey.set(key, html);
     if (rendererSharedState.terrainTooltipHtmlByContentKey.size > 4096) rendererSharedState.terrainTooltipHtmlByContentKey.clear();
     return html;
@@ -22111,7 +22222,9 @@
           airStrikes: [...rendererSharedState.pendingAirStrikes],
           ferryOrders: [...rendererSharedState.pendingFerryOrders],
           embarkOrders: [...rendererSharedState.pendingEmbarkOrders],
-          ...rendererSharedState.tacticalOpponentDraft ? { opponentTacticalDraft: rendererSharedState.tacticalOpponentDraft } : {}
+          ...rendererSharedState.tacticalOpponentDraft ? { opponentTacticalDraft: rendererSharedState.tacticalOpponentDraft } : {},
+          useEventDrivenConsultation: rendererSharedState.useEventDrivenConsultation,
+          aiPlanningRunEnabled: rendererSharedState.runButtonOn
         });
         if (!commitResult.success) {
           deps.showSidebarError(commitResult.reason ?? "Tactical commit failed");
@@ -22143,7 +22256,11 @@
         if (commitResult.tacticalBattle) {
           rendererSharedState.tacticalBattleSnapshot = commitResult.tacticalBattle;
         }
-        rendererSharedState.tacticalOpponentDraft = null;
+        rendererSharedState.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
+        if (commitResult.toolInvocationCounts) {
+          rendererSharedState.toolInvocationCounts = { ...rendererSharedState.toolInvocationCounts, ...commitResult.toolInvocationCounts };
+          deps.updateOpenRouterToolCountLabels();
+        }
         rendererSharedState.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length ? [...commitResult.tacticalMarchContinuations] : [];
         rendererSharedState.pendingRangedAttacks = [];
         rendererSharedState.pendingAirStrikes = [];
@@ -22233,6 +22350,11 @@
         }
         deps.redraw();
         deps.scheduleTacticalAnnihilationExit?.();
+        if (!rendererSharedState.useEventDrivenConsultation && rendererSharedState.runButtonOn) {
+          const oppAlive = rendererSharedState.tacticalBattleSnapshot?.subUnits.some((u) => u.player === "opponent") ?? false;
+          if (oppAlive) deps.startBackgroundRequestIfAllowed();
+        }
+        deps.updateReadyButtonState();
         return;
       }
       const hasPendingDraftOrders = rendererSharedState.pendingRangedAttacks.length > 0 || rendererSharedState.pendingAirStrikes.length > 0 || rendererSharedState.pendingFerryOrders.length > 0;
@@ -22569,7 +22691,7 @@
     const namingTarget = { h3Index, resolution: 1 };
     const namingLine = await deps.getCachedNamingLineForTarget(namingTarget);
     const state = deps.terrainTooltipStateForRes1Hex(h3Index);
-    return deps.getCachedTerrainTooltipHtml(state, namingLine);
+    return deps.getCachedTerrainTooltipHtml(state, namingLine, namingTarget);
   }
 
   // src/renderer/tactical/tacticalUiGuards.ts
@@ -24238,7 +24360,7 @@
     if (!isClientPointInsideMainMapLeafletContainer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY)) return;
     const el = document.getElementById("hex-tooltip");
     if (!el) return;
-    el.innerHTML = getCachedTerrainTooltipHtml(state, namingLine);
+    el.innerHTML = getCachedTerrainTooltipHtml(state, namingLine, namingTarget);
     el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
     el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
     el.classList.remove("hidden");

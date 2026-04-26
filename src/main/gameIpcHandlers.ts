@@ -154,8 +154,16 @@ export async function handleRequestAiOrders(
   deps: RequestAiOrdersDeps
 ): Promise<RequestAiOrdersResult> {
   const state = deps.getGameState();
+  const activeTactical = getActiveTacticalBattleSnapshot();
   if (state.phase !== 'planning') {
-    return { success: false, error: 'Not in planning phase' };
+    const tacticalDuringResolution = !!activeTactical && state.phase === 'resolution';
+    if (!tacticalDuringResolution) {
+      return { success: false, error: 'Not in planning phase' };
+    }
+    logDebug('handleRequestAiOrders allowing tactical opponent consultation during strategic resolution', {
+      battleId: activeTactical.battleId,
+      turnNumber: state.turnNumber,
+    });
   }
   const enabledGroupIds =
     payload?.enabledToolGroups && payload.enabledToolGroups.length > 0
@@ -173,14 +181,13 @@ export async function handleRequestAiOrders(
   deps.controllerRef.current = new AbortController();
   const signal = deps.controllerRef.current.signal;
   try {
-    const tacticalSnap = getActiveTacticalBattleSnapshot();
     const raw = await deps.requestOrders(state, modelId, {
       enabledToolNames,
       signal,
-      usePrecomputation: tacticalSnap ? false : usePrecomputation,
-      tacticalAiBattle: tacticalSnap ?? undefined,
+      usePrecomputation: activeTactical ? false : usePrecomputation,
+      tacticalAiBattle: activeTactical ?? undefined,
     });
-    if (tacticalSnap && raw.success === true) {
+    if (activeTactical && raw.success === true) {
       const tacticalOpponentPlan: TacticalOpponentPlanPayload = {
         movementOrders: [...raw.orders],
         rangedAttacks: [...(raw.rangedAttacks ?? [])],
@@ -211,7 +218,7 @@ export async function handleRequestAiOrders(
         ferryOrders: undefined,
         embarkOrders: undefined,
         dropReasons: [...(raw.dropReasons ?? []), tacticalNote],
-        tacticalBattle: tacticalSnap,
+        tacticalBattle: activeTactical,
         tacticalOpponentPlan,
       };
     }

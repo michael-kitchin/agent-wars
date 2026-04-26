@@ -79,6 +79,7 @@ import {
   handleResolveMeleeIntercept,
   type ReadyDeps,
 } from './gameIpcHandlers';
+import { runEventDrivenAfterTacticalBeatConsultation } from './ipc/readyIpcResolutionMapping';
 import type {
   SubmitOrdersPayload,
   ReadyResult,
@@ -369,10 +370,50 @@ function registerIpcHandlers(): void {
       return assignHumanMarchOrders(parsed.unitIds, parsed.destinationH3Index);
     }
   );
-  ipcMain.handle(IPC_GAME.commitHumanTacticalDraftOrders, (_event, payload: unknown) => {
+  ipcMain.handle(IPC_GAME.commitHumanTacticalDraftOrders, async (_event, payload: unknown) => {
     const parsed = parseHumanTacticalCommitPayload(payload);
     if (!parsed.ok) return { success: false, reason: parsed.reason };
-    return commitHumanTacticalDraftOrders(parsed.value);
+    const v = parsed.value;
+    const result = commitHumanTacticalDraftOrders({
+      movementOrders: v.movementOrders,
+      rangedAttacks: v.rangedAttacks,
+      airStrikes: v.airStrikes,
+      ferryOrders: v.ferryOrders,
+      embarkOrders: v.embarkOrders,
+      opponentTacticalDraft: v.opponentTacticalDraft,
+    });
+    if (
+      !result.success ||
+      !result.tacticalBattle ||
+      !result.tacticalResolutionPlayback ||
+      !v.useEventDrivenConsultation ||
+      !v.aiPlanningRunEnabled
+    ) {
+      return result;
+    }
+    const modelId = getSelectedModel();
+    const enabledToolNames = getToolNamesForEnabledGroups(TOOL_GROUP_REGISTRY.map((g) => g.id));
+    const post = await runEventDrivenAfterTacticalBeatConsultation({
+      useEventDrivenConsultation: v.useEventDrivenConsultation,
+      aiPlanningRunEnabled: v.aiPlanningRunEnabled,
+      opponentState: getGameStateForPlayer('opponent', { maskUnexploredTerrain: false }),
+      tacticalBattle: result.tacticalBattle,
+      tacticalResolutionPlayback: result.tacticalResolutionPlayback,
+      modelId: modelId ?? '',
+      enabledToolNames,
+      hasKey,
+      requestOrders: requestOrdersWithLog,
+      timeoutMs: 120_000,
+      errorLogMessage: 'commitHumanTacticalDraftOrders: tactical after-beat consultation failed or timed out',
+    });
+    logDebug('main commitHumanTacticalDraftOrders: post-beat tactical consult', {
+      hasPlan: Boolean(post.tacticalOpponentPlan),
+    });
+    return {
+      ...result,
+      ...(post.tacticalOpponentPlan ? { tacticalOpponentPlan: post.tacticalOpponentPlan } : {}),
+      ...(post.toolInvocationCounts ? { toolInvocationCounts: post.toolInvocationCounts } : {}),
+    };
   });
   ipcMain.handle(
     IPC_GAME.validateGroupRangedTarget,

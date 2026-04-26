@@ -1,3 +1,4 @@
+import { getStrategicRes1HexCode } from '../../shared/hexLlmCodeAssignment';
 import type { BuildUnitType, HexBuildQueueSnapshot } from '../../shared/ipcTypes';
 import { estimateTurnsToCompleteQueuedProduction, sumQueuedProductionCost } from '../../shared/productionConfig';
 import { TOOLTIP_OFFSET_PX, UNIT_SELECT_GLYPH } from '../core/constants';
@@ -240,13 +241,22 @@ export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
     const section = document.createElement('div');
     section.className = 'build-queue-section';
     const trimmedNamingLine = namingLine?.trim() ?? '';
+    const res1Code = getStrategicRes1HexCode(h3Index);
+    const llmPrefixHtml = res1Code ? `<strong>(${escapeHtml(res1Code)})</strong> ` : '';
     if (trimmedNamingLine.length > 0) {
       const descriptionLine = document.createElement('div');
-      descriptionLine.innerHTML = formatGroupedNamingLineHtml(trimmedNamingLine);
+      descriptionLine.innerHTML = `${llmPrefixHtml}${formatGroupedNamingLineHtml(trimmedNamingLine)}`;
       section.appendChild(descriptionLine);
       const descriptionSpacer = document.createElement('div');
       descriptionSpacer.style.height = '0.5em';
       section.appendChild(descriptionSpacer);
+    } else if (llmPrefixHtml) {
+      const codeLine = document.createElement('div');
+      codeLine.innerHTML = llmPrefixHtml;
+      section.appendChild(codeLine);
+      const codeSpacer = document.createElement('div');
+      codeSpacer.style.height = '0.5em';
+      section.appendChild(codeSpacer);
     }
     const pointsLine = document.createElement('div');
     const productionCapacity = snapshot.urbanHexCount;

@@ -25,8 +25,8 @@ export interface TacticalSubUnitSnapshot {
   /**
    * Stable identifier for this tactical sub-unit within the current battle session.
    *
-   * Contract: Unique among `subUnits` for a single tactical snapshot.
-   * When to use: Keys for rendering and future tactical order targeting.
+   * Contract: Unique among `subUnits` for a single tactical snapshot; formatted as `${parentUnitId}:${twoDigitSlot}` (no `battleId` prefix) because parent strategic ids are unique in the battle roster.
+   * When to use: Keys for rendering, tactical order targeting, and LLM-facing unit references while the session is active.
    * Expected outcome: Strings are non-empty and stable for the lifetime of the snapshot.
    * Exceptions: None.
    */
@@ -198,6 +198,7 @@ export interface TacticalBattleSnapshot {
   /**
    * Per-res4 road side masks (pent/hex boolean arrays) inside the footprint, from terrain classification cache.
    *
+   * Contract: Optional map keyed by res4 `h3Index` with boolean side arrays matching bundled road-rail geometry for that cell.
    * Purpose: Tactical land march may follow road edges at plains-equivalent cost and cross otherwise blocked terrain when rubble does not suppress the cell.
    * When to use: `buildTacticalTerrainKindResolverFromSnapshot` transport edges and ranged transport targeting.
    * Expected outcome: When present, keys are a subset of `res4ChildH3Indexes`; each array length matches bundled `terrain_res4_road_rail_sides.json` for that cell.
@@ -207,6 +208,7 @@ export interface TacticalBattleSnapshot {
   /**
    * Per-res4 rail side masks paired in length with `res4RoadSidesByH3` for the same cell keys.
    *
+   * Contract: Optional map keyed like `res4RoadSidesByH3` with parallel rail-side boolean arrays per cell.
    * Purpose: Same gameplay contract as roads for tactical transport links.
    * When to use: Same as `res4RoadSidesByH3`.
    * Expected outcome: Parallel arrays per `h3Index`; omitted when absent.

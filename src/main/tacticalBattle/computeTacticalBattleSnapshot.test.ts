@@ -67,13 +67,13 @@ test('TacticalBattleSnapshot round-trips through JSON for IPC-sized payloads', (
     tacticalTurnNumber: 1,
     subUnits: [
       {
-        id: 'tb-test:human-infantry-1:01',
+        id: 'human-infantry-1:01',
         parentUnitId: 'human-infantry-1',
         player: 'human',
         unitType: 'infantry',
         h3Index: '811fafffffffff',
         displayName: '1st Infantry (01)',
-        embarkedOnSubUnitId: 'tb-test:opponent-naval-1:01',
+        embarkedOnSubUnitId: 'opponent-naval-1:01',
       },
     ],
   };

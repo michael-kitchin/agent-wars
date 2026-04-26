@@ -13,6 +13,7 @@ import {
   formatControlProgressLine,
   buildHumanUnitsPromptLine,
   buildLatLngPreamble,
+  buildTacticalLatLngPreamble,
   buildProductionSubmitClause,
   buildToolUsageGuidance,
   formatLatLng as formatLatLngWithPrecision,
@@ -175,6 +176,7 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
     movementOrderInstruction,
     submitMemoryClause,
     productionSubmitClause: buildProductionSubmitClause(flags),
+    coordinateMode: coordinateContext.mode,
   });
   const finalJsonExample = getFinalJsonOrdersExampleBlock({
     includeMemoryUpdates: flags.memoryEnabled,
@@ -184,11 +186,19 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
     ? ' No human units are currently observed: prioritize scouting this turn by moving units along plausible approach routes to reveal enemy positions; do not remain static unless required for immediate defense.'
     : '';
   const primaryGoal = buildPrimaryScenarioGoalOpeningClause();
+  const latLngBlock =
+    coordinateContext.mode === 'tactical'
+      ? buildTacticalLatLngPreamble(LATLNG_DECIMAL_PLACES)
+      : buildLatLngPreamble(H3_RESOLUTION, LATLNG_DECIMAL_PLACES);
+  const infantryRangedScope =
+    coordinateContext.mode === 'tactical'
+      ? 'Infantry may use ranged_attack only at tactical res4 range 1 (adjacent res4 hex on the tactical map); use movement and melee when that is not enough.'
+      : 'Infantry may use ranged_attack only at strategic range 1 (adjacent res1 hex); use movement and melee when that is not enough.';
   const prompt = `You are the opponent in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}. ${primaryGoal} Move toward observed enemy forces to bring them into ranged, melee, or air-strike range as rules allow; do not stay passive.${scoutingDirective}${warning}
 
-${buildLatLngPreamble(H3_RESOLUTION, LATLNG_DECIMAL_PLACES)}
+${latLngBlock}
 
-Combat: d6 per shot — attack hits on roll ≤ attack stat; defense hits on roll ≤ defense. ${combatSummary}. Ranged uses pre-move positions. At most one ranged_attack per unit from turn-start range; use exactly one of targetHexCode (enemy cell from the map) or targetUnitId (not your move destination)${combatTargetHint}. Infantry may use ranged_attack only at strategic range 1 (adjacent res1 hex); use movement and melee when that is not enough. If a legal ranged_attack or air strike is available this turn, take it — these attacks resolve from turn-start positions and do not prevent movement in the same turn. Drop invalid attacks before submit.${navalCoaching}${combatAssessHint}
+Combat: d6 per shot — attack hits on roll ≤ attack stat; defense hits on roll ≤ defense. ${combatSummary}. Ranged uses pre-move positions. At most one ranged_attack per unit from turn-start range; use exactly one of targetHexCode (enemy cell from the map) or targetUnitId (not your move destination)${combatTargetHint}. ${infantryRangedScope} If a legal ranged_attack or air strike is available this turn, take it — these attacks resolve from turn-start positions and do not prevent movement in the same turn. Drop invalid attacks before submit.${navalCoaching}${combatAssessHint}
 
 ${mainBlock}
 

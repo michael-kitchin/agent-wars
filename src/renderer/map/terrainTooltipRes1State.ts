@@ -3,11 +3,12 @@
  *
  * Purpose: Extracts a large cohesive slice from `renderer.ts` so map tooltip behavior stays testable and navigable.
  * When to use: Renderer and `mainMapInteractions` should import the exported entrypoints instead of duplicating logic.
- * Expected outcome: Identical tooltip HTML, cache keys, and pointer resolution semantics as before extraction.
+ * Expected outcome: Map tooltip HTML, memoization keys, and pointer hit-testing stay cohesive, including bold `(XX)` / `(XX.YY)` prefixes aligned with strategic and tactical LLM hex codes.
  * Exceptions: Naming-line IPC failures are logged to `console.error` and cached as null (renderer has no main logger).
  */
 
 import { cellToChildren, cellToParent, latLngToCell } from 'h3-js';
+import { getLlmHexLocationParenLabelForNamingTarget } from '../../shared/hexLlmCodeAssignment';
 import { DETAIL_H3_RESOLUTION, WORLD_H3_RESOLUTION } from '../core/constants';
 import { isHexExploredByPlayer } from '../core/selection';
 import { rendererSharedState as S } from '../core/state';
@@ -514,6 +515,21 @@ function escapeHtml(text: string): string {
     .replaceAll("'", '&#39;');
 }
 
+/**
+ * Renders the bold LLM hex-code badge (`(XX)` or `(XX.YY)`) that prefixes tooltip copy for the active naming target.
+ *
+ * Purpose: Aligns hover copy with briefing coordinate labels without an IPC call.
+ * When to use: From `formatTerrainTooltipHtml` when a naming target is known (matches naming IPC resolution).
+ * Expected outcome: Empty string when codes cannot be resolved; otherwise escaped HTML with a trailing space.
+ * Exceptions: None.
+ */
+function formatLlmLocationBoldPrefixHtml(namingTarget: NamingLookupTarget | null): string {
+  if (!namingTarget) return '';
+  const label = getLlmHexLocationParenLabelForNamingTarget(namingTarget);
+  if (!label) return '';
+  return `<strong>${escapeHtml(label)}</strong> `;
+}
+
 function formatGroupedNamingLineHtml(namingLine: string): string {
   const groups = namingLine
     .split(';')
@@ -539,7 +555,12 @@ function formatTerrainVariantSuffix(state: Pick<TerrainTooltipState, 'isUrban' |
   return variants.length > 0 ? `, ${variants.join(', ')}` : '';
 }
 
-function formatTerrainTooltipHtml(state: TerrainTooltipState, namingLine: string | null): string {
+function formatTerrainTooltipHtml(
+  state: TerrainTooltipState,
+  namingLine: string | null,
+  namingTarget: NamingLookupTarget | null
+): string {
+  const prefix = formatLlmLocationBoldPrefixHtml(namingTarget);
   const terrainLabel = formatTerrainKindLabel(state.terrainKind);
   const terrainValue = state.res1TerrainSummary ?? `${terrainLabel}${formatTerrainVariantSuffix(state)}`;
   const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
@@ -554,11 +575,17 @@ function formatTerrainTooltipHtml(state: TerrainTooltipState, namingLine: string
     bodyParts.push(productionLine);
   }
   const bodyLine = bodyParts.join('<br/><span style="display:block;height:0.5em"></span>');
-  if (!namingLine) return bodyLine;
-  return `${formatGroupedNamingLineHtml(namingLine)}<br/><span style="display:block;height:0.5em"></span>${bodyLine}`;
+  if (!namingLine) return `${prefix}${bodyLine}`;
+  return `${prefix}${formatGroupedNamingLineHtml(namingLine)}<br/><span style="display:block;height:0.5em"></span>${bodyLine}`;
 }
 
-function terrainTooltipContentKey(state: TerrainTooltipState, namingLine: string | null): string {
+function terrainTooltipContentKey(
+  state: TerrainTooltipState,
+  namingLine: string | null,
+  namingTarget: NamingLookupTarget | null
+): string {
+  const targetKey =
+    namingTarget == null ? 'none' : `${namingTarget.resolution}:${namingTarget.h3Index}`;
   const namingKey = namingLine ?? '';
   const urbanKey = state.isUrban ? '1' : '0';
   const rubbleKey = state.isRubble ? '1' : '0';
@@ -566,7 +593,7 @@ function terrainTooltipContentKey(state: TerrainTooltipState, namingLine: string
   const urbanHexCountKey = state.urbanHexCount == null ? 'x' : String(state.urbanHexCount);
   const res1TerrainSummaryKey = state.res1TerrainSummary ?? '';
   const res1FeaturesSummaryKey = state.res1FeaturesSummary ?? '';
-  return `${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}`;
+  return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}`;
 }
 
 /**
@@ -574,14 +601,18 @@ function terrainTooltipContentKey(state: TerrainTooltipState, namingLine: string
  *
  * Purpose: Prevents expensive HTML rebuilds when the pointer jitters within the same logical tooltip.
  * When to use: From `showTerrainTooltip` after awaiting naming line lookup.
- * Expected outcome: Stable HTML string for identical `(state, namingLine)` pairs until caches clear.
+ * Expected outcome: Stable HTML string for identical `(state, namingLine, namingTarget)` tuples until caches clear.
  * Exceptions: None.
  */
-export function getCachedTerrainTooltipHtml(state: TerrainTooltipState, namingLine: string | null): string {
-  const key = terrainTooltipContentKey(state, namingLine);
+export function getCachedTerrainTooltipHtml(
+  state: TerrainTooltipState,
+  namingLine: string | null,
+  namingTarget: NamingLookupTarget | null
+): string {
+  const key = terrainTooltipContentKey(state, namingLine, namingTarget);
   const cachedHtml = S.terrainTooltipHtmlByContentKey.get(key);
   if (cachedHtml !== undefined) return cachedHtml;
-  const html = formatTerrainTooltipHtml(state, namingLine);
+  const html = formatTerrainTooltipHtml(state, namingLine, namingTarget);
   S.terrainTooltipHtmlByContentKey.set(key, html);
   if (S.terrainTooltipHtmlByContentKey.size > 4096) S.terrainTooltipHtmlByContentKey.clear();
   return html;

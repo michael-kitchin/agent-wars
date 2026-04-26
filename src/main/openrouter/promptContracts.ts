@@ -14,6 +14,10 @@ export function buildFinalJsonContractInstruction(args: {
   movementOrderInstruction: string;
   submitMemoryClause: string;
   productionSubmitClause: string;
+  /**
+   * When `tactical`, expands the callbacks clause so the model knows subscriptions apply to tactical beats under event-driven mode.
+   */
+  coordinateMode?: 'strategic' | 'tactical';
 }): string {
   const {
     includeMemoryUpdates,
@@ -21,6 +25,7 @@ export function buildFinalJsonContractInstruction(args: {
     movementOrderInstruction,
     submitMemoryClause,
     productionSubmitClause,
+    coordinateMode = 'strategic',
   } = args;
   const optionalTail =
     (includeMemoryUpdates ? ', "memoryUpdates": [...]' : '') +
@@ -34,7 +39,10 @@ export function buildFinalJsonContractInstruction(args: {
   const airClause =
     'Optional top-level air actions: airStrikes[] entries use { "unitId": "...", exactly one of "targetHexCode" or "targetUnitId", "targetType": "units"|"urban"|"airport"|"seaport" }, ferryOrders[] entries use { "unitId": "...", "destination": "<hex code>" }.';
   const legacyClause = 'Do not use top-level movementOrders or rangedAttacks (legacy).';
-  const callbacksClause = 'Include optional "callbacks" for re-consultation planning.';
+  const callbacksClause =
+    coordinateMode === 'tactical'
+      ? 'Include optional "callbacks" for re-consultation: the same subscription events as strategic (e.g. turns(N), unit_destroyed, infrastructure_destroyed, unit_engaged) are evaluated after each tactical beat when event-driven mode is on; each consultation replaces the full callback list.'
+      : 'Include optional "callbacks" for re-consultation planning.';
   return `${submitHeader} ${strictSchemaClause} ${ordersClause} ${airClause} ${legacyClause}${movementOrderInstruction} ${callbacksClause}${submitMemoryClause} ${productionSubmitClause}`;
 }
 

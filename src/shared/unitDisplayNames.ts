@@ -219,7 +219,7 @@ export function formatTacticalSubUnitDisplayName(parentStrategicDisplayName: str
 /**
  * Resolves the player-facing label for a tactical sub-unit when composing validation or status strings.
  *
- * Purpose: Tactical orders and IPC payloads key sub-units by opaque ids (`battleId:parentUnitId:ordinal`); surfaced errors should match sidebar/tooltip naming via `displayName`.
+ * Purpose: Tactical orders and IPC payloads key sub-units by opaque ids (`parentUnitId:ordinal`, unique within the active battle); surfaced errors should match sidebar/tooltip naming via `displayName`.
  * When to use: Tactical-mode branches in main-process validation that prefix a unit key in `reason` text (ranged, air, ferry, etc.).
  * Expected outcome: Trims and returns the snapshot row’s `displayName` when present; otherwise returns `subUnitId` for diagnostics.
  * Exceptions: None.

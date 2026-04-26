@@ -471,7 +471,7 @@ export function computeTacticalBattleSnapshot(
         placed += 1;
         const two = String(placed).padStart(2, '0');
         subUnits.push({
-          id: `${battleId}:${parent.id}:${two}`,
+          id: `${parent.id}:${two}`,
           parentUnitId: parent.id,
           player: parent.player === 'human' ? 'human' : 'opponent',
           unitType: parent.unitType,

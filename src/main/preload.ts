@@ -326,12 +326,16 @@ commitHumanTacticalDraftOrders: (payload: {
     ferryOrders?: { unitId: string; destinationH3Index: string }[];
     embarkOrders?: { unitId: string; navalUnitId: string }[];
     opponentTacticalDraft?: import('../shared/ipc/readyTypes').TacticalOpponentPlanPayload;
+    useEventDrivenConsultation?: boolean;
+    aiPlanningRunEnabled?: boolean;
   }): Promise<{
     success: boolean;
     reason?: string;
     tacticalBattle?: TacticalBattleSnapshot;
     tacticalResolutionPlayback?: TacticalCommitResolutionPlayback;
     tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
+    tacticalOpponentPlan?: import('../shared/ipc/readyTypes').TacticalOpponentPlanPayload;
+    toolInvocationCounts?: Record<string, number>;
   }> => ipcRenderer.invoke(IPC_GAME.commitHumanTacticalDraftOrders, payload),
     /**
    * Documents the object literal property `validateGroupRangedTarget` (validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke('g).

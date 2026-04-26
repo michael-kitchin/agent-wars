@@ -248,6 +248,50 @@ async function testRequestAiOrdersTacticalBuffersOpponentPlan(): Promise<void> {
 }
 
 /**
+ * Defines the `testRequestAiOrdersTacticalSucceedsDuringStrategicResolution` function shape (async function testRequestAiOrdersTacticalSucceedsDuringStrategicResolution(): Promise<void>).
+
+ * Purpose: Tactical battles opened from melee intercept keep `turn_state.phase === 'resolution'` until the tactical
+ * session ends; opponent Run consultations must still reach `requestOrders` with `tacticalAiBattle` set.
+ * When to use: Regression for renderer/main phase gating parity.
+ * Expected outcome: Success with `tacticalOpponentPlan` when an active tactical snapshot exists during resolution.
+ * Exceptions: None.
+ */
+async function testRequestAiOrdersTacticalSucceedsDuringStrategicResolution(): Promise<void> {
+  const tacticalSnap: TacticalBattleSnapshot = {
+    battleId: 'tb-resolution-phase',
+    enclosingRes1H3Index: '891f1d48b9fffff',
+    res4ChildH3Indexes: ['891f1d48b9fffff'],
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits: [],
+  };
+  setActiveTacticalBattleSnapshotRef(tacticalSnap);
+  try {
+    const controllerRef = { current: null as AbortController | null };
+    const deps = {
+      getGameState: () => resolutionState,
+      getGameStateForPlayer: () => resolutionState,
+      getSelectedModel: () => 'test-model',
+      hasKey: () => true,
+      getToolNamesForEnabledGroups: () => ['planning', 'assessment', 'estimation'],
+      defaultGroupIds: ['planning', 'assessment', 'estimation'],
+      requestOrders: async (): Promise<RequestAiOrdersResult> => ({
+        success: true,
+        orders: [{ unitId: 'opp-su-1', toH3Index: '891f1d48b9fffff' }],
+      }),
+      controllerRef,
+    };
+    const result = await handleRequestAiOrders({}, deps);
+    assert.strictEqual(result.success, true);
+    const ok = result as { tacticalOpponentPlan?: TacticalOpponentPlanPayload };
+    assert.ok(ok.tacticalOpponentPlan);
+    assert.strictEqual(ok.tacticalOpponentPlan!.movementOrders.length, 1);
+  } finally {
+    setActiveTacticalBattleSnapshotRef(null);
+  }
+}
+
+/**
  * Defines the `testRequestAiOrdersCancelled` function shape (async function testRequestAiOrdersCancelled(): Promise<void>).
 
  * Purpose: Supports maintainability by documenting why `testRequestAiOrdersCancelled` exists.
@@ -611,6 +655,10 @@ async function runAll(): Promise<void> {
     { name: 'requestAiOrders no key', fn: testRequestAiOrdersNoKey },
     { name: 'requestAiOrders success', fn: testRequestAiOrdersSuccess },
     { name: 'requestAiOrders tactical buffers opponent plan', fn: testRequestAiOrdersTacticalBuffersOpponentPlan },
+    {
+      name: 'requestAiOrders tactical succeeds during strategic resolution',
+      fn: testRequestAiOrdersTacticalSucceedsDuringStrategicResolution,
+    },
     { name: 'requestAiOrders cancelled', fn: testRequestAiOrdersCancelled },
     { name: 'game:ready precomputed skips requestOrders', fn: testGameReadyPrecomputedSkipsRequestOrders },
     {

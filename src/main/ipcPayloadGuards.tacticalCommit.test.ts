@@ -21,6 +21,28 @@ function testHappyPathMinimalMovement(): void {
   assert.deepStrictEqual(r.value.ferryOrders, []);
   assert.deepStrictEqual(r.value.embarkOrders, []);
   assert.strictEqual(r.value.opponentTacticalDraft, undefined);
+  assert.strictEqual(r.value.useEventDrivenConsultation, false);
+  assert.strictEqual(r.value.aiPlanningRunEnabled, false);
+}
+
+/**
+ * Verifies event-driven flags round-trip when explicitly true.
+ *
+ * Purpose: IPC contract for tactical post-beat consultation on the main process.
+ * When to use: Regression after edits to `parseHumanTacticalCommitPayload`.
+ * Expected outcome: Booleans preserved as true.
+ * Exceptions: Assertion failure on contract drift.
+ */
+function testEventDrivenFlagsTrue(): void {
+  const r = parseHumanTacticalCommitPayload({
+    movementOrders: [],
+    useEventDrivenConsultation: true,
+    aiPlanningRunEnabled: true,
+  });
+  assert.strictEqual(r.ok, true);
+  if (!r.ok) return;
+  assert.strictEqual(r.value.useEventDrivenConsultation, true);
+  assert.strictEqual(r.value.aiPlanningRunEnabled, true);
 }
 
 /**
@@ -87,6 +109,7 @@ function testRejectsNullPayload(): void {
 
 const tests: { name: string; fn: () => void }[] = [
   { name: 'parseHumanTacticalCommitPayload happy path', fn: testHappyPathMinimalMovement },
+  { name: 'parseHumanTacticalCommitPayload event-driven flags true', fn: testEventDrivenFlagsTrue },
   { name: 'parseHumanTacticalCommitPayload opponent draft round trip', fn: testOpponentDraftRoundTrip },
   { name: 'parseHumanTacticalCommitPayload rejects bad movement', fn: testRejectsBadMovementRow },
   { name: 'parseHumanTacticalCommitPayload rejects null', fn: testRejectsNullPayload },

@@ -96,11 +96,11 @@ function testBuildStrategicResolverMatchesLookupAndFallback(): void {
  */
 function testTacticalSubUnitLabelForUserMessage(): void {
   const subUnits = [
-    { id: 'tb-x:human-naval-1:01', displayName: '1st Fleet (01)' },
-    { id: 'tb-x:human-naval-1:02', displayName: '  ' },
+    { id: 'human-naval-1:01', displayName: '1st Fleet (01)' },
+    { id: 'human-naval-1:02', displayName: '  ' },
   ];
-  assert.strictEqual(tacticalSubUnitLabelForUserMessage(subUnits, 'tb-x:human-naval-1:01'), '1st Fleet (01)');
-  assert.strictEqual(tacticalSubUnitLabelForUserMessage(subUnits, 'tb-x:human-naval-1:02'), 'tb-x:human-naval-1:02');
+  assert.strictEqual(tacticalSubUnitLabelForUserMessage(subUnits, 'human-naval-1:01'), '1st Fleet (01)');
+  assert.strictEqual(tacticalSubUnitLabelForUserMessage(subUnits, 'human-naval-1:02'), 'human-naval-1:02');
   assert.strictEqual(tacticalSubUnitLabelForUserMessage(subUnits, 'missing'), 'missing');
 }
 

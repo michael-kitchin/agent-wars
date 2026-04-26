@@ -7,23 +7,18 @@
  * Exceptions: Throws if registry used before initialization for the requested context.
  */
 
-import { cellToChildren, cellToLatLng, getRes0Cells, latLngToCell } from 'h3-js';
+import { cellToChildren, cellToLatLng, latLngToCell } from 'h3-js';
+import {
+  buildStrategicRes1H3ToCodeMap,
+  indexToCode,
+  sortCellsForStableLlmCodes,
+} from '../../../shared/hexLlmCodeAssignment';
 import { logDebug, logError, logTrace } from '../../logger';
 import type { CoordinateContext } from './coordinateContext';
 import { HEX_CODE_PATTERN } from './coordinateContext';
 
 const STRATEGIC_RESOLUTION = 1;
 const TACTICAL_RESOLUTION = 4;
-
-/**
- * Alphabet for 2-character codes: A–Z then 0–9 (36 symbols), 1296 combinations.
- *
- * Purpose: Matches the ASCII map plan: uppercase+digits only, leaving lowercase for overlay symbology.
- * When to use: Code assignment order for both strategic and tactical registries.
- * Expected outcome: Deterministic sequential codes independent of insertion order beyond the global sort.
- * Exceptions: None.
- */
-const CODE_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
 let strategicH3ToCode: Map<string, string> | null = null;
 let strategicCodeToH3: Map<string, string> | null = null;
@@ -32,45 +27,6 @@ const tacticalRegistries = new Map<
   string,
   { h3ToCode: Map<string, string>; codeToH3: Map<string, string>; parentRes1: string }
 >();
-
-/**
- * Converts a stable registry index into a 2-character code.
- *
- * Purpose: Shared encoder for strategic and tactical registries.
- * When to use: During registry initialization after sorting candidate cells.
- * Expected outcome: Surjective mapping onto the code space for indices < 1296.
- * Exceptions: Throws if index is out of range for the alphabet (indicates a logic bug).
- */
-function indexToCode(index: number): string {
-  if (index < 0 || index >= CODE_ALPHABET.length * CODE_ALPHABET.length) {
-    logError('hex-coordinates indexToCode: index out of range', { index });
-    throw new Error(`hex-coordinates: code index out of range (${index})`);
-  }
-  const hi = Math.floor(index / CODE_ALPHABET.length);
-  const lo = index % CODE_ALPHABET.length;
-  return `${CODE_ALPHABET[hi]}${CODE_ALPHABET[lo]}`;
-}
-
-/**
- * Sorts H3 cells for stable code assignment (north-first, then west-to-east at equal latitude).
- *
- * Purpose: Implements the plan's deterministic ordering contract.
- * When to use: Before assigning sequential codes for any registry build.
- * Expected outcome: Stable ordering given the same input set.
- * Exceptions: None.
- */
-function sortCellsForRegistry(cells: string[]): string[] {
-  const decorated = cells.map((h3) => {
-    const [lat, lng] = cellToLatLng(h3);
-    return { h3, lat, lng };
-  });
-  decorated.sort((a, b) => {
-    if (a.lat !== b.lat) return b.lat - a.lat;
-    if (a.lng !== b.lng) return a.lng - b.lng;
-    return a.h3.localeCompare(b.h3);
-  });
-  return decorated.map((d) => d.h3);
-}
 
 /**
  * Initializes the global strategic res1 registry (all Earth res1 children of res0 cells).
@@ -83,20 +39,9 @@ function sortCellsForRegistry(cells: string[]): string[] {
 export function initStrategicCoordinateRegistry(): void {
   logDebug('hex-coordinates initStrategicCoordinateRegistry: building strategic res1 registry');
   try {
-    const res0 = getRes0Cells();
-    const res1Set = new Set<string>();
-    for (const r0 of res0) {
-      for (const child of cellToChildren(r0, STRATEGIC_RESOLUTION)) {
-        res1Set.add(child);
-      }
-    }
-    const sorted = sortCellsForRegistry([...res1Set]);
-    const h3ToCode = new Map<string, string>();
+    const h3ToCode = new Map(buildStrategicRes1H3ToCodeMap());
     const codeToH3 = new Map<string, string>();
-    for (let i = 0; i < sorted.length; i++) {
-      const h3 = sorted[i]!;
-      const code = indexToCode(i);
-      h3ToCode.set(h3, code);
+    for (const [h3, code] of h3ToCode.entries()) {
       codeToH3.set(code, h3);
     }
     strategicH3ToCode = h3ToCode;
@@ -124,7 +69,7 @@ export function initTacticalCoordinateRegistry(battleId: string, enclosingRes1H3
     enclosingRes1H3Index,
   });
   try {
-    const children = sortCellsForRegistry(cellToChildren(enclosingRes1H3Index, TACTICAL_RESOLUTION));
+    const children = sortCellsForStableLlmCodes(cellToChildren(enclosingRes1H3Index, TACTICAL_RESOLUTION));
     const h3ToCode = new Map<string, string>();
     const codeToH3 = new Map<string, string>();
     for (let i = 0; i < children.length; i++) {

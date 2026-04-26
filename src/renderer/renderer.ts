@@ -1376,7 +1376,7 @@ async function showTerrainTooltip(
   if (!isClientPointInsideMainMapLeafletContainer(S.lastPointerClientX, S.lastPointerClientY)) return;
   const el = document.getElementById('hex-tooltip');
   if (!el) return;
-  el.innerHTML = getCachedTerrainTooltipHtml(state, namingLine);
+  el.innerHTML = getCachedTerrainTooltipHtml(state, namingLine, namingTarget);
   el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
   el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
   el.classList.remove('hidden');

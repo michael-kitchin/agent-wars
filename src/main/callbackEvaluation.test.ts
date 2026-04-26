@@ -4,7 +4,11 @@
  */
 
 import * as assert from 'assert';
-import { evaluateMandatoryOverrides, evaluateSubscriptionEvents } from './callbackEvaluation';
+import {
+  evaluateMandatoryOverrides,
+  evaluateSubscriptionEvents,
+  evaluateTacticalMandatoryOverrides,
+} from './callbackEvaluation';
 import type { GameStateSnapshot } from './gameDb';
 import type { CallbackSubscription } from './callbackSubscriptions';
 
@@ -204,6 +208,25 @@ function testAttackMixChangedFires(): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * Defines the `testTacticalMandatoryEmitsUnitDestroyedPerOpponentLoss` function shape.
+ *
+ * Purpose: Ensures tactical post-beat mandatory evaluation stays scoped to sub-unit removals.
+ * When to use: Regression when editing `evaluateTacticalMandatoryOverrides`.
+ * Expected outcome: One `unit_destroyed` entry per removed opponent id.
+ * Exceptions: Assertion failure on contract drift.
+ */
+function testTacticalMandatoryEmitsUnitDestroyedPerOpponentLoss(): void {
+  const results = evaluateTacticalMandatoryOverrides({
+    opponentCombatParticipantUnitIds: ['o-sub-1'],
+    removedUnitIds: ['o-sub-1', 'h-sub-1'],
+    removedOpponentUnitIds: ['o-sub-1'],
+  });
+  assert.strictEqual(results.length, 1);
+  assert.strictEqual(results[0]!.type, 'unit_destroyed');
+  assert.strictEqual((results[0] as { unitId: string }).unitId, 'o-sub-1');
+}
+
 function testInfrastructureDestroyedSubscriptionEventFires(): void {
   const subscriptions: CallbackSubscription[] = [
     { event: 'infrastructure_destroyed', params: { targetType: 'airport' }, subscribedTurn: 9 },
@@ -240,6 +263,7 @@ function run(): void {
   testNoFirstCombatWhenAlreadyInSet();
   testAttackMixChangedFires();
   testInfrastructureDestroyedSubscriptionEventFires();
+  testTacticalMandatoryEmitsUnitDestroyedPerOpponentLoss();
   console.log('callbackEvaluation.test.ts passed');
 }
 

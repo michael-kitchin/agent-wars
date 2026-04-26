@@ -162,6 +162,14 @@ reason?: string;
    * Exceptions: None; omit when every march completed in one apply step.
    */
   tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
+  /**
+   * When set by main after an event-driven post-beat consultation, mirrors `requestAiOrders` tactical buffering for the renderer.
+   */
+  tacticalOpponentPlan?: TacticalOpponentPlanPayload;
+  /**
+   * Optional tool invocation counts from the same tactical consultation pass.
+   */
+  toolInvocationCounts?: Record<string, number>;
 }
 
 /**
