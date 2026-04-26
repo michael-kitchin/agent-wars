@@ -18960,8 +18960,7 @@
     const L = getLeafletGlobal();
     const groupedMoves = /* @__PURE__ */ new Map();
     for (const move of moves) {
-      const pathKey = move.pathH3Indexes?.join(":") ?? "";
-      const groupKey = `${move.player}|${move.fromH3Index}|${move.toH3Index}|${pathKey}`;
+      const groupKey = `${move.player}|${move.fromH3Index}|${move.toH3Index}`;
       const existing = groupedMoves.get(groupKey);
       if (existing) {
         existing.count += 1;
