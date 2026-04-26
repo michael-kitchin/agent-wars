@@ -4,7 +4,7 @@
  * Purpose: Keeps strategic march (main), tactical march (renderer), and tactical ranged cap messaging aligned on
  * title-case terrain labels without importing renderer or Electron main modules.
  * When to use: `humanMarchPreviewImpl`, `buildTacticalMarchHoverPreview`, and `publishHoverRoutePreview` only.
- * Expected outcome: Plain English labels suitable for `Slower: ${label}`; `null` when no slowdown applies.
+ * Expected outcome: Plain English labels suitable for `Slower: ${label}` (or `Using: Road/Rail` when infrastructure enables an otherwise impassable step); `null` when no slowdown applies.
  * Exceptions: None; invalid inputs yield `null`.
  */
 
@@ -20,7 +20,11 @@ import {
 import type { TacticalBattleTerrainPick } from './tacticalTerrainCombatModifiers';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from './tacticalBattleTypes';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE, RANGED_RANGE_BY_UNIT_TYPE } from './tacticalRanges';
-import { normalizeDbTerrainKindToTacticalCategory, tacticalEnterHexMovementCost } from './tacticalTerrainMovement';
+import {
+  buildTacticalTerrainKindResolverFromSnapshot,
+  normalizeDbTerrainKindToTacticalCategory,
+  tacticalEnterHexMovementCost,
+} from './tacticalTerrainMovement';
 import type { TacticalMovementCategory } from './tacticalTerrainMovement';
 
 const STRATEGIC_H3_RESOLUTION = 1;
@@ -28,14 +32,20 @@ const STRATEGIC_H3_RESOLUTION = 1;
 /**
  * Builds the full one-line hover string for terrain-throttled movement or ranged planning.
  *
- * Purpose: Centralizes the `Slower:` prefix so renderer tooltips stay consistent with product wording.
+ * Purpose: Centralizes the `Slower:` prefix so renderer tooltips stay consistent with product wording; uses `Using:` for
+ * `Road/Rail` because that label denotes infrastructure that unlocks movement (e.g. armor across mountains), not merely a speed penalty.
  * When to use: Renderer after resolving a non-null display terrain title from march/ranged slow helpers.
- * Expected outcome: `Slower: Forest` style string; throws on empty `displayTerrainTitle` (caller should guard).
+ * Expected outcome: `Slower: Forest` for terrain buckets; `Using: Road/Rail` when the title is `Road/Rail` (spacing/case-insensitive) or was redundantly prefixed with `Slower:`; `Slower: Terrain` when empty after stripping.
  * Exceptions: None.
  */
 export function formatSlowerHoverTooltipMessage(displayTerrainTitle: string): string {
-  const t = displayTerrainTitle.trim();
+  let t = displayTerrainTitle.trim();
+  if (/^slower:\s*/i.test(t)) {
+    t = t.replace(/^slower:\s*/i, '').trim();
+  }
   if (!t) return 'Slower: Terrain';
+  const compact = t.replace(/\s+/g, '').toLowerCase();
+  if (compact === 'road/rail') return 'Using: Road/Rail';
   return `Slower: ${t}`;
 }
 
@@ -162,7 +172,9 @@ export function pickTacticalMarchSlowTerrainDisplayTitle(args: {
     }
   }
 
+  const terrainForTransport = buildTacticalTerrainKindResolverFromSnapshot(battle);
   for (let i = 1; i < pathH3.length; i++) {
+    const prev = pathH3[i - 1]!;
     const h = pathH3[i]!;
     if (battle.res4IsRubbleByH3?.[h]) return 'Rubble';
     if (battle.res4IsUrbanByH3?.[h]) return 'Urban';
@@ -170,6 +182,13 @@ export function pickTacticalMarchSlowTerrainDisplayTitle(args: {
     const parent = battle.strategicHexTerrain ?? 'land';
     const cat = normalizeDbTerrainKindToTacticalCategory(String(rawKind).toLowerCase(), parent);
     const cost = tacticalEnterHexMovementCost(moveType, cat);
+    const plainsCost = tacticalEnterHexMovementCost(moveType, 'plains');
+    if (
+      terrainForTransport.transportFromTo?.(prev, h) &&
+      (cost > plainsCost || !Number.isFinite(cost))
+    ) {
+      return 'Road/Rail';
+    }
     if (Number.isFinite(cost) && cost > 1) {
       const label = displayTitleForSlowTerrainBucket(cat);
       if (label) return label;

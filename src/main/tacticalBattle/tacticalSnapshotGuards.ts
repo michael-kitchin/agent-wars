@@ -1,11 +1,142 @@
 /**
- * Pure tactical snapshot guard helpers shared by movement projection and composite order application.
+ * Tactical snapshot guard helpers shared by movement projection and composite order application.
  */
 
+import type { TacticalMarchPlanResult } from '../../shared/tacticalRes4MovementPlanner';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
+import {
+  buildLandMarchStepLegalityDetailAlongPath,
+  summarizeLandMarchStepLegalityAlongPath,
+} from '../../shared/tacticalRes4LandMarchContinuity';
 import { planTacticalRes4MarchWithSessionCache } from './tacticalMovementPlanningCache';
-import { tacticalMovementUnitTypeForPathfinding } from '../../shared/tacticalTerrainMovement';
+import {
+  buildTacticalTerrainKindResolverFromSnapshot,
+  tacticalMovementUnitTypeForPathfinding,
+} from '../../shared/tacticalTerrainMovement';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
+import { tacticalLogMutate } from './tacticalLogging';
+
+/**
+ * Snapshot fields required to rebuild the tactical terrain resolver for march debug previews.
+ *
+ * Purpose: Keeps `tacticalCompute*MovementOrderOutcome` and `logTacticalMarchPlanOk` aligned with `planTacticalRes4MarchWithSessionCache`.
+ * When to use: Typing `battle` arguments that must support transport overlay reconstruction.
+ * Expected outcome: Same shape as `buildTacticalTerrainKindResolverFromSnapshot` input.
+ * Exceptions: None.
+ */
+type TacticalBattleSnapshotMarchTerrainPick = Pick<
+  TacticalBattleSnapshot,
+  | 'res4TerrainKindByH3'
+  | 'strategicHexTerrain'
+  | 'strategicHexTerrainKind'
+  | 'res4IsSeaportByH3'
+  | 'res4IsUrbanByH3'
+  | 'res4IsRubbleByH3'
+  | 'res4RoadSidesByH3'
+  | 'res4RailSidesByH3'
+>;
+
+/**
+ * Builds a compact comma-separated list of effective res4 terrain kind strings along a planned path for debug triage.
+ *
+ * Purpose: Correlates accepted tactical routes with snapshot `res4TerrainKindByH3` (and parent kind fallback) without dumping full H3 lists.
+ * When to use: Only from debug logging after a successful `planTacticalRes4MarchWithSessionCache` result.
+ * Expected outcome: Short string for typical paths; middle elided when the path is long.
+ * Exceptions: None.
+ */
+function res4KindPreviewAlongPath(
+  battle: Pick<TacticalBattleSnapshot, 'res4TerrainKindByH3' | 'strategicHexTerrainKind'>,
+  path: readonly string[] | null
+): string | null {
+  if (!path?.length) return null;
+  const row = (h: string): string => {
+    const raw = battle.res4TerrainKindByH3?.[h];
+    if (raw != null && String(raw).trim().length > 0) return String(raw).trim();
+    return battle.strategicHexTerrainKind ?? 'plains';
+  };
+  const rows = path.map(row);
+  if (rows.length <= 14) return rows.join(',');
+  return `${rows.slice(0, 7).join(',')}…${rows.slice(-6).join(',')}`;
+}
+
+/**
+ * Emits debug-level structured context for a reachable tactical march plan (human or opponent).
+ *
+ * Purpose: Makes `debug.log` useful at default debug settings when investigating mountain vs transport and multi-turn reachability.
+ * When to use: After `planTacticalRes4MarchWithSessionCache` returns `reachable: true` inside movement outcome helpers.
+ * Expected outcome: One line per validated order with path head/tail, costs, and terrain kind preview.
+ * Exceptions: None.
+ */
+function logTacticalMarchPlanOk(args: {
+  player: 'human' | 'opponent';
+  battle: Pick<
+    TacticalBattleSnapshot,
+    'battleId' | 'tacticalTurnNumber' | 'res4TerrainKindByH3' | 'strategicHexTerrainKind'
+  > &
+    TacticalBattleSnapshotMarchTerrainPick;
+  unitId: string;
+  subUnitType: string;
+  moveType: string;
+  fromH3: string;
+  toH3: string;
+  budget: number;
+  plan: TacticalMarchPlanResult;
+  res4Set: ReadonlySet<string>;
+}): void {
+  const path = args.plan.pathToDestination;
+  const terrain =
+    args.moveType === 'infantry' || args.moveType === 'armor'
+      ? buildTacticalTerrainKindResolverFromSnapshot(args.battle)
+      : null;
+  const landMarch =
+    terrain != null
+      ? summarizeLandMarchStepLegalityAlongPath({
+          path,
+          unitTypeForMovement: args.moveType,
+          terrain,
+          marchGoalH3: args.toH3,
+          res4Set: args.res4Set,
+        })
+      : null;
+  const landMarchDetail =
+    terrain != null ? buildLandMarchStepLegalityDetailAlongPath({
+      path,
+      unitTypeForMovement: args.moveType,
+      terrain,
+      marchGoalH3: args.toH3,
+      res4Set: args.res4Set,
+    }) : null;
+  const stepLegalityDetailPayload =
+    landMarchDetail == null
+      ? {}
+      : landMarchDetail.length <= 10
+        ? { stepLegalityDetail: landMarchDetail }
+        : {
+            stepLegalityDetailHead: landMarchDetail.slice(0, 4),
+            stepLegalityDetailTail: landMarchDetail.slice(-3),
+          };
+  tacticalLogMutate('tacticalMarchPlan ok', {
+    battleId: args.battle.battleId,
+    tacticalTurnNumber: args.battle.tacticalTurnNumber,
+    player: args.player,
+    unitId: args.unitId,
+    subUnitType: args.subUnitType,
+    moveType: args.moveType,
+    fromH3: args.fromH3,
+    toH3: args.toH3,
+    movementPointBudget: args.budget,
+    totalCostToDestination: args.plan.totalCostToDestination,
+    reachableThisTurn: args.plan.reachableThisTurn,
+    firstStopH3: args.plan.firstStopWithinBudget.stopH3,
+    firstStopConsumedFullPath: args.plan.firstStopWithinBudget.consumedFullPath,
+    pathLen: path?.length ?? 0,
+    pathHead: path?.slice(0, 4) ?? [],
+    pathTail: path?.slice(-3) ?? [],
+    terrainKindsAlongPath: res4KindPreviewAlongPath(args.battle, path),
+    stepLegalityAlongPath: landMarch,
+    ...stepLegalityDetailPayload,
+  });
+}
 
 /**
  * Enumerates why an opponent tactical march order may be ignored during snapshot projection.
@@ -26,7 +157,7 @@ export type TacticalMovementBlockReason =
 /**
  * Decides whether a single opponent movement order may mutate a tactical sub-unit row in the snapshot clone.
  *
- * Contract: Pure; does not log; does not mutate arrays; uses §12.4 terrain-weighted reachability inside the tactical footprint.
+ * Contract: Does not mutate arrays; uses §12.4 terrain-weighted reachability inside the tactical footprint. Emits debug logs for planner outcomes.
  * When to use: `projectTacticalSnapshotAfterOpponentMovementOrders` loop before applying `h3Index` updates.
  * Expected outcome: Returns `ok: true` with `idx` into the mutable `sub` clone, or `ok: false` with a reason and diagnostic context.
  * Exceptions: Invalid H3 indexes may yield `out_of_range` when the tactical march planner cannot find a finite-cost path.
@@ -47,6 +178,8 @@ export function tacticalComputeMovementOrderOutcome(args: {
     | 'res4IsSeaportByH3'
     | 'res4IsUrbanByH3'
     | 'res4IsRubbleByH3'
+    | 'res4RoadSidesByH3'
+    | 'res4RailSidesByH3'
   >;
 }):
   | { ok: true; idx: number }
@@ -79,6 +212,18 @@ export function tacticalComputeMovementOrderOutcome(args: {
     movementPointBudget: Math.max(0, budget),
   });
   if (!plan.reachable) {
+    tacticalLogMutate('tacticalMarchPlan unreachable', {
+      battleId: args.battle.battleId,
+      tacticalTurnNumber: args.battle.tacticalTurnNumber,
+      player: 'opponent',
+      unitId: args.order.unitId,
+      subUnitType: u.unitType,
+      moveType,
+      fromH3: u.h3Index,
+      toH3: args.order.toH3Index,
+      movementPointBudget: budget,
+      plannerReason: plan.failureReason,
+    });
     return {
       ok: false,
       reason: 'out_of_range',
@@ -91,6 +236,18 @@ export function tacticalComputeMovementOrderOutcome(args: {
       },
     };
   }
+  logTacticalMarchPlanOk({
+    player: 'opponent',
+    battle: args.battle,
+    unitId: args.order.unitId,
+    subUnitType: u.unitType,
+    moveType,
+    fromH3: u.h3Index,
+    toH3: args.order.toH3Index,
+    budget,
+    plan,
+    res4Set: args.res4Set,
+  });
   return { ok: true, idx };
 }
 
@@ -99,7 +256,7 @@ export function tacticalComputeMovementOrderOutcome(args: {
  *
  * Purpose: Mirrors `tacticalComputeMovementOrderOutcome` for opponent rows but requires `player === 'human'`.
  * When to use: `projectTacticalSnapshotAfterHumanMovementOrders` before applying `h3Index` updates for the human player.
- * Expected outcome: Same success/failure shape as the opponent helper with `non_human` instead of `non_opponent`.
+ * Expected outcome: Same success/failure shape as the opponent helper with `non_human` instead of `non_opponent`. Emits debug logs when the planner finds a reachable path.
  * Exceptions: Invalid H3 indexes may yield `out_of_range` when the tactical march planner cannot find a finite-cost path.
  */
 export function tacticalComputeHumanMovementOrderOutcome(args: {
@@ -118,6 +275,8 @@ export function tacticalComputeHumanMovementOrderOutcome(args: {
     | 'res4IsSeaportByH3'
     | 'res4IsUrbanByH3'
     | 'res4IsRubbleByH3'
+    | 'res4RoadSidesByH3'
+    | 'res4RailSidesByH3'
   >;
 }):
   | { ok: true; idx: number }
@@ -150,6 +309,18 @@ export function tacticalComputeHumanMovementOrderOutcome(args: {
     movementPointBudget: Math.max(0, budget),
   });
   if (!plan.reachable) {
+    tacticalLogMutate('tacticalMarchPlan unreachable', {
+      battleId: args.battle.battleId,
+      tacticalTurnNumber: args.battle.tacticalTurnNumber,
+      player: 'human',
+      unitId: args.order.unitId,
+      subUnitType: u.unitType,
+      moveType,
+      fromH3: u.h3Index,
+      toH3: args.order.toH3Index,
+      movementPointBudget: budget,
+      plannerReason: plan.failureReason,
+    });
     return {
       ok: false,
       reason: 'out_of_range',
@@ -162,6 +333,18 @@ export function tacticalComputeHumanMovementOrderOutcome(args: {
       },
     };
   }
+  logTacticalMarchPlanOk({
+    player: 'human',
+    battle: args.battle,
+    unitId: args.order.unitId,
+    subUnitType: u.unitType,
+    moveType,
+    fromH3: u.h3Index,
+    toH3: args.order.toH3Index,
+    budget,
+    plan,
+    res4Set: args.res4Set,
+  });
   return { ok: true, idx };
 }
 

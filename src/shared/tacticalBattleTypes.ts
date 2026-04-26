@@ -196,6 +196,24 @@ export interface TacticalBattleSnapshot {
    */
   res4IsRubbleByH3?: Record<string, boolean>;
   /**
+   * Per-res4 road side masks (pent/hex boolean arrays) inside the footprint, from terrain classification cache.
+   *
+   * Purpose: Tactical land march may follow road edges at plains-equivalent cost and cross otherwise blocked terrain when rubble does not suppress the cell.
+   * When to use: `buildTacticalTerrainKindResolverFromSnapshot` transport edges and ranged transport targeting.
+   * Expected outcome: When present, keys are a subset of `res4ChildH3Indexes`; each array length matches bundled `terrain_res4_road_rail_sides.json` for that cell.
+   * Exceptions: Omitted when cache is empty or cell has no road overlay row.
+   */
+  res4RoadSidesByH3?: Record<string, readonly boolean[]>;
+  /**
+   * Per-res4 rail side masks paired in length with `res4RoadSidesByH3` for the same cell keys.
+   *
+   * Purpose: Same gameplay contract as roads for tactical transport links.
+   * When to use: Same as `res4RoadSidesByH3`.
+   * Expected outcome: Parallel arrays per `h3Index`; omitted when absent.
+   * Exceptions: None.
+   */
+  res4RailSidesByH3?: Record<string, readonly boolean[]>;
+  /**
    * All tactical sub-units spawned for this battle.
    *
    * Contract: May be shorter than theoretical totals when parents are unplaceable.

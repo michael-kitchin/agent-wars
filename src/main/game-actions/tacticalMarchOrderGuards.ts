@@ -35,6 +35,11 @@ export function validateHumanMarchOrdersWhenTacticalActive(
       logDebug('tacticalMarchOrderGuards validateHumanMarchOrdersWhenTacticalActive rejected', { reason: checked.reason });
       return { success: false, reason: checked.reason };
     }
+    logDebug('tacticalMarchOrderGuards validateHumanMarchOrdersWhenTacticalActive accepted', {
+      unitCount: uniqueUnitIds.length,
+      destinationH3Index,
+      unitIds: uniqueUnitIds,
+    });
     return { success: true };
   } catch (err) {
     logError('validateHumanMarchOrdersWhenTacticalActive: exception', err);

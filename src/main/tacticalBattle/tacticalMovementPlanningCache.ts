@@ -84,6 +84,8 @@ export function planTacticalRes4MarchWithSessionCache(
     | 'res4IsSeaportByH3'
     | 'res4IsUrbanByH3'
     | 'res4IsRubbleByH3'
+    | 'res4RoadSidesByH3'
+    | 'res4RailSidesByH3'
   >,
   args: {
     fromH3: string;

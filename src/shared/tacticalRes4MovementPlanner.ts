@@ -10,6 +10,13 @@ import {
   normalizeDbTerrainKindToTacticalCategory,
   tacticalEnterHexMovementCost,
 } from './tacticalTerrainMovement';
+import {
+  landInfantryArmorEnterCost,
+  landTerrainBlocksWithoutTransport,
+  landTransportStepMovementPointsAfterAuthorization,
+  planInfantryArmorLandContinuityMarch,
+} from './tacticalRes4LandMarchContinuity';
+import { tacticalRes4TransportReciprocalBoundaryActive } from './tacticalRes4TransportLink';
 
 /**
  * Explains why a tactical march plan failed or could not finish in one turn.
@@ -28,7 +35,8 @@ export type TacticalMarchPlanFailureReason =
 /**
  * Result of a tactical movement plan between two res4 cells inside one battle footprint.
  *
- * Contract: `pathToDestination` includes both endpoints when reachable; `firstStopWithinBudget` matches commit truncation.
+ * Contract: `pathToDestination` includes both endpoints when reachable; `firstStopWithinBudget` matches commit truncation plus a
+ * one-hex floor when the budget is positive but cannot pay for the first step (see `stopIdxWithMinimumOneHexProgress`).
  * When to use: Hover preview, IPC validation, and `commitHumanTacticalDraftOrders` first-leg application.
  * Expected outcome: `reachable` true iff finite-cost path exists under terrain rules; `reachableThisTurn` iff total cost ≤ budget.
  * Exceptions: None; invalid H3 inputs yield `reachable: false` without throwing.
@@ -117,6 +125,25 @@ function neighborsInFootprint(h: string, res4Set: ReadonlySet<string>): string[]
 }
 
 /**
+ * When strict MP truncation would leave the unit on the path origin despite a multi-step route, advance one cell
+ * along that path if the per-turn budget is positive so Ready/hover never apply a zero-length leg.
+ *
+ * Purpose: First-step costs can exceed budget 1 (e.g. armor 1.6 into blocking transport) while a longer path remains valid.
+ * When to use: After the cumulative-cost loop that computes `stopIdx` in `planTacticalRes4March` (land and naval branches).
+ * Expected outcome: Returns index `1` when `movementPointBudget > 0`, `stopIdx === 0`, and `pathLength >= 2`; otherwise returns `stopIdx`.
+ * Exceptions: None.
+ */
+function stopIdxWithMinimumOneHexProgress(args: {
+  stopIdx: number;
+  pathLength: number;
+  movementPointBudget: number;
+}): number {
+  const { stopIdx, pathLength, movementPointBudget } = args;
+  if (movementPointBudget > 0 && stopIdx === 0 && pathLength >= 2) return 1;
+  return stopIdx;
+}
+
+/**
  * Movement cost for a naval unit to step from `fromH3` into `toH3` (§12.4 naval footprint rules).
  *
  * Purpose: Single implementation shared by Dijkstra relaxation and tactical spawn checks so “navigable” matches “can leave this cell”.
@@ -129,6 +156,9 @@ function tacticalNavalEnterNeighborCost(
   toH3: string,
   terrain: TacticalTerrainKindResolver
 ): number {
+  if (terrain.isUrbanRes4?.(toH3) || terrain.isRubbleRes4?.(toH3)) {
+    return Infinity;
+  }
   const resolved = terrain.effectiveKindForRes4Hex(toH3);
   const seaportTo = terrain.isSeaportRes4?.(toH3) ?? false;
   if (
@@ -191,9 +221,41 @@ function enterCostForHex(
   if (unitTypeForMovement === 'naval') {
     return tacticalNavalEnterNeighborCost(fromH3, h, terrain);
   }
+  if (unitTypeForMovement === 'infantry' || unitTypeForMovement === 'armor') {
+    if (terrain.isRubbleRes4?.(h)) return 2;
+    if (terrain.isUrbanRes4?.(h)) return 1;
+  }
   const raw = terrain.effectiveKindForRes4Hex(h);
   const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
-  return tacticalEnterHexMovementCost(unitTypeForMovement, cat);
+  const base = tacticalEnterHexMovementCost(unitTypeForMovement, cat);
+  if (
+    (unitTypeForMovement === 'infantry' || unitTypeForMovement === 'armor') &&
+    fromH3 != null &&
+    terrain.transportFromTo?.(fromH3, h)
+  ) {
+    const blocking = landTerrainBlocksWithoutTransport(unitTypeForMovement, terrain, h);
+    const ctx = terrain.landTransportMarchContext;
+    const transportReciprocalOk =
+      !blocking ||
+      (ctx != null
+        ? tacticalRes4TransportReciprocalBoundaryActive({
+            fromH3,
+            toH3: h,
+            roadRailByH3: ctx.roadRailByH3,
+            rubbleByH3: ctx.rubbleByH3,
+          })
+        : !!terrain.transportFromTo?.(h, fromH3));
+    if (transportReciprocalOk) {
+      return landTransportStepMovementPointsAfterAuthorization({
+        unitTypeForMovement,
+        fromH3,
+        toH3: h,
+        blockingDestination: blocking,
+        terrain,
+      });
+    }
+  }
+  return base;
 }
 
 /**
@@ -222,7 +284,8 @@ function reconstructPath(parent: Map<string, string | null>, from: string, to: s
  *
  * Contract: Dijkstra over res4 cells in `res4Set` using §12.4 enter-hex costs; origin pays no cost to stand still.
  * When to use: Any tactical march validation or preview that must respect terrain and per-turn MP budget.
- * Expected outcome: `firstStopWithinBudget` matches walking the cheapest path until the next enter would exceed `movementPointBudget`.
+ * Expected outcome: `firstStopWithinBudget` walks the cheapest path until the next enter would exceed `movementPointBudget`; if that
+ * would spend zero MPs on a path of length ≥ 2 while the budget is positive, the first stop is still the first cell after the origin.
  * Exceptions: Catches H3 failures and returns `reachable: false` with `no_path`.
  */
 export function planTacticalRes4March(args: {
@@ -263,6 +326,71 @@ export function planTacticalRes4March(args: {
       failureReason: 'outside_footprint',
     };
   }
+
+  const isLandInfantryOrArmor = unitTypeForMovement === 'infantry' || unitTypeForMovement === 'armor';
+
+  if (isLandInfantryOrArmor) {
+    const landResult = planInfantryArmorLandContinuityMarch({
+      fromH3,
+      toH3,
+      res4Set,
+      unitTypeForMovement,
+      terrain,
+    });
+    if (!landResult) {
+      return {
+        reachable: false,
+        reachableThisTurn: false,
+        totalCostToDestination: Infinity,
+        pathToDestination: null,
+        firstStopWithinBudget: { stopH3: fromH3, consumedFullPath: false },
+        failureReason: 'no_path',
+      };
+    }
+    const { path, totalCost: total } = landResult;
+    let cum = 0;
+    let stopIdx = 0;
+    for (let i = 1; i < path.length; i++) {
+      const prevOfFrom = i >= 2 ? path[i - 2]! : null;
+      const stepCost = landInfantryArmorEnterCost({
+        toH3: path[i]!,
+        unitTypeForMovement,
+        terrain,
+        fromH3: path[i - 1]!,
+        prevOfFrom,
+        marchGoalH3: toH3,
+        res4Set,
+      });
+      if (!Number.isFinite(stepCost)) {
+        return {
+          reachable: false,
+          reachableThisTurn: false,
+          totalCostToDestination: Infinity,
+          pathToDestination: null,
+          firstStopWithinBudget: { stopH3: fromH3, consumedFullPath: false },
+          failureReason: 'no_path',
+        };
+      }
+      if (cum + stepCost > movementPointBudget) break;
+      cum += stepCost;
+      stopIdx = i;
+    }
+    stopIdx = stopIdxWithMinimumOneHexProgress({
+      stopIdx,
+      pathLength: path.length,
+      movementPointBudget,
+    });
+    const stopH3 = path[stopIdx]!;
+    const consumedFullPath = stopIdx >= path.length - 1;
+    return {
+      reachable: true,
+      reachableThisTurn: total <= movementPointBudget,
+      totalCostToDestination: total,
+      pathToDestination: path,
+      firstStopWithinBudget: { stopH3, consumedFullPath },
+    };
+  }
+
   const dist = new Map<string, number>();
   const parent = new Map<string, string | null>();
   const heap: QNode[] = [];
@@ -287,8 +415,8 @@ export function planTacticalRes4March(args: {
       }
     }
   }
-  const total = dist.get(toH3);
-  if (total === undefined || !Number.isFinite(total)) {
+  const totalNaval = dist.get(toH3);
+  if (totalNaval === undefined || !Number.isFinite(totalNaval)) {
     return {
       reachable: false,
       reachableThisTurn: false,
@@ -327,12 +455,17 @@ export function planTacticalRes4March(args: {
     cum += stepCost;
     stopIdx = i;
   }
+  stopIdx = stopIdxWithMinimumOneHexProgress({
+    stopIdx,
+    pathLength: path.length,
+    movementPointBudget,
+  });
   const stopH3 = path[stopIdx]!;
   const consumedFullPath = stopIdx >= path.length - 1;
   return {
     reachable: true,
-    reachableThisTurn: total <= movementPointBudget,
-    totalCostToDestination: total,
+    reachableThisTurn: totalNaval <= movementPointBudget,
+    totalCostToDestination: totalNaval,
     pathToDestination: path,
     firstStopWithinBudget: { stopH3, consumedFullPath },
   };

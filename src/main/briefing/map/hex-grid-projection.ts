@@ -2,7 +2,7 @@
  * Projects a set of H3 cells onto a 2D row/column grid for ASCII rendering.
  *
  * Purpose: Phase 2 spatial backbone: stable row/column layout for a bounded hex set.
- * When to use: After `computeMapHexes` (strategic) or tactical footprint selection.
+ * When to use: After selecting strategic cells (full-world res1 list) or tactical footprint selection.
  * Expected outcome: Deterministic `(row,col)` per input cell for the same inputs and threshold.
  * Exceptions: None for normal Earth coordinates; relies on H3 centers from `cellToLatLng`.
  */
@@ -23,11 +23,59 @@ const DEFAULT_CLUSTER_THRESHOLD_DEG = 4;
  * Exceptions: None.
  */
 export interface GridCell {
+  /**
+   * Canonical H3 cell index for this grid position.
+   *
+   * Contract: Matches an index from the input set passed to `projectToGrid` for this render pass.
+   * When to use: Renderer and footnote logic that must correlate ASCII cells back to game state.
+   * Expected outcome: Stable string usable as a key into per-hex briefing maps.
+   * Exceptions: None.
+   */
   h3Index: string;
+  /**
+   * Two-character briefing hex code for the active coordinate context.
+   *
+   * Contract: Always defined when the cell was projected; equals registry encoding for `h3Index`.
+   * When to use: Top line of each ASCII cell in operational maps and displaced-feature notes.
+   * Expected outcome: Uppercase letters and digits only; unique among cells in one projection.
+   * Exceptions: None.
+   */
   code: string;
+  /**
+   * Zero-based row index after latitude clustering (north-first ordering).
+   *
+   * Contract: Non-negative integer less than parent `HexGrid.numRows` for occupied cells.
+   * When to use: Sparse grid placement and odd-row ASCII indentation in the renderer.
+   * Expected outcome: Cells in the same row share this value; rows increase toward the south.
+   * Exceptions: None.
+   */
   row: number;
+  /**
+   * Zero-based column index after wrapped-longitude sort within the row.
+   *
+   * Contract: Non-negative integer less than parent `HexGrid.numCols` for that row's width.
+   * When to use: Horizontal placement of 2×2 ASCII blocks in `renderHexAsciiMap`.
+   * Expected outcome: Increases west-to-east relative to the projection's longitude center.
+   * Exceptions: None.
+   */
   col: number;
+  /**
+   * Cell center latitude in degrees from `cellToLatLng`.
+   *
+   * Contract: WGS84-style decimal degrees consistent with H3 library output for `h3Index`.
+   * When to use: Diagnostics, future labeling, or tests that assert geographic ordering.
+   * Expected outcome: Finite number in [-90, 90].
+   * Exceptions: None.
+   */
   lat: number;
+  /**
+   * Cell center longitude in degrees from `cellToLatLng`.
+   *
+   * Contract: WGS84-style decimal degrees; column sort uses deltas wrapped around the projection center.
+   * When to use: Same as `lat` for geographic reasoning tied to the projected cell.
+   * Expected outcome: Finite number typically in [-180, 180].
+   * Exceptions: None.
+   */
   lng: number;
 }
 
@@ -40,8 +88,32 @@ export interface GridCell {
  * Exceptions: None.
  */
 export interface HexGrid {
+  /**
+   * All occupied cells with row, column, and code assignments.
+   *
+   * Contract: Length equals number of input H3 indices; no duplicate `(row,col)` pairs.
+   * When to use: Primary input to `renderHexAsciiMap` alongside per-hex game state.
+   * Expected outcome: Each entry maps one briefing cell to one grid slot.
+   * Exceptions: None.
+   */
   cells: GridCell[];
+  /**
+   * Count of latitude-clustered rows in the sparse grid.
+   *
+   * Contract: Positive integer; `row` indices run `0 .. numRows - 1` for occupied cells.
+   * When to use: Renderer row loops and vertical padding of empty slots.
+   * Expected outcome: Matches clustered row count derived from the latitude threshold.
+   * Exceptions: None.
+   */
   numRows: number;
+  /**
+   * One plus the maximum column index across all rows (width bound).
+   *
+   * Contract: Positive integer; supports ragged rows via empty slots when `col` gaps exist.
+   * When to use: Renderer column loops for rectangular canvas over the sparse occupancy.
+   * Expected outcome: At least the widest row's column count after projection.
+   * Exceptions: None.
+   */
   numCols: number;
 }
 

@@ -23,7 +23,7 @@ from pyproj import CRS, Transformer
 from shapely.geometry import LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon, shape
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry.polygon import orient
-from shapely.ops import linemerge
+from shapely.ops import linemerge, nearest_points
 
 from .sampling import cell_polygon
 
@@ -503,7 +503,18 @@ def _edge_touched_by_clipped_route(edge: LineString, clipped: BaseGeometry) -> b
 
     inter = edge.intersection(clipped)
     if inter.is_empty:
-        return False
+        # Shapely clipping can leave boundary-contact endpoints microscopically off the edge.
+        # Treat those epsilon near-misses as touches only when the nearest edge point is on the
+        # edge interior (not at a corner), preserving the corner-graze exclusion contract.
+        try:
+            edge_pt, clipped_pt = nearest_points(edge, clipped)
+        except Exception:
+            return False
+        if edge_pt.distance(clipped_pt) > _EDGE_INTERIOR_TOL:
+            return False
+        ax, ay = edge.coords[0][0], edge.coords[0][1]
+        bx, by = edge.coords[1][0], edge.coords[1][1]
+        return _point_on_closed_segment_interior(edge_pt.x, edge_pt.y, ax, ay, bx, by)
 
     if isinstance(inter, LineString):
         return inter.length > _LINE_LENGTH_TOL

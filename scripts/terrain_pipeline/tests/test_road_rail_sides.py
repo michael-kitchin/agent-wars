@@ -35,6 +35,16 @@ class RoadRailSidesTests(unittest.TestCase):
         clipped = Point(0.0, 0.0)
         self.assertFalse(rr._edge_touched_by_clipped_route(edge, clipped))
 
+    def test_edge_touch_near_boundary_epsilon_still_counts(self) -> None:
+        edge = LineString([(0.0, 0.0), (1.0, 0.0)])
+        clipped = LineString([(0.25, 5e-10), (0.25, 0.5)])
+        self.assertTrue(rr._edge_touched_by_clipped_route(edge, clipped))
+
+    def test_edge_touch_near_corner_epsilon_is_rejected(self) -> None:
+        edge = LineString([(0.0, 0.0), (1.0, 0.0)])
+        clipped = LineString([(5e-10, 5e-10), (0.0, 0.5)])
+        self.assertFalse(rr._edge_touched_by_clipped_route(edge, clipped))
+
     def test_ordered_edges_anchor_is_north_most_midpoint(self) -> None:
         import h3
 

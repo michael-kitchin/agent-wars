@@ -802,6 +802,8 @@ export function commitHumanTacticalDraftOrders(args: {
       ...(preBattle.res4IsSeaportByH3 ? { res4IsSeaportByH3: preBattle.res4IsSeaportByH3 } : {}),
       ...(preBattle.res4IsUrbanByH3 ? { res4IsUrbanByH3: preBattle.res4IsUrbanByH3 } : {}),
       ...(preBattle.res4IsRubbleByH3 ? { res4IsRubbleByH3: preBattle.res4IsRubbleByH3 } : {}),
+      ...(preBattle.res4RoadSidesByH3 ? { res4RoadSidesByH3: preBattle.res4RoadSidesByH3 } : {}),
+      ...(preBattle.res4RailSidesByH3 ? { res4RailSidesByH3: preBattle.res4RailSidesByH3 } : {}),
     };
     const appliedMovementOrders: { unitId: string; toH3Index: string }[] = [];
     const tacticalMarchContinuations: { subUnitId: string; destinationH3Index: string }[] = [];

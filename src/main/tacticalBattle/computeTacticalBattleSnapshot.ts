@@ -8,7 +8,13 @@ import {
   listRes4FeatureOverridesForGame,
   listUnitsForSnapshot,
 } from '../gameDb';
+import { getRes4RoadRailOverlaysForRenderer } from '../terrainClassificationCache';
 import { tacticalNavalHasMovableNeighborInFootprint } from '../../shared/tacticalRes4MovementPlanner';
+import {
+  tacticalRes4FootprintTransportOverlayRecords,
+  tacticalRes4InfantryArmorSpawnAllowedViaTransport,
+  tacticalRes4TransportEdgeActive,
+} from '../../shared/tacticalRes4TransportLink';
 import { tacticalRes4UrbanRubbleFlagRecordsForFootprint } from '../../shared/tacticalTerrainCombatModifiers';
 import type { TacticalTerrainKindResolver } from '../../shared/tacticalTerrainMovement';
 import {
@@ -75,15 +81,23 @@ export function refreshTacticalBattleRes4TerrainFromGameDb(battle: TacticalBattl
     if (row.isSeaport) res4IsSeaportByH3[row.h3Index] = true;
   }
   const urbanRubble = tacticalRes4UrbanRubbleFlagRecordsForFootprint(battle.res4ChildH3Indexes, res4Rows);
+  const transport = tacticalRes4FootprintTransportOverlayRecords({
+    childFootprint: childSet,
+    overlays: getRes4RoadRailOverlaysForRenderer(),
+  });
   const next: TacticalBattleSnapshot = { ...battle, res4TerrainKindByH3, ...urbanRubble };
   delete next.res4IsSeaportByH3;
   delete next.res4IsUrbanByH3;
   delete next.res4IsRubbleByH3;
+  delete next.res4RoadSidesByH3;
+  delete next.res4RailSidesByH3;
   if (Object.keys(res4IsSeaportByH3).length > 0) {
     next.res4IsSeaportByH3 = res4IsSeaportByH3;
   }
   if (urbanRubble.res4IsUrbanByH3) next.res4IsUrbanByH3 = urbanRubble.res4IsUrbanByH3;
   if (urbanRubble.res4IsRubbleByH3) next.res4IsRubbleByH3 = urbanRubble.res4IsRubbleByH3;
+  if (transport.res4RoadSidesByH3) next.res4RoadSidesByH3 = transport.res4RoadSidesByH3;
+  if (transport.res4RailSidesByH3) next.res4RailSidesByH3 = transport.res4RailSidesByH3;
   return next;
 }
 
@@ -197,6 +211,8 @@ function dot(a: { lat: number; lng: number }, b: { lat: number; lng: number }): 
  * @param cellH3 Active res4 index (naval spawn checks use footprint neighbors from this cell).
  * @param childFootprint Full res1→res4 child set for naval first-step connectivity.
  * @param placementTerrain Resolver mirroring post-snapshot march rules for the enclosing hex.
+ * @param roadRailByH3 Bundled road/rail side masks keyed by res4 index for transport-linked spawn relaxation.
+ * @param rubbleByH3 Optional snapshot rubble map so transport benefits never apply through rubble endpoints.
  */
 function isRes4CellPassableForUnitType(
   unitType: string,
@@ -207,7 +223,9 @@ function isRes4CellPassableForUnitType(
   isAirportCell: boolean,
   cellH3: string,
   childFootprint: ReadonlySet<string>,
-  placementTerrain: TacticalTerrainKindResolver
+  placementTerrain: TacticalTerrainKindResolver,
+  roadRailByH3: ReadonlyMap<string, { roadSides: readonly boolean[]; railSides: readonly boolean[] }>,
+  rubbleByH3?: Readonly<Record<string, boolean>>
 ): boolean {
   const kind = effectiveKind || parentTerrainKind;
   if (unitType === 'naval') {
@@ -231,10 +249,21 @@ function isRes4CellPassableForUnitType(
     return isAirportCell;
   }
   if (unitType === 'infantry' || unitType === 'armor') {
-    return isInfantryOrArmorTacticalSpawnCell({
-      resolvedKindForCell: effectiveKind,
-      parentTerrain,
-      parentTerrainKind,
+    if (
+      isInfantryOrArmorTacticalSpawnCell({
+        resolvedKindForCell: effectiveKind,
+        parentTerrain,
+        parentTerrainKind,
+      })
+    ) {
+      return true;
+    }
+    if (roadRailByH3.size === 0) return false;
+    return tacticalRes4InfantryArmorSpawnAllowedViaTransport({
+      cellH3,
+      childFootprint,
+      roadRailByH3,
+      rubbleByH3,
     });
   }
   return kind !== 'water';
@@ -351,6 +380,12 @@ export function computeTacticalBattleSnapshot(
       if (row.isSeaport) res4IsSeaportByH3[row.h3Index] = true;
       if (row.isAirport) res4IsAirportByH3[row.h3Index] = true;
     }
+    const urbanRubbleForPlacement = tacticalRes4UrbanRubbleFlagRecordsForFootprint(children, res4Rows);
+    const transportForPlacement = tacticalRes4FootprintTransportOverlayRecords({
+      childFootprint: childSet,
+      overlays: getRes4RoadRailOverlaysForRenderer(),
+    });
+    const roadRailByH3 = transportForPlacement.roadRailByH3;
     const placementTerrain: TacticalTerrainKindResolver = {
       parentTerrain: hexRow.terrain,
       parentTerrainKind: hexRow.terrain_kind,
@@ -360,6 +395,24 @@ export function computeTacticalBattleSnapshot(
       isSeaportRes4(h3: string): boolean {
         return !!res4IsSeaportByH3[h3];
       },
+      transportFromTo:
+        roadRailByH3.size > 0
+          ? (fromH3: string, toH3: string): boolean =>
+              tacticalRes4TransportEdgeActive({
+                fromH3,
+                toH3,
+                roadRailByH3,
+                rubbleByH3: urbanRubbleForPlacement.res4IsRubbleByH3,
+              })
+          : undefined,
+      // Mirrors `buildTacticalTerrainKindResolverFromSnapshot` so any placement-time march checks use the same transport continuity bundle as battle snapshots.
+      landTransportMarchContext:
+        roadRailByH3.size > 0
+          ? {
+              roadRailByH3,
+              rubbleByH3: urbanRubbleForPlacement.res4IsRubbleByH3 ?? {},
+            }
+          : undefined,
     };
     const orderedCells = orderRes4CellsForPlacement({
       enclosingRes1: enclosingRes1H3Index,
@@ -408,7 +461,9 @@ export function computeTacticalBattleSnapshot(
             airportHere,
             cell,
             childSet,
-            placementTerrain
+            placementTerrain,
+            roadRailByH3,
+            urbanRubbleForPlacement.res4IsRubbleByH3
           )
         ) {
           continue;
@@ -442,7 +497,7 @@ export function computeTacticalBattleSnapshot(
     for (const cell of children) {
       res4TerrainKindByH3[cell] = res4KindByH3.get(cell) ?? hexRow.terrain_kind;
     }
-    const urbanRubble = tacticalRes4UrbanRubbleFlagRecordsForFootprint(children, res4Rows);
+    const urbanRubble = urbanRubbleForPlacement;
     const snapshot: TacticalBattleSnapshot = {
       battleId,
       enclosingRes1H3Index,
@@ -455,6 +510,12 @@ export function computeTacticalBattleSnapshot(
       ...(Object.keys(res4IsSeaportByH3).length > 0 ? { res4IsSeaportByH3 } : {}),
       ...(urbanRubble.res4IsUrbanByH3 ? { res4IsUrbanByH3: urbanRubble.res4IsUrbanByH3 } : {}),
       ...(urbanRubble.res4IsRubbleByH3 ? { res4IsRubbleByH3: urbanRubble.res4IsRubbleByH3 } : {}),
+      ...(transportForPlacement.res4RoadSidesByH3
+        ? { res4RoadSidesByH3: transportForPlacement.res4RoadSidesByH3 }
+        : {}),
+      ...(transportForPlacement.res4RailSidesByH3
+        ? { res4RailSidesByH3: transportForPlacement.res4RailSidesByH3 }
+        : {}),
       subUnits,
     };
     tacticalLogQuery('computeTacticalBattleSnapshot result', {

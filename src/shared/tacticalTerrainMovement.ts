@@ -4,6 +4,10 @@
  */
 
 import type { TacticalBattleSnapshot } from './tacticalBattleTypes';
+import {
+  tacticalRes4TransportEdgeActive,
+  type TacticalRes4TransportMasks,
+} from './tacticalRes4TransportLink';
 
 /**
  * Normalized tactical terrain bucket used for movement cost lookup.
@@ -33,6 +37,24 @@ export type TacticalMovementCategory =
  */
 export type TacticalTerrainKindResolver = {
   /**
+   * Returns true when this res4 cell counts as **urban infrastructure** (not rubble) for forced march enter cost.
+   *
+   * Contract: Optional; when absent, land enter-hex costs use terrain category only.
+   * When to use: Tactical march planner to apply urban=1 MP enter override for infantry/armor.
+   * Expected outcome: Matches snapshot `res4IsUrbanByH3` for the active battle.
+   * Exceptions: None.
+   */
+  isUrbanRes4?: (h3: string) => boolean;
+  /**
+   * Returns true when this res4 cell is **rubble** for forced march enter cost and naval blocking.
+   *
+   * Contract: Optional; when absent, rubble forcing and naval land blocking are skipped.
+   * When to use: Tactical march planner for rubble=2 land enters and `tacticalNavalEnterNeighborCost` land-like blocks.
+   * Expected outcome: Matches snapshot `res4IsRubbleByH3`.
+   * Exceptions: None.
+   */
+  isRubbleRes4?: (h3: string) => boolean;
+  /**
    * Returns true when this res4 cell is a seaport facility (naval may berth; blocks seaport→seaport march steps).
    *
    * Contract: Optional for tests and legacy snapshots; when absent, callers treat every cell as non-seaport.
@@ -41,6 +63,30 @@ export type TacticalTerrainKindResolver = {
    * Exceptions: None.
    */
   isSeaportRes4?: (h3: string) => boolean;
+  /**
+   * Returns true when a land unit may treat the step `fromH3` → `toH3` as following a road/rail link (not rubble-suppressed).
+   *
+   * Contract: Optional; when absent, no transport shortcuts apply in march planning.
+   * When to use: `planTacticalRes4March` land enter-cost override for infantry/armor.
+   * Expected outcome: Symmetric edge test over bundled side masks.
+   * Exceptions: None.
+   */
+  transportFromTo?: (fromH3: string, toH3: string) => boolean;
+  /**
+   * Bundled road/rail masks and rubble flags for land transport **continuity** (interior corridor) checks in march planning.
+   *
+   * Contract: Present when the snapshot contributes any normalized `res4RoadSidesByH3` / `res4RailSidesByH3` rows; absent when
+   * there is no transport overlay (planner falls back to `transportFromTo` only).
+   * When to use: `planTacticalRes4March` land branch to require coherent entry/exit sides on traversed corridor cells
+   * (including the ordered destination when transport plains cost would apply), with a single-edge allowance only on the
+   * march origin step where rules permit.
+   * Expected outcome: Same `Map` instance backing `transportFromTo` edge tests for that snapshot build.
+   * Exceptions: None.
+   */
+  landTransportMarchContext?: {
+    roadRailByH3: ReadonlyMap<string, TacticalRes4TransportMasks>;
+    rubbleByH3: Readonly<Record<string, boolean>>;
+  };
   /**
    * Returns raw terrain kind for a res4 index (may be empty when only parent kind applies).
    *
@@ -217,16 +263,53 @@ export function tacticalEnterHexMovementCost(unitType: string, category: Tactica
 export function buildTacticalTerrainKindResolverFromSnapshot(
   battle: Pick<
     TacticalBattleSnapshot,
-    'res4TerrainKindByH3' | 'strategicHexTerrain' | 'strategicHexTerrainKind' | 'res4IsSeaportByH3'
+    | 'res4TerrainKindByH3'
+    | 'strategicHexTerrain'
+    | 'strategicHexTerrainKind'
+    | 'res4IsSeaportByH3'
+    | 'res4IsUrbanByH3'
+    | 'res4IsRubbleByH3'
+    | 'res4RoadSidesByH3'
+    | 'res4RailSidesByH3'
   >
 ): TacticalTerrainKindResolver {
   const parentTerrain = battle.strategicHexTerrain ?? 'land';
   const parentKind = battle.strategicHexTerrainKind ?? 'plains';
   const map = battle.res4TerrainKindByH3 ?? {};
   const seaportMap = battle.res4IsSeaportByH3 ?? {};
+  const urbanMap = battle.res4IsUrbanByH3 ?? {};
+  const rubbleMap = battle.res4IsRubbleByH3 ?? {};
+  const roadBy = battle.res4RoadSidesByH3 ?? {};
+  const railBy = battle.res4RailSidesByH3 ?? {};
+  const roadRailByH3 = new Map<string, TacticalRes4TransportMasks>();
+  const transportKeys = new Set([...Object.keys(roadBy), ...Object.keys(railBy)]);
+  for (const h3 of transportKeys) {
+    const r = roadBy[h3];
+    const l = railBy[h3];
+    if (!r && !l) continue;
+    const n = Math.max(r?.length ?? 0, l?.length ?? 0);
+    if (n === 0) continue;
+    const roadSides = r ?? Array.from({ length: n }, () => false);
+    const railSides = l ?? Array.from({ length: n }, () => false);
+    if (roadSides.length !== railSides.length) continue;
+    roadRailByH3.set(h3, { roadSides, railSides });
+  }
+  const transportFromToFn =
+    roadRailByH3.size > 0
+      ? (fromH3: string, toH3: string): boolean =>
+          tacticalRes4TransportEdgeActive({
+            fromH3,
+            toH3,
+            roadRailByH3,
+            rubbleByH3: rubbleMap,
+          })
+      : undefined;
   return {
     parentTerrain,
     parentTerrainKind: parentKind,
+    transportFromTo: transportFromToFn,
+    landTransportMarchContext:
+      roadRailByH3.size > 0 ? { roadRailByH3, rubbleByH3: rubbleMap } : undefined,
     effectiveKindForRes4Hex(h3: string): string {
       const raw = map[h3];
       if (raw == null) return parentKind;
@@ -235,6 +318,12 @@ export function buildTacticalTerrainKindResolverFromSnapshot(
     },
     isSeaportRes4(h3: string): boolean {
       return !!seaportMap[h3];
+    },
+    isUrbanRes4(h3: string): boolean {
+      return !!urbanMap[h3];
+    },
+    isRubbleRes4(h3: string): boolean {
+      return !!rubbleMap[h3];
     },
   };
 }
@@ -272,7 +361,7 @@ export function tacticalMovementUnitTypeForPathfinding(
  *
  * Purpose: `battleId` + turn + sub-unit positions are not enough when only `res4TerrainKindByH3` values change under the same key set.
  * When to use: `planTacticalRes4MarchWithSessionCache` environment keys and renderer hover memo keys alongside those fields.
- * Expected outcome: Deterministic for a fixed snapshot; changes when any override entry or parent terrain fields change.
+ * Expected outcome: Deterministic for a fixed snapshot; changes when any override entry, parent terrain fields, or res4 road/rail mask content changes.
  * Exceptions: None.
  */
 export function tacticalTerrainLayerSignature(
@@ -284,6 +373,8 @@ export function tacticalTerrainLayerSignature(
     | 'res4IsSeaportByH3'
     | 'res4IsUrbanByH3'
     | 'res4IsRubbleByH3'
+    | 'res4RoadSidesByH3'
+    | 'res4RailSidesByH3'
   >
 ): string {
   const parentTerrain = battle.strategicHexTerrain ?? '';
@@ -313,12 +404,31 @@ export function tacticalTerrainLayerSignature(
         .map(([h3]) => h3)
         .sort((a, b) => a.localeCompare(b))
         .join(';');
+  const road = battle.res4RoadSidesByH3;
+  const rail = battle.res4RailSidesByH3;
+  const trKeys = new Set<string>([...(road ? Object.keys(road) : []), ...(rail ? Object.keys(rail) : [])]);
+  const trBody =
+    trKeys.size === 0
+      ? ''
+      : [...trKeys]
+          .sort((a, b) => a.localeCompare(b))
+          .map((h3) => {
+            const r = road?.[h3] ?? [];
+            const l = rail?.[h3] ?? [];
+            const n = Math.max(r.length, l.length);
+            let s = `${h3}:`;
+            for (let i = 0; i < n; i++) {
+              s += (r[i] ? '1' : '0') + (l[i] ? '1' : '0');
+            }
+            return s;
+          })
+          .join(';');
   if (!map || Object.keys(map).length === 0) {
-    return `${parentTerrain}|${parentKind}||sp:${spBody}|u:${urbanBody}|rb:${rubbleBody}`;
+    return `${parentTerrain}|${parentKind}||sp:${spBody}|u:${urbanBody}|rb:${rubbleBody}|tr:${trBody}`;
   }
   const body = Object.entries(map)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([h3, kind]) => `${h3}:${kind}`)
     .join(';');
-  return `${parentTerrain}|${parentKind}|${body}|sp:${spBody}|u:${urbanBody}|rb:${rubbleBody}`;
+  return `${parentTerrain}|${parentKind}|${body}|sp:${spBody}|u:${urbanBody}|rb:${rubbleBody}|tr:${trBody}`;
 }

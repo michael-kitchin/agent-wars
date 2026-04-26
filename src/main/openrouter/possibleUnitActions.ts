@@ -1,13 +1,14 @@
-﻿/**
+/**
  * Builds the "Possible unit actions" markdown block for AI Commander's Briefings.
  * Derives legal one-step moves/melee reach, air ferry destinations, ranged attacks, and air strikes from order validation rules.
  *
- * When `tacticalBattle` is passed, **ranged** rows use `collectTacticalLegalRangedTargetRes4Hexes` (terrain caps + mountain LOS)
- * on the res4 footprint; movement and strikes still use the same strategic-style helpers on the projected `state`.
+ * When `tacticalBattle` is passed, **ranged** rows use `collectTacticalLegalRangedTargetRes4Hexes` (terrain caps + mountain LOS,
+ * enemy **or** strikeable infrastructure targets, DB rows for the enclosing res1) on the res4 footprint; movement and strikes
+ * still use the same strategic-style helpers on the projected `state`.
  */
 
 import { gridDistance, gridDisk } from 'h3-js';
-import { type GameStateSnapshot } from '../gameDb';
+import { type GameStateSnapshot, listRes4FeatureOverridesForGame } from '../gameDb';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { getRange } from '../combatConstants';
 import { getValidDestinations } from '../oneStepMoveDestinations';
@@ -510,10 +511,29 @@ export function collectAggregatedPossibleActionRows(args: {
     }
 
     if (unit.unitType !== 'air' && getRange(unit.unitType as 'infantry' | 'armor' | 'naval' | 'air') >= 1) {
+      let tacticalRangedRows:
+        | ReadonlyArray<{
+            h3Index: string;
+            isUrban: boolean;
+            isAirport: boolean;
+            isSeaport: boolean;
+            isRubble: boolean;
+          }>
+        | undefined;
+      if (tacticalBattle) {
+        try {
+          const foot = new Set(tacticalBattle.res4ChildH3Indexes);
+          tacticalRangedRows = listRes4FeatureOverridesForGame().filter(
+            (r) => r.parentH3Index === tacticalBattle.enclosingRes1H3Index && foot.has(r.h3Index)
+          );
+        } catch {
+          tacticalRangedRows = [];
+        }
+      }
       const rangedHexes = excludeUnitCurrentHex(
         unit.h3Index,
         tacticalBattle
-          ? collectTacticalLegalRangedTargetRes4Hexes(tacticalBattle, unit.id)
+          ? collectTacticalLegalRangedTargetRes4Hexes(tacticalBattle, unit.id, tacticalRangedRows)
           : collectRangedTargetHexes(unit.h3Index, unit.unitType, indexed)
       );
       if (rangedHexes.length > 0) {

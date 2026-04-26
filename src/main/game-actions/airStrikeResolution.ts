@@ -16,7 +16,7 @@ import { isEmbarkedLandUnitOnWater } from './sealift';
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function pruneBuildQueueForInfrastructureState(h3Index: string): void {
+export function pruneBuildQueueForInfrastructureState(h3Index: string): void {
   const infra = getRes1InfrastructureForHex(h3Index);
   const rows = listBuildQueueRowsForHex(h3Index);
   if (rows.length === 0) return;
@@ -79,9 +79,10 @@ function replaceRandomRes4FeaturesWithRubble(
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function destroyBasedAirUnitsAtHex(
+export function destroyBasedAirUnitsAtHex(
   h3Index: string
 ): Array<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }> {
+  logDebug('airStrikeResolution destroyBasedAirUnitsAtHex', { h3Index });
   const rows = dbGetAll<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }>(
     'SELECT id, player, unit_type, h3_index, display_order FROM units WHERE h3_index = ? AND unit_type = ?',
     [h3Index, 'air']

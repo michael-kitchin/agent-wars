@@ -21,6 +21,7 @@ import { gridPathCells } from 'h3-js';
 import { isWithinGridRangePure } from './h3GridRangePure';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from './tacticalBattleTypes';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE, RANGED_RANGE_BY_UNIT_TYPE } from './tacticalRanges';
+import { tacticalRes4CellHasActiveTransportCorridor } from './tacticalRes4TransportLink';
 import { normalizeDbTerrainKindToTacticalCategory, type TacticalMovementCategory } from './tacticalTerrainMovement';
 
 /**
@@ -33,7 +34,13 @@ import { normalizeDbTerrainKindToTacticalCategory, type TacticalMovementCategory
  */
 export type TacticalBattleTerrainPick = Pick<
   TacticalBattleSnapshot,
-  'res4TerrainKindByH3' | 'strategicHexTerrain' | 'strategicHexTerrainKind' | 'res4IsUrbanByH3' | 'res4IsRubbleByH3'
+  | 'res4TerrainKindByH3'
+  | 'strategicHexTerrain'
+  | 'strategicHexTerrainKind'
+  | 'res4IsUrbanByH3'
+  | 'res4IsRubbleByH3'
+  | 'res4RoadSidesByH3'
+  | 'res4RailSidesByH3'
 >;
 
 /**
@@ -122,6 +129,42 @@ export function tacticalRes4CellIsUrbanOrRubble(battle: TacticalBattleTerrainPic
 }
 
 /**
+ * Returns true when a res4 cell hosts strikeable urban, airport, or seaport infrastructure (not already rubble).
+ *
+ * Purpose: Lets tactical ranged validation and AI legal-target lists allow infra-only shots alongside enemy-occupied hexes.
+ * When to use: After loading `listRes4FeatureOverridesForGame` rows filtered to the battle footprint and parent res1.
+ * Expected outcome: True when snapshot maps or a matching non-rubble override row still carries urban, airport, or seaport.
+ * Exceptions: None; empty `res4FeatureRows` still allows hits from `res4IsUrbanByH3` / `res4IsSeaportByH3` alone.
+ */
+export function tacticalRes4HasStrikeableInfrastructure(
+  battle: Pick<
+    TacticalBattleSnapshot,
+    'res4IsUrbanByH3' | 'res4IsRubbleByH3' | 'res4IsSeaportByH3' | 'res4RoadSidesByH3' | 'res4RailSidesByH3'
+  >,
+  res4H3: string,
+  res4FeatureRows: ReadonlyArray<{
+    h3Index: string;
+    isUrban: boolean;
+    isAirport: boolean;
+    isSeaport: boolean;
+    isRubble: boolean;
+  }>
+): boolean {
+  if (battle.res4IsRubbleByH3?.[res4H3]) return false;
+  if (battle.res4IsUrbanByH3?.[res4H3]) return true;
+  if (battle.res4IsSeaportByH3?.[res4H3]) return true;
+  const row = res4FeatureRows.find((r) => r.h3Index === res4H3);
+  if (row?.isRubble) return false;
+  if (row && (row.isUrban || row.isAirport || row.isSeaport)) return true;
+  return tacticalRes4CellHasActiveTransportCorridor({
+    cellH3: res4H3,
+    roadSidesByH3: battle.res4RoadSidesByH3,
+    railSidesByH3: battle.res4RailSidesByH3,
+    rubbleByH3: battle.res4IsRubbleByH3,
+  });
+}
+
+/**
  * Returns true when the cell is **forest-class** for movement and ranged caps (terrain normalization).
  *
  * Contract: Category `forests`; does not use urban/rubble flags.
@@ -156,20 +199,30 @@ export function tacticalMovementTerrainAnchorH3(
 /**
  * Returns true when armor/infantry **direct** ranged orders use the forest/urban/rubble **max range 1** cap.
  *
- * Contract: True iff forest-class **or** urban **or** rubble on the attacker anchor cell.
+ * Contract: True iff forest-class **or** urban **or** rubble **or** active road/rail mask on the attacker anchor cell.
  * When to use: Inside `effectiveTacticalRangedMaxRangeForAttacker`.
  * Expected outcome: False for naval/air (those types are not capped by this rule).
  * Exceptions: None.
  */
 export function tacticalForestUrbanRubbleRangedCapActive(battle: TacticalBattleTerrainPick, attackerAnchorH3: string): boolean {
   if (tacticalRes4CellIsUrbanOrRubble(battle, attackerAnchorH3)) return true;
+  if (
+    tacticalRes4CellHasActiveTransportCorridor({
+      cellH3: attackerAnchorH3,
+      roadSidesByH3: battle.res4RoadSidesByH3,
+      railSidesByH3: battle.res4RailSidesByH3,
+      rubbleByH3: battle.res4IsRubbleByH3,
+    })
+  ) {
+    return true;
+  }
   return tacticalRes4CellIsForestClass(battle, attackerAnchorH3);
 }
 
 /**
  * Returns the **effective** tactical ranged max range in H3 grid steps for one attacker cell and unit type.
  *
- * Contract: Baseline from `RANGED_RANGE_BY_UNIT_TYPE`; armor/infantry on forest/urban/rubble return `min(baseline, 1)`.
+ * Contract: Baseline from `RANGED_RANGE_BY_UNIT_TYPE`; armor/infantry on forest/urban/rubble/active transport return `min(baseline, 1)`.
  * When to use: Tactical `validateGroupRangedTarget` and apply-phase ranged filters.
  * Expected outcome: Non-negative integer; 0 means no ranged for that type.
  * Exceptions: None.
@@ -263,9 +316,9 @@ export function tacticalRangedDirectFirePassesTerrainAndRange(
 /**
  * Returns the **movement point budget** for one tactical march leg after terrain modifiers.
  *
- * Contract: Urban/rubble + armor or infantry ⇒ **1**; else armor in forest ⇒ **infantry** baseline; else `MOVEMENT_RANGE_BY_UNIT_TYPE[moveType]` with unit fallback like snapshot guards.
+ * Contract: Urban/rubble + armor or infantry ⇒ **1**; else armor in forest ⇒ **infantry** baseline; else `MOVEMENT_RANGE_BY_UNIT_TYPE[moveType]` with unit fallback like snapshot guards. When the computed budget is **0** but the leg is not an **air** march (air does not use tactical res4 marching), the result is **1** so first-leg truncation and `planTacticalRes4March` stay aligned with finite-cost reachability.
  * When to use: `tacticalComputeMovementOrderOutcome`, human twin, and `tacticalMarchFirstStopAlongPath` callers.
- * Expected outcome: Non-negative integer suitable for `planTacticalRes4MarchWithSessionCache`.
+ * Expected outcome: Positive integer suitable for `planTacticalRes4MarchWithSessionCache` for infantry/armor/naval; **0** only for air (no tactical march).
  * Exceptions: None.
  */
 export function effectiveTacticalMovementPointBudgetForMarchLeg(
@@ -276,29 +329,44 @@ export function effectiveTacticalMovementPointBudgetForMarchLeg(
 ): number {
   const anchor = tacticalMovementTerrainAnchorH3(subUnit, allSubUnits);
   const base = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[subUnit.unitType] ?? 1;
+  let budget: number;
   if (subUnit.unitType === 'infantry' || subUnit.unitType === 'armor') {
     if (tacticalRes4CellIsUrbanOrRubble(battle, anchor)) {
-      return Math.max(0, 1);
-    }
-    if (subUnit.unitType === 'armor' && tacticalRes4CellIsForestClass(battle, anchor)) {
+      budget = Math.max(0, 1);
+    } else if (subUnit.unitType === 'armor' && tacticalRes4CellIsForestClass(battle, anchor)) {
       const inf = MOVEMENT_RANGE_BY_UNIT_TYPE.infantry ?? 2;
-      return Math.max(0, inf);
+      budget = Math.max(0, inf);
+    } else {
+      budget = Math.max(0, base);
     }
+  } else {
+    budget = Math.max(0, base);
   }
-  return Math.max(0, base);
+  if (budget === 0 && moveType !== 'air' && subUnit.unitType !== 'air') {
+    return 1;
+  }
+  return budget;
 }
 
 /**
- * Lists res4 footprint cells where the attacker may order a **legal tactical ranged** shot (enemy present, range, mountain LOS, terrain cap).
+ * Lists res4 footprint cells where the attacker may order a **legal tactical ranged** shot (enemy or strikeable infra, range, mountain LOS, terrain cap).
  *
  * Contract: Excludes the attacker’s own `h3Index` cell from results; does not dedupe beyond `Set` ordering of iteration.
  * When to use: `buildPossibleUnitActionsMarkdown` when `tacticalBattle` is supplied for tactical AI briefings.
- * Expected outcome: Only cells in `battle.res4ChildH3Indexes` hosting at least one sub-unit whose `player` differs from the attacker’s.
+ * Expected outcome: Cells in `battle.res4ChildH3Indexes` with an enemy **or** strikeable infrastructure per `tacticalRes4HasStrikeableInfrastructure` when `res4FeatureRowsInFootprint` is supplied.
  * Exceptions: None; unknown `attackerSubUnitId` yields an empty list.
  */
 export function collectTacticalLegalRangedTargetRes4Hexes(
-  battle: TacticalBattleTerrainPick & Pick<TacticalBattleSnapshot, 'res4ChildH3Indexes' | 'subUnits'>,
-  attackerSubUnitId: string
+  battle: TacticalBattleTerrainPick &
+    Pick<TacticalBattleSnapshot, 'res4ChildH3Indexes' | 'subUnits' | 'res4IsSeaportByH3'>,
+  attackerSubUnitId: string,
+  res4FeatureRowsInFootprint?: ReadonlyArray<{
+    h3Index: string;
+    isUrban: boolean;
+    isAirport: boolean;
+    isSeaport: boolean;
+    isRubble: boolean;
+  }>
 ): string[] {
   const u = battle.subUnits.find((s) => s.id === attackerSubUnitId);
   const baseline = RANGED_RANGE_BY_UNIT_TYPE[u?.unitType ?? ''] ?? 0;
@@ -306,9 +374,12 @@ export function collectTacticalLegalRangedTargetRes4Hexes(
   const footprint = new Set(battle.res4ChildH3Indexes);
   const anchor = tacticalMovementTerrainAnchorH3(u, battle.subUnits);
   const out = new Set<string>();
+  const rows = res4FeatureRowsInFootprint ?? [];
   for (const h3 of battle.res4ChildH3Indexes) {
     if (h3 === anchor) continue;
-    if (!battle.subUnits.some((s) => s.h3Index === h3 && s.player !== u.player)) continue;
+    const enemyHere = battle.subUnits.some((s) => s.h3Index === h3 && s.player !== u.player);
+    const infraHere = rows.length > 0 && tacticalRes4HasStrikeableInfrastructure(battle, h3, rows);
+    if (!enemyHere && !infraHere) continue;
     if (!tacticalRangedDirectFirePassesTerrainAndRange(battle, footprint, u.unitType, anchor, h3)) continue;
     out.add(h3);
   }

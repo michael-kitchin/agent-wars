@@ -87,6 +87,31 @@ test('armor in forest uses infantry movement budget; infantry in urban uses 1 MP
   assert.equal(bInf, 1);
 });
 
+test('tactical march budget is never zero for non-air; air stays at zero (no res4 march leg)', () => {
+  const cell = tacticalRes4Cell(48, 58);
+  const battle = {
+    ...baseBattle,
+    res4TerrainKindByH3: { [cell]: 'plains' },
+  };
+  const air = {
+    id: 't-air',
+    unitType: 'air' as const,
+    h3Index: cell,
+    embarkedOnSubUnitId: null as string | null,
+  };
+  assert.equal(
+    effectiveTacticalMovementPointBudgetForMarchLeg(battle, air, [air], 'air'),
+    MOVEMENT_RANGE_BY_UNIT_TYPE.air
+  );
+  const inf = {
+    id: 't-inf',
+    unitType: 'infantry' as const,
+    h3Index: cell,
+    embarkedOnSubUnitId: null as string | null,
+  };
+  assert.ok(effectiveTacticalMovementPointBudgetForMarchLeg(battle, inf, [inf], 'infantry') >= 1);
+});
+
 test('armor in forest caps tactical ranged range to 1', () => {
   const cell = tacticalRes4Cell(43, 53);
   const battle = {

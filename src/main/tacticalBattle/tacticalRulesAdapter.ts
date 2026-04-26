@@ -64,6 +64,7 @@ export function tacticalMarchReachableAlongRes4Footprint(
  * Purpose: Lets tactical Ready apply only the first leg of a multi-turn march using §12.4 terrain costs (milestone 2.2).
  * When to use: `commitHumanTacticalDraftOrders` before `applyHumanTacticalDraftBeatInStrategicOrder`, using the same footprint and terrain snapshot as march validation.
  * Expected outcome: `stopH3` lies on the minimum movement-point path; `consumedFullPath` is true when the ordered destination is reached within budget.
+ * When the budget cannot pay for the first step but the path exists and the budget is positive, `planTacticalRes4March` still advances one hex along that path.
  * Exceptions: When no finite-cost path exists, returns `{ stopH3: from, consumedFullPath: false }` so callers do not advance illegally.
  */
 export function tacticalMarchFirstStopAlongPath(
@@ -82,6 +83,8 @@ export function tacticalMarchFirstStopAlongPath(
     | 'res4IsSeaportByH3'
     | 'res4IsUrbanByH3'
     | 'res4IsRubbleByH3'
+    | 'res4RoadSidesByH3'
+    | 'res4RailSidesByH3'
   >,
   unitTypeForMovement = 'infantry'
 ): { stopH3: string; consumedFullPath: boolean } {

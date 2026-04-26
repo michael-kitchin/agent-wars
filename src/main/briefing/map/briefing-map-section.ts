@@ -4,7 +4,7 @@
  * Purpose: Phase 6 integration point: map + displaced footnote + this-turn options + unit roster.
  * When to use: Replace the legacy `# Possible Unit Actions` block for strategic precomputed briefings.
  * Expected outcome: Self-contained markdown with legend, ASCII map, and compact tables using hex codes.
- * Exceptions: Returns a short fallback message if no friendly/enemy units exist to bound the map.
+ * Exceptions: Returns a short fallback message if no friendly/enemy units exist (strategic map not rendered in that case).
  */
 
 import type { GameStateSnapshot } from '../../gameDb';
@@ -12,9 +12,12 @@ import type { PrecomputationResult } from '../../precomputation';
 import { logDebug } from '../../logger';
 import { collectAggregatedPossibleActionRows } from '../../openrouter/possibleUnitActions';
 import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
-import { computeMapHexes } from './hex-bounding-box';
 import type { CoordinateContext } from './coordinateContext';
-import { ensureStrategicCoordinateRegistryInitialized, initTacticalCoordinateRegistry } from './hex-coordinates';
+import {
+  ensureStrategicCoordinateRegistryInitialized,
+  initTacticalCoordinateRegistry,
+  listStrategicRes1H3Indexes,
+} from './hex-coordinates';
 import { projectToGrid } from './hex-grid-projection';
 import type { HexMapCellState } from './hex-map-renderer';
 import { renderHexAsciiMap } from './hex-map-renderer';
@@ -32,6 +35,9 @@ import {
  * When to use: Strategic consultations where the LLM needs geography without huge action tables.
  * Expected outcome: Markdown fragment including H1/H2 headings per existing briefing style.
  * Exceptions: None beyond missing registry initialization (handled via `ensureStrategicCoordinateRegistryInitialized`).
+ *
+ * Map extent: Uses every registered strategic res1 cell (full world) so the LLM sees pole-to-pole and dateline-safe
+ * geography; fog and enemy markers still follow `buildStrategicHexGameStateMap` visibility rules.
  */
 export function buildStrategicOperationalMapSectionMarkdown(args: {
   state: GameStateSnapshot;
@@ -56,9 +62,12 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
     return '# Operational Map\n\n(No units — map not rendered.)\n';
   }
 
-  const mapHexes = computeMapHexes(aiUnits, enemyUnits, 5);
+  const mapHexes = listStrategicRes1H3Indexes();
+  logDebug('briefing-map-section buildStrategicOperationalMapSectionMarkdown: full-world res1 set', {
+    res1CellCount: mapHexes.length,
+  });
   const grid = projectToGrid(mapHexes, context);
-  const gameByH3 = buildStrategicHexGameStateMap(args.state, mapHexes, args.latLngByH3);
+  const gameByH3 = buildStrategicHexGameStateMap(args.state, mapHexes);
   const { mapString, displacedFeatures } = renderHexAsciiMap(grid, gameByH3);
 
   const aggRows = collectAggregatedPossibleActionRows({
@@ -85,11 +94,7 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
   );
 }
 
-function buildStrategicHexGameStateMap(
-  state: GameStateSnapshot,
-  mapHexes: string[],
-  latLngByH3: Map<string, [number, number]>
-): Map<string, HexMapCellState> {
+function buildStrategicHexGameStateMap(state: GameStateSnapshot, mapHexes: string[]): Map<string, HexMapCellState> {
   const terrainByH3 = new Map(state.hexes.map((h) => [h.h3Index, h.terrain]));
   const controlByH3 = new Map((state.res1Control ?? []).map((r) => [r.h3Index, r.controllerPlayerId]));
   const infraByH3 = new Map(

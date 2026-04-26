@@ -642,6 +642,32 @@ export function listRes4FeatureOverridesForGame(ops: ControlDbOps): Res4FeatureO
 }
 
 /**
+ * Inserts a new `res4_feature_overrides` row marking rubble-only damage (no facilities) for tactical transport destruction.
+ *
+ * Purpose: `UPDATE` on missing rows is a no-op; road/rail-only cells need a durable rubble row so refresh and march rules see `is_rubble`.
+ * When to use: `applyTacticalRangedRubbleToRes4Cell` after confirming no existing row for the res4 index and a strikeable transport corridor.
+ * Expected outcome: One INSERT with `is_rubble=1`, facility flags cleared, `terrain_kind` from merged renderer metadata; triggers roll up res1 infrastructure counts.
+ * Exceptions: Caller must ensure `h3_index` is unused or SQLite will throw (caught at caller).
+ */
+export function insertRes4FeatureOverrideRubbleRow(
+  ops: ControlDbOps,
+  args: { h3Index: string; parentH3Index: string; terrainKind: string }
+): void {
+  logDebug('gameDb insertRes4FeatureOverrideRubbleRow', {
+    h3Index: args.h3Index,
+    parentH3Index: args.parentH3Index,
+    terrainKind: args.terrainKind,
+  });
+  ops.run(
+    `INSERT INTO res4_feature_overrides (
+       h3_index, parent_h3_index, terrain_kind,
+       is_urban, is_airport, is_seaport, is_rubble
+     ) VALUES (?, ?, ?, 0, 0, 0, 1)`,
+    [args.h3Index, args.parentH3Index, args.terrainKind]
+  );
+}
+
+/**
  * Defines the `updateRes4FeatureOverrideRow` function shape (export function updateRes4FeatureOverrideRow( ops: ControlDbOps, h3Index: string, patch: Partial<Pick<Res4FeatureOverrideRow, 'isUrban' | 'isAirport' |).
 
  * Purpose: Supports maintainability by documenting why `updateRes4FeatureOverrideRow` exists.

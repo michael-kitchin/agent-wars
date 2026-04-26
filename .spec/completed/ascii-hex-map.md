@@ -944,8 +944,8 @@ The briefing generator currently produces these sections (in order). Items marke
 
 ### Integration Steps
 
-1. **Call `computeMapHexes()`** with current unit positions to determine the map's bounding box.
-2. **Call `projectToGrid()`** on the resulting hex set.
+1. **Select strategic map cells** as the full registered strategic res1 set (`listStrategicRes1H3Indexes()`), pole-to-pole / dateline-safe extent (no unit-centered viewport). `computeMapHexes()` remains available for other callers that need a bounded window.
+2. **Call `projectToGrid()`** on that hex set.
 3. **Populate `HexGameState`** for each hex from the game state (terrain, features, unit counts by side).
 4. **Call `renderMap()`** to produce the ASCII map and displaced features list.
 5. **Call the table renderers** (unit roster, this-turn options, production summary).

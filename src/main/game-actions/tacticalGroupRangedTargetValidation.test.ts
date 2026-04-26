@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import { gridDisk, gridDistance } from 'h3-js';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { validateTacticalGroupRangedTarget } from './tacticalGroupRangedTargetValidation';
+import { res4GridDiskNeighborsOrdered } from '../../shared/tacticalRes4TransportLink';
 import { firstRingCellDistinctFrom, tacticalRes1Cell, tacticalRes4UnderRes1Corner } from '../tacticalBattle/testSupport/tacticalRes4HexFixtures';
 
 test('validateTacticalGroupRangedTarget accepts opponent naval ranged to adjacent human on clear plains', () => {
@@ -106,4 +107,84 @@ test('validateTacticalGroupRangedTarget rejects opponent naval when mountain LOS
   });
   assert.equal(out.success, false);
   assert.ok(out.reason?.includes('Line of sight blocked by mountains'), out.reason);
+});
+
+test('validateTacticalGroupRangedTarget accepts infantry shot at empty urban cell from snapshot flags', () => {
+  const res1 = tacticalRes1Cell(9, 10);
+  const h0 = tacticalRes4UnderRes1Corner(9, 10);
+  const hUrban = firstRingCellDistinctFrom(h0);
+  const ring = [...gridDisk(h0, 2)];
+  assert.ok(ring.includes(hUrban));
+  const terrain: Record<string, string> = {};
+  for (const h of ring) terrain[h] = 'plains';
+  const snap: TacticalBattleSnapshot = {
+    battleId: 'tb-rg-infra-only',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: ring,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: terrain,
+    res4IsUrbanByH3: { [hUrban]: true },
+    subUnits: [
+      {
+        id: 'hum-inf-urban',
+        parentUnitId: 'p-u',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: h0,
+        displayName: '1st Infantry (urban shot)',
+      },
+    ],
+  };
+  const out = validateTacticalGroupRangedTarget({
+    snap,
+    uniqueUnitIds: ['hum-inf-urban'],
+    targetH3Index: hUrban,
+    tacticalAttackerPlayer: 'human',
+  });
+  assert.equal(out.success, true);
+});
+
+test('validateTacticalGroupRangedTarget accepts infantry shot at road-only strikeable cell', () => {
+  const res1 = tacticalRes1Cell(10, 11);
+  const h0 = tacticalRes4UnderRes1Corner(10, 11);
+  const hRoad = firstRingCellDistinctFrom(h0);
+  const ring = [...gridDisk(h0, 2)];
+  assert.ok(ring.includes(hRoad));
+  const terrain: Record<string, string> = {};
+  for (const h of ring) terrain[h] = 'plains';
+  const n = res4GridDiskNeighborsOrdered(hRoad).length;
+  const roadSides = Array.from({ length: n }, () => true);
+  const railSides = Array.from({ length: n }, () => false);
+  const snap: TacticalBattleSnapshot = {
+    battleId: 'tb-rg-transport',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: ring,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: terrain,
+    res4RoadSidesByH3: { [hRoad]: roadSides },
+    res4RailSidesByH3: { [hRoad]: railSides },
+    subUnits: [
+      {
+        id: 'hum-inf-road',
+        parentUnitId: 'p-r',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: h0,
+        displayName: '1st Infantry (road shot)',
+      },
+    ],
+  };
+  const out = validateTacticalGroupRangedTarget({
+    snap,
+    uniqueUnitIds: ['hum-inf-road'],
+    targetH3Index: hRoad,
+    tacticalAttackerPlayer: 'human',
+  });
+  assert.equal(out.success, true);
 });

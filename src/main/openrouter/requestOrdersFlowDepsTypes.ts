@@ -8,6 +8,7 @@
  */
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
 
 /**
@@ -133,7 +134,7 @@ export interface RequestOrdersFlowDeps {
   validateAiRangedOrder: (
     order: { unitId: string; targetH3Index: string },
     state: GameStateSnapshot,
-    opts?: { labelForUnitId?: (unitId: string) => string }
+    opts?: { labelForUnitId?: (unitId: string) => string; tacticalBattle?: TacticalBattleSnapshot }
   ) => { valid: true } | { valid: false; reason: string };
   /**
    * Formats a lat/lng pair for human-readable prompts and logs.

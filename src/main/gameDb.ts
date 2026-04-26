@@ -51,6 +51,7 @@ import {
   setBuildProgressPointsForHex as setBuildProgressPointsForHexFromModule,
   setHexController as setHexControllerFromModule,
   setRes1InfrastructureForHex as setRes1InfrastructureForHexFromModule,
+  insertRes4FeatureOverrideRubbleRow as insertRes4FeatureOverrideRubbleRowFromModule,
   updateRes4FeatureOverrideRow as updateRes4FeatureOverrideRowFromModule,
   type BuildQueueRow,
   type HexControlRow,
@@ -1088,6 +1089,22 @@ export function ensureRes1InfrastructureSyncTriggers(): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * Defines the `insertRes4FeatureOverrideRubbleRow` function shape (export function insertRes4FeatureOverrideRubbleRow(args: { h3Index: string; parentH3Index: string; terrainKind: string }): void).
+ *
+ * Purpose: Exposes transport-only tactical rubble persistence at the game DB facade.
+ * When to use: `applyTacticalRangedRubbleToRes4Cell` when no override row exists yet for the res4 cell.
+ * Expected outcome: Delegates to `controlInfrastructure.insertRes4FeatureOverrideRubbleRow` with the live connection bundle (which emits debug logs).
+ * Exceptions: None; SQLite errors surface to callers that wrap in try/catch.
+ */
+export function insertRes4FeatureOverrideRubbleRow(args: {
+  h3Index: string;
+  parentH3Index: string;
+  terrainKind: string;
+}): void {
+  insertRes4FeatureOverrideRubbleRowFromModule({ run, getOne, getAll }, args);
+}
+
 export function updateRes4FeatureOverrideRow(
   h3Index: string,
   patch: Partial<Pick<Res4FeatureOverrideRow, 'isUrban' | 'isAirport' | 'isSeaport' | 'isRubble'>>

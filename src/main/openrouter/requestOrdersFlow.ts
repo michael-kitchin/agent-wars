@@ -150,6 +150,23 @@ tool_call_id: string;   /**
 content: string };
 
 /**
+ * Builds a concise comma-separated tool-name list for the OpenRouter sidebar log.
+ *
+ * Purpose: Keeps per-round log lines readable when the model issues many parallel tool calls.
+ * When to use: After each assistant message in `requestOrdersFlow` that includes `tool_calls`.
+ * Expected outcome: Single-line fragment; truncates with a count suffix when the list exceeds `maxNames`.
+ * Exceptions: None.
+ */
+function summarizeToolCallNamesForAiLog(
+  toolCalls: ReadonlyArray<{ function: { name: string } }>,
+  maxNames: number
+): string {
+  const names = toolCalls.map((tc) => tc.function.name);
+  if (names.length <= maxNames) return names.join(', ');
+  return `${names.slice(0, maxNames).join(', ')} (+${names.length - maxNames} more)`;
+}
+
+/**
  * Defines the `requestOrdersFlow` function shape (export async function requestOrdersFlow( deps: RequestOrdersFlowDeps, state: GameStateSnapshot, modelId: string, options?: RequestOrdersOptions ):).
 
  * Purpose: Supports maintainability by documenting why `requestOrdersFlow` exists.
@@ -429,6 +446,12 @@ export async function requestOrdersFlow(
         return failRequest(timeoutMsg);
       }
       iteration++;
+      if (onLog) {
+        onLog(
+          `AI round ${iteration}: calling model with ${messages.length} message(s) in context` +
+            (tacticalBattle ? ' (tactical).' : '.')
+        );
+      }
       const body: Record<string, unknown> = {
         model: modelId,
         messages,
@@ -478,10 +501,23 @@ export async function requestOrdersFlow(
       totalInputTokens += json.usage?.prompt_tokens ?? 0;
       totalOutputTokens += json.usage?.completion_tokens ?? 0;
       const assistantMessage = json.choices?.[0]?.message;
-      if (!assistantMessage) return failRequest('Invalid response: no message');
+      if (!assistantMessage) {
+        if (onLog) onLog('Invalid response: no assistant message from model.', true);
+        return failRequest('Invalid response: no message');
+      }
+
+      const usageIn = json.usage?.prompt_tokens;
+      const usageOut = json.usage?.completion_tokens;
+      const usageFrag =
+        usageIn != null && usageOut != null ? ` (+${usageIn} / ${usageOut} tokens this call)` : '';
 
       const toolCalls = assistantMessage.tool_calls;
       if (toolCalls && toolCalls.length > 0) {
+        if (onLog) {
+          onLog(
+            `AI round ${iteration}: model requested ${toolCalls.length} tool call(s)${usageFrag}: ${summarizeToolCallNamesForAiLog(toolCalls, 24)}.`
+          );
+        }
         messages.push({
           role: 'assistant',
           content: assistantMessage.content ?? null,
@@ -553,17 +589,27 @@ export async function requestOrdersFlow(
           const groupId = getGroupIdForToolName(toolName);
           if (groupId !== undefined) toolInvocationCounts[groupId] = (toolInvocationCounts[groupId] ?? 0) + 1;
         }
+        if (onLog) {
+          onLog(
+            `AI round ${iteration}: recorded ${toolCalls.length} tool result(s); conversation now has ${messages.length} message(s).`
+          );
+        }
         continue;
       }
 
       const content = assistantMessage.content;
       if (typeof content !== 'string' || !content.trim()) {
+        if (onLog) onLog('Invalid response: assistant returned no text content (expected JSON orders).', true);
         return failRequest('Invalid response: no content');
+      }
+      if (onLog) {
+        onLog(`AI round ${iteration}: model returned final text (${content.length} chars)${usageFrag}; parsing orders…`);
       }
       const productionEnabledForParse = tacticalBattle ? false : flags.productionEnabled;
       let parsed = parseOrdersResponse(content, resolveToH3, planState, latLngByH3, productionEnabledForParse, coordinateContext);
       if (!parsed && !parseRepairAttempted) {
         parseRepairAttempted = true;
+        if (onLog) onLog('Orders JSON was not parseable; sending one repair user message (no tools, separate API call).');
         const repairMessages: ChatMessage[] = [
           ...messages,
           { role: 'assistant', content },
@@ -582,6 +628,7 @@ export async function requestOrdersFlow(
         });
         if (repairResponse.ok) {
           const repairText = repairResponse.bodyText;
+          if (onLog) onLog('Repair API call completed; parsing repair JSON…');
           logResponsePreview('openRouter requestOrders repair: raw response body', repairText);
           const repairJson = JSON.parse(repairText) as {
             choices?: Array<{ message?: { content?: string | null } }>;
@@ -592,6 +639,7 @@ export async function requestOrdersFlow(
           totalOutputTokens += repairJson.usage?.completion_tokens ?? 0;
           const repairContent = repairJson.choices?.[0]?.message?.content;
           if (typeof repairContent === 'string' && repairContent.trim()) {
+            if (onLog) onLog(`Repair assistant text received (${repairContent.length} chars); parsing orders…`);
             parsed = parseOrdersResponse(
               repairContent,
               resolveToH3,
@@ -601,9 +649,14 @@ export async function requestOrdersFlow(
               coordinateContext
             );
           }
+        } else if (onLog && repairResponse.error) {
+          onLog(`Repair request failed: ${repairResponse.error}`, true);
         }
       }
-      if (!parsed) return failRequest('Invalid response: could not parse orders');
+      if (!parsed) {
+        if (onLog) onLog('Invalid response: could not parse orders JSON after normal and repair attempts.', true);
+        return failRequest('Invalid response: could not parse orders');
+      }
 
       if (parsed.callbacks?.length) replaceSubscriptions('opponent', parsed.callbacks, state.turnNumber);
       toolInvocationCounts['events'] = parsed.callbacks?.length ?? 0;
@@ -665,7 +718,10 @@ export async function requestOrdersFlow(
           dropReasons.push(`Duplicate ranged for ${aiOrderUnitLabel(r.unitId)}`);
           continue;
         }
-        const result = validateAiRangedOrder(r, rangedState, { labelForUnitId: aiOrderUnitLabel });
+        const result = validateAiRangedOrder(r, rangedState, {
+          labelForUnitId: aiOrderUnitLabel,
+          tacticalBattle: tacticalBattle ?? undefined,
+        });
         if (result.valid) {
           validatedRanged.push(r);
           seenRanged.add(r.unitId);
@@ -742,6 +798,24 @@ export async function requestOrdersFlow(
       }
 
       markSuccessfulConsultation();
+      if (onLog) {
+        const ms = Date.now() - wallClockStart;
+        const bits: string[] = [
+          `${validated.length} movement`,
+          `${validatedRanged.length} ranged`,
+        ];
+        if (tacticalBattle) {
+          bits.push(`${outAir.length} air strike(s)`);
+          bits.push(`${outFerry.length} ferry`);
+          bits.push(`${outEmbark.length} embark`);
+        }
+        const dropNote = dropReasons.length > 0 ? `; ${dropReasons.length} validation note(s)` : '';
+        const tokNote =
+          totalInputTokens > 0 || totalOutputTokens > 0
+            ? `; session tokens in/out ${totalInputTokens}/${totalOutputTokens}`
+            : '';
+        onLog(`AI planning complete in ${ms} ms: ${bits.join(', ')}${dropNote}${tokNote}.`);
+      }
       return {
         success: true,
         orders: validated,
@@ -761,6 +835,12 @@ export async function requestOrdersFlow(
     }
     setAiToolLimitExceededLastTurn();
     markSuccessfulConsultation();
+    if (onLog) {
+      onLog(
+        `AI planning stopped after ${iteration} round(s) without a completed order JSON (max tool rounds or empty final reply). Returning no movement orders.`,
+        true
+      );
+    }
     return {
       success: true,
       orders: [],

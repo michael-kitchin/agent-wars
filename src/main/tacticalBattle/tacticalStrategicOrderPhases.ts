@@ -10,12 +10,19 @@ import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shar
 import {
   tacticalMovementTerrainAnchorH3,
   tacticalRangedDirectFirePassesTerrainAndRange,
+  tacticalRes4HasStrikeableInfrastructure,
 } from '../../shared/tacticalTerrainCombatModifiers';
+import { tacticalRes4CellHasActiveTransportCorridor } from '../../shared/tacticalRes4TransportLink';
 import { casualtyPriorityIndex, getAttack, getDefense, getRange } from '../combatConstants';
 import { runRangedPhase } from '../combatResolution';
 import type { CombatUnit } from '../combatUnitTypes';
 import { deleteStrategicParentUnitAndApplyTransportOutcome } from '../game-actions/sealift';
 import { applyInfrastructureDestructionEffects } from '../game-actions/airStrikeResolution';
+import {
+  applyTacticalRangedRubbleToRes4Cell,
+  type TacticalRangedRubbleApplyOptions,
+} from '../game-actions/tacticalRangedInfrastructureRubble';
+import { listRes4FeatureOverridesForGame } from '../gameDb';
 import { refreshTacticalBattleRes4TerrainFromGameDb } from './computeTacticalBattleSnapshot';
 import { tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 import {
@@ -23,6 +30,50 @@ import {
   tacticalGuardOpponentAirSubUnitForFerry,
   tacticalRes4FootprintContains,
 } from './tacticalSnapshotGuards';
+
+/**
+ * Picks an `InfrastructureDestroyedEvent.targetType` label from DB override flags before a ranged rubble write.
+ *
+ * Purpose: Keeps tactical ranged infrastructure toasts aligned with air-strike `targetType` vocabulary when a cell mixes features.
+ * When to use: Immediately before `applyTacticalRangedRubbleToRes4Cell` when emitting synthetic infra events.
+ * Expected outcome: `airport` when the row had an airport; else `seaport` when a seaport flag; else `urban`.
+ * Exceptions: None; missing rows default to `urban`.
+ */
+function tacticalRangedRubbleApplyOptsForHex(
+  battle: Pick<
+    TacticalBattleSnapshot,
+    | 'res4TerrainKindByH3'
+    | 'strategicHexTerrainKind'
+    | 'res4RoadSidesByH3'
+    | 'res4RailSidesByH3'
+    | 'res4IsRubbleByH3'
+  >,
+  hex: string
+): TacticalRangedRubbleApplyOptions {
+  const merged =
+    (battle.res4TerrainKindByH3 && battle.res4TerrainKindByH3[hex]) ||
+    battle.strategicHexTerrainKind ||
+    'plains';
+  return {
+    mergedTerrainKindForInsert: String(merged),
+    insertStrikeableTransportCorridor: tacticalRes4CellHasActiveTransportCorridor({
+      cellH3: hex,
+      roadSidesByH3: battle.res4RoadSidesByH3,
+      railSidesByH3: battle.res4RailSidesByH3,
+      rubbleByH3: battle.res4IsRubbleByH3,
+    }),
+  };
+}
+
+function tacticalRangedInfraEventTargetTypeBeforeRubble(
+  res4H3: string,
+  rows: ReadonlyArray<{ h3Index: string; isAirport: boolean; isSeaport: boolean; isUrban: boolean; isRubble: boolean }>
+): 'urban' | 'airport' | 'seaport' {
+  const row = rows.find((r) => r.h3Index === res4H3 && !r.isRubble);
+  if (row?.isAirport) return 'airport';
+  if (row?.isSeaport) return 'seaport';
+  return 'urban';
+}
 
 /**
  * Expands a removal id list to include embarked land cargo when the victim is a naval tactical sub-unit.
@@ -382,9 +433,43 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       rangedPlayer,
     });
   }
-  if (rangedOrders.length > 0) {
+  let res4RowsForBattle: Array<{
+    h3Index: string;
+    parentH3Index: string;
+    isUrban: boolean;
+    isAirport: boolean;
+    isSeaport: boolean;
+    isRubble: boolean;
+  }>;
+  try {
+    res4RowsForBattle = listRes4FeatureOverridesForGame().filter(
+      (r) => r.parentH3Index === workBattle.enclosingRes1H3Index && footprint.has(r.h3Index)
+    );
+  } catch {
+    res4RowsForBattle = [];
+  }
+
+  const hexHasEnemyForPlayer = (attackerPlayer: string, hex: string): boolean =>
+    workBattle.subUnits.some((u) => u.h3Index === hex && u.player !== attackerPlayer);
+
+  const rangedOrdersCombat: RangedAttackOrder[] = [];
+  const rangedOrdersInfraOnly: RangedAttackOrder[] = [];
+  for (const o of rangedOrders) {
+    const atk = workBattle.subUnits.find((u) => u.id === o.unitId);
+    if (!atk) continue;
+    if (hexHasEnemyForPlayer(atk.player, o.targetH3Index)) {
+      rangedOrdersCombat.push(o);
+    } else if (tacticalRes4HasStrikeableInfrastructure(workBattle, o.targetH3Index, res4RowsForBattle)) {
+      rangedOrdersInfraOnly.push(o);
+    }
+  }
+
+  let rangedTerrainMutated = false;
+  if (rangedOrdersCombat.length > 0) {
+    const subBeforeRanged = workBattle.subUnits.map((u) => ({ ...u }));
+    const byIdBefore = new Map(subBeforeRanged.map((u) => [u.id, u] as const));
     const rangedInput = tacticalSubUnitsToRangedCombatUnits(workBattle, workBattle.subUnits);
-    const rangedResult = runRangedPhase(rangedInput, workBattle.res4ChildH3Indexes, rangedOrders, next);
+    const rangedResult = runRangedPhase(rangedInput, workBattle.res4ChildH3Indexes, rangedOrdersCombat, next);
     const removedSet = new Set(rangedResult.removedUnitIds);
     const byId = new Map(workBattle.subUnits.map((u) => [u.id, u] as const));
     for (const id of rangedResult.removedUnitIds) {
@@ -409,8 +494,72 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       ...workBattle,
       subUnits: workBattle.subUnits.filter((u) => !removedSet.has(u.id)),
     };
+
+    const defenderHexesWithKill = new Set<string>();
+    for (const k of rangedResult.killsByDirectFire ?? []) {
+      const pre = byIdBefore.get(k.victimId);
+      if (pre) defenderHexesWithKill.add(pre.h3Index);
+    }
+    const rubbledFromCombat = new Set<string>();
+    for (const hex of defenderHexesWithKill) {
+      if (!footprint.has(hex) || rubbledFromCombat.has(hex)) continue;
+      if (!tacticalRes4HasStrikeableInfrastructure(workBattle, hex, res4RowsForBattle)) continue;
+      const targetType = tacticalRangedInfraEventTargetTypeBeforeRubble(hex, res4RowsForBattle);
+      const { changed, destroyedAirUnitsCount } = applyTacticalRangedRubbleToRes4Cell(
+        hex,
+        workBattle.enclosingRes1H3Index,
+        tacticalRangedRubbleApplyOptsForHex(workBattle, hex)
+      );
+      if (changed) {
+        rubbledFromCombat.add(hex);
+        rangedTerrainMutated = true;
+        infrastructureDestroyedEvents.push({
+          h3Index: workBattle.enclosingRes1H3Index,
+          targetType,
+          changedRubbleCount: 1,
+          destroyedAirUnitsCount,
+        });
+      }
+    }
   }
-  if (infrastructureDestroyedEvents.length > 0) {
+
+  if (rangedOrdersInfraOnly.length > 0) {
+    try {
+      res4RowsForBattle = listRes4FeatureOverridesForGame().filter(
+        (r) => r.parentH3Index === workBattle.enclosingRes1H3Index && footprint.has(r.h3Index)
+      );
+    } catch {
+      /* keep previous rows */
+    }
+    const rollRangedInfraStrikeD6 = (): number => Math.floor(next() * 6) + 1;
+    const rubbledInfraHexes = new Set<string>();
+    for (const o of rangedOrdersInfraOnly) {
+      const atk = workBattle.subUnits.find((u) => u.id === o.unitId);
+      if (!atk) continue;
+      if (rollRangedInfraStrikeD6() > getAttack(atk.unitType)) continue;
+      const hex = o.targetH3Index;
+      if (rubbledInfraHexes.has(hex)) continue;
+      if (!tacticalRes4HasStrikeableInfrastructure(workBattle, hex, res4RowsForBattle)) continue;
+      const targetType = tacticalRangedInfraEventTargetTypeBeforeRubble(hex, res4RowsForBattle);
+      const { changed, destroyedAirUnitsCount } = applyTacticalRangedRubbleToRes4Cell(
+        hex,
+        workBattle.enclosingRes1H3Index,
+        tacticalRangedRubbleApplyOptsForHex(workBattle, hex)
+      );
+      if (changed) {
+        rubbledInfraHexes.add(hex);
+        rangedTerrainMutated = true;
+        infrastructureDestroyedEvents.push({
+          h3Index: workBattle.enclosingRes1H3Index,
+          targetType,
+          changedRubbleCount: 1,
+          destroyedAirUnitsCount,
+        });
+      }
+    }
+  }
+
+  if (infrastructureDestroyedEvents.length > 0 || rangedTerrainMutated) {
     workBattle = refreshTacticalBattleRes4TerrainFromGameDb(workBattle);
   }
   tacticalLogMutate('applyTacticalAirStrikeThenRangedPhaseOnBattle complete', {

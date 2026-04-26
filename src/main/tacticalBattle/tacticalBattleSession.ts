@@ -214,7 +214,7 @@ function humanTacticalMarchValidationFailure(
   for (const o of orders) {
     const outcome = tacticalComputeHumanMovementOrderOutcome({ byId, sub, order: o, res4Set, battle: cur });
     if (!outcome.ok) {
-      tacticalLogQuery('humanTacticalMarchValidationFailure', {
+      tacticalLogMutate('humanTacticalMarchValidationFailure', {
         reason: outcome.reason,
         ...outcome.context,
         unitId: o.unitId,
@@ -245,6 +245,12 @@ export function validateHumanTacticalMarchOrders(
   }
   const fail = humanTacticalMarchValidationFailure(cur, orders);
   if (fail) return { success: false, reason: fail };
+  tacticalLogMutate('validateHumanTacticalMarchOrders accepted', {
+    battleId: cur.battleId,
+    tacticalTurnNumber: cur.tacticalTurnNumber,
+    orderCount: orders.length,
+    orders: orders.map((o) => ({ unitId: o.unitId, toH3Index: o.toH3Index })),
+  });
   return { success: true };
 }
 

@@ -18,7 +18,9 @@ import {
   resolveMovementTerrainForHex,
 } from '../oneStepMoveDestinations';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildStrategicUnitDisplayLabelResolver } from '../../shared/unitDisplayNames';
+import { validateTacticalGroupRangedTarget } from '../game-actions/tacticalGroupRangedTargetValidation';
 import { formatLatLng as formatLatLngWithPrecision } from './promptText';
 import { requestOrdersFlow } from './requestOrdersFlow';
 import { NAVAL_DESTINATION_MUST_BE_WATER_COASTAL } from '../navalMovementMessages';
@@ -398,9 +400,19 @@ function validateAiOrder(
 function validateAiRangedOrder(
   order: { unitId: string; targetH3Index: string },
   state: GameStateSnapshot,
-  opts?: { labelForUnitId?: (unitId: string) => string }
+  opts?: { labelForUnitId?: (unitId: string) => string; tacticalBattle?: TacticalBattleSnapshot }
 ): { valid: true } | { valid: false; reason: string } {
   const resolveLabel = opts?.labelForUnitId ?? ((id: string) => buildStrategicUnitDisplayLabelResolver(state.units)(id));
+  const tactical = opts?.tacticalBattle;
+  if (tactical) {
+    const t = validateTacticalGroupRangedTarget({
+      snap: tactical,
+      uniqueUnitIds: [order.unitId],
+      targetH3Index: order.targetH3Index,
+      tacticalAttackerPlayer: 'opponent',
+    });
+    return t.success ? { valid: true } : { valid: false, reason: t.reason ?? 'Illegal tactical ranged target' };
+  }
   const unit = state.units.find((u) => u.id === order.unitId);
   if (!unit) return { valid: false, reason: `Unit not found: ${resolveLabel(order.unitId)}` };
   if (unit.player !== 'opponent') return { valid: false, reason: 'Only opponent units can have AI ranged orders' };

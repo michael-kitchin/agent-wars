@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { gridDisk } from 'h3-js';
 import { test } from 'node:test';
+import { firstRingCellDistinctFrom } from './testSupport/tacticalRes4HexFixtures';
 import type { AirStrikeOrder } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import {
@@ -158,5 +159,113 @@ test('tactical urban air strike updates res1 urban_hex_count after reconcile (Ph
     reconcileRes1InfrastructureCountsFromRes4Overrides();
     const afterUrban = getRes1InfrastructureForHex(parent).urbanHexCount;
     assert.strictEqual(afterUrban, beforeUrban - 1);
+  });
+});
+
+test('tactical infra-only ranged strike leaves urban DB row when strike roll misses', () => {
+  withTempGameDb('aw-tactical-ranged-infra-miss-', () => {
+    const urban = dbGetOne<{ h3Index: string; parentH3Index: string }>(
+      `SELECT h3_index AS h3Index, parent_h3_index AS parentH3Index
+       FROM res4_feature_overrides
+       WHERE is_urban = 1 AND is_rubble = 0
+       LIMIT 1`
+    );
+    assert.ok(urban);
+    const ring = [...gridDisk(urban!.h3Index, 2)];
+    const neighbor = firstRingCellDistinctFrom(urban!.h3Index);
+    assert.ok(ring.includes(neighbor));
+    const terrain: Record<string, string> = {};
+    for (const h of ring) terrain[h] = 'plains';
+    const snap: TacticalBattleSnapshot = {
+      battleId: 'tb-ranged-infra-miss',
+      enclosingRes1H3Index: urban!.parentH3Index,
+      res4ChildH3Indexes: ring,
+      strategicTurnNumber: 1,
+      tacticalTurnNumber: 1,
+      strategicHexTerrain: 'land',
+      strategicHexTerrainKind: 'plains',
+      res4TerrainKindByH3: terrain,
+      subUnits: [
+        {
+          id: 'hi-infra-miss',
+          parentUnitId: 'ph-im',
+          player: 'human',
+          unitType: 'infantry',
+          h3Index: neighbor,
+          displayName: '1st Infantry (infra miss)',
+        },
+      ],
+    };
+    let i = 0;
+    const rolls = [0.5];
+    const next = () => rolls[i++] ?? 0.99;
+    applyTacticalAirStrikeThenRangedPhaseOnBattle(
+      snap,
+      undefined,
+      [{ unitId: 'hi-infra-miss', targetH3Index: urban!.h3Index }],
+      'human',
+      next,
+      'singlePlayer'
+    );
+    const row = dbGetOne<{ isRubble: number }>(
+      'SELECT is_rubble AS isRubble FROM res4_feature_overrides WHERE h3_index = ?',
+      [urban!.h3Index]
+    );
+    assert.strictEqual(row?.isRubble, 0);
+  });
+});
+
+test('tactical infra-only ranged strike converts urban DB row to rubble on hit', () => {
+  withTempGameDb('aw-tactical-ranged-infra-hit-', () => {
+    const urban = dbGetOne<{ h3Index: string; parentH3Index: string }>(
+      `SELECT h3_index AS h3Index, parent_h3_index AS parentH3Index
+       FROM res4_feature_overrides
+       WHERE is_urban = 1 AND is_rubble = 0
+       LIMIT 1`
+    );
+    assert.ok(urban);
+    const ring = [...gridDisk(urban!.h3Index, 2)];
+    const neighbor = firstRingCellDistinctFrom(urban!.h3Index);
+    assert.ok(ring.includes(neighbor));
+    const terrain: Record<string, string> = {};
+    for (const h of ring) terrain[h] = 'plains';
+    const snap: TacticalBattleSnapshot = {
+      battleId: 'tb-ranged-infra-hit',
+      enclosingRes1H3Index: urban!.parentH3Index,
+      res4ChildH3Indexes: ring,
+      strategicTurnNumber: 1,
+      tacticalTurnNumber: 1,
+      strategicHexTerrain: 'land',
+      strategicHexTerrainKind: 'plains',
+      res4TerrainKindByH3: terrain,
+      subUnits: [
+        {
+          id: 'hi-infra-hit',
+          parentUnitId: 'ph-ih',
+          player: 'human',
+          unitType: 'infantry',
+          h3Index: neighbor,
+          displayName: '1st Infantry (infra hit)',
+        },
+      ],
+    };
+    let j = 0;
+    const rollsHit = [0.01];
+    const nextHit = () => rollsHit[j++] ?? 0.99;
+    const out = applyTacticalAirStrikeThenRangedPhaseOnBattle(
+      snap,
+      undefined,
+      [{ unitId: 'hi-infra-hit', targetH3Index: urban!.h3Index }],
+      'human',
+      nextHit,
+      'singlePlayer'
+    );
+    assert.ok(out.infrastructureDestroyedEvents.length > 0);
+    const row = dbGetOne<{ isRubble: number; isUrban: number }>(
+      'SELECT is_rubble AS isRubble, is_urban AS isUrban FROM res4_feature_overrides WHERE h3_index = ?',
+      [urban!.h3Index]
+    );
+    assert.strictEqual(row?.isRubble, 1);
+    assert.strictEqual(row?.isUrban, 0);
   });
 });

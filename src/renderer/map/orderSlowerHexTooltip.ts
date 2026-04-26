@@ -69,7 +69,7 @@ export function isOrderSlowerHexTooltipVisible(): boolean {
 /**
  * Shows or hides `#order-slower-tooltip` near the last pointer position, suppressing the terrain tooltip while visible.
  *
- * Purpose: Gives immediate “Slower: …” feedback for terrain-throttled valid hovers without waiting for the terrain dwell delay.
+ * Purpose: Gives immediate “Slower: …” or “Using: Road/Rail” feedback for terrain-throttled valid hovers without waiting for the terrain dwell delay.
  * When to use: After `publishHoverRoutePreview` when no blocking message applies and a slow terrain title is present.
  * Expected outcome: Plain-text tooltip follows `S.lastPointerClientX/Y`; auto-hides after `ORDER_BLOCK_HEX_TOOLTIP_TTL_MS`.
  * Exceptions: Missing DOM nodes no-op without throwing.

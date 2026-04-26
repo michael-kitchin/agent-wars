@@ -51,7 +51,7 @@ function circularMeanLongitudeDegrees(longitudes: number[]): number {
  * Returns all res1 H3 indices whose centers fall inside the buffered unit bounding window.
  *
  * Purpose: Phase 2 bounding box selection feeding the ASCII renderer.
- * When to use: Strategic Commander briefing map generation.
+ * When to use: Callers that need a unit-centered strategic window (not the full-world AI operational map).
  * Expected outcome: Includes water and land cells in the window; excludes far-away cells.
  * Exceptions: None.
  */
