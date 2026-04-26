@@ -1291,7 +1291,10 @@ function getTacticalBattleActivationSideEffects(): TacticalRendererStartBattleSi
     showMapToast,
     syncTacticalEntryOverlay: syncTacticalEntryButtonOverlay,
     redraw,
-    refreshReadyButton: updateReadyButtonState,
+    refreshReadyButton: () => {
+      updateReadyButtonState();
+      startBackgroundRequestIfAllowed();
+    },
     scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
     rebuildUnitDisplayNameLookup: () => rebuildUnitDisplayNameLookup(S.gameState),
   });

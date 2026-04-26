@@ -16,8 +16,10 @@ import {
   representativeMarchPreviewUnitIdsByOriginH3,
   uniqueStrategicMarchPreviewUnitIds,
 } from '../../../shared/humanMarchPreviewGroupAssembly';
+import type { OrderPreviewTerrainImpact } from '../../../shared/ipc/humanOrderPreviewTypes';
 import {
-  pickStrategicMarchSlowTerrainDisplayTitle,
+  collectStrategicMarchSlowTerrainLabels,
+  sortSlowTerrainLabels,
   strategicMarchPathH3IndicesFromPlan,
 } from '../../../shared/orderPreviewSlowTerrainTooltip';
 import { isWithinAirFerryGridRange } from '../gridRange';
@@ -104,16 +106,31 @@ type PlanRouteResult = PlanRouteOk | PlanRouteError;
 /**
  * Resolves the grouped march “slow terrain” label for a successful strategic `PlanRouteOk` path.
  *
- * Purpose: Feeds `HumanOrderPreviewResult.slowerTerrainDisplayTitle` without duplicating latLng→H3 conversion rules in multiple branches.
+ * Purpose: Feeds `HumanOrderPreviewResult.slowerTerrainDisplayTitle` and `orderPreviewTerrainImpact` without duplicating latLng→H3 conversion rules in multiple branches.
  * When to use: After `executePlanRouteCached` / nearby fallback returns `status: 'ok'` for land/naval march previews.
- * Expected outcome: Title-case terrain token or `null` when the planned path does not traverse slower-than-plains cells.
- * Exceptions: None; malformed plans yield `null`.
+ * Expected outcome: Comma-separated sorted terrain tokens for legacy string fields; structured impact for HTML tooltips; `null` when the path does not traverse slower-than-plains cells.
+ * Exceptions: None; malformed plans yield `null` fields.
  */
-function strategicMarchSlowerTitleForPlan(unit: HumanOwnedUnit, context: PreviewComputationContext, planned: PlanRouteOk): string | null {
-  logTrace('humanMarchPreview strategicMarchSlowerTitleForPlan', { unitId: unit.id, unitType: unit.unitType });
-  if (unit.unitType === 'air') return null;
+function strategicMarchTerrainForPlan(
+  unit: HumanOwnedUnit,
+  context: PreviewComputationContext,
+  planned: PlanRouteOk
+): { slowerTerrainDisplayTitle: string | null; orderPreviewTerrainImpact: OrderPreviewTerrainImpact | null } {
+  logTrace('humanMarchPreview strategicMarchTerrainForPlan', { unitId: unit.id, unitType: unit.unitType });
+  if (unit.unitType === 'air') return { slowerTerrainDisplayTitle: null, orderPreviewTerrainImpact: null };
   const pathH3 = strategicMarchPathH3IndicesFromPlan(planned);
-  return pickStrategicMarchSlowTerrainDisplayTitle(unit.unitType, pathH3, context.terrainKindByH3, context.terrainByH3);
+  const collected = collectStrategicMarchSlowTerrainLabels(
+    unit.unitType,
+    pathH3,
+    context.terrainKindByH3,
+    context.terrainByH3
+  );
+  if (collected.length === 0) return { slowerTerrainDisplayTitle: null, orderPreviewTerrainImpact: null };
+  const slower = sortSlowTerrainLabels(collected);
+  return {
+    slowerTerrainDisplayTitle: slower.join(', '),
+    orderPreviewTerrainImpact: { slower, roadRail: false },
+  };
 }
 
 /**
@@ -385,6 +402,15 @@ segments: HumanOrderPreviewSegment[];
    * Exceptions: None.
    */
 slowerTerrainDisplayTitle?: string | null;
+    /**
+   * Terrain throttle hints for HTML order-preview tooltips (parity with `humanOrderPreviewTypes`).
+   *
+   * Contract: Present only when valid march previews include slower-than-plains cells along the planned path.
+   * When to use: Strategic march hover rows after a successful `PlanRouteOk`.
+   * Expected outcome: Sorted `slower` labels; strategic march never sets `roadRail`.
+   * Exceptions: None.
+   */
+orderPreviewTerrainImpact?: OrderPreviewTerrainImpact | null;
 }
 
 /**
@@ -488,6 +514,15 @@ previews: HumanOrderGroupPreviewUnitResult[];
    * Exceptions: None.
    */
 slowerTerrainDisplayTitle?: string | null;
+    /**
+   * Merged terrain / transport hints for grouped march HTML tooltips (parity with `humanOrderPreviewTypes`).
+   *
+   * Contract: Union of contributing per-row impacts after envelope assembly.
+   * When to use: Returned from `previewHumanMarchOrdersImpl` after `buildHumanOrderGroupPreviewEnvelope`.
+   * Expected outcome: Sorted union of `slower`; `roadRail` false for strategic-only payloads today.
+   * Exceptions: None.
+   */
+orderPreviewTerrainImpact?: OrderPreviewTerrainImpact | null;
 }
 
 /**
@@ -513,6 +548,7 @@ function logPreviewOutcome(
     invalidReason: preview.invalidReason ?? null,
     segmentCount: preview.segments.length,
     slowerTerrainDisplayTitle: preview.slowerTerrainDisplayTitle ?? null,
+    orderPreviewTerrainImpact: preview.orderPreviewTerrainImpact ?? null,
   });
 }
 
@@ -683,7 +719,7 @@ function findNearbyReachablePreview(
         showInvalidMarker: false,
         arrowLatLng: planned.destination,
         segments: planned.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes })),
-        slowerTerrainDisplayTitle: strategicMarchSlowerTitleForPlan(unit, context, planned),
+        ...strategicMarchTerrainForPlan(unit, context, planned),
       };
     }
   }
@@ -836,7 +872,7 @@ function computeHumanMarchPreviewForUnit(
       showInvalidMarker: false,
       arrowLatLng: direct.destination,
       segments: direct.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes })),
-      slowerTerrainDisplayTitle: strategicMarchSlowerTitleForPlan(unit, context, direct),
+      ...strategicMarchTerrainForPlan(unit, context, direct),
     };
     cacheSetBounded(previewResultCache, cacheKey, result, maxPreviewResultCacheEntries);
     logPreviewOutcome(unitId, hoveredH3Index, result, 'computed');

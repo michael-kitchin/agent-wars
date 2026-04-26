@@ -16,7 +16,8 @@ import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes
 import { buildTacticalAiPlanState } from '../../tacticalBattle/buildTacticalAiPlanState';
 import { tacticalRes1Cell, tacticalRes4UnderRes1Corner } from '../../tacticalBattle/testSupport/tacticalRes4HexFixtures';
 import { buildStrategicOperationalMapSectionMarkdown, buildTacticalOperationalMapSectionMarkdown } from './briefing-map-section';
-import { ensureStrategicCoordinateRegistryInitialized, getHexCodeForContext, listStrategicRes1H3Indexes } from './hex-coordinates';
+import { ensureStrategicCoordinateRegistryInitialized, getHexCodeForContext, initTacticalCoordinateRegistry, listStrategicRes1H3Indexes } from './hex-coordinates';
+import { projectTacticalRes4FootprintToAsciiGrid } from './tacticalAsciiGridProjection';
 
 /**
  * Documents the module-scope binding `STRATEGIC_CTX` (STRATEGIC_CTX).
@@ -241,6 +242,28 @@ function testTacticalOperationalMapIncludesAllRes4Codes(): void {
 }
 
 /**
+ * Defines the `testTacticalAsciiGridUsesManyRowsNotLatitudeRibbon` function shape.
+ *
+ * Purpose: Ensures tactical maps use H3-local projection so ~343 res4 cells spread across many ASCII rows instead of 1–3 latitude bands.
+ * When to use: Regression guard for `projectTacticalRes4FootprintToAsciiGrid` wiring.
+ * Expected outcome: Row count comfortably above 3, one cell per footprint index, unique grid slots.
+ * Exceptions: None.
+ */
+function testTacticalAsciiGridUsesManyRowsNotLatitudeRibbon(): void {
+  const res1 = tacticalRes1Cell(12, 34);
+  const res4Children = [...cellToChildren(res1, 4)];
+  assert.strictEqual(res4Children.length, 343, 'fixture expects full res1→res4 child count');
+  const battleId = 't-ascii-rows-test';
+  initTacticalCoordinateRegistry(battleId, res1);
+  const tacticalCtx = { mode: 'tactical' as const, battleId };
+  const grid = projectTacticalRes4FootprintToAsciiGrid(res4Children, tacticalCtx);
+  assert.ok(grid.numRows >= 15, `expected many ASCII rows, got numRows=${grid.numRows}`);
+  assert.strictEqual(grid.cells.length, res4Children.length, 'every res4 cell should appear in the grid');
+  const slotKeys = new Set(grid.cells.map((c) => `${c.row},${c.col}`));
+  assert.strictEqual(slotKeys.size, grid.cells.length, 'no two cells may share the same row,col slot');
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
  *
  * Purpose: Ordered list of named tests executed by `run`.
@@ -253,6 +276,10 @@ const tests = [
   { name: 'strategic operational map no-units fallback', fn: testStrategicOperationalMapNoUnitsFallback },
   { name: 'strategic fog hides enemy markers in fenced map', fn: testStrategicFogHidesEnemyMarkersOnMap },
   { name: 'tactical operational map includes all res4 codes', fn: testTacticalOperationalMapIncludesAllRes4Codes },
+  {
+    name: 'tactical ascii grid uses many rows (IJ projection not latitude ribbon)',
+    fn: testTacticalAsciiGridUsesManyRowsNotLatitudeRibbon,
+  },
 ];
 
 /**

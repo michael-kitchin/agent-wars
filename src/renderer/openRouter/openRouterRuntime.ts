@@ -90,22 +90,19 @@ export function syncEventDrivenFromTools(): void {
 }
 
 /**
- * True when the renderer is in tactical planning with Run-style (non–event-driven) AI so `requestAiOrders` is valid
- * even if the enclosing strategic turn is still `resolution` (common after melee intercept opens tactical).
+ * True when a background `requestAiOrders` is allowed for the current strategic phase or tactical overlay.
  *
- * Purpose: `startBackgroundRequestIfAllowed` historically gated on strategic `planning` only, which blocked all
- * tactical opponent background consultations in that scenario.
- * When to use: Relax the strategic phase check alongside `isWaitingForPrecomputedAiOrders` for tactical Run.
- * Expected outcome: Returns false when Events tool drives consultations or tactical planning UI is inactive.
+ * Purpose: `startBackgroundRequestIfAllowed` originally required strategic `planning`, which blocked tactical
+ * opponent fetches while the enclosing turn stayed in `resolution` (melee intercept → tactical). Event-driven mode
+ * must not block tactical-only consultations: opponent draft requests use tactical state, not strategic pending orders.
+ * When to use: First gate inside `startBackgroundRequestIfAllowed` after `isWaitingForPrecomputedAiOrders`.
+ * Expected outcome: Tactical planning with an active res4 snapshot always permits the fetch; strategic play still
+ * requires `planning` when not in tactical UI.
  * Exceptions: None.
  */
 function strategicPhaseAllowsBackgroundAi(): boolean {
   if (S.gameState?.phase === 'planning') return true;
-  return !!(
-    S.tacticalBattleSnapshot &&
-    S.tacticalPhasePlanning &&
-    !S.useEventDrivenConsultation
-  );
+  return !!(S.tacticalBattleSnapshot && S.tacticalPhasePlanning);
 }
 
 /**

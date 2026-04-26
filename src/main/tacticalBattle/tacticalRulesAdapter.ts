@@ -87,7 +87,7 @@ export function tacticalMarchFirstStopAlongPath(
     | 'res4RailSidesByH3'
   >,
   unitTypeForMovement = 'infantry'
-): { stopH3: string; consumedFullPath: boolean } {
+): { stopH3: string; consumedFullPath: boolean; pathH3Prefix?: string[] } {
   tacticalLogQuery('tacticalMarchFirstStopAlongPath', {
     fromRes4H3Index,
     toRes4H3Index,
@@ -95,7 +95,7 @@ export function tacticalMarchFirstStopAlongPath(
     unitTypeForMovement,
   });
   if (movementPointBudget <= 0) {
-    return { stopH3: fromRes4H3Index, consumedFullPath: false };
+    return { stopH3: fromRes4H3Index, consumedFullPath: false, pathH3Prefix: undefined };
   }
   const planArgs = {
     fromH3: fromRes4H3Index,
@@ -113,8 +113,17 @@ export function tacticalMarchFirstStopAlongPath(
         });
   if (!plan.reachable) {
     tacticalLogQuery('tacticalMarchFirstStopAlongPath unreachable', { failureReason: plan.failureReason });
-    return { stopH3: fromRes4H3Index, consumedFullPath: false };
+    return { stopH3: fromRes4H3Index, consumedFullPath: false, pathH3Prefix: undefined };
   }
-  tacticalLogQuery('tacticalMarchFirstStopAlongPath result', plan.firstStopWithinBudget);
-  return plan.firstStopWithinBudget;
+  const { stopH3, consumedFullPath } = plan.firstStopWithinBudget;
+  let pathH3Prefix: string[] | undefined;
+  const fullPath = plan.pathToDestination;
+  if (fullPath && fullPath.length >= 2) {
+    const stopIdx = fullPath.indexOf(stopH3);
+    if (stopIdx >= 0) {
+      pathH3Prefix = fullPath.slice(0, stopIdx + 1);
+    }
+  }
+  tacticalLogQuery('tacticalMarchFirstStopAlongPath result', { stopH3, consumedFullPath, pathLen: pathH3Prefix?.length });
+  return { stopH3, consumedFullPath, pathH3Prefix };
 }

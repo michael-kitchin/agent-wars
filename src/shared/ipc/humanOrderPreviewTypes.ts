@@ -71,6 +71,19 @@ routeSegments?: { turn: number; hexes: [number, number][] }[];
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * Structured terrain / transport hints for valid march (and tactical ranged) order previews shown as HTML tooltips.
+ *
+ * Purpose: Lets the renderer render comma-separated `Slower:` lists and a separate `Using: Road/Rail` line without re-walking paths.
+ * When to use: Populate on each `HumanOrderPreviewResult` when `valid` and terrain throttles movement or infrastructure applies.
+ * Expected outcome: `slower` contains title-case terrain tokens (typically sorted); `roadRail` true when any march step used transport-over-blocked semantics.
+ * Exceptions: Omitted entirely when no throttle applies; never set on invalid-only previews.
+ */
+export type OrderPreviewTerrainImpact = {
+  readonly slower: readonly string[];
+  readonly roadRail: boolean;
+};
+
 export interface HumanOrderPreviewSegment {
     /**
    * Specifies the contract for the `turn` member (turn: number;).
@@ -151,10 +164,19 @@ segments: HumanOrderPreviewSegment[];
    *
    * Contract: Omitted or `null` when not applicable; never set alongside `valid: false` except transitional payloads.
    * When to use: March hover envelopes from strategic `previewHumanMarchOrders` and tactical `buildTacticalMarchHoverPreview`.
-   * Expected outcome: Renderer shows `Slower: ${slowerTerrainDisplayTitle}` without re-deriving path costs.
+   * Expected outcome: Plain-text aggregate for logs/sidebar; comma-separated when multiple terrains apply; renderer prefers `orderPreviewTerrainImpact` for tooltips.
    * Exceptions: None.
    */
 slowerTerrainDisplayTitle?: string | null;
+    /**
+   * Terrain throttle + road/rail transport flags for HTML order-preview tooltips (`#order-slower-tooltip`).
+   *
+   * Contract: Present only when `valid` and at least one of `slower.length > 0` or `roadRail` is true.
+   * When to use: Strategic `previewHumanMarchOrders`, tactical `buildTacticalMarchHoverPreview`, merged grouped envelopes.
+   * Expected outcome: Renderer calls `formatOrderPreviewImpactHtml` without recomputing tactical/strategic paths.
+   * Exceptions: None.
+   */
+orderPreviewTerrainImpact?: OrderPreviewTerrainImpact | null;
 }
 
 /**
@@ -254,8 +276,17 @@ previews: HumanOrderGroupPreviewUnitResult[];
    *
    * Contract: First non-null `preview.slowerTerrainDisplayTitle` among `previews` order, or explicit envelope override.
    * When to use: Renderer `publishHoverRoutePreview` for march modes after `buildHumanOrderGroupPreviewEnvelope`.
-   * Expected outcome: Title-case word only (no `Slower:` prefix); `null` when no row is slowed.
+   * Expected outcome: Title-case words, comma-separated when merged across origins; `null` when no row is slowed.
    * Exceptions: None.
    */
 slowerTerrainDisplayTitle?: string | null;
+    /**
+   * Merged `orderPreviewTerrainImpact` across grouped march previews (union of `slower`, OR of `roadRail`).
+   *
+   * Contract: Same shape as per-row `HumanOrderPreviewResult.orderPreviewTerrainImpact`; omitted when nothing applies.
+   * When to use: After `buildHumanOrderGroupPreviewEnvelope` for strategic and tactical grouped hovers.
+   * Expected outcome: Superset of contributing rows for tooltip HTML.
+   * Exceptions: None.
+   */
+orderPreviewTerrainImpact?: OrderPreviewTerrainImpact | null;
 }

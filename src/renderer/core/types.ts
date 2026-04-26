@@ -36,6 +36,15 @@ fromH3Index: string;
    * Exceptions: None.
    */
 toH3Index: string;
+    /**
+   * When set (tactical playback), ordered res4 vertices from `fromH3Index` through `toH3Index` for path-following animation.
+   *
+   * Contract: Omitted for strategic Ready; when present, length is at least 2 and endpoints match `fromH3Index` / `toH3Index`.
+   * When to use: Tactical `commitHumanTacticalDraftOrders` resolution payload copied into `S.resolutionMoveAnimation.moves`.
+   * Expected outcome: Renderer interpolates along this polyline instead of a single geodesic chord.
+   * Exceptions: None.
+   */
+pathH3Indexes?: string[];
 }
 
 /**
@@ -92,6 +101,15 @@ fromH3Index: string;
    * Exceptions: None.
    */
 toH3Index: string;
+    /**
+   * Optional tactical march centerline; same contract as `ResolutionMove.pathH3Indexes`.
+   *
+   * Contract: Omitted when absent from IPC playback; when set, length at least 2.
+   * When to use: After `buildResolutionPlaybackMoves` copies optional path from `ResolutionMove`.
+   * Expected outcome: `drawMovingUnits` uses polyline interpolation when present.
+   * Exceptions: None.
+   */
+pathH3Indexes?: string[];
 }
 
 /**

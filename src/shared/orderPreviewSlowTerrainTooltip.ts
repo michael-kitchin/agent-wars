@@ -3,9 +3,9 @@
  *
  * Purpose: Keeps strategic march (main), tactical march (renderer), and tactical ranged cap messaging aligned on
  * title-case terrain labels without importing renderer or Electron main modules.
- * When to use: `humanMarchPreviewImpl`, `buildTacticalMarchHoverPreview`, and `publishHoverRoutePreview` only.
- * Expected outcome: Plain English labels suitable for `Slower: ${label}` (or `Using: Road/Rail` when infrastructure enables an otherwise impassable step); `null` when no slowdown applies.
- * Exceptions: None; invalid inputs yield `null`.
+ * When to use: `humanMarchPreviewImpl`, `buildTacticalMarchHoverPreview`, `publishHoverRoutePreview`, and HTML tooltip formatters.
+ * Expected outcome: Structured `OrderPreviewTerrainImpact` for IPC plus HTML fragments with bold section labels; `null` when no slowdown applies.
+ * Exceptions: None; invalid inputs yield `null` or empty collections.
  */
 
 import { latLngToCell } from 'h3-js';
@@ -26,16 +26,97 @@ import {
   tacticalEnterHexMovementCost,
 } from './tacticalTerrainMovement';
 import type { TacticalMovementCategory } from './tacticalTerrainMovement';
+import { TOOLTIP_SECTION_GAP_HTML } from './tooltipSectionGap';
 
 const STRATEGIC_H3_RESOLUTION = 1;
 
+/** Stable ordering for multi-terrain comma lists in order-preview HTML (lower sorts earlier). */
+const SLOW_TERRAIN_LABEL_SORT_PRIORITY: Readonly<Record<string, number>> = {
+  Urban: 0,
+  Rubble: 1,
+  Forest: 2,
+  Mountain: 3,
+  Wetlands: 4,
+};
+
 /**
- * Builds the full one-line hover string for terrain-throttled movement or ranged planning.
+ * Escapes plain text for insertion into order-preview tooltip HTML (defense-in-depth for GIS-derived tokens).
  *
- * Purpose: Centralizes the `Slower:` prefix so renderer tooltips stay consistent with product wording; uses `Using:` for
- * `Road/Rail` because that label denotes infrastructure that unlocks movement (e.g. armor across mountains), not merely a speed penalty.
- * When to use: Renderer after resolving a non-null display terrain title from march/ranged slow helpers.
- * Expected outcome: `Slower: Forest` for terrain buckets; `Using: Road/Rail` when the title is `Road/Rail` (spacing/case-insensitive) or was redundantly prefixed with `Slower:`; `Slower: Terrain` when empty after stripping.
+ * Purpose: Prevents attribute/text injection when labels are joined into `innerHTML` fragments.
+ * When to use: `formatOrderPreviewImpactHtml` and blocking-tooltip HTML wrappers for suffix tokens.
+ * Expected outcome: HTML-safe ASCII; `&` `<` `>` `"` entity-encoded.
+ * Exceptions: None.
+ */
+export function escapeHtmlForOrderPreviewTooltip(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * Sorts distinct slow-terrain UI labels for stable comma-list rendering.
+ *
+ * Purpose: Matches product expectation that multi-hex previews list terrains in a predictable order (not path order).
+ * When to use: After collecting union labels for strategic paths, grouped ranged unions, or envelope merge.
+ * Expected outcome: Known labels follow `SLOW_TERRAIN_LABEL_SORT_PRIORITY`; unknown labels sort last then `localeCompare`.
+ * Exceptions: None; mutates no inputs.
+ */
+export function sortSlowTerrainLabels(labels: readonly string[]): string[] {
+  return [...labels].sort((a, b) => {
+    const pa = SLOW_TERRAIN_LABEL_SORT_PRIORITY[a] ?? 100;
+    const pb = SLOW_TERRAIN_LABEL_SORT_PRIORITY[b] ?? 100;
+    if (pa !== pb) return pa - pb;
+    return a.localeCompare(b);
+  });
+}
+
+/**
+ * Input for `formatOrderPreviewImpactHtml` (terrain tokens are escaped; booleans select fixed markup lines).
+ *
+ * Purpose: Keeps HTML builder arguments explicit and renderer-call sites self-documenting.
+ * When to use: Only when assembling `#order-slower-tooltip` / related order-preview HTML.
+ * Expected outcome: At most one of `blocked` vs `slower` wins in the formatter; `roadRail` adds `Using: Road/Rail` after the terrain line when present.
+ * Exceptions: None; omit fields or pass empty arrays when not applicable.
+ */
+export type OrderPreviewImpactHtmlInput = {
+  readonly blocked?: readonly string[];
+  readonly slower?: readonly string[];
+  readonly roadRail?: boolean;
+};
+
+/**
+ * Builds safe HTML for order-preview terrain/transport impact (bold `Blocked:` / `Slower:` / `Using:` labels only).
+ *
+ * Purpose: Unifies march and ranged slower hints with hex tooltip vertical rhythm via `TOOLTIP_SECTION_GAP_HTML`.
+ * When to use: Renderer `publishHoverRoutePreview` when showing `#order-slower-tooltip` with `innerHTML`.
+ * Expected outcome: At most one terrain line (`Blocked` wins over `Slower`); optional second line `Using: Road/Rail`; `null` if nothing applies.
+ * Exceptions: None; empty arrays treated as absent.
+ */
+export function formatOrderPreviewImpactHtml(args: OrderPreviewImpactHtmlInput): string | null {
+  const blocked = (args.blocked ?? []).map((s) => s.trim()).filter((s) => s.length > 0);
+  const slower = (args.slower ?? []).map((s) => s.trim()).filter((s) => s.length > 0);
+  const terrainLine =
+    blocked.length > 0
+      ? `<strong>Blocked:</strong> ${blocked.map((s) => escapeHtmlForOrderPreviewTooltip(s)).join(', ')}`
+      : slower.length > 0
+        ? `<strong>Slower:</strong> ${slower.map((s) => escapeHtmlForOrderPreviewTooltip(s)).join(', ')}`
+        : null;
+  let out = terrainLine;
+  if (args.roadRail) {
+    const usingLine = `<strong>Using:</strong> Road/Rail`;
+    out = out ? `${out}${TOOLTIP_SECTION_GAP_HTML}${usingLine}` : usingLine;
+  }
+  return out;
+}
+
+/**
+ * Builds the legacy one-line hover string for terrain-throttled movement or ranged planning (plain text).
+ *
+ * Purpose: Backward-compatible helper for callers that still expect `Slower: …` / `Using: Road/Rail` without HTML.
+ * When to use: Non-renderer tests or transitional string consumers only; prefer `formatOrderPreviewImpactHtml` in UI.
+ * Expected outcome: Same strings as the pre-HTML rollout for single-token titles.
  * Exceptions: None.
  */
 export function formatSlowerHoverTooltipMessage(displayTerrainTitle: string): string {
@@ -106,12 +187,54 @@ export function strategicMarchPathH3IndicesFromPlan(plan: {
 }
 
 /**
+ * Collects every distinct slowing terrain label along a strategic res1 path (first-seen path order).
+ *
+ * Purpose: Feeds grouped HTML tooltips and `OrderPreviewTerrainImpact` without stopping at the first slow hex.
+ * When to use: `humanMarchPreviewImpl` after `PlanRouteOk`; combine with `sortSlowTerrainLabels` for display lists.
+ * Expected outcome: Title-case terrain tokens in traversal order, de-duplicated.
+ * Exceptions: None.
+ */
+export function collectStrategicMarchSlowTerrainLabels(
+  unitType: string,
+  pathH3: readonly string[],
+  terrainKindByH3: ReadonlyMap<string, string>,
+  terrainByH3: ReadonlyMap<string, string>
+): string[] {
+  if (pathH3.length < 2) return [];
+  if (unitType === 'air') return [];
+  const order: string[] = [];
+  const seen = new Set<string>();
+  for (let i = 1; i < pathH3.length; i++) {
+    const h = pathH3[i]!;
+    const kindRaw = terrainKindByH3.get(h) ?? 'plains';
+    const kindLower = String(kindRaw).toLowerCase();
+    const parentRaw = terrainByH3.get(h) ?? 'land';
+    const parent = parentRaw === 'water' ? 'water' : 'land';
+    let label: string | null = null;
+    if (kindLower.includes('urban')) {
+      label = 'Urban';
+    } else if (kindLower.includes('rubble')) {
+      label = 'Rubble';
+    } else {
+      const cat = normalizeDbTerrainKindToTacticalCategory(kindLower, parent);
+      const cost = tacticalEnterHexMovementCost(unitType, cat);
+      if (!Number.isFinite(cost) || cost <= 1) continue;
+      label = displayTitleForSlowTerrainBucket(cat);
+    }
+    if (label && !seen.has(label)) {
+      seen.add(label);
+      order.push(label);
+    }
+  }
+  return order;
+}
+
+/**
  * Picks the first march slow-down terrain label along a strategic res1 path for the given unit type.
  *
- * Purpose: Mirrors tactical “expensive enter” intuition using `tacticalEnterHexMovementCost` on normalized categories.
- * When to use: `computeHumanMarchPreviewForUnit` after a successful `PlanRouteOk` for land/naval march previews.
- * Expected outcome: `Urban` / `Forest` / … for the first entered cell that is slower than baseline plains for that type;
- * `null` when the path is empty or introduces no slower-than-plains enters.
+ * Purpose: Backward-compatible single-token surface for callers/tests expecting first-hit semantics.
+ * When to use: Legacy call sites; prefer `collectStrategicMarchSlowTerrainLabels` for IPC.
+ * Expected outcome: First label in path order from the collector, or `null`.
  * Exceptions: None.
  */
 export function pickStrategicMarchSlowTerrainDisplayTitle(
@@ -120,35 +243,98 @@ export function pickStrategicMarchSlowTerrainDisplayTitle(
   terrainKindByH3: ReadonlyMap<string, string>,
   terrainByH3: ReadonlyMap<string, string>
 ): string | null {
-  if (pathH3.length < 2) return null;
-  if (unitType === 'air') return null;
-  for (let i = 1; i < pathH3.length; i++) {
-    const h = pathH3[i]!;
-    const kindRaw = terrainKindByH3.get(h) ?? 'plains';
-    const kindLower = String(kindRaw).toLowerCase();
-    const parentRaw = terrainByH3.get(h) ?? 'land';
-    const parent = parentRaw === 'water' ? 'water' : 'land';
-    if (kindLower.includes('urban')) {
-      return 'Urban';
-    }
-    if (kindLower.includes('rubble')) {
-      return 'Rubble';
-    }
-    const cat = normalizeDbTerrainKindToTacticalCategory(kindLower, parent);
-    const cost = tacticalEnterHexMovementCost(unitType, cat);
-    if (!Number.isFinite(cost) || cost <= 1) continue;
-    const label = displayTitleForSlowTerrainBucket(cat);
-    if (label) return label;
+  const labels = collectStrategicMarchSlowTerrainLabels(unitType, pathH3, terrainKindByH3, terrainByH3);
+  return labels.length > 0 ? labels[0]! : null;
+}
+
+export type TacticalMarchTerrainImpact = {
+  readonly slower: string[];
+  readonly roadRail: boolean;
+};
+
+/**
+ * Collects tactical march slow terrain labels along `pathH3` plus whether any step uses road/rail transport over costly terrain.
+ *
+ * Purpose: Replaces “first only” `pickTacticalMarchSlowTerrainDisplayTitle` with a union suitable for HTML tooltips.
+ * When to use: `buildTacticalMarchHoverPreview` / `buildPreviewForSubUnit` after `planTacticalRes4March` succeeds.
+ * Expected outcome: Anchor throttle labels (when `eff < baseline`) plus per-hex path labels (same branch precedence as the legacy picker); `roadRail` true if any step qualifies (including when anchor already supplied `slower`).
+ * Exceptions: None; air/naval and trivial paths yield empty `slower` and `roadRail: false`.
+ */
+export function collectTacticalMarchTerrainImpact(args: {
+  battle: TacticalBattleSnapshot;
+  subUnit: TacticalSubUnitSnapshot;
+  moveType: string;
+  pathH3: readonly string[];
+}): TacticalMarchTerrainImpact {
+  const { battle, subUnit, moveType, pathH3 } = args;
+  if (pathH3.length < 2 || moveType === 'air' || moveType === 'naval') {
+    return { slower: [], roadRail: false };
   }
-  return null;
+
+  const slowerOrder: string[] = [];
+  const seen = new Set<string>();
+  const push = (lab: string) => {
+    if (!seen.has(lab)) {
+      seen.add(lab);
+      slowerOrder.push(lab);
+    }
+  };
+  let roadRail = false;
+
+  const baseLine = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[subUnit.unitType] ?? 1;
+  const eff = effectiveTacticalMovementPointBudgetForMarchLeg(battle, subUnit, battle.subUnits, moveType);
+  if (eff < baseLine) {
+    const anchor = tacticalMovementTerrainAnchorH3(subUnit, battle.subUnits);
+    if (battle.res4IsRubbleByH3?.[anchor]) push('Rubble');
+    else if (battle.res4IsUrbanByH3?.[anchor]) push('Urban');
+    else if (subUnit.unitType === 'armor' && tacticalRes4CellIsForestClass(battle, anchor)) push('Forest');
+  }
+
+  const terrainForTransport = buildTacticalTerrainKindResolverFromSnapshot(battle);
+  for (let i = 1; i < pathH3.length; i++) {
+    const prev = pathH3[i - 1]!;
+    const h = pathH3[i]!;
+    if (battle.res4IsRubbleByH3?.[h]) {
+      push('Rubble');
+      continue;
+    }
+    if (battle.res4IsUrbanByH3?.[h]) {
+      push('Urban');
+      continue;
+    }
+    const rawKind = effectiveRes4TerrainKindString(battle, h);
+    const parent = battle.strategicHexTerrain ?? 'land';
+    const cat = normalizeDbTerrainKindToTacticalCategory(String(rawKind).toLowerCase(), parent);
+    const cost = tacticalEnterHexMovementCost(moveType, cat);
+    const plainsCost = tacticalEnterHexMovementCost(moveType, 'plains');
+    if (terrainForTransport.transportFromTo?.(prev, h) && (cost > plainsCost || !Number.isFinite(cost))) {
+      roadRail = true;
+      continue;
+    }
+    if (Number.isFinite(cost) && cost > 1) {
+      const label = displayTitleForSlowTerrainBucket(cat);
+      if (label) {
+        push(label);
+        continue;
+      }
+    }
+    if (tacticalRes4CellIsForestClass(battle, h) && (subUnit.unitType === 'armor' || subUnit.unitType === 'infantry')) {
+      push('Forest');
+      continue;
+    }
+    if (subUnit.unitType === 'infantry' && tacticalRes4CellIsMountain(battle, h)) {
+      push('Mountain');
+    }
+  }
+  return { slower: slowerOrder, roadRail };
 }
 
 /**
  * Resolves tactical march “slow terrain” copy from anchor throttling and/or expensive cells along the res4 path.
  *
- * Purpose: Covers armor-in-forest, urban/rubble anchor MP=1, and multi-turn paths that traverse dense terrain.
- * When to use: `buildPreviewForSubUnit` after `planTacticalRes4March` succeeds with a concrete `pathToDestination`.
- * Expected outcome: Title-case terrain word or `null` when the leg is not terrain-limited for UI purposes.
+ * Purpose: Backward-compatible first-label return matching pre-union behavior (including `Road/Rail` alone).
+ * When to use: Callers that still expect `string | null` only.
+ * Expected outcome: Same as historical `pickTacticalMarchSlowTerrainDisplayTitle` for tested scenarios.
  * Exceptions: None.
  */
 export function pickTacticalMarchSlowTerrainDisplayTitle(args: {
@@ -157,49 +343,9 @@ export function pickTacticalMarchSlowTerrainDisplayTitle(args: {
   moveType: string;
   pathH3: readonly string[];
 }): string | null {
-  const { battle, subUnit, moveType, pathH3 } = args;
-  if (pathH3.length < 2) return null;
-  if (moveType === 'air' || moveType === 'naval') return null;
-
-  const baseLine = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[subUnit.unitType] ?? 1;
-  const eff = effectiveTacticalMovementPointBudgetForMarchLeg(battle, subUnit, battle.subUnits, moveType);
-  if (eff < baseLine) {
-    const anchor = tacticalMovementTerrainAnchorH3(subUnit, battle.subUnits);
-    if (battle.res4IsRubbleByH3?.[anchor]) return 'Rubble';
-    if (battle.res4IsUrbanByH3?.[anchor]) return 'Urban';
-    if (subUnit.unitType === 'armor' && tacticalRes4CellIsForestClass(battle, anchor)) {
-      return 'Forest';
-    }
-  }
-
-  const terrainForTransport = buildTacticalTerrainKindResolverFromSnapshot(battle);
-  for (let i = 1; i < pathH3.length; i++) {
-    const prev = pathH3[i - 1]!;
-    const h = pathH3[i]!;
-    if (battle.res4IsRubbleByH3?.[h]) return 'Rubble';
-    if (battle.res4IsUrbanByH3?.[h]) return 'Urban';
-    const rawKind = effectiveRes4TerrainKindString(battle, h);
-    const parent = battle.strategicHexTerrain ?? 'land';
-    const cat = normalizeDbTerrainKindToTacticalCategory(String(rawKind).toLowerCase(), parent);
-    const cost = tacticalEnterHexMovementCost(moveType, cat);
-    const plainsCost = tacticalEnterHexMovementCost(moveType, 'plains');
-    if (
-      terrainForTransport.transportFromTo?.(prev, h) &&
-      (cost > plainsCost || !Number.isFinite(cost))
-    ) {
-      return 'Road/Rail';
-    }
-    if (Number.isFinite(cost) && cost > 1) {
-      const label = displayTitleForSlowTerrainBucket(cat);
-      if (label) return label;
-    }
-    if (tacticalRes4CellIsForestClass(battle, h) && (subUnit.unitType === 'armor' || subUnit.unitType === 'infantry')) {
-      return 'Forest';
-    }
-    if (subUnit.unitType === 'infantry' && tacticalRes4CellIsMountain(battle, h)) {
-      return 'Mountain';
-    }
-  }
+  const { slower, roadRail } = collectTacticalMarchTerrainImpact(args);
+  if (slower.length > 0) return slower[0]!;
+  if (roadRail) return 'Road/Rail';
   return null;
 }
 
@@ -207,7 +353,7 @@ export function pickTacticalMarchSlowTerrainDisplayTitle(args: {
  * Resolves tactical ranged “slow terrain” when forest/urban/rubble caps range below the unit’s baseline.
  *
  * Purpose: Surfaces the attacker-anchor terrain that triggers the max-range-1 cap for infantry/armor.
- * When to use: Renderer ranged hover while a tactical battle snapshot is active and ranged validation succeeded.
+ * When to use: Per-unit ranged hover while a tactical battle snapshot is active and ranged validation succeeded.
  * Expected outcome: `Rubble` / `Urban` / `Forest` priority on the anchor cell, or `null` when the cap is inactive.
  * Exceptions: None.
  */
@@ -230,22 +376,43 @@ export function pickTacticalRangedSlowTerrainDisplayTitle(
 }
 
 /**
+ * Collects ranged slow terrain labels across selected human infantry/armor (union, stable preview-unit order).
+ *
+ * Purpose: Grouped ranged hover shows every throttling terrain type present among origins, not only the first unit.
+ * When to use: `publishHoverRoutePreview` tactical ranged branch with `formatOrderPreviewImpactHtml`.
+ * Expected outcome: Distinct labels in `previewUnitIds` traversal order.
+ * Exceptions: None.
+ */
+export function collectTacticalRangedSlowTerrainLabels(
+  battle: TacticalBattleTerrainPick & Pick<TacticalBattleSnapshot, 'subUnits'>,
+  previewUnitIds: readonly string[]
+): string[] {
+  const order: string[] = [];
+  const seen = new Set<string>();
+  for (const id of previewUnitIds) {
+    const sub = battle.subUnits.find((s) => s.id === id);
+    if (!sub || sub.player !== 'human') continue;
+    const t = pickTacticalRangedSlowTerrainDisplayTitle(battle, sub.unitType, id);
+    if (t && !seen.has(t)) {
+      seen.add(t);
+      order.push(t);
+    }
+  }
+  return order;
+}
+
+/**
  * Picks a ranged slow label for the first representative tactical sub-unit in ranged mode with an active cap.
  *
- * Purpose: Grouped selection may include multiple origins; the hover line uses one representative per origin—match that for copy.
- * When to use: `publishHoverRoutePreview` for tactical ranged after `validateGroupRangedTarget` succeeds.
- * Expected outcome: First non-null per-unit slow label, or `null` when no selected infantry/armor is capped.
+ * Purpose: Backward-compatible first-non-null helper aligned with legacy hover copy.
+ * When to use: Callers/tests expecting a single string.
+ * Expected outcome: First label from `collectTacticalRangedSlowTerrainLabels`, or `null`.
  * Exceptions: None.
  */
 export function pickFirstTacticalRangedSlowTerrainDisplayTitle(
   battle: TacticalBattleTerrainPick & Pick<TacticalBattleSnapshot, 'subUnits'>,
   previewUnitIds: readonly string[]
 ): string | null {
-  for (const id of previewUnitIds) {
-    const sub = battle.subUnits.find((s) => s.id === id);
-    if (!sub || sub.player !== 'human') continue;
-    const t = pickTacticalRangedSlowTerrainDisplayTitle(battle, sub.unitType, id);
-    if (t) return t;
-  }
-  return null;
+  const labels = collectTacticalRangedSlowTerrainLabels(battle, previewUnitIds);
+  return labels.length > 0 ? labels[0]! : null;
 }

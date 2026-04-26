@@ -5,7 +5,11 @@ import {
   representativeMarchPreviewUnitIdsByOriginH3,
 } from '../../shared/humanMarchPreviewGroupAssembly';
 import { buildTacticalMarchHoverPreview } from '../../shared/tacticalMarchHoverPreview';
-import { pickFirstTacticalRangedSlowTerrainDisplayTitle } from '../../shared/orderPreviewSlowTerrainTooltip';
+import {
+  collectTacticalRangedSlowTerrainLabels,
+  formatOrderPreviewImpactHtml,
+  sortSlowTerrainLabels,
+} from '../../shared/orderPreviewSlowTerrainTooltip';
 import { unitHasTacticalRangedBaseline } from '../../shared/tacticalRanges';
 import {
   formatPendingAirStrikeSidebarLabel,
@@ -45,19 +49,23 @@ function publishHoverRoutePreview(
     preview.renderAsSupportTargeting === 'ranged' ? rangedValidationReason : null,
     preview.renderAsSupportTargeting === 'air' ? airStrikeValidationReason : null
   );
-  let slowTitle: string | null = null;
+  let slowHtml: string | null = null;
   if (!msg && preview.renderAsSupportTargeting === 'ranged' && preview.data.validForAll && S.tacticalBattleSnapshot) {
     const ids = preview.data.previews.map((p) => p.unitId);
-    slowTitle = pickFirstTacticalRangedSlowTerrainDisplayTitle(S.tacticalBattleSnapshot, ids);
+    const labels = sortSlowTerrainLabels(collectTacticalRangedSlowTerrainLabels(S.tacticalBattleSnapshot, ids));
+    slowHtml = formatOrderPreviewImpactHtml({ slower: labels, roadRail: false });
   } else if (!msg && !preview.renderAsSupportTargeting && preview.data.validForAll) {
-    slowTitle = preview.data.slowerTerrainDisplayTitle ?? null;
+    const imp = preview.data.orderPreviewTerrainImpact ?? null;
+    if (imp && (imp.slower.length > 0 || imp.roadRail)) {
+      slowHtml = formatOrderPreviewImpactHtml({ slower: [...imp.slower], roadRail: imp.roadRail });
+    }
   }
   if (msg) {
     hideOrderSlowerHexTooltip();
     showOrderBlockHexTooltip(msg);
   } else {
     showOrderBlockHexTooltip(null);
-    showOrderSlowerHexTooltip(slowTitle);
+    showOrderSlowerHexTooltip(slowHtml);
   }
   deps.requestRedraw();
 }

@@ -4,6 +4,7 @@ import {
   blockingHoverMessageFromAirStrikeReason,
   blockingHoverMessageFromMarchInvalidReason,
   blockingHoverMessageFromRangedReason,
+  blockingHoverMessageHtmlFromPlainMessage,
 } from '../../shared/orderPreviewBlockingCopy';
 import type { HumanOrderGroupPreviewResult } from '../../shared/ipc/humanOrderPreviewTypes';
 import { clearTerrainTooltipTimer, hideTerrainTooltipVisual } from './terrainTooltipRes1State';
@@ -143,7 +144,7 @@ export function resolveOrderBlockHexTooltipMessage(
  *
  * Purpose: Gives immediate “Blocked: …” feedback for invalid march/ranged hovers without waiting for the terrain dwell delay.
  * When to use: End of `refreshHoverRoutePreview` when `resolveOrderBlockHexTooltipMessage` returns non-null, or with `null` to clear.
- * Expected outcome: Plain-text tooltip follows `S.lastPointerClientX/Y`, auto-hides after `ORDER_BLOCK_HEX_TOOLTIP_TTL_MS`.
+ * Expected outcome: HTML tooltip (bold `Blocked:` only) follows `S.lastPointerClientX/Y`, auto-hides after `ORDER_BLOCK_HEX_TOOLTIP_TTL_MS`.
  * Exceptions: Missing DOM nodes no-op without throwing.
  */
 export function showOrderBlockHexTooltip(message: string | null): void {
@@ -156,7 +157,7 @@ export function showOrderBlockHexTooltip(message: string | null): void {
   hideTerrainTooltipVisual();
   const el = document.getElementById('order-block-tooltip');
   if (!el) return;
-  el.textContent = message;
+  el.innerHTML = blockingHoverMessageHtmlFromPlainMessage(message);
   el.style.left = `${S.lastPointerClientX + TOOLTIP_OFFSET_PX}px`;
   el.style.top = `${S.lastPointerClientY + TOOLTIP_OFFSET_PX}px`;
   el.classList.remove('hidden');

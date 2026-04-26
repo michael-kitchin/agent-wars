@@ -14,9 +14,10 @@ import type {
   HumanOrderGroupPreviewResult,
   HumanOrderGroupPreviewUnitResult,
   HumanOrderPreviewResult,
+  OrderPreviewTerrainImpact,
 } from './ipc/humanOrderPreviewTypes';
 import { planTacticalRes4March } from './tacticalRes4MovementPlanner';
-import { pickTacticalMarchSlowTerrainDisplayTitle } from './orderPreviewSlowTerrainTooltip';
+import { collectTacticalMarchTerrainImpact, sortSlowTerrainLabels } from './orderPreviewSlowTerrainTooltip';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from './tacticalTerrainCombatModifiers';
 import {
   buildTacticalTerrainKindResolverFromSnapshot,
@@ -147,12 +148,19 @@ function buildPreviewForSubUnit(args: {
   }
   const path = plan.pathToDestination;
   const [destLat, destLng] = cellToLatLng(args.hoveredH3Index);
-  const slowTitle = pickTacticalMarchSlowTerrainDisplayTitle({
+  const marchImpact = collectTacticalMarchTerrainImpact({
     battle: args.battle,
     subUnit: sub,
     moveType,
     pathH3: path,
   });
+  const sortedSlower = sortSlowTerrainLabels(marchImpact.slower);
+  const orderPreviewTerrainImpact: OrderPreviewTerrainImpact | null =
+    sortedSlower.length > 0 || marchImpact.roadRail
+      ? { slower: sortedSlower, roadRail: marchImpact.roadRail }
+      : null;
+  const slowTitle =
+    sortedSlower.length > 0 ? sortedSlower.join(', ') : marchImpact.roadRail ? 'Road/Rail' : null;
   if (plan.reachableThisTurn) {
     return {
       valid: true,
@@ -160,6 +168,7 @@ function buildPreviewForSubUnit(args: {
       arrowLatLng: [destLat, destLng],
       segments: [{ turn: 1, hexes: h3PathToLatLngHexes(path) }],
       slowerTerrainDisplayTitle: slowTitle,
+      orderPreviewTerrainImpact,
     };
   }
   const stopH3 = plan.firstStopWithinBudget.stopH3;
@@ -176,6 +185,7 @@ function buildPreviewForSubUnit(args: {
       { turn: 2, hexes: h3PathToLatLngHexes(leg2) },
     ],
     slowerTerrainDisplayTitle: slowTitle,
+    orderPreviewTerrainImpact,
   };
 }
 

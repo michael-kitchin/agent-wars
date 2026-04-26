@@ -19,6 +19,7 @@ import {
   listStrategicRes1H3Indexes,
 } from './hex-coordinates';
 import { projectToGrid } from './hex-grid-projection';
+import { projectTacticalRes4FootprintToAsciiGrid } from './tacticalAsciiGridProjection';
 import type { HexMapCellState } from './hex-map-renderer';
 import { renderHexAsciiMap } from './hex-map-renderer';
 import {
@@ -176,7 +177,7 @@ export function buildTacticalOperationalMapSectionMarkdown(args: {
       stateHexRows: args.state.hexes.length,
     });
   }
-  const grid = projectToGrid(mapHexes, context);
+  const grid = projectTacticalRes4FootprintToAsciiGrid(mapHexes, context);
   const gameByH3 = buildTacticalHexGameStateMap(args.state, mapHexes);
   const { mapString, displacedFeatures } = renderHexAsciiMap(grid, gameByH3);
 

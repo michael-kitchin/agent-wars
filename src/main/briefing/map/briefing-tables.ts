@@ -13,7 +13,12 @@ import type { UnitAssessmentResult } from '../../precomputation';
 import { buildPromptTableLines } from '../../promptTableUtils';
 import { logDebug, logTrace } from '../../logger';
 import type { PossibleActionTableRow } from '../../openrouter/possibleUnitActionsTableAssembly';
-import { selectTopRowsPerUnit } from '../../openrouter/possibleUnitActionsTableAssembly';
+import {
+  deriveThisTurnOptionsActionColumn,
+  mergeThisTurnOptionsRowsForBriefing,
+  selectTopRowsPerUnit,
+} from '../../openrouter/possibleUnitActionsTableAssembly';
+import { compareHexIds } from '../../openrouter/possibleUnitActionsPartition';
 import type { CoordinateContext } from './coordinateContext';
 import { h3ToCode } from './hex-code-translator';
 
@@ -72,21 +77,16 @@ export function renderThisTurnOptionsTableMarkdown(
 ): string {
   logDebug('briefing-tables renderThisTurnOptionsTableMarkdown', { rowCount: rows.length, mode: context.mode });
   if (rows.length === 0) return '';
-  const capped = selectTopRowsPerUnit(rows, latLngByH3);
+  const merged = mergeThisTurnOptionsRowsForBriefing(rows);
+  const capped = selectTopRowsPerUnit(merged, latLngByH3);
   const body = capped.map((r) => {
-    const hex = h3ToCode(r.targetH3, context);
-    const action =
-      r.actionTypes.includes('air strike') || r.actionTypes.includes('air_strike')
-        ? 'air strike'
-        : r.actionTypes.includes('ranged')
-          ? 'ranged'
-          : r.actionTypes.includes('move') || r.actionTypes.includes('melee')
-            ? 'move/melee'
-            : r.actionTypes;
+    const allH3 = [r.targetH3, ...(r.coTargetH3Indexes ?? [])].sort(compareHexIds);
+    const hex = allH3.map((h) => h3ToCode(h, context)).join(', ');
+    const action = deriveThisTurnOptionsActionColumn(r);
     const target = `${r.enemySummary} / ${r.featuresSummary}`.trim();
     return [r.unitId, action, hex, target.replace(/\|/g, ' '), r.actionTypes];
   });
-  const lines = buildPromptTableLines(['Unit ID', 'Action', 'Target Hex', 'Target', 'Notes'], body);
+  const lines = buildPromptTableLines(['Unit ID', 'Action', 'Target Hexes', 'Target Units', 'Notes'], body);
   return `${lines.join('\n')}\n`;
 }
 

@@ -142,13 +142,17 @@ export function buildResolutionPlaybackMoves(
     .map((move) => {
       const unit = byId.get(move.unitId);
       if (!unit) return null;
-      return {
+      const base = {
         unitId: move.unitId,
         player: unit.player,
         unitType: unit.unitType,
         fromH3Index: move.fromH3Index,
         toH3Index: move.toH3Index,
       };
+      if (move.pathH3Indexes && move.pathH3Indexes.length >= 2) {
+        return { ...base, pathH3Indexes: move.pathH3Indexes };
+      }
+      return base;
     })
     .filter((move): move is ResolutionPlaybackMove => move !== null);
 }

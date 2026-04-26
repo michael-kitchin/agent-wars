@@ -285,7 +285,7 @@ function testFormatBriefingPossibleActionsArmorRanged(): void {
   const out = formatBriefing(fixtureState, precomputed, '', '');
   assert.ok(out.includes('opponent-armor-1'));
   assert.ok(out.includes('ranged'));
-  assert.ok(out.includes('| Unit ID | Action | Target Hex | Target | Notes |'));
+  assert.ok(out.includes('| Unit ID | Action | Target Hexes | Target Units | Notes |'));
 }
 
 /**

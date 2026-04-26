@@ -18,6 +18,7 @@ import type { GameStateSnapshot, HumanStandingOrderSnapshot } from '../../shared
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildTacticalMarchDraftDestinationPreview } from '../../shared/tacticalMarchHoverPreview';
 import type { ResolutionPlaybackMove } from '../core/types';
+import { latLngAlongPolylineByArcFraction } from '../../shared/pathPolylineInterp.js';
 import { drawOneUnitMarker } from './unitDrawing';
 
 /**
@@ -265,9 +266,37 @@ export function drawResolutionMoveLines(
   ctx.save();
   ctx.globalAlpha = opacity;
   const includeArrowForHuman = options?.includeArrowForHuman === true;
+  const map = getMainLeafletMap() as { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } } | null;
+  const L = getLeafletGlobal();
   for (const move of moves) {
     const isHumanMove = move.player === 'human';
     const lineColor = move.player === 'human' ? ORDER_LINE_COLOR : AI_ORDER_LINE_COLOR;
+    const path = move.pathH3Indexes;
+    if (path && path.length >= 2 && map) {
+      const points = path.map((h) => {
+        const [lat, lng] = cellToLatLng(h);
+        const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
+        return { x: p.x, y: p.y };
+      });
+      ctx.strokeStyle = lineColor;
+      ctx.lineWidth = ORDER_LINE_WIDTH;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
+      const hPen = path[path.length - 2]!;
+      const hLast = path[path.length - 1]!;
+      const fromPt = hexCenterPx(hPen);
+      const toPt = hexCenterPxRelativeTo(hPen, hLast);
+      if (isHumanMove && includeArrowForHuman) {
+        drawArrowheadOnly(ctx, fromPt, toPt, lineColor, { tipAtTargetCenter: true });
+        continue;
+      }
+      if (isHumanMove) {
+        continue;
+      }
+      drawArrowheadOnly(ctx, fromPt, toPt, lineColor, { tipAtTargetCenter: true });
+      continue;
+    }
     const from = hexCenterPx(move.fromH3Index);
     const to = hexCenterPxRelativeTo(move.fromH3Index, move.toH3Index);
     if (isHumanMove && includeArrowForHuman) {
@@ -291,20 +320,7 @@ export function drawResolutionMoveLines(
     ctx.lineJoin = 'round';
     ctx.stroke();
     if (isHumanMove) continue;
-    const ax = endX + ux * ORDER_ARROW_SIZE;
-    const ay = endY + uy * ORDER_ARROW_SIZE;
-    const perpX = -uy * (ORDER_ARROW_SIZE * 0.6);
-    const perpY = ux * (ORDER_ARROW_SIZE * 0.6);
-    ctx.beginPath();
-    ctx.moveTo(ax, ay);
-    ctx.lineTo(endX - perpX, endY - perpY);
-    ctx.lineTo(endX + perpX, endY + perpY);
-    ctx.closePath();
-    ctx.fillStyle = lineColor;
-    ctx.fill();
-    ctx.strokeStyle = lineColor;
-    ctx.lineWidth = ORDER_LINE_WIDTH;
-    ctx.stroke();
+    drawArrowheadOnly(ctx, from, to, lineColor);
   }
   ctx.restore();
 }
@@ -343,7 +359,8 @@ export function drawMovingUnits(
     }
   >();
   for (const move of moves) {
-    const groupKey = `${move.player}|${move.fromH3Index}|${move.toH3Index}`;
+    const pathKey = move.pathH3Indexes?.join(':') ?? '';
+    const groupKey = `${move.player}|${move.fromH3Index}|${move.toH3Index}|${pathKey}`;
     const existing = groupedMoves.get(groupKey);
     if (existing) {
       existing.count += 1;
@@ -355,11 +372,23 @@ export function drawMovingUnits(
 
   for (const group of groupedMoves.values()) {
     const move = group.move;
-    const [lat0, lng0] = cellToLatLng(move.fromH3Index);
-    const [lat1, lng1] = cellToLatLng(move.toH3Index);
-    const lng1Aligned = alignLngToReference(lng1, lng0);
-    const lat = lat0 + progress * (lat1 - lat0);
-    const lng = lng0 + progress * (lng1Aligned - lng0);
+    const path = move.pathH3Indexes;
+    let lat: number;
+    let lng: number;
+    if (path && path.length >= 2) {
+      const refLng = cellToLatLng(path[0]!)[1];
+      const coords = path.map((h) => {
+        const [la, ln] = cellToLatLng(h);
+        return { lat: la, lng: ln };
+      });
+      ({ lat, lng } = latLngAlongPolylineByArcFraction(refLng, coords, progress));
+    } else {
+      const [lat0, lng0] = cellToLatLng(move.fromH3Index);
+      const [lat1, lng1] = cellToLatLng(move.toH3Index);
+      const lng1Aligned = alignLngToReference(lng1, lng0);
+      lat = lat0 + progress * (lat1 - lat0);
+      lng = lng0 + progress * (lng1Aligned - lng0);
+    }
     const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
     const color = PLAYER_COLORS[move.player] ?? '#333';
     const label = group.unitTypes.size > 1 ? '*' : (UNIT_TYPE_LABELS[move.unitType] ?? '?');

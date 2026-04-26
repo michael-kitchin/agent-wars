@@ -11,7 +11,9 @@
 import type {
   HumanOrderGroupPreviewResult,
   HumanOrderGroupPreviewUnitResult,
+  OrderPreviewTerrainImpact,
 } from './ipc/humanOrderPreviewTypes';
+import { sortSlowTerrainLabels } from './orderPreviewSlowTerrainTooltip';
 
 /**
  * De-duplicates strategic march preview unit ids using the same rules as legacy strategic hover preview.
@@ -101,6 +103,30 @@ export function representativeTacticalMarchPreviewUnitIdsByOriginH3(
  * Expected outcome: Minimum positive integer range among known types; `fallbackPerType` when a type is unknown.
  * Exceptions: Returns `0` when `unitTypes` is empty.
  */
+/**
+ * Unions per-row `orderPreviewTerrainImpact` values into one grouped envelope payload.
+ *
+ * Purpose: Multi-origin march hovers should list every slowing terrain encountered by any representative path, and surface road/rail if any path used it.
+ * When to use: `buildHumanOrderGroupPreviewEnvelope` when the caller does not pass an explicit merged impact.
+ * Expected outcome: Sorted unique `slower` labels; `roadRail` true if any row had it.
+ * Exceptions: Returns `null` when no row contributes terrain or transport hints.
+ */
+export function mergeOrderPreviewTerrainImpactsFromPreviews(
+  previews: readonly HumanOrderGroupPreviewUnitResult[]
+): OrderPreviewTerrainImpact | null {
+  const slower = new Set<string>();
+  let roadRail = false;
+  for (const row of previews) {
+    const imp = row.preview.orderPreviewTerrainImpact;
+    if (!imp) continue;
+    roadRail = roadRail || imp.roadRail;
+    for (const s of imp.slower) slower.add(s);
+  }
+  const slowerArr = sortSlowTerrainLabels([...slower]);
+  if (slowerArr.length === 0 && !roadRail) return null;
+  return { slower: slowerArr, roadRail };
+}
+
 export function minMovementRangeAmongUnitTypes(
   unitTypes: readonly string[],
   rangeByType: Readonly<Record<string, number>>,
@@ -113,27 +139,41 @@ export function minMovementRangeAmongUnitTypes(
 /**
  * Builds the grouped preview envelope fields from per-unit previews and the aggregated movement range.
  *
- * Purpose: Single place for `validForAll`, `showInvalidMarker`, and `invalidReason` derivation.
+ * Purpose: Single place for `validForAll`, `showInvalidMarker`, `invalidReason`, merged terrain tooltips, and movement-range aggregation.
  * When to use: Final assembly step after all per-unit previews are computed.
- * Expected outcome: Shallow-copied `previews` array in the returned object.
+ * Expected outcome: Shallow-copied `previews`; when `orderPreviewTerrainImpact` is omitted, it is merged from row `preview.orderPreviewTerrainImpact` (union of `slower`, OR of `roadRail`); `slowerTerrainDisplayTitle` prefers explicit arg, then merged impact text, then first row string.
  * Exceptions: None.
  */
 export function buildHumanOrderGroupPreviewEnvelope(args: {
   previews: readonly HumanOrderGroupPreviewUnitResult[];
   slowestMovementRange: number;
   slowerTerrainDisplayTitle?: string | null;
+  /** When set (including `null`), skips auto-merge and uses this envelope-level impact directly. */
+  orderPreviewTerrainImpact?: OrderPreviewTerrainImpact | null;
 }): HumanOrderGroupPreviewResult {
   const previews = [...args.previews];
   const invalid = previews.find((e) => !e.preview.valid);
   const fromRows = previews.map((e) => e.preview.slowerTerrainDisplayTitle).find((t) => t != null && String(t).length > 0);
   const explicit = args.slowerTerrainDisplayTitle;
-  const slowerTerrainDisplayTitle = explicit !== undefined ? explicit : fromRows ?? null;
+  const mergedImpact =
+    args.orderPreviewTerrainImpact !== undefined
+      ? args.orderPreviewTerrainImpact
+      : mergeOrderPreviewTerrainImpactsFromPreviews(previews);
+  const slowerFromImpact =
+    mergedImpact && (mergedImpact.slower.length > 0 || mergedImpact.roadRail)
+      ? mergedImpact.slower.length > 0
+        ? mergedImpact.slower.join(', ')
+        : 'Road/Rail'
+      : null;
+  const slowerTerrainDisplayTitle =
+    explicit !== undefined ? explicit : (slowerFromImpact ?? fromRows) ?? null;
   return {
     validForAll: invalid === undefined,
     showInvalidMarker: invalid !== undefined,
     invalidReason: invalid?.preview.invalidReason,
     slowestMovementRange: args.slowestMovementRange,
     slowerTerrainDisplayTitle: slowerTerrainDisplayTitle ?? null,
+    orderPreviewTerrainImpact: mergedImpact ?? null,
     previews,
   };
 }

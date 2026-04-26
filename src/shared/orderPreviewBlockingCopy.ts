@@ -1,3 +1,5 @@
+import { escapeHtmlForOrderPreviewTooltip } from './orderPreviewSlowTerrainTooltip';
+
 /**
  * Pure copy + classification for “Blocked: …” hover hints during march / ranged order preview.
  *
@@ -112,4 +114,19 @@ export function blockingHoverMessageFromMarchInvalidReason(
     }
   }
   return null;
+}
+
+/**
+ * Converts a plain `Blocked: …` hover line into minimal HTML (`Blocked:` label in bold, suffix escaped).
+ *
+ * Purpose: Matches order-slower tooltip styling while keeping `#order-block-tooltip` on `innerHTML` with safe markup.
+ * When to use: Renderer `showOrderBlockHexTooltip` after `resolveOrderBlockHexTooltipMessage` returns a blocking string.
+ * Expected outcome: `<strong>Blocked:</strong> Range` for `Blocked: Range`; non-`Blocked:` input is fully escaped.
+ * Exceptions: None; empty string yields empty string.
+ */
+export function blockingHoverMessageHtmlFromPlainMessage(message: string): string {
+  const t = message.trim();
+  const m = t.match(/^blocked:\s*(.*)$/i);
+  if (!m) return escapeHtmlForOrderPreviewTooltip(t);
+  return `<strong>Blocked:</strong> ${escapeHtmlForOrderPreviewTooltip(m[1]!.trim())}`;
 }

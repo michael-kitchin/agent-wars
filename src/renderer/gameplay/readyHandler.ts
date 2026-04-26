@@ -820,7 +820,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       }
       deps.redraw();
       deps.scheduleTacticalAnnihilationExit?.();
-      if (!S.useEventDrivenConsultation && S.runButtonOn) {
+      if (S.runButtonOn) {
         const oppAlive = S.tacticalBattleSnapshot?.subUnits.some((u) => u.player === 'opponent') ?? false;
         if (oppAlive) deps.startBackgroundRequestIfAllowed();
       }
@@ -1038,6 +1038,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     deps.redraw();
     if (readyResult.tacticalAutoStartRes1H3Index) {
       await deps.startTacticalBattleFromInterceptHex(readyResult.tacticalAutoStartRes1H3Index);
+      if (S.runButtonOn) deps.startBackgroundRequestIfAllowed();
     }
   } catch (err) {
     deps.showSidebarError(String(err));

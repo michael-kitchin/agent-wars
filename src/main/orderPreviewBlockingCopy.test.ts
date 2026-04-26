@@ -4,6 +4,7 @@ import {
   blockingHoverMessageFromAirStrikeReason,
   blockingHoverMessageFromMarchInvalidReason,
   blockingHoverMessageFromRangedReason,
+  blockingHoverMessageHtmlFromPlainMessage,
   composeResolutionMapToastBullets,
 } from '../shared/orderPreviewBlockingCopy';
 
@@ -45,4 +46,15 @@ test('blockingHoverMessageFromAirStrikeReason is range-only', () => {
     'Blocked: Range'
   );
   assert.equal(blockingHoverMessageFromAirStrikeReason('Target hex has no urban infrastructure'), null);
+});
+
+test('blockingHoverMessageHtmlFromPlainMessage bolds Blocked and escapes suffix', () => {
+  assert.equal(
+    blockingHoverMessageHtmlFromPlainMessage('Blocked: Range'),
+    '<strong>Blocked:</strong> Range'
+  );
+  assert.equal(
+    blockingHoverMessageHtmlFromPlainMessage('Blocked: <script>x</script>'),
+    '<strong>Blocked:</strong> &lt;script&gt;x&lt;/script&gt;'
+  );
 });

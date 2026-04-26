@@ -31,6 +31,7 @@ import type {
   GameStateSnapshot,
 } from '../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
+import { clipTacticalMarchPathToDestination } from '../shared/tacticalMarchPlaybackPath.js';
 import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
 import { executePlanRoute } from './tools/tool1Pathfinding';
 import { normalizeMovementTerrain, isLandSeaportSpawnHex } from './movementTerrain';
@@ -815,6 +816,10 @@ export function commitHumanTacticalDraftOrders(args: {
     };
     const appliedMovementOrders: { unitId: string; toH3Index: string }[] = [];
     const tacticalMarchContinuations: { subUnitId: string; destinationH3Index: string }[] = [];
+    const humanMarchPlanByUnitId = new Map<
+      string,
+      { stopH3: string; consumedFullPath: boolean; pathH3Prefix?: string[] }
+    >();
     for (const o of effectiveHumanMarches) {
       const sub = preBattle.subUnits.find((u) => u.id === o.unitId);
       if (!sub || sub.player !== 'human') continue;
@@ -826,7 +831,7 @@ export function commitHumanTacticalDraftOrders(args: {
         appliedMovementOrders.push({ unitId: o.unitId, toH3Index: o.toH3Index });
         continue;
       }
-      const { stopH3, consumedFullPath } = tacticalMarchFirstStopAlongPath(
+      const marchPlan = tacticalMarchFirstStopAlongPath(
         from,
         o.toH3Index,
         maxEdges,
@@ -834,6 +839,8 @@ export function commitHumanTacticalDraftOrders(args: {
         terrainBattle,
         moveType
       );
+      humanMarchPlanByUnitId.set(o.unitId, marchPlan);
+      const { stopH3, consumedFullPath } = marchPlan;
       if (stopH3 !== from) {
         appliedMovementOrders.push({ unitId: o.unitId, toH3Index: stopH3 });
       }
@@ -876,16 +883,17 @@ export function commitHumanTacticalDraftOrders(args: {
         humanMoves.push({ unitId: o.unitId, fromH3Index: from, toH3Index: o.toH3Index });
         continue;
       }
-      const { stopH3 } = tacticalMarchFirstStopAlongPath(
-        from,
-        o.toH3Index,
-        maxEdges,
-        res4Set,
-        terrainBattle,
-        moveType
-      );
+      const marchPlan = humanMarchPlanByUnitId.get(o.unitId);
+      if (!marchPlan) continue;
+      const { stopH3, pathH3Prefix } = marchPlan;
       if (stopH3 === from) continue;
-      humanMoves.push({ unitId: o.unitId, fromH3Index: from, toH3Index: stopH3 });
+      const pathForPlayback = clipTacticalMarchPathToDestination(stopH3, pathH3Prefix);
+      humanMoves.push({
+        unitId: o.unitId,
+        fromH3Index: from,
+        toH3Index: stopH3,
+        ...(pathForPlayback ? { pathH3Indexes: pathForPlayback } : {}),
+      });
     }
     for (const f of args.ferryOrders ?? []) {
       const u = postMovementBattle.subUnits.find((x) => x.id === f.unitId);
@@ -903,7 +911,32 @@ export function commitHumanTacticalDraftOrders(args: {
         if (from === o.toH3Index) continue;
         const after = postMovementBattle.subUnits.find((u) => u.id === o.unitId);
         const to = after?.h3Index ?? o.toH3Index;
-        if (from !== to) opponentMoves.push({ unitId: o.unitId, fromH3Index: from, toH3Index: to });
+        if (from === to) continue;
+        const oppMoveType = tacticalMovementUnitTypeForPathfinding(su, o.toH3Index);
+        const oppMaxEdges = effectiveTacticalMovementPointBudgetForMarchLeg(
+          terrainBattle,
+          su,
+          preBattle.subUnits,
+          oppMoveType
+        );
+        let pathH3Indexes: string[] | undefined;
+        if (oppMaxEdges > 0) {
+          const oppMarch = tacticalMarchFirstStopAlongPath(
+            from,
+            o.toH3Index,
+            oppMaxEdges,
+            res4Set,
+            terrainBattle,
+            oppMoveType
+          );
+          pathH3Indexes = clipTacticalMarchPathToDestination(to, oppMarch.pathH3Prefix);
+        }
+        opponentMoves.push({
+          unitId: o.unitId,
+          fromH3Index: from,
+          toH3Index: to,
+          ...(pathH3Indexes ? { pathH3Indexes } : {}),
+        });
       }
       for (const f of od.ferryOrders) {
         const u = postMovementBattle.subUnits.find((x) => x.id === f.unitId);

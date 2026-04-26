@@ -1,6 +1,5 @@
 import { ORDER_BLOCK_HEX_TOOLTIP_TTL_MS, TOOLTIP_OFFSET_PX } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
-import { formatSlowerHoverTooltipMessage } from '../../shared/orderPreviewSlowTerrainTooltip';
 import { clearTerrainTooltipTimer, hideTerrainTooltipVisual } from './terrainTooltipRes1State';
 
 let slowerHideTimer: ReturnType<typeof setTimeout> | null = null;
@@ -71,12 +70,12 @@ export function isOrderSlowerHexTooltipVisible(): boolean {
  *
  * Purpose: Gives immediate “Slower: …” or “Using: Road/Rail” feedback for terrain-throttled valid hovers without waiting for the terrain dwell delay.
  * When to use: After `publishHoverRoutePreview` when no blocking message applies and a slow terrain title is present.
- * Expected outcome: Plain-text tooltip follows `S.lastPointerClientX/Y`; auto-hides after `ORDER_BLOCK_HEX_TOOLTIP_TTL_MS`.
+ * Expected outcome: HTML tooltip follows `S.lastPointerClientX/Y`; auto-hides after `ORDER_BLOCK_HEX_TOOLTIP_TTL_MS` (caller supplies escaped game-built markup).
  * Exceptions: Missing DOM nodes no-op without throwing.
  */
-export function showOrderSlowerHexTooltip(displayTerrainTitle: string | null): void {
+export function showOrderSlowerHexTooltip(tooltipHtml: string | null): void {
   clearSlowerTooltipTimer();
-  if (!displayTerrainTitle) {
+  if (!tooltipHtml) {
     hideOrderSlowerHexTooltip();
     return;
   }
@@ -84,7 +83,7 @@ export function showOrderSlowerHexTooltip(displayTerrainTitle: string | null): v
   hideTerrainTooltipVisual();
   const el = document.getElementById('order-slower-tooltip');
   if (!el) return;
-  el.textContent = formatSlowerHoverTooltipMessage(displayTerrainTitle);
+  el.innerHTML = tooltipHtml;
   el.style.left = `${S.lastPointerClientX + TOOLTIP_OFFSET_PX}px`;
   el.style.top = `${S.lastPointerClientY + TOOLTIP_OFFSET_PX}px`;
   el.classList.remove('hidden');

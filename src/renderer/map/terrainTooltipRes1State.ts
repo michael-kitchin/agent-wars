@@ -13,6 +13,7 @@ import { DETAIL_H3_RESOLUTION, WORLD_H3_RESOLUTION } from '../core/constants';
 import { isHexExploredByPlayer } from '../core/selection';
 import { rendererSharedState as S } from '../core/state';
 import { getLeafletGlobal } from './mapUtils';
+import { TOOLTIP_SECTION_GAP_HTML } from '../../shared/tooltipSectionGap';
 import type { NamingLookupTarget, TerrainTooltipState } from './terrainTooltipTypes';
 import { shouldRenderRes4Hexes } from './terrainView';
 import { getMainLeafletMap } from './worldLeafletMap';
@@ -574,9 +575,9 @@ function formatTerrainTooltipHtml(
         : `<strong>Production:</strong> (none)`;
     bodyParts.push(productionLine);
   }
-  const bodyLine = bodyParts.join('<br/><span style="display:block;height:0.5em"></span>');
+  const bodyLine = bodyParts.join(TOOLTIP_SECTION_GAP_HTML);
   if (!namingLine) return `${prefix}${bodyLine}`;
-  return `${prefix}${formatGroupedNamingLineHtml(namingLine)}<br/><span style="display:block;height:0.5em"></span>${bodyLine}`;
+  return `${prefix}${formatGroupedNamingLineHtml(namingLine)}${TOOLTIP_SECTION_GAP_HTML}${bodyLine}`;
 }
 
 function terrainTooltipContentKey(

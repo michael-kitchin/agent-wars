@@ -182,17 +182,32 @@ export type TacticalOpponentPlanPayload = {
   embarkOrders: EmbarkOrder[];
 };
 
+/**
+ * One tactical Ready playback march segment for resolution animation (res4 cells).
+ *
+ * Purpose: Carries optional `pathH3Indexes` so the renderer can glide units along the planned §12.4 path instead of a straight chord.
+ * When to use: `TacticalCommitResolutionPlayback.humanMoves` and `opponentMoves` entries from `commitHumanTacticalDraftOrders`.
+ * Expected outcome: When `pathH3Indexes` is set, it is ordered `[from, …, to]` inclusive with length at least 2.
+ * Exceptions: Ferry-only rows omit `pathH3Indexes`; straight-line fallback when unset.
+ */
+export type TacticalPlaybackMarchMove = {
+  unitId: string;
+  fromH3Index: string;
+  toH3Index: string;
+  pathH3Indexes?: string[];
+};
+
 export type TacticalCommitResolutionPlayback = {
-  humanMoves: Array<{ unitId: string; fromH3Index: string; toH3Index: string }>;
+  humanMoves: TacticalPlaybackMarchMove[];
   /**
    * Opponent sub-unit march deltas applied on the same Ready beat after human marches (strategic `allOrders` orders human rows before AI).
    *
    * Purpose: Lets `S.resolutionMoveAnimation.moves` include AI tactical marches without re-fetching the snapshot mid-playback.
    * When to use: Populated when `opponentTacticalDraft.movementOrders` committed non-noop opponent legs this beat.
-   * Expected outcome: Same `{ unitId, fromH3Index, toH3Index }` shape as `humanMoves`.
+   * Expected outcome: Same shape as `humanMoves`, including optional `pathH3Indexes` for bent res4 paths.
    * Exceptions: Omitted when empty.
    */
-  opponentMoves?: Array<{ unitId: string; fromH3Index: string; toH3Index: string }>;
+  opponentMoves?: TacticalPlaybackMarchMove[];
   rangedCombatHexes?: string[];
   rangedCasualtyHexes?: string[];
   rangedRemovedUnits?: RemovedUnitSnapshot[];
