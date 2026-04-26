@@ -19,7 +19,7 @@ export type StrategicRangedTargetHexIndex = {
  * Lists enemy-occupied res1 hexes within strategic ranged distance of the attacker using `getRange` + H3 `gridDistance`.
  *
  * Purpose: Isolates strategic ranged target discovery from the larger possible-actions builder.
- * When to use: `buildPossibleUnitActionsMarkdown` when `tacticalBattle` is absent (strategic briefing path).
+ * When to use: `buildPossibleUnitActionsMarkdown` and strategic `collectAggregatedPossibleActionRows` ranged rows when `tacticalBattle` is absent (enemy-occupied res1 cells only).
  * Expected outcome: Same hex set as before extraction: every key of `indexed.enemyUnitsByHex` with finite `gridDistance` in `[0, getRange(unitType)]`.
  * Exceptions: `gridDistance` failures skip that enemy hex (same as prior try/catch loop).
  */

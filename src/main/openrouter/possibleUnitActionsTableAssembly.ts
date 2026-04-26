@@ -2,7 +2,7 @@
  * Table model, markdown assembly, and shared labels for "Possible unit actions" briefing output.
  *
  * Purpose: Keeps prompt table shaping and row aggregation separate from hex discovery / indexing in `possibleUnitActions.ts`.
- * When to use: Only from `buildPossibleUnitActionsMarkdown` after raw legal hex rows are collected.
+ * When to use: From `buildPossibleUnitActionsMarkdown` and `renderThisTurnOptionsTableMarkdown` after raw legal hex rows are collected.
  * Expected outcome: Stable markdown tables and row ordering; no game-state mutation.
  * Exceptions: None for these pure helpers.
  */
@@ -119,15 +119,6 @@ export interface PossibleActionTableRow {
    * Exceptions: None.
    */
   urbanHexCount: number;
-  /**
-   * When set, extra destination H3 cells folded into this briefing row with the same unit, action column, Notes text, and target-units column.
-   *
-   * Contract: Sorted with `compareHexIds`; omit when only `targetH3` applies. Only produced by `mergeThisTurnOptionsRowsForBriefing`.
-   * When to use: `renderThisTurnOptionsTableMarkdown` joins `targetH3` with these for the "Target Hexes" column.
-   * Expected outcome: Each index is distinct from `targetH3` and from each other.
-   * Exceptions: None.
-   */
-  coTargetH3Indexes?: string[];
 }
 
 /**
@@ -295,10 +286,10 @@ export function excludeUnitCurrentHex(unitH3: string, hexes: string[]): string[]
 }
 
 /**
- * Derives the Action column label for the Commander "this turn" options table (matches briefing markdown semantics).
+ * Derives the Action column label for the Commander **Best Options This Turn** table (matches briefing markdown semantics).
  *
- * Purpose: Single source for grouping keys and rendered action text so merge and table stay aligned.
- * When to use: `mergeThisTurnOptionsRowsForBriefing` and `renderThisTurnOptionsTableMarkdown` (via import).
+ * Purpose: Single source for rendered action text in the **Best Options This Turn** markdown table.
+ * When to use: `renderThisTurnOptionsTableMarkdown` (via import).
  * Expected outcome: One of `air strike`, `ranged`, `move/melee`, or the raw `actionTypes` string as fallback.
  * Exceptions: None.
  */
@@ -307,69 +298,6 @@ export function deriveThisTurnOptionsActionColumn(r: PossibleActionTableRow): st
   if (r.actionTypes.includes('ranged')) return 'ranged';
   if (r.actionTypes.includes('move') || r.actionTypes.includes('melee')) return 'move/melee';
   return r.actionTypes;
-}
-
-/**
- * Target-units / features column key used to decide when two rows describe the same opportunity across hexes.
- *
- * Purpose: Rows merge only when this string matches so we do not combine different enemy or infrastructure summaries.
- * When to use: `mergeThisTurnOptionsRowsForBriefing` grouping key only.
- * Expected outcome: Stable string from `enemySummary` and `featuresSummary`.
- * Exceptions: None.
- */
-function thisTurnOptionsTargetUnitsColumnKey(r: PossibleActionTableRow): string {
-  return `${r.enemySummary} / ${r.featuresSummary}`.trim();
-}
-
-/**
- * Merges briefing "this turn" rows that share unit, action, Notes (`actionTypes`), and target-units column into one row listing every target hex.
- *
- * Purpose: Cuts duplicate lines when the only difference is destination hex (same move/ranged/strike context).
- * When to use: Immediately before `selectTopRowsPerUnit` inside `renderThisTurnOptionsTableMarkdown`.
- * Expected outcome: One `PossibleActionTableRow` per merge group with optional `coTargetH3Indexes`; `distance` is the minimum among merged rows; bucket picks best `BUCKET_PRIORITY`.
- * Exceptions: None; assumes each group shares the same `unitType` (true for identical `unitId` in normal pipelines).
- */
-export function mergeThisTurnOptionsRowsForBriefing(rows: PossibleActionTableRow[]): PossibleActionTableRow[] {
-  const byKey = new Map<string, PossibleActionTableRow[]>();
-  for (const row of rows) {
-    const action = deriveThisTurnOptionsActionColumn(row);
-    const key = [row.unitId, action, row.actionTypes, thisTurnOptionsTargetUnitsColumnKey(row)].join('\x1e');
-    const list = byKey.get(key) ?? [];
-    list.push(row);
-    byKey.set(key, list);
-  }
-  const out: PossibleActionTableRow[] = [];
-  for (const list of byKey.values()) {
-    if (list.length === 1) {
-      out.push(list[0]!);
-      continue;
-    }
-    const sorted = [...list].sort((a, b) => {
-      if (a.distance !== b.distance) return a.distance - b.distance;
-      return compareHexIds(a.targetH3, b.targetH3);
-    });
-    let bucket = sorted[0]!.bucket;
-    let enemyUnitCount = sorted[0]!.enemyUnitCount;
-    let urbanHexCount = sorted[0]!.urbanHexCount;
-    for (const r of sorted) {
-      if (BUCKET_PRIORITY[r.bucket] < BUCKET_PRIORITY[bucket]) bucket = r.bucket;
-      enemyUnitCount = Math.max(enemyUnitCount, r.enemyUnitCount);
-      urbanHexCount = Math.max(urbanHexCount, r.urbanHexCount);
-    }
-    const primary = sorted[0]!;
-    const primaryBase: PossibleActionTableRow = { ...primary };
-    delete primaryBase.coTargetH3Indexes;
-    const restHexes = sorted.slice(1).map((row) => row.targetH3).sort(compareHexIds);
-    out.push({
-      ...primaryBase,
-      bucket,
-      enemyUnitCount,
-      urbanHexCount,
-      distance: Math.min(...sorted.map((row) => row.distance)),
-      coTargetH3Indexes: restHexes.length > 0 ? restHexes : undefined,
-    });
-  }
-  return out;
 }
 
 /**

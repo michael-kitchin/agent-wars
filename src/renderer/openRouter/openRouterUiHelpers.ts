@@ -51,7 +51,9 @@ export function setReadyButtonLabelAiWait(readyBtn: HTMLButtonElement, elapsedMs
 
  * Purpose: Supports maintainability by documenting why `updateReadyButtonState` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Expected outcome: Disables the control while the game is over, while precomputed AI orders are still loading, or
+ * while `readyRequestInFlight` is true for an in-progress Ready / tactical-commit pipeline; restores label/interval
+ * state for the AI-wait countdown when applicable.
  * Exceptions: None.
  */
 export function updateReadyButtonState(): void {
@@ -59,7 +61,7 @@ export function updateReadyButtonState(): void {
   if (!readyBtn) return;
   const gameOver = S.gameState?.gameOver ?? false;
   const waitingOnAi = isWaitingForPrecomputedAiOrders();
-  readyBtn.disabled = gameOver || waitingOnAi;
+  readyBtn.disabled = gameOver || waitingOnAi || S.readyRequestInFlight;
 
   if (waitingOnAi) {
     const now = Date.now();

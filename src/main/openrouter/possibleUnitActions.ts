@@ -419,6 +419,58 @@ function collectLegalFerryDestinationHexes(
   return [...out];
 }
 /**
+ * Defines the `filterGroundMoveHexesForThisTurnOptionsTable` function shape (function filterGroundMoveHexesForThisTurnOptionsTable(indexed: IndexedState, hexes: string[]): string[]).
+
+ * Purpose: Restricts **Best Options This Turn** move/melee rows to enemy-occupied hexes or uncontrolled res1 cells that still show urban, airport, or seaport infrastructure.
+ * When to use: Only from `collectAggregatedPossibleActionRows` when `forThisTurnOptionsTable` is true for non-air units (air ferry lists skip this filter).
+ * Expected outcome: Filtered subset of `hexes` in caller iteration order.
+ * Exceptions: None.
+ */
+function filterGroundMoveHexesForThisTurnOptionsTable(indexed: IndexedState, hexes: string[]): string[] {
+  return hexes.filter((h3) => {
+    if ((indexed.enemyUnitsByHex.get(h3)?.length ?? 0) > 0) return true;
+    const controller = indexed.controlByHex.get(h3) ?? null;
+    if (controller !== null) return false;
+    const inf = getInfra(indexed, h3);
+    return inf.urban > 0 || inf.airport > 0 || inf.seaport > 0;
+  });
+}
+
+/**
+ * Defines the `filterTacticalRangedHexesForThisTurnOptionsTable` function shape (function filterTacticalRangedHexesForThisTurnOptionsTable(battle: TacticalBattleSnapshot, attackerSubUnitId: string, hexes: string[], tacticalRangedRows: ReadonlyArray<{ h3Index: string; isUrban: boolean; isAirport: boolean; isSeaport: boolean; isRubble: boolean }>): string[]).
+
+ * Purpose: Drops transport-only res4 ranged targets from the Best Options This Turn table while keeping enemy-occupied cells and urban, airport, or seaport infrastructure tiles.
+ * When to use: Only from `collectAggregatedPossibleActionRows` after `collectTacticalLegalRangedTargetRes4Hexes` when `forThisTurnOptionsTable` and `tacticalBattle` are set.
+ * Expected outcome: Subset of `hexes`; unknown `attackerSubUnitId` returns `hexes` unchanged.
+ * Exceptions: None.
+ */
+function filterTacticalRangedHexesForThisTurnOptionsTable(
+  battle: TacticalBattleSnapshot,
+  attackerSubUnitId: string,
+  hexes: string[],
+  tacticalRangedRows: ReadonlyArray<{
+    h3Index: string;
+    isUrban: boolean;
+    isAirport: boolean;
+    isSeaport: boolean;
+    isRubble: boolean;
+  }>
+): string[] {
+  const self = battle.subUnits.find((s) => s.id === attackerSubUnitId);
+  if (!self) return hexes;
+  const rowByH3 = new Map(tacticalRangedRows.map((r) => [r.h3Index, r] as const));
+  return hexes.filter((h3) => {
+    const enemyHere = battle.subUnits.some((s) => s.h3Index === h3 && s.player !== self.player);
+    if (enemyHere) return true;
+    if (battle.res4IsUrbanByH3?.[h3]) return true;
+    if (battle.res4IsSeaportByH3?.[h3]) return true;
+    const row = rowByH3.get(h3);
+    if (row && !row.isRubble && (row.isUrban || row.isAirport || row.isSeaport)) return true;
+    return false;
+  });
+}
+
+/**
  * Defines the `collectStrikeHexesForAirUnit` function shape (function collectStrikeHexesForAirUnit(airH3: string, indexed: IndexedState): string[]).
 
  * Purpose: Supports maintainability by documenting why `collectStrikeHexesForAirUnit` exists.
@@ -426,7 +478,6 @@ function collectLegalFerryDestinationHexes(
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-
 function collectStrikeHexesForAirUnit(airH3: string, indexed: IndexedState): string[] {
   try {
     const disk = gridDisk(airH3, AIR_STRIKE_RANGE_HEXES);
@@ -441,11 +492,11 @@ function collectStrikeHexesForAirUnit(airH3: string, indexed: IndexedState): str
 }
 
 /**
- * Defines the `buildPossibleUnitActionsMarkdown` function shape (export function buildPossibleUnitActionsMarkdown(args: { state: GameStateSnapshot; latLngByH3: Map<string, [number, number]>; formatLatLng: (ll: [numbe).
+ * Defines the `collectAggregatedPossibleActionRows` function shape (export function collectAggregatedPossibleActionRows(args: { state: GameStateSnapshot; latLngByH3: Map<string, [number, number]>; formatLatLng: (ll: [number, number]) => string; tacticalBattle?: TacticalBattleSnapshot; forThisTurnOptionsTable?: boolean }): PossibleActionTableRow[]).
 
- * Purpose: Supports maintainability by documenting why `buildPossibleUnitActionsMarkdown` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Aggregates opponent legal moves, air strikes, and ranged targets into briefing table rows, optionally tightening targets for the Best Options This Turn prompt table.
+ * When to use: `buildPossibleUnitActionsMarkdown` and operational map sections that render the Best Options This Turn table.
+ * Expected outcome: Deduplicated `PossibleActionTableRow` list after `aggregateRows`, or an empty array when no raw rows.
  * Exceptions: None.
  */
 
@@ -454,24 +505,46 @@ export function collectAggregatedPossibleActionRows(args: {
   latLngByH3: Map<string, [number, number]>;
   formatLatLng: (ll: [number, number]) => string;
   tacticalBattle?: TacticalBattleSnapshot;
+  /**
+   * Specifies the contract for the `forThisTurnOptionsTable` member (forThisTurnOptionsTable?: boolean).
+
+   * Contract: When true, narrows move/ranged candidate hexes for the operational-map Best Options This Turn table; when false or omitted, preserves legacy full-table row generation.
+   * When to use: Set only from `buildStrategicOperationalMapSectionMarkdown` / `buildTacticalOperationalMapSectionMarkdown`.
+   * Expected outcome: Ground move/melee filter for non-air units; strategic ranged lists only enemy-occupied hexes in range (same as full markdown); tactical ranged excludes transport-only cells; air ferry lists unchanged.
+   * Exceptions: None.
+   */
+  forThisTurnOptionsTable?: boolean;
 }): PossibleActionTableRow[] {
+  const forThisTurn = args.forThisTurnOptionsTable === true;
   logDebug('possibleUnitActions collectAggregatedPossibleActionRows', {
     turnNumber: args.state.turnNumber,
     tactical: Boolean(args.tacticalBattle),
+    forThisTurnOptionsTable: forThisTurn,
   });
   const { state, latLngByH3, tacticalBattle } = args;
   const indexed = buildIndexedState(state);
   const homeland = enemyHomelandHexSet(state);
   const opponentUnits = state.units.filter((u) => u.player === FRIENDLY_PLAYER).sort((a, b) => a.id.localeCompare(b.id));
   const rawRows: RawPossibleActionRow[] = [];
+  const thisTurnFilterStats = forThisTurn
+    ? { moveIn: 0, moveOut: 0, rangedIn: 0, rangedOut: 0 }
+    : null;
 
   for (const unit of opponentUnits) {
-    const moveHexes = excludeUnitCurrentHex(
+    let moveHexes = excludeUnitCurrentHex(
       unit.h3Index,
       unit.unitType === 'air'
         ? collectLegalFerryDestinationHexes(unit, indexed)
         : getValidDestinations(unit, state)
     );
+    if (forThisTurn && unit.unitType !== 'air') {
+      const before = moveHexes.length;
+      moveHexes = filterGroundMoveHexesForThisTurnOptionsTable(indexed, moveHexes);
+      if (thisTurnFilterStats) {
+        thisTurnFilterStats.moveIn += before;
+        thisTurnFilterStats.moveOut += moveHexes.length;
+      }
+    }
     if (moveHexes.length > 0) {
       appendRowsForLegalHexes({
         rows: rawRows,
@@ -530,12 +603,25 @@ export function collectAggregatedPossibleActionRows(args: {
           tacticalRangedRows = [];
         }
       }
-      const rangedHexes = excludeUnitCurrentHex(
+      let rangedHexes = excludeUnitCurrentHex(
         unit.h3Index,
         tacticalBattle
           ? collectTacticalLegalRangedTargetRes4Hexes(tacticalBattle, unit.id, tacticalRangedRows)
           : collectRangedTargetHexes(unit.h3Index, unit.unitType, indexed)
       );
+      if (forThisTurn && tacticalBattle) {
+        const before = rangedHexes.length;
+        rangedHexes = filterTacticalRangedHexesForThisTurnOptionsTable(
+          tacticalBattle,
+          unit.id,
+          rangedHexes,
+          tacticalRangedRows ?? []
+        );
+        if (thisTurnFilterStats) {
+          thisTurnFilterStats.rangedIn += before;
+          thisTurnFilterStats.rangedOut += rangedHexes.length;
+        }
+      }
       if (rangedHexes.length > 0) {
         appendRowsForLegalHexes({
           rows: rawRows,
@@ -553,10 +639,27 @@ export function collectAggregatedPossibleActionRows(args: {
     }
   }
 
+  if (forThisTurn && thisTurnFilterStats) {
+    logDebug('possibleUnitActions collectAggregatedPossibleActionRows thisTurnOptionsFilterTotals', {
+      groundMoveHexSlotsOffered: thisTurnFilterStats.moveIn,
+      groundMoveHexSlotsKept: thisTurnFilterStats.moveOut,
+      rangedHexSlotsOffered: thisTurnFilterStats.rangedIn,
+      rangedHexSlotsKept: thisTurnFilterStats.rangedOut,
+    });
+  }
+
   if (rawRows.length === 0) return [];
   return aggregateRows(rawRows);
 }
 
+/**
+ * Defines the `buildPossibleUnitActionsMarkdown` function shape (export function buildPossibleUnitActionsMarkdown(args: { state: GameStateSnapshot; latLngByH3: Map<string, [number, number]>; formatLatLng: (ll: [number, number]) => string; tacticalBattle?: TacticalBattleSnapshot }): string).
+
+ * Purpose: Emits bucketed markdown tables of possible opponent unit actions for legacy Commander briefing sections.
+ * When to use: Callers that still embed the multi-section possible-actions block (not the compact Best Options This Turn table alone).
+ * Expected outcome: Markdown string with `##` subsections per homeland/nearest/other buckets, or an empty string when no rows.
+ * Exceptions: None.
+ */
 export function buildPossibleUnitActionsMarkdown(args: {
   state: GameStateSnapshot;
   latLngByH3: Map<string, [number, number]>;

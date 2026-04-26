@@ -1,5 +1,5 @@
 /**
- * Markdown tables that accompany the operational ASCII map (unit roster, this-turn options, footnotes).
+ * Markdown tables that accompany the operational ASCII map (unit roster, Best Options This Turn, footnotes).
  *
  * Purpose: Phase 4 compact briefing tables using stable hex codes instead of lat/lng.
  * When to use: After possible-actions row collection and hex registry initialization.
@@ -13,14 +13,27 @@ import type { UnitAssessmentResult } from '../../precomputation';
 import { buildPromptTableLines } from '../../promptTableUtils';
 import { logDebug, logTrace } from '../../logger';
 import type { PossibleActionTableRow } from '../../openrouter/possibleUnitActionsTableAssembly';
-import {
-  deriveThisTurnOptionsActionColumn,
-  mergeThisTurnOptionsRowsForBriefing,
-  selectTopRowsPerUnit,
-} from '../../openrouter/possibleUnitActionsTableAssembly';
-import { compareHexIds } from '../../openrouter/possibleUnitActionsPartition';
+import { deriveThisTurnOptionsActionColumn, selectTopRowsPerUnit } from '../../openrouter/possibleUnitActionsTableAssembly';
 import type { CoordinateContext } from './coordinateContext';
 import { h3ToCode } from './hex-code-translator';
+
+/**
+ * Defines the `infrastructureCellForThisTurnOptionsRow` function shape (function infrastructureCellForThisTurnOptionsRow(r: PossibleActionTableRow): string).
+
+ * Purpose: Builds the **Target Infrastructure** column for the **Best Options This Turn** table from `featuresSummary`, stripping air-strike-only `; strike: …` suffixes so strike kinds stay out of that column.
+ * When to use: Only from `renderThisTurnOptionsTableMarkdown` per body row.
+ * Expected outcome: Pipe-safe text, or `—` when nothing remains after trim/strip.
+ * Exceptions: None.
+ */
+function infrastructureCellForThisTurnOptionsRow(r: PossibleActionTableRow): string {
+  let s = r.featuresSummary.replace(/\|/g, ' ');
+  if (deriveThisTurnOptionsActionColumn(r) === 'air strike') {
+    const cut = s.indexOf('; strike:');
+    if (cut >= 0) s = s.slice(0, cut);
+  }
+  s = s.trim();
+  return s.length > 0 ? s : '—';
+}
 
 /**
  * Renders the unit roster table (one row per AI unit with nearest enemy summary).
@@ -63,11 +76,11 @@ export function renderUnitRosterTableMarkdown(
 }
 
 /**
- * Renders the consolidated "this turn" options table from aggregated possible-action rows.
+ * Renders the consolidated **Best Options This Turn** table from aggregated possible-action rows.
  *
  * Purpose: Single high-signal table replacing multi-bucket possible-actions markdown.
  * When to use: After `collectAggregatedPossibleActionRows`.
- * Expected outcome: At most five rows per unit after the existing priority comparator.
+ * Expected outcome: Columns `Unit ID`, `Action`, `Target Hexes`, `Target Units` (enemy summary only), `Target Infrastructure` (hex features; air-strike rows omit `; strike: …`); at most five rows per unit; one target hex per row.
  * Exceptions: Propagates `h3ToCode` failures for unknown tactical/strategic cells.
  */
 export function renderThisTurnOptionsTableMarkdown(
@@ -77,16 +90,18 @@ export function renderThisTurnOptionsTableMarkdown(
 ): string {
   logDebug('briefing-tables renderThisTurnOptionsTableMarkdown', { rowCount: rows.length, mode: context.mode });
   if (rows.length === 0) return '';
-  const merged = mergeThisTurnOptionsRowsForBriefing(rows);
-  const capped = selectTopRowsPerUnit(merged, latLngByH3);
+  const capped = selectTopRowsPerUnit(rows, latLngByH3);
   const body = capped.map((r) => {
-    const allH3 = [r.targetH3, ...(r.coTargetH3Indexes ?? [])].sort(compareHexIds);
-    const hex = allH3.map((h) => h3ToCode(h, context)).join(', ');
+    const hex = h3ToCode(r.targetH3, context);
     const action = deriveThisTurnOptionsActionColumn(r);
-    const target = `${r.enemySummary} / ${r.featuresSummary}`.trim();
-    return [r.unitId, action, hex, target.replace(/\|/g, ' '), r.actionTypes];
+    const targetUnits = r.enemySummary.replace(/\|/g, ' ');
+    const infrastructure = infrastructureCellForThisTurnOptionsRow(r);
+    return [r.unitId, action, hex, targetUnits, infrastructure];
   });
-  const lines = buildPromptTableLines(['Unit ID', 'Action', 'Target Hexes', 'Target Units', 'Notes'], body);
+  const lines = buildPromptTableLines(
+    ['Unit ID', 'Action', 'Target Hexes', 'Target Units', 'Target Infrastructure'],
+    body
+  );
   return `${lines.join('\n')}\n`;
 }
 

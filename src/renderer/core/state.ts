@@ -924,12 +924,13 @@ precomputedToolInvocationCounts: null as Record<string, number> | null,
    */
 backgroundRequestInFlight: false,
     /**
-   * Documents the object literal property `readyRequestInFlight` (readyRequestInFlight: false).
+   * True from the first line of `handleReadyButtonClick` until its `finally` block (strategic Ready, tactical commit,
+   * submit-orders path, or early exit after toasts/errors) so duplicate clicks are ignored and `#ready-btn` stays disabled.
 
-   * Purpose: Supports maintainability by documenting why `readyRequestInFlight` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * Purpose: Single latch for the full async Ready pipeline including post-`ready` resolution playback setup.
+   * When to use: Written only in `readyHandler`; read by `updateReadyButtonState` and the handler’s re-entry guard.
+   * Expected outcome: At most one Ready completion run at a time; button reflects disabled state while true.
+   * Exceptions: Cleared in `finally` even when the handler returns early (e.g. AI planning wait toast).
    */
 readyRequestInFlight: false,
     /**

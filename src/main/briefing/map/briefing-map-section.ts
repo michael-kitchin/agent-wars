@@ -1,7 +1,7 @@
 /**
  * Assembles the full "Operational Map" markdown section for Commander briefings.
  *
- * Purpose: Phase 6 integration point: map + displaced footnote + this-turn options + unit roster.
+ * Purpose: Phase 6 integration point: map + displaced footnote + Best Options This Turn table + unit roster.
  * When to use: Replace the legacy `# Possible Unit Actions` block for strategic precomputed briefings.
  * Expected outcome: Self-contained markdown with legend, ASCII map, and compact tables using hex codes.
  * Exceptions: Returns a short fallback message if no friendly/enemy units exist (strategic map not rendered in that case).
@@ -75,6 +75,7 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
     state: args.state,
     latLngByH3: args.latLngByH3,
     formatLatLng: () => '',
+    forThisTurnOptionsTable: true,
   });
   const optionsMd = renderThisTurnOptionsTableMarkdown(aggRows, args.latLngByH3, context);
   const rosterMd = renderUnitRosterTableMarkdown(args.precomputed.unitAssessments, context);
@@ -90,7 +91,7 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
   return (
     `# Operational Map\n\n${legend}\`\`\`\n${mapString}\n\`\`\`\n\n` +
     `${displacedLine}\n` +
-    `### This-Turn Options\n\n${optionsMd}\n` +
+    `### Best Options This Turn\n\n${optionsMd}\n` +
     `### Unit Roster\n\n${rosterMd}\n`
   );
 }
@@ -186,6 +187,7 @@ export function buildTacticalOperationalMapSectionMarkdown(args: {
     latLngByH3: args.latLngByH3,
     formatLatLng: () => '',
     tacticalBattle: args.tacticalBattle,
+    forThisTurnOptionsTable: true,
   });
   const optionsMd = renderThisTurnOptionsTableMarkdown(aggRows, args.latLngByH3, context);
   const rosterMd = renderTacticalOpponentRosterMarkdown(args.state, context);
@@ -200,7 +202,7 @@ export function buildTacticalOperationalMapSectionMarkdown(args: {
   return (
     `${legend}\`\`\`\n${mapString}\n\`\`\`\n\n` +
     `${displacedLine}\n` +
-    `### This-Turn Options\n\n${optionsMd}\n` +
+    `### Best Options This Turn\n\n${optionsMd}\n` +
     `### Unit Roster\n\n${rosterMd}\n`
   );
 }

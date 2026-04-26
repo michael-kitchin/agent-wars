@@ -9,6 +9,14 @@ import { validateAirStrikeOrder } from './airValidation';
 import { isEmbarkedLandUnitOnWater } from './sealift';
 
 /**
+ * Explains why this constant exists: upper bound on how many res4 urban cells one successful **strategic** urban infrastructure air strike may turn to rubble **per air unit order** (same cap regardless of how many sub-units the row represents).
+ * When to use: Only the non-tactical urban branch of `applyInfrastructureDestructionEffects`; tactical urban strikes that pin a res4 cell stay at one cell.
+ * What to expect: Actual count is `Math.min(this value, current res1 urban_hex_count)` and may be lower if fewer eligible res4 override rows exist.
+ * Exceptions: None.
+ */
+const MAX_URBAN_RES4_CELLS_DESTROYED_PER_STRATEGIC_URBAN_AIR_STRIKE = 9;
+
+/**
  * Defines the `pruneBuildQueueForInfrastructureState` function shape (function pruneBuildQueueForInfrastructureState(h3Index: string): void).
 
  * Purpose: Supports maintainability by documenting why `pruneBuildQueueForInfrastructureState` exists.
@@ -96,7 +104,7 @@ export function destroyBasedAirUnitsAtHex(
 /**
  * Documents optional behavior flags for `applyInfrastructureDestructionEffects` as a named contract surface.
  *
- * Purpose: Lets tactical urban strikes convert a single targeted res4 cell to rubble while strategic strikes keep random multi-cell destruction under the parent res1.
+ * Purpose: Lets tactical urban strikes convert a single targeted res4 cell to rubble while strategic strikes keep random multi-cell destruction under the parent res1 (capped per air unit by `MAX_URBAN_RES4_CELLS_DESTROYED_PER_STRATEGIC_URBAN_AIR_STRIKE`).
  * When to use: Pass from tactical projection when resolving urban infrastructure strikes at res4 resolution; omit for strategic resolution and non-urban strikes.
  * Expected outcome: When `tacticalUrbanStrikeTargetRes4H3` is set with `targetType === 'urban'`, at most that res4 urban override becomes rubble if it belongs to `h3Index` and is eligible.
  * Exceptions: None.
@@ -161,7 +169,7 @@ export function applyInfrastructureDestructionEffects(
       pruneBuildQueueForInfrastructureState(h3Index);
       return result;
     }
-    const destroyCount = Math.min(3, current.urbanHexCount);
+    const destroyCount = Math.min(MAX_URBAN_RES4_CELLS_DESTROYED_PER_STRATEGIC_URBAN_AIR_STRIKE, current.urbanHexCount);
     if (destroyCount <= 0) return result;
     result.changedRubbleCount = replaceRandomRes4FeaturesWithRubble(h3Index, 'urban', destroyCount, next);
     if (result.changedRubbleCount > 0) {

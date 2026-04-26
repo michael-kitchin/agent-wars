@@ -171,13 +171,13 @@ export const TERRAIN_TOOLTIP_DELAY_MS = 750;
 /**
  * Wall-clock visibility for the transient “Blocked: …” and “Slower: …” order-preview tooltips that follow the pointer.
  *
- * Purpose: Shorter than map toasts so hints stay lightweight; equals the normal hex tooltip dwell (`TERRAIN_TOOLTIP_DELAY_MS`)
- * so blocked and slower transients stay visible twice as long as the prior half-dwell default.
+ * Purpose: Shorter than map toasts so hints stay lightweight; set to **twice** the hex tooltip dwell delay so blocking
+ * hints remain readable while the pointer settles without matching the full strategic terrain dwell.
  * When to use: `orderBlockHexTooltip` and `orderSlowerHexTooltip` auto-hide timers after each reveal / pointer refresh.
  * Expected outcome: Tooltip dismisses after this interval unless refreshed by a new hover evaluation.
  * Exceptions: None.
  */
-export const ORDER_BLOCK_HEX_TOOLTIP_TTL_MS = TERRAIN_TOOLTIP_DELAY_MS;
+export const ORDER_BLOCK_HEX_TOOLTIP_TTL_MS = 2 * TERRAIN_TOOLTIP_DELAY_MS;
 
 /**
  * Documents the module-scope binding `WORLD_H3_RESOLUTION` (WORLD_H3_RESOLUTION).

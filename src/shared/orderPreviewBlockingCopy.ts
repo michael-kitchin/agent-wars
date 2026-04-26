@@ -84,7 +84,9 @@ export function blockingHoverMessageFromAirStrikeReason(reason: string): string 
  * Purpose: March preview strings mix movement rules, terrain vocabulary, and generic unreachable messages; this
  * collapses them into the two buckets the UI shows (`Blocked: Range` vs `Blocked: <Terrain>`).
  * When to use: Renderer hover while movement planning shows `showInvalidMarker` on the grouped envelope or per-unit preview.
- * Expected outcome: Prefer explicit out-of-range / ferry-range copy; otherwise use `hoveredTerrainKind` for generic blocks.
+ * Expected outcome: Prefer explicit out-of-range / ferry-range copy; list every terrain named by the rule when the
+ * failure text encodes multiple domains (water+arctic hop, land+coastal+wetlands eligibility, mixed-stack coastal-only);
+ * otherwise use `hoveredTerrainKind` for generic “no route” / footprint failures.
  * Exceptions: Returns `null` when `invalidReason` is empty or clearly non-terrain (e.g. database errors).
  */
 export function blockingHoverMessageFromMarchInvalidReason(
@@ -98,6 +100,14 @@ export function blockingHoverMessageFromMarchInvalidReason(
   }
   if (low.includes('out of range') || low.includes('out of ferry range')) return 'Blocked: Range';
   if (low.includes('line of sight blocked') || low.includes('blocked by mountains')) return 'Blocked: Mountain';
+  if (low.includes('land, coastal, or wetlands')) return 'Blocked: Coastal, Land, Wetlands';
+  if (low.includes('mixed land/naval')) return 'Blocked: Coastal';
+  if (
+    low.includes('cannot move directly from one water or arctic') ||
+    low.includes('one water or arctic hex to another')
+  ) {
+    return 'Blocked: Arctic, Water';
+  }
   if (low.includes('arctic')) return 'Blocked: Arctic';
   if (low.includes('cannot move directly from one water') || (low.includes('water') && low.includes('cannot')))
     return 'Blocked: Water';
@@ -107,8 +117,7 @@ export function blockingHoverMessageFromMarchInvalidReason(
       low.includes('no valid tactical route') ||
       low.includes('unreachable') ||
       low.includes('invalid for this unit type') ||
-      low.includes('outside tactical footprint') ||
-      low.includes('mixed land/naval')
+      low.includes('outside tactical footprint')
     ) {
       return `Blocked: ${titleCaseTerrainKindToken(hoveredTerrainKind)}`;
     }

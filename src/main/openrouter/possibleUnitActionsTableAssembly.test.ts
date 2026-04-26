@@ -1,25 +1,21 @@
 /**
- * Unit tests for this-turn options table assembly helpers (`mergeThisTurnOptionsRowsForBriefing`, action column derivation).
+ * Unit tests for Best Options This Turn table assembly helpers (`deriveThisTurnOptionsActionColumn`, row priority inputs).
  *
- * Purpose: Locks merge-by-target-hex behavior without full briefing or map registries.
+ * Purpose: Locks action-column labels and documents that Best Options This Turn tables no longer merge multiple target hexes into one row.
  * When to use: `npm test` after `build:main`.
- * Expected outcome: Rows with identical unit, action, Notes, and target-units text collapse to one row with `coTargetH3Indexes`.
- * Exceptions: Assertion failures indicate regression in merge keys or output shape.
+ * Expected outcome: `deriveThisTurnOptionsActionColumn` returns stable labels; merged multi-hex rows are not produced by this module.
+ * Exceptions: Assertion failures indicate regression in action column derivation.
  */
 
 import assert from 'node:assert/strict';
-import {
-  deriveThisTurnOptionsActionColumn,
-  mergeThisTurnOptionsRowsForBriefing,
-  type PossibleActionTableRow,
-} from './possibleUnitActionsTableAssembly';
+import { deriveThisTurnOptionsActionColumn, selectTopRowsPerUnit, type PossibleActionTableRow } from './possibleUnitActionsTableAssembly';
 
 /**
  * Documents the function binding `fixtureRow` (fixtureRow).
  *
- * Purpose: Builds a minimal `PossibleActionTableRow` with overridable fields for merge tests.
+ * Purpose: Builds a minimal `PossibleActionTableRow` with overridable fields for assembly tests.
  * When to use: Only inside this test module.
- * Expected outcome: Valid row with defaults matching the user’s multi-hex merge example shape.
+ * Expected outcome: Valid row with defaults for priority / action column checks.
  * Exceptions: None.
  */
 function fixtureRow(overrides: Partial<PossibleActionTableRow>): PossibleActionTableRow {
@@ -39,14 +35,14 @@ function fixtureRow(overrides: Partial<PossibleActionTableRow>): PossibleActionT
 }
 
 /**
- * Documents the function binding `testMergeCombinesMultipleTargetHexes` (testMergeCombinesMultipleTargetHexes).
+ * Documents the function binding `testSelectTopRowsPerUnitKeepsDistinctHexRows` (testSelectTopRowsPerUnitKeepsDistinctHexRows).
  *
- * Purpose: Ensures four identical-context rows become one row with three co-target indexes.
- * When to use: Regression for briefing "Target Hexes" comma grouping.
- * Expected outcome: Single merged row; `coTargetH3Indexes` length 3; primary keeps smallest distance then lexicographic H3.
+ * Purpose: Ensures four same-context rows stay four rows after per-unit capping (no merge step in this module).
+ * When to use: Regression guard after removing `mergeThisTurnOptionsRowsForBriefing`.
+ * Expected outcome: `selectTopRowsPerUnit` returns four rows for one unit when under the per-unit cap.
  * Exceptions: None.
  */
-function testMergeCombinesMultipleTargetHexes(): void {
+function testSelectTopRowsPerUnitKeepsDistinctHexRows(): void {
   const h0 = '8f283082dcb519f0';
   const h1 = '8f283082dcb519f1';
   const h2 = '8f283082dcb519f2';
@@ -57,35 +53,18 @@ function testMergeCombinesMultipleTargetHexes(): void {
     fixtureRow({ targetH3: h2, distance: 2 }),
     fixtureRow({ targetH3: h3, distance: 2 }),
   ];
-  const merged = mergeThisTurnOptionsRowsForBriefing(rows);
-  assert.strictEqual(merged.length, 1);
-  const m = merged[0]!;
-  assert.strictEqual(m.targetH3, h0);
-  assert.deepStrictEqual(m.coTargetH3Indexes, [h1, h2, h3]);
-}
-
-/**
- * Documents the function binding `testMergeDoesNotCombineDifferentEnemySummary` (testMergeDoesNotCombineDifferentEnemySummary).
- *
- * Purpose: Different target-units column text must stay separate rows.
- * When to use: Same merge helper as `testMergeCombinesMultipleTargetHexes`.
- * Expected outcome: Two output rows.
- * Exceptions: None.
- */
-function testMergeDoesNotCombineDifferentEnemySummary(): void {
-  const rows: PossibleActionTableRow[] = [
-    fixtureRow({ targetH3: '8f283082dcb519a0', enemySummary: 'H1' }),
-    fixtureRow({ targetH3: '8f283082dcb519a1', enemySummary: 'H2' }),
-  ];
-  const merged = mergeThisTurnOptionsRowsForBriefing(rows);
-  assert.strictEqual(merged.length, 2);
+  const latLngByH3 = new Map<string, [number, number]>();
+  const capped = selectTopRowsPerUnit(rows, latLngByH3);
+  assert.strictEqual(capped.length, 4);
+  const hexes = new Set(capped.map((r) => r.targetH3));
+  assert.strictEqual(hexes.size, 4);
 }
 
 /**
  * Documents the function binding `testDeriveActionColumnMoveMelee` (testDeriveActionColumnMoveMelee).
  *
  * Purpose: Smoke test for exported action label helper.
- * When to use: Same module as merge tests.
+ * When to use: Same module as priority tests.
  * Expected outcome: `move/melee` for standard move row.
  * Exceptions: None.
  */
@@ -102,8 +81,7 @@ function testDeriveActionColumnMoveMelee(): void {
  * Exceptions: Propagates assertion errors.
  */
 function main(): void {
-  testMergeCombinesMultipleTargetHexes();
-  testMergeDoesNotCombineDifferentEnemySummary();
+  testSelectTopRowsPerUnitKeepsDistinctHexRows();
   testDeriveActionColumnMoveMelee();
   console.log('possibleUnitActionsTableAssembly tests passed');
 }

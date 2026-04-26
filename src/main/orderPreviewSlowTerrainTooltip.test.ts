@@ -115,6 +115,60 @@ test('collectStrategicMarchSlowTerrainLabels unions multiple slowing hex kinds a
   assert.deepEqual(labels, ['Urban', 'Forest']);
 });
 
+test('collectStrategicMarchSlowTerrainLabels includes coastal when armor pays 2 MP to enter', () => {
+  const path = ['a', 'b'];
+  const kind = new Map<string, string>([
+    ['a', 'plains'],
+    ['b', 'coastal'],
+  ]);
+  const terrain = new Map<string, string>([
+    ['a', 'land'],
+    ['b', 'land'],
+  ]);
+  const labels = collectStrategicMarchSlowTerrainLabels('armor', path, kind, terrain);
+  assert.deepEqual(labels, ['Coastal']);
+  assert.deepEqual(collectStrategicMarchSlowTerrainLabels('infantry', path, kind, terrain), []);
+});
+
+test('collectTacticalMarchTerrainImpact lists coastal for armor when path enters a coastal res4', () => {
+  const a = tacticalRes4Cell(59, 69);
+  const b = firstRingCellDistinctFrom(a);
+  const impact = collectTacticalMarchTerrainImpact({
+    battle: {
+      battleId: 'tb-coastal-armor',
+      enclosingRes1H3Index: '8f283082dcb519f',
+      res4ChildH3Indexes: [a, b],
+      strategicTurnNumber: 1,
+      tacticalTurnNumber: 1,
+      strategicHexTerrain: 'land',
+      strategicHexTerrainKind: 'plains',
+      res4TerrainKindByH3: { [a]: 'plains', [b]: 'coastal' },
+      subUnits: [
+        {
+          id: 'u1',
+          parentUnitId: 'p1',
+          player: 'human',
+          unitType: 'armor',
+          h3Index: a,
+          displayName: 'A',
+        },
+      ],
+    },
+    subUnit: {
+      id: 'u1',
+      parentUnitId: 'p1',
+      player: 'human',
+      unitType: 'armor',
+      h3Index: a,
+      displayName: 'A',
+    },
+    moveType: 'armor',
+    pathH3: [a, b],
+  });
+  assert.deepEqual(impact.slower, ['Coastal']);
+  assert.equal(impact.roadRail, false);
+});
+
 test('pickStrategicMarchSlowTerrainDisplayTitle returns first path-order label when multiple apply', () => {
   const path = ['a', 'b', 'c'];
   const kind = new Map<string, string>([

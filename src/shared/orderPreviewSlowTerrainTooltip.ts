@@ -35,8 +35,11 @@ const SLOW_TERRAIN_LABEL_SORT_PRIORITY: Readonly<Record<string, number>> = {
   Urban: 0,
   Rubble: 1,
   Forest: 2,
-  Mountain: 3,
-  Wetlands: 4,
+  Coastal: 3,
+  Mountain: 4,
+  Wetlands: 5,
+  Desert: 6,
+  Arctic: 7,
 };
 
 /**
@@ -135,7 +138,8 @@ export function formatSlowerHoverTooltipMessage(displayTerrainTitle: string): st
  *
  * Purpose: Normalizes internal buckets (`forests`, `mountains`, …) to user-facing words like `Forest`, `Mountain`.
  * When to use: After classifying a strategic or tactical cell into a slowing bucket.
- * Expected outcome: Single English word in title case; `null` when the bucket should not surface a slow hint.
+ * Expected outcome: Single English word or short title-case label; `null` for buckets that never throttle movement
+ * (`plains`, `water`) under §12.4.
  * Exceptions: None.
  */
 export function displayTitleForSlowTerrainBucket(bucket: TacticalMovementCategory | 'urban' | 'rubble'): string | null {
@@ -146,10 +150,19 @@ export function displayTitleForSlowTerrainBucket(bucket: TacticalMovementCategor
       return 'Mountain';
     case 'wetlands':
       return 'Wetlands';
+    case 'coastal':
+      return 'Coastal';
+    case 'desert':
+      return 'Desert';
+    case 'arctic':
+      return 'Arctic';
     case 'urban':
       return 'Urban';
     case 'rubble':
       return 'Rubble';
+    case 'plains':
+    case 'water':
+      return null;
     default:
       return null;
   }

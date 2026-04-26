@@ -14916,7 +14916,7 @@
   var AI_ORDER_LINE_COLOR = "#7b4a2e";
   var TOOLTIP_OFFSET_PX = 12;
   var TERRAIN_TOOLTIP_DELAY_MS = 750;
-  var ORDER_BLOCK_HEX_TOOLTIP_TTL_MS = TERRAIN_TOOLTIP_DELAY_MS;
+  var ORDER_BLOCK_HEX_TOOLTIP_TTL_MS = 2 * TERRAIN_TOOLTIP_DELAY_MS;
   var WORLD_H3_RESOLUTION2 = 1;
   var DETAIL_H3_RESOLUTION = 4;
   var RES4_SHOW_THRESHOLD_VIEW_FRACTION = 0.8;
@@ -15645,12 +15645,13 @@
        */
     backgroundRequestInFlight: false,
     /**
-       * Documents the object literal property `readyRequestInFlight` (readyRequestInFlight: false).
+       * True from the first line of `handleReadyButtonClick` until its `finally` block (strategic Ready, tactical commit,
+       * submit-orders path, or early exit after toasts/errors) so duplicate clicks are ignored and `#ready-btn` stays disabled.
     
-       * Purpose: Supports maintainability by documenting why `readyRequestInFlight` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
+       * Purpose: Single latch for the full async Ready pipeline including post-`ready` resolution playback setup.
+       * When to use: Written only in `readyHandler`; read by `updateReadyButtonState` and the handler’s re-entry guard.
+       * Expected outcome: At most one Ready completion run at a time; button reflects disabled state while true.
+       * Exceptions: Cleared in `finally` even when the handler returns early (e.g. AI planning wait toast).
        */
     readyRequestInFlight: false,
     /**
@@ -15741,7 +15742,7 @@
     if (!readyBtn) return;
     const gameOver = rendererSharedState.gameState?.gameOver ?? false;
     const waitingOnAi = isWaitingForPrecomputedAiOrders();
-    readyBtn.disabled = gameOver || waitingOnAi;
+    readyBtn.disabled = gameOver || waitingOnAi || rendererSharedState.readyRequestInFlight;
     if (waitingOnAi) {
       const now = Date.now();
       if (rendererSharedState.readyBtnAiWaitStartTime === null) {
@@ -17419,8 +17420,11 @@
     Urban: 0,
     Rubble: 1,
     Forest: 2,
-    Mountain: 3,
-    Wetlands: 4
+    Coastal: 3,
+    Mountain: 4,
+    Wetlands: 5,
+    Desert: 6,
+    Arctic: 7
   };
   function escapeHtmlForOrderPreviewTooltip(text) {
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -17452,10 +17456,19 @@
         return "Mountain";
       case "wetlands":
         return "Wetlands";
+      case "coastal":
+        return "Coastal";
+      case "desert":
+        return "Desert";
+      case "arctic":
+        return "Arctic";
       case "urban":
         return "Urban";
       case "rubble":
         return "Rubble";
+      case "plains":
+      case "water":
+        return null;
       default:
         return null;
     }
@@ -20740,12 +20753,17 @@
     }
     if (low.includes("out of range") || low.includes("out of ferry range")) return "Blocked: Range";
     if (low.includes("line of sight blocked") || low.includes("blocked by mountains")) return "Blocked: Mountain";
+    if (low.includes("land, coastal, or wetlands")) return "Blocked: Coastal, Land, Wetlands";
+    if (low.includes("mixed land/naval")) return "Blocked: Coastal";
+    if (low.includes("cannot move directly from one water or arctic") || low.includes("one water or arctic hex to another")) {
+      return "Blocked: Arctic, Water";
+    }
     if (low.includes("arctic")) return "Blocked: Arctic";
     if (low.includes("cannot move directly from one water") || low.includes("water") && low.includes("cannot"))
       return "Blocked: Water";
     if (low.includes("mountain")) return "Blocked: Mountain";
     if (hoveredTerrainKind) {
-      if (low.includes("no valid tactical route") || low.includes("unreachable") || low.includes("invalid for this unit type") || low.includes("outside tactical footprint") || low.includes("mixed land/naval")) {
+      if (low.includes("no valid tactical route") || low.includes("unreachable") || low.includes("invalid for this unit type") || low.includes("outside tactical footprint")) {
         return `Blocked: ${titleCaseTerrainKindToken(hoveredTerrainKind)}`;
       }
     }

@@ -38,6 +38,24 @@ test('blockingHoverMessageFromRangedReason', () => {
 test('blockingHoverMessageFromMarchInvalidReason', () => {
   assert.equal(blockingHoverMessageFromMarchInvalidReason('No valid tactical route', 'mountain'), 'Blocked: Mountain');
   assert.equal(blockingHoverMessageFromMarchInvalidReason('Destination out of ferry range (4).', null), 'Blocked: Range');
+  assert.equal(
+    blockingHoverMessageFromMarchInvalidReason(
+      'Land units cannot move directly from one water or arctic hex to another.',
+      'plains'
+    ),
+    'Blocked: Arctic, Water'
+  );
+  assert.equal(
+    blockingHoverMessageFromMarchInvalidReason('Mixed land/naval stacks can only move to coastal hexes.', 'mountain'),
+    'Blocked: Coastal'
+  );
+  assert.equal(
+    blockingHoverMessageFromMarchInvalidReason(
+      'Land units must move to land, coastal, or wetlands hexes',
+      'desert'
+    ),
+    'Blocked: Coastal, Land, Wetlands'
+  );
 });
 
 test('blockingHoverMessageFromAirStrikeReason is range-only', () => {
