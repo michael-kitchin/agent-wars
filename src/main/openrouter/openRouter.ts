@@ -6,8 +6,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { app, safeStorage } from 'electron';
-import { gridDistance } from 'h3-js';
 import { getRange } from '../combatConstants';
+import { computeGridDistancePure, isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import { logDebug, logError, logTrace } from '../logger';
 import type { GameStateSnapshot } from '../gameDb';
 import { dbGetOne, dbRun } from '../gameDb';
@@ -359,13 +359,7 @@ function validateAiOrder(
   const hexIds = new Set(state.hexes.map((h) => h.h3Index));
   if (!hexIds.has(order.toH3Index)) return { valid: false, reason: 'Destination not on map' };
 
-  let dist: number | null = null;
-  try {
-    dist = gridDistance(unit.h3Index, order.toH3Index);
-  } catch (err) {
-    logError('openRouter validateAiOrder: gridDistance failed', err);
-    /* gridDistance can throw for cross-face/pentagon; fall back to valid-destinations check */
-  }
+  const dist: number | null = computeGridDistancePure(unit.h3Index, order.toH3Index);
   if (dist !== null) {
     const range = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
     if (dist > range) return { valid: false, reason: `${unit.unitType} can move at most ${range} hex(es)` };
@@ -419,14 +413,13 @@ function validateAiRangedOrder(
   if (getRange(unit.unitType) < 1) return { valid: false, reason: `${unit.unitType} has no ranged attack` };
   const hexIds = new Set(state.hexes.map((h) => h.h3Index));
   if (!hexIds.has(order.targetH3Index)) return { valid: false, reason: 'Target not on map' };
-  let dist: number;
-  try {
-    dist = gridDistance(unit.h3Index, order.targetH3Index);
-  } catch (err) {
-    logError('openRouter validateAiRangedOrder: gridDistance failed', err);
+  const maxR = getRange(unit.unitType);
+  const d = computeGridDistancePure(unit.h3Index, order.targetH3Index);
+  if (d !== null) {
+    if (d > maxR) return { valid: false, reason: 'Target out of range' };
+  } else if (!isWithinGridRangePure(unit.h3Index, order.targetH3Index, maxR)) {
     return { valid: false, reason: 'Invalid distance' };
   }
-  if (dist > getRange(unit.unitType)) return { valid: false, reason: 'Target out of range' };
   const hasEnemy = state.units.some((u) => u.h3Index === order.targetH3Index && u.player !== unit.player);
   if (!hasEnemy) return { valid: false, reason: 'Target hex has no enemy' };
   return { valid: true };
