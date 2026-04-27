@@ -675,6 +675,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
         tacticalOpponentPlan?: TacticalOpponentPlanPayload;
         toolInvocationCounts?: Record<string, number>;
+        aiStrategy?: string;
       };
       if (!commitResult.success) {
         deps.showSidebarError(commitResult.reason ?? 'Tactical commit failed');
@@ -723,6 +724,8 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         S.tacticalBattleSnapshot = commitResult.tacticalBattle;
       }
       S.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
+      if (commitResult.aiStrategy) deps.showAiStrategyToast(commitResult.aiStrategy);
+      else deps.hideAiStrategyToast();
       if (commitResult.toolInvocationCounts) {
         S.toolInvocationCounts = { ...S.toolInvocationCounts, ...commitResult.toolInvocationCounts };
         deps.updateOpenRouterToolCountLabels();

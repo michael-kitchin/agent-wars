@@ -408,10 +408,12 @@ function registerIpcHandlers(): void {
     });
     logDebug('main commitHumanTacticalDraftOrders: post-beat tactical consult', {
       hasPlan: Boolean(post.tacticalOpponentPlan),
+      hasStrategy: Boolean(post.aiStrategy),
     });
     return {
       ...result,
       ...(post.tacticalOpponentPlan ? { tacticalOpponentPlan: post.tacticalOpponentPlan } : {}),
+      ...(post.aiStrategy ? { aiStrategy: post.aiStrategy } : {}),
       ...(post.toolInvocationCounts ? { toolInvocationCounts: post.toolInvocationCounts } : {}),
     };
   });

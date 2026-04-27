@@ -67,6 +67,15 @@ updateOpenRouterCostLabel: () => void;
    */
   showSidebarError: (message: string) => void;
     /**
+   * Specifies the contract for the `showAiStrategyToast` member (showAiStrategyToast: (content: string) => void;).
+
+   * Contract: Displays the same LLM strategy toast used after strategic Ready when the model returns a `strategy` field.
+   * When to use: After a successful tactical background `requestAiOrders` when `result.strategy` is present and the player is in tactical planning.
+   * Expected outcome: Non-empty strategy text becomes visible until timeout or dismiss.
+   * Exceptions: None.
+   */
+  showAiStrategyToast: (content: string) => void;
+    /**
    * Specifies the contract for the `requestRedraw` member (requestRedraw?: () => void;).
 
    * Contract: Optional canvas refresh after AI results that only touch renderer state (e.g. tactical snapshot updates).
@@ -144,6 +153,9 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
         }
         if (S.runButtonOn && result.success) {
           applySuccessfulPrecomputedAiResult(result);
+          if (S.tacticalBattleSnapshot && S.tacticalPhasePlanning && result.strategy) {
+            deps.showAiStrategyToast(result.strategy);
+          }
           if (result.tacticalBattle) {
             deps.requestRedraw?.();
           }

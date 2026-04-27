@@ -74,6 +74,34 @@ export function computeIntersectingHomeRegionHexes(
 }
 
 /**
+ * Defines the `computeHomeRegionHexPartitionsForPrompting` function shape (export function computeHomeRegionHexPartitionsForPrompting().
+
+ * Purpose: Splits AI vs human declared home-region hex lists into exclusive subsets and intersection for Commander system-prompt bullets.
+ * When to use: Only from strategic LLM context assembly when `scenarioId === 'region_vs_region'`.
+ * Expected outcome: `equalAsSets` true when sorted unique lists match; `intersection` matches `computeIntersectingHomeRegionHexes` on the same inputs.
+ * Exceptions: None; empty inputs yield empty arrays and `equalAsSets` true.
+ */
+export function computeHomeRegionHexPartitionsForPrompting(
+  aiHomeRegionHexes: readonly string[] | undefined,
+  humanHomeRegionHexes: readonly string[] | undefined
+): {
+  aiExclusive: string[];
+  humanExclusive: string[];
+  intersection: string[];
+  equalAsSets: boolean;
+} {
+  const ai = uniqueSortedHexes(aiHomeRegionHexes ?? []);
+  const human = uniqueSortedHexes(humanHomeRegionHexes ?? []);
+  const aiSet = new Set(ai);
+  const humanSet = new Set(human);
+  const equalAsSets = ai.length === human.length && ai.every((h) => humanSet.has(h));
+  const aiExclusive = ai.filter((h) => !humanSet.has(h));
+  const humanExclusive = human.filter((h) => !aiSet.has(h));
+  const intersection = computeIntersectingHomeRegionHexes(humanHomeRegionHexes ?? [], aiHomeRegionHexes ?? []);
+  return { aiExclusive, humanExclusive, intersection, equalAsSets };
+}
+
+/**
  * Defines the `computeContestedHomeRegionHexes` function shape (export function computeContestedHomeRegionHexes().
 
  * Purpose: Supports maintainability by documenting why `computeContestedHomeRegionHexes` exists.

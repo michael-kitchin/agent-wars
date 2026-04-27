@@ -262,10 +262,9 @@ export async function requestOrdersFlow(
   const coordinateContext: CoordinateContext = tacticalBattle
     ? { mode: 'tactical', battleId: tacticalBattle.battleId }
     : { mode: 'strategic' };
+  ensureStrategicCoordinateRegistryInitialized();
   if (tacticalBattle) {
     initTacticalCoordinateRegistry(tacticalBattle.battleId, tacticalBattle.enclosingRes1H3Index);
-  } else {
-    ensureStrategicCoordinateRegistryInitialized();
   }
   const coordMap = {
     latLngByH3,

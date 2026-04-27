@@ -615,6 +615,12 @@ function testRes4RubbleTooltipAndTerrainVariantContracts(): void {
     'res4 feature labels should include rubble when a child override marks rubble'
   );
   assert.ok(
+    featureLabelsForRes4ChildFn.includes('res4RoadSidesByH3') &&
+      featureLabelsForRes4ChildFn.includes("labels.push('Road')") &&
+      featureLabelsForRes4ChildFn.includes("labels.push('Rail')"),
+    'tactical res4 terrain tooltips should list Road/Rail when battle snapshot masks have any true side'
+  );
+  assert.ok(
     terrainStateForPointerFn.includes('isRubble: detail?.isRubble ?? false'),
     'res4 tooltip state should preserve rubble override flags from terrain detail state'
   );

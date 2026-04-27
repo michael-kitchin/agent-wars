@@ -30,19 +30,21 @@ export function buildRegionVsRegionScenarioObjectiveBlock(state: GameStateSnapsh
   const lines: string[] = [
     '# Scenario Objective (Required)',
     '',
-    'Scenario: region_vs_region',
+    '- Scenario: region_vs_region',
   ];
   const aiName = typeof state.aiHomeRegion === 'string' ? state.aiHomeRegion.trim() : '';
   const humanName = typeof state.humanHomeRegion === 'string' ? state.humanHomeRegion.trim() : '';
   if (aiName.length > 0) {
-    lines.push(`Your home region: ${aiName}`);
+    lines.push(`- Your home region: ${aiName}`);
   }
   if (humanName.length > 0) {
-    lines.push(`Opponent home region: ${humanName}`);
+    lines.push(`- Enemy home region: ${humanName}`);
   }
-  lines.push('Win at end of turn by either:');
-  lines.push('1) Controlling all hexes intersecting the opponent home region, OR');
-  lines.push('2) Destroying all opponent units.');
-  lines.push('Both home-region outlines are always visible on the map.');
+  lines.push(
+    '- Win at end of turn by either:\n' +
+      '    (1) Controlling all hexes intersecting the enemy home region, OR\n' +
+      '    (2) Destroying all enemy units.'
+  );
+  lines.push('- Both home-region outlines are always visible on the map.');
   return lines.join('\n');
 }

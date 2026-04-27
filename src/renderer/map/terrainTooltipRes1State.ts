@@ -115,6 +115,19 @@ function featureLabelsForRes1Hex(h3: string): string[] {
   return labels;
 }
 
+/**
+ * Defines the `transportSideMaskHasAnyTrue` function shape (function transportSideMaskHasAnyTrue(mask: readonly boolean[] | undefined): boolean).
+
+ * Purpose: Detects whether a res4 road or rail side-boolean array carries any active edge for tooltip feature lists.
+ * When to use: Only from `featureLabelsForRes4Child` when a tactical battle snapshot supplies `res4RoadSidesByH3` / `res4RailSidesByH3` rows.
+ * Expected outcome: False for missing, empty, or all-false masks; true when at least one entry is strictly `true`.
+ * Exceptions: None.
+ */
+function transportSideMaskHasAnyTrue(mask: readonly boolean[] | undefined): boolean {
+  if (!mask || mask.length === 0) return false;
+  return mask.some((v) => v === true);
+}
+
 function featureLabelsForRes4Child(parentH3: string, childH3: string): string[] {
   if (!infraGlyphsAllowedForRes4Child(parentH3, childH3)) return [];
   const labels: string[] = [];
@@ -122,6 +135,13 @@ function featureLabelsForRes4Child(parentH3: string, childH3: string): string[] 
   if (detail?.isRubble) labels.push('Rubble');
   if (S.terrainInfraRes4Airport.has(childH3)) labels.push('Airport');
   if (S.terrainInfraRes4Seaport.has(childH3)) labels.push('Seaport');
+  const tb = S.tacticalBattleSnapshot;
+  if (tb && tb.res4ChildH3Indexes.includes(childH3)) {
+    const roadMask = tb.res4RoadSidesByH3?.[childH3];
+    const railMask = tb.res4RailSidesByH3?.[childH3];
+    if (transportSideMaskHasAnyTrue(roadMask)) labels.push('Road');
+    if (transportSideMaskHasAnyTrue(railMask)) labels.push('Rail');
+  }
   return labels;
 }
 

@@ -311,25 +311,46 @@ async function run(): Promise<void> {
         `enemy-intent strategic context missing for mask=${mask}`
       );
       assert.ok(
+        systemPrompt.includes('You are the enemy commander in a WEGO'),
+        `enemy-commander role opening missing for mask=${mask}`
+      );
+      assert.ok(
         systemPrompt.includes('Your primary goal is to defeat the enemy'),
         `primary scenario goal clause missing for mask=${mask}`
       );
       assert.ok(systemPrompt.includes('- Your priorities are:'), `priority coaching header missing for mask=${mask}`);
       assert.ok(
-        systemPrompt.includes('(1) Expand territorial control toward likely enemy positions'),
+        systemPrompt.includes('(1) Expand territorial control toward known and likely enemy-occupied hexes'),
         `priority (1) coaching missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('(2) Disperse infantry as scouts to maximize visibility'),
+        systemPrompt.includes('(2) Engage enemy units and destroy them'),
         `priority (2) coaching missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('(3) Maximize unit production (idle production capacity is wasted)'),
+        systemPrompt.includes('(3) Disperse your units to maximize visibility'),
         `priority (3) coaching missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('(4) Engage the enemy and destroy them'),
+        systemPrompt.includes('(4) Maximize your own unit production'),
         `priority (4) coaching missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes("(5) Destroy the enemy's production capacity, airports, and seaports"),
+        `priority (5) coaching missing for mask=${mask}`
+      );
+      assert.ok(systemPrompt.includes('- Your strategy is:'), `strategy coaching header missing for mask=${mask}`);
+      assert.ok(
+        systemPrompt.includes('(1) Use speed, surprise, and initiative to break the enemy\'s cohesion and morale'),
+        `strategy (1) coaching missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('(2) Attack the enemy\'s weaknesses (gaps) and avoid their strengths (surfaces)'),
+        `strategy (2) coaching missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('(3) Create maximum disruption with minimum force'),
+        `strategy (3) coaching missing for mask=${mask}`
       );
       assert.ok(
         systemPrompt.includes('- Explored: 3 of 8 land hexes (38%)'),
@@ -344,8 +365,20 @@ async function run(): Promise<void> {
         `own-home-region ownership summary missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes("- Your control of opponent's home region: 1 of 2 hexes (50%)"),
-        `opponent-home-region ownership summary missing for mask=${mask}`
+        systemPrompt.includes("- Your control of the enemy's home region: 1 of 2 hexes (50%)"),
+        `enemy-home-region ownership summary missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('Your home region hexes are:'),
+        `AI-exclusive home region hex list missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes("Your enemy's home region hexes are:"),
+        `human-exclusive home region hex list missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('These hexes are in both home regions:'),
+        `overlapping home region hex list missing for mask=${mask}`
       );
       assert.ok(
         systemPrompt.includes('# Scenario Objective (Required)'),
@@ -356,12 +389,24 @@ async function run(): Promise<void> {
         `scenario id guidance missing for mask=${mask}`
       );
       assert.ok(
+        systemPrompt.includes('Controlling all hexes intersecting the enemy home region'),
+        `region-vs-region win condition (enemy home) missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes('Destroying all enemy units'),
+        `region-vs-region win condition (destroy enemy units) missing for mask=${mask}`
+      );
+      assert.ok(
         systemPrompt.includes('Your home region: Eastern Europe'),
         `AI home-region guidance missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('Opponent home region: Northern America'),
+        systemPrompt.includes('Enemy home region: Northern America'),
         `human home-region guidance missing for mask=${mask}`
+      );
+      assert.ok(
+        !systemPrompt.includes('Opponent home region:'),
+        `legacy Opponent home region label should not appear for mask=${mask}`
       );
       assert.ok(
         systemPrompt.includes('Never emit raw H3 strings or latitude/longitude pairs'),
@@ -464,6 +509,61 @@ async function run(): Promise<void> {
     assert.strictEqual(airResult.success, true, 'valid air action JSON should parse successfully');
     assert.strictEqual(airResult.airStrikes?.length ?? 0, 1, 'air strike entries should carry through model JSON parsing');
     assert.strictEqual(airResult.ferryOrders?.length ?? 0, 1, 'ferry entries should carry through model JSON parsing');
+
+    const buildSystemPromptModule = require('./openRouterBuildSystemPrompt') as {
+      buildSystemPromptForTools: (
+        st: typeof state,
+        cm: {
+          latLngByH3: Map<string, [number, number]>;
+          format: (h: string) => string;
+          resolveToH3: (lat: number, lng: number) => string | undefined;
+        },
+        tools?: string[],
+        briefing?: string,
+        ctx?: { mode: 'strategic' | 'tactical'; battleId?: string }
+      ) => string;
+    };
+    const mapDataForTactical = require('../mapData') as {
+      buildLatLngCoordinateMap: (hexes: string[]) => {
+        latLngByH3: Map<string, [number, number]>;
+        resolveToH3: (lat: number, lng: number) => string | undefined;
+      };
+    };
+    const { latLngByH3: llTac, resolveToH3: rTac } = mapDataForTactical.buildLatLngCoordinateMap(allHexes);
+    const tacticalCoordMap = {
+      latLngByH3: llTac,
+      resolveToH3: rTac,
+      format: (h3: string) => hexCodeTranslator.h3ToCode(h3, strategicCtx),
+    };
+    const tacticalSystemPrompt = buildSystemPromptModule.buildSystemPromptForTools(
+      state,
+      tacticalCoordMap,
+      openRouter.getToolNamesForEnabledGroups(apiToggleIds),
+      '# Brief\n\n## Operational Map\n\n```\nx\n```\n',
+      { mode: 'tactical', battleId: 'matrix-tactical-contract' }
+    );
+    assert.ok(
+      !tacticalSystemPrompt.includes(
+        'At least one enemy unit remains in play, and the human player is actively searching for your forces with intent to destroy them.'
+      ),
+      'tactical prompt omits strategic-only enemy-search opening line'
+    );
+    assert.ok(!tacticalSystemPrompt.includes('- Explored:'), 'tactical system prompt omits explored land bullet');
+    assert.ok(!tacticalSystemPrompt.includes('- Controlled:'), 'tactical system prompt omits controlled land bullet');
+    assert.ok(!tacticalSystemPrompt.includes('Your home region control'), 'tactical prompt omits home region control progress');
+    assert.ok(
+      !tacticalSystemPrompt.includes("Your control of the enemy's home region"),
+      'tactical prompt omits enemy-home control progress'
+    );
+    assert.ok(
+      tacticalSystemPrompt.includes('- Your priority is to engage enemy units and destroy them'),
+      'tactical prompt includes single engage priority'
+    );
+    assert.ok(tacticalSystemPrompt.includes('- Your strategy is:'), 'tactical prompt includes strategy coaching');
+    assert.ok(
+      !tacticalSystemPrompt.includes('(1) Expand territorial control toward known and likely enemy-occupied hexes'),
+      'tactical prompt omits strategic five-priority list'
+    );
 
     console.log(`openRouter.matrix.test.ts passed (${combosChecked} combinations)`);
   } finally {

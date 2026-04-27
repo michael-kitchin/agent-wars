@@ -218,6 +218,7 @@ commitHumanTacticalDraftOrders: (payload: {
     tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
     tacticalOpponentPlan?: import('./readyTypes').TacticalOpponentPlanPayload;
     toolInvocationCounts?: Record<string, number>;
+    aiStrategy?: string;
   }>;
     /**
    * Specifies the contract for the `validateGroupRangedTarget` member (validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }) => Promise<{ success: boolean; reason?: string }>;).

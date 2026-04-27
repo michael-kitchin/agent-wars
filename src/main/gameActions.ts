@@ -181,6 +181,15 @@ reason?: string;
    * Exceptions: None.
    */
   toolInvocationCounts?: Record<string, number>;
+  /**
+   * Free-text opponent strategy from the post–tactical-beat LLM pass (IPC merge only).
+   *
+   * Contract: Populated by `game:commitHumanTacticalDraftOrders` in the main process after `runEventDrivenAfterTacticalBeatConsultation` when event-driven Run mode is on; never set by `commitHumanTacticalDraftOrders` inside `gameActions`.
+   * When to use: Renderer shows the AI strategy toast after a tactical Ready beat, mirroring strategic `ReadyResult.aiStrategy`.
+   * Expected outcome: Omitted when consultation is skipped or the model returns no strategy field.
+   * Exceptions: None.
+   */
+  aiStrategy?: string;
 }
 
 /**

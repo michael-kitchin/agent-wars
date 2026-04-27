@@ -20415,6 +20415,9 @@
         }
         if (rendererSharedState.runButtonOn && result.success) {
           applySuccessfulPrecomputedAiResult(result);
+          if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning && result.strategy) {
+            deps.showAiStrategyToast(result.strategy);
+          }
           if (result.tacticalBattle) {
             deps.requestRedraw?.();
           }
@@ -20825,6 +20828,10 @@
     if (counts.rubbleCount > 0) labels.push("Rubble");
     return labels;
   }
+  function transportSideMaskHasAnyTrue(mask) {
+    if (!mask || mask.length === 0) return false;
+    return mask.some((v) => v === true);
+  }
   function featureLabelsForRes4Child(parentH3, childH3) {
     if (!infraGlyphsAllowedForRes4Child(parentH3, childH3)) return [];
     const labels = [];
@@ -20832,6 +20839,13 @@
     if (detail?.isRubble) labels.push("Rubble");
     if (rendererSharedState.terrainInfraRes4Airport.has(childH3)) labels.push("Airport");
     if (rendererSharedState.terrainInfraRes4Seaport.has(childH3)) labels.push("Seaport");
+    const tb = rendererSharedState.tacticalBattleSnapshot;
+    if (tb && tb.res4ChildH3Indexes.includes(childH3)) {
+      const roadMask = tb.res4RoadSidesByH3?.[childH3];
+      const railMask = tb.res4RailSidesByH3?.[childH3];
+      if (transportSideMaskHasAnyTrue(roadMask)) labels.push("Road");
+      if (transportSideMaskHasAnyTrue(railMask)) labels.push("Rail");
+    }
     return labels;
   }
   function countUrbanRes4HexesInRes1Hex(parentH3) {
@@ -22429,6 +22443,8 @@
           rendererSharedState.tacticalBattleSnapshot = commitResult.tacticalBattle;
         }
         rendererSharedState.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
+        if (commitResult.aiStrategy) deps.showAiStrategyToast(commitResult.aiStrategy);
+        else deps.hideAiStrategyToast();
         if (commitResult.toolInvocationCounts) {
           rendererSharedState.toolInvocationCounts = { ...rendererSharedState.toolInvocationCounts, ...commitResult.toolInvocationCounts };
           deps.updateOpenRouterToolCountLabels();
@@ -24877,6 +24893,7 @@
       updateOpenRouterToolCountLabels,
       updateOpenRouterCostLabel,
       showSidebarError: showSidebarError2,
+      showAiStrategyToast,
       requestRedraw
     });
   }
@@ -24886,7 +24903,8 @@
       updateReadyButtonState,
       updateOpenRouterToolCountLabels,
       updateOpenRouterCostLabel,
-      showSidebarError: showSidebarError2
+      showSidebarError: showSidebarError2,
+      showAiStrategyToast
     });
   }
   function drawLoadingScene2(ctx, width, height) {

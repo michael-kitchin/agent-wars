@@ -2067,6 +2067,7 @@ function startBackgroundRequestIfAllowed(): void {
     updateOpenRouterToolCountLabels,
     updateOpenRouterCostLabel,
     showSidebarError,
+    showAiStrategyToast,
     requestRedraw,
   });
 }
@@ -2086,6 +2087,7 @@ function renderOpenRouterToolsList(): void {
     updateOpenRouterToolCountLabels,
     updateOpenRouterCostLabel,
     showSidebarError,
+    showAiStrategyToast,
   });
 }
 

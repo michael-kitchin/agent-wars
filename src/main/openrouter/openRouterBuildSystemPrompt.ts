@@ -5,7 +5,10 @@ import { H3_RESOLUTION, LATLNG_DECIMAL_PLACES } from '../mapData';
 import { getValidDestinationsUnoccupied } from '../oneStepMoveDestinations';
 import { getInjectionText } from '../tools/tool4Memory';
 import { getInjectionText as getStandingOrderInjectionText } from '../tools/tool5StandingOrders';
-import { countControlledHexesInRegion } from '../../shared/homeRegionRules';
+import {
+  computeHomeRegionHexPartitionsForPrompting,
+  countControlledHexesInRegion,
+} from '../../shared/homeRegionRules';
 import { buildFinalJsonContractInstruction, getFinalJsonOrdersExampleBlock } from './promptContracts';
 import { buildAirOperationsBriefingBlock, buildProductionBriefingBlock, buildSealiftBriefingBlock } from './briefingSections';
 import {
@@ -28,6 +31,48 @@ import { getFilteredToolMetadata } from './openRouterToolCatalog';
 import { getToolFlags } from './openRouterToolGroups';
 import { logDebug } from '../logger';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
+import { h3ToCode } from '../briefing/map/hex-code-translator';
+
+/** Home regions are defined at strategic res1; always encode with the strategic registry, not tactical res4. */
+const HOME_REGION_HEX_COORD_CTX = { mode: 'strategic' as const };
+
+/**
+ * Defines the `formatHomeRegionHexCodesForPrompt` function shape (function formatHomeRegionHexCodesForPrompt()).
+
+ * Purpose: Maps home-region H3 indexes to strategic briefing hex codes for LLM-visible comma-separated lists.
+ * When to use: Strategic `region_vs_region` home-region hex bullets in `buildSystemPromptForTools` only.
+ * Expected outcome: Comma-separated res1 codes via `h3ToCode` strategic context; falls back to raw `h3` on lookup failure.
+ * Exceptions: None; empty input returns an empty string.
+ */
+function formatHomeRegionHexCodesForPrompt(h3Indexes: readonly string[]): string {
+  const parts: string[] = [];
+  for (const h3 of h3Indexes) {
+    try {
+      parts.push(h3ToCode(h3, HOME_REGION_HEX_COORD_CTX));
+    } catch {
+      parts.push(h3);
+    }
+  }
+  return parts.join(', ');
+}
+
+/** Shared coaching block appended after priorities in both strategic and tactical system prompts. */
+const COACHING_STRATEGY_BLOCK = `- Your strategy is:
+    (1) Use speed, surprise, and initiative to break the enemy's cohesion and morale
+    (2) Attack the enemy's weaknesses (gaps) and avoid their strengths (surfaces)
+    (3) Create maximum disruption with minimum force`;
+
+const COACHING_STRATEGIC_PRIORITIES = `- Your priorities are:
+    (1) Expand territorial control toward known and likely enemy-occupied hexes
+    (2) Engage enemy units and destroy them
+    (3) Disperse your units to maximize visibility
+    (4) Maximize your own unit production
+    (5) Destroy the enemy's production capacity, airports, and seaports`;
+
+const COACHING_TACTICAL_PRIORITY = `- Your priority is to engage enemy units and destroy them`;
+
+const STRATEGIC_CONTEXT_OPENING =
+  '- At least one enemy unit remains in play, and the human player is actively searching for your forces with intent to destroy them.';
 
 export function buildSystemPromptForTools(
   state: GameStateSnapshot,
@@ -152,23 +197,52 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
   ).length;
   const ownHomeRegionControl = countControlledHexesInRegion(state.res1Control ?? [], state.aiHomeRegionHexes, 'opponent');
   const opponentHomeRegionControl = countControlledHexesInRegion(state.res1Control ?? [], state.humanHomeRegionHexes, 'opponent');
-  const homeRegionOwnershipSummary =
-    state.scenarioId === 'region_vs_region'
-      ? `\n${formatControlProgressLine('Your home region control', ownHomeRegionControl.controlled, ownHomeRegionControl.total)}\n${formatControlProgressLine("Your control of opponent's home region", opponentHomeRegionControl.controlled, opponentHomeRegionControl.total)}`
-      : '';
+  const homePartitions =
+    state.scenarioId === 'region_vs_region' && coordinateContext.mode !== 'tactical'
+      ? computeHomeRegionHexPartitionsForPrompting(state.aiHomeRegionHexes, state.humanHomeRegionHexes)
+      : null;
+  let regionHomeProgressAndHexBullets = '';
+  if (homePartitions) {
+    const lineOwn = formatControlProgressLine('Your home region control', ownHomeRegionControl.controlled, ownHomeRegionControl.total);
+    const lineEnemyHome = formatControlProgressLine(
+      "Your control of the enemy's home region",
+      opponentHomeRegionControl.controlled,
+      opponentHomeRegionControl.total
+    );
+    const p = homePartitions;
+    const aiHexLine =
+      !p.equalAsSets && p.aiExclusive.length > 0
+        ? `\n- Your home region hexes are: ${formatHomeRegionHexCodesForPrompt(p.aiExclusive)}`
+        : '';
+    const humanHexLine =
+      !p.equalAsSets && p.humanExclusive.length > 0
+        ? `\n- Your enemy's home region hexes are: ${formatHomeRegionHexCodesForPrompt(p.humanExclusive)}`
+        : '';
+    const overlapLine =
+      p.intersection.length > 0
+        ? `\n- These hexes are in both home regions: ${formatHomeRegionHexCodesForPrompt(p.intersection)}`
+        : '';
+    regionHomeProgressAndHexBullets = `\n${lineOwn}${aiHexLine}\n${lineEnemyHome}${humanHexLine}${overlapLine}`;
+  }
+
+  const tacticalContextBlock = `Strategic context:
+${COACHING_TACTICAL_PRIORITY}
+${COACHING_STRATEGY_BLOCK}`;
+
   const strategicContextBlock = `Strategic context:
-- At least one enemy unit remains in play, and the human player is actively searching for your forces with intent to destroy them.
-- Your priorities are:
-  (1) Expand territorial control toward likely enemy positions
-  (2) Disperse infantry as scouts to maximize visibility
-  (3) Maximize unit production (idle production capacity is wasted)
-  (4) Engage the enemy and destroy them
+${STRATEGIC_CONTEXT_OPENING}
+${COACHING_STRATEGIC_PRIORITIES}
+${COACHING_STRATEGY_BLOCK}
 - ${formatControlProgressLine('Explored', exploredLandHexes, totalLandHexes, 'land hexes').slice(2)}
-- ${formatControlProgressLine('Controlled', controlledLandHexes, totalLandHexes, 'land hexes').slice(2)}${homeRegionOwnershipSummary}`;
+- ${formatControlProgressLine('Controlled', controlledLandHexes, totalLandHexes, 'land hexes').slice(2)}${regionHomeProgressAndHexBullets}`;
+
+  const coachingContextBlock =
+    coordinateContext.mode === 'tactical' ? tacticalContextBlock : strategicContextBlock;
+
   const scenarioObjectiveBlock = buildRegionVsRegionScenarioObjectiveBlock(state);
   const mainBlock = briefingOverride != null && briefingOverride.length > 0
-    ? `${briefingOverride}\n\n${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${strategicContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, briefing hex): ${opponentRoster || 'none'}\n${humanUnitsLine}`
-    : `${memoryBlock}${standingOrderBlock}${productionBlock}${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${strategicContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, briefing hex): ${opponentRoster || 'none'}\n${humanUnitsLine}${adjacentCellsBlock}`;
+    ? `${briefingOverride}\n\n${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${coachingContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, briefing hex): ${opponentRoster || 'none'}\n${humanUnitsLine}`
+    : `${memoryBlock}${standingOrderBlock}${productionBlock}${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${coachingContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, briefing hex): ${opponentRoster || 'none'}\n${humanUnitsLine}${adjacentCellsBlock}`;
 
   const finalJsonContract = buildFinalJsonContractInstruction({
     includeMemoryUpdates: flags.memoryEnabled,
@@ -194,7 +268,7 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
     coordinateContext.mode === 'tactical'
       ? 'Infantry may use ranged_attack only at tactical res4 range 1 (adjacent res4 hex on the tactical map); use movement and melee when that is not enough.'
       : 'Infantry may use ranged_attack only at strategic range 1 (adjacent res1 hex); use movement and melee when that is not enough.';
-  const prompt = `You are the opponent in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}. ${primaryGoal} Move toward observed enemy forces to bring them into ranged, melee, or air-strike range as rules allow; do not stay passive.${scoutingDirective}${warning}
+  const prompt = `You are the enemy commander in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}. ${primaryGoal} Move toward observed enemy forces to bring them into ranged, melee, or air-strike range as rules allow; do not stay passive.${scoutingDirective}${warning}
 
 ${latLngBlock}
 

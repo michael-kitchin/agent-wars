@@ -449,6 +449,7 @@ export function buildAirOperationsBriefingBlock(
   );
   const threatenedHumanAirports = humanAirports.filter((ap) => strikeEnvelopes.some((s) => s.has(ap.h3Index))).length;
   const threatenedHumanSeaports = humanSeaports.filter((sp) => strikeEnvelopes.some((s) => s.has(sp.h3Index))).length;
+  lines.push('');
   lines.push(
     `Enemy infrastructure in your current strike envelope: airports=${threatenedHumanAirports}, seaports=${threatenedHumanSeaports}.`
   );
@@ -519,14 +520,14 @@ export function buildSealiftBriefingBlock(
 
   lines.push('# Naval Transport Status');
   lines.push('');
-  lines.push('Embark: opponent-controlled coastal hex, or non-coastal with seaport+control. Capacity: 1 armor or 2 infantry per naval unit.');
+  lines.push('Embark: your-controlled coastal hex, or non-coastal with seaport+control. Capacity: 1 armor or 2 infantry per naval unit.');
   lines.push('');
   const navalRows: Array<Array<unknown>> = [];
   if (opponentNaval.length <= 0) {
     navalRows.push(['—', '—', '—', '—', '—', '—', '—']);
     lines.push(
       ...buildPromptTableLines(
-        ['Unit ID', 'Hex', 'Opponent Controlled', 'Seaport Here', 'Aboard', 'Capacity Used', 'Nearest Embark Hex'],
+        ['Unit ID', 'Hex', 'Your control', 'Seaport Here', 'Aboard', 'Capacity Used', 'Nearest Embark Hex'],
         navalRows
       )
     );
@@ -553,7 +554,7 @@ export function buildSealiftBriefingBlock(
   }
   lines.push(
     ...buildPromptTableLines(
-      ['Unit ID', 'Hex', 'Opponent Controlled', 'Seaport Here', 'Aboard', 'Capacity Used', 'Nearest Embark Hex'],
+      ['Unit ID', 'Hex', 'Your control', 'Seaport Here', 'Aboard', 'Capacity Used', 'Nearest Embark Hex'],
       navalRows
     )
   );

@@ -336,6 +336,7 @@ commitHumanTacticalDraftOrders: (payload: {
     tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
     tacticalOpponentPlan?: import('../shared/ipc/readyTypes').TacticalOpponentPlanPayload;
     toolInvocationCounts?: Record<string, number>;
+    aiStrategy?: string;
   }> => ipcRenderer.invoke(IPC_GAME.commitHumanTacticalDraftOrders, payload),
     /**
    * Documents the object literal property `validateGroupRangedTarget` (validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke('g).
