@@ -109,3 +109,51 @@ export function mergeHumanStandingOrdersIntoTacticalMarchOrders(
 
   return out;
 }
+
+/**
+ * Expands opponent standing-order rows keyed by strategic parent unit id into per–sub-unit tactical orders in the battle footprint.
+ *
+ * Purpose: `generateOrdersForStandingOrders` emits strategic `unitId` values; tactical `requestAiOrders` validation and
+ * application require tactical sub-unit ids and res4 targets derived from strategic path endpoints.
+ * When to use: Tactical branch of `requestOrdersFlow` after Tool 5 generation with `mutateProgress: false`.
+ * Expected outcome: Movement uses `pickTacticalRes4TowardStrategicH3` per parent march; ranged uses the same projection
+ * for targets; when a parent has no opponent sub-units in the snapshot, that standing row contributes nothing.
+ * Exceptions: None.
+ */
+export function expandOpponentStandingOrdersForTacticalBattle(
+  battle: TacticalBattleSnapshot,
+  standingParentMovement: readonly { unitId: string; toH3Index: string }[],
+  standingParentRanged: readonly { unitId: string; targetH3Index: string }[]
+): { movementOrders: { unitId: string; toH3Index: string }[]; rangedAttacks: { unitId: string; targetH3Index: string }[] } {
+  const oppSubs = battle.subUnits.filter((u) => u.player === 'opponent');
+  const movementBySub = new Map<string, string>();
+  for (const o of standingParentMovement) {
+    const res4Dest = pickTacticalRes4TowardStrategicH3(battle, o.toH3Index);
+    if (!res4Dest) continue;
+    for (const su of oppSubs) {
+      if (su.parentUnitId !== o.unitId) continue;
+      if (su.h3Index === res4Dest) continue;
+      movementBySub.set(su.id, res4Dest);
+    }
+  }
+  const rangedBySub = new Map<string, string>();
+  for (const r of standingParentRanged) {
+    const tacticalTarget = pickTacticalRes4TowardStrategicH3(battle, r.targetH3Index);
+    if (!tacticalTarget) continue;
+    for (const su of oppSubs) {
+      if (su.parentUnitId !== r.unitId) continue;
+      rangedBySub.set(su.id, tacticalTarget);
+    }
+  }
+  logDebug('tacticalStandingOrderMarchMerge expandOpponentStandingOrdersForTacticalBattle', {
+    battleId: battle.battleId,
+    parentMovementIn: standingParentMovement.length,
+    parentRangedIn: standingParentRanged.length,
+    subMovementOut: movementBySub.size,
+    subRangedOut: rangedBySub.size,
+  });
+  return {
+    movementOrders: [...movementBySub.entries()].map(([unitId, toH3Index]) => ({ unitId, toH3Index })),
+    rangedAttacks: [...rangedBySub.entries()].map(([unitId, targetH3Index]) => ({ unitId, targetH3Index })),
+  };
+}

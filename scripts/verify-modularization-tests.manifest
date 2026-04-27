@@ -1,0 +1,16 @@
+# Curated subset for `npm run verify:modularization` (faster than full `npm test`).
+# Paths are relative to the repository root.
+
+dist/main/rendererConsolidation.test.js
+dist/main/openrouter/openRouter.matrix.test.js
+dist/main/briefing/map/hex-coordinates.test.js
+dist/main/hexLlmCodeAssignment.test.js
+dist/main/briefing/map/hex-code-translator.test.js
+dist/main/openrouter/promptHexExclusiveAudit.test.js
+dist/main/game-actions/orderPlanSanitize.test.js
+dist/main/gameActionsMultiSelect.test.js
+dist/main/gameActionsProduction.test.js
+dist/main/productionRules.test.js
+dist/main/productionOrders.test.js
+dist/main/openrouter/openRouterToolResultHex.test.js
+dist/main/submitOrdersPayload.test.js

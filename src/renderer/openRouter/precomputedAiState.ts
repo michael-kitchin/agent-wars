@@ -34,8 +34,8 @@ const EMPTY_TACTICAL_OPPONENT_DRAFT: TacticalOpponentPlanPayload = createEmptyTa
  * Returns a fresh empty tactical opponent plan object for Run-mode latch bookkeeping.
  *
  * Purpose: `isWaitingForPrecomputedAiOrders` treats `tacticalOpponentDraft === null` as “still waiting”; after a tactical
- * commit that defers post-beat LLM to main, the renderer must hold a non-null placeholder until the push arrives.
- * When to use: Tactical Ready success path with event-driven + Run, and IPC push handlers that must not restore `null`.
+ * commit while event-driven Run is on, main may return an empty placeholder until post-beat consultation fields merge on the same IPC result.
+ * When to use: Tactical Ready success path with event-driven + Run, and post-beat merge helpers that must not restore `null`.
  * Expected outcome: Same shape as a failed-background unblock; commit may still omit `opponentTacticalDraft` when empty.
  * Exceptions: None.
  */

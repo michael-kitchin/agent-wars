@@ -128,6 +128,7 @@ export function killBucketsMentionHumanStrategicKillers(
  * Purpose: One implementation for `opponentHadTacticalBeatResolutionActions` / `humanHadTacticalBeatResolutionActions`.
  * When to use: Exported wrappers only; keeps tactical kill-bucket order identical for both players.
  * Expected outcome: Opponent branch treats non-empty `opponentMoves` as activity without per-leg no-op filtering (matches prior behavior).
+ * When ranged or air orders were submitted this beat, treats that side as active even if march playback rows are empty or kills omit that side (see `humanBeatHadSubmittedRangedOrAirOrders` / `opponentBeatHadSubmittedRangedOrAirOrders` on playback).
  * Exceptions: None.
  */
 function subUnitPlayerHadTacticalBeatResolutionActions(
@@ -137,6 +138,8 @@ function subUnitPlayerHadTacticalBeatResolutionActions(
 ): boolean {
   if (player === 'opponent' && (playback.opponentMoves?.length ?? 0) > 0) return true;
   if (player === 'human' && hasNonNoopMarchMoves(playback.humanMoves)) return true;
+  if (player === 'human' && playback.humanBeatHadSubmittedRangedOrAirOrders === true) return true;
+  if (player === 'opponent' && playback.opponentBeatHadSubmittedRangedOrAirOrders === true) return true;
   const ids = new Set(tacticalBattle.subUnits.filter((s) => s.player === player).map((s) => s.id));
   const buckets: ReadonlyArray<ReadonlyArray<{ victimId: string; killerIds: string[] }> | undefined> = [
     playback.killsByDirectFire,

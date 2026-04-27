@@ -32,8 +32,7 @@ import type {
   StartTacticalBattleIpcResult,
   TacticalBattleSnapshot,
 } from '../shared/tacticalBattleTypes';
-import type { PostResolutionConsultPushPayload } from '../shared/ipc/readyTypes';
-
+import type { CommitHumanTacticalDraftOrdersIpcResult } from '../shared/ipc/gameApiTypes';
 /**
  * Preload-local IPC channel map for game handlers.
  *
@@ -78,7 +77,6 @@ const IPC_GAME = {
   resolveMeleeIntercept: 'game:resolveMeleeIntercept',
   requestAiOrders: 'game:requestAiOrders',
   cancelRequestAiOrders: 'game:cancelRequestAiOrders',
-  postResolutionConsultPush: 'game:postResolutionConsultPush',
 } as const;
 
 /**
@@ -110,19 +108,6 @@ const IPC_OPENROUTER = {
 let openRouterLogListener: ((payload: { line: string; isError?: boolean }) => void) | null = null;
 ipcRenderer.on(IPC_OPENROUTER.log, (_event, payload: { line: string; isError?: boolean }) => {
   openRouterLogListener?.(payload);
-});
-
-/**
- * Documents the module-scope binding `postResolutionConsultPushListener` (postResolutionConsultPushListener: ((payload: PostResolutionConsultPushPayload) => void) | null).
-
- * Purpose: Bridges main-process deferred tactical post-beat consultation results into the renderer without a second invoke round-trip.
- * When to use: Registered once from `initOpenRouterUI` alongside OpenRouter log streaming.
- * Expected outcome: Listener applies `tacticalOpponentPlan` / strategy when `battleId` matches the active tactical session.
- * Exceptions: None; listener is optional until registered.
- */
-let postResolutionConsultPushListener: ((payload: PostResolutionConsultPushPayload) => void) | null = null;
-ipcRenderer.on(IPC_GAME.postResolutionConsultPush, (_event, payload: PostResolutionConsultPushPayload) => {
-  postResolutionConsultPushListener?.(payload);
 });
 
 /**
@@ -331,7 +316,8 @@ assignHumanMarchOrders: (payload: {
 
    * Purpose: Exposes tactical Ready commit for all tactical draft rows held in renderer state until confirmed.
    * When to use: Tactical planning sidebar Ready click after the human has edited pending drafts.
-   * Expected outcome: Main returns the updated tactical snapshot JSON on success.
+   * Expected outcome: Main returns the updated tactical snapshot JSON on success; event-driven Run may merge
+   * `TacticalPostBeatConsultFields` (kind `tactical`, battleId, attach flag, optional plan/strategy/counts) on the same result.
    * Exceptions: IPC errors propagate as promise rejections.
    */
 commitHumanTacticalDraftOrders: (payload: {
@@ -343,17 +329,8 @@ commitHumanTacticalDraftOrders: (payload: {
     opponentTacticalDraft?: import('../shared/ipc/readyTypes').TacticalOpponentPlanPayload;
     useEventDrivenConsultation?: boolean;
     aiPlanningRunEnabled?: boolean;
-  }): Promise<{
-    success: boolean;
-    reason?: string;
-    tacticalBattle?: TacticalBattleSnapshot;
-    tacticalResolutionPlayback?: TacticalCommitResolutionPlayback;
-    tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
-    tacticalOpponentPlan?: import('../shared/ipc/readyTypes').TacticalOpponentPlanPayload | null;
-    committedOpponentTacticalDraft?: import('../shared/ipc/readyTypes').TacticalOpponentPlanPayload | null;
-    toolInvocationCounts?: Record<string, number>;
-    aiStrategy?: string;
-  }> => ipcRenderer.invoke(IPC_GAME.commitHumanTacticalDraftOrders, payload),
+  }): Promise<CommitHumanTacticalDraftOrdersIpcResult> =>
+    ipcRenderer.invoke(IPC_GAME.commitHumanTacticalDraftOrders, payload),
     /**
    * Documents the object literal property `validateGroupRangedTarget` (validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke('g).
 
@@ -515,17 +492,6 @@ cancelRequestAiOrders: (): Promise<void> =>
    */
   registerOpenRouterLogListener: (callback: (payload: { line: string; isError?: boolean }) => void): void => {
     openRouterLogListener = callback;
-  },
-  /**
-   * Registers the callback for main-process `postResolutionConsultPush` (deferred tactical post-beat consultation).
-   *
-   * Purpose: Keeps tactical Run + event-driven parity with strategic “resolution then consult” ordering while allowing parallel human planning.
-   * When to use: Once from OpenRouter UI init; replaces relying on `tacticalOpponentPlan` embedded in the commit IPC return.
-   * Expected outcome: Renderer merges opponent draft and tool telemetry when payloads arrive after `commitHumanTacticalDraftOrders` resolves.
-   * Exceptions: None; replacing the callback overwrites the previous listener.
-   */
-  registerPostResolutionConsultPushListener: (callback: (payload: PostResolutionConsultPushPayload) => void): void => {
-    postResolutionConsultPushListener = callback;
   },
     /**
    * Documents the object literal property `openRouter` (openRouter: { getKey: (): Promise<{ hasKey: boolean }> => ipcRenderer.invoke('openRouter:getKey'), getSelectedModel: (): Promise<string> =>).

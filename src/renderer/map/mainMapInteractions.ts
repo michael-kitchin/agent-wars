@@ -2,6 +2,7 @@ import type { AirStrikeTargetType, GameStateSnapshot } from '../../shared/ipcTyp
 import type { NamingLookupTarget, TerrainTooltipState } from './terrainTooltipTypes';
 import { TERRAIN_TOOLTIP_DELAY_MS } from '../core/constants';
 import { hitTestHexAtContainerPixel, hitTestTacticalRes4HexAtContainerPixel } from './mapUtils';
+import { withTacticalHumanDraftPrefetchInvalidation } from '../openRouter/openRouterRuntime';
 import { rendererSharedState as S } from '../core/state';
 import { getMainLeafletMap } from './worldLeafletMap';
 import { tacticalRendererHitInsideBattleFootprint } from '../tactical/tacticalUiGuards';
@@ -436,12 +437,14 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       return true;
     }
     if (S.tacticalBattleSnapshot) {
-      S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => !selectedIds.includes(e.unitId));
-      for (const subUnitId of selectedIds) {
-        const idx = S.tacticalPendingMarches.findIndex((row) => row.subUnitId === subUnitId);
-        if (idx >= 0) S.tacticalPendingMarches.splice(idx, 1);
-        S.tacticalPendingMarches.push({ subUnitId, destinationH3Index: destinationH3 });
-      }
+      withTacticalHumanDraftPrefetchInvalidation(() => {
+        S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => !selectedIds.includes(e.unitId));
+        for (const subUnitId of selectedIds) {
+          const idx = S.tacticalPendingMarches.findIndex((row) => row.subUnitId === subUnitId);
+          if (idx >= 0) S.tacticalPendingMarches.splice(idx, 1);
+          S.tacticalPendingMarches.push({ subUnitId, destinationH3Index: destinationH3 });
+        }
+      });
     }
     deps.clearCommittedOrderDraftState();
     if (!S.tacticalBattleSnapshot) {

@@ -134,6 +134,7 @@ import {
   renderOpenRouterToolsList as renderOpenRouterToolsListFromModule,
   startBackgroundRequestIfAllowed as startBackgroundRequestIfAllowedFromModule,
   syncEventDrivenFromTools as syncEventDrivenFromToolsFromModule,
+  withTacticalHumanDraftPrefetchInvalidation,
 } from './openRouter/openRouterRuntime';
 import { resetPrecomputedAiState } from './openRouter/precomputedAiState';
 import {
@@ -659,10 +660,14 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
           if (tacticalSealiftMode) {
             const prev = select.dataset.prevLand ?? '';
             if (prev) {
-              S.tacticalPendingMarches = S.tacticalPendingMarches.filter((m) => m.subUnitId !== prev);
+              withTacticalHumanDraftPrefetchInvalidation(() => {
+                S.tacticalPendingMarches = S.tacticalPendingMarches.filter((m) => m.subUnitId !== prev);
+              });
             }
             if (selected.length > 0) {
-              S.tacticalPendingMarches = S.tacticalPendingMarches.filter((m) => m.subUnitId !== selected);
+              withTacticalHumanDraftPrefetchInvalidation(() => {
+                S.tacticalPendingMarches = S.tacticalPendingMarches.filter((m) => m.subUnitId !== selected);
+              });
             }
             const result = await window.gameApi.updateTacticalSealiftSlot!({
               h3Index,
@@ -677,7 +682,9 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
                 S.tacticalBattleSnapshot = result.tacticalBattle;
               }
               const navalIds = new Set((result.state?.navalRows ?? []).map((r) => r.navalUnitId));
-              S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => !navalIds.has(e.navalUnitId));
+              withTacticalHumanDraftPrefetchInvalidation(() => {
+                S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => !navalIds.has(e.navalUnitId));
+              });
               select.dataset.prevLand = selected;
               if (selected.length > 0) {
                 await refreshHumanStandingOrders();
@@ -730,7 +737,10 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
                     S.tacticalBattleSnapshot = result.tacticalBattle;
                   }
                   const navalIds = new Set((result.state?.navalRows ?? []).map((r) => r.navalUnitId));
-                  S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => !navalIds.has(e.navalUnitId));
+                  withTacticalHumanDraftPrefetchInvalidation(() => {
+                    S.tacticalPendingMarches = S.tacticalPendingMarches.filter((m) => m.subUnitId !== prev);
+                    S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => !navalIds.has(e.navalUnitId));
+                  });
                   updatePendingOrdersSidebar();
                 }
               }
@@ -738,6 +748,8 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
               requestRedraw();
               return;
             }
+            // Strategic sealift debark (`updateSealiftSlot`): not a tactical res4 draft mutation, so no tactical prefetch
+            // fingerprint / `withTacticalHumanDraftPrefetchInvalidation` hook (those apply only under `tacticalSealiftMode`).
             const result = await window.gameApi!.updateSealiftSlot({
               h3Index,
               navalUnitId: row.navalUnitId,

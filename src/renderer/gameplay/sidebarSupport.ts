@@ -6,6 +6,7 @@ import {
 import { buildUnitDisplayNameLookup, fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
 import { formatPendingFerryOrderSidebarLabel } from './orderLabelFormatting';
 import { UNIT_DESELECT_GLYPH, UNIT_SELECT_GLYPH } from '../core/constants';
+import { withTacticalHumanDraftPrefetchInvalidation } from '../openRouter/openRouterRuntime';
 import { rendererSharedState as S } from '../core/state';
 
 /**
@@ -471,7 +472,9 @@ export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
         selected: S.selectedUnitIds.includes(row.subUnitId),
         onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(row.subUnitId, event),
         onCancel: () => {
-          S.tacticalPendingMarches = S.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
+          withTacticalHumanDraftPrefetchInvalidation(() => {
+            S.tacticalPendingMarches = S.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
+          });
           deps.updatePendingOrdersSidebar?.();
           deps.redraw?.();
         },
@@ -485,7 +488,9 @@ export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
         selected: S.selectedUnitIds.includes(emb.unitId),
         onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(emb.unitId, event),
         onCancel: () => {
-          S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== emb.unitId);
+          withTacticalHumanDraftPrefetchInvalidation(() => {
+            S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== emb.unitId);
+          });
           deps.updatePendingOrdersSidebar?.();
           deps.refreshStackCalloutIfOpen?.();
           deps.redraw?.();

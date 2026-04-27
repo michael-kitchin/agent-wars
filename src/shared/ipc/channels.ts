@@ -42,8 +42,6 @@ export const IPC_GAME = {
   resolveMeleeIntercept: 'game:resolveMeleeIntercept',
   requestAiOrders: 'game:requestAiOrders',
   cancelRequestAiOrders: 'game:cancelRequestAiOrders',
-  /** Main → renderer: deferred post-resolution consultation (tactical beat only; strategic consult stays awaited in `game:ready`). */
-  postResolutionConsultPush: 'game:postResolutionConsultPush',
 } as const;
 
 /** OpenRouter settings and logging (`ipcMain.handle` / `ipcRenderer.invoke` / `webContents.send`). */

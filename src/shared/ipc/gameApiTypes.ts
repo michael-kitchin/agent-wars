@@ -19,12 +19,33 @@ import type { NewGameIpcPayload, SubmitOrdersIpcPayload } from './ordersTypes';
 import type { OpenRouterModel, RequestAiOrdersResult } from './openRouterTypes';
 import type {
   GameReadyIpcPayload,
-  PostResolutionConsultPushPayload,
   ReadyResult,
   ResolveMeleeInterceptIpcPayload,
   TacticalCommitResolutionPlayback,
+  TacticalOpponentPlanPayload,
+  TacticalPostBeatConsultFields,
 } from './readyTypes';
 import type { SealiftStackState } from './sealiftTypes';
+
+/**
+ * Invoke result for `game:commitHumanTacticalDraftOrders` (success or validation failure).
+ *
+ * Purpose: Names the preload/renderer contract for tactical Ready commit, including optional post-beat consultation keys merged on main when event-driven Run completes inside the same invoke.
+ * When to use: `GameApi.commitHumanTacticalDraftOrders`, `preload` typing, and renderer code that inspects `commitResult`.
+ * Expected outcome: On success, `tacticalBattle` and playback fields may be set; `kind`/`battleId`/`attachTacticalOpponentPlanToIpc` appear only when main merged `TacticalPostBeatConsultFields`.
+ * Exceptions: None.
+ */
+export type CommitHumanTacticalDraftOrdersIpcResult = {
+  success: boolean;
+  reason?: string;
+  tacticalBattle?: TacticalBattleSnapshot;
+  tacticalResolutionPlayback?: TacticalCommitResolutionPlayback;
+  tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
+  tacticalOpponentPlan?: TacticalOpponentPlanPayload | null;
+  committedOpponentTacticalDraft?: TacticalOpponentPlanPayload | null;
+  toolInvocationCounts?: Record<string, number>;
+  aiStrategy?: string;
+} & Partial<TacticalPostBeatConsultFields>;
 
 /**
  * Documents the `GameApi` interface as a named contract surface (export interface GameApi).
@@ -211,17 +232,7 @@ commitHumanTacticalDraftOrders: (payload: {
     opponentTacticalDraft?: import('./readyTypes').TacticalOpponentPlanPayload;
     useEventDrivenConsultation?: boolean;
     aiPlanningRunEnabled?: boolean;
-  }) => Promise<{
-    success: boolean;
-    reason?: string;
-    tacticalBattle?: TacticalBattleSnapshot;
-    tacticalResolutionPlayback?: TacticalCommitResolutionPlayback;
-    tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
-    tacticalOpponentPlan?: import('./readyTypes').TacticalOpponentPlanPayload | null;
-    committedOpponentTacticalDraft?: import('./readyTypes').TacticalOpponentPlanPayload | null;
-    toolInvocationCounts?: Record<string, number>;
-    aiStrategy?: string;
-  }>;
+  }) => Promise<CommitHumanTacticalDraftOrdersIpcResult>;
     /**
    * Specifies the contract for the `validateGroupRangedTarget` member (validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }) => Promise<{ success: boolean; reason?: string }>;).
 
@@ -402,16 +413,6 @@ cancelRequestAiOrders: () => Promise<void>;
    * Exceptions: None.
    */
   registerOpenRouterLogListener?: (callback: (payload: { line: string; isError?: boolean }) => void) => void;
-  /**
-   * Registers a listener for main-process deferred post-resolution consultation pushes (tactical post-beat only).
-   *
-   * Contract: Invoked zero or more times after `commitHumanTacticalDraftOrders` when event-driven Run schedules async consult.
-   * Strategic `game:ready` already awaits post-resolution consultation on main; it does not use this channel.
-   * When to use: OpenRouter UI init alongside `registerOpenRouterLogListener`.
-   * Expected outcome: Renderer merges `tacticalOpponentPlan` / strategy when `battleId` matches the active tactical battle.
-   * Exceptions: None; optional on older preload builds.
-   */
-  registerPostResolutionConsultPushListener?: (callback: (payload: PostResolutionConsultPushPayload) => void) => void;
     /**
    * Specifies the contract for the `openRouter` member (openRouter?: { getKey: () => Promise<{ hasKey: boolean }>; getSelectedModel: () => Promise<string>; setKey: (key: string) => Promise<void>;).
 

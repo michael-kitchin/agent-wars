@@ -18,7 +18,37 @@ import type {
   TacticalCommitResolutionPlayback,
 } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import type { TacticalOpponentPlanPayload } from '../../shared/ipc/readyTypes';
+import type { TacticalPostBeatConsultFields, TacticalPostBeatConsultMergeSource } from '../../shared/ipc/readyTypes';
+
+/**
+ * Maps runner merge source plus `battleId` into the renderer-facing tactical post-beat consultation IPC fields.
+ *
+ * Purpose: Single attach/`tacticalOpponentPlan`/`aiStrategy`/`toolInvocationCounts` wiring for `commitHumanTacticalDraftOrders` so `main.ts` and `runEventDrivenAfterTacticalBeatConsultation` cannot drift.
+ * When to use: After `runEventDrivenAfterTacticalBeatConsultation` resolves, or whenever converting an `afterTacticalBeatResolution`-shaped merge source into `TacticalPostBeatConsultFields`.
+ * Expected outcome: `kind` and `battleId` always set; `strategy` from the merge source is exposed as `aiStrategy` when present.
+ * Exceptions: None; pure data transform.
+ */
+export function toTacticalPostBeatConsultFields(
+  battleId: string,
+  post: TacticalPostBeatConsultMergeSource
+): TacticalPostBeatConsultFields {
+  const attach = post.attachTacticalOpponentPlanToIpc === true;
+  logDebug('ipc toTacticalPostBeatConsultFields', {
+    battleId,
+    attachTacticalOpponentPlanToIpc: attach,
+    hasStrategy: Boolean(post.aiStrategy ?? post.strategy),
+    hasToolInvocationCounts: Boolean(post.toolInvocationCounts),
+  });
+  const strategyText = post.aiStrategy ?? post.strategy;
+  return {
+    kind: 'tactical',
+    battleId,
+    attachTacticalOpponentPlanToIpc: attach,
+    ...(attach ? { tacticalOpponentPlan: post.tacticalOpponentPlan ?? null } : {}),
+    ...(strategyText ? { aiStrategy: strategyText } : {}),
+    ...(post.toolInvocationCounts ? { toolInvocationCounts: post.toolInvocationCounts } : {}),
+  };
+}
 
 /**
  * Subset of `ReadyResult` fields copied verbatim into completed-turn IPC payloads.
@@ -210,7 +240,7 @@ export async function runEventDrivenAfterResolutionConsultation(args: {
  * Post–tactical-beat event-driven consultation with the same timeout envelope as strategic Ready follow-up.
  *
  * Purpose: Lets the opponent LLM re-plan inside an active tactical session when callbacks or tactical mandatory rules fire.
- * When to use: After tactical beat resolution succeeds: from Electron `game:commitHumanTacticalDraftOrders` (deferred via `setImmediate` + push, mirroring strategic “resolution then consult” ordering) or from tests that call this helper directly.
+ * When to use: After tactical beat resolution succeeds: from Electron `game:commitHumanTacticalDraftOrders` (handler awaits this helper before resolving the invoke, mirroring strategic “resolution then consult” ordering) or from tests that call this helper directly.
  * Expected outcome: Optional `tacticalOpponentPlan` (and `attachTacticalOpponentPlanToIpc`) when evaluation invoked the LLM; otherwise empty merge so IPC can preserve the renderer draft.
  * Exceptions: Does not throw; failures are logged at error and swallowed.
  */
@@ -234,12 +264,7 @@ export async function runEventDrivenAfterTacticalBeatConsultation(args: {
   ) => Promise<RequestAiOrdersResult>;
   timeoutMs: number;
   errorLogMessage: string;
-}): Promise<{
-  attachTacticalOpponentPlanToIpc?: boolean;
-  tacticalOpponentPlan?: TacticalOpponentPlanPayload | null;
-  aiStrategy?: string;
-  toolInvocationCounts?: Record<string, number>;
-}> {
+}): Promise<TacticalPostBeatConsultMergeSource> {
   if (!args.useEventDrivenConsultation || !args.aiPlanningRunEnabled) {
     return {};
   }
@@ -259,12 +284,11 @@ export async function runEventDrivenAfterTacticalBeatConsultation(args: {
         );
       }),
     ]);
-    const attach = post.attachTacticalOpponentPlanToIpc === true;
     return {
-      attachTacticalOpponentPlanToIpc: attach,
-      ...(attach ? { tacticalOpponentPlan: post.tacticalOpponentPlan ?? null } : {}),
-      ...(post.strategy ? { aiStrategy: post.strategy } : {}),
-      ...(post.toolInvocationCounts ? { toolInvocationCounts: post.toolInvocationCounts } : {}),
+      attachTacticalOpponentPlanToIpc: post.attachTacticalOpponentPlanToIpc,
+      tacticalOpponentPlan: post.tacticalOpponentPlan,
+      strategy: post.strategy,
+      toolInvocationCounts: post.toolInvocationCounts,
     };
   } catch (err) {
     logError(args.errorLogMessage, err);

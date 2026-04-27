@@ -1,4 +1,5 @@
 import { cellToLatLng } from 'h3-js';
+import { isLikelyAbortError } from '../../shared/abortError';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
 import { buildLatLngCoordinateMap } from '../mapData';
 import { logDebug, logError } from '../logger';
@@ -32,6 +33,7 @@ import {
   validateTacticalOpponentFerryOrder,
 } from '../tacticalBattle/tacticalOpponentOrderValidation';
 import { tacticalComputeMovementOrderOutcome } from '../tacticalBattle/tacticalSnapshotGuards';
+import { expandOpponentStandingOrdersForTacticalBattle } from '../tacticalBattle/tacticalStandingOrderMarchMerge';
 import {
   buildStrategicOperationalMapSectionMarkdown,
   buildTacticalOperationalMapSectionMarkdown,
@@ -53,6 +55,7 @@ import {
   logResponsePreview,
   type AiPathfindingSessionMetrics,
 } from './requestOrdersFlowSupport';
+import { maybeApplyTacticalLightPrecomputeToolAllowlist } from './tacticalLightPrecompute';
 
 export type { RequestOrdersError, RequestOrdersOptions, RequestOrdersResult } from './requestOrdersFlowTypes';
 
@@ -216,9 +219,10 @@ export async function requestOrdersFlow(
       enabledToolNames !== undefined
         ? stripStrategicOnlyTools(enabledToolNames)
         : stripStrategicOnlyTools(toolGroupRegistry.flatMap((g) => [...g.toolNames]));
+    enabledToolNames = maybeApplyTacticalLightPrecomputeToolAllowlist(tacticalBattle.battleId, enabledToolNames);
     logDebug('openRouter requestOrders tactical tool filter applied', {
       battleId: tacticalBattle.battleId,
-      enabledToolCount: enabledToolNames.length,
+      enabledToolCount: enabledToolNames?.length ?? 0,
     });
   }
   const planState = tacticalBattle ? buildTacticalAiPlanState(state, tacticalBattle) : state;
@@ -694,10 +698,29 @@ export async function requestOrdersFlow(
       if (parsed.callbacks?.length) replaceSubscriptions('opponent', parsed.callbacks, state.turnNumber);
       toolInvocationCounts['events'] = parsed.callbacks?.length ?? 0;
 
-      const { movementOrders: standingOrderMovement, rangedAttacks: standingOrderRanged } =
-        flags.ordersEnabled && !tacticalBattle
-          ? generateOrdersForStandingOrders('opponent', state, latLngByH3, resolveToH3)
-          : { movementOrders: [] as { unitId: string; toH3Index: string }[], rangedAttacks: [] as { unitId: string; targetH3Index: string }[] };
+      const standingGenerated = flags.ordersEnabled
+        ? generateOrdersForStandingOrders('opponent', state, latLngByH3, resolveToH3, {
+            mutateProgress: tacticalBattle == null,
+          })
+        : { movementOrders: [] as { unitId: string; toH3Index: string }[], rangedAttacks: [] as { unitId: string; targetH3Index: string }[] };
+      let standingOrderMovement = standingGenerated.movementOrders;
+      let standingOrderRanged = standingGenerated.rangedAttacks;
+      if (tacticalBattle) {
+        const expanded = expandOpponentStandingOrdersForTacticalBattle(
+          tacticalBattle,
+          standingOrderMovement,
+          standingOrderRanged
+        );
+        standingOrderMovement = expanded.movementOrders;
+        standingOrderRanged = expanded.rangedAttacks;
+        logDebug('openRouter requestOrdersFlow standing orders expanded for tactical opponent', {
+          battleId: tacticalBattle.battleId,
+          parentMovementCount: standingGenerated.movementOrders.length,
+          parentRangedCount: standingGenerated.rangedAttacks.length,
+          subMovementCount: expanded.movementOrders.length,
+          subRangedCount: expanded.rangedAttacks.length,
+        });
+      }
       const llmMovementOrders = dedupeByUnitKeepLast(parsed.movementOrders ?? []);
       const llmRangedOrders = dedupeByUnitKeepLast(parsed.rangedAttacks ?? []);
       const llmAirStrikes = dedupeByUnitKeepLast(parsed.airStrikes ?? []);
@@ -929,7 +952,7 @@ export async function requestOrdersFlow(
       outputTokens: totalOutputTokens > 0 ? totalOutputTokens : undefined,
     };
   } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
+    if (isLikelyAbortError(err)) {
       if (onLog) onLog('Cancelled.');
       return failRequest('Cancelled');
     }
@@ -957,5 +980,16 @@ export async function requestOrdersFlow(
         totalToolCalls: aiTurnAggregateMetrics.totalToolCalls,
       },
     });
+    if (tacticalBattle) {
+      logDebug('openRouter requestOrders tactical latency diagnostics (phase 6)', {
+        battleId: tacticalBattle.battleId,
+        wallClockMs: Date.now() - wallClockStart,
+        turnNumber: state.turnNumber,
+        modelId,
+        planRouteToolCalls: aiPathfindingSessionMetrics.planRouteToolCalls,
+        checkDistanceToolCalls: aiPathfindingSessionMetrics.checkDistanceToolCalls,
+        totalToolCalls: aiPathfindingSessionMetrics.totalToolCalls,
+      });
+    }
   }
 }

@@ -1,11 +1,11 @@
 /**
- * Regression tests for deferred tactical post-beat `tacticalOpponentPlan` merge rules.
+ * Regression tests for tactical post-beat `tacticalOpponentPlan` merge rules on the commit IPC return.
  *
- * Purpose: An attach push with null or all-empty plan must not behave like a valid opponent plan (that would commit
+ * Purpose: An attach payload with null or all-empty plan must not behave like a valid opponent plan (that would commit
  * zero opponent movement while leaving Ready enabled). Non-empty plans must pass through unchanged.
- * When to use: `npm test` / `npm run build:main` after changing `tacticalOpponentPlanMerge` or the push listener.
- * Expected outcome: `tacticalOpponentPlanPayloadHasAnyOrders` and `nextTacticalOpponentDraftAfterDeferredPush` match
- * the contracts exercised by `registerPostResolutionConsultPushListener`.
+ * When to use: `npm test` / `npm run build:main` after changing `tacticalOpponentPlanMerge` or renderer post-beat handling.
+ * Expected outcome: `tacticalOpponentPlanPayloadHasAnyOrders` and `nextTacticalOpponentDraftAfterPostBeatPlan` match
+ * the contracts exercised by `applyTacticalPostBeatConsultSideEffects`.
  * Exceptions: None.
  */
 
@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { TacticalOpponentPlanPayload } from '../shared/ipc/readyTypes';
 import {
-  nextTacticalOpponentDraftAfterDeferredPush,
+  nextTacticalOpponentDraftAfterPostBeatPlan,
   tacticalOpponentPlanPayloadHasAnyOrders,
 } from '../shared/ipc/tacticalOpponentPlanMerge';
 
@@ -50,20 +50,20 @@ test('tacticalOpponentPlanPayloadHasAnyOrders is true when any list is non-empty
   );
 });
 
-test('nextTacticalOpponentDraftAfterDeferredPush keeps non-empty plans and requests prefetch otherwise', () => {
-  assert.deepEqual(nextTacticalOpponentDraftAfterDeferredPush(sampleMarchPlan), {
+test('nextTacticalOpponentDraftAfterPostBeatPlan keeps non-empty plans and requests prefetch otherwise', () => {
+  assert.deepEqual(nextTacticalOpponentDraftAfterPostBeatPlan(sampleMarchPlan), {
     draft: sampleMarchPlan,
     startBackgroundPrefetch: false,
   });
-  assert.deepEqual(nextTacticalOpponentDraftAfterDeferredPush(null), {
+  assert.deepEqual(nextTacticalOpponentDraftAfterPostBeatPlan(null), {
     draft: null,
     startBackgroundPrefetch: true,
   });
-  assert.deepEqual(nextTacticalOpponentDraftAfterDeferredPush(undefined), {
+  assert.deepEqual(nextTacticalOpponentDraftAfterPostBeatPlan(undefined), {
     draft: null,
     startBackgroundPrefetch: true,
   });
-  assert.deepEqual(nextTacticalOpponentDraftAfterDeferredPush(emptyPlan), {
+  assert.deepEqual(nextTacticalOpponentDraftAfterPostBeatPlan(emptyPlan), {
     draft: null,
     startBackgroundPrefetch: true,
   });

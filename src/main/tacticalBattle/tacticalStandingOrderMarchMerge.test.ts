@@ -11,7 +11,11 @@ import { dbGetAll, getGameStateForPlayer } from '../gameDb';
 import { buildLatLngCoordinateMap } from '../mapData';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import { generateOrdersForStandingOrders } from '../tools/tool5StandingOrders';
-import { mergeHumanStandingOrdersIntoTacticalMarchOrders, pickTacticalRes4TowardStrategicH3 } from './tacticalStandingOrderMarchMerge';
+import {
+  expandOpponentStandingOrdersForTacticalBattle,
+  mergeHumanStandingOrdersIntoTacticalMarchOrders,
+  pickTacticalRes4TowardStrategicH3,
+} from './tacticalStandingOrderMarchMerge';
 import { tacticalRes1Cell, tacticalRes4UnderRes1Corner } from './testSupport/tacticalRes4HexFixtures';
 
 test('pickTacticalRes4TowardStrategicH3 prefers footprint cell closest to strategic target centroid', () => {
@@ -82,4 +86,42 @@ test('generateOrdersForStandingOrders preview leaves standing_orders rows unchan
       after.map((r) => [r.unit_id, r.computed_route])
     );
   });
+});
+
+test('expandOpponentStandingOrdersForTacticalBattle maps parent standing rows to opponent sub-units in the footprint', () => {
+  const res1 = tacticalRes1Cell(5, 5);
+  const h0 = tacticalRes4UnderRes1Corner(5, 5);
+  const ring = [...gridDisk(h0, 1)];
+  const destStrategic = ring.find((h) => h !== h0);
+  assert.ok(destStrategic);
+  const battle: TacticalBattleSnapshot = {
+    battleId: 'tb-expand-parent',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: ring,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits: [
+      {
+        id: 'parent-x:01',
+        parentUnitId: 'parent-x',
+        player: 'opponent',
+        unitType: 'infantry',
+        h3Index: h0,
+        displayName: 'Ox1',
+      },
+    ],
+  };
+  const expandedMove = expandOpponentStandingOrdersForTacticalBattle(battle, [
+    { unitId: 'parent-x', toH3Index: destStrategic! },
+  ], []);
+  assert.strictEqual(expandedMove.movementOrders.length, 1);
+  assert.strictEqual(expandedMove.movementOrders[0]!.unitId, 'parent-x:01');
+  assert.ok(ring.includes(expandedMove.movementOrders[0]!.toH3Index));
+
+  const expandedRanged = expandOpponentStandingOrdersForTacticalBattle(battle, [], [
+    { unitId: 'parent-x', targetH3Index: destStrategic! },
+  ]);
+  assert.strictEqual(expandedRanged.rangedAttacks.length, 1);
+  assert.strictEqual(expandedRanged.rangedAttacks[0]!.unitId, 'parent-x:01');
+  assert.ok(ring.includes(expandedRanged.rangedAttacks[0]!.targetH3Index));
 });

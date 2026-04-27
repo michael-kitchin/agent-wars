@@ -1076,8 +1076,14 @@ export function commitHumanTacticalDraftOrders(args: {
     const rangedCombatHexes = [...rangedCombatHexSet];
     const casualtyHexSet = new Set(rangedRemovedUnits.map((v) => v.h3Index));
     const rangedCasualtyHexes = rangedCombatHexes.filter((h) => casualtyHexSet.has(h));
+    const humanBeatHadSubmittedRangedOrAirOrders =
+      (args.rangedAttacks?.length ?? 0) > 0 || (args.airStrikes?.length ?? 0) > 0;
+    const opponentBeatHadSubmittedRangedOrAirOrders =
+      !!od && ((od.rangedAttacks?.length ?? 0) > 0 || (od.airStrikes?.length ?? 0) > 0);
     const tacticalResolutionPlayback: TacticalCommitResolutionPlayback = {
       humanMoves,
+      ...(humanBeatHadSubmittedRangedOrAirOrders ? { humanBeatHadSubmittedRangedOrAirOrders: true } : {}),
+      ...(opponentBeatHadSubmittedRangedOrAirOrders ? { opponentBeatHadSubmittedRangedOrAirOrders: true } : {}),
       opponentMoves: opponentMoves.length > 0 ? opponentMoves : undefined,
       rangedCombatHexes: rangedCombatHexes.length > 0 ? rangedCombatHexes : undefined,
       rangedCasualtyHexes: rangedCasualtyHexes.length > 0 ? rangedCasualtyHexes : undefined,

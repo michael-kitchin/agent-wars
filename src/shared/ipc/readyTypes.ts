@@ -183,21 +183,34 @@ export type TacticalOpponentPlanPayload = {
 };
 
 /**
- * Main → renderer push after tactical beat resolution completes and deferred `afterTacticalBeatResolution` finishes.
+ * Post–beat tactical consultation fields merged on the commit IPC result (or historically via a renderer push).
  *
- * Purpose: Mirrors strategic ordering (resolution first, then LLM) while letting the tactical Ready IPC return before
- * the consultation network call so the human can start the next beat’s planning in parallel with opponent LLM work.
- * When to use: Only `game:commitHumanTacticalDraftOrders` when event-driven Run mode schedules `runEventDrivenAfterTacticalBeatConsultation` on a macrotask after the commit response is sent.
- * Expected outcome: Renderer merges non-empty `tacticalOpponentPlan` when `attachTacticalOpponentPlanToIpc`; a null or
- * all-empty plan clears the draft and triggers a tactical background refill instead of freezing opponent movement.
- * Ignores stale `battleId` rows.
- * Exceptions: None; malformed payloads are ignored client-side.
+ * Purpose: Single shape for opponent draft refresh, optional strategy toast, and tool-count telemetry after `afterTacticalBeatResolution`.
+ * When to use: Main attaches to successful `commitHumanTacticalDraftOrders` when event-driven Run consult completes; renderer matches `battleId` to `S.tacticalBattleSnapshot`.
+ * Expected outcome: When `attachTacticalOpponentPlanToIpc` is true, `tacticalOpponentPlan` may be null or empty to clear draft and trigger prefetch; when false, prior draft is preserved unless prefetch rules apply.
+ * Exceptions: None.
  */
-export type PostResolutionConsultPushPayload = {
+export type TacticalPostBeatConsultFields = {
   kind: 'tactical';
   battleId: string;
   attachTacticalOpponentPlanToIpc: boolean;
   tacticalOpponentPlan?: TacticalOpponentPlanPayload | null;
+  aiStrategy?: string;
+  toolInvocationCounts?: Record<string, number>;
+};
+
+/**
+ * Partial post-beat consultation payload before `kind` and `battleId` are attached for the tactical commit IPC surface.
+ *
+ * Purpose: Lets `runEventDrivenAfterTacticalBeatConsultation` return the same intermediate shape `afterTacticalBeatResolution` uses (`strategy` name) while `toTacticalPostBeatConsultFields` maps to `TacticalPostBeatConsultFields` (`aiStrategy`) in one place.
+ * When to use: As the resolve type of `runEventDrivenAfterTacticalBeatConsultation` and as input to `toTacticalPostBeatConsultFields` from `main.ts`.
+ * Expected outcome: Empty object when consultation is skipped or fails; otherwise optional attach flag, plan, strategy text, and tool counts.
+ * Exceptions: None.
+ */
+export type TacticalPostBeatConsultMergeSource = {
+  attachTacticalOpponentPlanToIpc?: boolean;
+  tacticalOpponentPlan?: TacticalOpponentPlanPayload | null;
+  strategy?: string;
   aiStrategy?: string;
   toolInvocationCounts?: Record<string, number>;
 };
@@ -228,6 +241,24 @@ export type TacticalCommitResolutionPlayback = {
    * Exceptions: Omitted when empty.
    */
   opponentMoves?: TacticalPlaybackMarchMove[];
+  /**
+   * True when the human commit payload included at least one ranged or air-strike order this beat (before resolution drops).
+   *
+   * Purpose: Lets `consultationPolicy` treat human ranged/air attempts as observable beat activity even when no kills or noop marches appear in playback.
+   * When to use: Set by `commitHumanTacticalDraftOrders` alongside other playback fields.
+   * Expected outcome: Omitted when both human lists were empty.
+   * Exceptions: None.
+   */
+  humanBeatHadSubmittedRangedOrAirOrders?: boolean;
+  /**
+   * True when the committed opponent draft included at least one ranged or air-strike order this beat.
+   *
+   * Purpose: Lets `consultationPolicy` treat opponent ranged/air as beat activity when `opponentMoves` is empty (ranged does not populate march playback).
+   * When to use: Set by `commitHumanTacticalDraftOrders` when `opponentTacticalDraft` was present.
+   * Expected outcome: Omitted when opponent draft had no ranged or air rows.
+   * Exceptions: None.
+   */
+  opponentBeatHadSubmittedRangedOrAirOrders?: boolean;
   rangedCombatHexes?: string[];
   rangedCasualtyHexes?: string[];
   rangedRemovedUnits?: RemovedUnitSnapshot[];

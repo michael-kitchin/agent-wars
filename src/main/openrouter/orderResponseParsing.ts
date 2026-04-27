@@ -728,10 +728,25 @@ export function parseOrdersResponse(
     if (block) candidates.push(block);
   }
   const lastBrace = trimmed.lastIndexOf('{');
-  if (lastBrace >= 0) candidates.push(trimmed.slice(lastBrace).trim());
+  // When the assistant returns only a JSON array, slicing at the last `{` still yields a substring whose balanced `{…}` is a row object, not the required envelope—skip this candidate in that case.
+  if (lastBrace >= 0 && !trimmed.trimStart().startsWith('[')) {
+    candidates.push(trimmed.slice(lastBrace).trim());
+  }
 
   for (const raw of candidates) {
     let jsonStr = raw;
+    // Models sometimes return a bare `orders[]` as a JSON array; we must not peel the first `{...}` row and treat it as the full `{ strategy, orders }` envelope (see openRouter.matrix strict-schema test).
+    if (raw.trimStart().startsWith('[')) {
+      try {
+        const topLevel = JSON.parse(stripJsonLikeComments(raw.trim())) as unknown;
+        if (Array.isArray(topLevel)) {
+          logDebug('openRouter parseOrdersResponse: skipping candidate: top-level JSON array is not a valid strategy+orders envelope');
+          continue;
+        }
+      } catch {
+        // Not valid JSON as a whole; fall through so `{…}` extraction may still recover a lone object.
+      }
+    }
     const firstBrace = jsonStr.search(/\{/);
     if (firstBrace >= 0) {
       const balanced = extractBalancedJsonObjectFrom(jsonStr, firstBrace);

@@ -325,7 +325,7 @@ export interface AfterTacticalBeatResolutionDeps {
  * Documents the `AfterTacticalBeatResolutionResult` interface as a named contract surface (export interface AfterTacticalBeatResolutionResult).
 
  * Purpose: Returns buffered opponent tactical rows when event-driven consultation fires after a tactical beat.
- * When to use: Consumed by `game:commitHumanTacticalDraftOrders` IPC to hydrate `S.tacticalOpponentDraft` without a second round-trip.
+ * When to use: Consumed by `game:commitHumanTacticalDraftOrders` IPC (main awaits consultation, then merges fields onto the invoke result for the renderer).
  * Expected outcome: `tacticalOpponentPlan` when the model returned a valid plan; `attachTacticalOpponentPlanToIpc` tells main whether to merge any plan field at all.
  * Exceptions: None.
  */
@@ -393,12 +393,19 @@ export async function afterTacticalBeatResolution(
   deps: AfterTacticalBeatResolutionDeps
 ): Promise<AfterTacticalBeatResolutionResult> {
   if (!deps.modelId?.trim() || !deps.hasKey()) {
-    logDebug('afterTacticalBeatResolution: skip (no model or no key)');
+    logDebug('afterTacticalBeatResolution: skip tactical LLM', {
+      reason: 'skip_no_model_or_key',
+      turnNumber: state.turnNumber,
+      battleId: tacticalBattle.battleId,
+      hasModel: Boolean(deps.modelId?.trim()),
+      hasKey: deps.hasKey(),
+    });
     return { consulted: false, attachTacticalOpponentPlanToIpc: false };
   }
   if (getTacticalAnnihilationOutcome(tacticalBattle.subUnits) !== null) {
     clearAiPendingOrders('opponent');
-    logDebug('afterTacticalBeatResolution: skip tactical LLM (annihilation roster)', {
+    logDebug('afterTacticalBeatResolution: skip tactical LLM', {
+      reason: 'skip_annihilation_roster',
       turnNumber: state.turnNumber,
       battleId: tacticalBattle.battleId,
     });
@@ -428,11 +435,15 @@ export async function afterTacticalBeatResolution(
   });
   if (!shouldConsult) {
     clearAiPendingOrders('opponent');
-    logDebug('afterTacticalBeatResolution: skipping tactical LLM', {
-      reason: 'no_callback_events_opponent_active_human_not_observable',
+    logDebug('afterTacticalBeatResolution: skip tactical LLM', {
+      reason: 'skip_should_consult_false',
       turnNumber: state.turnNumber,
+      battleId: tacticalBattle.battleId,
+      mandatoryCount: mandatoryFired.length,
+      subscriptionCount: subscriptionFired.length,
       hadOpponentBeatActions,
       humanHadObservableBeatActions,
+      opponentIdle: consultBecauseOpponentIdle,
     });
     return { consulted: false, attachTacticalOpponentPlanToIpc: false };
   }

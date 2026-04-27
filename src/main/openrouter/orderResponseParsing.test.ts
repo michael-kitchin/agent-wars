@@ -94,6 +94,21 @@ function testSkipsBadCandidateThenParsesFence(): void {
 }
 
 /**
+ * Defines the `testRejectsTopLevelJsonArray` function shape.
+
+ * Purpose: Enforces the assistant contract that final JSON is a single object with `strategy` and `orders`, not a legacy top-level array of order rows (which must fail `requestOrders` / repair, not parse as empty success).
+ * When to use: Regression when changing candidate extraction in `parseOrdersResponse`.
+ * Expected outcome: `parseOrdersResponse` returns null so callers surface a parse failure.
+ * Exceptions: Assertion failure if an inner `{...}` is incorrectly accepted as the envelope.
+ */
+function testRejectsTopLevelJsonArray(): void {
+  const parsed = parseFixture(
+    '[{"unitId":"opponent-armor-1","action":"explicit_move","destination":[0,0]}]'
+  );
+  assert.strictEqual(parsed, null);
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
 
  * Purpose: Registers named cases for the manual test runner at the bottom of this file.
@@ -105,6 +120,7 @@ const tests = [
   { name: 'parseOrdersResponse null strategy and empty orders', fn: testAcceptsNullStrategyAndOmittedOrders },
   { name: 'parseOrdersResponse balanced extract before trailing prose', fn: testExtractsJsonBeforeTrailingBraceInProse },
   { name: 'parseOrdersResponse tries fenced json after bad preamble', fn: testSkipsBadCandidateThenParsesFence },
+  { name: 'parseOrdersResponse rejects top-level JSON array', fn: testRejectsTopLevelJsonArray },
 ];
 
 /**

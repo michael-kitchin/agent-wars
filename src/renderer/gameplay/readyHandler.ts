@@ -8,6 +8,10 @@ import type {
 } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/readyTypes';
+import {
+  applyTacticalPostBeatConsultSideEffects,
+  isTacticalPostBeatConsultOnCommit,
+} from '../tactical/applyTacticalPostBeatConsultSideEffects';
 import type { MeleeInterceptModalOpenArgs, MeleeInterceptModalOutcome } from './meleeInterceptModal';
 import { buildTacticalSubUnitKillLabelOverlay } from './sidebarSupport';
 import { buildTurnUpdateBullets } from './turnUpdateSummary';
@@ -738,13 +742,11 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         S.tacticalBattleSnapshot = commitResult.tacticalBattle;
       }
       const deferredTacticalPostBeatConsult = S.useEventDrivenConsultation && S.runButtonOn;
-      if (deferredTacticalPostBeatConsult) {
-        if ('committedOpponentTacticalDraft' in commitResult) {
-          S.tacticalOpponentDraft = commitResult.committedOpponentTacticalDraft ?? null;
-        }
-        if (commitResult.tacticalResolutionPlayback) {
-          S.tacticalDeferredPostBeatConsultPending = true;
-        }
+      if (deferredTacticalPostBeatConsult && 'committedOpponentTacticalDraft' in commitResult) {
+        S.tacticalOpponentDraft = commitResult.committedOpponentTacticalDraft ?? null;
+      }
+      if (isTacticalPostBeatConsultOnCommit(commitResult)) {
+        applyTacticalPostBeatConsultSideEffects(commitResult, deps);
       } else {
         if ('tacticalOpponentPlan' in commitResult) {
           S.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
@@ -758,6 +760,11 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
           deps.updateOpenRouterToolCountLabels();
         }
       }
+      // Intentionally no `withTacticalHumanDraftPrefetchInvalidation` here: Phase-4 prefetch cancel on *human edits*
+      // during tactical planning uses that wrapper on sidebar/map paths. This block replaces pending rows from the
+      // successful commit IPC (continuations + cleared ranged/air/ferry/embark), not a mid-flight draft tweak.
+      // In-flight tactical prefetch is torn down via `cancelTacticalScopedBackgroundPrefetchForSessionTeardown` when the
+      // res4 session ends; late `requestAiOrders` resolves are dropped in `openRouterRuntime` if `tacticalBattleSnapshot` is gone.
       S.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length
         ? [...commitResult.tacticalMarchContinuations]
         : [];
@@ -853,10 +860,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       deps.scheduleTacticalAnnihilationExit?.();
       if (S.runButtonOn) {
         const oppAlive = S.tacticalBattleSnapshot?.subUnits.some((u) => u.player === 'opponent') ?? false;
-        // Event-driven Run uses deferred `afterTacticalBeatResolution` on main; skip immediate `requestAiOrders`
-        // prefetch here to avoid duplicating that policy path before the push applies (strategic uses awaited consult
-        // inside `game:ready` instead, then optional prefetch after the IPC returns).
-        if (oppAlive && !deferredTacticalPostBeatConsult) deps.startBackgroundRequestIfAllowed();
+        if (oppAlive) deps.startBackgroundRequestIfAllowed();
       }
       deps.updateReadyButtonState();
       return;

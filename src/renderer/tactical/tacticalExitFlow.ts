@@ -89,7 +89,6 @@ export async function tacticalPerformBattleExit(session: TacticalExitSessionAcce
   session.setBattleSnapshot(null);
   closeTacticalAnnihilationOutcomeDialog();
   S.tacticalOpponentDraft = null;
-  S.tacticalDeferredPostBeatConsultPending = false;
   session.setPhasePlanning(true);
   exitTacticalMapView();
   tacticalApplyStrategicSidebarForTacticalMode(false);

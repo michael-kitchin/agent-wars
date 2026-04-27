@@ -10,6 +10,7 @@ import { exitTacticalMapView } from '../map/tacticalMapView';
 import { hideTacticalEntryLayer, syncTacticalEntryButton } from '../map/tacticalEntryLayer';
 import { updateGameStateSidebar } from '../core/uiState';
 import { restoreStrategicOrderDraftsAfterTacticalSession } from './tacticalStrategicOrderUiStash';
+import { cancelTacticalScopedBackgroundPrefetchForSessionTeardown } from '../openRouter/openRouterRuntime';
 
 /**
  * Clears renderer tactical mode and map constraints when the main process has no tactical session (e.g. new game).
@@ -26,10 +27,12 @@ export function tacticalReleaseRendererSessionForNewStrategicMatch(nextState: Ga
   }
   S.resolutionMoveAnimationFrameId = null;
   S.resolutionMoveAnimation = null;
+  cancelTacticalScopedBackgroundPrefetchForSessionTeardown();
   S.tacticalBattleSnapshot = null;
   S.tacticalOpponentDraft = null;
-  S.tacticalDeferredPostBeatConsultPending = false;
   S.tacticalPhasePlanning = true;
+  // No `withTacticalHumanDraftPrefetchInvalidation`: session teardown, not an in-beat human edit. Any tactical-scoped
+  // background `requestAiOrders` was cancelled above while `tacticalBattleSnapshot` was still set for fingerprint bookkeeping.
   S.tacticalPendingMarches = [];
   S.pendingEmbarkOrders = [];
   S.hideCommittedOrderLinesAfterReady = false;
@@ -79,10 +82,11 @@ export function tacticalReconcileBattleAfterStrategicSnapshot(nextState: GameSta
   if (!snap) return;
   if (nextState.phase !== 'planning' || nextState.turnNumber !== snap.strategicTurnNumber) {
     closeTacticalAnnihilationOutcomeDialog();
+    cancelTacticalScopedBackgroundPrefetchForSessionTeardown();
     S.tacticalBattleSnapshot = null;
     S.tacticalOpponentDraft = null;
-    S.tacticalDeferredPostBeatConsultPending = false;
     S.tacticalPhasePlanning = true;
+    // No `withTacticalHumanDraftPrefetchInvalidation`: same rationale as `tacticalReleaseRendererSessionForNewStrategicMatch`.
     S.tacticalPendingMarches = [];
     S.pendingEmbarkOrders = [];
     exitTacticalMapView();

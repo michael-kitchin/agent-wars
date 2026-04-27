@@ -47,7 +47,7 @@ export type { RequestAiOrdersResult } from '../shared/ipcTypes';
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-const POST_RESOLUTION_CONSULT_TIMEOUT_MS = 120_000;
+export const POST_RESOLUTION_CONSULT_TIMEOUT_MS = 120_000;
 
 /**
  * Documents the `ReadyResultMinimal` type alias (export type ReadyResultMinimal).
@@ -543,9 +543,9 @@ export async function handleGameReady(
 
   // Must await post-resolution consultation before returning: `afterResolution` writes opponent pending orders
   // to the DB; a fast second Ready must not run until those rows exist (same ordering contract as melee resolve).
-  // Renderer parity: tactical `commitHumanTacticalDraftOrders` cannot await here (returns snapshot first), so it uses
-  // `postResolutionConsultPush` + `S.tacticalDeferredPostBeatConsultPending` instead—do not switch strategic Ready to a
-  // fire-and-forget consult without adding an equivalent strategic latch on the renderer.
+  // Renderer parity: tactical `commitHumanTacticalDraftOrders` now awaits `runEventDrivenAfterTacticalBeatConsultation`
+  // in the Electron handler before returning (same round-trip contract as strategic Ready here)—do not switch strategic
+  // Ready to a fire-and-forget consult without matching tactical ordering on main.
   const postConsult = await runEventDrivenAfterResolutionConsultation({
     useEventDrivenConsultation,
     resolutionSuccess: readyResult.success,

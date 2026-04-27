@@ -15,6 +15,7 @@ import {
   formatPendingAirStrikeSidebarLabel,
   formatPendingRangedAttackSidebarLabel,
 } from './orderLabelFormatting';
+import { withTacticalHumanDraftPrefetchInvalidation } from '../openRouter/openRouterRuntime';
 import { rendererSharedState as S } from '../core/state';
 import type { HoverRoutePreviewState } from '../core/types';
 import { resolveOrderBlockHexTooltipMessage, showOrderBlockHexTooltip } from '../map/orderBlockHexTooltip';
@@ -241,10 +242,12 @@ export function getRepresentativeSelectedUnitIdsByOrigin(): string[] {
  * Exceptions: None.
  */
 export function replacePendingRangedAttacksForSelected(selectedIds: string[], targetH3Index: string): void {
-  S.pendingRangedAttacks = S.pendingRangedAttacks.filter((row) => !selectedIds.includes(row.unitId));
-  for (const unitId of selectedIds) {
-    S.pendingRangedAttacks.push({ unitId, targetH3Index });
-  }
+  withTacticalHumanDraftPrefetchInvalidation(() => {
+    S.pendingRangedAttacks = S.pendingRangedAttacks.filter((row) => !selectedIds.includes(row.unitId));
+    for (const unitId of selectedIds) {
+      S.pendingRangedAttacks.push({ unitId, targetH3Index });
+    }
+  });
 }
 
 /**
@@ -260,10 +263,12 @@ export function replacePendingAirStrikesForSelected(
   targetH3Index: string,
   targetType: AirStrikeTargetType
 ): void {
-  S.pendingAirStrikes = S.pendingAirStrikes.filter((row) => !selectedIds.includes(row.unitId));
-  for (const unitId of selectedIds) {
-    S.pendingAirStrikes.push({ unitId, targetH3Index, targetType });
-  }
+  withTacticalHumanDraftPrefetchInvalidation(() => {
+    S.pendingAirStrikes = S.pendingAirStrikes.filter((row) => !selectedIds.includes(row.unitId));
+    for (const unitId of selectedIds) {
+      S.pendingAirStrikes.push({ unitId, targetH3Index, targetType });
+    }
+  });
 }
 
 /**
@@ -275,10 +280,12 @@ export function replacePendingAirStrikesForSelected(
  * Exceptions: None.
  */
 export function replacePendingFerryOrdersForSelected(selectedIds: string[], destinationH3Index: string): void {
-  S.pendingFerryOrders = S.pendingFerryOrders.filter((row) => !selectedIds.includes(row.unitId));
-  for (const unitId of selectedIds) {
-    S.pendingFerryOrders.push({ unitId, destinationH3Index });
-  }
+  withTacticalHumanDraftPrefetchInvalidation(() => {
+    S.pendingFerryOrders = S.pendingFerryOrders.filter((row) => !selectedIds.includes(row.unitId));
+    for (const unitId of selectedIds) {
+      S.pendingFerryOrders.push({ unitId, destinationH3Index });
+    }
+  });
 }
 
 /**
@@ -290,13 +297,15 @@ export function replacePendingFerryOrdersForSelected(selectedIds: string[], dest
  * Exceptions: None.
  */
 export function clearPendingTacticalOrders(): void {
-  S.pendingRangedAttacks = [];
-  S.rangedModeActive = false;
-  S.pendingAirStrikes = [];
-  S.airStrikeModeActive = false;
-  S.pendingFerryOrders = [];
-  S.pendingEmbarkOrders = [];
-  S.tacticalPendingMarches = [];
+  withTacticalHumanDraftPrefetchInvalidation(() => {
+    S.pendingRangedAttacks = [];
+    S.rangedModeActive = false;
+    S.pendingAirStrikes = [];
+    S.airStrikeModeActive = false;
+    S.pendingFerryOrders = [];
+    S.pendingEmbarkOrders = [];
+    S.tacticalPendingMarches = [];
+  });
 }
 
 /**
@@ -614,11 +623,13 @@ export async function cancelOrderForUnit(unitId: string, deps: TacticalOrderDeps
  * Exceptions: None.
  */
 export function cancelRangedForUnit(unitId: string, deps: TacticalOrderDeps): void {
-  S.pendingRangedAttacks = S.pendingRangedAttacks.filter((r) => r.unitId !== unitId);
-  if (S.tacticalBattleSnapshot) {
-    S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
-  }
-  S.rangedModeActive = false;
+  withTacticalHumanDraftPrefetchInvalidation(() => {
+    S.pendingRangedAttacks = S.pendingRangedAttacks.filter((r) => r.unitId !== unitId);
+    if (S.tacticalBattleSnapshot) {
+      S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
+    }
+    S.rangedModeActive = false;
+  });
   void refreshHoverRoutePreview(deps);
   deps.updateSidebar();
   deps.updatePendingOrdersSidebar();
@@ -636,11 +647,13 @@ export function cancelRangedForUnit(unitId: string, deps: TacticalOrderDeps): vo
  * Exceptions: None.
  */
 export function cancelAirStrikeForUnit(unitId: string, deps: TacticalOrderDeps): void {
-  S.pendingAirStrikes = S.pendingAirStrikes.filter((r) => r.unitId !== unitId);
-  if (S.tacticalBattleSnapshot) {
-    S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
-  }
-  S.airStrikeModeActive = false;
+  withTacticalHumanDraftPrefetchInvalidation(() => {
+    S.pendingAirStrikes = S.pendingAirStrikes.filter((r) => r.unitId !== unitId);
+    if (S.tacticalBattleSnapshot) {
+      S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
+    }
+    S.airStrikeModeActive = false;
+  });
   void refreshHoverRoutePreview(deps);
   deps.updateSidebar();
   deps.updatePendingOrdersSidebar();
@@ -658,10 +671,12 @@ export function cancelAirStrikeForUnit(unitId: string, deps: TacticalOrderDeps):
  * Exceptions: None.
  */
 export function cancelFerryForUnit(unitId: string, deps: TacticalOrderDeps): void {
-  S.pendingFerryOrders = S.pendingFerryOrders.filter((r) => r.unitId !== unitId);
-  if (S.tacticalBattleSnapshot) {
-    S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
-  }
+  withTacticalHumanDraftPrefetchInvalidation(() => {
+    S.pendingFerryOrders = S.pendingFerryOrders.filter((r) => r.unitId !== unitId);
+    if (S.tacticalBattleSnapshot) {
+      S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
+    }
+  });
   void refreshHoverRoutePreview(deps);
   deps.updateSidebar();
   deps.updatePendingOrdersSidebar();
