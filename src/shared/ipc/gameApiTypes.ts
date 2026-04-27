@@ -19,6 +19,7 @@ import type { NewGameIpcPayload, SubmitOrdersIpcPayload } from './ordersTypes';
 import type { OpenRouterModel, RequestAiOrdersResult } from './openRouterTypes';
 import type {
   GameReadyIpcPayload,
+  PostResolutionConsultPushPayload,
   ReadyResult,
   ResolveMeleeInterceptIpcPayload,
   TacticalCommitResolutionPlayback,
@@ -400,7 +401,17 @@ cancelRequestAiOrders: () => Promise<void>;
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-registerOpenRouterLogListener?: (callback: (payload: { line: string; isError?: boolean }) => void) => void;
+  registerOpenRouterLogListener?: (callback: (payload: { line: string; isError?: boolean }) => void) => void;
+  /**
+   * Registers a listener for main-process deferred post-resolution consultation pushes (tactical post-beat only).
+   *
+   * Contract: Invoked zero or more times after `commitHumanTacticalDraftOrders` when event-driven Run schedules async consult.
+   * Strategic `game:ready` already awaits post-resolution consultation on main; it does not use this channel.
+   * When to use: OpenRouter UI init alongside `registerOpenRouterLogListener`.
+   * Expected outcome: Renderer merges `tacticalOpponentPlan` / strategy when `battleId` matches the active tactical battle.
+   * Exceptions: None; optional on older preload builds.
+   */
+  registerPostResolutionConsultPushListener?: (callback: (payload: PostResolutionConsultPushPayload) => void) => void;
     /**
    * Specifies the contract for the `openRouter` member (openRouter?: { getKey: () => Promise<{ hasKey: boolean }>; getSelectedModel: () => Promise<string>; setKey: (key: string) => Promise<void>;).
 

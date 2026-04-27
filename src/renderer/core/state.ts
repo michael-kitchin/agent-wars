@@ -94,6 +94,17 @@ startTime: number;
    */
 tacticalDeferResolutionClock?: boolean;
     /**
+   * Sub-units copied at tactical Ready commit time (pre-commit snapshot) for resolution march playback lookup only.
+   *
+   * Purpose: `buildResolutionPlaybackMoves` needs `player`/`unitType` per `unitId`; the live `tacticalBattleSnapshot` is
+   * swapped to the post-beat row set before animation runs, so units removed by ranged/melee in the same beat would
+   * otherwise vanish from the map and drop their march segments from playback.
+   * When to use: Tactical `commitHumanTacticalDraftOrders` path when arming `resolutionMoveAnimation` with march moves.
+   * Expected outcome: Merged with current snapshot rows so movers still resolve for lines and glides until the anim ends.
+   * Exceptions: None.
+   */
+tacticalMarchPlaybackUnits?: GameStateSnapshot['units'];
+    /**
    * Specifies the contract for the `combatHexes` member (combatHexes?: string[];).
 
    * Contract: Describes stable behavior for callers of `combatHexes` in this codebase.
@@ -277,6 +288,19 @@ tacticalBattleSnapshot: null as TacticalBattleSnapshot | null,
    * Exceptions: None.
    */
 tacticalOpponentDraft: null as TacticalOpponentPlanPayload | null,
+    /**
+   * True while the main process may still be running deferred `afterTacticalBeatResolution` for the current tactical beat.
+   *
+   * Purpose: Event-driven Run **tactical** commits return before the post-beat LLM finishes; Ready must stay disabled until the
+   * matching `postResolutionConsultPush` arrives (or main sends attach-false after determining no consultation), so the
+   * human cannot commit the next beat before opponent orders for that policy boundary are known or skipped.
+   * Strategic play does **not** set this flag: `game:ready` awaits post-resolution consultation before the IPC resolves.
+   * When to use: Set on tactical Ready success when `useEventDrivenConsultation && runButtonOn`; cleared on every
+   * tactical push for the active `battleId`, on tactical session teardown, and when staging strategic drafts after exit.
+   * Expected outcome: `isWaitingForPrecomputedAiOrders` stays true while this flag is true and an opponent remains.
+   * Exceptions: None.
+   */
+tacticalDeferredPostBeatConsultPending: false,
     /**
    * Documents the object literal property `lastTacticalEntryLayerKey` (lastTacticalEntryLayerKey: null as string | null).
 

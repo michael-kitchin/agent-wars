@@ -53,6 +53,7 @@ import {
   parseHumanTacticalCommitPayload,
 } from './ipcPayloadGuards';
 import { IPC_GAME, IPC_OPENROUTER } from '../shared/ipc/channels';
+import type { PostResolutionConsultPushPayload } from '../shared/ipc/readyTypes';
 import {
   saveKey,
   hasKey,
@@ -393,7 +394,8 @@ function registerIpcHandlers(): void {
     }
     const modelId = getSelectedModel();
     const enabledToolNames = getToolNamesForEnabledGroups(TOOL_GROUP_REGISTRY.map((g) => g.id));
-    const post = await runEventDrivenAfterTacticalBeatConsultation({
+    const battleId = result.tacticalBattle.battleId;
+    const consultArgs = {
       useEventDrivenConsultation: v.useEventDrivenConsultation,
       aiPlanningRunEnabled: v.aiPlanningRunEnabled,
       opponentState: getGameStateForPlayer('opponent', { maskUnexploredTerrain: false }),
@@ -405,19 +407,40 @@ function registerIpcHandlers(): void {
       requestOrders: requestOrdersWithLog,
       timeoutMs: 120_000,
       errorLogMessage: 'commitHumanTacticalDraftOrders: tactical after-beat consultation failed or timed out',
-    });
-    logDebug('main commitHumanTacticalDraftOrders: post-beat tactical consult', {
-      hasPlan: Boolean(post.tacticalOpponentPlan),
-      hasStrategy: Boolean(post.aiStrategy),
-    });
-    return {
-      ...result,
-      ...(post.attachTacticalOpponentPlanToIpc === true
-        ? { tacticalOpponentPlan: post.tacticalOpponentPlan ?? null }
-        : {}),
-      ...(post.aiStrategy ? { aiStrategy: post.aiStrategy } : {}),
-      ...(post.toolInvocationCounts ? { toolInvocationCounts: post.toolInvocationCounts } : {}),
     };
+    logDebug('main commitHumanTacticalDraftOrders: scheduling deferred tactical post-beat consult', { battleId });
+    setImmediate(() => {
+      void (async (): Promise<void> => {
+        try {
+          const post = await runEventDrivenAfterTacticalBeatConsultation(consultArgs);
+          logDebug('main commitHumanTacticalDraftOrders: deferred tactical post-beat consult finished', {
+            battleId,
+            hasPlan: Boolean(post.tacticalOpponentPlan),
+            hasStrategy: Boolean(post.aiStrategy),
+            attach: post.attachTacticalOpponentPlanToIpc === true,
+          });
+          const attach = post.attachTacticalOpponentPlanToIpc === true;
+          const push: PostResolutionConsultPushPayload = {
+            kind: 'tactical',
+            battleId,
+            attachTacticalOpponentPlanToIpc: attach,
+            ...(attach ? { tacticalOpponentPlan: post.tacticalOpponentPlan ?? null } : {}),
+            ...(post.aiStrategy ? { aiStrategy: post.aiStrategy } : {}),
+            ...(post.toolInvocationCounts ? { toolInvocationCounts: post.toolInvocationCounts } : {}),
+          };
+          mainWindow?.webContents.send(IPC_GAME.postResolutionConsultPush, push);
+        } catch (err) {
+          logError('commitHumanTacticalDraftOrders: deferred tactical post-beat consult', err);
+          const fallbackPush: PostResolutionConsultPushPayload = {
+            kind: 'tactical',
+            battleId,
+            attachTacticalOpponentPlanToIpc: false,
+          };
+          mainWindow?.webContents.send(IPC_GAME.postResolutionConsultPush, fallbackPush);
+        }
+      })();
+    });
+    return result;
   });
   ipcMain.handle(
     IPC_GAME.validateGroupRangedTarget,

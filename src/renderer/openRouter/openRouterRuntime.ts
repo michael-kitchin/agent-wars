@@ -123,10 +123,12 @@ function strategicPhaseAllowsBackgroundAi(): boolean {
 
  * Purpose: Supports maintainability by documenting why `startBackgroundRequestIfAllowed` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Expected outcome: No `requestAiOrders` while deferred post-beat consult is pending or the tactical annihilation game-over modal is open.
  * Exceptions: None.
  */
 export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): void {
+  if (S.tacticalDeferredPostBeatConsultPending) return;
+  if (S.tacticalAnnihilationOutcomeDialog != null) return;
   if (S.backgroundRequestInFlight || !isWaitingForPrecomputedAiOrders() || !strategicPhaseAllowsBackgroundAi()) return;
   const keyPromise = window.gameApi?.openRouter?.getKey?.();
   const modelPromise = window.gameApi?.openRouter?.getSelectedModel?.();

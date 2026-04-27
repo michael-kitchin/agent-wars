@@ -16,6 +16,7 @@ import { composeResolutionMapToastBullets } from '../../shared/orderPreviewBlock
 import { tacticalKillEdgesForStrategicStyleTurnUpdate } from '../../shared/tacticalToastKillSlice';
 import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
 import { rendererSharedState as S } from '../core/state';
+import { tacticalOpponentPlanPayloadHasAnyOrders } from '../../shared/ipc/tacticalOpponentPlanMerge';
 import { resetPrecomputedAiState } from '../openRouter/precomputedAiState';
 import { isWaitingForPrecomputedAiOrders } from '../openRouter/aiPlanningState';
 
@@ -665,7 +666,9 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         airStrikes: [...S.pendingAirStrikes],
         ferryOrders: [...S.pendingFerryOrders],
         embarkOrders: [...S.pendingEmbarkOrders],
-        ...(S.tacticalOpponentDraft ? { opponentTacticalDraft: S.tacticalOpponentDraft } : {}),
+        ...(S.tacticalOpponentDraft && tacticalOpponentPlanPayloadHasAnyOrders(S.tacticalOpponentDraft)
+          ? { opponentTacticalDraft: S.tacticalOpponentDraft }
+          : {}),
         useEventDrivenConsultation: S.useEventDrivenConsultation,
         aiPlanningRunEnabled: S.runButtonOn,
       })) as {
@@ -703,17 +706,26 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         (playback?.killsByReturnFire?.length ?? 0) > 0 ||
         (playback?.killsByMelee?.length ?? 0) > 0;
       const needsResolutionPlayback = hasMoves || hasRangedPlayback || hasMeleePlayback || hasKillPlayback;
-      // Start resolution playback before updating the tactical snapshot or awaiting IPC so no redraw can
-      // paint post-commit cells while `resolutionMoveAnimation` is still null (avoids a one-frame teleport hop).
-      // Defer the playback clock and the first rAF until after post-commit awaits so the movement segment is not
-      // consumed invisibly during `getGameState` / terrain refresh (avoids a short initial glide, pause, then tail).
+      // Start resolution playback before updating the tactical snapshot so no redraw can paint post-commit cells
+      // while `resolutionMoveAnimation` is still null (avoids a one-frame teleport hop).
+      // Defer the playback clock and the first rAF until after post-commit `getGameState` / terrain refresh so the
+      // movement segment is not consumed invisibly (avoids a short initial glide, pause, then tail).
       if (playback && needsResolutionPlayback) {
         if (S.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
         S.resolutionMoveAnimationFrameId = null;
+        const tacticalMarchPlaybackUnits = tacticalSubUnitsBeforeCommit?.length
+          ? (tacticalSubUnitsBeforeCommit.map((u) => ({
+              id: u.id,
+              player: u.player,
+              unitType: u.unitType,
+              h3Index: u.h3Index,
+            })) as GameStateSnapshot['units'])
+          : undefined;
         S.resolutionMoveAnimation = {
           moves: [...playback.humanMoves, ...(playback.opponentMoves ?? [])],
           startTime: Date.now(),
           tacticalDeferResolutionClock: true,
+          ...(tacticalMarchPlaybackUnits ? { tacticalMarchPlaybackUnits } : {}),
           rangedCombatHexes: playback.rangedCombatHexes,
           rangedCasualtyHexes: playback.rangedCasualtyHexes,
           rangedRemovedUnits: playback.rangedRemovedUnits,
@@ -725,16 +737,26 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       if (commitResult.tacticalBattle) {
         S.tacticalBattleSnapshot = commitResult.tacticalBattle;
       }
-      if ('tacticalOpponentPlan' in commitResult) {
-        S.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
-      } else if ('committedOpponentTacticalDraft' in commitResult) {
-        S.tacticalOpponentDraft = commitResult.committedOpponentTacticalDraft ?? null;
-      }
-      if (commitResult.aiStrategy) deps.showAiStrategyToast(commitResult.aiStrategy);
-      else deps.hideAiStrategyToast();
-      if (commitResult.toolInvocationCounts) {
-        S.toolInvocationCounts = { ...S.toolInvocationCounts, ...commitResult.toolInvocationCounts };
-        deps.updateOpenRouterToolCountLabels();
+      const deferredTacticalPostBeatConsult = S.useEventDrivenConsultation && S.runButtonOn;
+      if (deferredTacticalPostBeatConsult) {
+        if ('committedOpponentTacticalDraft' in commitResult) {
+          S.tacticalOpponentDraft = commitResult.committedOpponentTacticalDraft ?? null;
+        }
+        if (commitResult.tacticalResolutionPlayback) {
+          S.tacticalDeferredPostBeatConsultPending = true;
+        }
+      } else {
+        if ('tacticalOpponentPlan' in commitResult) {
+          S.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
+        } else if ('committedOpponentTacticalDraft' in commitResult) {
+          S.tacticalOpponentDraft = commitResult.committedOpponentTacticalDraft ?? null;
+        }
+        if (commitResult.aiStrategy) deps.showAiStrategyToast(commitResult.aiStrategy);
+        else deps.hideAiStrategyToast();
+        if (commitResult.toolInvocationCounts) {
+          S.toolInvocationCounts = { ...S.toolInvocationCounts, ...commitResult.toolInvocationCounts };
+          deps.updateOpenRouterToolCountLabels();
+        }
       }
       S.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length
         ? [...commitResult.tacticalMarchContinuations]
@@ -831,7 +853,10 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       deps.scheduleTacticalAnnihilationExit?.();
       if (S.runButtonOn) {
         const oppAlive = S.tacticalBattleSnapshot?.subUnits.some((u) => u.player === 'opponent') ?? false;
-        if (oppAlive) deps.startBackgroundRequestIfAllowed();
+        // Event-driven Run uses deferred `afterTacticalBeatResolution` on main; skip immediate `requestAiOrders`
+        // prefetch here to avoid duplicating that policy path before the push applies (strategic uses awaited consult
+        // inside `game:ready` instead, then optional prefetch after the IPC returns).
+        if (oppAlive && !deferredTacticalPostBeatConsult) deps.startBackgroundRequestIfAllowed();
       }
       deps.updateReadyButtonState();
       return;

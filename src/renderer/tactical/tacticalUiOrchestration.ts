@@ -28,6 +28,7 @@ export function tacticalReleaseRendererSessionForNewStrategicMatch(nextState: Ga
   S.resolutionMoveAnimation = null;
   S.tacticalBattleSnapshot = null;
   S.tacticalOpponentDraft = null;
+  S.tacticalDeferredPostBeatConsultPending = false;
   S.tacticalPhasePlanning = true;
   S.tacticalPendingMarches = [];
   S.pendingEmbarkOrders = [];
@@ -80,6 +81,7 @@ export function tacticalReconcileBattleAfterStrategicSnapshot(nextState: GameSta
     closeTacticalAnnihilationOutcomeDialog();
     S.tacticalBattleSnapshot = null;
     S.tacticalOpponentDraft = null;
+    S.tacticalDeferredPostBeatConsultPending = false;
     S.tacticalPhasePlanning = true;
     S.tacticalPendingMarches = [];
     S.pendingEmbarkOrders = [];

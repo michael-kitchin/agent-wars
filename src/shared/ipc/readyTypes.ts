@@ -183,6 +183,26 @@ export type TacticalOpponentPlanPayload = {
 };
 
 /**
+ * Main → renderer push after tactical beat resolution completes and deferred `afterTacticalBeatResolution` finishes.
+ *
+ * Purpose: Mirrors strategic ordering (resolution first, then LLM) while letting the tactical Ready IPC return before
+ * the consultation network call so the human can start the next beat’s planning in parallel with opponent LLM work.
+ * When to use: Only `game:commitHumanTacticalDraftOrders` when event-driven Run mode schedules `runEventDrivenAfterTacticalBeatConsultation` on a macrotask after the commit response is sent.
+ * Expected outcome: Renderer merges non-empty `tacticalOpponentPlan` when `attachTacticalOpponentPlanToIpc`; a null or
+ * all-empty plan clears the draft and triggers a tactical background refill instead of freezing opponent movement.
+ * Ignores stale `battleId` rows.
+ * Exceptions: None; malformed payloads are ignored client-side.
+ */
+export type PostResolutionConsultPushPayload = {
+  kind: 'tactical';
+  battleId: string;
+  attachTacticalOpponentPlanToIpc: boolean;
+  tacticalOpponentPlan?: TacticalOpponentPlanPayload | null;
+  aiStrategy?: string;
+  toolInvocationCounts?: Record<string, number>;
+};
+
+/**
  * One tactical Ready playback march segment for resolution animation (res4 cells).
  *
  * Purpose: Carries optional `pathH3Indexes` so the renderer can glide units along the planned §12.4 path instead of a straight chord.

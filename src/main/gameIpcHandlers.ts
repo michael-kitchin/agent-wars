@@ -13,6 +13,7 @@ import {
 } from './gameDb';
 import { buildLatLngCoordinateMap } from './mapData';
 import { generateOrdersForStandingOrders } from './tools/tool5StandingOrders';
+import { shouldEndTacticalBattleForAnnihilation } from '../shared/tacticalAnnihilation';
 import { getActiveTacticalBattleSnapshot } from './tacticalBattle/tacticalBattleSession';
 import {
   buildDistinctAiMovesFromPlanningOrders,
@@ -155,13 +156,26 @@ export async function handleRequestAiOrders(
 ): Promise<RequestAiOrdersResult> {
   const state = deps.getGameState();
   const activeTactical = getActiveTacticalBattleSnapshot();
+  if (
+    activeTactical &&
+    shouldEndTacticalBattleForAnnihilation(activeTactical.subUnits)
+  ) {
+    logDebug('handleRequestAiOrders skipping; tactical roster is terminal (annihilation)', {
+      battleId: activeTactical.battleId,
+      turnNumber: state.turnNumber,
+    });
+    return {
+      success: false,
+      error: 'Tactical battle ended; exit to the strategic map before requesting new AI orders.',
+    };
+  }
   if (state.phase !== 'planning') {
     const tacticalDuringResolution = !!activeTactical && state.phase === 'resolution';
     if (!tacticalDuringResolution) {
       return { success: false, error: 'Not in planning phase' };
     }
     logDebug('handleRequestAiOrders allowing tactical opponent consultation during strategic resolution', {
-      battleId: activeTactical.battleId,
+      battleId: activeTactical!.battleId,
       turnNumber: state.turnNumber,
     });
   }
@@ -527,6 +541,11 @@ export async function handleGameReady(
   const allAiMoves = [...aiMoves, ...opponentFerryMoves];
   const allHumanMoves = [...(readyResult.humanMoves ?? []), ...humanFerryMoves];
 
+  // Must await post-resolution consultation before returning: `afterResolution` writes opponent pending orders
+  // to the DB; a fast second Ready must not run until those rows exist (same ordering contract as melee resolve).
+  // Renderer parity: tactical `commitHumanTacticalDraftOrders` cannot await here (returns snapshot first), so it uses
+  // `postResolutionConsultPush` + `S.tacticalDeferredPostBeatConsultPending` instead—do not switch strategic Ready to a
+  // fire-and-forget consult without adding an equivalent strategic latch on the renderer.
   const postConsult = await runEventDrivenAfterResolutionConsultation({
     useEventDrivenConsultation,
     resolutionSuccess: readyResult.success,
@@ -613,6 +632,7 @@ export async function handleResolveMeleeIntercept(
     return { success: false, reason: resolveResult.reason };
   }
 
+  // Same await contract as `handleGameReady`: pending opponent orders must land before the renderer can Ready again.
   const resolvePostConsult = await runEventDrivenAfterResolutionConsultation({
     useEventDrivenConsultation,
     resolutionSuccess: resolveResult.success,

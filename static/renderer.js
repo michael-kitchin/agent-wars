@@ -15024,6 +15024,18 @@
        */
     tacticalOpponentDraft: null,
     /**
+    * True while the main process may still be running deferred `afterTacticalBeatResolution` for the current tactical beat.
+    *
+    * Purpose: Event-driven Run commits return before the post-beat LLM finishes; Ready must stay disabled until the
+    * matching `postResolutionConsultPush` arrives (or main sends attach-false after determining no consultation), so the
+    * human cannot commit the next beat before opponent orders for that policy boundary are known or skipped.
+    * When to use: Set on tactical Ready success when `useEventDrivenConsultation && runButtonOn`; cleared on every
+    * tactical push for the active `battleId`, on tactical session teardown, and when staging strategic drafts after exit.
+    * Expected outcome: `isWaitingForPrecomputedAiOrders` stays true while this flag is true and an opponent remains.
+    * Exceptions: None.
+    */
+    tacticalDeferredPostBeatConsultPending: false,
+    /**
        * Documents the object literal property `lastTacticalEntryLayerKey` (lastTacticalEntryLayerKey: null as string | null).
     
        * Purpose: Avoids rebuilding tactical-entry DOM when the derived overlay key is unchanged between frames.
@@ -15724,7 +15736,9 @@
     if (!rendererSharedState.runButtonOn) return false;
     if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning) {
       const opponentAlive = rendererSharedState.tacticalBattleSnapshot.subUnits.some((u) => u.player === "opponent");
-      return opponentAlive && rendererSharedState.tacticalOpponentDraft === null;
+      if (!opponentAlive) return false;
+      if (rendererSharedState.tacticalDeferredPostBeatConsultPending) return true;
+      return rendererSharedState.tacticalOpponentDraft === null;
     }
     return rendererSharedState.precomputedAiOrders === null;
   }
@@ -19354,13 +19368,16 @@
   }
 
   // src/renderer/openRouter/precomputedAiState.ts
-  var EMPTY_TACTICAL_OPPONENT_DRAFT = {
-    movementOrders: [],
-    rangedAttacks: [],
-    airStrikes: [],
-    ferryOrders: [],
-    embarkOrders: []
-  };
+  function createEmptyTacticalOpponentDraft() {
+    return {
+      movementOrders: [],
+      rangedAttacks: [],
+      airStrikes: [],
+      ferryOrders: [],
+      embarkOrders: []
+    };
+  }
+  var EMPTY_TACTICAL_OPPONENT_DRAFT = createEmptyTacticalOpponentDraft();
   function resetPrecomputedAiState(mode) {
     if (mode === "empty") {
       rendererSharedState.precomputedAiOrders = [];
@@ -19548,6 +19565,7 @@
     rendererSharedState.pendingEmbarkOrders = [];
     rendererSharedState.tacticalPendingMarches = [];
     rendererSharedState.tacticalOpponentDraft = null;
+    rendererSharedState.tacticalDeferredPostBeatConsultPending = false;
     rendererSharedState.rangedModeActive = false;
     rendererSharedState.airStrikeModeActive = false;
   }
@@ -19575,6 +19593,7 @@
     rendererSharedState.resolutionMoveAnimation = null;
     rendererSharedState.tacticalBattleSnapshot = null;
     rendererSharedState.tacticalOpponentDraft = null;
+    rendererSharedState.tacticalDeferredPostBeatConsultPending = false;
     rendererSharedState.tacticalPhasePlanning = true;
     rendererSharedState.tacticalPendingMarches = [];
     rendererSharedState.pendingEmbarkOrders = [];
@@ -19600,6 +19619,7 @@
       closeTacticalAnnihilationOutcomeDialog();
       rendererSharedState.tacticalBattleSnapshot = null;
       rendererSharedState.tacticalOpponentDraft = null;
+      rendererSharedState.tacticalDeferredPostBeatConsultPending = false;
       rendererSharedState.tacticalPhasePlanning = true;
       rendererSharedState.tacticalPendingMarches = [];
       rendererSharedState.pendingEmbarkOrders = [];
@@ -19787,6 +19807,7 @@
     session.setBattleSnapshot(null);
     closeTacticalAnnihilationOutcomeDialog();
     rendererSharedState.tacticalOpponentDraft = null;
+    rendererSharedState.tacticalDeferredPostBeatConsultPending = false;
     session.setPhasePlanning(true);
     exitTacticalMapView();
     tacticalApplyStrategicSidebarForTacticalMode(false);
@@ -20232,6 +20253,18 @@
     return { hideBuildPopup: hideBuildPopup2, showBuildPopup: showBuildPopup2, refreshBuildPopupIfOpen: refreshBuildPopupIfOpen2 };
   }
 
+  // src/shared/ipc/tacticalOpponentPlanMerge.ts
+  function tacticalOpponentPlanPayloadHasAnyOrders(plan) {
+    if (plan == null) return false;
+    return plan.movementOrders.length + plan.rangedAttacks.length + plan.airStrikes.length + plan.ferryOrders.length + plan.embarkOrders.length > 0;
+  }
+  function nextTacticalOpponentDraftAfterDeferredPush(tacticalOpponentPlan) {
+    if (tacticalOpponentPlan != null && tacticalOpponentPlanPayloadHasAnyOrders(tacticalOpponentPlan)) {
+      return { draft: tacticalOpponentPlan, startBackgroundPrefetch: false };
+    }
+    return { draft: null, startBackgroundPrefetch: true };
+  }
+
   // src/renderer/gameplay/tacticalBattlePromptPreference.ts
   var STORAGE_KEY = "agentWars.tacticalBattlesInterceptPrompt";
   function readTacticalBattlesInterceptPromptEnabled() {
@@ -20255,6 +20288,32 @@
     const api = window.gameApi?.openRouter;
     if (!api) return;
     window.gameApi?.registerOpenRouterLogListener?.((p) => deps.appendOpenRouterLog(p.line, p.isError ?? false));
+    window.gameApi?.registerPostResolutionConsultPushListener?.((payload) => {
+      if (payload.kind !== "tactical") return;
+      if (payload.battleId !== rendererSharedState.tacticalBattleSnapshot?.battleId) return;
+      rendererSharedState.tacticalDeferredPostBeatConsultPending = false;
+      if (payload.attachTacticalOpponentPlanToIpc) {
+        const { draft, startBackgroundPrefetch } = nextTacticalOpponentDraftAfterDeferredPush(
+          payload.tacticalOpponentPlan
+        );
+        rendererSharedState.tacticalOpponentDraft = draft;
+        if (startBackgroundPrefetch) deps.startBackgroundRequestIfAllowed();
+      } else {
+        const oppAlive = rendererSharedState.tacticalBattleSnapshot?.subUnits.some((u) => u.player === "opponent") ?? false;
+        if (rendererSharedState.runButtonOn && oppAlive && rendererSharedState.tacticalOpponentDraft === null) {
+          deps.startBackgroundRequestIfAllowed();
+        }
+      }
+      if (payload.aiStrategy) deps.showAiStrategyToast(payload.aiStrategy);
+      else deps.hideAiStrategyToast();
+      if (payload.toolInvocationCounts) {
+        rendererSharedState.toolInvocationCounts = { ...rendererSharedState.toolInvocationCounts, ...payload.toolInvocationCounts };
+        deps.updateOpenRouterToolCountLabels();
+      }
+      deps.appendOpenRouterLog("Tactical post-beat consultation (deferred) applied.", false);
+      deps.requestRedraw();
+      deps.updateReadyButtonState();
+    });
     deps.updateOpenRouterCostLabel();
     const tabTools = document.getElementById("openrouter-tab-tools");
     const tabModel = document.getElementById("openrouter-tab-model");
@@ -20448,6 +20507,7 @@
     return !!(rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning);
   }
   function startBackgroundRequestIfAllowed(deps) {
+    if (rendererSharedState.tacticalDeferredPostBeatConsultPending) return;
     if (rendererSharedState.backgroundRequestInFlight || !isWaitingForPrecomputedAiOrders() || !strategicPhaseAllowsBackgroundAi()) return;
     const keyPromise = window.gameApi?.openRouter?.getKey?.();
     const modelPromise = window.gameApi?.openRouter?.getSelectedModel?.();
@@ -22471,7 +22531,7 @@
           airStrikes: [...rendererSharedState.pendingAirStrikes],
           ferryOrders: [...rendererSharedState.pendingFerryOrders],
           embarkOrders: [...rendererSharedState.pendingEmbarkOrders],
-          ...rendererSharedState.tacticalOpponentDraft ? { opponentTacticalDraft: rendererSharedState.tacticalOpponentDraft } : {},
+          ...rendererSharedState.tacticalOpponentDraft && tacticalOpponentPlanPayloadHasAnyOrders(rendererSharedState.tacticalOpponentDraft) ? { opponentTacticalDraft: rendererSharedState.tacticalOpponentDraft } : {},
           useEventDrivenConsultation: rendererSharedState.useEventDrivenConsultation,
           aiPlanningRunEnabled: rendererSharedState.runButtonOn
         });
@@ -22490,10 +22550,17 @@
         if (playback && needsResolutionPlayback) {
           if (rendererSharedState.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
           rendererSharedState.resolutionMoveAnimationFrameId = null;
+          const tacticalMarchPlaybackUnits = tacticalSubUnitsBeforeCommit?.length ? tacticalSubUnitsBeforeCommit.map((u) => ({
+            id: u.id,
+            player: u.player,
+            unitType: u.unitType,
+            h3Index: u.h3Index
+          })) : void 0;
           rendererSharedState.resolutionMoveAnimation = {
             moves: [...playback.humanMoves, ...playback.opponentMoves ?? []],
             startTime: Date.now(),
             tacticalDeferResolutionClock: true,
+            ...tacticalMarchPlaybackUnits ? { tacticalMarchPlaybackUnits } : {},
             rangedCombatHexes: playback.rangedCombatHexes,
             rangedCasualtyHexes: playback.rangedCasualtyHexes,
             rangedRemovedUnits: playback.rangedRemovedUnits,
@@ -22505,16 +22572,26 @@
         if (commitResult.tacticalBattle) {
           rendererSharedState.tacticalBattleSnapshot = commitResult.tacticalBattle;
         }
-        if ("tacticalOpponentPlan" in commitResult) {
-          rendererSharedState.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
-        } else if ("committedOpponentTacticalDraft" in commitResult) {
-          rendererSharedState.tacticalOpponentDraft = commitResult.committedOpponentTacticalDraft ?? null;
-        }
-        if (commitResult.aiStrategy) deps.showAiStrategyToast(commitResult.aiStrategy);
-        else deps.hideAiStrategyToast();
-        if (commitResult.toolInvocationCounts) {
-          rendererSharedState.toolInvocationCounts = { ...rendererSharedState.toolInvocationCounts, ...commitResult.toolInvocationCounts };
-          deps.updateOpenRouterToolCountLabels();
+        const deferredTacticalPostBeatConsult = rendererSharedState.useEventDrivenConsultation && rendererSharedState.runButtonOn;
+        if (deferredTacticalPostBeatConsult) {
+          if ("committedOpponentTacticalDraft" in commitResult) {
+            rendererSharedState.tacticalOpponentDraft = commitResult.committedOpponentTacticalDraft ?? null;
+          }
+          if (commitResult.tacticalResolutionPlayback) {
+            rendererSharedState.tacticalDeferredPostBeatConsultPending = true;
+          }
+        } else {
+          if ("tacticalOpponentPlan" in commitResult) {
+            rendererSharedState.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
+          } else if ("committedOpponentTacticalDraft" in commitResult) {
+            rendererSharedState.tacticalOpponentDraft = commitResult.committedOpponentTacticalDraft ?? null;
+          }
+          if (commitResult.aiStrategy) deps.showAiStrategyToast(commitResult.aiStrategy);
+          else deps.hideAiStrategyToast();
+          if (commitResult.toolInvocationCounts) {
+            rendererSharedState.toolInvocationCounts = { ...rendererSharedState.toolInvocationCounts, ...commitResult.toolInvocationCounts };
+            deps.updateOpenRouterToolCountLabels();
+          }
         }
         rendererSharedState.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length ? [...commitResult.tacticalMarchContinuations] : [];
         rendererSharedState.pendingRangedAttacks = [];
@@ -22607,7 +22684,7 @@
         deps.scheduleTacticalAnnihilationExit?.();
         if (rendererSharedState.runButtonOn) {
           const oppAlive = rendererSharedState.tacticalBattleSnapshot?.subUnits.some((u) => u.player === "opponent") ?? false;
-          if (oppAlive) deps.startBackgroundRequestIfAllowed();
+          if (oppAlive && !deferredTacticalPostBeatConsult) deps.startBackgroundRequestIfAllowed();
         }
         deps.updateReadyButtonState();
         return;
@@ -24991,7 +25068,11 @@
           unitType: u.unitType,
           h3Index: u.h3Index
         }));
-        return getUnitsForDrawWithMovingIds({ ...state, units: tacticalUnits }, {
+        const merged = mergeTacticalSubUnitsForMarchPlayback(
+          tacticalUnits,
+          rendererSharedState.resolutionMoveAnimation.tacticalMarchPlaybackUnits
+        );
+        return getUnitsForDrawWithMovingIds({ ...state, units: merged }, {
           backgroundColor: BACKGROUND_COLOR,
           buildResolutionPlaybackState: buildResolutionPlaybackState2,
           hideBuildPopup,
@@ -25104,6 +25185,14 @@
       showBuildPopup
     });
   }
+  function mergeTacticalSubUnitsForMarchPlayback(current, pre) {
+    if (!pre?.length) return current;
+    const byId = new Map(current.map((u) => [u.id, u]));
+    for (const u of pre) {
+      if (!byId.has(u.id)) byId.set(u.id, u);
+    }
+    return [...byId.values()];
+  }
   function drawGameScene(ctx, width, height, state) {
     syncRes4TransportVectorLeafletLayer();
     ctx.clearRect(0, 0, width, height);
@@ -25134,14 +25223,15 @@
         h3Index: u.h3Index
       }));
       const anim2 = rendererSharedState.resolutionMoveAnimation;
+      const tacticalUnitsForMarchPlayback = anim2 ? mergeTacticalSubUnitsForMarchPlayback(tacticalUnits, anim2.tacticalMarchPlaybackUnits) : tacticalUnits;
       let moveProgress2 = 1;
       let airStrikeOutboundProgress2 = 1;
       let airStrikeReturnProgress2 = 1;
       let playbackPhase2 = null;
-      const regularPlaybackMoves2 = buildResolutionPlaybackMoves(anim2?.moves ?? [], tacticalUnits);
+      const regularPlaybackMoves2 = buildResolutionPlaybackMoves(anim2?.moves ?? [], tacticalUnitsForMarchPlayback);
       const airStrikeOutboundPlaybackMoves2 = anim2?.airStrikeOutboundMoves ?? [];
       const airStrikeReturnPlaybackMoves2 = anim2?.airStrikeReturnMoves ?? [];
-      const stateForTacticalAnim = anim2 && tacticalUnits.length > 0 ? { ...state, units: tacticalUnits } : state;
+      const stateForTacticalAnim = anim2 && tacticalUnitsForMarchPlayback.length > 0 ? { ...state, units: tacticalUnitsForMarchPlayback } : state;
       const { unitsToDraw: unitsToDraw2, movingIds: movingIds2 } = anim2 ? getUnitsForDrawWithMovingIds2(stateForTacticalAnim) : { unitsToDraw: tacticalUnits, movingIds: void 0 };
       if (anim2) {
         const elapsed = resolutionAnimationElapsedMs2(anim2);
@@ -25543,7 +25633,10 @@
       openNewGameOverlayFromModelTab: openNewGameOverlayFromModelTab2,
       startBackgroundRequestIfAllowed: startBackgroundRequestIfAllowed2,
       updateReadyButtonState,
-      syncOpenRouterRunToggleInteractable
+      syncOpenRouterRunToggleInteractable,
+      showAiStrategyToast,
+      updateOpenRouterToolCountLabels,
+      requestRedraw
     });
   }
   function init() {

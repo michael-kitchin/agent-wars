@@ -156,6 +156,8 @@ export function buildDistinctAiMovesFromPlanningOrders(
  * Purpose: Consolidates the duplicated `Promise.race` + `afterResolution` try/catch in Ready vs melee-resolve handlers.
  * When to use: When `useEventDrivenConsultation && resolution.success && aiPlanningRunEnabled` after a finished turn.
  * Expected outcome: Partial strategy/tool-count updates, or empty object on skip/timeout/failure (errors logged).
+ * Contract: Callers **must** await this before resolving strategic `game:ready` / `game:resolveMeleeIntercept` IPC so the
+ * renderer never re-enables Ready mid-consultation (tactical beat consult is deferred separately via push + pending flag).
  * Exceptions: Does not throw; failures are logged at error and swallowed.
  */
 export async function runEventDrivenAfterResolutionConsultation(args: {
@@ -208,7 +210,7 @@ export async function runEventDrivenAfterResolutionConsultation(args: {
  * Post–tactical-beat event-driven consultation with the same timeout envelope as strategic Ready follow-up.
  *
  * Purpose: Lets the opponent LLM re-plan inside an active tactical session when callbacks or tactical mandatory rules fire.
- * When to use: `game:commitHumanTacticalDraftOrders` after a successful commit when the renderer passed event-driven flags.
+ * When to use: After tactical beat resolution succeeds: from Electron `game:commitHumanTacticalDraftOrders` (deferred via `setImmediate` + push, mirroring strategic “resolution then consult” ordering) or from tests that call this helper directly.
  * Expected outcome: Optional `tacticalOpponentPlan` (and `attachTacticalOpponentPlanToIpc`) when evaluation invoked the LLM; otherwise empty merge so IPC can preserve the renderer draft.
  * Exceptions: Does not throw; failures are logged at error and swallowed.
  */

@@ -1095,6 +1095,7 @@ export function commitHumanTacticalDraftOrders(args: {
     };
     logDebug('gameActions commitHumanTacticalDraftOrders playback', {
       humanMoveCount: humanMoves.length,
+      opponentMoveCount: opponentMoves.length,
       rangedCombatHexCount: rangedCombatHexes.length,
       rangedRemovedCount: rangedRemovedUnits.length,
       rangedKillEdgeCount: support.killsByDirectFire.length,

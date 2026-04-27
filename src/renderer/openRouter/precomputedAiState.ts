@@ -3,6 +3,24 @@ import type { RequestAiOrdersResult } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
 
 /**
+ * Builds a new empty tactical opponent plan with fresh array instances (safe to mutate without affecting shared constants).
+ *
+ * Purpose: Single source for empty-plan shape used by failure unblock, deferred-consult placeholders, and exports.
+ * When to use: Internal to this module and via `getEmptyTacticalOpponentPlanPayload` when callers need their own copy.
+ * Expected outcome: Object matching `TacticalOpponentPlanPayload` with all lists empty.
+ * Exceptions: None.
+ */
+function createEmptyTacticalOpponentDraft(): TacticalOpponentPlanPayload {
+  return {
+    movementOrders: [],
+    rangedAttacks: [],
+    airStrikes: [],
+    ferryOrders: [],
+    embarkOrders: [],
+  };
+}
+
+/**
  * Valid empty opponent plan used only to leave the “waiting for tactical AI” state after a failed background request.
  *
  * Purpose: `isWaitingForPrecomputedAiOrders` treats `tacticalOpponentDraft === null` as still waiting; a typed empty payload is truthy for commit spread yet carries no opponent rows.
@@ -10,13 +28,20 @@ import { rendererSharedState as S } from '../core/state';
  * Expected outcome: Ready unlocks; the player may commit the human beat with no opponent draft or retry after the next successful fetch repopulates the draft.
  * Exceptions: None.
  */
-const EMPTY_TACTICAL_OPPONENT_DRAFT: TacticalOpponentPlanPayload = {
-  movementOrders: [],
-  rangedAttacks: [],
-  airStrikes: [],
-  ferryOrders: [],
-  embarkOrders: [],
-};
+const EMPTY_TACTICAL_OPPONENT_DRAFT: TacticalOpponentPlanPayload = createEmptyTacticalOpponentDraft();
+
+/**
+ * Returns a fresh empty tactical opponent plan object for Run-mode latch bookkeeping.
+ *
+ * Purpose: `isWaitingForPrecomputedAiOrders` treats `tacticalOpponentDraft === null` as “still waiting”; after a tactical
+ * commit that defers post-beat LLM to main, the renderer must hold a non-null placeholder until the push arrives.
+ * When to use: Tactical Ready success path with event-driven + Run, and IPC push handlers that must not restore `null`.
+ * Expected outcome: Same shape as a failed-background unblock; commit may still omit `opponentTacticalDraft` when empty.
+ * Exceptions: None.
+ */
+export function getEmptyTacticalOpponentPlanPayload(): TacticalOpponentPlanPayload {
+  return createEmptyTacticalOpponentDraft();
+}
 
 /**
  * Documents the `PrecomputedResetMode` type alias (type PrecomputedResetMode).

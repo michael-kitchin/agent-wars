@@ -52,8 +52,9 @@ export function setReadyButtonLabelAiWait(readyBtn: HTMLButtonElement, elapsedMs
  * Purpose: Supports maintainability by documenting why `updateReadyButtonState` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Disables the control while the game is over, while precomputed AI orders are still loading, or
- * while `readyRequestInFlight` is true for an in-progress Ready / tactical-commit pipeline; restores label/interval
- * state for the AI-wait countdown when applicable.
+ * while `readyRequestInFlight` is true for an in-progress strategic `game:ready` / melee-resolve IPC (which includes
+ * awaited post-resolution consultation on main), or while tactical Run waits on `isWaitingForPrecomputedAiOrders`;
+ * restores label/interval state for the AI-wait countdown when applicable.
  * Exceptions: None.
  */
 export function updateReadyButtonState(): void {

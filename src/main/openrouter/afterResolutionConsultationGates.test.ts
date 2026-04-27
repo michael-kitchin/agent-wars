@@ -1,31 +1,17 @@
 /**
- * Pure predicates for post-resolution LLM consultation gating (`opponent idle` paths).
+ * Pure predicates for post-resolution LLM consultation gating (opponent idle and human-observable paths).
  * Run with: node dist/main/openrouter/afterResolutionConsultationGates.test.js
  */
 
 import * as assert from 'assert';
-import { opponentHadStrategicResolutionUnitActions, opponentHadTacticalBeatResolutionActions } from './afterResolution';
-import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import {
+  humanHadStrategicResolutionObservableActions,
+  humanHadTacticalBeatResolutionActions,
+  opponentHadStrategicResolutionUnitActions,
+  opponentHadTacticalBeatResolutionActions,
+} from './afterResolution';
 import type { TacticalCommitResolutionPlayback } from '../../shared/ipcTypes';
-
-/**
- * Defines the `minimalTacticalBattle` function shape.
-
- * Purpose: Minimal `TacticalBattleSnapshot` for tactical idle-detection tests (only `subUnits` matter to the helper).
- * When to use: Tactical predicate cases below.
- * Expected outcome: Structurally valid enough for TypeScript when cast.
- * Exceptions: None.
- */
-function minimalTacticalBattle(subUnits: TacticalBattleSnapshot['subUnits']): TacticalBattleSnapshot {
-  return {
-    battleId: 'gate-test',
-    enclosingRes1H3Index: '81193ffffffffff',
-    res4ChildH3Indexes: ['81283fffffffffff'],
-    strategicTurnNumber: 1,
-    tacticalTurnNumber: 1,
-    subUnits,
-  };
-}
+import { emptyOpponentState, minimalTacticalBattle } from './testSupport/postResolutionConsultationFixtures';
 
 /**
  * Defines the `testOpponentHadStrategicResolutionUnitActionsQuietTurn` function shape.
@@ -128,6 +114,83 @@ function testOpponentHadTacticalBeatResolutionActionsDetectsMarch(): void {
 }
 
 /**
+ * Defines the `testHumanHadStrategicResolutionObservableActionsHumanMove` function shape.
+
+ * Purpose: Human march rows in `ReadyResult` trigger observable detection.
+ * When to use: `afterResolution` human policy branch.
+ * Expected outcome: True when `fromH3Index !== toH3Index`.
+ * Exceptions: None.
+ */
+function testHumanHadStrategicResolutionObservableActionsHumanMove(): void {
+  assert.strictEqual(
+    humanHadStrategicResolutionObservableActions(
+      {
+        humanMoves: [{ unitId: 'human-infantry-1', fromH3Index: '81193ffffffffff', toH3Index: '81195ffffffffff' }],
+      },
+      emptyOpponentState()
+    ),
+    true
+  );
+}
+
+/**
+ * Defines the `testHumanHadStrategicResolutionObservableActionsKillFallback` function shape.
+
+ * Purpose: When the opponent snapshot lists no human `units`, killer ids still match `human-` prefix.
+ * When to use: Fog-masked opponent perspective.
+ * Expected outcome: True for `killsByDirectFire` with a `human-*` killer.
+ * Exceptions: None.
+ */
+function testHumanHadStrategicResolutionObservableActionsKillFallback(): void {
+  assert.strictEqual(
+    humanHadStrategicResolutionObservableActions(
+      {
+        killsByDirectFire: [{ victimId: 'opponent-infantry-1', killerIds: ['human-armor-1'] }],
+      },
+      emptyOpponentState()
+    ),
+    true
+  );
+}
+
+/**
+ * Defines the `testHumanHadStrategicResolutionObservableActionsQuiet` function shape.
+
+ * Purpose: No moves, ferry, strikes, or kill edges means no human observable activity.
+ * When to use: Same module.
+ * Expected outcome: False.
+ * Exceptions: None.
+ */
+function testHumanHadStrategicResolutionObservableActionsQuiet(): void {
+  assert.strictEqual(humanHadStrategicResolutionObservableActions({}, emptyOpponentState()), false);
+}
+
+/**
+ * Defines the `testHumanHadTacticalBeatResolutionActionsHumanMarch` function shape.
+
+ * Purpose: Tactical human march segment triggers observable detection.
+ * When to use: `afterTacticalBeatResolution` human policy branch.
+ * Expected outcome: True.
+ * Exceptions: None.
+ */
+function testHumanHadTacticalBeatResolutionActionsHumanMarch(): void {
+  const battle = minimalTacticalBattle([
+    {
+      id: 'hum-1',
+      parentUnitId: 'hp',
+      player: 'human',
+      unitType: 'infantry',
+      h3Index: '81283fffffffffff',
+      displayName: 'H',
+    },
+  ]);
+  const playback: TacticalCommitResolutionPlayback = {
+    humanMoves: [{ unitId: 'hum-1', fromH3Index: '81283fffffffffff', toH3Index: '81284fffffffffff' }],
+  };
+  assert.strictEqual(humanHadTacticalBeatResolutionActions(playback, battle), true);
+}
+
+/**
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Node test driver after `tsc`.
@@ -141,6 +204,10 @@ function run(): void {
   testOpponentHadStrategicResolutionUnitActionsDetectsCombatIds();
   testOpponentHadTacticalBeatResolutionActionsIdle();
   testOpponentHadTacticalBeatResolutionActionsDetectsMarch();
+  testHumanHadStrategicResolutionObservableActionsHumanMove();
+  testHumanHadStrategicResolutionObservableActionsKillFallback();
+  testHumanHadStrategicResolutionObservableActionsQuiet();
+  testHumanHadTacticalBeatResolutionActionsHumanMarch();
   console.log('afterResolutionConsultationGates.test.ts passed');
 }
 

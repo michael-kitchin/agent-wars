@@ -16,6 +16,26 @@ import type { AirStrikeOrder, EmbarkOrder, FerryOrder, ReadyResult, TacticalOppo
 import { setActiveTacticalBattleSnapshotRef } from './tacticalBattle/activeTacticalBattleRef';
 import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
 
+/** Two-sided tactical roster so `shouldEndTacticalBattleForAnnihilation` is false (IPC tests are not annihilation scenarios). */
+const ipcTestTacticalSubUnits: TacticalBattleSnapshot['subUnits'] = [
+  {
+    id: 'hum-su-1',
+    parentUnitId: 'human-1',
+    player: 'human',
+    unitType: 'infantry',
+    h3Index: '891f1d48b9fffff',
+    displayName: 'H',
+  },
+  {
+    id: 'opp-su-1',
+    parentUnitId: 'opponent-1',
+    player: 'opponent',
+    unitType: 'armor',
+    h3Index: '891f1d48b9fffff',
+    displayName: 'O',
+  },
+];
+
 /**
  * Documents the module-scope binding `minimalPlanningState` (minimalPlanningState).
 
@@ -209,7 +229,7 @@ async function testRequestAiOrdersTacticalBuffersOpponentPlan(): Promise<void> {
     res4ChildH3Indexes: ['891f1d48b9fffff'],
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
-    subUnits: [],
+    subUnits: ipcTestTacticalSubUnits,
   };
   setActiveTacticalBattleSnapshotRef(tacticalSnap);
   try {
@@ -263,7 +283,7 @@ async function testRequestAiOrdersTacticalSucceedsDuringStrategicResolution(): P
     res4ChildH3Indexes: ['891f1d48b9fffff'],
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
-    subUnits: [],
+    subUnits: ipcTestTacticalSubUnits,
   };
   setActiveTacticalBattleSnapshotRef(tacticalSnap);
   try {
@@ -286,6 +306,61 @@ async function testRequestAiOrdersTacticalSucceedsDuringStrategicResolution(): P
     const ok = result as { tacticalOpponentPlan?: TacticalOpponentPlanPayload };
     assert.ok(ok.tacticalOpponentPlan);
     assert.strictEqual(ok.tacticalOpponentPlan!.movementOrders.length, 1);
+  } finally {
+    setActiveTacticalBattleSnapshotRef(null);
+  }
+}
+
+/**
+ * Defines the `testRequestAiOrdersTacticalAnnihilationBlocksLlm` function shape.
+ *
+ * Purpose: While the tactical annihilation modal is up, the active snapshot is terminal; `requestAiOrders` must not invoke the model.
+ * When to use: Regression when editing `handleRequestAiOrders` tactical gating.
+ * Expected outcome: Failure without calling `requestOrders` when one side has zero sub-units.
+ * Exceptions: None.
+ */
+async function testRequestAiOrdersTacticalAnnihilationBlocksLlm(): Promise<void> {
+  const tacticalSnap: TacticalBattleSnapshot = {
+    battleId: 'tb-annihilation-ipc',
+    enclosingRes1H3Index: '891f1d48b9fffff',
+    res4ChildH3Indexes: ['891f1d48b9fffff'],
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits: [
+      {
+        id: 'hum-su-1',
+        parentUnitId: 'human-1',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: '891f1d48b9fffff',
+        displayName: 'H',
+      },
+    ],
+  };
+  setActiveTacticalBattleSnapshotRef(tacticalSnap);
+  try {
+    let calls = 0;
+    const controllerRef = { current: null as AbortController | null };
+    const deps = {
+      getGameState: () => minimalPlanningState,
+      getGameStateForPlayer: () => minimalPlanningState,
+      getSelectedModel: () => 'test-model',
+      hasKey: () => true,
+      getToolNamesForEnabledGroups: () => ['planning', 'assessment', 'estimation'],
+      defaultGroupIds: ['planning', 'assessment', 'estimation'],
+      requestOrders: async (): Promise<RequestAiOrdersResult> => {
+        calls += 1;
+        return { success: true, orders: [] };
+      },
+      controllerRef,
+    };
+    const result = await handleRequestAiOrders({}, deps);
+    assert.strictEqual(calls, 0);
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(
+      (result as { error: string }).error,
+      'Tactical battle ended; exit to the strategic map before requesting new AI orders.'
+    );
   } finally {
     setActiveTacticalBattleSnapshotRef(null);
   }
@@ -659,6 +734,7 @@ async function runAll(): Promise<void> {
       name: 'requestAiOrders tactical succeeds during strategic resolution',
       fn: testRequestAiOrdersTacticalSucceedsDuringStrategicResolution,
     },
+    { name: 'requestAiOrders tactical annihilation blocks LLM', fn: testRequestAiOrdersTacticalAnnihilationBlocksLlm },
     { name: 'requestAiOrders cancelled', fn: testRequestAiOrdersCancelled },
     { name: 'game:ready precomputed skips requestOrders', fn: testGameReadyPrecomputedSkipsRequestOrders },
     {

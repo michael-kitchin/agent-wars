@@ -2127,8 +2127,12 @@ function getUnitsForDrawWithMovingIds(state: GameStateSnapshot): {
         player: u.player,
         unitType: u.unitType,
         h3Index: u.h3Index,
-      }));
-      return getUnitsForDrawWithMovingIdsFromModule({ ...state, units: tacticalUnits }, {
+      })) as GameStateSnapshot['units'];
+      const merged = mergeTacticalSubUnitsForMarchPlayback(
+        tacticalUnits,
+        S.resolutionMoveAnimation.tacticalMarchPlaybackUnits
+      );
+      return getUnitsForDrawWithMovingIdsFromModule({ ...state, units: merged }, {
         backgroundColor: BACKGROUND_COLOR,
         buildResolutionPlaybackState,
         hideBuildPopup,
@@ -2340,6 +2344,28 @@ function updateMapInteractionCursor(clientX: number, clientY: number): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * Merges current tactical sub-unit rows with a pre-commit copy so resolution playback can still resolve movers removed
+ * later in the same beat (ranged/melee) from `buildResolutionPlaybackMoves`.
+ *
+ * Purpose: Post-commit `tacticalBattleSnapshot.subUnits` omits casualties; march `ResolutionMove` entries would
+ * otherwise lose `player`/`unitType` lookup and be dropped from lines and glides.
+ * When to use: Tactical `drawGameScene` and `getUnitsForDrawWithMovingIds` while `resolutionMoveAnimation` is active.
+ * Expected outcome: Prefer live rows when an id exists; add missing ids from `pre` only.
+ * Exceptions: None.
+ */
+function mergeTacticalSubUnitsForMarchPlayback(
+  current: GameStateSnapshot['units'],
+  pre: GameStateSnapshot['units'] | undefined
+): GameStateSnapshot['units'] {
+  if (!pre?.length) return current;
+  const byId = new Map(current.map((u) => [u.id, u]));
+  for (const u of pre) {
+    if (!byId.has(u.id)) byId.set(u.id, u);
+  }
+  return [...byId.values()];
+}
+
 function drawGameScene(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -2375,15 +2401,20 @@ function drawGameScene(
       h3Index: u.h3Index,
     })) as GameStateSnapshot['units'];
     const anim = S.resolutionMoveAnimation;
+    const tacticalUnitsForMarchPlayback = anim
+      ? mergeTacticalSubUnitsForMarchPlayback(tacticalUnits, anim.tacticalMarchPlaybackUnits)
+      : tacticalUnits;
     let moveProgress = 1;
     let airStrikeOutboundProgress = 1;
     let airStrikeReturnProgress = 1;
     let playbackPhase: ResolutionPlaybackPhase | null = null;
-    const regularPlaybackMoves = buildResolutionPlaybackMoves(anim?.moves ?? [], tacticalUnits);
+    const regularPlaybackMoves = buildResolutionPlaybackMoves(anim?.moves ?? [], tacticalUnitsForMarchPlayback);
     const airStrikeOutboundPlaybackMoves = anim?.airStrikeOutboundMoves ?? [];
     const airStrikeReturnPlaybackMoves = anim?.airStrikeReturnMoves ?? [];
     const stateForTacticalAnim =
-      anim && tacticalUnits.length > 0 ? { ...state, units: tacticalUnits } : state;
+      anim && tacticalUnitsForMarchPlayback.length > 0
+        ? { ...state, units: tacticalUnitsForMarchPlayback }
+        : state;
     const { unitsToDraw, movingIds } = anim
       ? getUnitsForDrawWithMovingIds(stateForTacticalAnim)
       : { unitsToDraw: tacticalUnits, movingIds: undefined };
@@ -3151,6 +3182,9 @@ function initOpenRouterUI(): void {
     startBackgroundRequestIfAllowed,
     updateReadyButtonState,
     syncOpenRouterRunToggleInteractable,
+    showAiStrategyToast,
+    updateOpenRouterToolCountLabels,
+    requestRedraw,
   });
 }
 

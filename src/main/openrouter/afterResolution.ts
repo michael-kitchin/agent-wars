@@ -1,11 +1,11 @@
 /**
  * After-resolution callback evaluation and conditional consultation (Milestone 0.7).
  * Runs when event-driven mode is on: evaluates mandatory overrides and subscription events,
- * and if any fire, invokes the LLM and stores pending orders for the next turn.
+ * and consults when those fire, when the opponent had no resolution-time unit actions, or when the human had observable resolution outcomes.
  * Call synchronously after ready() returns so pending orders are set before the next Ready.
  */
 
-import { logDebug, logError, logTrace } from '../logger';
+import { logDebug, logError } from '../logger';
 import type { GameStateSnapshot } from '../gameDb';
 import {
   getAiLastConsultationTurn,
@@ -24,92 +24,18 @@ import {
   evaluateTacticalMandatoryOverrides,
   type ResolutionContext,
 } from '../callbackEvaluation';
-import type { ReadyResult, RequestAiOrdersResult, TacticalCommitResolutionPlayback } from '../../shared/ipcTypes';
+import type { RequestAiOrdersResult, TacticalCommitResolutionPlayback } from '../../shared/ipcTypes';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/readyTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-
-/**
- * Strategic `ReadyResult` slice used to detect opponent activity during the resolved turn (march, ferry, strikes, combat).
- *
- * Purpose: Keeps `opponentHadStrategicResolutionUnitActions` aligned with fields present on completed Ready / melee-intercept results.
- * When to use: Only as the argument type for `opponentHadStrategicResolutionUnitActions` and the `afterResolution` participant pick.
- * Expected outcome: All listed keys are optional on wire payloads except where finalize always sets booleans.
- * Exceptions: None.
- */
-type StrategicResolutionOpponentActivitySlice = Pick<
-  ReadyResult,
-  | 'opponentCombatParticipantUnitIds'
-  | 'resolvedFerryMoves'
-  | 'airStrikeMoves'
-  | 'opponentHadStrategicMarchResolution'
->;
-
-/**
- * Documents the `ReadyResultWithParticipants` type alias (type ReadyResultWithParticipants).
-
- * Purpose: Supports maintainability by documenting why `ReadyResultWithParticipants` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Includes combat and animation slices so idle-opponent consultation can see march, ferry, and air-strike participation.
- * Exceptions: None.
- */
-type ReadyResultWithParticipants = Pick<
-  ReadyResult,
-  | 'success'
-  | 'reason'
-  | 'removedUnitIds'
-  | 'removedOpponentUnitIds'
-  | 'opponentCombatParticipantUnitIds'
-  | 'infrastructureDestroyedEvents'
-  | 'resolvedFerryMoves'
-  | 'airStrikeMoves'
-  | 'opponentHadStrategicMarchResolution'
->;
-
-/**
- * Returns true when the opponent had any unit-level outcome during strategic turn resolution (movement, ferry, strike, or combat participation).
- *
- * Purpose: Drives the “idle opponent” branch so event-driven mode still calls the LLM after quiet turns when no callback events fired.
- * When to use: `afterResolution` after mandatory/subscription evaluation.
- * Expected outcome: False only when the opponent neither marched (including air), ferried, struck, nor appeared in combat participant lists this turn.
- * Exceptions: None.
- */
-export function opponentHadStrategicResolutionUnitActions(r: StrategicResolutionOpponentActivitySlice): boolean {
-  logTrace('opponentHadStrategicResolutionUnitActions', {});
-  if (r.opponentHadStrategicMarchResolution === true) return true;
-  if ((r.opponentCombatParticipantUnitIds?.length ?? 0) > 0) return true;
-  if (r.resolvedFerryMoves?.some((m) => m.player === 'opponent')) return true;
-  if (r.airStrikeMoves?.some((m) => m.player === 'opponent')) return true;
-  return false;
-}
-
-/**
- * Returns true when opponent sub-units moved, ferried (via march playback), or dealt damage on this tactical beat.
- *
- * Purpose: Mirrors strategic idle detection for res4 post-beat consultation.
- * When to use: `afterTacticalBeatResolution` alongside tactical mandatory rules.
- * Expected outcome: False when `opponentMoves` is empty and no kill edge lists an opponent sub-unit as killer.
- * Exceptions: None.
- */
-export function opponentHadTacticalBeatResolutionActions(
-  playback: TacticalCommitResolutionPlayback,
-  tacticalBattle: TacticalBattleSnapshot
-): boolean {
-  logTrace('opponentHadTacticalBeatResolutionActions', {});
-  if ((playback.opponentMoves?.length ?? 0) > 0) return true;
-  const opponentSubIds = new Set(tacticalBattle.subUnits.filter((s) => s.player === 'opponent').map((s) => s.id));
-  const buckets: ReadonlyArray<ReadonlyArray<{ victimId: string; killerIds: string[] }> | undefined> = [
-    playback.killsByDirectFire,
-    playback.killsByAirStrike,
-    playback.killsByReturnFire,
-    playback.killsByMelee,
-  ];
-  for (const bucket of buckets) {
-    for (const edge of bucket ?? []) {
-      if (edge.killerIds.some((id) => opponentSubIds.has(id))) return true;
-    }
-  }
-  return false;
-}
+import { getTacticalAnnihilationOutcome } from '../../shared/tacticalAnnihilation';
+import {
+  computePostResolutionConsultTriggers,
+  humanHadStrategicResolutionObservableActions,
+  humanHadTacticalBeatResolutionActions,
+  opponentHadStrategicResolutionUnitActions,
+  opponentHadTacticalBeatResolutionActions,
+  type ReadyResultWithParticipants,
+} from './consultationPolicy';
 
 /**
  * Documents the `AfterResolutionDeps` interface as a named contract surface (export interface AfterResolutionDeps).
@@ -247,11 +173,20 @@ export async function afterResolution(
 
   const opponentHadUnitActions = opponentHadStrategicResolutionUnitActions(resolutionResult);
   const consultBecauseOpponentIdle = !opponentHadUnitActions;
-  const shouldConsult =
-    mandatoryFired.length > 0 || subscriptionFired.length > 0 || consultBecauseOpponentIdle;
+  const humanHadObservableActions = humanHadStrategicResolutionObservableActions(resolutionResult, state);
+  const { shouldConsult, policyOnlyConsult } = computePostResolutionConsultTriggers({
+    mandatoryCount: mandatoryFired.length,
+    subscriptionCount: subscriptionFired.length,
+    opponentIdle: consultBecauseOpponentIdle,
+    humanObservable: humanHadObservableActions,
+  });
 
-  if (shouldConsult && consultBecauseOpponentIdle && mandatoryFired.length === 0 && subscriptionFired.length === 0) {
-    logDebug('afterResolution: opponent had no resolution-time unit actions; invoking LLM', { turnNumber: state.turnNumber });
+  if (shouldConsult && policyOnlyConsult) {
+    logDebug('afterResolution: invoking LLM from post-resolution policy', {
+      turnNumber: state.turnNumber,
+      opponentIdle: consultBecauseOpponentIdle,
+      humanObservableResolution: humanHadObservableActions,
+    });
   }
 
   if (shouldConsult) {
@@ -289,8 +224,10 @@ export async function afterResolution(
     }
   } else {
     clearAiPendingOrders('opponent');
-    logDebug('afterResolution: skipping LLM (callback events absent and opponent had resolution-time unit actions)', {
+    logDebug('afterResolution: skipping LLM (no callback events; opponent had resolution actions; human had no observable resolution actions)', {
       turnNumber: state.turnNumber,
+      opponentHadUnitActions,
+      humanHadObservableActions,
     });
     return { consulted: false };
   }
@@ -445,8 +382,9 @@ export interface AfterTacticalBeatResolutionResult {
  *
  * Purpose: Mirrors strategic `afterResolution` for res4 battles without writing strategic `setAiPendingOrders`.
  * When to use: After a successful `commitHumanTacticalDraftOrders` when the renderer sent event-driven flags.
- * Expected outcome: Buffered `tacticalOpponentPlan` when subscriptions, tactical mandatory rules, or idle-opponent policy demand a consultation pass.
+ * Expected outcome: Buffered `tacticalOpponentPlan` when subscriptions, tactical mandatory rules, idle-opponent policy, or observable human beat actions demand a consultation pass.
  * Exceptions: Swallows LLM failures after logging; clears strategic pending orders when skipping or failing.
+ * Annihilation: When `getTacticalAnnihilationOutcome(tacticalBattle.subUnits)` is non-null, skips immediately so no LLM runs while the renderer shows the tactical game-over modal.
  */
 export async function afterTacticalBeatResolution(
   state: GameStateSnapshot,
@@ -456,6 +394,14 @@ export async function afterTacticalBeatResolution(
 ): Promise<AfterTacticalBeatResolutionResult> {
   if (!deps.modelId?.trim() || !deps.hasKey()) {
     logDebug('afterTacticalBeatResolution: skip (no model or no key)');
+    return { consulted: false, attachTacticalOpponentPlanToIpc: false };
+  }
+  if (getTacticalAnnihilationOutcome(tacticalBattle.subUnits) !== null) {
+    clearAiPendingOrders('opponent');
+    logDebug('afterTacticalBeatResolution: skip tactical LLM (annihilation roster)', {
+      turnNumber: state.turnNumber,
+      battleId: tacticalBattle.battleId,
+    });
     return { consulted: false, attachTacticalOpponentPlanToIpc: false };
   }
   const resolutionSlice = buildTacticalBeatResolutionReadyParticipants(playback, tacticalBattle);
@@ -473,19 +419,28 @@ export async function afterTacticalBeatResolution(
   const subscriptionFired = evaluateSubscriptionEvents(state, subscriptions, ctx);
   const hadOpponentBeatActions = opponentHadTacticalBeatResolutionActions(playback, tacticalBattle);
   const consultBecauseOpponentIdle = !hadOpponentBeatActions;
-  const shouldConsult =
-    mandatoryFired.length > 0 || subscriptionFired.length > 0 || consultBecauseOpponentIdle;
+  const humanHadObservableBeatActions = humanHadTacticalBeatResolutionActions(playback, tacticalBattle);
+  const { shouldConsult, policyOnlyConsult } = computePostResolutionConsultTriggers({
+    mandatoryCount: mandatoryFired.length,
+    subscriptionCount: subscriptionFired.length,
+    opponentIdle: consultBecauseOpponentIdle,
+    humanObservable: humanHadObservableBeatActions,
+  });
   if (!shouldConsult) {
     clearAiPendingOrders('opponent');
     logDebug('afterTacticalBeatResolution: skipping tactical LLM', {
-      reason: 'no_callback_events_and_opponent_had_beat_resolution_actions',
+      reason: 'no_callback_events_opponent_active_human_not_observable',
       turnNumber: state.turnNumber,
+      hadOpponentBeatActions,
+      humanHadObservableBeatActions,
     });
     return { consulted: false, attachTacticalOpponentPlanToIpc: false };
   }
-  if (consultBecauseOpponentIdle && mandatoryFired.length === 0 && subscriptionFired.length === 0) {
-    logDebug('afterTacticalBeatResolution: opponent had no beat-time unit actions; invoking LLM', {
+  if (policyOnlyConsult) {
+    logDebug('afterTacticalBeatResolution: invoking LLM from post-beat policy', {
       turnNumber: state.turnNumber,
+      opponentIdle: consultBecauseOpponentIdle,
+      humanObservableResolution: humanHadObservableBeatActions,
     });
   }
   try {
@@ -517,3 +472,15 @@ export async function afterTacticalBeatResolution(
     return { consulted: false, attachTacticalOpponentPlanToIpc: true };
   }
 }
+
+export {
+  opponentHadStrategicResolutionUnitActions,
+  humanHadStrategicResolutionObservableActions,
+  opponentHadTacticalBeatResolutionActions,
+  humanHadTacticalBeatResolutionActions,
+} from './consultationPolicy';
+export type {
+  ReadyResultWithParticipants,
+  StrategicResolutionHumanActivitySlice,
+  StrategicResolutionOpponentActivitySlice,
+} from './consultationPolicy';

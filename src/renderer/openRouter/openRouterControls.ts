@@ -1,3 +1,5 @@
+import type { PostResolutionConsultPushPayload } from '../../shared/ipc/readyTypes';
+import { nextTacticalOpponentDraftAfterDeferredPush } from '../../shared/ipc/tacticalOpponentPlanMerge';
 import { rendererSharedState as S } from '../core/state';
 import {
   readTacticalBattlesInterceptPromptEnabled,
@@ -87,6 +89,33 @@ openNewGameOverlayFromModelTab: () => void;
    */
 startBackgroundRequestIfAllowed: () => void;
     /**
+   * Specifies the contract for the `showAiStrategyToast` member (showAiStrategyToast: (content: string) => void;).
+
+   * Contract: Displays deferred tactical post-beat strategy text when the main push arrives after commit.
+   * When to use: `registerPostResolutionConsultPushListener` handler only.
+   * Expected outcome: Non-empty strategy becomes visible until timeout or dismiss.
+   * Exceptions: None.
+   */
+showAiStrategyToast: (content: string) => void;
+    /**
+   * Specifies the contract for the `updateOpenRouterToolCountLabels` member (updateOpenRouterToolCountLabels: () => void;).
+
+   * Contract: Refreshes per-tool invocation count labels after deferred consultation telemetry.
+   * When to use: After merging `toolInvocationCounts` from `PostResolutionConsultPushPayload`.
+   * Expected outcome: Sidebar counts match the latest consultation pass.
+   * Exceptions: None.
+   */
+updateOpenRouterToolCountLabels: () => void;
+    /**
+   * Specifies the contract for the `requestRedraw` member (requestRedraw: () => void;).
+
+   * Contract: Repaints the map after deferred opponent draft hydration.
+   * When to use: End of post-resolution push handling.
+   * Expected outcome: Tactical glyphs reflect updated opponent rows when present.
+   * Exceptions: None.
+   */
+requestRedraw: () => void;
+    /**
    * Specifies the contract for the `updateReadyButtonState` member (updateReadyButtonState: () => void;).
 
    * Contract: Describes stable behavior for callers of `updateReadyButtonState` in this codebase.
@@ -119,6 +148,33 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
   if (!api) return;
 
   window.gameApi?.registerOpenRouterLogListener?.((p) => deps.appendOpenRouterLog(p.line, p.isError ?? false));
+  window.gameApi?.registerPostResolutionConsultPushListener?.((payload: PostResolutionConsultPushPayload) => {
+    if (payload.kind !== 'tactical') return;
+    if (payload.battleId !== S.tacticalBattleSnapshot?.battleId) return;
+    S.tacticalDeferredPostBeatConsultPending = false;
+    if (payload.attachTacticalOpponentPlanToIpc) {
+      const { draft, startBackgroundPrefetch } = nextTacticalOpponentDraftAfterDeferredPush(
+        payload.tacticalOpponentPlan
+      );
+      S.tacticalOpponentDraft = draft;
+      if (startBackgroundPrefetch) deps.startBackgroundRequestIfAllowed();
+    } else {
+      const oppAlive =
+        S.tacticalBattleSnapshot?.subUnits.some((u) => u.player === 'opponent') ?? false;
+      if (S.runButtonOn && oppAlive && S.tacticalOpponentDraft === null) {
+        deps.startBackgroundRequestIfAllowed();
+      }
+    }
+    if (payload.aiStrategy) deps.showAiStrategyToast(payload.aiStrategy);
+    else deps.hideAiStrategyToast();
+    if (payload.toolInvocationCounts) {
+      S.toolInvocationCounts = { ...S.toolInvocationCounts, ...payload.toolInvocationCounts };
+      deps.updateOpenRouterToolCountLabels();
+    }
+    deps.appendOpenRouterLog('Tactical post-beat consultation (deferred) applied.', false);
+    deps.requestRedraw();
+    deps.updateReadyButtonState();
+  });
   deps.updateOpenRouterCostLabel();
 
   const tabTools = document.getElementById('openrouter-tab-tools');
