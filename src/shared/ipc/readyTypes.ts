@@ -801,6 +801,15 @@ outputTokens?: number;
    */
 opponentCombatParticipantUnitIds?: string[];
     /**
+   * True when at least one opponent unit executed a non–no-op strategic WEGO march this turn (any unit type, including air, which is omitted from control-traversal sets).
+   *
+   * Contract: Set on completed Ready / melee-intercept finalize paths only; independent of ferry rows (see `resolvedFerryMoves`).
+   * When to use: Event-driven post-resolution consultation treats a false together with empty combat/ferry/air-strike signals as “opponent idle this turn” so the LLM still runs once.
+   * Expected outcome: Boolean aligned with `readyStrategicResolutionPipeline` movement application for opponent `pending_orders` legs.
+   * Exceptions: Omitted on `awaitingMeleeDecision` early returns where finalize has not run yet.
+   */
+opponentHadStrategicMarchResolution?: boolean;
+    /**
    * Specifies the contract for the `removedOpponentUnitIds` member (removedOpponentUnitIds?: string[];).
 
    * Contract: Describes stable behavior for callers of `removedOpponentUnitIds` in this codebase.

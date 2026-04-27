@@ -216,7 +216,8 @@ commitHumanTacticalDraftOrders: (payload: {
     tacticalBattle?: TacticalBattleSnapshot;
     tacticalResolutionPlayback?: TacticalCommitResolutionPlayback;
     tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
-    tacticalOpponentPlan?: import('./readyTypes').TacticalOpponentPlanPayload;
+    tacticalOpponentPlan?: import('./readyTypes').TacticalOpponentPlanPayload | null;
+    committedOpponentTacticalDraft?: import('./readyTypes').TacticalOpponentPlanPayload | null;
     toolInvocationCounts?: Record<string, number>;
     aiStrategy?: string;
   }>;

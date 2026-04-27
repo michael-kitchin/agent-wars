@@ -236,6 +236,12 @@ export function executeReadyStrategicTurn(
     allOrders,
     preMoveState.units.map((u) => ({ id: u.id, player: u.player, h3Index: u.h3Index, unitType: u.unitType }))
   );
+  const opponentHadStrategicMarchResolution =
+    traversedHexesByPlayer.opponent.size > 0 ||
+    aiOrders.some((o) => {
+      const u = unitsBeforeMove.find((x) => x.id === o.unitId);
+      return u?.player === 'opponent' && u.h3Index !== o.toH3Index;
+    });
   for (const order of allOrders) {
     const prevUnit = unitsBeforeMove.find((u) => u.id === order.unitId);
     if (prevUnit && prevUnit.h3Index !== order.toH3Index) {
@@ -317,6 +323,7 @@ export function executeReadyStrategicTurn(
         human: new Set(traversedHexesByPlayer.human),
         opponent: new Set(traversedHexesByPlayer.opponent),
       },
+      opponentHadStrategicMarchResolution,
       allRanged: [...allRanged],
       aiRangedOrders: [...aiRangedOrders],
       candidateHexes: [...candidateHexes],
@@ -349,6 +356,7 @@ export function executeReadyStrategicTurn(
     embarkedFollowMoves,
     resolvedFerryMoves,
     traversedHexesByPlayer,
+    opponentHadStrategicMarchResolution,
     turnNumber,
     allRanged,
     aiRangedOrders,

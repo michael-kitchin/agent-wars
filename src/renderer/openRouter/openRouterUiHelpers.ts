@@ -61,7 +61,9 @@ export function updateReadyButtonState(): void {
   if (!readyBtn) return;
   const gameOver = S.gameState?.gameOver ?? false;
   const waitingOnAi = isWaitingForPrecomputedAiOrders();
-  readyBtn.disabled = gameOver || waitingOnAi || S.readyRequestInFlight;
+  const tacticalAnnihilationDialogOpen = S.tacticalAnnihilationOutcomeDialog != null;
+  readyBtn.disabled =
+    gameOver || waitingOnAi || S.readyRequestInFlight || tacticalAnnihilationDialogOpen;
 
   if (waitingOnAi) {
     const now = Date.now();

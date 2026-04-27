@@ -412,7 +412,9 @@ function registerIpcHandlers(): void {
     });
     return {
       ...result,
-      ...(post.tacticalOpponentPlan ? { tacticalOpponentPlan: post.tacticalOpponentPlan } : {}),
+      ...(post.attachTacticalOpponentPlanToIpc === true
+        ? { tacticalOpponentPlan: post.tacticalOpponentPlan ?? null }
+        : {}),
       ...(post.aiStrategy ? { aiStrategy: post.aiStrategy } : {}),
       ...(post.toolInvocationCounts ? { toolInvocationCounts: post.toolInvocationCounts } : {}),
     };

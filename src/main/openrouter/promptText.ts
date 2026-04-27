@@ -278,17 +278,30 @@ export function buildAdjacentCellsFallbackBlock(
 }
 
 /**
- * Defines the `getMovementOrderInstruction` function shape (export function getMovementOrderInstruction(flags: PromptToolFlags): string).
+ * Defines the `getMovementOrderInstruction` function shape (export function getMovementOrderInstruction(flags: PromptToolFlags, coordinateMode?: 'strategic' | 'tactical'): string).
 
  * Purpose: Supports maintainability by documenting why `getMovementOrderInstruction` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getMovementOrderInstruction(flags: PromptToolFlags): string {
+export function getMovementOrderInstruction(
+  flags: PromptToolFlags,
+  /**
+   * When `tactical`, appends march reachability guidance so explicit_move rows match terrain-weighted tactical validation (same checks as Ready commit).
+   */
+  coordinateMode: 'strategic' | 'tactical' = 'strategic'
+): string {
   const memorySuffix = flags.memoryEnabled ? MOVEMENT_INSTRUCTION_MEMORY_SUFFIX : '';
+  const tacticalMarchReachabilityClause =
+    coordinateMode === 'tactical'
+      ? ' Tactical marches use terrain-weighted MP budgets per beat; when a finite-cost path exists, the server applies at most the first leg toward each explicit_move destination (same truncation as human Ready). When the continuity planner rejects the full destination but a footprint neighbor still advances you on the H3 grid toward that hex, the server may take that one-step fallback. Copy plan_route\'s orderToHexCode exactly, not a guessed adjacent code.'
+      : '';
   if (flags.planningEnabled) {
-    return ' For each explicit_move entry: set "destination" to the exact orderToHexCode from that unit\'s plan_route result (copy the two-character code exactly).';
+    return (
+      ' For each explicit_move entry: set "destination" to the exact orderToHexCode from that unit\'s plan_route result (copy the two-character code exactly).' +
+      tacticalMarchReachabilityClause
+    );
   }
   if (flags.ordersEnabled) {
     return (

@@ -154,6 +154,15 @@ resolvedFerryMoves: FerryAnimationMove[];
    */
 traversedHexesByPlayer: Record<'human' | 'opponent', Set<string>>;
     /**
+   * Whether any opponent unit had a resolving march leg this turn before melee pause (mirrors `ReadyResult.opponentHadStrategicMarchResolution`).
+   *
+   * Contract: Frozen at pause time from the same predicate used when calling `finalizeReadyTurnAfterMelee` without pause.
+   * When to use: Post–melee-intercept `afterResolution` idle-opponent detection across the full turn.
+   * Expected outcome: True when opponent `pending_orders` produced a position change, including air marches not represented in `traversedHexesByPlayer.opponent`.
+   * Exceptions: None.
+   */
+opponentHadStrategicMarchResolution: boolean;
+    /**
    * Specifies the contract for the `allRanged` member (allRanged: RangedAttackOrder[];).
 
    * Contract: Human+AI ranged declarations for the turn.

@@ -39,13 +39,14 @@ export function projectTacticalSnapshotAfterOpponentMovementOrders(
     }
     const idx = outcome.idx;
     const u = sub[idx]!;
+    const applied = outcome.appliedToH3Index;
     const disembarks =
       !!u.embarkedOnSubUnitId &&
       (u.unitType === 'infantry' || u.unitType === 'armor') &&
-      o.toH3Index !== u.h3Index;
+      applied !== u.h3Index;
     sub[idx] = disembarks
-      ? { ...u, h3Index: o.toH3Index, embarkedOnSubUnitId: undefined }
-      : { ...u, h3Index: o.toH3Index };
+      ? { ...u, h3Index: applied, embarkedOnSubUnitId: undefined }
+      : { ...u, h3Index: applied };
   }
   const idToUnit = new Map(sub.map((u) => [u.id, u] as const));
   for (let i = 0; i < sub.length; i++) {
@@ -90,13 +91,14 @@ export function projectTacticalSnapshotAfterHumanMovementOrders(
     }
     const idx = outcome.idx;
     const u = sub[idx]!;
+    const applied = outcome.appliedToH3Index;
     const disembarks =
       !!u.embarkedOnSubUnitId &&
       (u.unitType === 'infantry' || u.unitType === 'armor') &&
-      o.toH3Index !== u.h3Index;
+      applied !== u.h3Index;
     sub[idx] = disembarks
-      ? { ...u, h3Index: o.toH3Index, embarkedOnSubUnitId: undefined }
-      : { ...u, h3Index: o.toH3Index };
+      ? { ...u, h3Index: applied, embarkedOnSubUnitId: undefined }
+      : { ...u, h3Index: applied };
   }
   const idToUnit = new Map(sub.map((u) => [u.id, u] as const));
   for (let i = 0; i < sub.length; i++) {

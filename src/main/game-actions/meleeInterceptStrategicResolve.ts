@@ -72,6 +72,7 @@ export function executeResolveMeleeIntercept(payload: ResolveMeleeInterceptIpcPa
     embarkedFollowMoves: pending.embarkedFollowMoves,
     resolvedFerryMoves: pending.resolvedFerryMoves,
     traversedHexesByPlayer: pending.traversedHexesByPlayer,
+    opponentHadStrategicMarchResolution: pending.opponentHadStrategicMarchResolution,
     turnNumber: pending.turnNumber,
     allRanged: pending.allRanged,
     aiRangedOrders: pending.aiRangedOrders,

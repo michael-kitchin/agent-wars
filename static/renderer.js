@@ -15051,6 +15051,15 @@
        */
     tacticalPhasePlanning: true,
     /**
+       * Documents the object literal property `tacticalAnnihilationOutcomeDialog` (tacticalAnnihilationOutcomeDialog: null as TacticalAnnihilationOutcomeKind | null).
+    
+       * Purpose: While non-null, the tactical annihilation win/loss modal is shown and the HUD exit control stays hidden until the player confirms `Exit Battle`.
+       * When to use: Set when `getTacticalAnnihilationOutcome` is terminal during tactical planning; cleared on acknowledged exit, new game, or strategic reconciliation that drops the tactical session.
+       * Expected outcome: Blocks Ready and map interaction (via `setMainUIControlsEnabled`) until dismissal; mirrors strategic `updateGameOverUI` message strings for win/loss.
+       * Exceptions: None; keep `null` whenever no tactical snapshot exists.
+       */
+    tacticalAnnihilationOutcomeDialog: null,
+    /**
        * Documents the object literal property `preTacticalLeafletMinZoom` (preTacticalLeafletMinZoom: null as number | null).
     
        * Purpose: Stores the main map min zoom before tactical constraints so it can be restored after tactical exit.
@@ -15742,7 +15751,8 @@
     if (!readyBtn) return;
     const gameOver = rendererSharedState.gameState?.gameOver ?? false;
     const waitingOnAi = isWaitingForPrecomputedAiOrders();
-    readyBtn.disabled = gameOver || waitingOnAi || rendererSharedState.readyRequestInFlight;
+    const tacticalAnnihilationDialogOpen = rendererSharedState.tacticalAnnihilationOutcomeDialog != null;
+    readyBtn.disabled = gameOver || waitingOnAi || rendererSharedState.readyRequestInFlight || tacticalAnnihilationDialogOpen;
     if (waitingOnAi) {
       const now = Date.now();
       if (rendererSharedState.readyBtnAiWaitStartTime === null) {
@@ -19293,7 +19303,8 @@
     const container = document.getElementById("canvas-container");
     if (container) {
       for (const child of container.children) {
-        if (child.id === "game-over-overlay") continue;
+        const id = child.id;
+        if (id === "game-over-overlay" || id === "tactical-annihilation-overlay") continue;
         child.style.pointerEvents = enabled ? "" : "none";
       }
     }
@@ -19343,6 +19354,13 @@
   }
 
   // src/renderer/openRouter/precomputedAiState.ts
+  var EMPTY_TACTICAL_OPPONENT_DRAFT = {
+    movementOrders: [],
+    rangedAttacks: [],
+    airStrikes: [],
+    ferryOrders: [],
+    embarkOrders: []
+  };
   function resetPrecomputedAiState(mode) {
     if (mode === "empty") {
       rendererSharedState.precomputedAiOrders = [];
@@ -19355,6 +19373,12 @@
     }
     rendererSharedState.precomputedAiStrategy = null;
     rendererSharedState.precomputedToolInvocationCounts = null;
+  }
+  function unblockPrecomputedAiPlanningAfterBackgroundFailure() {
+    resetPrecomputedAiState("empty");
+    if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning) {
+      rendererSharedState.tacticalOpponentDraft = EMPTY_TACTICAL_OPPONENT_DRAFT;
+    }
   }
   function applySuccessfulPrecomputedAiResult(result) {
     if (result.tacticalOpponentPlan) {
@@ -19381,6 +19405,50 @@
       }
       rendererSharedState.tacticalOpponentDraft = result.tacticalOpponentPlan;
     }
+  }
+
+  // src/renderer/tactical/tacticalExitButtonDom.ts
+  function syncTacticalExitButtonElementVisibility() {
+    const hud = document.getElementById("tactical-battle-hud");
+    const exitBtn = document.getElementById("tactical-exit-btn");
+    const active = !!rendererSharedState.tacticalBattleSnapshot;
+    const annihilationDialogOpen = rendererSharedState.tacticalAnnihilationOutcomeDialog != null;
+    hud?.classList.toggle("hidden", !active);
+    const disabled = !active || !rendererSharedState.tacticalPhasePlanning;
+    if (exitBtn) {
+      if (annihilationDialogOpen) {
+        exitBtn.classList.add("hidden");
+        exitBtn.disabled = true;
+      } else {
+        exitBtn.classList.remove("hidden");
+        exitBtn.disabled = disabled;
+      }
+    }
+  }
+
+  // src/renderer/tactical/tacticalAnnihilationDialog.ts
+  var TACTICAL_ANNIHILATION_NEUTRAL_MESSAGE = "All units destroyed.";
+  function tacticalAnnihilationMessageForOutcome(outcome) {
+    if (outcome === "human_win") return "You win!";
+    if (outcome === "human_loss") return "You lose.";
+    return TACTICAL_ANNIHILATION_NEUTRAL_MESSAGE;
+  }
+  function openTacticalAnnihilationOutcomeDialog(outcome) {
+    rendererSharedState.tacticalAnnihilationOutcomeDialog = outcome;
+    const overlay = document.getElementById("tactical-annihilation-overlay");
+    const messageEl = document.getElementById("tactical-annihilation-message");
+    if (messageEl) messageEl.textContent = tacticalAnnihilationMessageForOutcome(outcome);
+    overlay?.classList.remove("hidden");
+    setMainUIControlsEnabled(false);
+    syncTacticalExitButtonElementVisibility();
+    updateReadyButtonState();
+  }
+  function closeTacticalAnnihilationOutcomeDialog() {
+    rendererSharedState.tacticalAnnihilationOutcomeDialog = null;
+    document.getElementById("tactical-annihilation-overlay")?.classList.add("hidden");
+    setMainUIControlsEnabled(true);
+    syncTacticalExitButtonElementVisibility();
+    updateReadyButtonState();
   }
 
   // src/renderer/map/tacticalMapView.ts
@@ -19499,6 +19567,7 @@
 
   // src/renderer/tactical/tacticalUiOrchestration.ts
   function tacticalReleaseRendererSessionForNewStrategicMatch(nextState) {
+    closeTacticalAnnihilationOutcomeDialog();
     if (rendererSharedState.resolutionMoveAnimationFrameId !== null) {
       cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
     }
@@ -19522,17 +19591,13 @@
     document.getElementById("sidebar")?.classList.remove("tactical-strategic-suppress");
   }
   function tacticalUpdateExitButtonVisibility() {
-    const hud = document.getElementById("tactical-battle-hud");
-    const exitBtn = document.getElementById("tactical-exit-btn");
-    const active = !!rendererSharedState.tacticalBattleSnapshot;
-    hud?.classList.toggle("hidden", !active);
-    const disabled = !active || !rendererSharedState.tacticalPhasePlanning;
-    if (exitBtn) exitBtn.disabled = disabled;
+    syncTacticalExitButtonElementVisibility();
   }
   function tacticalReconcileBattleAfterStrategicSnapshot(nextState) {
     const snap = rendererSharedState.tacticalBattleSnapshot;
     if (!snap) return;
     if (nextState.phase !== "planning" || nextState.turnNumber !== snap.strategicTurnNumber) {
+      closeTacticalAnnihilationOutcomeDialog();
       rendererSharedState.tacticalBattleSnapshot = null;
       rendererSharedState.tacticalOpponentDraft = null;
       rendererSharedState.tacticalPhasePlanning = true;
@@ -19684,32 +19749,28 @@
   }
 
   // src/shared/tacticalAnnihilation.ts
-  function shouldEndTacticalBattleForAnnihilation(subUnits) {
+  function getTacticalAnnihilationOutcome(subUnits) {
     let human = 0;
     let opponent = 0;
     for (const u of subUnits) {
       if (u.player === "human") human += 1;
       else opponent += 1;
     }
-    return human === 0 || opponent === 0;
+    if (human > 0 && opponent > 0) return null;
+    if (human > 0 && opponent === 0) return "human_win";
+    if (human === 0 && opponent > 0) return "human_loss";
+    return "mutual";
   }
 
   // src/renderer/tactical/tacticalExitFlow.ts
-  var tacticalAnnihilationExitInFlight = false;
   function tacticalMaybeScheduleAnnihilationExit(session, io) {
-    if (tacticalAnnihilationExitInFlight) return;
+    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null) return;
     const snap = session.getBattleSnapshot();
     if (!snap || !session.getPhasePlanning()) return;
-    if (!shouldEndTacticalBattleForAnnihilation(snap.subUnits)) return;
-    tacticalAnnihilationExitInFlight = true;
-    void (async () => {
-      try {
-        io.showMapToast("Tactical battle ended \u2014 one side has no remaining sub-units.", {});
-        await tacticalPerformBattleExit(session, io);
-      } finally {
-        tacticalAnnihilationExitInFlight = false;
-      }
-    })();
+    const outcome = getTacticalAnnihilationOutcome(snap.subUnits);
+    if (outcome === null) return;
+    openTacticalAnnihilationOutcomeDialog(outcome);
+    io.redraw();
   }
   async function tacticalPerformBattleExit(session, io) {
     const boundary = tacticalBoundaryPlanningExitAllowed(session.getBattleSnapshot(), session.getPhasePlanning());
@@ -19724,6 +19785,7 @@
       return;
     }
     session.setBattleSnapshot(null);
+    closeTacticalAnnihilationOutcomeDialog();
     rendererSharedState.tacticalOpponentDraft = null;
     session.setPhasePlanning(true);
     exitTacticalMapView();
@@ -20437,7 +20499,7 @@
         } else if (!result.success) {
           deps.appendOpenRouterLog(`Background planning failed: ${result.error ?? "Unknown error"}`, true);
           deps.showSidebarError(result.error ?? "Background AI request failed");
-          resetPrecomputedAiState("null");
+          unblockPrecomputedAiPlanningAfterBackgroundFailure();
         }
         deps.updateReadyButtonState();
       }).catch((err) => {
@@ -20445,13 +20507,13 @@
         rendererSharedState.backgroundRequestInFlight = false;
         deps.appendOpenRouterLog(`Background planning request rejected: ${String(err)}`, true);
         deps.showSidebarError(String(err));
-        resetPrecomputedAiState("null");
+        unblockPrecomputedAiPlanningAfterBackgroundFailure();
         deps.updateReadyButtonState();
       });
     }).catch((err) => {
       rendererSharedState.backgroundRequestInFlight = false;
       deps.showSidebarError(String(err));
-      resetPrecomputedAiState("null");
+      unblockPrecomputedAiPlanningAfterBackgroundFailure();
       deps.updateReadyButtonState();
     });
   }
@@ -22382,6 +22444,7 @@
     if (!window.gameApi) return;
     if (rendererSharedState.gameState?.gameOver) return;
     if (rendererSharedState.readyRequestInFlight) return;
+    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null) return;
     deps.clearSidebarError();
     rendererSharedState.readyRequestInFlight = true;
     rendererSharedState.toolInvocationCounts = Object.fromEntries(rendererSharedState.openRouterToolGroups.map((g) => [g.id, 0]));
@@ -22442,7 +22505,11 @@
         if (commitResult.tacticalBattle) {
           rendererSharedState.tacticalBattleSnapshot = commitResult.tacticalBattle;
         }
-        rendererSharedState.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
+        if ("tacticalOpponentPlan" in commitResult) {
+          rendererSharedState.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
+        } else if ("committedOpponentTacticalDraft" in commitResult) {
+          rendererSharedState.tacticalOpponentDraft = commitResult.committedOpponentTacticalDraft ?? null;
+        }
         if (commitResult.aiStrategy) deps.showAiStrategyToast(commitResult.aiStrategy);
         else deps.hideAiStrategyToast();
         if (commitResult.toolInvocationCounts) {
@@ -25510,6 +25577,10 @@
     });
     const tacticalExitBtn = document.getElementById("tactical-exit-btn");
     tacticalExitBtn?.addEventListener("click", () => {
+      void performTacticalBattleExit();
+    });
+    const tacticalAnnihilationExitBtn = document.getElementById("tactical-annihilation-exit-btn");
+    tacticalAnnihilationExitBtn?.addEventListener("click", () => {
       void performTacticalBattleExit();
     });
     tacticalUpdateExitButtonVisibility();

@@ -179,7 +179,7 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
   const adjacentCellsBlock = flags.fallbackMovementEnabled
     ? buildAdjacentCellsFallbackBlock(state, opponentUnits, coordMap, getValidDestinationsUnoccupied)
     : '';
-  const movementOrderInstruction = getMovementOrderInstruction(flags);
+  const movementOrderInstruction = getMovementOrderInstruction(flags, coordinateContext.mode);
   const submitMemoryClause = flags.memoryEnabled
     ? ' Use optional "memoryUpdates" for memory writes/deletes (applied from JSON only; there are no memory_write or memory_delete tools).'
     : ' When Memory tools are not listed above, omit "memoryUpdates" or use []; any entries are ignored.';

@@ -528,13 +528,20 @@ function cancelOrder(playerId: string, unitId: string): Record<string, unknown> 
 
  * Purpose: Supports maintainability by documenting why `getStandingOrderForUnit` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Expected outcome: March/defend/patrol geometry and pursue `targetUnitId` when present in stored params.
  * Exceptions: None.
  */
 export function getStandingOrderForUnit(
   playerId: string,
   unitId: string
-): { type: string; destination?: [number, number]; defendHex?: [number, number]; waypoints?: [number, number][]; status: string } | null {
+): {
+  type: string;
+  destination?: [number, number];
+  defendHex?: [number, number];
+  waypoints?: [number, number][];
+  status: string;
+  targetUnitId?: string;
+} | null {
   logTrace('tool5StandingOrders getStandingOrderForUnit', { playerId, unitId });
   const row = dbGetOne<StandingOrderRow>(
     'SELECT * FROM standing_orders WHERE player_id = ? AND unit_id = ?',
@@ -542,13 +549,21 @@ export function getStandingOrderForUnit(
   );
   if (!row) return null;
   const params = parseOrderParams(row);
-  const out: { type: string; destination?: [number, number]; defendHex?: [number, number]; waypoints?: [number, number][]; status: string } = {
+  const out: {
+    type: string;
+    destination?: [number, number];
+    defendHex?: [number, number];
+    waypoints?: [number, number][];
+    status: string;
+    targetUnitId?: string;
+  } = {
     type: row.order_type,
     status: row.status,
   };
   if (row.order_type === 'march' && params.destination) out.destination = params.destination as [number, number];
   if (row.order_type === 'defend' && params.defendHex) out.defendHex = params.defendHex as [number, number];
   if (row.order_type === 'patrol' && params.waypoints) out.waypoints = params.waypoints as [number, number][];
+  if (row.order_type === 'pursue' && params.targetUnitId) out.targetUnitId = String(params.targetUnitId);
   return out;
 }
 

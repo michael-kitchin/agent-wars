@@ -390,6 +390,10 @@
       z-index: 7002;
     }
     .game-over-overlay.hidden { display: none; }
+    /* Stacks above tactical HUD (6600) and matches game-over overlay chrome for annihilation results. */
+    .tactical-annihilation-overlay.game-over-overlay {
+      z-index: 7010;
+    }
     .game-over-box {
       background: #f0eeea;
       padding: 1.5rem 2rem;
@@ -595,6 +599,9 @@
     .tactical-exit-btn:disabled {
       opacity: 0.45;
       cursor: not-allowed;
+    }
+    .tactical-exit-btn.hidden {
+      display: none;
     }
     aside#sidebar.tactical-strategic-suppress {
       visibility: hidden;
@@ -866,6 +873,19 @@
           Fog of war
         </label>
         <button type="button" id="new-game-btn">Start game</button>
+      </div>
+    </div>
+    <div
+      id="tactical-annihilation-overlay"
+      class="game-over-overlay tactical-annihilation-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="tactical-annihilation-message"
+      aria-live="polite"
+    >
+      <div class="game-over-box">
+        <p id="tactical-annihilation-message"></p>
+        <button type="button" id="tactical-annihilation-exit-btn">Exit Battle</button>
       </div>
     </div>
     <div id="map-toast" class="map-toast hidden" aria-live="polite">

@@ -314,11 +314,11 @@ openMeleeInterceptModal: (args: MeleeInterceptModalOpenArgs) => Promise<MeleeInt
    */
 startTacticalBattleFromInterceptHex: (h3Index: string) => Promise<void>;
     /**
-   * Schedules tactical annihilation auto-exit when a post-commit snapshot leaves one side with zero sub-units.
+   * Opens the tactical annihilation win/loss modal when a post-commit snapshot leaves at least one side with zero sub-units.
    *
    * Contract: Optional; renderer supplies the same hook used after tactical draw updates.
    * When to use: Immediately after tactical Ready successfully commits march drafts to the main snapshot.
-   * Expected outcome: Annihilation toast/exit runs when roster rules demand it.
+   * Expected outcome: Modal appears when the roster is terminal; battle exit IPC runs only after the player confirms.
    * Exceptions: None.
    */
 scheduleTacticalAnnihilationExit?: () => void;
@@ -638,6 +638,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
   if (!window.gameApi) return;
   if (S.gameState?.gameOver) return;
   if (S.readyRequestInFlight) return;
+  if (S.tacticalAnnihilationOutcomeDialog != null) return;
   deps.clearSidebarError();
   S.readyRequestInFlight = true;
   S.toolInvocationCounts = Object.fromEntries(S.openRouterToolGroups.map((g) => [g.id, 0]));
@@ -673,7 +674,8 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         tacticalBattle?: TacticalBattleSnapshot;
         tacticalResolutionPlayback?: TacticalCommitResolutionPlayback;
         tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
-        tacticalOpponentPlan?: TacticalOpponentPlanPayload;
+        tacticalOpponentPlan?: TacticalOpponentPlanPayload | null;
+        committedOpponentTacticalDraft?: TacticalOpponentPlanPayload | null;
         toolInvocationCounts?: Record<string, number>;
         aiStrategy?: string;
       };
@@ -723,7 +725,11 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       if (commitResult.tacticalBattle) {
         S.tacticalBattleSnapshot = commitResult.tacticalBattle;
       }
-      S.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
+      if ('tacticalOpponentPlan' in commitResult) {
+        S.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
+      } else if ('committedOpponentTacticalDraft' in commitResult) {
+        S.tacticalOpponentDraft = commitResult.committedOpponentTacticalDraft ?? null;
+      }
       if (commitResult.aiStrategy) deps.showAiStrategyToast(commitResult.aiStrategy);
       else deps.hideAiStrategyToast();
       if (commitResult.toolInvocationCounts) {

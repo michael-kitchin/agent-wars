@@ -4,6 +4,8 @@
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
+import { closeTacticalAnnihilationOutcomeDialog } from './tacticalAnnihilationDialog';
+import { syncTacticalExitButtonElementVisibility } from './tacticalExitButtonDom';
 import { exitTacticalMapView } from '../map/tacticalMapView';
 import { hideTacticalEntryLayer, syncTacticalEntryButton } from '../map/tacticalEntryLayer';
 import { updateGameStateSidebar } from '../core/uiState';
@@ -18,6 +20,7 @@ import { restoreStrategicOrderDraftsAfterTacticalSession } from './tacticalStrat
  * Exceptions: None; safe when already strategic (no-op aside from `exitTacticalMapView` if pre-tactical zoom was captured).
  */
 export function tacticalReleaseRendererSessionForNewStrategicMatch(nextState: GameStateSnapshot): void {
+  closeTacticalAnnihilationOutcomeDialog();
   if (S.resolutionMoveAnimationFrameId !== null) {
     cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
   }
@@ -59,12 +62,7 @@ export function tacticalApplyStrategicSidebarForTacticalMode(tactical: boolean):
  * Exceptions: None.
  */
 export function tacticalUpdateExitButtonVisibility(): void {
-  const hud = document.getElementById('tactical-battle-hud');
-  const exitBtn = document.getElementById('tactical-exit-btn') as HTMLButtonElement | null;
-  const active = !!S.tacticalBattleSnapshot;
-  hud?.classList.toggle('hidden', !active);
-  const disabled = !active || !S.tacticalPhasePlanning;
-  if (exitBtn) exitBtn.disabled = disabled;
+  syncTacticalExitButtonElementVisibility();
 }
 
 /**
@@ -79,6 +77,7 @@ export function tacticalReconcileBattleAfterStrategicSnapshot(nextState: GameSta
   const snap = S.tacticalBattleSnapshot;
   if (!snap) return;
   if (nextState.phase !== 'planning' || nextState.turnNumber !== snap.strategicTurnNumber) {
+    closeTacticalAnnihilationOutcomeDialog();
     S.tacticalBattleSnapshot = null;
     S.tacticalOpponentDraft = null;
     S.tacticalPhasePlanning = true;

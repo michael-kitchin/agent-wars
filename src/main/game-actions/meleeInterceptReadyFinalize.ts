@@ -122,6 +122,15 @@ resolvedFerryMoves: FerryAnimationMove[];
    */
 traversedHexesByPlayer: Record<'human' | 'opponent', Set<string>>;
     /**
+   * Whether opponent units had resolving march activity this turn (including air), for post-resolution LLM idle detection.
+   *
+   * Contract: Must match the value computed in `executeReadyStrategicTurn` / melee pause snapshot.
+   * When to use: Written to `ReadyResult.opponentHadStrategicMarchResolution` for `afterResolution` gating.
+   * Expected outcome: True when any opponent march order changed `h3_index`; ferry success remains in `resolvedFerryMoves`.
+   * Exceptions: None.
+   */
+opponentHadStrategicMarchResolution: boolean;
+    /**
    * Specifies the contract for the `turnNumber` member (turnNumber: number;).
 
    * Contract: Strategic turn index before increment at end of finalize.
@@ -172,6 +181,7 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     embarkedFollowMoves,
     resolvedFerryMoves,
     traversedHexesByPlayer,
+    opponentHadStrategicMarchResolution,
     turnNumber,
     allRanged,
     aiRangedOrders,
@@ -334,5 +344,6 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
       productionSummary.capReachedByPlayer.opponent.length > 0 ? productionSummary.capReachedByPlayer.opponent : undefined,
     opponentCombatParticipantUnitIds,
     removedOpponentUnitIds,
+    opponentHadStrategicMarchResolution,
   };
 }

@@ -1,5 +1,9 @@
 import { rendererSharedState as S } from '../core/state';
-import { applySuccessfulPrecomputedAiResult, resetPrecomputedAiState } from './precomputedAiState';
+import {
+  applySuccessfulPrecomputedAiResult,
+  resetPrecomputedAiState,
+  unblockPrecomputedAiPlanningAfterBackgroundFailure,
+} from './precomputedAiState';
 import { isWaitingForPrecomputedAiOrders } from './aiPlanningState';
 
 /**
@@ -175,7 +179,7 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
         } else if (!result.success) {
           deps.appendOpenRouterLog(`Background planning failed: ${result.error ?? 'Unknown error'}`, true);
           deps.showSidebarError(result.error ?? 'Background AI request failed');
-          resetPrecomputedAiState('null');
+          unblockPrecomputedAiPlanningAfterBackgroundFailure();
         }
         deps.updateReadyButtonState();
       })
@@ -184,13 +188,13 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
         S.backgroundRequestInFlight = false;
         deps.appendOpenRouterLog(`Background planning request rejected: ${String(err)}`, true);
         deps.showSidebarError(String(err));
-        resetPrecomputedAiState('null');
+        unblockPrecomputedAiPlanningAfterBackgroundFailure();
         deps.updateReadyButtonState();
       });
   }).catch((err) => {
     S.backgroundRequestInFlight = false;
     deps.showSidebarError(String(err));
-    resetPrecomputedAiState('null');
+    unblockPrecomputedAiPlanningAfterBackgroundFailure();
     deps.updateReadyButtonState();
   });
 }

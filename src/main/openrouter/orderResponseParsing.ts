@@ -171,6 +171,50 @@ function stripJsonLikeComments(s: string): string {
 }
 
 /**
+ * Extracts the first top-level `{ ... }` span from `s` starting at `startIndex`, respecting JSON string escapes so `}` inside strings does not end the object early.
+ *
+ * Purpose: LLM replies often include prose or trailing text; a greedy `\{[\s\S]*\}` slice can pull extra characters and break `JSON.parse`, or stop trying other candidates too early.
+ * When to use: As the preferred substring for `JSON.parse` in `parseOrdersResponse` before falling back to the legacy greedy match.
+ * Expected outcome: Returns a balanced brace object substring, or `null` if no complete object is found.
+ * Exceptions: None; treats `"` strings per JSON (single-quoted strings are not skipped).
+ */
+function extractBalancedJsonObjectFrom(s: string, startIndex: number): string | null {
+  const start = s.indexOf('{', startIndex);
+  if (start < 0) return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < s.length; i++) {
+    const c = s[i]!;
+    if (inString) {
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (c === '\\') {
+        escape = true;
+        continue;
+      }
+      if (c === '"') {
+        inString = false;
+        continue;
+      }
+      continue;
+    }
+    if (c === '"') {
+      inString = true;
+      continue;
+    }
+    if (c === '{') depth += 1;
+    else if (c === '}') {
+      depth -= 1;
+      if (depth === 0) return s.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+/**
  * Documents the module-scope binding `CALLBACK_EVENT_VOCAB` (CALLBACK_EVENT_VOCAB).
 
  * Purpose: Supports maintainability by documenting why `CALLBACK_EVENT_VOCAB` exists.
@@ -690,8 +734,12 @@ export function parseOrdersResponse(
     let jsonStr = raw;
     const firstBrace = jsonStr.search(/\{/);
     if (firstBrace >= 0) {
-      const objectMatch = jsonStr.slice(firstBrace).match(/\{[\s\S]*\}/);
-      if (objectMatch) jsonStr = objectMatch[0];
+      const balanced = extractBalancedJsonObjectFrom(jsonStr, firstBrace);
+      if (balanced) jsonStr = balanced;
+      else {
+        const objectMatch = jsonStr.slice(firstBrace).match(/\{[\s\S]*\}/);
+        if (objectMatch) jsonStr = objectMatch[0];
+      }
     }
 
     jsonStr = stripJsonLikeComments(jsonStr);
@@ -699,16 +747,24 @@ export function parseOrdersResponse(
       const parsed = JSON.parse(jsonStr) as unknown;
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         const obj = parsed as Record<string, unknown>;
-        if (typeof obj.strategy !== 'string' || !Array.isArray(obj.orders)) {
-          logDebug('openRouter parseOrdersResponse: rejected payload that does not match strict object schema');
-          return null;
+        const ordersField = obj.orders;
+        if (ordersField !== undefined && ordersField !== null && !Array.isArray(ordersField)) {
+          logDebug('openRouter parseOrdersResponse: skipping candidate: orders is not an array');
+          continue;
         }
+        const ordersArray: unknown[] = Array.isArray(ordersField) ? ordersField : [];
         if (hasNonEmptyLegacyTopLevel(obj)) {
-          logDebug('openRouter parseOrdersResponse: rejected non-empty legacy movementOrders/rangedAttacks');
-          return null;
+          logDebug('openRouter parseOrdersResponse: skipping candidate: non-empty legacy movementOrders/rangedAttacks');
+          continue;
         }
+        if (obj.strategy != null && typeof obj.strategy !== 'string') {
+          logDebug('openRouter parseOrdersResponse: non-string strategy coerced to empty', {
+            strategyType: typeof obj.strategy,
+          });
+        }
+        const strategy = typeof obj.strategy === 'string' ? obj.strategy.trim() : '';
         const { movementOrders, rangedAttacks, embarkOrders } = processV3OrdersArray(
-          obj.orders as unknown[],
+          ordersArray,
           state,
           latLngByH3,
           resolveToH3,
@@ -725,7 +781,6 @@ export function parseOrdersResponse(
         } else if (obj.productionOrders !== undefined) {
           productionDropReasons = ['productionOrders dropped: production tool group is disabled.'];
         }
-        const strategy = obj.strategy.trim();
         const callbacks = normalizeCallbacks(obj.callbacks);
         const memoryUpdates = normalizeMemoryUpdates(obj.memoryUpdates);
         const dropReasons = [

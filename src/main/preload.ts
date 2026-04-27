@@ -334,7 +334,8 @@ commitHumanTacticalDraftOrders: (payload: {
     tacticalBattle?: TacticalBattleSnapshot;
     tacticalResolutionPlayback?: TacticalCommitResolutionPlayback;
     tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
-    tacticalOpponentPlan?: import('../shared/ipc/readyTypes').TacticalOpponentPlanPayload;
+    tacticalOpponentPlan?: import('../shared/ipc/readyTypes').TacticalOpponentPlanPayload | null;
+    committedOpponentTacticalDraft?: import('../shared/ipc/readyTypes').TacticalOpponentPlanPayload | null;
     toolInvocationCounts?: Record<string, number>;
     aiStrategy?: string;
   }> => ipcRenderer.invoke(IPC_GAME.commitHumanTacticalDraftOrders, payload),

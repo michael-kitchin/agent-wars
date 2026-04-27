@@ -16,6 +16,7 @@ import type { PossibleActionTableRow } from '../../openrouter/possibleUnitAction
 import { deriveThisTurnOptionsActionColumn, selectTopRowsPerUnit } from '../../openrouter/possibleUnitActionsTableAssembly';
 import type { CoordinateContext } from './coordinateContext';
 import { h3ToCode } from './hex-code-translator';
+import { getStandingOrderForUnit } from '../../tools/tool5StandingOrders';
 
 /**
  * Defines the `infrastructureCellForThisTurnOptionsRow` function shape (function infrastructureCellForThisTurnOptionsRow(r: PossibleActionTableRow): string).
@@ -141,9 +142,34 @@ export function renderTacticalOpponentRosterMarkdown(state: GameStateSnapshot, c
       }
     }
     const hex = h3ToCode(u.h3Index, context);
-    lines.push(`| ${hex} | ${u.id} | ${u.unitType} | — | ${best ? best.id : '—'} | ${best ? String(best.d) : '—'} |`);
+    const standingRow = getStandingOrderForUnit('opponent', u.id);
+    const standingText = summarizeStandingOrder(
+      standingRow ? standingOrderRecordForBriefingTable(standingRow) : null,
+      context
+    );
+    lines.push(
+      `| ${hex} | ${u.id} | ${u.unitType} | ${standingText} | ${best ? best.id : '—'} | ${best ? String(best.d) : '—'} |`
+    );
   }
   return `${[header, sep, ...lines].join('\n')}\n`;
+}
+
+/**
+ * Adapts a persisted standing-order row into the loose record shape consumed by `summarizeStandingOrder`.
+ *
+ * Purpose: Tactical roster markdown lists snapshot units without embedded `currentStandingOrder`; the DB row supplies the same fields strategic assessments attach on units.
+ * When to use: Only when building the Standing order column in `renderTacticalOpponentRosterMarkdown`.
+ * Expected outcome: Defend hexes are surfaced as `destination` so lat/lng maps to the tactical hex code column; pursue exposes `targetUnitId`.
+ * Exceptions: None.
+ */
+function standingOrderRecordForBriefingTable(
+  ord: NonNullable<ReturnType<typeof getStandingOrderForUnit>>
+): Record<string, unknown> {
+  const rec: Record<string, unknown> = { type: ord.type, status: ord.status };
+  if (ord.destination) rec.destination = ord.destination;
+  if (ord.defendHex) rec.destination = ord.defendHex;
+  if (ord.targetUnitId) rec.targetUnitId = ord.targetUnitId;
+  return rec;
 }
 
 export function renderDisplacedFeaturesLine(

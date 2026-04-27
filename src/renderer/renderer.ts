@@ -2283,11 +2283,11 @@ function createReadyHandlerDeps(): ReadyHandlerDeps {
 }
 
 /**
- * Coordinates annihilation-driven tactical teardown with the shared exit IPC and Ready-equivalent continuation.
+ * Opens the annihilation result modal when the tactical roster becomes terminal during planning.
  *
- * Purpose: Wraps `tacticalMaybeScheduleAnnihilationExit` so renderer scheduling matches the shared in-flight guard.
+ * Purpose: Wraps `tacticalMaybeScheduleAnnihilationExit` so redraw paths share the same session accessor as exit.
  * When to use: Tactical redraw after snapshots that may eliminate a full side roster.
- * Expected outcome: At most one queued exit while planning-phase annihilation is detected.
+ * Expected outcome: At most one modal per terminal beat; exit IPC runs only after the player confirms on the modal.
  * Exceptions: None.
  */
 function maybeScheduleTacticalAnnihilationExit(): void {
@@ -2303,7 +2303,7 @@ function maybeScheduleTacticalAnnihilationExit(): void {
  * Ends the tactical session in the main process then resumes strategic Ready handling.
  *
  * Purpose: Delegates boundary checks and DOM restoration to `tacticalPerformBattleExit` while preserving renderer IPC wiring.
- * When to use: Tactical HUD exit button and annihilation auto-exit path.
+ * When to use: Tactical HUD exit button and annihilation modal `Exit Battle` confirmation.
  * Expected outcome: Clears renderer tactical snapshot and invokes Ready pipeline on success.
  * Exceptions: Surfaces toasts when IPC fails per tactical helper contract.
  */
@@ -3197,6 +3197,10 @@ function init(): void {
 
   const tacticalExitBtn = document.getElementById('tactical-exit-btn');
   tacticalExitBtn?.addEventListener('click', () => {
+    void performTacticalBattleExit();
+  });
+  const tacticalAnnihilationExitBtn = document.getElementById('tactical-annihilation-exit-btn');
+  tacticalAnnihilationExitBtn?.addEventListener('click', () => {
     void performTacticalBattleExit();
   });
   tacticalUpdateExitButtonVisibility();

@@ -15,6 +15,7 @@ import type {
   RemovedUnitSnapshot,
   TacticalOpponentPlanPayload,
 } from '../../shared/ipcTypes';
+import type { TacticalAnnihilationOutcomeKind } from '../../shared/tacticalAnnihilation';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { OPENROUTER_TOOL_GROUPS } from './constants';
 import type { HoverRoutePreviewState, ResolutionMove, ResolutionPlaybackMove } from './types';
@@ -303,6 +304,15 @@ tacticalEntryButtonPointerInside: false,
    * Exceptions: Reconciling snapshots or ending tactical always resets this to `true` once the renderer returns to a coherent tactical or strategic mode.
    */
 tacticalPhasePlanning: true,
+    /**
+   * Documents the object literal property `tacticalAnnihilationOutcomeDialog` (tacticalAnnihilationOutcomeDialog: null as TacticalAnnihilationOutcomeKind | null).
+
+   * Purpose: While non-null, the tactical annihilation win/loss modal is shown and the HUD exit control stays hidden until the player confirms `Exit Battle`.
+   * When to use: Set when `getTacticalAnnihilationOutcome` is terminal during tactical planning; cleared on acknowledged exit, new game, or strategic reconciliation that drops the tactical session.
+   * Expected outcome: Blocks Ready and map interaction (via `setMainUIControlsEnabled`) until dismissal; mirrors strategic `updateGameOverUI` message strings for win/loss.
+   * Exceptions: None; keep `null` whenever no tactical snapshot exists.
+   */
+tacticalAnnihilationOutcomeDialog: null as TacticalAnnihilationOutcomeKind | null,
     /**
    * Documents the object literal property `preTacticalLeafletMinZoom` (preTacticalLeafletMinZoom: null as number | null).
 

@@ -80,6 +80,11 @@ import {
 } from './game-actions/landMovementConstraints';
 import { submitOrdersImpl } from './game-actions/submitOrders';
 import {
+  ORDER_PLAN_SANITIZE_CONTEXT,
+  logOrderPlanSanitizeDrop,
+  logOrderPlanSanitizeSummary,
+} from './game-actions/orderPlanSanitize';
+import {
   applyTacticalEmbarkCommittedOrdersToStrategicDb,
   getSealiftStackStateImpl,
   isEmbarkedLandUnitOnWater,
@@ -169,9 +174,9 @@ reason?: string;
    * Contract: When present, matches the tactical-only plan shape returned by `afterTacticalBeatResolution` for renderer-side draft hydration.
    * When to use: `commitHumanTacticalDraftOrders` success path after main attached post-beat consultation results.
    * Expected outcome: Renderer can populate `tacticalOpponentDraft` without a second model round-trip.
-   * Exceptions: None; omit when no consultation ran or the model produced no plan.
+   * Exceptions: Omitted when no post-beat consultation ran; explicit `null` after consultation when the model returned no tactical plan (renderer clears buffer).
    */
-  tacticalOpponentPlan?: TacticalOpponentPlanPayload;
+  tacticalOpponentPlan?: TacticalOpponentPlanPayload | null;
   /**
    * Per-tool call counts from the tactical consultation pass that produced `tacticalOpponentPlan`, if any.
    *
@@ -190,6 +195,15 @@ reason?: string;
    * Exceptions: None.
    */
   aiStrategy?: string;
+  /**
+   * Opponent tactical rows actually applied this Ready after sanitization (invalid AI rows removed).
+   *
+   * Contract: Present only when the renderer sent `opponentTacticalDraft`; value is the filtered plan or `null` if every row was dropped.
+   * When to use: Renderer refreshes `S.tacticalOpponentDraft` when no `tacticalOpponentPlan` merge runs so the sidebar does not keep stale illegal rows.
+   * Expected outcome: Omitted when there was no incoming opponent draft.
+   * Exceptions: None.
+   */
+  committedOpponentTacticalDraft?: TacticalOpponentPlanPayload | null;
 }
 
 /**
@@ -698,28 +712,32 @@ function clearEmbarkAssignmentForIndependentLandMove(unitId: string, destination
 }
 
 /**
- * Re-validates a buffered opponent tactical draft against the current committed snapshot before merging it into a Ready beat.
+ * Drops opponent tactical draft rows that no longer pass footprint / strike / embark rules so Ready can complete with the remaining valid rows.
  *
- * Purpose: Prevents applying AI orders that were valid at consultation time but are illegal after human sealift edits or snapshot drift; mirrors tactical branch checks in `requestOrdersFlow` without re-invoking the model.
- * When to use: `commitHumanTacticalDraftOrders` after human targeting validation and before `applyHumanTacticalDraftBeatInStrategicOrder`.
- * Expected outcome: `success: true` when every opponent row passes the same tactical footprint and strike rules as group validation helpers.
- * Exceptions: None; returns `success: false` with a human-readable reason on first failure.
+ * Purpose: Buffered AI plans can go stale (e.g. ranged target hex cleared of enemies) before the human clicks Ready; failing the whole beat was too strict.
+ * When to use: `commitHumanTacticalDraftOrders` after resolving `preBattle` and before `applyHumanTacticalDraftBeatInStrategicOrder`.
+ * Expected outcome: Returns a subset plan or `undefined` when nothing remains; each dropped row is logged at debug with reason; a single info summary when any row was dropped.
+ * Exceptions: None; never throws.
  */
-function validateOpponentTacticalDraftForReadyCommit(
+function sanitizeOpponentTacticalDraftForReadyCommit(
   preBattle: TacticalBattleSnapshot,
   draft: TacticalOpponentPlanPayload | undefined
-): SubmitOrdersResult {
-  logDebug('gameActions validateOpponentTacticalDraftForReadyCommit', {
+): TacticalOpponentPlanPayload | undefined {
+  logDebug('gameActions sanitizeOpponentTacticalDraftForReadyCommit', {
     movementCount: draft?.movementOrders.length ?? 0,
     rangedCount: draft?.rangedAttacks.length ?? 0,
     airCount: draft?.airStrikes.length ?? 0,
     ferryCount: draft?.ferryOrders.length ?? 0,
     embarkCount: draft?.embarkOrders.length ?? 0,
   });
-  if (!draft) return { success: true };
+  if (!draft) return undefined;
   const res4Set = new Set(preBattle.res4ChildH3Indexes);
   const sub = [...preBattle.subUnits];
   const byId = new Map(sub.map((u, i) => [u.id, i] as const));
+  let dropped = 0;
+  const sanitizeCtx = ORDER_PLAN_SANITIZE_CONTEXT.opponentTacticalDraft;
+
+  const movementOrders: TacticalOpponentPlanPayload['movementOrders'] = [];
   for (const o of draft.movementOrders) {
     const outcome = tacticalComputeMovementOrderOutcome({
       byId,
@@ -729,39 +747,116 @@ function validateOpponentTacticalDraftForReadyCommit(
       battle: preBattle,
     });
     if (!outcome.ok) {
-      return {
-        success: false,
-        reason: `Opponent march is no longer valid (${outcome.reason}). Request fresh AI orders.`,
-      };
+      dropped += 1;
+      logOrderPlanSanitizeDrop(sanitizeCtx, 'march', {
+        unitId: o.unitId,
+        toH3Index: o.toH3Index,
+        reason: outcome.reason,
+      });
+      continue;
     }
+    movementOrders.push(o);
   }
+
+  const rangedAttacks: TacticalOpponentPlanPayload['rangedAttacks'] = [];
   for (const r of draft.rangedAttacks) {
     const checked = validateGroupRangedTarget([r.unitId], r.targetH3Index, { tacticalAttackerPlayer: 'opponent' });
-    if (!checked.success) return checked;
+    if (!checked.success) {
+      dropped += 1;
+      logOrderPlanSanitizeDrop(sanitizeCtx, 'ranged', {
+        unitId: r.unitId,
+        targetH3Index: r.targetH3Index,
+        reason: checked.reason,
+      });
+      continue;
+    }
+    rangedAttacks.push(r);
   }
-  const strikeUnitIds = new Set(draft.airStrikes.map((a) => a.unitId));
+
+  const airStrikes: TacticalOpponentPlanPayload['airStrikes'] = [];
   for (const a of draft.airStrikes) {
     const checked = validateGroupAirStrikeTarget([a.unitId], a.targetH3Index, a.targetType, {
       tacticalAttackerPlayer: 'opponent',
     });
-    if (!checked.success) return checked;
+    if (!checked.success) {
+      dropped += 1;
+      logOrderPlanSanitizeDrop(sanitizeCtx, 'airStrike', {
+        unitId: a.unitId,
+        targetH3Index: a.targetH3Index,
+        targetType: a.targetType,
+        reason: checked.reason,
+      });
+      continue;
+    }
+    airStrikes.push(a);
   }
+
+  const strikeUnitIds = new Set(airStrikes.map((a) => a.unitId));
+  const ferryOrders: TacticalOpponentPlanPayload['ferryOrders'] = [];
   for (const f of draft.ferryOrders) {
     if (strikeUnitIds.has(f.unitId)) {
-      return { success: false, reason: 'Opponent cannot strike and ferry the same air unit in one tactical turn.' };
+      dropped += 1;
+      logOrderPlanSanitizeDrop(sanitizeCtx, 'ferry', {
+        unitId: f.unitId,
+        reason: 'strike_same_unit',
+      });
+      continue;
     }
     const checked = validateGroupFerryTarget([f.unitId], f.destinationH3Index, { tacticalAttackerPlayer: 'opponent' });
-    if (!checked.success) return checked;
+    if (!checked.success) {
+      dropped += 1;
+      logOrderPlanSanitizeDrop(sanitizeCtx, 'ferry', {
+        unitId: f.unitId,
+        destinationH3Index: f.destinationH3Index,
+        reason: checked.reason,
+      });
+      continue;
+    }
+    ferryOrders.push(f);
   }
+
   const projected =
-    draft.movementOrders.length > 0
-      ? projectTacticalSnapshotAfterOpponentMovementOrders(preBattle, draft.movementOrders)
+    movementOrders.length > 0
+      ? projectTacticalSnapshotAfterOpponentMovementOrders(preBattle, movementOrders)
       : preBattle;
+  const embarkOrders: TacticalOpponentPlanPayload['embarkOrders'] = [];
   for (const e of draft.embarkOrders) {
     const er = validateTacticalOpponentEmbarkOrder(e, projected.subUnits);
-    if (!er.valid) return { success: false, reason: er.reason };
+    if (!er.valid) {
+      dropped += 1;
+      logOrderPlanSanitizeDrop(sanitizeCtx, 'embark', {
+        unitId: e.unitId,
+        reason: er.reason,
+      });
+      continue;
+    }
+    embarkOrders.push(e);
   }
-  return { success: true };
+
+  const kept =
+    movementOrders.length +
+    rangedAttacks.length +
+    airStrikes.length +
+    ferryOrders.length +
+    embarkOrders.length;
+  if (dropped > 0) {
+    logOrderPlanSanitizeSummary(sanitizeCtx, dropped, {
+      keptTotal: kept,
+      movements: movementOrders.length,
+      ranged: rangedAttacks.length,
+      airStrikes: airStrikes.length,
+      ferry: ferryOrders.length,
+      embark: embarkOrders.length,
+    });
+  }
+  if (kept === 0) return undefined;
+  return {
+    movementOrders,
+    rangedAttacks,
+    airStrikes,
+    ferryOrders,
+    embarkOrders,
+  };
 }
 
 /**
@@ -787,6 +882,7 @@ export function commitHumanTacticalDraftOrders(args: {
     ferryCount: args.ferryOrders?.length ?? 0,
     embarkCount: args.embarkOrders?.length ?? 0,
     opponentMovementCount: args.opponentTacticalDraft?.movementOrders.length ?? 0,
+    opponentRangedCount: args.opponentTacticalDraft?.rangedAttacks.length ?? 0,
   });
   try {
     if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
@@ -807,8 +903,7 @@ export function commitHumanTacticalDraftOrders(args: {
     if (!preBattle) {
       return { success: false, reason: 'No tactical battle is active.' };
     }
-    const oppDraftCheck = validateOpponentTacticalDraftForReadyCommit(preBattle, args.opponentTacticalDraft);
-    if (!oppDraftCheck.success) return oppDraftCheck;
+    const opponentTacticalDraft = sanitizeOpponentTacticalDraftForReadyCommit(preBattle, args.opponentTacticalDraft);
     const effectiveHumanMarches = mergeHumanStandingOrdersIntoTacticalMarchOrders(preBattle, args.movementOrders);
     logDebug('gameActions commitHumanTacticalDraftOrders standing-order march merge', {
       explicitMarchCount: args.movementOrders.length,
@@ -873,7 +968,7 @@ export function commitHumanTacticalDraftOrders(args: {
       airStrikes: args.airStrikes,
       ferryOrders: args.ferryOrders,
       embarkOrders: args.embarkOrders,
-      opponentTacticalDraft: args.opponentTacticalDraft,
+      opponentTacticalDraft,
     });
     if (!beat.success) {
       logDebug('gameActions commitHumanTacticalDraftOrders rejected beat', { reason: beat.reason });
@@ -920,7 +1015,7 @@ export function commitHumanTacticalDraftOrders(args: {
       if (u.h3Index === f.destinationH3Index) continue;
       humanMoves.push({ unitId: f.unitId, fromH3Index: u.h3Index, toH3Index: f.destinationH3Index });
     }
-    const od = args.opponentTacticalDraft;
+    const od = opponentTacticalDraft;
     const opponentMoves: NonNullable<TacticalCommitResolutionPlayback['opponentMoves']> = [];
     if (od) {
       for (const o of od.movementOrders) {
@@ -1029,6 +1124,9 @@ export function commitHumanTacticalDraftOrders(args: {
       tacticalResolutionPlayback,
       tacticalMarchContinuations:
         tacticalMarchContinuations.length > 0 ? tacticalMarchContinuations : undefined,
+      ...(args.opponentTacticalDraft
+        ? { committedOpponentTacticalDraft: opponentTacticalDraft ?? null }
+        : {}),
     };
   } catch (err) {
     logError('commitHumanTacticalDraftOrders: exception', err);

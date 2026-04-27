@@ -3,6 +3,15 @@ import type { SubmitOrdersPayload } from '../../shared/ipcTypes';
 import { logDebug, logError } from '../logger';
 import { isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession';
 import { validateAirStrikeOrder, validateFerryOrder } from './airValidation';
+import {
+  ORDER_PLAN_SANITIZE_CONTEXT,
+  logOrderPlanSanitizeDrop,
+  logOrderPlanSanitizeSummary,
+  strategicAirStrikeDuplicateReason,
+  strategicFerryDuplicateReason,
+  strategicMovementDuplicateReason,
+  strategicRangedDuplicateReason,
+} from './orderPlanSanitize';
 
 /**
  * Resolves a roster id to the same display label the renderer uses for tooltips and pending-order UI.
@@ -106,10 +115,10 @@ validPhase: string;
 /**
  * Defines the `submitOrdersImpl` function shape (export function submitOrdersImpl(payload: SubmitOrdersPayload, deps: SubmitOrdersDeps): SubmitOrdersResult).
 
- * Purpose: Supports maintainability by documenting why `submitOrdersImpl` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Purpose: Persists human strategic pending orders for the current planning phase after validation.
+ * When to use: Called from `submitOrders` in `gameActions` with injected validators and display labels.
+ * Expected outcome: Duplicate unit ids within a single category still fail the whole submit; per-row validation failures drop only that row, log via `orderPlanSanitize`, and persist the sanitized plan. Ferry rows for a unit that keeps a valid air strike are dropped (strike wins) instead of failing the batch.
+ * Exceptions: Database and tactical-guard failures return `success: false`; caught exceptions are logged at error.
  */
 export function submitOrdersImpl(payload: SubmitOrdersPayload, deps: SubmitOrdersDeps): SubmitOrdersResult {
   const orders = payload.movementOrders ?? [];
@@ -138,74 +147,106 @@ export function submitOrdersImpl(payload: SubmitOrdersPayload, deps: SubmitOrder
       return { success: false, reason: 'Not in planning phase' };
     }
 
-    const seen = new Set<string>();
+    const sanitizeCtx = ORDER_PLAN_SANITIZE_CONTEXT.strategicSubmit;
+    let droppedInvalidRows = 0;
+
+    const movementDupReason = strategicMovementDuplicateReason(orders, deps.displayLabelForUnit);
+    if (movementDupReason) {
+      return { success: false, reason: movementDupReason };
+    }
+    const keptMovements: typeof orders = [];
     for (const order of orders) {
-      if (seen.has(order.unitId)) {
-        return { success: false, reason: `Duplicate order for ${deps.displayLabelForUnit(order.unitId)}` };
-      }
-      seen.add(order.unitId);
       const result = deps.validateOrder(order.unitId, order.toH3Index);
-      if (!result.valid) return { success: false, reason: result.reason };
+      if (!result.valid) {
+        droppedInvalidRows += 1;
+        logOrderPlanSanitizeDrop(sanitizeCtx, 'movement', { unitId: order.unitId, reason: result.reason });
+        continue;
+      }
+      keptMovements.push(order);
     }
 
-    const seenRanged = new Set<string>();
+    const rangedDupReason = strategicRangedDuplicateReason(ranged, deps.displayLabelForUnit);
+    if (rangedDupReason) {
+      return { success: false, reason: rangedDupReason };
+    }
+    const keptRanged: typeof ranged = [];
     for (const r of ranged) {
-      if (seenRanged.has(r.unitId)) {
-        return { success: false, reason: `Duplicate ranged order for ${deps.displayLabelForUnit(r.unitId)}` };
-      }
-      seenRanged.add(r.unitId);
       const result = deps.validateRangedAttack(r.unitId, r.targetH3Index, {
         allowedPlayer: 'human',
         displayLabelForUnit: deps.displayLabelForUnit,
       });
-      if (!result.valid) return { success: false, reason: result.reason };
+      if (!result.valid) {
+        droppedInvalidRows += 1;
+        logOrderPlanSanitizeDrop(sanitizeCtx, 'ranged', { unitId: r.unitId, reason: result.reason });
+        continue;
+      }
+      keptRanged.push(r);
     }
 
-    const seenAirStrike = new Set<string>();
+    const airDupReason = strategicAirStrikeDuplicateReason(airStrikes, deps.displayLabelForUnit);
+    if (airDupReason) {
+      return { success: false, reason: airDupReason };
+    }
+    const keptAirStrikes: typeof airStrikes = [];
     for (const s of airStrikes) {
-      if (seenAirStrike.has(s.unitId)) {
-        return { success: false, reason: `Duplicate strike order for ${deps.displayLabelForUnit(s.unitId)}` };
-      }
-      seenAirStrike.add(s.unitId);
       const result = validateAirStrikeOrder(s.unitId, s.targetH3Index, s.targetType, {
         allowedPlayer: deps.humanPlayerId,
         displayLabelForUnit: deps.displayLabelForUnit,
       });
-      if (!result.valid) return { success: false, reason: result.reason };
-    }
-
-    const seenFerry = new Set<string>();
-    for (const f of ferryOrders) {
-      if (seenFerry.has(f.unitId)) {
-        return { success: false, reason: `Duplicate ferry order for ${deps.displayLabelForUnit(f.unitId)}` };
+      if (!result.valid) {
+        droppedInvalidRows += 1;
+        logOrderPlanSanitizeDrop(sanitizeCtx, 'airStrike', { unitId: s.unitId, reason: result.reason });
+        continue;
       }
-      seenFerry.add(f.unitId);
+      keptAirStrikes.push(s);
+    }
+    const strikeUnitIds = new Set(keptAirStrikes.map((s) => s.unitId));
+
+    const ferryDupReason = strategicFerryDuplicateReason(ferryOrders, deps.displayLabelForUnit);
+    if (ferryDupReason) {
+      return { success: false, reason: ferryDupReason };
+    }
+    const keptFerry: typeof ferryOrders = [];
+    for (const f of ferryOrders) {
+      if (strikeUnitIds.has(f.unitId)) {
+        droppedInvalidRows += 1;
+        logOrderPlanSanitizeDrop(sanitizeCtx, 'ferry', {
+          unitId: f.unitId,
+          reason: `Air unit ${deps.displayLabelForUnit(f.unitId)} cannot strike and ferry in the same turn`,
+        });
+        continue;
+      }
       const result = validateFerryOrder(f.unitId, f.destinationH3Index, {
         allowedPlayer: deps.humanPlayerId,
         displayLabelForUnit: deps.displayLabelForUnit,
       });
-      if (!result.valid) return { success: false, reason: result.reason };
+      if (!result.valid) {
+        droppedInvalidRows += 1;
+        logOrderPlanSanitizeDrop(sanitizeCtx, 'ferry', { unitId: f.unitId, reason: result.reason });
+        continue;
+      }
+      keptFerry.push(f);
     }
 
-    for (const unitId of seenAirStrike) {
-      if (seenFerry.has(unitId)) {
-        return {
-          success: false,
-          reason: `Air unit ${deps.displayLabelForUnit(unitId)} cannot strike and ferry in the same turn`,
-        };
-      }
+    if (droppedInvalidRows > 0) {
+      logOrderPlanSanitizeSummary(sanitizeCtx, droppedInvalidRows, {
+        movements: keptMovements.length,
+        ranged: keptRanged.length,
+        airStrikes: keptAirStrikes.length,
+        ferry: keptFerry.length,
+      });
     }
 
     dbRun('DELETE FROM pending_orders');
-    for (const order of orders) {
+    for (const order of keptMovements) {
       dbRun('INSERT INTO pending_orders (unit_id, to_h3_index) VALUES (?, ?)', [order.unitId, order.toH3Index]);
     }
     dbRun('DELETE FROM pending_ranged_orders');
-    for (const r of ranged) {
+    for (const r of keptRanged) {
       dbRun('INSERT INTO pending_ranged_orders (unit_id, target_h3_index) VALUES (?, ?)', [r.unitId, r.targetH3Index]);
     }
     dbRun('DELETE FROM pending_air_orders');
-    for (const s of airStrikes) {
+    for (const s of keptAirStrikes) {
       dbRun('INSERT INTO pending_air_orders (unit_id, target_h3_index, target_type) VALUES (?, ?, ?)', [
         s.unitId,
         s.targetH3Index,
@@ -213,7 +254,7 @@ export function submitOrdersImpl(payload: SubmitOrdersPayload, deps: SubmitOrder
       ]);
     }
     dbRun('DELETE FROM pending_ferry_orders');
-    for (const f of ferryOrders) {
+    for (const f of keptFerry) {
       dbRun('INSERT INTO pending_ferry_orders (unit_id, destination_h3_index) VALUES (?, ?)', [f.unitId, f.destinationH3Index]);
     }
     return { success: true };

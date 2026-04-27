@@ -70,7 +70,8 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
   const container = document.getElementById('canvas-container');
   if (container) {
     for (const child of container.children) {
-      if ((child as HTMLElement).id === 'game-over-overlay') continue;
+      const id = (child as HTMLElement).id;
+      if (id === 'game-over-overlay' || id === 'tactical-annihilation-overlay') continue;
       (child as HTMLElement).style.pointerEvents = enabled ? '' : 'none';
     }
   }

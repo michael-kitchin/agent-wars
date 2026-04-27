@@ -137,7 +137,7 @@ export function activateRestoredTacticalBattleFromMainSnapshot(
  * Ends the tactical session in the main process then resumes strategic Ready handling.
  *
  * Contract: Injects current `window.gameApi.endTacticalBattle` per call like the renderer button handler did.
- * When to use: Tactical HUD exit button and annihilation auto-exit path.
+ * When to use: Tactical HUD exit button and annihilation modal `Exit Battle` confirmation.
  * Expected outcome: Clears renderer tactical snapshot and invokes Ready pipeline on success.
  * Exceptions: Surfaces toasts when IPC fails per `tacticalPerformBattleExit` contract.
  */

@@ -3,7 +3,9 @@
  */
 
 import * as assert from 'assert';
+import { getToolFlags } from './openRouterToolGroups';
 import { buildFinalJsonContractInstruction, getFinalJsonOrdersExampleBlock } from './promptContracts';
+import { getMovementOrderInstruction } from './promptText';
 
 /**
  * Defines the `testExampleBlockParsesWithParser` function shape (function testExampleBlockParsesWithParser(): void).
@@ -39,6 +41,26 @@ function testExampleBlockParsesWithParser(): void {
  * Expected outcome: Tactical string mentions tactical beat and event-driven.
  * Exceptions: Assertion failure on contract drift.
  */
+/**
+ * Defines the `testTacticalPlanningMovementInstructionAddsReachabilityClause` function shape.
+ *
+ * Purpose: Regression for tactical AI prompts: planning + explicit_move must mention terrain-weighted reachability.
+ * When to use: After edits to `getMovementOrderInstruction`.
+ * Expected outcome: Tactical mode appends reachability/drop guidance; strategic planning text stays unchanged aside from that clause.
+ * Exceptions: Assertion failure on contract drift.
+ */
+function testTacticalPlanningMovementInstructionAddsReachabilityClause(): void {
+  const flags = getToolFlags(['plan_route']);
+  assert.ok(flags.planningEnabled);
+  const tactical = getMovementOrderInstruction(flags, 'tactical');
+  assert.ok(tactical.includes('orderToHexCode'));
+  assert.ok(tactical.includes('terrain'));
+  assert.ok(tactical.includes('first leg'));
+  const strategic = getMovementOrderInstruction(flags, 'strategic');
+  assert.ok(strategic.includes('orderToHexCode'));
+  assert.ok(!strategic.includes('first leg'));
+}
+
 function testTacticalCallbacksClauseMentionsBeat(): void {
   const tactical = buildFinalJsonContractInstruction({
     includeMemoryUpdates: false,
@@ -80,6 +102,10 @@ const tests = [
   { name: 'getFinalJsonOrdersExampleBlock contains parseable JSON', fn: testExampleBlockParsesWithParser },
   { name: 'getFinalJsonOrdersExampleBlock optional tails', fn: testExampleBlockIncludesOptionalTails },
   { name: 'buildFinalJsonContractInstruction tactical callbacks clause', fn: testTacticalCallbacksClauseMentionsBeat },
+  {
+    name: 'getMovementOrderInstruction tactical planning adds march reachability clause',
+    fn: testTacticalPlanningMovementInstructionAddsReachabilityClause,
+  },
 ];
 
 /**

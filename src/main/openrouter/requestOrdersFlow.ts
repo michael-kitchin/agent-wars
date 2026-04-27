@@ -31,6 +31,7 @@ import {
   validateTacticalOpponentEmbarkOrder,
   validateTacticalOpponentFerryOrder,
 } from '../tacticalBattle/tacticalOpponentOrderValidation';
+import { tacticalComputeMovementOrderOutcome } from '../tacticalBattle/tacticalSnapshotGuards';
 import {
   buildStrategicOperationalMapSectionMarkdown,
   buildTacticalOperationalMapSectionMarkdown,
@@ -422,6 +423,18 @@ export async function requestOrdersFlow(
   logPromptPreview('openRouter requestOrders: user message', userMessage);
   logDebug('openRouter requestOrders: starting tool loop', { turnNumber: state.turnNumber });
 
+  /**
+   * Tactical consultations often emit very large `orders[]` (many sub-units × multi-line JSON objects).
+   * When `max_tokens` is too low, the provider stops mid-JSON (`finish_reason: length`), `JSON.parse` fails, and repair also truncates if its budget is small.
+   */
+  const completionMaxTokens = tacticalBattle ? 8192 : 2048;
+  const repairMaxTokens = tacticalBattle ? 8192 : 2048;
+  logDebug('openRouter requestOrders: completion token budgets', {
+    tacticalAiBattle: tacticalBattle?.battleId ?? null,
+    completionMaxTokens,
+    repairMaxTokens,
+  });
+
   const wallClockStart = Date.now();
   let requestCost = 0;
   let totalInputTokens = 0;
@@ -454,7 +467,7 @@ export async function requestOrdersFlow(
       const body: Record<string, unknown> = {
         model: modelId,
         messages,
-        max_tokens: 2048,
+        max_tokens: completionMaxTokens,
         tools,
         tool_choice: 'auto',
       };
@@ -499,6 +512,18 @@ export async function requestOrdersFlow(
       requestCost += json.usage?.cost ?? 0;
       totalInputTokens += json.usage?.prompt_tokens ?? 0;
       totalOutputTokens += json.usage?.completion_tokens ?? 0;
+      const head = json.choices?.[0] as { finish_reason?: string; native_finish_reason?: string } | undefined;
+      const finishReason = head?.finish_reason;
+      const nativeFinish = head?.native_finish_reason;
+      if (finishReason === 'length' || nativeFinish === 'MAX_TOKENS') {
+        logError('openRouter requestOrders: model output truncated at max_tokens (final JSON may be incomplete)', {
+          iteration,
+          tacticalAiBattle: tacticalBattle?.battleId ?? null,
+          completionMaxTokens,
+          finishReason,
+          nativeFinish,
+        });
+      }
       const assistantMessage = json.choices?.[0]?.message;
       if (!assistantMessage) {
         if (onLog) onLog('Invalid response: no assistant message from model.', true);
@@ -620,7 +645,7 @@ export async function requestOrdersFlow(
         ];
         const repairResponse = await postOpenRouterChatWithTimeoutAndRetry({
           key,
-          body: { model: modelId, messages: repairMessages, max_tokens: 1024, tool_choice: 'none' },
+          body: { model: modelId, messages: repairMessages, max_tokens: repairMaxTokens, tool_choice: 'none' },
           signal,
           onLog,
           requestLabel: 'requestOrders repair',
@@ -633,6 +658,15 @@ export async function requestOrdersFlow(
             choices?: Array<{ message?: { content?: string | null } }>;
             usage?: { cost?: number; prompt_tokens?: number; completion_tokens?: number };
           };
+          const repairHead = repairJson.choices?.[0] as { finish_reason?: string; native_finish_reason?: string } | undefined;
+          if (repairHead?.finish_reason === 'length' || repairHead?.native_finish_reason === 'MAX_TOKENS') {
+            logError('openRouter requestOrders repair: model output truncated at max_tokens (repair JSON may be incomplete)', {
+              tacticalAiBattle: tacticalBattle?.battleId ?? null,
+              repairMaxTokens,
+              finishReason: repairHead.finish_reason,
+              nativeFinish: repairHead.native_finish_reason,
+            });
+          }
           requestCost += repairJson.usage?.cost ?? 0;
           totalInputTokens += repairJson.usage?.prompt_tokens ?? 0;
           totalOutputTokens += repairJson.usage?.completion_tokens ?? 0;
@@ -682,6 +716,50 @@ export async function requestOrdersFlow(
       for (const order of mergedMovement) {
         if (seenUnits.has(order.unitId)) {
           dropReasons.push(`Duplicate order for ${aiOrderUnitLabel(order.unitId)}`);
+          continue;
+        }
+        if (tacticalBattle) {
+          const res4Set = new Set(tacticalBattle.res4ChildH3Indexes);
+          const sub = [...tacticalBattle.subUnits];
+          const byId = new Map(sub.map((u, i) => [u.id, i] as const));
+          const tacticalOutcome = tacticalComputeMovementOrderOutcome({
+            byId,
+            sub,
+            order,
+            res4Set,
+            battle: tacticalBattle,
+          });
+          if (!tacticalOutcome.ok) {
+            const plannerReason =
+              tacticalOutcome.reason === 'out_of_range' &&
+              tacticalOutcome.context &&
+              typeof (tacticalOutcome.context as { plannerReason?: unknown }).plannerReason === 'string'
+                ? (tacticalOutcome.context as { plannerReason: string }).plannerReason
+                : '';
+            const suffix = plannerReason ? ` (${plannerReason})` : '';
+            dropReasons.push(
+              `Tactical march ${aiOrderUnitLabel(order.unitId)} -> ${order.toH3Index}: ${tacticalOutcome.reason}${suffix}`
+            );
+            continue;
+          }
+          const appliedTo = tacticalOutcome.appliedToH3Index;
+          const unitRow = sub[tacticalOutcome.idx]!;
+          if (appliedTo === unitRow.h3Index) {
+            if (order.toH3Index !== unitRow.h3Index) {
+              dropReasons.push(
+                `Tactical march ${aiOrderUnitLabel(order.unitId)} -> ${order.toH3Index}: out_of_range (no_progress)`
+              );
+            }
+            seenUnits.add(order.unitId);
+            continue;
+          }
+          if (appliedTo !== order.toH3Index) {
+            dropReasons.push(
+              `Tactical march ${aiOrderUnitLabel(order.unitId)}: clamped explicit_move destination to first leg this beat (${order.toH3Index} → ${appliedTo})`
+            );
+          }
+          validated.push({ unitId: order.unitId, toH3Index: appliedTo });
+          seenUnits.add(order.unitId);
           continue;
         }
         const result = validateAiOrder(order, planState, { labelForUnitId: aiOrderUnitLabel });

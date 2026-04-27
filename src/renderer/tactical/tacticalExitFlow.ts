@@ -5,12 +5,13 @@
 import {
   tacticalBoundaryPlanningExitAllowed,
 } from '../../shared/tacticalStateAssertions';
-import { shouldEndTacticalBattleForAnnihilation } from '../../shared/tacticalAnnihilation';
+import { getTacticalAnnihilationOutcome } from '../../shared/tacticalAnnihilation';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { rendererSharedState as S } from '../core/state';
 import { updateGameStateSidebar } from '../core/uiState';
 import { exitTacticalMapView } from '../map/tacticalMapView';
 import { hideTacticalEntryLayer } from '../map/tacticalEntryLayer';
+import { closeTacticalAnnihilationOutcomeDialog, openTacticalAnnihilationOutcomeDialog } from './tacticalAnnihilationDialog';
 import { restoreStrategicOrderDraftsAfterTacticalSession } from './tacticalStrategicOrderUiStash';
 import {
   tacticalApplyStrategicSidebarForTacticalMode,
@@ -47,37 +48,29 @@ export type TacticalBattleExitIo = {
   runReadyAfterExit: () => Promise<void>;
 };
 
-let tacticalAnnihilationExitInFlight = false;
-
 /**
- * Schedules Ready-equivalent tactical exit when the roster shows annihilation (one side has zero sub-units).
+ * Opens the annihilation win/loss modal when the roster is terminal; exit IPC runs only after the player confirms.
  *
- * Contract: No-op unless planning phase is active and snapshot indicates annihilation.
+ * Contract: No-op unless planning phase is active, snapshot exists, dialog not already open, and outcome is terminal.
  * When to use: Tactical draw paths after snapshot updates that may eliminate the last sub-units on a side.
- * Expected outcome: One toast plus one exit attempt per guard window.
- * Exceptions: Swallowed errors still clear the in-flight guard via `finally`.
+ * Expected outcome: At most one modal per annihilation beat; `io.redraw` refreshes HUD exit visibility.
+ * Exceptions: None.
  */
 export function tacticalMaybeScheduleAnnihilationExit(session: TacticalExitSessionAccessor, io: TacticalBattleExitIo): void {
-  if (tacticalAnnihilationExitInFlight) return;
+  if (S.tacticalAnnihilationOutcomeDialog != null) return;
   const snap = session.getBattleSnapshot();
   if (!snap || !session.getPhasePlanning()) return;
-  if (!shouldEndTacticalBattleForAnnihilation(snap.subUnits)) return;
-  tacticalAnnihilationExitInFlight = true;
-  void (async () => {
-    try {
-      io.showMapToast('Tactical battle ended — one side has no remaining sub-units.', {});
-      await tacticalPerformBattleExit(session, io);
-    } finally {
-      tacticalAnnihilationExitInFlight = false;
-    }
-  })();
+  const outcome = getTacticalAnnihilationOutcome(snap.subUnits);
+  if (outcome === null) return;
+  openTacticalAnnihilationOutcomeDialog(outcome);
+  io.redraw();
 }
 
 /**
  * Ends the main-process tactical session, restores strategic map chrome, then runs Ready-equivalent flow.
  *
  * Contract: Early return when boundary check fails; does not throw on IPC errors (toast + return).
- * When to use: Tactical exit button and annihilation-driven auto exit.
+ * When to use: Tactical exit button and annihilation modal confirmation.
  * Expected outcome: Local snapshot cleared, Leaflet bounds restored, Ready pipeline invoked on success path.
  * Exceptions: `endTacticalBattle` failures keep renderer snapshot unchanged after toast.
  */
@@ -94,6 +87,7 @@ export async function tacticalPerformBattleExit(session: TacticalExitSessionAcce
     return;
   }
   session.setBattleSnapshot(null);
+  closeTacticalAnnihilationOutcomeDialog();
   S.tacticalOpponentDraft = null;
   session.setPhasePlanning(true);
   exitTacticalMapView();

@@ -209,7 +209,7 @@ export async function runEventDrivenAfterResolutionConsultation(args: {
  *
  * Purpose: Lets the opponent LLM re-plan inside an active tactical session when callbacks or tactical mandatory rules fire.
  * When to use: `game:commitHumanTacticalDraftOrders` after a successful commit when the renderer passed event-driven flags.
- * Expected outcome: Optional `tacticalOpponentPlan` plus optional strategy/tool-count telemetry for the IPC payload.
+ * Expected outcome: Optional `tacticalOpponentPlan` (and `attachTacticalOpponentPlanToIpc`) when evaluation invoked the LLM; otherwise empty merge so IPC can preserve the renderer draft.
  * Exceptions: Does not throw; failures are logged at error and swallowed.
  */
 export async function runEventDrivenAfterTacticalBeatConsultation(args: {
@@ -233,7 +233,8 @@ export async function runEventDrivenAfterTacticalBeatConsultation(args: {
   timeoutMs: number;
   errorLogMessage: string;
 }): Promise<{
-  tacticalOpponentPlan?: TacticalOpponentPlanPayload;
+  attachTacticalOpponentPlanToIpc?: boolean;
+  tacticalOpponentPlan?: TacticalOpponentPlanPayload | null;
   aiStrategy?: string;
   toolInvocationCounts?: Record<string, number>;
 }> {
@@ -256,8 +257,10 @@ export async function runEventDrivenAfterTacticalBeatConsultation(args: {
         );
       }),
     ]);
+    const attach = post.attachTacticalOpponentPlanToIpc === true;
     return {
-      ...(post.tacticalOpponentPlan ? { tacticalOpponentPlan: post.tacticalOpponentPlan } : {}),
+      attachTacticalOpponentPlanToIpc: attach,
+      ...(attach ? { tacticalOpponentPlan: post.tacticalOpponentPlan ?? null } : {}),
       ...(post.strategy ? { aiStrategy: post.strategy } : {}),
       ...(post.toolInvocationCounts ? { toolInvocationCounts: post.toolInvocationCounts } : {}),
     };

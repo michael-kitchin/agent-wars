@@ -738,14 +738,14 @@ function testSubmitOrdersAllowsLandMovementFromSingleArcticHex(): void {
 }
 
 /**
- * Defines the `testSubmitOrdersRejectsLandWaterToWaterPortMovement` function shape (function testSubmitOrdersRejectsLandWaterToWaterPortMovement(): void).
+ * Defines the `testSubmitOrdersDropsInvalidLandWaterToWaterPortMovement` function shape (function testSubmitOrdersDropsInvalidLandWaterToWaterPortMovement(): void).
 
- * Purpose: Supports maintainability by documenting why `testSubmitOrdersRejectsLandWaterToWaterPortMovement` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Asserts strategic `submitOrders` matches tactical resilience: invalid movement rows are dropped and the commit still succeeds.
+ * When to use: Regression guard when changing `submitOrdersImpl` sanitization.
+ * Expected outcome: `success: true` and no pending march row for the unit after the invalid destination is filtered out.
  * Exceptions: None.
  */
-function testSubmitOrdersRejectsLandWaterToWaterPortMovement(): void {
+function testSubmitOrdersDropsInvalidLandWaterToWaterPortMovement(): void {
   withTempDb(() => {
     const state = getGameState();
     const landUnit = state.units.find((u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor'));
@@ -754,8 +754,10 @@ function testSubmitOrdersRejectsLandWaterToWaterPortMovement(): void {
     const result = submitOrders({
       movementOrders: [{ unitId: landUnit!.id, toH3Index: destinationWaterHex! }],
     });
-    assert.strictEqual(result.success, false);
-    assert.strictEqual(result.reason, LAND_UNITS_CANNOT_MOVE_WATER_OR_ARCTIC_TO_WATER_OR_ARCTIC_REASON);
+    assert.strictEqual(result.success, true, result.reason ?? 'expected submit to succeed after dropping invalid march');
+    const pendingCount =
+      dbGetOne<{ count: number }>('SELECT COUNT(*) AS count FROM pending_orders WHERE unit_id = ?', [landUnit!.id])?.count ?? 0;
+    assert.strictEqual(pendingCount, 0, 'expected invalid march row not persisted');
   });
 }
 
@@ -781,14 +783,14 @@ function testPreviewShowsInvalidForLandWaterToWaterPortMovement(): void {
 }
 
 /**
- * Defines the `testSubmitOrdersRejectsLandWaterToArcticPortMovement` function shape (function testSubmitOrdersRejectsLandWaterToArcticPortMovement(): void).
+ * Defines the `testSubmitOrdersDropsInvalidLandWaterToArcticPortMovement` function shape (function testSubmitOrdersDropsInvalidLandWaterToArcticPortMovement(): void).
 
- * Purpose: Supports maintainability by documenting why `testSubmitOrdersRejectsLandWaterToArcticPortMovement` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Same resilience contract as `testSubmitOrdersDropsInvalidLandWaterToWaterPortMovement` for land/water-to-arctic port transitions.
+ * When to use: Regression guard for `submitOrdersImpl` movement sanitization.
+ * Expected outcome: Submit succeeds; the disallowed march is not stored in `pending_orders`.
  * Exceptions: None.
  */
-function testSubmitOrdersRejectsLandWaterToArcticPortMovement(): void {
+function testSubmitOrdersDropsInvalidLandWaterToArcticPortMovement(): void {
   withTempDb(() => {
     const state = getGameState();
     const landUnit = state.units.find((u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor'));
@@ -804,8 +806,10 @@ function testSubmitOrdersRejectsLandWaterToArcticPortMovement(): void {
     const result = submitOrders({
       movementOrders: [{ unitId: landUnit!.id, toH3Index: destinationAdjacentHex! }],
     });
-    assert.strictEqual(result.success, false);
-    assert.strictEqual(result.reason, LAND_UNITS_CANNOT_MOVE_WATER_OR_ARCTIC_TO_WATER_OR_ARCTIC_REASON);
+    assert.strictEqual(result.success, true, result.reason ?? 'expected submit to succeed after dropping invalid march');
+    const pendingCount =
+      dbGetOne<{ count: number }>('SELECT COUNT(*) AS count FROM pending_orders WHERE unit_id = ?', [landUnit!.id])?.count ?? 0;
+    assert.strictEqual(pendingCount, 0, 'expected invalid march row not persisted');
   });
 }
 
@@ -834,9 +838,9 @@ function run(): void {
   testReadyIncludesEmbarkedCargoFollowMoveForNavalMovement();
   testSubmitOrdersAllowsLandMovementToSingleArcticHex();
   testSubmitOrdersAllowsLandMovementFromSingleArcticHex();
-  testSubmitOrdersRejectsLandWaterToWaterPortMovement();
+  testSubmitOrdersDropsInvalidLandWaterToWaterPortMovement();
   testPreviewShowsInvalidForLandWaterToWaterPortMovement();
-  testSubmitOrdersRejectsLandWaterToArcticPortMovement();
+  testSubmitOrdersDropsInvalidLandWaterToArcticPortMovement();
   console.log('gameActionsMultiSelect.test.ts passed');
 }
 
