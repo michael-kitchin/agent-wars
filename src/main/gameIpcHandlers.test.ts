@@ -5,6 +5,10 @@
 
 import * as assert from 'assert';
 import {
+  clearDeferredPlaybackConsultPending,
+  setPendingStrategicReadyConsult,
+} from './ipc/deferredResolutionPlaybackConsult';
+import {
   handleRequestAiOrders,
   cancelRequestAiOrders,
   handleGameReady,
@@ -698,6 +702,49 @@ async function testHandleResolveMeleeInterceptForwardsTacticalAutoStartOnFight()
  * Expected outcome: `tacticalAutoStartRes1H3Index` is absent when the mocked resolve result omits it.
  * Exceptions: None.
  */
+/**
+ * Defines the `testHandleGameReadyFailsWhileDeferredPlaybackConsultPending` function shape.
+
+ * Purpose: Locks mutex behavior so a second `game:ready` cannot run while deferred consultation is outstanding.
+ * When to use: Regression guard for playback deferral ordering.
+ * Expected outcome: `{ success: false }` without invoking `ready`.
+ * Exceptions: Clears pending after the assertion so other tests stay isolated.
+ */
+async function testHandleGameReadyFailsWhileDeferredPlaybackConsultPending(): Promise<void> {
+  clearDeferredPlaybackConsultPending();
+  setPendingStrategicReadyConsult(1, {
+    useEventDrivenConsultation: false,
+    resolutionSuccess: true,
+    aiPlanningRunEnabled: true,
+    opponentState: minimalPlanningState as never,
+    resolution: { success: true } as ReadyResult,
+    modelId: '',
+    enabledToolNames: [],
+    hasKey: () => false,
+    requestOrders: async (): Promise<RequestAiOrdersResult> => ({ success: true, orders: [] }),
+    timeoutMs: 1000,
+    errorLogMessage: 'testHandleGameReadyFailsWhileDeferredPlaybackConsultPending',
+  });
+  let readyCalled = false;
+  const deps = {
+    getGameState: () => minimalPlanningState,
+    getGameStateForPlayer: () => minimalPlanningState,
+    getSelectedModel: () => 'test-model',
+    hasKey: () => true,
+    getToolNamesForEnabledGroups: () => ['planning'],
+    defaultGroupIds: ['planning'],
+    requestOrders: async (): Promise<RequestAiOrdersResult> => ({ success: true, orders: [] }),
+    ready: (): ReadyResultMinimal & { success: boolean } => {
+      readyCalled = true;
+      return { success: false, reason: 'ready should not run while deferred consultation pending' };
+    },
+  };
+  const result = await handleGameReady({ enabledToolGroups: ['planning'], aiPlanningRunEnabled: false }, deps);
+  assert.strictEqual(result.success, false);
+  assert.strictEqual(readyCalled, false);
+  clearDeferredPlaybackConsultPending();
+}
+
 async function testHandleResolveMeleeInterceptOmitsTacticalAutoStartOnIgnore(): Promise<void> {
   const deps = {
     getGameState: () => minimalPlanningState,
@@ -745,6 +792,10 @@ async function runAll(): Promise<void> {
     {
       name: 'game:ready forwards AI air strike, ferry, and embark orders',
       fn: testGameReadyForwardsAiAirStrikeFerryAndEmbarkOrders,
+    },
+    {
+      name: 'game:ready fails while deferred playback consultation pending',
+      fn: testHandleGameReadyFailsWhileDeferredPlaybackConsultPending,
     },
     { name: 'game:ready awaiting melee decision surfaces token and rows', fn: testGameReadyAwaitingMeleeDecisionSurfacesFields },
     { name: 'game:resolveMeleeIntercept rejects invalid payload', fn: testHandleResolveMeleeInterceptRejectsInvalidPayload },

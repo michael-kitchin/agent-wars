@@ -22,7 +22,11 @@ import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
 import { rendererSharedState as S } from '../core/state';
 import { tacticalOpponentPlanPayloadHasAnyOrders } from '../../shared/ipc/tacticalOpponentPlanMerge';
 import { resetPrecomputedAiState } from '../openRouter/precomputedAiState';
-import { isWaitingForPrecomputedAiOrders } from '../openRouter/aiPlanningState';
+import {
+  isDeferredResolutionPlaybackConsultPending,
+  isWaitingForPrecomputedAiOrders,
+} from '../openRouter/aiPlanningState';
+import { enqueueResolutionPlaybackCompleteNotify } from '../openRouter/resolutionPlaybackDeferral';
 
 /**
  * Documents the `ReadyHandlerDeps` interface as a named contract surface (export interface ReadyHandlerDeps).
@@ -644,6 +648,10 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
   if (S.gameState?.gameOver) return;
   if (S.readyRequestInFlight) return;
   if (S.tacticalAnnihilationOutcomeDialog != null) return;
+  if (isDeferredResolutionPlaybackConsultPending()) {
+    deps.updateReadyButtonState();
+    return;
+  }
   deps.clearSidebarError();
   S.readyRequestInFlight = true;
   S.toolInvocationCounts = Object.fromEntries(S.openRouterToolGroups.map((g) => [g.id, 0]));
@@ -685,6 +693,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         committedOpponentTacticalDraft?: TacticalOpponentPlanPayload | null;
         toolInvocationCounts?: Record<string, number>;
         aiStrategy?: string;
+        tacticalPostBeatConsultDeferred?: boolean;
       };
       if (!commitResult.success) {
         deps.showSidebarError(commitResult.reason ?? 'Tactical commit failed');
@@ -709,7 +718,13 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         (playback?.killsByAirStrike?.length ?? 0) > 0 ||
         (playback?.killsByReturnFire?.length ?? 0) > 0 ||
         (playback?.killsByMelee?.length ?? 0) > 0;
-      const needsResolutionPlayback = hasMoves || hasRangedPlayback || hasMeleePlayback || hasKillPlayback;
+      const hasAirStrikePlaybackAnim =
+        (playback?.airStrikeAttemptCount ?? 0) > 0 ||
+        (playback?.airStrikeMoves?.length ?? 0) > 0 ||
+        (playback?.airStrikeHexes?.length ?? 0) > 0 ||
+        (playback?.airStrikeCasualtyHexes?.length ?? 0) > 0;
+      const needsResolutionPlayback =
+        hasMoves || hasRangedPlayback || hasMeleePlayback || hasKillPlayback || hasAirStrikePlaybackAnim;
       // Start resolution playback before updating the tactical snapshot so no redraw can paint post-commit cells
       // while `resolutionMoveAnimation` is still null (avoids a one-frame teleport hop).
       // Defer the playback clock and the first rAF until after post-commit `getGameState` / terrain refresh so the
@@ -725,11 +740,17 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
               h3Index: u.h3Index,
             })) as GameStateSnapshot['units'])
           : undefined;
+        const airStrikeOutboundMoves = deps.buildAirStrikeOutboundPlaybackMoves(playback.airStrikeMoves);
+        const airStrikeReturnMoves = deps.buildAirStrikeReturnPlaybackMoves(playback.airStrikeMoves);
         S.resolutionMoveAnimation = {
           moves: [...playback.humanMoves, ...(playback.opponentMoves ?? [])],
           startTime: Date.now(),
           tacticalDeferResolutionClock: true,
           ...(tacticalMarchPlaybackUnits ? { tacticalMarchPlaybackUnits } : {}),
+          ...(airStrikeOutboundMoves.length > 0 ? { airStrikeOutboundMoves } : {}),
+          ...(airStrikeReturnMoves.length > 0 ? { airStrikeReturnMoves } : {}),
+          ...(playback.airStrikeHexes?.length ? { airStrikeCombatHexes: playback.airStrikeHexes } : {}),
+          ...(playback.airStrikeCasualtyHexes?.length ? { airStrikeCasualtyHexes: playback.airStrikeCasualtyHexes } : {}),
           rangedCombatHexes: playback.rangedCombatHexes,
           rangedCasualtyHexes: playback.rangedCasualtyHexes,
           rangedRemovedUnits: playback.rangedRemovedUnits,
@@ -741,13 +762,15 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       if (commitResult.tacticalBattle) {
         S.tacticalBattleSnapshot = commitResult.tacticalBattle;
       }
-      const deferredTacticalPostBeatConsult = S.useEventDrivenConsultation && S.runButtonOn;
-      if (deferredTacticalPostBeatConsult && 'committedOpponentTacticalDraft' in commitResult) {
+      if (commitResult.tacticalPostBeatConsultDeferred && 'committedOpponentTacticalDraft' in commitResult) {
         S.tacticalOpponentDraft = commitResult.committedOpponentTacticalDraft ?? null;
       }
-      if (isTacticalPostBeatConsultOnCommit(commitResult)) {
+      if (commitResult.tacticalPostBeatConsultDeferred) {
+        S.pendingDeferredTacticalPostBeatConsult = true;
+      }
+      if (!commitResult.tacticalPostBeatConsultDeferred && isTacticalPostBeatConsultOnCommit(commitResult)) {
         applyTacticalPostBeatConsultSideEffects(commitResult, deps);
-      } else {
+      } else if (!commitResult.tacticalPostBeatConsultDeferred) {
         if ('tacticalOpponentPlan' in commitResult) {
           S.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
         } else if ('committedOpponentTacticalDraft' in commitResult) {
@@ -858,7 +881,20 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       }
       deps.redraw();
       deps.scheduleTacticalAnnihilationExit?.();
-      if (S.runButtonOn) {
+      if (commitResult.tacticalPostBeatConsultDeferred) {
+        const bid = commitResult.tacticalBattle?.battleId;
+        if (bid) {
+          const sendTacticalNotify = (): void => {
+            void window.gameApi?.notifyResolutionPlaybackComplete?.({ kind: 'tactical', battleId: bid });
+          };
+          if (needsResolutionPlayback) {
+            enqueueResolutionPlaybackCompleteNotify(sendTacticalNotify);
+          } else {
+            sendTacticalNotify();
+          }
+        }
+      }
+      if (S.runButtonOn && !commitResult.tacticalPostBeatConsultDeferred) {
         const oppAlive = S.tacticalBattleSnapshot?.subUnits.some((u) => u.player === 'opponent') ?? false;
         if (oppAlive) deps.startBackgroundRequestIfAllowed();
       }
@@ -895,6 +931,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       aiPlanningRunEnabled: S.runButtonOn,
     });
     let readyResult = await deps.callReadyWithTimeout(readyPayload);
+    let resolutionPlaybackNotifyKind: 'strategic' | 'melee' = 'strategic';
     if (!readyResult.success) {
       deps.showSidebarError(readyResult.reason ?? 'Ready failed');
       deps.updateReadyButtonState();
@@ -938,6 +975,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         return;
       }
       readyResult = resolveResult;
+      resolutionPlaybackNotifyKind = 'melee';
     }
 
     resetPrecomputedAiState('null');
@@ -1001,6 +1039,21 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       visibleHexes
     );
     const needsAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution;
+    if (readyResult.postResolutionConsultDeferred === true) {
+      S.pendingDeferredStrategicPostResolutionConsult = true;
+      const planningTurn = readyResult.deferredResolutionPlanningTurnNumber ?? state.turnNumber;
+      const sendStrategicNotify = (): void => {
+        void window.gameApi?.notifyResolutionPlaybackComplete?.({
+          kind: resolutionPlaybackNotifyKind,
+          planningTurnNumber: planningTurn,
+        });
+      };
+      if (needsAnimation) {
+        enqueueResolutionPlaybackCompleteNotify(sendStrategicNotify);
+      } else {
+        sendStrategicNotify();
+      }
+    }
     if (needsAnimation) {
       if (S.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
       S.resolutionMoveAnimation = {
@@ -1072,11 +1125,11 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     deps.updateSidebar();
     deps.updateGameOverUI(state);
     deps.updateReadyButtonState();
-    if (S.runButtonOn) deps.startBackgroundRequestIfAllowed();
+    if (S.runButtonOn && !S.pendingDeferredStrategicPostResolutionConsult) deps.startBackgroundRequestIfAllowed();
     deps.redraw();
     if (readyResult.tacticalAutoStartRes1H3Index) {
       await deps.startTacticalBattleFromInterceptHex(readyResult.tacticalAutoStartRes1H3Index);
-      if (S.runButtonOn) deps.startBackgroundRequestIfAllowed();
+      if (S.runButtonOn && !S.pendingDeferredStrategicPostResolutionConsult) deps.startBackgroundRequestIfAllowed();
     }
   } catch (err) {
     deps.showSidebarError(String(err));

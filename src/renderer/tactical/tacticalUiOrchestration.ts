@@ -28,6 +28,7 @@ export function tacticalReleaseRendererSessionForNewStrategicMatch(nextState: Ga
   S.resolutionMoveAnimationFrameId = null;
   S.resolutionMoveAnimation = null;
   cancelTacticalScopedBackgroundPrefetchForSessionTeardown();
+  S.pendingDeferredTacticalPostBeatConsult = false;
   S.tacticalBattleSnapshot = null;
   S.tacticalOpponentDraft = null;
   S.tacticalPhasePlanning = true;

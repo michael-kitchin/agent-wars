@@ -19,6 +19,8 @@ import type { NewGameIpcPayload, SubmitOrdersIpcPayload } from './ordersTypes';
 import type { OpenRouterModel, RequestAiOrdersResult } from './openRouterTypes';
 import type {
   GameReadyIpcPayload,
+  NotifyResolutionPlaybackCompletePayload,
+  PostResolutionConsultationPushPayload,
   ReadyResult,
   ResolveMeleeInterceptIpcPayload,
   TacticalCommitResolutionPlayback,
@@ -45,6 +47,15 @@ export type CommitHumanTacticalDraftOrdersIpcResult = {
   committedOpponentTacticalDraft?: TacticalOpponentPlanPayload | null;
   toolInvocationCounts?: Record<string, number>;
   aiStrategy?: string;
+  /**
+   * True when main deferred `runEventDrivenAfterTacticalBeatConsultation` until resolution playback notify + push.
+   *
+   * Purpose: Distinguishes invoke responses that omit merged `TacticalPostBeatConsultFields` from those that include them inline.
+   * When to use: Tactical Ready handler schedules notify and listens for `postTacticalBeatConsultation` when set.
+   * Expected outcome: Consult fields arrive only via push for that commit.
+   * Exceptions: Omitted when consultation ran inline or was skipped.
+   */
+  tacticalPostBeatConsultDeferred?: boolean;
 } & Partial<TacticalPostBeatConsultFields>;
 
 /**
@@ -164,6 +175,35 @@ ready: (payload?: GameReadyIpcPayload) => Promise<ReadyResult>;
    * Exceptions: None.
    */
 resolveMeleeIntercept: (payload: ResolveMeleeInterceptIpcPayload) => Promise<ReadyResult>;
+    /**
+   * Notifies main that strategic/melee/tactical resolution playback finished so deferred LLM consultation may run.
+   *
+   * Contract: Payload discriminant must match the deferred batch armed on main (`planningTurnNumber` / `battleId`).
+   * When to use: Renderer after `tickResolutionMoveAnimation` completes or immediately when no animation ran.
+   * Expected outcome: Main runs deferred consultation and pushes results via registered listeners.
+   * Exceptions: Mismatches return `{ ok: false }` and may clear the mutex.
+   */
+notifyResolutionPlaybackComplete: (
+    payload: NotifyResolutionPlaybackCompletePayload
+  ) => Promise<{ ok: boolean; reason?: string }>;
+    /**
+   * Subscribes to main-pushed strategic post-resolution consult results (deferred path).
+   *
+   * Contract: Replaces any prior callback; used for one logical listener in the renderer shell.
+   * When to use: Once during OpenRouter / game UI init.
+   * Expected outcome: Invoked with merged strategy and tool counts when `planningTurnNumber` matches the current turn.
+   * Exceptions: None.
+   */
+registerPostResolutionConsultationListener: (callback: (payload: PostResolutionConsultationPushPayload) => void) => void;
+    /**
+   * Subscribes to main-pushed tactical post-beat consult fields (deferred path).
+   *
+   * Contract: Replaces any prior callback; same shape as inline `TacticalPostBeatConsultFields` on commit.
+   * When to use: Once during init when tactical event-driven Run can defer consultation.
+   * Expected outcome: Renderer hydrates opponent draft and tool telemetry after playback notify.
+   * Exceptions: None.
+   */
+registerPostTacticalBeatConsultationListener: (callback: (payload: TacticalPostBeatConsultFields) => void) => void;
     /**
    * Specifies the contract for the `listHumanStandingOrders` member (listHumanStandingOrders: () => Promise<HumanStandingOrderSnapshot[]>;).
 

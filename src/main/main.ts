@@ -81,9 +81,11 @@ import {
   type ReadyDeps,
 } from './gameIpcHandlers';
 import {
-  runEventDrivenAfterTacticalBeatConsultation,
-  toTacticalPostBeatConsultFields,
-} from './ipc/readyIpcResolutionMapping';
+  clearDeferredPlaybackConsultPending,
+  handleNotifyResolutionPlaybackComplete,
+  hasDeferredPlaybackConsultPending,
+  setPendingTacticalBeatConsult,
+} from './ipc/deferredResolutionPlaybackConsult';
 import type {
   SubmitOrdersPayload,
   ReadyResult,
@@ -321,6 +323,7 @@ function registerIpcHandlers(): void {
       humanHomeRegion: payload?.humanHomeRegion,
       aiHomeRegion: payload?.aiHomeRegion,
     });
+    clearDeferredPlaybackConsultPending();
     clearStrategicPreviousHexMemory();
     endTacticalBattleSession();
     return getGameStateForPlayer('human', { maskUnexploredTerrain: false });
@@ -375,6 +378,9 @@ function registerIpcHandlers(): void {
     }
   );
   ipcMain.handle(IPC_GAME.commitHumanTacticalDraftOrders, async (_event, payload: unknown) => {
+    if (hasDeferredPlaybackConsultPending()) {
+      return { success: false, reason: 'Resolution playback consultation is still in progress.' };
+    }
     const parsed = parseHumanTacticalCommitPayload(payload);
     if (!parsed.ok) return { success: false, reason: parsed.reason };
     const v = parsed.value;
@@ -411,16 +417,11 @@ function registerIpcHandlers(): void {
       timeoutMs: POST_RESOLUTION_CONSULT_TIMEOUT_MS,
       errorLogMessage: 'commitHumanTacticalDraftOrders: tactical after-beat consultation failed or timed out',
     };
-    logDebug('main commitHumanTacticalDraftOrders: awaiting tactical post-beat consult', { battleId });
-    const mergeSource = await runEventDrivenAfterTacticalBeatConsultation(consultArgs);
-    const consultFields = toTacticalPostBeatConsultFields(battleId, mergeSource);
-    logDebug('main commitHumanTacticalDraftOrders: tactical post-beat consult finished', {
+    setPendingTacticalBeatConsult(battleId, consultArgs);
+    logDebug('main commitHumanTacticalDraftOrders: deferred tactical post-beat consult until playback notify', {
       battleId,
-      hasPlan: Boolean(mergeSource.tacticalOpponentPlan),
-      hasStrategy: Boolean(consultFields.aiStrategy),
-      attach: consultFields.attachTacticalOpponentPlanToIpc,
     });
-    return { ...result, ...consultFields };
+    return { ...result, tacticalPostBeatConsultDeferred: true };
   });
   ipcMain.handle(
     IPC_GAME.validateGroupRangedTarget,
@@ -549,6 +550,7 @@ function registerIpcHandlers(): void {
     return startTacticalBattleForEnclosingRes1Hex(payload.enclosingRes1H3Index);
   });
   ipcMain.handle(IPC_GAME.endTacticalBattle, () => {
+    clearDeferredPlaybackConsultPending();
     endTacticalBattleSession();
     return { success: true as const };
   });
@@ -562,6 +564,10 @@ function registerIpcHandlers(): void {
       return handleResolveMeleeIntercept(payload, { ...sharedReadyConsultationDeps, resolveMeleeIntercept });
     }
   );
+  ipcMain.handle(IPC_GAME.notifyResolutionPlaybackComplete, async (event, payload: unknown) => {
+    logDebug('main game:notifyResolutionPlaybackComplete invoke', { payload });
+    return handleNotifyResolutionPlaybackComplete(event.sender, payload);
+  });
 
   ipcMain.handle(
     IPC_GAME.requestAiOrders,

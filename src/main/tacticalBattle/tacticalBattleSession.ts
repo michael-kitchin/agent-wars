@@ -2,7 +2,7 @@ import type {
   StartTacticalBattleIpcResult,
   TacticalBattleSnapshot,
 } from '../../shared/tacticalBattleTypes';
-import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
+import type { AirStrikeAnimationMove, AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import { tacticalBoundaryConcurrentSessionAllowed } from '../../shared/tacticalStateAssertions';
 import { createCombatRng } from '../combatResolution';
@@ -321,6 +321,9 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
       removedUnits: RemovedUnitSnapshot[];
       infrastructureDestroyedEvents: InfrastructureDestroyedEvent[];
       airStrikeAttemptCount: number;
+      airStrikePlaybackMoves: AirStrikeAnimationMove[];
+      airStrikePlaybackStrikeHexes: string[];
+      airStrikePlaybackCasualtyHexes: string[];
       meleePack: ReturnType<typeof applyTacticalMeleeAfterSupportOrders>;
     }
   | { success: false; reason: string } {
@@ -413,6 +416,9 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
       removedUnits: acc.removedUnits,
       infrastructureDestroyedEvents: acc.infrastructureDestroyedEvents,
       airStrikeAttemptCount: acc.airStrikeAttemptCount,
+      airStrikePlaybackMoves: acc.airStrikePlaybackMoves,
+      airStrikePlaybackStrikeHexes: acc.airStrikePlaybackStrikeHexes,
+      airStrikePlaybackCasualtyHexes: acc.airStrikePlaybackCasualtyHexes,
       meleePack: {
         ...meleePack,
         battle: battleAdvancedTurn,

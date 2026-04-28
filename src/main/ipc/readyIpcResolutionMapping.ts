@@ -186,8 +186,9 @@ export function buildDistinctAiMovesFromPlanningOrders(
  * Purpose: Consolidates the duplicated `Promise.race` + `afterResolution` try/catch in Ready vs melee-resolve handlers.
  * When to use: When `useEventDrivenConsultation && resolution.success && aiPlanningRunEnabled` after a finished turn.
  * Expected outcome: Partial strategy/tool-count updates, or empty object on skip/timeout/failure (errors logged).
- * Contract: Callers **must** await this before resolving strategic `game:ready` / `game:resolveMeleeIntercept` IPC so the
- * renderer never re-enables Ready mid-consultation (tactical beat consult is deferred separately via push + pending flag).
+ * Contract: Callers **must** either await this inline before resolving IPC when deferral does not apply **or** arm
+ * `setPendingStrategicReadyConsult` / `setPendingMeleeResolveConsult` when playback deferral is active; notify completes
+ * the mutex (`game:notifyResolutionPlaybackComplete`). Tactical beat consult uses `setPendingTacticalBeatConsult` likewise.
  * Exceptions: Does not throw; failures are logged at error and swallowed.
  */
 export async function runEventDrivenAfterResolutionConsultation(args: {

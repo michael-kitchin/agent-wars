@@ -768,6 +768,24 @@ resolutionMoveAnimation: null as ResolutionMoveAnimationState,
    */
 resolutionMoveAnimationFrameId: null as number | null,
     /**
+   * True while main deferred strategic post-resolution LLM consultation until playback notify + push.
+   *
+   * Purpose: Gates Ready + Run prefetch until `registerPostResolutionConsultationListener` receives a matching push.
+   * When to use: Strategic Ready path when `ReadyResult.postResolutionConsultDeferred` is true until push clears this flag.
+   * Expected outcome: Cleared when push applies or on new game / fatal mismatch recovery.
+   * Exceptions: None.
+   */
+pendingDeferredStrategicPostResolutionConsult: false,
+    /**
+   * True while main deferred tactical post-beat LLM consultation until playback notify + push.
+   *
+   * Purpose: Mirrors `pendingDeferredStrategicPostResolutionConsult` for tactical event-driven Run commits.
+   * When to use: Tactical commit returned `tacticalPostBeatConsultDeferred` until `registerPostTacticalBeatConsultationListener` fires.
+   * Expected outcome: Cleared when tactical push applies or tactical session ends.
+   * Exceptions: None.
+   */
+pendingDeferredTacticalPostBeatConsult: false,
+    /**
    * Documents the object literal property `initialCameraApplied` (initialCameraApplied: false).
 
    * Purpose: Supports maintainability by documenting why `initialCameraApplied` exists.

@@ -159,6 +159,62 @@ test('tactical urban air strike updates res1 urban_hex_count after reconcile (Ph
     reconcileRes1InfrastructureCountsFromRes4Overrides();
     const afterUrban = getRes1InfrastructureForHex(parent).urbanHexCount;
     assert.strictEqual(afterUrban, beforeUrban - 1);
+    assert.strictEqual(
+      out.airStrikePlaybackMoves.length,
+      out.airStrikeAttemptCount,
+      'tactical air playback: one animation row per strike attempt'
+    );
+    assert.ok(out.airStrikePlaybackStrikeHexes.includes(urban!.h3Index), 'strike hex list includes urban target res4');
+  });
+});
+
+test('applyTacticalAirStrikeThenRangedPhaseOnBattle leaves air playback arrays empty when no air orders', () => {
+  withTempGameDb('aw-tactical-no-air-playback-', () => {
+    const urban = dbGetOne<{ h3Index: string; parentH3Index: string }>(
+      `SELECT h3_index AS h3Index, parent_h3_index AS parentH3Index
+       FROM res4_feature_overrides
+       WHERE is_urban = 1 AND is_rubble = 0
+       LIMIT 1`
+    );
+    assert.ok(urban);
+    const ring = [...gridDisk(urban!.h3Index, 2)];
+    const neighbor = firstRingCellDistinctFrom(urban!.h3Index);
+    assert.ok(ring.includes(neighbor));
+    const terrain: Record<string, string> = {};
+    for (const h of ring) terrain[h] = 'plains';
+    const snap: TacticalBattleSnapshot = {
+      battleId: 'tb-ranged-no-air-playback',
+      enclosingRes1H3Index: urban!.parentH3Index,
+      res4ChildH3Indexes: ring,
+      strategicTurnNumber: 1,
+      tacticalTurnNumber: 1,
+      strategicHexTerrain: 'land',
+      strategicHexTerrainKind: 'plains',
+      res4TerrainKindByH3: terrain,
+      subUnits: [
+        {
+          id: 'hi-no-air',
+          parentUnitId: 'ph-na',
+          player: 'human',
+          unitType: 'infantry',
+          h3Index: neighbor,
+          displayName: '1st Infantry (no air playback)',
+        },
+      ],
+    };
+    let i = 0;
+    const next = () => [0.99][i++] ?? 0.99;
+    const out = applyTacticalAirStrikeThenRangedPhaseOnBattle(
+      snap,
+      undefined,
+      [{ unitId: 'hi-no-air', targetH3Index: urban!.h3Index }],
+      'human',
+      next,
+      'singlePlayer'
+    );
+    assert.strictEqual(out.airStrikeAttemptCount, 0);
+    assert.deepStrictEqual(out.airStrikePlaybackMoves, []);
+    assert.deepStrictEqual(out.airStrikePlaybackStrikeHexes, []);
   });
 });
 

@@ -40,6 +40,18 @@ export const IPC_GAME = {
   endTacticalBattle: 'game:endTacticalBattle',
   ready: 'game:ready',
   resolveMeleeIntercept: 'game:resolveMeleeIntercept',
+  /**
+   * Renderer signals resolution canvas playback finished so main can run deferred event-driven post-resolution LLM work.
+   */
+  notifyResolutionPlaybackComplete: 'game:notifyResolutionPlaybackComplete',
+  /**
+   * Main pushes strategic post-resolution consult results after deferred `runEventDrivenAfterResolutionConsultation`.
+   */
+  postResolutionConsultation: 'game:postResolutionConsultation',
+  /**
+   * Main pushes tactical post-beat consult after deferred `runEventDrivenAfterTacticalBeatConsultation`.
+   */
+  postTacticalBeatConsultation: 'game:postTacticalBeatConsultation',
   requestAiOrders: 'game:requestAiOrders',
   cancelRequestAiOrders: 'game:cancelRequestAiOrders',
 } as const;

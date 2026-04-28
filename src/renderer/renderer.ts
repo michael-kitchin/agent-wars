@@ -137,6 +137,7 @@ import {
   withTacticalHumanDraftPrefetchInvalidation,
 } from './openRouter/openRouterRuntime';
 import { resetPrecomputedAiState } from './openRouter/precomputedAiState';
+import { flushResolutionPlaybackCompleteNotifyCallbacks } from './openRouter/resolutionPlaybackDeferral';
 import {
   containerPixelHitsDrawnUnitIcon as containerPixelHitsDrawnUnitIconFromModule,
   drawLoadingScene as drawLoadingSceneFromModule,
@@ -899,6 +900,41 @@ function showStackCallout(
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * Resolves stored stack-callout unit ids to drawable rows for both strategic units and tactical sub-units.
+ *
+ * Purpose: `refreshStackCalloutIfOpen` runs on Control keydown (`ctrl_pressed`); tactical stacks store sub-unit ids that
+ * are not rows in `gameState.units`, so resolving only from strategic state incorrectly yields zero rows and closes the popup.
+ * When to use: Only from `refreshStackCalloutIfOpen`.
+ * Expected outcome: Same unit rows `showStackCallout` would receive when opening from map hit-testing in tactical mode.
+ * Exceptions: Returns empty array when ids cannot be matched (caller may hide the callout).
+ */
+function resolveUnitsForStackCalloutRefresh(unitIds: string[], state: GameStateSnapshot): GameStateSnapshot['units'] {
+  if (unitIds.length === 0) return [];
+  const tactical = S.tacticalBattleSnapshot;
+  const firstId = unitIds[0];
+  const tacticalRowsMatch =
+    tactical !== null &&
+    tactical.subUnits.some((su) => su.id === firstId);
+  if (tacticalRowsMatch && tactical) {
+    const out: GameStateSnapshot['units'] = [];
+    for (const id of unitIds) {
+      const su = tactical.subUnits.find((s) => s.id === id);
+      if (!su) return [];
+      out.push({
+        id: su.id,
+        player: su.player,
+        unitType: su.unitType,
+        h3Index: su.h3Index,
+      } as GameStateSnapshot['units'][number]);
+    }
+    return out;
+  }
+  return unitIds
+    .map((id) => state.units.find((u) => u.id === id))
+    .filter((unit): unit is NonNullable<typeof unit> => !!unit);
+}
+
 function refreshStackCalloutIfOpen(): void {
   const calloutEl = document.getElementById('stack-callout');
   if (!calloutEl || calloutEl.classList.contains('hidden')) return;
@@ -915,9 +951,7 @@ function refreshStackCalloutIfOpen(): void {
   }
   const state = S.gameState;
   if (!state) return;
-  const units = unitIds
-    .map((id) => state.units.find((u) => u.id === id))
-    .filter((unit): unit is NonNullable<typeof unit> => !!unit);
+  const units = resolveUnitsForStackCalloutRefresh(unitIds, state);
   if (units.length === 0) {
     hideStackCallout();
     return;
@@ -2726,6 +2760,7 @@ function tickResolutionMoveAnimation(): void {
   } else {
     S.resolutionMoveAnimation = null;
     S.resolutionMoveAnimationFrameId = null;
+    flushResolutionPlaybackCompleteNotifyCallbacks();
     // Re-enable committed path rendering at the end of resolution playback.
     S.hideCommittedOrderLinesAfterReady = false;
     redraw();

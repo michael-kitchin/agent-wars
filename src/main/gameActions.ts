@@ -1064,14 +1064,8 @@ export function commitHumanTacticalDraftOrders(args: {
     for (const r of args.rangedAttacks ?? []) {
       rangedCombatHexSet.add(r.targetH3Index);
     }
-    for (const a of args.airStrikes ?? []) {
-      rangedCombatHexSet.add(a.targetH3Index);
-    }
     for (const r of od?.rangedAttacks ?? []) {
       rangedCombatHexSet.add(r.targetH3Index);
-    }
-    for (const a of od?.airStrikes ?? []) {
-      rangedCombatHexSet.add(a.targetH3Index);
     }
     const rangedCombatHexes = [...rangedCombatHexSet];
     const casualtyHexSet = new Set(rangedRemovedUnits.map((v) => v.h3Index));
@@ -1094,6 +1088,11 @@ export function commitHumanTacticalDraftOrders(args: {
       infrastructureDestroyedEvents:
         support.infrastructureDestroyedEvents.length > 0 ? support.infrastructureDestroyedEvents : undefined,
       airStrikeAttemptCount: support.airStrikeAttemptCount > 0 ? support.airStrikeAttemptCount : undefined,
+      ...(support.airStrikePlaybackMoves.length > 0 ? { airStrikeMoves: support.airStrikePlaybackMoves } : {}),
+      ...(support.airStrikePlaybackStrikeHexes.length > 0 ? { airStrikeHexes: support.airStrikePlaybackStrikeHexes } : {}),
+      ...(support.airStrikePlaybackCasualtyHexes.length > 0
+        ? { airStrikeCasualtyHexes: support.airStrikePlaybackCasualtyHexes }
+        : {}),
       killsByMelee: meleePack.killsByMelee.length > 0 ? meleePack.killsByMelee : undefined,
       meleeCombatHexes: meleePack.meleeCombatHexes.length > 0 ? meleePack.meleeCombatHexes : undefined,
       meleeCasualtyHexes: meleePack.meleeCasualtyHexes.length > 0 ? meleePack.meleeCasualtyHexes : undefined,
@@ -1103,6 +1102,9 @@ export function commitHumanTacticalDraftOrders(args: {
       humanMoveCount: humanMoves.length,
       opponentMoveCount: opponentMoves.length,
       rangedCombatHexCount: rangedCombatHexes.length,
+      airStrikePlaybackMoveCount: support.airStrikePlaybackMoves.length,
+      airStrikePlaybackStrikeHexCount: support.airStrikePlaybackStrikeHexes.length,
+      airStrikePlaybackCasualtyHexCount: support.airStrikePlaybackCasualtyHexes.length,
       rangedRemovedCount: rangedRemovedUnits.length,
       rangedKillEdgeCount: support.killsByDirectFire.length,
       returnFireKillEdgeCount: support.killsByReturnFire.length,

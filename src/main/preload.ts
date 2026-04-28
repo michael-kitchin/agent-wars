@@ -25,7 +25,9 @@ import type {
   HexBuildQueueSnapshot,
   NewGameIpcPayload,
   ResolveMeleeInterceptIpcPayload,
-  TacticalCommitResolutionPlayback,
+  NotifyResolutionPlaybackCompletePayload,
+  PostResolutionConsultationPushPayload,
+  TacticalPostBeatConsultFields,
 } from '../shared/ipcTypes';
 import type {
   EndTacticalBattleIpcResult,
@@ -75,6 +77,9 @@ const IPC_GAME = {
   endTacticalBattle: 'game:endTacticalBattle',
   ready: 'game:ready',
   resolveMeleeIntercept: 'game:resolveMeleeIntercept',
+  notifyResolutionPlaybackComplete: 'game:notifyResolutionPlaybackComplete',
+  postResolutionConsultation: 'game:postResolutionConsultation',
+  postTacticalBeatConsultation: 'game:postTacticalBeatConsultation',
   requestAiOrders: 'game:requestAiOrders',
   cancelRequestAiOrders: 'game:cancelRequestAiOrders',
 } as const;
@@ -108,6 +113,31 @@ const IPC_OPENROUTER = {
 let openRouterLogListener: ((payload: { line: string; isError?: boolean }) => void) | null = null;
 ipcRenderer.on(IPC_OPENROUTER.log, (_event, payload: { line: string; isError?: boolean }) => {
   openRouterLogListener?.(payload);
+});
+
+/**
+ * Documents the module-scope binding `postResolutionConsultationListener` (optional callback for deferred strategic push).
+ *
+ * Purpose: Bridges `webContents.send` post-resolution consult payloads into the renderer without exposing `ipcRenderer` directly.
+ * When to use: Set once via `registerPostResolutionConsultationListener` during shell init.
+ * Expected outcome: Listener receives merged strategy/tool counts after deferred `afterResolution` completes on main.
+ * Exceptions: None.
+ */
+let postResolutionConsultationListener: ((payload: PostResolutionConsultationPushPayload) => void) | null = null;
+/**
+ * Documents the module-scope binding `postTacticalBeatConsultationListener` (optional callback for deferred tactical push).
+ *
+ * Purpose: Bridges tactical post-beat consult fields after deferred `afterTacticalBeatResolution` completes on main.
+ * When to use: Set once via `registerPostTacticalBeatConsultationListener` during shell init.
+ * Expected outcome: Same merge semantics as inline tactical commit consultation fields.
+ * Exceptions: None.
+ */
+let postTacticalBeatConsultationListener: ((payload: TacticalPostBeatConsultFields) => void) | null = null;
+ipcRenderer.on(IPC_GAME.postResolutionConsultation, (_event, payload: PostResolutionConsultationPushPayload) => {
+  postResolutionConsultationListener?.(payload);
+});
+ipcRenderer.on(IPC_GAME.postTacticalBeatConsultation, (_event, payload: TacticalPostBeatConsultFields) => {
+  postTacticalBeatConsultationListener?.(payload);
 });
 
 /**
@@ -236,6 +266,40 @@ ready: (payload?: GameReadyIpcPayload): Promise<ReadyResult> => ipcRenderer.invo
    */
 resolveMeleeIntercept: (payload: ResolveMeleeInterceptIpcPayload): Promise<ReadyResult> =>
     ipcRenderer.invoke(IPC_GAME.resolveMeleeIntercept, payload),
+    /**
+   * Documents the object literal property `notifyResolutionPlaybackComplete`.
+   *
+   * Purpose: Signals main that resolution canvas playback finished so deferred LLM consultation runs.
+   * When to use: After strategic/tactical resolution animations complete or immediately when none ran.
+   * Expected outcome: Main validates pending mutex metadata and pushes consult results to registered listeners.
+   * Exceptions: IPC failures propagate as promise rejections.
+   */
+notifyResolutionPlaybackComplete: (
+    payload: NotifyResolutionPlaybackCompletePayload
+  ): Promise<{ ok: boolean; reason?: string }> =>
+    ipcRenderer.invoke(IPC_GAME.notifyResolutionPlaybackComplete, payload),
+    /**
+   * Documents the object literal property `registerPostResolutionConsultationListener`.
+   *
+   * Purpose: Receives deferred strategic post-resolution consultation merges from main.
+   * When to use: Renderer init once.
+   * Expected outcome: Callback invoked after notify completes successful deferred consultation.
+   * Exceptions: None.
+   */
+registerPostResolutionConsultationListener: (callback: (payload: PostResolutionConsultationPushPayload) => void): void => {
+    postResolutionConsultationListener = callback;
+  },
+    /**
+   * Documents the object literal property `registerPostTacticalBeatConsultationListener`.
+   *
+   * Purpose: Receives deferred tactical post-beat consultation fields from main.
+   * When to use: Renderer init once alongside strategic deferred listener.
+   * Expected outcome: Same hydration path as inline tactical commit consultation merges.
+   * Exceptions: None.
+   */
+registerPostTacticalBeatConsultationListener: (callback: (payload: TacticalPostBeatConsultFields) => void): void => {
+    postTacticalBeatConsultationListener = callback;
+  },
     /**
    * Documents the object literal property `startTacticalBattle` (startTacticalBattle: (payload: { enclosingRes1H3Index: string }): Promise<StartTacticalBattleIpcResult> => ipcRenderer.invoke('game:startTacticalBattle', payload)).
 

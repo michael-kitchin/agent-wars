@@ -6,7 +6,7 @@ import {
   resetPrecomputedAiState,
   unblockPrecomputedAiPlanningAfterBackgroundFailure,
 } from './precomputedAiState';
-import { isWaitingForPrecomputedAiOrders } from './aiPlanningState';
+import { isDeferredResolutionPlaybackConsultPending, isWaitingForPrecomputedAiOrders } from './aiPlanningState';
 
 /**
  * Documents the module-scope binding `BACKGROUND_AI_REQUEST_TIMEOUT_MS` (BACKGROUND_AI_REQUEST_TIMEOUT_MS).
@@ -203,6 +203,7 @@ function strategicPhaseAllowsBackgroundAi(): boolean {
  */
 export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): void {
   if (S.tacticalAnnihilationOutcomeDialog != null) return;
+  if (isDeferredResolutionPlaybackConsultPending()) return;
   if (S.backgroundRequestInFlight || !isWaitingForPrecomputedAiOrders() || !strategicPhaseAllowsBackgroundAi()) return;
   openRouterRuntimeDepsRef = deps;
   const keyPromise = window.gameApi?.openRouter?.getKey?.();

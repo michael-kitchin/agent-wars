@@ -299,6 +299,33 @@ export type TacticalCommitResolutionPlayback = {
    */
   airStrikeAttemptCount?: number;
   /**
+   * Per–air-strike animation rows for tactical Ready, aligned with `ReadyResult.airStrikeMoves` / strategic `resolveAirStrikePhase`.
+   *
+   * Purpose: Lets the renderer call `buildAirStrikeOutboundPlaybackMoves` / `buildAirStrikeReturnPlaybackMoves` so air phases precede ranged movement on the shared timeline.
+   * When to use: Populated by `applyTacticalAirStrikeThenRangedPhaseOnBattle` for each processed strike (pre-strike `fromH3Index`, post-strike `returnsToBase`).
+   * Expected outcome: Omitted when no air orders entered resolution; length matches attempted strikes that recorded playback.
+   * Exceptions: None.
+   */
+  airStrikeMoves?: AirStrikeAnimationMove[];
+  /**
+   * Res4 hexes where tactical air combat lightning should flash (targets), mirroring `ReadyResult.airStrikeHexes`.
+   *
+   * Purpose: Feeds `resolutionMoveAnimation.airStrikeCombatHexes` for `phase.inAirStrikeLightning`; must not duplicate ranged-only combat hexes.
+   * When to use: Set alongside `airStrikeMoves` from the same air pass.
+   * Expected outcome: Unique target cells for strikes that ran in the air phase.
+   * Exceptions: Omitted when empty.
+   */
+  airStrikeHexes?: string[];
+  /**
+   * Res4 hexes where air-strike casualties occurred this beat, mirroring `ReadyResult.airStrikeCasualtyHexes`.
+   *
+   * Purpose: Feeds `resolutionMoveAnimation.airStrikeCasualtyHexes` for the air casualty pulse segment.
+   * When to use: Populated from removals and outcomes during the tactical air phase (ground AA, destroyed aircraft, etc.).
+   * Expected outcome: Subset of cells tied to `killsByAirStrike` / air-phase `removedUnits`.
+   * Exceptions: Omitted when empty.
+   */
+  airStrikeCasualtyHexes?: string[];
+  /**
    * Kill edges from tactical **melee** resolution after movement and support on the same commit (mirrors melee slice of `ReadyResult.kills`).
    *
    * Purpose: Lets `buildTacticalCommitReadyResultForToast` classify melee lines separately from ranged and air-strike summaries.
@@ -914,7 +941,53 @@ meleeInterceptCandidates?: MeleeCandidateRow[];
    * Exceptions: None.
    */
 tacticalAutoStartRes1H3Index?: string;
+    /**
+   * True when main deferred event-driven post-resolution LLM work until `notifyResolutionPlaybackComplete`.
+   *
+   * Contract: Mutually exclusive with inline `aiStrategy`/`toolInvocationCounts` from post-turn consultation on the same
+   * IPC result; those arrive via `postResolutionConsultation` push afterward.
+   * When to use: Renderer gates Ready prefetch and schedules playback-complete notify using `deferredResolutionPlanningTurnNumber`.
+   * Expected outcome: Renderer invokes notify once playback finishes (or immediately when no animation).
+   * Exceptions: Omitted when consultation ran inline (non–event-driven or Run off).
+   */
+postResolutionConsultDeferred?: boolean;
+    /**
+   * Planning-phase turn number after resolution that pairs with `notifyResolutionPlaybackComplete` `{ kind: 'strategic' | 'melee' }`.
+   *
+   * Contract: Matches main-process pending mutex key for the deferred consultation batch.
+   * When to use: Only when `postResolutionConsultDeferred` is true.
+   * Expected outcome: Same value main stored when arming deferred consultation.
+   * Exceptions: None.
+   */
+deferredResolutionPlanningTurnNumber?: number;
 }
+
+/**
+ * Renderer tells main that resolution canvas playback finished so deferred LLM consultation may run.
+ *
+ * Purpose: Typed `game:notifyResolutionPlaybackComplete` body discriminating strategic Ready vs melee resolve vs tactical beat.
+ * When to use: Preload bridge and main notify handler validation.
+ * Expected outcome: `planningTurnNumber` aligns with `ReadyResult.deferredResolutionPlanningTurnNumber` for strategic/melee.
+ * Exceptions: Invalid payloads clear pending mutex on main (logged).
+ */
+export type NotifyResolutionPlaybackCompletePayload =
+  | { kind: 'strategic'; planningTurnNumber: number }
+  | { kind: 'melee'; planningTurnNumber: number }
+  | { kind: 'tactical'; battleId: string };
+
+/**
+ * Main pushes merged strategy telemetry after deferred `runEventDrivenAfterResolutionConsultation` completes.
+ *
+ * Purpose: Separates mechanical Ready IPC from post-resolution consultation results when deferring LLM work.
+ * When to use: `webContents.send` on `IPC_GAME.postResolutionConsultation`.
+ * Expected outcome: Renderer merges strategy toast + tool counts once `planningTurnNumber` matches `gameState.turnNumber`.
+ * Exceptions: None.
+ */
+export type PostResolutionConsultationPushPayload = {
+  planningTurnNumber: number;
+  aiStrategy?: string;
+  toolInvocationCounts?: Record<string, number>;
+};
 
 /**
  * Documents the `MeleeCandidateRow` interface as a named contract surface (export interface MeleeCandidateRow).

@@ -4,7 +4,13 @@
  */
 
 import { cellToParent } from 'h3-js';
-import type { AirStrikeOrder, EmbarkOrder, FerryOrder, RangedAttackOrder } from '../../shared/ipcTypes';
+import type {
+  AirStrikeAnimationMove,
+  AirStrikeOrder,
+  EmbarkOrder,
+  FerryOrder,
+  RangedAttackOrder,
+} from '../../shared/ipcTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import {
@@ -293,6 +299,33 @@ export type TacticalAirRangedPhaseAccum = {
   removedUnits: RemovedUnitSnapshot[];
   infrastructureDestroyedEvents: InfrastructureDestroyedEvent[];
   airStrikeAttemptCount: number;
+  /**
+   * Air-strike animation rows for tactical resolution playback (mirrors strategic `resolveAirStrikePhase.strikeMoves`).
+   *
+   * Purpose: Feeds `TacticalCommitResolutionPlayback.airStrikeMoves` and renderer outbound/return glide construction.
+   * When to use: Read by `commitHumanTacticalDraftOrders` when assembling `tacticalResolutionPlayback`.
+   * Expected outcome: One entry per `airStrikeAttemptCount` increment that recorded a glide segment; may be empty when no strikes ran.
+   * Exceptions: None.
+   */
+  airStrikePlaybackMoves: AirStrikeAnimationMove[];
+  /**
+   * Target hexes for air combat lightning during playback (mirrors strategic `strikeHexes`).
+   *
+   * Purpose: Maps to `TacticalCommitResolutionPlayback.airStrikeHexes` separate from ranged combat hexes.
+   * When to use: Same assembly path as `airStrikePlaybackMoves`.
+   * Expected outcome: De-duplicated res4 target references for strikes that entered the animation pipeline.
+   * Exceptions: None.
+   */
+  airStrikePlaybackStrikeHexes: string[];
+  /**
+   * Hexes where air phase removals occurred, for casualty pulse timing (mirrors strategic `casualtyHexes` from air only).
+   *
+   * Purpose: Feeds `TacticalCommitResolutionPlayback.airStrikeCasualtyHexes`.
+   * When to use: Populated from `flushAirCasualties` during the air loop and final flush.
+   * Expected outcome: May be a superset of cells that also appear in other removal lists; renderer de-dupes visually.
+   * Exceptions: None.
+   */
+  airStrikePlaybackCasualtyHexes: string[];
 };
 
 /**
@@ -332,6 +365,9 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
   const removedUnitIdsLogged = new Set<string>();
   let airStrikeAttemptCount = 0;
   const toRemove = new Set<string>();
+  const strikeMoves: AirStrikeAnimationMove[] = [];
+  const strikeHexesSet = new Set<string>();
+  const airStrikeCasualtyHexSet = new Set<string>();
   const flushAirCasualties = (): void => {
     if (toRemove.size === 0) return;
     for (const id of toRemove) {
@@ -346,6 +382,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
           h3Index: row.h3Index,
           displayName: row.displayName,
         });
+        airStrikeCasualtyHexSet.add(row.h3Index);
       }
     }
     sub = sub.filter((u) => !toRemove.has(u.id));
@@ -360,6 +397,8 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     if (!attacker || !airPlayerOk(attacker)) continue;
     if (s.targetType === 'units') {
       airStrikeAttemptCount += 1;
+      strikeHexesSet.add(s.targetH3Index);
+      const fromH3Index = attacker.h3Index;
       const rollD6Strike = (): number => Math.floor(next() * 6) + 1;
       resolveTacticalAirStrikeAgainstUnitsOnSubUnits(
         battle,
@@ -371,14 +410,44 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
         killsByAirStrike
       );
       flushAirCasualties();
+      strikeMoves.push({
+        unitId: attacker.id,
+        player: attacker.player,
+        unitType: attacker.unitType,
+        fromH3Index,
+        targetH3Index: s.targetH3Index,
+        returnsToBase: sub.some((u) => u.id === s.unitId),
+      });
       continue;
     }
     if (attacker.unitType !== 'air') continue;
     airStrikeAttemptCount += 1;
+    strikeHexesSet.add(s.targetH3Index);
+    const fromH3Index = attacker.h3Index;
     const rollD6 = (): number => Math.floor(next() * 6) + 1;
     const parent = cellToParent(s.targetH3Index, 1);
-    if (parent !== battle.enclosingRes1H3Index) continue;
-    if (rollD6() > getAttack('air')) continue;
+    if (parent !== battle.enclosingRes1H3Index) {
+      strikeMoves.push({
+        unitId: attacker.id,
+        player: attacker.player,
+        unitType: attacker.unitType,
+        fromH3Index,
+        targetH3Index: s.targetH3Index,
+        returnsToBase: true,
+      });
+      continue;
+    }
+    if (rollD6() > getAttack('air')) {
+      strikeMoves.push({
+        unitId: attacker.id,
+        player: attacker.player,
+        unitType: attacker.unitType,
+        fromH3Index,
+        targetH3Index: s.targetH3Index,
+        returnsToBase: true,
+      });
+      continue;
+    }
     const destruction = applyInfrastructureDestructionEffects(parent, s.targetType, next, {
       tacticalUrbanStrikeTargetRes4H3: s.targetType === 'urban' ? s.targetH3Index : undefined,
     });
@@ -404,6 +473,14 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       toRemove.add(attacker.id);
     }
     flushAirCasualties();
+    strikeMoves.push({
+      unitId: attacker.id,
+      player: attacker.player,
+      unitType: attacker.unitType,
+      fromH3Index,
+      targetH3Index: s.targetH3Index,
+      returnsToBase: sub.some((u) => u.id === s.unitId),
+    });
   }
   flushAirCasualties();
   let workBattle: TacticalBattleSnapshot = { ...battle, subUnits: sub };
@@ -565,6 +642,9 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
   tacticalLogMutate('applyTacticalAirStrikeThenRangedPhaseOnBattle complete', {
     battleId: battle.battleId,
     airAttempts: airStrikeAttemptCount,
+    playbackStrikeMoveCount: strikeMoves.length,
+    strikeHexPlaybackCount: strikeHexesSet.size,
+    airCasualtyHexPlaybackCount: airStrikeCasualtyHexSet.size,
     rangedOrderCount: rangedOrders.length,
     removedCount: removedUnits.length,
   });
@@ -577,6 +657,9 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     removedUnits,
     infrastructureDestroyedEvents,
     airStrikeAttemptCount,
+    airStrikePlaybackMoves: strikeMoves,
+    airStrikePlaybackStrikeHexes: [...strikeHexesSet],
+    airStrikePlaybackCasualtyHexes: [...airStrikeCasualtyHexSet],
   };
 }
 

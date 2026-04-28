@@ -253,6 +253,8 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       S.selectedHexIndex = null;
       deps.hideStackCallout();
       resetPrecomputedAiState('null');
+      S.pendingDeferredStrategicPostResolutionConsult = false;
+      S.pendingDeferredTacticalPostBeatConsult = false;
       S.backgroundRequestInFlight = false;
       S.eventDrivenInitialConsultationDone = false;
       S.openRouterGameCost = 0;
@@ -283,6 +285,8 @@ export function registerNewGameButton(deps: NewGameDeps): void {
 export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enabled: boolean) => void, updateReadyButtonState: () => void): void {
   window.gameApi?.cancelRequestAiOrders?.();
   resetPrecomputedAiState('null');
+  S.pendingDeferredStrategicPostResolutionConsult = false;
+  S.pendingDeferredTacticalPostBeatConsult = false;
   S.backgroundRequestInFlight = false;
   S.readyRequestInFlight = false;
   S.eventDrivenInitialConsultationDone = false;

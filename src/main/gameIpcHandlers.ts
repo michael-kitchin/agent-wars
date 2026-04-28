@@ -16,6 +16,11 @@ import { generateOrdersForStandingOrders } from './tools/tool5StandingOrders';
 import { shouldEndTacticalBattleForAnnihilation } from '../shared/tacticalAnnihilation';
 import { getActiveTacticalBattleSnapshot } from './tacticalBattle/tacticalBattleSession';
 import {
+  hasDeferredPlaybackConsultPending,
+  setPendingMeleeResolveConsult,
+  setPendingStrategicReadyConsult,
+} from './ipc/deferredResolutionPlaybackConsult';
+import {
   buildDistinctAiMovesFromPlanningOrders,
   computeAiRangedByTypeCounts,
   pickReadyResolutionIpcMirrorFields,
@@ -385,6 +390,10 @@ export async function handleGameReady(
   deps: ReadyDeps
 ): Promise<ReadyResultMinimal> {
   logDebug('handleGameReady', { hasPayload: payload !== undefined });
+  if (hasDeferredPlaybackConsultPending()) {
+    logDebug('handleGameReady blocked: deferred playback consult pending', {});
+    return { success: false, reason: 'Resolution playback consultation is still in progress.' };
+  }
   // Milestone 0.7 behavior preserved here: event-driven vs every-turn toggle, precomputation groups, Ready flow,
   // afterResolution consultation and POST_RESOLUTION_CONSULT_TIMEOUT_MS — unchanged by 1.1 DB/LLM contract work.
   const state = deps.getGameState();
@@ -541,29 +550,43 @@ export async function handleGameReady(
   const allAiMoves = [...aiMoves, ...opponentFerryMoves];
   const allHumanMoves = [...(readyResult.humanMoves ?? []), ...humanFerryMoves];
 
-  // Must await post-resolution consultation before returning: `afterResolution` writes opponent pending orders
-  // to the DB; a fast second Ready must not run until those rows exist (same ordering contract as melee resolve).
-  // Renderer parity: tactical `commitHumanTacticalDraftOrders` now awaits `runEventDrivenAfterTacticalBeatConsultation`
-  // in the Electron handler before returning (same round-trip contract as strategic Ready here)—do not switch strategic
-  // Ready to a fire-and-forget consult without matching tactical ordering on main.
-  const postConsult = await runEventDrivenAfterResolutionConsultation({
-    useEventDrivenConsultation,
-    resolutionSuccess: readyResult.success,
-    aiPlanningRunEnabled,
-    opponentState: deps.getGameStateForPlayer('opponent'),
-    resolution: readyResult,
-    modelId: modelId ?? '',
-    enabledToolNames,
-    hasKey: deps.hasKey,
-    requestOrders: deps.requestOrders,
-    timeoutMs: POST_RESOLUTION_CONSULT_TIMEOUT_MS,
-    errorLogMessage: 'handleGameReady: afterResolution failed or timed out',
-  });
-  if (postConsult.aiStrategy) {
-    aiStrategy = postConsult.aiStrategy;
-  }
-  if (postConsult.toolInvocationCounts) {
-    toolInvocationCounts = postConsult.toolInvocationCounts;
+  const shouldDeferPostResolutionConsult = useEventDrivenConsultation && aiPlanningRunEnabled;
+  const planningTurnNumberAfterResolution = deps.getGameState().turnNumber;
+
+  if (shouldDeferPostResolutionConsult) {
+    setPendingStrategicReadyConsult(planningTurnNumberAfterResolution, {
+      useEventDrivenConsultation,
+      resolutionSuccess: readyResult.success,
+      aiPlanningRunEnabled,
+      opponentState: deps.getGameStateForPlayer('opponent'),
+      resolution: readyResult,
+      modelId: modelId ?? '',
+      enabledToolNames,
+      hasKey: deps.hasKey,
+      requestOrders: deps.requestOrders,
+      timeoutMs: POST_RESOLUTION_CONSULT_TIMEOUT_MS,
+      errorLogMessage: 'handleGameReady: afterResolution failed or timed out',
+    });
+  } else {
+    const postConsult = await runEventDrivenAfterResolutionConsultation({
+      useEventDrivenConsultation,
+      resolutionSuccess: readyResult.success,
+      aiPlanningRunEnabled,
+      opponentState: deps.getGameStateForPlayer('opponent'),
+      resolution: readyResult,
+      modelId: modelId ?? '',
+      enabledToolNames,
+      hasKey: deps.hasKey,
+      requestOrders: deps.requestOrders,
+      timeoutMs: POST_RESOLUTION_CONSULT_TIMEOUT_MS,
+      errorLogMessage: 'handleGameReady: afterResolution failed or timed out',
+    });
+    if (postConsult.aiStrategy) {
+      aiStrategy = postConsult.aiStrategy;
+    }
+    if (postConsult.toolInvocationCounts) {
+      toolInvocationCounts = postConsult.toolInvocationCounts;
+    }
   }
 
   const aiRangedByType = computeAiRangedByTypeCounts(state, aiRangedOrders);
@@ -589,6 +612,12 @@ export async function handleGameReady(
     inputTokens: turnInputTokens,
     outputTokens: turnOutputTokens,
     tacticalAutoStartRes1H3Index: readyResult.tacticalAutoStartRes1H3Index,
+    ...(shouldDeferPostResolutionConsult
+      ? {
+          postResolutionConsultDeferred: true,
+          deferredResolutionPlanningTurnNumber: planningTurnNumberAfterResolution,
+        }
+      : {}),
   };
 }
 
@@ -605,6 +634,10 @@ export async function handleResolveMeleeIntercept(
   deps: ResolveMeleeInterceptDeps
 ): Promise<ReadyResultMinimal> {
   logDebug('handleResolveMeleeIntercept', { hasPayload: payload !== undefined });
+  if (hasDeferredPlaybackConsultPending()) {
+    logDebug('handleResolveMeleeIntercept blocked: deferred playback consult pending', {});
+    return { success: false, reason: 'Resolution playback consultation is still in progress.' };
+  }
   const state = deps.getGameState();
   logHybridPipelineBoundary('handleResolveMeleeIntercept', { turnNumber: state.turnNumber, phase: state.phase });
   const modelId = deps.getSelectedModel();
@@ -632,25 +665,43 @@ export async function handleResolveMeleeIntercept(
     return { success: false, reason: resolveResult.reason };
   }
 
-  // Same await contract as `handleGameReady`: pending opponent orders must land before the renderer can Ready again.
-  const resolvePostConsult = await runEventDrivenAfterResolutionConsultation({
-    useEventDrivenConsultation,
-    resolutionSuccess: resolveResult.success,
-    aiPlanningRunEnabled,
-    opponentState: deps.getGameStateForPlayer('opponent'),
-    resolution: resolveResult,
-    modelId: modelId ?? '',
-    enabledToolNames,
-    hasKey: deps.hasKey,
-    requestOrders: deps.requestOrders,
-    timeoutMs: POST_RESOLUTION_CONSULT_TIMEOUT_MS,
-    errorLogMessage: 'handleResolveMeleeIntercept: afterResolution failed or timed out',
-  });
-  if (resolvePostConsult.aiStrategy) {
-    aiStrategy = resolvePostConsult.aiStrategy;
-  }
-  if (resolvePostConsult.toolInvocationCounts) {
-    toolInvocationCounts = resolvePostConsult.toolInvocationCounts;
+  const shouldDeferPostResolutionConsult = useEventDrivenConsultation && aiPlanningRunEnabled;
+  const planningTurnNumberAfterResolution = deps.getGameState().turnNumber;
+
+  if (shouldDeferPostResolutionConsult) {
+    setPendingMeleeResolveConsult(planningTurnNumberAfterResolution, {
+      useEventDrivenConsultation,
+      resolutionSuccess: resolveResult.success,
+      aiPlanningRunEnabled,
+      opponentState: deps.getGameStateForPlayer('opponent'),
+      resolution: resolveResult,
+      modelId: modelId ?? '',
+      enabledToolNames,
+      hasKey: deps.hasKey,
+      requestOrders: deps.requestOrders,
+      timeoutMs: POST_RESOLUTION_CONSULT_TIMEOUT_MS,
+      errorLogMessage: 'handleResolveMeleeIntercept: afterResolution failed or timed out',
+    });
+  } else {
+    const resolvePostConsult = await runEventDrivenAfterResolutionConsultation({
+      useEventDrivenConsultation,
+      resolutionSuccess: resolveResult.success,
+      aiPlanningRunEnabled,
+      opponentState: deps.getGameStateForPlayer('opponent'),
+      resolution: resolveResult,
+      modelId: modelId ?? '',
+      enabledToolNames,
+      hasKey: deps.hasKey,
+      requestOrders: deps.requestOrders,
+      timeoutMs: POST_RESOLUTION_CONSULT_TIMEOUT_MS,
+      errorLogMessage: 'handleResolveMeleeIntercept: afterResolution failed or timed out',
+    });
+    if (resolvePostConsult.aiStrategy) {
+      aiStrategy = resolvePostConsult.aiStrategy;
+    }
+    if (resolvePostConsult.toolInvocationCounts) {
+      toolInvocationCounts = resolvePostConsult.toolInvocationCounts;
+    }
   }
 
   return {
@@ -666,5 +717,11 @@ export async function handleResolveMeleeIntercept(
     wallClockMs: turnWallClockMs,
     inputTokens: turnInputTokens,
     outputTokens: turnOutputTokens,
+    ...(shouldDeferPostResolutionConsult
+      ? {
+          postResolutionConsultDeferred: true,
+          deferredResolutionPlanningTurnNumber: planningTurnNumberAfterResolution,
+        }
+      : {}),
   };
 }

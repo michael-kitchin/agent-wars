@@ -1,8 +1,10 @@
+import type { PostResolutionConsultationPushPayload } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
 import {
   readTacticalBattlesInterceptPromptEnabled,
   writeTacticalBattlesInterceptPromptEnabled,
 } from '../gameplay/tacticalBattlePromptPreference';
+import { applyTacticalPostBeatConsultSideEffects } from '../tactical/applyTacticalPostBeatConsultSideEffects';
 import { resetPrecomputedAiState } from './precomputedAiState';
 
 /**
@@ -141,7 +143,59 @@ syncOpenRouterRunToggleInteractable: () => Promise<void>;
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * Wires main-process pushes for deferred strategic/tactical LLM consultation into renderer shared state.
+ *
+ * Purpose: Centralizes listener registration next to OpenRouter UI bootstrap so prefetch + Ready gates stay aligned.
+ * When to use: Once from `initOpenRouterUI`.
+ * Expected outcome: Push payloads apply strategy toasts, tool counts, and tactical opponent drafts after playback notify.
+ * Exceptions: Stale `planningTurnNumber` merges log and clear strategic latch only.
+ */
+function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): void {
+  window.gameApi?.registerPostResolutionConsultationListener?.((payload: PostResolutionConsultationPushPayload) => {
+    if (!S.gameState || payload.planningTurnNumber !== S.gameState.turnNumber) {
+      deps.appendOpenRouterLog('Ignored stale post-resolution consultation push.', false);
+      S.pendingDeferredStrategicPostResolutionConsult = false;
+      deps.updateReadyButtonState();
+      return;
+    }
+    S.pendingDeferredStrategicPostResolutionConsult = false;
+    if (payload.aiStrategy) deps.showAiStrategyToast(payload.aiStrategy);
+    else deps.hideAiStrategyToast();
+    if (payload.toolInvocationCounts) {
+      S.toolInvocationCounts = { ...S.toolInvocationCounts, ...payload.toolInvocationCounts };
+      deps.updateOpenRouterToolCountLabels();
+    }
+    deps.appendOpenRouterLog('Post-resolution consultation applied.', false);
+    deps.requestRedraw();
+    if (S.runButtonOn) deps.startBackgroundRequestIfAllowed();
+    deps.updateReadyButtonState();
+  });
+  window.gameApi?.registerPostTacticalBeatConsultationListener?.((fields) => {
+    if (
+      fields.kind !== 'tactical' ||
+      fields.battleId !== S.tacticalBattleSnapshot?.battleId
+    ) {
+      deps.appendOpenRouterLog('Ignored stale tactical post-beat consultation push.', false);
+      S.pendingDeferredTacticalPostBeatConsult = false;
+      deps.updateReadyButtonState();
+      return;
+    }
+    S.pendingDeferredTacticalPostBeatConsult = false;
+    applyTacticalPostBeatConsultSideEffects(fields, {
+      startBackgroundRequestIfAllowed: deps.startBackgroundRequestIfAllowed,
+      showAiStrategyToast: deps.showAiStrategyToast,
+      hideAiStrategyToast: deps.hideAiStrategyToast,
+      updateOpenRouterToolCountLabels: deps.updateOpenRouterToolCountLabels,
+      appendOpenRouterLog: deps.appendOpenRouterLog,
+      redraw: deps.requestRedraw,
+      updateReadyButtonState: deps.updateReadyButtonState,
+    });
+  });
+}
+
 export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
+  initDeferredResolutionPlaybackPushListeners(deps);
   const api = window.gameApi?.openRouter;
   if (!api) return;
 

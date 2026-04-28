@@ -1,7 +1,7 @@
 import type { GameApi, GameReadyIpcPayload } from '../../shared/ipcTypes';
 import { READY_REQUEST_TIMEOUT_MS, TOAST_DURATION_MS } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
-import { isWaitingForPrecomputedAiOrders } from './aiPlanningState';
+import { isDeferredResolutionPlaybackConsultPending, isWaitingForPrecomputedAiOrders } from './aiPlanningState';
 
 /**
  * Defines the `formatElapsedMmSs` function shape (export function formatElapsedMmSs(ms: number): string).
@@ -51,20 +51,21 @@ export function setReadyButtonLabelAiWait(readyBtn: HTMLButtonElement, elapsedMs
 
  * Purpose: Supports maintainability by documenting why `updateReadyButtonState` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Disables the control while the game is over, while precomputed AI orders are still loading, or
- * while `readyRequestInFlight` is true for an in-progress strategic `game:ready` / melee-resolve IPC (which includes
- * awaited post-resolution consultation on main), or while tactical Run waits on `isWaitingForPrecomputedAiOrders`;
- * restores label/interval state for the AI-wait countdown when applicable.
+ * Expected outcome: Disables the control while the game is over, while precomputed AI orders are still loading, while
+ * deferred post-resolution / post-beat consultation is outstanding (`isDeferredResolutionPlaybackConsultPending`), or
+ * while `readyRequestInFlight` is true for an in-progress strategic `game:ready` / melee-resolve IPC; restores label/
+ * interval state for the AI-wait countdown when applicable (deferred consult keeps the Ready label without the timer).
  * Exceptions: None.
  */
 export function updateReadyButtonState(): void {
   const readyBtn = document.getElementById('ready-btn') as HTMLButtonElement | null;
   if (!readyBtn) return;
   const gameOver = S.gameState?.gameOver ?? false;
+  const deferredConsult = isDeferredResolutionPlaybackConsultPending();
   const waitingOnAi = isWaitingForPrecomputedAiOrders();
   const tacticalAnnihilationDialogOpen = S.tacticalAnnihilationOutcomeDialog != null;
   readyBtn.disabled =
-    gameOver || waitingOnAi || S.readyRequestInFlight || tacticalAnnihilationDialogOpen;
+    gameOver || waitingOnAi || deferredConsult || S.readyRequestInFlight || tacticalAnnihilationDialogOpen;
 
   if (waitingOnAi) {
     const now = Date.now();
