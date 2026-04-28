@@ -8,6 +8,7 @@
  */
 
 import { gridDisk, latLngToCell } from 'h3-js';
+import { res4GridDiskNeighborsOrdered } from '../../../shared/tacticalRes4TransportLink';
 
 /**
  * Returns the res-4 H3 index for a latitude/longitude pair (convenience over `latLngToCell(..., 4)`).
@@ -66,4 +67,43 @@ export function firstRingCellDistinctFrom(center: string): string {
     throw new Error('expected a distinct res4 ring-1 neighbor');
   }
   return neighbor;
+}
+
+/**
+ * Builds `res4RoadSidesByH3` / `res4RailSidesByH3` for two adjacent cells so march-pair transport tests stay consistent.
+ *
+ * Purpose: DRY fixture setup after loose march-pair rules required overlays on **both** endpoints of a step.
+ * When to use: Snapshot builders in tactical march or tooltip tests that model a single adjacent hop with aligned corridor sides.
+ * Expected outcome: Flags true on the slot toward the neighbor on each cell per `mode`; throws if `fromH3`/`toH3` are not ring-1 neighbors.
+ * Exceptions: Throws when either index is missing from the neighbor ring of the other.
+ */
+export function pairedTransportSidesForAdjacentHexes(
+  fromH3: string,
+  toH3: string,
+  mode: 'road' | 'rail' | 'both'
+): { res4RoadSidesByH3: Record<string, boolean[]>; res4RailSidesByH3: Record<string, boolean[]> } {
+  const ringFrom = res4GridDiskNeighborsOrdered(fromH3);
+  const iTowardTo = ringFrom.indexOf(toH3);
+  if (iTowardTo < 0) {
+    throw new Error('pairedTransportSidesForAdjacentHexes: toH3 is not a ring-1 neighbor of fromH3');
+  }
+  const ringTo = res4GridDiskNeighborsOrdered(toH3);
+  const iTowardFrom = ringTo.indexOf(fromH3);
+  if (iTowardFrom < 0) {
+    throw new Error('pairedTransportSidesForAdjacentHexes: fromH3 is not a ring-1 neighbor of toH3');
+  }
+  const nF = ringFrom.length;
+  const nT = ringTo.length;
+  const roadAtFrom = mode === 'rail' ? false : true;
+  const railAtFrom = mode === 'road' ? false : true;
+  const roadAtTo = mode === 'rail' ? false : true;
+  const railAtTo = mode === 'road' ? false : true;
+  const roadSidesFrom = Array.from({ length: nF }, (_, k) => k === iTowardTo && roadAtFrom);
+  const railSidesFrom = Array.from({ length: nF }, (_, k) => k === iTowardTo && railAtFrom);
+  const roadSidesTo = Array.from({ length: nT }, (_, k) => k === iTowardFrom && roadAtTo);
+  const railSidesTo = Array.from({ length: nT }, (_, k) => k === iTowardFrom && railAtTo);
+  return {
+    res4RoadSidesByH3: { [fromH3]: roadSidesFrom, [toH3]: roadSidesTo },
+    res4RailSidesByH3: { [fromH3]: railSidesFrom, [toH3]: railSidesTo },
+  };
 }

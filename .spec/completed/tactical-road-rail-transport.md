@@ -7,8 +7,8 @@
 - When transport applies, enter **movement points** are a **base transport cost** divided by a **line speed multiplier**:
   - **Open terrain (non-blocking destination):** base = §12.4 **plains** enter cost for the unit type.
   - **Blocking destination** (e.g. armor → mountain, infantry → water): base = **1** MP (infantry) or **2** MPs (armor), matching a “two hexes per full baseline budget” pace on that hex.
-  - **Road** along the traversed edge: divide by **1.25** (effective 1.25× movement budget on that step).
-  - **Rail** along the traversed edge: divide by **1.5**.
+  - **Road** along the traversed edge: divide by **2.0** (effective 2× movement budget on that step).
+  - **Rail** along the traversed edge: divide by **3.0**.
   - If **both** `roadSides` and `railSides` mark the same edge on the **from** cell, **rail** wins (more favorable to the unit).
 - MPs may be fractional after division; march truncation and reachability compare the running sum to the integer per-leg budget.
 - **First-stop floor (`planTacticalRes4March`):** If the cheapest path has length ≥ 2 but strict truncation would spend **0** MPs on the first turn (the first step cost alone exceeds `movementPointBudget`) while the budget is **positive**, the applied first stop is still the **first cell after the origin** on that path so Ready never records a zero-hex leg for a valid order.

@@ -5,7 +5,7 @@
 
 import type { TacticalBattleSnapshot } from './tacticalBattleTypes';
 import {
-  tacticalRes4TransportEdgeActive,
+  tacticalRes4TransportMarchAdjacentPairAllowsStep,
   type TacticalRes4TransportMasks,
 } from './tacticalRes4TransportLink';
 
@@ -68,7 +68,7 @@ export type TacticalTerrainKindResolver = {
    *
    * Contract: Optional; when absent, no transport shortcuts apply in march planning.
    * When to use: `planTacticalRes4March` land enter-cost override for infantry/armor.
-   * Expected outcome: Symmetric edge test over bundled side masks.
+   * Expected outcome: Adjacent pair with both cells carrying any road/rail overlay side (`tacticalRes4TransportMarchAdjacentPairAllowsStep`).
    * Exceptions: None.
    */
   transportFromTo?: (fromH3: string, toH3: string) => boolean;
@@ -77,10 +77,9 @@ export type TacticalTerrainKindResolver = {
    *
    * Contract: Present when the snapshot contributes any normalized `res4RoadSidesByH3` / `res4RailSidesByH3` rows; absent when
    * there is no transport overlay (planner falls back to `transportFromTo` only).
-   * When to use: `planTacticalRes4March` land branch to require coherent entry/exit sides on traversed corridor cells
-   * (including the ordered destination when transport plains cost would apply), with a single-edge allowance only on the
-   * march origin step where rules permit.
-   * Expected outcome: Same `Map` instance backing `transportFromTo` edge tests for that snapshot build.
+   * When to use: `planTacticalRes4March` land branch to require march pair steps plus loose interior continuity on traversed
+   * corridor cells (both endpoints any road/rail per step).
+   * Expected outcome: Same `Map` instance backing `transportFromTo` pair tests for that snapshot build.
    * Exceptions: None.
    */
   landTransportMarchContext?: {
@@ -205,6 +204,65 @@ export function isNavalRes4TacticalCellNavigable(args: {
  * Expected outcome: Sum along a path equals tactical movement budget consumption for the turn.
  * Exceptions: None.
  */
+/**
+ * Merges parallel `res4RoadSidesByH3` / `res4RailSidesByH3` snapshot records into a normalized `roadRailByH3` map.
+ *
+ * Purpose: Single implementation for resolver construction and any caller that needs the same padding/length rules as gameplay.
+ * When to use: `buildTacticalTerrainKindResolverFromSnapshot` before attaching transport resolver helpers.
+ * Expected outcome: Empty map when no keys or only malformed rows; aligned `roadSides`/`railSides` arrays per cell.
+ * Exceptions: Drops rows whose padded arrays still disagree in length.
+ */
+export function buildRoadRailMapFromRes4RoadRailRecords(
+  roadBy: Readonly<Record<string, readonly boolean[] | undefined>>,
+  railBy: Readonly<Record<string, readonly boolean[] | undefined>>
+): Map<string, TacticalRes4TransportMasks> {
+  const roadRailByH3 = new Map<string, TacticalRes4TransportMasks>();
+  const transportKeys = new Set([...Object.keys(roadBy), ...Object.keys(railBy)]);
+  for (const h3 of transportKeys) {
+    const r = roadBy[h3];
+    const l = railBy[h3];
+    if (!r && !l) continue;
+    const n = Math.max(r?.length ?? 0, l?.length ?? 0);
+    if (n === 0) continue;
+    const roadSides = r ?? Array.from({ length: n }, () => false);
+    const railSides = l ?? Array.from({ length: n }, () => false);
+    if (roadSides.length !== railSides.length) continue;
+    roadRailByH3.set(h3, { roadSides, railSides });
+  }
+  return roadRailByH3;
+}
+
+/**
+ * Builds `transportFromTo` and `landTransportMarchContext` from an existing normalized road/rail map and rubble flags.
+ *
+ * Purpose: Keeps march-pair closure identical between snapshot `buildTacticalTerrainKindResolverFromSnapshot` and placement-time resolvers.
+ * When to use: After `buildRoadRailMapFromRes4RoadRailRecords` or `tacticalRes4FootprintTransportOverlayRecords` yields `roadRailByH3`.
+ * Expected outcome: Both fields undefined when the map is empty; otherwise shared map reference on context and closure over rubble.
+ * Exceptions: None.
+ */
+export function tacticalTerrainTransportResolverFnsFromRoadRailMap(
+  roadRailByH3: ReadonlyMap<string, TacticalRes4TransportMasks>,
+  rubbleByH3: Readonly<Record<string, boolean>>
+): {
+  transportFromTo: TacticalTerrainKindResolver['transportFromTo'];
+  landTransportMarchContext: TacticalTerrainKindResolver['landTransportMarchContext'];
+} {
+  if (roadRailByH3.size === 0) {
+    return { transportFromTo: undefined, landTransportMarchContext: undefined };
+  }
+  const transportFromTo = (fromH3: string, toH3: string): boolean =>
+    tacticalRes4TransportMarchAdjacentPairAllowsStep({
+      fromH3,
+      toH3,
+      roadRailByH3,
+      rubbleByH3,
+    });
+  return {
+    transportFromTo,
+    landTransportMarchContext: { roadRailByH3, rubbleByH3 },
+  };
+}
+
 export function tacticalEnterHexMovementCost(unitType: string, category: TacticalMovementCategory): number {
   if (unitType === 'infantry') {
     switch (category) {
@@ -281,35 +339,14 @@ export function buildTacticalTerrainKindResolverFromSnapshot(
   const rubbleMap = battle.res4IsRubbleByH3 ?? {};
   const roadBy = battle.res4RoadSidesByH3 ?? {};
   const railBy = battle.res4RailSidesByH3 ?? {};
-  const roadRailByH3 = new Map<string, TacticalRes4TransportMasks>();
-  const transportKeys = new Set([...Object.keys(roadBy), ...Object.keys(railBy)]);
-  for (const h3 of transportKeys) {
-    const r = roadBy[h3];
-    const l = railBy[h3];
-    if (!r && !l) continue;
-    const n = Math.max(r?.length ?? 0, l?.length ?? 0);
-    if (n === 0) continue;
-    const roadSides = r ?? Array.from({ length: n }, () => false);
-    const railSides = l ?? Array.from({ length: n }, () => false);
-    if (roadSides.length !== railSides.length) continue;
-    roadRailByH3.set(h3, { roadSides, railSides });
-  }
-  const transportFromToFn =
-    roadRailByH3.size > 0
-      ? (fromH3: string, toH3: string): boolean =>
-          tacticalRes4TransportEdgeActive({
-            fromH3,
-            toH3,
-            roadRailByH3,
-            rubbleByH3: rubbleMap,
-          })
-      : undefined;
+  const roadRailByH3 = buildRoadRailMapFromRes4RoadRailRecords(roadBy, railBy);
+  const { transportFromTo: transportFromToFn, landTransportMarchContext } =
+    tacticalTerrainTransportResolverFnsFromRoadRailMap(roadRailByH3, rubbleMap);
   return {
     parentTerrain,
     parentTerrainKind: parentKind,
     transportFromTo: transportFromToFn,
-    landTransportMarchContext:
-      roadRailByH3.size > 0 ? { roadRailByH3, rubbleByH3: rubbleMap } : undefined,
+    landTransportMarchContext,
     effectiveKindForRes4Hex(h3: string): string {
       const raw = map[h3];
       if (raw == null) return parentKind;

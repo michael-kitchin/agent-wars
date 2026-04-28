@@ -12,7 +12,11 @@ import {
 } from '../../shared/tacticalRes4LandMarchContinuity';
 import { res4GridDiskNeighborsOrdered } from '../../shared/tacticalRes4TransportLink';
 import { buildTacticalTerrainKindResolverFromSnapshot } from '../../shared/tacticalTerrainMovement';
-import { firstRingCellDistinctFrom, tacticalRes4Cell } from './testSupport/tacticalRes4HexFixtures';
+import {
+  firstRingCellDistinctFrom,
+  pairedTransportSidesForAdjacentHexes,
+  tacticalRes4Cell,
+} from './testSupport/tacticalRes4HexFixtures';
 
 test('armor cannot enter a mountain neighbor', () => {
   const center = tacticalRes4Cell(40, 50);
@@ -497,7 +501,7 @@ test('armor reaches mountain goal at plains cost when the goal cell has a corrid
     terrain,
   });
   assert.equal(plan.reachable, true);
-  assert.equal(plan.totalCostToDestination, 1.6);
+  assert.equal(plan.totalCostToDestination, 1.0);
 });
 
 test('armor first stop advances one hex when budget is below first-step cost but path exists', () => {
@@ -530,7 +534,7 @@ test('armor first stop advances one hex when budget is below first-step cost but
     toH3: m,
     res4Set: new Set([p, m, w]),
     unitTypeForMovement: 'armor',
-    movementPointBudget: 1,
+    movementPointBudget: 0.5,
     terrain,
   });
   assert.equal(plan.reachable, true);
@@ -624,7 +628,7 @@ test('armor reaches mountain goal at plains cost when reciprocal boundary is mar
     terrain,
   });
   assert.equal(plan.reachable, true);
-  assert.equal(plan.totalCostToDestination, 1.6);
+  assert.equal(plan.totalCostToDestination, 1.0);
 });
 
 test('armor cannot use a road link into mountain when the head cell is rubble', () => {
@@ -710,12 +714,17 @@ test('armor can march through mountain when the corridor marks both entry and ex
   const nM = ringM.length;
   const roadM = Array.from({ length: nM }, (_, j) => j === ip || j === ib);
   const railM = Array.from({ length: nM }, () => false);
+  const ringB = res4GridDiskNeighborsOrdered(b);
+  const imb = ringB.indexOf(m);
+  assert.ok(imb >= 0);
+  const roadBFix = Array.from({ length: ringB.length }, (_, j) => j === imb);
+  const railBFix = Array.from({ length: ringB.length }, () => false);
   const terrain = buildTacticalTerrainKindResolverFromSnapshot({
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
     res4TerrainKindByH3: { [p]: 'plains', [m]: 'mountain', [b]: 'plains' },
-    res4RoadSidesByH3: { [p]: roadP, [m]: roadM },
-    res4RailSidesByH3: { [p]: railP, [m]: railM },
+    res4RoadSidesByH3: { [p]: roadP, [m]: roadM, [b]: roadBFix },
+    res4RailSidesByH3: { [p]: railP, [m]: railM, [b]: railBFix },
   });
   const plan = planTacticalRes4March({
     fromH3: p,
@@ -727,8 +736,8 @@ test('armor can march through mountain when the corridor marks both entry and ex
   });
   assert.equal(plan.reachable, true);
   assert.ok(
-    Math.abs(plan.totalCostToDestination - 2.4) < 1e-9,
-    `expected ~2.4 MPs, got ${plan.totalCostToDestination}`
+    Math.abs(plan.totalCostToDestination - 1.5) < 1e-9,
+    `expected ~1.5 MPs, got ${plan.totalCostToDestination}`
   );
 });
 
@@ -753,12 +762,17 @@ test('armor routes from off-road neighbor through mountain when approach marks r
   const nM = ringM.length;
   const roadM = Array.from({ length: nM }, (_, j) => j === ip || j === ib);
   const railM = Array.from({ length: nM }, () => false);
+  const ringB = res4GridDiskNeighborsOrdered(b);
+  const imb = ringB.indexOf(m);
+  assert.ok(imb >= 0);
+  const roadBx = Array.from({ length: ringB.length }, (_, j) => j === imb);
+  const railBx = Array.from({ length: ringB.length }, () => false);
   const terrain = buildTacticalTerrainKindResolverFromSnapshot({
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
     res4TerrainKindByH3: { [x]: 'plains', [p]: 'plains', [m]: 'mountain', [b]: 'plains' },
-    res4RoadSidesByH3: { [p]: roadP, [m]: roadM },
-    res4RailSidesByH3: { [p]: railP, [m]: railM },
+    res4RoadSidesByH3: { [p]: roadP, [m]: roadM, [b]: roadBx },
+    res4RailSidesByH3: { [p]: railP, [m]: railM, [b]: railBx },
   });
   const plan = planTacticalRes4March({
     fromH3: x,
@@ -854,8 +868,8 @@ test('classifyLandInfantryArmorEnterStep: armor into mountain goal uses transpor
     res4Set,
   });
   assert.equal(c.appliedReason, 'transport_blocking');
-  assert.equal(c.appliedCost, 1.6);
-  assert.equal(c.transportEffectiveBudgetMultiplier, 1.25);
+  assert.equal(c.appliedCost, 1.0);
+  assert.equal(c.transportEffectiveBudgetMultiplier, 2.0);
   assert.equal(c.transportEdgeActive, true);
   assert.equal(c.transportContinuityAllowed, true);
 });
@@ -879,12 +893,17 @@ test('summarizeLandMarchStepLegalityAlongPath lists transport_blocking then tran
   const nM = ringM.length;
   const roadM = Array.from({ length: nM }, (_, j) => j === ip || j === ib);
   const railM = Array.from({ length: nM }, () => false);
+  const ringB = res4GridDiskNeighborsOrdered(b);
+  const imb = ringB.indexOf(m);
+  assert.ok(imb >= 0);
+  const roadMB = Array.from({ length: ringB.length }, (_, j) => j === imb);
+  const railMB = Array.from({ length: ringB.length }, () => false);
   const terrain = buildTacticalTerrainKindResolverFromSnapshot({
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
     res4TerrainKindByH3: { [p]: 'plains', [m]: 'mountain', [b]: 'plains' },
-    res4RoadSidesByH3: { [p]: roadP, [m]: roadM },
-    res4RailSidesByH3: { [p]: railP, [m]: railM },
+    res4RoadSidesByH3: { [p]: roadP, [m]: roadM, [b]: roadMB },
+    res4RailSidesByH3: { [p]: railP, [m]: railM, [b]: railMB },
   });
   const res4Set = new Set([p, m, b]);
   const plan = planTacticalRes4March({
@@ -955,7 +974,7 @@ test('buildLandMarchStepLegalityDetailAlongPath includes toH3 and transport flag
   const row = details![0]!;
   assert.equal(row.toH3, m);
   assert.equal(row.appliedReason, 'transport_blocking');
-  assert.equal(row.transportEffectiveBudgetMultiplier, 1.25);
+  assert.equal(row.transportEffectiveBudgetMultiplier, 2.0);
   assert.equal(row.transportEdgeActive, true);
   assert.equal(row.transportContinuityAllowed, true);
 });
@@ -1010,12 +1029,17 @@ test('infantry can transit water when the water hex marks both entry and exit tr
   const nW = ringW.length;
   const roadW = Array.from({ length: nW }, (_, j) => j === ip || j === ib);
   const railW = Array.from({ length: nW }, () => false);
+  const ringB = res4GridDiskNeighborsOrdered(b);
+  const imb = ringB.indexOf(w);
+  assert.ok(imb >= 0);
+  const roadB = Array.from({ length: ringB.length }, (_, j) => j === imb);
+  const railB = Array.from({ length: ringB.length }, () => false);
   const terrain = buildTacticalTerrainKindResolverFromSnapshot({
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
     res4TerrainKindByH3: { [p]: 'plains', [w]: 'water', [b]: 'plains' },
-    res4RoadSidesByH3: { [p]: roadP, [w]: roadW },
-    res4RailSidesByH3: { [p]: railP, [w]: railW },
+    res4RoadSidesByH3: { [p]: roadP, [w]: roadW, [b]: roadB },
+    res4RailSidesByH3: { [p]: railP, [w]: railW, [b]: railB },
   });
   const plan = planTacticalRes4March({
     fromH3: p,
@@ -1026,7 +1050,7 @@ test('infantry can transit water when the water hex marks both entry and exit tr
     terrain,
   });
   assert.equal(plan.reachable, true);
-  assert.equal(plan.totalCostToDestination, 1.6);
+  assert.equal(plan.totalCostToDestination, 1.0);
 });
 
 test('infantry cannot enter water goal when only plains marks the shared boundary (water lacks head edge toward plains)', () => {
@@ -1093,7 +1117,54 @@ test('infantry reaches water goal at plains cost when reciprocal boundary is mar
     terrain,
   });
   assert.equal(plan.reachable, true);
-  assert.equal(plan.totalCostToDestination, 0.8);
+  assert.equal(plan.totalCostToDestination, 0.5);
+});
+
+test('infantry urban neighbor uses road transport divisor on a road link when both cells carry march masks', () => {
+  const a = tacticalRes4Cell(74, 84);
+  const b = firstRingCellDistinctFrom(a);
+  const paired = pairedTransportSidesForAdjacentHexes(a, b, 'road');
+  const terrain = buildTacticalTerrainKindResolverFromSnapshot({
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: { [a]: 'plains', [b]: 'plains' },
+    res4IsUrbanByH3: { [b]: true },
+    res4RoadSidesByH3: paired.res4RoadSidesByH3,
+    res4RailSidesByH3: paired.res4RailSidesByH3,
+  });
+  const plan = planTacticalRes4March({
+    fromH3: a,
+    toH3: b,
+    res4Set: new Set([a, b]),
+    unitTypeForMovement: 'infantry',
+    movementPointBudget: 2,
+    terrain,
+  });
+  assert.equal(plan.reachable, true);
+  assert.equal(plan.totalCostToDestination, 0.5);
+});
+
+test('infantry forest neighbor uses terrain base over road transport divisor on a road-only link', () => {
+  const a = tacticalRes4Cell(75, 85);
+  const b = firstRingCellDistinctFrom(a);
+  const paired = pairedTransportSidesForAdjacentHexes(a, b, 'road');
+  const terrain = buildTacticalTerrainKindResolverFromSnapshot({
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: { [a]: 'plains', [b]: 'forest' },
+    res4RoadSidesByH3: paired.res4RoadSidesByH3,
+    res4RailSidesByH3: paired.res4RailSidesByH3,
+  });
+  const plan = planTacticalRes4March({
+    fromH3: a,
+    toH3: b,
+    res4Set: new Set([a, b]),
+    unitTypeForMovement: 'infantry',
+    movementPointBudget: 4,
+    terrain,
+  });
+  assert.equal(plan.reachable, true);
+  assert.equal(plan.totalCostToDestination, 2 / 2.0);
 });
 
 test('infantry cannot transit water when the water hex only marks entry (dead-end corridor)', () => {
@@ -1132,25 +1203,16 @@ test('infantry cannot transit water when the water hex only marks entry (dead-en
   assert.equal(plan.reachable, false);
 });
 
-test('infantry plains neighbor costs 1/1.25 MPs on a road-only link', () => {
+test('infantry plains neighbor uses road transport divisor on a road-only link', () => {
   const a = tacticalRes4Cell(71, 81);
   const b = firstRingCellDistinctFrom(a);
-  const ringA = res4GridDiskNeighborsOrdered(a);
-  const ringB = res4GridDiskNeighborsOrdered(b);
-  const i = ringA.indexOf(b);
-  assert.ok(i >= 0);
-  const nA = ringA.length;
-  const nB = ringB.length;
-  const roadA = Array.from({ length: nA }, (_, j) => j === i);
-  const railA = Array.from({ length: nA }, () => false);
-  const roadB = Array.from({ length: nB }, () => false);
-  const railB = Array.from({ length: nB }, () => false);
+  const paired = pairedTransportSidesForAdjacentHexes(a, b, 'road');
   const terrain = buildTacticalTerrainKindResolverFromSnapshot({
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
     res4TerrainKindByH3: { [a]: 'plains', [b]: 'plains' },
-    res4RoadSidesByH3: { [a]: roadA, [b]: roadB },
-    res4RailSidesByH3: { [a]: railA, [b]: railB },
+    res4RoadSidesByH3: paired.res4RoadSidesByH3,
+    res4RailSidesByH3: paired.res4RailSidesByH3,
   });
   const plan = planTacticalRes4March({
     fromH3: a,
@@ -1161,28 +1223,19 @@ test('infantry plains neighbor costs 1/1.25 MPs on a road-only link', () => {
     terrain,
   });
   assert.equal(plan.reachable, true);
-  assert.equal(plan.totalCostToDestination, 0.8);
+  assert.equal(plan.totalCostToDestination, 0.5);
 });
 
-test('infantry plains neighbor costs 1/1.5 MPs on a rail-only link', () => {
+test('infantry plains neighbor uses rail transport divisor on a rail-only link', () => {
   const a = tacticalRes4Cell(72, 82);
   const b = firstRingCellDistinctFrom(a);
-  const ringA = res4GridDiskNeighborsOrdered(a);
-  const ringB = res4GridDiskNeighborsOrdered(b);
-  const i = ringA.indexOf(b);
-  assert.ok(i >= 0);
-  const nA = ringA.length;
-  const nB = ringB.length;
-  const roadA = Array.from({ length: nA }, () => false);
-  const railA = Array.from({ length: nA }, (_, j) => j === i);
-  const roadB = Array.from({ length: nB }, () => false);
-  const railB = Array.from({ length: nB }, () => false);
+  const paired = pairedTransportSidesForAdjacentHexes(a, b, 'rail');
   const terrain = buildTacticalTerrainKindResolverFromSnapshot({
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
     res4TerrainKindByH3: { [a]: 'plains', [b]: 'plains' },
-    res4RoadSidesByH3: { [a]: roadA, [b]: roadB },
-    res4RailSidesByH3: { [a]: railA, [b]: railB },
+    res4RoadSidesByH3: paired.res4RoadSidesByH3,
+    res4RailSidesByH3: paired.res4RailSidesByH3,
   });
   const plan = planTacticalRes4March({
     fromH3: a,
@@ -1193,28 +1246,19 @@ test('infantry plains neighbor costs 1/1.5 MPs on a rail-only link', () => {
     terrain,
   });
   assert.equal(plan.reachable, true);
-  assert.equal(plan.totalCostToDestination, 1 / 1.5);
+  assert.equal(plan.totalCostToDestination, 1 / 3.0);
 });
 
 test('infantry plains link uses rail multiplier when both road and rail mark the traversed edge', () => {
   const a = tacticalRes4Cell(73, 83);
   const b = firstRingCellDistinctFrom(a);
-  const ringA = res4GridDiskNeighborsOrdered(a);
-  const ringB = res4GridDiskNeighborsOrdered(b);
-  const i = ringA.indexOf(b);
-  assert.ok(i >= 0);
-  const nA = ringA.length;
-  const nB = ringB.length;
-  const roadA = Array.from({ length: nA }, (_, j) => j === i);
-  const railA = Array.from({ length: nA }, (_, j) => j === i);
-  const roadB = Array.from({ length: nB }, () => false);
-  const railB = Array.from({ length: nB }, () => false);
+  const paired = pairedTransportSidesForAdjacentHexes(a, b, 'both');
   const terrain = buildTacticalTerrainKindResolverFromSnapshot({
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
     res4TerrainKindByH3: { [a]: 'plains', [b]: 'plains' },
-    res4RoadSidesByH3: { [a]: roadA, [b]: roadB },
-    res4RailSidesByH3: { [a]: railA, [b]: railB },
+    res4RoadSidesByH3: paired.res4RoadSidesByH3,
+    res4RailSidesByH3: paired.res4RailSidesByH3,
   });
   const plan = planTacticalRes4March({
     fromH3: a,
@@ -1225,5 +1269,5 @@ test('infantry plains link uses rail multiplier when both road and rail mark the
     terrain,
   });
   assert.equal(plan.reachable, true);
-  assert.equal(plan.totalCostToDestination, 1 / 1.5);
+  assert.equal(plan.totalCostToDestination, 1 / 3.0);
 });

@@ -3,9 +3,10 @@
  *
  * Purpose: Aligns gameplay with bundled `road_sides` / `rail_sides` masks: neighbor slot indices must match `gridDisk(h, 1)`
  * iteration order used when authoring terrain JSON.
- * When to use: `TacticalTerrainKindResolver.transportFromTo` and spawn passability when a land bridge exists.
- * Expected outcome: `tacticalRes4TransportEdgeActive` is true only when the **from** cell’s `roadSides`/`railSides` mark that edge’s slot (head-only) and neither cell is rubble; mask arrays must match the `gridDisk` ring length. March **continuity**
- * (including goal legs) composes these edges via `tacticalRes4TransportInteriorContinuityOnCurr` in `tacticalRes4LandMarchContinuity`.
+ * When to use: Strict **slot-aligned** helpers (`tacticalRes4TransportEdgeActive`) for tests/diagnostics; **march** helpers
+ * (`tacticalRes4TransportMarchAdjacentPairAllowsStep`) for resolver `transportFromTo`, continuity, and §12.4 speed scaling.
+ * Expected outcome: March passage allows adjacent steps when **both** endpoints have valid masks with **any** road/rail side set;
+ * strict APIs still require the traversed side marked on the head cell only.
  * Exceptions: `gridDisk` failures yield empty rings and false negatives.
  */
 
@@ -21,7 +22,7 @@ export type TacticalRes4TransportMasks = {
  *
  * Purpose: Stable neighbor list for indexing into `roadSides` / `rail_sides` arrays on the same cell.
  * When to use: `neighborSlotIndex` and transport spawn scans.
- * Expected outcome: Same iteration order as `neighborsInFootprint` in the tactical march planner for a single origin.
+ * Expected outcome: Same iteration order as `res4NeighborsInFootprint` neighbor iteration for a single origin (before footprint filtering).
  * Exceptions: Swallows `gridDisk` errors and returns `[]`.
  */
 export function res4GridDiskNeighborsOrdered(fromH3: string): string[] {
@@ -30,6 +31,26 @@ export function res4GridDiskNeighborsOrdered(fromH3: string): string[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Lists res4 neighbors of `h` that remain inside the tactical battle footprint.
+ *
+ * Purpose: Single edge list for §12.4 Dijkstra on the res4 grid (`planTacticalRes4March` land and naval branches).
+ * When to use: Any tactical pathfinding restricted to a parent res1 child set.
+ * Expected outcome: Excludes `h` itself; returns only indexes present in `res4Set`; empty when `gridDisk` throws.
+ * Exceptions: Swallows malformed H3 like other tactical helpers.
+ */
+export function res4NeighborsInFootprint(h: string, res4Set: ReadonlySet<string>): string[] {
+  const out: string[] = [];
+  try {
+    for (const n of gridDisk(h, 1)) {
+      if (n !== h && res4Set.has(n)) out.push(n);
+    }
+  } catch {
+    return out;
+  }
+  return out;
 }
 
 /**
@@ -51,6 +72,99 @@ function maskActiveAtSlot(masks: TacticalRes4TransportMasks | undefined, slot: n
   const { roadSides, railSides } = masks;
   if (slot < 0 || slot >= roadSides.length || slot >= railSides.length) return false;
   return !!(roadSides[slot] || railSides[slot]);
+}
+
+/**
+ * Returns true when `masks` has length aligned with `ringLen` and at least one road or rail side is set.
+ *
+ * Purpose: Shared check for “cell participates in transport overlay” without fixing a neighbor slot.
+ * When to use: `tacticalRes4TransportMarchAdjacentPairAllowsStep` after verifying `roadSides`/`railSides` length equals `ringLen`.
+ * Expected outcome: False when lengths mismatch or every side is false.
+ * Exceptions: None.
+ */
+export function tacticalRes4TransportMaskHasAnyRoadOrRail(masks: TacticalRes4TransportMasks, ringLen: number): boolean {
+  const { roadSides, railSides } = masks;
+  if (roadSides.length !== ringLen || railSides.length !== ringLen) return false;
+  for (let i = 0; i < ringLen; i++) {
+    if (roadSides[i] || railSides[i]) return true;
+  }
+  return false;
+}
+
+/**
+ * Returns true when `h3` has a map row whose arrays match `gridDisk(h3,1)` length and at least one road/rail side is true.
+ *
+ * Purpose: Endpoint eligibility for march pairs independent of which boundary shares the step.
+ * When to use: Building `tacticalRes4TransportMarchAdjacentPairAllowsStep`.
+ * Expected outcome: False when missing row, length mismatch vs ring, or all sides false.
+ * Exceptions: None.
+ */
+function tacticalRes4TransportCellHasValidAnySideOverlay(
+  h3: string,
+  roadRailByH3: ReadonlyMap<string, TacticalRes4TransportMasks>
+): boolean {
+  const masks = roadRailByH3.get(h3);
+  if (!masks) return false;
+  const ring = res4GridDiskNeighborsOrdered(h3);
+  return tacticalRes4TransportMaskHasAnyRoadOrRail(masks, ring.length);
+}
+
+/**
+ * Returns true when infantry/armor may treat the adjacent step `fromH3` → `toH3` as a transport step (both cells show any road/rail).
+ *
+ * Purpose: March-time passage when both res4 hexes carry transport overlay data; ignores **which** edge bits are set.
+ * When to use: `transportFromTo`, land continuity, blocking-terrain transport authorization, spawn bridge checks.
+ * Expected outcome: False when not ring-1 neighbors, either endpoint is rubble, either cell lacks a mask row or length-valid
+ * overlay with at least one side flagged.
+ * Exceptions: None.
+ */
+export function tacticalRes4TransportMarchAdjacentPairAllowsStep(args: {
+  fromH3: string;
+  toH3: string;
+  roadRailByH3: ReadonlyMap<string, TacticalRes4TransportMasks>;
+  rubbleByH3?: Readonly<Record<string, boolean>>;
+}): boolean {
+  const { fromH3, toH3, roadRailByH3, rubbleByH3 } = args;
+  if (rubbleByH3?.[fromH3] || rubbleByH3?.[toH3]) return false;
+  const ring = res4GridDiskNeighborsOrdered(fromH3);
+  if (ring.indexOf(toH3) < 0) return false;
+  return (
+    tacticalRes4TransportCellHasValidAnySideOverlay(fromH3, roadRailByH3) &&
+    tacticalRes4TransportCellHasValidAnySideOverlay(toH3, roadRailByH3)
+  );
+}
+
+/**
+ * Returns true when `currH3` may sit between `prevH3` and `nextH3` on a transport march (both legs satisfy march pair rules).
+ *
+ * Purpose: Interior corridor continuity using loose pair checks instead of head-only dual slots on `currH3`.
+ * When to use: `tacticalRes4LandMarchContinuity` non-blocking steps with `prevOfFrom` set; blocked transit witness paths.
+ * Expected outcome: False when `prevH3 === nextH3` or either adjacent pair fails `tacticalRes4TransportMarchAdjacentPairAllowsStep`.
+ * Exceptions: None.
+ */
+export function tacticalRes4TransportMarchInteriorContinuity(args: {
+  prevH3: string;
+  currH3: string;
+  nextH3: string;
+  roadRailByH3: ReadonlyMap<string, TacticalRes4TransportMasks>;
+  rubbleByH3?: Readonly<Record<string, boolean>>;
+}): boolean {
+  const { prevH3, currH3, nextH3, roadRailByH3, rubbleByH3 } = args;
+  if (prevH3 === nextH3) return false;
+  return (
+    tacticalRes4TransportMarchAdjacentPairAllowsStep({
+      fromH3: currH3,
+      toH3: prevH3,
+      roadRailByH3,
+      rubbleByH3,
+    }) &&
+    tacticalRes4TransportMarchAdjacentPairAllowsStep({
+      fromH3: currH3,
+      toH3: nextH3,
+      roadRailByH3,
+      rubbleByH3,
+    })
+  );
 }
 
 /**
@@ -81,10 +195,10 @@ export function tacticalRes4TransportEdgeActive(args: {
 }
 
 /** §12.4 road-line effective movement budget multiplier (divide enter MPs by this value on a road-only transport step). */
-export const TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER = 1.25 as const;
+export const TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER = 2.0 as const;
 
 /** §12.4 rail-line effective movement budget multiplier (divide enter MPs by this value on a rail-marked transport step). */
-export const TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER = 1.5 as const;
+export const TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER = 3.0 as const;
 
 /**
  * Returns true when the **from** cell marks **road** on the side toward `toH3` (same rubble, adjacency, and length guards as `tacticalRes4TransportEdgeActive`).
@@ -141,9 +255,9 @@ export function tacticalRes4TransportStepRailActive(args: {
 /**
  * Returns the §12.4 **effective budget multiplier** for a directed transport step `fromH3` → `toH3` (divide base transport enter MPs by this value).
  *
- * Purpose: Road lines scale effective budget by 1.25×, rail by 1.5×; when **both** masks mark the same edge, rail wins (lower MP cost).
+ * Purpose: Road lines scale effective budget by 2×, rail by 3×; when `fromH3` carries **any** rail side prefer rail multiplier, else **any** road side prefer road (march pair must already hold).
  * When to use: Land march enter cost after transport legality and base transport MP (plains or blocking-transport) are fixed.
- * Expected outcome: `1` when `tacticalRes4TransportEdgeActive` is false; else `TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER` if `railSides[slot]`, else `TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER` if `roadSides[slot]`, else `1`.
+ * Expected outcome: `1` when `tacticalRes4TransportMarchAdjacentPairAllowsStep` is false; else rail multiplier if any `railSides` on `fromH3`, else road if any `roadSides`, else `1`.
  * Exceptions: None.
  */
 export function tacticalRes4TransportStepSpeedMultiplier(args: {
@@ -152,27 +266,30 @@ export function tacticalRes4TransportStepSpeedMultiplier(args: {
   roadRailByH3: ReadonlyMap<string, TacticalRes4TransportMasks>;
   rubbleByH3?: Readonly<Record<string, boolean>>;
 }): number {
-  if (!tacticalRes4TransportEdgeActive(args)) return 1;
-  const { fromH3, toH3, roadRailByH3 } = args;
-  const ring = res4GridDiskNeighborsOrdered(fromH3);
-  const i = ring.indexOf(toH3);
-  if (i < 0) return 1;
+  if (!tacticalRes4TransportMarchAdjacentPairAllowsStep(args)) return 1;
+  const { fromH3, roadRailByH3 } = args;
   const masks = roadRailByH3.get(fromH3);
   if (!masks) return 1;
+  const ring = res4GridDiskNeighborsOrdered(fromH3);
   const { railSides, roadSides } = masks;
-  if (railSides[i]) return TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER;
-  if (roadSides[i]) return TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER;
+  if (roadSides.length !== ring.length || railSides.length !== ring.length) return 1;
+  for (let i = 0; i < ring.length; i++) {
+    if (railSides[i]) return TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER;
+  }
+  for (let i = 0; i < ring.length; i++) {
+    if (roadSides[i]) return TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER;
+  }
   return 1;
 }
 
 /**
  * Returns true when both adjacent hexes head-mark the shared boundary for road/rail (symmetric link across the step).
  *
- * Purpose: Blocked tactical destinations (armor `mountains`, infantry `water`, etc.) require reciprocal mask support so
- * entry is authorized on the destination cell as well as on the approach cell.
- * When to use: `landTransportPlainsEnterAllowed` when `toH3` is blocking without urban/rubble override.
- * Expected outcome: True only when `tacticalRes4TransportEdgeActive` holds for `fromH3`→`toH3` and `toH3`→`fromH3` (each cell
- * must have a valid mask row when required by those predicates).
+ * @deprecated Tactical march uses `tacticalRes4TransportMarchAdjacentPairAllowsStep` (both cells any road/rail). Retained for strict slot-aligned diagnostics only.
+ *
+ * Purpose: Historical reciprocal slot test; blocked destinations previously required both head marks on the shared edge.
+ * When to use: Rare strict edge-case tests; prefer march-pair helpers for gameplay-adjacent logic.
+ * Expected outcome: True only when `tacticalRes4TransportEdgeActive` holds for `fromH3`→`toH3` and `toH3`→`fromH3`.
  * Exceptions: None.
  */
 export function tacticalRes4TransportReciprocalBoundaryActive(args: {
@@ -264,7 +381,7 @@ export function tacticalRes4CellHasActiveTransportCorridor(args: {
  *
  * Purpose: Bridge / causeway tiles inside the tactical parent without widening spawn to arbitrary open water.
  * When to use: `computeTacticalBattleSnapshot` placement after the baseline `isInfantryOrArmorTacticalSpawnCell` check fails.
- * Expected outcome: True only when at least one footprint neighbor shares an active transport edge with `cellH3`.
+ * Expected outcome: True only when at least one footprint neighbor forms a march transport pair with `cellH3` (both cells any road/rail).
  * Exceptions: None.
  */
 export function tacticalRes4InfantryArmorSpawnAllowedViaTransport(args: {
@@ -277,7 +394,7 @@ export function tacticalRes4InfantryArmorSpawnAllowedViaTransport(args: {
   for (const nb of res4GridDiskNeighborsOrdered(cellH3)) {
     if (!childFootprint.has(nb)) continue;
     if (
-      tacticalRes4TransportEdgeActive({
+      tacticalRes4TransportMarchAdjacentPairAllowsStep({
         fromH3: cellH3,
         toH3: nb,
         roadRailByH3,
@@ -295,7 +412,7 @@ export function tacticalRes4InfantryArmorSpawnAllowedViaTransport(args: {
  *
  * Purpose: Single place to align `roadSides` / `railSides` lengths before snapshot fields and `Map` construction for transport predicates.
  * When to use: `computeTacticalBattleSnapshot`, `refreshTacticalBattleRes4TerrainFromGameDb`, and tests that synthesize transport masks.
- * Expected outcome: Optional `res4RoadSidesByH3` / `res4RailSidesByH3` records plus a `roadRailByH3` map suitable for `tacticalRes4TransportEdgeActive`; empty map when no overlays hit the footprint.
+ * Expected outcome: Optional `res4RoadSidesByH3` / `res4RailSidesByH3` records plus a `roadRailByH3` map suitable for transport predicates; empty map when no overlays hit the footprint.
  * Exceptions: Drops rows whose padded arrays would still disagree in length (malformed asset rows).
  */
 export function tacticalRes4FootprintTransportOverlayRecords(args: {

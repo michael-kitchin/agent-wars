@@ -14,6 +14,8 @@ import {
   tacticalRes4FootprintTransportOverlayRecords,
   tacticalRes4TransportEdgeActive,
   tacticalRes4TransportInteriorContinuityOnCurr,
+  tacticalRes4TransportMarchAdjacentPairAllowsStep,
+  tacticalRes4TransportMarchInteriorContinuity,
   tacticalRes4TransportStepSpeedMultiplier,
 } from '../../shared/tacticalRes4TransportLink';
 import { tacticalRes4Cell, firstRingCellDistinctFrom } from './testSupport/tacticalRes4HexFixtures';
@@ -177,7 +179,9 @@ test('tacticalRes4TransportStepSpeedMultiplier matches road vs rail vs combined-
   assert.ok(i >= 0);
   const n = ringFrom.length;
   const ringTo = res4GridDiskNeighborsOrdered(to);
-  const roadSidesTo = Array.from({ length: ringTo.length }, () => false);
+  const jFromOnTo = ringTo.indexOf(from);
+  assert.ok(jFromOnTo >= 0);
+  const roadSidesTo = Array.from({ length: ringTo.length }, (_, j) => j === jFromOnTo);
   const railSidesTo = Array.from({ length: ringTo.length }, () => false);
 
   const roadOnlyFrom = Array.from({ length: n }, (_, j) => j === i);
@@ -219,5 +223,79 @@ test('tacticalRes4TransportStepSpeedMultiplier matches road vs rail vs combined-
   assert.equal(
     tacticalRes4TransportStepSpeedMultiplier({ fromH3: from, toH3: to, roadRailByH3: bothMap }),
     TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER
+  );
+});
+
+test('tacticalRes4TransportMarchAdjacentPairAllowsStep is true when shared boundary is unmarked but both cells have any road/rail', () => {
+  const from = tacticalRes4Cell(74, 84);
+  const to = firstRingCellDistinctFrom(from);
+  const ringFrom = res4GridDiskNeighborsOrdered(from);
+  const i = ringFrom.indexOf(to);
+  assert.ok(i >= 0);
+  const n = ringFrom.length;
+  const roadSidesFrom = Array.from({ length: n }, (_, j) => j === (i + 1) % n);
+  const railSidesFrom = Array.from({ length: n }, () => false);
+  const ringTo = res4GridDiskNeighborsOrdered(to);
+  const j = ringTo.indexOf(from);
+  assert.ok(j >= 0);
+  const roadSidesTo = Array.from({ length: ringTo.length }, (_, k) => k === j);
+  const railSidesTo = Array.from({ length: ringTo.length }, () => false);
+  const { roadRailByH3 } = tacticalRes4FootprintTransportOverlayRecords({
+    childFootprint: new Set([from, to]),
+    overlays: [
+      { h3Index: from, roadSides: roadSidesFrom, railSides: railSidesFrom },
+      { h3Index: to, roadSides: roadSidesTo, railSides: railSidesTo },
+    ],
+  });
+  assert.equal(tacticalRes4TransportEdgeActive({ fromH3: from, toH3: to, roadRailByH3 }), false);
+  assert.equal(
+    tacticalRes4TransportMarchAdjacentPairAllowsStep({ fromH3: from, toH3: to, roadRailByH3 }),
+    true
+  );
+});
+
+test('tacticalRes4TransportMarchInteriorContinuity does not require middle cell to mark both corridor slots', () => {
+  const prev = tacticalRes4Cell(75, 85);
+  const curr = firstRingCellDistinctFrom(prev);
+  const ringCurr = res4GridDiskNeighborsOrdered(curr);
+  const next = ringCurr.find((h) => h !== prev);
+  assert.ok(next);
+  const ringPrev = res4GridDiskNeighborsOrdered(prev);
+  const ringNext = res4GridDiskNeighborsOrdered(next);
+  const nP = ringPrev.length;
+  const nC = ringCurr.length;
+  const nN = ringNext.length;
+  const roadPrev = Array.from({ length: nP }, (_, j) => j === ringPrev.indexOf(curr));
+  const railPrev = Array.from({ length: nP }, () => false);
+  const ip = ringCurr.indexOf(prev);
+  const roadCurr = Array.from({ length: nC }, (_, j) => j === ip);
+  const railCurr = Array.from({ length: nC }, () => false);
+  const roadNext = Array.from({ length: nN }, (_, j) => j === ringNext.indexOf(curr));
+  const railNext = Array.from({ length: nN }, () => false);
+  const { roadRailByH3 } = tacticalRes4FootprintTransportOverlayRecords({
+    childFootprint: new Set([prev, curr, next]),
+    overlays: [
+      { h3Index: prev, roadSides: roadPrev, railSides: railPrev },
+      { h3Index: curr, roadSides: roadCurr, railSides: railCurr },
+      { h3Index: next, roadSides: roadNext, railSides: railNext },
+    ],
+  });
+  assert.equal(
+    tacticalRes4TransportInteriorContinuityOnCurr({
+      prevH3: prev,
+      currH3: curr,
+      nextH3: next,
+      roadRailByH3,
+    }),
+    false
+  );
+  assert.equal(
+    tacticalRes4TransportMarchInteriorContinuity({
+      prevH3: prev,
+      currH3: curr,
+      nextH3: next,
+      roadRailByH3,
+    }),
+    true
   );
 });

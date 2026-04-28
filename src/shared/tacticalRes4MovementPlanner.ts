@@ -2,7 +2,6 @@
  * Res4 tactical march planning: least movement-point paths inside a footprint (combat rules §12.4).
  */
 
-import { gridDisk } from 'h3-js';
 import type { TacticalTerrainKindResolver } from './tacticalTerrainMovement';
 import {
   isNavalRes4TacticalCellNavigable,
@@ -16,7 +15,15 @@ import {
   landTransportStepMovementPointsAfterAuthorization,
   planInfantryArmorLandContinuityMarch,
 } from './tacticalRes4LandMarchContinuity';
-import { tacticalRes4TransportReciprocalBoundaryActive } from './tacticalRes4TransportLink';
+import {
+  popNumericPriorityMinHeap,
+  pushNumericPriorityMinHeap,
+  type NumericPriorityHeapEntry,
+} from './numericPriorityMinHeap';
+import {
+  res4NeighborsInFootprint,
+  tacticalRes4TransportMarchAdjacentPairAllowsStep,
+} from './tacticalRes4TransportLink';
 
 /**
  * Explains why a tactical march plan failed or could not finish in one turn.
@@ -50,85 +57,11 @@ export type TacticalMarchPlanResult = {
   failureReason?: TacticalMarchPlanFailureReason;
 };
 
-type QNode = { h: string; d: number };
-
-/**
- * Inserts a Dijkstra queue node into a binary min-heap ordered by accumulated movement cost.
- *
- * Purpose: Keeps tactical march search fast enough for full-footprint (~343 cell) battles without pulling a heap dependency.
- * When to use: Only from `planTacticalRes4March` while relaxing edges on the res4 grid.
- * Expected outcome: Heap ordering invariant restored after push.
- * Exceptions: None.
- */
-function pushHeap(heap: QNode[], h: string, d: number): void {
-  heap.push({ h, d });
-  let i = heap.length - 1;
-  while (i > 0) {
-    const p = (i - 1) >> 1;
-    if (heap[p]!.d <= heap[i]!.d) break;
-    const t = heap[p]!;
-    heap[p] = heap[i]!;
-    heap[i] = t;
-    i = p;
-  }
-}
-
-/**
- * Removes the smallest-cost Dijkstra node from the binary min-heap.
- *
- * Purpose: Completes the push/pop pair for the tactical march priority queue.
- * When to use: Only from `planTacticalRes4March` while draining the frontier.
- * Expected outcome: Returns the cheapest node or `undefined` when empty.
- * Exceptions: None.
- */
-function popHeap(heap: QNode[]): QNode | undefined {
-  if (heap.length === 0) return undefined;
-  const top = heap[0]!;
-  const last = heap.pop()!;
-  if (heap.length > 0) {
-    heap[0] = last;
-    let i = 0;
-    for (;;) {
-      const l = i * 2 + 1;
-      const r = l + 1;
-      let smallest = i;
-      if (l < heap.length && heap[l]!.d < heap[smallest]!.d) smallest = l;
-      if (r < heap.length && heap[r]!.d < heap[smallest]!.d) smallest = r;
-      if (smallest === i) break;
-      const t = heap[i]!;
-      heap[i] = heap[smallest]!;
-      heap[smallest] = t;
-      i = smallest;
-    }
-  }
-  return top;
-}
-
-/**
- * Lists res4 neighbors of `h` that remain inside the tactical battle footprint.
- *
- * Purpose: Defines the movement graph edges for §12.4 costed search without leaving the parent res1 child set.
- * When to use: Each Dijkstra expansion step in `planTacticalRes4March`.
- * Expected outcome: Excludes `h` itself; returns only indexes present in `res4Set`.
- * Exceptions: Returns an empty list when `gridDisk` throws for malformed indexes.
- */
-function neighborsInFootprint(h: string, res4Set: ReadonlySet<string>): string[] {
-  const out: string[] = [];
-  try {
-    for (const n of gridDisk(h, 1)) {
-      if (n !== h && res4Set.has(n)) out.push(n);
-    }
-  } catch {
-    return out;
-  }
-  return out;
-}
-
 /**
  * When strict MP truncation would leave the unit on the path origin despite a multi-step route, advance one cell
  * along that path if the per-turn budget is positive so Ready/hover never apply a zero-length leg.
  *
- * Purpose: First-step costs can exceed budget 1 (e.g. armor 1.6 into blocking transport) while a longer path remains valid.
+ * Purpose: First-step costs can exceed budget 1 (e.g. armor 1.0 into blocking transport on road) while a longer path remains valid.
  * When to use: After the cumulative-cost loop that computes `stopIdx` in `planTacticalRes4March` (land and naval branches).
  * Expected outcome: Returns index `1` when `movementPointBudget > 0`, `stopIdx === 0`, and `pathLength >= 2`; otherwise returns `stopIdx`.
  * Exceptions: None.
@@ -197,7 +130,7 @@ export function tacticalNavalHasMovableNeighborInFootprint(args: {
   terrain: TacticalTerrainKindResolver;
 }): boolean {
   const { fromH3, res4Set, terrain } = args;
-  for (const nb of neighborsInFootprint(fromH3, res4Set)) {
+  for (const nb of res4NeighborsInFootprint(fromH3, res4Set)) {
     const w = tacticalNavalEnterNeighborCost(fromH3, nb, terrain);
     if (Number.isFinite(w) && w > 0) return true;
   }
@@ -223,11 +156,11 @@ function enterCostForHex(
   }
   if (unitTypeForMovement === 'infantry' || unitTypeForMovement === 'armor') {
     if (terrain.isRubbleRes4?.(h)) return 2;
-    if (terrain.isUrbanRes4?.(h)) return 1;
   }
   const raw = terrain.effectiveKindForRes4Hex(h);
   const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
   const base = tacticalEnterHexMovementCost(unitTypeForMovement, cat);
+  const urbanDest = !!(unitTypeForMovement === 'infantry' || unitTypeForMovement === 'armor') && !!terrain.isUrbanRes4?.(h);
   if (
     (unitTypeForMovement === 'infantry' || unitTypeForMovement === 'armor') &&
     fromH3 != null &&
@@ -238,7 +171,7 @@ function enterCostForHex(
     const transportReciprocalOk =
       !blocking ||
       (ctx != null
-        ? tacticalRes4TransportReciprocalBoundaryActive({
+        ? tacticalRes4TransportMarchAdjacentPairAllowsStep({
             fromH3,
             toH3: h,
             roadRailByH3: ctx.roadRailByH3,
@@ -252,9 +185,12 @@ function enterCostForHex(
         toH3: h,
         blockingDestination: blocking,
         terrain,
+        tacticalCategoryForDestination: cat,
+        isUrbanDestination: urbanDest,
       });
     }
   }
+  if (urbanDest) return 1;
   return base;
 }
 
@@ -393,17 +329,17 @@ export function planTacticalRes4March(args: {
 
   const dist = new Map<string, number>();
   const parent = new Map<string, string | null>();
-  const heap: QNode[] = [];
+  const heap: NumericPriorityHeapEntry<string>[] = [];
   dist.set(fromH3, 0);
   parent.set(fromH3, null);
-  pushHeap(heap, fromH3, 0);
+  pushNumericPriorityMinHeap(heap, fromH3, 0);
   while (heap.length > 0) {
-    const node = popHeap(heap);
+    const node = popNumericPriorityMinHeap(heap);
     if (!node) break;
-    const { h, d } = node;
+    const { payload: h, d } = node;
     if (d !== dist.get(h)) continue;
     if (h === toH3) break;
-    for (const nb of neighborsInFootprint(h, res4Set)) {
+    for (const nb of res4NeighborsInFootprint(h, res4Set)) {
       const w = enterCostForHex(nb, unitTypeForMovement, terrain, h);
       if (!Number.isFinite(w) || w <= 0) continue;
       const nd = d + w;
@@ -411,7 +347,7 @@ export function planTacticalRes4March(args: {
       if (prev === undefined || nd < prev) {
         dist.set(nb, nd);
         parent.set(nb, h);
-        pushHeap(heap, nb, nd);
+        pushNumericPriorityMinHeap(heap, nb, nd);
       }
     }
   }

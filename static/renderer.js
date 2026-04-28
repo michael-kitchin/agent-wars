@@ -16995,66 +16995,70 @@
       return [];
     }
   }
-  function maskActiveAtSlot(masks, slot) {
-    if (!masks) return false;
-    const { roadSides, railSides } = masks;
-    if (slot < 0 || slot >= roadSides.length || slot >= railSides.length) return false;
-    return !!(roadSides[slot] || railSides[slot]);
+  function res4NeighborsInFootprint(h, res4Set) {
+    const out = [];
+    try {
+      for (const n of gridDisk(h, 1)) {
+        if (n !== h && res4Set.has(n)) out.push(n);
+      }
+    } catch {
+      return out;
+    }
+    return out;
   }
-  function tacticalRes4TransportEdgeActive(args) {
+  function tacticalRes4TransportMaskHasAnyRoadOrRail(masks, ringLen) {
+    const { roadSides, railSides } = masks;
+    if (roadSides.length !== ringLen || railSides.length !== ringLen) return false;
+    for (let i = 0; i < ringLen; i++) {
+      if (roadSides[i] || railSides[i]) return true;
+    }
+    return false;
+  }
+  function tacticalRes4TransportCellHasValidAnySideOverlay(h3, roadRailByH3) {
+    const masks = roadRailByH3.get(h3);
+    if (!masks) return false;
+    const ring = res4GridDiskNeighborsOrdered(h3);
+    return tacticalRes4TransportMaskHasAnyRoadOrRail(masks, ring.length);
+  }
+  function tacticalRes4TransportMarchAdjacentPairAllowsStep(args) {
     const { fromH3, toH3, roadRailByH3, rubbleByH3 } = args;
     if (rubbleByH3?.[fromH3] || rubbleByH3?.[toH3]) return false;
     const ring = res4GridDiskNeighborsOrdered(fromH3);
-    const i = ring.indexOf(toH3);
-    if (i < 0) return false;
-    const masks = roadRailByH3.get(fromH3);
-    if (!masks) return false;
-    const { roadSides, railSides } = masks;
-    if (roadSides.length !== ring.length || railSides.length !== ring.length) return false;
-    return maskActiveAtSlot(masks, i);
+    if (ring.indexOf(toH3) < 0) return false;
+    return tacticalRes4TransportCellHasValidAnySideOverlay(fromH3, roadRailByH3) && tacticalRes4TransportCellHasValidAnySideOverlay(toH3, roadRailByH3);
   }
-  var TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER = 1.25;
-  var TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER = 1.5;
-  function tacticalRes4TransportStepSpeedMultiplier(args) {
-    if (!tacticalRes4TransportEdgeActive(args)) return 1;
-    const { fromH3, toH3, roadRailByH3 } = args;
-    const ring = res4GridDiskNeighborsOrdered(fromH3);
-    const i = ring.indexOf(toH3);
-    if (i < 0) return 1;
-    const masks = roadRailByH3.get(fromH3);
-    if (!masks) return 1;
-    const { railSides, roadSides } = masks;
-    if (railSides[i]) return TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER;
-    if (roadSides[i]) return TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER;
-    return 1;
-  }
-  function tacticalRes4TransportReciprocalBoundaryActive(args) {
-    return tacticalRes4TransportEdgeActive({
-      fromH3: args.fromH3,
-      toH3: args.toH3,
-      roadRailByH3: args.roadRailByH3,
-      rubbleByH3: args.rubbleByH3
-    }) && tacticalRes4TransportEdgeActive({
-      fromH3: args.toH3,
-      toH3: args.fromH3,
-      roadRailByH3: args.roadRailByH3,
-      rubbleByH3: args.rubbleByH3
-    });
-  }
-  function tacticalRes4TransportInteriorContinuityOnCurr(args) {
+  function tacticalRes4TransportMarchInteriorContinuity(args) {
     const { prevH3, currH3, nextH3, roadRailByH3, rubbleByH3 } = args;
     if (prevH3 === nextH3) return false;
-    return tacticalRes4TransportEdgeActive({
+    return tacticalRes4TransportMarchAdjacentPairAllowsStep({
       fromH3: currH3,
       toH3: prevH3,
       roadRailByH3,
       rubbleByH3
-    }) && tacticalRes4TransportEdgeActive({
+    }) && tacticalRes4TransportMarchAdjacentPairAllowsStep({
       fromH3: currH3,
       toH3: nextH3,
       roadRailByH3,
       rubbleByH3
     });
+  }
+  var TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER = 2;
+  var TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER = 3;
+  function tacticalRes4TransportStepSpeedMultiplier(args) {
+    if (!tacticalRes4TransportMarchAdjacentPairAllowsStep(args)) return 1;
+    const { fromH3, roadRailByH3 } = args;
+    const masks = roadRailByH3.get(fromH3);
+    if (!masks) return 1;
+    const ring = res4GridDiskNeighborsOrdered(fromH3);
+    const { railSides, roadSides } = masks;
+    if (roadSides.length !== ring.length || railSides.length !== ring.length) return 1;
+    for (let i = 0; i < ring.length; i++) {
+      if (railSides[i]) return TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER;
+    }
+    for (let i = 0; i < ring.length; i++) {
+      if (roadSides[i]) return TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER;
+    }
+    return 1;
   }
   function tacticalRes4CellHasActiveTransportCorridor(args) {
     const { cellH3, roadSidesByH3, railSidesByH3, rubbleByH3 } = args;
@@ -17097,6 +17101,37 @@
     void parentTerrainKind;
     const cat = normalizeDbTerrainKindToTacticalCategory(resolvedKindForCell, parentTerrain);
     return cat === "water" || cat === "coastal";
+  }
+  function buildRoadRailMapFromRes4RoadRailRecords(roadBy, railBy) {
+    const roadRailByH3 = /* @__PURE__ */ new Map();
+    const transportKeys = /* @__PURE__ */ new Set([...Object.keys(roadBy), ...Object.keys(railBy)]);
+    for (const h3 of transportKeys) {
+      const r = roadBy[h3];
+      const l = railBy[h3];
+      if (!r && !l) continue;
+      const n = Math.max(r?.length ?? 0, l?.length ?? 0);
+      if (n === 0) continue;
+      const roadSides = r ?? Array.from({ length: n }, () => false);
+      const railSides = l ?? Array.from({ length: n }, () => false);
+      if (roadSides.length !== railSides.length) continue;
+      roadRailByH3.set(h3, { roadSides, railSides });
+    }
+    return roadRailByH3;
+  }
+  function tacticalTerrainTransportResolverFnsFromRoadRailMap(roadRailByH3, rubbleByH3) {
+    if (roadRailByH3.size === 0) {
+      return { transportFromTo: void 0, landTransportMarchContext: void 0 };
+    }
+    const transportFromTo = (fromH3, toH3) => tacticalRes4TransportMarchAdjacentPairAllowsStep({
+      fromH3,
+      toH3,
+      roadRailByH3,
+      rubbleByH3
+    });
+    return {
+      transportFromTo,
+      landTransportMarchContext: { roadRailByH3, rubbleByH3 }
+    };
   }
   function tacticalEnterHexMovementCost(unitType, category) {
     if (unitType === "infantry") {
@@ -17153,30 +17188,13 @@
     const rubbleMap = battle.res4IsRubbleByH3 ?? {};
     const roadBy = battle.res4RoadSidesByH3 ?? {};
     const railBy = battle.res4RailSidesByH3 ?? {};
-    const roadRailByH3 = /* @__PURE__ */ new Map();
-    const transportKeys = /* @__PURE__ */ new Set([...Object.keys(roadBy), ...Object.keys(railBy)]);
-    for (const h3 of transportKeys) {
-      const r = roadBy[h3];
-      const l = railBy[h3];
-      if (!r && !l) continue;
-      const n = Math.max(r?.length ?? 0, l?.length ?? 0);
-      if (n === 0) continue;
-      const roadSides = r ?? Array.from({ length: n }, () => false);
-      const railSides = l ?? Array.from({ length: n }, () => false);
-      if (roadSides.length !== railSides.length) continue;
-      roadRailByH3.set(h3, { roadSides, railSides });
-    }
-    const transportFromToFn = roadRailByH3.size > 0 ? (fromH3, toH3) => tacticalRes4TransportEdgeActive({
-      fromH3,
-      toH3,
-      roadRailByH3,
-      rubbleByH3: rubbleMap
-    }) : void 0;
+    const roadRailByH3 = buildRoadRailMapFromRes4RoadRailRecords(roadBy, railBy);
+    const { transportFromTo: transportFromToFn, landTransportMarchContext } = tacticalTerrainTransportResolverFnsFromRoadRailMap(roadRailByH3, rubbleMap);
     return {
       parentTerrain,
       parentTerrainKind: parentKind,
       transportFromTo: transportFromToFn,
-      landTransportMarchContext: roadRailByH3.size > 0 ? { roadRailByH3, rubbleByH3: rubbleMap } : void 0,
+      landTransportMarchContext,
       effectiveKindForRes4Hex(h3) {
         const raw = map[h3];
         if (raw == null) return parentKind;
@@ -17523,31 +17541,9 @@
     };
   }
 
-  // src/shared/tacticalRes4LandMarchContinuity.ts
-  var LAND_STATE_SEP = "\0";
-  function neighborsInFootprint(h, res4Set) {
-    const out = [];
-    try {
-      for (const n of gridDisk(h, 1)) {
-        if (n !== h && res4Set.has(n)) out.push(n);
-      }
-    } catch {
-      return out;
-    }
-    return out;
-  }
-  function landStateKey(h, prev) {
-    return `${h}${LAND_STATE_SEP}${prev ?? ""}`;
-  }
-  function parseLandStateKey(key) {
-    const i = key.indexOf(LAND_STATE_SEP);
-    if (i < 0) return { h: key, prev: null };
-    const h = key.slice(0, i);
-    const rest = key.slice(i + LAND_STATE_SEP.length);
-    return { h, prev: rest.length > 0 ? rest : null };
-  }
-  function pushLandHeap(heap, key, d) {
-    heap.push({ key, d });
+  // src/shared/numericPriorityMinHeap.ts
+  function pushNumericPriorityMinHeap(heap, payload, d) {
+    heap.push({ payload, d });
     let i = heap.length - 1;
     while (i > 0) {
       const p = i - 1 >> 1;
@@ -17558,7 +17554,7 @@
       i = p;
     }
   }
-  function popLandHeap(heap) {
+  function popNumericPriorityMinHeap(heap) {
     if (heap.length === 0) return void 0;
     const top = heap[0];
     const last = heap.pop();
@@ -17580,6 +17576,19 @@
     }
     return top;
   }
+
+  // src/shared/tacticalRes4LandMarchContinuity.ts
+  var LAND_STATE_SEP = "\0";
+  function landStateKey(h, prev) {
+    return `${h}${LAND_STATE_SEP}${prev ?? ""}`;
+  }
+  function parseLandStateKey(key) {
+    const i = key.indexOf(LAND_STATE_SEP);
+    if (i < 0) return { h: key, prev: null };
+    const h = key.slice(0, i);
+    const rest = key.slice(i + LAND_STATE_SEP.length);
+    return { h, prev: rest.length > 0 ? rest : null };
+  }
   function landTerrainBlocksWithoutTransport(unitTypeForMovement, terrain, h) {
     if (unitTypeForMovement !== "infantry" && unitTypeForMovement !== "armor") return false;
     if (terrain.isUrbanRes4?.(h) || terrain.isRubbleRes4?.(h)) return false;
@@ -17598,7 +17607,7 @@
     const { prevOfFrom, marchGoalH3, fromH3, toH3 } = args;
     const { roadRailByH3, rubbleByH3 } = args;
     if (!blocking) {
-      if (!tacticalRes4TransportEdgeActive({
+      if (!tacticalRes4TransportMarchAdjacentPairAllowsStep({
         fromH3,
         toH3,
         roadRailByH3,
@@ -17607,7 +17616,7 @@
         return false;
       }
       if (prevOfFrom === null) return true;
-      return tacticalRes4TransportInteriorContinuityOnCurr({
+      return tacticalRes4TransportMarchInteriorContinuity({
         prevH3: prevOfFrom,
         currH3: fromH3,
         nextH3: toH3,
@@ -17615,7 +17624,7 @@
         rubbleByH3
       });
     }
-    if (!tacticalRes4TransportReciprocalBoundaryActive({
+    if (!tacticalRes4TransportMarchAdjacentPairAllowsStep({
       fromH3,
       toH3,
       roadRailByH3,
@@ -17626,7 +17635,7 @@
     if (toH3 === marchGoalH3) return true;
     for (const w of args.footprintNeighborsOf(toH3)) {
       if (w === fromH3) continue;
-      if (tacticalRes4TransportInteriorContinuityOnCurr({
+      if (tacticalRes4TransportMarchInteriorContinuity({
         prevH3: fromH3,
         currH3: toH3,
         nextH3: w,
@@ -17646,7 +17655,7 @@
     if (!landTerrainBlocksWithoutTransport(unitTypeForMovement, terrain, h)) return true;
     const ctx = terrain.landTransportMarchContext;
     if (ctx != null) {
-      return tacticalRes4TransportInteriorContinuityOnCurr({
+      return tacticalRes4TransportMarchInteriorContinuity({
         prevH3: prev,
         currH3: h,
         nextH3: nb,
@@ -17657,8 +17666,16 @@
     return !!(terrain.transportFromTo?.(h, prev) && terrain.transportFromTo?.(h, nb));
   }
   function landTransportStepMovementPointsAfterAuthorization(args) {
-    const { unitTypeForMovement, fromH3, toH3, blockingDestination, terrain } = args;
-    const baseTransportMp = blockingDestination ? unitTypeForMovement === "armor" ? 2 : 1 : tacticalEnterHexMovementCost(unitTypeForMovement, "plains");
+    const {
+      unitTypeForMovement,
+      fromH3,
+      toH3,
+      blockingDestination,
+      terrain,
+      tacticalCategoryForDestination,
+      isUrbanDestination
+    } = args;
+    const baseTransportMp = blockingDestination ? unitTypeForMovement === "armor" ? 2 : 1 : isUrbanDestination ? tacticalEnterHexMovementCost(unitTypeForMovement, "plains") : tacticalEnterHexMovementCost(unitTypeForMovement, tacticalCategoryForDestination);
     const ctx = terrain.landTransportMarchContext;
     const mult = ctx != null ? tacticalRes4TransportStepSpeedMultiplier({
       fromH3,
@@ -17677,12 +17694,7 @@
     const rubbleOverride = !!terrain.isRubbleRes4?.(toH3);
     const urbanOverride = !!terrain.isUrbanRes4?.(toH3);
     const blockingDestination = !rubbleOverride && !urbanOverride && landTerrainBlocksWithoutTransport(unitTypeForMovement, terrain, toH3);
-    const transportEdgeActive = ctx != null ? blockingDestination ? tacticalRes4TransportReciprocalBoundaryActive({
-      fromH3,
-      toH3,
-      roadRailByH3: ctx.roadRailByH3,
-      rubbleByH3: ctx.rubbleByH3
-    }) : tacticalRes4TransportEdgeActive({
+    const transportEdgeActive = ctx != null ? tacticalRes4TransportMarchAdjacentPairAllowsStep({
       fromH3,
       toH3,
       roadRailByH3: ctx.roadRailByH3,
@@ -17697,7 +17709,7 @@
       terrain,
       roadRailByH3: ctx.roadRailByH3,
       rubbleByH3: ctx.rubbleByH3,
-      footprintNeighborsOf: (h) => neighborsInFootprint(h, res4Set)
+      footprintNeighborsOf: (h) => res4NeighborsInFootprint(h, res4Set)
     }) : legacyLandTransportPlainsEnterAllowed({ terrain, fromH3, toH3, unitTypeForMovement });
     const blockingTerrainWithoutTransport = blockingDestination;
     if (rubbleOverride) {
@@ -17715,7 +17727,8 @@
         transportEffectiveBudgetMultiplier: 1
       };
     }
-    if (urbanOverride) {
+    const useTransport = transportContinuityAllowed;
+    if (urbanOverride && !useTransport) {
       return {
         appliedCost: 1,
         appliedReason: "urban",
@@ -17725,12 +17738,11 @@
         urbanOverride: true,
         rubbleOverride: false,
         transportEdgeActive,
-        transportContinuityAllowed: false,
+        transportContinuityAllowed,
         blockingTerrainWithoutTransport: false,
         transportEffectiveBudgetMultiplier: 1
       };
     }
-    const useTransport = transportContinuityAllowed;
     const transportEffectiveBudgetMultiplier = useTransport && ctx != null ? tacticalRes4TransportStepSpeedMultiplier({
       fromH3,
       toH3,
@@ -17742,7 +17754,9 @@
       fromH3,
       toH3,
       blockingDestination,
-      terrain
+      terrain,
+      tacticalCategoryForDestination: cat,
+      isUrbanDestination: urbanOverride
     }) : base;
     return {
       appliedCost,
@@ -17783,14 +17797,14 @@
     const startKey = landStateKey(fromH3, null);
     distLand.set(startKey, 0);
     parentLand.set(startKey, null);
-    pushLandHeap(heapLand, startKey, 0);
+    pushNumericPriorityMinHeap(heapLand, startKey, 0);
     while (heapLand.length > 0) {
-      const node = popLandHeap(heapLand);
+      const node = popNumericPriorityMinHeap(heapLand);
       if (!node) break;
-      const { key, d } = node;
+      const { payload: key, d } = node;
       if (d !== distLand.get(key)) continue;
       const { h, prev } = parseLandStateKey(key);
-      for (const nb of neighborsInFootprint(h, res4Set)) {
+      for (const nb of res4NeighborsInFootprint(h, res4Set)) {
         if (!blockedHexLandTransitAllowsRelaxation({
           unitTypeForMovement,
           terrain,
@@ -17818,7 +17832,7 @@
         if (prevD === void 0 || nd < prevD) {
           distLand.set(nk, nd);
           parentLand.set(nk, key);
-          pushLandHeap(heapLand, nk, nd);
+          pushNumericPriorityMinHeap(heapLand, nk, nd);
         }
       }
     }
@@ -17838,51 +17852,6 @@
   }
 
   // src/shared/tacticalRes4MovementPlanner.ts
-  function pushHeap(heap, h, d) {
-    heap.push({ h, d });
-    let i = heap.length - 1;
-    while (i > 0) {
-      const p = i - 1 >> 1;
-      if (heap[p].d <= heap[i].d) break;
-      const t = heap[p];
-      heap[p] = heap[i];
-      heap[i] = t;
-      i = p;
-    }
-  }
-  function popHeap(heap) {
-    if (heap.length === 0) return void 0;
-    const top = heap[0];
-    const last = heap.pop();
-    if (heap.length > 0) {
-      heap[0] = last;
-      let i = 0;
-      for (; ; ) {
-        const l = i * 2 + 1;
-        const r = l + 1;
-        let smallest = i;
-        if (l < heap.length && heap[l].d < heap[smallest].d) smallest = l;
-        if (r < heap.length && heap[r].d < heap[smallest].d) smallest = r;
-        if (smallest === i) break;
-        const t = heap[i];
-        heap[i] = heap[smallest];
-        heap[smallest] = t;
-        i = smallest;
-      }
-    }
-    return top;
-  }
-  function neighborsInFootprint2(h, res4Set) {
-    const out = [];
-    try {
-      for (const n of gridDisk(h, 1)) {
-        if (n !== h && res4Set.has(n)) out.push(n);
-      }
-    } catch {
-      return out;
-    }
-    return out;
-  }
   function stopIdxWithMinimumOneHexProgress(args) {
     const { stopIdx, pathLength, movementPointBudget } = args;
     if (movementPointBudget > 0 && stopIdx === 0 && pathLength >= 2) return 1;
@@ -17916,15 +17885,15 @@
     }
     if (unitTypeForMovement === "infantry" || unitTypeForMovement === "armor") {
       if (terrain.isRubbleRes4?.(h)) return 2;
-      if (terrain.isUrbanRes4?.(h)) return 1;
     }
     const raw = terrain.effectiveKindForRes4Hex(h);
     const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
     const base = tacticalEnterHexMovementCost(unitTypeForMovement, cat);
+    const urbanDest = !!(unitTypeForMovement === "infantry" || unitTypeForMovement === "armor") && !!terrain.isUrbanRes4?.(h);
     if ((unitTypeForMovement === "infantry" || unitTypeForMovement === "armor") && fromH3 != null && terrain.transportFromTo?.(fromH3, h)) {
       const blocking = landTerrainBlocksWithoutTransport(unitTypeForMovement, terrain, h);
       const ctx = terrain.landTransportMarchContext;
-      const transportReciprocalOk = !blocking || (ctx != null ? tacticalRes4TransportReciprocalBoundaryActive({
+      const transportReciprocalOk = !blocking || (ctx != null ? tacticalRes4TransportMarchAdjacentPairAllowsStep({
         fromH3,
         toH3: h,
         roadRailByH3: ctx.roadRailByH3,
@@ -17936,10 +17905,13 @@
           fromH3,
           toH3: h,
           blockingDestination: blocking,
-          terrain
+          terrain,
+          tacticalCategoryForDestination: cat,
+          isUrbanDestination: urbanDest
         });
       }
     }
+    if (urbanDest) return 1;
     return base;
   }
   function reconstructPath(parent, from, to) {
@@ -18052,14 +18024,14 @@
     const heap = [];
     dist.set(fromH3, 0);
     parent.set(fromH3, null);
-    pushHeap(heap, fromH3, 0);
+    pushNumericPriorityMinHeap(heap, fromH3, 0);
     while (heap.length > 0) {
-      const node = popHeap(heap);
+      const node = popNumericPriorityMinHeap(heap);
       if (!node) break;
-      const { h, d } = node;
+      const { payload: h, d } = node;
       if (d !== dist.get(h)) continue;
       if (h === toH3) break;
-      for (const nb of neighborsInFootprint2(h, res4Set)) {
+      for (const nb of res4NeighborsInFootprint(h, res4Set)) {
         const w = enterCostForHex(nb, unitTypeForMovement, terrain, h);
         if (!Number.isFinite(w) || w <= 0) continue;
         const nd = d + w;
@@ -18067,7 +18039,7 @@
         if (prev === void 0 || nd < prev) {
           dist.set(nb, nd);
           parent.set(nb, h);
-          pushHeap(heap, nb, nd);
+          pushNumericPriorityMinHeap(heap, nb, nd);
         }
       }
     }

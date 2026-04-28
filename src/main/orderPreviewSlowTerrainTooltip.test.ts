@@ -12,9 +12,12 @@ import {
   pickStrategicMarchSlowTerrainDisplayTitle,
   pickTacticalMarchSlowTerrainDisplayTitle,
 } from '../shared/orderPreviewSlowTerrainTooltip';
-import { firstRingCellDistinctFrom, tacticalRes4Cell } from './tacticalBattle/testSupport/tacticalRes4HexFixtures';
+import {
+  firstRingCellDistinctFrom,
+  pairedTransportSidesForAdjacentHexes,
+  tacticalRes4Cell,
+} from './tacticalBattle/testSupport/tacticalRes4HexFixtures';
 import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
-import { res4GridDiskNeighborsOrdered } from '../shared/tacticalRes4TransportLink';
 
 test('formatSlowerHoverTooltipMessage prefixes title-case terrain', () => {
   assert.equal(formatSlowerHoverTooltipMessage('Forest'), 'Slower: Forest');
@@ -200,12 +203,7 @@ test('pickStrategicMarchSlowTerrainDisplayTitle returns Urban when kind names ur
 test('pickTacticalMarchSlowTerrainDisplayTitle returns Road/Rail when a step uses transport over blocked terrain', () => {
   const a = tacticalRes4Cell(57, 67);
   const b = firstRingCellDistinctFrom(a);
-  const ring = res4GridDiskNeighborsOrdered(a);
-  const i = ring.indexOf(b);
-  assert.ok(i >= 0);
-  const n = ring.length;
-  const roadSides = Array.from({ length: n }, (_, j) => j === i);
-  const railSides = Array.from({ length: n }, () => false);
+  const paired = pairedTransportSidesForAdjacentHexes(a, b, 'road');
   const title = pickTacticalMarchSlowTerrainDisplayTitle({
     battle: {
       battleId: 'tb-slow',
@@ -216,8 +214,8 @@ test('pickTacticalMarchSlowTerrainDisplayTitle returns Road/Rail when a step use
       strategicHexTerrain: 'land',
       strategicHexTerrainKind: 'plains',
       res4TerrainKindByH3: { [a]: 'plains', [b]: 'mountain' },
-      res4RoadSidesByH3: { [a]: roadSides },
-      res4RailSidesByH3: { [a]: railSides },
+      res4RoadSidesByH3: paired.res4RoadSidesByH3,
+      res4RailSidesByH3: paired.res4RailSidesByH3,
       subUnits: [
         {
           id: 'u1',
@@ -246,12 +244,7 @@ test('pickTacticalMarchSlowTerrainDisplayTitle returns Road/Rail when a step use
 test('collectTacticalMarchTerrainImpact keeps roadRail when anchor MP throttle already added slower (forest armor)', () => {
   const a = tacticalRes4Cell(58, 68);
   const b = firstRingCellDistinctFrom(a);
-  const ring = res4GridDiskNeighborsOrdered(a);
-  const i = ring.indexOf(b);
-  assert.ok(i >= 0);
-  const n = ring.length;
-  const roadSides = Array.from({ length: n }, (_, j) => j === i);
-  const railSides = Array.from({ length: n }, () => false);
+  const paired = pairedTransportSidesForAdjacentHexes(a, b, 'road');
   const impact = collectTacticalMarchTerrainImpact({
     battle: {
       battleId: 'tb-anchor-road',
@@ -262,8 +255,8 @@ test('collectTacticalMarchTerrainImpact keeps roadRail when anchor MP throttle a
       strategicHexTerrain: 'land',
       strategicHexTerrainKind: 'plains',
       res4TerrainKindByH3: { [a]: 'forest', [b]: 'mountain' },
-      res4RoadSidesByH3: { [a]: roadSides },
-      res4RailSidesByH3: { [a]: railSides },
+      res4RoadSidesByH3: paired.res4RoadSidesByH3,
+      res4RailSidesByH3: paired.res4RailSidesByH3,
       subUnits: [
         {
           id: 'u1',
@@ -296,12 +289,7 @@ test('collectTacticalMarchTerrainImpact keeps roadRail when anchor MP throttle a
 test('collectTacticalMarchTerrainImpact sets roadRail without duplicating Road/Rail in slower list', () => {
   const a = tacticalRes4Cell(57, 67);
   const b = firstRingCellDistinctFrom(a);
-  const ring = res4GridDiskNeighborsOrdered(a);
-  const i = ring.indexOf(b);
-  assert.ok(i >= 0);
-  const n = ring.length;
-  const roadSides = Array.from({ length: n }, (_, j) => j === i);
-  const railSides = Array.from({ length: n }, () => false);
+  const paired = pairedTransportSidesForAdjacentHexes(a, b, 'road');
   const impact = collectTacticalMarchTerrainImpact({
     battle: {
       battleId: 'tb-slow2',
@@ -312,8 +300,8 @@ test('collectTacticalMarchTerrainImpact sets roadRail without duplicating Road/R
       strategicHexTerrain: 'land',
       strategicHexTerrainKind: 'plains',
       res4TerrainKindByH3: { [a]: 'plains', [b]: 'mountain' },
-      res4RoadSidesByH3: { [a]: roadSides },
-      res4RailSidesByH3: { [a]: railSides },
+      res4RoadSidesByH3: paired.res4RoadSidesByH3,
+      res4RailSidesByH3: paired.res4RailSidesByH3,
       subUnits: [
         {
           id: 'u1',

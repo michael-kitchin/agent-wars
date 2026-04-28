@@ -13,13 +13,13 @@ import { tacticalNavalHasMovableNeighborInFootprint } from '../../shared/tactica
 import {
   tacticalRes4FootprintTransportOverlayRecords,
   tacticalRes4InfantryArmorSpawnAllowedViaTransport,
-  tacticalRes4TransportEdgeActive,
 } from '../../shared/tacticalRes4TransportLink';
 import { tacticalRes4UrbanRubbleFlagRecordsForFootprint } from '../../shared/tacticalTerrainCombatModifiers';
 import type { TacticalTerrainKindResolver } from '../../shared/tacticalTerrainMovement';
 import {
   isInfantryOrArmorTacticalSpawnCell,
   isNavalRes4TacticalCellNavigable,
+  tacticalTerrainTransportResolverFnsFromRoadRailMap,
 } from '../../shared/tacticalTerrainMovement';
 import { tacticalLogError, tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 
@@ -386,6 +386,10 @@ export function computeTacticalBattleSnapshot(
       overlays: getRes4RoadRailOverlaysForRenderer(),
     });
     const roadRailByH3 = transportForPlacement.roadRailByH3;
+    const transportFns = tacticalTerrainTransportResolverFnsFromRoadRailMap(
+      roadRailByH3,
+      urbanRubbleForPlacement.res4IsRubbleByH3 ?? {}
+    );
     const placementTerrain: TacticalTerrainKindResolver = {
       parentTerrain: hexRow.terrain,
       parentTerrainKind: hexRow.terrain_kind,
@@ -395,24 +399,8 @@ export function computeTacticalBattleSnapshot(
       isSeaportRes4(h3: string): boolean {
         return !!res4IsSeaportByH3[h3];
       },
-      transportFromTo:
-        roadRailByH3.size > 0
-          ? (fromH3: string, toH3: string): boolean =>
-              tacticalRes4TransportEdgeActive({
-                fromH3,
-                toH3,
-                roadRailByH3,
-                rubbleByH3: urbanRubbleForPlacement.res4IsRubbleByH3,
-              })
-          : undefined,
-      // Mirrors `buildTacticalTerrainKindResolverFromSnapshot` so any placement-time march checks use the same transport continuity bundle as battle snapshots.
-      landTransportMarchContext:
-        roadRailByH3.size > 0
-          ? {
-              roadRailByH3,
-              rubbleByH3: urbanRubbleForPlacement.res4IsRubbleByH3 ?? {},
-            }
-          : undefined,
+      transportFromTo: transportFns.transportFromTo,
+      landTransportMarchContext: transportFns.landTransportMarchContext,
     };
     const orderedCells = orderRes4CellsForPlacement({
       enclosingRes1: enclosingRes1H3Index,
