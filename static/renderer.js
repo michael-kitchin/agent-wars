@@ -14162,23 +14162,23 @@
   var UNIT_RADIUS = 18;
   var PLAYER_COLORS = {
     /**
-       * Documents the object literal property `human` (human: '#2e7548').
+       * Documents the object literal property `human` (human: '#115e59').
     
        * Purpose: Supports maintainability by documenting why `human` exists.
        * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
        * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
        * Exceptions: None.
        */
-    human: "#2e7548",
+    human: "#115e59",
     /**
-       * Documents the object literal property `opponent` (opponent: '#8e4d22').
+       * Documents the object literal property `opponent` (opponent: '#9d174d').
     
        * Purpose: Supports maintainability by documenting why `opponent` exists.
        * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
        * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
        * Exceptions: None.
        */
-    opponent: "#8e4d22"
+    opponent: "#9d174d"
   };
   var UNIT_TYPE_LABELS = {
     /**
@@ -16784,8 +16784,8 @@
     const L = getLeafletGlobal();
     const zoom = typeof map.getZoom === "function" ? map.getZoom() : 4;
     const zoomScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
-    const humanColor = PLAYER_COLORS.human ?? "#2e7548";
-    const aiColor = PLAYER_COLORS.opponent ?? "#8e4d22";
+    const humanColor = PLAYER_COLORS.human ?? "#115e59";
+    const aiColor = PLAYER_COLORS.opponent ?? "#9d174d";
     const intersectionHexes = new Set(
       state.intersectingHomeRegionHexes ?? computeIntersectingHomeRegionHexes(state.humanHomeRegionHexes ?? [], state.aiHomeRegionHexes ?? [])
     );

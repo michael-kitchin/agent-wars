@@ -236,8 +236,8 @@ export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): v
   const L = getLeafletGlobal();
   const zoom = typeof map.getZoom === 'function' ? map.getZoom() : 4;
   const zoomScale = Math.max(0.88, Math.min(1.22, 1.22 - ((zoom - 2) * (0.32 / 8))));
-  const humanColor = PLAYER_COLORS.human ?? '#2e7548';
-  const aiColor = PLAYER_COLORS.opponent ?? '#8e4d22';
+  const humanColor = PLAYER_COLORS.human ?? '#115e59';
+  const aiColor = PLAYER_COLORS.opponent ?? '#9d174d';
   const intersectionHexes = new Set(
     state.intersectingHomeRegionHexes ??
       computeIntersectingHomeRegionHexes(state.humanHomeRegionHexes ?? [], state.aiHomeRegionHexes ?? [])

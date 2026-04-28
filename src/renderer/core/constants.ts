@@ -27,23 +27,23 @@ export const UNIT_RADIUS = 18;
  */
 export const PLAYER_COLORS: Record<string, string> = {
     /**
-   * Documents the object literal property `human` (human: '#2e7548').
+   * Documents the object literal property `human` (human: '#115e59').
 
    * Purpose: Supports maintainability by documenting why `human` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-human: '#2e7548',
+human: '#115e59',
     /**
-   * Documents the object literal property `opponent` (opponent: '#8e4d22').
+   * Documents the object literal property `opponent` (opponent: '#9d174d').
 
    * Purpose: Supports maintainability by documenting why `opponent` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-opponent: '#8e4d22',
+opponent: '#9d174d',
 };
 /**
  * Documents the module-scope binding `UNIT_TYPE_LABELS` (UNIT_TYPE_LABELS: Record<string, string>).
