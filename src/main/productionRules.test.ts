@@ -114,10 +114,10 @@ function testTurnsToNextSpawnEstimateUsesNextUnitOnly(): void {
  */
 function testDeploymentCapsMatchMilestone14Values(): void {
   assert.deepStrictEqual(MAX_UNITS_PER_TYPE_SHARED, {
-    infantry: 6,
-    armor: 4,
-    naval: 4,
-    air: 3,
+    infantry: 12,
+    armor: 8,
+    naval: 8,
+    air: 6,
   });
   assert.deepStrictEqual(MAX_UNITS_PER_TYPE_MAIN, MAX_UNITS_PER_TYPE_SHARED);
 }

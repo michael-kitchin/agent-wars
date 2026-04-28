@@ -3,7 +3,7 @@
  * Keeps parsing logic pure so OpenRouter can share one contract across prompt/tool paths.
  */
 
-import { BUILD_ENTRY_MAX_COUNT, BUILD_ENTRY_MIN_COUNT, type BuildUnitType } from './productionRules';
+import { BUILD_ENTRY_MAX_COUNT, BUILD_ENTRY_MIN_COUNT, isBuildUnitType, type BuildUnitType } from './productionRules';
 import { logTrace } from './logger';
 import type { CoordinateContext } from './briefing/map/coordinateContext';
 import { HEX_CODE_PATTERN } from './briefing/map/coordinateContext';
@@ -93,18 +93,6 @@ validOrders: ProductionOrder[];
    * Exceptions: None.
    */
 droppedReasons: string[];
-}
-
-/**
- * Defines the `isBuildUnitType` function shape (function isBuildUnitType(value: unknown): value is BuildUnitType).
-
- * Purpose: Supports maintainability by documenting why `isBuildUnitType` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function isBuildUnitType(value: unknown): value is BuildUnitType {
-  return value === 'infantry' || value === 'armor' || value === 'naval' || value === 'air';
 }
 
 /**

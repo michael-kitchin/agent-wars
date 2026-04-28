@@ -1,3 +1,4 @@
+import { ALL_BUILD_UNIT_TYPES } from '../../shared/ipc/productionTypes';
 import type { BuildUnitType, ReadyResult } from '../../shared/ipcTypes';
 
 /**
@@ -141,7 +142,7 @@ function formatDeploymentCapReachedLine(
 ): string | null {
   if (player !== 'human') return null;
   if (!cappedTypes || cappedTypes.length === 0) return null;
-  const ordered = (['infantry', 'armor', 'naval', 'air'] as const).filter((unitType) => cappedTypes.includes(unitType));
+  const ordered = ALL_BUILD_UNIT_TYPES.filter((unitType) => cappedTypes.includes(unitType));
   if (ordered.length === 0) return null;
   if (ordered.length === 1) return `Maximum human ${ordered[0]} units deployed.`;
   if (ordered.length === 2) return `Maximum human ${ordered[0]} and ${ordered[1]} units deployed.`;

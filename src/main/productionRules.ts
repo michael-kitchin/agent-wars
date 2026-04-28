@@ -6,16 +6,13 @@ import {
   applyProduction as applyProductionShared,
   UNIT_COST_BY_TYPE as SHARED_UNIT_COST_BY_TYPE,
 } from '../shared/productionConfig';
+import {
+  ALL_BUILD_UNIT_TYPES,
+  isBuildUnitType,
+  type BuildUnitType,
+} from '../shared/ipc/productionTypes';
 
-/**
- * Documents the `BuildUnitType` type alias (export type BuildUnitType).
-
- * Purpose: Supports maintainability by documenting why `BuildUnitType` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export type BuildUnitType = 'infantry' | 'armor' | 'naval' | 'air';
+export { ALL_BUILD_UNIT_TYPES, isBuildUnitType, type BuildUnitType };
 
 /**
  * Documents the `BuildQueueEntryLike` interface as a named contract surface (export interface BuildQueueEntryLike).
@@ -242,8 +239,7 @@ export function getAvailableBuildUnitTypes(
   seaportCount: number,
   airportCount = 0
 ): BuildUnitType[] {
-  const ordered: BuildUnitType[] = ['infantry', 'armor', 'naval', 'air'];
-  return ordered.filter((unitType) => {
+  return ALL_BUILD_UNIT_TYPES.filter((unitType) => {
     const req = BUILD_PREREQUISITES_BY_TYPE[unitType];
     if (urbanHexCount < req.minUrbanHexes || seaportCount < req.minSeaports) return false;
     if (unitType === 'air') return airportCount > 0;

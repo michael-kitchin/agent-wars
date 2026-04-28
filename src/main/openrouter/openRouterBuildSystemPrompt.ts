@@ -22,6 +22,7 @@ import {
   formatLatLng as formatLatLngWithPrecision,
   getMovementOrderInstruction,
 } from './promptText';
+import { ALL_BUILD_UNIT_TYPES } from '../../shared/ipc/productionTypes';
 import { buildPrimaryScenarioGoalOpeningClause, buildRegionVsRegionScenarioObjectiveBlock } from './scenarioGoals';
 import {
   NAVAL_MOVEMENT_PROMPT_RULE,
@@ -114,7 +115,7 @@ export function buildSystemPromptForTools(
     .map((u) => `${u.id} (${u.unitType}) at ${format(u.h3Index)}`)
     .join('; ');
 
-  const unitTypes: Array<'infantry' | 'armor' | 'naval' | 'air'> = ['infantry', 'armor', 'naval', 'air'];
+  const unitTypes = [...ALL_BUILD_UNIT_TYPES];
   const combatSummary = unitTypes
     .map(
       (t) =>

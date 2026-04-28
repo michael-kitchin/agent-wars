@@ -5,7 +5,12 @@
 
 import { LATLNG_DECIMAL_PLACES } from '../mapData';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
-import { BUILD_ENTRY_MAX_COUNT, BUILD_ENTRY_MIN_COUNT, type BuildUnitType, isValidBuildCount } from '../productionRules';
+import {
+  BUILD_ENTRY_MAX_COUNT,
+  BUILD_ENTRY_MIN_COUNT,
+  isBuildUnitType,
+  isValidBuildCount,
+} from '../productionRules';
 import {
   addHexBuildQueueEntry,
   getHexBuildQueue,
@@ -68,18 +73,6 @@ function roundCoordinate(value: number): number {
  */
 function toDisplayLatLng(ll: [number, number]): [number, number] {
   return [roundCoordinate(ll[0]), roundCoordinate(ll[1])];
-}
-
-/**
- * Defines the `isBuildUnitType` function shape (function isBuildUnitType(value: unknown): value is BuildUnitType).
-
- * Purpose: Supports maintainability by documenting why `isBuildUnitType` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function isBuildUnitType(value: unknown): value is BuildUnitType {
-  return value === 'infantry' || value === 'armor' || value === 'naval' || value === 'air';
 }
 
 /**

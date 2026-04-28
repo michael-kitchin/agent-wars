@@ -9,7 +9,6 @@ import { deriveInfrastructureOverlayState } from './rendering/infrastructureOver
 import type {
   GameStateSnapshot,
   GameApi,
-  BuildUnitType,
   AirStrikeTargetType,
   RemovedUnitSnapshot,
   HumanStandingOrderSnapshot,
@@ -18,7 +17,6 @@ import type {
   Res4RoadRailOverlayRow,
   Res4TransportVectorOverlayRow,
 } from '../shared/ipcTypes';
-import { estimateTurnsToNextSpawn, MAX_UNITS_PER_TYPE } from '../shared/productionConfig';
 import {
   buildUnitDisplayNameLookup,
   fallbackDisplayNameFromUnitId,
@@ -162,6 +160,15 @@ import {
   prepareStrategicPlanningUiBeforeTacticalAutoStart,
   type ReadyHandlerDeps,
 } from './gameplay/readyHandler';
+import {
+  buildProductionOverlayContext,
+  formatProductionLabelForAnyController,
+  formatProductionLabelForHumanControllerOnly,
+  getControllerForHex,
+  getUrbanProductionCapacityForHex,
+  isMapInspectionModeHeld,
+  isRes1HexHumanUrbanProduction,
+} from './gameplay/productionOverlayHelpers';
 import { openMeleeInterceptModal } from './gameplay/meleeInterceptModal';
 import { buildMeleeInterceptHexPopupHtmlForRes1 as buildMeleeInterceptHexPopupHtmlForRes1FromModule } from './gameplay/meleeInterceptHexTooltip';
 import type { NamingLookupTarget, TerrainTooltipState } from './map/terrainTooltipTypes';
@@ -171,7 +178,6 @@ import {
   getCachedNamingLineForTarget,
   getCachedTerrainTooltipHtml,
   getRes1DominantTerrainKind,
-  getUrbanProductionCapacityForHex as getUrbanProductionCapacityForHexFromTooltipState,
   hideTerrainTooltipVisual,
   infraGlyphsAllowedForRes1Hex,
   infraGlyphsAllowedForRes4Child,
@@ -1027,272 +1033,6 @@ function getBuildQueuePopupController(): ReturnType<typeof createBuildQueuePopup
     showMapToast,
   });
   return buildQueuePopupController;
-}
-
-/**
- * Defines the `getControllerForHex` function shape (function getControllerForHex(state: GameStateSnapshot, h3Index: string): string | null).
-
- * Purpose: Supports maintainability by documenting why `getControllerForHex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function getControllerForHex(state: GameStateSnapshot, h3Index: string): string | null {
-  const row = state.res1Control?.find((entry) => entry.h3Index === h3Index);
-  return row?.controllerPlayerId ?? null;
-}
-
-/**
- * Returns urban production capacity for a res1 hex for renderer overlays (delegates to shared tooltip state module).
- *
- * Purpose: Preserves a `function getUrbanProductionCapacityForHex` anchor in `renderer.ts` for consolidation source-scan tests.
- * When to use: `drawRes1ProductionOverlays`, `syncBuildEntryButton`, and `isRes1HexHumanUrbanProduction`.
- * Expected outcome: Same capacity semantics as `terrainTooltipRes1State.getUrbanProductionCapacityForHex`.
- * Exceptions: None.
- */
-function getUrbanProductionCapacityForHex(h3Index: string): number {
-  return getUrbanProductionCapacityForHexFromTooltipState(h3Index);
-}
-
-/**
- * Defines the `isMapInspectionModeHeld` function shape (function isMapInspectionModeHeld(): boolean).
-
- * Purpose: Supports maintainability by documenting why `isMapInspectionModeHeld` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function isMapInspectionModeHeld(): boolean {
-  return S.hideTerrainFillWhileHeld;
-}
-
-/**
- * Defines the `isRes1HexHumanUrbanProduction` function shape (function isRes1HexHumanUrbanProduction().
-
- * Purpose: Supports maintainability by documenting why `isRes1HexHumanUrbanProduction` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function isRes1HexHumanUrbanProduction(
-  state: GameStateSnapshot,
-  hx: GameStateSnapshot['hexes'][number]
-): boolean {
-  if (getControllerForHex(state, hx.h3Index) !== 'human') return false;
-  return getUrbanProductionCapacityForHex(hx.h3Index) > 0;
-}
-
-/**
- * Defines the `getBuildQueueSummaryForHex` function shape (function getBuildQueueSummaryForHex( state: GameStateSnapshot, h3Index: string ): NonNullable<GameStateSnapshot['res1BuildQueueTotals']>[number] | null {).
-
- * Purpose: Supports maintainability by documenting why `getBuildQueueSummaryForHex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function getBuildQueueSummaryForHex(
-  state: GameStateSnapshot,
-  h3Index: string
-): NonNullable<GameStateSnapshot['res1BuildQueueTotals']>[number] | null {
-  return state.res1BuildQueueTotals?.find((entry) => entry.h3Index === h3Index) ?? null;
-}
-
-/**
- * Documents the `UnitCountsByType` type alias (type UnitCountsByType).
-
- * Purpose: Supports maintainability by documenting why `UnitCountsByType` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-type UnitCountsByType = Record<BuildUnitType, number>;
-/**
- * Documents the `UnitCountsByPlayer` type alias (type UnitCountsByPlayer).
-
- * Purpose: Supports maintainability by documenting why `UnitCountsByPlayer` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-type UnitCountsByPlayer = Record<'human' | 'opponent', UnitCountsByType>;
-
-/**
- * Defines the `getUnitCountsByTypeForPlayer` function shape (function getUnitCountsByTypeForPlayer().
-
- * Purpose: Supports maintainability by documenting why `getUnitCountsByTypeForPlayer` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function getUnitCountsByTypeForPlayer(
-  state: GameStateSnapshot,
-  playerId: 'human' | 'opponent'
-): UnitCountsByType {
-  const counts: UnitCountsByType = { infantry: 0, armor: 0, naval: 0, air: 0 };
-  for (const unit of state.units) {
-    if (unit.player !== playerId) continue;
-    if (unit.unitType === 'infantry' || unit.unitType === 'armor' || unit.unitType === 'naval' || unit.unitType === 'air') {
-      counts[unit.unitType] += 1;
-    }
-  }
-  return counts;
-}
-
-/**
- * Defines the `isFogOfWarDisabledForSnapshot` function shape (function isFogOfWarDisabledForSnapshot(state: GameStateSnapshot): boolean).
-
- * Purpose: Supports maintainability by documenting why `isFogOfWarDisabledForSnapshot` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function isFogOfWarDisabledForSnapshot(state: GameStateSnapshot): boolean {
-  return state.fogOfWarEnabled === false;
-}
-
-/**
- * Defines the `formatProductionQueueAwareLabel` function shape (function formatProductionQueueAwareLabel( state: GameStateSnapshot, h3Index: string, capacityPerTurn: number, controller: string | null, unitCoun).
-
- * Purpose: Supports maintainability by documenting why `formatProductionQueueAwareLabel` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function formatProductionQueueAwareLabel(
-  state: GameStateSnapshot,
-  h3Index: string,
-  capacityPerTurn: number,
-  controller: string | null,
-  unitCountsByPlayer?: UnitCountsByPlayer
-): string {
-  const capacityText = `$${Math.max(0, capacityPerTurn).toLocaleString()}`;
-  const queue = getBuildQueueSummaryForHex(state, h3Index);
-  const queuedUnits = queue?.queuedUnits ?? 0;
-  if (queuedUnits <= 0) return capacityText;
-  const nextUnitType = queue?.nextUnitType;
-  const storedPoints = Math.max(0, queue?.storedPoints ?? 0);
-  if (!nextUnitType || capacityPerTurn <= 0) {
-    return `${capacityText} / ?t`;
-  }
-  if (controller === 'human' || controller === 'opponent') {
-    const countsByType =
-      controller === 'human'
-        ? (unitCountsByPlayer?.human ?? getUnitCountsByTypeForPlayer(state, 'human'))
-        : (unitCountsByPlayer?.opponent ?? getUnitCountsByTypeForPlayer(state, 'opponent'));
-    if (countsByType[nextUnitType] >= MAX_UNITS_PER_TYPE[nextUnitType]) {
-      return `${capacityText} / ∞t`;
-    }
-  }
-  const turns = estimateTurnsToNextSpawn(nextUnitType, storedPoints, capacityPerTurn);
-  if (turns === null) return `${capacityText} / ?t`;
-  return `${capacityText} / ${turns.toLocaleString()}t`;
-}
-
-/**
- * Defines the `formatProductionLabelForHumanControllerOnly` function shape (function formatProductionLabelForHumanControllerOnly( state: GameStateSnapshot, h3Index: string, capacityPerTurn: number, controller: string | null).
-
- * Purpose: Supports maintainability by documenting why `formatProductionLabelForHumanControllerOnly` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function formatProductionLabelForHumanControllerOnly(
-  state: GameStateSnapshot,
-  h3Index: string,
-  capacityPerTurn: number,
-  controller: string | null
-): string {
-  if (controller !== 'human') return `$${Math.max(0, capacityPerTurn).toLocaleString()} / ?t`;
-  return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller);
-}
-
-/**
- * Defines the `formatProductionLabelForAnyController` function shape (function formatProductionLabelForAnyController( state: GameStateSnapshot, h3Index: string, capacityPerTurn: number, controller: string | null, un).
-
- * Purpose: Supports maintainability by documenting why `formatProductionLabelForAnyController` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function formatProductionLabelForAnyController(
-  state: GameStateSnapshot,
-  h3Index: string,
-  capacityPerTurn: number,
-  controller: string | null,
-  unitCountsByPlayer?: UnitCountsByPlayer
-): string {
-  return formatProductionQueueAwareLabel(state, h3Index, capacityPerTurn, controller, unitCountsByPlayer);
-}
-
-/**
- * Documents the `ProductionOverlayContext` interface as a named contract surface (interface ProductionOverlayContext).
-
- * Purpose: Supports maintainability by documenting why `ProductionOverlayContext` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-interface ProductionOverlayContext {
-    /**
-   * Specifies the contract for the `mapInspectionHeld` member (mapInspectionHeld: boolean;).
-
-   * Contract: Describes stable behavior for callers of `mapInspectionHeld` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-mapInspectionHeld: boolean;
-    /**
-   * Specifies the contract for the `revealAllControllerQueues` member (revealAllControllerQueues: boolean;).
-
-   * Contract: Describes stable behavior for callers of `revealAllControllerQueues` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-revealAllControllerQueues: boolean;
-    /**
-   * Specifies the contract for the `unitHexes` member (unitHexes: Set<string>;).
-
-   * Contract: Describes stable behavior for callers of `unitHexes` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-unitHexes: Set<string>;
-    /**
-   * Specifies the contract for the `unitCountsByPlayer` member (unitCountsByPlayer?: UnitCountsByPlayer;).
-
-   * Contract: Describes stable behavior for callers of `unitCountsByPlayer` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-unitCountsByPlayer?: UnitCountsByPlayer;
-}
-
-/**
- * Defines the `buildProductionOverlayContext` function shape (function buildProductionOverlayContext(state: GameStateSnapshot): ProductionOverlayContext).
-
- * Purpose: Supports maintainability by documenting why `buildProductionOverlayContext` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function buildProductionOverlayContext(state: GameStateSnapshot): ProductionOverlayContext {
-  const mapInspectionHeld = isMapInspectionModeHeld();
-  const revealAllControllerQueues = mapInspectionHeld && isFogOfWarDisabledForSnapshot(state);
-  return {
-    mapInspectionHeld,
-    revealAllControllerQueues,
-    unitHexes: new Set(state.units.map((u) => u.h3Index)),
-    unitCountsByPlayer: revealAllControllerQueues
-      ? {
-          human: getUnitCountsByTypeForPlayer(state, 'human'),
-          opponent: getUnitCountsByTypeForPlayer(state, 'opponent'),
-        }
-      : undefined,
-  };
 }
 
 /**

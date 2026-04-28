@@ -28,6 +28,10 @@ import {
   silentRecoverCorruptDatabase as silentRecoverCorruptDatabaseWithFs,
 } from './game-db/recovery/corruptRecovery';
 import { notifyBetterSqliteNativeLoadFailureAndExitIfApplicable } from './game-db/betterSqliteNativeLoad';
+import {
+  ensureTurnStateRowWhenDbOpen,
+  repairStrandedStrategicResolutionPhaseWhenDbOpen,
+} from './game-db/databaseBootstrap';
 import { getFullDdl } from './game-db/schema';
 import {
   applyGameDbPragmas as applyGameDbPragmasCore,
@@ -248,10 +252,7 @@ function getCanonicalDbPath(): string {
  */
 function ensureTurnStateRow(): void {
   if (!db) return;
-  const row = getOne('SELECT 1 FROM turn_state WHERE id = 1');
-  if (!row) {
-    run('INSERT INTO turn_state (id, phase, turn_number) VALUES (1, ?, ?)', ['planning', 1]);
-  }
+  ensureTurnStateRowWhenDbOpen(run, getOne);
 }
 
 /**
@@ -264,12 +265,7 @@ function ensureTurnStateRow(): void {
  */
 export function repairStrandedStrategicResolutionPhaseOnDbBootstrap(): void {
   if (!db) return;
-  const row = getOne<{ phase: string }>('SELECT phase FROM turn_state WHERE id = 1');
-  if (!row || row.phase !== 'resolution') return;
-  run('UPDATE turn_state SET phase = ? WHERE id = 1', ['planning']);
-  logDebug('gameDb repairStrandedStrategicResolutionPhaseOnDbBootstrap: reset phase planning after interrupted resolution', {
-    priorPhase: row.phase,
-  });
+  repairStrandedStrategicResolutionPhaseWhenDbOpen(run, getOne);
 }
 
 /**

@@ -183,16 +183,18 @@ function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void {
  */
 function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const productionOverlayHelpersPath = path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'productionOverlayHelpers.ts');
   const terrainTooltipStatePath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'terrainTooltipRes1State.ts');
   const policyPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'canvasPreviewPolicy.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
+  const productionOverlayHelpersSource = fs.readFileSync(productionOverlayHelpersPath, 'utf8');
   const policySource = fs.readFileSync(policyPath, 'utf8');
   const terrainTooltipSource = fs.readFileSync(terrainTooltipStatePath, 'utf8');
   const drawProductionFn = getFunctionSource(source, 'drawRes1ProductionOverlays');
   const syncBuildEntryFn = getFunctionSource(source, 'syncBuildEntryButton');
-  const getUrbanProductionCapacityForHexFn = getFunctionSource(source, 'getUrbanProductionCapacityForHex');
+  const getUrbanProductionCapacityForHexFn = getFunctionSource(productionOverlayHelpersSource, 'getUrbanProductionCapacityForHex');
   const canonicalUrbanCapacityFn = getFunctionSource(terrainTooltipSource, 'getUrbanProductionCapacityForHex');
-  const isRes1HexHumanUrbanProductionFn = getFunctionSource(source, 'isRes1HexHumanUrbanProduction');
+  const isRes1HexHumanUrbanProductionFn = getFunctionSource(productionOverlayHelpersSource, 'isRes1HexHumanUrbanProduction');
   const drawHoverPreviewFn = getFunctionSource(source, 'drawHoverRoutePreview');
   const shouldDrawHoveredPathPreviewFn = getFunctionSource(policySource, 'shouldDrawHoveredPathPreview');
 
@@ -269,7 +271,7 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   );
   assert.ok(
     getUrbanProductionCapacityForHexFn.includes('getUrbanProductionCapacityForHexFromTooltipState'),
-    'renderer should delegate urban capacity to the shared terrain tooltip / res1 cache module'
+    'productionOverlayHelpers should delegate urban capacity to the shared terrain tooltip / res1 cache module'
   );
   assert.ok(
     canonicalUrbanCapacityFn.includes('countUrbanRes4HexesInRes1Hex(h3Index)'),

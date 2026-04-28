@@ -57,41 +57,41 @@ air: 30,
  */
 export const MAX_UNITS_PER_TYPE: Readonly<Record<BuildUnitType, number>> = {
     /**
-   * Documents the object literal property `infantry` (infantry: 6).
+   * Documents the object literal property `infantry` (infantry: 12).
 
    * Purpose: Supports maintainability by documenting why `infantry` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-infantry: 6,
+infantry: 12,
     /**
-   * Documents the object literal property `armor` (armor: 4).
+   * Documents the object literal property `armor` (armor: 8).
 
    * Purpose: Supports maintainability by documenting why `armor` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-armor: 4,
+armor: 8,
     /**
-   * Documents the object literal property `naval` (naval: 4).
+   * Documents the object literal property `naval` (naval: 8).
 
    * Purpose: Supports maintainability by documenting why `naval` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-naval: 4,
+naval: 8,
     /**
-   * Documents the object literal property `air` (air: 3).
+   * Documents the object literal property `air` (air: 6).
 
    * Purpose: Supports maintainability by documenting why `air` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-air: 3,
+air: 6,
 };
 
 /**

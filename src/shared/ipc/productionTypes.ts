@@ -1,12 +1,34 @@
 /**
- * Documents the `BuildUnitType` type alias (export type BuildUnitType).
-
- * Purpose: Supports maintainability by documenting why `BuildUnitType` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Canonical deployment / build-queue iteration order: infantry, armor, naval, air.
+ *
+ * Purpose: Single source for cap ordering, availability filters, deployment UI, and OpenRouter tool enums.
+ * When to use: Spread or copy when a mutable `BuildUnitType[]` is required; use `BuildUnitType` for typed elements.
+ * Expected outcome: All game surfaces that list types in this order stay aligned.
  * Exceptions: None.
  */
-export type BuildUnitType = 'infantry' | 'armor' | 'naval' | 'air';
+export const ALL_BUILD_UNIT_TYPES = ['infantry', 'armor', 'naval', 'air'] as const;
+
+/**
+ * Union of deployable unit kinds used in production queues and deployment caps.
+ *
+ * Purpose: Typed alternative to raw strings for queue rows, IPC payloads, and DB columns.
+ * When to use: Prefer over `string` wherever the value must be one of the four buildable types.
+ * Expected outcome: Compile-time exhaustiveness when switching on `BuildUnitType`.
+ * Exceptions: None.
+ */
+export type BuildUnitType = (typeof ALL_BUILD_UNIT_TYPES)[number];
+
+/**
+ * Narrows unknown or stringly-typed values (JSON, tools, IPC) to `BuildUnitType`.
+ *
+ * Purpose: Avoid duplicated string equality chains when validating external input.
+ * When to use: Guards before indexing cap maps or queue operations keyed by unit type.
+ * Expected outcome: TypeScript narrows `value` to `BuildUnitType` when `true`.
+ * Exceptions: None; returns `false` for any non-matching value.
+ */
+export function isBuildUnitType(value: unknown): value is BuildUnitType {
+  return value === 'infantry' || value === 'armor' || value === 'naval' || value === 'air';
+}
 
 /**
  * Documents the `Res1ProductionContextSnapshot` interface as a named contract surface (export interface Res1ProductionContextSnapshot).

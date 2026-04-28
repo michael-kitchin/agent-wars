@@ -428,11 +428,11 @@ export async function requestOrdersFlow(
   logDebug('openRouter requestOrders: starting tool loop', { turnNumber: state.turnNumber });
 
   /**
-   * Tactical consultations often emit very large `orders[]` (many sub-units × multi-line JSON objects).
-   * When `max_tokens` is too low, the provider stops mid-JSON (`finish_reason: length`), `JSON.parse` fails, and repair also truncates if its budget is small.
+   * Both tactical and strategic final-json passes can emit large `orders[]` (many units + subscriptions + production).
+   * Keeping completion/repair budgets aligned avoids `finish_reason: length` mid-JSON, which breaks parsing and spams repair attempts.
    */
-  const completionMaxTokens = tacticalBattle ? 8192 : 2048;
-  const repairMaxTokens = tacticalBattle ? 8192 : 2048;
+  const completionMaxTokens = 8192;
+  const repairMaxTokens = 8192;
   logDebug('openRouter requestOrders: completion token budgets', {
     tacticalAiBattle: tacticalBattle?.battleId ?? null,
     completionMaxTokens,

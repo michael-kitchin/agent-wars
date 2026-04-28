@@ -699,7 +699,7 @@ export function executePlanRouteWithSession(
     hexSet: session.hexSet,
     resolveToH3: session.resolveToH3,
     logUnitNotFound: (missingUnitId) => {
-      logError('tool1Pathfinding executePlanRoute: unit not found', missingUnitId);
+      logDebug('tool1Pathfinding executePlanRoute: unit not found (invalid id or not in snapshot)', { missingUnitId });
     },
     logUnitOffMap: (offMapUnitId) => {
       logError('tool1Pathfinding executePlanRoute: unit not on map', offMapUnitId);
