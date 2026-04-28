@@ -10,41 +10,41 @@ import type { BuildUnitType } from './ipcTypes';
  */
 export const UNIT_COST_BY_TYPE: Readonly<Record<BuildUnitType, number>> = {
     /**
-   * Documents the object literal property `infantry` (infantry: 10).
+   * Documents the object literal property `infantry` (infantry: 20).
 
    * Purpose: Supports maintainability by documenting why `infantry` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-infantry: 10,
+infantry: 20,
     /**
-   * Documents the object literal property `armor` (armor: 20).
+   * Documents the object literal property `armor` (armor: 40).
 
    * Purpose: Supports maintainability by documenting why `armor` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-armor: 20,
+armor: 40,
     /**
-   * Documents the object literal property `naval` (naval: 50).
+   * Documents the object literal property `naval` (naval: 100).
 
    * Purpose: Supports maintainability by documenting why `naval` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-naval: 50,
+naval: 100,
     /**
-   * Documents the object literal property `air` (air: 30).
+   * Documents the object literal property `air` (air: 60).
 
    * Purpose: Supports maintainability by documenting why `air` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-air: 30,
+air: 60,
 };
 
 /**

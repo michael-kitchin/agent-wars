@@ -371,7 +371,7 @@ function testHomeRegionVisibilityAndInitialControlContracts(gameDb: typeof impor
     const intersectingHexes = new Set(humanState.intersectingHomeRegionHexes ?? []);
     const humanVisible = new Set(humanState.visibleHexes ?? []);
     const opponentVisible = new Set(opponentState.visibleHexes ?? []);
-    const controlsByHex = new Map(gameDb.listAllHexControls().map((row) => [row.h3Index, row.controllerPlayerId]));
+    const controlsByHex = gameDb.getHexControlMap();
 
     for (const h3Index of humanHomeHexes) {
       assert.ok(humanVisible.has(h3Index), `expected human home-region hex to remain visible: ${h3Index}`);

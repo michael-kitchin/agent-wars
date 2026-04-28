@@ -22,7 +22,7 @@ Implement a reliable region-vs-region scenario flow where human and AI each sele
 5. Spawn seeding best-effort constrained to selected home regions with deterministic substitution rules.
 6. Scenario win condition:
    - control all hexes intersecting opponent home region **or**
-   - destroy all opponent units.
+   - eliminate all urban production (res4 urban hexes aggregated across that opponent home region), while your own home region still has at least one urban cell — strategic elimination of all enemy units alone is **not** a victory condition (units can be rebuilt while home hexes remain).
 7. Persistent dual home-region map outlines:
    - always visible, independent of fog and control.
    - outline individual region hexes using player-color primary stroke with fine black edging for contrast.
@@ -47,7 +47,7 @@ Implement a reliable region-vs-region scenario flow where human and AI each sele
    - no-land case: replace unplaceable land units with an equal count of naval units.
    - enforce unit caps during substitution; drop excess units deterministically (infantry is lowest priority / first dropped among land units).
 7. Scenario permits overlapping/adjacent starts (same region or neighboring regions) without failure.
-8. Match win objective is evaluated once at end of turn; winner is side that controls all hexes intersecting opponent region, or whose opponent has zero units.
+8. Match win objective is evaluated once at end of turn; winner is the side that fully controls the opponent home region (all intersecting res1 hexes), or that has eliminated all enemy-home urban production while their own home still has urban capacity — not “last standing units.”
 9. Home-region outlines for both sides remain visible regardless of fog setting and hex visibility/control state.
 10. Outline styling remains legible on all terrain through black edging and player-color core stroke, with mixed-region gray fallback when both sides choose the same region.
 11. AI briefing/prompt explicitly states scenario objective and identifies both home regions.
@@ -103,8 +103,8 @@ Implement a reliable region-vs-region scenario flow where human and AI each sele
 5. Apply substitutions in stable unit-id order for reproducible outcomes.
 6. Keep substitutions deterministic, side-local, and clearly logged.
 7. Add scenario-aware win evaluator:
-   - eliminate-opponent-units path,
-   - opponent-home-region-total-control path (evaluated at end of turn only).
+   - opponent-home-region-total-control path (evaluated at end of turn only),
+   - opponent-home-region urban elimination path (sum of `urbanHexCount` over opponent home res1 hexes is zero while friendly home sum remains positive; mutual zero urban yields no urban-only winner until control resolves).
 8. Ensure control criterion uses region hex set intersection, not current visibility.
 
 ### 3.4 Renderer integration

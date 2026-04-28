@@ -3,7 +3,6 @@
  */
 
 import {
-  dbGetAll,
   dbRun,
   saveDatabase,
   refreshFogOfWarIntelFromCurrentState,
@@ -238,12 +237,8 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     .filter((t) => !finalUnits.some((u) => u.player === 'human' && u.h3Index === t.h3Index))
     .map((t) => t.h3Index);
 
-  const humanCount = dbGetAll<{ c: number }>('SELECT COUNT(*) AS c FROM units WHERE player = ?', ['human'])[0]?.c ?? 0;
-  const opponentCount = dbGetAll<{ c: number }>('SELECT COUNT(*) AS c FROM units WHERE player = ?', ['opponent'])[0]?.c ?? 0;
   const regionWinner = evaluateRegionControlWinnerAtEndOfTurn();
   if (regionWinner) setGameOver(regionWinner);
-  else if (humanCount === 0 && opponentCount > 0) setGameOver('opponent');
-  else if (opponentCount === 0 && humanCount > 0) setGameOver('human');
 
   dbRun('DELETE FROM pending_orders');
   dbRun('DELETE FROM pending_ranged_orders');

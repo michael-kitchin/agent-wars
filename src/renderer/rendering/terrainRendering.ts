@@ -9,8 +9,7 @@ import { getHexBoundaryLatLngForLeafletOverlay } from '../map/hexGrid';
 import { getActiveHexStrokeStyle, fillHexTerrain } from './terrainVisualStyles';
 import { withOpacityHex } from './canvasColor';
 import { drawTerrainInfrastructureGlyphs, RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE } from './terrainInfrastructureOverlay';
-import { DETAIL_H3_RESOLUTION } from '../core/constants';
-import { MULTI_PLAYER_FILL, PLAYER_COLORS } from '../core/constants';
+import { DETAIL_H3_RESOLUTION, MULTI_PLAYER_FILL, PLAYER_COLORS } from '../core/constants';
 import { getLeafletGlobal, hexCenterPx } from '../map/mapUtils';
 import {
   projectHexBoundaryToContainerPoints,
@@ -146,7 +145,7 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
     ctx.stroke();
     if (S.selectedHexIndex === hx.h3Index) {
       drawClosedPath();
-      ctx.strokeStyle = '#2e5a7b';
+      ctx.strokeStyle = PLAYER_COLORS.human;
       ctx.lineWidth = Math.max(1.8, 2.2 * zoomStrokeScale);
       ctx.stroke();
     }
@@ -237,8 +236,8 @@ export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): v
   const L = getLeafletGlobal();
   const zoom = typeof map.getZoom === 'function' ? map.getZoom() : 4;
   const zoomScale = Math.max(0.88, Math.min(1.22, 1.22 - ((zoom - 2) * (0.32 / 8))));
-  const humanColor = PLAYER_COLORS.human ?? '#2e5a7b';
-  const aiColor = PLAYER_COLORS.opponent ?? '#7b4a2e';
+  const humanColor = PLAYER_COLORS.human ?? '#2e7548';
+  const aiColor = PLAYER_COLORS.opponent ?? '#8e4d22';
   const intersectionHexes = new Set(
     state.intersectingHomeRegionHexes ??
       computeIntersectingHomeRegionHexes(state.humanHomeRegionHexes ?? [], state.aiHomeRegionHexes ?? [])
@@ -248,7 +247,15 @@ export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): v
       computeContestedHomeRegionHexes(state.units, [...(state.humanHomeRegionHexes ?? []), ...(state.aiHomeRegionHexes ?? [])])
   );
   const controlByHex = buildControlByHex(state);
-  const resolveHexOutlineColor = (h3Index: string, fallbackColor: string): string => {
+  /**
+   * Resolves the stroke color for one strategic hex in a home-region outline pass.
+   *
+   * Purpose: Colors each border by **which side’s home region** is being outlined (`regionBorderColor`), not by
+   * territorial control — control-based coloring made AI-home borders look human-colored (and vice versa).
+   * When to use: Only from `drawScenarioHomeRegionOutlines` when tracing `humanHomeRegionHexes` vs `aiHomeRegionHexes`.
+   * Expected outcome: Intersection/contested hexes use neutral grey; all other hexes use that pass’s home-region hue.
+   */
+  const resolveHexOutlineColor = (h3Index: string, regionBorderColor: string): string => {
     const outlineState = classifyHomeRegionOutlineState(
       h3Index,
       intersectionHexes,
@@ -256,9 +263,7 @@ export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): v
       controlByHex.get(h3Index)
     );
     if (outlineState === 'intersection' || outlineState === 'contested') return MULTI_PLAYER_FILL;
-    if (outlineState === 'controlledByHuman') return humanColor;
-    if (outlineState === 'controlledByOpponent') return aiColor;
-    return fallbackColor;
+    return regionBorderColor;
   };
   const drawRegion = (hexes: string[] | undefined, fallbackColor: string): void => {
     if (!Array.isArray(hexes) || hexes.length <= 0) return;
@@ -271,9 +276,9 @@ export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): v
       const outlineColor = resolveHexOutlineColor(h3Index, fallbackColor);
       strokeDualClosedPolygon(ctx, pts, {
         underStrokeColor: 'rgba(0, 0, 0, 0.25)',
-        underStrokeWidth: Math.max(1.2, 2.2 * zoomScale),
+        underStrokeWidth: Math.max(1.2, 2.2 * zoomScale) * 1.25,
         topStrokeColor: withOpacityHex(outlineColor, 0.5),
-        topStrokeWidth: Math.max(0.75, 1.25 * zoomScale) * 0.75 * 1.5,
+        topStrokeWidth: Math.max(0.75, 1.25 * zoomScale) * 0.75 * 1.5 * 1.25,
       });
     }
   };

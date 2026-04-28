@@ -1,7 +1,7 @@
 import { escapeHtmlForOrderPreviewTooltip } from './orderPreviewSlowTerrainTooltip';
 
 /**
- * Pure copy + classification for “Blocked: …” hover hints during march / ranged order preview.
+ * Pure copy + classification for “Blocked: …” hover hints during march / ranged / air-strike order preview.
  *
  * Purpose: Keeps renderer and any future callers aligned on how validation `reason` / `invalidReason` strings map to
  * short user-facing labels without importing renderer-only modules.
@@ -50,32 +50,73 @@ export function titleCaseTerrainKindToken(kind: string): string {
 /**
  * Derives the ranged-validation hover string from a main-process `validateGroupRangedTarget` failure reason.
  *
- * Purpose: Ranged failures are already phrased as range vs mountain LOS in tactical and strategic validators.
+ * Purpose: Ranged failures are phrased as range vs mountain LOS vs empty target; range uses `formatTargetOutOfRangeReason` / `Target out of range.` across unit types.
  * When to use: Renderer hover while `rangedModeActive` and grouped validation failed.
- * Expected outcome: `Blocked: Range`, `Blocked: Mountain`, `Blocked: No Target` when there is no valid enemy target, or `null` for unrelated failures.
+ * Expected outcome: Any out-of-range failure → `Blocked: Range`; mountain LOS → `Blocked: Mountain`; no enemies → `Blocked: No Target`; else `null`.
  * Exceptions: None.
  */
 export function blockingHoverMessageFromRangedReason(reason: string): string | null {
   const r = reason.toLowerCase();
-  if (r.includes('target out of range') || r.includes('out of ferry range')) return 'Blocked: Range';
+  // Strategic `formatTargetOutOfRangeReason`, tactical `Target out of range.`, and any future copy using "out of range".
+  // Keep `out of ferry range` separately — it does not contain the contiguous substring `out of range`.
+  if (r.includes('out of range') || r.includes('out of ferry range')) return 'Blocked: Range';
   if (r.includes('line of sight blocked') || r.includes('blocked by mountains')) return 'Blocked: Mountain';
   if (r.includes('no enemy') || r.includes('no eligible')) return 'Blocked: No Target';
   return null;
 }
 
 /**
- * Derives the air-strike validation hover string from `validateGroupAirStrikeTarget` failure reasons (strategic range only).
+ * Strips a single leading `Label: ` prefix from validator copy so pattern matching works for grouped `Unit: reason` lines.
  *
- * Purpose: Air strikes do not use terrain-block hover copy; strategic strikes still fail on `isWithinAirStrikeGridRange`
- * with the same `formatTargetOutOfRangeReason` phrasing as other unit types.
+ * Purpose: `validateGroupAirStrikeTarget` and similar prepend a per-unit display label; hover hints classify the failure, not the label.
+ * When to use: First step inside `blockingHoverMessageFromAirStrikeReason` before lowercase keyword checks.
+ * Expected outcome: Trimmed tail after the first `": "` when present; otherwise the original trimmed string.
+ * Exceptions: None.
+ */
+function stripLeadingUnitLabelForStrikeReason(reason: string): string {
+  const t = reason.trim();
+  const m = t.match(/^[^:]+:\s+(.+)$/s);
+  return m?.[1]?.trim() ? m[1]!.trim() : t;
+}
+
+/**
+ * Derives the air-strike validation hover string from `validateGroupAirStrikeTarget` failure reasons (strategic + tactical).
+ *
+ * Purpose: Surfaces `Blocked: …` for every substantive strike failure so hover matches invalid strike previews (not only range).
  * When to use: Renderer hover while `airStrikeModeActive` and grouped strike validation failed.
- * Expected outcome: `Blocked: Range` when the reason is out-of-strike-range; `null` for all other failures (footprint, payload, etc.).
+ * Expected outcome: Short `Blocked: …` bucket per failure kind; `null` only for suppressed infra noise (e.g. DB unavailable).
  * Exceptions: None.
  */
 export function blockingHoverMessageFromAirStrikeReason(reason: string): string | null {
-  const r = reason.toLowerCase();
-  if (r.includes('target out of range')) return 'Blocked: Range';
-  return null;
+  const raw = reason.trim();
+  if (!raw) return null;
+  const r = raw.toLowerCase();
+  if (r.includes('database not initialized')) return null;
+
+  const tail = stripLeadingUnitLabelForStrikeReason(raw).toLowerCase();
+
+  if (tail.includes('target out of range') || r.includes('target out of range')) return 'Blocked: Range';
+
+  if (
+    tail.includes('must be based at an intact airport') ||
+    tail.includes('based at an intact airport to strike')
+  ) {
+    return 'Blocked: No base airport';
+  }
+  if (tail.includes('outside the tactical battle footprint')) return 'Blocked: Unit outside battle area';
+  if (tail.includes('target is outside the tactical battle')) return 'Blocked: Target outside battle';
+  if (tail.includes('contested strategic hex')) return 'Blocked: Strike wrong hex';
+  if (tail.includes('unit not in tactical battle')) return 'Blocked: Unit not in battle';
+  if (tail.includes('only air units can strike')) return 'Blocked: Not an air unit';
+  if (tail.includes('no enemy units')) return 'Blocked: No enemies at target';
+  if (tail.includes('no urban infrastructure')) return 'Blocked: No urban at target';
+  if (tail.includes('target hex has no airport')) return 'Blocked: No airport at target';
+  if (tail.includes('target hex has no seaport')) return 'Blocked: No seaport at target';
+  if (tail.includes('not on map')) return 'Blocked: Hex not on map';
+  if (tail.includes('only air units can execute strikes')) return 'Blocked: Not an air unit';
+  if (tail.includes('must belong to')) return 'Blocked: Wrong owner';
+
+  return 'Blocked: Cannot strike here';
 }
 
 /**
@@ -99,6 +140,9 @@ export function blockingHoverMessageFromMarchInvalidReason(
     return null;
   }
   if (low.includes('out of range') || low.includes('out of ferry range')) return 'Blocked: Range';
+  if (low.includes('ferry destination must be a human-controlled airport')) return 'Blocked: Invalid';
+  if (low.includes('ferry destination must have an intact airport')) return 'Blocked: Invalid';
+  if (low.includes('air units do not use tactical march')) return 'Blocked: Air — use strike mode or ferry (dbl-click)';
   if (low.includes('line of sight blocked') || low.includes('blocked by mountains')) return 'Blocked: Mountain';
   if (low.includes('land, coastal, or wetlands')) return 'Blocked: Coastal, Land, Wetlands';
   if (low.includes('mixed land/naval')) return 'Blocked: Coastal';

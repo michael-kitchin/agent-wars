@@ -23,7 +23,7 @@ import {
   getMovementOrderInstruction,
 } from './promptText';
 import { ALL_BUILD_UNIT_TYPES } from '../../shared/ipc/productionTypes';
-import { buildPrimaryScenarioGoalOpeningClause, buildRegionVsRegionScenarioObjectiveBlock } from './scenarioGoals';
+import { buildRegionVsRegionScenarioObjectiveBlock, buildWinConditionReminderClause } from './scenarioGoals';
 import {
   NAVAL_MOVEMENT_PROMPT_RULE,
   NAVAL_PLAN_ROUTE_LAND_TARGET_HINT,
@@ -57,20 +57,20 @@ function formatHomeRegionHexCodesForPrompt(h3Indexes: readonly string[]): string
   return parts.join(', ');
 }
 
-/** Shared coaching block appended after priorities in both strategic and tactical system prompts. */
+/** Shared strategy coaching block; strategic prompt also includes `COACHING_STRATEGIC_PRIORITIES` (goals) before this. */
 const COACHING_STRATEGY_BLOCK = `- Your strategy is:
     (1) Use speed, surprise, and initiative to break the enemy's cohesion and morale
     (2) Attack the enemy's weaknesses (gaps) and avoid their strengths (surfaces)
     (3) Create maximum disruption with minimum force`;
 
-const COACHING_STRATEGIC_PRIORITIES = `- Your priorities are:
-    (1) Expand territorial control toward known and likely enemy-occupied hexes
-    (2) Engage enemy units and destroy them
-    (3) Disperse your units to maximize visibility
-    (4) Maximize your own unit production
-    (5) Destroy the enemy's production capacity, airports, and seaports`;
+const COACHING_STRATEGIC_PRIORITIES = `- Your goals are:
+    (1) Engage enemy forces to reduce their combat effectiveness
+    (2) Disperse your units to maximize visibility
+    (3) Maximize your own unit production
+    (4) Protect your home region's production capacity
+    (5) Degrade or eliminate the enemy home region's urban production capacity`;
 
-const COACHING_TACTICAL_PRIORITY = `- Your priority is to engage enemy units and destroy them`;
+const COACHING_TACTICAL_PRIORITY = `- Your priority is to engage enemy forces and inflict losses when advantageous`;
 
 const STRATEGIC_CONTEXT_OPENING =
   '- At least one enemy unit remains in play, and the human player is actively searching for your forces with intent to destroy them.';
@@ -257,10 +257,11 @@ ${COACHING_STRATEGY_BLOCK}
     includeMemoryUpdates: flags.memoryEnabled,
     includeProductionOrders: flags.productionEnabled,
   });
-  const scoutingDirective = humanRoster.length === 0
-    ? ' No human units are currently observed: prioritize scouting this turn by moving units along plausible approach routes to reveal enemy positions; do not remain static unless required for immediate defense.'
-    : '';
-  const primaryGoal = buildPrimaryScenarioGoalOpeningClause();
+  const scoutingDirective =
+    humanRoster.length === 0
+      ? '\n\nNo human units are currently observed: prioritize scouting this turn by moving units along plausible approach routes to reveal enemy positions; do not remain static unless required for immediate defense.'
+      : '';
+  const winConditionReminder = buildWinConditionReminderClause();
   const latLngBlock =
     coordinateContext.mode === 'tactical'
       ? buildTacticalLatLngPreamble(LATLNG_DECIMAL_PLACES)
@@ -269,7 +270,9 @@ ${COACHING_STRATEGY_BLOCK}
     coordinateContext.mode === 'tactical'
       ? 'Infantry may use ranged_attack only at tactical res4 range 1 (adjacent res4 hex on the tactical map); use movement and melee when that is not enough.'
       : 'Infantry may use ranged_attack only at strategic range 1 (adjacent res1 hex); use movement and melee when that is not enough.';
-  const prompt = `You are the enemy commander in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}. ${primaryGoal} Move toward observed enemy forces to bring them into ranged, melee, or air-strike range as rules allow; do not stay passive.${scoutingDirective}${warning}
+  const prompt = `You are the enemy commander in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}.
+
+${winConditionReminder}${scoutingDirective}${warning}
 
 ${latLngBlock}
 

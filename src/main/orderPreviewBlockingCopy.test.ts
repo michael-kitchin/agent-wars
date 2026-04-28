@@ -26,44 +26,77 @@ test('composeResolutionMapToastBullets keeps fallback when casualty outcomes pre
   assert.deepEqual(composeResolutionMapToastBullets([], fb), fb);
 });
 
-test('blockingHoverMessageFromRangedReason', () => {
-  assert.equal(blockingHoverMessageFromRangedReason('Infantry: Target out of range (infantry range 1)'), 'Blocked: Range');
-  assert.equal(blockingHoverMessageFromRangedReason('Naval: Line of sight blocked by mountains.'), 'Blocked: Mountain');
-  assert.equal(blockingHoverMessageFromRangedReason('Target hex has no enemy units'), 'Blocked: No Target');
-  assert.equal(blockingHoverMessageFromRangedReason('Naval: Target hex has no enemy units'), 'Blocked: No Target');
-  assert.equal(blockingHoverMessageFromRangedReason('Target hex has no enemy'), 'Blocked: No Target');
-  assert.equal(blockingHoverMessageFromRangedReason('No tactical battle'), null);
+const rangedBlockingCases: { input: string; expected: string | null }[] = [
+  { input: 'Infantry: Target out of range (infantry range 1)', expected: 'Blocked: Range' },
+  { input: 'Naval: Target out of range (naval range 2)', expected: 'Blocked: Range' },
+  { input: 'Armor: Target out of range.', expected: 'Blocked: Range' },
+  { input: 'Naval: Line of sight blocked by mountains.', expected: 'Blocked: Mountain' },
+  { input: 'Target hex has no enemy units', expected: 'Blocked: No Target' },
+  { input: 'Naval: Target hex has no enemy units', expected: 'Blocked: No Target' },
+  { input: 'Target hex has no enemy', expected: 'Blocked: No Target' },
+  { input: 'No tactical battle', expected: null },
+];
+
+test('blockingHoverMessageFromRangedReason (table)', () => {
+  for (const { input, expected } of rangedBlockingCases) {
+    assert.equal(blockingHoverMessageFromRangedReason(input), expected, input);
+  }
 });
 
-test('blockingHoverMessageFromMarchInvalidReason', () => {
-  assert.equal(blockingHoverMessageFromMarchInvalidReason('No valid tactical route', 'mountain'), 'Blocked: Mountain');
-  assert.equal(blockingHoverMessageFromMarchInvalidReason('Destination out of ferry range (4).', null), 'Blocked: Range');
-  assert.equal(
-    blockingHoverMessageFromMarchInvalidReason(
-      'Land units cannot move directly from one water or arctic hex to another.',
-      'plains'
-    ),
-    'Blocked: Arctic, Water'
-  );
-  assert.equal(
-    blockingHoverMessageFromMarchInvalidReason('Mixed land/naval stacks can only move to coastal hexes.', 'mountain'),
-    'Blocked: Coastal'
-  );
-  assert.equal(
-    blockingHoverMessageFromMarchInvalidReason(
-      'Land units must move to land, coastal, or wetlands hexes',
-      'desert'
-    ),
-    'Blocked: Coastal, Land, Wetlands'
-  );
+const marchBlockingCases: { reason: string; terrainKind: string | null; expected: string | null }[] = [
+  { reason: 'No valid tactical route', terrainKind: 'mountain', expected: 'Blocked: Mountain' },
+  { reason: 'Destination out of ferry range (4).', terrainKind: null, expected: 'Blocked: Range' },
+  {
+    reason: 'Ferry destination must be a human-controlled airport hex.',
+    terrainKind: null,
+    expected: 'Blocked: Invalid',
+  },
+  {
+    reason: 'Ferry destination must have an intact airport.',
+    terrainKind: null,
+    expected: 'Blocked: Invalid',
+  },
+  {
+    reason: 'Air units do not use tactical march',
+    terrainKind: 'plains',
+    expected: 'Blocked: Air — use strike mode or ferry (dbl-click)',
+  },
+  {
+    reason: 'Land units cannot move directly from one water or arctic hex to another.',
+    terrainKind: 'plains',
+    expected: 'Blocked: Arctic, Water',
+  },
+  {
+    reason: 'Mixed land/naval stacks can only move to coastal hexes.',
+    terrainKind: 'mountain',
+    expected: 'Blocked: Coastal',
+  },
+  {
+    reason: 'Land units must move to land, coastal, or wetlands hexes',
+    terrainKind: 'desert',
+    expected: 'Blocked: Coastal, Land, Wetlands',
+  },
+];
+
+test('blockingHoverMessageFromMarchInvalidReason (table)', () => {
+  for (const { reason, terrainKind, expected } of marchBlockingCases) {
+    assert.equal(blockingHoverMessageFromMarchInvalidReason(reason, terrainKind), expected, reason);
+  }
 });
 
-test('blockingHoverMessageFromAirStrikeReason is range-only', () => {
-  assert.equal(
-    blockingHoverMessageFromAirStrikeReason('Target out of range (air range 3)'),
-    'Blocked: Range'
-  );
-  assert.equal(blockingHoverMessageFromAirStrikeReason('Target hex has no urban infrastructure'), null);
+const airStrikeBlockingCases: { input: string; expected: string | null }[] = [
+  { input: 'Alpha: Target out of range (air range 3)', expected: 'Blocked: Range' },
+  { input: 'Target out of range (air range 3)', expected: 'Blocked: Range' },
+  { input: 'Alpha: Target hex has no enemy units', expected: 'Blocked: No enemies at target' },
+  { input: 'Target is outside the tactical battle.', expected: 'Blocked: Target outside battle' },
+  { input: 'Database not initialized', expected: null },
+  { input: 'Odd future reason', expected: 'Blocked: Cannot strike here' },
+];
+
+test('blockingHoverMessageFromAirStrikeReason (table)', () => {
+  for (const { input, expected } of airStrikeBlockingCases) {
+    assert.equal(blockingHoverMessageFromAirStrikeReason(input), expected, input);
+  }
 });
 
 test('blockingHoverMessageHtmlFromPlainMessage bolds Blocked and escapes suffix', () => {

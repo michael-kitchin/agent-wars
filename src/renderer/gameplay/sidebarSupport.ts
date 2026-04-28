@@ -57,14 +57,16 @@ syncUiAfterSelectionChange: () => void;
  */
 interface SyncUiDeps {
     /**
-   * Specifies the contract for the `refreshHoverRoutePreview` member (refreshHoverRoutePreview: () => Promise<void>;).
+   * Specifies the contract for the `refreshHoverRoutePreview` member (refreshHoverRoutePreview: (options?: import('./tacticalOrders').RefreshHoverRoutePreviewOptions) => Promise<void>;).
 
-   * Contract: Describes stable behavior for callers of `refreshHoverRoutePreview` in this codebase.
+   * Contract: Selection-driven refreshes omit options so blocking tooltips stay hover-only.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-refreshHoverRoutePreview: () => Promise<void>;
+refreshHoverRoutePreview: (
+    options?: import('./tacticalOrders').RefreshHoverRoutePreviewOptions
+  ) => Promise<void>;
     /**
    * Specifies the contract for the `updateSidebar` member (updateSidebar: () => void;).
 

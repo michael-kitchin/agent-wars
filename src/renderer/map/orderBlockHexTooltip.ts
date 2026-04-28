@@ -8,22 +8,20 @@ import {
 } from '../../shared/orderPreviewBlockingCopy';
 import type { HumanOrderGroupPreviewResult } from '../../shared/ipc/humanOrderPreviewTypes';
 import { clearTerrainTooltipTimer, hideTerrainTooltipVisual } from './terrainTooltipRes1State';
+import { createTransientPointerTooltipTtl } from './transientPointerTooltipTtl';
 
-let orderBlockHideTimer: ReturnType<typeof setTimeout> | null = null;
+const orderBlockTtl = createTransientPointerTooltipTtl(ORDER_BLOCK_HEX_TOOLTIP_TTL_MS);
 
 /**
  * Clears the auto-dismiss timer for the order-blocking hover tooltip without hiding the element.
  *
  * Purpose: Lets `showOrderBlockHexTooltip` replace an existing transient without stacking timers.
  * When to use: Immediately before scheduling a new TTL or when tearing down hover state globally.
- * Expected outcome: `orderBlockHideTimer` is null after this returns.
+ * Expected outcome: No pending expiry callback remains on this module's TTL handle.
  * Exceptions: None.
  */
 function clearOrderBlockTooltipTimer(): void {
-  if (orderBlockHideTimer !== null) {
-    clearTimeout(orderBlockHideTimer);
-    orderBlockHideTimer = null;
-  }
+  orderBlockTtl.clear();
 }
 
 /**
@@ -35,11 +33,7 @@ function clearOrderBlockTooltipTimer(): void {
  * Exceptions: None.
  */
 function scheduleOrderBlockTooltipTtl(): void {
-  clearOrderBlockTooltipTimer();
-  orderBlockHideTimer = setTimeout(() => {
-    orderBlockHideTimer = null;
-    hideOrderBlockHexTooltip();
-  }, ORDER_BLOCK_HEX_TOOLTIP_TTL_MS);
+  orderBlockTtl.schedule(() => hideOrderBlockHexTooltip());
 }
 
 /**
@@ -143,7 +137,7 @@ export function resolveOrderBlockHexTooltipMessage(
  * Shows or hides `#order-block-tooltip` near the last pointer position, suppressing the terrain tooltip while visible.
  *
  * Purpose: Gives immediate “Blocked: …” feedback for invalid march/ranged hovers without waiting for the terrain dwell delay.
- * When to use: End of `refreshHoverRoutePreview` when `resolveOrderBlockHexTooltipMessage` returns non-null, or with `null` to clear.
+ * When to use: End of `refreshHoverRoutePreview` when `resolveOrderBlockHexTooltipMessage` returns non-null and the refresh used `{ allowBlockingOrderTooltip: true }` (map `pointermove` only), or with `null` to clear.
  * Expected outcome: HTML tooltip (bold `Blocked:` only) follows `S.lastPointerClientX/Y`, auto-hides after `ORDER_BLOCK_HEX_TOOLTIP_TTL_MS`.
  * Exceptions: Missing DOM nodes no-op without throwing.
  */

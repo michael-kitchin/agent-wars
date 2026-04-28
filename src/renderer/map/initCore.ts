@@ -107,14 +107,16 @@ initNewGameButton: () => void;
    */
 updateReadyButtonState: () => void;
     /**
-   * Specifies the contract for the `refreshHoverRoutePreview` member (refreshHoverRoutePreview: () => Promise<void>;).
+   * Specifies the contract for the `refreshHoverRoutePreview` member (refreshHoverRoutePreview: (options?: import('../gameplay/tacticalOrders').RefreshHoverRoutePreviewOptions) => Promise<void>;).
 
-   * Contract: Describes stable behavior for callers of `refreshHoverRoutePreview` in this codebase.
+   * Contract: Omit options unless forwarding map hover-only blocking tooltip intent.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-refreshHoverRoutePreview: () => Promise<void>;
+refreshHoverRoutePreview: (
+    options?: import('../gameplay/tacticalOrders').RefreshHoverRoutePreviewOptions
+  ) => Promise<void>;
     /**
    * Specifies the contract for the `applyGameStateSnapshot` member (applyGameStateSnapshot: ( nextState: GameStateSnapshot, options?: { refreshStandingOrders?: boolean; updateGameStateSidebarUi?: boolean;).
 

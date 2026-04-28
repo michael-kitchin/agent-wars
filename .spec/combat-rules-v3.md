@@ -32,10 +32,10 @@ The game has four unit types. Unit caps are 10 infantry, 5 armor, 5 naval, and 3
 
 | Unit type | Move | Attack | Defense | Range | Domain | Cost |
 |-----------|------|--------|---------|-------|--------|------|
-| **Infantry** | 1 | 1 | 2 | 0 (melee only) | Land | 10 urban hexes |
-| **Armor** | 2 | 3 | 2 | 1 (adjacent hex) | Land | 20 urban hexes |
-| **Naval** | 2 | 2 | 2 | 2 hexes | Water | 50 urban hexes |
-| **Air** | 0 (ferry only) | 3 | 1 | 3 (strike radius) | Air | 30 urban hexes |
+| **Infantry** | 1 | 1 | 2 | 0 (melee only) | Land | 20 urban hexes |
+| **Armor** | 2 | 3 | 2 | 1 (adjacent hex) | Land | 40 urban hexes |
+| **Naval** | 2 | 2 | 2 | 2 hexes | Water | 100 urban hexes |
+| **Air** | 0 (ferry only) | 3 | 1 | 3 (strike radius) | Air | 60 urban hexes |
 
 - **Range 0:** Unit only participates in same-hex (melee) combat.
 - **Range 1:** Unit can attack an enemy in any **adjacent** hex (H3 grid distance 1; includes land–water boundary; see §6 for coastal bombardment).
@@ -44,9 +44,9 @@ The game has four unit types. Unit caps are 10 infantry, 5 armor, 5 naval, and 3
 - **Move 0 (air):** Air units have no incremental movement. They reposition via ferry orders (up to 4 hexes between owned airports, one action per turn — see §4.4). Ferry range (4) is longer than strike/visibility range (3), reflecting that a player always knows where their own airports are — ferry destinations don't require air reconnaissance, just ownership.
 - **Cost:** The cost column is the total production points required to build the unit. Each res1 hex generates production points equal to its res4 urban hex count per turn. Points accumulate toward the unit cost across multiple turns; when accumulated points meet or exceed the cost, the unit spawns and excess production carries over immediately to the next unit in the queue. If the excess is sufficient to cover the next unit's cost, that unit also spawns in the same turn — a hex produces as many units per turn as its production rate and unit caps allow.
 
-  Examples: a hex with 5 urban hexes produces 1 infantry (cost 10) every 2 turns. A hex with 15 urban hexes and a seaport queues a naval unit (cost 50) followed by an infantry: the naval unit spawns on turn 4 (15 × 4 = 60 ≥ 50) with 10 points left over, which immediately covers the infantry cost (10), so both units spawn on turn 4.
+  Examples: a hex with 5 urban hexes produces one infantry (cost 20) every 4 turns. A hex with 10 urban hexes and a seaport queues a naval unit (cost 100): it spawns on turn 10 when accumulated production first reaches 100.
 
-  Air strikes that destroy urban hexes (3 res4 hexes per hit) permanently reduce the production rate. Air unit cost (30) is a starting value subject to playtesting.
+  Air strikes that destroy urban hexes (3 res4 hexes per hit) permanently reduce the production rate. Air unit cost (60) is a starting value subject to playtesting.
 
 ---
 

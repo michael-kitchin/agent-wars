@@ -3,6 +3,7 @@
  * order live in basemapProvider.ts.
  */
 
+import { ORDER_LINE_COLOR } from '../core/constants';
 import { getRasterBasemapChain, getRasterBasemapChainStartIndex } from './basemapProvider';
 import {
   WEB_MERCATOR_MAX_ABS_LAT,
@@ -430,7 +431,7 @@ export function syncMinimapViewportRect(): void {
 
   if (!viewportRect) {
     viewportRect = Lref.rectangle(mainBounds, {
-      color: '#2e5a7b',
+      color: ORDER_LINE_COLOR,
       weight: 2,
       fill: false,
       interactive: false,

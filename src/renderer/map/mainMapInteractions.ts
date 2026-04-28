@@ -70,14 +70,14 @@ shouldSuppressTerrainTooltip: () => boolean;
    */
 requestRedraw: () => void;
     /**
-   * Specifies the contract for the `refreshHoverRoutePreview` member (refreshHoverRoutePreview: () => Promise<void>;).
+   * Specifies the contract for the `refreshHoverRoutePreview` member (refreshHoverRoutePreview: (options?: import('../gameplay/tacticalOrders').RefreshHoverRoutePreviewOptions) => Promise<void>;).
 
-   * Contract: Describes stable behavior for callers of `refreshHoverRoutePreview` in this codebase.
+   * Contract: Map `pointermove` passes `{ allowBlockingOrderTooltip: true }` so `#order-block-tooltip` may show; other callers omit options.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-refreshHoverRoutePreview: () => Promise<void>;
+refreshHoverRoutePreview: (options?: import('../gameplay/tacticalOrders').RefreshHoverRoutePreviewOptions) => Promise<void>;
     /**
    * Specifies the contract for the `detailHitAtClientPixel` member (detailHitAtClientPixel: (clientX: number, clientY: number, mapHexSet: Set<string>) => string | null;).
 
@@ -491,7 +491,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
 
     S.hoveredHexH3 = hit;
     S.hoveredDetailHexH3 = detailHit;
-    void deps.refreshHoverRoutePreview();
+    void deps.refreshHoverRoutePreview({ allowBlockingOrderTooltip: true });
     deps.requestRedraw();
 
     const tooltipDelayShouldReset = S.tacticalBattleSnapshot ? hitChanged : hitChanged || detailChanged;

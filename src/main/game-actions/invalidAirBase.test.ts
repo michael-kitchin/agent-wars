@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { dbGetOne, dbRun, getGameState, setRes1InfrastructureForHex } from '../gameDb';
+import { ZERO_RES1_INFRA_COUNTS } from '../testSupport/res1TestFixtures';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import { destroyAirUnitsWithInvalidBase } from './invalidAirBase';
 
@@ -15,7 +16,7 @@ test('destroyAirUnitsWithInvalidBase retains human air on opponent hex while ene
     const landHex = state.hexes.find((hx) => hx.terrainKind !== 'water' && hx.terrain !== 'water');
     assert.ok(landHex);
     const h = landHex!.h3Index;
-    setRes1InfrastructureForHex(h, { urbanHexCount: 0, airportCount: 0, seaportCount: 0 });
+    setRes1InfrastructureForHex(h, ZERO_RES1_INFRA_COUNTS);
     dbRun('DELETE FROM units WHERE h3_index = ?', [h]);
     dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [h, 'opponent']);
     dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
@@ -47,7 +48,7 @@ test('destroyAirUnitsWithInvalidBase still removes sole stranded human air on en
     const landHex = state.hexes.find((hx) => hx.terrainKind !== 'water' && hx.terrain !== 'water');
     assert.ok(landHex);
     const h = landHex!.h3Index;
-    setRes1InfrastructureForHex(h, { urbanHexCount: 0, airportCount: 0, seaportCount: 0 });
+    setRes1InfrastructureForHex(h, ZERO_RES1_INFRA_COUNTS);
     dbRun('DELETE FROM units WHERE h3_index = ?', [h]);
     dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [h, 'opponent']);
     dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [

@@ -27,23 +27,23 @@ export const UNIT_RADIUS = 18;
  */
 export const PLAYER_COLORS: Record<string, string> = {
     /**
-   * Documents the object literal property `human` (human: '#2e5a7b').
+   * Documents the object literal property `human` (human: '#2e7548').
 
    * Purpose: Supports maintainability by documenting why `human` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-human: '#2e5a7b',
+human: '#2e7548',
     /**
-   * Documents the object literal property `opponent` (opponent: '#7b4a2e').
+   * Documents the object literal property `opponent` (opponent: '#8e4d22').
 
    * Purpose: Supports maintainability by documenting why `opponent` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-opponent: '#7b4a2e',
+opponent: '#8e4d22',
 };
 /**
  * Documents the module-scope binding `UNIT_TYPE_LABELS` (UNIT_TYPE_LABELS: Record<string, string>).
@@ -100,7 +100,7 @@ air: 'S',
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const ORDER_LINE_COLOR = '#2e5a7b';
+export const ORDER_LINE_COLOR = PLAYER_COLORS.human;
 /**
  * Documents the module-scope binding `ORDER_LINE_WIDTH` (ORDER_LINE_WIDTH).
 
@@ -147,7 +147,7 @@ export const ORDER_ARROW_SIZE = 10;
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const AI_ORDER_LINE_COLOR = '#7b4a2e';
+export const AI_ORDER_LINE_COLOR = PLAYER_COLORS.opponent;
 
 /**
  * Documents the module-scope binding `TOOLTIP_OFFSET_PX` (TOOLTIP_OFFSET_PX).

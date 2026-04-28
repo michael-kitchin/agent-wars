@@ -1,22 +1,20 @@
 import { ORDER_BLOCK_HEX_TOOLTIP_TTL_MS, TOOLTIP_OFFSET_PX } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { clearTerrainTooltipTimer, hideTerrainTooltipVisual } from './terrainTooltipRes1State';
+import { createTransientPointerTooltipTtl } from './transientPointerTooltipTtl';
 
-let slowerHideTimer: ReturnType<typeof setTimeout> | null = null;
+const slowerTtl = createTransientPointerTooltipTtl(ORDER_BLOCK_HEX_TOOLTIP_TTL_MS);
 
 /**
  * Clears the auto-dismiss timer for the “Slower: …” hover tooltip without hiding the element.
  *
  * Purpose: Prevents stacked timers when the transient message changes between pointer moves.
  * When to use: Before scheduling a new TTL or when tearing down hover state globally.
- * Expected outcome: `slowerHideTimer` is null after this returns.
+ * Expected outcome: No pending expiry callback remains on this module's TTL handle.
  * Exceptions: None.
  */
 function clearSlowerTooltipTimer(): void {
-  if (slowerHideTimer !== null) {
-    clearTimeout(slowerHideTimer);
-    slowerHideTimer = null;
-  }
+  slowerTtl.clear();
 }
 
 /**
@@ -28,11 +26,7 @@ function clearSlowerTooltipTimer(): void {
  * Exceptions: None.
  */
 function scheduleSlowerTooltipTtl(): void {
-  clearSlowerTooltipTimer();
-  slowerHideTimer = setTimeout(() => {
-    slowerHideTimer = null;
-    hideOrderSlowerHexTooltip();
-  }, ORDER_BLOCK_HEX_TOOLTIP_TTL_MS);
+  slowerTtl.schedule(() => hideOrderSlowerHexTooltip());
 }
 
 /**

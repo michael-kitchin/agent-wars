@@ -149,11 +149,13 @@ import {
   clearCommittedOrderDraftState as clearCommittedOrderDraftStateFromModule,
   clearPendingTacticalOrders as clearPendingTacticalOrdersFromModule,
   refreshHoverRoutePreview as refreshHoverRoutePreviewFromModule,
+  type RefreshHoverRoutePreviewOptions,
   replacePendingAirStrikesForSelected as replacePendingAirStrikesForSelectedFromModule,
   replacePendingFerryOrdersForSelected as replacePendingFerryOrdersForSelectedFromModule,
   replacePendingRangedAttacksForSelected as replacePendingRangedAttacksForSelectedFromModule,
   updateRangedSidebar as updateRangedSidebarFromModule,
 } from './gameplay/tacticalOrders';
+import { formatTargetingValidationReason as formatTargetingValidationReasonWithResolver } from './gameplay/formatTargetingValidationReason';
 import { drawHoverRoutePreview as drawHoverRoutePreviewFromModule } from './rendering/hoverPreview';
 import {
   handleReadyButtonClick as handleReadyButtonClickFromModule,
@@ -1348,14 +1350,7 @@ function formatUnitDisplayName(unitId: string): string {
  * Exceptions: None.
  */
 function formatTargetingValidationReason(reason: string | undefined, fallbackMessage: string): string {
-  const trimmed = reason?.trim();
-  if (!trimmed) return fallbackMessage;
-  const prefixed = trimmed.match(/^([^:]+):\s+(.+)$/);
-  if (!prefixed) return trimmed;
-  const unitId = prefixed[1] ?? '';
-  const unitReason = prefixed[2] ?? '';
-  if (!unitId || !unitReason) return trimmed;
-  return `${formatUnitDisplayName(unitId)}: ${unitReason}`;
+  return formatTargetingValidationReasonWithResolver(reason, fallbackMessage, formatUnitDisplayName);
 }
 
 /**
@@ -2893,8 +2888,8 @@ function clearCommittedOrderDraftState(): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-async function refreshHoverRoutePreview(): Promise<void> {
-  return refreshHoverRoutePreviewFromModule(createTacticalSidebarDeps());
+async function refreshHoverRoutePreview(options?: RefreshHoverRoutePreviewOptions): Promise<void> {
+  return refreshHoverRoutePreviewFromModule(createTacticalSidebarDeps(), options);
 }
 
 /**

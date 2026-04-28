@@ -1,27 +1,45 @@
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
 
-/**
- * Defines the `buildPrimaryScenarioGoalOpeningClause` function shape (export function buildPrimaryScenarioGoalOpeningClause(): string).
+/** First sentence of the strategic/tactical win reminder (single source for prompts and matrix tests). */
+export const WIN_CONDITION_REMINDER_FIRST_SENTENCE =
+  'Your goal is to win the game, and to achieve this you must control all enemy home region hexes or destroy all enemy home region production capacity.';
 
- * Purpose: Supports maintainability by documenting why `buildPrimaryScenarioGoalOpeningClause` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+const WIN_CONDITION_REMINDER_SECOND_SENTENCE =
+  'Enemy units can be destroyed through ranged and melee combat, and production capacity can be destroyed through air strikes. Review the rules, below, for how to order this.';
+
+/** Substring matched by matrix tests for the control-based branch of the scenario objective. */
+export const REGION_VS_REGION_SCENARIO_WIN_CONTROL_SNIPPET =
+  'Controlling all hexes intersecting the enemy home region';
+
+/** Substring matched by matrix tests for the urban-elimination branch of the scenario objective. */
+export const REGION_VS_REGION_SCENARIO_WIN_URBAN_SNIPPET =
+  'Eliminating all urban production (res4 urban hexes) in the enemy home region';
+
+const REGION_VS_REGION_SCENARIO_WIN_BLOCK =
+  '- Win at end of turn by either:\n' +
+  `    (1) ${REGION_VS_REGION_SCENARIO_WIN_CONTROL_SNIPPET}, OR\n` +
+  `    (2) ${REGION_VS_REGION_SCENARIO_WIN_URBAN_SNIPPET}.`;
+
+/**
+ * Defines the `buildWinConditionReminderClause` function shape (export function buildWinConditionReminderClause(): string).
+
+ * Purpose: Early paragraph in the system prompt after turn/phase; states win conditions consistent with `region_vs_region` rules and how combat vs strikes apply.
+ * When to use: Always appended in `buildSystemPromptForTools` after the opening line so the model sees objectives alongside combat coaching.
+ * Expected outcome: Plain-language reminder referencing enemy-home hex control or destruction of enemy-home production capacity; unchanged when scenario rules evolve (update here and Scenario Objective in tandem).
  * Exceptions: None.
  */
-export function buildPrimaryScenarioGoalOpeningClause(): string {
-  logDebug('scenarioGoals buildPrimaryScenarioGoalOpeningClause', {});
-  return (
-    'Your primary goal is to defeat the enemy by destroying all of their units and, where the rules allow, eliminating their urban areas through strikes.'
-  );
+export function buildWinConditionReminderClause(): string {
+  logDebug('scenarioGoals buildWinConditionReminderClause', {});
+  return `${WIN_CONDITION_REMINDER_FIRST_SENTENCE} ${WIN_CONDITION_REMINDER_SECOND_SENTENCE}`;
 }
 
 /**
- * Defines the `buildRegionVsRegionScenarioObjectiveBlock` function shape (export function buildRegionVsRegionScenarioObjectiveBlock(state: GameStateSnapshot): string).
-
- * Purpose: Supports maintainability by documenting why `buildRegionVsRegionScenarioObjectiveBlock` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Builds the Markdown “Scenario Objective” section for `region_vs_region`, or an empty string for other scenarios.
+ *
+ * Contract: When `state.scenarioId === 'region_vs_region'`, returns a fixed heading plus home-region labels (when present) and win paths aligned with `evaluateRegionControlWinnerAtEndOfTurn`; otherwise returns ''.
+ * When to use: Strategic system prompt assembly only (`buildSystemPromptForTools`), not tactical-only prompts unless explicitly wired.
+ * Expected outcome: Multi-line string listing scenario id, optional “Your home region” / “Enemy home region” lines from state, win bullets for full enemy-home control or enemy-home urban elimination, and visibility note.
  * Exceptions: None.
  */
 export function buildRegionVsRegionScenarioObjectiveBlock(state: GameStateSnapshot): string {
@@ -40,11 +58,7 @@ export function buildRegionVsRegionScenarioObjectiveBlock(state: GameStateSnapsh
   if (humanName.length > 0) {
     lines.push(`- Enemy home region: ${humanName}`);
   }
-  lines.push(
-    '- Win at end of turn by either:\n' +
-      '    (1) Controlling all hexes intersecting the enemy home region, OR\n' +
-      '    (2) Destroying all enemy units.'
-  );
+  lines.push(REGION_VS_REGION_SCENARIO_WIN_BLOCK);
   lines.push('- Both home-region outlines are always visible on the map.');
   return lines.join('\n');
 }

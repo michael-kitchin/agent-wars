@@ -928,6 +928,19 @@ export function listAllHexControls(): HexControlRow[] {
 }
 
 /**
+ * Returns every strategic res1 hex’s current controller as a map keyed by H3 index.
+ *
+ * Purpose: Avoid repeating `new Map(listAllHexControls().map(...))` at call sites that need bulk control lookups.
+ * When to use: Whenever resolution reads many hex controllers from `res1_control` in one pass (win checks, control resolution snapshots).
+ * Expected outcome: A new map per call; values mirror `controller_player_id` (including null when unset).
+ * Exceptions: None.
+ */
+export function getHexControlMap(): ReadonlyMap<string, string | null> {
+  logTrace('gameDb getHexControlMap');
+  return new Map(listAllHexControls().map((row) => [row.h3Index, row.controllerPlayerId]));
+}
+
+/**
  * Defines the `listBuildQueueRowsForHex` function shape (export function listBuildQueueRowsForHex(h3Index: string): BuildQueueRow[]).
 
  * Purpose: Supports maintainability by documenting why `listBuildQueueRowsForHex` exists.
@@ -997,6 +1010,23 @@ export function replaceBuildQueueForHex(h3Index: string, entries: Array<{ unitTy
  */
 export function getRes1InfrastructureForHex(h3Index: string): Res1InfrastructureRow {
   return getRes1InfrastructureForHexFromModule({ run, getOne, getAll }, h3Index);
+}
+
+/**
+ * Sums persisted res4 urban cell counts (aggregated per res1 hex) over a list of strategic hex ids.
+ *
+ * Purpose: Single place for region-scale urban totals used by victory rules and any future analytics.
+ * When to use: Pass the full res1 hex list for a home region or other bounded set.
+ * Expected outcome: Non-negative integer equal to the sum of each hex’s `urbanHexCount` from `res1_infrastructure`.
+ * Exceptions: None.
+ */
+export function sumUrbanHexCountForHexes(hexIds: readonly string[]): number {
+  logTrace('gameDb sumUrbanHexCountForHexes', { hexCount: hexIds.length });
+  let sum = 0;
+  for (const h3Index of hexIds) {
+    sum += getRes1InfrastructureForHex(h3Index).urbanHexCount;
+  }
+  return sum;
 }
 
 /**

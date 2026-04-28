@@ -14157,6 +14157,108 @@
     return rad * 180 / Math.PI;
   }
 
+  // src/renderer/core/constants.ts
+  var BACKGROUND_COLOR = "#e0dcd4";
+  var UNIT_RADIUS = 18;
+  var PLAYER_COLORS = {
+    /**
+       * Documents the object literal property `human` (human: '#2e7548').
+    
+       * Purpose: Supports maintainability by documenting why `human` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    human: "#2e7548",
+    /**
+       * Documents the object literal property `opponent` (opponent: '#8e4d22').
+    
+       * Purpose: Supports maintainability by documenting why `opponent` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    opponent: "#8e4d22"
+  };
+  var UNIT_TYPE_LABELS = {
+    /**
+       * Documents the object literal property `infantry` (infantry: 'I').
+    
+       * Purpose: Supports maintainability by documenting why `infantry` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    infantry: "I",
+    /**
+       * Documents the object literal property `armor` (armor: 'A').
+    
+       * Purpose: Supports maintainability by documenting why `armor` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    armor: "A",
+    /**
+       * Documents the object literal property `naval` (naval: 'N').
+    
+       * Purpose: Supports maintainability by documenting why `naval` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    naval: "N",
+    /**
+       * Documents the object literal property `air` (air: 'S').
+    
+       * Purpose: Supports maintainability by documenting why `air` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    air: "S"
+  };
+  var ORDER_LINE_COLOR = PLAYER_COLORS.human;
+  var ORDER_LINE_WIDTH = 2.5;
+  var PENDING_RANGED_ORDER_LINE_COLOR = "#a06020";
+  var PENDING_AIR_STRIKE_ORDER_LINE_COLOR = "#7a3db5";
+  var ORDER_ARROW_SIZE = 10;
+  var AI_ORDER_LINE_COLOR = PLAYER_COLORS.opponent;
+  var TOOLTIP_OFFSET_PX = 12;
+  var TERRAIN_TOOLTIP_DELAY_MS = 750;
+  var ORDER_BLOCK_HEX_TOOLTIP_TTL_MS = 2 * TERRAIN_TOOLTIP_DELAY_MS;
+  var WORLD_H3_RESOLUTION = 1;
+  var DETAIL_H3_RESOLUTION = 4;
+  var RES4_SHOW_THRESHOLD_VIEW_FRACTION = 0.8;
+  var RES4_HIDE_THRESHOLD_VIEW_FRACTION = 0.7;
+  var BUILD_ENTRY_ZOOM_STEPS_FROM_DEFAULT = 2;
+  var MAIN_MAP_WHEEL_ZOOM_STEP = 0.5;
+  var INITIAL_CAMERA_ZOOM_IN_LEVELS = 1;
+  var OPENROUTER_TOOL_GROUPS = [
+    { id: "precomputation", label: "Precomputation" },
+    { id: "events", label: "Events" },
+    { id: "planning", label: "Planning" },
+    { id: "assessment", label: "Assessment" },
+    { id: "estimation", label: "Estimation" },
+    { id: "memory", label: "Memory" },
+    { id: "orders", label: "Orders" },
+    { id: "production", label: "Production" }
+  ];
+  var UNIT_SELECT_GLYPH = "+";
+  var UNIT_DESELECT_GLYPH = "-";
+  var TOAST_DURATION_MS = 24e3;
+  var READY_REQUEST_TIMEOUT_MS = 12e4;
+  var UNIT_ICON_HIT_PAD_PX = 2;
+  var BUILD_ENTRY_HIT_PAD_PX = 2;
+  var TACTICAL_ENTRY_HIT_PAD_PX = 6;
+  var STACK_OFFSET_X = 6;
+  var STACK_OFFSET_Y = -3;
+  var COUNT_BADGE_OFFSET = 16;
+  var MULTI_PLAYER_FILL = "#b0b0b0";
+  var MULTI_PLAYER_STROKE = "#000";
+  var LIGHTNING_COLOR = "#f0d000";
+  var CASUALTY_X_COLOR = "#c03030";
+
   // src/renderer/map/basemapProvider.ts
   var RASTER_BASEMAP_ORDER = [
     {
@@ -14398,7 +14500,7 @@
     }
     if (!viewportRect) {
       viewportRect = Lref.rectangle(mainBounds, {
-        color: "#2e5a7b",
+        color: ORDER_LINE_COLOR,
         weight: 2,
         fill: false,
         interactive: false
@@ -14449,7 +14551,7 @@
   }
 
   // src/renderer/rendering/infrastructureOverlayState.ts
-  var WORLD_H3_RESOLUTION = 1;
+  var WORLD_H3_RESOLUTION2 = 1;
   function deriveInfrastructureOverlayState(rows) {
     const res4TerrainOverridesByH3 = new Map(
       rows.map((r) => [
@@ -14469,7 +14571,7 @@
     const terrainInfraRes1Seaport = /* @__PURE__ */ new Set();
     for (const row of rows) {
       if (!row.isAirport && !row.isSeaport) continue;
-      const parentH3 = cellToParent(row.h3Index, WORLD_H3_RESOLUTION);
+      const parentH3 = cellToParent(row.h3Index, WORLD_H3_RESOLUTION2);
       if (row.isAirport) terrainInfraRes1Airport.add(parentH3);
       if (row.isSeaport) terrainInfraRes1Seaport.add(parentH3);
     }
@@ -14698,108 +14800,6 @@
       )
     };
   }
-
-  // src/renderer/core/constants.ts
-  var BACKGROUND_COLOR = "#e0dcd4";
-  var UNIT_RADIUS = 18;
-  var PLAYER_COLORS = {
-    /**
-       * Documents the object literal property `human` (human: '#2e5a7b').
-    
-       * Purpose: Supports maintainability by documenting why `human` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    human: "#2e5a7b",
-    /**
-       * Documents the object literal property `opponent` (opponent: '#7b4a2e').
-    
-       * Purpose: Supports maintainability by documenting why `opponent` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    opponent: "#7b4a2e"
-  };
-  var UNIT_TYPE_LABELS = {
-    /**
-       * Documents the object literal property `infantry` (infantry: 'I').
-    
-       * Purpose: Supports maintainability by documenting why `infantry` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    infantry: "I",
-    /**
-       * Documents the object literal property `armor` (armor: 'A').
-    
-       * Purpose: Supports maintainability by documenting why `armor` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    armor: "A",
-    /**
-       * Documents the object literal property `naval` (naval: 'N').
-    
-       * Purpose: Supports maintainability by documenting why `naval` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    naval: "N",
-    /**
-       * Documents the object literal property `air` (air: 'S').
-    
-       * Purpose: Supports maintainability by documenting why `air` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    air: "S"
-  };
-  var ORDER_LINE_COLOR = "#2e5a7b";
-  var ORDER_LINE_WIDTH = 2.5;
-  var PENDING_RANGED_ORDER_LINE_COLOR = "#a06020";
-  var PENDING_AIR_STRIKE_ORDER_LINE_COLOR = "#7a3db5";
-  var ORDER_ARROW_SIZE = 10;
-  var AI_ORDER_LINE_COLOR = "#7b4a2e";
-  var TOOLTIP_OFFSET_PX = 12;
-  var TERRAIN_TOOLTIP_DELAY_MS = 750;
-  var ORDER_BLOCK_HEX_TOOLTIP_TTL_MS = 2 * TERRAIN_TOOLTIP_DELAY_MS;
-  var WORLD_H3_RESOLUTION2 = 1;
-  var DETAIL_H3_RESOLUTION = 4;
-  var RES4_SHOW_THRESHOLD_VIEW_FRACTION = 0.8;
-  var RES4_HIDE_THRESHOLD_VIEW_FRACTION = 0.7;
-  var BUILD_ENTRY_ZOOM_STEPS_FROM_DEFAULT = 2;
-  var MAIN_MAP_WHEEL_ZOOM_STEP = 0.5;
-  var INITIAL_CAMERA_ZOOM_IN_LEVELS = 1;
-  var OPENROUTER_TOOL_GROUPS = [
-    { id: "precomputation", label: "Precomputation" },
-    { id: "events", label: "Events" },
-    { id: "planning", label: "Planning" },
-    { id: "assessment", label: "Assessment" },
-    { id: "estimation", label: "Estimation" },
-    { id: "memory", label: "Memory" },
-    { id: "orders", label: "Orders" },
-    { id: "production", label: "Production" }
-  ];
-  var UNIT_SELECT_GLYPH = "+";
-  var UNIT_DESELECT_GLYPH = "-";
-  var TOAST_DURATION_MS = 24e3;
-  var READY_REQUEST_TIMEOUT_MS = 12e4;
-  var UNIT_ICON_HIT_PAD_PX = 2;
-  var BUILD_ENTRY_HIT_PAD_PX = 2;
-  var TACTICAL_ENTRY_HIT_PAD_PX = 6;
-  var STACK_OFFSET_X = 6;
-  var STACK_OFFSET_Y = -3;
-  var COUNT_BADGE_OFFSET = 16;
-  var MULTI_PLAYER_FILL = "#b0b0b0";
-  var MULTI_PLAYER_STROKE = "#000";
-  var LIGHTNING_COLOR = "#f0d000";
-  var CASUALTY_X_COLOR = "#c03030";
 
   // src/renderer/core/state.ts
   var rendererSharedState = {
@@ -15821,7 +15821,7 @@
     const center = map.getCenter();
     let centerH3;
     try {
-      centerH3 = latLngToCell(center.lat, center.lng, WORLD_H3_RESOLUTION2);
+      centerH3 = latLngToCell(center.lat, center.lng, WORLD_H3_RESOLUTION);
     } catch {
       return;
     }
@@ -15876,14 +15876,14 @@
     const latlng = map.containerPointToLatLng(L.point(x, y));
     let cell;
     try {
-      cell = latLngToCell(latlng.lat, latlng.lng, WORLD_H3_RESOLUTION2);
+      cell = latLngToCell(latlng.lat, latlng.lng, WORLD_H3_RESOLUTION);
     } catch {
       return null;
     }
     if (mapHexSet.has(cell)) return cell;
     try {
       const detailCell = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
-      const parent = cellToParent(detailCell, WORLD_H3_RESOLUTION2);
+      const parent = cellToParent(detailCell, WORLD_H3_RESOLUTION);
       return mapHexSet.has(parent) ? parent : null;
     } catch {
       return null;
@@ -15903,7 +15903,7 @@
     }
     if (tactical.res4ChildH3Indexes.includes(res4)) return res4;
     try {
-      const res1 = latLngToCell(latlng.lat, latlng.lng, WORLD_H3_RESOLUTION2);
+      const res1 = latLngToCell(latlng.lat, latlng.lng, WORLD_H3_RESOLUTION);
       if (res1 === tactical.enclosingRes1H3Index) return tactical.enclosingRes1H3Index;
     } catch {
       return null;
@@ -15925,7 +15925,7 @@
     const centerLatLng = map.containerPointToLatLng(L.point(center.x, center.y));
     let sampleH3;
     try {
-      sampleH3 = latLngToCell(centerLatLng.lat, centerLatLng.lng, WORLD_H3_RESOLUTION2);
+      sampleH3 = latLngToCell(centerLatLng.lat, centerLatLng.lng, WORLD_H3_RESOLUTION);
     } catch {
       sampleH3 = rendererSharedState.gameState.hexes[0].h3Index;
     }
@@ -16718,7 +16718,7 @@
       ctx.stroke();
       if (rendererSharedState.selectedHexIndex === hx.h3Index) {
         drawClosedPath();
-        ctx.strokeStyle = "#2e5a7b";
+        ctx.strokeStyle = PLAYER_COLORS.human;
         ctx.lineWidth = Math.max(1.8, 2.2 * zoomStrokeScale);
         ctx.stroke();
       }
@@ -16784,8 +16784,8 @@
     const L = getLeafletGlobal();
     const zoom = typeof map.getZoom === "function" ? map.getZoom() : 4;
     const zoomScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
-    const humanColor = PLAYER_COLORS.human ?? "#2e5a7b";
-    const aiColor = PLAYER_COLORS.opponent ?? "#7b4a2e";
+    const humanColor = PLAYER_COLORS.human ?? "#2e7548";
+    const aiColor = PLAYER_COLORS.opponent ?? "#8e4d22";
     const intersectionHexes = new Set(
       state.intersectingHomeRegionHexes ?? computeIntersectingHomeRegionHexes(state.humanHomeRegionHexes ?? [], state.aiHomeRegionHexes ?? [])
     );
@@ -16793,7 +16793,7 @@
       state.contestedHomeRegionHexes ?? computeContestedHomeRegionHexes(state.units, [...state.humanHomeRegionHexes ?? [], ...state.aiHomeRegionHexes ?? []])
     );
     const controlByHex = buildControlByHex(state);
-    const resolveHexOutlineColor = (h3Index, fallbackColor) => {
+    const resolveHexOutlineColor = (h3Index, regionBorderColor) => {
       const outlineState = classifyHomeRegionOutlineState(
         h3Index,
         intersectionHexes,
@@ -16801,9 +16801,7 @@
         controlByHex.get(h3Index)
       );
       if (outlineState === "intersection" || outlineState === "contested") return MULTI_PLAYER_FILL;
-      if (outlineState === "controlledByHuman") return humanColor;
-      if (outlineState === "controlledByOpponent") return aiColor;
-      return fallbackColor;
+      return regionBorderColor;
     };
     const drawRegion = (hexes, fallbackColor) => {
       if (!Array.isArray(hexes) || hexes.length <= 0) return;
@@ -16816,9 +16814,9 @@
         const outlineColor = resolveHexOutlineColor(h3Index, fallbackColor);
         strokeDualClosedPolygon(ctx, pts, {
           underStrokeColor: "rgba(0, 0, 0, 0.25)",
-          underStrokeWidth: Math.max(1.2, 2.2 * zoomScale),
+          underStrokeWidth: Math.max(1.2, 2.2 * zoomScale) * 1.25,
           topStrokeColor: withOpacityHex(outlineColor, 0.5),
-          topStrokeWidth: Math.max(0.75, 1.25 * zoomScale) * 0.75 * 1.5
+          topStrokeWidth: Math.max(0.75, 1.25 * zoomScale) * 0.75 * 1.5 * 1.25
         });
       }
     };
@@ -19753,15 +19751,39 @@
   }
   function blockingHoverMessageFromRangedReason(reason) {
     const r = reason.toLowerCase();
-    if (r.includes("target out of range") || r.includes("out of ferry range")) return "Blocked: Range";
+    if (r.includes("out of range") || r.includes("out of ferry range")) return "Blocked: Range";
     if (r.includes("line of sight blocked") || r.includes("blocked by mountains")) return "Blocked: Mountain";
     if (r.includes("no enemy") || r.includes("no eligible")) return "Blocked: No Target";
     return null;
   }
+  function stripLeadingUnitLabelForStrikeReason(reason) {
+    const t = reason.trim();
+    const m = t.match(/^[^:]+:\s+(.+)$/s);
+    return m?.[1]?.trim() ? m[1].trim() : t;
+  }
   function blockingHoverMessageFromAirStrikeReason(reason) {
-    const r = reason.toLowerCase();
-    if (r.includes("target out of range")) return "Blocked: Range";
-    return null;
+    const raw = reason.trim();
+    if (!raw) return null;
+    const r = raw.toLowerCase();
+    if (r.includes("database not initialized")) return null;
+    const tail = stripLeadingUnitLabelForStrikeReason(raw).toLowerCase();
+    if (tail.includes("target out of range") || r.includes("target out of range")) return "Blocked: Range";
+    if (tail.includes("must be based at an intact airport") || tail.includes("based at an intact airport to strike")) {
+      return "Blocked: No base airport";
+    }
+    if (tail.includes("outside the tactical battle footprint")) return "Blocked: Unit outside battle area";
+    if (tail.includes("target is outside the tactical battle")) return "Blocked: Target outside battle";
+    if (tail.includes("contested strategic hex")) return "Blocked: Strike wrong hex";
+    if (tail.includes("unit not in tactical battle")) return "Blocked: Unit not in battle";
+    if (tail.includes("only air units can strike")) return "Blocked: Not an air unit";
+    if (tail.includes("no enemy units")) return "Blocked: No enemies at target";
+    if (tail.includes("no urban infrastructure")) return "Blocked: No urban at target";
+    if (tail.includes("target hex has no airport")) return "Blocked: No airport at target";
+    if (tail.includes("target hex has no seaport")) return "Blocked: No seaport at target";
+    if (tail.includes("not on map")) return "Blocked: Hex not on map";
+    if (tail.includes("only air units can execute strikes")) return "Blocked: Not an air unit";
+    if (tail.includes("must belong to")) return "Blocked: Wrong owner";
+    return "Blocked: Cannot strike here";
   }
   function blockingHoverMessageFromMarchInvalidReason(invalidReason, hoveredTerrainKind) {
     if (!invalidReason) return null;
@@ -19770,6 +19792,9 @@
       return null;
     }
     if (low.includes("out of range") || low.includes("out of ferry range")) return "Blocked: Range";
+    if (low.includes("ferry destination must be a human-controlled airport")) return "Blocked: Invalid";
+    if (low.includes("ferry destination must have an intact airport")) return "Blocked: Invalid";
+    if (low.includes("air units do not use tactical march")) return "Blocked: Air \u2014 use strike mode or ferry (dbl-click)";
     if (low.includes("line of sight blocked") || low.includes("blocked by mountains")) return "Blocked: Mountain";
     if (low.includes("land, coastal, or wetlands")) return "Blocked: Coastal, Land, Wetlands";
     if (low.includes("mixed land/naval")) return "Blocked: Coastal";
@@ -20136,7 +20161,7 @@
     const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
     try {
       const detailH3 = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
-      const parentH3 = cellToParent(detailH3, WORLD_H3_RESOLUTION2);
+      const parentH3 = cellToParent(detailH3, WORLD_H3_RESOLUTION);
       const parentKind = terrainKindForRes1Hex(parentH3);
       const detail = rendererSharedState.res4TerrainOverridesByH3.get(detailH3);
       return {
@@ -20274,20 +20299,36 @@
     return html;
   }
 
+  // src/renderer/map/transientPointerTooltipTtl.ts
+  function createTransientPointerTooltipTtl(ttlMs) {
+    let hideTimer = null;
+    return {
+      clear() {
+        if (hideTimer !== null) {
+          clearTimeout(hideTimer);
+          hideTimer = null;
+        }
+      },
+      schedule(onExpire) {
+        if (hideTimer !== null) {
+          clearTimeout(hideTimer);
+          hideTimer = null;
+        }
+        hideTimer = setTimeout(() => {
+          hideTimer = null;
+          onExpire();
+        }, ttlMs);
+      }
+    };
+  }
+
   // src/renderer/map/orderBlockHexTooltip.ts
-  var orderBlockHideTimer = null;
+  var orderBlockTtl = createTransientPointerTooltipTtl(ORDER_BLOCK_HEX_TOOLTIP_TTL_MS);
   function clearOrderBlockTooltipTimer() {
-    if (orderBlockHideTimer !== null) {
-      clearTimeout(orderBlockHideTimer);
-      orderBlockHideTimer = null;
-    }
+    orderBlockTtl.clear();
   }
   function scheduleOrderBlockTooltipTtl() {
-    clearOrderBlockTooltipTimer();
-    orderBlockHideTimer = setTimeout(() => {
-      orderBlockHideTimer = null;
-      hideOrderBlockHexTooltip();
-    }, ORDER_BLOCK_HEX_TOOLTIP_TTL_MS);
+    orderBlockTtl.schedule(() => hideOrderBlockHexTooltip());
   }
   function hideOrderBlockHexTooltip() {
     clearOrderBlockTooltipTimer();
@@ -20359,19 +20400,12 @@
   }
 
   // src/renderer/map/orderSlowerHexTooltip.ts
-  var slowerHideTimer = null;
+  var slowerTtl = createTransientPointerTooltipTtl(ORDER_BLOCK_HEX_TOOLTIP_TTL_MS);
   function clearSlowerTooltipTimer() {
-    if (slowerHideTimer !== null) {
-      clearTimeout(slowerHideTimer);
-      slowerHideTimer = null;
-    }
+    slowerTtl.clear();
   }
   function scheduleSlowerTooltipTtl() {
-    clearSlowerTooltipTimer();
-    slowerHideTimer = setTimeout(() => {
-      slowerHideTimer = null;
-      hideOrderSlowerHexTooltip();
-    }, ORDER_BLOCK_HEX_TOOLTIP_TTL_MS);
+    slowerTtl.schedule(() => hideOrderSlowerHexTooltip());
   }
   function hideOrderSlowerHexTooltip() {
     clearSlowerTooltipTimer();
@@ -20410,8 +20444,60 @@
     scheduleSlowerTooltipTtl();
   }
 
-  // src/renderer/gameplay/tacticalOrders.ts
-  function publishHoverRoutePreview(deps, preview, rangedValidationReason, airStrikeValidationReason) {
+  // src/renderer/gameplay/gameApiHumanOrderPreview.ts
+  function getValidateGroupRangedTarget() {
+    return window.gameApi?.validateGroupRangedTarget;
+  }
+  function getValidateGroupAirStrikeTarget() {
+    return window.gameApi?.validateGroupAirStrikeTarget;
+  }
+  function getPreviewHumanMarchOrders() {
+    return window.gameApi?.previewHumanMarchOrders;
+  }
+
+  // src/renderer/gameplay/hoverRoutePreviewGroupedTargeting.ts
+  function buildGroupedSupportTargetingLinePreview(previewUnitIds, hoveredH3, valid, validationReason, resolveHumanOriginH3) {
+    const previews = previewUnitIds.map((unitId) => {
+      const originH3 = resolveHumanOriginH3(unitId);
+      if (!originH3) {
+        return {
+          unitId,
+          preview: {
+            valid: false,
+            showInvalidMarker: true,
+            invalidReason: "Unknown unit",
+            segments: []
+          }
+        };
+      }
+      const [lat1, lng1] = cellToLatLng(originH3);
+      const [lat2, lng2] = cellToLatLng(hoveredH3);
+      return {
+        unitId,
+        originH3Index: originH3,
+        preview: {
+          valid,
+          showInvalidMarker: !valid,
+          invalidReason: valid ? "" : validationReason ?? "Invalid target",
+          segments: [{ turn: 1, hexes: [[lat1, lng1], [lat2, lng2]] }],
+          arrowLatLng: [lat2, lng2]
+        }
+      };
+    });
+    return buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange: 99 });
+  }
+
+  // src/renderer/gameplay/hoverRoutePreviewStale.ts
+  function hoverRoutePreviewAsyncContextStillValid(args) {
+    if (args.seqAtStart !== rendererSharedState.hoverPreviewRequestSeq) return false;
+    if (rendererSharedState.hoveredHexH3 !== args.hoveredH3) return false;
+    const currentSelected = [...rendererSharedState.selectedUnitIds].sort().join("|");
+    const requestedSelected = [...args.unitIdsAtStart].sort().join("|");
+    return currentSelected === requestedSelected;
+  }
+
+  // src/renderer/gameplay/hoverRoutePreviewRefresh.ts
+  function publishHoverRoutePreview(deps, preview, rangedValidationReason, airStrikeValidationReason, allowBlockingOrderTooltip) {
     rendererSharedState.hoverRoutePreview = preview;
     if (!preview) {
       showOrderBlockHexTooltip(null);
@@ -20440,13 +20526,217 @@
     }
     if (msg) {
       hideOrderSlowerHexTooltip();
-      showOrderBlockHexTooltip(msg);
+      if (allowBlockingOrderTooltip) {
+        showOrderBlockHexTooltip(msg);
+      } else {
+        showOrderBlockHexTooltip(null);
+      }
     } else {
       showOrderBlockHexTooltip(null);
       showOrderSlowerHexTooltip(slowHtml);
     }
     deps.requestRedraw();
   }
+  async function refreshHoverRoutePreview(deps, options) {
+    const allowBlockingOrderTooltip = options?.allowBlockingOrderTooltip === true;
+    const unitIds = [...rendererSharedState.selectedUnitIds];
+    const hoveredH3 = rendererSharedState.hoveredHexH3;
+    const seq = ++rendererSharedState.hoverPreviewRequestSeq;
+    if (rendererSharedState.tacticalBattleSnapshot) {
+      if (unitIds.length === 0 || !hoveredH3) {
+        publishHoverRoutePreview(deps, null, null, null, allowBlockingOrderTooltip);
+        return;
+      }
+      const tb = rendererSharedState.tacticalBattleSnapshot;
+      if (rendererSharedState.rangedModeActive && !rendererSharedState.airStrikeModeActive) {
+        const validateRanged = getValidateGroupRangedTarget();
+        if (!validateRanged) {
+          publishHoverRoutePreview(deps, null, null, null, allowBlockingOrderTooltip);
+          return;
+        }
+        const validation = await validateRanged({ unitIds, targetH3Index: hoveredH3 });
+        if (!hoverRoutePreviewAsyncContextStillValid({
+          seqAtStart: seq,
+          hoveredH3,
+          unitIdsAtStart: unitIds
+        })) {
+          return;
+        }
+        const valid = validation.success;
+        const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
+          unitIds.map((id) => ({
+            unitId: id,
+            originH3: tb.subUnits.find((s) => s.id === id)?.h3Index ?? ""
+          }))
+        );
+        const data3 = buildGroupedSupportTargetingLinePreview(
+          previewUnitIds,
+          hoveredH3,
+          valid,
+          validation.reason ?? null,
+          (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === "human")?.h3Index
+        );
+        publishHoverRoutePreview(
+          deps,
+          { hoveredH3Index: hoveredH3, data: data3, renderAsSupportTargeting: "ranged" },
+          valid ? null : validation.reason ?? null,
+          null,
+          allowBlockingOrderTooltip
+        );
+        return;
+      }
+      if (rendererSharedState.airStrikeModeActive) {
+        const validateAir = getValidateGroupAirStrikeTarget();
+        if (!validateAir) {
+          publishHoverRoutePreview(deps, null, null, null, allowBlockingOrderTooltip);
+          return;
+        }
+        const validation = await validateAir({
+          unitIds,
+          targetH3Index: hoveredH3,
+          targetType: rendererSharedState.airStrikeTargetType
+        });
+        if (!hoverRoutePreviewAsyncContextStillValid({
+          seqAtStart: seq,
+          hoveredH3,
+          unitIdsAtStart: unitIds
+        })) {
+          return;
+        }
+        const valid = validation.success;
+        const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
+          unitIds.map((id) => ({
+            unitId: id,
+            originH3: tb.subUnits.find((s) => s.id === id)?.h3Index ?? ""
+          }))
+        );
+        const data3 = buildGroupedSupportTargetingLinePreview(
+          previewUnitIds,
+          hoveredH3,
+          valid,
+          validation.reason ?? null,
+          (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === "human")?.h3Index
+        );
+        publishHoverRoutePreview(
+          deps,
+          { hoveredH3Index: hoveredH3, data: data3, renderAsSupportTargeting: "air" },
+          null,
+          valid ? null : validation.reason ?? null,
+          allowBlockingOrderTooltip
+        );
+        return;
+      }
+      const data2 = buildTacticalMarchHoverPreview(tb, unitIds, hoveredH3);
+      if (!hoverRoutePreviewAsyncContextStillValid({
+        seqAtStart: seq,
+        hoveredH3,
+        unitIdsAtStart: unitIds
+      })) {
+        return;
+      }
+      publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data: data2 }, null, null, allowBlockingOrderTooltip);
+      return;
+    }
+    if (unitIds.length === 0 || !hoveredH3 || !rendererSharedState.gameState) {
+      publishHoverRoutePreview(deps, null, null, null, allowBlockingOrderTooltip);
+      return;
+    }
+    const gs = rendererSharedState.gameState;
+    if (rendererSharedState.rangedModeActive && !rendererSharedState.airStrikeModeActive) {
+      const validateRanged = getValidateGroupRangedTarget();
+      if (!validateRanged) {
+        publishHoverRoutePreview(deps, null, null, null, allowBlockingOrderTooltip);
+        return;
+      }
+      const validation = await validateRanged({ unitIds, targetH3Index: hoveredH3 });
+      if (!hoverRoutePreviewAsyncContextStillValid({
+        seqAtStart: seq,
+        hoveredH3,
+        unitIdsAtStart: unitIds
+      })) {
+        return;
+      }
+      const valid = validation.success;
+      const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
+        unitIds.map((id) => ({
+          unitId: id,
+          originH3: gs.units.find((u) => u.id === id)?.h3Index ?? ""
+        }))
+      );
+      const data2 = buildGroupedSupportTargetingLinePreview(
+        previewUnitIds,
+        hoveredH3,
+        valid,
+        validation.reason ?? null,
+        (unitId) => gs.units.find((u) => u.id === unitId && u.player === "human")?.h3Index
+      );
+      publishHoverRoutePreview(
+        deps,
+        { hoveredH3Index: hoveredH3, data: data2, renderAsSupportTargeting: "ranged" },
+        valid ? null : validation.reason ?? null,
+        null,
+        allowBlockingOrderTooltip
+      );
+      return;
+    }
+    if (rendererSharedState.airStrikeModeActive) {
+      const validateAir = getValidateGroupAirStrikeTarget();
+      if (!validateAir) {
+        publishHoverRoutePreview(deps, null, null, null, allowBlockingOrderTooltip);
+        return;
+      }
+      const validation = await validateAir({
+        unitIds,
+        targetH3Index: hoveredH3,
+        targetType: rendererSharedState.airStrikeTargetType
+      });
+      if (!hoverRoutePreviewAsyncContextStillValid({
+        seqAtStart: seq,
+        hoveredH3,
+        unitIdsAtStart: unitIds
+      })) {
+        return;
+      }
+      const valid = validation.success;
+      const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
+        unitIds.map((id) => ({
+          unitId: id,
+          originH3: gs.units.find((u) => u.id === id)?.h3Index ?? ""
+        }))
+      );
+      const data2 = buildGroupedSupportTargetingLinePreview(
+        previewUnitIds,
+        hoveredH3,
+        valid,
+        validation.reason ?? null,
+        (unitId) => gs.units.find((u) => u.id === unitId && u.player === "human")?.h3Index
+      );
+      publishHoverRoutePreview(
+        deps,
+        { hoveredH3Index: hoveredH3, data: data2, renderAsSupportTargeting: "air" },
+        null,
+        valid ? null : validation.reason ?? null,
+        allowBlockingOrderTooltip
+      );
+      return;
+    }
+    const previewMarch = getPreviewHumanMarchOrders();
+    if (!previewMarch) {
+      publishHoverRoutePreview(deps, null, null, null, allowBlockingOrderTooltip);
+      return;
+    }
+    const data = await previewMarch({ unitIds, hoveredH3Index: hoveredH3 });
+    if (!hoverRoutePreviewAsyncContextStillValid({
+      seqAtStart: seq,
+      hoveredH3,
+      unitIdsAtStart: unitIds
+    })) {
+      return;
+    }
+    publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data }, null, null, allowBlockingOrderTooltip);
+  }
+
+  // src/renderer/gameplay/tacticalOrders.ts
   function replacePendingRangedAttacksForSelected(selectedIds, targetH3Index) {
     withTacticalHumanDraftPrefetchInvalidation(() => {
       rendererSharedState.pendingRangedAttacks = rendererSharedState.pendingRangedAttacks.filter((row) => !selectedIds.includes(row.unitId));
@@ -20490,266 +20780,6 @@
     rendererSharedState.hoverRoutePreview = null;
     showOrderBlockHexTooltip(null);
     hideOrderSlowerHexTooltip();
-  }
-  async function refreshHoverRoutePreview(deps) {
-    const unitIds = [...rendererSharedState.selectedUnitIds];
-    const hoveredH3 = rendererSharedState.hoveredHexH3;
-    const seq = ++rendererSharedState.hoverPreviewRequestSeq;
-    if (rendererSharedState.tacticalBattleSnapshot) {
-      if (unitIds.length === 0 || !hoveredH3) {
-        publishHoverRoutePreview(deps, null, null, null);
-        return;
-      }
-      const tb = rendererSharedState.tacticalBattleSnapshot;
-      if (rendererSharedState.rangedModeActive && !rendererSharedState.airStrikeModeActive) {
-        if (!window.gameApi?.validateGroupRangedTarget) {
-          publishHoverRoutePreview(deps, null, null, null);
-          return;
-        }
-        const validation = await window.gameApi.validateGroupRangedTarget({ unitIds, targetH3Index: hoveredH3 });
-        if (seq !== rendererSharedState.hoverPreviewRequestSeq) return;
-        if (rendererSharedState.hoveredHexH3 !== hoveredH3) return;
-        const currentSelected3 = [...rendererSharedState.selectedUnitIds].sort().join("|");
-        const requestedSelected3 = [...unitIds].sort().join("|");
-        if (currentSelected3 !== requestedSelected3) return;
-        const valid = validation.success;
-        const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
-          unitIds.map((id) => ({
-            unitId: id,
-            originH3: tb.subUnits.find((s) => s.id === id)?.h3Index ?? ""
-          }))
-        );
-        const previews = previewUnitIds.map((unitId) => {
-          const sub = tb.subUnits.find((s) => s.id === unitId && s.player === "human");
-          if (!sub) {
-            return {
-              unitId,
-              preview: {
-                valid: false,
-                showInvalidMarker: true,
-                invalidReason: "Unknown unit",
-                segments: []
-              }
-            };
-          }
-          const [lat1, lng1] = cellToLatLng(sub.h3Index);
-          const [lat2, lng2] = cellToLatLng(hoveredH3);
-          return {
-            unitId,
-            originH3Index: sub.h3Index,
-            preview: {
-              valid,
-              showInvalidMarker: !valid,
-              invalidReason: valid ? "" : validation.reason ?? "Invalid target",
-              segments: [{ turn: 1, hexes: [[lat1, lng1], [lat2, lng2]] }],
-              arrowLatLng: [lat2, lng2]
-            }
-          };
-        });
-        const data3 = buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange: 99 });
-        publishHoverRoutePreview(
-          deps,
-          { hoveredH3Index: hoveredH3, data: data3, renderAsSupportTargeting: "ranged" },
-          valid ? null : validation.reason ?? null,
-          null
-        );
-        return;
-      }
-      if (rendererSharedState.airStrikeModeActive) {
-        if (!window.gameApi?.validateGroupAirStrikeTarget) {
-          publishHoverRoutePreview(deps, null, null, null);
-          return;
-        }
-        const validation = await window.gameApi.validateGroupAirStrikeTarget({
-          unitIds,
-          targetH3Index: hoveredH3,
-          targetType: rendererSharedState.airStrikeTargetType
-        });
-        if (seq !== rendererSharedState.hoverPreviewRequestSeq) return;
-        if (rendererSharedState.hoveredHexH3 !== hoveredH3) return;
-        const currentSelected3 = [...rendererSharedState.selectedUnitIds].sort().join("|");
-        const requestedSelected3 = [...unitIds].sort().join("|");
-        if (currentSelected3 !== requestedSelected3) return;
-        const valid = validation.success;
-        const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
-          unitIds.map((id) => ({
-            unitId: id,
-            originH3: tb.subUnits.find((s) => s.id === id)?.h3Index ?? ""
-          }))
-        );
-        const previews = previewUnitIds.map((unitId) => {
-          const sub = tb.subUnits.find((s) => s.id === unitId && s.player === "human");
-          if (!sub) {
-            return {
-              unitId,
-              preview: {
-                valid: false,
-                showInvalidMarker: true,
-                invalidReason: "Unknown unit",
-                segments: []
-              }
-            };
-          }
-          const [lat1, lng1] = cellToLatLng(sub.h3Index);
-          const [lat2, lng2] = cellToLatLng(hoveredH3);
-          return {
-            unitId,
-            originH3Index: sub.h3Index,
-            preview: {
-              valid,
-              showInvalidMarker: !valid,
-              invalidReason: valid ? "" : validation.reason ?? "Invalid target",
-              segments: [{ turn: 1, hexes: [[lat1, lng1], [lat2, lng2]] }],
-              arrowLatLng: [lat2, lng2]
-            }
-          };
-        });
-        const data3 = buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange: 99 });
-        publishHoverRoutePreview(
-          deps,
-          { hoveredH3Index: hoveredH3, data: data3, renderAsSupportTargeting: "air" },
-          null,
-          valid ? null : validation.reason ?? null
-        );
-        return;
-      }
-      const data2 = buildTacticalMarchHoverPreview(tb, unitIds, hoveredH3);
-      if (seq !== rendererSharedState.hoverPreviewRequestSeq) return;
-      if (rendererSharedState.hoveredHexH3 !== hoveredH3) return;
-      const currentSelected2 = [...rendererSharedState.selectedUnitIds].sort().join("|");
-      const requestedSelected2 = [...unitIds].sort().join("|");
-      if (currentSelected2 !== requestedSelected2) return;
-      publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data: data2 }, null, null);
-      return;
-    }
-    if (unitIds.length === 0 || !hoveredH3 || !rendererSharedState.gameState) {
-      publishHoverRoutePreview(deps, null, null, null);
-      return;
-    }
-    const gs = rendererSharedState.gameState;
-    if (rendererSharedState.rangedModeActive && !rendererSharedState.airStrikeModeActive) {
-      if (!window.gameApi?.validateGroupRangedTarget) {
-        publishHoverRoutePreview(deps, null, null, null);
-        return;
-      }
-      const validation = await window.gameApi.validateGroupRangedTarget({ unitIds, targetH3Index: hoveredH3 });
-      if (seq !== rendererSharedState.hoverPreviewRequestSeq) return;
-      if (rendererSharedState.hoveredHexH3 !== hoveredH3) return;
-      const currentSelected2 = [...rendererSharedState.selectedUnitIds].sort().join("|");
-      const requestedSelected2 = [...unitIds].sort().join("|");
-      if (currentSelected2 !== requestedSelected2) return;
-      const valid = validation.success;
-      const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
-        unitIds.map((id) => ({
-          unitId: id,
-          originH3: gs.units.find((u) => u.id === id)?.h3Index ?? ""
-        }))
-      );
-      const previews = previewUnitIds.map((unitId) => {
-        const unit = gs.units.find((u) => u.id === unitId && u.player === "human");
-        if (!unit) {
-          return {
-            unitId,
-            preview: {
-              valid: false,
-              showInvalidMarker: true,
-              invalidReason: "Unknown unit",
-              segments: []
-            }
-          };
-        }
-        const [lat1, lng1] = cellToLatLng(unit.h3Index);
-        const [lat2, lng2] = cellToLatLng(hoveredH3);
-        return {
-          unitId,
-          originH3Index: unit.h3Index,
-          preview: {
-            valid,
-            showInvalidMarker: !valid,
-            invalidReason: valid ? "" : validation.reason ?? "Invalid target",
-            segments: [{ turn: 1, hexes: [[lat1, lng1], [lat2, lng2]] }],
-            arrowLatLng: [lat2, lng2]
-          }
-        };
-      });
-      const data2 = buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange: 99 });
-      publishHoverRoutePreview(
-        deps,
-        { hoveredH3Index: hoveredH3, data: data2, renderAsSupportTargeting: "ranged" },
-        valid ? null : validation.reason ?? null,
-        null
-      );
-      return;
-    }
-    if (rendererSharedState.airStrikeModeActive) {
-      if (!window.gameApi?.validateGroupAirStrikeTarget) {
-        publishHoverRoutePreview(deps, null, null, null);
-        return;
-      }
-      const validation = await window.gameApi.validateGroupAirStrikeTarget({
-        unitIds,
-        targetH3Index: hoveredH3,
-        targetType: rendererSharedState.airStrikeTargetType
-      });
-      if (seq !== rendererSharedState.hoverPreviewRequestSeq) return;
-      if (rendererSharedState.hoveredHexH3 !== hoveredH3) return;
-      const currentSelected2 = [...rendererSharedState.selectedUnitIds].sort().join("|");
-      const requestedSelected2 = [...unitIds].sort().join("|");
-      if (currentSelected2 !== requestedSelected2) return;
-      const valid = validation.success;
-      const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
-        unitIds.map((id) => ({
-          unitId: id,
-          originH3: gs.units.find((u) => u.id === id)?.h3Index ?? ""
-        }))
-      );
-      const previews = previewUnitIds.map((unitId) => {
-        const unit = gs.units.find((u) => u.id === unitId && u.player === "human");
-        if (!unit) {
-          return {
-            unitId,
-            preview: {
-              valid: false,
-              showInvalidMarker: true,
-              invalidReason: "Unknown unit",
-              segments: []
-            }
-          };
-        }
-        const [lat1, lng1] = cellToLatLng(unit.h3Index);
-        const [lat2, lng2] = cellToLatLng(hoveredH3);
-        return {
-          unitId,
-          originH3Index: unit.h3Index,
-          preview: {
-            valid,
-            showInvalidMarker: !valid,
-            invalidReason: valid ? "" : validation.reason ?? "Invalid target",
-            segments: [{ turn: 1, hexes: [[lat1, lng1], [lat2, lng2]] }],
-            arrowLatLng: [lat2, lng2]
-          }
-        };
-      });
-      const data2 = buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange: 99 });
-      publishHoverRoutePreview(
-        deps,
-        { hoveredH3Index: hoveredH3, data: data2, renderAsSupportTargeting: "air" },
-        null,
-        valid ? null : validation.reason ?? null
-      );
-      return;
-    }
-    if (!window.gameApi?.previewHumanMarchOrders) {
-      publishHoverRoutePreview(deps, null, null, null);
-      return;
-    }
-    const data = await window.gameApi.previewHumanMarchOrders({ unitIds, hoveredH3Index: hoveredH3 });
-    if (seq !== rendererSharedState.hoverPreviewRequestSeq) return;
-    if (rendererSharedState.hoveredHexH3 !== hoveredH3) return;
-    const currentSelected = [...rendererSharedState.selectedUnitIds].sort().join("|");
-    const requestedSelected = [...unitIds].sort().join("|");
-    if (currentSelected !== requestedSelected) return;
-    publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data }, null, null);
   }
   async function cancelOrderForUnit(unitId, deps) {
     if (!window.gameApi?.cancelHumanStandingOrder) return;
@@ -21230,41 +21260,41 @@
   // src/shared/productionConfig.ts
   var UNIT_COST_BY_TYPE = {
     /**
-       * Documents the object literal property `infantry` (infantry: 10).
+       * Documents the object literal property `infantry` (infantry: 20).
     
        * Purpose: Supports maintainability by documenting why `infantry` exists.
        * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
        * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
        * Exceptions: None.
        */
-    infantry: 10,
+    infantry: 20,
     /**
-       * Documents the object literal property `armor` (armor: 20).
+       * Documents the object literal property `armor` (armor: 40).
     
        * Purpose: Supports maintainability by documenting why `armor` exists.
        * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
        * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
        * Exceptions: None.
        */
-    armor: 20,
+    armor: 40,
     /**
-       * Documents the object literal property `naval` (naval: 50).
+       * Documents the object literal property `naval` (naval: 100).
     
        * Purpose: Supports maintainability by documenting why `naval` exists.
        * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
        * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
        * Exceptions: None.
        */
-    naval: 50,
+    naval: 100,
     /**
-       * Documents the object literal property `air` (air: 30).
+       * Documents the object literal property `air` (air: 60).
     
        * Purpose: Supports maintainability by documenting why `air` exists.
        * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
        * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
        * Exceptions: None.
        */
-    air: 30
+    air: 60
   };
   var MAX_UNITS_PER_TYPE = {
     /**
@@ -22134,6 +22164,18 @@
       if (want === "") container.style.removeProperty("cursor");
       else container.style.cursor = want;
     }
+  }
+
+  // src/renderer/gameplay/formatTargetingValidationReason.ts
+  function formatTargetingValidationReason(reason, fallbackMessage, resolveUnitDisplayName) {
+    const trimmed = reason?.trim();
+    if (!trimmed) return fallbackMessage;
+    const prefixed = trimmed.match(/^([^:]+):\s+(.+)$/);
+    if (!prefixed) return trimmed;
+    const unitId = prefixed[1] ?? "";
+    const unitReason = prefixed[2] ?? "";
+    if (!unitId || !unitReason) return trimmed;
+    return `${resolveUnitDisplayName(unitId)}: ${unitReason}`;
   }
 
   // src/renderer/rendering/hoverPreview.ts
@@ -23576,7 +23618,7 @@
       }
       rendererSharedState.hoveredHexH3 = hit;
       rendererSharedState.hoveredDetailHexH3 = detailHit;
-      void deps.refreshHoverRoutePreview();
+      void deps.refreshHoverRoutePreview({ allowBlockingOrderTooltip: true });
       deps.requestRedraw();
       const tooltipDelayShouldReset = rendererSharedState.tacticalBattleSnapshot ? hitChanged : hitChanged || detailChanged;
       if (tooltipDelayShouldReset) {
@@ -24696,7 +24738,7 @@
                 landUnitId: selected.length > 0 ? selected : null
               });
               if (!result2.success) {
-                showMapToast(formatTargetingValidationReason(result2.reason, "Failed to update sealift assignment."));
+                showMapToast(formatTargetingValidationReason2(result2.reason, "Failed to update sealift assignment."));
               } else {
                 if (result2.tacticalBattle) {
                   rendererSharedState.tacticalBattleSnapshot = result2.tacticalBattle;
@@ -24722,7 +24764,7 @@
               landUnitId: selected.length > 0 ? selected : null
             });
             if (!result.success) {
-              showMapToast(formatTargetingValidationReason(result.reason, "Failed to update sealift assignment."));
+              showMapToast(formatTargetingValidationReason2(result.reason, "Failed to update sealift assignment."));
             } else if (selected.length > 0) {
               await refreshHumanStandingOrders2();
               updatePendingOrdersSidebar2();
@@ -24749,7 +24791,7 @@
                     landUnitId: null
                   });
                   if (!result2.success) {
-                    showMapToast(formatTargetingValidationReason(result2.reason, "Failed to debark unit."));
+                    showMapToast(formatTargetingValidationReason2(result2.reason, "Failed to debark unit."));
                   } else {
                     if (result2.tacticalBattle) {
                       rendererSharedState.tacticalBattleSnapshot = result2.tacticalBattle;
@@ -24773,7 +24815,7 @@
                 landUnitId: null
               });
               if (!result.success) {
-                showMapToast(formatTargetingValidationReason(result.reason, "Failed to debark unit."));
+                showMapToast(formatTargetingValidationReason2(result.reason, "Failed to debark unit."));
               }
               refreshStackCalloutIfOpen();
               requestRedraw();
@@ -25113,15 +25155,8 @@
   function formatUnitDisplayName(unitId) {
     return rendererSharedState.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
   }
-  function formatTargetingValidationReason(reason, fallbackMessage) {
-    const trimmed = reason?.trim();
-    if (!trimmed) return fallbackMessage;
-    const prefixed = trimmed.match(/^([^:]+):\s+(.+)$/);
-    if (!prefixed) return trimmed;
-    const unitId = prefixed[1] ?? "";
-    const unitReason = prefixed[2] ?? "";
-    if (!unitId || !unitReason) return trimmed;
-    return `${formatUnitDisplayName(unitId)}: ${unitReason}`;
+  function formatTargetingValidationReason2(reason, fallbackMessage) {
+    return formatTargetingValidationReason(reason, fallbackMessage, formatUnitDisplayName);
   }
   function reconcileSelectionToCurrentState2() {
     return reconcileSelectionToCurrentState();
@@ -25186,7 +25221,7 @@
     const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
     try {
       const detailH3 = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
-      const parentH3 = cellToParent(detailH3, WORLD_H3_RESOLUTION2);
+      const parentH3 = cellToParent(detailH3, WORLD_H3_RESOLUTION);
       if (!exploredHexes.has(parentH3)) return null;
       return mapHexSet.has(parentH3) ? detailH3 : null;
     } catch {
@@ -25929,8 +25964,8 @@
   function clearCommittedOrderDraftState2() {
     return clearCommittedOrderDraftState(createTacticalSidebarDeps());
   }
-  async function refreshHoverRoutePreview2() {
-    return refreshHoverRoutePreview(createTacticalSidebarDeps());
+  async function refreshHoverRoutePreview2(options) {
+    return refreshHoverRoutePreview(createTacticalSidebarDeps(), options);
   }
   function cancelFerryForUnit2(unitId) {
     return cancelFerryForUnit(unitId, createTacticalSidebarDeps());
@@ -26051,7 +26086,7 @@
       namingLookupTargetForPointer,
       showTerrainTooltip,
       clearSidebarError: clearSidebarError2,
-      formatTargetingValidationReason,
+      formatTargetingValidationReason: formatTargetingValidationReason2,
       showMapToast,
       replacePendingAirStrikesForSelected: replacePendingAirStrikesForSelected2,
       replacePendingRangedAttacksForSelected: replacePendingRangedAttacksForSelected2,

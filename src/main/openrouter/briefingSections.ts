@@ -302,7 +302,7 @@ export function buildProductionBriefingBlock(args: {
   lines.push('# Production Status');
   lines.push('');
   lines.push(
-    'Rules: infantry cost 10 (min urban 1), armor cost 20 (min urban 2), naval cost 50 (min urban 10 + min seaports 1), air cost 30 (min urban 5 + requires airport).'
+    'Rules: infantry cost 20 (min urban 1), armor cost 40 (min urban 2), naval cost 100 (min urban 10 + min seaports 1), air cost 60 (min urban 5 + requires airport).'
   );
   lines.push(
     `Deployment caps (per side): infantry ${MAX_UNITS_PER_TYPE.infantry}, armor ${MAX_UNITS_PER_TYPE.armor}, naval ${MAX_UNITS_PER_TYPE.naval}, air ${MAX_UNITS_PER_TYPE.air}.`

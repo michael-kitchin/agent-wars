@@ -6,6 +6,7 @@ import {
   dbGetOne,
   dbRun,
   getBuildProgressPointsForHex,
+  getHexControlMap,
   getRes1InfrastructureForHex,
   listAllHexControls,
   listBuildQueueRowsForHex,
@@ -224,7 +225,7 @@ export function resolveRes1ControlAfterCombatAndMovement(
      GROUP BY h3_index`
   );
   const occupancyByHex = new Map(occupantRows.map((row) => [row.h3Index, row]));
-  const currentControlByHex = new Map(listAllHexControls().map((row) => [row.h3Index, row.controllerPlayerId]));
+  const currentControlByHex = getHexControlMap();
   const allHexes = new Set<string>([
     ...Array.from(occupancyByHex.keys()),
     ...Array.from(currentControlByHex.keys()),
@@ -317,7 +318,6 @@ export function processProductionAfterControlResolution(): {
     while (idx < queueWorking.length) {
       const entry = queueWorking[idx]!;
       const cost = UNIT_COST_BY_TYPE[entry.unitType];
-      if (points < cost) break;
       const currentCount = simulatedCountsByType.get(entry.unitType) ?? 0;
       const maxCount = MAX_UNITS_PER_TYPE[entry.unitType];
       if (currentCount >= maxCount) {
@@ -325,6 +325,7 @@ export function processProductionAfterControlResolution(): {
         capSet.add(entry.unitType);
         break;
       }
+      if (points < cost) break;
       const maxByPoints = Math.floor(points / cost);
       const maxByCap = maxCount - currentCount;
       const built = Math.min(entry.remainingCount, maxByPoints, maxByCap);

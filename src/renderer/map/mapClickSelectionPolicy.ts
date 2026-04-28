@@ -47,7 +47,9 @@ export function clearDeferredHumanUnitSingleSelectTimer(): void {
 export type HumanUnitIconSelectionSideEffects = {
   replaceSelection: (unitIds: string[]) => void;
   toggleUnitSelection: (unitId: string) => void;
-  refreshHoverRoutePreview: () => Promise<void>;
+  refreshHoverRoutePreview: (
+    options?: import('../gameplay/tacticalOrders').RefreshHoverRoutePreviewOptions
+  ) => Promise<void>;
   updateSidebar: () => void;
   updateRangedSidebar: () => void;
   redraw: () => void;

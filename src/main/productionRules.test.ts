@@ -61,30 +61,30 @@ function testBuildCountValidationBounds(): void {
  * Exceptions: None.
  */
 function testProductionExamplesFromSpec(): void {
-  // 2 urban -> one infantry (cost 10) in 5 turns.
+  // 2 urban -> one infantry (cost 20) in 10 turns.
   let points = 0;
   let spawnedTotal = 0;
-  for (let t = 0; t < 5; t++) {
+  for (let t = 0; t < 10; t++) {
     const result = applyProduction([{ id: 1, queueIndex: 0, unitType: 'infantry', remainingCount: 1 }], points, 2);
     points = result.storedPoints;
     spawnedTotal += result.spawnedUnitTypes.length;
   }
   assert.strictEqual(spawnedTotal, 1);
 
-  // 10 urban -> one naval (cost 50) in 5 turns.
+  // 10 urban -> one naval (cost 100) in 10 turns.
   points = 0;
   spawnedTotal = 0;
-  for (let t = 0; t < 5; t++) {
+  for (let t = 0; t < 10; t++) {
     const result = applyProduction([{ id: 2, queueIndex: 0, unitType: 'naval', remainingCount: 1 }], points, 10);
     points = result.storedPoints;
     spawnedTotal += result.spawnedUnitTypes.length;
   }
   assert.strictEqual(spawnedTotal, 1);
 
-  // 100 urban -> up to 5 armor (cost 20) in one turn when queued.
+  // 100 urban -> up to 2 armor (cost 40) in one turn when queued.
   const high = applyProduction([{ id: 3, queueIndex: 0, unitType: 'armor', remainingCount: 10 }], 0, 100);
-  assert.strictEqual(high.spawnedUnitTypes.length, 5);
-  assert.strictEqual(high.updatedEntries[0]?.remainingCount, 5);
+  assert.strictEqual(high.spawnedUnitTypes.length, 2);
+  assert.strictEqual(high.updatedEntries[0]?.remainingCount, 8);
 }
 
 /**
@@ -96,10 +96,10 @@ function testProductionExamplesFromSpec(): void {
  * Exceptions: None.
  */
 function testTurnsToNextSpawnEstimateUsesNextUnitOnly(): void {
-  // Queue count does not matter for "next spawn" timing. At 5c/turn and infantry cost 10, first spawn is 2 turns away.
-  assert.strictEqual(estimateTurnsToNextSpawn('infantry', 0, 5), 2);
-  // Stored overflow should allow immediate next-turn spawn.
-  assert.strictEqual(estimateTurnsToNextSpawn('infantry', 10, 5), 1);
+  // Queue count does not matter for "next spawn" timing. At 5c/turn and infantry cost 20, first spawn is 4 turns away.
+  assert.strictEqual(estimateTurnsToNextSpawn('infantry', 0, 5), 4);
+  // Stored progress shortens the ETA (deficit 10 → 2 turns at 5c/turn).
+  assert.strictEqual(estimateTurnsToNextSpawn('infantry', 10, 5), 2);
   // Non-positive capacity cannot produce a valid ETA.
   assert.strictEqual(estimateTurnsToNextSpawn('armor', 0, 0), null);
 }
@@ -137,12 +137,12 @@ function testQueuedCostAndCompletionTurnEstimates(): void {
       { unitType: 'infantry', count: 2 },
       { unitType: 'armor', count: 1 },
     ]),
-    40
+    80
   );
   assert.strictEqual(estimateTurnsToCompleteQueuedProduction([], 0, 3), 0);
   assert.strictEqual(
     estimateTurnsToCompleteQueuedProduction([{ id: 1, queueIndex: 0, unitType: 'infantry', count: 1 }], 0, 2),
-    5
+    10
   );
   assert.strictEqual(
     estimateTurnsToCompleteQueuedProduction([{ id: 1, queueIndex: 0, unitType: 'infantry', count: 1 }], 0, 0),

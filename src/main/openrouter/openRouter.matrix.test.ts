@@ -17,6 +17,11 @@ import * as path from 'path';
 import Module = require('module');
 import type { AirStrikeOrder, FerryOrder } from '../../shared/ipcTypes';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
+import {
+  REGION_VS_REGION_SCENARIO_WIN_CONTROL_SNIPPET,
+  REGION_VS_REGION_SCENARIO_WIN_URBAN_SNIPPET,
+  WIN_CONDITION_REMINDER_FIRST_SENTENCE,
+} from './scenarioGoals';
 
 /**
  * Documents the `ChatResponse` type alias (type ChatResponse).
@@ -315,29 +320,30 @@ async function run(): Promise<void> {
         `enemy-commander role opening missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('Your primary goal is to defeat the enemy'),
-        `primary scenario goal clause missing for mask=${mask}`
+        !systemPrompt.includes('Move toward observed enemy forces to bring them into ranged'),
+        `removed passive-movement coaching should not appear for mask=${mask}`
       );
-      assert.ok(systemPrompt.includes('- Your priorities are:'), `priority coaching header missing for mask=${mask}`);
+      assert.ok(systemPrompt.includes(WIN_CONDITION_REMINDER_FIRST_SENTENCE), `win-condition reminder paragraph missing for mask=${mask}`);
+      assert.ok(systemPrompt.includes('- Your goals are:'), `goals coaching header missing for mask=${mask}`);
       assert.ok(
-        systemPrompt.includes('(1) Expand territorial control toward known and likely enemy-occupied hexes'),
-        `priority (1) coaching missing for mask=${mask}`
-      );
-      assert.ok(
-        systemPrompt.includes('(2) Engage enemy units and destroy them'),
-        `priority (2) coaching missing for mask=${mask}`
+        systemPrompt.includes('(1) Engage enemy forces to reduce their combat effectiveness'),
+        `goal (1) coaching missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('(3) Disperse your units to maximize visibility'),
-        `priority (3) coaching missing for mask=${mask}`
+        systemPrompt.includes('(2) Disperse your units to maximize visibility'),
+        `goal (2) coaching missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes('(4) Maximize your own unit production'),
-        `priority (4) coaching missing for mask=${mask}`
+        systemPrompt.includes('(3) Maximize your own unit production'),
+        `goal (3) coaching missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes("(5) Destroy the enemy's production capacity, airports, and seaports"),
-        `priority (5) coaching missing for mask=${mask}`
+        systemPrompt.includes("(4) Protect your home region's production capacity"),
+        `goal (4) coaching missing for mask=${mask}`
+      );
+      assert.ok(
+        systemPrompt.includes("(5) Degrade or eliminate the enemy home region's urban production capacity"),
+        `goal (5) coaching missing for mask=${mask}`
       );
       assert.ok(systemPrompt.includes('- Your strategy is:'), `strategy coaching header missing for mask=${mask}`);
       assert.ok(
@@ -388,14 +394,8 @@ async function run(): Promise<void> {
         systemPrompt.includes('Scenario: region_vs_region'),
         `scenario id guidance missing for mask=${mask}`
       );
-      assert.ok(
-        systemPrompt.includes('Controlling all hexes intersecting the enemy home region'),
-        `region-vs-region win condition (enemy home) missing for mask=${mask}`
-      );
-      assert.ok(
-        systemPrompt.includes('Destroying all enemy units'),
-        `region-vs-region win condition (destroy enemy units) missing for mask=${mask}`
-      );
+      assert.ok(systemPrompt.includes(REGION_VS_REGION_SCENARIO_WIN_CONTROL_SNIPPET), `region-vs-region win condition (enemy home) missing for mask=${mask}`);
+      assert.ok(systemPrompt.includes(REGION_VS_REGION_SCENARIO_WIN_URBAN_SNIPPET), `region-vs-region win condition (urban elimination) missing for mask=${mask}`);
       assert.ok(
         systemPrompt.includes('Your home region: Eastern Europe'),
         `AI home-region guidance missing for mask=${mask}`
@@ -556,13 +556,18 @@ async function run(): Promise<void> {
       'tactical prompt omits enemy-home control progress'
     );
     assert.ok(
-      tacticalSystemPrompt.includes('- Your priority is to engage enemy units and destroy them'),
+      !tacticalSystemPrompt.includes('Move toward observed enemy forces to bring them into ranged'),
+      'tactical prompt omits removed passive-movement coaching'
+    );
+    assert.ok(tacticalSystemPrompt.includes(WIN_CONDITION_REMINDER_FIRST_SENTENCE), 'tactical prompt includes win-condition reminder');
+    assert.ok(
+      tacticalSystemPrompt.includes('- Your priority is to engage enemy forces and inflict losses when advantageous'),
       'tactical prompt includes single engage priority'
     );
     assert.ok(tacticalSystemPrompt.includes('- Your strategy is:'), 'tactical prompt includes strategy coaching');
     assert.ok(
-      !tacticalSystemPrompt.includes('(1) Expand territorial control toward known and likely enemy-occupied hexes'),
-      'tactical prompt omits strategic five-priority list'
+      !tacticalSystemPrompt.includes('(4) Protect your home region'),
+      'tactical prompt omits strategic five-goal list'
     );
 
     console.log(`openRouter.matrix.test.ts passed (${combosChecked} combinations)`);
