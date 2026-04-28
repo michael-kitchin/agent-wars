@@ -49,6 +49,15 @@ export type TacticalBattleActivationBindings = {
    * Exceptions: None.
    */
   rebuildUnitDisplayNameLookup?: () => void;
+  /**
+   * Syncs pending-order, ranged, and unit sidebars after stash removes strategic drafts so `#pending-orders-list` matches tactical mode immediately.
+   *
+   * Contract: Safe to omit in tests that only validate IPC callbacks.
+   * When to use: Wired from the renderer as `refreshStrategicOrderSidebars` alongside tactical activation.
+   * Expected outcome: Pass-through to `fx.refreshOrderSidebars` in `buildDefaultTacticalBattleActivationSideEffects`.
+   * Exceptions: None.
+   */
+  refreshOrderSidebars?: () => void;
 };
 
 /**
@@ -78,6 +87,7 @@ export function buildDefaultTacticalBattleActivationSideEffects(
     refreshReadyButton: bindings.refreshReadyButton,
     syncTacticalEntryOverlay: bindings.syncTacticalEntryOverlay,
     redraw: bindings.redraw,
+    refreshOrderSidebars: bindings.refreshOrderSidebars,
   };
 }
 
@@ -94,6 +104,15 @@ export type StartTacticalBattleFromEntryHexDeps = {
   invokeStartTacticalBattle?: GameApi['startTacticalBattle'];
   getActivationSideEffects: () => TacticalRendererStartBattleSideEffects;
   onMissingStartTacticalBattleIpc: () => void;
+  /**
+   * Runs immediately before tactical activation so magnifier entry matches the melee-intercept Fight → `tacticalAutoStartRes1H3Index` path (clear drafts, reload standing orders from main, refresh strategic sidebars).
+   *
+   * Purpose: Keeps the right-hand orders panel aligned with main state and emptied for tactical drafts once `stashStrategicOrderDraftsForTacticalSession` runs inside activation.
+   * When to use: Wired from the renderer; omit only in tests that stub tactical IPC without strategic UI.
+   * Expected outcome: `S.humanStandingOrders` reflects `listHumanStandingOrders` before stash captures or clears them.
+   * Exceptions: None when omitted (backward-compatible tests).
+   */
+  prepareStrategicUiBeforeTacticalStart?: () => Promise<void>;
 };
 
 /**
@@ -108,6 +127,20 @@ export async function startTacticalBattleFromEntryHex(
   enclosingRes1H3Index: string,
   deps: StartTacticalBattleFromEntryHexDeps
 ): Promise<void> {
+  if (deps.prepareStrategicUiBeforeTacticalStart) {
+    await deps.prepareStrategicUiBeforeTacticalStart();
+  }
+  const resumedSession =
+    S.gameState?.tacticalBattleSession &&
+    S.gameState.tacticalBattleSession.enclosingRes1H3Index === enclosingRes1H3Index &&
+    !S.tacticalBattleSnapshot
+      ? S.gameState.tacticalBattleSession
+      : null;
+  if (resumedSession) {
+    deps.hideBuildPopup();
+    activateRestoredTacticalBattleFromMainSnapshot(resumedSession, deps.getActivationSideEffects());
+    return;
+  }
   const ipc = deps.invokeStartTacticalBattle;
   if (!ipc) {
     deps.onMissingStartTacticalBattleIpc();

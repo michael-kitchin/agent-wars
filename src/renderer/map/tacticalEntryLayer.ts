@@ -37,6 +37,8 @@ function isContestedRes1Hex(state: GameStateSnapshot, h3Index: string): boolean 
  *
  * Vertical placement: same horizontal center as the hex; `top` is `center.y + (textY - center.y)` so the icon sits
  * **below** the hex midpoint by the same distance overlay text sits below it (previously `2 * center.y - textY` mirrored above).
+ *
+ * Magnifiers are hidden outside strategic planning (`phase !== 'planning'`) or while the renderer already holds a tactical battle (`S.tacticalBattleSnapshot`).
  */
 export function syncTacticalEntryButton(deps: {
   isHexExploredByPlayer: (h3: string) => boolean;

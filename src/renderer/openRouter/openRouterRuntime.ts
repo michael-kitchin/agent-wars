@@ -79,24 +79,60 @@ export function withTacticalHumanDraftPrefetchInvalidation(run: () => void): voi
 }
 
 /**
- * Cancels an in-flight tactical `requestAiOrders` prefetch when the res4 tactical session is torn down on the renderer.
+ * Log line when background `requestAiOrders` is cancelled because the main/renderer tactical session ended (reconcile, new game).
  *
- * Purpose: `invalidateTacticalPrefetchIfHumanDraftChangedSinceRequestStart` only runs while `S.tacticalBattleSnapshot` and planning are true; exiting tactical or reconciling away the battle must still cancel main work keyed by `S.tacticalPrefetchFingerprintWhenRequestStarted` so a late success cannot call `applySuccessfulPrecomputedAiResult` against a null snapshot.
- * When to use: Start of `tacticalReleaseRendererSessionForNewStrategicMatch` and `tacticalReconcileBattleAfterStrategicSnapshot` before clearing `S.tacticalBattleSnapshot`.
- * Expected outcome: No-op when no background request or when the in-flight request was strategic-only (fingerprint never set). Otherwise `cancelRequestAiOrders`, cleared flags, optional log, Ready refresh, and tactical latch unblock when still in planning with a snapshot.
+ * Purpose: Single source for grep and copy used by `cancelTacticalScopedBackgroundPrefetchForSessionTeardown`.
+ * When to use: Pass to `cancelInFlightBackgroundAiRequestForRendererTeardown`; do not concatenate ad hoc at call sites.
+ * Expected outcome: Matches prior user-visible OpenRouter log wording.
+ * Exceptions: None.
+ */
+export const OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_SESSION_ENDED =
+  'Tactical AI prefetch cancelled (tactical session ended).';
+
+/**
+ * Log line when background `requestAiOrders` is cancelled because the player exited tactical combat voluntarily.
+ *
+ * Purpose: Single source for `tacticalBattleExitTeardownTransientRendererState` in `tacticalUiOrchestration.ts`.
+ * When to use: Pass to `cancelInFlightBackgroundAiRequestForRendererTeardown` from tactical exit teardown only.
+ * Expected outcome: Matches prior user-visible OpenRouter log wording.
+ * Exceptions: None.
+ */
+export const OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_TACTICAL_BATTLE_EXIT =
+  'Background AI request cancelled (exiting tactical battle).';
+
+/**
+ * Cancels any in-flight `requestAiOrders` work from the renderer (tactical prefetch or strategic background planning).
+ *
+ * Purpose: `cancelTacticalScopedBackgroundPrefetchForSessionTeardown` previously skipped cancellation when
+ * `tacticalPrefetchFingerprintWhenRequestStarted` was null, leaving strategic prefetch running during tactical teardown.
+ * Exit battle and session reconciliation must always abort main-process AI work and unblock Ready-equivalent latches.
+ * When to use: Tactical battle exit, `tacticalReleaseRendererSessionForNewStrategicMatch`, `tacticalReconcileBattleAfterStrategicSnapshot`, and other renderer teardown that must not apply late AI results.
+ * Expected outcome: No-op when no background request; otherwise `cancelRequestAiOrders`, cleared in-flight flags, log line, `unblockPrecomputedAiPlanningAfterBackgroundFailure`, and Ready UI refresh.
  * Exceptions: None; safe when `openRouterRuntimeDepsRef` is unset (still cancels on main).
  */
-export function cancelTacticalScopedBackgroundPrefetchForSessionTeardown(): void {
-  if (!S.backgroundRequestInFlight) return;
-  if (S.tacticalPrefetchFingerprintWhenRequestStarted === null) return;
+export function cancelInFlightBackgroundAiRequestForRendererTeardown(logLine: string): void {
+  if (!S.backgroundRequestInFlight) {
+    S.tacticalPrefetchFingerprintWhenRequestStarted = null;
+    return;
+  }
   void window.gameApi?.cancelRequestAiOrders?.();
   S.backgroundRequestInFlight = false;
   S.tacticalPrefetchFingerprintWhenRequestStarted = null;
-  openRouterRuntimeDepsRef?.appendOpenRouterLog('Tactical AI prefetch cancelled (tactical session ended).', false);
-  if (S.tacticalBattleSnapshot && S.tacticalPhasePlanning) {
-    unblockPrecomputedAiPlanningAfterBackgroundFailure();
-  }
+  openRouterRuntimeDepsRef?.appendOpenRouterLog(logLine, false);
+  unblockPrecomputedAiPlanningAfterBackgroundFailure();
   openRouterRuntimeDepsRef?.updateReadyButtonState();
+}
+
+/**
+ * Cancels an in-flight tactical `requestAiOrders` prefetch when the res4 tactical session is torn down on the renderer.
+ *
+ * Purpose: `invalidateTacticalPrefetchIfHumanDraftChangedSinceRequestStart` only runs while `S.tacticalBattleSnapshot` and planning are true; exiting tactical or reconciling away the battle must still cancel main work so a late success cannot call `applySuccessfulPrecomputedAiResult` against a null snapshot.
+ * When to use: Start of `tacticalReleaseRendererSessionForNewStrategicMatch` and `tacticalReconcileBattleAfterStrategicSnapshot` before clearing `S.tacticalBattleSnapshot`.
+ * Expected outcome: Delegates to `cancelInFlightBackgroundAiRequestForRendererTeardown` with the session-ended log line.
+ * Exceptions: None.
+ */
+export function cancelTacticalScopedBackgroundPrefetchForSessionTeardown(): void {
+  cancelInFlightBackgroundAiRequestForRendererTeardown(OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_SESSION_ENDED);
 }
 
 interface OpenRouterRuntimeDeps {

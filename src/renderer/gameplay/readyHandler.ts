@@ -786,8 +786,8 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       // Intentionally no `withTacticalHumanDraftPrefetchInvalidation` here: Phase-4 prefetch cancel on *human edits*
       // during tactical planning uses that wrapper on sidebar/map paths. This block replaces pending rows from the
       // successful commit IPC (continuations + cleared ranged/air/ferry/embark), not a mid-flight draft tweak.
-      // In-flight tactical prefetch is torn down via `cancelTacticalScopedBackgroundPrefetchForSessionTeardown` when the
-      // res4 session ends; late `requestAiOrders` resolves are dropped in `openRouterRuntime` if `tacticalBattleSnapshot` is gone.
+      // In-flight tactical prefetch is torn down via `cancelInFlightBackgroundAiRequestForRendererTeardown` when the
+      // res4 session ends (main reconcile or voluntary exit); late `requestAiOrders` resolves are dropped in `openRouterRuntime` if `tacticalBattleSnapshot` is gone.
       S.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length
         ? [...commitResult.tacticalMarchContinuations]
         : [];
@@ -1117,12 +1117,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     }
     S.hoverRoutePreview = null;
     S.hideCommittedOrderLinesAfterReady = false;
-    deps.clearPendingTacticalOrders();
-    await deps.refreshHumanStandingOrders();
-    deps.updateGameStateSidebar(state);
-    deps.updatePendingOrdersSidebar();
-    deps.updateRangedSidebar();
-    deps.updateSidebar();
+    await prepareStrategicPlanningUiBeforeTacticalAutoStart(state, deps);
     deps.updateGameOverUI(state);
     deps.updateReadyButtonState();
     if (S.runButtonOn && !S.pendingDeferredStrategicPostResolutionConsult) deps.startBackgroundRequestIfAllowed();
@@ -1138,4 +1133,43 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     S.readyRequestInFlight = false;
     deps.updateReadyButtonState();
   }
+}
+
+/**
+ * Dependencies for reloading strategic planning sidebar state before tactical auto-start (melee Fight handoff or magnifier entry).
+ *
+ * Purpose: Matches the subset of `ReadyHandlerDeps` used together after Ready resolves movement and before `startTacticalBattleFromInterceptHex`.
+ * When to use: Pass `deps` from `handleReadyButtonClick` or build an object from renderer closures for magnifier-driven tactical start.
+ * Expected outcome: Callers supply real sidebar mutators; tests may stub minimal implementations.
+ * Exceptions: None.
+ */
+export type PrepareStrategicPlanningUiBeforeTacticalAutoStartDeps = {
+  clearPendingTacticalOrders: () => void;
+  refreshHumanStandingOrders: () => Promise<void>;
+  updateGameStateSidebar: (state: GameStateSnapshot | null) => void;
+  updatePendingOrdersSidebar: () => void;
+  updateRangedSidebar: () => void;
+  updateSidebar: () => void;
+};
+
+/**
+ * Clears tactical-order draft slices, reloads human standing orders from main, and refreshes strategic sidebars (pending orders, ranged/air panel, unit sidebar).
+ *
+ * Purpose: Single sequence shared by `handleReadyButtonClick` immediately before `tacticalAutoStartRes1H3Index` tactical entry and magnifier `prepareStrategicUiBeforeTacticalStart` so Fight and magnifier paths cannot drift.
+ * When to use: After strategic resolution updates game state and before activating tactical battle from the same planning turn.
+ * Expected outcome: Right-hand panels reflect `listHumanStandingOrders` and empty tactical drafts before `stashStrategicOrderDraftsForTacticalSession` runs inside tactical activation.
+ * Exceptions: None.
+ */
+export async function prepareStrategicPlanningUiBeforeTacticalAutoStart(
+  gameState: GameStateSnapshot | null,
+  deps: PrepareStrategicPlanningUiBeforeTacticalAutoStartDeps
+): Promise<void> {
+  deps.clearPendingTacticalOrders();
+  await deps.refreshHumanStandingOrders();
+  if (gameState) {
+    deps.updateGameStateSidebar(gameState);
+  }
+  deps.updatePendingOrdersSidebar();
+  deps.updateRangedSidebar();
+  deps.updateSidebar();
 }

@@ -26,6 +26,15 @@ export type TacticalRendererStartBattleSideEffects = {
   refreshReadyButton: () => void;
   syncTacticalEntryOverlay: () => void;
   redraw: () => void;
+  /**
+   * Rebuilds pending-movement, ranged/air, and selected-unit sidebars immediately after stash clears strategic drafts so the DOM matches tactical mode.
+   *
+   * Purpose: `updateGameStateSidebar` only updates phase/turn lines; `#pending-orders-list` would otherwise keep stale strategic rows until the next unrelated refresh.
+   * When to use: Wired from the renderer after successful tactical IPC / restore activation.
+   * Expected outcome: Tactical pending-order UI or empty placeholders replace strategic standing-order rows right away.
+   * Exceptions: Optional when tests stub minimal side effects.
+   */
+  refreshOrderSidebars?: () => void;
 };
 
 /**
@@ -59,6 +68,7 @@ export function tacticalRendererApplyStartBattleIpcResult(
   fx.syncTacticalEntryOverlay();
   fx.redraw();
   updateGameStateSidebar(S.gameState);
+  fx.refreshOrderSidebars?.();
 }
 
 /**
@@ -84,4 +94,5 @@ export function tacticalRendererActivateRestoredBattleSnapshot(
   fx.syncTacticalEntryOverlay();
   fx.redraw();
   updateGameStateSidebar(S.gameState);
+  fx.refreshOrderSidebars?.();
 }

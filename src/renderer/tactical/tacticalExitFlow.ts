@@ -15,6 +15,7 @@ import { closeTacticalAnnihilationOutcomeDialog, openTacticalAnnihilationOutcome
 import { restoreStrategicOrderDraftsAfterTacticalSession } from './tacticalStrategicOrderUiStash';
 import {
   tacticalApplyStrategicSidebarForTacticalMode,
+  tacticalBattleExitTeardownTransientRendererState,
   tacticalUpdateExitButtonVisibility,
 } from './tacticalUiOrchestration';
 
@@ -46,6 +47,15 @@ export type TacticalBattleExitIo = {
   showMapToast: (message: string, options: { isError?: boolean }) => void;
   redraw: () => void;
   runReadyAfterExit: () => Promise<void>;
+  /**
+   * Syncs DOM sidebars after tactical draft slices are cleared so the right-hand panel does not retain ranged/air/march rows until the next redraw.
+   *
+   * Purpose: `clearPendingTacticalOrders` updates shared state immediately; pending-orders and ranged sidebar nodes must refresh before strategic chrome and `runReadyAfterExit`.
+   * When to use: Wired from the renderer with `hideStackCallout`, `updatePendingOrdersSidebar`, `updateRangedSidebar`, and `updateSidebar`.
+   * Expected outcome: Empty tactical order UI; stack callout closed if it referenced tactical-only selection.
+   * Exceptions: None when omitted (optional).
+   */
+  refreshSidebarAfterTacticalDraftTeardown?: () => void;
 };
 
 /**
@@ -71,7 +81,7 @@ export function tacticalMaybeScheduleAnnihilationExit(session: TacticalExitSessi
  *
  * Contract: Early return when boundary check fails; does not throw on IPC errors (toast + return).
  * When to use: Tactical exit button and annihilation modal confirmation.
- * Expected outcome: Local snapshot cleared, Leaflet bounds restored, Ready pipeline invoked on success path.
+ * Expected outcome: In-flight Run-mode AI canceled, tactical drafts cleared, sidebar DOM refreshed, local snapshot cleared, Leaflet bounds restored, Ready pipeline invoked on success path.
  * Exceptions: `endTacticalBattle` failures keep renderer snapshot unchanged after toast.
  */
 export async function tacticalPerformBattleExit(session: TacticalExitSessionAccessor, io: TacticalBattleExitIo): Promise<void> {
@@ -86,6 +96,7 @@ export async function tacticalPerformBattleExit(session: TacticalExitSessionAcce
     io.showMapToast('Could not exit tactical battle.', { isError: true });
     return;
   }
+  tacticalBattleExitTeardownTransientRendererState();
   session.setBattleSnapshot(null);
   closeTacticalAnnihilationOutcomeDialog();
   S.tacticalOpponentDraft = null;
@@ -97,6 +108,7 @@ export async function tacticalPerformBattleExit(session: TacticalExitSessionAcce
   tacticalUpdateExitButtonVisibility();
   updateGameStateSidebar(S.gameState);
   restoreStrategicOrderDraftsAfterTacticalSession();
+  io.refreshSidebarAfterTacticalDraftTeardown?.();
   io.redraw();
   await io.runReadyAfterExit();
 }

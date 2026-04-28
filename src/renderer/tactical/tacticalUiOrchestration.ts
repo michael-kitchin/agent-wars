@@ -10,7 +10,44 @@ import { exitTacticalMapView } from '../map/tacticalMapView';
 import { hideTacticalEntryLayer, syncTacticalEntryButton } from '../map/tacticalEntryLayer';
 import { updateGameStateSidebar } from '../core/uiState';
 import { restoreStrategicOrderDraftsAfterTacticalSession } from './tacticalStrategicOrderUiStash';
-import { cancelTacticalScopedBackgroundPrefetchForSessionTeardown } from '../openRouter/openRouterRuntime';
+import {
+  cancelInFlightBackgroundAiRequestForRendererTeardown,
+  cancelTacticalScopedBackgroundPrefetchForSessionTeardown,
+  OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_TACTICAL_BATTLE_EXIT,
+} from '../openRouter/openRouterRuntime';
+import { clearPendingTacticalOrders } from '../gameplay/tacticalOrders';
+
+/**
+ * Stops resolution playback bookkeeping without touching combat outcomes (shared voluntary exit and forced session release).
+ *
+ * Purpose: `tacticalBattleExitTeardownTransientRendererState` and `tacticalReleaseRendererSessionForNewStrategicMatch` both must cancel the RAF loop and clear `resolutionMoveAnimation` to avoid stale playback after tactical teardown.
+ * When to use: Only from tactical orchestration teardown paths that already handle broader state; not from Ready resolution ticks.
+ * Expected outcome: No in-flight `requestAnimationFrame` callback from resolution playback; animation fields null.
+ * Exceptions: None.
+ */
+function clearResolutionPlaybackAnimationState(): void {
+  if (S.resolutionMoveAnimationFrameId !== null) {
+    cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
+  }
+  S.resolutionMoveAnimationFrameId = null;
+  S.resolutionMoveAnimation = null;
+}
+
+/**
+ * Cancels Run-mode AI, clears tactical draft lists, and tears down resolution playback animation state when leaving tactical combat via the exit control (after successful `endTacticalBattle`).
+ *
+ * Purpose: Aligns voluntary exit with `tacticalReleaseRendererSessionForNewStrategicMatch` so the strategic map does not retain tactical-only pending orders, deferred consult flags, or in-flight prefetch that could apply after snapshot teardown.
+ * When to use: Immediately after successful `endTacticalBattle` IPC in `tacticalPerformBattleExit`, before clearing `S.tacticalBattleSnapshot`.
+ * Expected outcome: Main-process AI work aborted; `clearPendingTacticalOrders` empties tactical rows shown in the right-hand panel; caller runs `TacticalBattleExitIo.refreshSidebarAfterTacticalDraftTeardown` to sync DOM sidebars.
+ * Exceptions: None.
+ */
+export function tacticalBattleExitTeardownTransientRendererState(): void {
+  cancelInFlightBackgroundAiRequestForRendererTeardown(OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_TACTICAL_BATTLE_EXIT);
+  clearResolutionPlaybackAnimationState();
+  S.pendingDeferredTacticalPostBeatConsult = false;
+  clearPendingTacticalOrders();
+  S.hideCommittedOrderLinesAfterReady = false;
+}
 
 /**
  * Clears renderer tactical mode and map constraints when the main process has no tactical session (e.g. new game).
@@ -22,20 +59,15 @@ import { cancelTacticalScopedBackgroundPrefetchForSessionTeardown } from '../ope
  */
 export function tacticalReleaseRendererSessionForNewStrategicMatch(nextState: GameStateSnapshot): void {
   closeTacticalAnnihilationOutcomeDialog();
-  if (S.resolutionMoveAnimationFrameId !== null) {
-    cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
-  }
-  S.resolutionMoveAnimationFrameId = null;
-  S.resolutionMoveAnimation = null;
+  clearResolutionPlaybackAnimationState();
   cancelTacticalScopedBackgroundPrefetchForSessionTeardown();
   S.pendingDeferredTacticalPostBeatConsult = false;
   S.tacticalBattleSnapshot = null;
   S.tacticalOpponentDraft = null;
   S.tacticalPhasePlanning = true;
-  // No `withTacticalHumanDraftPrefetchInvalidation`: session teardown, not an in-beat human edit. Any tactical-scoped
-  // background `requestAiOrders` was cancelled above while `tacticalBattleSnapshot` was still set for fingerprint bookkeeping.
-  S.tacticalPendingMarches = [];
-  S.pendingEmbarkOrders = [];
+  // `clearPendingTacticalOrders` replaces manual tactical march/embark clears and aligns with voluntary tactical exit.
+  // No `withTacticalHumanDraftPrefetchInvalidation` concern at call time: snapshot is already null; stale prefetch was cancelled above.
+  clearPendingTacticalOrders();
   S.hideCommittedOrderLinesAfterReady = false;
   exitTacticalMapView();
   tacticalApplyStrategicSidebarForTacticalMode(false);

@@ -694,8 +694,12 @@ function testTacticalEntryLayerPlanningAndContestedContracts(): void {
   const entryPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'tacticalEntryLayer.ts');
   const source = fs.readFileSync(entryPath, 'utf8');
   assert.ok(
-    source.includes("if (S.gameState.phase !== 'planning' || S.tacticalBattleSnapshot)"),
-    'syncTacticalEntryButton should hide overlays outside strategic planning or while a tactical snapshot is active'
+    !source.includes('HIDE_MAGIFIERS_WHEN_TACTICAL_BATTLE_SESSION_ACTIVE'),
+    'syncTacticalEntryButton should not reference removed optional magnifier-hide flag'
+  );
+  assert.ok(
+    /if\s*\(\s*S\.gameState\.phase\s*!==\s*'planning'\s*\|\|\s*S\.tacticalBattleSnapshot\s*\)/.test(source),
+    'syncTacticalEntryButton should gate overlays on planning phase OR renderer tactical snapshot in one condition'
   );
   assert.ok(
     source.includes('if (!isContestedRes1Hex(S.gameState, hx.h3Index)) continue;'),

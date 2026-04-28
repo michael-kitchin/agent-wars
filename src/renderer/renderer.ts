@@ -159,6 +159,7 @@ import {
 import { drawHoverRoutePreview as drawHoverRoutePreviewFromModule } from './rendering/hoverPreview';
 import {
   handleReadyButtonClick as handleReadyButtonClickFromModule,
+  prepareStrategicPlanningUiBeforeTacticalAutoStart,
   type ReadyHandlerDeps,
 } from './gameplay/readyHandler';
 import { openMeleeInterceptModal } from './gameplay/meleeInterceptModal';
@@ -1343,6 +1344,7 @@ function getTacticalBattleActivationSideEffects(): TacticalRendererStartBattleSi
     },
     scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
     rebuildUnitDisplayNameLookup: () => rebuildUnitDisplayNameLookup(S.gameState),
+    refreshOrderSidebars: refreshStrategicOrderSidebars,
   });
 }
 
@@ -2242,11 +2244,44 @@ function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number): boolea
 }
 
 /**
+ * Refreshes pending-movement, ranged/air/ferry, and selected-unit sidebars after shared order state changes (e.g. tactical exit teardown).
+ *
+ * Purpose: Keeps DOM updates for the three panels in one place alongside `prepareStrategicPlanningUiBeforeTacticalAutoStart` (which performs the same three calls after clearing drafts and reloading standing orders).
+ * When to use: Tactical-exit `refreshSidebarAfterTacticalDraftTeardown`; do not duplicate these three calls elsewhere without updating both paths.
+ * Expected outcome: Pending orders list, ranged strike UI, and unit sidebar reflect current `S` slices.
+ * Exceptions: None.
+ */
+function refreshStrategicOrderSidebars(): void {
+  updatePendingOrdersSidebar();
+  updateRangedSidebar();
+  updateSidebar();
+}
+
+/**
+ * Delegates to `prepareStrategicPlanningUiBeforeTacticalAutoStart` with renderer closures so magnifier tactical entry matches Ready’s Fight → tactical auto-start sequence.
+ *
+ * Purpose: Bridges `startTacticalBattleFromEntryHex` deps to the shared ready-handler helper.
+ * When to use: Passed as `prepareStrategicUiBeforeTacticalStart` into `startTacticalBattleFromEntryHexFromModule`.
+ * Expected outcome: Same mutations as `handleReadyButtonClick` immediately before `startTacticalBattleFromInterceptHex`.
+ * Exceptions: None.
+ */
+async function prepareStrategicUiBeforeTacticalStartFromMagnifier(): Promise<void> {
+  await prepareStrategicPlanningUiBeforeTacticalAutoStart(S.gameState, {
+    clearPendingTacticalOrders,
+    refreshHumanStandingOrders,
+    updateGameStateSidebar,
+    updatePendingOrdersSidebar,
+    updateRangedSidebar,
+    updateSidebar,
+  });
+}
+
+/**
  * Renderer-local entry point for magnifier-driven tactical start; delegates IPC and activation to `tacticalEntryFlow`.
  *
  * Purpose: Preserves the historical `startTacticalBattleFromEntryHex` symbol for map wiring while shrinking `renderer.ts`.
  * When to use: Tactical entry layer hit tests and `#tactical-entry-layer` button handlers.
- * Expected outcome: Same toasts and res4 transition as `startTacticalBattleFromEntryHexFromModule`.
+ * Expected outcome: Same toasts and res4 transition as `startTacticalBattleFromEntryHexFromModule`; resumes an existing main-process session when the clicked hex matches without a redundant `startTacticalBattle` IPC.
  * Exceptions: None; missing IPC surfaces through the shared unavailable toast.
  */
 async function startTacticalBattleFromEntryHex(h3: string): Promise<void> {
@@ -2257,6 +2292,7 @@ async function startTacticalBattleFromEntryHex(h3: string): Promise<void> {
     onMissingStartTacticalBattleIpc: () => {
       showMapToast('Tactical battle is not available.', { isError: true });
     },
+    prepareStrategicUiBeforeTacticalStart: prepareStrategicUiBeforeTacticalStartFromMagnifier,
   });
 }
 
@@ -2362,6 +2398,10 @@ async function performTacticalBattleExit(): Promise<void> {
     showMapToast,
     redraw,
     runReadyAfterExit: () => handleReadyButtonClickFromModule(createReadyHandlerDeps()),
+    refreshSidebarAfterTacticalDraftTeardown: () => {
+      hideStackCallout();
+      refreshStrategicOrderSidebars();
+    },
   });
 }
 
@@ -2461,27 +2501,38 @@ function drawGameScene(
       anim && tacticalUnitsForMarchPlayback.length > 0
         ? { ...state, units: tacticalUnitsForMarchPlayback }
         : state;
-    const { unitsToDraw, movingIds } = anim
-      ? getUnitsForDrawWithMovingIds(stateForTacticalAnim)
-      : { unitsToDraw: tacticalUnits, movingIds: undefined };
+    let elapsedAnim = 0;
     if (anim) {
-      const elapsed = resolutionAnimationElapsedMs(anim);
-      const { phase } = buildResolutionPlaybackState(anim, elapsed);
+      elapsedAnim = resolutionAnimationElapsedMs(anim);
+      const { phase } = buildResolutionPlaybackState(anim, elapsedAnim);
       playbackPhase = phase;
       moveProgress = phase.moveProgress;
       airStrikeOutboundProgress = phase.airStrikeOutboundProgress;
       airStrikeReturnProgress = phase.airStrikeReturnProgress;
-      if (phase.inAirStrikeOutbound) {
+    }
+    const { unitsToDraw, movingIds } = anim
+      ? getUnitsForDrawWithMovingIds(stateForTacticalAnim)
+      : { unitsToDraw: tacticalUnits, movingIds: undefined };
+    let effectiveMovingIds = movingIds;
+    if (anim && playbackPhase?.inMovement && moveProgress < 1) {
+      if (regularPlaybackMoves.length > 0) {
+        effectiveMovingIds = new Set(regularPlaybackMoves.map((m) => m.unitId));
+      } else if ((anim.moves?.length ?? 0) > 0) {
+        effectiveMovingIds = undefined;
+      }
+    }
+    if (anim && playbackPhase) {
+      if (playbackPhase.inAirStrikeOutbound) {
         drawResolutionMoveLines(ctx, width, height, airStrikeOutboundPlaybackMoves, hexList, 1, { includeArrowForHuman: true });
       }
-      if (phase.inAirStrikeReturn) {
+      if (playbackPhase.inAirStrikeReturn) {
         drawResolutionMoveLines(ctx, width, height, airStrikeReturnPlaybackMoves, hexList, 1, { includeArrowForHuman: true });
       }
-      if (elapsed >= phase.movementStart) {
+      if (elapsedAnim >= playbackPhase.movementStart) {
         drawResolutionMoveLines(ctx, width, height, regularPlaybackMoves, hexList, 1);
       }
     }
-    if (unitsToDraw.length) drawUnits(ctx, unitsToDraw, movingIds);
+    if (unitsToDraw.length) drawUnits(ctx, unitsToDraw, effectiveMovingIds);
     if (anim && hexList) {
       if (playbackPhase?.inAirStrikeOutbound && airStrikeOutboundProgress < 1) {
         drawMovingUnits(ctx, width, height, airStrikeOutboundPlaybackMoves, hexList, airStrikeOutboundProgress);
@@ -2548,21 +2599,32 @@ function drawGameScene(
   const regularPlaybackMoves = buildResolutionPlaybackMoves(anim?.moves ?? [], state.units);
   const airStrikeOutboundPlaybackMoves = anim?.airStrikeOutboundMoves ?? [];
   const airStrikeReturnPlaybackMoves = anim?.airStrikeReturnMoves ?? [];
-  const { unitsToDraw, movingIds } = getUnitsForDrawWithMovingIds(state);
+  let elapsedStrategic = 0;
   if (anim) {
-    const elapsed = resolutionAnimationElapsedMs(anim);
-    const { phase } = buildResolutionPlaybackState(anim, elapsed);
+    elapsedStrategic = resolutionAnimationElapsedMs(anim);
+    const { phase } = buildResolutionPlaybackState(anim, elapsedStrategic);
     playbackPhase = phase;
     moveProgress = phase.moveProgress;
     airStrikeOutboundProgress = phase.airStrikeOutboundProgress;
     airStrikeReturnProgress = phase.airStrikeReturnProgress;
-    if (phase.inAirStrikeOutbound) {
+  }
+  const { unitsToDraw, movingIds } = getUnitsForDrawWithMovingIds(state);
+  let effectiveMovingIdsStrategic = movingIds;
+  if (anim && playbackPhase?.inMovement && moveProgress < 1) {
+    if (regularPlaybackMoves.length > 0) {
+      effectiveMovingIdsStrategic = new Set(regularPlaybackMoves.map((m) => m.unitId));
+    } else if ((anim.moves?.length ?? 0) > 0) {
+      effectiveMovingIdsStrategic = undefined;
+    }
+  }
+  if (anim && playbackPhase) {
+    if (playbackPhase.inAirStrikeOutbound) {
       drawResolutionMoveLines(ctx, width, height, airStrikeOutboundPlaybackMoves, hexList, 1, { includeArrowForHuman: true });
     }
-    if (phase.inAirStrikeReturn) {
+    if (playbackPhase.inAirStrikeReturn) {
       drawResolutionMoveLines(ctx, width, height, airStrikeReturnPlaybackMoves, hexList, 1, { includeArrowForHuman: true });
     }
-    if (elapsed >= phase.movementStart) {
+    if (elapsedStrategic >= playbackPhase.movementStart) {
       drawResolutionMoveLines(ctx, width, height, regularPlaybackMoves, hexList, 1);
     }
   }
@@ -2587,7 +2649,7 @@ function drawGameScene(
   drawTerrainInfrastructureOverlays(ctx);
   drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId);
   if (unitsToDraw.length) {
-    drawUnits(ctx, unitsToDraw, movingIds);
+    drawUnits(ctx, unitsToDraw, effectiveMovingIdsStrategic);
   }
   if (anim && hexList) {
     if (playbackPhase?.inAirStrikeOutbound && airStrikeOutboundProgress < 1) {
@@ -2599,7 +2661,7 @@ function drawGameScene(
     }
   }
   if (anim && hexList) {
-    const elapsed = resolutionAnimationElapsedMs(anim);
+    const elapsed = elapsedStrategic;
     const { phase } = buildResolutionPlaybackState(anim, elapsed);
     const meleeCombatHexes = [
       ...(anim.meleeCombatHexes ?? []),
