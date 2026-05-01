@@ -199,7 +199,7 @@ import {
   drawTerrainInfrastructureOverlays as drawTerrainInfrastructureOverlaysFromModule,
   hasVisibleRes1InfrastructureGlyphs as hasVisibleRes1InfrastructureGlyphsFromModule,
 } from './rendering/terrainRendering';
-import { drawRes4CityOverlays } from './rendering/res4CityOverlays';
+import { drawRes4CityOverlays, drawStrategicRes1InspectionHexCodes } from './rendering/res4CityOverlays';
 import { applyRes4CityOverlayRows } from './rendererRes4Hydration';
 import { syncRes4TransportVectorLeafletLayer } from './map/res4TransportVectorLayer';
 import {
@@ -1668,7 +1668,13 @@ function syncBuildEntryButton(): void {
     const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs(hx.h3Index, res4On, visibleUnitHexes);
     const hasVisibleUnits = visibleUnitHexes.has(hx.h3Index);
     const center = hexCenterPx(hx.h3Index);
-    const textY = computeRes1OverlayTextY(hx.h3Index, map, L, hasInfraSymbols || hasVisibleUnits);
+    // While T is held, align build-entry buttons with the downward offset used for airport/seaport hexes so labels stay clear of centered hex codes.
+    const textY = computeRes1OverlayTextY(
+      hx.h3Index,
+      map,
+      L,
+      isMapInspectionModeHeld() || hasInfraSymbols || hasVisibleUnits
+    );
     rows.push({
       h3: hx.h3Index,
       label: formatProductionLabelForHumanControllerOnly(S.gameState, hx.h3Index, capacityPerTurn, 'human'),
@@ -1793,7 +1799,13 @@ function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void {
     const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs(hx.h3Index, false, overlayContext.unitHexes);
     const hasVisibleUnits = overlayContext.unitHexes.has(hx.h3Index);
     const center = hexCenterPx(hx.h3Index);
-    const textY = computeRes1OverlayTextY(hx.h3Index, map, L, hasInfraSymbols || hasVisibleUnits);
+    // Inspection mode shows centered hex codes on res1; push production text to the same lower band as infra-heavy hexes.
+    const textY = computeRes1OverlayTextY(
+      hx.h3Index,
+      map,
+      L,
+      overlayContext.mapInspectionHeld || hasInfraSymbols || hasVisibleUnits
+    );
     const text = explored || overlayContext.revealAllControllerQueues
       ? overlayContext.revealAllControllerQueues
         ? formatProductionLabelForAnyController(
@@ -2201,6 +2213,7 @@ function drawGameScene(
     drawRes4TerrainHexes(ctx);
     drawRes1ProductionOverlays(ctx);
     drawRes4CityOverlayPass(ctx);
+    drawStrategicRes1InspectionHexCodes(ctx, { getExploredHexSet });
     drawTerrainInfrastructureOverlays(ctx);
     const tb = S.tacticalBattleSnapshot;
     const hexList = state.hexes.map((h) => h.h3Index);
@@ -2381,6 +2394,7 @@ function drawGameScene(
   });
   drawRes1ProductionOverlays(ctx);
   drawRes4CityOverlayPass(ctx);
+  drawStrategicRes1InspectionHexCodes(ctx, { getExploredHexSet });
   drawTerrainInfrastructureOverlays(ctx);
   drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId);
   if (unitsToDraw.length) {

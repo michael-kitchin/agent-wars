@@ -16837,6 +16837,7 @@
     if (!rendererSharedState.gameState) return;
     const map = getMainLeafletMap();
     if (!map) return;
+    if (deps.isMapInspectionModeHeld()) return;
     const mapWithZoom = map;
     const zoom = typeof mapWithZoom.getZoom === "function" ? mapWithZoom.getZoom() : 4;
     const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
@@ -24134,6 +24135,7 @@
   var RES4_MAP_OVERLAY_CITY_LABEL_COLLISION_STEP_PX = 17;
 
   // src/renderer/rendering/res4CityOverlays.ts
+  var INSPECTION_HEX_CODE_FONT_SCALE = 0.75;
   function projectedCentroid(pts) {
     let sx = 0;
     let sy = 0;
@@ -24143,6 +24145,52 @@
     }
     const n = pts.length;
     return { x: sx / n, y: sy / n };
+  }
+  function scheduleCityStyleLabelJob(labelJobs, centerPx, span, text, zoomStrokeScale) {
+    const fontPx = Math.max(14, Math.min(23, span * 0.165));
+    const labelLiftPx = (span * RES4_MAP_OVERLAY_CITY_LABEL_UPWARD_OFFSET_SPAN_FRAC + RES4_MAP_OVERLAY_CITY_LABEL_UPWARD_EXTRA_PX * zoomStrokeScale) * RES4_MAP_OVERLAY_CITY_LABEL_LIFT_SCALE;
+    const labelYBase = centerPx.y - labelLiftPx;
+    labelJobs.push({ x: centerPx.x, y: labelYBase, text, fontPx });
+  }
+  function scheduleCenteredInspectionCodeLabelJob(labelJobs, centerPx, span, text) {
+    const fontPx = Math.max(14, Math.min(23, span * 0.165)) * INSPECTION_HEX_CODE_FONT_SCALE;
+    labelJobs.push({ x: centerPx.x, y: centerPx.y, text, fontPx });
+  }
+  function flushCityStyleLabelJobs(ctx, labelJobs, zoomStrokeScale) {
+    if (labelJobs.length === 0) return;
+    labelJobs.sort((a, b) => a.y - b.y || a.x - b.x);
+    const placed = [];
+    const haloW = RES4_MAP_OVERLAY_CITY_LABEL_HALO_WIDTH_PX * zoomStrokeScale;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (const job of labelJobs) {
+      ctx.font = `${job.fontPx}px sans-serif`;
+      const metrics = ctx.measureText(job.text);
+      const w = metrics.width;
+      const h = job.fontPx;
+      let y = job.y;
+      for (let guard = 0; guard < 8; guard++) {
+        const left = job.x - w * 0.5;
+        const right = job.x + w * 0.5;
+        const top = y - h * 0.5;
+        const bottom = y + h * 0.5;
+        const hit = placed.some((r) => !(right < r.left || left > r.right || bottom < r.top || top > r.bottom));
+        if (!hit) break;
+        y += RES4_MAP_OVERLAY_CITY_LABEL_COLLISION_STEP_PX;
+      }
+      ctx.lineJoin = "round";
+      ctx.lineWidth = haloW;
+      ctx.strokeStyle = withOpacityHex("#ffffff", RES4_MAP_OVERLAY_CITY_HALO_ALPHA);
+      ctx.strokeText(job.text, job.x, y);
+      ctx.fillStyle = "#000000";
+      ctx.fillText(job.text, job.x, y);
+      placed.push({
+        left: job.x - w * 0.5 - 1,
+        right: job.x + w * 0.5 + 1,
+        top: y - h * 0.5 - 2,
+        bottom: y + h * 0.5 + 2
+      });
+    }
   }
   function drawRes4CityCircleMarker(ctx, cx, cy, radiusPx, haloWidthPx, zoomStrokeScale) {
     const r = Math.max(0.5, radiusPx);
@@ -24171,13 +24219,17 @@
       const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
       const exploredHexes = deps.getExploredHexSet(rendererSharedState.gameState);
       const tactical = rendererSharedState.tacticalBattleSnapshot;
+      const inspection = isMapInspectionModeHeld();
       const labelJobs = [];
       for (const parent of rendererSharedState.gameState.hexes) {
         if (tactical && parent.h3Index !== tactical.enclosingRes1H3Index) continue;
-        if (!tactical && !exploredHexes.has(parent.h3Index)) continue;
+        if (!tactical && !inspection && !exploredHexes.has(parent.h3Index)) continue;
         if (!shouldConsiderRes4ChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
-        const children = rendererSharedState.res4ChildrenByParent.get(parent.h3Index);
-        if (!children) continue;
+        let children = rendererSharedState.res4ChildrenByParent.get(parent.h3Index);
+        if (!children) {
+          children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
+          rendererSharedState.res4ChildrenByParent.set(parent.h3Index, children);
+        }
         for (const child of children) {
           const pts = projectHexBoundaryToContainerPoints(child, map, L);
           if (!shouldDrawRes4ChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
@@ -24198,50 +24250,47 @@
                 zoomStrokeScale
               );
             }
-            const fontPx = Math.max(14, Math.min(23, span * 0.165));
-            const labelLiftPx = (span * RES4_MAP_OVERLAY_CITY_LABEL_UPWARD_OFFSET_SPAN_FRAC + RES4_MAP_OVERLAY_CITY_LABEL_UPWARD_EXTRA_PX * zoomStrokeScale) * RES4_MAP_OVERLAY_CITY_LABEL_LIFT_SCALE;
-            const labelYBase = centerPx.y - labelLiftPx;
-            labelJobs.push({ x: centerPx.x, y: labelYBase, text: cityLabel, fontPx });
+          }
+          if (inspection) {
+            const parentForCode = tactical ? tactical.enclosingRes1H3Index : parent.h3Index;
+            const code = getRes4ChildCodeWithinParent(parentForCode, child);
+            if (code) {
+              scheduleCenteredInspectionCodeLabelJob(labelJobs, centerPx, span, code);
+            }
+          } else if (cityLabel) {
+            scheduleCityStyleLabelJob(labelJobs, centerPx, span, cityLabel, zoomStrokeScale);
           }
         }
       }
-      if (labelJobs.length > 0) {
-        labelJobs.sort((a, b) => a.y - b.y || a.x - b.x);
-        const placed = [];
-        const haloW = RES4_MAP_OVERLAY_CITY_LABEL_HALO_WIDTH_PX * zoomStrokeScale;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        for (const job of labelJobs) {
-          ctx.font = `${job.fontPx}px sans-serif`;
-          const metrics = ctx.measureText(job.text);
-          const w = metrics.width;
-          const h = job.fontPx;
-          let y = job.y;
-          for (let guard = 0; guard < 8; guard++) {
-            const left = job.x - w * 0.5;
-            const right = job.x + w * 0.5;
-            const top = y - h * 0.5;
-            const bottom = y + h * 0.5;
-            const hit = placed.some(
-              (r) => !(right < r.left || left > r.right || bottom < r.top || top > r.bottom)
-            );
-            if (!hit) break;
-            y += RES4_MAP_OVERLAY_CITY_LABEL_COLLISION_STEP_PX;
-          }
-          ctx.lineJoin = "round";
-          ctx.lineWidth = haloW;
-          ctx.strokeStyle = withOpacityHex("#ffffff", RES4_MAP_OVERLAY_CITY_HALO_ALPHA);
-          ctx.strokeText(job.text, job.x, y);
-          ctx.fillStyle = "#000000";
-          ctx.fillText(job.text, job.x, y);
-          placed.push({
-            left: job.x - w * 0.5 - 1,
-            right: job.x + w * 0.5 + 1,
-            top: y - h * 0.5 - 2,
-            bottom: y + h * 0.5 + 2
-          });
-        }
+      flushCityStyleLabelJobs(ctx, labelJobs, zoomStrokeScale);
+    } finally {
+      ctx.restore();
+    }
+  }
+  function drawStrategicRes1InspectionHexCodes(ctx, _deps) {
+    if (!rendererSharedState.gameState || shouldRenderRes4Hexes() || rendererSharedState.tacticalBattleSnapshot || !isMapInspectionModeHeld()) return;
+    const map = getMainLeafletMapForProjection();
+    if (!map) return;
+    const L = getLeafletGlobal();
+    if (!L) return;
+    ctx.save();
+    try {
+      const container = map.getContainer();
+      const viewportWidth = Math.max(1, container.clientWidth);
+      const viewportHeight = Math.max(1, container.clientHeight);
+      const zoom = typeof map.getZoom === "function" ? map.getZoom() ?? 4 : 4;
+      const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
+      const labelJobs = [];
+      for (const parent of rendererSharedState.gameState.hexes) {
+        if (!shouldConsiderRes4ChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
+        const pts = projectHexBoundaryToContainerPoints(parent.h3Index, map, L);
+        const span = spanForProjectedHex(pts);
+        const centerPx = projectedCentroid(pts);
+        const code = getStrategicRes1HexCode(parent.h3Index);
+        if (!code) continue;
+        scheduleCenteredInspectionCodeLabelJob(labelJobs, centerPx, span, code);
       }
+      flushCityStyleLabelJobs(ctx, labelJobs, zoomStrokeScale);
     } finally {
       ctx.restore();
     }
@@ -25257,7 +25306,12 @@
       const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs2(hx.h3Index, res4On, visibleUnitHexes);
       const hasVisibleUnits = visibleUnitHexes.has(hx.h3Index);
       const center = hexCenterPx(hx.h3Index);
-      const textY = computeRes1OverlayTextY2(hx.h3Index, map, L, hasInfraSymbols || hasVisibleUnits);
+      const textY = computeRes1OverlayTextY2(
+        hx.h3Index,
+        map,
+        L,
+        isMapInspectionModeHeld() || hasInfraSymbols || hasVisibleUnits
+      );
       rows.push({
         h3: hx.h3Index,
         label: formatProductionLabelForHumanControllerOnly(rendererSharedState.gameState, hx.h3Index, capacityPerTurn, "human"),
@@ -25330,7 +25384,12 @@
       const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs2(hx.h3Index, false, overlayContext.unitHexes);
       const hasVisibleUnits = overlayContext.unitHexes.has(hx.h3Index);
       const center = hexCenterPx(hx.h3Index);
-      const textY = computeRes1OverlayTextY2(hx.h3Index, map, L, hasInfraSymbols || hasVisibleUnits);
+      const textY = computeRes1OverlayTextY2(
+        hx.h3Index,
+        map,
+        L,
+        overlayContext.mapInspectionHeld || hasInfraSymbols || hasVisibleUnits
+      );
       const text = explored || overlayContext.revealAllControllerQueues ? overlayContext.revealAllControllerQueues ? formatProductionLabelForAnyController(
         rendererSharedState.gameState,
         hx.h3Index,
@@ -25549,6 +25608,7 @@
       drawRes4TerrainHexes2(ctx);
       drawRes1ProductionOverlays(ctx);
       drawRes4CityOverlayPass(ctx);
+      drawStrategicRes1InspectionHexCodes(ctx, { getExploredHexSet: getExploredHexSet2 });
       drawTerrainInfrastructureOverlays2(ctx);
       const tb = rendererSharedState.tacticalBattleSnapshot;
       const hexList2 = state.hexes.map((h) => h.h3Index);
@@ -25706,6 +25766,7 @@
     });
     drawRes1ProductionOverlays(ctx);
     drawRes4CityOverlayPass(ctx);
+    drawStrategicRes1InspectionHexCodes(ctx, { getExploredHexSet: getExploredHexSet2 });
     drawTerrainInfrastructureOverlays2(ctx);
     drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId);
     if (unitsToDraw.length) {

@@ -327,7 +327,7 @@ export function computeRes1OverlayTextY(
 /**
  * Defines the `drawTerrainInfrastructureOverlays` function shape (export function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void).
 
- * Purpose: Supports maintainability by documenting why `drawTerrainInfrastructureOverlays` exists.
+ * Purpose: Renders res1/res4 airport and seaport glyphs on the overlay canvas (skipped entirely while map inspection T is held).
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
@@ -342,6 +342,8 @@ export function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D,
       }
     | null;
   if (!map) return;
+  // Map inspection (T held): omit airport/seaport canvas glyphs so centered hex codes stay readable.
+  if (deps.isMapInspectionModeHeld()) return;
   const mapWithZoom = map as { getZoom?: () => number };
   const zoom = typeof mapWithZoom.getZoom === 'function' ? mapWithZoom.getZoom() : 4;
   const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - ((zoom - 2) * (0.32 / 8))));
