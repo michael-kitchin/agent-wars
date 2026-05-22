@@ -216,6 +216,15 @@ export interface TacticalBattleSnapshot {
    */
   res4RailSidesByH3?: Record<string, readonly boolean[]>;
   /**
+   * Per-parent tactical baseline counts captured when this battle snapshot was created.
+   *
+   * Contract: Keys are strategic parent unit ids present at tactical start; values are positive integers equal to how many sub-units were actually placed for that parent.
+   * When to use: Tactical bailout threshold mapping back to strategic unit survival.
+   * Expected outcome: Present on newly created snapshots; may be absent on legacy persisted snapshots.
+   * Exceptions: None.
+   */
+  initialPlacedSubUnitCountByParentId?: Record<string, number>;
+  /**
    * All tactical sub-units spawned for this battle.
    *
    * Contract: May be shorter than theoretical totals when parents are unplaceable.
@@ -274,9 +283,9 @@ export interface StartTacticalBattleIpcResult {
 }
 
 /**
- * IPC result for ending the active tactical battle without strategic combat resolution (milestone 2.1).
+ * IPC result for ending the active tactical battle and returning to strategic planning.
  *
- * Contract: Acknowledges main-process session teardown without embedding new game state.
+ * Contract: Acknowledges main-process session teardown without embedding new game state; human voluntary exit may apply bailout threshold elimination to strategic parents first.
  * When to use: After `game:endTacticalBattle` when returning to strategic planning view.
  * Expected outcome: `success` true when a session was cleared or none was active per handler policy.
  * Exceptions: None.

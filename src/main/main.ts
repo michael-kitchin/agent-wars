@@ -40,6 +40,7 @@ import {
 import { clearStrategicPreviousHexMemory } from './strategicUnitPreviousHex';
 import {
   endTacticalBattleSession,
+  endTacticalBattleSessionForHumanVoluntaryExitBailout,
   startTacticalBattleForEnclosingRes1Hex,
 } from './tacticalBattle/tacticalBattleSession';
 import { restorePersistedTacticalBattleSession } from './tacticalBattle/tacticalBattleSession';
@@ -551,7 +552,7 @@ function registerIpcHandlers(): void {
   });
   ipcMain.handle(IPC_GAME.endTacticalBattle, () => {
     clearDeferredPlaybackConsultPending();
-    endTacticalBattleSession();
+    endTacticalBattleSessionForHumanVoluntaryExitBailout();
     return { success: true as const };
   });
   const sharedReadyConsultationDeps = buildSharedHumanReadyConsultationDeps(requestOrdersWithLog);

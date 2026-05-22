@@ -69,6 +69,22 @@ test('computeTacticalBattleSnapshot is deterministic for identical battle id and
   });
 });
 
+test('computeTacticalBattleSnapshot records placed baseline counts by parent id', () => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-snap-baseline-', ({ targetRes1H3 }) => {
+    const battleId = 'baseline-map-probe';
+    const result = computeTacticalBattleSnapshot(targetRes1H3, battleId);
+    assert.ok(result.snapshot, result.failureReason ?? 'expected snapshot');
+    const byParent = result.snapshot!.initialPlacedSubUnitCountByParentId;
+    assert.ok(byParent, 'expected baseline counts map');
+    const computed = result.snapshot!.subUnits.reduce<Record<string, number>>((acc, sub) => {
+      const prior = acc[sub.parentUnitId] ?? 0;
+      acc[sub.parentUnitId] = prior + 1;
+      return acc;
+    }, {});
+    assert.deepEqual(byParent, computed);
+  });
+});
+
 test('startTacticalBattleForEnclosingRes1Hex rejects a second start while session is active', () => {
   tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-snap-dup-', ({ targetRes1H3 }) => {
     const first = startTacticalBattleForEnclosingRes1Hex(targetRes1H3);

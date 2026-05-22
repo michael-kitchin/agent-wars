@@ -13,7 +13,7 @@ import {
   loadPersistedTacticalBattleSnapshotIfConsistent,
   writeTacticalBattleSnapshotToGameConfig,
 } from './tacticalBattlePersistence';
-import { computeTacticalBattleSnapshot } from './computeTacticalBattleSnapshot';
+import { computeTacticalBattleSnapshot, tacticalSubUnitCountForStrategicUnitType } from './computeTacticalBattleSnapshot';
 import {
   projectTacticalSnapshotAfterValidatedHumanSupportOrders,
   projectTacticalSnapshotAfterValidatedOpponentOrders,
@@ -31,7 +31,7 @@ import {
 } from './tacticalStrategicOrderPhases';
 import type { TacticalMovementBlockReason } from './tacticalSnapshotGuards';
 import { tacticalComputeHumanMovementOrderOutcome, tacticalComputeMovementOrderOutcome } from './tacticalSnapshotGuards';
-import { applyTacticalEmbarkCommittedOrdersToStrategicDb } from '../game-actions/sealift';
+import { applyTacticalEmbarkCommittedOrdersToStrategicDb, deleteStrategicParentUnitAndApplyTransportOutcome } from '../game-actions/sealift';
 import { tacticalLogError, tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 import { validateTacticalHumanEmbarkOrder } from './tacticalOpponentOrderValidation';
 import {
@@ -86,6 +86,119 @@ function commitActiveTacticalBattle(snapshot: TacticalBattleSnapshot | null): vo
   setActiveTacticalBattleSnapshotRef(snapshot);
   if (snapshot) writeTacticalBattleSnapshotToGameConfig(snapshot);
   else clearTacticalBattleSnapshotFromGameConfig();
+}
+
+/**
+ * Resolves one parent's tactical baseline count for human voluntary bailout threshold checks.
+ *
+ * Purpose: Keeps bailout elimination deterministic across new snapshots (captured placed counts) and legacy snapshots (theoretical fallback).
+ * When to use: `applyHumanVoluntaryBailoutStrategicParentElimination` per surviving parent id.
+ * Expected outcome: Positive baseline for known unit types; zero only when unit type is unknown.
+ * Exceptions: None.
+ */
+function tacticalBaselineCountForParentOnHumanVoluntaryBailout(
+  snapshot: TacticalBattleSnapshot,
+  parentUnitId: string,
+  tacticalUnitType: string
+): number {
+  const mappedBaseline = snapshot.initialPlacedSubUnitCountByParentId?.[parentUnitId];
+  if (typeof mappedBaseline === 'number' && mappedBaseline > 0) {
+    tacticalLogQuery('tacticalBaselineCountForParentOnHumanVoluntaryBailout mapped', {
+      battleId: snapshot.battleId,
+      parentUnitId,
+      mappedBaseline,
+    });
+    return mappedBaseline;
+  }
+  const fallback = tacticalSubUnitCountForStrategicUnitType(tacticalUnitType);
+  tacticalLogMutate('tacticalBaselineCountForParentOnHumanVoluntaryBailout fallback theoretical', {
+    battleId: snapshot.battleId,
+    parentUnitId,
+    tacticalUnitType,
+    fallback,
+  });
+  return fallback;
+}
+
+/**
+ * Applies strategic-parent elimination for human voluntary tactical bailout using strict-less-than-half survival threshold.
+ *
+ * Purpose: Ensures tactical bailout outcomes remove weakened strategic parents before automatic strategic continuation.
+ * When to use: Human voluntary exit path only, after transport baseline restoration and before active tactical snapshot clear.
+ * Expected outcome: Deletes strategic parents where `survivors * 2 < baseline`.
+ * Exceptions: None; caller handles and logs unexpected failures.
+ */
+function applyHumanVoluntaryBailoutStrategicParentElimination(snapshot: TacticalBattleSnapshot): void {
+  const hasHuman = snapshot.subUnits.some((u) => u.player === 'human');
+  const hasOpponent = snapshot.subUnits.some((u) => u.player === 'opponent');
+  if (!hasHuman || !hasOpponent) {
+    tacticalLogMutate('applyHumanVoluntaryBailoutStrategicParentElimination skipped annihilation-state roster', {
+      battleId: snapshot.battleId,
+      hasHuman,
+      hasOpponent,
+      subUnitCount: snapshot.subUnits.length,
+    });
+    return;
+  }
+  const survivorsByParent = new Map<string, { survivors: number; unitType: string }>();
+  for (const sub of snapshot.subUnits) {
+    const prior = survivorsByParent.get(sub.parentUnitId);
+    if (!prior) {
+      survivorsByParent.set(sub.parentUnitId, { survivors: 1, unitType: sub.unitType });
+      continue;
+    }
+    survivorsByParent.set(sub.parentUnitId, { ...prior, survivors: prior.survivors + 1 });
+  }
+  const eliminatedParentIds: string[] = [];
+  for (const [parentUnitId, parentState] of survivorsByParent) {
+    const baseline = tacticalBaselineCountForParentOnHumanVoluntaryBailout(snapshot, parentUnitId, parentState.unitType);
+    if (baseline <= 0) {
+      tacticalLogMutate('applyHumanVoluntaryBailoutStrategicParentElimination skipped unknown baseline', {
+        battleId: snapshot.battleId,
+        parentUnitId,
+        unitType: parentState.unitType,
+      });
+      continue;
+    }
+    if (parentState.survivors * 2 >= baseline) continue;
+    deleteStrategicParentUnitAndApplyTransportOutcome(parentUnitId);
+    eliminatedParentIds.push(parentUnitId);
+  }
+  tacticalLogMutate('applyHumanVoluntaryBailoutStrategicParentElimination complete', {
+    battleId: snapshot.battleId,
+    parentCount: survivorsByParent.size,
+    eliminatedParentCount: eliminatedParentIds.length,
+    eliminatedParentIds,
+  });
+}
+
+/**
+ * Ends tactical session state and optionally applies human-voluntary bailout elimination before snapshot clear.
+ *
+ * Purpose: Centralizes teardown ordering so transport restoration and optional bailout elimination remain consistent.
+ * When to use: Called by both `endTacticalBattleSession` and `endTacticalBattleSessionForHumanVoluntaryExitBailout`.
+ * Expected outcome: Tactical session snapshot clears in both modes; voluntary mode may additionally delete strategic parent units.
+ * Exceptions: Bailout elimination errors are logged and suppressed so teardown always completes.
+ */
+function endTacticalBattleSessionCore(applyHumanVoluntaryBailoutResolution: boolean): void {
+  tacticalLogMutate('endTacticalBattleSessionCore', {
+    hadBattle: !!getActiveTacticalBattleSnapshotRef(),
+    applyHumanVoluntaryBailoutResolution,
+  });
+  const snap = getActiveTacticalBattleSnapshotRef();
+  const parentIds = snap ? [...new Set(snap.subUnits.map((u) => u.parentUnitId))] : null;
+  restoreTacticalTransportBaselineForParentUnitIds(parentIds);
+  if (snap && applyHumanVoluntaryBailoutResolution) {
+    try {
+      applyHumanVoluntaryBailoutStrategicParentElimination(snap);
+    } catch (err) {
+      tacticalLogError('endTacticalBattleSessionCore bailout elimination failed', {
+        battleId: snap.battleId,
+        err,
+      });
+    }
+  }
+  commitActiveTacticalBattle(null);
 }
 
 /**
@@ -164,10 +277,22 @@ export function startTacticalBattleForEnclosingRes1Hex(enclosingRes1H3Index: str
  */
 export function endTacticalBattleSession(): void {
   tacticalLogMutate('endTacticalBattleSession', { hadBattle: !!getActiveTacticalBattleSnapshotRef() });
-  const snap = getActiveTacticalBattleSnapshotRef();
-  const parentIds = snap ? [...new Set(snap.subUnits.map((u) => u.parentUnitId))] : null;
-  restoreTacticalTransportBaselineForParentUnitIds(parentIds);
-  commitActiveTacticalBattle(null);
+  endTacticalBattleSessionCore(false);
+}
+
+/**
+ * Clears tactical session state for the human voluntary tactical exit bailout flow and applies threshold parent elimination.
+ *
+ * Contract: Idempotent; restores transport baseline like `endTacticalBattleSession` and then removes strategic parents that fail `survivors * 2 < baseline` when both players still have tactical sub-units.
+ * When to use: Main-process `game:endTacticalBattle` handler for human Return-to-Strategic bailout.
+ * Expected outcome: Tactical session closes, strategic-ready gating reopens, and below-half parent strategic units are removed before automatic strategic continuation.
+ * Exceptions: Elimination failures are logged and suppressed so tactical teardown still completes.
+ */
+export function endTacticalBattleSessionForHumanVoluntaryExitBailout(): void {
+  tacticalLogMutate('endTacticalBattleSessionForHumanVoluntaryExitBailout', {
+    hadBattle: !!getActiveTacticalBattleSnapshotRef(),
+  });
+  endTacticalBattleSessionCore(true);
 }
 
 /**

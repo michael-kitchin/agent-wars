@@ -429,7 +429,7 @@ startTacticalBattle: (payload: { enclosingRes1H3Index: string }) => Promise<Star
     /**
    * Specifies the contract for the `endTacticalBattle` member (endTacticalBattle: () => Promise<EndTacticalBattleIpcResult>;).
 
-   * Contract: Clears the active tactical session in the main process without applying strategic combat outcomes.
+   * Contract: Clears the active tactical session in the main process; on human voluntary tactical exit, bailout threshold elimination may remove strategic parents before returning to strategic planning.
    * When to use: Renderer invokes this when the player exits tactical planning and returns to the strategic map.
    * Expected outcome: Strategic `ready` and order mutations become eligible again after this succeeds.
    * Exceptions: None.

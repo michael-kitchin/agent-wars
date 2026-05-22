@@ -504,6 +504,11 @@ export function computeTacticalBattleSnapshot(
       ...(transportForPlacement.res4RailSidesByH3
         ? { res4RailSidesByH3: transportForPlacement.res4RailSidesByH3 }
         : {}),
+      initialPlacedSubUnitCountByParentId: subUnits.reduce<Record<string, number>>((acc, sub) => {
+        const prior = acc[sub.parentUnitId] ?? 0;
+        acc[sub.parentUnitId] = prior + 1;
+        return acc;
+      }, {}),
       subUnits,
     };
     tacticalLogQuery('computeTacticalBattleSnapshot result', {
