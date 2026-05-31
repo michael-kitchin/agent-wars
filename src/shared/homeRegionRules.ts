@@ -17,6 +17,24 @@ export type HomeRegionOutlineState =
   | 'unknown';
 
 /**
+ * Classifies how a strategic hex border should communicate ownership to the current player.
+ *
+ * Purpose: Provides a single contract for renderer border style decisions so home/non-home visibility
+ * and ownership coloring remain consistent across scenarios and draw passes.
+ * When to use: Use when deriving per-hex border paint instructions from perspective, visibility, and control.
+ * Expected outcome: Home hexes resolve to outlined variants, non-home visible ownership resolves to normal lines,
+ * and hidden non-home ownership resolves to no owner-colored border.
+ * Exceptions: None.
+ */
+export type OwnershipBorderStyle =
+  | 'none'
+  | 'normalControlledByHuman'
+  | 'normalControlledByOpponent'
+  | 'outlinedControlledByHuman'
+  | 'outlinedControlledByOpponent'
+  | 'outlinedNeutral';
+
+/**
  * Documents the `HomeRegionUnitPosition` interface as a named contract surface (export interface HomeRegionUnitPosition).
 
  * Purpose: Supports maintainability by documenting why `HomeRegionUnitPosition` exists.
@@ -43,6 +61,136 @@ player: string;
    * Exceptions: None.
    */
 h3Index: string;
+}
+
+/**
+ * Defines the ownership-visibility decision inputs used by perspective-aware border helpers.
+ *
+ * Purpose: Bundles all state needed to decide whether a player should see ownership on one hex.
+ * When to use: Build this parameter object from `GameStateSnapshot` fields and renderer visibility sets.
+ * Expected outcome: Deterministic ownership visibility decisions for both home and non-home hexes.
+ * Exceptions: None.
+ */
+export interface OwnershipVisibilityDecisionInput {
+  /**
+   * Identifies the queried strategic hex.
+   *
+   * Contract: Supplies the h3 index whose ownership visibility is being resolved.
+   * When to use: Populate with the current loop hex before calling `isHexOwnershipVisibleToPerspective`.
+   * Expected outcome: Visibility helper evaluates one deterministic hex at a time.
+   * Exceptions: None.
+   */
+  h3Index: string;
+  /**
+   * Declares the viewer perspective used for own-home visibility exceptions.
+   *
+   * Contract: Must be the same perspective used for the surrounding snapshot/render flow.
+   * When to use: Set from `GameStateSnapshot.playerPerspective` with a stable fallback.
+   * Expected outcome: Own-home ownership exceptions map to the correct side.
+   * Exceptions: None.
+   */
+  playerPerspective: 'human' | 'opponent';
+  /**
+   * Supplies currently visible hexes from fog/proximity logic.
+   *
+   * Contract: Represents normal ownership visibility derived from fog/proximity systems.
+   * When to use: Pass the perspective-specific `visibleHexes` set for the current frame/snapshot.
+   * Expected outcome: Non-home ownership visibility follows existing fog contracts.
+   * Exceptions: None.
+   */
+  visibleHexes: ReadonlySet<string>;
+  /**
+   * Lists human home-region hexes when scenario metadata exists.
+   *
+   * Contract: Optional home metadata source for own-home ownership exceptions.
+   * When to use: Forward from snapshot metadata when available.
+   * Expected outcome: Human-home membership checks remain deterministic.
+   * Exceptions: None.
+   */
+  humanHomeRegionHexes?: readonly string[];
+  /**
+   * Lists opponent home-region hexes when scenario metadata exists.
+   *
+   * Contract: Optional home metadata source for cross-side and intersection checks.
+   * When to use: Forward from snapshot metadata when available.
+   * Expected outcome: Opponent-home membership checks remain deterministic.
+   * Exceptions: None.
+   */
+  aiHomeRegionHexes?: readonly string[];
+  /**
+   * Lists intersecting home-region hexes; when omitted, helper derives them from both home sets.
+   *
+   * Contract: Optional precomputed intersection override to avoid recomputation.
+   * When to use: Provide when caller already has intersection metadata on snapshot.
+   * Expected outcome: Intersection visibility rules remain stable and perspective-independent.
+   * Exceptions: None.
+   */
+  intersectingHomeRegionHexes?: readonly string[];
+}
+
+/**
+ * Defines the border-style classification inputs used by ownership border rendering.
+ *
+ * Purpose: Carries the visibility and control context required to map one hex to a stable style token.
+ * When to use: Pass this object after computing ownership visibility for the current perspective.
+ * Expected outcome: Shared style categories usable by renderer passes without duplicating business rules.
+ * Exceptions: None.
+ */
+export interface OwnershipBorderStyleDecisionInput {
+  /**
+   * Identifies the strategic hex whose border style is being resolved.
+   *
+   * Contract: Supplies the h3 index whose border style token must be computed.
+   * When to use: Populate while iterating strategic hexes before painting borders.
+   * Expected outcome: Style resolver returns one deterministic token per hex.
+   * Exceptions: None.
+   */
+  h3Index: string;
+  /**
+   * Reports who currently controls the hex, if known in state.
+   *
+   * Contract: Uses current authoritative control owner from `res1Control`.
+   * When to use: Pass through control-map lookup result for this hex.
+   * Expected outcome: Owner-colored styles reflect current control state when visible.
+   * Exceptions: None.
+   */
+  controllerPlayerId: string | null | undefined;
+  /**
+   * States whether the current perspective is allowed to see ownership for this hex.
+   *
+   * Contract: Indicates if ownership may be shown without violating fog contracts.
+   * When to use: Use output from `isHexOwnershipVisibleToPerspective`.
+   * Expected outcome: Hidden ownership does not leak via border colors.
+   * Exceptions: None.
+   */
+  isOwnershipVisible: boolean;
+  /**
+   * Lists human home-region hexes when scenario metadata exists.
+   *
+   * Contract: Optional home metadata used to classify home-region borders.
+   * When to use: Forward snapshot metadata for the active frame.
+   * Expected outcome: Human-home membership decisions remain deterministic.
+   * Exceptions: None.
+   */
+  humanHomeRegionHexes?: readonly string[];
+  /**
+   * Lists opponent home-region hexes when scenario metadata exists.
+   *
+   * Contract: Optional home metadata used to classify home-region borders.
+   * When to use: Forward snapshot metadata for the active frame.
+   * Expected outcome: Opponent-home membership decisions remain deterministic.
+   * Exceptions: None.
+   */
+  aiHomeRegionHexes?: readonly string[];
+  /**
+   * Lists intersecting home-region hexes; when omitted, helper derives them from both home sets.
+   *
+   * Contract: Optional precomputed intersection override to keep classification fast.
+   * When to use: Pass provided snapshot intersection metadata when available.
+   * Expected outcome: Intersecting home hexes consistently resolve to neutral outlined style.
+   * Exceptions: None.
+   */
+  intersectingHomeRegionHexes?: readonly string[];
 }
 
 /**
@@ -161,11 +309,11 @@ export function classifyHomeRegionOutlineState(
  * Exceptions: None.
  */
 export function getForcedVisibleHomeRegionHexesForPlayer(
-  state: Pick<GameStateSnapshot, 'scenarioId' | 'humanHomeRegionHexes' | 'aiHomeRegionHexes' | 'intersectingHomeRegionHexes'>,
+  state: Pick<GameStateSnapshot, 'humanHomeRegionHexes' | 'aiHomeRegionHexes' | 'intersectingHomeRegionHexes'>,
   playerId: 'human' | 'opponent',
   mapHexSet: ReadonlySet<string>
 ): Set<string> {
-  if (state.scenarioId !== 'region_vs_region') return new Set<string>();
+  if (!hasHomeRegionMetadata(state)) return new Set<string>();
   const ownHomeHexes = playerId === 'human'
     ? (state.humanHomeRegionHexes ?? [])
     : (state.aiHomeRegionHexes ?? []);
@@ -174,6 +322,68 @@ export function getForcedVisibleHomeRegionHexesForPlayer(
   return new Set(
     [...ownHomeHexes, ...intersectionHexes].filter((h3Index) => mapHexSet.has(h3Index))
   );
+}
+
+/**
+ * Detects whether a snapshot carries home-region metadata that should activate home visibility rules.
+ *
+ * Purpose: Generalizes home-region behaviors across any scenario that provides home-region hex lists.
+ * When to use: Use before applying forced-home visibility or ownership-display exceptions.
+ * Expected outcome: `true` when either side has at least one home-region hex listed.
+ * Exceptions: None.
+ */
+export function hasHomeRegionMetadata(
+  state: { humanHomeRegionHexes?: readonly string[]; aiHomeRegionHexes?: readonly string[] }
+): boolean {
+  return (state.humanHomeRegionHexes?.length ?? 0) > 0 || (state.aiHomeRegionHexes?.length ?? 0) > 0;
+}
+
+/**
+ * Determines whether ownership for one hex is visible to the current player perspective.
+ *
+ * Purpose: Centralizes ownership visibility contract across home exceptions and normal fog visibility.
+ * When to use: Use before selecting owner-colored border styles in renderer draw passes.
+ * Expected outcome: Own-home and intersecting home hexes remain ownership-visible even without proximity.
+ * Exceptions: None.
+ */
+export function isHexOwnershipVisibleToPerspective(input: OwnershipVisibilityDecisionInput): boolean {
+  if (input.visibleHexes.has(input.h3Index)) return true;
+  if (!hasHomeRegionMetadata(input)) return false;
+  const intersectionSet = new Set(
+    input.intersectingHomeRegionHexes ??
+      computeIntersectingHomeRegionHexes(input.humanHomeRegionHexes ?? [], input.aiHomeRegionHexes ?? [])
+  );
+  if (intersectionSet.has(input.h3Index)) return true;
+  const ownHomeHexSet = new Set(
+    input.playerPerspective === 'human'
+      ? (input.humanHomeRegionHexes ?? [])
+      : (input.aiHomeRegionHexes ?? [])
+  );
+  return ownHomeHexSet.has(input.h3Index);
+}
+
+/**
+ * Resolves border style token for one strategic hex using ownership visibility and home-region context.
+ *
+ * Purpose: Encodes the shared contract required by home outlined borders and normal non-home borders.
+ * When to use: Use for every strategic hex before rendering ownership borders.
+ * Expected outcome: Intersecting home hexes resolve to neutral outlines; non-home hidden ownership resolves to `none`.
+ * Exceptions: None.
+ */
+export function resolveOwnershipBorderStyle(input: OwnershipBorderStyleDecisionInput): OwnershipBorderStyle {
+  const humanHomeHexes = new Set(input.humanHomeRegionHexes ?? []);
+  const aiHomeHexes = new Set(input.aiHomeRegionHexes ?? []);
+  const isHomeHex = humanHomeHexes.has(input.h3Index) || aiHomeHexes.has(input.h3Index);
+  if (isHomeHex) {
+    // Home-region ownership outlines must always reflect current controller color, even when fog-hidden.
+    if (input.controllerPlayerId === 'human') return 'outlinedControlledByHuman';
+    if (input.controllerPlayerId === 'opponent') return 'outlinedControlledByOpponent';
+    return 'outlinedNeutral';
+  }
+  if (!input.isOwnershipVisible) return 'none';
+  if (input.controllerPlayerId === 'human') return 'normalControlledByHuman';
+  if (input.controllerPlayerId === 'opponent') return 'normalControlledByOpponent';
+  return 'none';
 }
 
 /**

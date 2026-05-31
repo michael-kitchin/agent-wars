@@ -1,13 +1,12 @@
 import { cellToChildren } from 'h3-js';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import {
-  classifyHomeRegionOutlineState,
-  computeContestedHomeRegionHexes,
-  computeIntersectingHomeRegionHexes,
+  isHexOwnershipVisibleToPerspective,
+  resolveOwnershipBorderStyle,
+  type OwnershipBorderStyle,
 } from '../../shared/homeRegionRules';
 import { getHexBoundaryLatLngForLeafletOverlay } from '../map/hexGrid';
 import { getActiveHexStrokeStyle, fillHexTerrain } from './terrainVisualStyles';
-import { withOpacityHex } from './canvasColor';
 import { drawTerrainInfrastructureGlyphs, RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE } from './terrainInfrastructureOverlay';
 import { DETAIL_H3_RESOLUTION, MULTI_PLAYER_FILL, PLAYER_COLORS } from '../core/constants';
 import { getLeafletGlobal, hexCenterPx } from '../map/mapUtils';
@@ -20,7 +19,6 @@ import {
 } from '../map/terrainView';
 import { rendererSharedState as S } from '../core/state';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
-import { strokeDualClosedPolygon } from './polygonOutline';
 
 /**
  * Documents the `TerrainRenderingDeps` interface as a named contract surface (interface TerrainRenderingDeps).
@@ -91,6 +89,53 @@ function buildControlByHex(state: GameStateSnapshot): Map<string, string | null>
 }
 
 /**
+ * Maps a shared ownership border style token to a concrete render color.
+ *
+ * Purpose: Keeps border-color mapping centralized so home and non-home ownership rendering remains consistent.
+ * When to use: Strategic border rendering after ownership style classification.
+ * Expected outcome: Human/opponent styles map to player colors and neutral maps to mixed-player gray.
+ * Exceptions: `none` returns null.
+ */
+function resolveOwnershipBorderColor(style: OwnershipBorderStyle): string | null {
+  if (style === 'normalControlledByHuman' || style === 'outlinedControlledByHuman') return PLAYER_COLORS.human;
+  if (style === 'normalControlledByOpponent' || style === 'outlinedControlledByOpponent') return PLAYER_COLORS.opponent;
+  if (style === 'outlinedNeutral') return MULTI_PLAYER_FILL;
+  return null;
+}
+
+/**
+ * Builds an inward-offset polygon approximation for drawing inner home-region ownership lines.
+ *
+ * Purpose: Supports home-border dual-line styling by moving each vertex toward centroid by a fixed screen-pixel inset.
+ * When to use: After drawing the primary home ownership border when an inner parallel line is required.
+ * Expected outcome: Returns a same-vertex-count polygon inset toward center; falls back to original vertices for degenerate points.
+ * Exceptions: None.
+ */
+function buildInsetPolygonPoints(
+  pts: readonly { x: number; y: number }[],
+  insetPx: number
+): { x: number; y: number }[] {
+  if (pts.length === 0 || insetPx <= 0) return [...pts];
+  let sumX = 0;
+  let sumY = 0;
+  for (const p of pts) {
+    sumX += p.x;
+    sumY += p.y;
+  }
+  const cx = sumX / pts.length;
+  const cy = sumY / pts.length;
+  return pts.map((p) => {
+    const dx = cx - p.x;
+    const dy = cy - p.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist <= 0.0001) return { x: p.x, y: p.y };
+    const appliedInset = Math.min(insetPx, dist * 0.35);
+    const t = appliedInset / dist;
+    return { x: p.x + dx * t, y: p.y + dy * t };
+  });
+}
+
+/**
  * Defines the `drawTerrainHexes` function shape (export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void).
 
  * Purpose: Supports maintainability by documenting why `drawTerrainHexes` exists.
@@ -110,6 +155,9 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
   const zoom = typeof mapWithZoom.getZoom === 'function' ? mapWithZoom.getZoom() : 4;
   const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - ((zoom - 2) * (0.32 / 8))));
   const L = getLeafletGlobal();
+  const visibleHexes = S.gameState.visibleHexes ? new Set(S.gameState.visibleHexes) : new Set(S.gameState.hexes.map((h) => h.h3Index));
+  const controlByHex = buildControlByHex(S.gameState);
+  const perspective = S.gameState.playerPerspective === 'opponent' ? 'opponent' : 'human';
   for (const hx of S.gameState.hexes) {
     const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
     const pts = boundary.map(([lat, lng]: [number, number]) => {
@@ -139,10 +187,50 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
       });
     }
     const stroke = getActiveHexStrokeStyle();
-    ctx.strokeStyle = stroke.color;
+    const ownershipVisible = isHexOwnershipVisibleToPerspective({
+      h3Index: hx.h3Index,
+      playerPerspective: perspective,
+      visibleHexes,
+      humanHomeRegionHexes: S.gameState.humanHomeRegionHexes,
+      aiHomeRegionHexes: S.gameState.aiHomeRegionHexes,
+      intersectingHomeRegionHexes: S.gameState.intersectingHomeRegionHexes,
+    });
+    const ownershipStyle = resolveOwnershipBorderStyle({
+      h3Index: hx.h3Index,
+      controllerPlayerId: controlByHex.get(hx.h3Index),
+      isOwnershipVisible: ownershipVisible,
+      humanHomeRegionHexes: S.gameState.humanHomeRegionHexes,
+      aiHomeRegionHexes: S.gameState.aiHomeRegionHexes,
+      intersectingHomeRegionHexes: S.gameState.intersectingHomeRegionHexes,
+    });
+    const ownershipColor = resolveOwnershipBorderColor(ownershipStyle);
+    ctx.strokeStyle = ownershipStyle.startsWith('outlined') ? 'rgba(0, 0, 0, 0)' : stroke.color;
     ctx.lineWidth = stroke.width * zoomStrokeScale;
     drawClosedPath();
     ctx.stroke();
+    if (ownershipColor && ownershipStyle !== 'none') {
+      const ownershipLineWidth = Math.max(stroke.width * zoomStrokeScale * 3, 2.7);
+      drawClosedPath();
+      ctx.strokeStyle = ownershipColor;
+      ctx.lineWidth = ownershipLineWidth;
+      ctx.stroke();
+      if (ownershipStyle.startsWith('outlined')) {
+        const innerPts = buildInsetPolygonPoints(pts, ownershipLineWidth * 1.5);
+        const innerLineWidth = Math.max(ownershipLineWidth * 0.5, 1);
+        ctx.beginPath();
+        for (let i = 0; i < innerPts.length; i++) {
+          const p = innerPts[i]!;
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = ownershipColor;
+        ctx.lineWidth = innerLineWidth;
+        ctx.setLineDash([innerLineWidth * 2.6, innerLineWidth * 1.8]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
     if (S.selectedHexIndex === hx.h3Index) {
       drawClosedPath();
       ctx.strokeStyle = PLAYER_COLORS.human;
@@ -230,60 +318,72 @@ export function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D, deps: Terrai
  */
 export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): void {
   const state = S.gameState;
-  if (!state || state.scenarioId !== 'region_vs_region') return;
+  if (!state) return;
+  const homeRegionHexes = [...new Set([...(state.humanHomeRegionHexes ?? []), ...(state.aiHomeRegionHexes ?? [])])];
+  if (homeRegionHexes.length === 0) return;
+  if (!shouldRenderRes4Hexes()) return;
   const map = getMainLeafletMap() as { latLngToContainerPoint: (ll: unknown) => { x: number; y: number }; getZoom?: () => number } | null;
   if (!map) return;
   const L = getLeafletGlobal();
   const zoom = typeof map.getZoom === 'function' ? map.getZoom() : 4;
   const zoomScale = Math.max(0.88, Math.min(1.22, 1.22 - ((zoom - 2) * (0.32 / 8))));
-  const humanColor = PLAYER_COLORS.human ?? '#115e59';
-  const aiColor = PLAYER_COLORS.opponent ?? '#9d174d';
-  const intersectionHexes = new Set(
-    state.intersectingHomeRegionHexes ??
-      computeIntersectingHomeRegionHexes(state.humanHomeRegionHexes ?? [], state.aiHomeRegionHexes ?? [])
-  );
-  const contestedHomeHexes = new Set(
-    state.contestedHomeRegionHexes ??
-      computeContestedHomeRegionHexes(state.units, [...(state.humanHomeRegionHexes ?? []), ...(state.aiHomeRegionHexes ?? [])])
-  );
+  const perspective = state.playerPerspective === 'opponent' ? 'opponent' : 'human';
+  const visibleHexes = state.visibleHexes ? new Set(state.visibleHexes) : new Set(state.hexes.map((h) => h.h3Index));
   const controlByHex = buildControlByHex(state);
-  /**
-   * Resolves the stroke color for one strategic hex in a home-region outline pass.
-   *
-   * Purpose: Colors each border by **which side’s home region** is being outlined (`regionBorderColor`), not by
-   * territorial control — control-based coloring made AI-home borders look human-colored (and vice versa).
-   * When to use: Only from `drawScenarioHomeRegionOutlines` when tracing `humanHomeRegionHexes` vs `aiHomeRegionHexes`.
-   * Expected outcome: Intersection/contested hexes use neutral grey; all other hexes use that pass’s home-region hue.
-   */
-  const resolveHexOutlineColor = (h3Index: string, regionBorderColor: string): string => {
-    const outlineState = classifyHomeRegionOutlineState(
+  for (const h3Index of homeRegionHexes) {
+    const ownershipVisible = isHexOwnershipVisibleToPerspective({
       h3Index,
-      intersectionHexes,
-      contestedHomeHexes,
-      controlByHex.get(h3Index)
-    );
-    if (outlineState === 'intersection' || outlineState === 'contested') return MULTI_PLAYER_FILL;
-    return regionBorderColor;
-  };
-  const drawRegion = (hexes: string[] | undefined, fallbackColor: string): void => {
-    if (!Array.isArray(hexes) || hexes.length <= 0) return;
-    for (const h3Index of hexes) {
-      const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
-      const pts = boundary.map(([lat, lng]: [number, number]) => {
-        const p = map.latLngToContainerPoint(L.latLng(lat, lng));
-        return { x: p.x, y: p.y };
-      });
-      const outlineColor = resolveHexOutlineColor(h3Index, fallbackColor);
-      strokeDualClosedPolygon(ctx, pts, {
-        underStrokeColor: 'rgba(0, 0, 0, 0.25)',
-        underStrokeWidth: Math.max(1.2, 2.2 * zoomScale) * 1.25,
-        topStrokeColor: withOpacityHex(outlineColor, 0.5),
-        topStrokeWidth: Math.max(0.75, 1.25 * zoomScale) * 0.75 * 1.5 * 1.25,
-      });
+      playerPerspective: perspective,
+      visibleHexes,
+      humanHomeRegionHexes: state.humanHomeRegionHexes,
+      aiHomeRegionHexes: state.aiHomeRegionHexes,
+      intersectingHomeRegionHexes: state.intersectingHomeRegionHexes,
+    });
+    const style = resolveOwnershipBorderStyle({
+      h3Index,
+      controllerPlayerId: controlByHex.get(h3Index),
+      isOwnershipVisible: ownershipVisible,
+      humanHomeRegionHexes: state.humanHomeRegionHexes,
+      aiHomeRegionHexes: state.aiHomeRegionHexes,
+      intersectingHomeRegionHexes: state.intersectingHomeRegionHexes,
+    });
+    if (style === 'none') continue;
+    const color = resolveOwnershipBorderColor(style);
+    if (!color) continue;
+    const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
+    const pts = boundary.map(([lat, lng]: [number, number]) => {
+      const p = map.latLngToContainerPoint(L.latLng(lat, lng));
+      return { x: p.x, y: p.y };
+    });
+    const drawClosedPath = (): void => {
+      ctx.beginPath();
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i]!;
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.closePath();
+    };
+    drawClosedPath();
+    ctx.strokeStyle = color;
+    const ownershipLineWidth = Math.max(getActiveHexStrokeStyle().width * zoomScale * 3, 2.7);
+    ctx.lineWidth = ownershipLineWidth;
+    ctx.stroke();
+    const innerPts = buildInsetPolygonPoints(pts, ownershipLineWidth * 1.5);
+    const innerLineWidth = Math.max(ownershipLineWidth * 0.5, 1);
+    ctx.beginPath();
+    for (let i = 0; i < innerPts.length; i++) {
+      const p = innerPts[i]!;
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
     }
-  };
-  drawRegion(state.humanHomeRegionHexes, humanColor);
-  drawRegion(state.aiHomeRegionHexes, aiColor);
+    ctx.closePath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = innerLineWidth;
+    ctx.setLineDash([innerLineWidth * 2.6, innerLineWidth * 1.8]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 }
 
 /**

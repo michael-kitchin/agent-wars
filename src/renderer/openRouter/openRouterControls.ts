@@ -257,6 +257,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
   let lastPersistedApiKeyValue = '';
   let modelRefreshInFlight = false;
   let startupModelRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  let startupModelRetryConsumed = false;
 
   function clearStartupModelRetryTimer(): void {
     if (startupModelRetryTimer !== null) {
@@ -266,11 +267,19 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
   }
 
   function scheduleStartupModelRetry(): void {
-    if (startupModelRetryTimer !== null) return;
+    if (startupModelRetryTimer !== null || startupModelRetryConsumed) return;
+    startupModelRetryConsumed = true;
     startupModelRetryTimer = setTimeout(() => {
       startupModelRetryTimer = null;
       refreshModels(true);
     }, 2000);
+  }
+
+  function shouldRetryStartupModelFetch(errorMessage: string): boolean {
+    if (errorMessage === 'No API key set') return false;
+    if (errorMessage === 'Invalid API key') return false;
+    if (errorMessage.startsWith('API error: 4')) return false;
+    return true;
   }
 
   function refreshModels(retryOnFailure = false): void {
@@ -282,7 +291,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       modelSelect.innerHTML = '<option value="">— Select model —</option>';
       if ('error' in result && result.error) {
         deps.appendOpenRouterLog(`Models: ${result.error}`, true);
-        if (retryOnFailure) scheduleStartupModelRetry();
+        if (retryOnFailure && shouldRetryStartupModelFetch(result.error)) scheduleStartupModelRetry();
         void deps.syncOpenRouterRunToggleInteractable();
         return;
       }
@@ -300,8 +309,9 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       clearStartupModelRetryTimer();
       void deps.syncOpenRouterRunToggleInteractable();
     }).catch((err) => {
-      deps.appendOpenRouterLog(`Models: ${String(err)}`, true);
-      if (retryOnFailure) scheduleStartupModelRetry();
+      const message = String(err);
+      deps.appendOpenRouterLog(`Models: ${message}`, true);
+      if (retryOnFailure && shouldRetryStartupModelFetch(message)) scheduleStartupModelRetry();
       void deps.syncOpenRouterRunToggleInteractable();
     }).finally(() => {
       modelRefreshInFlight = false;

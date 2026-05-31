@@ -16030,28 +16030,34 @@
     const aiSet = new Set(aiHomeRegionHexes);
     return uniqueSortedHexes(humanHomeRegionHexes.filter((h3Index) => aiSet.has(h3Index)));
   }
-  function computeContestedHomeRegionHexes(units, homeRegionHexes) {
-    const homeHexSet = new Set(homeRegionHexes);
-    const playersByHomeHex = /* @__PURE__ */ new Map();
-    for (const unit of units) {
-      if (!homeHexSet.has(unit.h3Index)) continue;
-      let players = playersByHomeHex.get(unit.h3Index);
-      if (!players) {
-        players = /* @__PURE__ */ new Set();
-        playersByHomeHex.set(unit.h3Index, players);
-      }
-      players.add(unit.player);
-    }
-    return uniqueSortedHexes(
-      [...playersByHomeHex.entries()].filter(([, players]) => players.size > 1).map(([h3Index]) => h3Index)
-    );
+  function hasHomeRegionMetadata(state) {
+    return (state.humanHomeRegionHexes?.length ?? 0) > 0 || (state.aiHomeRegionHexes?.length ?? 0) > 0;
   }
-  function classifyHomeRegionOutlineState(h3Index, intersectionHexes, contestedHexes, controllerPlayerId) {
-    if (intersectionHexes.has(h3Index)) return "intersection";
-    if (contestedHexes.has(h3Index)) return "contested";
-    if (controllerPlayerId === "human") return "controlledByHuman";
-    if (controllerPlayerId === "opponent") return "controlledByOpponent";
-    return "unknown";
+  function isHexOwnershipVisibleToPerspective(input) {
+    if (input.visibleHexes.has(input.h3Index)) return true;
+    if (!hasHomeRegionMetadata(input)) return false;
+    const intersectionSet = new Set(
+      input.intersectingHomeRegionHexes ?? computeIntersectingHomeRegionHexes(input.humanHomeRegionHexes ?? [], input.aiHomeRegionHexes ?? [])
+    );
+    if (intersectionSet.has(input.h3Index)) return true;
+    const ownHomeHexSet = new Set(
+      input.playerPerspective === "human" ? input.humanHomeRegionHexes ?? [] : input.aiHomeRegionHexes ?? []
+    );
+    return ownHomeHexSet.has(input.h3Index);
+  }
+  function resolveOwnershipBorderStyle(input) {
+    const humanHomeHexes = new Set(input.humanHomeRegionHexes ?? []);
+    const aiHomeHexes = new Set(input.aiHomeRegionHexes ?? []);
+    const isHomeHex = humanHomeHexes.has(input.h3Index) || aiHomeHexes.has(input.h3Index);
+    if (isHomeHex) {
+      if (input.controllerPlayerId === "human") return "outlinedControlledByHuman";
+      if (input.controllerPlayerId === "opponent") return "outlinedControlledByOpponent";
+      return "outlinedNeutral";
+    }
+    if (!input.isOwnershipVisible) return "none";
+    if (input.controllerPlayerId === "human") return "normalControlledByHuman";
+    if (input.controllerPlayerId === "opponent") return "normalControlledByOpponent";
+    return "none";
   }
 
   // src/shared/pipelineTerrain.ts
@@ -16433,27 +16439,6 @@
     }
   }
 
-  // src/renderer/rendering/canvasColor.ts
-  function withOpacityHex(color, alpha) {
-    const normalizedAlpha = Math.max(0, Math.min(1, alpha));
-    if (color.startsWith("#")) {
-      const hex = color.slice(1);
-      if (hex.length === 3) {
-        const r = Number.parseInt(`${hex[0]}${hex[0]}`, 16);
-        const g = Number.parseInt(`${hex[1]}${hex[1]}`, 16);
-        const b = Number.parseInt(`${hex[2]}${hex[2]}`, 16);
-        return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
-      }
-      if (hex.length === 6) {
-        const r = Number.parseInt(hex.slice(0, 2), 16);
-        const g = Number.parseInt(hex.slice(2, 4), 16);
-        const b = Number.parseInt(hex.slice(4, 6), 16);
-        return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
-      }
-    }
-    return color;
-  }
-
   // src/renderer/rendering/terrainInfrastructureIconPaths.ts
   var AIRPLANE_VIEWBOX_SIZE = 16;
   var AIRPLANE_VIEWBOX_CENTER = {
@@ -16648,29 +16633,35 @@
     }
   }
 
-  // src/renderer/rendering/polygonOutline.ts
-  function drawClosedPolygonPath(ctx, points) {
-    ctx.beginPath();
-    for (let i = 0; i < points.length; i++) {
-      const p = points[i];
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    }
-    ctx.closePath();
-  }
-  function strokeDualClosedPolygon(ctx, points, styles) {
-    drawClosedPolygonPath(ctx, points);
-    ctx.strokeStyle = styles.underStrokeColor;
-    ctx.lineWidth = styles.underStrokeWidth;
-    ctx.stroke();
-    ctx.strokeStyle = styles.topStrokeColor;
-    ctx.lineWidth = styles.topStrokeWidth;
-    ctx.stroke();
-  }
-
   // src/renderer/rendering/terrainRendering.ts
   function buildControlByHex(state) {
     return new Map((state.res1Control ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
+  }
+  function resolveOwnershipBorderColor(style) {
+    if (style === "normalControlledByHuman" || style === "outlinedControlledByHuman") return PLAYER_COLORS.human;
+    if (style === "normalControlledByOpponent" || style === "outlinedControlledByOpponent") return PLAYER_COLORS.opponent;
+    if (style === "outlinedNeutral") return MULTI_PLAYER_FILL;
+    return null;
+  }
+  function buildInsetPolygonPoints(pts, insetPx) {
+    if (pts.length === 0 || insetPx <= 0) return [...pts];
+    let sumX = 0;
+    let sumY = 0;
+    for (const p of pts) {
+      sumX += p.x;
+      sumY += p.y;
+    }
+    const cx = sumX / pts.length;
+    const cy = sumY / pts.length;
+    return pts.map((p) => {
+      const dx = cx - p.x;
+      const dy = cy - p.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist <= 1e-4) return { x: p.x, y: p.y };
+      const appliedInset = Math.min(insetPx, dist * 0.35);
+      const t = appliedInset / dist;
+      return { x: p.x + dx * t, y: p.y + dy * t };
+    });
   }
   function drawTerrainHexes(ctx, deps) {
     if (!rendererSharedState.gameState) return;
@@ -16684,6 +16675,9 @@
     const zoom = typeof mapWithZoom.getZoom === "function" ? mapWithZoom.getZoom() : 4;
     const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
     const L = getLeafletGlobal();
+    const visibleHexes = rendererSharedState.gameState.visibleHexes ? new Set(rendererSharedState.gameState.visibleHexes) : new Set(rendererSharedState.gameState.hexes.map((h) => h.h3Index));
+    const controlByHex = buildControlByHex(rendererSharedState.gameState);
+    const perspective = rendererSharedState.gameState.playerPerspective === "opponent" ? "opponent" : "human";
     for (const hx of rendererSharedState.gameState.hexes) {
       const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
       const pts = boundary.map(([lat, lng]) => {
@@ -16712,10 +16706,50 @@
         });
       }
       const stroke = getActiveHexStrokeStyle();
-      ctx.strokeStyle = stroke.color;
+      const ownershipVisible = isHexOwnershipVisibleToPerspective({
+        h3Index: hx.h3Index,
+        playerPerspective: perspective,
+        visibleHexes,
+        humanHomeRegionHexes: rendererSharedState.gameState.humanHomeRegionHexes,
+        aiHomeRegionHexes: rendererSharedState.gameState.aiHomeRegionHexes,
+        intersectingHomeRegionHexes: rendererSharedState.gameState.intersectingHomeRegionHexes
+      });
+      const ownershipStyle = resolveOwnershipBorderStyle({
+        h3Index: hx.h3Index,
+        controllerPlayerId: controlByHex.get(hx.h3Index),
+        isOwnershipVisible: ownershipVisible,
+        humanHomeRegionHexes: rendererSharedState.gameState.humanHomeRegionHexes,
+        aiHomeRegionHexes: rendererSharedState.gameState.aiHomeRegionHexes,
+        intersectingHomeRegionHexes: rendererSharedState.gameState.intersectingHomeRegionHexes
+      });
+      const ownershipColor = resolveOwnershipBorderColor(ownershipStyle);
+      ctx.strokeStyle = ownershipStyle.startsWith("outlined") ? "rgba(0, 0, 0, 0)" : stroke.color;
       ctx.lineWidth = stroke.width * zoomStrokeScale;
       drawClosedPath();
       ctx.stroke();
+      if (ownershipColor && ownershipStyle !== "none") {
+        const ownershipLineWidth = Math.max(stroke.width * zoomStrokeScale * 3, 2.7);
+        drawClosedPath();
+        ctx.strokeStyle = ownershipColor;
+        ctx.lineWidth = ownershipLineWidth;
+        ctx.stroke();
+        if (ownershipStyle.startsWith("outlined")) {
+          const innerPts = buildInsetPolygonPoints(pts, ownershipLineWidth * 1.5);
+          const innerLineWidth = Math.max(ownershipLineWidth * 0.5, 1);
+          ctx.beginPath();
+          for (let i = 0; i < innerPts.length; i++) {
+            const p = innerPts[i];
+            if (i === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+          }
+          ctx.closePath();
+          ctx.strokeStyle = ownershipColor;
+          ctx.lineWidth = innerLineWidth;
+          ctx.setLineDash([innerLineWidth * 2.6, innerLineWidth * 1.8]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
       if (rendererSharedState.selectedHexIndex === hx.h3Index) {
         drawClosedPath();
         ctx.strokeStyle = PLAYER_COLORS.human;
@@ -16778,50 +16812,72 @@
   }
   function drawScenarioHomeRegionOutlines(ctx) {
     const state = rendererSharedState.gameState;
-    if (!state || state.scenarioId !== "region_vs_region") return;
+    if (!state) return;
+    const homeRegionHexes = [.../* @__PURE__ */ new Set([...state.humanHomeRegionHexes ?? [], ...state.aiHomeRegionHexes ?? []])];
+    if (homeRegionHexes.length === 0) return;
+    if (!shouldRenderRes4Hexes()) return;
     const map = getMainLeafletMap();
     if (!map) return;
     const L = getLeafletGlobal();
     const zoom = typeof map.getZoom === "function" ? map.getZoom() : 4;
     const zoomScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
-    const humanColor = PLAYER_COLORS.human ?? "#115e59";
-    const aiColor = PLAYER_COLORS.opponent ?? "#9d174d";
-    const intersectionHexes = new Set(
-      state.intersectingHomeRegionHexes ?? computeIntersectingHomeRegionHexes(state.humanHomeRegionHexes ?? [], state.aiHomeRegionHexes ?? [])
-    );
-    const contestedHomeHexes = new Set(
-      state.contestedHomeRegionHexes ?? computeContestedHomeRegionHexes(state.units, [...state.humanHomeRegionHexes ?? [], ...state.aiHomeRegionHexes ?? []])
-    );
+    const perspective = state.playerPerspective === "opponent" ? "opponent" : "human";
+    const visibleHexes = state.visibleHexes ? new Set(state.visibleHexes) : new Set(state.hexes.map((h) => h.h3Index));
     const controlByHex = buildControlByHex(state);
-    const resolveHexOutlineColor = (h3Index, regionBorderColor) => {
-      const outlineState = classifyHomeRegionOutlineState(
+    for (const h3Index of homeRegionHexes) {
+      const ownershipVisible = isHexOwnershipVisibleToPerspective({
         h3Index,
-        intersectionHexes,
-        contestedHomeHexes,
-        controlByHex.get(h3Index)
-      );
-      if (outlineState === "intersection" || outlineState === "contested") return MULTI_PLAYER_FILL;
-      return regionBorderColor;
-    };
-    const drawRegion = (hexes, fallbackColor) => {
-      if (!Array.isArray(hexes) || hexes.length <= 0) return;
-      for (const h3Index of hexes) {
-        const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
-        const pts = boundary.map(([lat, lng]) => {
-          const p = map.latLngToContainerPoint(L.latLng(lat, lng));
-          return { x: p.x, y: p.y };
-        });
-        const outlineColor = resolveHexOutlineColor(h3Index, fallbackColor);
-        strokeDualClosedPolygon(ctx, pts, {
-          underStrokeColor: "rgba(0, 0, 0, 0.25)",
-          underStrokeWidth: Math.max(1.2, 2.2 * zoomScale) * 1.25,
-          topStrokeColor: withOpacityHex(outlineColor, 0.5),
-          topStrokeWidth: Math.max(0.75, 1.25 * zoomScale) * 0.75 * 1.5 * 1.25
-        });
+        playerPerspective: perspective,
+        visibleHexes,
+        humanHomeRegionHexes: state.humanHomeRegionHexes,
+        aiHomeRegionHexes: state.aiHomeRegionHexes,
+        intersectingHomeRegionHexes: state.intersectingHomeRegionHexes
+      });
+      const style = resolveOwnershipBorderStyle({
+        h3Index,
+        controllerPlayerId: controlByHex.get(h3Index),
+        isOwnershipVisible: ownershipVisible,
+        humanHomeRegionHexes: state.humanHomeRegionHexes,
+        aiHomeRegionHexes: state.aiHomeRegionHexes,
+        intersectingHomeRegionHexes: state.intersectingHomeRegionHexes
+      });
+      if (style === "none") continue;
+      const color = resolveOwnershipBorderColor(style);
+      if (!color) continue;
+      const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
+      const pts = boundary.map(([lat, lng]) => {
+        const p = map.latLngToContainerPoint(L.latLng(lat, lng));
+        return { x: p.x, y: p.y };
+      });
+      const drawClosedPath = () => {
+        ctx.beginPath();
+        for (let i = 0; i < pts.length; i++) {
+          const p = pts[i];
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+      };
+      drawClosedPath();
+      ctx.strokeStyle = color;
+      const ownershipLineWidth = Math.max(getActiveHexStrokeStyle().width * zoomScale * 3, 2.7);
+      ctx.lineWidth = ownershipLineWidth;
+      ctx.stroke();
+      const innerPts = buildInsetPolygonPoints(pts, ownershipLineWidth * 1.5);
+      const innerLineWidth = Math.max(ownershipLineWidth * 0.5, 1);
+      ctx.beginPath();
+      for (let i = 0; i < innerPts.length; i++) {
+        const p = innerPts[i];
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
       }
-    };
-    drawRegion(state.humanHomeRegionHexes, humanColor);
-    drawRegion(state.aiHomeRegionHexes, aiColor);
+      ctx.closePath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = innerLineWidth;
+      ctx.setLineDash([innerLineWidth * 2.6, innerLineWidth * 1.8]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
   }
   function hasVisibleRes1InfrastructureGlyphs(h3Index, res4On, unitHexes, deps) {
     void unitHexes;
@@ -20235,12 +20291,44 @@
     if (state.isRubble) variants.push("Rubble");
     return variants.length > 0 ? `, ${variants.join(", ")}` : "";
   }
+  function resolveStrategicHexForControlLine(namingTarget) {
+    if (!namingTarget) return null;
+    if (namingTarget.resolution === 1) return namingTarget.h3Index;
+    try {
+      return cellToParent(namingTarget.h3Index, WORLD_H3_RESOLUTION);
+    } catch {
+      return null;
+    }
+  }
+  function getTooltipControlLabel(namingTarget) {
+    if (!rendererSharedState.gameState) return "Unknown";
+    const strategicHex = resolveStrategicHexForControlLine(namingTarget);
+    if (!strategicHex) return "Unknown";
+    const isHomeRegionHex = (rendererSharedState.gameState.humanHomeRegionHexes ?? []).includes(strategicHex) || (rendererSharedState.gameState.aiHomeRegionHexes ?? []).includes(strategicHex);
+    const controller = (rendererSharedState.gameState.res1Control ?? []).find((row) => row.h3Index === strategicHex)?.controllerPlayerId ?? null;
+    const ownerLabel = controller === "human" ? "Human" : controller === "opponent" ? "AI" : "Unknown";
+    if (isHomeRegionHex) return `${ownerLabel} (Home Region)`;
+    const visibleHexes = Array.isArray(rendererSharedState.gameState.visibleHexes) ? new Set(rendererSharedState.gameState.visibleHexes) : new Set(rendererSharedState.gameState.hexes.map((h) => h.h3Index));
+    const perspective = rendererSharedState.gameState.playerPerspective === "opponent" ? "opponent" : "human";
+    const ownershipVisible = isHexOwnershipVisibleToPerspective({
+      h3Index: strategicHex,
+      playerPerspective: perspective,
+      visibleHexes,
+      humanHomeRegionHexes: rendererSharedState.gameState.humanHomeRegionHexes,
+      aiHomeRegionHexes: rendererSharedState.gameState.aiHomeRegionHexes,
+      intersectingHomeRegionHexes: rendererSharedState.gameState.intersectingHomeRegionHexes
+    });
+    if (!ownershipVisible) return "Unknown";
+    return ownerLabel;
+  }
   function formatTerrainTooltipHtml(state, namingLine, namingTarget) {
     const prefix = formatLlmLocationBoldPrefixHtml(namingTarget);
+    const showControlLine = namingTarget?.resolution === 1;
+    const controlLine = showControlLine ? `<strong>Control:</strong> ${getTooltipControlLabel(namingTarget)}` : null;
     const terrainLabel = formatTerrainKindLabel(state.terrainKind);
     const terrainValue = state.res1TerrainSummary ?? `${terrainLabel}${formatTerrainVariantSuffix(state)}`;
     const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
-    const bodyParts = [terrainLine];
+    const bodyParts = controlLine ? [controlLine, terrainLine] : [terrainLine];
     if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
     else if (state.features.length > 0) bodyParts.push(`<strong>Features:</strong> ${state.features.join(", ")}`);
     if (state.urbanHexCount != null) {
@@ -20260,7 +20348,8 @@
     const urbanHexCountKey = state.urbanHexCount == null ? "x" : String(state.urbanHexCount);
     const res1TerrainSummaryKey = state.res1TerrainSummary ?? "";
     const res1FeaturesSummaryKey = state.res1FeaturesSummary ?? "";
-    return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}`;
+    const controlKey = getTooltipControlLabel(namingTarget);
+    return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}::${controlKey}`;
   }
   function getCachedTerrainTooltipHtml(state, namingLine, namingTarget) {
     const key = terrainTooltipContentKey(state, namingLine, namingTarget);
@@ -21824,6 +21913,7 @@
     let lastPersistedApiKeyValue = "";
     let modelRefreshInFlight = false;
     let startupModelRetryTimer = null;
+    let startupModelRetryConsumed = false;
     function clearStartupModelRetryTimer() {
       if (startupModelRetryTimer !== null) {
         clearTimeout(startupModelRetryTimer);
@@ -21831,11 +21921,18 @@
       }
     }
     function scheduleStartupModelRetry() {
-      if (startupModelRetryTimer !== null) return;
+      if (startupModelRetryTimer !== null || startupModelRetryConsumed) return;
+      startupModelRetryConsumed = true;
       startupModelRetryTimer = setTimeout(() => {
         startupModelRetryTimer = null;
         refreshModels(true);
       }, 2e3);
+    }
+    function shouldRetryStartupModelFetch(errorMessage) {
+      if (errorMessage === "No API key set") return false;
+      if (errorMessage === "Invalid API key") return false;
+      if (errorMessage.startsWith("API error: 4")) return false;
+      return true;
     }
     function refreshModels(retryOnFailure = false) {
       if (modelRefreshInFlight) return;
@@ -21846,7 +21943,7 @@
         modelSelect.innerHTML = '<option value="">\u2014 Select model \u2014</option>';
         if ("error" in result && result.error) {
           deps.appendOpenRouterLog(`Models: ${result.error}`, true);
-          if (retryOnFailure) scheduleStartupModelRetry();
+          if (retryOnFailure && shouldRetryStartupModelFetch(result.error)) scheduleStartupModelRetry();
           void deps.syncOpenRouterRunToggleInteractable();
           return;
         }
@@ -21864,8 +21961,9 @@
         clearStartupModelRetryTimer();
         void deps.syncOpenRouterRunToggleInteractable();
       }).catch((err) => {
-        deps.appendOpenRouterLog(`Models: ${String(err)}`, true);
-        if (retryOnFailure) scheduleStartupModelRetry();
+        const message = String(err);
+        deps.appendOpenRouterLog(`Models: ${message}`, true);
+        if (retryOnFailure && shouldRetryStartupModelFetch(message)) scheduleStartupModelRetry();
         void deps.syncOpenRouterRunToggleInteractable();
       }).finally(() => {
         modelRefreshInFlight = false;
@@ -24134,6 +24232,27 @@
   var RES4_MAP_OVERLAY_CITY_LABEL_LIFT_SCALE = 0.5;
   var RES4_MAP_OVERLAY_CITY_LABEL_COLLISION_STEP_PX = 17;
 
+  // src/renderer/rendering/canvasColor.ts
+  function withOpacityHex(color, alpha) {
+    const normalizedAlpha = Math.max(0, Math.min(1, alpha));
+    if (color.startsWith("#")) {
+      const hex = color.slice(1);
+      if (hex.length === 3) {
+        const r = Number.parseInt(`${hex[0]}${hex[0]}`, 16);
+        const g = Number.parseInt(`${hex[1]}${hex[1]}`, 16);
+        const b = Number.parseInt(`${hex[2]}${hex[2]}`, 16);
+        return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
+      }
+      if (hex.length === 6) {
+        const r = Number.parseInt(hex.slice(0, 2), 16);
+        const g = Number.parseInt(hex.slice(2, 4), 16);
+        const b = Number.parseInt(hex.slice(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${normalizedAlpha})`;
+      }
+    }
+    return color;
+  }
+
   // src/renderer/rendering/res4CityOverlays.ts
   var INSPECTION_HEX_CODE_FONT_SCALE = 0.75;
   function projectedCentroid(pts) {
@@ -24268,6 +24387,7 @@
     }
   }
   function drawStrategicRes1InspectionHexCodes(ctx, _deps) {
+    void _deps;
     if (!rendererSharedState.gameState || shouldRenderRes4Hexes() || rendererSharedState.tacticalBattleSnapshot || !isMapInspectionModeHeld()) return;
     const map = getMainLeafletMapForProjection();
     if (!map) return;

@@ -291,6 +291,7 @@ export function drawStrategicRes1InspectionHexCodes(
   ctx: CanvasRenderingContext2D,
   _deps: Res4CityOverlayDrawDeps
 ): void {
+  void _deps;
   if (!S.gameState || shouldRenderRes4Hexes() || S.tacticalBattleSnapshot || !isMapInspectionModeHeld()) return;
   const map = getMainLeafletMapForProjection();
   if (!map) return;

@@ -9,6 +9,7 @@
 
 import { cellToChildren, cellToParent, latLngToCell } from 'h3-js';
 import { getLlmHexLocationParenLabelForNamingTarget } from '../../shared/hexLlmCodeAssignment';
+import { isHexOwnershipVisibleToPerspective } from '../../shared/homeRegionRules';
 import { DETAIL_H3_RESOLUTION, WORLD_H3_RESOLUTION } from '../core/constants';
 import { isHexExploredByPlayer } from '../core/selection';
 import { rendererSharedState as S } from '../core/state';
@@ -576,16 +577,70 @@ function formatTerrainVariantSuffix(state: Pick<TerrainTooltipState, 'isUrban' |
   return variants.length > 0 ? `, ${variants.join(', ')}` : '';
 }
 
+/**
+ * Resolves the strategic hex id for control-tooltip rendering from the current naming target.
+ *
+ * Purpose: Lets tooltip control lines use res1 ownership even when pointer sampling is on res4 cells.
+ * When to use: Only from control-line helpers in this module.
+ * Expected outcome: Returns a res1 h3 index or null when no stable mapping is available.
+ * Exceptions: Invalid h3 conversion returns null.
+ */
+function resolveStrategicHexForControlLine(namingTarget: NamingLookupTarget | null): string | null {
+  if (!namingTarget) return null;
+  if (namingTarget.resolution === 1) return namingTarget.h3Index;
+  try {
+    return cellToParent(namingTarget.h3Index, WORLD_H3_RESOLUTION);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Computes human-facing control label text for terrain tooltip content.
+ *
+ * Purpose: Shows perspective-aware ownership (`Human`/`AI`) while respecting hidden ownership as unknown.
+ * When to use: Tooltip HTML formatting and cache-key derivation for res1/res4 terrain popups.
+ * Expected outcome: Returns `Human`, `AI`, or `?`.
+ * Exceptions: Missing game state/control rows return `?`.
+ */
+function getTooltipControlLabel(namingTarget: NamingLookupTarget | null): string {
+  if (!S.gameState) return 'Unknown';
+  const strategicHex = resolveStrategicHexForControlLine(namingTarget);
+  if (!strategicHex) return 'Unknown';
+  const isHomeRegionHex =
+    (S.gameState.humanHomeRegionHexes ?? []).includes(strategicHex) ||
+    (S.gameState.aiHomeRegionHexes ?? []).includes(strategicHex);
+  const controller = (S.gameState.res1Control ?? []).find((row) => row.h3Index === strategicHex)?.controllerPlayerId ?? null;
+  const ownerLabel = controller === 'human' ? 'Human' : controller === 'opponent' ? 'AI' : 'Unknown';
+  if (isHomeRegionHex) return `${ownerLabel} (Home Region)`;
+  const visibleHexes = Array.isArray(S.gameState.visibleHexes)
+    ? new Set(S.gameState.visibleHexes)
+    : new Set(S.gameState.hexes.map((h) => h.h3Index));
+  const perspective = S.gameState.playerPerspective === 'opponent' ? 'opponent' : 'human';
+  const ownershipVisible = isHexOwnershipVisibleToPerspective({
+    h3Index: strategicHex,
+    playerPerspective: perspective,
+    visibleHexes,
+    humanHomeRegionHexes: S.gameState.humanHomeRegionHexes,
+    aiHomeRegionHexes: S.gameState.aiHomeRegionHexes,
+    intersectingHomeRegionHexes: S.gameState.intersectingHomeRegionHexes,
+  });
+  if (!ownershipVisible) return 'Unknown';
+  return ownerLabel;
+}
+
 function formatTerrainTooltipHtml(
   state: TerrainTooltipState,
   namingLine: string | null,
   namingTarget: NamingLookupTarget | null
 ): string {
   const prefix = formatLlmLocationBoldPrefixHtml(namingTarget);
+  const showControlLine = namingTarget?.resolution === 1;
+  const controlLine = showControlLine ? `<strong>Control:</strong> ${getTooltipControlLabel(namingTarget)}` : null;
   const terrainLabel = formatTerrainKindLabel(state.terrainKind);
   const terrainValue = state.res1TerrainSummary ?? `${terrainLabel}${formatTerrainVariantSuffix(state)}`;
   const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
-  const bodyParts: string[] = [terrainLine];
+  const bodyParts: string[] = controlLine ? [controlLine, terrainLine] : [terrainLine];
   if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
   else if (state.features.length > 0) bodyParts.push(`<strong>Features:</strong> ${state.features.join(', ')}`);
   if (state.urbanHexCount != null) {
@@ -614,7 +669,8 @@ function terrainTooltipContentKey(
   const urbanHexCountKey = state.urbanHexCount == null ? 'x' : String(state.urbanHexCount);
   const res1TerrainSummaryKey = state.res1TerrainSummary ?? '';
   const res1FeaturesSummaryKey = state.res1FeaturesSummary ?? '';
-  return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}`;
+  const controlKey = getTooltipControlLabel(namingTarget);
+  return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}::${controlKey}`;
 }
 
 /**
