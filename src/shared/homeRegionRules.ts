@@ -187,7 +187,7 @@ export interface OwnershipBorderStyleDecisionInput {
    *
    * Contract: Optional precomputed intersection override to keep classification fast.
    * When to use: Pass provided snapshot intersection metadata when available.
-   * Expected outcome: Intersecting home hexes consistently resolve to neutral outlined style.
+   * Expected outcome: Intersecting home hexes resolve to controller-colored outlines when a controller is known.
    * Exceptions: None.
    */
   intersectingHomeRegionHexes?: readonly string[];
@@ -367,7 +367,7 @@ export function isHexOwnershipVisibleToPerspective(input: OwnershipVisibilityDec
  *
  * Purpose: Encodes the shared contract required by home outlined borders and normal non-home borders.
  * When to use: Use for every strategic hex before rendering ownership borders.
- * Expected outcome: Intersecting home hexes resolve to neutral outlines; non-home hidden ownership resolves to `none`.
+ * Expected outcome: Intersecting home hexes resolve to controller-colored outlines when controlled; uncontrolled home hexes use neutral outlines.
  * Exceptions: None.
  */
 export function resolveOwnershipBorderStyle(input: OwnershipBorderStyleDecisionInput): OwnershipBorderStyle {

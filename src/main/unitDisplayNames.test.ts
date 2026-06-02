@@ -6,6 +6,7 @@
 import * as assert from 'assert';
 import {
   buildStrategicUnitDisplayLabelResolver,
+  buildKillLabelUnitRoster,
   buildUnitDisplayNameLookup,
   fallbackDisplayNameFromUnitId,
   formatTacticalSubUnitDisplayName,
@@ -56,6 +57,76 @@ function testFallbackUsesRomanNumeralsForAiAndLeavesUnknownIdsUntouched(): void 
   assert.strictEqual(fallbackDisplayNameFromUnitId('opponent-air-5'), 'V Squadron');
   assert.strictEqual(fallbackDisplayNameFromUnitId('human-air-6'), '6th Squadron');
   assert.strictEqual(fallbackDisplayNameFromUnitId('opponent-unknown'), 'opponent-unknown');
+  assert.strictEqual(
+    fallbackDisplayNameFromUnitId('opponent-air-prod-3-276'),
+    'opponent-air-prod-3-276',
+    'production spawn sequence must not become a roman formation label'
+  );
+  assert.strictEqual(
+    fallbackDisplayNameFromUnitId('opponent-infantry-prod-9-281'),
+    'opponent-infantry-prod-9-281'
+  );
+}
+
+/**
+ * Verifies production roster rows label by per-type display order, not global spawn sequence suffixes.
+ *
+ * Purpose: Regression guard for AI squadron/armor/infantry/navals produced mid-campaign (`*-prod-*` ids).
+ * When to use: After changing `buildUnitDisplayNameLookup` or production unit insertion.
+ * Expected outcome: Roman/ordinal labels follow `displayOrder` within each unit type; corrupted spawn-sequence orders fall back to id sort.
+ * Exceptions: None.
+ */
+function testProductionUnitsUseDisplayOrderNotSpawnSequence(): void {
+  const lookup = buildUnitDisplayNameLookup([
+    { id: 'opponent-air-1', unitType: 'air', displayOrder: 1 },
+    { id: 'opponent-air-prod-3-276', unitType: 'air', displayOrder: 2 },
+    { id: 'opponent-air-prod-4-277', unitType: 'air', displayOrder: 3 },
+    { id: 'opponent-infantry-1', unitType: 'infantry', displayOrder: 1 },
+    { id: 'opponent-infantry-prod-9-281', unitType: 'infantry', displayOrder: 2 },
+    { id: 'opponent-armor-2', unitType: 'armor', displayOrder: 2 },
+    { id: 'opponent-armor-prod-8-275', unitType: 'armor', displayOrder: 3 },
+    { id: 'opponent-naval-1', unitType: 'naval', displayOrder: 1 },
+    { id: 'opponent-naval-prod-5-279', unitType: 'naval', displayOrder: 2 },
+  ]);
+  assert.strictEqual(lookup.get('opponent-air-1'), 'I Squadron');
+  assert.strictEqual(lookup.get('opponent-air-prod-3-276'), 'II Squadron');
+  assert.strictEqual(lookup.get('opponent-air-prod-4-277'), 'III Squadron');
+  assert.strictEqual(lookup.get('opponent-infantry-prod-9-281'), 'II Infantry');
+  assert.strictEqual(lookup.get('opponent-armor-prod-8-275'), 'III Armored');
+  assert.strictEqual(lookup.get('opponent-naval-prod-5-279'), 'II Fleet');
+
+  const corruptedLookup = buildUnitDisplayNameLookup([
+    { id: 'opponent-air-1', unitType: 'air', displayOrder: 1 },
+    { id: 'opponent-air-prod-3-276', unitType: 'air', displayOrder: 276 },
+    { id: 'opponent-air-prod-4-277', unitType: 'air', displayOrder: 277 },
+  ]);
+  assert.strictEqual(corruptedLookup.get('opponent-air-prod-3-276'), 'II Squadron');
+  assert.strictEqual(corruptedLookup.get('opponent-air-prod-4-277'), 'III Squadron');
+}
+
+/**
+ * Verifies kill-label roster rows let toast formatters name fog-hidden production killers by display order.
+ *
+ * Purpose: Regression guard for update lines like `VIII Armored destroyed 1st Armored` when the killer is absent from fog-filtered snapshot units.
+ * When to use: After changing `buildKillLabelUnitRoster` or kill toast roster merge logic.
+ * Expected outcome: Lookup resolves production killer ids to roman labels when only `killLabelUnits` carries the hidden row.
+ * Exceptions: None.
+ */
+function testKillLabelRosterResolvesHiddenProductionKillers(): void {
+  const killEdges = [{ victimId: 'human-armor-1', killerIds: ['opponent-armor-prod-7-308', 'opponent-armor-2'] }];
+  const killLabelUnits = buildKillLabelUnitRoster(
+    killEdges,
+    [
+      { id: 'opponent-armor-prod-7-308', unitType: 'armor', displayOrder: 8 },
+      { id: 'opponent-armor-2', unitType: 'armor', displayOrder: 2 },
+    ],
+    [{ id: 'human-armor-1', unitType: 'armor', displayOrder: 1 }]
+  );
+  const fogFilteredStateUnits = [{ id: 'human-armor-1', unitType: 'armor', displayOrder: 1 }];
+  const lookup = buildUnitDisplayNameLookup([...fogFilteredStateUnits, ...killLabelUnits]);
+  assert.strictEqual(lookup.get('opponent-armor-prod-7-308'), 'VIII Armored');
+  assert.strictEqual(lookup.get('opponent-armor-2'), 'II Armored');
+  assert.strictEqual(lookup.get('human-armor-1'), '1st Armored');
 }
 
 /**
@@ -115,6 +186,8 @@ function testTacticalSubUnitLabelForUserMessage(): void {
 function run(): void {
   testBuildLookupUsesRomanNumeralsForAiAndOrdinalsForHuman();
   testFallbackUsesRomanNumeralsForAiAndLeavesUnknownIdsUntouched();
+  testProductionUnitsUseDisplayOrderNotSpawnSequence();
+  testKillLabelRosterResolvesHiddenProductionKillers();
   testFormatTacticalSubUnitDisplayName();
   testBuildStrategicResolverMatchesLookupAndFallback();
   testTacticalSubUnitLabelForUserMessage();

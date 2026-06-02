@@ -89,7 +89,7 @@ function testOwnershipVisibilityUsesNormalVisibilityForNonHomeHexes(): void {
  *
  * Purpose: Locks the shared style-token mapping used by renderer border passes.
  * When to use: Run after changing ownership style classification logic.
- * Expected outcome: Home styles resolve to outlined variants and hidden non-home resolves to none.
+ * Expected outcome: Home styles resolve to outlined controller-colored variants; uncontrolled home hexes use neutral outlines.
  * Exceptions: None.
  */
 function testResolveOwnershipBorderStyleContract(): void {
@@ -112,6 +112,15 @@ function testResolveOwnershipBorderStyleContract(): void {
       ...sharedInputs,
       h3Index: 'shared',
       controllerPlayerId: 'human',
+      isOwnershipVisible: true,
+    }),
+    'outlinedControlledByHuman'
+  );
+  assert.strictEqual(
+    resolveOwnershipBorderStyle({
+      ...sharedInputs,
+      h3Index: 'shared',
+      controllerPlayerId: null,
       isOwnershipVisible: true,
     }),
     'outlinedNeutral'

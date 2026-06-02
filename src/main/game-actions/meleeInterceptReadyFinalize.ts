@@ -19,6 +19,7 @@ import type { FerryAnimationMove, RangedAttackOrder, ReadyResult } from '../../s
 import { evaluateRegionControlWinnerAtEndOfTurn } from './regionControlWinner';
 import { destroyAirUnitsWithInvalidBase } from './invalidAirBase';
 import { logDebug } from '../logger';
+import { buildKillLabelUnitRoster } from '../../shared/unitDisplayNames';
 
 export interface FinalizeReadyAfterMeleeArgs {
     /**
@@ -302,12 +303,28 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     rangedResult.killsByReturnFire
   );
 
+  const killLabelKillEdges = [
+    ...allKills,
+    ...(rangedResult.killsByDirectFire ?? []),
+    ...(rangedResult.killsByReturnFire ?? []),
+  ];
+  const killLabelUnits = buildKillLabelUnitRoster(
+    killLabelKillEdges,
+    listUnitsForSnapshot(),
+    allRemovedUnits.map((u) => ({
+      id: u.id,
+      unitType: u.unitType,
+      displayOrder: u.displayOrder,
+    }))
+  );
+
   return {
     success: true,
     combatHexes: allCombatHexes.length > 0 ? allCombatHexes : undefined,
     removedUnitIds: allRemovedIds.length > 0 ? allRemovedIds : undefined,
     casualtyHexes: allCasualtyHexes.length > 0 ? allCasualtyHexes : undefined,
     removedUnits: allRemovedUnits.length > 0 ? allRemovedUnits : undefined,
+    killLabelUnits: killLabelUnits.length > 0 ? killLabelUnits : undefined,
     kills: allKills.length > 0 ? allKills : undefined,
     killsByDirectFire: rangedResult.killsByDirectFire?.length ? rangedResult.killsByDirectFire : undefined,
     killsByReturnFire: rangedResult.killsByReturnFire?.length ? rangedResult.killsByReturnFire : undefined,

@@ -194,7 +194,8 @@ getVisibleHexSet: (state: GameStateSnapshot | null) => Set<string>;
 buildKillToastFormatterBundle: (
     state: GameStateSnapshot,
     removedUnits?: RemovedUnitSnapshot[],
-    tacticalSubUnitsForKillLabels?: readonly { id: string; displayName: string }[]
+    tacticalSubUnitsForKillLabels?: readonly { id: string; displayName: string }[],
+    killLabelUnits?: readonly { id: string; unitType: string; displayOrder?: number }[]
   ) => { formatKillLine: (entry: { victimId: string; killerIds: string[] }) => string; formatUnitName: (unitId: string) => string };
     /**
    * Specifies the contract for the `formatUnknownBattleAnnouncement` member (formatUnknownBattleAnnouncement: (continentNames: string[]) => string;).
@@ -1083,7 +1084,12 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       const knownDirectFire = directFire.filter((k) => knownVictimIds.has(k.victimId));
       const knownReturnFire = returnFire.filter((k) => knownVictimIds.has(k.victimId));
       const knownMeleeKills = meleeKills.filter((k) => knownVictimIds.has(k.victimId));
-      const killToastFormatter = deps.buildKillToastFormatterBundle(state, readyResult.removedUnits);
+      const killToastFormatter = deps.buildKillToastFormatterBundle(
+        state,
+        readyResult.removedUnits,
+        undefined,
+        readyResult.killLabelUnits
+      );
       const bullets = buildTurnUpdateBullets({
         readyResult: readyResult as Parameters<typeof buildTurnUpdateBullets>[0]['readyResult'],
         knownDirectFire,

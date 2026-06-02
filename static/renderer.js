@@ -14667,6 +14667,25 @@
   function formatUnitNumberLabel(unitId, value, locale) {
     return unitId.startsWith("opponent-") ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
   }
+  function parseSeedUnitIdParts(unitId) {
+    const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-(\d+)$/);
+    if (!match) return null;
+    const ordinal = Number.parseInt(match[3], 10);
+    if (!Number.isFinite(ordinal) || ordinal <= 0) return null;
+    return { unitType: match[2], ordinal };
+  }
+  function productionSpawnSequenceFromUnitId(unitId) {
+    const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-prod-\d+-(\d+)$/);
+    if (!match) return null;
+    const sequence = Number.parseInt(match[3], 10);
+    return Number.isFinite(sequence) && sequence > 0 ? sequence : null;
+  }
+  function resolvePersistedDisplayOrderForUnitLabel(unit) {
+    if (typeof unit.displayOrder !== "number" || unit.displayOrder <= 0) return void 0;
+    const spawnSequence = productionSpawnSequenceFromUnitId(unit.id);
+    if (spawnSequence !== null && unit.displayOrder === spawnSequence) return void 0;
+    return unit.displayOrder;
+  }
   function formatOrdinalLabel(value, locale) {
     const normalized = Math.max(1, Math.trunc(value));
     const numberText = new Intl.NumberFormat(locale).format(normalized);
@@ -14685,15 +14704,20 @@
     }
     const result = /* @__PURE__ */ new Map();
     for (const [unitType, group] of byGroup.entries()) {
-      const withPersisted = group.filter((u) => typeof u.displayOrder === "number" && u.displayOrder > 0).sort((a, b) => a.displayOrder - b.displayOrder || NATURAL_ID_COLLATOR.compare(a.id, b.id));
-      const withoutPersisted = group.filter((u) => !(typeof u.displayOrder === "number" && u.displayOrder > 0)).sort((a, b) => NATURAL_ID_COLLATOR.compare(a.id, b.id));
+      const withPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) !== void 0).sort(
+        (a, b) => resolvePersistedDisplayOrderForUnitLabel(a) - resolvePersistedDisplayOrderForUnitLabel(b) || NATURAL_ID_COLLATOR.compare(a.id, b.id)
+      );
+      const withoutPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) === void 0).sort((a, b) => NATURAL_ID_COLLATOR.compare(a.id, b.id));
       const noun = getUnitDisplayNoun(unitType);
       for (const unit of withPersisted) {
-        const ordinal = unit.displayOrder;
+        const ordinal = resolvePersistedDisplayOrderForUnitLabel(unit);
         const numberLabel = formatUnitNumberLabel(unit.id, ordinal, locale);
         result.set(unit.id, `${numberLabel} ${noun}`);
       }
-      let fallbackOrdinal = withPersisted.reduce((max, u) => Math.max(max, u.displayOrder), 0);
+      let fallbackOrdinal = withPersisted.reduce(
+        (max, u) => Math.max(max, resolvePersistedDisplayOrderForUnitLabel(u)),
+        0
+      );
       for (const unit of withoutPersisted) {
         fallbackOrdinal += 1;
         const numberLabel = formatUnitNumberLabel(unit.id, fallbackOrdinal, locale);
@@ -14703,13 +14727,13 @@
     return result;
   }
   function fallbackDisplayNameFromUnitId(unitId, locale) {
-    const typeMatch = unitId.match(/-(infantry|armor|naval|air)-/);
-    const ordinalMatch = unitId.match(/(\d+)(?!.*\d)/);
-    if (!typeMatch || !ordinalMatch) return unitId;
-    const ordinalValue = Number.parseInt(ordinalMatch[1] ?? "", 10);
-    if (!Number.isFinite(ordinalValue) || ordinalValue <= 0) return unitId;
-    const numberLabel = formatUnitNumberLabel(unitId, ordinalValue, locale);
-    return `${numberLabel} ${getUnitDisplayNoun(typeMatch[1] ?? "")}`;
+    const seed = parseSeedUnitIdParts(unitId);
+    if (seed) {
+      const numberLabel = formatUnitNumberLabel(unitId, seed.ordinal, locale);
+      return `${numberLabel} ${getUnitDisplayNoun(seed.unitType)}`;
+    }
+    if (productionSpawnSequenceFromUnitId(unitId) !== null) return unitId;
+    return unitId;
   }
 
   // src/renderer/rendering/resolutionPlayback.ts
@@ -22474,7 +22498,7 @@
     }
     return [...byId.entries()].map(([id, displayName]) => ({ id, displayName }));
   }
-  function buildKillToastFormatterBundle(state, removedUnits, tacticalSubUnitsForKillLabels) {
+  function buildKillToastFormatterBundle(state, removedUnits, tacticalSubUnitsForKillLabels, killLabelUnits) {
     const removedUnitsForDisplay = removedUnits ?? [];
     const rosterFromRemoved = removedUnitsForDisplay.filter((u) => !u.displayName).map((u) => ({
       id: u.id,
@@ -22482,7 +22506,27 @@
       unitType: u.unitType,
       displayOrder: u.displayOrder
     }));
-    const rosterForDisplay = [...state.units ?? [], ...rosterFromRemoved];
+    const rosterById = /* @__PURE__ */ new Map();
+    for (const unit of state.units ?? []) {
+      rosterById.set(unit.id, {
+        id: unit.id,
+        unitType: unit.unitType,
+        displayOrder: unit.displayOrder
+      });
+    }
+    for (const unit of rosterFromRemoved) {
+      if (rosterById.has(unit.id)) continue;
+      rosterById.set(unit.id, {
+        id: unit.id,
+        unitType: unit.unitType,
+        displayOrder: unit.displayOrder
+      });
+    }
+    for (const unit of killLabelUnits ?? []) {
+      if (rosterById.has(unit.id)) continue;
+      rosterById.set(unit.id, unit);
+    }
+    const rosterForDisplay = [...rosterById.values()];
     const displayNameById = buildUnitDisplayNameLookup(rosterForDisplay);
     for (const u of removedUnitsForDisplay) {
       if (u.displayName) displayNameById.set(u.id, u.displayName);
@@ -23220,7 +23264,12 @@
         const knownDirectFire = directFire.filter((k) => knownVictimIds.has(k.victimId));
         const knownReturnFire = returnFire.filter((k) => knownVictimIds.has(k.victimId));
         const knownMeleeKills = meleeKills.filter((k) => knownVictimIds.has(k.victimId));
-        const killToastFormatter = deps.buildKillToastFormatterBundle(state, readyResult.removedUnits);
+        const killToastFormatter = deps.buildKillToastFormatterBundle(
+          state,
+          readyResult.removedUnits,
+          void 0,
+          readyResult.killLabelUnits
+        );
         const bullets = buildTurnUpdateBullets({
           readyResult,
           knownDirectFire,
@@ -26064,8 +26113,8 @@
   function formatPendingOrderSidebarLabel2(order) {
     return formatPendingOrderSidebarLabel(order, formatUnitArrowLabel2);
   }
-  function buildKillToastFormatterBundle2(state, removedUnits, tacticalSubUnitsForKillLabels) {
-    return buildKillToastFormatterBundle(state, removedUnits, tacticalSubUnitsForKillLabels);
+  function buildKillToastFormatterBundle2(state, removedUnits, tacticalSubUnitsForKillLabels, killLabelUnits) {
+    return buildKillToastFormatterBundle(state, removedUnits, tacticalSubUnitsForKillLabels, killLabelUnits);
   }
   function syncUiAfterSelectionChange2(options = {}) {
     return syncUiAfterSelectionChange(

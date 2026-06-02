@@ -82,11 +82,11 @@ function tacticalRangedInfraEventTargetTypeBeforeRubble(
 }
 
 /**
- * Expands a removal id list to include embarked land cargo when the victim is a naval tactical sub-unit.
+ * Deletes strategic parent units whose tactical sub-units were all eliminated during a tactical phase.
  *
- * Purpose: Matches strategic sealift cargo loss when a carrier is eliminated at tactical resolution.
- * When to use: After selecting a ranged or air victim that may be naval.
- * Expected outcome: Stable id list including the victim and zero or more embarked land ids.
+ * Purpose: Removes a parent from SQLite only when no tactical sub-units of that parent remain on the snapshot.
+ * When to use: After air+ranged or melee filters `subUnits`; compares subs before and after the phase.
+ * Expected outcome: `deleteStrategicParentUnitAndApplyTransportOutcome` runs only for fully eliminated parents.
  * Exceptions: None.
  */
 export function syncStrategicUnitsDbWhenTacticalParentsEliminated(
@@ -107,6 +107,14 @@ export function syncStrategicUnitsDbWhenTacticalParentsEliminated(
   });
 }
 
+/**
+ * Lists tactical sub-unit ids to remove for one casualty, including cargo embarked on that naval sub.
+ *
+ * Purpose: Keeps naval sub-unit loss aligned with sealift cargo without expanding to sibling sub-units.
+ * When to use: `markTacticalSubUnitCasualty` when building the removal set for one strike victim.
+ * Expected outcome: Victim id plus zero or more embarked land ids when the victim is naval.
+ * Exceptions: None.
+ */
 function expandedRemovalIdsForVictim(subUnits: readonly TacticalSubUnitSnapshot[], victimId: string): string[] {
   const victim = subUnits.find((u) => u.id === victimId);
   const out = new Set<string>([victimId]);
@@ -119,11 +127,35 @@ function expandedRemovalIdsForVictim(subUnits: readonly TacticalSubUnitSnapshot[
 }
 
 /**
- * Resolves one air-vs-`units` strike on a tactical snapshot using the same rules as strategic `resolveAirStrikeAgainstUnits`.
+ * Marks one tactical sub-unit (and land cargo embarked on that naval sub) for snapshot removal.
  *
- * Purpose: Keeps tactical air casualties, AA return fire, victim ordering, and `units` table deletes aligned with `resolveAirStrikePhase` / DB-backed strike resolution.
+ * Purpose: Enforces per-sub-unit tactical casualties without removing sibling sub-units of the same strategic parent.
+ * When to use: Air strike and AA paths before `flushAirCasualties`; infra counterattacks pass empty killers to skip kill ledger rows.
+ * Expected outcome: `toRemove` gains the victim id(s); kill ledger rows are added only when `killerSubUnitIds` is non-empty.
+ * Exceptions: None.
+ */
+function markTacticalSubUnitCasualty(
+  subUnits: readonly TacticalSubUnitSnapshot[],
+  toRemove: Set<string>,
+  victimSubUnitId: string,
+  killerSubUnitIds: string[],
+  killLedger: { victimId: string; killerIds: string[] }[]
+): void {
+  for (const id of expandedRemovalIdsForVictim(subUnits, victimSubUnitId)) {
+    if (toRemove.has(id)) continue;
+    toRemove.add(id);
+    if (killerSubUnitIds.length > 0) {
+      killLedger.push({ victimId: id, killerIds: killerSubUnitIds });
+    }
+  }
+}
+
+/**
+ * Resolves one air-vs-`units` strike on a tactical snapshot using per-sub-unit casualty rules.
+ *
+ * Purpose: Keeps tactical air casualties and AA return fire aligned with strategic dice while only removing the struck sub-unit (plus cargo on that naval sub).
  * When to use: Inside `applyTacticalAirStrikeThenRangedPhaseOnBattle` for each `targetType === 'units'` order after the hit roll.
- * Expected outcome: Mutates `toRemove` and `killsByAirStrike`; issues strategic parent deletes with transport cleanup like strategic air resolution.
+ * Expected outcome: Mutates `toRemove` and `killsByAirStrike`; strategic parent delete is deferred to `syncStrategicUnitsDbWhenTacticalParentsEliminated`.
  * Exceptions: None; skips silently when the attacker row is missing from `sub`.
  */
 function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(
@@ -148,20 +180,11 @@ function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(
         getDefense(a.unitType) - getDefense(b.unitType) ||
         casualtyPriorityIndex(a.unitType) - casualtyPriorityIndex(b.unitType)
     )[0]!;
-    const victimParentId = victim.parentUnitId;
-    const victimKillIds = new Set(expandedRemovalIdsForVictim(sub, victim.id));
-    for (const su of sub) {
-      if (su.parentUnitId === victimParentId) victimKillIds.add(su.id);
-    }
-    for (const id of victimKillIds) {
-      if (toRemove.has(id)) continue;
-      toRemove.add(id);
-      killsByAirStrike.push({ victimId: id, killerIds: [attacker.id] });
-    }
-    deleteStrategicParentUnitAndApplyTransportOutcome(victimParentId);
+    markTacticalSubUnitCasualty(sub, toRemove, victim.id, [attacker.id], killsByAirStrike);
     tacticalLogMutate('resolveTacticalAirStrikeAgainstUnitsOnSubUnits ground target destroyed', {
       targetH3Index,
-      victimParentId,
+      victimSubUnitId: victim.id,
+      victimParentUnitId: victim.parentUnitId,
       attackerSubUnitId: attacker.id,
     });
   }
@@ -170,12 +193,7 @@ function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(
     if (toRemove.has(defender.id)) continue;
     if (getRange(defender.unitType) < 1) continue;
     if (rollD6() > getAttack(defender.unitType)) continue;
-    deleteStrategicParentUnitAndApplyTransportOutcome(attacker.parentUnitId);
-    killsByAirStrike.push({ victimId: attacker.id, killerIds: [defender.id] });
-    for (const su of sub) {
-      if (su.parentUnitId !== attacker.parentUnitId || toRemove.has(su.id)) continue;
-      toRemove.add(su.id);
-    }
+    markTacticalSubUnitCasualty(sub, toRemove, attacker.id, [defender.id], killsByAirStrike);
     tacticalLogMutate('resolveTacticalAirStrikeAgainstUnitsOnSubUnits attacker lost to AA', {
       targetH3Index,
       attackerSubUnitId: attacker.id,
@@ -469,8 +487,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     }
     const counterThreshold = s.targetType === 'airport' ? 2 : 1;
     if (rollD6() <= counterThreshold) {
-      deleteStrategicParentUnitAndApplyTransportOutcome(attacker.parentUnitId);
-      toRemove.add(attacker.id);
+      markTacticalSubUnitCasualty(sub, toRemove, attacker.id, [], killsByAirStrike);
     }
     flushAirCasualties();
     strikeMoves.push({

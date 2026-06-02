@@ -177,6 +177,52 @@ function formatUnitNumberLabel(
 }
 
 /**
+ * Parses seeded roster ids like `opponent-air-1` into unit type and formation ordinal.
+ *
+ * Purpose: Restricts id-based fallback labels to scenario seed shapes, not production spawn ids.
+ * When to use: `fallbackDisplayNameFromUnitId` when roster lookup is unavailable.
+ * Expected outcome: Returns type and ordinal for seed ids; null for production ids and unknown shapes.
+ * Exceptions: None.
+ */
+function parseSeedUnitIdParts(unitId: string): { unitType: string; ordinal: number } | null {
+  const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-(\d+)$/);
+  if (!match) return null;
+  const ordinal = Number.parseInt(match[3]!, 10);
+  if (!Number.isFinite(ordinal) || ordinal <= 0) return null;
+  return { unitType: match[2]!, ordinal };
+}
+
+/**
+ * Reads the global production spawn sequence suffix from ids like `opponent-air-prod-3-276`.
+ *
+ * Purpose: Detects when persisted `displayOrder` was mistakenly aligned with spawn sequence instead of formation ordinal.
+ * When to use: `resolvePersistedDisplayOrderForUnitLabel` before applying roster display-order labels.
+ * Expected outcome: Returns the trailing spawn sequence integer for production ids; null for seed ids.
+ * Exceptions: None.
+ */
+function productionSpawnSequenceFromUnitId(unitId: string): number | null {
+  const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-prod-\d+-(\d+)$/);
+  if (!match) return null;
+  const sequence = Number.parseInt(match[3]!, 10);
+  return Number.isFinite(sequence) && sequence > 0 ? sequence : null;
+}
+
+/**
+ * Returns roster `displayOrder` for label lookup, ignoring production ids whose order equals global spawn sequence.
+ *
+ * Purpose: Prevents `CCLXXVI Squadron`-style labels when `display_order` mirrors the production spawn counter tail.
+ * When to use: Inside `buildUnitDisplayNameLookup` when classifying persisted vs fallback ordinals.
+ * Expected outcome: Valid per-type formation ordinals pass through; corrupted production rows behave as unset.
+ * Exceptions: None.
+ */
+function resolvePersistedDisplayOrderForUnitLabel(unit: UnitDisplayIdentity): number | undefined {
+  if (typeof unit.displayOrder !== 'number' || unit.displayOrder <= 0) return undefined;
+  const spawnSequence = productionSpawnSequenceFromUnitId(unit.id);
+  if (spawnSequence !== null && unit.displayOrder === spawnSequence) return undefined;
+  return unit.displayOrder;
+}
+
+/**
  * Defines the `formatOrdinalLabel` function shape (export function formatOrdinalLabel(value: number, locale?: Intl.LocalesArgument): string).
 
  * Purpose: Supports maintainability by documenting why `formatOrdinalLabel` exists.
@@ -250,6 +296,43 @@ export function buildStrategicUnitDisplayLabelResolver(
 }
 
 /**
+ * Collects display-order identity rows for every unit id referenced in kill edges.
+ *
+ * Purpose: Kill toasts use fog-filtered `GameStateSnapshot.units`, which omits opponent killers outside visible hexes; this roster preserves authoritative names from resolution-time DB rows and casualty snapshots.
+ * When to use: Strategic Ready / melee finalize when building `ReadyResult.killLabelUnits`; renderer kill toast formatters merge this roster before `buildUnitDisplayNameLookup`.
+ * Expected outcome: One row per kill participant id found in `liveUnits` or `removedUnits`; ids with no row are omitted.
+ * Exceptions: None.
+ */
+export function buildKillLabelUnitRoster(
+  killEdges: readonly { victimId: string; killerIds: string[] }[],
+  liveUnits: readonly UnitDisplayIdentity[],
+  removedUnits: readonly { id: string; unitType: string; displayOrder?: number }[]
+): UnitDisplayIdentity[] {
+  const participantIds = new Set<string>();
+  for (const edge of killEdges) {
+    participantIds.add(edge.victimId);
+    for (const killerId of edge.killerIds) participantIds.add(killerId);
+  }
+  if (participantIds.size === 0) return [];
+
+  const byId = new Map<string, UnitDisplayIdentity>();
+  for (const unit of liveUnits) {
+    byId.set(unit.id, { id: unit.id, unitType: unit.unitType, displayOrder: unit.displayOrder });
+  }
+  for (const unit of removedUnits) {
+    if (byId.has(unit.id)) continue;
+    byId.set(unit.id, { id: unit.id, unitType: unit.unitType, displayOrder: unit.displayOrder });
+  }
+
+  const out: UnitDisplayIdentity[] = [];
+  for (const id of participantIds) {
+    const row = byId.get(id);
+    if (row) out.push(row);
+  }
+  return out;
+}
+
+/**
  * Defines the `buildUnitDisplayNameLookup` function shape (export function buildUnitDisplayNameLookup().
 
  * Purpose: Supports maintainability by documenting why `buildUnitDisplayNameLookup` exists.
@@ -272,18 +355,26 @@ export function buildUnitDisplayNameLookup(
   const result = new Map<string, string>();
   for (const [unitType, group] of byGroup.entries()) {
     const withPersisted = group
-      .filter((u) => typeof u.displayOrder === 'number' && u.displayOrder > 0)
-      .sort((a, b) => (a.displayOrder as number) - (b.displayOrder as number) || NATURAL_ID_COLLATOR.compare(a.id, b.id));
+      .filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) !== undefined)
+      .sort(
+        (a, b) =>
+          (resolvePersistedDisplayOrderForUnitLabel(a) as number) -
+            (resolvePersistedDisplayOrderForUnitLabel(b) as number) ||
+          NATURAL_ID_COLLATOR.compare(a.id, b.id)
+      );
     const withoutPersisted = group
-      .filter((u) => !(typeof u.displayOrder === 'number' && u.displayOrder > 0))
+      .filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) === undefined)
       .sort((a, b) => NATURAL_ID_COLLATOR.compare(a.id, b.id));
     const noun = getUnitDisplayNoun(unitType);
     for (const unit of withPersisted) {
-      const ordinal = unit.displayOrder as number;
+      const ordinal = resolvePersistedDisplayOrderForUnitLabel(unit) as number;
       const numberLabel = formatUnitNumberLabel(unit.id, ordinal, locale);
       result.set(unit.id, `${numberLabel} ${noun}`);
     }
-    let fallbackOrdinal = withPersisted.reduce((max, u) => Math.max(max, u.displayOrder as number), 0);
+    let fallbackOrdinal = withPersisted.reduce(
+      (max, u) => Math.max(max, resolvePersistedDisplayOrderForUnitLabel(u) as number),
+      0
+    );
     for (const unit of withoutPersisted) {
       fallbackOrdinal += 1;
       const numberLabel = formatUnitNumberLabel(unit.id, fallbackOrdinal, locale);
@@ -294,19 +385,19 @@ export function buildUnitDisplayNameLookup(
 }
 
 /**
- * Defines the `fallbackDisplayNameFromUnitId` function shape (export function fallbackDisplayNameFromUnitId(unitId: string, locale?: Intl.LocalesArgument): string).
-
- * Purpose: Supports maintainability by documenting why `fallbackDisplayNameFromUnitId` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Builds a player-facing label from a unit id when roster lookup is unavailable.
+ *
+ * Purpose: Last-resort naming for validation toasts and stale renderer caches; must not treat production spawn sequence as formation ordinal.
+ * When to use: After `buildUnitDisplayNameLookup` misses an id; production ids without roster context return the raw id.
+ * Expected outcome: Seed ids like `opponent-air-1` become roman/ordinal labels; production ids never become `CCLXXVI`-style labels from spawn tails.
+ * Exceptions: Unknown id shapes return the id unchanged.
  */
 export function fallbackDisplayNameFromUnitId(unitId: string, locale?: Intl.LocalesArgument): string {
-  const typeMatch = unitId.match(/-(infantry|armor|naval|air)-/);
-  const ordinalMatch = unitId.match(/(\d+)(?!.*\d)/);
-  if (!typeMatch || !ordinalMatch) return unitId;
-  const ordinalValue = Number.parseInt(ordinalMatch[1] ?? '', 10);
-  if (!Number.isFinite(ordinalValue) || ordinalValue <= 0) return unitId;
-  const numberLabel = formatUnitNumberLabel(unitId, ordinalValue, locale);
-  return `${numberLabel} ${getUnitDisplayNoun(typeMatch[1] ?? '')}`;
+  const seed = parseSeedUnitIdParts(unitId);
+  if (seed) {
+    const numberLabel = formatUnitNumberLabel(unitId, seed.ordinal, locale);
+    return `${numberLabel} ${getUnitDisplayNoun(seed.unitType)}`;
+  }
+  if (productionSpawnSequenceFromUnitId(unitId) !== null) return unitId;
+  return unitId;
 }

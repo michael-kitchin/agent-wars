@@ -2745,12 +2745,13 @@ function formatPendingOrderSidebarLabel(order: HumanStandingOrderSnapshot): stri
 function buildKillToastFormatterBundle(
   state: GameStateSnapshot,
   removedUnits: RemovedUnitSnapshot[] | undefined,
-  tacticalSubUnitsForKillLabels?: readonly { id: string; displayName: string }[]
+  tacticalSubUnitsForKillLabels?: readonly { id: string; displayName: string }[],
+  killLabelUnits?: import('../../shared/unitDisplayNames').UnitDisplayIdentity[]
 ): {
   formatKillLine: (kill: { victimId: string; killerIds: string[] }) => string;
   formatUnitName: (unitId: string) => string;
 } {
-  return buildKillToastFormatterBundleFromModule(state, removedUnits, tacticalSubUnitsForKillLabels);
+  return buildKillToastFormatterBundleFromModule(state, removedUnits, tacticalSubUnitsForKillLabels, killLabelUnits);
 }
 
 /**

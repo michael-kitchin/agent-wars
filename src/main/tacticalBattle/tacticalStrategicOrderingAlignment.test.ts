@@ -6,11 +6,13 @@
 import assert from 'node:assert/strict';
 import { gridDisk } from 'h3-js';
 import { test } from 'node:test';
-import { firstRingCellDistinctFrom } from './testSupport/tacticalRes4HexFixtures';
+import { firstRingCellDistinctFrom, tacticalRes1Cell, tacticalRes4UnderRes1Corner } from './testSupport/tacticalRes4HexFixtures';
+import { tacticalSequencedRandom, tacticalUniformForD6Face } from './testSupport/tacticalDiceFixtures';
 import type { AirStrikeOrder } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import {
   dbGetOne,
+  dbRun,
   getRes1InfrastructureForHex,
   reconcileRes1InfrastructureCountsFromRes4Overrides,
 } from '../gameDb';
@@ -323,5 +325,160 @@ test('tactical infra-only ranged strike converts urban DB row to rubble on hit',
     );
     assert.strictEqual(row?.isRubble, 1);
     assert.strictEqual(row?.isUrban, 0);
+  });
+});
+
+test('tactical air strike against units removes one sub-unit when sibling sub-units remain', () => {
+  const res1 = tacticalRes1Cell(11, 12);
+  const h0 = tacticalRes4UnderRes1Corner(11, 12);
+  const h1 = firstRingCellDistinctFrom(h0);
+  const ring = [...gridDisk(h0, 1)];
+  const snap: TacticalBattleSnapshot = {
+    battleId: 'tb-air-sibling-survives',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: ring,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits: [
+      {
+        id: 'hum-air',
+        parentUnitId: 'human-air-1',
+        player: 'human',
+        unitType: 'air',
+        h3Index: h0,
+        displayName: '1st Squadron (01)',
+      },
+      {
+        id: 'op-a',
+        parentUnitId: 'opponent-armor-1',
+        player: 'opponent',
+        unitType: 'armor',
+        h3Index: h1,
+        displayName: 'I Armor (01)',
+      },
+      {
+        id: 'op-b',
+        parentUnitId: 'opponent-armor-1',
+        player: 'opponent',
+        unitType: 'armor',
+        h3Index: h1,
+        displayName: 'I Armor (02)',
+      },
+    ],
+  };
+  const out = applyTacticalAirStrikeThenRangedPhaseOnBattle(
+    snap,
+    [{ unitId: 'hum-air', targetH3Index: h1, targetType: 'units' }],
+    undefined,
+    'human',
+    tacticalSequencedRandom([
+      tacticalUniformForD6Face(1), // air strike hits (d6=1 <= air attack 3)
+      tacticalUniformForD6Face(6), // surviving sibling armor AA misses (d6=6 > armor attack 3)
+    ])
+  );
+  const survivingOpp = out.battle.subUnits.filter((u) => u.parentUnitId === 'opponent-armor-1');
+  assert.strictEqual(survivingOpp.length, 1, 'one sibling sub-unit should survive');
+  assert.strictEqual(out.battle.subUnits.length, 2, 'air plus one opponent sub-unit remain');
+  assert.strictEqual(out.killsByAirStrike.length, 1);
+});
+
+test('tactical air strike deletes strategic parent when the last sub-unit is eliminated', () => {
+  withTempGameDb('aw-tactical-air-last-sub-', () => {
+    const res1 = tacticalRes1Cell(13, 14);
+    const h0 = tacticalRes4UnderRes1Corner(13, 14);
+    const h1 = firstRingCellDistinctFrom(h0);
+    const ring = [...gridDisk(h0, 1)];
+    const parentId = 'opponent-armor-test-last-sub';
+    dbRun('INSERT INTO units (id, player, unit_type, h3_index, display_order) VALUES (?, ?, ?, ?, ?)', [
+      parentId,
+      'opponent',
+      'armor',
+      res1,
+      0,
+    ]);
+    const snap: TacticalBattleSnapshot = {
+      battleId: 'tb-air-last-sub',
+      enclosingRes1H3Index: res1,
+      res4ChildH3Indexes: ring,
+      strategicTurnNumber: 1,
+      tacticalTurnNumber: 1,
+      subUnits: [
+        {
+          id: 'hum-air',
+          parentUnitId: 'human-air-1',
+          player: 'human',
+          unitType: 'air',
+          h3Index: h0,
+          displayName: '1st Squadron (01)',
+        },
+        {
+          id: 'op-only',
+          parentUnitId: parentId,
+          player: 'opponent',
+          unitType: 'armor',
+          h3Index: h1,
+          displayName: 'I Armor (01)',
+        },
+      ],
+    };
+    const out = applyTacticalAirStrikeThenRangedPhaseOnBattle(
+      snap,
+      [{ unitId: 'hum-air', targetH3Index: h1, targetType: 'units' }],
+      undefined,
+      'human',
+      tacticalSequencedRandom([
+        tacticalUniformForD6Face(1), // air strike hits; sole defender eliminated, no AA roll
+      ])
+    );
+    assert.strictEqual(out.battle.subUnits.some((u) => u.parentUnitId === parentId), false);
+    const row = dbGetOne<{ id: string }>('SELECT id FROM units WHERE id = ?', [parentId]);
+    assert.equal(row, undefined);
+  });
+});
+
+test('tactical infrastructure counterattack removes attacker without killsByAirStrike ledger rows', () => {
+  withTempGameDb('aw-tactical-infra-counter-', () => {
+    const urban = dbGetOne<{ h3Index: string; parentH3Index: string }>(
+      `SELECT h3_index AS h3Index, parent_h3_index AS parentH3Index
+       FROM res4_feature_overrides
+       WHERE is_urban = 1 AND is_rubble = 0
+       LIMIT 1`
+    );
+    assert.ok(urban);
+    const ring = [...gridDisk(urban!.h3Index, 2)];
+    const neighbor = firstRingCellDistinctFrom(urban!.h3Index);
+    const snap: TacticalBattleSnapshot = {
+      battleId: 'tb-infra-counter',
+      enclosingRes1H3Index: urban!.parentH3Index,
+      res4ChildH3Indexes: ring,
+      strategicTurnNumber: 1,
+      tacticalTurnNumber: 1,
+      subUnits: [
+        {
+          id: 'hum-air-infra-counter',
+          parentUnitId: 'human-air-parent-infra-counter',
+          player: 'human',
+          unitType: 'air',
+          h3Index: neighbor,
+          displayName: 'Air (infra counter)',
+        },
+      ],
+    };
+    const out = applyTacticalAirStrikeThenRangedPhaseOnBattle(
+      snap,
+      [{ unitId: 'hum-air-infra-counter', targetH3Index: urban!.h3Index, targetType: 'urban' }],
+      undefined,
+      'human',
+      tacticalSequencedRandom([
+        tacticalUniformForD6Face(1), // infra strike hits (d6=1 <= air attack 3)
+        tacticalUniformForD6Face(1), // urban counterattack succeeds (d6=1 <= threshold 1)
+      ]),
+      'singlePlayer'
+    );
+    assert.strictEqual(out.killsByAirStrike.length, 0);
+    assert.ok(
+      out.removedUnits.some((u) => u.id === 'hum-air-infra-counter'),
+      'counterattack should remove the attacking air sub-unit from the snapshot'
+    );
   });
 });

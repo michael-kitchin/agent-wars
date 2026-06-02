@@ -3,7 +3,7 @@ import {
   formatPendingMovementSidebarTargetLabel,
   formatTacticalDraftMarchPendingOrderTargetLabel,
 } from '../../shared/pendingMovementSidebarLabels';
-import { buildUnitDisplayNameLookup, fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
+import { buildUnitDisplayNameLookup, fallbackDisplayNameFromUnitId, type UnitDisplayIdentity } from '../../shared/unitDisplayNames';
 import { formatPendingFerryOrderSidebarLabel } from './orderLabelFormatting';
 import { UNIT_DESELECT_GLYPH, UNIT_SELECT_GLYPH } from '../core/constants';
 import { withTacticalHumanDraftPrefetchInvalidation } from '../openRouter/openRouterRuntime';
@@ -354,7 +354,8 @@ export function buildTacticalSubUnitKillLabelOverlay(args: {
 export function buildKillToastFormatterBundle(
   state: GameStateSnapshot,
   removedUnits: RemovedUnitSnapshot[] | undefined,
-  tacticalSubUnitsForKillLabels?: readonly { id: string; displayName: string }[]
+  tacticalSubUnitsForKillLabels?: readonly { id: string; displayName: string }[],
+  killLabelUnits?: readonly UnitDisplayIdentity[]
 ): { formatUnitName: (unitId: string) => string; formatKillLine: (kill: { victimId: string; killerIds: string[] }) => string } {
   const removedUnitsForDisplay = removedUnits ?? [];
   const rosterFromRemoved = removedUnitsForDisplay
@@ -365,7 +366,27 @@ export function buildKillToastFormatterBundle(
       unitType: u.unitType,
       displayOrder: u.displayOrder,
     }));
-  const rosterForDisplay = [...(state.units ?? []), ...rosterFromRemoved];
+  const rosterById = new Map<string, UnitDisplayIdentity>();
+  for (const unit of state.units ?? []) {
+    rosterById.set(unit.id, {
+      id: unit.id,
+      unitType: unit.unitType,
+      displayOrder: unit.displayOrder,
+    });
+  }
+  for (const unit of rosterFromRemoved) {
+    if (rosterById.has(unit.id)) continue;
+    rosterById.set(unit.id, {
+      id: unit.id,
+      unitType: unit.unitType,
+      displayOrder: unit.displayOrder,
+    });
+  }
+  for (const unit of killLabelUnits ?? []) {
+    if (rosterById.has(unit.id)) continue;
+    rosterById.set(unit.id, unit);
+  }
+  const rosterForDisplay = [...rosterById.values()];
   const displayNameById = buildUnitDisplayNameLookup(rosterForDisplay);
   for (const u of removedUnitsForDisplay) {
     if (u.displayName) displayNameById.set(u.id, u.displayName);

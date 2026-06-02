@@ -555,6 +555,15 @@ removedUnitIds?: string[];
    */
 removedUnits?: RemovedUnitSnapshot[];
     /**
+     * Display-order rows for kill toast labels when fog-filtered snapshots omit opponent participants.
+     *
+     * Contract: Built at resolution from full DB unit rows plus casualty snapshots for every id in kill edges.
+     * When to use: Renderer `buildKillToastFormatterBundle` merges this roster before roman/ordinal lookup.
+     * Expected outcome: Kill lines show `VIII Armored` instead of raw `opponent-armor-prod-7-308` ids for hidden killers.
+     * Exceptions: Omitted when no kills occurred.
+     */
+killLabelUnits?: Array<{ id: string; unitType: string; displayOrder?: number }>;
+    /**
    * Specifies the contract for the `casualtyHexes` member (casualtyHexes?: string[];).
 
    * Contract: Describes stable behavior for callers of `casualtyHexes` in this codebase.

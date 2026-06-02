@@ -89,6 +89,7 @@ export type ReadyResolutionIpcMirrorSource = Pick<
   | 'opponentDeploymentCapReachedUnitTypes'
   | 'humanHexesLostCount'
   | 'controlLossLightningHexes'
+  | 'killLabelUnits'
 >;
 
 /**
@@ -131,6 +132,7 @@ export function pickReadyResolutionIpcMirrorFields(source: ReadyResolutionIpcMir
     opponentDeploymentCapReachedUnitTypes: source.opponentDeploymentCapReachedUnitTypes,
     humanHexesLostCount: source.humanHexesLostCount,
     controlLossLightningHexes: source.controlLossLightningHexes,
+    killLabelUnits: source.killLabelUnits,
   };
 }
 
