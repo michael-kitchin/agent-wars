@@ -160,6 +160,23 @@ function buildIndexedState(state: GameStateSnapshot): IndexedState {
     hexSet: new Set(state.hexes.map((h) => h.h3Index)),
   };
 }
+
+/** Indexed snapshot maps reused across possible-action collection within one AI request. */
+export type PossibleActionsIndexedState = IndexedState;
+
+/**
+ * Builds indexed control/infrastructure maps for possible-action collection.
+ *
+ * Purpose: Allows callers to build once per AI request and pass into `collectAggregatedPossibleActionRows`.
+ * When to use: From `requestOrdersFlow` before briefing/operational-map assembly.
+ * Expected outcome: Same structure as the internal builder used when `indexedState` is omitted.
+ * Exceptions: None.
+ */
+export function buildPossibleActionsIndexedState(state: GameStateSnapshot): PossibleActionsIndexedState {
+  logDebug('possibleUnitActions buildPossibleActionsIndexedState', { turnNumber: state.turnNumber });
+  return buildIndexedState(state);
+}
+
 /**
  * Defines the `enemyHomelandHexSet` function shape (function enemyHomelandHexSet(state: GameStateSnapshot): Set<string>).
 
@@ -378,10 +395,10 @@ function airBaseHasIntactAirport(indexed: IndexedState, airH3: string): boolean 
 /**
  * Defines the `collectLegalFerryDestinationHexes` function shape (function collectLegalFerryDestinationHexes().
 
- * Purpose: Supports maintainability by documenting why `collectLegalFerryDestinationHexes` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Purpose: Lists friendly-controlled hexes with intact airports within air-ferry grid range of the unit's base.
+ * When to use: From `collectAggregatedPossibleActionRows` for air units with an intact home airport.
+ * Expected outcome: Every returned hex is already within `AIR_FERRY_RANGE_HEXES`; callers must not re-apply range checks.
+ * Exceptions: Returns [] when the unit is not air or its base airport is damaged.
  */
 
 function collectLegalFerryDestinationHexes(
@@ -404,7 +421,6 @@ function collectLegalFerryDestinationHexes(
   }
   const out = new Set<string>();
   for (const h3 of candidates) {
-    if (!isWithinAirFerryGridRange(unit.h3Index, h3, 'possibleUnitActions ferry')) continue;
     if (getInfra(indexed, h3).airport <= 0) continue;
     const snapshotController = indexed.controlByHex.get(h3) ?? null;
     if (snapshotController !== unit.player) continue;
@@ -454,14 +470,14 @@ function filterTacticalRangedHexesForThisTurnOptionsTable(
     isAirport: boolean;
     isSeaport: boolean;
     isRubble: boolean;
-  }>
+  }>,
+  humanOccupiedH3: ReadonlySet<string>
 ): string[] {
   const self = battle.subUnits.find((s) => s.id === attackerSubUnitId);
   if (!self) return hexes;
   const rowByH3 = new Map(tacticalRangedRows.map((r) => [r.h3Index, r] as const));
   return hexes.filter((h3) => {
-    const enemyHere = battle.subUnits.some((s) => s.h3Index === h3 && s.player !== self.player);
-    if (enemyHere) return true;
+    if (humanOccupiedH3.has(h3)) return true;
     if (battle.res4IsUrbanByH3?.[h3]) return true;
     if (battle.res4IsSeaportByH3?.[h3]) return true;
     const row = rowByH3.get(h3);
@@ -473,10 +489,10 @@ function filterTacticalRangedHexesForThisTurnOptionsTable(
 /**
  * Defines the `collectStrikeHexesForAirUnit` function shape (function collectStrikeHexesForAirUnit(airH3: string, indexed: IndexedState): string[]).
 
- * Purpose: Supports maintainability by documenting why `collectStrikeHexesForAirUnit` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Purpose: Lists map hexes within air-strike grid range of a base hex.
+ * When to use: From `collectAggregatedPossibleActionRows` before infrastructure/kind filters.
+ * Expected outcome: Every returned hex is within `AIR_STRIKE_RANGE_HEXES` (via `gridDisk` or fallback scan); callers must not re-apply range checks.
+ * Exceptions: Returns [] when `gridDisk` and fallback both fail.
  */
 function collectStrikeHexesForAirUnit(airH3: string, indexed: IndexedState): string[] {
   try {
@@ -514,21 +530,48 @@ export function collectAggregatedPossibleActionRows(args: {
    * Exceptions: None.
    */
   forThisTurnOptionsTable?: boolean;
+  /** Pre-built indexed state; when omitted, built from `state` on this call. */
+  indexedState?: PossibleActionsIndexedState;
 }): PossibleActionTableRow[] {
   const forThisTurn = args.forThisTurnOptionsTable === true;
   logDebug('possibleUnitActions collectAggregatedPossibleActionRows', {
     turnNumber: args.state.turnNumber,
     tactical: Boolean(args.tacticalBattle),
     forThisTurnOptionsTable: forThisTurn,
+    reusedIndexedState: Boolean(args.indexedState),
   });
   const { state, latLngByH3, tacticalBattle } = args;
-  const indexed = buildIndexedState(state);
+  const indexed = args.indexedState ?? buildIndexedState(state);
   const homeland = enemyHomelandHexSet(state);
   const opponentUnits = state.units.filter((u) => u.player === FRIENDLY_PLAYER).sort((a, b) => a.id.localeCompare(b.id));
   const rawRows: RawPossibleActionRow[] = [];
   const thisTurnFilterStats = forThisTurn
     ? { moveIn: 0, moveOut: 0, rangedIn: 0, rangedOut: 0 }
     : null;
+  const thisTurnStartedAt = forThisTurn && tacticalBattle ? performance.now() : null;
+  let tacticalRangedRowsForFootprint:
+    | ReadonlyArray<{
+        h3Index: string;
+        isUrban: boolean;
+        isAirport: boolean;
+        isSeaport: boolean;
+        isRubble: boolean;
+      }>
+    | undefined;
+  let tacticalHumanOccupiedH3: ReadonlySet<string> | undefined;
+  if (tacticalBattle) {
+    tacticalHumanOccupiedH3 = new Set(
+      tacticalBattle.subUnits.filter((s) => s.player === ENEMY_PLAYER).map((s) => s.h3Index)
+    );
+    try {
+      const foot = new Set(tacticalBattle.res4ChildH3Indexes);
+      tacticalRangedRowsForFootprint = listRes4FeatureOverridesForGame().filter(
+        (r) => r.parentH3Index === tacticalBattle.enclosingRes1H3Index && foot.has(r.h3Index)
+      );
+    } catch {
+      tacticalRangedRowsForFootprint = [];
+    }
+  }
 
   for (const unit of opponentUnits) {
     let moveHexes = excludeUnitCurrentHex(
@@ -563,9 +606,7 @@ export function collectAggregatedPossibleActionRows(args: {
     if (unit.unitType === 'air' && airBaseHasIntactAirport(indexed, unit.h3Index)) {
       const strikeTargets = excludeUnitCurrentHex(
         unit.h3Index,
-        collectStrikeHexesForAirUnit(unit.h3Index, indexed)
-          .filter((h3) => isWithinAirStrikeGridRange(unit.h3Index, h3, 'possibleUnitActions air strike'))
-          .filter((h3) => strikeKindsForHex(indexed, h3).length > 0)
+        collectStrikeHexesForAirUnit(unit.h3Index, indexed).filter((h3) => strikeKindsForHex(indexed, h3).length > 0)
       );
       if (strikeTargets.length > 0) {
         appendRowsForLegalHexes({
@@ -584,38 +625,21 @@ export function collectAggregatedPossibleActionRows(args: {
     }
 
     if (unit.unitType !== 'air' && getRange(unit.unitType as 'infantry' | 'armor' | 'naval' | 'air') >= 1) {
-      let tacticalRangedRows:
-        | ReadonlyArray<{
-            h3Index: string;
-            isUrban: boolean;
-            isAirport: boolean;
-            isSeaport: boolean;
-            isRubble: boolean;
-          }>
-        | undefined;
-      if (tacticalBattle) {
-        try {
-          const foot = new Set(tacticalBattle.res4ChildH3Indexes);
-          tacticalRangedRows = listRes4FeatureOverridesForGame().filter(
-            (r) => r.parentH3Index === tacticalBattle.enclosingRes1H3Index && foot.has(r.h3Index)
-          );
-        } catch {
-          tacticalRangedRows = [];
-        }
-      }
+      const tacticalRangedRows = tacticalRangedRowsForFootprint;
       let rangedHexes = excludeUnitCurrentHex(
         unit.h3Index,
         tacticalBattle
           ? collectTacticalLegalRangedTargetRes4Hexes(tacticalBattle, unit.id, tacticalRangedRows)
           : collectRangedTargetHexes(unit.h3Index, unit.unitType, indexed)
       );
-      if (forThisTurn && tacticalBattle) {
+      if (forThisTurn && tacticalBattle && tacticalHumanOccupiedH3) {
         const before = rangedHexes.length;
         rangedHexes = filterTacticalRangedHexesForThisTurnOptionsTable(
           tacticalBattle,
           unit.id,
           rangedHexes,
-          tacticalRangedRows ?? []
+          tacticalRangedRows ?? [],
+          tacticalHumanOccupiedH3
         );
         if (thisTurnFilterStats) {
           thisTurnFilterStats.rangedIn += before;
@@ -645,6 +669,8 @@ export function collectAggregatedPossibleActionRows(args: {
       groundMoveHexSlotsKept: thisTurnFilterStats.moveOut,
       rangedHexSlotsOffered: thisTurnFilterStats.rangedIn,
       rangedHexSlotsKept: thisTurnFilterStats.rangedOut,
+      tactical: Boolean(tacticalBattle),
+      elapsedMs: thisTurnStartedAt != null ? Math.round(performance.now() - thisTurnStartedAt) : undefined,
     });
   }
 

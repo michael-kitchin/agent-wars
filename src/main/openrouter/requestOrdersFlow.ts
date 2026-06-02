@@ -12,6 +12,8 @@ import { executeTool5, getInjectionText as getStandingOrderInjectionText, genera
 import { executeTool6 } from '../tools/tool6Production';
 import { runPrecomputation } from '../precomputation';
 import { formatBriefing } from '../briefingFormatter';
+import { resetHexControllerParityCheckDedupForTurn } from '../snapshotDbParity';
+import { buildPossibleActionsIndexedState } from './possibleUnitActions';
 import { getSubscriptions, replaceSubscriptions } from '../callbackSubscriptions';
 import {
   clearAiLossEventsSinceConsultation,
@@ -226,6 +228,7 @@ export async function requestOrdersFlow(
     });
   }
   const planState = tacticalBattle ? buildTacticalAiPlanState(state, tacticalBattle) : state;
+  resetHexControllerParityCheckDedupForTurn();
   const aiOrderUnitLabel = (unitId: string) =>
     tacticalBattle
       ? tacticalSubUnitLabelForUserMessage(tacticalBattle.subUnits, unitId)
@@ -342,6 +345,7 @@ export async function requestOrdersFlow(
           },
         })
       : '';
+    const possibleActionsIndexed = buildPossibleActionsIndexedState(state);
     briefingOverride = formatBriefing(
       state,
       precomputed,
@@ -349,7 +353,8 @@ export async function requestOrdersFlow(
       memoryText,
       subscriptions,
       lossesSinceLastConsultation,
-      productionBriefing
+      productionBriefing,
+      { latLngByH3, indexedState: possibleActionsIndexed }
     );
     if (!briefingOverride.includes('# Operational Map')) {
       logError('openRouter requestOrders: strategic map generation missing from briefing');
@@ -701,6 +706,7 @@ export async function requestOrdersFlow(
       const standingGenerated = flags.ordersEnabled
         ? generateOrdersForStandingOrders('opponent', state, latLngByH3, resolveToH3, {
             mutateProgress: tacticalBattle == null,
+            pathfindingSession: tacticalBattle == null ? getOrCreateAiPlanningPathfindingSession() : undefined,
           })
         : { movementOrders: [] as { unitId: string; toH3Index: string }[], rangedAttacks: [] as { unitId: string; targetH3Index: string }[] };
       let standingOrderMovement = standingGenerated.movementOrders;

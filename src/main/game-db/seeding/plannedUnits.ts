@@ -46,7 +46,7 @@ run: (sql: string, params?: unknown[]) => unknown;
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-allocateNextUnitDisplayOrder: (unitType: BuildUnitType) => number;
+allocateNextUnitDisplayOrder: (unitType: BuildUnitType, player: PlannedUnitOwner) => number;
 }
 
 /**
@@ -81,7 +81,7 @@ export function insertPlannedUnitsForPlayer(
       id,
       player,
       unitType,
-      deps.allocateNextUnitDisplayOrder(unitType),
+      deps.allocateNextUnitDisplayOrder(unitType, player),
       h3Index,
     ]);
   }

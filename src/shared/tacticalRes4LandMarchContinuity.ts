@@ -22,6 +22,7 @@ import {
 } from './numericPriorityMinHeap';
 import {
   res4NeighborsInFootprint,
+  type Res4FootprintNeighborLookup,
   tacticalRes4TransportMarchAdjacentPairAllowsStep,
   tacticalRes4TransportMarchInteriorContinuity,
   tacticalRes4TransportStepSpeedMultiplier,
@@ -322,8 +323,11 @@ export function classifyLandInfantryArmorEnterStep(args: {
   prevOfFrom: string | null;
   marchGoalH3: string;
   res4Set: ReadonlySet<string>;
+  /** Precomputed footprint adjacency; when omitted, falls back to `res4NeighborsInFootprint` per step. */
+  footprintNeighbors?: Res4FootprintNeighborLookup;
 }): LandInfantryArmorEnterStepClassification {
   const { toH3, unitTypeForMovement, terrain, fromH3, prevOfFrom, marchGoalH3, res4Set } = args;
+  const neighborsOf = args.footprintNeighbors ?? ((h: string) => res4NeighborsInFootprint(h, res4Set));
   const raw = terrain.effectiveKindForRes4Hex(toH3);
   const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
   const base = tacticalEnterHexMovementCost(unitTypeForMovement, cat);
@@ -354,7 +358,7 @@ export function classifyLandInfantryArmorEnterStep(args: {
           terrain,
           roadRailByH3: ctx.roadRailByH3,
           rubbleByH3: ctx.rubbleByH3,
-          footprintNeighborsOf: (h) => res4NeighborsInFootprint(h, res4Set),
+          footprintNeighborsOf: neighborsOf,
         })
       : legacyLandTransportPlainsEnterAllowed({ terrain, fromH3, toH3, unitTypeForMovement });
   const blockingTerrainWithoutTransport = blockingDestination;
@@ -445,6 +449,8 @@ export function landInfantryArmorEnterCost(args: {
   prevOfFrom: string | null;
   marchGoalH3: string;
   res4Set: ReadonlySet<string>;
+  /** Precomputed footprint adjacency; when omitted, falls back to `res4NeighborsInFootprint` per step. */
+  footprintNeighbors?: Res4FootprintNeighborLookup;
 }): number {
   return classifyLandInfantryArmorEnterStep(args).appliedCost;
 }
@@ -590,8 +596,11 @@ export function planInfantryArmorLandContinuityMarch(args: {
   res4Set: ReadonlySet<string>;
   unitTypeForMovement: string;
   terrain: TacticalTerrainKindResolver;
+  /** Precomputed footprint adjacency; when omitted, falls back to `res4NeighborsInFootprint` per state. */
+  footprintNeighbors?: Res4FootprintNeighborLookup;
 }): { path: string[]; totalCost: number } | null {
   const { fromH3, toH3, res4Set, unitTypeForMovement, terrain } = args;
+  const neighborsOf = args.footprintNeighbors ?? ((h: string) => res4NeighborsInFootprint(h, res4Set));
   const distLand = new Map<string, number>();
   const parentLand = new Map<string, string | null>();
   const heapLand: NumericPriorityHeapEntry<string>[] = [];
@@ -605,7 +614,7 @@ export function planInfantryArmorLandContinuityMarch(args: {
     const { payload: key, d } = node;
     if (d !== distLand.get(key)) continue;
     const { h, prev } = parseLandStateKey(key);
-    for (const nb of res4NeighborsInFootprint(h, res4Set)) {
+    for (const nb of neighborsOf(h)) {
       if (
         !blockedHexLandTransitAllowsRelaxation({
           unitTypeForMovement,
@@ -627,6 +636,7 @@ export function planInfantryArmorLandContinuityMarch(args: {
         prevOfFrom: prev,
         marchGoalH3: toH3,
         res4Set,
+        footprintNeighbors: neighborsOf,
       });
       if (!Number.isFinite(w) || w <= 0) continue;
       const nd = d + w;

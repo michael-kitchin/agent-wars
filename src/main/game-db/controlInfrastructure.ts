@@ -1,5 +1,6 @@
 import { getRes4TerrainOverridesForRenderer as getRes4TerrainOverridesFromCache } from '../terrainClassificationCache';
 import { logDebug, logTrace } from '../logger';
+import { getRes4RendererOverrideRowsCached } from './res4RendererOverrideCache';
 import type { BuildUnitType } from '../productionRules';
 import type { BasicDbOps } from './dbOps';
 
@@ -795,6 +796,26 @@ export function getRes4TerrainOverridesForRendererFromGame(ops: ControlDbOps): A
   isRubble?: boolean;
 }> {
   logDebug('gameDb getRes4TerrainOverridesForRendererFromGame');
+  return getRes4RendererOverrideRowsCached(ops, () => buildRes4TerrainOverridesForRendererFromGameUncached(ops));
+}
+
+/**
+ * Builds merged res4 terrain override rows for the renderer without memoization.
+ *
+ * Purpose: Inner rebuild used by `getRes4RendererOverrideRowsCached` on cache miss.
+ * When to use: Only from the cache wrapper in this module.
+ * Expected outcome: Same row list as the pre-memoization implementation.
+ * Exceptions: None.
+ */
+function buildRes4TerrainOverridesForRendererFromGameUncached(ops: ControlDbOps): Array<{
+  h3Index: string;
+  terrainKind: string;
+  isUrban: boolean;
+  isAirport?: boolean;
+  isSeaport?: boolean;
+  isRubble?: boolean;
+}> {
+  logDebug('gameDb buildRes4TerrainOverridesForRendererFromGameUncached');
   const baseRows = getRes4TerrainOverridesFromCache();
   const mergedByH3 = new Map(
     baseRows.map((row) => [

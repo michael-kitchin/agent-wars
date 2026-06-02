@@ -29,8 +29,8 @@ function testBuildLookupUsesRomanNumeralsForAiAndOrdinalsForHuman(): void {
     { id: 'opponent-infantry-20', unitType: 'infantry', displayOrder: 20 },
     { id: 'human-infantry-1', unitType: 'infantry', displayOrder: 1 },
     { id: 'human-infantry-2', unitType: 'infantry', displayOrder: 2 },
-    { id: 'human-air-1', unitType: 'air', displayOrder: 3 },
-    { id: 'opponent-air-1', unitType: 'air', displayOrder: 4 },
+    { id: 'human-air-1', unitType: 'air', displayOrder: 1 },
+    { id: 'opponent-air-1', unitType: 'air', displayOrder: 1 },
   ]);
 
   assert.strictEqual(lookup.get('opponent-infantry-1'), 'I Infantry');
@@ -39,8 +39,8 @@ function testBuildLookupUsesRomanNumeralsForAiAndOrdinalsForHuman(): void {
   assert.strictEqual(lookup.get('opponent-infantry-20'), 'XX Infantry');
   assert.strictEqual(lookup.get('human-infantry-1'), '1st Infantry');
   assert.strictEqual(lookup.get('human-infantry-2'), '2nd Infantry');
-  assert.strictEqual(lookup.get('human-air-1'), '3rd Squadron');
-  assert.strictEqual(lookup.get('opponent-air-1'), 'IV Squadron');
+  assert.strictEqual(lookup.get('human-air-1'), '1st Squadron');
+  assert.strictEqual(lookup.get('opponent-air-1'), 'I Squadron');
 }
 
 /**

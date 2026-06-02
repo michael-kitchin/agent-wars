@@ -7,7 +7,7 @@
  * Exceptions: Throws if registry used before initialization for the requested context.
  */
 
-import { cellToChildren, cellToLatLng, latLngToCell } from 'h3-js';
+import { cellToChildren, cellToLatLng, getResolution, latLngToCell } from 'h3-js';
 import {
   buildStrategicRes1H3ToCodeMap,
   indexToCode,
@@ -100,8 +100,10 @@ export function initTacticalCoordinateRegistry(battleId: string, enclosingRes1H3
 export function getHexCodeForContext(h3Index: string, context: CoordinateContext): string | undefined {
   logTrace('hex-coordinates getHexCodeForContext', { h3Index, mode: context.mode });
   if (context.mode === 'strategic') {
-    const [lat, lng] = cellToLatLng(h3Index);
-    const res1 = latLngToCell(lat, lng, STRATEGIC_RESOLUTION);
+    const res1 =
+      getResolution(h3Index) === STRATEGIC_RESOLUTION
+        ? h3Index
+        : latLngToCell(...cellToLatLng(h3Index), STRATEGIC_RESOLUTION);
     return strategicH3ToCode?.get(res1);
   }
   const battleId = context.battleId;

@@ -17069,12 +17069,23 @@
   }
 
   // src/shared/tacticalRes4TransportLink.ts
+  var orderedRingMemo = /* @__PURE__ */ new Map();
+  var ORDERED_RING_MEMO_CAPACITY = 1e3;
   function res4GridDiskNeighborsOrdered(fromH3) {
+    const cached = orderedRingMemo.get(fromH3);
+    if (cached !== void 0) return cached;
+    let ring;
     try {
-      return [...gridDisk(fromH3, 1)].filter((h) => h !== fromH3);
+      ring = [...gridDisk(fromH3, 1)].filter((h) => h !== fromH3);
     } catch {
-      return [];
+      ring = [];
     }
+    if (orderedRingMemo.size >= ORDERED_RING_MEMO_CAPACITY) {
+      const oldest = orderedRingMemo.keys().next().value;
+      if (oldest !== void 0) orderedRingMemo.delete(oldest);
+    }
+    orderedRingMemo.set(fromH3, ring);
+    return ring;
   }
   function res4NeighborsInFootprint(h, res4Set) {
     const out = [];
@@ -17768,6 +17779,7 @@
   }
   function classifyLandInfantryArmorEnterStep(args) {
     const { toH3, unitTypeForMovement, terrain, fromH3, prevOfFrom, marchGoalH3, res4Set } = args;
+    const neighborsOf = args.footprintNeighbors ?? ((h) => res4NeighborsInFootprint(h, res4Set));
     const raw = terrain.effectiveKindForRes4Hex(toH3);
     const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
     const base = tacticalEnterHexMovementCost(unitTypeForMovement, cat);
@@ -17790,7 +17802,7 @@
       terrain,
       roadRailByH3: ctx.roadRailByH3,
       rubbleByH3: ctx.rubbleByH3,
-      footprintNeighborsOf: (h) => res4NeighborsInFootprint(h, res4Set)
+      footprintNeighborsOf: neighborsOf
     }) : legacyLandTransportPlainsEnterAllowed({ terrain, fromH3, toH3, unitTypeForMovement });
     const blockingTerrainWithoutTransport = blockingDestination;
     if (rubbleOverride) {
@@ -17872,6 +17884,7 @@
   }
   function planInfantryArmorLandContinuityMarch(args) {
     const { fromH3, toH3, res4Set, unitTypeForMovement, terrain } = args;
+    const neighborsOf = args.footprintNeighbors ?? ((h) => res4NeighborsInFootprint(h, res4Set));
     const distLand = /* @__PURE__ */ new Map();
     const parentLand = /* @__PURE__ */ new Map();
     const heapLand = [];
@@ -17885,7 +17898,7 @@
       const { payload: key, d } = node;
       if (d !== distLand.get(key)) continue;
       const { h, prev } = parseLandStateKey(key);
-      for (const nb of res4NeighborsInFootprint(h, res4Set)) {
+      for (const nb of neighborsOf(h)) {
         if (!blockedHexLandTransitAllowsRelaxation({
           unitTypeForMovement,
           terrain,
@@ -17904,7 +17917,8 @@
           fromH3: h,
           prevOfFrom: prev,
           marchGoalH3: toH3,
-          res4Set
+          res4Set,
+          footprintNeighbors: neighborsOf
         });
         if (!Number.isFinite(w) || w <= 0) continue;
         const nd = d + w;
@@ -18009,6 +18023,7 @@
   }
   function planTacticalRes4March(args) {
     const { fromH3, toH3, res4Set, unitTypeForMovement, movementPointBudget, terrain } = args;
+    const neighborsOf = args.footprintNeighbors ?? ((h) => res4NeighborsInFootprint(h, res4Set));
     if (unitTypeForMovement === "air") {
       return {
         reachable: false,
@@ -18045,7 +18060,8 @@
         toH3,
         res4Set,
         unitTypeForMovement,
-        terrain
+        terrain,
+        footprintNeighbors: neighborsOf
       });
       if (!landResult) {
         return {
@@ -18069,7 +18085,8 @@
           fromH3: path2[i - 1],
           prevOfFrom,
           marchGoalH3: toH3,
-          res4Set
+          res4Set,
+          footprintNeighbors: neighborsOf
         });
         if (!Number.isFinite(stepCost)) {
           return {
@@ -18112,7 +18129,7 @@
       const { payload: h, d } = node;
       if (d !== dist.get(h)) continue;
       if (h === toH3) break;
-      for (const nb of res4NeighborsInFootprint(h, res4Set)) {
+      for (const nb of neighborsOf(h)) {
         const w = enterCostForHex(nb, unitTypeForMovement, terrain, h);
         if (!Number.isFinite(w) || w <= 0) continue;
         const nd = d + w;
@@ -21086,7 +21103,7 @@
           humanHomeRegion: selectedRegions.humanHomeRegion,
           aiHomeRegion: selectedRegions.aiHomeRegion
         });
-        await deps.refreshRes4TerrainOverridesForRenderer();
+        await deps.refreshRes4TerrainOverridesForRenderer({ reloadStaticOverlays: true });
         rendererSharedState.gameState = state;
         rendererSharedState.strategicScenarioInitialLeafletView = null;
         tacticalReleaseRendererSessionForNewStrategicMatch(state);
@@ -25322,21 +25339,25 @@
     rendererSharedState.terrainInfraRes4Seaport = nextState.terrainInfraRes4Seaport;
     clearRes1TooltipSummaryCaches();
   }
-  async function refreshRes4TerrainOverridesForRenderer() {
+  var sessionStaticRes4OverlaysLoaded = false;
+  async function ensureStaticRes4OverlaysLoaded(forceReload) {
+    if (sessionStaticRes4OverlaysLoaded && !forceReload) return;
+    const api = window.gameApi;
+    if (!api) return;
+    const cityPromise = api.getRes4CityOverlays ? api.getRes4CityOverlays() : Promise.resolve([]);
+    const roadRailPromise = api.getRes4RoadRailOverlays ? api.getRes4RoadRailOverlays() : Promise.resolve([]);
+    const vectorsPromise = api.getRes4TransportVectorOverlays ? api.getRes4TransportVectorOverlays() : Promise.resolve([]);
+    const [cityRows, roadRailRows, vectorRows] = await Promise.all([cityPromise, roadRailPromise, vectorsPromise]);
+    applyRes4CityOverlayRows(cityRows, roadRailRows, vectorRows);
+    sessionStaticRes4OverlaysLoaded = true;
+  }
+  async function refreshRes4TerrainOverridesForRenderer(options) {
     const api = window.gameApi;
     if (!api?.getRes4TerrainOverrides) return;
     try {
-      const cityPromise = api.getRes4CityOverlays ? api.getRes4CityOverlays() : Promise.resolve([]);
-      const roadRailPromise = api.getRes4RoadRailOverlays ? api.getRes4RoadRailOverlays() : Promise.resolve([]);
-      const vectorsPromise = api.getRes4TransportVectorOverlays ? api.getRes4TransportVectorOverlays() : Promise.resolve([]);
-      const [rows, cityRows, roadRailRows, vectorRows] = await Promise.all([
-        api.getRes4TerrainOverrides(),
-        cityPromise,
-        roadRailPromise,
-        vectorsPromise
-      ]);
+      await ensureStaticRes4OverlaysLoaded(options?.reloadStaticOverlays === true);
+      const rows = await api.getRes4TerrainOverrides();
       applyRes4TerrainOverrides(rows);
-      applyRes4CityOverlayRows(cityRows, roadRailRows, vectorRows);
       requestRedraw();
     } catch (err) {
       console.error("refreshRes4TerrainOverridesForRenderer failed:", err);

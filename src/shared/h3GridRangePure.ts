@@ -9,6 +9,17 @@
  */
 
 import { gridDistance, gridDisk, gridPathCells } from 'h3-js';
+import { DEFAULT_BOUNDED_MEMO_CAPACITY, getBoundedMemo } from './boundedMemoCache';
+
+/**
+ * Memoizes immutable H3 grid distances for repeated origin/destination pairs within a session.
+ *
+ * Purpose: Avoids redundant `gridDistance` / `gridPathCells` work on AI-turn hot paths.
+ * When to use: Only inside `computeGridDistancePure`; keys are `origin|destination`.
+ * Expected outcome: Same numeric or null result as an uncached call; safe for process lifetime because H3 geometry is fixed.
+ * Exceptions: None.
+ */
+const gridDistanceMemo = new Map<string, number | null>();
 
 /**
  * Returns grid-step distance between two cells, or null when H3 APIs cannot derive a path or distance.
@@ -19,18 +30,21 @@ import { gridDistance, gridDisk, gridPathCells } from 'h3-js';
  * Exceptions: None; failures return null.
  */
 export function computeGridDistancePure(originH3Index: string, destinationH3Index: string): number | null {
-  try {
-    return gridDistance(originH3Index, destinationH3Index);
-  } catch {
-    /* distance unavailable */
-  }
-  try {
-    const path = gridPathCells(originH3Index, destinationH3Index);
-    if (path.length > 0) return Math.max(0, path.length - 1);
-  } catch {
-    /* path unavailable */
-  }
-  return null;
+  const key = `${originH3Index}|${destinationH3Index}`;
+  return getBoundedMemo(gridDistanceMemo, key, DEFAULT_BOUNDED_MEMO_CAPACITY, () => {
+    try {
+      return gridDistance(originH3Index, destinationH3Index);
+    } catch {
+      /* distance unavailable */
+    }
+    try {
+      const path = gridPathCells(originH3Index, destinationH3Index);
+      if (path.length > 0) return Math.max(0, path.length - 1);
+    } catch {
+      /* path unavailable */
+    }
+    return null;
+  });
 }
 
 /**

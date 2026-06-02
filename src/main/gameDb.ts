@@ -431,15 +431,16 @@ function seedGameSeedIfMissing(): void {
 }
 
 /**
- * Defines the `allocateNextUnitDisplayOrder` function shape (export function allocateNextUnitDisplayOrder(unitType: BuildUnitType): number).
-
- * Purpose: Supports maintainability by documenting why `allocateNextUnitDisplayOrder` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Allocates the next monotonic display order for a given player and unit type.
+ *
+ * Purpose: Facade over `allocateNextUnitDisplayOrderWithOps` for seeding and production callers that hold a live DB.
+ * When to use: Unit insertion during seeding and production pipelines; always pass the owning player so each side's
+ * ordinals start at 1 independently.
+ * Expected outcome: Returns `1` when DB is absent; otherwise increments the per-player-per-type counter and returns it.
  * Exceptions: None.
  */
-export function allocateNextUnitDisplayOrder(unitType: BuildUnitType): number {
-  return allocateNextUnitDisplayOrderWithOps({ hasDb: () => db !== null, run, getOne }, unitType);
+export function allocateNextUnitDisplayOrder(unitType: BuildUnitType, player: string): number {
+  return allocateNextUnitDisplayOrderWithOps({ hasDb: () => db !== null, run, getOne }, unitType, player);
 }
 
 /**

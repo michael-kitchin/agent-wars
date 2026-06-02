@@ -181,7 +181,7 @@ function spawnProducedUnitsForHex(
     }
     sequence += 1;
     const unitId = `${controllerPlayerId}-${unitType}-prod-${turnNumber}-${sequence}`;
-    const displayOrder = allocateNextUnitDisplayOrder(unitType);
+    const displayOrder = allocateNextUnitDisplayOrder(unitType, controllerPlayerId);
     dbRun('INSERT INTO units (id, player, unit_type, display_order, h3_index) VALUES (?, ?, ?, ?, ?)', [
       unitId,
       controllerPlayerId,

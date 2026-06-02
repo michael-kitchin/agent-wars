@@ -22,6 +22,7 @@ import {
 } from './numericPriorityMinHeap';
 import {
   res4NeighborsInFootprint,
+  type Res4FootprintNeighborLookup,
   tacticalRes4TransportMarchAdjacentPairAllowsStep,
 } from './tacticalRes4TransportLink';
 
@@ -231,8 +232,11 @@ export function planTacticalRes4March(args: {
   unitTypeForMovement: string;
   movementPointBudget: number;
   terrain: TacticalTerrainKindResolver;
+  /** Precomputed footprint adjacency; when omitted, falls back to `res4NeighborsInFootprint` per state. */
+  footprintNeighbors?: Res4FootprintNeighborLookup;
 }): TacticalMarchPlanResult {
   const { fromH3, toH3, res4Set, unitTypeForMovement, movementPointBudget, terrain } = args;
+  const neighborsOf = args.footprintNeighbors ?? ((h: string) => res4NeighborsInFootprint(h, res4Set));
   if (unitTypeForMovement === 'air') {
     return {
       reachable: false,
@@ -272,6 +276,7 @@ export function planTacticalRes4March(args: {
       res4Set,
       unitTypeForMovement,
       terrain,
+      footprintNeighbors: neighborsOf,
     });
     if (!landResult) {
       return {
@@ -296,6 +301,7 @@ export function planTacticalRes4March(args: {
         prevOfFrom,
         marchGoalH3: toH3,
         res4Set,
+        footprintNeighbors: neighborsOf,
       });
       if (!Number.isFinite(stepCost)) {
         return {
@@ -339,7 +345,7 @@ export function planTacticalRes4March(args: {
     const { payload: h, d } = node;
     if (d !== dist.get(h)) continue;
     if (h === toH3) break;
-    for (const nb of res4NeighborsInFootprint(h, res4Set)) {
+    for (const nb of neighborsOf(h)) {
       const w = enterCostForHex(nb, unitTypeForMovement, terrain, h);
       if (!Number.isFinite(w) || w <= 0) continue;
       const nd = d + w;

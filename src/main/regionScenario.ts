@@ -1,5 +1,5 @@
 import { logDebug, logError, logTrace } from './logger';
-import { loadTerrainRes1NamingBundled } from './terrainNamingLoad';
+import { ensureTerrainClassificationCacheLoaded, getTerrainRes1NamingRecordsFromSnapshot } from './terrainClassificationCache';
 
 /**
  * Documents the module-scope binding `PASSABLE_LAND_TERRAIN_KINDS` (PASSABLE_LAND_TERRAIN_KINDS).
@@ -39,9 +39,10 @@ let cachedRegionHexesByName: Map<string, string[]> | null = null;
  */
 function buildRegionHexCache(): Map<string, string[]> {
   logDebug('regionScenario buildRegionHexCache');
-  const env = loadTerrainRes1NamingBundled();
+  ensureTerrainClassificationCacheLoaded();
+  const records = getTerrainRes1NamingRecordsFromSnapshot();
   const byRegion = new Map<string, Set<string>>();
-  for (const row of env.records) {
+  for (const row of records) {
     for (const country of row.countries) {
       const region = (country.region ?? '').trim();
       if (!region) continue;

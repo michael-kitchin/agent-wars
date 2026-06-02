@@ -7,8 +7,10 @@ import assert from 'node:assert/strict';
 import { gridDisk } from 'h3-js';
 import { test } from 'node:test';
 import {
+  buildRes4FootprintAdjacencyMap,
   neighborSlotIndex,
   res4GridDiskNeighborsOrdered,
+  res4NeighborsInFootprint,
   TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER,
   TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER,
   tacticalRes4FootprintTransportOverlayRecords,
@@ -19,6 +21,28 @@ import {
   tacticalRes4TransportStepSpeedMultiplier,
 } from '../../shared/tacticalRes4TransportLink';
 import { tacticalRes4Cell, firstRingCellDistinctFrom } from './testSupport/tacticalRes4HexFixtures';
+
+/**
+ * Verifies precomputed footprint adjacency matches live `res4NeighborsInFootprint` for every cell.
+ *
+ * Purpose: Regression guard for Phase 1 adjacency precompute used by the march session cache.
+ * When to use: After changes to `buildRes4FootprintAdjacencyMap` or `res4NeighborsInFootprint`.
+ * Expected outcome: Identical neighbor lists for each cell in a multi-cell res4 footprint sample.
+ * Exceptions: None; uses a smaller two-cell footprint when `gridDisk(k=2)` throws on pentagon edges.
+ */
+test('buildRes4FootprintAdjacencyMap matches res4NeighborsInFootprint for every cell', () => {
+  const center = tacticalRes4Cell(48, 58);
+  let footprint: Set<string>;
+  try {
+    footprint = new Set([...gridDisk(center, 2)]);
+  } catch {
+    footprint = new Set([center, firstRingCellDistinctFrom(center)]);
+  }
+  const adj = buildRes4FootprintAdjacencyMap(footprint);
+  for (const h of footprint) {
+    assert.deepStrictEqual(adj.get(h) ?? [], res4NeighborsInFootprint(h, footprint));
+  }
+});
 
 test('res4GridDiskNeighborsOrdered matches gridDisk ring cells excluding origin', () => {
   const center = tacticalRes4Cell(45, 55);

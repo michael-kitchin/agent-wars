@@ -36,14 +36,15 @@ function registerRegionRandomizeButtons(): void {
  */
 type NewGameDeps = {
     /**
-   * Specifies the contract for the `refreshRes4TerrainOverridesForRenderer` member (refreshRes4TerrainOverridesForRenderer: () => Promise<void>;).
-
-   * Contract: Describes stable behavior for callers of `refreshRes4TerrainOverridesForRenderer` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * Specifies the contract for the `refreshRes4TerrainOverridesForRenderer` member.
+   *
+   * Contract: Reloads res4 terrain override rows from main. Pass `{ reloadStaticOverlays: true }` to also
+   * re-fetch static city/road/rail/vector overlay payloads (required after `newGame` resets all terrain).
+   * When to use: After newGame (with reloadStaticOverlays), and on routine Ready refreshes (without it).
+   * Expected outcome: Renderer maps aligned with main-process caches after the promise settles.
+   * Exceptions: None; implementations log failures without throwing.
    */
-refreshRes4TerrainOverridesForRenderer: () => Promise<void>;
+refreshRes4TerrainOverridesForRenderer: (options?: { reloadStaticOverlays?: boolean }) => Promise<void>;
     /**
    * Specifies the contract for the `rebuildUnitDisplayNameLookup` member (rebuildUnitDisplayNameLookup: (state: GameStateSnapshot | null) => void;).
 
@@ -229,7 +230,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
         humanHomeRegion: selectedRegions.humanHomeRegion,
         aiHomeRegion: selectedRegions.aiHomeRegion,
       })) as GameStateSnapshot;
-      await deps.refreshRes4TerrainOverridesForRenderer();
+      await deps.refreshRes4TerrainOverridesForRenderer({ reloadStaticOverlays: true });
       S.gameState = state;
       S.strategicScenarioInitialLeafletView = null;
       tacticalReleaseRendererSessionForNewStrategicMatch(state);

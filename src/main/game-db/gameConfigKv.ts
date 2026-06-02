@@ -20,15 +20,15 @@ export type GameConfigKvDbOps = {
 };
 
 /**
- * Builds the `game_config` key used to monotonically allocate per-type unit display order.
+ * Builds the `game_config` key used to monotonically allocate per-player-per-type unit display order.
  *
  * Purpose: Keeps the key naming scheme centralized for tests and migrations.
  * When to use: From `allocateNextUnitDisplayOrderWithOps` only.
- * Expected outcome: Stable string keys `unit_display_sequence_<unitType>`.
+ * Expected outcome: Stable string keys `unit_display_sequence_<player>_<unitType>`, one sequence per side per type.
  * Exceptions: None.
  */
-function unitDisplaySequenceKey(unitType: BuildUnitType): string {
-  return `unit_display_sequence_${unitType}`;
+function unitDisplaySequenceKey(unitType: BuildUnitType, player: string): string {
+  return `unit_display_sequence_${player}_${unitType}`;
 }
 
 /**
@@ -49,17 +49,17 @@ export function seedGameSeedIfMissingWithOps(ops: GameConfigKvDbOps): void {
 }
 
 /**
- * Allocates the next monotonic display order for a buildable unit type using `game_config` counters.
+ * Allocates the next monotonic display order for a given player and buildable unit type using `game_config` counters.
  *
- * Purpose: Preserves `allocateNextUnitDisplayOrder` logging and fallback when DB is unavailable.
- * When to use: Unit insertion during seeding and production pipelines.
- * Expected outcome: Returns `1` when DB is absent; otherwise increments stored counter and returns it.
+ * Purpose: Ensures each side's formation ordinals start at 1 independently (human: 1st, 2nd…; opponent: I, II…).
+ * When to use: Unit insertion during seeding and production pipelines; always pass the owning player.
+ * Expected outcome: Returns `1` when DB is absent; otherwise increments the per-player-per-type stored counter and returns it.
  * Exceptions: None.
  */
-export function allocateNextUnitDisplayOrderWithOps(ops: GameConfigKvDbOps, unitType: BuildUnitType): number {
-  logDebug('gameDb allocateNextUnitDisplayOrder', { unitType });
+export function allocateNextUnitDisplayOrderWithOps(ops: GameConfigKvDbOps, unitType: BuildUnitType, player: string): number {
+  logDebug('gameDb allocateNextUnitDisplayOrder', { unitType, player });
   if (ops.hasDb && !ops.hasDb()) return 1;
-  const key = unitDisplaySequenceKey(unitType);
+  const key = unitDisplaySequenceKey(unitType, player);
   const row = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [key]);
   const current = row ? Number.parseInt(row.value, 10) : 0;
   const next = Number.isFinite(current) && current > 0 ? current + 1 : 1;

@@ -1297,32 +1297,54 @@ function applyRes4TerrainOverrides(rows: Array<{
 }
 
 /**
- * Defines the `refreshRes4TerrainOverridesForRenderer` function shape (async function refreshRes4TerrainOverridesForRenderer(): Promise<void>).
-
- * Purpose: Supports maintainability by documenting why `refreshRes4TerrainOverridesForRenderer` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Tracks whether static res4 city/road/rail/vector overlays were fetched this renderer session.
+ *
+ * Purpose: Avoids repeating large static IPC payloads on every Ready refresh.
+ * When to use: Cleared when `reloadStaticOverlays` is true (New Game path).
+ * Expected outcome: Static overlays load once per session unless explicitly reset.
  * Exceptions: None.
  */
-async function refreshRes4TerrainOverridesForRenderer(): Promise<void> {
+let sessionStaticRes4OverlaysLoaded = false;
+
+/**
+ * Fetches static res4 overlay IPC payloads once per session unless `forceReload` is set.
+ *
+ * Purpose: Split from dynamic terrain-override refresh (Phase 8 performance plan).
+ * When to use: Before every map refresh; skipped when already loaded and not forced.
+ * Expected outcome: City/road-rail/vector renderer state populated via `applyRes4CityOverlayRows`.
+ * Exceptions: Logs to console and rethrows on IPC failure (caller catches).
+ */
+async function ensureStaticRes4OverlaysLoaded(forceReload: boolean): Promise<void> {
+  if (sessionStaticRes4OverlaysLoaded && !forceReload) return;
+  const api = window.gameApi;
+  if (!api) return;
+  const cityPromise = api.getRes4CityOverlays ? api.getRes4CityOverlays() : Promise.resolve<Res4CityOverlayRow[]>([]);
+  const roadRailPromise = api.getRes4RoadRailOverlays
+    ? api.getRes4RoadRailOverlays()
+    : Promise.resolve<Res4RoadRailOverlayRow[]>([]);
+  const vectorsPromise = api.getRes4TransportVectorOverlays
+    ? api.getRes4TransportVectorOverlays()
+    : Promise.resolve<Res4TransportVectorOverlayRow[]>([]);
+  const [cityRows, roadRailRows, vectorRows] = await Promise.all([cityPromise, roadRailPromise, vectorsPromise]);
+  applyRes4CityOverlayRows(cityRows, roadRailRows, vectorRows);
+  sessionStaticRes4OverlaysLoaded = true;
+}
+
+/**
+ * Defines the `refreshRes4TerrainOverridesForRenderer` function shape (async function refreshRes4TerrainOverridesForRenderer(): Promise<void>).
+
+ * Purpose: Refreshes dynamic res4 terrain overrides on every call; static overlays load once per session (or when `reloadStaticOverlays` is true).
+ * When to use: Map init, New Game, Ready, and infrastructure-damage refresh triggers.
+ * Expected outcome: Dynamic rubble/airport/seaport state updates; static overlays unchanged on routine Ready.
+ * Exceptions: Logs failure to console; does not throw to callers.
+ */
+async function refreshRes4TerrainOverridesForRenderer(options?: { reloadStaticOverlays?: boolean }): Promise<void> {
   const api = window.gameApi;
   if (!api?.getRes4TerrainOverrides) return;
   try {
-    const cityPromise = api.getRes4CityOverlays ? api.getRes4CityOverlays() : Promise.resolve<Res4CityOverlayRow[]>([]);
-    const roadRailPromise = api.getRes4RoadRailOverlays
-      ? api.getRes4RoadRailOverlays()
-      : Promise.resolve<Res4RoadRailOverlayRow[]>([]);
-    const vectorsPromise = api.getRes4TransportVectorOverlays
-      ? api.getRes4TransportVectorOverlays()
-      : Promise.resolve<Res4TransportVectorOverlayRow[]>([]);
-    const [rows, cityRows, roadRailRows, vectorRows] = await Promise.all([
-      api.getRes4TerrainOverrides(),
-      cityPromise,
-      roadRailPromise,
-      vectorsPromise,
-    ]);
+    await ensureStaticRes4OverlaysLoaded(options?.reloadStaticOverlays === true);
+    const rows = await api.getRes4TerrainOverrides();
     applyRes4TerrainOverrides(rows);
-    applyRes4CityOverlayRows(cityRows, roadRailRows, vectorRows);
     requestRedraw();
   } catch (err) {
     console.error('refreshRes4TerrainOverridesForRenderer failed:', err);

@@ -174,6 +174,15 @@ res4FeatureRows: ReadonlyArray<{
     isAirport: boolean;
     isSeaport: boolean;
   }>;
+    /**
+   * Specifies the contract for the `res1NamingRecords` member (res1NamingRecords: ReadonlyArray<TerrainNamingRecordRes1>;).
+
+   * Contract: Parsed res1 naming rows from `terrain_res1_naming.json` retained for region/scenario helpers without a second file read.
+   * When to use: `regionScenario.buildRegionHexCache` and other callers needing country `region` per res1 hex.
+   * Expected outcome: Same records as `loadTerrainRes1NamingBundled().records` at snapshot build time.
+   * Exceptions: None.
+   */
+res1NamingRecords: ReadonlyArray<TerrainNamingRecordRes1>;
 }
 
 /**
@@ -374,6 +383,7 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     res4RoadRailOverlayByH3,
     res4TransportVectorOverlayRows,
     res4FeatureRows,
+    res1NamingRecords: namingRes1Env.records as TerrainNamingRecordRes1[],
   };
 }
 
@@ -394,6 +404,24 @@ export function ensureTerrainClassificationCacheLoaded(): void {
     logError('terrainClassificationCache ensureTerrainClassificationCacheLoaded: failed', err);
     throw err;
   }
+}
+
+/**
+ * Returns parsed res1 naming records from the loaded terrain snapshot.
+ *
+ * Purpose: Supplies `regionScenario` and similar helpers without re-reading `terrain_res1_naming.json`.
+ * When to use: After `ensureTerrainClassificationCacheLoaded()` at startup or before region hex aggregation.
+ * Expected outcome: Read-only array identical to the bundled naming envelope records used when the snapshot was built.
+ * Exceptions: Throws if the classification cache has not been loaded yet.
+ */
+export function getTerrainRes1NamingRecordsFromSnapshot(): ReadonlyArray<TerrainNamingRecordRes1> {
+  logTrace('terrainClassificationCache getTerrainRes1NamingRecordsFromSnapshot');
+  if (!cached) {
+    const err = new Error('terrainClassificationCache: load ensureTerrainClassificationCacheLoaded() first');
+    logError('terrainClassificationCache getTerrainRes1NamingRecordsFromSnapshot: cache empty', err);
+    throw err;
+  }
+  return cached.res1NamingRecords;
 }
 
 /**

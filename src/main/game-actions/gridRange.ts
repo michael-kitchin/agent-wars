@@ -1,15 +1,26 @@
 import { gridDisk } from 'h3-js';
+import { DEFAULT_BOUNDED_MEMO_CAPACITY, getBoundedMemo } from '../../shared/boundedMemoCache';
 import { computeGridDistancePure } from '../../shared/h3GridRangePure';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { logDebug, logError, logTrace } from '../logger';
 
 /**
- * Defines the `computeGridDistanceSafe` function shape (export function computeGridDistanceSafe().
-
- * Purpose: Supports maintainability by documenting why `computeGridDistanceSafe` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Memoizes `gridDisk(origin, maxRange)` sets for the null-distance fallback in `isWithinGridRangeSafe`.
+ *
+ * Purpose: Avoids rebuilding identical disks when many destinations share one origin and range cap.
+ * When to use: Only from `isWithinGridRangeSafe` when `computeGridDistancePure` returns null.
+ * Expected outcome: Membership tests match a fresh `gridDisk` call for the same origin/range pair.
  * Exceptions: None.
+ */
+const gridDiskFallbackMemo = new Map<string, Set<string>>();
+
+/**
+ * Returns H3 grid-step distance with main-process trace logging on fallback failure.
+ *
+ * Purpose: Logging wrapper around `computeGridDistancePure` for code paths that have access to the main logger.
+ * When to use: Anywhere in the main process that needs a numeric distance and wants trace-level fallback diagnostics.
+ * Expected outcome: Non-negative integer when derivable; null when both `gridDistance` and `gridPathCells` fail.
+ * Exceptions: None; all H3 errors are swallowed inside `computeGridDistancePure`.
  */
 export function computeGridDistanceSafe(
   originH3Index: string,
@@ -23,12 +34,12 @@ export function computeGridDistanceSafe(
 }
 
 /**
- * Defines the `isWithinGridRangeSafe` function shape (export function isWithinGridRangeSafe().
-
- * Purpose: Supports maintainability by documenting why `isWithinGridRangeSafe` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Uses `computeGridDistancePure` first; on `null` distance falls back to `gridDisk(origin, maxRange)` membership (aligned with `isWithinGridRangePure` semantics); logs disk failures only.
- * Exceptions: None.
+ * Returns whether a destination hex is within range, using a memoized disk-fallback with main-process error logging.
+ *
+ * Purpose: Main-process entry point for grid-range checks; extends `isWithinGridRangePure` with `logError` on disk failure.
+ * When to use: Use in main-process validation and AI order generation; prefer `isWithinGridRangePure` in shared modules.
+ * Expected outcome: `true` when distance ≤ maxRange (via direct calc) or destination is in `gridDisk` (on null distance).
+ * Exceptions: Returns false and logs error when `gridDisk` itself throws; never propagates.
  */
 export function isWithinGridRangeSafe(
   originH3Index: string,
@@ -39,8 +50,11 @@ export function isWithinGridRangeSafe(
   const distance = computeGridDistancePure(originH3Index, destinationH3Index);
   if (distance !== null) return distance <= maxRange;
   try {
-    const disk = gridDisk(originH3Index, maxRange);
-    return disk.includes(destinationH3Index);
+    const diskKey = `${originH3Index}|${maxRange}`;
+    const disk = getBoundedMemo(gridDiskFallbackMemo, diskKey, DEFAULT_BOUNDED_MEMO_CAPACITY, () => {
+      return new Set(gridDisk(originH3Index, maxRange));
+    });
+    return disk.has(destinationH3Index);
   } catch (diskErr) {
     logError(`${context}: gridDisk failed`, { originH3Index, destinationH3Index, maxRange, diskErr });
   }

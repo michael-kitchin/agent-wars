@@ -2,7 +2,7 @@ import { cellToLatLng, gridDistance } from 'h3-js';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { dbRun, dbGetAll, saveDatabase } from '../gameDb';
 import { getRange } from '../combatConstants';
-import { createPathfindingSession, executePlanRouteWithSession } from './tool1Pathfinding';
+import { createPathfindingSession, executePlanRouteWithSession, type PathfindingSession } from './tool1Pathfinding';
 import type { LatLng } from './tool1Pathfinding';
 import { logDebug } from '../logger';
 import {
@@ -22,6 +22,8 @@ import {
  */
 export type GenerateStandingOrdersOptions = {
   mutateProgress?: boolean;
+  /** Reuses an existing pathfinding session from the same AI request when provided. */
+  pathfindingSession?: PathfindingSession;
 };
 
 /**
@@ -147,7 +149,8 @@ export function generateOrdersForStandingOrders(
   if (mutateProgress) {
     expireAndUpdateStatus(playerId, state);
   }
-  const pathfindingSession = createPathfindingSession(state, latLngByH3, resolveToH3);
+  const pathfindingSession =
+    options?.pathfindingSession ?? createPathfindingSession(state, latLngByH3, resolveToH3);
 
   const movementOrders: { unitId: string; toH3Index: string }[] = [];
   const rangedAttacks: { unitId: string; targetH3Index: string }[] = [];

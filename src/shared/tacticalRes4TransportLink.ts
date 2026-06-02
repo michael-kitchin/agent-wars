@@ -18,19 +18,43 @@ export type TacticalRes4TransportMasks = {
 };
 
 /**
+ * Process-global cache for `res4GridDiskNeighborsOrdered` results.
+ *
+ * Purpose: Eliminates repeated native H3 `gridDisk` calls from the Dijkstra transport-mask alignment path
+ * (`neighborSlotIndex`, `tacticalRes4TransportMarchAdjacentPairAllowsStep`, etc.), which otherwise calls
+ * `gridDisk` several times per edge relaxation even after footprint adjacency is precomputed.
+ * When to use: Populated automatically by `res4GridDiskNeighborsOrdered`; capacity sized to cover a
+ * full res1 footprint (~343 cells) plus some margin.
+ * Expected outcome: After the first call per cell, subsequent calls return the cached ring in O(1).
+ * Exceptions: None.
+ */
+const orderedRingMemo = new Map<string, string[]>();
+const ORDERED_RING_MEMO_CAPACITY = 1_000;
+
+/**
  * Returns ordered res4 ring-1 neighbors of `fromH3` (excludes `fromH3`), or empty when H3 throws.
  *
  * Purpose: Stable neighbor list for indexing into `roadSides` / `rail_sides` arrays on the same cell.
+ * Result is memoized process-globally so repeated Dijkstra calls within a battle pay the H3 cost only once per cell.
  * When to use: `neighborSlotIndex` and transport spawn scans.
  * Expected outcome: Same iteration order as `res4NeighborsInFootprint` neighbor iteration for a single origin (before footprint filtering).
  * Exceptions: Swallows `gridDisk` errors and returns `[]`.
  */
 export function res4GridDiskNeighborsOrdered(fromH3: string): string[] {
+  const cached = orderedRingMemo.get(fromH3);
+  if (cached !== undefined) return cached;
+  let ring: string[];
   try {
-    return [...gridDisk(fromH3, 1)].filter((h) => h !== fromH3);
+    ring = [...gridDisk(fromH3, 1)].filter((h) => h !== fromH3);
   } catch {
-    return [];
+    ring = [];
   }
+  if (orderedRingMemo.size >= ORDERED_RING_MEMO_CAPACITY) {
+    const oldest = orderedRingMemo.keys().next().value as string | undefined;
+    if (oldest !== undefined) orderedRingMemo.delete(oldest);
+  }
+  orderedRingMemo.set(fromH3, ring);
+  return ring;
 }
 
 /**
@@ -51,6 +75,39 @@ export function res4NeighborsInFootprint(h: string, res4Set: ReadonlySet<string>
     return out;
   }
   return out;
+}
+
+/** Lookup for ring-1 neighbors inside a fixed res4 footprint without per-call `gridDisk`. */
+export type Res4FootprintNeighborLookup = (h: string) => readonly string[];
+
+/**
+ * Precomputes footprint-restricted ring-1 adjacency for every cell in `res4Set`.
+ *
+ * Purpose: Avoids thousands of native H3 `gridDisk` calls during tactical march Dijkstra on a static footprint.
+ * When to use: Session cache in `tacticalMovementPlanningCache` before calling `planTacticalRes4March`.
+ * Expected outcome: For each `h` in `res4Set`, value equals `res4NeighborsInFootprint(h, res4Set)`.
+ * Exceptions: None; malformed cells get empty neighbor lists like the live helper.
+ */
+export function buildRes4FootprintAdjacencyMap(res4Set: ReadonlySet<string>): Map<string, string[]> {
+  const adj = new Map<string, string[]>();
+  for (const h of res4Set) {
+    adj.set(h, res4NeighborsInFootprint(h, res4Set));
+  }
+  return adj;
+}
+
+/**
+ * Wraps a precomputed adjacency map as a `Res4FootprintNeighborLookup` for march planners.
+ *
+ * Purpose: Lets Dijkstra loops call `neighborsOf(h)` instead of `res4NeighborsInFootprint(h, res4Set)`.
+ * When to use: After `buildRes4FootprintAdjacencyMap` in the tactical planning session cache.
+ * Expected outcome: Returns the cached list for known cells; `[]` for unknown `h`.
+ * Exceptions: None.
+ */
+export function res4FootprintNeighborLookupFromMap(
+  adjacency: ReadonlyMap<string, readonly string[]>
+): Res4FootprintNeighborLookup {
+  return (h: string) => adjacency.get(h) ?? [];
 }
 
 /**

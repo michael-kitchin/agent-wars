@@ -16,7 +16,7 @@ import {
 import type { GuardedDbRunAndGetAllOps } from '../dbOps';
 import type { FlexAirSlotDeps } from './initialFlexAirSlot';
 import { applySacrificeToBaselineCounts, resolveFlexUnitPlacement } from './initialFlexAirSlot';
-import { countPlannedUnitsOfType, insertPlannedUnitsForPlayer, type PlannedUnitTuple } from './plannedUnits';
+import { countPlannedUnitsOfType, insertPlannedUnitsForPlayer, type PlannedUnitOwner, type PlannedUnitTuple } from './plannedUnits';
 import { trySeedScenarioRegionVsRegion } from './regionScenarioSeeding';
 
 /**
@@ -45,7 +45,7 @@ getOne: <T extends Record<string, unknown>>(sql: string, params?: unknown[]) => 
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-allocateNextUnitDisplayOrder: (unitType: BuildUnitType) => number;
+allocateNextUnitDisplayOrder: (unitType: BuildUnitType, player: PlannedUnitOwner) => number;
 }
 
 /**

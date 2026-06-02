@@ -76,6 +76,22 @@ function testStrategicRegistryStableAcrossExplicitReInit(): void {
 }
 
 /**
+ * Defines the `testStrategicRes1FastPathMatchesRoundTrip` function shape (function testStrategicRes1FastPathMatchesRoundTrip(): void).
+
+ * Purpose: Confirms res1-index fast-path encoding still round-trips through the strategic registry.
+ * When to use: After changes to `getHexCodeForContext` strategic branch.
+ * Expected outcome: Sample res1 cell encodes to a two-character code and decodes back to the same index.
+ * Exceptions: None.
+ */
+function testStrategicRes1FastPathMatchesRoundTrip(): void {
+  ensureStrategicCoordinateRegistryInitialized();
+  const sample = listStrategicRes1H3Indexes()[0]!;
+  const code = getHexCodeForContext(sample, STRATEGIC_CTX);
+  assert.ok(code && code.length === 2);
+  assert.strictEqual(getH3IndexForCode(code, STRATEGIC_CTX), sample);
+}
+
+/**
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Executes this module's tests in declaration order for Node's direct execution model.
@@ -87,6 +103,7 @@ function run(): void {
   testStrategicCodesAreUniqueAcrossAllRes1Cells();
   testStrategicFullRoundTripForEveryRes1Cell();
   testStrategicRegistryStableAcrossExplicitReInit();
+  testStrategicRes1FastPathMatchesRoundTrip();
   console.log('hex-coordinates.test.ts passed');
 }
 

@@ -694,6 +694,62 @@ function testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity(
 
 
 /**
+ * Verifies that `allocateNextUnitDisplayOrder` maintains independent per-player-per-type counters.
+ *
+ * Purpose: Regression guard for the fix where a shared counter caused opponent unit I to be labeled
+ * "II Infantry" instead of "I Infantry" (human consumed ordinal 1 first).
+ * When to use: After changes to `allocateNextUnitDisplayOrder` or `gameConfigKv.ts`.
+ * Expected outcome: Human and opponent infantry sequences start at 1 independently; each increments its own counter.
+ * Exceptions: None; uses temporary SQLite file under `os.tmpdir()`.
+ */
+function testUnitDisplayOrderIsIndependentPerPlayer(gameDb: typeof import('./gameDb')): void {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-display-order-'));
+  const p = path.join(dir, 't.sqlite');
+  try {
+    gameDb.openGameDatabaseAtPathForTests(p);
+    assert.strictEqual(gameDb.allocateNextUnitDisplayOrder('infantry', 'human'), 1, 'first human infantry ordinal must be 1');
+    assert.strictEqual(gameDb.allocateNextUnitDisplayOrder('infantry', 'opponent'), 1, 'first opponent infantry ordinal must also start at 1');
+    assert.strictEqual(gameDb.allocateNextUnitDisplayOrder('infantry', 'human'), 2, 'second human infantry ordinal must be 2');
+    assert.strictEqual(gameDb.allocateNextUnitDisplayOrder('infantry', 'opponent'), 2, 'second opponent infantry ordinal must be 2');
+    assert.strictEqual(gameDb.allocateNextUnitDisplayOrder('armor', 'human'), 1, 'human armor counter is independent of infantry');
+  } finally {
+    gameDb.closeGameDatabaseForTests();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+
+
+/**
+ * Defines the `testRendererRes4OverridesCacheReflectsDbChanges` function shape (function testRendererRes4OverridesCacheReflectsDbChanges(gameDb)).
+
+ * Purpose: Asserts renderer override fetch contract (stable rows when DB unchanged; updated rows after flag mutation).
+ * When to use: Regression guard after changes to `res4RendererOverrideCache.ts`.
+ * Expected outcome: Consecutive fetches match before mutation; `isRubble` reflects DB update after `updateRes4FeatureOverrideRow`.
+ * Exceptions: None; uses temporary SQLite file under `os.tmpdir()`.
+ */
+function testRendererRes4OverridesCacheReflectsDbChanges(gameDb: typeof import('./gameDb')): void {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-cache-'));
+  const p = path.join(dir, 't.sqlite');
+  try {
+    gameDb.openGameDatabaseAtPathForTests(p);
+    gameDb.resetGameForNewMatch();
+    const before = gameDb.getRes4TerrainOverridesForRendererFromGame();
+    const again = gameDb.getRes4TerrainOverridesForRendererFromGame();
+    assert.deepStrictEqual(before, again, 'unchanged DB must return equivalent rows');
+    const target = before.find((row) => row.isUrban && !row.isRubble);
+    assert.ok(target, 'expected an urban row to mutate for cache invalidation test');
+    gameDb.updateRes4FeatureOverrideRow(target!.h3Index, { isRubble: true });
+    const after = gameDb.getRes4TerrainOverridesForRendererFromGame();
+    const updated = after.find((row) => row.h3Index === target!.h3Index);
+    assert.strictEqual(updated?.isRubble, true, 'DB mutation must appear in subsequent fetch');
+  } finally {
+    gameDb.closeGameDatabaseForTests();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/**
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Supports maintainability by documenting why `run` exists.
@@ -717,6 +773,8 @@ function run(): void {
   testResetRegeneratesTerrain(gameDb);
   testResetSeedsInfrastructureState(gameDb);
   testRendererRes4OverridesIncludeInfrastructureFeatureRows(gameDb);
+  testRendererRes4OverridesCacheReflectsDbChanges(gameDb);
+  testUnitDisplayOrderIsIndependentPerPlayer(gameDb);
   testScenarioHomeRegionListIsSortedUnique(gameDb);
   testResetNormalizesInvalidScenarioHomeRegions(gameDb);
   testOpenExistingDatabaseReconcilesRes1InfrastructureDrift(gameDb);

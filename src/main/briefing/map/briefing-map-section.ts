@@ -10,7 +10,7 @@
 import type { GameStateSnapshot } from '../../gameDb';
 import type { PrecomputationResult } from '../../precomputation';
 import { logDebug } from '../../logger';
-import { collectAggregatedPossibleActionRows } from '../../openrouter/possibleUnitActions';
+import { collectAggregatedPossibleActionRows, type PossibleActionsIndexedState } from '../../openrouter/possibleUnitActions';
 import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
 import type { CoordinateContext } from './coordinateContext';
 import {
@@ -56,6 +56,7 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
   state: GameStateSnapshot;
   precomputed: PrecomputationResult;
   latLngByH3: Map<string, [number, number]>;
+  indexedState?: PossibleActionsIndexedState;
 }): string {
   logDebug('briefing-map-section buildStrategicOperationalMapSectionMarkdown', {
     turn: args.state.turnNumber,
@@ -88,6 +89,7 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
     latLngByH3: args.latLngByH3,
     formatLatLng: () => '',
     forThisTurnOptionsTable: true,
+    indexedState: args.indexedState,
   });
   const optionsMd = renderThisTurnOptionsTableMarkdown(aggRows, args.latLngByH3, context);
   const rosterMd = renderUnitRosterTableMarkdown(args.precomputed.unitAssessments, context);

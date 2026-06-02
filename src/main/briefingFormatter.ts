@@ -15,6 +15,20 @@ import { buildStrategicOperationalMapSectionMarkdown } from './briefing/map/brie
 import { ensureStrategicCoordinateRegistryInitialized } from './briefing/map/hex-coordinates';
 import { h3ToCode } from './briefing/map/hex-code-translator';
 import type { CoordinateContext } from './briefing/map/coordinateContext';
+import type { PossibleActionsIndexedState } from './openrouter/possibleUnitActions';
+
+/**
+ * Optional shared coordinate/index data to avoid rebuilding within one AI request.
+ *
+ * Purpose: Lets `requestOrdersFlow` pass maps built once into `formatBriefing`.
+ * When to use: Strategic AI order requests that already built `latLngByH3` / indexed state.
+ * Expected outcome: Briefing output identical to omitting this object (internal rebuild).
+ * Exceptions: None.
+ */
+export type FormatBriefingSharedContext = {
+  latLngByH3?: Map<string, [number, number]>;
+  indexedState?: PossibleActionsIndexedState;
+};
 
 /**
  * Documents the module-scope binding `WARNING_STATUSES` (WARNING_STATUSES).
@@ -420,7 +434,8 @@ export function formatBriefing(
   memoryText: string,
   subscriptions?: CallbackSubscription[],
   lossesSinceLastConsultation: AiLossEventSinceConsultation[] = [],
-  productionText = ''
+  productionText = '',
+  sharedContext?: FormatBriefingSharedContext
 ): string {
   logTrace('briefingFormatter formatBriefing', {
     turnNumber: state.turnNumber,
@@ -428,14 +443,20 @@ export function formatBriefing(
     hexAssessmentCount: precomputed.hexAssessments.length,
     callbackCount: subscriptions?.length ?? 0,
     hasProductionText: productionText.trim().length > 0,
+    reusedLatLngByH3: Boolean(sharedContext?.latLngByH3),
   });
   ensureStrategicCoordinateRegistryInitialized();
   const coordCtx: CoordinateContext = { mode: 'strategic' };
-  const latLngByH3 = new Map<string, [number, number]>();
-  for (const hx of state.hexes) {
-    const [lat, lng] = cellToLatLng(hx.h3Index);
-    latLngByH3.set(hx.h3Index, [lat, lng]);
-  }
+  const latLngByH3 =
+    sharedContext?.latLngByH3 ??
+    (() => {
+      const built = new Map<string, [number, number]>();
+      for (const hx of state.hexes) {
+        const [lat, lng] = cellToLatLng(hx.h3Index);
+        built.set(hx.h3Index, [lat, lng]);
+      }
+      return built;
+    })();
   const sections: string[] = [];
   sections.push(markdownHeading1("Commander's Briefing"));
   sections.push(buildStrategicNarrative(state, precomputed.unitAssessments));
@@ -443,7 +464,12 @@ export function formatBriefing(
   sections.push(buildUnitStatusTable(precomputed.unitAssessments, coordCtx));
   sections.push(markdownHeading2('Attention Flags'));
   sections.push(buildAttentionFlags(precomputed.unitAssessments));
-  const operational = buildStrategicOperationalMapSectionMarkdown({ state, precomputed, latLngByH3 });
+  const operational = buildStrategicOperationalMapSectionMarkdown({
+    state,
+    precomputed,
+    latLngByH3,
+    indexedState: sharedContext?.indexedState,
+  });
   if (operational.trim().length > 0) {
     sections.push('\n\n' + operational.trim());
   }
