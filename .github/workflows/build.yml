@@ -37,11 +37,6 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      # npm ci --ignore-scripts skips electron's postinstall download.
-      # GitHub-hosted runners set ELECTRON_SKIP_BINARY_DOWNLOAD; install.js no-ops unless we clear it.
-      - name: Install Electron binary
-        run: node scripts/install-electron-binary.cjs
-
       - name: Rebuild better-sqlite3 for Node (tests)
         run: npm run rebuild:native:node
 
@@ -52,6 +47,10 @@ jobs:
       # `npm run test` runs `npm run lint` after `build:main` (see package.json).
       - name: Run tests
         run: npm run test
+
+      # npm ci --ignore-scripts skips electron's postinstall download; tests do not require the binary.
+      - name: Install Electron binary
+        run: node scripts/install-electron-binary.cjs
 
       - name: Rebuild better-sqlite3 for Electron (packaging)
         run: npm run rebuild:native:electron
