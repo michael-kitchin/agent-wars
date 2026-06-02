@@ -1,7 +1,40 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { app, dialog } from 'electron';
 import { logDebug, logError } from '../../logger';
+
+/**
+ * Resolves Electron `app` and `dialog` for corrupt-database UI recovery without loading `electron` at module import time.
+ *
+ * Purpose: Node test runs import `gameDb` transitively but do not install the Electron binary; top-level `electron`
+ * imports throw before any recovery function runs.
+ * When to use: Only from `recoverCorruptDatabaseUi` in the Electron main process.
+ * Expected outcome: `{ app, dialog }` when Electron APIs are available; otherwise throws so callers fail loudly in production.
+ * Exceptions: Throws when `require('electron')` fails or does not expose UI APIs (plain Node).
+ */
+function requireElectronUi(): {
+  app: { exit: (code: number) => void };
+  dialog: { showErrorBox: (title: string, content: string) => void };
+} {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const electron = require('electron') as Record<string, unknown> | string | undefined;
+    if (!electron || typeof electron !== 'object') {
+      throw new Error('corruptRecovery requireElectronUi: Electron UI APIs are not available');
+    }
+    const appCandidate = electron.app as { exit?: (code: number) => void } | undefined;
+    const dialogCandidate = electron.dialog as { showErrorBox?: (title: string, content: string) => void } | undefined;
+    if (typeof appCandidate?.exit !== 'function' || typeof dialogCandidate?.showErrorBox !== 'function') {
+      throw new Error('corruptRecovery requireElectronUi: Electron UI APIs are not available');
+    }
+    return {
+      app: appCandidate as { exit: (code: number) => void },
+      dialog: dialogCandidate as { showErrorBox: (title: string, content: string) => void },
+    };
+  } catch (err) {
+    logError('corruptRecovery requireElectronUi: failed to load Electron UI APIs', err);
+    throw err;
+  }
+}
 
 /**
  * Defines the `isoTimestampForFilename` function shape (function isoTimestampForFilename(): string).
@@ -102,6 +135,7 @@ export function recoverCorruptDatabaseUi(
     createFreshDatabaseAt: (canonicalPath: string) => void;
   }
 ): void {
+  const { app, dialog } = requireElectronUi();
   deps.closeDbHandle();
   dialog.showErrorBox(
     'Database problem',

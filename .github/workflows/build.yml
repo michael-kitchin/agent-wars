@@ -43,6 +43,13 @@ jobs:
       - name: Install Electron binary
         run: node node_modules/electron/install.js
 
+      # Fail fast when postinstall was skipped (`npm ci --ignore-scripts`) but the binary is still missing.
+      - name: Verify Electron binary
+        shell: bash
+        run: |
+          test -f node_modules/electron/path.txt
+          node -e "const fs=require('fs');const path=require('path');const p=path.join('node_modules/electron','dist',fs.readFileSync('node_modules/electron/path.txt','utf8').trim());if(!fs.existsSync(p)){console.error('Electron binary missing at',p);process.exit(1)}"
+
       - name: Rebuild better-sqlite3 for Node (tests)
         run: npm run rebuild:native:node
 

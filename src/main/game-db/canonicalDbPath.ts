@@ -8,8 +8,32 @@
  */
 
 import * as path from 'path';
-import { app } from 'electron';
 import { logTrace } from '../logger';
+
+/**
+ * Resolves Electron `app.getPath` without loading `electron` at module import time.
+ *
+ * Purpose: Node tests import `gameDb` transitively; a top-level `electron` import fails when the binary is not installed.
+ * When to use: From `resolveGameDbFileUnderUserData` in the Electron main process.
+ * Expected outcome: An object with `getPath` when Electron is available.
+ * Exceptions: Throws when Electron is unavailable (for example in plain Node without the binary).
+ */
+function requireElectronApp(): { getPath: (name: string) => string } {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const electron = require('electron') as Record<string, unknown> | string | undefined;
+    if (!electron || typeof electron !== 'object') {
+      throw new Error('resolveGameDbFileUnderUserData: Electron app is not available');
+    }
+    const app = electron.app as { getPath?: (name: string) => string } | undefined;
+    if (typeof app?.getPath !== 'function') {
+      throw new Error('resolveGameDbFileUnderUserData: Electron app is not available');
+    }
+    return app as { getPath: (name: string) => string };
+  } catch (err) {
+    throw new Error('resolveGameDbFileUnderUserData: Electron app is not available', { cause: err });
+  }
+}
 
 /**
  * Builds the absolute path to the game database file in the per-user application data directory.
@@ -21,5 +45,5 @@ import { logTrace } from '../logger';
  */
 export function resolveGameDbFileUnderUserData(fileName: string): string {
   logTrace('resolveGameDbFileUnderUserData', { fileName });
-  return path.join(app.getPath('userData'), fileName);
+  return path.join(requireElectronApp().getPath('userData'), fileName);
 }
