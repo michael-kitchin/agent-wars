@@ -38,17 +38,9 @@ jobs:
         run: npm ci --ignore-scripts
 
       # npm ci --ignore-scripts skips electron's postinstall download.
-      # Some node-side tests import modules that depend on `electron`, so we
-      # install Electron's binary explicitly before test execution.
+      # GitHub-hosted runners set ELECTRON_SKIP_BINARY_DOWNLOAD; install.js no-ops unless we clear it.
       - name: Install Electron binary
-        run: node node_modules/electron/install.js
-
-      # Fail fast when postinstall was skipped (`npm ci --ignore-scripts`) but the binary is still missing.
-      - name: Verify Electron binary
-        shell: bash
-        run: |
-          test -f node_modules/electron/path.txt
-          node -e "const fs=require('fs');const path=require('path');const p=path.join('node_modules/electron','dist',fs.readFileSync('node_modules/electron/path.txt','utf8').trim());if(!fs.existsSync(p)){console.error('Electron binary missing at',p);process.exit(1)}"
+        run: node scripts/install-electron-binary.cjs
 
       - name: Rebuild better-sqlite3 for Node (tests)
         run: npm run rebuild:native:node
