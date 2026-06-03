@@ -5,7 +5,7 @@
  */
 
 import type { GameStateSnapshot } from './gameDb';
-import type { AiLossEventSinceConsultation } from './gameDb';
+import { buildRecentTurnNotesSection } from './briefing/recentTurnNotesSection';
 import type { PrecomputationResult, UnitAssessmentResult, HexAssessmentEntry } from './precomputation';
 import type { CallbackSubscription } from './callbackSubscriptions';
 import { cellToLatLng, latLngToCell } from 'h3-js';
@@ -315,31 +315,6 @@ function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntr
 }
 
 /**
- * Defines the `buildLossesSinceLastConsultationTable` function shape (function buildLossesSinceLastConsultationTable().
-
- * Purpose: Supports maintainability by documenting why `buildLossesSinceLastConsultationTable` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function buildLossesSinceLastConsultationTable(
-  losses: AiLossEventSinceConsultation[],
-  perspectivePlayerId: string
-): string {
-  const header = '| Turn | Victim Unit | Side | Cause | Killer IDs |';
-  const sep = '|------|-------------|------|-------|------------|';
-  if (losses.length === 0) return `${header}\n${sep}\n| — | — | — | — | — |\n`;
-  const rows = losses.map((loss) => {
-    const side = loss.victimPlayer === perspectivePlayerId ? 'own' : 'enemy';
-    const killers = loss.killerIds.length > 0
-      ? loss.killerIds.map((killerId) => formatUnitDisplayRef(killerId)).join(', ')
-      : 'unknown';
-    return `| ${loss.turnNumber} | ${formatUnitDisplayRef(loss.victimUnitId)} | ${side} | ${loss.cause} | ${killers} |`;
-  });
-  return `${[header, sep, ...rows].join('\n')}\n`;
-}
-
-/**
  * Defines the `buildAttentionFlags` function shape (function buildAttentionFlags().
 
  * Purpose: Supports maintainability by documenting why `buildAttentionFlags` exists.
@@ -433,7 +408,6 @@ export function formatBriefing(
   standingOrderText: string,
   memoryText: string,
   subscriptions?: CallbackSubscription[],
-  lossesSinceLastConsultation: AiLossEventSinceConsultation[] = [],
   productionText = '',
   sharedContext?: FormatBriefingSharedContext
 ): string {
@@ -477,8 +451,15 @@ export function formatBriefing(
   if (supplementalHex.trim().length > 0) {
     sections.push(supplementalHex);
   }
-  sections.push(markdownHeading2('Losses Since Last Consultation'));
-  sections.push(buildLossesSinceLastConsultationTable(lossesSinceLastConsultation, 'opponent'));
+  const recentTurnNotes = buildRecentTurnNotesSection({
+    scope: 'strategic',
+    battleId: '',
+    currentTurnNumber: state.turnNumber,
+    heading: 'Recent Turn Notes',
+  });
+  if (recentTurnNotes.trim().length > 0) {
+    sections.push('\n\n' + recentTurnNotes);
+  }
   if (productionText.trim().length > 0) {
     sections.push('\n\n' + productionText.trim());
   }

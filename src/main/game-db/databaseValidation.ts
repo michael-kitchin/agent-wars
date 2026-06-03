@@ -41,6 +41,7 @@ export const GAME_DB_REQUIRED_TABLES = [
   'res1_build_progress',
   'res1_infrastructure',
   'res4_feature_overrides',
+  'turn_notes_history',
 ] as const;
 
 /**

@@ -18,7 +18,7 @@ const RANGED_ENGAGEMENT_LINE = /^\u2022 Ranged engagements at \d+ hex(es)?\.\s*$
  *
  * Purpose: Suppresses low-signal “engagement count only” fallback toasts (inconclusive melee/ranged with no casualties
  * and no primary summary lines) that strategic Ready rarely surfaces alone; keeps tactical parity with that UX.
- * When to use: `readyHandler` after `buildTurnUpdateBullets` + `buildCombatActivityFallbackBullets` for both strategic and tactical Ready.
+ * When to use: `readyHandler` after `buildConsolidatedTurnUpdateToastMessage` / `buildCombatActivityFallbackBullets` for both strategic and tactical Ready.
  * Expected outcome: Primary lines win when present; otherwise fallback unless every line is only ranged/melee engagement counters.
  * Exceptions: None.
  */

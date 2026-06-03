@@ -10,6 +10,7 @@ import {
   listUnitsForSnapshot,
   setGameOver,
 } from '../gameDb';
+import { captureTurnLossNoteFromResolution } from './captureTurnLossNote';
 import { processProductionAfterControlResolution, resolveRes1ControlAfterCombatAndMovement } from './controlAndProduction';
 import { applyTransportOutcomeForRemovedStrategicUnits } from './sealift';
 import type { CombatResolutionResult } from '../combatResolution';
@@ -317,6 +318,18 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
       displayOrder: u.displayOrder,
     }))
   );
+
+  captureTurnLossNoteFromResolution({
+    scope: 'strategic',
+    battleId: '',
+    turnNumber,
+    kills: allKills,
+    killsByDirectFire: rangedResult.killsByDirectFire,
+    killsByReturnFire: rangedResult.killsByReturnFire,
+    removedUnits: allRemovedUnits,
+    airStrikeRemovedUnits: airStrikeResult.removedUnits,
+    labelUnits: killLabelUnits,
+  });
 
   return {
     success: true,

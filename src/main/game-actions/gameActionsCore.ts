@@ -102,6 +102,7 @@ import { validateTacticalOpponentEmbarkOrder } from '../tacticalBattle/tacticalO
 import { projectTacticalSnapshotAfterOpponentMovementOrders } from '../tacticalBattle/tacticalMovementApply';
 import { tacticalComputeMovementOrderOutcome } from '../tacticalBattle/tacticalSnapshotGuards';
 import { ready as readyImpl, resolveMeleeIntercept as resolveMeleeInterceptImpl } from './gameActionsReadyEntrypoints';
+import { captureTurnLossNoteFromResolution } from './captureTurnLossNote';
 import { validateHumanMarchOrdersWhenTacticalActive } from './tacticalMarchOrderGuards';
 
 export { evaluateRegionControlWinnerAtEndOfTurn } from './regionControlWinner';
@@ -1142,6 +1143,29 @@ export function commitHumanTacticalDraftOrders(args: {
         return row?.parentUnitId ?? null;
       });
     }
+    const tacticalRemovedById = new Map<string, (typeof rangedRemovedUnits)[number]>();
+    for (const u of rangedRemovedUnits) tacticalRemovedById.set(u.id, u);
+    for (const u of meleePack.meleeRemovedUnits ?? []) tacticalRemovedById.set(u.id, u);
+    const tacticalRemovedAll = [...tacticalRemovedById.values()];
+    const airStrikeVictimIds = new Set((support.killsByAirStrike ?? []).map((k) => k.victimId));
+    const rangedVictimIds = new Set(support.killsByDirectFire.map((k) => k.victimId));
+    const airStrikeRemovedUnits = tacticalRemovedAll.filter((u) => {
+      if (airStrikeVictimIds.has(u.id)) return true;
+      if (u.player === 'human' && u.unitType === 'air' && !rangedVictimIds.has(u.id)) return true;
+      return false;
+    });
+    const beatNumberResolved = Math.max(1, finalBattle.tacticalTurnNumber - 1);
+    captureTurnLossNoteFromResolution({
+      scope: 'tactical',
+      battleId: finalBattle.battleId,
+      turnNumber: beatNumberResolved,
+      killsByDirectFire: support.killsByDirectFire,
+      killsByReturnFire: support.killsByReturnFire,
+      killsByMelee: meleePack.killsByMelee,
+      killsByAirStrike: support.killsByAirStrike,
+      removedUnits: tacticalRemovedAll,
+      airStrikeRemovedUnits,
+    });
     return {
       success: true,
       tacticalBattle: finalBattle,

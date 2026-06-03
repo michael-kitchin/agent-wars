@@ -171,5 +171,15 @@ export function getFullDdl(): string {
       is_seaport INTEGER NOT NULL DEFAULT 0,
       is_rubble INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS turn_notes_history (
+      scope TEXT NOT NULL CHECK(scope IN ('strategic', 'tactical')),
+      battle_id TEXT NOT NULL DEFAULT '',
+      turn_number INTEGER NOT NULL,
+      strategy_text TEXT,
+      human_loss_json TEXT,
+      ai_loss_json TEXT,
+      PRIMARY KEY (scope, battle_id, turn_number)
+    );
   `;
 }

@@ -67,7 +67,7 @@ export function projectTacticalSnapshotAfterValidatedOpponentOrders(
 /**
  * Result of applying human tactical support orders: updated snapshot plus kill metadata for renderer turn summaries.
  *
- * Purpose: Lets `commitHumanTacticalDraftOrders` feed the same `buildTurnUpdateBullets` inputs as strategic `ReadyResult` without re-simulating combat in the renderer.
+ * Purpose: Lets `commitHumanTacticalDraftOrders` feed the same consolidated toast inputs as strategic `ReadyResult` without re-simulating combat in the renderer.
  * When to use: Return value from `projectTacticalSnapshotAfterValidatedHumanSupportOrders` only.
  * Expected outcome: `removedUnits` lists every sub-unit removed; `killsByDirectFire` / `killsByReturnFire` match `runRangedPhase`; `killsByAirStrike` covers air-vs-units and infrastructure-based removals.
  * Exceptions: None.

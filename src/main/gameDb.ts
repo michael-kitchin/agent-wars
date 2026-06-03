@@ -79,6 +79,14 @@ import {
   type AiLossEventSinceConsultation,
 } from './game-db/aiState';
 import {
+  clearTacticalTurnNotes as clearTacticalTurnNotesFromModule,
+  getRecentTurnNotes as getRecentTurnNotesFromModule,
+  upsertTurnLossNote as upsertTurnLossNoteFromModule,
+  upsertTurnStrategyNote as upsertTurnStrategyNoteFromModule,
+  type TurnNoteRow,
+  type TurnNotesScope,
+} from './game-db/turnNotesHistory';
+import {
   consumeFogNewContactsForPlayer as consumeFogNewContactsForPlayerFromModule,
   getGameStateSnapshot as getGameStateSnapshotFromModule,
   getGameStateForPlayer as getGameStateForPlayerFromModule,
@@ -102,6 +110,7 @@ import {
 
 export type { GameStateSnapshot } from '../shared/ipcTypes';
 export type { AiLossEventSinceConsultation } from './game-db/aiState';
+export type { TurnNoteRow, TurnNotesScope } from './game-db/turnNotesHistory';
 export type { BuildQueueRow, HexControlRow, Res1InfrastructureRow, Res4FeatureOverrideRow } from './game-db/controlInfrastructure';
 
 /**
@@ -112,7 +121,7 @@ export type { BuildQueueRow, HexControlRow, Res1InfrastructureRow, Res4FeatureOv
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const EXPECTED_USER_VERSION = 11;
+export const EXPECTED_USER_VERSION = 12;
 
 /**
  * Documents the module-scope binding `GAME_DB_FILE_NAME` (GAME_DB_FILE_NAME).
@@ -122,7 +131,7 @@ export const EXPECTED_USER_VERSION = 11;
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const GAME_DB_FILE_NAME = 'game-baseline-v11.sqlite';
+export const GAME_DB_FILE_NAME = 'game-baseline-v12.sqlite';
 
 /**
  * Documents the module-scope binding `db` (db: InstanceType<typeof Database> | null).
@@ -1401,6 +1410,70 @@ export function setAiPendingOrders(
  */
 export function clearAiPendingOrders(playerId: string): void {
   clearAiPendingOrdersFromModule(getAiStateDbOps(), playerId);
+}
+
+/**
+ * Persists AI strategy text for one strategic turn or tactical beat.
+ *
+ * Purpose: Public facade over `turnNotesHistory.upsertTurnStrategyNote` for OpenRouter consultation capture.
+ * When to use: After successful AI order planning in `requestOrdersFlow`.
+ * Expected outcome: Row upserted in `turn_notes_history` without disturbing loss JSON on the same row.
+ * Exceptions: None; underlying module logs errors without throwing.
+ */
+export function upsertTurnStrategyNote(
+  scope: TurnNotesScope,
+  battleId: string,
+  turnNumber: number,
+  strategyText: string | null | undefined
+): void {
+  upsertTurnStrategyNoteFromModule(getAiStateDbOps(), scope, battleId, turnNumber, strategyText);
+}
+
+/**
+ * Persists serialized human/AI loss summaries for one strategic turn or tactical beat.
+ *
+ * Purpose: Public facade over `turnNotesHistory.upsertTurnLossNote` for resolution finalize paths.
+ * When to use: Strategic Ready finalize and tactical beat commit on main process.
+ * Expected outcome: Row upserted in `turn_notes_history` without disturbing strategy text on the same row.
+ * Exceptions: None; underlying module logs errors without throwing.
+ */
+export function upsertTurnLossNote(
+  scope: TurnNotesScope,
+  battleId: string,
+  turnNumber: number,
+  humanLossJson: string,
+  aiLossJson: string
+): void {
+  upsertTurnLossNoteFromModule(getAiStateDbOps(), scope, battleId, turnNumber, humanLossJson, aiLossJson);
+}
+
+/**
+ * Reads recent turn/beat notes before the current planning turn for prompt injection.
+ *
+ * Purpose: Public facade over `turnNotesHistory.getRecentTurnNotes`.
+ * When to use: `buildRecentTurnNotesSection` when assembling AI system prompts.
+ * Expected outcome: Up to three prior rows in ascending turn order.
+ * Exceptions: None; returns empty array when DB unavailable.
+ */
+export function getRecentTurnNotes(
+  scope: TurnNotesScope,
+  battleId: string,
+  beforeTurnNumber: number,
+  limit = 3
+): TurnNoteRow[] {
+  return getRecentTurnNotesFromModule(getAiStateDbOps(), scope, battleId, beforeTurnNumber, limit);
+}
+
+/**
+ * Clears persisted tactical turn-note history when starting or resetting tactical battles.
+ *
+ * Purpose: Public facade over `turnNotesHistory.clearTacticalTurnNotes`.
+ * When to use: `startTacticalBattleForEnclosingRes1Hex` before recording notes for the new battle.
+ * Expected outcome: Tactical rows removed; strategic history preserved.
+ * Exceptions: None; underlying module logs errors without throwing.
+ */
+export function clearTacticalTurnNotes(battleId?: string): void {
+  clearTacticalTurnNotesFromModule(getAiStateDbOps(), battleId);
 }
 
 /**

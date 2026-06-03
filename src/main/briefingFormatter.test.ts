@@ -181,8 +181,7 @@ function testFormatBriefingContainsSections(): void {
   assert.ok(out.match(/\.\s+[A-Z]/), 'Section 1 has multiple sentences');
   assert.ok(out.includes('| Unit ID |'), 'unit table header');
   assert.ok(out.includes('# Operational Map'), 'operational map section');
-  assert.ok(out.includes('## Losses Since Last Consultation'), 'losses subsection header');
-  assert.ok(out.includes('| Turn | Victim Unit | Side | Cause | Killer IDs |'), 'losses subsection table header');
+  assert.ok(!out.includes('## Recent Turn Notes'), 'no recent turn notes on empty history');
   assert.ok(out.includes('opponent-armor-1'), 'unit table has unit');
   assert.ok(
     out.includes('| Unit ID |') || out.includes('## Other Hexes') || out.includes('# Operational Map'),
@@ -218,42 +217,6 @@ function testFormatBriefingActiveCallbacksWithSubscriptions(): void {
   assert.ok(out.includes('## Active Callbacks'), 'Active Callbacks section');
   assert.ok(out.includes('turns(3) → fires turn 13'), 'turns subscription line');
   assert.ok(out.includes('unit_engaged(opponent-armor-1)'), 'unit_engaged subscription line');
-}
-
-/**
- * Defines the `testFormatBriefingIncludesLossRowsWhenProvided` function shape (function testFormatBriefingIncludesLossRowsWhenProvided(): void).
-
- * Purpose: Supports maintainability by documenting why `testFormatBriefingIncludesLossRowsWhenProvided` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function testFormatBriefingIncludesLossRowsWhenProvided(): void {
-  const out = formatBriefing(
-    fixtureState,
-    precomputed,
-    '',
-    '',
-    [],
-    [
-      {
-        turnNumber: 5,
-        victimUnitId: 'opponent-naval-1',
-        victimPlayer: 'opponent',
-        cause: 'direct_fire',
-        killerIds: ['human-armor-1'],
-      },
-      {
-        turnNumber: 6,
-        victimUnitId: 'human-infantry-1',
-        victimPlayer: 'human',
-        cause: 'melee_or_other',
-        killerIds: ['opponent-armor-1'],
-      },
-    ]
-  );
-  assert.ok(out.includes('| 5 | opponent-naval-1 | own | direct_fire | human-armor-1 |'));
-  assert.ok(out.includes('| 6 | human-infantry-1 | enemy | melee_or_other | opponent-armor-1 |'));
 }
 
 /**
@@ -301,7 +264,6 @@ const tests = [
   { name: 'formatBriefing unit table rows', fn: testFormatBriefingUnitTableRows },
   { name: 'formatBriefing possible actions armor ranged', fn: testFormatBriefingPossibleActionsArmorRanged },
   { name: 'formatBriefing Active callbacks with subscriptions', fn: testFormatBriefingActiveCallbacksWithSubscriptions },
-  { name: 'formatBriefing losses table rows', fn: testFormatBriefingIncludesLossRowsWhenProvided },
 ];
 
 /**

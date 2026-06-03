@@ -166,9 +166,75 @@ export function bulletizeToastLines(message: string): string {
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
   if (lines.length === 0) return '•';
+  let inSection = false;
   return lines
-    .map((line) => (line.startsWith('•') ? line : `• ${line}`))
+    .map((line) => {
+      if (line.startsWith('## ')) {
+        inSection = true;
+        return line.slice(3);
+      }
+      const bullet = line.startsWith('•') ? line : `• ${line}`;
+      return inSection ? `  ${bullet}` : bullet;
+    })
     .join('\n');
+}
+
+/** Left margin applied to sub-bullets under a `##` section header in `#map-toast`. */
+export const MAP_TOAST_SECTION_BULLET_INDENT = '1.25em';
+
+/**
+ * Appends one bullet line, optionally indented when it belongs under a section header.
+ *
+ * Purpose: Implements the plan's indented sub-bullet layout under Human/AI/Other headers.
+ * When to use: From `appendMapToastMessageBody` for non-header lines.
+ * Expected outcome: Block-level row with left margin when `indent` is true.
+ * Exceptions: None.
+ */
+function appendMapToastBulletLine(target: HTMLElement, line: string, indent: boolean): void {
+  const text = line.startsWith('•') ? line : `• ${line}`;
+  const span = document.createElement('span');
+  span.style.display = 'block';
+  if (indent) {
+    span.style.marginLeft = MAP_TOAST_SECTION_BULLET_INDENT;
+  }
+  span.textContent = text;
+  target.appendChild(span);
+}
+
+function appendMapToastSectionHeader(target: HTMLElement, title: string): void {
+  const strong = document.createElement('strong');
+  strong.style.display = 'block';
+  strong.textContent = title.endsWith(':') ? title : `${title}:`;
+  target.appendChild(strong);
+}
+
+/**
+ * Appends consolidated map toast body lines to a DOM parent, rendering `##` lines as bold section headers.
+ *
+ * Purpose: Supports Human Losses / AI Losses / Updates section layout in `#map-toast`.
+ * When to use: From `showMapToast` instead of plain text bulletization.
+ * Expected outcome: Section headers render with a trailing colon; a blank line separates each section after the first.
+ * Exceptions: None.
+ */
+export function appendMapToastMessageBody(target: HTMLElement, message: string): void {
+  const lines = message
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  let inSection = false;
+  let isFirstSection = true;
+  for (const line of lines) {
+    if (line.startsWith('## ')) {
+      inSection = true;
+      if (!isFirstSection) {
+        target.appendChild(document.createElement('br'));
+      }
+      isFirstSection = false;
+      appendMapToastSectionHeader(target, line.slice(3));
+      continue;
+    }
+    appendMapToastBulletLine(target, line, inSection);
+  }
 }
 
 /**
@@ -211,10 +277,7 @@ export function showMapToast(message: string, options?: { isError?: boolean }): 
       el,
       textEl,
       (target) => {
-        const strong = document.createElement('strong');
-        strong.textContent = 'Update: ';
-        target.appendChild(strong);
-        target.appendChild(document.createTextNode('\n' + bulletizeToastLines(message)));
+        appendMapToastMessageBody(target, message);
       },
       options?.isError === false
     );

@@ -3186,7 +3186,7 @@ function init(): void {
       // .filter((h3) => !knownHumanAirStrikeTargetHexes.has(h3))
       // airStrikeOutboundMoves: airStrikeOutboundMoves.length > 0 ? airStrikeOutboundMoves : undefined
       // airStrikeReturnMoves: airStrikeReturnMoves.length > 0 ? airStrikeReturnMoves : undefined
-      // buildTurnUpdateBullets({})
+      // buildConsolidatedTurnUpdateToastMessage({})
       // formatKillLine: killToastFormatter.formatKillLine
       // ferryOrders: S.pendingFerryOrders,
       await handleReadyButtonClickFromModule(createReadyHandlerDeps());

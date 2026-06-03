@@ -506,9 +506,9 @@ function testAirStrikeAndAirGlyphContracts(): void {
   );
   assert.ok(
     readyHandlerSource.includes("from './turnUpdateSummary'") &&
-      readyHandlerSource.includes('buildTurnUpdateBullets({') &&
-      readyHandlerSource.includes('formatKillLine: killToastFormatter.formatKillLine'),
-    'ready update bullets should be delegated to shared turn update summary helpers'
+      readyHandlerSource.includes('buildConsolidatedTurnUpdateToastMessage({') &&
+      readyHandlerSource.includes('buildPopupTurnLossSummary({'),
+    'ready update toast should use consolidated turn update summary helpers'
   );
   assert.ok(
     source.includes("btnEl.style.display = S.airStrikeModeActive ? 'none' : 'inline-block';"),

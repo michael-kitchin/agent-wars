@@ -17,10 +17,11 @@ import { buildPossibleActionsIndexedState } from './possibleUnitActions';
 import { getSubscriptions, replaceSubscriptions } from '../callbackSubscriptions';
 import {
   clearAiLossEventsSinceConsultation,
-  getAiLossEventsSinceConsultation,
   setAiLastConsultationTurn,
   setAiToolLimitExceededLastTurn,
+  upsertTurnStrategyNote,
 } from '../gameDb';
+import { buildRecentTurnNotesSection } from '../briefing/recentTurnNotesSection';
 import type { GameStateSnapshot } from '../gameDb';
 import { buildProductionBriefingBlock } from './briefingSections';
 import { getInitialUserMessage } from './promptText';
@@ -320,7 +321,6 @@ export async function requestOrdersFlow(
 
   const toolInvocationCounts: Record<string, number> = {};
   for (const g of toolGroupRegistry) toolInvocationCounts[g.id] = 0;
-  const lossesSinceLastConsultation = getAiLossEventsSinceConsultation('opponent');
 
   let briefingOverride: string | undefined;
   if (!tacticalBattle) {
@@ -352,7 +352,6 @@ export async function requestOrdersFlow(
       standingOrderText,
       memoryText,
       subscriptions,
-      lossesSinceLastConsultation,
       productionBriefing,
       { latLngByH3, indexedState: possibleActionsIndexed }
     );
@@ -379,7 +378,15 @@ export async function requestOrdersFlow(
       });
       return failRequest('Operational map generation failed for tactical prompt.');
     }
-    const tacticalBlock = `## Operational Map\n\n${tacticalSection.trim()}`;
+    const tacticalBlockParts = [`## Operational Map\n\n${tacticalSection.trim()}`];
+    const beatNotes = buildRecentTurnNotesSection({
+      scope: 'tactical',
+      battleId: tacticalBattle.battleId,
+      currentTurnNumber: tacticalBattle.tacticalTurnNumber,
+      heading: 'Recent Turn Notes',
+    });
+    if (beatNotes.trim().length > 0) tacticalBlockParts.push(beatNotes.trim());
+    const tacticalBlock = tacticalBlockParts.join('\n\n');
     briefingOverride =
       briefingOverride && briefingOverride.trim().length > 0
         ? `${briefingOverride}\n\n${tacticalBlock}`
@@ -448,9 +455,14 @@ export async function requestOrdersFlow(
   let requestCost = 0;
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
-  const markSuccessfulConsultation = (): void => {
+  const markSuccessfulConsultation = (strategyText?: string | null): void => {
     setAiLastConsultationTurn(state.turnNumber);
     clearAiLossEventsSinceConsultation('opponent');
+    if (tacticalBattle) {
+      upsertTurnStrategyNote('tactical', tacticalBattle.battleId, tacticalBattle.tacticalTurnNumber, strategyText);
+    } else {
+      upsertTurnStrategyNote('strategic', '', state.turnNumber, strategyText);
+    }
   };
   try {
     let iteration = 0;
@@ -903,7 +915,7 @@ export async function requestOrdersFlow(
         outEmbark = validatedEmb;
       }
 
-      markSuccessfulConsultation();
+      markSuccessfulConsultation(parsed.strategy);
       if (onLog) {
         const ms = Date.now() - wallClockStart;
         const bits: string[] = [
@@ -940,7 +952,7 @@ export async function requestOrdersFlow(
       };
     }
     setAiToolLimitExceededLastTurn();
-    markSuccessfulConsultation();
+    markSuccessfulConsultation(null);
     if (onLog) {
       onLog(
         `AI planning stopped after ${iteration} round(s) without a completed order JSON (max tool rounds or empty final reply). Returning no movement orders.`,

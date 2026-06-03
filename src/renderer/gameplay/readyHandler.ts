@@ -14,9 +14,9 @@ import {
 } from '../tactical/applyTacticalPostBeatConsultSideEffects';
 import type { MeleeInterceptModalOpenArgs, MeleeInterceptModalOutcome } from './meleeInterceptModal';
 import { buildTacticalSubUnitKillLabelOverlay } from './sidebarSupport';
-import { buildTurnUpdateBullets } from './turnUpdateSummary';
+import { buildConsolidatedTurnUpdateToastMessage } from './turnUpdateSummary';
+import { buildTurnLossSummaryFromReadyShape } from '../../shared/lossSummaryFromResolution';
 import { readTacticalBattlesInterceptPromptEnabled } from './tacticalBattlePromptPreference';
-import { composeResolutionMapToastBullets } from '../../shared/orderPreviewBlockingCopy';
 import { tacticalKillEdgesForStrategicStyleTurnUpdate } from '../../shared/tacticalToastKillSlice';
 import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
 import { rendererSharedState as S } from '../core/state';
@@ -558,7 +558,7 @@ function deriveCombatVisibilityClassification(
  *
  * Purpose: Avoids a second toast pipeline in the renderer while tactical combat remains snapshot-simulated on the main process.
  * When to use: Only after a successful `commitHumanTacticalDraftOrders` when `tacticalResolutionPlayback` is present.
- * Expected outcome: `deriveCombatVisibilityClassification` and `buildTurnUpdateBullets` see the same kill and casualty fields they expect from strategic Ready, including `kills` without air-strike edges (air stays on the air strike summary line).
+ * Expected outcome: `deriveCombatVisibilityClassification` and `buildConsolidatedTurnUpdateToastMessage` see the same kill and casualty fields they expect from strategic Ready, including `kills` without air-strike edges (air infrastructure stays in the Other section).
  * Exceptions: None; omits optional arrays when empty to match typical `ReadyResult` payloads.
  */
 function buildTacticalCommitReadyResultForToast(playback: TacticalCommitResolutionPlayback): ReadyResult {
@@ -596,6 +596,46 @@ function buildTacticalCommitReadyResultForToast(playback: TacticalCommitResoluti
     meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : undefined,
     meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : undefined,
   };
+}
+
+/**
+ * Builds a fog-filtered {@link TurnLossSummary} for map toast display from a Ready-shaped resolution slice.
+ *
+ * Purpose: Shared popup loss bucketing for strategic Ready and tactical commit playback.
+ * When to use: After `deriveCombatVisibilityClassification` yields `knownVictimIds`.
+ * Expected outcome: Human losses always included; opponent losses only when visible or friendly-involved.
+ * Exceptions: None.
+ */
+function buildPopupTurnLossSummary(args: {
+  readySlice: ReadyResult;
+  knownVictimIds: Set<string>;
+  formatUnitName: (unitId: string) => string;
+  killsByMelee?: readonly { victimId: string }[];
+  killsByAirStrike?: readonly { victimId: string }[];
+}): ReturnType<typeof buildTurnLossSummaryFromReadyShape> {
+  const { readySlice, knownVictimIds, formatUnitName, killsByMelee, killsByAirStrike } = args;
+  const removed = readySlice.removedUnits ?? [];
+  const metaMap = new Map<string, { player: string; unitType: string }>();
+  for (const u of removed) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
+  for (const u of readySlice.airStrikeRemovedUnits ?? []) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
+  const readyWithAir = readySlice as ReadyResult & { killsByAirStrike?: readonly { victimId: string }[] };
+  return buildTurnLossSummaryFromReadyShape({
+    kills: readySlice.kills,
+    killsByDirectFire: readySlice.killsByDirectFire,
+    killsByReturnFire: readySlice.killsByReturnFire,
+    killsByMelee,
+    killsByAirStrike: killsByAirStrike ?? readyWithAir.killsByAirStrike,
+    removedUnits: removed,
+    airStrikeRemovedUnits: readySlice.airStrikeRemovedUnits,
+    resolveDisplayName: (id) => {
+      const snap =
+        removed.find((u) => u.id === id) ?? readySlice.airStrikeRemovedUnits?.find((u) => u.id === id);
+      if (snap?.displayName) return snap.displayName;
+      return formatUnitName(id);
+    },
+    resolveUnitMeta: (id) => metaMap.get(id),
+    isVictimVisible: (_id, player) => player === 'human' || knownVictimIds.has(_id),
+  });
 }
 
 /**
@@ -825,15 +865,6 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         const visibleHexes = deps.getVisibleHexSet(S.gameState);
         const { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds } =
           deriveCombatVisibilityClassification(tacticalReadySlice, visibleHexes);
-        const directFire = tacticalReadySlice.killsByDirectFire ?? [];
-        const returnFire = tacticalReadySlice.killsByReturnFire ?? [];
-        const allKills = tacticalReadySlice.kills ?? [];
-        const directSet = new Set(directFire.map((k) => k.victimId));
-        const returnSet = new Set(returnFire.map((k) => k.victimId));
-        const meleeKills = allKills.filter((k) => !directSet.has(k.victimId) && !returnSet.has(k.victimId));
-        const knownDirectFire = directFire.filter((k) => knownVictimIds.has(k.victimId));
-        const knownReturnFire = returnFire.filter((k) => knownVictimIds.has(k.victimId));
-        const knownMeleeKills = meleeKills.filter((k) => knownVictimIds.has(k.victimId));
         const killToastFormatter = deps.buildKillToastFormatterBundle(
           S.gameState,
           tacticalReadySlice.removedUnits,
@@ -843,20 +874,22 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
             removedUnits: tacticalReadySlice.removedUnits,
           })
         );
-        const bullets = buildTurnUpdateBullets({
-          readyResult: tacticalReadySlice as Parameters<typeof buildTurnUpdateBullets>[0]['readyResult'],
-          knownDirectFire,
-          knownReturnFire,
-          knownMeleeKills,
-          formatKillLine: killToastFormatter.formatKillLine,
+        const turnLossSummary = buildPopupTurnLossSummary({
+          readySlice: tacticalReadySlice,
+          knownVictimIds,
           formatUnitName: killToastFormatter.formatUnitName,
+          killsByMelee: playback.killsByMelee,
+          killsByAirStrike: playback.killsByAirStrike,
         });
         const combatFallbackBullets = buildCombatActivityFallbackBullets(tacticalReadySlice);
-        const updateBullets = composeResolutionMapToastBullets(bullets, combatFallbackBullets);
-        if (updateBullets.length > 0) {
-          const updateText = updateBullets.join('\n');
+        const updateText = buildConsolidatedTurnUpdateToastMessage({
+          readyResult: tacticalReadySlice,
+          turnLossSummary,
+          combatFallbackBullets,
+        });
+        if (updateText) {
           deps.showMapToast(updateText, { isError: false });
-          deps.appendOpenRouterLog(`Update: ${updateBullets.join(' | ')}`);
+          deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, ' | ')}`);
         }
         const hasUnknownBattle =
           unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
@@ -1040,7 +1073,6 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       (readyResult.infrastructureDestroyedEvents?.length ?? 0) > 0 ||
       (readyResult.baseInvalidAirLossCount ?? 0) > 0;
     const visibleHexes = deps.getVisibleHexSet(state);
-    const allKills = readyResult.kills ?? [];
     const { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds } = deriveCombatVisibilityClassification(
       readyResult,
       visibleHexes
@@ -1082,34 +1114,26 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         unknownCombatHexes: unknownCombatHexes.length > 0 ? unknownCombatHexes : undefined,
         unknownCasualtyHexes: unknownCasualtyHexes.length > 0 ? unknownCasualtyHexes : undefined,
       };
-      const directFire = readyResult.killsByDirectFire ?? [];
-      const returnFire = readyResult.killsByReturnFire ?? [];
-      const directSet = new Set(directFire.map((k) => k.victimId));
-      const returnSet = new Set(returnFire.map((k) => k.victimId));
-      const meleeKills = allKills.filter((k) => !directSet.has(k.victimId) && !returnSet.has(k.victimId));
-      const knownDirectFire = directFire.filter((k) => knownVictimIds.has(k.victimId));
-      const knownReturnFire = returnFire.filter((k) => knownVictimIds.has(k.victimId));
-      const knownMeleeKills = meleeKills.filter((k) => knownVictimIds.has(k.victimId));
       const killToastFormatter = deps.buildKillToastFormatterBundle(
         state,
         readyResult.removedUnits,
         undefined,
         readyResult.killLabelUnits
       );
-      const bullets = buildTurnUpdateBullets({
-        readyResult: readyResult as Parameters<typeof buildTurnUpdateBullets>[0]['readyResult'],
-        knownDirectFire,
-        knownReturnFire,
-        knownMeleeKills,
-        formatKillLine: killToastFormatter.formatKillLine,
+      const turnLossSummary = buildPopupTurnLossSummary({
+        readySlice: readyResult,
+        knownVictimIds,
         formatUnitName: killToastFormatter.formatUnitName,
       });
       const combatFallbackBullets = buildCombatActivityFallbackBullets(readyResult);
-      const updateBullets = composeResolutionMapToastBullets(bullets, combatFallbackBullets);
-      if (updateBullets.length > 0) {
-        const updateText = updateBullets.join('\n');
+      const updateText = buildConsolidatedTurnUpdateToastMessage({
+        readyResult,
+        turnLossSummary,
+        combatFallbackBullets,
+      });
+      if (updateText) {
         deps.showMapToast(updateText, { isError: false });
-        deps.appendOpenRouterLog(`Update: ${updateBullets.join(' | ')}`);
+        deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, ' | ')}`);
       }
       const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
       if (hasUnknownBattle) {

@@ -6,7 +6,7 @@ import type { AirStrikeAnimationMove, AirStrikeOrder, EmbarkOrder, FerryOrder } 
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import { tacticalBoundaryConcurrentSessionAllowed } from '../../shared/tacticalStateAssertions';
 import { createCombatRng } from '../combatResolution';
-import { getGameSeed } from '../gameDb';
+import { getGameSeed, clearTacticalTurnNotes } from '../gameDb';
 import { getActiveTacticalBattleSnapshotRef, setActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import {
   clearTacticalBattleSnapshotFromGameConfig,
@@ -252,6 +252,7 @@ export function startTacticalBattleForEnclosingRes1Hex(enclosingRes1H3Index: str
       return { success: false, reason: failureReason ?? 'Could not start tactical battle.' };
     }
     commitActiveTacticalBattle(snapshot);
+    clearTacticalTurnNotes();
     captureTacticalTransportBaselineForParentUnitIds([...new Set(snapshot.subUnits.map((u) => u.parentUnitId))]);
     if (skippedParentDisplayNames.length > 0) {
       tacticalLogMutate('startTacticalBattleForEnclosingRes1Hex skipped parents', { skippedParentDisplayNames });

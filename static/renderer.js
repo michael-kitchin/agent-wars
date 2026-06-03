@@ -15711,10 +15711,39 @@
     el.appendChild(span);
     el.scrollTop = el.scrollHeight;
   }
-  function bulletizeToastLines(message) {
+  var MAP_TOAST_SECTION_BULLET_INDENT = "1.25em";
+  function appendMapToastBulletLine(target, line, indent) {
+    const text = line.startsWith("\u2022") ? line : `\u2022 ${line}`;
+    const span = document.createElement("span");
+    span.style.display = "block";
+    if (indent) {
+      span.style.marginLeft = MAP_TOAST_SECTION_BULLET_INDENT;
+    }
+    span.textContent = text;
+    target.appendChild(span);
+  }
+  function appendMapToastSectionHeader(target, title) {
+    const strong = document.createElement("strong");
+    strong.style.display = "block";
+    strong.textContent = title.endsWith(":") ? title : `${title}:`;
+    target.appendChild(strong);
+  }
+  function appendMapToastMessageBody(target, message) {
     const lines = message.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
-    if (lines.length === 0) return "\u2022";
-    return lines.map((line) => line.startsWith("\u2022") ? line : `\u2022 ${line}`).join("\n");
+    let inSection = false;
+    let isFirstSection = true;
+    for (const line of lines) {
+      if (line.startsWith("## ")) {
+        inSection = true;
+        if (!isFirstSection) {
+          target.appendChild(document.createElement("br"));
+        }
+        isFirstSection = false;
+        appendMapToastSectionHeader(target, line.slice(3));
+        continue;
+      }
+      appendMapToastBulletLine(target, line, inSection);
+    }
   }
   function showToast(el, textEl, textContentBuilder, isInfo) {
     textEl.textContent = "";
@@ -15734,10 +15763,7 @@
         el,
         textEl,
         (target) => {
-          const strong = document.createElement("strong");
-          strong.textContent = "Update: ";
-          target.appendChild(strong);
-          target.appendChild(document.createTextNode("\n" + bulletizeToastLines(message)));
+          appendMapToastMessageBody(target, message);
         },
         options?.isError === false
       );
@@ -22734,7 +22760,61 @@
     return value === "infantry" || value === "armor" || value === "naval" || value === "air";
   }
 
-  // src/renderer/gameplay/turnUpdateSummary.ts
+  // src/shared/lossSummary.ts
+  var LOSS_ENTRY_LIST_MAX = 5;
+  var GROUP_LABEL_BY_TYPE = {
+    naval: "Naval",
+    air: "Air",
+    armor: "Armored",
+    infantry: "Infantry"
+  };
+  var GROUP_ORDER = ["naval", "air", "armor", "infantry"];
+  function emptyPlayerLossSummary() {
+    return { ranged: [], melee: [], returnFire: [], airStrike: [], other: [] };
+  }
+  function emptyTurnLossSummary() {
+    return { human: emptyPlayerLossSummary(), ai: emptyPlayerLossSummary() };
+  }
+  function playerHasAnyLoss(summary) {
+    return summary.ranged.length > 0 || summary.melee.length > 0 || summary.returnFire.length > 0 || summary.airStrike.length > 0 || summary.other.length > 0;
+  }
+  function formatLossEntries(units) {
+    if (units.length === 0) return "";
+    if (units.length <= LOSS_ENTRY_LIST_MAX) {
+      return units.map((u) => u.displayName).join(", ");
+    }
+    const counts = { naval: 0, air: 0, armor: 0, infantry: 0 };
+    for (const u of units) {
+      if (u.unitType in counts) counts[u.unitType] += 1;
+    }
+    const parts = [];
+    for (const t of GROUP_ORDER) {
+      const n = counts[t];
+      if (n > 0) parts.push(`${n.toLocaleString()} ${GROUP_LABEL_BY_TYPE[t]}`);
+    }
+    return parts.join(", ");
+  }
+  var CAUSE_SPECS = [
+    { key: "ranged", label: "Ranged attack" },
+    { key: "melee", label: "Melee attack" },
+    { key: "returnFire", label: "Return fire" },
+    { key: "airStrike", label: "Air strike" },
+    { key: "other", label: "Other losses" }
+  ];
+  function formatPlayerLossLinesMultiline(summary) {
+    const lines = [];
+    for (const spec of CAUSE_SPECS) {
+      const units = summary[spec.key];
+      if (units.length === 0) continue;
+      const text = formatLossEntries(units);
+      if (text.length > 0) lines.push({ causeLabel: spec.label, text });
+    }
+    return lines;
+  }
+
+  // src/shared/consolidatedTurnUpdateToast.ts
+  var MAP_TOAST_SECTION_HEADER_PREFIX = "## ";
+  var MAP_TOAST_UPDATES_SECTION_TITLE = "Updates";
   function formatCountLabel(value, singular, plural) {
     return `${value.toLocaleString()} ${value === 1 ? singular : plural}`;
   }
@@ -22761,7 +22841,7 @@
     if (ordered.length === 3) return `Maximum human ${ordered[0]}, ${ordered[1]}, and ${ordered[2]} units deployed.`;
     return `Maximum human ${ordered[0]}, ${ordered[1]}, ${ordered[2]}, and ${ordered[3]} units deployed.`;
   }
-  function formatAirStrikeOutcomeLine(readyResult, formatUnitName) {
+  function formatAirStrikeInfrastructureOtherLine(readyResult) {
     const attempts = readyResult.airStrikeAttemptCount ?? 0;
     if (attempts <= 0) return null;
     const destroyedByFeature = { urban: 0, airport: 0, seaport: 0 };
@@ -22771,47 +22851,129 @@
       else if (event.targetType === "airport") destroyedByFeature.airport += rubbleCells;
       else if (event.targetType === "seaport") destroyedByFeature.seaport += rubbleCells;
     }
-    const destroyedUnitsByType = { infantry: 0, armor: 0, naval: 0, air: 0 };
-    const airLossUnitIds = [];
-    for (const removed of readyResult.airStrikeRemovedUnits ?? []) {
-      if (removed.player === "human" && removed.unitType === "air") {
-        airLossUnitIds.push(removed.id);
-        continue;
-      }
-      if (removed.unitType === "infantry") destroyedUnitsByType.infantry += 1;
-      else if (removed.unitType === "armor") destroyedUnitsByType.armor += 1;
-      else if (removed.unitType === "naval") destroyedUnitsByType.naval += 1;
-      else if (removed.unitType === "air") destroyedUnitsByType.air += 1;
-    }
     const destroyedParts = [];
     if (destroyedByFeature.urban > 0) destroyedParts.push(formatCountLabel(destroyedByFeature.urban, "urban hex", "urban hexes"));
     if (destroyedByFeature.airport > 0) destroyedParts.push(formatCountLabel(destroyedByFeature.airport, "airport", "airports"));
     if (destroyedByFeature.seaport > 0) destroyedParts.push(formatCountLabel(destroyedByFeature.seaport, "seaport", "seaports"));
-    if (destroyedUnitsByType.infantry > 0) destroyedParts.push(formatCountLabel(destroyedUnitsByType.infantry, "infantry unit", "infantry units"));
-    if (destroyedUnitsByType.armor > 0) destroyedParts.push(formatCountLabel(destroyedUnitsByType.armor, "armor unit", "armor units"));
-    if (destroyedUnitsByType.naval > 0) destroyedParts.push(formatCountLabel(destroyedUnitsByType.naval, "naval unit", "naval units"));
-    if (destroyedUnitsByType.air > 0) destroyedParts.push(formatCountLabel(destroyedUnitsByType.air, "air unit", "air units"));
-    const uniqueAirLossUnitIds = [...new Set(airLossUnitIds)];
-    const lossesPart = uniqueAirLossUnitIds.length > 0 ? `; air losses ${uniqueAirLossUnitIds.map((unitId) => formatUnitName(unitId)).join(", ")}` : "";
     const destroyedPart = destroyedParts.length > 0 ? `destroyed ${destroyedParts.join(", ")}` : "destroyed nothing";
-    return `\u2022 Air strikes: ${attempts.toLocaleString()} attempted; ${destroyedPart}${lossesPart}`;
+    return `Air strikes: ${attempts.toLocaleString()} attempted; ${destroyedPart}`;
   }
-  function buildTurnUpdateBullets(args) {
-    const { readyResult, knownDirectFire, knownReturnFire, knownMeleeKills, formatKillLine, formatUnitName } = args;
-    const bullets = [];
+  function buildOtherTurnUpdatePrimaryLines(readyResult) {
+    const lines = [];
     const deployedLine = formatDeployedUnitsLine(readyResult.deployedUnitsByType);
-    if (deployedLine) bullets.push(deployedLine);
+    if (deployedLine) lines.push(deployedLine);
     const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, "human");
-    if (deploymentCapLine) bullets.push(deploymentCapLine);
-    const airStrikeOutcomeLine = formatAirStrikeOutcomeLine(readyResult, formatUnitName);
-    if (airStrikeOutcomeLine) bullets.push(airStrikeOutcomeLine);
+    if (deploymentCapLine) lines.push(deploymentCapLine);
+    const airStrikeInfraLine = formatAirStrikeInfrastructureOtherLine(readyResult);
+    if (airStrikeInfraLine) lines.push(airStrikeInfraLine);
     if ((readyResult.humanHexesLostCount ?? 0) > 0) {
-      bullets.push(`${readyResult.humanHexesLostCount.toLocaleString()} hexes lost to opponent`);
+      lines.push(`${readyResult.humanHexesLostCount.toLocaleString()} hexes lost to opponent`);
     }
-    if (knownDirectFire.length > 0) bullets.push(`\u2022 Direct fire: ${knownDirectFire.map(formatKillLine).join("; ")}`);
-    if (knownReturnFire.length > 0) bullets.push(`\u2022 Return fire: ${knownReturnFire.map(formatKillLine).join("; ")}`);
-    if (knownMeleeKills.length > 0) bullets.push(knownMeleeKills.map(formatKillLine).join("\n"));
-    return bullets;
+    return lines;
+  }
+  function stripLeadingBullet(line) {
+    return line.replace(/^\u2022\s*/, "");
+  }
+  function appendLossSection(out, header, summary) {
+    if (!playerHasAnyLoss(summary)) return;
+    out.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${header}`);
+    for (const line of formatPlayerLossLinesMultiline(summary)) {
+      out.push(`${line.causeLabel}: ${line.text}`);
+    }
+  }
+  function buildConsolidatedTurnUpdateToastMessage(args) {
+    const { readyResult, turnLossSummary, combatFallbackBullets } = args;
+    const sections = [];
+    appendLossSection(sections, "Human Losses", turnLossSummary.human);
+    appendLossSection(sections, "AI Losses", turnLossSummary.ai);
+    const hasLossSections = playerHasAnyLoss(turnLossSummary.human) || playerHasAnyLoss(turnLossSummary.ai);
+    let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
+    if (!hasLossSections && otherLines.length === 0) {
+      otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
+    }
+    if (otherLines.length > 0) {
+      sections.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`);
+      sections.push(...otherLines);
+    }
+    if (sections.length === 0) return null;
+    return sections.join("\n");
+  }
+
+  // src/shared/lossSummaryFromResolution.ts
+  function normalizeUnitType(raw) {
+    if (raw === "naval" || raw === "air" || raw === "armor" || raw === "infantry") return raw;
+    return null;
+  }
+  function snapshotById(snapshots) {
+    const map = /* @__PURE__ */ new Map();
+    for (const s of snapshots) map.set(s.id, s);
+    return map;
+  }
+  function allRemovedSnapshots(args) {
+    const byId = /* @__PURE__ */ new Map();
+    for (const s of args.removedUnits ?? []) byId.set(s.id, s);
+    for (const s of args.airStrikeRemovedUnits ?? []) byId.set(s.id, s);
+    return [...byId.values()];
+  }
+  function resolveLostUnit(victimId, snapshots, args) {
+    const snap = snapshots.get(victimId);
+    const meta = args.resolveUnitMeta(victimId) ?? (snap ? { player: snap.player, unitType: snap.unitType } : void 0);
+    if (!meta) return null;
+    const unitType = normalizeUnitType(meta.unitType);
+    if (!unitType) return null;
+    const player = meta.player;
+    const visible = player === "human" || !args.isVictimVisible || args.isVictimVisible(victimId, player);
+    if (!visible) return null;
+    const displayName = snap?.displayName && snap.displayName.length > 0 ? snap.displayName : args.resolveDisplayName(victimId);
+    return { unitType, displayName };
+  }
+  function bucketForPlayer(summary, player) {
+    return player === "human" ? summary.human : summary.ai;
+  }
+  function pushToBucket(summary, player, bucket, unit) {
+    bucketForPlayer(summary, player)[bucket].push(unit);
+  }
+  function buildTurnLossSummary(args) {
+    const summary = emptyTurnLossSummary();
+    const snapshots = snapshotById(allRemovedSnapshots(args));
+    const victimToCause = /* @__PURE__ */ new Map();
+    const assignFromEdges = (edges, cause) => {
+      for (const edge of edges ?? []) {
+        if (!victimToCause.has(edge.victimId)) victimToCause.set(edge.victimId, cause);
+      }
+    };
+    assignFromEdges(args.killsByAirStrike, "airStrike");
+    assignFromEdges(args.killsByDirectFire, "ranged");
+    assignFromEdges(args.killsByReturnFire, "returnFire");
+    if (args.killsByMelee && args.killsByMelee.length > 0) {
+      assignFromEdges(args.killsByMelee, "melee");
+    } else {
+      assignFromEdges(args.kills, "melee");
+    }
+    for (const snap of args.airStrikeRemovedUnits ?? []) {
+      if (!victimToCause.has(snap.id)) victimToCause.set(snap.id, "airStrike");
+    }
+    const claimed = /* @__PURE__ */ new Set();
+    const addVictim = (victimId, cause) => {
+      if (claimed.has(victimId)) return;
+      const unit = resolveLostUnit(victimId, snapshots, args);
+      if (!unit) return;
+      const meta = args.resolveUnitMeta(victimId) ?? snapshots.get(victimId);
+      const player = meta?.player ?? "opponent";
+      pushToBucket(summary, player, cause, unit);
+      claimed.add(victimId);
+    };
+    for (const [victimId, cause] of victimToCause) {
+      addVictim(victimId, cause);
+    }
+    for (const snap of allRemovedSnapshots(args)) {
+      if (claimed.has(snap.id)) continue;
+      addVictim(snap.id, "other");
+    }
+    return summary;
+  }
+  function buildTurnLossSummaryFromReadyShape(args) {
+    return buildTurnLossSummary(args);
   }
 
   // src/shared/tacticalToastKillSlice.ts
@@ -23000,6 +23162,30 @@
       meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : void 0
     };
   }
+  function buildPopupTurnLossSummary(args) {
+    const { readySlice, knownVictimIds, formatUnitName, killsByMelee, killsByAirStrike } = args;
+    const removed = readySlice.removedUnits ?? [];
+    const metaMap = /* @__PURE__ */ new Map();
+    for (const u of removed) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
+    for (const u of readySlice.airStrikeRemovedUnits ?? []) metaMap.set(u.id, { player: u.player, unitType: u.unitType });
+    const readyWithAir = readySlice;
+    return buildTurnLossSummaryFromReadyShape({
+      kills: readySlice.kills,
+      killsByDirectFire: readySlice.killsByDirectFire,
+      killsByReturnFire: readySlice.killsByReturnFire,
+      killsByMelee,
+      killsByAirStrike: killsByAirStrike ?? readyWithAir.killsByAirStrike,
+      removedUnits: removed,
+      airStrikeRemovedUnits: readySlice.airStrikeRemovedUnits,
+      resolveDisplayName: (id) => {
+        const snap = removed.find((u) => u.id === id) ?? readySlice.airStrikeRemovedUnits?.find((u) => u.id === id);
+        if (snap?.displayName) return snap.displayName;
+        return formatUnitName(id);
+      },
+      resolveUnitMeta: (id) => metaMap.get(id),
+      isVictimVisible: (_id, player) => player === "human" || knownVictimIds.has(_id)
+    });
+  }
   function formatHexCount(label, count) {
     return `\u2022 ${label} at ${count.toLocaleString()} ${count === 1 ? "hex" : "hexes"}.`;
   }
@@ -23149,15 +23335,6 @@
           const tacticalReadySlice = buildTacticalCommitReadyResultForToast(playback);
           const visibleHexes2 = deps.getVisibleHexSet(rendererSharedState.gameState);
           const { unknownCombatHexes: unknownCombatHexes2, unknownCasualtyHexes: unknownCasualtyHexes2, knownVictimIds: knownVictimIds2, unknownVictimIds: unknownVictimIds2 } = deriveCombatVisibilityClassification(tacticalReadySlice, visibleHexes2);
-          const directFire = tacticalReadySlice.killsByDirectFire ?? [];
-          const returnFire = tacticalReadySlice.killsByReturnFire ?? [];
-          const allKills2 = tacticalReadySlice.kills ?? [];
-          const directSet = new Set(directFire.map((k) => k.victimId));
-          const returnSet = new Set(returnFire.map((k) => k.victimId));
-          const meleeKills = allKills2.filter((k) => !directSet.has(k.victimId) && !returnSet.has(k.victimId));
-          const knownDirectFire = directFire.filter((k) => knownVictimIds2.has(k.victimId));
-          const knownReturnFire = returnFire.filter((k) => knownVictimIds2.has(k.victimId));
-          const knownMeleeKills = meleeKills.filter((k) => knownVictimIds2.has(k.victimId));
           const killToastFormatter = deps.buildKillToastFormatterBundle(
             rendererSharedState.gameState,
             tacticalReadySlice.removedUnits,
@@ -23167,20 +23344,22 @@
               removedUnits: tacticalReadySlice.removedUnits
             })
           );
-          const bullets = buildTurnUpdateBullets({
-            readyResult: tacticalReadySlice,
-            knownDirectFire,
-            knownReturnFire,
-            knownMeleeKills,
-            formatKillLine: killToastFormatter.formatKillLine,
-            formatUnitName: killToastFormatter.formatUnitName
+          const turnLossSummary = buildPopupTurnLossSummary({
+            readySlice: tacticalReadySlice,
+            knownVictimIds: knownVictimIds2,
+            formatUnitName: killToastFormatter.formatUnitName,
+            killsByMelee: playback.killsByMelee,
+            killsByAirStrike: playback.killsByAirStrike
           });
           const combatFallbackBullets = buildCombatActivityFallbackBullets(tacticalReadySlice);
-          const updateBullets = composeResolutionMapToastBullets(bullets, combatFallbackBullets);
-          if (updateBullets.length > 0) {
-            const updateText = updateBullets.join("\n");
+          const updateText = buildConsolidatedTurnUpdateToastMessage({
+            readyResult: tacticalReadySlice,
+            turnLossSummary,
+            combatFallbackBullets
+          });
+          if (updateText) {
             deps.showMapToast(updateText, { isError: false });
-            deps.appendOpenRouterLog(`Update: ${updateBullets.join(" | ")}`);
+            deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, " | ")}`);
           }
           const hasUnknownBattle = unknownCombatHexes2.length > 0 || unknownCasualtyHexes2.length > 0 || unknownVictimIds2.length > 0;
           if (hasUnknownBattle) {
@@ -23340,7 +23519,6 @@
       const hasLegacy = (readyResult.combatHexes?.length ?? 0) > 0 || (readyResult.casualtyHexes?.length ?? 0) > 0;
       const hasAirStrikeResolution = (readyResult.airStrikeAttemptCount ?? 0) > 0 || (readyResult.airStrikeHexes?.length ?? 0) > 0 || (readyResult.infrastructureDestroyedEvents?.length ?? 0) > 0 || (readyResult.baseInvalidAirLossCount ?? 0) > 0;
       const visibleHexes = deps.getVisibleHexSet(state);
-      const allKills = readyResult.kills ?? [];
       const { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds } = deriveCombatVisibilityClassification(
         readyResult,
         visibleHexes
@@ -23382,34 +23560,26 @@
           unknownCombatHexes: unknownCombatHexes.length > 0 ? unknownCombatHexes : void 0,
           unknownCasualtyHexes: unknownCasualtyHexes.length > 0 ? unknownCasualtyHexes : void 0
         };
-        const directFire = readyResult.killsByDirectFire ?? [];
-        const returnFire = readyResult.killsByReturnFire ?? [];
-        const directSet = new Set(directFire.map((k) => k.victimId));
-        const returnSet = new Set(returnFire.map((k) => k.victimId));
-        const meleeKills = allKills.filter((k) => !directSet.has(k.victimId) && !returnSet.has(k.victimId));
-        const knownDirectFire = directFire.filter((k) => knownVictimIds.has(k.victimId));
-        const knownReturnFire = returnFire.filter((k) => knownVictimIds.has(k.victimId));
-        const knownMeleeKills = meleeKills.filter((k) => knownVictimIds.has(k.victimId));
         const killToastFormatter = deps.buildKillToastFormatterBundle(
           state,
           readyResult.removedUnits,
           void 0,
           readyResult.killLabelUnits
         );
-        const bullets = buildTurnUpdateBullets({
-          readyResult,
-          knownDirectFire,
-          knownReturnFire,
-          knownMeleeKills,
-          formatKillLine: killToastFormatter.formatKillLine,
+        const turnLossSummary = buildPopupTurnLossSummary({
+          readySlice: readyResult,
+          knownVictimIds,
           formatUnitName: killToastFormatter.formatUnitName
         });
         const combatFallbackBullets = buildCombatActivityFallbackBullets(readyResult);
-        const updateBullets = composeResolutionMapToastBullets(bullets, combatFallbackBullets);
-        if (updateBullets.length > 0) {
-          const updateText = updateBullets.join("\n");
+        const updateText = buildConsolidatedTurnUpdateToastMessage({
+          readyResult,
+          turnLossSummary,
+          combatFallbackBullets
+        });
+        if (updateText) {
           deps.showMapToast(updateText, { isError: false });
-          deps.appendOpenRouterLog(`Update: ${updateBullets.join(" | ")}`);
+          deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, " | ")}`);
         }
         const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
         if (hasUnknownBattle) {
