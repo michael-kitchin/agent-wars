@@ -188,9 +188,23 @@ orderPreviewTerrainImpact?: OrderPreviewTerrainImpact | null;
  * Exceptions: None.
  */
 export interface TacticalDraftPreviewResult {
-  /** Lat/lng segment preview for canvas drawing and sidebar validation messaging. */
+  /**
+   * Lat/lng segment preview for canvas drawing and sidebar validation messaging.
+   *
+   * Contract: Same `HumanOrderPreviewResult` shape as hover previews; segments reflect the committed or override H3 path.
+   * When to use: Destructure from `buildTacticalMarchDraftDestinationPreview` for drawing and validation UI.
+   * Expected outcome: `valid` and `segments` suitable for `drawTacticalPendingMarchPlanLines` without extra conversion.
+   * Exceptions: None.
+   */
   preview: HumanOrderPreviewResult;
-  /** Ordered res4 H3 indexes (inclusive endpoints) used to build `preview.segments`; null when no valid route. */
+  /**
+   * Ordered res4 H3 indexes (inclusive endpoints) used to build `preview.segments`; null when unreachable.
+   *
+   * Contract: When non-null, indexes match the path used for segment generation; head is the planning origin cell.
+   * When to use: Store on `TacticalPendingMarchRow.pathH3Indexes` at draft time or after continuation tail advance.
+   * Expected outcome: Enables path-tail reuse via `findPathTailFromCurrentPosition` across tactical beats.
+   * Exceptions: None.
+   */
   pathH3Indexes: string[] | null;
 }
 
@@ -203,11 +217,41 @@ export interface TacticalDraftPreviewResult {
  * Exceptions: None.
  */
 export interface TacticalPendingMarchRow {
+  /**
+   * Specifies the contract for the `subUnitId` member (subUnitId: string;).
+   *
+   * Contract: Describes stable behavior for callers of `subUnitId` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
   subUnitId: string;
+  /**
+   * Specifies the contract for the `destinationH3Index` member (destinationH3Index: string;).
+   *
+   * Contract: Describes stable behavior for callers of `destinationH3Index` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
   destinationH3Index: string;
-  /** Committed res4 H3 path from unit origin to destination for stable display across beats. */
+  /**
+   * Committed res4 H3 path from unit origin to destination for stable display across beats.
+   *
+   * Contract: Inclusive endpoints; head must match unit `h3Index` for cached segment reuse in the renderer.
+   * When to use: Populated at draft commit and advanced via `buildTacticalPendingMarchRowsFromContinuations`.
+   * Expected outcome: Optional until first successful preview; omitted when route is unreachable.
+   * Exceptions: None.
+   */
   pathH3Indexes?: string[];
-  /** Precomputed lat/lng segments matching `pathH3Indexes`; used by `drawTacticalPendingMarchPlanLines` without replanning. */
+  /**
+   * Precomputed lat/lng segments matching `pathH3Indexes`; used by `drawTacticalPendingMarchPlanLines` without replanning.
+   *
+   * Contract: Same turn-split segment shape as tactical hover previews; paired with `pathH3Indexes` when present.
+   * When to use: Renderer draw path when `pathH3Indexes[0]` equals the sub-unit current cell.
+   * Expected outcome: Avoids repeated `planTacticalRes4March` calls during redraw and beat transitions.
+   * Exceptions: None.
+   */
   cachedSegments?: HumanOrderPreviewSegment[];
 }
 

@@ -10,12 +10,50 @@ import type { HumanOrderPreviewSegment } from '../../shared/ipc/humanOrderPrevie
  * Exceptions: None.
  */
 export interface StandingOrderComputedRoutePayload {
+  /**
+   * Specifies the contract for the `turnsRemaining` member (turnsRemaining: number;).
+   *
+   * Contract: Describes stable behavior for callers of `turnsRemaining` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
   turnsRemaining: number;
+  /**
+   * Specifies the contract for the `nextMoveHex` member (nextMoveHex: [number, number];).
+   *
+   * Contract: Describes stable behavior for callers of `nextMoveHex` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
   nextMoveHex: [number, number];
+  /**
+   * Specifies the contract for the `totalPath` member (totalPath: [number, number][];).
+   *
+   * Contract: Describes stable behavior for callers of `totalPath` in this codebase.
+   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Exceptions: None.
+   */
   totalPath: [number, number][];
-  /** res1 H3 where the cached route was planned; display reuse when the unit is still at this cell. */
+  /**
+   * res1 H3 where the cached route was planned; display reuse when the unit is still at this cell.
+   *
+   * Contract: Matches the unit cell at route assignment or turn refresh; `listHumanStandingOrders` reuses `cachedRouteSegments` only when current H3 equals this value.
+   * When to use: Persisted in `computed_route` after `toComputedRoutePayload`; read by standing-order list IPC for stable overlay rendering.
+   * Expected outcome: Optional on legacy rows; present on newly assigned or refreshed march/pursue orders.
+   * Exceptions: None.
+   */
   cachedOriginH3?: string;
-  /** Turn-partitioned lat/lng segments for stable standing-order line rendering. */
+  /**
+   * Turn-partitioned lat/lng segments for stable standing-order line rendering.
+   *
+   * Contract: Same shape as `HumanOrderPreviewSegment[]`; valid only together with matching `cachedOriginH3`.
+   * When to use: Returned from `rowToOrderResponse` and consumed by `listHumanStandingOrders` on cache hit.
+   * Expected outcome: Skips replanning when origin H3 still matches the unit position.
+   * Exceptions: None.
+   */
   cachedRouteSegments?: HumanOrderPreviewSegment[];
 }
 

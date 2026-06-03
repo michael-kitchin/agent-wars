@@ -36,13 +36,41 @@ export type HomeRegionOwnerIdentity = 'human' | 'opponent' | 'both' | null;
  * Exceptions: None.
  */
 export interface HomeRegionOwnerIdentityInput {
-  /** Strategic hex whose home-region membership is being resolved. */
+  /**
+   * Strategic hex whose home-region membership is being resolved.
+   *
+   * Contract: res1 H3 index present in snapshot hex lists or border styling inputs.
+   * When to use: Passed to `resolveHomeRegionOwnerIdentity` for inner dashed border coloring.
+   * Expected outcome: Drives which player(s) are treated as home-region owners for the hex.
+   * Exceptions: None.
+   */
   h3Index: string;
-  /** Human home-region hex list from snapshot metadata, when present. */
+  /**
+   * Human home-region hex list from snapshot metadata, when present.
+   *
+   * Contract: Read-only list of res1 H3 indexes declared as human home region.
+   * When to use: Together with opponent home lists to classify intersection and sole ownership.
+   * Expected outcome: Hexes in this list contribute to human home-region identity when matched.
+   * Exceptions: None.
+   */
   humanHomeRegionHexes?: readonly string[];
-  /** Opponent home-region hex list from snapshot metadata, when present. */
+  /**
+   * Opponent home-region hex list from snapshot metadata, when present.
+   *
+   * Contract: Read-only list of res1 H3 indexes declared as opponent home region.
+   * When to use: Together with human home lists to classify intersection and sole ownership.
+   * Expected outcome: Hexes in this list contribute to opponent home-region identity when matched.
+   * Exceptions: None.
+   */
   aiHomeRegionHexes?: readonly string[];
-  /** Precomputed intersection list; when omitted, derived from both home lists. */
+  /**
+   * Precomputed intersection list; when omitted, derived from both home lists.
+   *
+   * Contract: Hexes appearing in both home lists; may be empty when regions do not overlap.
+   * When to use: Optional optimization when snapshot already carries intersection metadata.
+   * Expected outcome: Shared home hexes resolve to `both` owner identity without recomputing intersection.
+   * Exceptions: None.
+   */
   intersectingHomeRegionHexes?: readonly string[];
 }
 
