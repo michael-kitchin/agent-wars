@@ -14,7 +14,7 @@ import {
 } from '../core/constants';
 import { getLeafletGlobal, hexCenterPx, hexCenterPxRelativeTo } from '../map/mapUtils';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
-import type { GameStateSnapshot, HumanStandingOrderSnapshot } from '../../shared/ipcTypes';
+import type { GameStateSnapshot, HumanStandingOrderSnapshot, TacticalPendingMarchRow } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildTacticalMarchDraftDestinationPreview } from '../../shared/tacticalMarchHoverPreview';
 import type { ResolutionPlaybackMove } from '../core/types';
@@ -203,7 +203,7 @@ export function drawStandingOrderLines(
 export function drawTacticalPendingMarchPlanLines(
   ctx: CanvasRenderingContext2D,
   battle: TacticalBattleSnapshot,
-  pendingMarches: readonly { subUnitId: string; destinationH3Index: string }[]
+  pendingMarches: readonly TacticalPendingMarchRow[]
 ): void {
   if (pendingMarches.length === 0) return;
   const map = getMainLeafletMap() as { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } } | null;
@@ -216,7 +216,13 @@ export function drawTacticalPendingMarchPlanLines(
     const fromH3 = sub.h3Index;
     const toH3 = row.destinationH3Index;
     if (fromH3 === toH3) continue;
-    const preview = buildTacticalMarchDraftDestinationPreview(battle, row.subUnitId, toH3);
+    const useCached =
+      row.cachedSegments &&
+      row.cachedSegments.length > 0 &&
+      row.pathH3Indexes?.[0] === fromH3;
+    const preview = useCached
+      ? { valid: true, segments: row.cachedSegments }
+      : buildTacticalMarchDraftDestinationPreview(battle, row.subUnitId, toH3).preview;
     if (!preview.valid || preview.segments.length === 0) continue;
     let lastPenultimate: { x: number; y: number } | null = null;
     let lastPoint: { x: number; y: number } | null = null;

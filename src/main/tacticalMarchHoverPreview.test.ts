@@ -65,8 +65,9 @@ test('buildTacticalMarchDraftDestinationPreview matches hover path for one pendi
   };
   const hover = buildTacticalMarchHoverPreview(battle, ['su-human'], neighbor);
   const draft = buildTacticalMarchDraftDestinationPreview(battle, 'su-human', neighbor);
-  assert.equal(hover.previews[0]?.preview.valid, draft.valid);
-  assert.deepEqual(hover.previews[0]?.preview.segments, draft.segments);
+  assert.equal(hover.previews[0]?.preview.valid, draft.preview.valid);
+  assert.deepEqual(hover.previews[0]?.preview.segments, draft.preview.segments);
+  assert.ok(draft.pathH3Indexes && draft.pathH3Indexes.length >= 2);
 });
 
 test('buildTacticalMarchHoverPreview rejects destinations outside the footprint', () => {

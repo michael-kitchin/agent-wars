@@ -180,6 +180,38 @@ orderPreviewTerrainImpact?: OrderPreviewTerrainImpact | null;
 }
 
 /**
+ * Wrapper for tactical draft march previews that also exposes the committed res4 H3 path for stable overlay reuse.
+ *
+ * Purpose: Keeps `HumanOrderPreviewResult` unchanged for IPC while letting the renderer cache `pathH3Indexes` alongside lat/lng segments.
+ * When to use: `buildTacticalMarchDraftDestinationPreview` return value; tactical pending-march row construction in the renderer.
+ * Expected outcome: `preview` matches hover/draft segment styling; `pathH3Indexes` is the H3 chain used for `preview.segments` (null when unreachable).
+ * Exceptions: None.
+ */
+export interface TacticalDraftPreviewResult {
+  /** Lat/lng segment preview for canvas drawing and sidebar validation messaging. */
+  preview: HumanOrderPreviewResult;
+  /** Ordered res4 H3 indexes (inclusive endpoints) used to build `preview.segments`; null when no valid route. */
+  pathH3Indexes: string[] | null;
+}
+
+/**
+ * Human tactical pending march row stored in renderer state before Ready commit.
+ *
+ * Purpose: Holds destination plus optional cached path data so beat-to-beat overlays do not replan from scratch.
+ * When to use: `S.tacticalPendingMarches` entries during an active tactical battle.
+ * Expected outcome: `pathH3Indexes` and `cachedSegments` are populated when a draft route is first computed or advanced along a continuation tail.
+ * Exceptions: None.
+ */
+export interface TacticalPendingMarchRow {
+  subUnitId: string;
+  destinationH3Index: string;
+  /** Committed res4 H3 path from unit origin to destination for stable display across beats. */
+  pathH3Indexes?: string[];
+  /** Precomputed lat/lng segments matching `pathH3Indexes`; used by `drawTacticalPendingMarchPlanLines` without replanning. */
+  cachedSegments?: HumanOrderPreviewSegment[];
+}
+
+/**
  * Documents the `HumanOrderGroupPreviewUnitResult` interface as a named contract surface (export interface HumanOrderGroupPreviewUnitResult).
 
  * Purpose: Supports maintainability by documenting why `HumanOrderGroupPreviewUnitResult` exists.

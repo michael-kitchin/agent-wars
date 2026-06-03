@@ -1,7 +1,7 @@
 {
   "name": "agent-wars",
-  "version": "2.3.0",
-  "description": "Grand strategy wargame with LLM opponents — Release 2.3.0",
+  "version": "2.4.0",
+  "description": "Grand strategy wargame with LLM opponents — Release 2.4.0",
   "main": "dist/main/main.js",
   "scripts": {
     "build": "npm run generated:extract && npm run build:main && npm run build:renderer",

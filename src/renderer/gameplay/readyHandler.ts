@@ -26,6 +26,7 @@ import {
   isDeferredResolutionPlaybackConsultPending,
   isWaitingForPrecomputedAiOrders,
 } from '../openRouter/aiPlanningState';
+import { buildTacticalPendingMarchRowsFromContinuations } from '../tactical/tacticalPendingMarchPath';
 import { enqueueResolutionPlaybackCompleteNotify } from '../openRouter/resolutionPlaybackDeferral';
 
 /**
@@ -789,8 +790,13 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       // successful commit IPC (continuations + cleared ranged/air/ferry/embark), not a mid-flight draft tweak.
       // In-flight tactical prefetch is torn down via `cancelInFlightBackgroundAiRequestForRendererTeardown` when the
       // res4 session ends (main reconcile or voluntary exit); late `requestAiOrders` resolves are dropped in `openRouterRuntime` if `tacticalBattleSnapshot` is gone.
+      const previousPendingMarches = new Map(S.tacticalPendingMarches.map((row) => [row.subUnitId, row]));
       S.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length
-        ? [...commitResult.tacticalMarchContinuations]
+        ? buildTacticalPendingMarchRowsFromContinuations({
+            battle: commitResult.tacticalBattle ?? S.tacticalBattleSnapshot!,
+            continuations: commitResult.tacticalMarchContinuations,
+            previousBySubUnitId: previousPendingMarches,
+          })
         : [];
       S.pendingRangedAttacks = [];
       S.pendingAirStrikes = [];

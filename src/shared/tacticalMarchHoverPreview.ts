@@ -14,7 +14,9 @@ import type {
   HumanOrderGroupPreviewResult,
   HumanOrderGroupPreviewUnitResult,
   HumanOrderPreviewResult,
+  HumanOrderPreviewSegment,
   OrderPreviewTerrainImpact,
+  TacticalDraftPreviewResult,
 } from './ipc/humanOrderPreviewTypes';
 import { planTacticalRes4March } from './tacticalRes4MovementPlanner';
 import { collectTacticalMarchTerrainImpact, sortSlowTerrainLabels } from './orderPreviewSlowTerrainTooltip';
@@ -88,10 +90,15 @@ function buildPreviewForSubUnit(args: {
   unitId: string;
   hoveredH3Index: string;
   res4Set: ReadonlySet<string>;
-}): HumanOrderPreviewResult {
+  overridePathH3Indexes?: readonly string[];
+}): { preview: HumanOrderPreviewResult; pathH3Indexes: string[] | null } {
+  const invalid = (preview: HumanOrderPreviewResult): { preview: HumanOrderPreviewResult; pathH3Indexes: null } => ({
+    preview,
+    pathH3Indexes: null,
+  });
   const sub = args.battle.subUnits.find((u) => u.id === args.unitId);
   if (!sub || sub.player !== 'human') {
-    return { valid: false, showInvalidMarker: false, invalidReason: 'Not a human tactical sub-unit', segments: [] };
+    return invalid({ valid: false, showInvalidMarker: false, invalidReason: 'Not a human tactical sub-unit', segments: [] });
   }
   const origin = tacticalMarchCommittedOriginH3(args.battle, args.unitId);
   let resOk = true;
@@ -102,22 +109,22 @@ function buildPreviewForSubUnit(args: {
     resOk = false;
   }
   if (!resOk) {
-    return { valid: false, showInvalidMarker: true, invalidReason: 'Invalid tactical cell', segments: [] };
+    return invalid({ valid: false, showInvalidMarker: true, invalidReason: 'Invalid tactical cell', segments: [] });
   }
   if (!args.res4Set.has(args.hoveredH3Index)) {
-    return { valid: false, showInvalidMarker: true, invalidReason: 'Outside tactical footprint', segments: [] };
+    return invalid({ valid: false, showInvalidMarker: true, invalidReason: 'Outside tactical footprint', segments: [] });
   }
   try {
     void gridDistance(origin, args.hoveredH3Index);
   } catch {
-    return { valid: false, showInvalidMarker: true, invalidReason: 'Could not measure distance', segments: [] };
+    return invalid({ valid: false, showInvalidMarker: true, invalidReason: 'Could not measure distance', segments: [] });
   }
   if (origin === args.hoveredH3Index) {
-    return { valid: true, showInvalidMarker: false, segments: [] };
+    return { preview: { valid: true, showInvalidMarker: false, segments: [] }, pathH3Indexes: [origin] };
   }
   const moveType = tacticalMovementUnitTypeForPathfinding(sub, args.hoveredH3Index);
   if (moveType === 'air') {
-    return { valid: false, showInvalidMarker: true, invalidReason: 'Air units do not use tactical march', segments: [] };
+    return invalid({ valid: false, showInvalidMarker: true, invalidReason: 'Air units do not use tactical march', segments: [] });
   }
   const budget = effectiveTacticalMovementPointBudgetForMarchLeg(args.battle, sub, args.battle.subUnits, moveType);
   const terrain = buildTacticalTerrainKindResolverFromSnapshot(args.battle);
@@ -144,15 +151,19 @@ function buildPreviewForSubUnit(args: {
     tacticalHoverPlanMemo.set(memoKey, plan);
   }
   if (!plan.reachable || !plan.pathToDestination || plan.pathToDestination.length < 2) {
-    return { valid: false, showInvalidMarker: true, invalidReason: 'No valid tactical route', segments: [] };
+    return invalid({ valid: false, showInvalidMarker: true, invalidReason: 'No valid tactical route', segments: [] });
   }
-  const path = plan.pathToDestination;
+  const displayPath = args.overridePathH3Indexes ?? plan.pathToDestination;
+  if (displayPath.length < 2) {
+    return invalid({ valid: false, showInvalidMarker: true, invalidReason: 'No valid tactical route', segments: [] });
+  }
+  const pathH3Indexes = [...displayPath];
   const [destLat, destLng] = cellToLatLng(args.hoveredH3Index);
   const marchImpact = collectTacticalMarchTerrainImpact({
     battle: args.battle,
     subUnit: sub,
     moveType,
-    pathH3: path,
+    pathH3: displayPath,
   });
   const sortedSlower = sortSlowTerrainLabels(marchImpact.slower);
   const orderPreviewTerrainImpact: OrderPreviewTerrainImpact | null =
@@ -161,31 +172,32 @@ function buildPreviewForSubUnit(args: {
       : null;
   const slowTitle =
     sortedSlower.length > 0 ? sortedSlower.join(', ') : marchImpact.roadRail ? 'Road/Rail' : null;
-  if (plan.reachableThisTurn) {
-    return {
+  const buildSegments = (): HumanOrderPreviewSegment[] => {
+    if (plan.reachableThisTurn) {
+      return [{ turn: 1, hexes: h3PathToLatLngHexes(displayPath) }];
+    }
+    const stopH3 = plan.firstStopWithinBudget.stopH3;
+    const stopIdx = displayPath.lastIndexOf(stopH3);
+    if (stopIdx < 0) {
+      return [{ turn: 1, hexes: h3PathToLatLngHexes(displayPath) }];
+    }
+    const leg1 = displayPath.slice(0, stopIdx + 1);
+    const leg2 = displayPath.slice(stopIdx);
+    return [
+      { turn: 1, hexes: h3PathToLatLngHexes(leg1) },
+      { turn: 2, hexes: h3PathToLatLngHexes(leg2) },
+    ];
+  };
+  return {
+    preview: {
       valid: true,
       showInvalidMarker: false,
       arrowLatLng: [destLat, destLng],
-      segments: [{ turn: 1, hexes: h3PathToLatLngHexes(path) }],
+      segments: buildSegments(),
       slowerTerrainDisplayTitle: slowTitle,
       orderPreviewTerrainImpact,
-    };
-  }
-  const stopH3 = plan.firstStopWithinBudget.stopH3;
-  const stopIdx = path.lastIndexOf(stopH3);
-  const safeIdx = stopIdx >= 0 ? stopIdx : 0;
-  const leg1 = path.slice(0, safeIdx + 1);
-  const leg2 = path.slice(safeIdx);
-  return {
-    valid: true,
-    showInvalidMarker: false,
-    arrowLatLng: [destLat, destLng],
-    segments: [
-      { turn: 1, hexes: h3PathToLatLngHexes(leg1) },
-      { turn: 2, hexes: h3PathToLatLngHexes(leg2) },
-    ],
-    slowerTerrainDisplayTitle: slowTitle,
-    orderPreviewTerrainImpact,
+    },
+    pathH3Indexes,
   };
 }
 
@@ -229,7 +241,7 @@ export function buildTacticalMarchHoverPreview(
       unitId,
       hoveredH3Index,
       res4Set,
-    }),
+    }).preview,
   }));
   const budgets = previewUnitIds.map((id) => {
     const u = battle.subUnits.find((s) => s.id === id);
@@ -253,13 +265,15 @@ export function buildTacticalMarchHoverPreview(
 export function buildTacticalMarchDraftDestinationPreview(
   battle: TacticalBattleSnapshot,
   subUnitId: string,
-  destinationH3Index: string
-): HumanOrderPreviewResult {
+  destinationH3Index: string,
+  options?: { overridePathH3Indexes?: readonly string[] }
+): TacticalDraftPreviewResult {
   const res4Set = new Set(battle.res4ChildH3Indexes);
   return buildPreviewForSubUnit({
     battle,
     unitId: subUnitId,
     hoveredH3Index: destinationH3Index,
     res4Set,
+    overridePathH3Indexes: options?.overridePathH3Indexes,
   });
 }

@@ -6,6 +6,7 @@ import { withTacticalHumanDraftPrefetchInvalidation } from '../openRouter/openRo
 import { rendererSharedState as S } from '../core/state';
 import { getMainLeafletMap } from './worldLeafletMap';
 import { tacticalRendererHitInsideBattleFootprint } from '../tactical/tacticalUiGuards';
+import { buildTacticalPendingMarchRowFromDraft } from '../tactical/tacticalPendingMarchPath';
 import {
   applyHumanUnitIconClickSelectionPolicy,
   clearDeferredHumanUnitSingleSelectTimer,
@@ -442,7 +443,13 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
         for (const subUnitId of selectedIds) {
           const idx = S.tacticalPendingMarches.findIndex((row) => row.subUnitId === subUnitId);
           if (idx >= 0) S.tacticalPendingMarches.splice(idx, 1);
-          S.tacticalPendingMarches.push({ subUnitId, destinationH3Index: destinationH3 });
+          S.tacticalPendingMarches.push(
+            buildTacticalPendingMarchRowFromDraft({
+              battle: S.tacticalBattleSnapshot!,
+              subUnitId,
+              destinationH3Index: destinationH3,
+            })
+          );
         }
       });
     }

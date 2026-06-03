@@ -2,7 +2,9 @@ import { cellToChildren } from 'h3-js';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import {
   isHexOwnershipVisibleToPerspective,
+  resolveHomeRegionOwnerIdentity,
   resolveOwnershipBorderStyle,
+  type HomeRegionOwnerIdentity,
   type OwnershipBorderStyle,
 } from '../../shared/homeRegionRules';
 import { getHexBoundaryLatLngForLeafletOverlay } from '../map/hexGrid';
@@ -89,16 +91,88 @@ function buildControlByHex(state: GameStateSnapshot): Map<string, string | null>
 }
 
 /**
- * Maps a shared ownership border style token to a concrete render color.
+ * Maps current hex control to the outer solid ownership border color.
  *
- * Purpose: Keeps border-color mapping centralized so home and non-home ownership rendering remains consistent.
- * When to use: Strategic border rendering after ownership style classification.
+ * Purpose: Home-region hexes use controller color on the outside edge, independent of home-region membership.
+ * When to use: Outlined home borders and any caller that needs control-only coloring.
+ * Expected outcome: Human/opponent player colors; uncontrolled hexes use neutral multi-player gray.
+ * Exceptions: None.
+ */
+function resolveControllerBorderColor(controllerPlayerId: string | null | undefined): string {
+  if (controllerPlayerId === 'human') return PLAYER_COLORS.human;
+  if (controllerPlayerId === 'opponent') return PLAYER_COLORS.opponent;
+  return MULTI_PLAYER_FILL;
+}
+
+/**
+ * Maps home-region owner identity to the inner dashed border color.
+ *
+ * Purpose: Inner home borders show declared home-region ownership, not current control.
+ * When to use: Outlined home-region border pass after `resolveHomeRegionOwnerIdentity`.
+ * Expected outcome: Human/opponent colors for exclusive home hexes; intersection hexes use neutral gray.
+ * Exceptions: None.
+ */
+function resolveHomeRegionOwnerBorderColor(identity: HomeRegionOwnerIdentity): string | null {
+  if (identity === 'human') return PLAYER_COLORS.human;
+  if (identity === 'opponent') return PLAYER_COLORS.opponent;
+  if (identity === 'both') return MULTI_PLAYER_FILL;
+  return null;
+}
+
+/**
+ * Draws dual-line home-region ownership borders: solid outer (controller) and dashed inner (home owner).
+ *
+ * Purpose: Implements the split-color home border contract without duplicating path/inset logic.
+ * When to use: Whenever `resolveOwnershipBorderStyle` returns an `outlined*` token.
+ * Expected outcome: Outer ring uses controller color; inset dashed ring uses home-region owner color.
+ * Exceptions: None.
+ */
+function drawOutlinedHomeRegionOwnershipBorders(
+  ctx: CanvasRenderingContext2D,
+  pts: readonly { x: number; y: number }[],
+  args: {
+    controllerPlayerId: string | null | undefined;
+    homeOwnerIdentity: HomeRegionOwnerIdentity;
+    ownershipLineWidth: number;
+  }
+): void {
+  const outerColor = resolveControllerBorderColor(args.controllerPlayerId);
+  const innerColor = resolveHomeRegionOwnerBorderColor(args.homeOwnerIdentity) ?? outerColor;
+  const drawClosedPath = (points: readonly { x: number; y: number }[]): void => {
+    ctx.beginPath();
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i]!;
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath();
+  };
+  drawClosedPath(pts);
+  ctx.strokeStyle = outerColor;
+  ctx.lineWidth = args.ownershipLineWidth;
+  ctx.setLineDash([]);
+  ctx.stroke();
+  const innerPts = buildInsetPolygonPoints(pts, args.ownershipLineWidth * 1.5);
+  const innerLineWidth = Math.max(args.ownershipLineWidth * 0.5, 1);
+  drawClosedPath(innerPts);
+  ctx.strokeStyle = innerColor;
+  ctx.lineWidth = innerLineWidth;
+  ctx.setLineDash([innerLineWidth * 2.6, innerLineWidth * 1.8]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+/**
+ * Maps a shared ownership border style token to a concrete render color for normal (non-home) borders.
+ *
+ * Purpose: Keeps border-color mapping centralized so non-home ownership rendering remains consistent.
+ * When to use: Strategic border rendering for hexes that use normal single-line ownership styles.
  * Expected outcome: Human/opponent styles map to player colors and neutral maps to mixed-player gray.
  * Exceptions: `none` returns null.
  */
 function resolveOwnershipBorderColor(style: OwnershipBorderStyle): string | null {
-  if (style === 'normalControlledByHuman' || style === 'outlinedControlledByHuman') return PLAYER_COLORS.human;
-  if (style === 'normalControlledByOpponent' || style === 'outlinedControlledByOpponent') return PLAYER_COLORS.opponent;
+  if (style === 'normalControlledByHuman') return PLAYER_COLORS.human;
+  if (style === 'normalControlledByOpponent') return PLAYER_COLORS.opponent;
   if (style === 'outlinedNeutral') return MULTI_PLAYER_FILL;
   return null;
 }
@@ -208,27 +282,24 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
     ctx.lineWidth = stroke.width * zoomStrokeScale;
     drawClosedPath();
     ctx.stroke();
-    if (ownershipColor && ownershipStyle !== 'none') {
+    if (ownershipStyle !== 'none') {
       const ownershipLineWidth = Math.max(stroke.width * zoomStrokeScale * 3, 2.7);
-      drawClosedPath();
-      ctx.strokeStyle = ownershipColor;
-      ctx.lineWidth = ownershipLineWidth;
-      ctx.stroke();
       if (ownershipStyle.startsWith('outlined')) {
-        const innerPts = buildInsetPolygonPoints(pts, ownershipLineWidth * 1.5);
-        const innerLineWidth = Math.max(ownershipLineWidth * 0.5, 1);
-        ctx.beginPath();
-        for (let i = 0; i < innerPts.length; i++) {
-          const p = innerPts[i]!;
-          if (i === 0) ctx.moveTo(p.x, p.y);
-          else ctx.lineTo(p.x, p.y);
-        }
-        ctx.closePath();
+        drawOutlinedHomeRegionOwnershipBorders(ctx, pts, {
+          controllerPlayerId: controlByHex.get(hx.h3Index),
+          homeOwnerIdentity: resolveHomeRegionOwnerIdentity({
+            h3Index: hx.h3Index,
+            humanHomeRegionHexes: S.gameState.humanHomeRegionHexes,
+            aiHomeRegionHexes: S.gameState.aiHomeRegionHexes,
+            intersectingHomeRegionHexes: S.gameState.intersectingHomeRegionHexes,
+          }),
+          ownershipLineWidth,
+        });
+      } else if (ownershipColor) {
+        drawClosedPath();
         ctx.strokeStyle = ownershipColor;
-        ctx.lineWidth = innerLineWidth;
-        ctx.setLineDash([innerLineWidth * 2.6, innerLineWidth * 1.8]);
+        ctx.lineWidth = ownershipLineWidth;
         ctx.stroke();
-        ctx.setLineDash([]);
       }
     }
     if (S.selectedHexIndex === hx.h3Index) {
@@ -348,41 +419,22 @@ export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): v
       intersectingHomeRegionHexes: state.intersectingHomeRegionHexes,
     });
     if (style === 'none') continue;
-    const color = resolveOwnershipBorderColor(style);
-    if (!color) continue;
     const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
     const pts = boundary.map(([lat, lng]: [number, number]) => {
       const p = map.latLngToContainerPoint(L.latLng(lat, lng));
       return { x: p.x, y: p.y };
     });
-    const drawClosedPath = (): void => {
-      ctx.beginPath();
-      for (let i = 0; i < pts.length; i++) {
-        const p = pts[i]!;
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      }
-      ctx.closePath();
-    };
-    drawClosedPath();
-    ctx.strokeStyle = color;
     const ownershipLineWidth = Math.max(getActiveHexStrokeStyle().width * zoomScale * 3, 2.7);
-    ctx.lineWidth = ownershipLineWidth;
-    ctx.stroke();
-    const innerPts = buildInsetPolygonPoints(pts, ownershipLineWidth * 1.5);
-    const innerLineWidth = Math.max(ownershipLineWidth * 0.5, 1);
-    ctx.beginPath();
-    for (let i = 0; i < innerPts.length; i++) {
-      const p = innerPts[i]!;
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    }
-    ctx.closePath();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = innerLineWidth;
-    ctx.setLineDash([innerLineWidth * 2.6, innerLineWidth * 1.8]);
-    ctx.stroke();
-    ctx.setLineDash([]);
+    drawOutlinedHomeRegionOwnershipBorders(ctx, pts, {
+      controllerPlayerId: controlByHex.get(h3Index),
+      homeOwnerIdentity: resolveHomeRegionOwnerIdentity({
+        h3Index,
+        humanHomeRegionHexes: state.humanHomeRegionHexes,
+        aiHomeRegionHexes: state.aiHomeRegionHexes,
+        intersectingHomeRegionHexes: state.intersectingHomeRegionHexes,
+      }),
+      ownershipLineWidth,
+    });
   }
 }
 

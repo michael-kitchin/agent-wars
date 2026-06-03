@@ -12,6 +12,7 @@ import { h3ToCode } from '../briefing/map/hex-code-translator';
 import { buildPromptTableLines } from '../promptTableUtils';
 import {
   parseComputedRoute,
+  parseStandingOrderComputedRoute,
   parseOrderParams,
   toComputedRoutePayload,
   type AssignOrderParams,
@@ -338,7 +339,7 @@ function assignOrder(
       if (routeResult.status === 'error') {
         return { status: 'error', error: routeResult.error };
       }
-      computedRouteJson = JSON.stringify(toComputedRoutePayload(routeResult));
+      computedRouteJson = JSON.stringify(toComputedRoutePayload(routeResult, unitH3));
     }
   }
 
@@ -354,7 +355,7 @@ function assignOrder(
     if (routeResult.status === 'error') {
       return { status: 'error', error: routeResult.error };
     }
-    computedRouteJson = JSON.stringify(toComputedRoutePayload(routeResult));
+    computedRouteJson = JSON.stringify(toComputedRoutePayload(routeResult, unit.h3Index));
   }
 
   if (orderType === 'patrol') {
@@ -469,7 +470,7 @@ function queryOrders(playerId: string, unitId?: string, all?: boolean): Record<s
  */
 function rowToOrderResponse(row: StandingOrderRow): Record<string, unknown> {
   const params = parseOrderParams(row);
-  const computed = parseComputedRoute(row);
+  const computed = parseStandingOrderComputedRoute(row);
   const turnsRemaining = computed?.turnsRemaining ?? 0;
   const nextMoveHex = computed?.nextMoveHex ?? null;
   return {
@@ -478,6 +479,8 @@ function rowToOrderResponse(row: StandingOrderRow): Record<string, unknown> {
     status: row.status,
     turnsRemaining,
     nextMoveHex,
+    ...(computed?.cachedOriginH3 && { cachedOriginH3: computed.cachedOriginH3 }),
+    ...(computed?.cachedRouteSegments?.length && { cachedRouteSegments: computed.cachedRouteSegments }),
     ...(row.order_type === 'march' && { destination: params.destination }),
     ...(row.order_type === 'defend' && {
       defendHex: params.defendHex,

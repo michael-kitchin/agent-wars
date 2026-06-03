@@ -1,4 +1,23 @@
 import type { PlanRouteOk } from './tool1Pathfinding';
+import type { HumanOrderPreviewSegment } from '../../shared/ipc/humanOrderPreviewTypes';
+
+/**
+ * JSON payload persisted in `standing_orders.computed_route` for march and pursue orders.
+ *
+ * Purpose: Stores turn progress plus optional display cache so `listHumanStandingOrders` can reuse polylines without replanning.
+ * When to use: Serialize via `toComputedRoutePayload` after `executePlanRouteWithSession`; parse with `parseStandingOrderComputedRoute`.
+ * Expected outcome: Always includes `turnsRemaining`, `nextMoveHex`, and `totalPath`; cache fields present after route assignment or turn refresh.
+ * Exceptions: None.
+ */
+export interface StandingOrderComputedRoutePayload {
+  turnsRemaining: number;
+  nextMoveHex: [number, number];
+  totalPath: [number, number][];
+  /** res1 H3 where the cached route was planned; display reuse when the unit is still at this cell. */
+  cachedOriginH3?: string;
+  /** Turn-partitioned lat/lng segments for stable standing-order line rendering. */
+  cachedRouteSegments?: HumanOrderPreviewSegment[];
+}
 
 /**
  * Documents the `StandingOrderRow` interface as a named contract surface (export interface StandingOrderRow extends Record<string, unknown>).
@@ -217,23 +236,51 @@ export function parseComputedRoute(row: Pick<StandingOrderRow, 'computed_route'>
 }
 
 /**
- * Defines the `toComputedRoutePayload` function shape (export function toComputedRoutePayload(routeResult: PlanRouteOk): { turnsRemaining: number; nextMoveHex: [number, number]; totalPath: [number, number][).
-
- * Purpose: Supports maintainability by documenting why `toComputedRoutePayload` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Parses `computed_route` JSON into a typed standing-order route payload.
+ *
+ * Purpose: Reads persisted route progress and optional display cache fields from the DB row.
+ * When to use: `rowToOrderResponse`, turn generation, and any code that inspects stored march routes.
+ * Expected outcome: Returns null when the column is empty or invalid JSON; cache fields are optional for legacy rows.
  * Exceptions: None.
  */
-export function toComputedRoutePayload(routeResult: PlanRouteOk): {
-  turnsRemaining: number;
-  nextMoveHex: [number, number];
-  totalPath: [number, number][];
-} {
+export function parseStandingOrderComputedRoute(
+  row: Pick<StandingOrderRow, 'computed_route'>
+): StandingOrderComputedRoutePayload | null {
+  const raw = parseComputedRoute(row);
+  if (!raw) return null;
+  const turnsRemaining = typeof raw.turnsRemaining === 'number' ? raw.turnsRemaining : 0;
+  const nextMoveHex =
+    Array.isArray(raw.nextMoveHex) && raw.nextMoveHex.length >= 2
+      ? (raw.nextMoveHex as [number, number])
+      : ([0, 0] as [number, number]);
+  const totalPath = Array.isArray(raw.totalPath) ? (raw.totalPath as [number, number][]) : ([] as [number, number][]);
+  const cachedOriginH3 = typeof raw.cachedOriginH3 === 'string' ? raw.cachedOriginH3 : undefined;
+  const cachedRouteSegments = Array.isArray(raw.cachedRouteSegments)
+    ? (raw.cachedRouteSegments as HumanOrderPreviewSegment[])
+    : undefined;
+  return { turnsRemaining, nextMoveHex, totalPath, cachedOriginH3, cachedRouteSegments };
+}
+
+/**
+ * Builds the JSON payload persisted in `standing_orders.computed_route` after a successful route plan.
+ *
+ * Purpose: Stores turn progress plus display cache keyed by the unit's planning origin H3.
+ * When to use: After `executePlanRouteWithSession` in assign and turn-generation paths.
+ * Expected outcome: Includes `cachedOriginH3` and `cachedRouteSegments` for stable overlay reuse while the unit remains at the origin cell.
+ * Exceptions: None.
+ */
+export function toComputedRoutePayload(routeResult: PlanRouteOk, originH3: string): StandingOrderComputedRoutePayload {
   const totalPath = routeResult.path.flatMap((seg) => seg.hexes);
   const nextMoveHex = routeResult.path.length > 0 ? routeResult.path[0]!.endHex : routeResult.destination;
+  const cachedRouteSegments: HumanOrderPreviewSegment[] = routeResult.path.map((seg) => ({
+    turn: seg.turn,
+    hexes: seg.hexes,
+  }));
   return {
     turnsRemaining: routeResult.turnsRequired,
     nextMoveHex,
     totalPath,
+    cachedOriginH3: originH3,
+    cachedRouteSegments,
   };
 }

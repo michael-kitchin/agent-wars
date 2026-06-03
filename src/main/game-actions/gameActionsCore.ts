@@ -593,6 +593,8 @@ export function listHumanStandingOrders(): HumanStandingOrderView[] {
         turnsRemaining?: number;
         nextMoveHex?: [number, number];
         destination?: [number, number];
+        cachedOriginH3?: string;
+        cachedRouteSegments?: { turn: number; hexes: [number, number][] }[];
       }>;
     };
     if (result.status !== 'ok' || !Array.isArray(result.orders)) return [];
@@ -616,12 +618,25 @@ export function listHumanStandingOrders(): HumanStandingOrderView[] {
     return marchOrders
       .map((o) => {
         const unitId = o.unitId as string;
+        const unit = state.units.find((u) => u.id === unitId);
+        const currentUnitH3 = unit?.h3Index ?? null;
         const destinationH3Index =
           Array.isArray(o.destination) && o.destination.length >= 2
             ? resolveToH3(Number(o.destination[0]), Number(o.destination[1])) ?? null
             : null;
         let routeSegments: { turn: number; hexes: [number, number][] }[] | undefined;
-        if (Array.isArray(o.destination) && o.destination.length >= 2) {
+        const cacheHit =
+          typeof o.cachedOriginH3 === 'string' &&
+          currentUnitH3 === o.cachedOriginH3 &&
+          Array.isArray(o.cachedRouteSegments) &&
+          o.cachedRouteSegments.length > 0;
+        if (cacheHit) {
+          routeSegments = o.cachedRouteSegments;
+          logDebug('gameActions listHumanStandingOrders: reused cached route segments', {
+            unitId,
+            cachedOriginH3: o.cachedOriginH3,
+          });
+        } else if (Array.isArray(o.destination) && o.destination.length >= 2) {
           const planned = executePlanRoute(
             unitId,
             [Number(o.destination[0]), Number(o.destination[1])],

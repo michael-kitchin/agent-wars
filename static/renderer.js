@@ -15170,11 +15170,11 @@
        */
     pendingEmbarkOrders: [],
     /**
-       * Documents the object literal property `tacticalPendingMarches` (tacticalPendingMarches: [] as { subUnitId: string; destinationH3Index: string }[]).
+       * Documents the object literal property `tacticalPendingMarches` (tacticalPendingMarches: [] as TacticalPendingMarchRow[]).
     
        * Purpose: Holds human tactical march rows shown in the pending-orders sidebar while a tactical battle is active; distinct from strategic standing orders.
        * When to use: Append after tactical march validation succeeds (draft, before Ready); clear on tactical Ready commit, advance turn, exit, stash, or new game.
-       * Expected outcome: Sidebar lists res4 destinations keyed by tactical sub-unit ids until the next tactical beat boundary clears them.
+       * Expected outcome: Sidebar lists res4 destinations keyed by tactical sub-unit ids; optional `pathH3Indexes` and `cachedSegments` keep overlay polylines stable across beats.
        * Exceptions: None.
        */
     tacticalPendingMarches: [],
@@ -16047,6 +16047,17 @@
   }
 
   // src/shared/homeRegionRules.ts
+  function resolveHomeRegionOwnerIdentity(input) {
+    const inHuman = (input.humanHomeRegionHexes ?? []).includes(input.h3Index);
+    const inAi = (input.aiHomeRegionHexes ?? []).includes(input.h3Index);
+    if (!inHuman && !inAi) return null;
+    const intersectionSet = new Set(
+      input.intersectingHomeRegionHexes ?? computeIntersectingHomeRegionHexes(input.humanHomeRegionHexes ?? [], input.aiHomeRegionHexes ?? [])
+    );
+    if (intersectionSet.has(input.h3Index) || inHuman && inAi) return "both";
+    if (inHuman) return "human";
+    return "opponent";
+  }
   function uniqueSortedHexes(hexes) {
     return [...new Set(hexes)].sort();
   }
@@ -16661,9 +16672,46 @@
   function buildControlByHex(state) {
     return new Map((state.res1Control ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
   }
+  function resolveControllerBorderColor(controllerPlayerId) {
+    if (controllerPlayerId === "human") return PLAYER_COLORS.human;
+    if (controllerPlayerId === "opponent") return PLAYER_COLORS.opponent;
+    return MULTI_PLAYER_FILL;
+  }
+  function resolveHomeRegionOwnerBorderColor(identity) {
+    if (identity === "human") return PLAYER_COLORS.human;
+    if (identity === "opponent") return PLAYER_COLORS.opponent;
+    if (identity === "both") return MULTI_PLAYER_FILL;
+    return null;
+  }
+  function drawOutlinedHomeRegionOwnershipBorders(ctx, pts, args) {
+    const outerColor = resolveControllerBorderColor(args.controllerPlayerId);
+    const innerColor = resolveHomeRegionOwnerBorderColor(args.homeOwnerIdentity) ?? outerColor;
+    const drawClosedPath = (points) => {
+      ctx.beginPath();
+      for (let i = 0; i < points.length; i++) {
+        const p = points[i];
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.closePath();
+    };
+    drawClosedPath(pts);
+    ctx.strokeStyle = outerColor;
+    ctx.lineWidth = args.ownershipLineWidth;
+    ctx.setLineDash([]);
+    ctx.stroke();
+    const innerPts = buildInsetPolygonPoints(pts, args.ownershipLineWidth * 1.5);
+    const innerLineWidth = Math.max(args.ownershipLineWidth * 0.5, 1);
+    drawClosedPath(innerPts);
+    ctx.strokeStyle = innerColor;
+    ctx.lineWidth = innerLineWidth;
+    ctx.setLineDash([innerLineWidth * 2.6, innerLineWidth * 1.8]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
   function resolveOwnershipBorderColor(style) {
-    if (style === "normalControlledByHuman" || style === "outlinedControlledByHuman") return PLAYER_COLORS.human;
-    if (style === "normalControlledByOpponent" || style === "outlinedControlledByOpponent") return PLAYER_COLORS.opponent;
+    if (style === "normalControlledByHuman") return PLAYER_COLORS.human;
+    if (style === "normalControlledByOpponent") return PLAYER_COLORS.opponent;
     if (style === "outlinedNeutral") return MULTI_PLAYER_FILL;
     return null;
   }
@@ -16751,27 +16799,24 @@
       ctx.lineWidth = stroke.width * zoomStrokeScale;
       drawClosedPath();
       ctx.stroke();
-      if (ownershipColor && ownershipStyle !== "none") {
+      if (ownershipStyle !== "none") {
         const ownershipLineWidth = Math.max(stroke.width * zoomStrokeScale * 3, 2.7);
-        drawClosedPath();
-        ctx.strokeStyle = ownershipColor;
-        ctx.lineWidth = ownershipLineWidth;
-        ctx.stroke();
         if (ownershipStyle.startsWith("outlined")) {
-          const innerPts = buildInsetPolygonPoints(pts, ownershipLineWidth * 1.5);
-          const innerLineWidth = Math.max(ownershipLineWidth * 0.5, 1);
-          ctx.beginPath();
-          for (let i = 0; i < innerPts.length; i++) {
-            const p = innerPts[i];
-            if (i === 0) ctx.moveTo(p.x, p.y);
-            else ctx.lineTo(p.x, p.y);
-          }
-          ctx.closePath();
+          drawOutlinedHomeRegionOwnershipBorders(ctx, pts, {
+            controllerPlayerId: controlByHex.get(hx.h3Index),
+            homeOwnerIdentity: resolveHomeRegionOwnerIdentity({
+              h3Index: hx.h3Index,
+              humanHomeRegionHexes: rendererSharedState.gameState.humanHomeRegionHexes,
+              aiHomeRegionHexes: rendererSharedState.gameState.aiHomeRegionHexes,
+              intersectingHomeRegionHexes: rendererSharedState.gameState.intersectingHomeRegionHexes
+            }),
+            ownershipLineWidth
+          });
+        } else if (ownershipColor) {
+          drawClosedPath();
           ctx.strokeStyle = ownershipColor;
-          ctx.lineWidth = innerLineWidth;
-          ctx.setLineDash([innerLineWidth * 2.6, innerLineWidth * 1.8]);
+          ctx.lineWidth = ownershipLineWidth;
           ctx.stroke();
-          ctx.setLineDash([]);
         }
       }
       if (rendererSharedState.selectedHexIndex === hx.h3Index) {
@@ -16866,41 +16911,22 @@
         intersectingHomeRegionHexes: state.intersectingHomeRegionHexes
       });
       if (style === "none") continue;
-      const color = resolveOwnershipBorderColor(style);
-      if (!color) continue;
       const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
       const pts = boundary.map(([lat, lng]) => {
         const p = map.latLngToContainerPoint(L.latLng(lat, lng));
         return { x: p.x, y: p.y };
       });
-      const drawClosedPath = () => {
-        ctx.beginPath();
-        for (let i = 0; i < pts.length; i++) {
-          const p = pts[i];
-          if (i === 0) ctx.moveTo(p.x, p.y);
-          else ctx.lineTo(p.x, p.y);
-        }
-        ctx.closePath();
-      };
-      drawClosedPath();
-      ctx.strokeStyle = color;
       const ownershipLineWidth = Math.max(getActiveHexStrokeStyle().width * zoomScale * 3, 2.7);
-      ctx.lineWidth = ownershipLineWidth;
-      ctx.stroke();
-      const innerPts = buildInsetPolygonPoints(pts, ownershipLineWidth * 1.5);
-      const innerLineWidth = Math.max(ownershipLineWidth * 0.5, 1);
-      ctx.beginPath();
-      for (let i = 0; i < innerPts.length; i++) {
-        const p = innerPts[i];
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      }
-      ctx.closePath();
-      ctx.strokeStyle = color;
-      ctx.lineWidth = innerLineWidth;
-      ctx.setLineDash([innerLineWidth * 2.6, innerLineWidth * 1.8]);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      drawOutlinedHomeRegionOwnershipBorders(ctx, pts, {
+        controllerPlayerId: controlByHex.get(h3Index),
+        homeOwnerIdentity: resolveHomeRegionOwnerIdentity({
+          h3Index,
+          humanHomeRegionHexes: state.humanHomeRegionHexes,
+          aiHomeRegionHexes: state.aiHomeRegionHexes,
+          intersectingHomeRegionHexes: state.intersectingHomeRegionHexes
+        }),
+        ownershipLineWidth
+      });
     }
   }
   function hasVisibleRes1InfrastructureGlyphs(h3Index, res4On, unitHexes, deps) {
@@ -18222,9 +18248,13 @@
     });
   }
   function buildPreviewForSubUnit(args) {
+    const invalid = (preview) => ({
+      preview,
+      pathH3Indexes: null
+    });
     const sub = args.battle.subUnits.find((u) => u.id === args.unitId);
     if (!sub || sub.player !== "human") {
-      return { valid: false, showInvalidMarker: false, invalidReason: "Not a human tactical sub-unit", segments: [] };
+      return invalid({ valid: false, showInvalidMarker: false, invalidReason: "Not a human tactical sub-unit", segments: [] });
     }
     const origin = tacticalMarchCommittedOriginH3(args.battle, args.unitId);
     let resOk = true;
@@ -18234,22 +18264,22 @@
       resOk = false;
     }
     if (!resOk) {
-      return { valid: false, showInvalidMarker: true, invalidReason: "Invalid tactical cell", segments: [] };
+      return invalid({ valid: false, showInvalidMarker: true, invalidReason: "Invalid tactical cell", segments: [] });
     }
     if (!args.res4Set.has(args.hoveredH3Index)) {
-      return { valid: false, showInvalidMarker: true, invalidReason: "Outside tactical footprint", segments: [] };
+      return invalid({ valid: false, showInvalidMarker: true, invalidReason: "Outside tactical footprint", segments: [] });
     }
     try {
       void gridDistance(origin, args.hoveredH3Index);
     } catch {
-      return { valid: false, showInvalidMarker: true, invalidReason: "Could not measure distance", segments: [] };
+      return invalid({ valid: false, showInvalidMarker: true, invalidReason: "Could not measure distance", segments: [] });
     }
     if (origin === args.hoveredH3Index) {
-      return { valid: true, showInvalidMarker: false, segments: [] };
+      return { preview: { valid: true, showInvalidMarker: false, segments: [] }, pathH3Indexes: [origin] };
     }
     const moveType = tacticalMovementUnitTypeForPathfinding(sub, args.hoveredH3Index);
     if (moveType === "air") {
-      return { valid: false, showInvalidMarker: true, invalidReason: "Air units do not use tactical march", segments: [] };
+      return invalid({ valid: false, showInvalidMarker: true, invalidReason: "Air units do not use tactical march", segments: [] });
     }
     const budget = effectiveTacticalMovementPointBudgetForMarchLeg(args.battle, sub, args.battle.subUnits, moveType);
     const terrain = buildTacticalTerrainKindResolverFromSnapshot(args.battle);
@@ -18276,44 +18306,49 @@
       tacticalHoverPlanMemo.set(memoKey, plan);
     }
     if (!plan.reachable || !plan.pathToDestination || plan.pathToDestination.length < 2) {
-      return { valid: false, showInvalidMarker: true, invalidReason: "No valid tactical route", segments: [] };
+      return invalid({ valid: false, showInvalidMarker: true, invalidReason: "No valid tactical route", segments: [] });
     }
-    const path = plan.pathToDestination;
+    const displayPath = args.overridePathH3Indexes ?? plan.pathToDestination;
+    if (displayPath.length < 2) {
+      return invalid({ valid: false, showInvalidMarker: true, invalidReason: "No valid tactical route", segments: [] });
+    }
+    const pathH3Indexes = [...displayPath];
     const [destLat, destLng] = cellToLatLng(args.hoveredH3Index);
     const marchImpact = collectTacticalMarchTerrainImpact({
       battle: args.battle,
       subUnit: sub,
       moveType,
-      pathH3: path
+      pathH3: displayPath
     });
     const sortedSlower = sortSlowTerrainLabels(marchImpact.slower);
     const orderPreviewTerrainImpact = sortedSlower.length > 0 || marchImpact.roadRail ? { slower: sortedSlower, roadRail: marchImpact.roadRail } : null;
     const slowTitle = sortedSlower.length > 0 ? sortedSlower.join(", ") : marchImpact.roadRail ? "Road/Rail" : null;
-    if (plan.reachableThisTurn) {
-      return {
+    const buildSegments = () => {
+      if (plan.reachableThisTurn) {
+        return [{ turn: 1, hexes: h3PathToLatLngHexes(displayPath) }];
+      }
+      const stopH3 = plan.firstStopWithinBudget.stopH3;
+      const stopIdx = displayPath.lastIndexOf(stopH3);
+      if (stopIdx < 0) {
+        return [{ turn: 1, hexes: h3PathToLatLngHexes(displayPath) }];
+      }
+      const leg1 = displayPath.slice(0, stopIdx + 1);
+      const leg2 = displayPath.slice(stopIdx);
+      return [
+        { turn: 1, hexes: h3PathToLatLngHexes(leg1) },
+        { turn: 2, hexes: h3PathToLatLngHexes(leg2) }
+      ];
+    };
+    return {
+      preview: {
         valid: true,
         showInvalidMarker: false,
         arrowLatLng: [destLat, destLng],
-        segments: [{ turn: 1, hexes: h3PathToLatLngHexes(path) }],
+        segments: buildSegments(),
         slowerTerrainDisplayTitle: slowTitle,
         orderPreviewTerrainImpact
-      };
-    }
-    const stopH3 = plan.firstStopWithinBudget.stopH3;
-    const stopIdx = path.lastIndexOf(stopH3);
-    const safeIdx = stopIdx >= 0 ? stopIdx : 0;
-    const leg1 = path.slice(0, safeIdx + 1);
-    const leg2 = path.slice(safeIdx);
-    return {
-      valid: true,
-      showInvalidMarker: false,
-      arrowLatLng: [destLat, destLng],
-      segments: [
-        { turn: 1, hexes: h3PathToLatLngHexes(leg1) },
-        { turn: 2, hexes: h3PathToLatLngHexes(leg2) }
-      ],
-      slowerTerrainDisplayTitle: slowTitle,
-      orderPreviewTerrainImpact
+      },
+      pathH3Indexes
     };
   }
   function buildTacticalMarchHoverPreview(battle, unitIds, hoveredH3Index) {
@@ -18342,7 +18377,7 @@
         unitId,
         hoveredH3Index,
         res4Set
-      })
+      }).preview
     }));
     const budgets = previewUnitIds.map((id) => {
       const u = battle.subUnits.find((s) => s.id === id);
@@ -18353,13 +18388,14 @@
     const slowestMovementRange = budgets.length > 0 ? Math.min(...budgets) : 0;
     return buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange });
   }
-  function buildTacticalMarchDraftDestinationPreview(battle, subUnitId, destinationH3Index) {
+  function buildTacticalMarchDraftDestinationPreview(battle, subUnitId, destinationH3Index, options) {
     const res4Set = new Set(battle.res4ChildH3Indexes);
     return buildPreviewForSubUnit({
       battle,
       unitId: subUnitId,
       hoveredH3Index: destinationH3Index,
-      res4Set
+      res4Set,
+      overridePathH3Indexes: options?.overridePathH3Indexes
     });
   }
 
@@ -18823,7 +18859,8 @@
       const fromH3 = sub.h3Index;
       const toH3 = row.destinationH3Index;
       if (fromH3 === toH3) continue;
-      const preview = buildTacticalMarchDraftDestinationPreview(battle, row.subUnitId, toH3);
+      const useCached = row.cachedSegments && row.cachedSegments.length > 0 && row.pathH3Indexes?.[0] === fromH3;
+      const preview = useCached ? { valid: true, segments: row.cachedSegments } : buildTacticalMarchDraftDestinationPreview(battle, row.subUnitId, toH3).preview;
       if (!preview.valid || preview.segments.length === 0) continue;
       let lastPenultimate = null;
       let lastPoint = null;
@@ -19672,9 +19709,14 @@
             deps.updateOpenRouterCostLabel();
           }
         } else if (!result.success) {
-          deps.appendOpenRouterLog(`Background planning failed: ${result.error ?? "Unknown error"}`, true);
-          deps.showSidebarError(result.error ?? "Background AI request failed");
-          unblockPrecomputedAiPlanningAfterBackgroundFailure();
+          if (result.error === "Cancelled") {
+            unblockPrecomputedAiPlanningAfterBackgroundFailure();
+            startBackgroundRequestIfAllowed(deps);
+          } else {
+            deps.appendOpenRouterLog(`Background planning failed: ${result.error ?? "Unknown error"}`, true);
+            deps.showSidebarError(result.error ?? "Background AI request failed");
+            unblockPrecomputedAiPlanningAfterBackgroundFailure();
+          }
         }
         deps.updateReadyButtonState();
       }).catch((err) => {
@@ -22781,6 +22823,68 @@
     ];
   }
 
+  // src/shared/marchPathUtils.ts
+  function findPathTailFromCurrentPosition(storedPathH3Indexes, currentH3) {
+    if (storedPathH3Indexes.length === 0) return null;
+    if (storedPathH3Indexes[0] === currentH3) return storedPathH3Indexes;
+    for (let i = 1; i < storedPathH3Indexes.length; i++) {
+      if (storedPathH3Indexes[i] === currentH3) return storedPathH3Indexes.slice(i);
+    }
+    return null;
+  }
+
+  // src/renderer/tactical/tacticalPendingMarchPath.ts
+  function buildTacticalPendingMarchRowsFromContinuations(args) {
+    return args.continuations.map((cont) => {
+      const prev = args.previousBySubUnitId.get(cont.subUnitId);
+      const sub = args.battle.subUnits.find((u) => u.id === cont.subUnitId);
+      const newUnitH3 = sub?.h3Index;
+      if (prev?.pathH3Indexes && newUnitH3) {
+        const tail = findPathTailFromCurrentPosition(prev.pathH3Indexes, newUnitH3);
+        if (tail) {
+          const result2 = buildTacticalMarchDraftDestinationPreview(
+            args.battle,
+            cont.subUnitId,
+            cont.destinationH3Index,
+            { overridePathH3Indexes: tail }
+          );
+          if (result2.preview.valid && result2.preview.segments.length > 0) {
+            return {
+              subUnitId: cont.subUnitId,
+              destinationH3Index: cont.destinationH3Index,
+              pathH3Indexes: [...tail],
+              cachedSegments: result2.preview.segments
+            };
+          }
+        }
+      }
+      const result = buildTacticalMarchDraftDestinationPreview(
+        args.battle,
+        cont.subUnitId,
+        cont.destinationH3Index
+      );
+      return {
+        subUnitId: cont.subUnitId,
+        destinationH3Index: cont.destinationH3Index,
+        ...result.pathH3Indexes ? { pathH3Indexes: result.pathH3Indexes } : {},
+        ...result.preview.valid && result.preview.segments.length > 0 ? { cachedSegments: result.preview.segments } : {}
+      };
+    });
+  }
+  function buildTacticalPendingMarchRowFromDraft(args) {
+    const result = buildTacticalMarchDraftDestinationPreview(
+      args.battle,
+      args.subUnitId,
+      args.destinationH3Index
+    );
+    return {
+      subUnitId: args.subUnitId,
+      destinationH3Index: args.destinationH3Index,
+      ...result.pathH3Indexes ? { pathH3Indexes: result.pathH3Indexes } : {},
+      ...result.preview.valid && result.preview.segments.length > 0 ? { cachedSegments: result.preview.segments } : {}
+    };
+  }
+
   // src/renderer/gameplay/readyHandler.ts
   function buildReadyPayload(args) {
     const { enabledToolGroupsPayload, useEventDriven, usePrecomputed, aiPlanningRunEnabled } = args;
@@ -23013,7 +23117,12 @@
             deps.updateOpenRouterToolCountLabels();
           }
         }
-        rendererSharedState.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length ? [...commitResult.tacticalMarchContinuations] : [];
+        const previousPendingMarches = new Map(rendererSharedState.tacticalPendingMarches.map((row) => [row.subUnitId, row]));
+        rendererSharedState.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length ? buildTacticalPendingMarchRowsFromContinuations({
+          battle: commitResult.tacticalBattle ?? rendererSharedState.tacticalBattleSnapshot,
+          continuations: commitResult.tacticalMarchContinuations,
+          previousBySubUnitId: previousPendingMarches
+        }) : [];
         rendererSharedState.pendingRangedAttacks = [];
         rendererSharedState.pendingAirStrikes = [];
         rendererSharedState.pendingFerryOrders = [];
@@ -23715,7 +23824,13 @@
           for (const subUnitId of selectedIds) {
             const idx = rendererSharedState.tacticalPendingMarches.findIndex((row) => row.subUnitId === subUnitId);
             if (idx >= 0) rendererSharedState.tacticalPendingMarches.splice(idx, 1);
-            rendererSharedState.tacticalPendingMarches.push({ subUnitId, destinationH3Index: destinationH3 });
+            rendererSharedState.tacticalPendingMarches.push(
+              buildTacticalPendingMarchRowFromDraft({
+                battle: rendererSharedState.tacticalBattleSnapshot,
+                subUnitId,
+                destinationH3Index: destinationH3
+              })
+            );
           }
         });
       }

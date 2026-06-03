@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import {
   getForcedVisibleHomeRegionHexesForPlayer,
   isHexOwnershipVisibleToPerspective,
+  resolveHomeRegionOwnerIdentity,
   resolveOwnershipBorderStyle,
 } from '../shared/homeRegionRules';
 
@@ -81,6 +82,38 @@ function testOwnershipVisibilityUsesNormalVisibilityForNonHomeHexes(): void {
       aiHomeRegionHexes: ['home-a'],
     }),
     false
+  );
+}
+
+/**
+ * Verifies home-region owner identity resolves separately from current control for split border coloring.
+ *
+ * Purpose: Locks inner dashed border ownership (home region) vs outer solid border ownership (controller).
+ * When to use: Run after changing `resolveHomeRegionOwnerIdentity`.
+ * Expected outcome: Exclusive lists return one side; intersection returns `both`; non-home returns null.
+ * Exceptions: None.
+ */
+function testResolveHomeRegionOwnerIdentityContract(): void {
+  const sharedInputs = {
+    humanHomeRegionHexes: ['home-h', 'shared'],
+    aiHomeRegionHexes: ['home-a', 'shared'],
+    intersectingHomeRegionHexes: ['shared'],
+  };
+  assert.strictEqual(
+    resolveHomeRegionOwnerIdentity({ ...sharedInputs, h3Index: 'home-h' }),
+    'human'
+  );
+  assert.strictEqual(
+    resolveHomeRegionOwnerIdentity({ ...sharedInputs, h3Index: 'home-a' }),
+    'opponent'
+  );
+  assert.strictEqual(
+    resolveHomeRegionOwnerIdentity({ ...sharedInputs, h3Index: 'shared' }),
+    'both'
+  );
+  assert.strictEqual(
+    resolveHomeRegionOwnerIdentity({ ...sharedInputs, h3Index: 'normal-visible' }),
+    null
   );
 }
 
@@ -177,6 +210,7 @@ function testForcedVisibleHomeHexesNoScenarioGate(): void {
 function run(): void {
   testOwnershipVisibilityUsesHomeExceptions();
   testOwnershipVisibilityUsesNormalVisibilityForNonHomeHexes();
+  testResolveHomeRegionOwnerIdentityContract();
   testResolveOwnershipBorderStyleContract();
   testForcedVisibleHomeHexesNoScenarioGate();
   console.log('homeRegionRules.test.ts passed');

@@ -244,12 +244,14 @@ export function generateOrdersForStandingOrders(
       const toH3 = routeResult.orderToH3;
       if (toH3) {
         movementOrders.push({ unitId: row.unit_id, toH3Index: toH3 });
-        const routePayload = toComputedRoutePayload(routeResult);
+        const routePayload = toComputedRoutePayload(routeResult, unit.h3Index);
         if (mutateProgress) {
           updateStandingOrderComputedRoute(playerId, row.unit_id, {
             nextMoveHex: routePayload.nextMoveHex,
             turnsRemaining: Math.max(0, routePayload.turnsRemaining - 1),
             totalPath: routePayload.totalPath,
+            cachedOriginH3: routePayload.cachedOriginH3,
+            cachedRouteSegments: routePayload.cachedRouteSegments,
           });
         }
       }
@@ -310,7 +312,7 @@ export function generateOrdersForStandingOrders(
       if (routeResult.path.length > 0) {
         const toH3 = routeResult.orderToH3;
         if (toH3) movementOrders.push({ unitId: row.unit_id, toH3Index: toH3 });
-        const routePayload = toComputedRoutePayload(routeResult);
+        const routePayload = toComputedRoutePayload(routeResult, unit.h3Index);
         if (mutateProgress) {
           updateStandingOrderComputedRoute(
             playerId,
@@ -319,6 +321,8 @@ export function generateOrdersForStandingOrders(
               nextMoveHex: routePayload.nextMoveHex,
               turnsRemaining: Math.max(0, routePayload.turnsRemaining - 1),
               totalPath: routePayload.totalPath,
+              cachedOriginH3: routePayload.cachedOriginH3,
+              cachedRouteSegments: routePayload.cachedRouteSegments,
             },
             'closing'
           );

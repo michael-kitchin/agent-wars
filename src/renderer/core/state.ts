@@ -14,6 +14,7 @@ import type {
   AirStrikeTargetType,
   RemovedUnitSnapshot,
   TacticalOpponentPlanPayload,
+  TacticalPendingMarchRow,
 } from '../../shared/ipcTypes';
 import type { TacticalAnnihilationOutcomeKind } from '../../shared/tacticalAnnihilation';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
@@ -566,14 +567,14 @@ pendingFerryOrders: [] as FerryOrder[],
    */
 pendingEmbarkOrders: [] as EmbarkOrder[],
     /**
-   * Documents the object literal property `tacticalPendingMarches` (tacticalPendingMarches: [] as { subUnitId: string; destinationH3Index: string }[]).
+   * Documents the object literal property `tacticalPendingMarches` (tacticalPendingMarches: [] as TacticalPendingMarchRow[]).
 
    * Purpose: Holds human tactical march rows shown in the pending-orders sidebar while a tactical battle is active; distinct from strategic standing orders.
    * When to use: Append after tactical march validation succeeds (draft, before Ready); clear on tactical Ready commit, advance turn, exit, stash, or new game.
-   * Expected outcome: Sidebar lists res4 destinations keyed by tactical sub-unit ids until the next tactical beat boundary clears them.
+   * Expected outcome: Sidebar lists res4 destinations keyed by tactical sub-unit ids; optional `pathH3Indexes` and `cachedSegments` keep overlay polylines stable across beats.
    * Exceptions: None.
    */
-tacticalPendingMarches: [] as { subUnitId: string; destinationH3Index: string }[],
+tacticalPendingMarches: [] as TacticalPendingMarchRow[],
     /**
    * Documents the object literal property `hideCommittedOrderLinesAfterReady` (hideCommittedOrderLinesAfterReady: false).
 

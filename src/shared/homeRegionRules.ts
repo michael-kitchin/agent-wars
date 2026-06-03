@@ -17,6 +17,58 @@ export type HomeRegionOutlineState =
   | 'unknown';
 
 /**
+ * Identifies which side(s) declared a hex as home region for inner dashed border coloring.
+ *
+ * Purpose: Distinguishes home-region ownership from current control when rendering dual-line home borders.
+ * When to use: Renderer inner-border pass after confirming the hex is a home-region outlined case.
+ * Expected outcome: `human`, `opponent`, `both` (intersection), or `null` for non-home hexes.
+ * Exceptions: None.
+ */
+export type HomeRegionOwnerIdentity = 'human' | 'opponent' | 'both' | null;
+
+/**
+ * Defines inputs for resolving which side's home region a strategic hex belongs to.
+ *
+ * Purpose: Separates home-region ownership (inner dashed border) from current control (outer solid border).
+ * When to use: Renderer passes snapshot home-region lists when drawing outlined home hex borders.
+ * Expected outcome: Exclusive human-home hexes resolve to `human`, exclusive opponent-home to `opponent`,
+ * intersection hexes to `both`, and non-home hexes to `null`.
+ * Exceptions: None.
+ */
+export interface HomeRegionOwnerIdentityInput {
+  /** Strategic hex whose home-region membership is being resolved. */
+  h3Index: string;
+  /** Human home-region hex list from snapshot metadata, when present. */
+  humanHomeRegionHexes?: readonly string[];
+  /** Opponent home-region hex list from snapshot metadata, when present. */
+  aiHomeRegionHexes?: readonly string[];
+  /** Precomputed intersection list; when omitted, derived from both home lists. */
+  intersectingHomeRegionHexes?: readonly string[];
+}
+
+/**
+ * Resolves which player(s) claim a hex as home region for inner dashed border coloring.
+ *
+ * Purpose: Outer ownership borders reflect current control; inner dashed borders reflect declared home-region
+ * ownership so a hex controlled by X in Y's home shows X on the outside and Y on the inside.
+ * When to use: Strategic renderer after classifying a hex as a home-region outlined border case.
+ * Expected outcome: Intersection hexes return `both` (neutral inner color); exclusive lists return one side.
+ * Exceptions: None.
+ */
+export function resolveHomeRegionOwnerIdentity(input: HomeRegionOwnerIdentityInput): HomeRegionOwnerIdentity {
+  const inHuman = (input.humanHomeRegionHexes ?? []).includes(input.h3Index);
+  const inAi = (input.aiHomeRegionHexes ?? []).includes(input.h3Index);
+  if (!inHuman && !inAi) return null;
+  const intersectionSet = new Set(
+    input.intersectingHomeRegionHexes ??
+      computeIntersectingHomeRegionHexes(input.humanHomeRegionHexes ?? [], input.aiHomeRegionHexes ?? [])
+  );
+  if (intersectionSet.has(input.h3Index) || (inHuman && inAi)) return 'both';
+  if (inHuman) return 'human';
+  return 'opponent';
+}
+
+/**
  * Classifies how a strategic hex border should communicate ownership to the current player.
  *
  * Purpose: Provides a single contract for renderer border style decisions so home/non-home visibility
@@ -367,7 +419,10 @@ export function isHexOwnershipVisibleToPerspective(input: OwnershipVisibilityDec
  *
  * Purpose: Encodes the shared contract required by home outlined borders and normal non-home borders.
  * When to use: Use for every strategic hex before rendering ownership borders.
- * Expected outcome: Intersecting home hexes resolve to controller-colored outlines when controlled; uncontrolled home hexes use neutral outlines.
+ * Expected outcome: Home hexes resolve to outlined variants keyed by current controller for the outer solid
+ * border; renderer pairs these with `resolveHomeRegionOwnerIdentity` for the inner dashed home-owner color.
+ * Intersecting home hexes resolve to controller-colored outlines when controlled; uncontrolled home hexes use
+ * neutral outer outlines.
  * Exceptions: None.
  */
 export function resolveOwnershipBorderStyle(input: OwnershipBorderStyleDecisionInput): OwnershipBorderStyle {

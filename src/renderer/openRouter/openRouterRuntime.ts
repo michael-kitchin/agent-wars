@@ -325,9 +325,16 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
             deps.updateOpenRouterCostLabel();
           }
         } else if (!result.success) {
-          deps.appendOpenRouterLog(`Background planning failed: ${result.error ?? 'Unknown error'}`, true);
-          deps.showSidebarError(result.error ?? 'Background AI request failed');
-          unblockPrecomputedAiPlanningAfterBackgroundFailure();
+          if (result.error === 'Cancelled') {
+            // Intentional cancel triggered by a human draft change; invalidateTacticalPrefetchIfHumanDraftChangedSinceRequestStart
+            // already logged the event — no error toast needed. Unblock and restart planning against the new draft.
+            unblockPrecomputedAiPlanningAfterBackgroundFailure();
+            startBackgroundRequestIfAllowed(deps);
+          } else {
+            deps.appendOpenRouterLog(`Background planning failed: ${result.error ?? 'Unknown error'}`, true);
+            deps.showSidebarError(result.error ?? 'Background AI request failed');
+            unblockPrecomputedAiPlanningAfterBackgroundFailure();
+          }
         }
         deps.updateReadyButtonState();
       })
