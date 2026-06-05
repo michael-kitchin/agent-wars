@@ -45,7 +45,11 @@ import {
   cancelHumanStandingOrder,
   queryHumanStandingOrders,
 } from '../tools/tool5StandingOrders';
-import { mergeHumanStandingOrdersIntoTacticalMarchOrders } from '../tacticalBattle/tacticalStandingOrderMarchMerge';
+import {
+  mergeHumanStandingOrdersIntoTacticalMarchOrders,
+  mergeHumanTacticalDefendEngagementOrders,
+} from '../tacticalBattle/tacticalStandingOrderMarchMerge';
+import { resolveTacticalRangedTargetForSubUnit } from '../tacticalBattle/tacticalRangedTargetResolve';
 import { validateHumanTacticalMarchOrders } from '../tacticalBattle/tacticalBattleSession';
 import type { BuildUnitType } from '../productionRules';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE, formatTargetOutOfRangeReason } from '../../shared/tacticalRanges';
@@ -730,12 +734,12 @@ function clearEmbarkAssignmentForIndependentLandMove(unitId: string, destination
 /**
  * Drops opponent tactical draft rows that no longer pass footprint / strike / embark rules so Ready can complete with the remaining valid rows.
  *
- * Purpose: Buffered AI plans can go stale (e.g. ranged target hex cleared of enemies) before the human clicks Ready; failing the whole beat was too strict.
+ * Purpose: Buffered AI plans can go stale (e.g. ranged target hex cleared of enemies) before the human clicks Ready; failing the whole beat was too strict. No-op marches (destination equals current hex) are dropped so recycled drafts do not loop when LLM consultation is skipped — same rule as `requestOrdersFlow` ingest.
  * When to use: `commitHumanTacticalDraftOrders` after resolving `preBattle` and before `applyHumanTacticalDraftBeatInStrategicOrder`.
  * Expected outcome: Returns a subset plan or `undefined` when nothing remains; each dropped row is logged at debug with reason; a single info summary when any row was dropped.
  * Exceptions: None; never throws.
  */
-function sanitizeOpponentTacticalDraftForReadyCommit(
+export function sanitizeOpponentTacticalDraftForReadyCommit(
   preBattle: TacticalBattleSnapshot,
   draft: TacticalOpponentPlanPayload | undefined
 ): TacticalOpponentPlanPayload | undefined {
@@ -771,12 +775,36 @@ function sanitizeOpponentTacticalDraftForReadyCommit(
       });
       continue;
     }
+    if (outcome.appliedToH3Index === sub[outcome.idx]!.h3Index) {
+      dropped += 1;
+      logOrderPlanSanitizeDrop(sanitizeCtx, 'march', {
+        unitId: o.unitId,
+        toH3Index: o.toH3Index,
+        reason: 'already_at_destination',
+      });
+      continue;
+    }
     movementOrders.push(o);
   }
 
   const rangedAttacks: TacticalOpponentPlanPayload['rangedAttacks'] = [];
   for (const r of draft.rangedAttacks) {
-    const checked = validateGroupRangedTarget([r.unitId], r.targetH3Index, { tacticalAttackerPlayer: 'opponent' });
+    let targetH3Index = r.targetH3Index;
+    let checked = validateGroupRangedTarget([r.unitId], targetH3Index, { tacticalAttackerPlayer: 'opponent' });
+    if (!checked.success) {
+      const retarget = resolveTacticalRangedTargetForSubUnit(preBattle, r.unitId, r.targetH3Index);
+      if (retarget) {
+        targetH3Index = retarget;
+        checked = validateGroupRangedTarget([r.unitId], targetH3Index, { tacticalAttackerPlayer: 'opponent' });
+        if (checked.success) {
+          logDebug('gameActions sanitizeOpponentTacticalDraftForReadyCommit: retargeted ranged', {
+            unitId: r.unitId,
+            fromTargetH3Index: r.targetH3Index,
+            toTargetH3Index: targetH3Index,
+          });
+        }
+      }
+    }
     if (!checked.success) {
       dropped += 1;
       logOrderPlanSanitizeDrop(sanitizeCtx, 'ranged', {
@@ -786,7 +814,7 @@ function sanitizeOpponentTacticalDraftForReadyCommit(
       });
       continue;
     }
-    rangedAttacks.push(r);
+    rangedAttacks.push({ unitId: r.unitId, targetH3Index });
   }
 
   const airStrikes: TacticalOpponentPlanPayload['airStrikes'] = [];
@@ -930,6 +958,17 @@ export function commitHumanTacticalDraftOrders(args: {
       logDebug('gameActions commitHumanTacticalDraftOrders rejected merged marches', { reason: mergedMarchCheck.reason });
       return mergedMarchCheck;
     }
+    const defendMerged = mergeHumanTacticalDefendEngagementOrders(
+      preBattle,
+      args.rangedAttacks ?? [],
+      args.airStrikes ?? []
+    );
+    logDebug('gameActions commitHumanTacticalDraftOrders DEFEND engagement merge', {
+      explicitRangedCount: args.rangedAttacks?.length ?? 0,
+      explicitAirCount: args.airStrikes?.length ?? 0,
+      mergedRangedCount: defendMerged.rangedAttacks.length,
+      mergedAirCount: defendMerged.airStrikes.length,
+    });
     const res4Set = new Set(preBattle.res4ChildH3Indexes);
     const terrainBattle = {
       battleId: preBattle.battleId,
@@ -980,8 +1019,8 @@ export function commitHumanTacticalDraftOrders(args: {
     }
     const beat = applyHumanTacticalDraftBeatInStrategicOrder({
       movementOrders: appliedMovementOrders,
-      rangedAttacks: args.rangedAttacks,
-      airStrikes: args.airStrikes,
+      rangedAttacks: defendMerged.rangedAttacks,
+      airStrikes: defendMerged.airStrikes,
       ferryOrders: args.ferryOrders,
       embarkOrders: args.embarkOrders,
       opponentTacticalDraft,
@@ -1077,7 +1116,7 @@ export function commitHumanTacticalDraftOrders(args: {
     }
     const rangedRemovedUnits = support.removedUnits;
     const rangedCombatHexSet = new Set<string>();
-    for (const r of args.rangedAttacks ?? []) {
+    for (const r of defendMerged.rangedAttacks) {
       rangedCombatHexSet.add(r.targetH3Index);
     }
     for (const r of od?.rangedAttacks ?? []) {
@@ -1087,7 +1126,7 @@ export function commitHumanTacticalDraftOrders(args: {
     const casualtyHexSet = new Set(rangedRemovedUnits.map((v) => v.h3Index));
     const rangedCasualtyHexes = rangedCombatHexes.filter((h) => casualtyHexSet.has(h));
     const humanBeatHadSubmittedRangedOrAirOrders =
-      (args.rangedAttacks?.length ?? 0) > 0 || (args.airStrikes?.length ?? 0) > 0;
+      defendMerged.rangedAttacks.length > 0 || defendMerged.airStrikes.length > 0;
     const opponentBeatHadSubmittedRangedOrAirOrders =
       !!od && ((od.rangedAttacks?.length ?? 0) > 0 || (od.airStrikes?.length ?? 0) > 0);
     const tacticalResolutionPlayback: TacticalCommitResolutionPlayback = {

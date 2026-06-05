@@ -109,6 +109,25 @@ function testRejectsTopLevelJsonArray(): void {
 }
 
 /**
+ * Defines the `testInvalidAssignOrderTypeSurfacesDropReason` function shape.
+ *
+ * Purpose: Regression for invalid standing-order types (e.g. model-emitted "hold") surfacing in dropReasons instead of silent failure.
+ * When to use: After edits to `processV3OrdersArray` assign_order handling.
+ * Expected outcome: Parsed dropReasons mention assign_order rejection; no standing order row is created.
+ * Exceptions: None.
+ */
+function testInvalidAssignOrderTypeSurfacesDropReason(): void {
+  const parsed = parseFixture(
+    '{"strategy":"x","orders":[{"action":"assign_order","unitId":"opponent-1","order":{"type":"hold"}}],"airStrikes":[],"ferryOrders":[],"callbacks":[]}'
+  );
+  assert.ok(parsed);
+  assert.ok(
+    parsed!.dropReasons?.some((r) => r.includes('assign_order opponent-1')),
+    'expected assign_order rejection in dropReasons'
+  );
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
 
  * Purpose: Registers named cases for the manual test runner at the bottom of this file.
@@ -121,6 +140,7 @@ const tests = [
   { name: 'parseOrdersResponse balanced extract before trailing prose', fn: testExtractsJsonBeforeTrailingBraceInProse },
   { name: 'parseOrdersResponse tries fenced json after bad preamble', fn: testSkipsBadCandidateThenParsesFence },
   { name: 'parseOrdersResponse rejects top-level JSON array', fn: testRejectsTopLevelJsonArray },
+  { name: 'parseOrdersResponse invalid assign_order type drop reason', fn: testInvalidAssignOrderTypeSurfacesDropReason },
 ];
 
 /**

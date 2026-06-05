@@ -4,7 +4,7 @@
  */
 
 import type { GameStateSnapshot } from '../gameDb';
-import { logDebug } from '../logger';
+import { logDebug, logError } from '../logger';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import { HEX_CODE_PATTERN } from '../briefing/map/coordinateContext';
 import { codeToH3, codeToLatLngRounded } from '../briefing/map/hex-code-translator';
@@ -533,10 +533,12 @@ function processV3OrdersArray(
   movementOrders: { unitId: string; toH3Index: string }[];
   rangedAttacks: { unitId: string; targetH3Index: string }[];
   embarkOrders: EmbarkOrder[];
+  dropReasons: string[];
 } {
   const movementOrders: { unitId: string; toH3Index: string }[] = [];
   const rangedAttacks: { unitId: string; targetH3Index: string }[] = [];
   const embarkOrders: EmbarkOrder[] = [];
+  const dropReasons: string[] = [];
   for (const raw of entries) {
     if (!raw || typeof raw !== 'object') continue;
     const o = raw as {
@@ -567,7 +569,19 @@ function processV3OrdersArray(
         }
         orderPayload = ord;
       }
-      executeTool5('assign_order', { unitId, order: orderPayload }, state, latLngByH3, resolveToH3);
+      const assignResult = executeTool5('assign_order', { unitId, order: orderPayload }, state, latLngByH3, resolveToH3);
+      if (assignResult.status === 'error' && typeof assignResult.error === 'string') {
+        const orderType =
+          orderPayload && typeof orderPayload === 'object' && !Array.isArray(orderPayload)
+            ? (orderPayload as { type?: unknown }).type
+            : undefined;
+        logError('openRouter processV3OrdersArray: assign_order rejected', {
+          unitId,
+          orderType: typeof orderType === 'string' ? orderType : undefined,
+          error: assignResult.error,
+        });
+        dropReasons.push(`assign_order ${unitId}: ${assignResult.error}`);
+      }
       continue;
     }
     if (action === 'cancel_order') {
@@ -652,7 +666,7 @@ function processV3OrdersArray(
     }
     logDebug('openRouter processV3OrdersArray: skipped unknown action', { action, unitId });
   }
-  return { movementOrders, rangedAttacks, embarkOrders };
+  return { movementOrders, rangedAttacks, embarkOrders, dropReasons };
 }
 
 /**
@@ -778,7 +792,7 @@ export function parseOrdersResponse(
           });
         }
         const strategy = typeof obj.strategy === 'string' ? obj.strategy.trim() : '';
-        const { movementOrders, rangedAttacks, embarkOrders } = processV3OrdersArray(
+        const { movementOrders, rangedAttacks, embarkOrders, dropReasons: assignOrderDropReasons } = processV3OrdersArray(
           ordersArray,
           state,
           latLngByH3,
@@ -799,6 +813,7 @@ export function parseOrdersResponse(
         const callbacks = normalizeCallbacks(obj.callbacks);
         const memoryUpdates = normalizeMemoryUpdates(obj.memoryUpdates);
         const dropReasons = [
+          ...assignOrderDropReasons,
           ...productionDropReasons,
           ...normalizedAirStrikes.dropReasons,
           ...normalizedFerryOrders.dropReasons,

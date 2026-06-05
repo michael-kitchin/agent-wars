@@ -2,10 +2,20 @@ import type { AirStrikeAnimationMove, AirStrikeOrder, FerryOrder, GameStateSnaps
 import {
   ORDER_LINE_COLOR,
   ORDER_LINE_WIDTH,
-  PENDING_AIR_STRIKE_ORDER_LINE_COLOR,
-  PENDING_RANGED_ORDER_LINE_COLOR,
+  RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION,
+  RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX,
+  RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX,
+  RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION,
+  RANGE_PERIMETER_AIR_STRIKE_COLOR,
+  RANGE_PERIMETER_ALPHA,
+  RANGE_PERIMETER_DASH_GAP_FRACTION,
+  RANGE_PERIMETER_DASH_MIN_GAP_PX,
+  RANGE_PERIMETER_DASH_MIN_SOLID_PX,
+  RANGE_PERIMETER_DASH_SOLID_FRACTION,
+  RANGE_PERIMETER_RANGED_COLOR,
 } from '../core/constants';
 import { hexCenterPx, hexCenterPxRelativeTo } from '../map/mapUtils';
+import { getCurrentRangePerimeterSupportLineWidth } from './terrainRendering';
 import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
 
 /**
@@ -17,6 +27,41 @@ import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
  * Exceptions: None.
  */
 export type PendingOrderLineUnit = { id: string; h3Index: string };
+
+/**
+ * Returns the static stroke style shared by planned support lines and their matching range perimeter.
+ *
+ * Purpose: Keeps planned and hover ranged/air-strike lines visually consistent with the targeting perimeter (color, width, dash) while leaving dash animation to the perimeter only.
+ * When to use: `drawRangedAttackLines`, `drawAirStrikeLines`, and support-targeting hover previews.
+ * Expected outcome: Mode-colored line style at 1.5× home-region border width with 50/50 dash spacing.
+ * Exceptions: None.
+ */
+export function rangePerimeterStaticLineStyle(mode: 'ranged' | 'airStrike'): {
+  lineWidth: number;
+  dash: [number, number];
+  strokeColor: string;
+} {
+  const lineWidth = getCurrentRangePerimeterSupportLineWidth();
+  const strokeColor = mode === 'airStrike' ? RANGE_PERIMETER_AIR_STRIKE_COLOR : RANGE_PERIMETER_RANGED_COLOR;
+  if (mode === 'airStrike') {
+    return {
+      lineWidth,
+      strokeColor,
+      dash: [
+        Math.max(RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX, lineWidth * RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION),
+        Math.max(RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX, lineWidth * RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION),
+      ],
+    };
+  }
+  return {
+    lineWidth,
+    strokeColor,
+    dash: [
+      Math.max(RANGE_PERIMETER_DASH_MIN_SOLID_PX, lineWidth * RANGE_PERIMETER_DASH_SOLID_FRACTION),
+      Math.max(RANGE_PERIMETER_DASH_MIN_GAP_PX, lineWidth * RANGE_PERIMETER_DASH_GAP_FRACTION),
+    ],
+  };
+}
 
 /**
  * Defines the `drawRangedAttackLines` function shape (export function drawRangedAttackLines( ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, ranged: RangedAttackOrder[], uni).
@@ -37,10 +82,12 @@ export function drawRangedAttackLines(
   void canvasWidth;
   void canvasHeight;
   if (ranged.length === 0 || !hexList) return;
+  const style = rangePerimeterStaticLineStyle('ranged');
   ctx.save();
-  ctx.setLineDash([6, 4]);
-  ctx.strokeStyle = PENDING_RANGED_ORDER_LINE_COLOR;
-  ctx.lineWidth = ORDER_LINE_WIDTH;
+  ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
+  ctx.setLineDash(style.dash);
+  ctx.strokeStyle = style.strokeColor;
+  ctx.lineWidth = style.lineWidth;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   for (const r of ranged) {
@@ -71,10 +118,12 @@ export function drawAirStrikeLines(
   hexList: string[] | undefined
 ): void {
   if (airStrikes.length === 0 || !hexList) return;
+  const style = rangePerimeterStaticLineStyle('airStrike');
   ctx.save();
-  ctx.setLineDash([2, 6]);
-  ctx.strokeStyle = PENDING_AIR_STRIKE_ORDER_LINE_COLOR;
-  ctx.lineWidth = ORDER_LINE_WIDTH;
+  ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
+  ctx.setLineDash(style.dash);
+  ctx.strokeStyle = style.strokeColor;
+  ctx.lineWidth = style.lineWidth;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   for (const strike of airStrikes) {

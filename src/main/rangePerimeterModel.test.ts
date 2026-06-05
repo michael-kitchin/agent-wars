@@ -1,0 +1,141 @@
+/**
+ * Contract tests for range hex set builders used by the planning perimeter overlay.
+ */
+
+import * as assert from 'assert';
+import { cellToChildren, gridDisk } from 'h3-js';
+import { AIR_STRIKE_RANGE_HEXES } from '../shared/tacticalRanges';
+import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
+import {
+  buildStrategicAirStrikeRangeSet,
+  buildStrategicRangedRangeSet,
+  buildTacticalAirStrikeRangeSet,
+  buildTacticalRangedRangeSet,
+  strategicRangedRangeHexesForUnitType,
+} from '../shared/rangePerimeterModel';
+
+const ORIGIN = '81283ffffffffff';
+
+/**
+ * Defines the `testStrategicRangedInfantryDiskSize` function shape (function testStrategicRangedInfantryDiskSize(): void).
+ *
+ * Purpose: Ensures strategic ranged range set matches `gridDisk` for infantry.
+ * When to use: Regression test for `buildStrategicRangedRangeSet`.
+ * Expected outcome: Set equals the infantry range disk around the origin.
+ * Exceptions: None.
+ */
+function testStrategicRangedInfantryDiskSize(): void {
+  const units = [{ h3Index: ORIGIN, unitType: 'infantry' }];
+  const set = buildStrategicRangedRangeSet(units);
+  const expected = new Set(gridDisk(ORIGIN, strategicRangedRangeHexesForUnitType('infantry')));
+  assert.strictEqual(set.size, expected.size);
+  for (const h of expected) assert.ok(set.has(h));
+}
+
+/**
+ * Defines the `testStrategicAirStrikeDiskSize` function shape (function testStrategicAirStrikeDiskSize(): void).
+ *
+ * Purpose: Ensures strategic air-strike range set matches `AIR_STRIKE_RANGE_HEXES` disk.
+ * When to use: Regression test for `buildStrategicAirStrikeRangeSet`.
+ * Expected outcome: Set equals the air-strike disk around the origin.
+ * Exceptions: None.
+ */
+function testStrategicAirStrikeDiskSize(): void {
+  const units = [{ h3Index: ORIGIN, unitType: 'air' }];
+  const set = buildStrategicAirStrikeRangeSet(units);
+  const expected = new Set(gridDisk(ORIGIN, AIR_STRIKE_RANGE_HEXES));
+  assert.strictEqual(set.size, expected.size);
+}
+
+/**
+ * Defines the `testTacticalAirStrikeEqualsFootprint` function shape (function testTacticalAirStrikeEqualsFootprint(): void).
+ *
+ * Purpose: Verifies tactical air-strike perimeter uses the full res4 footprint.
+ * When to use: Regression test for `buildTacticalAirStrikeRangeSet`.
+ * Expected outcome: Returned set equals the input footprint.
+ * Exceptions: None.
+ */
+function testTacticalAirStrikeEqualsFootprint(): void {
+  const footprint = new Set(['842d85fffffffff', '842d87fffffffff']);
+  const set = buildTacticalAirStrikeRangeSet(footprint);
+  assert.deepStrictEqual([...set].sort(), [...footprint].sort());
+}
+
+/**
+ * Defines the `minimalTacticalBattle` function shape (function minimalTacticalBattle(...): TacticalBattleSnapshot).
+ *
+ * Purpose: Builds a minimal tactical snapshot for range-set unit tests.
+ * When to use: Tactical ranged clip test only.
+ * Expected outcome: Snapshot satisfies `buildTacticalRangedRangeSet` inputs.
+ * Exceptions: None.
+ */
+function minimalTacticalBattle(
+  res4: string[],
+  subUnits: TacticalBattleSnapshot['subUnits']
+): TacticalBattleSnapshot {
+  return {
+    battleId: 'test-battle',
+    enclosingRes1H3Index: ORIGIN,
+    res4ChildH3Indexes: res4,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+  };
+}
+
+/**
+ * Defines the `testTacticalRangedClipsToFootprint` function shape (function testTacticalRangedClipsToFootprint(): void).
+ *
+ * Purpose: Verifies tactical ranged disks are clipped to the battle footprint.
+ * When to use: Regression test for `buildTacticalRangedRangeSet`.
+ * Expected outcome: Every hex in the set lies in the footprint and includes the anchor cell.
+ * Exceptions: None.
+ */
+function testTacticalRangedClipsToFootprint(): void {
+  const anchor = cellToChildren(ORIGIN, 4)[0]!;
+  const battle = minimalTacticalBattle([anchor], [
+    {
+      id: 'u1:01',
+      parentUnitId: 'u1',
+      player: 'human',
+      unitType: 'infantry',
+      h3Index: anchor,
+      displayName: 'Inf 1',
+    },
+  ]);
+  const footprint = new Set(battle.res4ChildH3Indexes);
+  const set = buildTacticalRangedRangeSet(battle, battle.subUnits, footprint);
+  for (const h of set) assert.ok(footprint.has(h));
+  assert.ok(set.has(anchor));
+}
+
+/**
+ * Documents the module-scope binding `tests` (tests).
+ *
+ * Purpose: Ordered test cases for range perimeter model builders.
+ * When to use: This file's `run` entrypoint.
+ * Expected outcome: Each entry has a `name` and zero-arg `fn`.
+ * Exceptions: None.
+ */
+const tests = [
+  { name: 'strategic ranged infantry disk size', fn: testStrategicRangedInfantryDiskSize },
+  { name: 'strategic air strike disk size', fn: testStrategicAirStrikeDiskSize },
+  { name: 'tactical air strike equals footprint', fn: testTacticalAirStrikeEqualsFootprint },
+  { name: 'tactical ranged clips to footprint', fn: testTacticalRangedClipsToFootprint },
+];
+
+function run(): void {
+  for (const t of tests) {
+    try {
+      t.fn();
+      console.log(`OK ${t.name}`);
+    } catch (err) {
+      console.error(`FAIL ${t.name}`, err);
+      process.exitCode = 1;
+    }
+  }
+}
+
+run();

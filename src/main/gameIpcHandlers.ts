@@ -463,6 +463,7 @@ export async function handleGameReady(
         const generated = generateOrdersForStandingOrders('opponent', aiState, latLngByH3, resolveToH3);
         aiOrders = generated.movementOrders;
         aiRangedOrders = generated.rangedAttacks;
+        aiAirStrikeOrders = generated.airStrikes;
         aiConsulted = false;
       }
     }
@@ -498,6 +499,7 @@ export async function handleGameReady(
     const generated = generateOrdersForStandingOrders('opponent', aiState, latLngByH3, resolveToH3);
     aiOrders = generated.movementOrders;
     aiRangedOrders = generated.rangedAttacks;
+    aiAirStrikeOrders = generated.airStrikes;
     if (aiPlanningRunEnabled) {
       aiSkipped = true;
       aiSkipReason = !deps.hasKey()

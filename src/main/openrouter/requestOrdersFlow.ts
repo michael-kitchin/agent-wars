@@ -720,23 +720,33 @@ export async function requestOrdersFlow(
             mutateProgress: tacticalBattle == null,
             pathfindingSession: tacticalBattle == null ? getOrCreateAiPlanningPathfindingSession() : undefined,
           })
-        : { movementOrders: [] as { unitId: string; toH3Index: string }[], rangedAttacks: [] as { unitId: string; targetH3Index: string }[] };
+        : {
+            movementOrders: [] as { unitId: string; toH3Index: string }[],
+            rangedAttacks: [] as { unitId: string; targetH3Index: string }[],
+            airStrikes: [] as { unitId: string; targetH3Index: string; targetType: 'units' | 'urban' | 'airport' | 'seaport' }[],
+          };
       let standingOrderMovement = standingGenerated.movementOrders;
       let standingOrderRanged = standingGenerated.rangedAttacks;
+      const standingOrderAir = standingGenerated.airStrikes;
+      let standingOrderAirExpanded = standingOrderAir;
       if (tacticalBattle) {
         const expanded = expandOpponentStandingOrdersForTacticalBattle(
           tacticalBattle,
           standingOrderMovement,
-          standingOrderRanged
+          standingOrderRanged,
+          standingOrderAir
         );
         standingOrderMovement = expanded.movementOrders;
         standingOrderRanged = expanded.rangedAttacks;
+        standingOrderAirExpanded = expanded.airStrikes;
         logDebug('openRouter requestOrdersFlow standing orders expanded for tactical opponent', {
           battleId: tacticalBattle.battleId,
           parentMovementCount: standingGenerated.movementOrders.length,
           parentRangedCount: standingGenerated.rangedAttacks.length,
+          parentAirCount: standingGenerated.airStrikes.length,
           subMovementCount: expanded.movementOrders.length,
           subRangedCount: expanded.rangedAttacks.length,
+          subAirCount: expanded.airStrikes.length,
         });
       }
       const llmMovementOrders = dedupeByUnitKeepLast(parsed.movementOrders ?? []);
@@ -749,6 +759,8 @@ export async function requestOrdersFlow(
       const mergedMovement = [...standingOrderMovement.filter((o) => !llmMovementUnitIds.has(o.unitId)), ...llmMovementOrders];
       const llmRangedUnitIds = new Set(llmRangedOrders.map((r) => r.unitId));
       const mergedRanged = [...standingOrderRanged.filter((o) => !llmRangedUnitIds.has(o.unitId)), ...llmRangedOrders];
+      const llmAirUnitIds = new Set(llmAirStrikes.map((s) => s.unitId));
+      const mergedAirStrikes = [...standingOrderAirExpanded.filter((s) => !llmAirUnitIds.has(s.unitId)), ...llmAirStrikes];
 
       const validated: { unitId: string; toH3Index: string }[] = [];
       const dropReasons: string[] = [...(parsed.dropReasons ?? [])];
@@ -852,7 +864,7 @@ export async function requestOrdersFlow(
         }
       }
 
-      let outAir = llmAirStrikes;
+      let outAir = mergedAirStrikes;
       let outFerry = llmFerryOrders;
       let outEmbark = llmEmbarkOrders;
       if (tacticalBattle) {
@@ -862,7 +874,7 @@ export async function requestOrdersFlow(
             : tacticalBattle;
         const validatedAir: AirStrikeOrder[] = [];
         const seenStrike = new Set<string>();
-        for (const s of llmAirStrikes) {
+        for (const s of mergedAirStrikes) {
           if (seenStrike.has(s.unitId)) {
             dropReasons.push(`Duplicate air strike for ${aiOrderUnitLabel(s.unitId)}`);
             continue;

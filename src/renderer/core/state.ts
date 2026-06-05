@@ -603,6 +603,33 @@ rangedModeActive: false,
    */
 airStrikeModeActive: false,
     /**
+   * Cached lat/lng vertex loops for the range perimeter overlay (recomputed when signature changes).
+
+   * Purpose: Avoids rebuilding H3 disks and edge chains every animation frame.
+   * When to use: Read by `drawRangePerimeterOverlay`; written by `refreshRangePerimeterCacheIfNeeded`.
+   * Expected outcome: `null` when mode inactive or selection invalid; otherwise one or more closed loops.
+   * Exceptions: None.
+   */
+rangePerimeterLoopsLatLng: null as Array<Array<[number, number]>> | null,
+    /**
+   * Signature of mode, battle, and selection used to invalidate `rangePerimeterLoopsLatLng`.
+
+   * Purpose: Detects when perimeter geometry must be recomputed.
+   * When to use: Compared on each draw while ranged/strike planning is active.
+   * Expected outcome: Changes when `selectedUnitIds`, mode flags, or enclosing battle hex changes.
+   * Exceptions: None.
+   */
+rangePerimeterSignature: null as string | null,
+    /**
+   * Active `requestAnimationFrame` id for flowing range perimeter dashes, or null when idle.
+
+   * Purpose: Ensures a single animation loop while planning mode is active.
+   * When to use: Set by `ensureRangePerimeterAnimation` / `tickRangePerimeterAnimation`.
+   * Expected outcome: Non-null only during ranged/strike mode without resolution playback.
+   * Exceptions: None.
+   */
+rangePerimeterAnimationFrameId: null as number | null,
+    /**
    * Documents the object literal property `airStrikeTargetType` (airStrikeTargetType: 'units' as AirStrikeTargetType).
 
    * Purpose: Supports maintainability by documenting why `airStrikeTargetType` exists.

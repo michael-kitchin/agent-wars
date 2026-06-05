@@ -143,10 +143,44 @@ export function executeReadyStrategicTurn(
   const humanFerryOrders = dbGetAll<{ unit_id: string; destination_h3_index: string }>(
     'SELECT unit_id, destination_h3_index FROM pending_ferry_orders ORDER BY unit_id, destination_h3_index'
   ).map((r) => ({ unitId: r.unit_id, destinationH3Index: r.destination_h3_index }));
-  const allAirStrikes = [...humanAirStrikes, ...aiAirStrikeOrders];
-  const allFerryOrders = [...humanFerryOrders, ...aiFerryOrders];
+  const humanOrders = dbGetAll<{ unit_id: string; to_h3_index: string }>('SELECT unit_id, to_h3_index FROM pending_orders');
+  const preMoveState = dbBackedStateSnapshot();
+  const preMoveHexList = preMoveState.hexes.map((h) => h.h3Index);
+  const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(preMoveHexList);
+  const preMoveStateForHuman = getGameStateForPlayer(constants.humanPlayerId, { maskUnexploredTerrain: false });
+  const generatedHuman = generateOrdersForStandingOrders(constants.humanPlayerId, preMoveStateForHuman, latLngByH3, resolveToH3);
+  const mergedHumanRanged = new Map<string, string>();
+  for (const r of generatedHuman.rangedAttacks) mergedHumanRanged.set(r.unitId, r.targetH3Index);
+  for (const r of humanRanged) mergedHumanRanged.set(r.unitId, r.targetH3Index);
+  const mergedHumanRangedOrders = [...mergedHumanRanged.entries()].map(([unitId, targetH3Index]) => ({
+    unitId,
+    targetH3Index,
+  }));
+  const mergedHumanAir = new Map<string, { targetH3Index: string; targetType: AirStrikeTargetType }>();
+  for (const a of generatedHuman.airStrikes) {
+    mergedHumanAir.set(a.unitId, { targetH3Index: a.targetH3Index, targetType: a.targetType });
+  }
+  for (const a of humanAirStrikes) {
+    mergedHumanAir.set(a.unitId, { targetH3Index: a.targetH3Index, targetType: a.targetType });
+  }
+  const mergedHumanAirStrikes = [...mergedHumanAir.entries()].map(([unitId, strike]) => ({
+    unitId,
+    targetH3Index: strike.targetH3Index,
+    targetType: strike.targetType,
+  }));
+  const allAirStrikes = [...mergedHumanAirStrikes, ...aiAirStrikeOrders];
+  const strikeUnitIds = new Set(allAirStrikes.map((s) => s.unitId));
+  const mergedFerryOrders = [...humanFerryOrders, ...aiFerryOrders];
+  const allFerryOrders = mergedFerryOrders.filter((f) => !strikeUnitIds.has(f.unitId));
+  const droppedFerryForStrikeCount = mergedFerryOrders.length - allFerryOrders.length;
+  if (droppedFerryForStrikeCount > 0) {
+    logDebug('ready: dropped ferry orders for units that also strike', {
+      droppedFerryForStrikeCount,
+      strikeUnitCount: strikeUnitIds.size,
+    });
+  }
   applyEmbarkOrdersForPlayer(aiEmbarkOrders, 'opponent');
-  const allRanged = [...humanRanged, ...aiRangedOrders];
+  const allRanged = [...mergedHumanRangedOrders, ...aiRangedOrders];
 
   const turnNumber = constants.turnNumber;
   const gameSeed = getGameSeed();
@@ -185,12 +219,6 @@ export function executeReadyStrategicTurn(
     rangedResult.removedUnits
   );
 
-  const humanOrders = dbGetAll<{ unit_id: string; to_h3_index: string }>('SELECT unit_id, to_h3_index FROM pending_orders');
-  const preMoveState = dbBackedStateSnapshot();
-  const preMoveHexList = preMoveState.hexes.map((h) => h.h3Index);
-  const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(preMoveHexList);
-  const preMoveStateForHuman = getGameStateForPlayer(constants.humanPlayerId, { maskUnexploredTerrain: false });
-  const generatedHuman = generateOrdersForStandingOrders(constants.humanPlayerId, preMoveStateForHuman, latLngByH3, resolveToH3);
   const mergedHuman = new Map<string, string>();
   for (const o of generatedHuman.movementOrders) mergedHuman.set(o.unitId, o.toH3Index);
   for (const o of humanOrders) mergedHuman.set(o.unit_id, o.to_h3_index);
@@ -232,10 +260,13 @@ export function executeReadyStrategicTurn(
       });
     }
   }
-  const traversedHexesByPlayer = collectTraversedHexesByPlayer(
-    allOrders,
-    preMoveState.units.map((u) => ({ id: u.id, player: u.player, h3Index: u.h3Index, unitType: u.unitType }))
-  );
+  const unitsBeforeMovementAfterCombat = listUnitsForSnapshot().map((u) => ({
+    id: u.id,
+    player: u.player,
+    h3Index: u.h3Index,
+    unitType: u.unitType,
+  }));
+  const traversedHexesByPlayer = collectTraversedHexesByPlayer(allOrders, unitsBeforeMovementAfterCombat);
   const opponentHadStrategicMarchResolution =
     traversedHexesByPlayer.opponent.size > 0 ||
     aiOrders.some((o) => {

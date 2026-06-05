@@ -4,10 +4,10 @@ import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
 import {
   ORDER_LINE_COLOR,
   ORDER_LINE_WIDTH,
-  PENDING_AIR_STRIKE_ORDER_LINE_COLOR,
-  PENDING_RANGED_ORDER_LINE_COLOR,
+  RANGE_PERIMETER_ALPHA,
 } from '../core/constants';
 import { clampLatForWebMercatorDisplay } from '../map/hexGrid';
+import { rangePerimeterStaticLineStyle } from './orderDrawing';
 import { drawArrowheadOnly, strokePolylineSkippingWrap } from './pathDrawing';
 import { rendererSharedState as S } from '../core/state';
 import { getLeafletGlobal, hexCenterPx, hexCenterPxRelativeTo } from '../map/mapUtils';
@@ -32,10 +32,8 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
   const supportMode = S.hoverRoutePreview.renderAsSupportTargeting;
   if (supportMode) {
     if (!state && !tb) return;
-    const dash: number[] = supportMode === 'ranged' ? [6, 4] : [2, 6];
     const targetH3 = S.hoverRoutePreview.hoveredH3Index;
-    const paletteColor =
-      supportMode === 'ranged' ? PENDING_RANGED_ORDER_LINE_COLOR : PENDING_AIR_STRIKE_ORDER_LINE_COLOR;
+    const style = rangePerimeterStaticLineStyle(supportMode === 'ranged' ? 'ranged' : 'airStrike');
     for (const perUnit of previewGroup.previews) {
       const preview = perUnit.preview;
       if (!preview.valid || preview.segments.length === 0) continue;
@@ -48,10 +46,10 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
       const from = hexCenterPx(originH3);
       const to = hexCenterPxRelativeTo(originH3, targetH3);
       ctx.save();
-      ctx.globalAlpha = 0.38;
-      ctx.setLineDash(dash);
-      ctx.strokeStyle = paletteColor;
-      ctx.lineWidth = ORDER_LINE_WIDTH;
+      ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
+      ctx.setLineDash(style.dash);
+      ctx.strokeStyle = style.strokeColor;
+      ctx.lineWidth = style.lineWidth;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.beginPath();

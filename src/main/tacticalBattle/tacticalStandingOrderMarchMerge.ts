@@ -8,11 +8,16 @@
  */
 
 import { cellToLatLng } from 'h3-js';
+import type { AirStrikeTargetType } from '../../shared/ipc/ordersTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildLatLngCoordinateMap } from '../mapData';
-import { getGameStateForPlayer } from '../gameDb';
+import { dbGetAll, getGameStateForPlayer } from '../gameDb';
 import { logDebug } from '../logger';
 import { generateOrdersForStandingOrders } from '../tools/tool5StandingOrders';
+import {
+  generateTacticalDefendEngagementForPlayer,
+  pickClosestEnemyTacticalRangedTargetForSubUnit,
+} from './tacticalRangedTargetResolve';
 
 /**
  * Picks the footprint res4 cell whose centroid is closest to the strategic H3 destination centroid.
@@ -116,15 +121,21 @@ export function mergeHumanStandingOrdersIntoTacticalMarchOrders(
  * Purpose: `generateOrdersForStandingOrders` emits strategic `unitId` values; tactical `requestAiOrders` validation and
  * application require tactical sub-unit ids and res4 targets derived from strategic path endpoints.
  * When to use: Tactical branch of `requestOrdersFlow` after Tool 5 generation with `mutateProgress: false`.
- * Expected outcome: Movement uses `pickTacticalRes4TowardStrategicH3` per parent march; ranged uses the same projection
- * for targets; when a parent has no opponent sub-units in the snapshot, that standing row contributes nothing.
+ * Expected outcome: Movement uses `pickTacticalRes4TowardStrategicH3` per parent march; ranged maps each sub-unit to the
+ * closest legal enemy res4 cell (not the footprint anchor nearest to a strategic res1 target); air strikes are expanded from
+ * strategic parent unit ids to tactical sub-unit ids targeting the closest legal enemy res4 cell.
  * Exceptions: None.
  */
 export function expandOpponentStandingOrdersForTacticalBattle(
   battle: TacticalBattleSnapshot,
   standingParentMovement: readonly { unitId: string; toH3Index: string }[],
-  standingParentRanged: readonly { unitId: string; targetH3Index: string }[]
-): { movementOrders: { unitId: string; toH3Index: string }[]; rangedAttacks: { unitId: string; targetH3Index: string }[] } {
+  standingParentRanged: readonly { unitId: string; targetH3Index: string }[],
+  standingParentAir: readonly { unitId: string; targetH3Index: string; targetType: AirStrikeTargetType }[] = []
+): {
+  movementOrders: { unitId: string; toH3Index: string }[];
+  rangedAttacks: { unitId: string; targetH3Index: string }[];
+  airStrikes: { unitId: string; targetH3Index: string; targetType: AirStrikeTargetType }[];
+} {
   const oppSubs = battle.subUnits.filter((u) => u.player === 'opponent');
   const movementBySub = new Map<string, string>();
   for (const o of standingParentMovement) {
@@ -138,22 +149,87 @@ export function expandOpponentStandingOrdersForTacticalBattle(
   }
   const rangedBySub = new Map<string, string>();
   for (const r of standingParentRanged) {
-    const tacticalTarget = pickTacticalRes4TowardStrategicH3(battle, r.targetH3Index);
-    if (!tacticalTarget) continue;
     for (const su of oppSubs) {
       if (su.parentUnitId !== r.unitId) continue;
+      const tacticalTarget =
+        pickClosestEnemyTacticalRangedTargetForSubUnit(battle, su.id) ??
+        pickTacticalRes4TowardStrategicH3(battle, r.targetH3Index);
+      if (!tacticalTarget) continue;
       rangedBySub.set(su.id, tacticalTarget);
+    }
+  }
+  const airBySubId = new Map<string, { targetH3Index: string; targetType: AirStrikeTargetType }>();
+  for (const a of standingParentAir) {
+    for (const su of oppSubs) {
+      if (su.unitType !== 'air' || su.parentUnitId !== a.unitId) continue;
+      const tacticalTarget = pickClosestEnemyTacticalRangedTargetForSubUnit(battle, su.id);
+      if (!tacticalTarget) continue;
+      airBySubId.set(su.id, { targetH3Index: tacticalTarget, targetType: a.targetType });
     }
   }
   logDebug('tacticalStandingOrderMarchMerge expandOpponentStandingOrdersForTacticalBattle', {
     battleId: battle.battleId,
     parentMovementIn: standingParentMovement.length,
     parentRangedIn: standingParentRanged.length,
+    parentAirIn: standingParentAir.length,
     subMovementOut: movementBySub.size,
     subRangedOut: rangedBySub.size,
+    subAirOut: airBySubId.size,
   });
   return {
     movementOrders: [...movementBySub.entries()].map(([unitId, toH3Index]) => ({ unitId, toH3Index })),
     rangedAttacks: [...rangedBySub.entries()].map(([unitId, targetH3Index]) => ({ unitId, targetH3Index })),
+    airStrikes: [...airBySubId.entries()].map(([unitId, { targetH3Index, targetType }]) => ({
+      unitId,
+      targetH3Index,
+      targetType,
+    })),
   };
+}
+
+/**
+ * Generates DEFEND auto-engagement ranged and air-strike rows for human sub-units in an active tactical battle and merges them with explicitly submitted orders (explicit wins on same sub-unit id).
+ *
+ * Purpose: Mirrors opponent DEFEND tactical expansion for the human player; reads the DB for current human DEFEND standing-order parent unit ids, then delegates to `generateTacticalDefendEngagementForPlayer`.
+ * When to use: `commitHumanTacticalDraftOrders` after `preBattle` is available and before the beat is applied; call once per commit.
+ * Expected outcome: Merged ranged/air arrays that include DEFEND-generated rows unless the human explicitly submitted an order for the same sub-unit.
+ * Exceptions: None; DB errors return only explicit orders.
+ */
+export function mergeHumanTacticalDefendEngagementOrders(
+  battle: TacticalBattleSnapshot,
+  explicitRanged: readonly { unitId: string; targetH3Index: string }[],
+  explicitAir: readonly { unitId: string; targetH3Index: string; targetType: AirStrikeTargetType }[]
+): {
+  rangedAttacks: { unitId: string; targetH3Index: string }[];
+  airStrikes: { unitId: string; targetH3Index: string; targetType: AirStrikeTargetType }[];
+} {
+  const defendRows = dbGetAll<{ unit_id: string }>(
+    "SELECT unit_id FROM standing_orders WHERE player_id = 'human' AND order_type = 'defend'"
+  );
+  const defendParentIds = defendRows.map((r) => r.unit_id);
+  if (defendParentIds.length === 0) {
+    return { rangedAttacks: [...explicitRanged], airStrikes: [...explicitAir] };
+  }
+  const generated = generateTacticalDefendEngagementForPlayer(battle, 'human', defendParentIds);
+  const explicitRangedUnitIds = new Set(explicitRanged.map((r) => r.unitId));
+  const explicitAirUnitIds = new Set(explicitAir.map((a) => a.unitId));
+  const mergedRanged = [
+    ...generated.rangedAttacks.filter((r) => !explicitRangedUnitIds.has(r.unitId)),
+    ...explicitRanged,
+  ];
+  const mergedAir = [
+    ...generated.airStrikes.filter((a) => !explicitAirUnitIds.has(a.unitId)),
+    ...explicitAir,
+  ];
+  logDebug('tacticalStandingOrderMarchMerge mergeHumanTacticalDefendEngagementOrders', {
+    battleId: battle.battleId,
+    defendParentCount: defendParentIds.length,
+    generatedRangedCount: generated.rangedAttacks.length,
+    generatedAirCount: generated.airStrikes.length,
+    explicitRangedCount: explicitRanged.length,
+    explicitAirCount: explicitAir.length,
+    mergedRangedCount: mergedRanged.length,
+    mergedAirCount: mergedAir.length,
+  });
+  return { rangedAttacks: mergedRanged, airStrikes: mergedAir };
 }

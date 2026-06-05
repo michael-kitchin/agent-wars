@@ -106,6 +106,10 @@ Using the **current** (pre-movement) positions, after air strike casualties are 
 - Build ranged attacks: for each unit with range ≥ 1 (armor, naval — **not** air, which resolves in §4.1), determine enemy-occupied hexes within range; each (attacker hex, defender hex) is a ranged attack.
 - Resolve all ranged engagements. Apply casualties and remove eliminated units. No melee yet.
 
+**DEFEND standing orders (strategic):** Each turn, a unit holding a DEFEND order automatically issues one ranged attack (infantry/armor/naval) or one air strike against enemy units (air only, `targetType: units`) at the closest enemy within weapon range, measured from the unit's **current** hex — including while still marching toward its defend post. Explicit human pending orders override standing-generated attack rows for the same unit id.
+
+**DEFEND standing orders (tactical):** The same per-beat auto-engagement applies during tactical battles. Each tactical beat, sub-units whose strategic parent carries a DEFEND order fire ranged (non-air) or air strikes (air, `targetType: units`) at the closest legal enemy res4 cell — regardless of whether the unit has yet reached its defend post. Explicit/LLM orders for the same sub-unit override standing-generated rows. Opponent standing-order air strikes are expanded from strategic parent ids to tactical sub-unit ids targeting the closest enemy sub-unit res4 hex.
+
 ### 4.3 Apply ground and naval movement
 
 Move every ground and naval unit that has a movement order to its destination. Positions are now final for ground and naval units.
@@ -419,6 +423,8 @@ At the tactical level, all unit types gain ranged attack capability, reflecting 
 Ranged attacks use the same A&A-style dice resolution as strategic combat: roll d6, hit if roll ≤ attack value. Counter-fire applies if the target has range to reach the attacker. Casualty assignment follows the standard fixed priority.
 
 Ranged attacks are not blocked by terrain — line of sight is not modeled at the tactical level. This is a deliberate simplification consistent with the strategic level's approach. If playtesting reveals that terrain-blocked LOS adds meaningful tactical depth without overwhelming the player or AI, it can be added later.
+
+**Tactical ranged target selection:** When standing-order or draft ranged rows are expanded from strategic parent units to tactical sub-units, targets must resolve to **enemy-occupied res4 cells** that pass tactical range and mountain LOS — not the res1-centroid footprint anchor. Sanitization re-targets invalid opponent draft rows to the closest legal enemy cell before dropping them. Naval may bombard adjacent land sub-units when range and LOS allow.
 
 ### 12.6 Tactical turn structure
 

@@ -10,7 +10,7 @@ import {
 import { getHexBoundaryLatLngForLeafletOverlay } from '../map/hexGrid';
 import { getActiveHexStrokeStyle, fillHexTerrain } from './terrainVisualStyles';
 import { drawTerrainInfrastructureGlyphs, RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE } from './terrainInfrastructureOverlay';
-import { DETAIL_H3_RESOLUTION, MULTI_PLAYER_FILL, PLAYER_COLORS } from '../core/constants';
+import { DETAIL_H3_RESOLUTION, MULTI_PLAYER_FILL, PLAYER_COLORS, RANGE_PERIMETER_WIDTH_MULTIPLIER } from '../core/constants';
 import { getLeafletGlobal, hexCenterPx } from '../map/mapUtils';
 import {
   projectHexBoundaryToContainerPoints,
@@ -21,6 +21,69 @@ import {
 } from '../map/terrainView';
 import { rendererSharedState as S } from '../core/state';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
+
+/**
+ * Returns the map zoom stroke scale factor used for terrain and ownership borders.
+ *
+ * Purpose: Centralizes the zoom-to-stroke mapping shared by terrain hexes and home-region outlines.
+ * When to use: Any canvas stroke that should track Leaflet zoom like `drawTerrainHexes`.
+ * Expected outcome: Value in `[0.88, 1.22]` for typical game zoom levels.
+ * Exceptions: None.
+ */
+export function getMapZoomStrokeScale(zoom: number): number {
+  return Math.max(0.88, Math.min(1.22, 1.22 - ((zoom - 2) * (0.32 / 8))));
+}
+
+/**
+ * Returns the solid outer home-region ownership border width in screen pixels.
+ *
+ * Purpose: Single source for home outer ring width; ranged/air-strike support lines use 1.5× this value at the same zoom.
+ * When to use: `drawOutlinedHomeRegionOwnershipBorders` and `getRangePerimeterSupportLineWidth`.
+ * Expected outcome: `Math.max(stroke.width * zoomScale * 3, 2.7)` matching pre-extraction behavior.
+ * Exceptions: None.
+ */
+export function getHomeRegionOwnershipLineWidth(zoom: number): number {
+  const stroke = getActiveHexStrokeStyle();
+  const zoomStrokeScale = getMapZoomStrokeScale(zoom);
+  return Math.max(stroke.width * zoomStrokeScale * 3, 2.7);
+}
+
+/**
+ * Returns screen-pixel stroke width for ranged/air-strike perimeter, planned, and hover lines.
+ *
+ * Purpose: Keeps support targeting strokes at 1.5× the outer home-region ownership border at the given map zoom.
+ * When to use: `drawRangePerimeterOverlay`, `rangePerimeterStaticLineStyle`, and support hover previews.
+ * Expected outcome: `getHomeRegionOwnershipLineWidth(zoom) * RANGE_PERIMETER_WIDTH_MULTIPLIER`.
+ * Exceptions: None.
+ */
+export function getRangePerimeterSupportLineWidth(zoom: number): number {
+  return getHomeRegionOwnershipLineWidth(zoom) * RANGE_PERIMETER_WIDTH_MULTIPLIER;
+}
+
+/**
+ * Resolves current main-map zoom for stroke width calculations.
+ *
+ * Purpose: Shared fallback when Leaflet zoom is unavailable during canvas overlay draws.
+ * When to use: Before computing home-border-derived stroke widths on the game canvas.
+ * Expected outcome: Map zoom or `defaultZoom` (4) when the main map is missing.
+ * Exceptions: None.
+ */
+export function resolveMainLeafletMapZoom(defaultZoom = 4): number {
+  const map = getMainLeafletMap() as { getZoom?: () => number } | null;
+  return map && typeof map.getZoom === 'function' ? map.getZoom() : defaultZoom;
+}
+
+/**
+ * Returns support-line width for the current main-map zoom.
+ *
+ * Purpose: Convenience for overlay drawers that do not already hold a zoom value.
+ * When to use: Planned/hover/perimeter support line drawing each frame.
+ * Expected outcome: Same as `getRangePerimeterSupportLineWidth(resolveMainLeafletMapZoom())`.
+ * Exceptions: None.
+ */
+export function getCurrentRangePerimeterSupportLineWidth(): number {
+  return getRangePerimeterSupportLineWidth(resolveMainLeafletMapZoom());
+}
 
 /**
  * Documents the `TerrainRenderingDeps` interface as a named contract surface (interface TerrainRenderingDeps).
@@ -227,7 +290,7 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
   if (!map) return;
   const mapWithZoom = map as { getZoom?: () => number };
   const zoom = typeof mapWithZoom.getZoom === 'function' ? mapWithZoom.getZoom() : 4;
-  const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - ((zoom - 2) * (0.32 / 8))));
+  const zoomStrokeScale = getMapZoomStrokeScale(zoom);
   const L = getLeafletGlobal();
   const visibleHexes = S.gameState.visibleHexes ? new Set(S.gameState.visibleHexes) : new Set(S.gameState.hexes.map((h) => h.h3Index));
   const controlByHex = buildControlByHex(S.gameState);
@@ -283,7 +346,7 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
     drawClosedPath();
     ctx.stroke();
     if (ownershipStyle !== 'none') {
-      const ownershipLineWidth = Math.max(stroke.width * zoomStrokeScale * 3, 2.7);
+      const ownershipLineWidth = getHomeRegionOwnershipLineWidth(zoom);
       if (ownershipStyle.startsWith('outlined')) {
         drawOutlinedHomeRegionOwnershipBorders(ctx, pts, {
           controllerPlayerId: controlByHex.get(hx.h3Index),
@@ -397,7 +460,6 @@ export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): v
   if (!map) return;
   const L = getLeafletGlobal();
   const zoom = typeof map.getZoom === 'function' ? map.getZoom() : 4;
-  const zoomScale = Math.max(0.88, Math.min(1.22, 1.22 - ((zoom - 2) * (0.32 / 8))));
   const perspective = state.playerPerspective === 'opponent' ? 'opponent' : 'human';
   const visibleHexes = state.visibleHexes ? new Set(state.visibleHexes) : new Set(state.hexes.map((h) => h.h3Index));
   const controlByHex = buildControlByHex(state);
@@ -424,7 +486,7 @@ export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): v
       const p = map.latLngToContainerPoint(L.latLng(lat, lng));
       return { x: p.x, y: p.y };
     });
-    const ownershipLineWidth = Math.max(getActiveHexStrokeStyle().width * zoomScale * 3, 2.7);
+    const ownershipLineWidth = getHomeRegionOwnershipLineWidth(zoom);
     drawOutlinedHomeRegionOwnershipBorders(ctx, pts, {
       controllerPlayerId: controlByHex.get(h3Index),
       homeOwnerIdentity: resolveHomeRegionOwnerIdentity({
@@ -498,7 +560,7 @@ export function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D,
   if (deps.isMapInspectionModeHeld()) return;
   const mapWithZoom = map as { getZoom?: () => number };
   const zoom = typeof mapWithZoom.getZoom === 'function' ? mapWithZoom.getZoom() : 4;
-  const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - ((zoom - 2) * (0.32 / 8))));
+  const zoomStrokeScale = getMapZoomStrokeScale(zoom);
   const outlineScreenPx = Math.max(0.5, 0.58 * zoomStrokeScale);
   const L = getLeafletGlobal();
   const res4On = shouldRenderRes4Hexes();

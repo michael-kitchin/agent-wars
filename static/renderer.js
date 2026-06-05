@@ -14125,6 +14125,44 @@
       libh3._free(countPtr);
     }
   }
+  function directedEdgeToCells(edgeIndex) {
+    var ref = h3IndexToSplitLong(edgeIndex);
+    var lower = ref[0];
+    var upper = ref[1];
+    var count = 2;
+    var hexagons = libh3._calloc(count, SZ_H3INDEX);
+    try {
+      throwIfError(H3.directedEdgeToCells(lower, upper, hexagons));
+      return readArrayOfH3Indexes(hexagons, count);
+    } finally {
+      libh3._free(hexagons);
+    }
+  }
+  function originToDirectedEdges(h3Index) {
+    var ref = h3IndexToSplitLong(h3Index);
+    var lower = ref[0];
+    var upper = ref[1];
+    var count = 6;
+    var edges = libh3._calloc(count, SZ_H3INDEX);
+    try {
+      throwIfError(H3.originToDirectedEdges(lower, upper, edges));
+      return readArrayOfH3Indexes(edges, count);
+    } finally {
+      libh3._free(edges);
+    }
+  }
+  function directedEdgeToBoundary(edgeIndex, formatAsGeoJson) {
+    var cellBoundary = libh3._malloc(SZ_CELLBOUNDARY);
+    var ref = h3IndexToSplitLong(edgeIndex);
+    var lower = ref[0];
+    var upper = ref[1];
+    try {
+      throwIfError(H3.directedEdgeToBoundary(lower, upper, cellBoundary));
+      return readCellBoundary(cellBoundary, formatAsGeoJson);
+    } finally {
+      libh3._free(cellBoundary);
+    }
+  }
   function gridDistance(origin, destination) {
     var ref = h3IndexToSplitLong(origin);
     var oLower = ref[0];
@@ -14220,8 +14258,6 @@
   };
   var ORDER_LINE_COLOR = PLAYER_COLORS.human;
   var ORDER_LINE_WIDTH = 2.5;
-  var PENDING_RANGED_ORDER_LINE_COLOR = "#a06020";
-  var PENDING_AIR_STRIKE_ORDER_LINE_COLOR = "#7a3db5";
   var ORDER_ARROW_SIZE = 10;
   var AI_ORDER_LINE_COLOR = PLAYER_COLORS.opponent;
   var TOOLTIP_OFFSET_PX = 12;
@@ -14258,6 +14294,19 @@
   var MULTI_PLAYER_STROKE = "#000";
   var LIGHTNING_COLOR = "#f0d000";
   var CASUALTY_X_COLOR = "#c03030";
+  var RANGE_PERIMETER_RANGED_COLOR = "#a06020";
+  var RANGE_PERIMETER_AIR_STRIKE_COLOR = "#7a3db5";
+  var RANGE_PERIMETER_WIDTH_MULTIPLIER = 1.5;
+  var RANGE_PERIMETER_ALPHA = 0.75;
+  var RANGE_PERIMETER_DASH_SOLID_FRACTION = 1;
+  var RANGE_PERIMETER_DASH_GAP_FRACTION = 1;
+  var RANGE_PERIMETER_DASH_MIN_SOLID_PX = 8;
+  var RANGE_PERIMETER_DASH_MIN_GAP_PX = 8;
+  var RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION = 1;
+  var RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION = 1;
+  var RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX = 8;
+  var RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX = 8;
+  var RANGE_PERIMETER_FLOW_PX_PER_SEC = 12;
 
   // src/renderer/map/basemapProvider.ts
   var RASTER_BASEMAP_ORDER = [
@@ -15205,6 +15254,33 @@
        * Exceptions: None.
        */
     airStrikeModeActive: false,
+    /**
+       * Cached lat/lng vertex loops for the range perimeter overlay (recomputed when signature changes).
+    
+       * Purpose: Avoids rebuilding H3 disks and edge chains every animation frame.
+       * When to use: Read by `drawRangePerimeterOverlay`; written by `refreshRangePerimeterCacheIfNeeded`.
+       * Expected outcome: `null` when mode inactive or selection invalid; otherwise one or more closed loops.
+       * Exceptions: None.
+       */
+    rangePerimeterLoopsLatLng: null,
+    /**
+       * Signature of mode, battle, and selection used to invalidate `rangePerimeterLoopsLatLng`.
+    
+       * Purpose: Detects when perimeter geometry must be recomputed.
+       * When to use: Compared on each draw while ranged/strike planning is active.
+       * Expected outcome: Changes when `selectedUnitIds`, mode flags, or enclosing battle hex changes.
+       * Exceptions: None.
+       */
+    rangePerimeterSignature: null,
+    /**
+       * Active `requestAnimationFrame` id for flowing range perimeter dashes, or null when idle.
+    
+       * Purpose: Ensures a single animation loop while planning mode is active.
+       * When to use: Set by `ensureRangePerimeterAnimation` / `tickRangePerimeterAnimation`.
+       * Expected outcome: Non-null only during ranged/strike mode without resolution playback.
+       * Exceptions: None.
+       */
+    rangePerimeterAnimationFrameId: null,
     /**
        * Documents the object literal property `airStrikeTargetType` (airStrikeTargetType: 'units' as AirStrikeTargetType).
     
@@ -16695,6 +16771,24 @@
   }
 
   // src/renderer/rendering/terrainRendering.ts
+  function getMapZoomStrokeScale(zoom) {
+    return Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
+  }
+  function getHomeRegionOwnershipLineWidth(zoom) {
+    const stroke = getActiveHexStrokeStyle();
+    const zoomStrokeScale = getMapZoomStrokeScale(zoom);
+    return Math.max(stroke.width * zoomStrokeScale * 3, 2.7);
+  }
+  function getRangePerimeterSupportLineWidth(zoom) {
+    return getHomeRegionOwnershipLineWidth(zoom) * RANGE_PERIMETER_WIDTH_MULTIPLIER;
+  }
+  function resolveMainLeafletMapZoom(defaultZoom = 4) {
+    const map = getMainLeafletMap();
+    return map && typeof map.getZoom === "function" ? map.getZoom() : defaultZoom;
+  }
+  function getCurrentRangePerimeterSupportLineWidth() {
+    return getRangePerimeterSupportLineWidth(resolveMainLeafletMapZoom());
+  }
   function buildControlByHex(state) {
     return new Map((state.res1Control ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
   }
@@ -16771,7 +16865,7 @@
     if (!map) return;
     const mapWithZoom = map;
     const zoom = typeof mapWithZoom.getZoom === "function" ? mapWithZoom.getZoom() : 4;
-    const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
+    const zoomStrokeScale = getMapZoomStrokeScale(zoom);
     const L = getLeafletGlobal();
     const visibleHexes = rendererSharedState.gameState.visibleHexes ? new Set(rendererSharedState.gameState.visibleHexes) : new Set(rendererSharedState.gameState.hexes.map((h) => h.h3Index));
     const controlByHex = buildControlByHex(rendererSharedState.gameState);
@@ -16826,7 +16920,7 @@
       drawClosedPath();
       ctx.stroke();
       if (ownershipStyle !== "none") {
-        const ownershipLineWidth = Math.max(stroke.width * zoomStrokeScale * 3, 2.7);
+        const ownershipLineWidth = getHomeRegionOwnershipLineWidth(zoom);
         if (ownershipStyle.startsWith("outlined")) {
           drawOutlinedHomeRegionOwnershipBorders(ctx, pts, {
             controllerPlayerId: controlByHex.get(hx.h3Index),
@@ -16915,7 +17009,6 @@
     if (!map) return;
     const L = getLeafletGlobal();
     const zoom = typeof map.getZoom === "function" ? map.getZoom() : 4;
-    const zoomScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
     const perspective = state.playerPerspective === "opponent" ? "opponent" : "human";
     const visibleHexes = state.visibleHexes ? new Set(state.visibleHexes) : new Set(state.hexes.map((h) => h.h3Index));
     const controlByHex = buildControlByHex(state);
@@ -16942,7 +17035,7 @@
         const p = map.latLngToContainerPoint(L.latLng(lat, lng));
         return { x: p.x, y: p.y };
       });
-      const ownershipLineWidth = Math.max(getActiveHexStrokeStyle().width * zoomScale * 3, 2.7);
+      const ownershipLineWidth = getHomeRegionOwnershipLineWidth(zoom);
       drawOutlinedHomeRegionOwnershipBorders(ctx, pts, {
         controllerPlayerId: controlByHex.get(h3Index),
         homeOwnerIdentity: resolveHomeRegionOwnerIdentity({
@@ -16972,7 +17065,7 @@
     if (deps.isMapInspectionModeHeld()) return;
     const mapWithZoom = map;
     const zoom = typeof mapWithZoom.getZoom === "function" ? mapWithZoom.getZoom() : 4;
-    const zoomStrokeScale = Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
+    const zoomStrokeScale = getMapZoomStrokeScale(zoom);
     const outlineScreenPx = Math.max(0.5, 0.58 * zoomStrokeScale);
     const L = getLeafletGlobal();
     const res4On = shouldRenderRes4Hexes();
@@ -17119,6 +17212,7 @@
   function unitHasTacticalRangedBaseline(unitType) {
     return (RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0) >= 1;
   }
+  var AIR_STRIKE_RANGE_HEXES = 3;
 
   // src/shared/tacticalRes4TransportLink.ts
   var orderedRingMemo = /* @__PURE__ */ new Map();
@@ -19036,14 +19130,38 @@
   }
 
   // src/renderer/rendering/orderDrawing.ts
+  function rangePerimeterStaticLineStyle(mode) {
+    const lineWidth = getCurrentRangePerimeterSupportLineWidth();
+    const strokeColor = mode === "airStrike" ? RANGE_PERIMETER_AIR_STRIKE_COLOR : RANGE_PERIMETER_RANGED_COLOR;
+    if (mode === "airStrike") {
+      return {
+        lineWidth,
+        strokeColor,
+        dash: [
+          Math.max(RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX, lineWidth * RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION),
+          Math.max(RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX, lineWidth * RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION)
+        ]
+      };
+    }
+    return {
+      lineWidth,
+      strokeColor,
+      dash: [
+        Math.max(RANGE_PERIMETER_DASH_MIN_SOLID_PX, lineWidth * RANGE_PERIMETER_DASH_SOLID_FRACTION),
+        Math.max(RANGE_PERIMETER_DASH_MIN_GAP_PX, lineWidth * RANGE_PERIMETER_DASH_GAP_FRACTION)
+      ]
+    };
+  }
   function drawRangedAttackLines(ctx, canvasWidth, canvasHeight, ranged, units, hexList) {
     void canvasWidth;
     void canvasHeight;
     if (ranged.length === 0 || !hexList) return;
+    const style = rangePerimeterStaticLineStyle("ranged");
     ctx.save();
-    ctx.setLineDash([6, 4]);
-    ctx.strokeStyle = PENDING_RANGED_ORDER_LINE_COLOR;
-    ctx.lineWidth = ORDER_LINE_WIDTH;
+    ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
+    ctx.setLineDash(style.dash);
+    ctx.strokeStyle = style.strokeColor;
+    ctx.lineWidth = style.lineWidth;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     for (const r of ranged) {
@@ -19060,10 +19178,12 @@
   }
   function drawAirStrikeLines(ctx, airStrikes, units, hexList) {
     if (airStrikes.length === 0 || !hexList) return;
+    const style = rangePerimeterStaticLineStyle("airStrike");
     ctx.save();
-    ctx.setLineDash([2, 6]);
-    ctx.strokeStyle = PENDING_AIR_STRIKE_ORDER_LINE_COLOR;
-    ctx.lineWidth = ORDER_LINE_WIDTH;
+    ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
+    ctx.setLineDash(style.dash);
+    ctx.strokeStyle = style.strokeColor;
+    ctx.lineWidth = style.lineWidth;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     for (const strike of airStrikes) {
@@ -22370,9 +22490,8 @@
     const supportMode = rendererSharedState.hoverRoutePreview.renderAsSupportTargeting;
     if (supportMode) {
       if (!state && !tb) return;
-      const dash = supportMode === "ranged" ? [6, 4] : [2, 6];
       const targetH3 = rendererSharedState.hoverRoutePreview.hoveredH3Index;
-      const paletteColor = supportMode === "ranged" ? PENDING_RANGED_ORDER_LINE_COLOR : PENDING_AIR_STRIKE_ORDER_LINE_COLOR;
+      const style = rangePerimeterStaticLineStyle(supportMode === "ranged" ? "ranged" : "airStrike");
       for (const perUnit of previewGroup.previews) {
         const preview = perUnit.preview;
         if (!preview.valid || preview.segments.length === 0) continue;
@@ -22381,10 +22500,10 @@
         const from = hexCenterPx(originH3);
         const to = hexCenterPxRelativeTo(originH3, targetH3);
         ctx.save();
-        ctx.globalAlpha = 0.38;
-        ctx.setLineDash(dash);
-        ctx.strokeStyle = paletteColor;
-        ctx.lineWidth = ORDER_LINE_WIDTH;
+        ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
+        ctx.setLineDash(style.dash);
+        ctx.strokeStyle = style.strokeColor;
+        ctx.lineWidth = style.lineWidth;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
         ctx.beginPath();
@@ -24559,6 +24678,322 @@
     });
   }
 
+  // src/shared/rangePerimeterGeometry.ts
+  function endpointKey(p) {
+    return `${p[0].toFixed(7)},${p[1].toFixed(7)}`;
+  }
+  function chainSegmentsIntoLoops(segments) {
+    if (segments.length === 0) return [];
+    const unused = new Set(segments.map((_, i) => i));
+    const neighbors = /* @__PURE__ */ new Map();
+    for (let i = 0; i < segments.length; i++) {
+      const s = segments[i];
+      for (const [pt, at] of [
+        [s.a, "a"],
+        [s.b, "b"]
+      ]) {
+        const k = endpointKey(pt);
+        const list = neighbors.get(k) ?? [];
+        list.push({ idx: i, at });
+        neighbors.set(k, list);
+      }
+    }
+    const loops = [];
+    while (unused.size > 0) {
+      const startIdx = unused.values().next().value;
+      unused.delete(startIdx);
+      const startSeg = segments[startIdx];
+      const loop = [startSeg.a, startSeg.b];
+      let currentKey = endpointKey(startSeg.b);
+      while (true) {
+        const candidates = (neighbors.get(currentKey) ?? []).filter((c) => unused.has(c.idx));
+        if (candidates.length === 0) break;
+        const next = candidates[0];
+        unused.delete(next.idx);
+        const seg = segments[next.idx];
+        if (endpointKey(seg.a) === currentKey) {
+          loop.push(seg.b);
+          currentKey = endpointKey(seg.b);
+        } else {
+          loop.push(seg.a);
+          currentKey = endpointKey(seg.a);
+        }
+        if (currentKey === endpointKey(loop[0])) break;
+      }
+      if (loop.length >= 3) loops.push(loop);
+    }
+    return loops;
+  }
+  function collectExteriorSegments(h3Indexes) {
+    const segments = [];
+    for (const cell of h3Indexes) {
+      let edges;
+      try {
+        edges = originToDirectedEdges(cell);
+      } catch {
+        continue;
+      }
+      for (const edge of edges) {
+        let cells;
+        try {
+          cells = directedEdgeToCells(edge);
+        } catch {
+          continue;
+        }
+        const dest = cells[1];
+        if (dest === void 0 || h3Indexes.has(dest)) continue;
+        let boundary;
+        try {
+          boundary = directedEdgeToBoundary(edge);
+        } catch {
+          continue;
+        }
+        if (boundary.length < 2) continue;
+        const a = boundary[0];
+        const b = boundary[boundary.length - 1];
+        segments.push({ a: [a[0], a[1]], b: [b[0], b[1]] });
+      }
+    }
+    return segments;
+  }
+  function computeUnionPerimeterLoops(h3Indexes) {
+    if (h3Indexes.size === 0) return [];
+    try {
+      return chainSegmentsIntoLoops(collectExteriorSegments(h3Indexes));
+    } catch {
+      return [];
+    }
+  }
+
+  // src/shared/rangePerimeterModel.ts
+  function strategicRangedRangeHexesForUnitType(unitType) {
+    const table = { infantry: 1, armor: 1, naval: 2, air: 3 };
+    return table[unitType] ?? 0;
+  }
+  function buildStrategicRangedRangeSet(units) {
+    const out = /* @__PURE__ */ new Set();
+    for (const u of units) {
+      const range = strategicRangedRangeHexesForUnitType(u.unitType);
+      if (range < 1) continue;
+      try {
+        for (const h of gridDisk(u.h3Index, range)) out.add(h);
+      } catch {
+      }
+    }
+    return out;
+  }
+  function buildStrategicAirStrikeRangeSet(units) {
+    const out = /* @__PURE__ */ new Set();
+    for (const u of units) {
+      try {
+        for (const h of gridDisk(u.h3Index, AIR_STRIKE_RANGE_HEXES)) out.add(h);
+      } catch {
+      }
+    }
+    return out;
+  }
+  function buildTacticalRangedRangeSet(battle, subUnits, footprint) {
+    const out = /* @__PURE__ */ new Set();
+    for (const u of subUnits) {
+      const anchor = tacticalMovementTerrainAnchorH3(u, battle.subUnits);
+      const range = effectiveTacticalRangedMaxRangeForAttacker(battle, u.unitType, anchor);
+      if (range < 1) continue;
+      try {
+        for (const h of gridDisk(anchor, range)) {
+          if (footprint.has(h)) out.add(h);
+        }
+      } catch {
+      }
+    }
+    return out;
+  }
+  function buildTacticalAirStrikeRangeSet(footprint) {
+    return new Set(footprint);
+  }
+
+  // src/renderer/rendering/polygonOutline.ts
+  function drawClosedPolygonPath(ctx, points) {
+    ctx.beginPath();
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath();
+  }
+
+  // src/renderer/rendering/rangePerimeterOverlay.ts
+  var rangePerimeterAnimationTickInFlight = false;
+  function isRangePerimeterModeActive() {
+    return rendererSharedState.rangedModeActive || rendererSharedState.airStrikeModeActive;
+  }
+  function buildRangePerimeterSignature() {
+    if (!isRangePerimeterModeActive()) return "";
+    const mode = rendererSharedState.airStrikeModeActive ? "air" : "ranged";
+    const battleKey = rendererSharedState.tacticalBattleSnapshot?.enclosingRes1H3Index ?? "strategic";
+    const ids = [...rendererSharedState.selectedUnitIds].sort().join(",");
+    return `${mode}|${battleKey}|${ids}`;
+  }
+  function computeSelectedRangeHexSetFromState() {
+    if (!isRangePerimeterModeActive()) return null;
+    const tactical = rendererSharedState.tacticalBattleSnapshot;
+    if (tactical) {
+      const footprint = new Set(tactical.res4ChildH3Indexes);
+      const selected2 = tactical.subUnits.filter((s) => rendererSharedState.selectedUnitIds.includes(s.id));
+      if (selected2.length === 0) return null;
+      try {
+        if (rendererSharedState.airStrikeModeActive) return buildTacticalAirStrikeRangeSet(footprint);
+        return buildTacticalRangedRangeSet(tactical, selected2, footprint);
+      } catch (err) {
+        console.error("computeSelectedRangeHexSetFromState tactical failed", err);
+        return null;
+      }
+    }
+    const gs = rendererSharedState.gameState;
+    if (!gs) return null;
+    const selected = gs.units.filter((u) => rendererSharedState.selectedUnitIds.includes(u.id));
+    if (selected.length === 0) return null;
+    const units = selected.map((u) => ({
+      h3Index: u.h3Index,
+      unitType: u.unitType
+    }));
+    try {
+      if (rendererSharedState.airStrikeModeActive) return buildStrategicAirStrikeRangeSet(units);
+      return buildStrategicRangedRangeSet(units);
+    } catch (err) {
+      console.error("computeSelectedRangeHexSetFromState strategic failed", err);
+      return null;
+    }
+  }
+  function clearRangePerimeterCache() {
+    rendererSharedState.rangePerimeterLoopsLatLng = null;
+    rendererSharedState.rangePerimeterSignature = null;
+  }
+  function refreshRangePerimeterCacheIfNeeded() {
+    const signature = buildRangePerimeterSignature();
+    if (signature === rendererSharedState.rangePerimeterSignature) return;
+    rendererSharedState.rangePerimeterSignature = signature;
+    const hexSet = computeSelectedRangeHexSetFromState();
+    if (!hexSet || hexSet.size === 0) {
+      rendererSharedState.rangePerimeterLoopsLatLng = null;
+      return;
+    }
+    try {
+      rendererSharedState.rangePerimeterLoopsLatLng = computeUnionPerimeterLoops(hexSet);
+    } catch (err) {
+      console.error("refreshRangePerimeterCacheIfNeeded failed", err);
+      rendererSharedState.rangePerimeterLoopsLatLng = null;
+    }
+  }
+  function resolveReferenceLngForPerimeter() {
+    const tactical = rendererSharedState.tacticalBattleSnapshot;
+    if (tactical) {
+      const primaryId2 = rendererSharedState.selectedUnitIds[0];
+      const sub = primaryId2 ? tactical.subUnits.find((s) => s.id === primaryId2) : void 0;
+      if (sub) {
+        try {
+          return cellToLatLng(sub.h3Index)[1];
+        } catch {
+        }
+      }
+    }
+    const gs = rendererSharedState.gameState;
+    const primaryId = rendererSharedState.selectedUnitIds[0];
+    const unit = primaryId && gs ? gs.units.find((u) => u.id === primaryId) : void 0;
+    if (unit) {
+      try {
+        return cellToLatLng(unit.h3Index)[1];
+      } catch {
+      }
+    }
+    return 0;
+  }
+  function projectLoopsToScreen(loops, refLng) {
+    const map = getMainLeafletMap();
+    const L = getLeafletGlobal();
+    if (!map || !L) return [];
+    const out = [];
+    for (const loop of loops) {
+      const pts = [];
+      for (const [lat, lng] of loop) {
+        const alignedLng = alignLngToReference(lng, refLng);
+        const p = map.latLngToContainerPoint(L.latLng(lat, alignedLng));
+        pts.push({ x: p.x, y: p.y });
+      }
+      if (pts.length >= 3) out.push(pts);
+    }
+    return out;
+  }
+  function drawRangePerimeterOverlay(ctx) {
+    if (!isRangePerimeterModeActive()) return;
+    refreshRangePerimeterCacheIfNeeded();
+    const loops = rendererSharedState.rangePerimeterLoopsLatLng;
+    if (!loops?.length) return;
+    const lineWidth = getCurrentRangePerimeterSupportLineWidth();
+    const airStrike = rendererSharedState.airStrikeModeActive;
+    const solidFraction = airStrike ? RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION : RANGE_PERIMETER_DASH_SOLID_FRACTION;
+    const gapFraction = airStrike ? RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION : RANGE_PERIMETER_DASH_GAP_FRACTION;
+    const minSolid = airStrike ? RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX : RANGE_PERIMETER_DASH_MIN_SOLID_PX;
+    const minGap = airStrike ? RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX : RANGE_PERIMETER_DASH_MIN_GAP_PX;
+    const dashSolid = Math.max(minSolid, lineWidth * solidFraction);
+    const dashGap = Math.max(minGap, lineWidth * gapFraction);
+    const patternLength = dashSolid + dashGap;
+    const phase = patternLength > 0 ? -(performance.now() / 1e3 * RANGE_PERIMETER_FLOW_PX_PER_SEC % patternLength) : 0;
+    const refLng = resolveReferenceLngForPerimeter();
+    const screenLoops = projectLoopsToScreen(loops, refLng);
+    if (screenLoops.length === 0) return;
+    ctx.save();
+    ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
+    ctx.strokeStyle = airStrike ? RANGE_PERIMETER_AIR_STRIKE_COLOR : RANGE_PERIMETER_RANGED_COLOR;
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.setLineDash([dashSolid, dashGap]);
+    ctx.lineDashOffset = phase;
+    for (const pts of screenLoops) {
+      drawClosedPolygonPath(ctx, pts);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
+    ctx.restore();
+  }
+  function stopRangePerimeterAnimation() {
+    if (rendererSharedState.rangePerimeterAnimationFrameId !== null) {
+      cancelAnimationFrame(rendererSharedState.rangePerimeterAnimationFrameId);
+      rendererSharedState.rangePerimeterAnimationFrameId = null;
+    }
+    clearRangePerimeterCache();
+  }
+  function tickRangePerimeterAnimation(redraw2) {
+    rendererSharedState.rangePerimeterAnimationFrameId = null;
+    if (!isRangePerimeterModeActive()) {
+      stopRangePerimeterAnimation();
+      return;
+    }
+    rangePerimeterAnimationTickInFlight = true;
+    try {
+      redraw2();
+    } finally {
+      rangePerimeterAnimationTickInFlight = false;
+    }
+    if (!isRangePerimeterModeActive()) {
+      stopRangePerimeterAnimation();
+      return;
+    }
+    rendererSharedState.rangePerimeterAnimationFrameId = requestAnimationFrame(() => tickRangePerimeterAnimation(redraw2));
+  }
+  function ensureRangePerimeterAnimation(redraw2) {
+    if (!isRangePerimeterModeActive()) {
+      stopRangePerimeterAnimation();
+      return;
+    }
+    if (rendererSharedState.resolutionMoveAnimation) return;
+    if (rangePerimeterAnimationTickInFlight) return;
+    if (rendererSharedState.rangePerimeterAnimationFrameId !== null) return;
+    rendererSharedState.rangePerimeterAnimationFrameId = requestAnimationFrame(() => tickRangePerimeterAnimation(redraw2));
+  }
+
   // src/renderer/map/leafletMainMapProjection.ts
   function getMainLeafletMapForProjection() {
     return getMainLeafletMap();
@@ -26085,6 +26520,7 @@
       drawRes4CityOverlayPass(ctx);
       drawStrategicRes1InspectionHexCodes(ctx, { getExploredHexSet: getExploredHexSet2 });
       drawTerrainInfrastructureOverlays2(ctx);
+      drawRangePerimeterOverlay(ctx);
       const tb = rendererSharedState.tacticalBattleSnapshot;
       const hexList2 = state.hexes.map((h) => h.h3Index);
       drawPendingMarchesHoverAndSupportOrderStack({
@@ -26180,6 +26616,7 @@
           drawUnknownBattleMarkers(ctx, unknownCasualtyHexes, pulseOpacity);
         }
       }
+      ensureRangePerimeterAnimation(redraw);
       return;
     }
     drawTerrainHexes2(ctx);
@@ -26243,6 +26680,7 @@
     drawRes4CityOverlayPass(ctx);
     drawStrategicRes1InspectionHexCodes(ctx, { getExploredHexSet: getExploredHexSet2 });
     drawTerrainInfrastructureOverlays2(ctx);
+    drawRangePerimeterOverlay(ctx);
     drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId);
     if (unitsToDraw.length) {
       drawUnits(ctx, unitsToDraw, effectiveMovingIdsStrategic);
@@ -26283,6 +26721,7 @@
         drawUnknownBattleMarkers(ctx, unknownCasualtyHexes, pulseOpacity);
       }
     }
+    ensureRangePerimeterAnimation(redraw);
   }
   function resizeAndRedraw() {
     const container = document.getElementById("canvas-container");

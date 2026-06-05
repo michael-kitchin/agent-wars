@@ -1,7 +1,10 @@
 import { cellToLatLng, gridDistance } from 'h3-js';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import type { AirStrikeTargetType } from '../../shared/ipcTypes';
 import { dbRun, dbGetAll, saveDatabase } from '../gameDb';
 import { getRange } from '../combatConstants';
+import { validateAirStrikeOrder } from '../game-actions/airValidation';
+import { isWithinAirStrikeGridRange } from '../game-actions/gridRange';
 import { createPathfindingSession, executePlanRouteWithSession, type PathfindingSession } from './tool1Pathfinding';
 import type { LatLng } from './tool1Pathfinding';
 import { logDebug } from '../logger';
@@ -20,6 +23,66 @@ import {
  * Expected outcome: When `mutateProgress` is false, returned movement/ranged rows mirror the live generator while standing_orders rows remain byte-identical aside from concurrent writers.
  * Exceptions: None.
  */
+export type StandingOrderGeneratedAirStrike = {
+  unitId: string;
+  targetH3Index: string;
+  targetType: AirStrikeTargetType;
+};
+
+/**
+ * Emits one defend-order ranged or air strike against the closest in-range enemy from the unit's current hex.
+ *
+ * Purpose: DEFEND units auto-engage without waiting to arrive at the defend post; air uses strikes, ground/naval use ranged.
+ * When to use: From the `defend` branch of `generateOrdersForStandingOrders` after optional march toward defend hex.
+ * Expected outcome: At most one attack row appended; no-op when no legal target exists.
+ * Exceptions: None; grid errors skip individual enemies.
+ */
+function appendDefendStandingOrderEngagement(
+  unit: GameStateSnapshot['units'][number],
+  playerId: string,
+  unitId: string,
+  state: GameStateSnapshot,
+  rangedAttacks: { unitId: string; targetH3Index: string }[],
+  airStrikes: StandingOrderGeneratedAirStrike[]
+): void {
+  const enemies = state.units.filter((u) => u.player !== playerId);
+  if (unit.unitType === 'air') {
+    let nearest: { h3Index: string; dist: number } | null = null;
+    for (const enemy of enemies) {
+      if (!isWithinAirStrikeGridRange(unit.h3Index, enemy.h3Index, 'defendStandingOrderEngagement')) continue;
+      const valid = validateAirStrikeOrder(unitId, enemy.h3Index, 'units', { allowedPlayer: playerId });
+      if (!valid.valid) continue;
+      try {
+        const dist = gridDistance(unit.h3Index, enemy.h3Index);
+        if (nearest === null || dist < nearest.dist) nearest = { h3Index: enemy.h3Index, dist };
+      } catch {
+        continue;
+      }
+    }
+    if (nearest) {
+      airStrikes.push({ unitId, targetH3Index: nearest.h3Index, targetType: 'units' });
+    }
+    return;
+  }
+
+  const weaponRange = getRange(unit.unitType);
+  if (weaponRange < 1) return;
+  let nearest: { h3Index: string; dist: number } | null = null;
+  for (const enemy of enemies) {
+    try {
+      const dist = gridDistance(unit.h3Index, enemy.h3Index);
+      if (dist <= weaponRange && (nearest === null || dist < nearest.dist)) {
+        nearest = { h3Index: enemy.h3Index, dist: dist };
+      }
+    } catch {
+      continue;
+    }
+  }
+  if (nearest) {
+    rangedAttacks.push({ unitId, targetH3Index: nearest.h3Index });
+  }
+}
+
 export type GenerateStandingOrdersOptions = {
   mutateProgress?: boolean;
   /** Reuses an existing pathfinding session from the same AI request when provided. */
@@ -139,7 +202,11 @@ export function generateOrdersForStandingOrders(
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined,
   options?: GenerateStandingOrdersOptions
-): { movementOrders: { unitId: string; toH3Index: string }[]; rangedAttacks: { unitId: string; targetH3Index: string }[] } {
+): {
+  movementOrders: { unitId: string; toH3Index: string }[];
+  rangedAttacks: { unitId: string; targetH3Index: string }[];
+  airStrikes: StandingOrderGeneratedAirStrike[];
+} {
   const mutateProgress = options?.mutateProgress !== false;
   logDebug('tool5StandingOrders generateOrdersForStandingOrders', {
     playerId,
@@ -154,6 +221,7 @@ export function generateOrdersForStandingOrders(
 
   const movementOrders: { unitId: string; toH3Index: string }[] = [];
   const rangedAttacks: { unitId: string; targetH3Index: string }[] = [];
+  const airStrikes: StandingOrderGeneratedAirStrike[] = [];
 
   const rows = dbGetAll<StandingOrderRow>(
     'SELECT * FROM standing_orders WHERE player_id = ? ORDER BY unit_id',
@@ -175,7 +243,6 @@ export function generateOrdersForStandingOrders(
     if (row.order_type === 'defend') {
       const defendHex = (params.defendHex as [number, number] | undefined) ?? latLngByH3.get(unit.h3Index) ?? [0, 0];
       const defendH3 = resolveToH3(defendHex[0], defendHex[1]);
-      const engageRange = Number(params.engageRange ?? getRange(unit.unitType));
       if (defendH3 && unit.h3Index !== defendH3) {
         const routeResult = executePlanRouteWithSession(
           row.unit_id,
@@ -192,26 +259,10 @@ export function generateOrdersForStandingOrders(
             updateStandingOrderComputedRoute(playerId, row.unit_id, { nextMoveHex: endHex, turnsRemaining });
           }
         }
-      } else if (defendH3 && engageRange >= 0) {
-        const enemies = state.units.filter((u) => u.player !== playerId);
-        let nearest: { id: string; h3Index: string; dist: number } | null = null;
-        for (const e of enemies) {
-          try {
-            const d = gridDistance(defendH3, e.h3Index);
-            if (d <= engageRange && (nearest === null || d < nearest.dist)) {
-              nearest = { id: e.id, h3Index: e.h3Index, dist: d };
-            }
-          } catch {
-            continue;
-          }
-        }
-        if (nearest && getRange(unit.unitType) >= 1 && nearest.dist <= getRange(unit.unitType)) {
-          rangedAttacks.push({ unitId: row.unit_id, targetH3Index: nearest.h3Index });
-        }
-        if (mutateProgress) {
-          updateStandingOrderComputedRoute(playerId, row.unit_id, { turnsRemaining: 0 });
-        }
+      } else if (defendH3 && mutateProgress) {
+        updateStandingOrderComputedRoute(playerId, row.unit_id, { turnsRemaining: 0 });
       }
+      appendDefendStandingOrderEngagement(unit, playerId, row.unit_id, state, rangedAttacks, airStrikes);
       continue;
     }
 
@@ -405,5 +456,5 @@ export function generateOrdersForStandingOrders(
   if (mutateProgress) {
     saveDatabase();
   }
-  return { movementOrders, rangedAttacks };
+  return { movementOrders, rangedAttacks, airStrikes };
 }

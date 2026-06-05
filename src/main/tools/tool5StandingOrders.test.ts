@@ -328,6 +328,79 @@ function testGenerateRemovesArrivedMarchOrder(): void {
 }
 
 /**
+ * Defines the `testDefendAutoEngagementClosestInRangeEnemy` function shape.
+ *
+ * Purpose: Regression for DEFEND auto-engagement from current position while en route to the defend hex.
+ * When to use: After edits to `appendDefendStandingOrderEngagement` or the defend branch in standing-order generation.
+ * Expected outcome: Closest in-range enemy hex is targeted and march toward defend hex is still emitted.
+ * Exceptions: Skips when seeded map lacks suitable land hexes at distances 1, 2, and 4.
+ */
+function testDefendAutoEngagementClosestInRangeEnemy(): void {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-tool5-'));
+  const dbPath = path.join(tempDir, 't.sqlite');
+  try {
+    openGameDatabaseAtPathForTests(dbPath);
+    resetGameForNewMatch();
+    const state = getGameState();
+    const human = state.units.find((u) => u.player === 'human' && u.unitType === 'armor');
+    assert.ok(human, 'Expected human armor');
+    const opponent = state.units.find((u) => u.player === 'opponent' && u.unitType === 'infantry');
+    assert.ok(opponent, 'Expected opponent infantry');
+    const adjacentToHuman = gridDisk(human!.h3Index, 1).find(
+      (h3) => h3 !== human!.h3Index && state.hexes.some((hex) => hex.h3Index === h3 && hex.terrain !== 'water')
+    );
+    const fartherHex = gridDisk(human!.h3Index, 2).find(
+      (h3) =>
+        h3 !== human!.h3Index &&
+        h3 !== adjacentToHuman &&
+        state.hexes.some((hex) => hex.h3Index === h3 && hex.terrain !== 'water')
+    );
+    assert.ok(adjacentToHuman && fartherHex, 'Expected land hexes at distances 1 and 2');
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [adjacentToHuman, opponent!.id]);
+    const farOpponentId = 'opponent-infantry-far-test';
+    dbRun(
+      `INSERT INTO units (id, player, unit_type, h3_index, display_order) VALUES (?, 'opponent', 'infantry', ?, 99)`,
+      [farOpponentId, fartherHex]
+    );
+    const defendDest = gridDisk(human!.h3Index, 4).find(
+      (h3) => h3 !== human!.h3Index && state.hexes.some((hex) => hex.h3Index === h3 && hex.terrain !== 'water')
+    );
+    assert.ok(defendDest, 'Expected defend destination');
+    const [defLat, defLng] = cellToLatLng(defendDest!);
+    const latLngByH3 = new Map(state.hexes.map((h) => [h.h3Index, cellToLatLng(h.h3Index) as [number, number]]));
+    const resolveToH3 = (a: number, b: number): string | undefined => {
+      try {
+        return latLngToCell(a, b, 1);
+      } catch {
+        return undefined;
+      }
+    };
+    dbRun(
+      `INSERT OR REPLACE INTO standing_orders (player_id, unit_id, order_type, params, computed_route, status, created_turn, origin_hex)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        'human',
+        human!.id,
+        'defend',
+        JSON.stringify({ type: 'defend', defendHex: [defLat, defLng] }),
+        null,
+        'en_route',
+        state.turnNumber,
+        JSON.stringify(cellToLatLng(human!.h3Index)),
+      ]
+    );
+    const refreshed = getGameState();
+    const generated = generateOrdersForStandingOrders('human', refreshed, latLngByH3, resolveToH3);
+    assert.strictEqual(generated.rangedAttacks.length, 1);
+    assert.strictEqual(generated.rangedAttacks[0]!.unitId, human!.id);
+    assert.strictEqual(generated.rangedAttacks[0]!.targetH3Index, adjacentToHuman);
+    assert.ok(generated.movementOrders.some((o) => o.unitId === human!.id), 'defend en route should still march');
+  } finally {
+    closeGameDatabaseForTests();
+  }
+}
+
+/**
  * Defines the `testHumanMarchDefaultsAvoidEnemiesFalse` function shape (function testHumanMarchDefaultsAvoidEnemiesFalse(): void).
 
  * Purpose: Supports maintainability by documenting why `testHumanMarchDefaultsAvoidEnemiesFalse` exists.
@@ -390,6 +463,63 @@ function testHumanMarchDefaultsAvoidEnemiesFalse(): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * Verifies that DEFEND auto-engagement generates an air strike (not ranged) for an air unit and picks the closest enemy.
+ *
+ * Purpose: Regression for the `appendDefendStandingOrderEngagement` air branch.
+ * When to use: After edits to `appendDefendStandingOrderEngagement` or the `air` branch in standing-order generation.
+ * Expected outcome: `airStrikes` contains the closest in-range enemy hex; `rangedAttacks` remains empty for that unit.
+ * Exceptions: Skips when seeded map lacks a human air unit or an adjacent non-water enemy hex.
+ */
+function testDefendAutoEngagementAirUnitUsesAirStrikeNotRanged(): void {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-tool5-air-'));
+  const dbPath = path.join(tempDir, 't.sqlite');
+  try {
+    openGameDatabaseAtPathForTests(dbPath);
+    resetGameForNewMatch();
+    const state = getGameState();
+    const airUnit = state.units.find((u) => u.player === 'human' && u.unitType === 'air');
+    if (!airUnit) {
+      console.log('testDefendAutoEngagementAirUnitUsesAirStrikeNotRanged: skip — no human air unit in seed');
+      return;
+    }
+    const adjacentToAir = gridDisk(airUnit.h3Index, 1).find(
+      (h3) => h3 !== airUnit.h3Index && state.hexes.some((h) => h.h3Index === h3 && h.terrain !== 'water')
+    );
+    if (!adjacentToAir) {
+      console.log('testDefendAutoEngagementAirUnitUsesAirStrikeNotRanged: skip — no adjacent non-water hex for air unit');
+      return;
+    }
+    const opponentId = 'opponent-infantry-air-test';
+    dbRun(
+      `INSERT INTO units (id, player, unit_type, h3_index, display_order) VALUES (?, 'opponent', 'infantry', ?, 99)`,
+      [opponentId, adjacentToAir]
+    );
+    const [defLat, defLng] = cellToLatLng(airUnit.h3Index);
+    const latLngByH3 = new Map(state.hexes.map((h) => [h.h3Index, cellToLatLng(h.h3Index) as [number, number]]));
+    const resolveToH3 = (a: number, b: number): string | undefined => {
+      try { return latLngToCell(a, b, 1); } catch { return undefined; }
+    };
+    dbRun(
+      `INSERT OR REPLACE INTO standing_orders (player_id, unit_id, order_type, params, computed_route, status, created_turn, origin_hex)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ['human', airUnit.id, 'defend', JSON.stringify({ type: 'defend', defendHex: [defLat, defLng] }), null, 'en_route', state.turnNumber, JSON.stringify(cellToLatLng(airUnit.h3Index))]
+    );
+    const refreshed = getGameState();
+    const generated = generateOrdersForStandingOrders('human', refreshed, latLngByH3, resolveToH3);
+    assert.strictEqual(generated.airStrikes.length, 1, 'air DEFEND should produce an air strike');
+    assert.strictEqual(generated.airStrikes[0]!.unitId, airUnit.id);
+    assert.strictEqual(generated.airStrikes[0]!.targetType, 'units');
+    assert.strictEqual(
+      generated.rangedAttacks.some((r) => r.unitId === airUnit.id),
+      false,
+      'air unit should not appear in rangedAttacks'
+    );
+  } finally {
+    closeGameDatabaseForTests();
+  }
+}
+
 function run(): void {
   testAssignOrderUnitNotFound();
   testAssignOrderPursueTargetNotFound();
@@ -399,6 +529,8 @@ function run(): void {
   testGetInjectionTextEmpty();
   testAssignMarchToCurrentHexDoesNotPersistStandingOrder();
   testGenerateRemovesArrivedMarchOrder();
+  testDefendAutoEngagementClosestInRangeEnemy();
+  testDefendAutoEngagementAirUnitUsesAirStrikeNotRanged();
   testHumanMarchDefaultsAvoidEnemiesFalse();
   console.log('tool5StandingOrders tests passed');
 }

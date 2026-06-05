@@ -110,26 +110,6 @@ export const ORDER_LINE_COLOR = PLAYER_COLORS.human;
  * Exceptions: None.
  */
 export const ORDER_LINE_WIDTH = 2.5;
-
-/**
- * Stroke color for pending human ranged-attack overlay lines (matches `drawRangedAttackLines`).
- *
- * Purpose: Keeps hover targeting previews visually aligned with committed ranged order graphics.
- * When to use: `orderDrawing.drawRangedAttackLines` and `hoverPreview` ranged targeting hover.
- * Expected outcome: Same `#a06020` tone everywhere ranged pending geometry is drawn.
- * Exceptions: None.
- */
-export const PENDING_RANGED_ORDER_LINE_COLOR = '#a06020';
-
-/**
- * Stroke color for pending human air-strike overlay lines (matches `drawAirStrikeLines`).
- *
- * Purpose: Keeps hover targeting previews visually aligned with committed air-strike order graphics.
- * When to use: `orderDrawing.drawAirStrikeLines` and `hoverPreview` air targeting hover.
- * Expected outcome: Same `#7a3db5` tone everywhere air-strike pending geometry is drawn.
- * Exceptions: None.
- */
-export const PENDING_AIR_STRIKE_ORDER_LINE_COLOR = '#7a3db5';
 /**
  * Documents the module-scope binding `ORDER_ARROW_SIZE` (ORDER_ARROW_SIZE).
 
@@ -413,3 +393,133 @@ export const LIGHTNING_COLOR = '#f0d000';
  * Exceptions: None.
  */
 export const CASUALTY_X_COLOR = '#c03030';
+
+/**
+ * Stroke color for ranged-attack perimeter, planned, and planning-hover lines.
+ *
+ * Purpose: Distinguishes ranged targeting geometry from air-strike strokes at a glance.
+ * When to use: Ranged branch of support-line drawing (`drawRangePerimeterOverlay`, `drawRangedAttackLines`, support hover).
+ * Expected outcome: Burnt orange outline and connector lines for ranged planning.
+ * Exceptions: None.
+ */
+export const RANGE_PERIMETER_RANGED_COLOR = '#a06020';
+
+/**
+ * Stroke color for air-strike perimeter, planned, and planning-hover lines.
+ *
+ * Purpose: Distinguishes air-strike targeting geometry from ranged strokes at a glance.
+ * When to use: Air-strike branch of support-line drawing (`drawRangePerimeterOverlay`, `drawAirStrikeLines`, support hover).
+ * Expected outcome: Violet outline and connector lines for air-strike planning.
+ * Exceptions: None.
+ */
+export const RANGE_PERIMETER_AIR_STRIKE_COLOR = '#7a3db5';
+
+/**
+ * Multiplier applied to home-region outer ownership line width for the range perimeter stroke.
+ *
+ * Purpose: Scales support-line thickness relative to the outer home-region ownership border at the current zoom.
+ * When to use: `getRangePerimeterSupportLineWidth`.
+ * Expected outcome: `getHomeRegionOwnershipLineWidth(zoom) * RANGE_PERIMETER_WIDTH_MULTIPLIER` (1.5× home border).
+ * Exceptions: None.
+ */
+export const RANGE_PERIMETER_WIDTH_MULTIPLIER = 1.5;
+
+/**
+ * Opacity for ranged/air-strike perimeter, planning hover, and planned support lines.
+ *
+ * Purpose: Keeps all support-attack overlay strokes at a consistent 75% opacity.
+ * When to use: `drawRangePerimeterOverlay`, support hover in `drawHoverRoutePreview`, and `drawRangedAttackLines` / `drawAirStrikeLines`.
+ * Expected outcome: `globalAlpha = 0.75` for perimeter, hover, and committed pending attack/strike connectors.
+ * Exceptions: None.
+ */
+export const RANGE_PERIMETER_ALPHA = 0.75;
+
+/**
+ * Solid segment length as a fraction of perimeter line width (dash portion of 1:1 solid:gap).
+ *
+ * Purpose: Keeps dash scale proportional when zoom changes home-border-derived width.
+ * When to use: `setLineDash` first element for range perimeter.
+ * Expected outcome: Dash length equals line width when above minimum pixel floor.
+ * Exceptions: None.
+ */
+export const RANGE_PERIMETER_DASH_SOLID_FRACTION = 1.0;
+
+/**
+ * Gap length as a fraction of perimeter line width (gap portion of 1:1 solid:gap).
+ *
+ * Purpose: Equal-length gaps and solid segments for the range perimeter stroke.
+ * When to use: `setLineDash` second element for range perimeter.
+ * Expected outcome: Gap length matches solid segment scaling (`lineWidth * this` above minimum).
+ * Exceptions: None.
+ */
+export const RANGE_PERIMETER_DASH_GAP_FRACTION = 1.0;
+
+/**
+ * Minimum solid dash length in screen pixels for the range perimeter stroke.
+ *
+ * Purpose: Keeps dashes readable when line width matches the thin home border (1×).
+ * When to use: `drawRangePerimeterOverlay` dash array sizing.
+ * Expected outcome: `Math.max(this, lineWidth * RANGE_PERIMETER_DASH_SOLID_FRACTION)` for the solid segment.
+ * Exceptions: None.
+ */
+export const RANGE_PERIMETER_DASH_MIN_SOLID_PX = 8;
+
+/**
+ * Minimum gap length in screen pixels between range perimeter dashes.
+ *
+ * Purpose: Ensures visible gaps at 1× home-border stroke width.
+ * When to use: `drawRangePerimeterOverlay` dash array sizing.
+ * Expected outcome: `Math.max(this, lineWidth * RANGE_PERIMETER_DASH_GAP_FRACTION)` for the gap segment.
+ * Exceptions: None.
+ */
+export const RANGE_PERIMETER_DASH_MIN_GAP_PX = 8;
+
+/**
+ * Solid segment length as a fraction of line width for air-strike perimeter dashes (1:1 solid:gap — 50/50).
+ *
+ * Purpose: Keeps air-strike dash spacing consistent with planned and hover air-strike lines.
+ * When to use: `drawRangePerimeterOverlay` when `airStrikeModeActive` is true.
+ * Expected outcome: Solid segment length equals line width when above minimum pixel floor.
+ * Exceptions: None.
+ */
+export const RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION = 1.0;
+
+/**
+ * Gap length as a fraction of line width for air-strike perimeter dashes (1:1 solid:gap — 50/50).
+ *
+ * Purpose: Equal-length gaps and solid segments for air-strike planning strokes.
+ * When to use: `drawRangePerimeterOverlay` when `airStrikeModeActive` is true.
+ * Expected outcome: Gap length matches solid segment scaling (`lineWidth * this` above minimum).
+ * Exceptions: None.
+ */
+export const RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION = 1.0;
+
+/**
+ * Minimum solid dash length in screen pixels for air-strike range perimeter (50/50 dash pattern).
+ *
+ * Purpose: Keeps dashes readable at perimeter line width.
+ * When to use: Air-strike branch of `drawRangePerimeterOverlay` dash sizing.
+ * Expected outcome: `Math.max(this, lineWidth * RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION)`.
+ * Exceptions: None.
+ */
+export const RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX = 8;
+
+/**
+ * Minimum gap length in screen pixels for air-strike range perimeter (50/50 dash pattern).
+ *
+ * Purpose: Ensures visible gaps at air-strike perimeter stroke width.
+ * When to use: Air-strike branch of `drawRangePerimeterOverlay` dash sizing.
+ * Expected outcome: `Math.max(this, lineWidth * RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION)`.
+ * Exceptions: None.
+ */
+export const RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX = 8;
+
+/**
+ * Flow speed for animated range perimeter dashes in screen pixels per second.
+ *
+ * Purpose: Drives `lineDashOffset` advance each animation frame (half of the original 24 px/s rate).
+ * When to use: `drawRangePerimeterOverlay` dash phase calculation.
+ * Expected outcome: Visible forward flow along the perimeter path at a moderate pace.
+ * Exceptions: None.
+ */
+export const RANGE_PERIMETER_FLOW_PX_PER_SEC = 12;
