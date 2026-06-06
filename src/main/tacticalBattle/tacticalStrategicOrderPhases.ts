@@ -155,7 +155,7 @@ function markTacticalSubUnitCasualty(
  *
  * Purpose: Keeps tactical air casualties and AA return fire aligned with strategic dice while only removing the struck sub-unit (plus cargo on that naval sub).
  * When to use: Inside `applyTacticalAirStrikeThenRangedPhaseOnBattle` for each `targetType === 'units'` order after the hit roll.
- * Expected outcome: Mutates `toRemove` and `killsByAirStrike`; strategic parent delete is deferred to `syncStrategicUnitsDbWhenTacticalParentsEliminated`.
+ * Expected outcome: Mutates `toRemove` and kill ledgers; strategic parent delete is deferred to `syncStrategicUnitsDbWhenTacticalParentsEliminated`.
  * Exceptions: None; skips silently when the attacker row is missing from `sub`.
  */
 function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(
@@ -165,7 +165,8 @@ function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(
   targetH3Index: string,
   rollD6: () => number,
   toRemove: Set<string>,
-  killsByAirStrike: { victimId: string; killerIds: string[] }[]
+  killsByAirStrike: { victimId: string; killerIds: string[] }[],
+  killsByReturnFire: { victimId: string; killerIds: string[] }[]
 ): void {
   const defenders = sub.filter((u) => u.h3Index === targetH3Index && u.player !== attacker.player);
   const eligibleForAa = defenders.filter(
@@ -193,7 +194,7 @@ function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(
     if (toRemove.has(defender.id)) continue;
     if (getRange(defender.unitType) < 1) continue;
     if (rollD6() > getAttack(defender.unitType)) continue;
-    markTacticalSubUnitCasualty(sub, toRemove, attacker.id, [defender.id], killsByAirStrike);
+    markTacticalSubUnitCasualty(sub, toRemove, attacker.id, [defender.id], killsByReturnFire);
     tacticalLogMutate('resolveTacticalAirStrikeAgainstUnitsOnSubUnits attacker lost to AA', {
       targetH3Index,
       attackerSubUnitId: attacker.id,
@@ -425,7 +426,8 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
         s.targetH3Index,
         rollD6Strike,
         toRemove,
-        killsByAirStrike
+        killsByAirStrike,
+        killsByReturnFire
       );
       flushAirCasualties();
       strikeMoves.push({

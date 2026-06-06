@@ -3,7 +3,11 @@
  */
 
 import type { RemovedUnitSnapshot } from '../../shared/ipcTypes';
-import { buildTurnLossSummary, type KillEdge } from '../../shared/lossSummaryFromResolution';
+import {
+  buildTurnLossSummary,
+  airStrikeAttackerLossUnitIdsFromMoves,
+  type KillEdge,
+} from '../../shared/lossSummaryFromResolution';
 import { serializePlayerLossSummary } from '../../shared/lossSummary';
 import {
   buildUnitDisplayNameLookup,
@@ -108,6 +112,15 @@ export interface CaptureTurnLossNoteArgs {
    */
   airStrikeRemovedUnits?: readonly RemovedUnitSnapshot[];
   /**
+   * Air-strike animation rows used to identify striker ids lost to counter-fire.
+   *
+   * Contract: Same shape as Ready `airStrikeMoves`; `returnsToBase === false` marks attacker losses.
+   * When to use: Strategic finalize and tactical commit loss capture.
+   * Expected outcome: Attacker losses classify as return fire in persisted turn notes.
+   * Exceptions: None.
+   */
+  airStrikeMoves?: readonly { unitId: string; returnsToBase?: boolean }[];
+  /**
    * Optional roster rows for strategic display-name lookup when snapshots omit names.
    *
    * Contract: Same shape as `killLabelUnits` / `buildKillLabelUnitRoster` output.
@@ -139,6 +152,7 @@ export function captureTurnLossNoteFromResolution(args: CaptureTurnLossNoteArgs)
     removedUnits,
     airStrikeRemovedUnits,
     labelUnits,
+    airStrikeMoves,
   } = args;
   logDebug('captureTurnLossNoteFromResolution', {
     scope,
@@ -166,6 +180,7 @@ export function captureTurnLossNoteFromResolution(args: CaptureTurnLossNoteArgs)
     killsByAirStrike,
     removedUnits,
     airStrikeRemovedUnits,
+    airStrikeAttackerLossUnitIds: airStrikeAttackerLossUnitIdsFromMoves(airStrikeMoves),
     resolveDisplayName: (id) => {
       const snap = removedUnits.find((u) => u.id === id) ?? airStrikeRemovedUnits?.find((u) => u.id === id);
       if (snap?.displayName) return snap.displayName;

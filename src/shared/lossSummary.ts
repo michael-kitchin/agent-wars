@@ -89,12 +89,12 @@ export interface PlayerLossSummary {
    */
   returnFire: LostUnit[];
   /**
-   * Victims destroyed by air strikes (including AA and infrastructure counterattacks).
+   * Victims destroyed by air strikes against enemy units or infrastructure (not counter-fire on the striker).
    *
-   * Contract: Populated from air-strike kill edges and `airStrikeRemovedUnits` without prior classification.
+   * Contract: Populated from air-strike kill edges where the victim is not the lost striker.
    * When to use: Serialized to JSON for turn notes and formatted for UI.
    * Expected outcome: Rendered as the `Air strike` cause line when non-empty.
-   * Exceptions: None.
+   * Exceptions: Attacker losses from AA/counter-fire use `returnFire` instead.
    */
   airStrike: LostUnit[];
   /**

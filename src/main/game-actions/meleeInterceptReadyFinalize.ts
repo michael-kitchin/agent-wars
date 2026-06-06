@@ -329,6 +329,7 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     removedUnits: allRemovedUnits,
     airStrikeRemovedUnits: airStrikeResult.removedUnits,
     labelUnits: killLabelUnits,
+    airStrikeMoves: airStrikeResult.strikeMoves,
   });
 
   return {

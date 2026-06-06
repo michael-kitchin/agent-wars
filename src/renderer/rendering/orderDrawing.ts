@@ -1,7 +1,6 @@
 import type { AirStrikeAnimationMove, AirStrikeOrder, FerryOrder, GameStateSnapshot, RangedAttackOrder } from '../../shared/ipcTypes';
 import {
   ORDER_LINE_COLOR,
-  ORDER_LINE_WIDTH,
   RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION,
   RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX,
   RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX,

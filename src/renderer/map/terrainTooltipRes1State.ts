@@ -14,10 +14,63 @@ import { DETAIL_H3_RESOLUTION, WORLD_H3_RESOLUTION } from '../core/constants';
 import { isHexExploredByPlayer } from '../core/selection';
 import { rendererSharedState as S } from '../core/state';
 import { getLeafletGlobal } from './mapUtils';
+import { computeTerrainEffectsLineHtml } from '../../shared/terrainEffectsForTooltip';
 import { TOOLTIP_SECTION_GAP_HTML } from '../../shared/tooltipSectionGap';
 import type { NamingLookupTarget, TerrainTooltipState } from './terrainTooltipTypes';
 import { shouldRenderRes4Hexes } from './terrainView';
 import { getMainLeafletMap } from './worldLeafletMap';
+
+/** Default res4 effect fields for res1 tooltips and error fallbacks. */
+const EMPTY_TERRAIN_EFFECT_FIELDS: Pick<
+  TerrainTooltipState,
+  'parentTerrain' | 'parentTerrainKind' | 'isSeaport' | 'hasRoad' | 'hasRail'
+> = {
+  parentTerrain: '',
+  parentTerrainKind: '',
+  isSeaport: false,
+  hasRoad: false,
+  hasRail: false,
+};
+
+/**
+ * Resolves res1 passability (`terrain` column) for a strategic hex id.
+ *
+ * Purpose: Supplies `parentTerrain` for res4 effects normalization.
+ * When to use: From `res4EffectFieldsForChild` when building res4 tooltip state.
+ * Expected outcome: Passability string or `land` when hex row is missing.
+ * Exceptions: None.
+ */
+function parentPassabilityForRes1Hex(parentH3: string): string {
+  if (!S.gameState) return 'land';
+  const hx = S.gameState.hexes.find((h) => h.h3Index === parentH3);
+  return hx?.terrain ?? 'land';
+}
+
+/**
+ * Builds res4 effect-input fields from renderer terrain/infra caches for one child hex.
+ *
+ * Purpose: Keeps road/rail detection aligned with global map data (not tactical snapshot only).
+ * When to use: Res4 branch of `terrainStateForPointer` after resolving parent/child ids.
+ * Expected outcome: Empty transport flags when parent is unexplored; seaport/road/rail from renderer maps.
+ * Exceptions: None.
+ */
+function res4EffectFieldsForChild(
+  parentH3: string,
+  detailH3: string
+): Pick<TerrainTooltipState, 'parentTerrain' | 'parentTerrainKind' | 'isSeaport' | 'hasRoad' | 'hasRail'> {
+  if (!infraGlyphsAllowedForRes4Child(parentH3, detailH3)) {
+    return { ...EMPTY_TERRAIN_EFFECT_FIELDS };
+  }
+  const parentKind = terrainKindForRes1Hex(parentH3);
+  const roadRail = S.res4RoadRailSidesByH3.get(detailH3);
+  return {
+    parentTerrain: parentPassabilityForRes1Hex(parentH3),
+    parentTerrainKind: parentKind,
+    isSeaport: S.terrainInfraRes4Seaport.has(detailH3),
+    hasRoad: transportSideMaskHasAnyTrue(roadRail?.roadSides),
+    hasRail: transportSideMaskHasAnyTrue(roadRail?.railSides),
+  };
+}
 
 /**
  * Clears the delayed terrain tooltip timer without touching tooltip visibility.
@@ -342,6 +395,7 @@ export function terrainTooltipStateForRes1Hex(h3: string): TerrainTooltipState {
   const state = terrainStateForRes1Hex(h3);
   return {
     ...state,
+    ...EMPTY_TERRAIN_EFFECT_FIELDS,
     features: featureLabelsForRes1Hex(h3),
     urbanHexCount: countUrbanRes4HexesInRes1Hex(h3),
     res1TerrainSummary: getRes1TerrainSummary(h3, state.terrainKind),
@@ -371,6 +425,7 @@ export function terrainStateForPointer(
       urbanHexCount: null,
       res1TerrainSummary: null,
       res1FeaturesSummary: null,
+      ...EMPTY_TERRAIN_EFFECT_FIELDS,
     };
   }
   const res4On = shouldRenderRes4Hexes();
@@ -384,6 +439,7 @@ export function terrainStateForPointer(
         urbanHexCount: null,
         res1TerrainSummary: null,
         res1FeaturesSummary: null,
+        ...EMPTY_TERRAIN_EFFECT_FIELDS,
       };
     }
     return terrainTooltipStateForRes1Hex(fallbackRes1H3);
@@ -404,6 +460,7 @@ export function terrainStateForPointer(
         urbanHexCount: null,
         res1TerrainSummary: null,
         res1FeaturesSummary: null,
+        ...EMPTY_TERRAIN_EFFECT_FIELDS,
       };
     }
     return terrainTooltipStateForRes1Hex(fallbackRes1H3);
@@ -419,6 +476,7 @@ export function terrainStateForPointer(
         urbanHexCount: null,
         res1TerrainSummary: null,
         res1FeaturesSummary: null,
+        ...EMPTY_TERRAIN_EFFECT_FIELDS,
       };
     }
     return terrainTooltipStateForRes1Hex(fallbackRes1H3);
@@ -438,6 +496,7 @@ export function terrainStateForPointer(
       urbanHexCount: null,
       res1TerrainSummary: null,
       res1FeaturesSummary: null,
+      ...res4EffectFieldsForChild(parentH3, detailH3),
     };
   } catch {
     if (!fallbackRes1H3) {
@@ -449,6 +508,7 @@ export function terrainStateForPointer(
         urbanHexCount: null,
         res1TerrainSummary: null,
         res1FeaturesSummary: null,
+        ...EMPTY_TERRAIN_EFFECT_FIELDS,
       };
     }
     return terrainTooltipStateForRes1Hex(fallbackRes1H3);
@@ -643,6 +703,19 @@ function formatTerrainTooltipHtml(
   const bodyParts: string[] = controlLine ? [controlLine, terrainLine] : [terrainLine];
   if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
   else if (state.features.length > 0) bodyParts.push(`<strong>Features:</strong> ${state.features.join(', ')}`);
+  if (namingTarget?.resolution === 4) {
+    const effectsLineHtml = computeTerrainEffectsLineHtml({
+      terrainKind: state.terrainKind,
+      parentTerrain: state.parentTerrain,
+      parentTerrainKind: state.parentTerrainKind,
+      isUrban: state.isUrban,
+      isRubble: state.isRubble,
+      isSeaport: state.isSeaport,
+      hasRoad: state.hasRoad,
+      hasRail: state.hasRail,
+    });
+    if (effectsLineHtml) bodyParts.push(`<strong>Effects:</strong> ${effectsLineHtml}`);
+  }
   if (state.urbanHexCount != null) {
     const productionLine =
       state.urbanHexCount > 0
@@ -670,7 +743,12 @@ function terrainTooltipContentKey(
   const res1TerrainSummaryKey = state.res1TerrainSummary ?? '';
   const res1FeaturesSummaryKey = state.res1FeaturesSummary ?? '';
   const controlKey = getTooltipControlLabel(namingTarget);
-  return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}::${controlKey}`;
+  const parentTerrainKey = state.parentTerrain;
+  const parentTerrainKindKey = state.parentTerrainKind;
+  const seaportKey = state.isSeaport ? '1' : '0';
+  const roadKey = state.hasRoad ? '1' : '0';
+  const railKey = state.hasRail ? '1' : '0';
+  return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}`;
 }
 
 /**

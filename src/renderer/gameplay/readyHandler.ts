@@ -15,7 +15,10 @@ import {
 import type { MeleeInterceptModalOpenArgs, MeleeInterceptModalOutcome } from './meleeInterceptModal';
 import { buildTacticalSubUnitKillLabelOverlay } from './sidebarSupport';
 import { buildConsolidatedTurnUpdateToastMessage } from './turnUpdateSummary';
-import { buildTurnLossSummaryFromReadyShape } from '../../shared/lossSummaryFromResolution';
+import {
+  airStrikeAttackerLossUnitIdsFromMoves,
+  buildTurnLossSummaryFromReadyShape,
+} from '../../shared/lossSummaryFromResolution';
 import { readTacticalBattlesInterceptPromptEnabled } from './tacticalBattlePromptPreference';
 import { tacticalKillEdgesForStrategicStyleTurnUpdate } from '../../shared/tacticalToastKillSlice';
 import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
@@ -627,6 +630,7 @@ function buildPopupTurnLossSummary(args: {
     killsByAirStrike: killsByAirStrike ?? readyWithAir.killsByAirStrike,
     removedUnits: removed,
     airStrikeRemovedUnits: readySlice.airStrikeRemovedUnits,
+    airStrikeAttackerLossUnitIds: airStrikeAttackerLossUnitIdsFromMoves(readySlice.airStrikeMoves),
     resolveDisplayName: (id) => {
       const snap =
         removed.find((u) => u.id === id) ?? readySlice.airStrikeRemovedUnits?.find((u) => u.id === id);

@@ -1204,6 +1204,7 @@ export function commitHumanTacticalDraftOrders(args: {
       killsByAirStrike: support.killsByAirStrike,
       removedUnits: tacticalRemovedAll,
       airStrikeRemovedUnits,
+      airStrikeMoves: support.airStrikePlaybackMoves,
     });
     return {
       success: true,

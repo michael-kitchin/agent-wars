@@ -15,20 +15,8 @@ import { composeResolutionMapToastBullets } from './orderPreviewBlockingCopy';
 /** Prefix for bold section headers in `#map-toast` consolidated update messages. */
 export const MAP_TOAST_SECTION_HEADER_PREFIX = '## ';
 
-/** Section header label for non-loss deployment, infrastructure, and fallback lines in map toasts. */
+/** Section header label for non-loss deployment and fallback lines in map toasts. */
 export const MAP_TOAST_UPDATES_SECTION_TITLE = 'Updates';
-
-/**
- * Formats a count with singular/plural noun labels for infrastructure toast lines.
- *
- * Purpose: Keeps air-strike infrastructure summaries readable in the Other section.
- * When to use: Inside `formatAirStrikeInfrastructureOtherLine` when rubble counts are non-zero.
- * Expected outcome: `"1 urban hex"` or `"3 urban hexes"` style strings.
- * Exceptions: None.
- */
-function formatCountLabel(value: number, singular: string, plural: string): string {
-  return `${value.toLocaleString()} ${value === 1 ? singular : plural}`;
-}
 
 /**
  * Builds the deployment summary line for the Other toast section when new units entered play.
@@ -77,35 +65,9 @@ function formatDeploymentCapReachedLine(
 }
 
 /**
- * Summarizes air-strike attempts and infrastructure destroyed (excludes unit losses).
+ * Builds non-loss "Updates" section lines (deployment, caps, hexes lost).
  *
- * Purpose: Keeps infrastructure outcomes in Other while unit victims flow through loss summaries.
- * When to use: When `airStrikeAttemptCount` is positive on a Ready-shaped slice.
- * Expected outcome: Attempt count plus destroyed urban/airport/seaport phrase or null when no attempts.
- * Exceptions: None.
- */
-function formatAirStrikeInfrastructureOtherLine(readyResult: ReadyResult): string | null {
-  const attempts = readyResult.airStrikeAttemptCount ?? 0;
-  if (attempts <= 0) return null;
-  const destroyedByFeature = { urban: 0, airport: 0, seaport: 0 };
-  for (const event of readyResult.infrastructureDestroyedEvents ?? []) {
-    const rubbleCells = event.changedRubbleCount ?? 0;
-    if (event.targetType === 'urban') destroyedByFeature.urban += rubbleCells;
-    else if (event.targetType === 'airport') destroyedByFeature.airport += rubbleCells;
-    else if (event.targetType === 'seaport') destroyedByFeature.seaport += rubbleCells;
-  }
-  const destroyedParts: string[] = [];
-  if (destroyedByFeature.urban > 0) destroyedParts.push(formatCountLabel(destroyedByFeature.urban, 'urban hex', 'urban hexes'));
-  if (destroyedByFeature.airport > 0) destroyedParts.push(formatCountLabel(destroyedByFeature.airport, 'airport', 'airports'));
-  if (destroyedByFeature.seaport > 0) destroyedParts.push(formatCountLabel(destroyedByFeature.seaport, 'seaport', 'seaports'));
-  const destroyedPart = destroyedParts.length > 0 ? `destroyed ${destroyedParts.join(', ')}` : 'destroyed nothing';
-  return `Air strikes: ${attempts.toLocaleString()} attempted; ${destroyedPart}`;
-}
-
-/**
- * Builds non-loss "Other" section lines (deployment, caps, hexes lost, air-strike infrastructure).
- *
- * Purpose: Feeds the consolidated popup `Other` section without duplicating unit loss reporting.
+ * Purpose: Feeds the consolidated popup Updates section without duplicating unit loss reporting.
  * When to use: Inside `buildConsolidatedTurnUpdateToastMessage` before optional combat fallbacks.
  * Expected outcome: Plain strings without leading bullets.
  * Exceptions: None.
@@ -116,8 +78,6 @@ export function buildOtherTurnUpdatePrimaryLines(readyResult: ReadyResult): stri
   if (deployedLine) lines.push(deployedLine);
   const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, 'human');
   if (deploymentCapLine) lines.push(deploymentCapLine);
-  const airStrikeInfraLine = formatAirStrikeInfrastructureOtherLine(readyResult);
-  if (airStrikeInfraLine) lines.push(airStrikeInfraLine);
   if ((readyResult.humanHexesLostCount ?? 0) > 0) {
     lines.push(`${readyResult.humanHexesLostCount!.toLocaleString()} hexes lost to opponent`);
   }

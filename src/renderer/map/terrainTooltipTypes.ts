@@ -79,6 +79,51 @@ export interface TerrainTooltipState {
    * Exceptions: None.
    */
   res1FeaturesSummary: string | null;
+  /**
+   * Res1 passability bucket for the parent hex when sampling res4; empty on res1-only tooltips.
+   *
+   * Contract: `land`, `water`, `coastal`, or `wetlands` from `gameState.hexes[].terrain`.
+   * When to use: Passed to `computeTerrainEffectsLine` for res4 Effects line assembly.
+   * Expected outcome: Empty string on res1 tooltips; populated under res4 pointer sampling.
+   * Exceptions: None.
+   */
+  parentTerrain: string;
+  /**
+   * Res1 terrain kind for the parent hex when sampling res4; empty on res1-only tooltips.
+   *
+   * Contract: Parent `terrainKind` used for naval navigability in effects computation.
+   * When to use: Paired with `parentTerrain` for res4 Effects line assembly.
+   * Expected outcome: Empty string on res1 tooltips; parent kind string under res4 sampling.
+   * Exceptions: None.
+   */
+  parentTerrainKind: string;
+  /**
+   * Whether the sampled res4 cell is a seaport facility.
+   *
+   * Contract: From `terrainInfraRes4Seaport` for res4 cells; false on res1 tooltips.
+   * When to use: Effects line naval occupiability checks.
+   * Expected outcome: True only when the hovered res4 child is marked seaport.
+   * Exceptions: None.
+   */
+  isSeaport: boolean;
+  /**
+   * Whether explored res4 road side masks are active on the sampled cell.
+   *
+   * Contract: From global `res4RoadRailSidesByH3` when parent hex is explored.
+   * When to use: Effects line transport movement bonus (rule 5).
+   * Expected outcome: False on res1 tooltips or unexplored parents.
+   * Exceptions: None.
+   */
+  hasRoad: boolean;
+  /**
+   * Whether explored res4 rail side masks are active on the sampled cell.
+   *
+   * Contract: From global `res4RoadRailSidesByH3` when parent hex is explored.
+   * When to use: Effects line transport movement bonus (rule 5).
+   * Expected outcome: False on res1 tooltips or unexplored parents.
+   * Exceptions: None.
+   */
+  hasRail: boolean;
 }
 
 /**

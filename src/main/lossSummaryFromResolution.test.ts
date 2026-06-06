@@ -108,6 +108,56 @@ function testOtherCatchAllWithoutKillEdge(): void {
 }
 
 /**
+ * Verifies AA counter-fire on a striker classifies as return fire, not air strike.
+ *
+ * Purpose: Protects popup Human Losses label for air lost while striking.
+ * When to use: Run after changing air-strike loss classification.
+ * Expected outcome: Human air victim in `returnFire`; enemy victim stays in `airStrike`.
+ * Exceptions: None.
+ */
+function testAirStrikerCounterFireIsReturnFire(): void {
+  const summary = buildTurnLossSummary({
+    killsByAirStrike: [
+      { victimId: 'h-air', killerIds: ['o-naval'] },
+      { victimId: 'o1', killerIds: ['h-air'] },
+    ],
+    removedUnits: [snap('h-air', 'human', 'air'), snap('o1', 'opponent', 'armor')],
+    resolveDisplayName: (id) => id,
+    resolveUnitMeta: (id) =>
+      id === 'h-air'
+        ? { player: 'human', unitType: 'air' }
+        : id === 'o1'
+          ? { player: 'opponent', unitType: 'armor' }
+          : id === 'o-naval'
+            ? { player: 'opponent', unitType: 'naval' }
+            : undefined,
+  });
+  assert.strictEqual(summary.human.returnFire.length, 1);
+  assert.strictEqual(summary.human.airStrike.length, 0);
+  assert.strictEqual(summary.ai.airStrike.length, 1);
+  assert.strictEqual(summary.ai.returnFire.length, 0);
+}
+
+/**
+ * Verifies strategic infra counter attacker loss uses return fire via strike moves.
+ *
+ * Purpose: Protects classification when kill edges omit the striker.
+ * When to use: Run after changing `airStrikeAttackerLossUnitIdsFromMoves` wiring.
+ * Expected outcome: Striker id in return fire bucket.
+ * Exceptions: None.
+ */
+function testAttackerLossFromStrikeMovesIsReturnFire(): void {
+  const summary = buildTurnLossSummary({
+    airStrikeRemovedUnits: [snap('h-air', 'human', 'air')],
+    airStrikeAttackerLossUnitIds: ['h-air'],
+    resolveDisplayName: (id) => id,
+    resolveUnitMeta: (id) => (id === 'h-air' ? { player: 'human', unitType: 'air' } : undefined),
+  });
+  assert.strictEqual(summary.human.returnFire.length, 1);
+  assert.strictEqual(summary.human.airStrike.length, 0);
+}
+
+/**
  * Runs all loss summary normalization tests.
  *
  * Purpose: Single entrypoint for the Node test runner manifest.
@@ -117,6 +167,8 @@ function testOtherCatchAllWithoutKillEdge(): void {
  */
 function run(): void {
   testAirPrecedenceOverDirect();
+  testAirStrikerCounterFireIsReturnFire();
+  testAttackerLossFromStrikeMovesIsReturnFire();
   testHumanAiSplit();
   testFogFiltersOpponentOnly();
   testOtherCatchAllWithoutKillEdge();

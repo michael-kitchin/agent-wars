@@ -22,6 +22,15 @@ export interface KillEdge {
    * Exceptions: None.
    */
   victimId: string;
+  /**
+   * Optional killer unit ids when resolution recorded explicit attribution.
+   *
+   * Contract: Present on tactical/strategic air-strike and ranged kill edges.
+   * When to use: Distinguish air-strike counter-fire (attacker lost) from strike victims.
+   * Expected outcome: Enables AA and return-fire classification for air victims.
+   * Exceptions: None.
+   */
+  killerIds?: readonly string[];
 }
 
 /**
@@ -96,6 +105,15 @@ export interface BuildTurnLossSummaryArgs {
    * Exceptions: None.
    */
   airStrikeRemovedUnits?: readonly RemovedUnitSnapshot[];
+  /**
+   * Unit ids of air strikers lost to counter-fire or AA (from `airStrikeMoves` where `returnsToBase` is false).
+   *
+   * Contract: Striker ids only; excludes enemy units destroyed by the strike.
+   * When to use: Strategic Ready and tactical playback loss normalization.
+   * Expected outcome: Classified as `returnFire`, not `airStrike`, in popup and turn notes.
+   * Exceptions: None.
+   */
+  airStrikeAttackerLossUnitIds?: readonly string[];
   /**
    * Resolves a display label for a victim unit id.
    *
@@ -228,6 +246,60 @@ function pushToBucket(
 }
 
 /**
+ * Returns unit ids for air strikers that did not return to base after their strike animation row.
+ *
+ * Purpose: Identifies attacker counter-fire/AA losses without kill-edge metadata (strategic infra counter).
+ * When to use: Before `buildTurnLossSummary` from Ready-shaped payloads with `airStrikeMoves`.
+ * Expected outcome: Ids where `returnsToBase === false`; empty when moves absent.
+ * Exceptions: None.
+ */
+export function airStrikeAttackerLossUnitIdsFromMoves(
+  moves: readonly { unitId: string; returnsToBase?: boolean }[] | undefined
+): readonly string[] {
+  if (!moves || moves.length === 0) return [];
+  return moves.filter((m) => m.returnsToBase === false).map((m) => m.unitId);
+}
+
+/**
+ * Classifies one air-strike kill edge as strike victim vs attacker lost to counter-fire/AA.
+ *
+ * Purpose: Routes friendly air lost while striking into the return-fire bucket for popup copy.
+ * When to use: While assigning `killsByAirStrike` victims in `buildTurnLossSummary`.
+ * Expected outcome: `returnFire` when the victim is the striker lost to defenders; otherwise `airStrike`.
+ * Exceptions: None.
+ */
+function classifyAirStrikeKillCause(
+  edge: KillEdge,
+  args: BuildTurnLossSummaryArgs
+): keyof PlayerLossSummary {
+  const victimMeta = args.resolveUnitMeta(edge.victimId);
+  if (victimMeta?.unitType !== 'air') return 'airStrike';
+  const killerId = edge.killerIds?.[0];
+  if (!killerId) return 'returnFire';
+  const killerMeta = args.resolveUnitMeta(killerId);
+  if (killerMeta && killerMeta.player !== victimMeta.player) return 'returnFire';
+  return 'airStrike';
+}
+
+/**
+ * Resolves the loss cause for one air-strike removed snapshot not yet classified via kill edges.
+ *
+ * Purpose: Handles strategic removals and infra counterattacks without kill ledger rows.
+ * When to use: Final sweep over `airStrikeRemovedUnits` in `buildTurnLossSummary`.
+ * Expected outcome: Attacker losses map to `returnFire`; enemy strike victims map to `airStrike`.
+ * Exceptions: None.
+ */
+function causeForAirStrikeRemovedUnit(
+  snap: RemovedUnitSnapshot,
+  args: BuildTurnLossSummaryArgs
+): keyof PlayerLossSummary {
+  const edge = (args.killsByAirStrike ?? []).find((e) => e.victimId === snap.id);
+  if (edge) return classifyAirStrikeKillCause(edge, args);
+  if (args.airStrikeAttackerLossUnitIds?.includes(snap.id)) return 'returnFire';
+  return 'airStrike';
+}
+
+/**
  * Builds human and AI loss summaries from one combat resolution payload.
  *
  * Purpose: Single normalizer for popup display and persisted turn-note loss JSON.
@@ -246,7 +318,11 @@ export function buildTurnLossSummary(args: BuildTurnLossSummaryArgs): TurnLossSu
     }
   };
 
-  assignFromEdges(args.killsByAirStrike, 'airStrike');
+  for (const edge of args.killsByAirStrike ?? []) {
+    if (!victimToCause.has(edge.victimId)) {
+      victimToCause.set(edge.victimId, classifyAirStrikeKillCause(edge, args));
+    }
+  }
   assignFromEdges(args.killsByDirectFire, 'ranged');
   assignFromEdges(args.killsByReturnFire, 'returnFire');
   if (args.killsByMelee && args.killsByMelee.length > 0) {
@@ -256,7 +332,9 @@ export function buildTurnLossSummary(args: BuildTurnLossSummaryArgs): TurnLossSu
   }
 
   for (const snap of args.airStrikeRemovedUnits ?? []) {
-    if (!victimToCause.has(snap.id)) victimToCause.set(snap.id, 'airStrike');
+    if (!victimToCause.has(snap.id)) {
+      victimToCause.set(snap.id, causeForAirStrikeRemovedUnit(snap, args));
+    }
   }
 
   const claimed = new Set<string>();
@@ -299,6 +377,7 @@ export function buildTurnLossSummaryFromReadyShape(args: {
   killsByAirStrike?: readonly KillEdge[];
   removedUnits?: readonly RemovedUnitSnapshot[];
   airStrikeRemovedUnits?: readonly RemovedUnitSnapshot[];
+  airStrikeAttackerLossUnitIds?: readonly string[];
   resolveDisplayName: (unitId: string) => string;
   resolveUnitMeta: (unitId: string) => { player: string; unitType: string } | undefined;
   isVictimVisible?: (unitId: string, player: string) => boolean;
