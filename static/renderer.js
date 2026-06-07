@@ -14296,8 +14296,9 @@
   var CASUALTY_X_COLOR = "#c03030";
   var RANGE_PERIMETER_RANGED_COLOR = "#a06020";
   var RANGE_PERIMETER_AIR_STRIKE_COLOR = "#7a3db5";
-  var RANGE_PERIMETER_WIDTH_MULTIPLIER = 1.5;
-  var RANGE_PERIMETER_ALPHA = 0.75;
+  var RANGE_PERIMETER_WIDTH_MULTIPLIER = 3;
+  var RANGE_SUPPORT_LINE_WIDTH_MULTIPLIER = 1.5;
+  var RANGE_PERIMETER_ALPHA = 0.55;
   var RANGE_PERIMETER_DASH_SOLID_FRACTION = 1;
   var RANGE_PERIMETER_DASH_GAP_FRACTION = 1;
   var RANGE_PERIMETER_DASH_MIN_SOLID_PX = 8;
@@ -16784,15 +16785,21 @@
     const zoomStrokeScale = getMapZoomStrokeScale(zoom);
     return Math.max(stroke.width * zoomStrokeScale * 3, 2.7);
   }
-  function getRangePerimeterSupportLineWidth(zoom) {
+  function getRangePerimeterOutlineLineWidth(zoom) {
     return getHomeRegionOwnershipLineWidth(zoom) * RANGE_PERIMETER_WIDTH_MULTIPLIER;
+  }
+  function getRangeSupportPlanLineWidth(zoom) {
+    return getHomeRegionOwnershipLineWidth(zoom) * RANGE_SUPPORT_LINE_WIDTH_MULTIPLIER;
   }
   function resolveMainLeafletMapZoom(defaultZoom = 4) {
     const map = getMainLeafletMap();
     return map && typeof map.getZoom === "function" ? map.getZoom() : defaultZoom;
   }
-  function getCurrentRangePerimeterSupportLineWidth() {
-    return getRangePerimeterSupportLineWidth(resolveMainLeafletMapZoom());
+  function getCurrentRangePerimeterOutlineLineWidth() {
+    return getRangePerimeterOutlineLineWidth(resolveMainLeafletMapZoom());
+  }
+  function getCurrentRangeSupportPlanLineWidth() {
+    return getRangeSupportPlanLineWidth(resolveMainLeafletMapZoom());
   }
   function buildControlByHex(state) {
     return new Map((state.res1Control ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
@@ -19141,7 +19148,7 @@
 
   // src/renderer/rendering/orderDrawing.ts
   function rangePerimeterStaticLineStyle(mode) {
-    const lineWidth = getCurrentRangePerimeterSupportLineWidth();
+    const lineWidth = getCurrentRangeSupportPlanLineWidth();
     const strokeColor = mode === "airStrike" ? RANGE_PERIMETER_AIR_STRIKE_COLOR : RANGE_PERIMETER_RANGED_COLOR;
     if (mode === "airStrike") {
       return {
@@ -25145,7 +25152,7 @@
     refreshRangePerimeterCacheIfNeeded();
     const loops = rendererSharedState.rangePerimeterLoopsLatLng;
     if (!loops?.length) return;
-    const lineWidth = getCurrentRangePerimeterSupportLineWidth();
+    const lineWidth = getCurrentRangePerimeterOutlineLineWidth();
     const airStrike = rendererSharedState.airStrikeModeActive;
     const solidFraction = airStrike ? RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION : RANGE_PERIMETER_DASH_SOLID_FRACTION;
     const gapFraction = airStrike ? RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION : RANGE_PERIMETER_DASH_GAP_FRACTION;

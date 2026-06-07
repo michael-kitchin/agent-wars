@@ -14,7 +14,7 @@ import {
   RANGE_PERIMETER_RANGED_COLOR,
 } from '../core/constants';
 import { hexCenterPx, hexCenterPxRelativeTo } from '../map/mapUtils';
-import { getCurrentRangePerimeterSupportLineWidth } from './terrainRendering';
+import { getCurrentRangeSupportPlanLineWidth } from './terrainRendering';
 import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
 
 /**
@@ -40,7 +40,7 @@ export function rangePerimeterStaticLineStyle(mode: 'ranged' | 'airStrike'): {
   dash: [number, number];
   strokeColor: string;
 } {
-  const lineWidth = getCurrentRangePerimeterSupportLineWidth();
+  const lineWidth = getCurrentRangeSupportPlanLineWidth();
   const strokeColor = mode === 'airStrike' ? RANGE_PERIMETER_AIR_STRIKE_COLOR : RANGE_PERIMETER_RANGED_COLOR;
   if (mode === 'airStrike') {
     return {

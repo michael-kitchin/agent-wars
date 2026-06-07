@@ -10,7 +10,7 @@ import {
 import { getHexBoundaryLatLngForLeafletOverlay } from '../map/hexGrid';
 import { getActiveHexStrokeStyle, fillHexTerrain } from './terrainVisualStyles';
 import { drawTerrainInfrastructureGlyphs, RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE } from './terrainInfrastructureOverlay';
-import { DETAIL_H3_RESOLUTION, MULTI_PLAYER_FILL, PLAYER_COLORS, RANGE_PERIMETER_WIDTH_MULTIPLIER } from '../core/constants';
+import { DETAIL_H3_RESOLUTION, MULTI_PLAYER_FILL, PLAYER_COLORS, RANGE_PERIMETER_WIDTH_MULTIPLIER, RANGE_SUPPORT_LINE_WIDTH_MULTIPLIER } from '../core/constants';
 import { getLeafletGlobal, hexCenterPx } from '../map/mapUtils';
 import {
   projectHexBoundaryToContainerPoints,
@@ -37,8 +37,8 @@ export function getMapZoomStrokeScale(zoom: number): number {
 /**
  * Returns the solid outer home-region ownership border width in screen pixels.
  *
- * Purpose: Single source for home outer ring width; ranged/air-strike support lines use 1.5× this value at the same zoom.
- * When to use: `drawOutlinedHomeRegionOwnershipBorders` and `getRangePerimeterSupportLineWidth`.
+ * Purpose: Single source for home outer ring width; ranged/air-strike overlays scale from this value at the same zoom.
+ * When to use: `drawOutlinedHomeRegionOwnershipBorders`, `getRangePerimeterOutlineLineWidth`, and `getRangeSupportPlanLineWidth`.
  * Expected outcome: `Math.max(stroke.width * zoomScale * 3, 2.7)` matching pre-extraction behavior.
  * Exceptions: None.
  */
@@ -49,15 +49,27 @@ export function getHomeRegionOwnershipLineWidth(zoom: number): number {
 }
 
 /**
- * Returns screen-pixel stroke width for ranged/air-strike perimeter, planned, and hover lines.
+ * Returns screen-pixel stroke width for the ranged/air-strike range perimeter outline.
  *
- * Purpose: Keeps support targeting strokes at 1.5× the outer home-region ownership border at the given map zoom.
- * When to use: `drawRangePerimeterOverlay`, `rangePerimeterStaticLineStyle`, and support hover previews.
+ * Purpose: Keeps the animated perimeter at 3× the outer home-region ownership border at the given map zoom.
+ * When to use: `drawRangePerimeterOverlay`.
  * Expected outcome: `getHomeRegionOwnershipLineWidth(zoom) * RANGE_PERIMETER_WIDTH_MULTIPLIER`.
  * Exceptions: None.
  */
-export function getRangePerimeterSupportLineWidth(zoom: number): number {
+export function getRangePerimeterOutlineLineWidth(zoom: number): number {
   return getHomeRegionOwnershipLineWidth(zoom) * RANGE_PERIMETER_WIDTH_MULTIPLIER;
+}
+
+/**
+ * Returns screen-pixel stroke width for planned and planning ranged/air-strike connector lines.
+ *
+ * Purpose: Keeps support connectors at 1.5× the outer home-region ownership border at the given map zoom.
+ * When to use: `rangePerimeterStaticLineStyle` and support hover previews.
+ * Expected outcome: `getHomeRegionOwnershipLineWidth(zoom) * RANGE_SUPPORT_LINE_WIDTH_MULTIPLIER`.
+ * Exceptions: None.
+ */
+export function getRangeSupportPlanLineWidth(zoom: number): number {
+  return getHomeRegionOwnershipLineWidth(zoom) * RANGE_SUPPORT_LINE_WIDTH_MULTIPLIER;
 }
 
 /**
@@ -74,15 +86,27 @@ export function resolveMainLeafletMapZoom(defaultZoom = 4): number {
 }
 
 /**
- * Returns support-line width for the current main-map zoom.
+ * Returns perimeter outline width for the current main-map zoom.
  *
- * Purpose: Convenience for overlay drawers that do not already hold a zoom value.
- * When to use: Planned/hover/perimeter support line drawing each frame.
- * Expected outcome: Same as `getRangePerimeterSupportLineWidth(resolveMainLeafletMapZoom())`.
+ * Purpose: Convenience for the range perimeter overlay each frame.
+ * When to use: `drawRangePerimeterOverlay`.
+ * Expected outcome: Same as `getRangePerimeterOutlineLineWidth(resolveMainLeafletMapZoom())`.
  * Exceptions: None.
  */
-export function getCurrentRangePerimeterSupportLineWidth(): number {
-  return getRangePerimeterSupportLineWidth(resolveMainLeafletMapZoom());
+export function getCurrentRangePerimeterOutlineLineWidth(): number {
+  return getRangePerimeterOutlineLineWidth(resolveMainLeafletMapZoom());
+}
+
+/**
+ * Returns planned/planning support connector width for the current main-map zoom.
+ *
+ * Purpose: Convenience for support hover and pending attack/strike line drawing each frame.
+ * When to use: `rangePerimeterStaticLineStyle`.
+ * Expected outcome: Same as `getRangeSupportPlanLineWidth(resolveMainLeafletMapZoom())`.
+ * Exceptions: None.
+ */
+export function getCurrentRangeSupportPlanLineWidth(): number {
+  return getRangeSupportPlanLineWidth(resolveMainLeafletMapZoom());
 }
 
 /**

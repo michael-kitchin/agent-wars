@@ -25,7 +25,7 @@ import {
   RANGE_PERIMETER_FLOW_PX_PER_SEC,
   RANGE_PERIMETER_RANGED_COLOR,
 } from '../core/constants';
-import { getCurrentRangePerimeterSupportLineWidth } from './terrainRendering';
+import { getCurrentRangePerimeterOutlineLineWidth } from './terrainRendering';
 import { rendererSharedState as S } from '../core/state';
 import { alignLngToReference } from '../map/hexGrid';
 import { getLeafletGlobal } from '../map/mapUtils';
@@ -221,7 +221,7 @@ export function drawRangePerimeterOverlay(ctx: CanvasRenderingContext2D): void {
   const loops = S.rangePerimeterLoopsLatLng;
   if (!loops?.length) return;
 
-  const lineWidth = getCurrentRangePerimeterSupportLineWidth();
+  const lineWidth = getCurrentRangePerimeterOutlineLineWidth();
   const airStrike = S.airStrikeModeActive;
   const solidFraction = airStrike ? RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION : RANGE_PERIMETER_DASH_SOLID_FRACTION;
   const gapFraction = airStrike ? RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION : RANGE_PERIMETER_DASH_GAP_FRACTION;

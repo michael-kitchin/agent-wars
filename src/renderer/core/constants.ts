@@ -417,22 +417,32 @@ export const RANGE_PERIMETER_AIR_STRIKE_COLOR = '#7a3db5';
 /**
  * Multiplier applied to home-region outer ownership line width for the range perimeter stroke.
  *
- * Purpose: Scales support-line thickness relative to the outer home-region ownership border at the current zoom.
- * When to use: `getRangePerimeterSupportLineWidth`.
- * Expected outcome: `getHomeRegionOwnershipLineWidth(zoom) * RANGE_PERIMETER_WIDTH_MULTIPLIER` (1.5× home border).
+ * Purpose: Scales perimeter outline thickness relative to the outer home-region ownership border at the current zoom.
+ * When to use: `getRangePerimeterOutlineLineWidth`.
+ * Expected outcome: `getHomeRegionOwnershipLineWidth(zoom) * RANGE_PERIMETER_WIDTH_MULTIPLIER` (3× home border).
  * Exceptions: None.
  */
-export const RANGE_PERIMETER_WIDTH_MULTIPLIER = 1.5;
+export const RANGE_PERIMETER_WIDTH_MULTIPLIER = 3;
+
+/**
+ * Multiplier applied to home-region outer ownership line width for planned and planning ranged/air-strike connector lines.
+ *
+ * Purpose: Scales support connector thickness relative to the outer home-region ownership border at the current zoom.
+ * When to use: `getRangeSupportPlanLineWidth`.
+ * Expected outcome: `getHomeRegionOwnershipLineWidth(zoom) * RANGE_SUPPORT_LINE_WIDTH_MULTIPLIER` (1.5× home border).
+ * Exceptions: None.
+ */
+export const RANGE_SUPPORT_LINE_WIDTH_MULTIPLIER = 1.5;
 
 /**
  * Opacity for ranged/air-strike perimeter, planning hover, and planned support lines.
  *
- * Purpose: Keeps all support-attack overlay strokes at a consistent 75% opacity.
+ * Purpose: Matches valid movement route preview opacity so support targeting reads like march planning.
  * When to use: `drawRangePerimeterOverlay`, support hover in `drawHoverRoutePreview`, and `drawRangedAttackLines` / `drawAirStrikeLines`.
- * Expected outcome: `globalAlpha = 0.75` for perimeter, hover, and committed pending attack/strike connectors.
+ * Expected outcome: `globalAlpha = 0.55` for perimeter, hover, and committed pending attack/strike connectors.
  * Exceptions: None.
  */
-export const RANGE_PERIMETER_ALPHA = 0.75;
+export const RANGE_PERIMETER_ALPHA = 0.55;
 
 /**
  * Solid segment length as a fraction of perimeter line width (dash portion of 1:1 solid:gap).

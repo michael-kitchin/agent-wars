@@ -144,7 +144,7 @@ data: HumanOrderGroupPreviewResult;
 
    * Contract: When set, hover drawing uses pending ranged or air-stroke styling instead of march path caps and movement-range dashes.
    * When to use: Only while ranged or air-strike targeting mode is active and a hover preview envelope has been built.
-   * Expected outcome: `drawHoverRoutePreview` applies the same colors, width, and dash patterns as planned attack/strike lines at perimeter opacity.
+   * Expected outcome: `drawHoverRoutePreview` applies the same colors, width, and dash patterns as planned attack/strike lines at route-preview opacity.
    * Exceptions: None.
    */
 renderAsSupportTargeting?: 'ranged' | 'air';
