@@ -376,6 +376,16 @@ export const MULTI_PLAYER_FILL = '#b0b0b0';
 export const MULTI_PLAYER_STROKE = '#000';
 
 /**
+ * Opacity for res1 region-control and home-region ownership border strokes.
+ *
+ * Purpose: Softens player-colored control rings so terrain fill remains readable beneath them.
+ * When to use: `drawOutlinedHomeRegionOwnershipBorders` and normal single-line control borders in `drawTerrainHexes`.
+ * Expected outcome: `globalAlpha = 0.75` for outer control, inner home-owner dashed, and non-home control outlines.
+ * Exceptions: None.
+ */
+export const OWNERSHIP_BORDER_ALPHA = 0.75;
+
+/**
  * Documents the module-scope binding `LIGHTNING_COLOR` (LIGHTNING_COLOR).
 
  * Purpose: Supports maintainability by documenting why `LIGHTNING_COLOR` exists.
@@ -419,10 +429,10 @@ export const RANGE_PERIMETER_AIR_STRIKE_COLOR = '#7a3db5';
  *
  * Purpose: Scales perimeter outline thickness relative to the outer home-region ownership border at the current zoom.
  * When to use: `getRangePerimeterOutlineLineWidth`.
- * Expected outcome: `getHomeRegionOwnershipLineWidth(zoom) * RANGE_PERIMETER_WIDTH_MULTIPLIER` (3× home border).
+ * Expected outcome: `getHomeRegionOwnershipLineWidth(zoom) * RANGE_PERIMETER_WIDTH_MULTIPLIER` (2× home border).
  * Exceptions: None.
  */
-export const RANGE_PERIMETER_WIDTH_MULTIPLIER = 3;
+export const RANGE_PERIMETER_WIDTH_MULTIPLIER = 2;
 
 /**
  * Multiplier applied to home-region outer ownership line width for planned and planning ranged/air-strike connector lines.
@@ -437,12 +447,12 @@ export const RANGE_SUPPORT_LINE_WIDTH_MULTIPLIER = 1.5;
 /**
  * Opacity for ranged/air-strike perimeter, planning hover, and planned support lines.
  *
- * Purpose: Matches valid movement route preview opacity so support targeting reads like march planning.
+ * Purpose: Keeps support-attack overlay strokes at a consistent 75% opacity.
  * When to use: `drawRangePerimeterOverlay`, support hover in `drawHoverRoutePreview`, and `drawRangedAttackLines` / `drawAirStrikeLines`.
- * Expected outcome: `globalAlpha = 0.55` for perimeter, hover, and committed pending attack/strike connectors.
+ * Expected outcome: `globalAlpha = 0.75` for perimeter, hover, and committed pending attack/strike connectors.
  * Exceptions: None.
  */
-export const RANGE_PERIMETER_ALPHA = 0.55;
+export const RANGE_PERIMETER_ALPHA = 0.75;
 
 /**
  * Solid segment length as a fraction of perimeter line width (dash portion of 1:1 solid:gap).

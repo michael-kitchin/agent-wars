@@ -14292,13 +14292,14 @@
   var COUNT_BADGE_OFFSET = 16;
   var MULTI_PLAYER_FILL = "#b0b0b0";
   var MULTI_PLAYER_STROKE = "#000";
+  var OWNERSHIP_BORDER_ALPHA = 0.75;
   var LIGHTNING_COLOR = "#f0d000";
   var CASUALTY_X_COLOR = "#c03030";
   var RANGE_PERIMETER_RANGED_COLOR = "#a06020";
   var RANGE_PERIMETER_AIR_STRIKE_COLOR = "#7a3db5";
-  var RANGE_PERIMETER_WIDTH_MULTIPLIER = 3;
+  var RANGE_PERIMETER_WIDTH_MULTIPLIER = 2;
   var RANGE_SUPPORT_LINE_WIDTH_MULTIPLIER = 1.5;
-  var RANGE_PERIMETER_ALPHA = 0.55;
+  var RANGE_PERIMETER_ALPHA = 0.75;
   var RANGE_PERIMETER_DASH_SOLID_FRACTION = 1;
   var RANGE_PERIMETER_DASH_GAP_FRACTION = 1;
   var RANGE_PERIMETER_DASH_MIN_SOLID_PX = 8;
@@ -16816,6 +16817,8 @@
     return null;
   }
   function drawOutlinedHomeRegionOwnershipBorders(ctx, pts, args) {
+    ctx.save();
+    ctx.globalAlpha = OWNERSHIP_BORDER_ALPHA;
     const outerColor = resolveControllerBorderColor(args.controllerPlayerId);
     const innerColor = resolveHomeRegionOwnerBorderColor(args.homeOwnerIdentity) ?? outerColor;
     const drawClosedPath = (points) => {
@@ -16840,6 +16843,7 @@
     ctx.setLineDash([innerLineWidth * 2.6, innerLineWidth * 1.8]);
     ctx.stroke();
     ctx.setLineDash([]);
+    ctx.restore();
   }
   function resolveOwnershipBorderColor(style) {
     if (style === "normalControlledByHuman") return PLAYER_COLORS.human;
@@ -16945,10 +16949,13 @@
             ownershipLineWidth
           });
         } else if (ownershipColor) {
+          ctx.save();
+          ctx.globalAlpha = OWNERSHIP_BORDER_ALPHA;
           drawClosedPath();
           ctx.strokeStyle = ownershipColor;
           ctx.lineWidth = ownershipLineWidth;
           ctx.stroke();
+          ctx.restore();
         }
       }
       if (rendererSharedState.selectedHexIndex === hx.h3Index) {

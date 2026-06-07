@@ -10,7 +10,7 @@ import {
 import { getHexBoundaryLatLngForLeafletOverlay } from '../map/hexGrid';
 import { getActiveHexStrokeStyle, fillHexTerrain } from './terrainVisualStyles';
 import { drawTerrainInfrastructureGlyphs, RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE } from './terrainInfrastructureOverlay';
-import { DETAIL_H3_RESOLUTION, MULTI_PLAYER_FILL, PLAYER_COLORS, RANGE_PERIMETER_WIDTH_MULTIPLIER, RANGE_SUPPORT_LINE_WIDTH_MULTIPLIER } from '../core/constants';
+import { DETAIL_H3_RESOLUTION, MULTI_PLAYER_FILL, OWNERSHIP_BORDER_ALPHA, PLAYER_COLORS, RANGE_PERIMETER_WIDTH_MULTIPLIER, RANGE_SUPPORT_LINE_WIDTH_MULTIPLIER } from '../core/constants';
 import { getLeafletGlobal, hexCenterPx } from '../map/mapUtils';
 import {
   projectHexBoundaryToContainerPoints,
@@ -51,7 +51,7 @@ export function getHomeRegionOwnershipLineWidth(zoom: number): number {
 /**
  * Returns screen-pixel stroke width for the ranged/air-strike range perimeter outline.
  *
- * Purpose: Keeps the animated perimeter at 3× the outer home-region ownership border at the given map zoom.
+ * Purpose: Keeps the animated perimeter at 2× the outer home-region ownership border at the given map zoom.
  * When to use: `drawRangePerimeterOverlay`.
  * Expected outcome: `getHomeRegionOwnershipLineWidth(zoom) * RANGE_PERIMETER_WIDTH_MULTIPLIER`.
  * Exceptions: None.
@@ -223,6 +223,8 @@ function drawOutlinedHomeRegionOwnershipBorders(
     ownershipLineWidth: number;
   }
 ): void {
+  ctx.save();
+  ctx.globalAlpha = OWNERSHIP_BORDER_ALPHA;
   const outerColor = resolveControllerBorderColor(args.controllerPlayerId);
   const innerColor = resolveHomeRegionOwnerBorderColor(args.homeOwnerIdentity) ?? outerColor;
   const drawClosedPath = (points: readonly { x: number; y: number }[]): void => {
@@ -247,6 +249,7 @@ function drawOutlinedHomeRegionOwnershipBorders(
   ctx.setLineDash([innerLineWidth * 2.6, innerLineWidth * 1.8]);
   ctx.stroke();
   ctx.setLineDash([]);
+  ctx.restore();
 }
 
 /**
@@ -383,10 +386,13 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
           ownershipLineWidth,
         });
       } else if (ownershipColor) {
+        ctx.save();
+        ctx.globalAlpha = OWNERSHIP_BORDER_ALPHA;
         drawClosedPath();
         ctx.strokeStyle = ownershipColor;
         ctx.lineWidth = ownershipLineWidth;
         ctx.stroke();
+        ctx.restore();
       }
     }
     if (S.selectedHexIndex === hx.h3Index) {
