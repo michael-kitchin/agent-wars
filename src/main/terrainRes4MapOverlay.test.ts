@@ -32,6 +32,7 @@ function testCityReductionPicksLowestScalerank(): void {
       ],
       states: [],
       countries: [],
+      water: [],
     },
   ];
   const m = reduceRes4CityOverlayLabelsByH3(records);
@@ -57,6 +58,7 @@ function testCityTieJoinsAndSorts(): void {
       ],
       states: [],
       countries: [],
+      water: [],
     },
   ];
   const m = reduceRes4CityOverlayLabelsByH3(records);
@@ -78,6 +80,7 @@ function testCityReductionIgnoresOutOfRangeScalerank(): void {
       cities: [{ name: 'OnlyFive', state: null, country: null, population: 1, scalerank: 5 }],
       states: [],
       countries: [],
+      water: [],
     },
   ];
   const m = reduceRes4CityOverlayLabelsByH3(records);

@@ -8,6 +8,10 @@ import {
   namesForFirstOccurringScalerankList,
   preferredNamingLineForRes1Record,
   preferredNamingLineForRes4Record,
+  namingLineForRes1Record,
+  namingLineForRes4Record,
+  waterNamingLineForRes1Record,
+  waterNamingLineForRes4Record,
   TOOLTIP_NAME_LIST_MAX_ITEMS,
   type TerrainNamingRecordRes1,
   type TerrainNamingRecordRes4,
@@ -86,6 +90,7 @@ function testRes4PrefersCityLineOverStates(): void {
         scalerank: 0,
       },
     ],
+    water: [],
   };
   assert.strictEqual(preferredNamingLineForRes4Record(record), 'United States of America: Connecticut, New York');
 }
@@ -122,6 +127,7 @@ function testRes4FallsBackToStatesWhenNoCities(): void {
         scalerank: 3,
       },
     ],
+    water: [],
   };
   assert.strictEqual(
     preferredNamingLineForRes4Record(record),
@@ -148,6 +154,7 @@ function testRes1UsesFirstOccurringStateScalerank(): void {
     countries: [
       { name: 'Xland', continent: 'X', region: 'Y', population: 1, scalerank: 7 },
     ],
+    water: [],
   };
   assert.strictEqual(preferredNamingLineForRes1Record(record), 'X: Xland');
 }
@@ -170,6 +177,7 @@ function testRes4FallsBackToCountriesWhenNoCitiesOrStates(): void {
       { name: 'S. Sudan', continent: 'Africa', region: 'Eastern Africa', population: 11062113, scalerank: 3 },
       { name: 'Another Rank 6 Country', continent: 'Africa', region: 'Middle Africa', population: 2, scalerank: 6 },
     ],
+    water: [],
   };
   assert.strictEqual(
     preferredNamingLineForRes4Record(record),
@@ -201,6 +209,7 @@ function testRes4EscalatesCitiesToStatesWhenCityListTooLarge(): void {
       { name: 'State B', country: 'C', scalerank: 3 },
     ],
     countries: [{ name: 'Country A', continent: 'X', region: 'Y', population: 1, scalerank: 1 }],
+    water: [],
   };
   assert.strictEqual(preferredNamingLineForRes4Record(record), 'X: Country A');
 }
@@ -227,6 +236,7 @@ function testRes4EscalatesStatesToCountriesWhenStateListTooLarge(): void {
       { name: 'Country A', continent: 'X', region: 'Y', population: 1, scalerank: 1 },
       { name: 'Country B', continent: 'X', region: 'Y', population: 1, scalerank: 1 },
     ],
+    water: [],
   };
   assert.strictEqual(preferredNamingLineForRes4Record(record), 'X: Country A, Country B');
 }
@@ -247,6 +257,7 @@ function testRes1FallsBackToCountriesWhenNoStates(): void {
       { name: 'Country A', continent: 'X', region: 'Y', population: 1, scalerank: 2 },
       { name: 'Country B', continent: 'X', region: 'Y', population: 1, scalerank: 5 },
     ],
+    water: [],
   };
   assert.strictEqual(preferredNamingLineForRes1Record(record), 'X: Country A, Country B');
 }
@@ -272,6 +283,7 @@ function testRes1EscalatesStatesToCountriesWhenStateListTooLarge(): void {
       { name: 'Country A', continent: 'X', region: 'Y', population: 1, scalerank: 1 },
       { name: 'Country B', continent: 'X', region: 'Y', population: 1, scalerank: 1 },
     ],
+    water: [],
   };
   assert.strictEqual(preferredNamingLineForRes1Record(record), 'X: Country A, Country B');
 }
@@ -297,6 +309,7 @@ function testRes4GroupsCitiesByCountryAndState(): void {
     ],
     states: [],
     countries: [],
+    water: [],
   };
   assert.strictEqual(
     preferredNamingLineForRes4Record(record),
@@ -323,6 +336,7 @@ function testRes4GroupsStatesByCountryWithinSameScalerank(): void {
       { name: 'State4', country: 'Country2', scalerank: 4 },
     ],
     countries: [],
+    water: [],
   };
   assert.strictEqual(preferredNamingLineForRes4Record(record), 'Country1: State1, State2; Country2: State3, State4');
 }
@@ -341,6 +355,7 @@ function testNoFirstLineWhenNoCitiesStatesOrCountries(): void {
     cities: [],
     states: [],
     countries: [],
+    water: [],
   };
   assert.strictEqual(preferredNamingLineForRes4Record(record), null);
 }
@@ -378,6 +393,7 @@ function testRes4FallsBackToStatesWhenCitiesMissSomeStates(): void {
         scalerank: 0,
       },
     ],
+    water: [],
   };
   assert.strictEqual(preferredNamingLineForRes4Record(record), 'United States of America: Connecticut, New York');
 }
@@ -398,6 +414,7 @@ function testRes1FallsBackToCountriesWhenStatesMissSomeCountries(): void {
       { name: 'Country A', continent: 'X', region: 'Y', population: 1, scalerank: 1 },
       { name: 'Country B', continent: 'X', region: 'Y', population: 1, scalerank: 5 },
     ],
+    water: [],
   };
   assert.strictEqual(preferredNamingLineForRes1Record(record), 'X: Country A, Country B');
 }
@@ -432,6 +449,7 @@ function testRes4UsesTopFiveCitiesWhenTheyCoverStatesAndCountries(): void {
       { name: 'Country A', continent: 'North America', region: 'X', population: 1, scalerank: 1 },
       { name: 'Country B', continent: 'Europe', region: 'Y', population: 1, scalerank: 1 },
     ],
+    water: [],
   };
   assert.strictEqual(
     preferredNamingLineForRes4Record(record),
@@ -462,8 +480,118 @@ function testRes1UsesTopFiveStatesWhenTheyCoverCountriesAndContinents(): void {
       { name: 'Country A', continent: 'North America', region: 'X', population: 1, scalerank: 1 },
       { name: 'Country B', continent: 'Europe', region: 'Y', population: 1, scalerank: 1 },
     ],
+    water: [],
   };
   assert.strictEqual(preferredNamingLineForRes1Record(record), 'Country A: State 1, State 2, State 5; Country B: State 3, State 4');
+}
+
+function testWaterNamingLineRes1EmptyReturnsNull(): void {
+  const record: TerrainNamingRecordRes1 = {
+    h3_index: '81003ffffffffff',
+    states: [],
+    countries: [],
+    water: [],
+  };
+  assert.strictEqual(waterNamingLineForRes1Record(record), null);
+}
+
+function testWaterNamingLineRes1GroupsDescendingScalerank(): void {
+  const record: TerrainNamingRecordRes1 = {
+    h3_index: '81003ffffffffff',
+    states: [],
+    countries: [],
+    water: [
+      { name: 'North Pacific Ocean', type: 'ocean', scalerank: 0 },
+      { name: 'Tiny Lake', type: 'lake', scalerank: 8 },
+      { name: 'Small Pond', type: 'lake', scalerank: 8 },
+    ],
+  };
+  assert.strictEqual(
+    waterNamingLineForRes1Record(record),
+    'Water: Small Pond, Tiny Lake; North Pacific Ocean'
+  );
+}
+
+function testWaterNamingLineRes4GroupsDescendingScalerank(): void {
+  const record: TerrainNamingRecordRes1 = {
+    h3_index: '8400001ffffffff',
+    states: [],
+    countries: [],
+    water: [
+      { name: 'North Pacific Ocean', type: 'ocean', scalerank: 0 },
+      { name: 'Tiny Lake', type: 'lake', scalerank: 8 },
+      { name: 'Small Pond', type: 'lake', scalerank: 8 },
+    ],
+  };
+  assert.strictEqual(
+    waterNamingLineForRes4Record(record),
+    'Water: Small Pond, Tiny Lake; North Pacific Ocean'
+  );
+  assert.strictEqual(waterNamingLineForRes1Record(record), waterNamingLineForRes4Record(record));
+}
+
+function testNamingLineRes1PrefersGeographicOverWater(): void {
+  const record: TerrainNamingRecordRes1 = {
+    h3_index: '81077ffffffffff',
+    states: [
+      { name: 'Austurland', country: 'Iceland', scalerank: 2 },
+      { name: 'Höfuðborgarsvæði', country: 'Iceland', scalerank: 2 },
+      { name: 'Norðurland eystra', country: 'Iceland', scalerank: 2 },
+      { name: 'Norðurland vestra', country: 'Iceland', scalerank: 2 },
+      { name: 'Reykjavík', country: 'Iceland', scalerank: 2 },
+    ],
+    countries: [
+      { name: 'Iceland', continent: 'Europe', region: 'Northern Europe', population: 366463, scalerank: 0 },
+    ],
+    water: [{ name: 'North Atlantic Ocean', type: 'ocean', scalerank: 0 }],
+  };
+  assert.strictEqual(
+    namingLineForRes1Record(record),
+    'Iceland: Austurland, Höfuðborgarsvæði, Norðurland eystra, Norðurland vestra, Reykjavík'
+  );
+}
+
+function testNamingLineRes1FallsBackToWaterWhenNoGeographic(): void {
+  const record: TerrainNamingRecordRes1 = {
+    h3_index: '810000000000000',
+    states: [],
+    countries: [],
+    water: [
+      { name: 'North Pacific Ocean', type: 'ocean', scalerank: 0 },
+      { name: 'Arctic Ocean', type: 'ocean', scalerank: 0 },
+    ],
+  };
+  assert.strictEqual(namingLineForRes1Record(record), 'Water: Arctic Ocean, North Pacific Ocean');
+  assert.strictEqual(waterNamingLineForRes1Record(record), namingLineForRes1Record(record));
+}
+
+function testNamingLineRes4FallsBackToWaterWhenNoGeographic(): void {
+  const record: TerrainNamingRecordRes4 = {
+    h3_index: '8400001ffffffff',
+    cities: [],
+    states: [],
+    countries: [],
+    water: [
+      { name: 'North Pacific Ocean', type: 'ocean', scalerank: 0 },
+      { name: 'Tiny Lake', type: 'lake', scalerank: 8 },
+    ],
+  };
+  assert.strictEqual(namingLineForRes4Record(record), 'Water: Tiny Lake; North Pacific Ocean');
+}
+
+function testWaterNamingLineNullScalerankLeastProminentFirst(): void {
+  const record: TerrainNamingRecordRes1 = {
+    h3_index: '8400001ffffffff',
+    states: [],
+    countries: [],
+    water: [
+      { name: 'Named Ocean', type: 'ocean', scalerank: 0 },
+      { name: 'Unranked Lake', type: 'lake', scalerank: null },
+    ],
+  };
+  const expected = 'Water: Unranked Lake; Named Ocean';
+  assert.strictEqual(waterNamingLineForRes1Record(record), expected);
+  assert.strictEqual(waterNamingLineForRes4Record(record), expected);
 }
 
 /**
@@ -492,6 +620,13 @@ function main(): void {
   testRes1FallsBackToCountriesWhenStatesMissSomeCountries();
   testRes4UsesTopFiveCitiesWhenTheyCoverStatesAndCountries();
   testRes1UsesTopFiveStatesWhenTheyCoverCountriesAndContinents();
+  testWaterNamingLineRes1EmptyReturnsNull();
+  testWaterNamingLineRes1GroupsDescendingScalerank();
+  testWaterNamingLineRes4GroupsDescendingScalerank();
+  testWaterNamingLineNullScalerankLeastProminentFirst();
+  testNamingLineRes1PrefersGeographicOverWater();
+  testNamingLineRes1FallsBackToWaterWhenNoGeographic();
+  testNamingLineRes4FallsBackToWaterWhenNoGeographic();
   console.log('terrainNamingLoad.test: ok');
 }
 

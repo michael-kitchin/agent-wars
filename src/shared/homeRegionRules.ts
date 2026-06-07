@@ -97,6 +97,22 @@ export function resolveHomeRegionOwnerIdentity(input: HomeRegionOwnerIdentityInp
 }
 
 /**
+ * Formats the parenthetical home-region assignment suffix for res1 tooltip control lines.
+ *
+ * Purpose: Distinguishes declared home-region ownership from current hex control in tooltip copy.
+ * When to use: After `resolveHomeRegionOwnerIdentity` returns a non-null identity for a strategic hex.
+ * Expected outcome: `(Human Home Region)`, `(AI Home Region)`, or `(Human & AI Home Region)`.
+ * Exceptions: None — callers must pass a non-null `HomeRegionOwnerIdentity`.
+ */
+export function formatHomeRegionAssignmentControlSuffix(
+  identity: Exclude<HomeRegionOwnerIdentity, null>
+): string {
+  if (identity === 'both') return '(Human & AI Home Region)';
+  if (identity === 'human') return '(Human Home Region)';
+  return '(AI Home Region)';
+}
+
+/**
  * Classifies how a strategic hex border should communicate ownership to the current player.
  *
  * Purpose: Provides a single contract for renderer border style decisions so home/non-home visibility

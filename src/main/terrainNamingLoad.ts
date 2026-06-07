@@ -13,7 +13,7 @@ import { resolveTerrainRes1NamingPath, resolveTerrainRes4NamingPath } from './te
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const EXPECTED_HEX_NAMING_SCHEMA_VERSION = '1.0.0';
+export const EXPECTED_HEX_NAMING_SCHEMA_VERSION = '1.1.0';
 /**
  * Documents the module-scope binding `TOOLTIP_NAME_LIST_MAX_ITEMS` (TOOLTIP_NAME_LIST_MAX_ITEMS).
 
@@ -126,6 +126,44 @@ scalerank: number | null;
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * One lake or ocean polygon intersecting a hex from Natural Earth water shapefiles.
+ *
+ * Contract: `type` is `lake` (ne_10m_lakes) or `ocean` (ne_10m_geography_marine_polys).
+ * When to use: Parsed from naming JSON `water` arrays; input to water caption functions.
+ * Expected outcome: Stable name/type/scalerank triple per intersecting water body.
+ * Exceptions: None.
+ */
+export interface TerrainNamingWaterRow {
+  /**
+   * Specifies the contract for the `name` member (name: string;).
+
+   * Contract: Human-readable water body name from the source shapefile.
+   * When to use: Water caption formatting and JSON parsing validation.
+   * Expected outcome: Non-empty string for each intersecting lake or ocean feature.
+   * Exceptions: None.
+   */
+  name: string;
+  /**
+   * Specifies the contract for the `type` member (type: 'ocean' | 'lake';).
+
+   * Contract: Source layer discriminator for lakes vs marine polygons.
+   * When to use: JSON parsing validation and dedupe keys in the naming pipeline.
+   * Expected outcome: Exactly `ocean` or `lake` per originating shapefile.
+   * Exceptions: None.
+   */
+  type: 'ocean' | 'lake';
+  /**
+   * Specifies the contract for the `scalerank` member (scalerank: number | null;).
+
+   * Contract: Natural Earth prominence rank; lower integer = more prominent.
+   * When to use: Scalerank filtering when building water tooltip captions.
+   * Expected outcome: Integer rank or null when the source field is missing.
+   * Exceptions: None.
+   */
+  scalerank: number | null;
+}
+
 export interface TerrainNamingCountryRow {
     /**
    * Specifies the contract for the `name` member (name: string;).
@@ -210,6 +248,15 @@ states: TerrainNamingStateRow[];
    * Exceptions: None.
    */
 countries: TerrainNamingCountryRow[];
+    /**
+   * Specifies the contract for the `water` member (water: TerrainNamingWaterRow[];).
+
+   * Contract: Lake and ocean polygons intersecting this hex from Natural Earth water shapefiles.
+   * When to use: Water caption fallback when geographic naming returns null.
+   * Expected outcome: Array ordered by scalerank then name; empty when no water bodies intersect.
+   * Exceptions: None.
+   */
+  water: TerrainNamingWaterRow[];
 }
 
 /**
@@ -421,6 +468,31 @@ function readCountryArray(r: Record<string, unknown>, key: string): TerrainNamin
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * Parses the `water` array from a naming JSON record.
+ *
+ * Purpose: Validates lake/ocean rows emitted by the Python naming pipeline.
+ * When to use: From `parseRes1Row` for every res1/res4 naming record.
+ * Expected outcome: Array of `TerrainNamingWaterRow` with required `name` and `type`.
+ * Exceptions: Throws when `type` is not `ocean` or `lake`.
+ */
+function readWaterArray(r: Record<string, unknown>, key: string): TerrainNamingWaterRow[] {
+  const v = r[key];
+  if (!Array.isArray(v)) throw new Error(`terrain naming: "${key}" must be an array`);
+  return v.map((el, i) => {
+    if (!isRecord(el)) throw new Error(`terrain naming: ${key}[${i}] must be an object`);
+    const typeRaw = readStr(el, 'type');
+    if (typeRaw !== 'ocean' && typeRaw !== 'lake') {
+      throw new Error(`terrain naming: ${key}[${i}].type must be "ocean" or "lake"`);
+    }
+    return {
+      name: readStr(el, 'name'),
+      type: typeRaw,
+      scalerank: readIntOrNull(el, 'scalerank'),
+    };
+  });
+}
+
 function readCityArray(r: Record<string, unknown>, key: string): TerrainNamingCityRow[] {
   const v = r[key];
   if (!Array.isArray(v)) throw new Error(`terrain naming: "${key}" must be an array`);
@@ -454,6 +526,7 @@ function parseRes1Row(raw: unknown, resolution: number): TerrainNamingRecordRes1
     h3_index,
     states: readStateArray(raw, 'states'),
     countries: readCountryArray(raw, 'countries'),
+    water: readWaterArray(raw, 'water'),
   };
 }
 
@@ -824,6 +897,87 @@ export function preferredNamingLineForRes4Record(record: TerrainNamingRecordRes4
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * Formats lake/ocean rows into a grouped water caption string shared by res1 and res4.
+ *
+ * Purpose: Keep water tooltip grouping identical at both resolutions.
+ * When to use: From `waterNamingLineForRes1Record` and `waterNamingLineForRes4Record`.
+ * Expected outcome: `Water: group1; group2` with scalerank groups descending (null rank first), or `null` when empty.
+ * Exceptions: None.
+ */
+function formatGroupedWaterNamingLine(water: ReadonlyArray<TerrainNamingWaterRow>): string | null {
+  if (water.length === 0) return null;
+  const byRank = new Map<number | null, string[]>();
+  for (const row of water) {
+    const rank = row.scalerank ?? null;
+    let names = byRank.get(rank);
+    if (!names) {
+      names = [];
+      byRank.set(rank, names);
+    }
+    names.push(row.name);
+  }
+  const ranks = Array.from(byRank.keys()).sort((a, b) => {
+    const aSort = a === null ? Number.POSITIVE_INFINITY : a;
+    const bSort = b === null ? Number.POSITIVE_INFINITY : b;
+    return bSort - aSort;
+  });
+  const groupStrings = ranks.map((rank) => {
+    const names = [...(byRank.get(rank) ?? [])].sort((x, y) => x.localeCompare(y));
+    return names.join(', ');
+  });
+  if (groupStrings.length === 0) return null;
+  return `Water: ${groupStrings.join('; ')}`;
+}
+
+/**
+ * Builds the water-body caption for a res1 hex from lake/ocean naming JSON rows.
+ *
+ * Purpose: Water fallback when state/country geographic naming is unavailable.
+ * When to use: As fallback from `namingLineForRes1Record` after `preferredNamingLineForRes1Record` returns null.
+ * Expected outcome: Same grouped `Water: ...` format as res4, or `null` when `water` is empty.
+ * Exceptions: None.
+ */
+export function waterNamingLineForRes1Record(record: TerrainNamingRecordRes1): string | null {
+  return formatGroupedWaterNamingLine(record.water);
+}
+
+/**
+ * Builds the water-body caption for a res4 hex from lake/ocean naming JSON rows.
+ *
+ * Purpose: Water fallback when city/state/country geographic naming is unavailable.
+ * When to use: As fallback from `namingLineForRes4Record` after `preferredNamingLineForRes4Record` returns null.
+ * Expected outcome: `Water: group1; group2` with semicolon-separated scalerank groups, or `null` when empty.
+ * Exceptions: None.
+ */
+export function waterNamingLineForRes4Record(record: TerrainNamingRecordRes1): string | null {
+  return formatGroupedWaterNamingLine(record.water);
+}
+
+/**
+ * Resolves the res1 tooltip naming line: geographic (state/country) first, then water bodies.
+ *
+ * Purpose: Single entrypoint for res1 caption selection in the terrain classification cache.
+ * When to use: From `buildSnapshot` when precomputing `namingLinesRes1ByH3`.
+ * Expected outcome: Geographic line when available; otherwise `Water: ...` from `water` JSON; else `null`.
+ * Exceptions: None.
+ */
+export function namingLineForRes1Record(record: TerrainNamingRecordRes1): string | null {
+  return preferredNamingLineForRes1Record(record) ?? waterNamingLineForRes1Record(record);
+}
+
+/**
+ * Resolves the res4 tooltip naming line: geographic (city/state/country) first, then water bodies.
+ *
+ * Purpose: Single entrypoint for res4 caption selection in the terrain classification cache.
+ * When to use: From `buildSnapshot` when precomputing `namingLinesRes4ByH3`.
+ * Expected outcome: Geographic line when available; otherwise `Water: ...` from `water` JSON; else `null`.
+ * Exceptions: None.
+ */
+export function namingLineForRes4Record(record: TerrainNamingRecordRes4): string | null {
+  return preferredNamingLineForRes4Record(record) ?? waterNamingLineForRes4Record(record);
+}
+
 export function preferredNamingLineForRes1Record(record: TerrainNamingRecordRes1): string | null {
   const firstRankStates = sortRowsByScalerankAscending(record.states).slice(0, TOOLTIP_NAME_LIST_MAX_ITEMS);
   if (

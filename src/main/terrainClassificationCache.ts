@@ -25,8 +25,8 @@ import {
 import {
   loadTerrainRes1NamingBundled,
   loadTerrainRes4NamingBundled,
-  preferredNamingLineForRes1Record,
-  preferredNamingLineForRes4Record,
+  namingLineForRes1Record,
+  namingLineForRes4Record,
   type TerrainNamingRecordRes1,
   type TerrainNamingRecordRes4,
 } from './terrainNamingLoad';
@@ -334,12 +334,12 @@ function buildSnapshot(): TerrainClassificationSnapshot {
   }
   const namingLinesRes1ByH3 = new Map<string, string>();
   for (const row of namingRes1Env.records) {
-    const line = preferredNamingLineForRes1Record(row);
+    const line = namingLineForRes1Record(row);
     if (line) namingLinesRes1ByH3.set(row.h3_index, line);
   }
   const namingLinesRes4ByH3 = new Map<string, string>();
   for (const row of namingRes4Env.records as TerrainNamingRecordRes4[]) {
-    const line = preferredNamingLineForRes4Record(row);
+    const line = namingLineForRes4Record(row);
     if (line) namingLinesRes4ByH3.set(row.h3_index, line);
   }
   const res4CityOverlayByH3 = reduceRes4CityOverlayLabelsByH3(namingRes4Env.records as TerrainNamingRecordRes4[]);

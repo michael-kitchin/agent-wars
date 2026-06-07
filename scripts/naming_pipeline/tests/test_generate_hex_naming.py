@@ -67,6 +67,48 @@ class GenerateHexNamingTests(unittest.TestCase):
             finally:
                 conn.close()
 
+    def test_water_output_shape_sort_and_dedupe(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            out_res1 = Path(td) / "terrain_res1_naming.json"
+            out_res4 = Path(td) / "terrain_res4_naming.json"
+            conn = sqlite3.connect(":memory:")
+            try:
+                _init_tables(conn)
+                conn.executescript(
+                    """
+                    INSERT OR IGNORE INTO water_res1(cell, name, type, scalerank) VALUES
+                    ('81003ffffffffff', 'North Pacific Ocean', 'ocean', 0),
+                    ('81003ffffffffff', 'Superior', 'lake', 0),
+                    ('81003ffffffffff', 'Superior', 'lake', 0),
+                    ('81003ffffffffff', 'Small Pond', 'lake', 5);
+
+                    INSERT OR IGNORE INTO water_res4(cell, name, type, scalerank) VALUES
+                    ('8400001ffffffff', 'Lake Erie', 'lake', 0),
+                    ('8400001ffffffff', 'Lake Erie', 'lake', 0),
+                    ('8400001ffffffff', 'Tiny Lake', 'lake', 8);
+                    """
+                )
+                conn.commit()
+
+                _write_res1_json(conn, ["81003ffffffffff"], out_res1)
+                _write_res4_json(conn, ["8400001ffffffff"], out_res4)
+
+                res1 = json.loads(out_res1.read_text(encoding="utf-8"))
+                water_res1 = res1["records"][0]["water"]
+                self.assertEqual(
+                    ["North Pacific Ocean", "Superior", "Small Pond"],
+                    [w["name"] for w in water_res1],
+                )
+                self.assertEqual("ocean", water_res1[0]["type"])
+                self.assertEqual("lake", water_res1[1]["type"])
+
+                res4 = json.loads(out_res4.read_text(encoding="utf-8"))
+                water_res4 = res4["records"][0]["water"]
+                self.assertEqual(["Lake Erie", "Tiny Lake"], [w["name"] for w in water_res4])
+                self.assertEqual([], res4["records"][0]["cities"])
+            finally:
+                conn.close()
+
     def test_validate_inputs_fails_when_shapefiles_missing(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             with self.assertRaises(FileNotFoundError):

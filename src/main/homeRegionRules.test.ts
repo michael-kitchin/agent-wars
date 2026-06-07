@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import {
+  formatHomeRegionAssignmentControlSuffix,
   getForcedVisibleHomeRegionHexesForPlayer,
   isHexOwnershipVisibleToPerspective,
   resolveHomeRegionOwnerIdentity,
@@ -93,6 +94,12 @@ function testOwnershipVisibilityUsesNormalVisibilityForNonHomeHexes(): void {
  * Expected outcome: Exclusive lists return one side; intersection returns `both`; non-home returns null.
  * Exceptions: None.
  */
+function testFormatHomeRegionAssignmentControlSuffixContract(): void {
+  assert.strictEqual(formatHomeRegionAssignmentControlSuffix('human'), '(Human Home Region)');
+  assert.strictEqual(formatHomeRegionAssignmentControlSuffix('opponent'), '(AI Home Region)');
+  assert.strictEqual(formatHomeRegionAssignmentControlSuffix('both'), '(Human & AI Home Region)');
+}
+
 function testResolveHomeRegionOwnerIdentityContract(): void {
   const sharedInputs = {
     humanHomeRegionHexes: ['home-h', 'shared'],
@@ -210,6 +217,7 @@ function testForcedVisibleHomeHexesNoScenarioGate(): void {
 function run(): void {
   testOwnershipVisibilityUsesHomeExceptions();
   testOwnershipVisibilityUsesNormalVisibilityForNonHomeHexes();
+  testFormatHomeRegionAssignmentControlSuffixContract();
   testResolveHomeRegionOwnerIdentityContract();
   testResolveOwnershipBorderStyleContract();
   testForcedVisibleHomeHexesNoScenarioGate();

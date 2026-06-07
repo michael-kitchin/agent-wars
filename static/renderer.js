@@ -16160,6 +16160,11 @@
     if (inHuman) return "human";
     return "opponent";
   }
+  function formatHomeRegionAssignmentControlSuffix(identity) {
+    if (identity === "both") return "(Human & AI Home Region)";
+    if (identity === "human") return "(Human Home Region)";
+    return "(AI Home Region)";
+  }
   function uniqueSortedHexes(hexes) {
     return [...new Set(hexes)].sort();
   }
@@ -20715,10 +20720,17 @@
     if (!rendererSharedState.gameState) return "Unknown";
     const strategicHex = resolveStrategicHexForControlLine(namingTarget);
     if (!strategicHex) return "Unknown";
-    const isHomeRegionHex = (rendererSharedState.gameState.humanHomeRegionHexes ?? []).includes(strategicHex) || (rendererSharedState.gameState.aiHomeRegionHexes ?? []).includes(strategicHex);
     const controller = (rendererSharedState.gameState.res1Control ?? []).find((row) => row.h3Index === strategicHex)?.controllerPlayerId ?? null;
     const ownerLabel = controller === "human" ? "Human" : controller === "opponent" ? "AI" : "Unknown";
-    if (isHomeRegionHex) return `${ownerLabel} (Home Region)`;
+    const homeRegionIdentity = resolveHomeRegionOwnerIdentity({
+      h3Index: strategicHex,
+      humanHomeRegionHexes: rendererSharedState.gameState.humanHomeRegionHexes,
+      aiHomeRegionHexes: rendererSharedState.gameState.aiHomeRegionHexes,
+      intersectingHomeRegionHexes: rendererSharedState.gameState.intersectingHomeRegionHexes
+    });
+    if (homeRegionIdentity != null) {
+      return `${ownerLabel} ${formatHomeRegionAssignmentControlSuffix(homeRegionIdentity)}`;
+    }
     const visibleHexes = Array.isArray(rendererSharedState.gameState.visibleHexes) ? new Set(rendererSharedState.gameState.visibleHexes) : new Set(rendererSharedState.gameState.hexes.map((h) => h.h3Index));
     const perspective = rendererSharedState.gameState.playerPerspective === "opponent" ? "opponent" : "human";
     const ownershipVisible = isHexOwnershipVisibleToPerspective({

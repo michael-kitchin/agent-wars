@@ -5,6 +5,8 @@ This pipeline builds naming metadata from Natural Earth shapefiles:
 - Countries: ne_10m_admin_0_countries.shp
 - States: ne_10m_admin_1_states_provinces.shp
 - Cities: ne_10m_populated_places.shp (res-4 only)
+- Lakes: ne_10m_lakes.shp
+- Marine polys (oceans/seas): ne_10m_geography_marine_polys.shp
 """
 
 from __future__ import annotations
@@ -30,7 +32,7 @@ from shapely.ops import transform
 
 LOGGER = logging.getLogger(__name__)
 
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "1.1.0"
 DEFAULT_DATA_ROOT = Path("F:/Data")
 DEFAULT_OUTPUT_RES1 = Path("data/generated/terrain_res1_naming.json")
 DEFAULT_OUTPUT_RES4 = Path("data/generated/terrain_res4_naming.json")
@@ -38,12 +40,15 @@ DEFAULT_OUTPUT_RES4 = Path("data/generated/terrain_res4_naming.json")
 COUNTRIES_SHP = "ne_10m_admin_0_countries.shp"
 STATES_SHP = "ne_10m_admin_1_states_provinces.shp"
 CITIES_SHP = "ne_10m_populated_places.shp"
+LAKES_SHP = "ne_10m_lakes.shp"
+MARINE_POLYS_SHP = "ne_10m_geography_marine_polys.shp"
 
 WGS84 = CRS.from_epsg(4326)
 REQUIRED_FIELDS_BY_LAYER: dict[str, tuple[str, ...]] = {
     "countries": ("name", "continent", "subregion", "pop_est", "scalerank"),
     "states": ("name", "admin", "scalerank"),
     "cities": ("name", "adm1name", "adm0name", "pop_max", "scalerank"),
+    "water": ("name", "scalerank"),
 }
 
 
@@ -216,6 +221,20 @@ def _init_tables(conn: sqlite3.Connection) -> None:
             population REAL,
             scalerank INTEGER,
             UNIQUE(cell, name, state, country, population, scalerank)
+        );
+        CREATE TABLE water_res1 (
+            cell TEXT NOT NULL,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL,
+            scalerank INTEGER,
+            UNIQUE(cell, name, type)
+        );
+        CREATE TABLE water_res4 (
+            cell TEXT NOT NULL,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL,
+            scalerank INTEGER,
+            UNIQUE(cell, name, type)
         );
         """
     )
@@ -411,6 +430,63 @@ def _insert_cities(
                     LOGGER.debug("Processed %d city features.", idx)
 
 
+def _insert_water(
+    conn: sqlite3.Connection,
+    water_path: Path,
+    water_type: str,
+    *,
+    res4_cell_filter: set[str] | None = None,
+) -> None:
+    """
+    Why this exists:
+        Map lake or marine-polygon features to overlapping H3 cells for water naming metadata.
+    When to use:
+        Once per water shapefile during `run_pipeline` (lakes and marine polys).
+    What to expect:
+        Inserts rows into `water_res1` and `water_res4` with dedupe on (cell, name, type).
+    """
+
+    if not water_path.is_file():
+        raise FileNotFoundError(f"Water shapefile not found: {water_path}")
+    LOGGER.debug("Loading water (%s) from %s", water_type, water_path)
+    with fiona.open(water_path) as src:
+        xy_transform = _feature_transformer(src)
+        schema_props = (src.schema or {}).get("properties") or {}
+        fields = _resolve_field_names(schema_props, REQUIRED_FIELDS_BY_LAYER["water"])
+        with conn:
+            for idx, feature in enumerate(src, start=1):
+                props = feature.get("properties") or {}
+                name = props.get(fields["name"])
+                if not name or not str(name).strip():
+                    continue
+                scalerank = _to_int(props.get(fields["scalerank"]))
+
+                geom_wgs84 = _feature_geometry_wgs84(feature.get("geometry"), xy_transform)
+                if geom_wgs84 is None:
+                    continue
+
+                cells_res1 = _h3_overlap_cells(geom_wgs84, 1)
+                cells_res4 = _h3_overlap_cells(geom_wgs84, 4)
+                if res4_cell_filter is not None:
+                    cells_res4 = [cell for cell in cells_res4 if cell in res4_cell_filter]
+                conn.executemany(
+                    """
+                    INSERT OR IGNORE INTO water_res1(cell, name, type, scalerank)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    [(cell, str(name), water_type, scalerank) for cell in cells_res1],
+                )
+                conn.executemany(
+                    """
+                    INSERT OR IGNORE INTO water_res4(cell, name, type, scalerank)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    [(cell, str(name), water_type, scalerank) for cell in cells_res4],
+                )
+                if idx % 100 == 0:
+                    LOGGER.debug("Processed %d %s water features.", idx, water_type)
+
+
 def _group_rows(
     rows: Iterable[tuple[str, Any]],
 ) -> Iterator[tuple[str, Any]]:
@@ -463,6 +539,15 @@ def _write_res1_json(conn: sqlite3.Connection, cells: list[str], out_path: Path)
             """
         )
     )
+    water_cursor = _make_group_cursor(
+        conn.execute(
+            """
+            SELECT cell, json_object('name', name, 'type', type, 'scalerank', scalerank)
+            FROM water_res1
+            ORDER BY cell ASC, scalerank ASC, name ASC
+            """
+        )
+    )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     generated_at = datetime.now(UTC).isoformat()
@@ -477,7 +562,8 @@ def _write_res1_json(conn: sqlite3.Connection, cells: list[str], out_path: Path)
         for idx, cell in enumerate(cells, start=1):
             states = [json.loads(v) for v in states_cursor.take_for_cell(cell)]
             countries = [json.loads(v) for v in countries_cursor.take_for_cell(cell)]
-            record = {"h3_index": cell, "states": states, "countries": countries}
+            water = [json.loads(v) for v in water_cursor.take_for_cell(cell)]
+            record = {"h3_index": cell, "states": states, "countries": countries, "water": water}
             if not first:
                 f.write(",\n")
             _write_pretty_record(f, record)
@@ -528,6 +614,15 @@ def _write_res4_json(conn: sqlite3.Connection, cells: list[str], out_path: Path)
             """
         )
     )
+    water_cursor = _make_group_cursor(
+        conn.execute(
+            """
+            SELECT cell, json_object('name', name, 'type', type, 'scalerank', scalerank)
+            FROM water_res4
+            ORDER BY cell ASC, scalerank ASC, name ASC
+            """
+        )
+    )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     generated_at = datetime.now(UTC).isoformat()
@@ -543,11 +638,13 @@ def _write_res4_json(conn: sqlite3.Connection, cells: list[str], out_path: Path)
             cities = [json.loads(v) for v in cities_cursor.take_for_cell(cell)]
             states = [json.loads(v) for v in states_cursor.take_for_cell(cell)]
             countries = [json.loads(v) for v in countries_cursor.take_for_cell(cell)]
+            water = [json.loads(v) for v in water_cursor.take_for_cell(cell)]
             record = {
                 "h3_index": cell,
                 "cities": cities,
                 "states": states,
                 "countries": countries,
+                "water": water,
             }
             if not first:
                 f.write(",\n")
@@ -578,6 +675,8 @@ def run_pipeline(
     countries_path = data_root / COUNTRIES_SHP
     states_path = data_root / STATES_SHP
     cities_path = data_root / CITIES_SHP
+    lakes_path = data_root / LAKES_SHP
+    marine_polys_path = data_root / MARINE_POLYS_SHP
 
     LOGGER.debug("Generating global H3 cell lists for resolutions 1 and 4.")
     res1_cells = _generate_cells_for_resolution(1)
@@ -594,6 +693,8 @@ def run_pipeline(
         _insert_countries(conn, countries_path, res4_cell_filter=res4_cell_filter)
         _insert_states(conn, states_path, res4_cell_filter=res4_cell_filter)
         _insert_cities(conn, cities_path, res4_cell_filter=res4_cell_filter)
+        _insert_water(conn, lakes_path, "lake", res4_cell_filter=res4_cell_filter)
+        _insert_water(conn, marine_polys_path, "ocean", res4_cell_filter=res4_cell_filter)
 
         LOGGER.info("Writing res1 naming JSON to %s", output_res1)
         _write_res1_json(conn, res1_cells, output_res1)
@@ -642,6 +743,8 @@ def _validate_inputs(data_root: Path) -> None:
         data_root / COUNTRIES_SHP,
         data_root / STATES_SHP,
         data_root / CITIES_SHP,
+        data_root / LAKES_SHP,
+        data_root / MARINE_POLYS_SHP,
     )
     missing = [str(p) for p in needed if not p.is_file()]
     if missing:
@@ -649,6 +752,8 @@ def _validate_inputs(data_root: Path) -> None:
     _validate_layer_fields(data_root / COUNTRIES_SHP, REQUIRED_FIELDS_BY_LAYER["countries"])
     _validate_layer_fields(data_root / STATES_SHP, REQUIRED_FIELDS_BY_LAYER["states"])
     _validate_layer_fields(data_root / CITIES_SHP, REQUIRED_FIELDS_BY_LAYER["cities"])
+    _validate_layer_fields(data_root / LAKES_SHP, REQUIRED_FIELDS_BY_LAYER["water"])
+    _validate_layer_fields(data_root / MARINE_POLYS_SHP, REQUIRED_FIELDS_BY_LAYER["water"])
 
 
 def main(argv: list[str] | None = None) -> int:

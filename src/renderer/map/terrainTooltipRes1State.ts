@@ -9,7 +9,11 @@
 
 import { cellToChildren, cellToParent, latLngToCell } from 'h3-js';
 import { getLlmHexLocationParenLabelForNamingTarget } from '../../shared/hexLlmCodeAssignment';
-import { isHexOwnershipVisibleToPerspective } from '../../shared/homeRegionRules';
+import {
+  formatHomeRegionAssignmentControlSuffix,
+  isHexOwnershipVisibleToPerspective,
+  resolveHomeRegionOwnerIdentity,
+} from '../../shared/homeRegionRules';
 import { DETAIL_H3_RESOLUTION, WORLD_H3_RESOLUTION } from '../core/constants';
 import { isHexExploredByPlayer } from '../core/selection';
 import { rendererSharedState as S } from '../core/state';
@@ -667,12 +671,17 @@ function getTooltipControlLabel(namingTarget: NamingLookupTarget | null): string
   if (!S.gameState) return 'Unknown';
   const strategicHex = resolveStrategicHexForControlLine(namingTarget);
   if (!strategicHex) return 'Unknown';
-  const isHomeRegionHex =
-    (S.gameState.humanHomeRegionHexes ?? []).includes(strategicHex) ||
-    (S.gameState.aiHomeRegionHexes ?? []).includes(strategicHex);
   const controller = (S.gameState.res1Control ?? []).find((row) => row.h3Index === strategicHex)?.controllerPlayerId ?? null;
   const ownerLabel = controller === 'human' ? 'Human' : controller === 'opponent' ? 'AI' : 'Unknown';
-  if (isHomeRegionHex) return `${ownerLabel} (Home Region)`;
+  const homeRegionIdentity = resolveHomeRegionOwnerIdentity({
+    h3Index: strategicHex,
+    humanHomeRegionHexes: S.gameState.humanHomeRegionHexes,
+    aiHomeRegionHexes: S.gameState.aiHomeRegionHexes,
+    intersectingHomeRegionHexes: S.gameState.intersectingHomeRegionHexes,
+  });
+  if (homeRegionIdentity != null) {
+    return `${ownerLabel} ${formatHomeRegionAssignmentControlSuffix(homeRegionIdentity)}`;
+  }
   const visibleHexes = Array.isArray(S.gameState.visibleHexes)
     ? new Set(S.gameState.visibleHexes)
     : new Set(S.gameState.hexes.map((h) => h.h3Index));
