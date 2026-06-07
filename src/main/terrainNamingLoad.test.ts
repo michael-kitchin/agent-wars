@@ -508,7 +508,7 @@ function testWaterNamingLineRes1GroupsDescendingScalerank(): void {
   };
   assert.strictEqual(
     waterNamingLineForRes1Record(record),
-    'Water: Small Pond, Tiny Lake; North Pacific Ocean'
+    'Small Pond, Tiny Lake, North Pacific Ocean'
   );
 }
 
@@ -525,7 +525,7 @@ function testWaterNamingLineRes4GroupsDescendingScalerank(): void {
   };
   assert.strictEqual(
     waterNamingLineForRes4Record(record),
-    'Water: Small Pond, Tiny Lake; North Pacific Ocean'
+    'Small Pond, Tiny Lake, North Pacific Ocean'
   );
   assert.strictEqual(waterNamingLineForRes1Record(record), waterNamingLineForRes4Record(record));
 }
@@ -561,7 +561,7 @@ function testNamingLineRes1FallsBackToWaterWhenNoGeographic(): void {
       { name: 'Arctic Ocean', type: 'ocean', scalerank: 0 },
     ],
   };
-  assert.strictEqual(namingLineForRes1Record(record), 'Water: Arctic Ocean, North Pacific Ocean');
+  assert.strictEqual(namingLineForRes1Record(record), 'Arctic Ocean, North Pacific Ocean');
   assert.strictEqual(waterNamingLineForRes1Record(record), namingLineForRes1Record(record));
 }
 
@@ -576,7 +576,7 @@ function testNamingLineRes4FallsBackToWaterWhenNoGeographic(): void {
       { name: 'Tiny Lake', type: 'lake', scalerank: 8 },
     ],
   };
-  assert.strictEqual(namingLineForRes4Record(record), 'Water: Tiny Lake; North Pacific Ocean');
+  assert.strictEqual(namingLineForRes4Record(record), 'Tiny Lake, North Pacific Ocean');
 }
 
 function testWaterNamingLineNullScalerankLeastProminentFirst(): void {
@@ -589,7 +589,7 @@ function testWaterNamingLineNullScalerankLeastProminentFirst(): void {
       { name: 'Unranked Lake', type: 'lake', scalerank: null },
     ],
   };
-  const expected = 'Water: Unranked Lake; Named Ocean';
+  const expected = 'Unranked Lake, Named Ocean';
   assert.strictEqual(waterNamingLineForRes1Record(record), expected);
   assert.strictEqual(waterNamingLineForRes4Record(record), expected);
 }

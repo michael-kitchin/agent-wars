@@ -902,7 +902,7 @@ export function preferredNamingLineForRes4Record(record: TerrainNamingRecordRes4
  *
  * Purpose: Keep water tooltip grouping identical at both resolutions.
  * When to use: From `waterNamingLineForRes1Record` and `waterNamingLineForRes4Record`.
- * Expected outcome: `Water: group1; group2` with scalerank groups descending (null rank first), or `null` when empty.
+ * Expected outcome: Comma-separated scalerank groups (descending rank; null rank first), or `null` when empty.
  * Exceptions: None.
  */
 function formatGroupedWaterNamingLine(water: ReadonlyArray<TerrainNamingWaterRow>): string | null {
@@ -927,7 +927,7 @@ function formatGroupedWaterNamingLine(water: ReadonlyArray<TerrainNamingWaterRow
     return names.join(', ');
   });
   if (groupStrings.length === 0) return null;
-  return `Water: ${groupStrings.join('; ')}`;
+  return groupStrings.join(', ');
 }
 
 /**
@@ -935,7 +935,7 @@ function formatGroupedWaterNamingLine(water: ReadonlyArray<TerrainNamingWaterRow
  *
  * Purpose: Water fallback when state/country geographic naming is unavailable.
  * When to use: As fallback from `namingLineForRes1Record` after `preferredNamingLineForRes1Record` returns null.
- * Expected outcome: Same grouped `Water: ...` format as res4, or `null` when `water` is empty.
+ * Expected outcome: Same comma-grouped water format as res4, or `null` when `water` is empty.
  * Exceptions: None.
  */
 export function waterNamingLineForRes1Record(record: TerrainNamingRecordRes1): string | null {
@@ -947,7 +947,7 @@ export function waterNamingLineForRes1Record(record: TerrainNamingRecordRes1): s
  *
  * Purpose: Water fallback when city/state/country geographic naming is unavailable.
  * When to use: As fallback from `namingLineForRes4Record` after `preferredNamingLineForRes4Record` returns null.
- * Expected outcome: `Water: group1; group2` with semicolon-separated scalerank groups, or `null` when empty.
+ * Expected outcome: Comma-separated scalerank groups, or `null` when empty.
  * Exceptions: None.
  */
 export function waterNamingLineForRes4Record(record: TerrainNamingRecordRes1): string | null {
@@ -959,7 +959,7 @@ export function waterNamingLineForRes4Record(record: TerrainNamingRecordRes1): s
  *
  * Purpose: Single entrypoint for res1 caption selection in the terrain classification cache.
  * When to use: From `buildSnapshot` when precomputing `namingLinesRes1ByH3`.
- * Expected outcome: Geographic line when available; otherwise `Water: ...` from `water` JSON; else `null`.
+ * Expected outcome: Geographic line when available; otherwise water-body names from `water` JSON; else `null`.
  * Exceptions: None.
  */
 export function namingLineForRes1Record(record: TerrainNamingRecordRes1): string | null {
@@ -971,7 +971,7 @@ export function namingLineForRes1Record(record: TerrainNamingRecordRes1): string
  *
  * Purpose: Single entrypoint for res4 caption selection in the terrain classification cache.
  * When to use: From `buildSnapshot` when precomputing `namingLinesRes4ByH3`.
- * Expected outcome: Geographic line when available; otherwise `Water: ...` from `water` JSON; else `null`.
+ * Expected outcome: Geographic line when available; otherwise water-body names from `water` JSON; else `null`.
  * Exceptions: None.
  */
 export function namingLineForRes4Record(record: TerrainNamingRecordRes4): string | null {

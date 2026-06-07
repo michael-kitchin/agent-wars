@@ -53,13 +53,13 @@ Functions: `waterNamingLineForRes1Record`, `waterNamingLineForRes4Record` (share
 2. Group rows by `scalerank` value.
 3. Within each group, sort names alphabetically.
 4. Order groups by scalerank **descending** (highest integer = least prominent first; `null` scalerank = least prominent, first group).
-5. Join groups with `; ` (semicolon-space). Prefix the full line with `Water: `.
+5. Join scalerank groups with `, ` (comma-space). Do not prefix the line with `Water:`.
 
-Example: `Water: Tiny Lake A, Tiny Lake B; Arctic Ocean, North Pacific Ocean`
+Example: `Tiny Lake A, Tiny Lake B, Arctic Ocean, North Pacific Ocean`
 
 ## Display rendering
 
-The renderer uses `formatGroupedNamingLineHtml`, which bolds the heading before the first colon (`Water:`). Individual name text is not bolded. Subsequent semicolon-separated groups have no heading and are not bolded.
+Water-only captions have no geographic heading colon, so `formatGroupedNamingLineHtml` renders the full line as plain escaped text (no bold segment).
 
 ## Validation
 
