@@ -14,6 +14,7 @@ import {
 } from '../core/constants';
 import { getLeafletGlobal, hexCenterPx, hexCenterPxRelativeTo } from '../map/mapUtils';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
+import type { HumanOrderPreviewSegment } from '../../shared/ipc/humanOrderPreviewTypes';
 import type { GameStateSnapshot, HumanStandingOrderSnapshot, TacticalPendingMarchRow } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildTacticalMarchDraftDestinationPreview } from '../../shared/tacticalMarchHoverPreview';
@@ -114,6 +115,51 @@ export function drawArrowheadOnly(
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * Strokes human march-style route segments (solid turn-1, dashed continuation) with a terminal arrowhead.
+ *
+ * Purpose: Single visual contract for standing orders, tactical draft marches, pending ferry lines, and matching hover previews.
+ * When to use: Any committed or planned human movement polyline that should match ground march line styling.
+ * Expected outcome: Polylines at `ORDER_LINE_COLOR` / `ORDER_LINE_WIDTH`; arrowhead at route end with `tipAtTargetCenter`.
+ * Exceptions: Skips segments with fewer than two lat/lng points; no-op when Leaflet map is unavailable.
+ */
+export function drawHumanMarchStyleRouteSegments(
+  ctx: CanvasRenderingContext2D,
+  segments: readonly HumanOrderPreviewSegment[],
+  options?: { globalAlpha?: number }
+): void {
+  if (segments.length === 0) return;
+  const map = getMainLeafletMap() as { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } } | null;
+  if (!map) return;
+  const L = getLeafletGlobal();
+  ctx.save();
+  if (options?.globalAlpha !== undefined) {
+    ctx.globalAlpha = options.globalAlpha;
+  }
+  let lastPenultimate: { x: number; y: number } | null = null;
+  let lastPoint: { x: number; y: number } | null = null;
+  for (const seg of segments) {
+    if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
+    const points = seg.hexes.map(([lat, lng]) => {
+      const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
+      return { x: p.x, y: p.y };
+    });
+    ctx.setLineDash(seg.turn <= 1 ? [] : [6, 4]);
+    ctx.strokeStyle = ORDER_LINE_COLOR;
+    ctx.lineWidth = ORDER_LINE_WIDTH;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
+    lastPenultimate = points[points.length - 2] ?? null;
+    lastPoint = points[points.length - 1] ?? null;
+  }
+  ctx.setLineDash([]);
+  if (lastPenultimate && lastPoint) {
+    drawArrowheadOnly(ctx, lastPenultimate, lastPoint, ORDER_LINE_COLOR, { tipAtTargetCenter: true });
+  }
+  ctx.restore();
+}
+
 export function strokePolylineSkippingWrap(
   ctx: CanvasRenderingContext2D,
   points: Array<{ x: number; y: number }>,
@@ -149,9 +195,6 @@ export function drawStandingOrderLines(
   excludeUnitIds?: ReadonlySet<string> | null
 ): void {
   if (orders.length === 0) return;
-  const map = getMainLeafletMap() as { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } } | null;
-  if (!map) return;
-  const L = getLeafletGlobal();
   for (const order of orders) {
     if (excludeUnitIds?.has(order.unitId)) continue;
     const unit = units.find((u) => u.id === order.unitId && u.player === 'human');
@@ -168,27 +211,7 @@ export function drawStandingOrderLines(
       }
       continue;
     }
-    let lastPenultimate: { x: number; y: number } | null = null;
-    let lastPoint: { x: number; y: number } | null = null;
-    for (const seg of segments) {
-      if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
-      const points = seg.hexes.map(([lat, lng]) => {
-        const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
-        return { x: p.x, y: p.y };
-      });
-      ctx.setLineDash(seg.turn <= 1 ? [] : [6, 4]);
-      ctx.strokeStyle = ORDER_LINE_COLOR;
-      ctx.lineWidth = ORDER_LINE_WIDTH;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
-      lastPenultimate = points[points.length - 2] ?? null;
-      lastPoint = points[points.length - 1] ?? null;
-    }
-    ctx.setLineDash([]);
-    if (lastPenultimate && lastPoint) {
-      drawArrowheadOnly(ctx, lastPenultimate, lastPoint, ORDER_LINE_COLOR, { tipAtTargetCenter: true });
-    }
+    drawHumanMarchStyleRouteSegments(ctx, segments);
   }
 }
 
@@ -206,9 +229,6 @@ export function drawTacticalPendingMarchPlanLines(
   pendingMarches: readonly TacticalPendingMarchRow[]
 ): void {
   if (pendingMarches.length === 0) return;
-  const map = getMainLeafletMap() as { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } } | null;
-  if (!map) return;
-  const L = getLeafletGlobal();
   ctx.save();
   for (const row of pendingMarches) {
     const sub = battle.subUnits.find((u) => u.id === row.subUnitId && u.player === 'human');
@@ -224,27 +244,7 @@ export function drawTacticalPendingMarchPlanLines(
       ? { valid: true, segments: row.cachedSegments }
       : buildTacticalMarchDraftDestinationPreview(battle, row.subUnitId, toH3).preview;
     if (!preview.valid || preview.segments.length === 0) continue;
-    let lastPenultimate: { x: number; y: number } | null = null;
-    let lastPoint: { x: number; y: number } | null = null;
-    for (const seg of preview.segments) {
-      if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
-      const points = seg.hexes.map(([lat, lng]) => {
-        const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
-        return { x: p.x, y: p.y };
-      });
-      ctx.setLineDash(seg.turn <= 1 ? [] : [6, 4]);
-      ctx.strokeStyle = ORDER_LINE_COLOR;
-      ctx.lineWidth = ORDER_LINE_WIDTH;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
-      lastPenultimate = points[points.length - 2] ?? null;
-      lastPoint = points[points.length - 1] ?? null;
-    }
-    ctx.setLineDash([]);
-    if (lastPenultimate && lastPoint) {
-      drawArrowheadOnly(ctx, lastPenultimate, lastPoint, ORDER_LINE_COLOR, { tipAtTargetCenter: true });
-    }
+    drawHumanMarchStyleRouteSegments(ctx, preview.segments);
   }
   ctx.restore();
 }

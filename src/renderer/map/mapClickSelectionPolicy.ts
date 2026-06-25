@@ -9,6 +9,10 @@
 
 import { rendererSharedState as S } from '../core/state';
 import { emitParityDiagnosticsBreadcrumb } from '../core/parityDiagnostics';
+import {
+  shouldBlockSelectionReplaceDuringHoverPlanning,
+  shouldBlockToggleSelectionDuringHoverPlanning,
+} from '../rendering/canvasPreviewPolicy';
 
 /**
  * Milliseconds to wait before treating a single click as committed single-select (debounce for double-click planning).
@@ -69,6 +73,9 @@ export function applyHumanUnitIconClickSelectionPolicy(args: {
   deps: HumanUnitIconSelectionSideEffects;
 }): void {
   if (args.ctrlKey) {
+    if (shouldBlockToggleSelectionDuringHoverPlanning(args.unitId)) {
+      return;
+    }
     clearDeferredHumanUnitSingleSelectTimer();
     emitParityDiagnosticsBreadcrumb('selection.ctrlToggle', {
       unitId: args.unitId,
@@ -78,6 +85,10 @@ export function applyHumanUnitIconClickSelectionPolicy(args: {
     return;
   }
   if (S.pendingSelectTimeout !== null) {
+    if (shouldBlockSelectionReplaceDuringHoverPlanning([args.unitId])) {
+      clearDeferredHumanUnitSingleSelectTimer();
+      return;
+    }
     clearDeferredHumanUnitSingleSelectTimer();
     emitParityDiagnosticsBreadcrumb('selection.doubleClickFlushToSingleSelect', {
       unitId: args.unitId,
@@ -87,6 +98,9 @@ export function applyHumanUnitIconClickSelectionPolicy(args: {
     return;
   }
   const unitIdToSelect = args.unitId;
+  if (shouldBlockSelectionReplaceDuringHoverPlanning([unitIdToSelect])) {
+    return;
+  }
   emitParityDiagnosticsBreadcrumb('selection.deferSingleSelect', {
     unitId: unitIdToSelect,
     delayMs: HUMAN_UNIT_SINGLE_SELECT_DEBOUNCE_MS,

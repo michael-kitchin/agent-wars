@@ -14261,8 +14261,8 @@
   var ORDER_ARROW_SIZE = 10;
   var AI_ORDER_LINE_COLOR = PLAYER_COLORS.opponent;
   var TOOLTIP_OFFSET_PX = 12;
-  var TERRAIN_TOOLTIP_DELAY_MS = 750;
-  var ORDER_BLOCK_HEX_TOOLTIP_TTL_MS = 2 * TERRAIN_TOOLTIP_DELAY_MS;
+  var HEX_DETAILS_TOOLTIP_DELAY_MS = 750;
+  var ORDER_BLOCK_HEX_TOOLTIP_TTL_MS = 1500;
   var WORLD_H3_RESOLUTION = 1;
   var DETAIL_H3_RESOLUTION = 4;
   var RES4_SHOW_THRESHOLD_VIEW_FRACTION = 0.8;
@@ -16150,6 +16150,31 @@
     return Math.max(1, Math.min(maxX - minX, maxY - minY));
   }
 
+  // src/renderer/rendering/canvasPreviewPolicy.ts
+  function shouldDrawCommittedOrderPaths() {
+    return !rendererSharedState.ctrlKeyActive;
+  }
+  function shouldDrawHoveredPathPreview() {
+    return !rendererSharedState.ctrlKeyActive && rendererSharedState.selectedUnitIds.length > 0;
+  }
+  function getCommittedOrderUnitsHiddenDuringPreview(shouldDrawPathPreview) {
+    if (!shouldDrawPathPreview || !rendererSharedState.hoverRoutePreview) return null;
+    return new Set(rendererSharedState.selectedUnitIds);
+  }
+  function isHoverOrderPlanningActive() {
+    return shouldDrawHoveredPathPreview() && rendererSharedState.hoverRoutePreview !== null && rendererSharedState.hoveredHexH3 !== null;
+  }
+  function shouldBlockSelectionReplaceDuringHoverPlanning(proposedUnitIds) {
+    if (!isHoverOrderPlanningActive()) return false;
+    if (proposedUnitIds.length === 0) return false;
+    const current = new Set(rendererSharedState.selectedUnitIds);
+    return proposedUnitIds.some((id) => !current.has(id));
+  }
+  function shouldBlockToggleSelectionDuringHoverPlanning(unitId) {
+    if (!isHoverOrderPlanningActive()) return false;
+    return !rendererSharedState.selectedUnitIds.includes(unitId);
+  }
+
   // src/shared/homeRegionRules.ts
   function resolveHomeRegionOwnerIdentity(input) {
     const inHuman = (input.humanHomeRegionHexes ?? []).includes(input.h3Index);
@@ -17200,6 +17225,7 @@
     layer.setAttribute("aria-hidden", "false");
   }
   async function tryHandleTacticalEntryAtClientXY(clientX, clientY, onStart) {
+    if (isHoverOrderPlanningActive()) return false;
     const layer = document.getElementById("tactical-entry-layer");
     if (!layer || layer.classList.contains("hidden")) return false;
     const buttons = Array.from(layer.querySelectorAll(".tactical-entry-btn"));
@@ -18932,6 +18958,38 @@
     ctx.lineWidth = ORDER_LINE_WIDTH;
     ctx.stroke();
   }
+  function drawHumanMarchStyleRouteSegments(ctx, segments, options) {
+    if (segments.length === 0) return;
+    const map = getMainLeafletMap();
+    if (!map) return;
+    const L = getLeafletGlobal();
+    ctx.save();
+    if (options?.globalAlpha !== void 0) {
+      ctx.globalAlpha = options.globalAlpha;
+    }
+    let lastPenultimate = null;
+    let lastPoint = null;
+    for (const seg of segments) {
+      if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
+      const points = seg.hexes.map(([lat, lng]) => {
+        const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
+        return { x: p.x, y: p.y };
+      });
+      ctx.setLineDash(seg.turn <= 1 ? [] : [6, 4]);
+      ctx.strokeStyle = ORDER_LINE_COLOR;
+      ctx.lineWidth = ORDER_LINE_WIDTH;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
+      lastPenultimate = points[points.length - 2] ?? null;
+      lastPoint = points[points.length - 1] ?? null;
+    }
+    ctx.setLineDash([]);
+    if (lastPenultimate && lastPoint) {
+      drawArrowheadOnly(ctx, lastPenultimate, lastPoint, ORDER_LINE_COLOR, { tipAtTargetCenter: true });
+    }
+    ctx.restore();
+  }
   function strokePolylineSkippingWrap(ctx, points, wrapJumpThresholdPx) {
     if (points.length < 2) return;
     ctx.beginPath();
@@ -18949,9 +19007,6 @@
   }
   function drawStandingOrderLines(ctx, orders, units, excludeUnitIds) {
     if (orders.length === 0) return;
-    const map = getMainLeafletMap();
-    if (!map) return;
-    const L = getLeafletGlobal();
     for (const order of orders) {
       if (excludeUnitIds?.has(order.unitId)) continue;
       const unit = units.find((u) => u.id === order.unitId && u.player === "human");
@@ -18968,34 +19023,11 @@
         }
         continue;
       }
-      let lastPenultimate = null;
-      let lastPoint = null;
-      for (const seg of segments) {
-        if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
-        const points = seg.hexes.map(([lat, lng]) => {
-          const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
-          return { x: p.x, y: p.y };
-        });
-        ctx.setLineDash(seg.turn <= 1 ? [] : [6, 4]);
-        ctx.strokeStyle = ORDER_LINE_COLOR;
-        ctx.lineWidth = ORDER_LINE_WIDTH;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
-        lastPenultimate = points[points.length - 2] ?? null;
-        lastPoint = points[points.length - 1] ?? null;
-      }
-      ctx.setLineDash([]);
-      if (lastPenultimate && lastPoint) {
-        drawArrowheadOnly(ctx, lastPenultimate, lastPoint, ORDER_LINE_COLOR, { tipAtTargetCenter: true });
-      }
+      drawHumanMarchStyleRouteSegments(ctx, segments);
     }
   }
   function drawTacticalPendingMarchPlanLines(ctx, battle, pendingMarches) {
     if (pendingMarches.length === 0) return;
-    const map = getMainLeafletMap();
-    if (!map) return;
-    const L = getLeafletGlobal();
     ctx.save();
     for (const row of pendingMarches) {
       const sub = battle.subUnits.find((u) => u.id === row.subUnitId && u.player === "human");
@@ -19006,27 +19038,7 @@
       const useCached = row.cachedSegments && row.cachedSegments.length > 0 && row.pathH3Indexes?.[0] === fromH3;
       const preview = useCached ? { valid: true, segments: row.cachedSegments } : buildTacticalMarchDraftDestinationPreview(battle, row.subUnitId, toH3).preview;
       if (!preview.valid || preview.segments.length === 0) continue;
-      let lastPenultimate = null;
-      let lastPoint = null;
-      for (const seg of preview.segments) {
-        if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
-        const points = seg.hexes.map(([lat, lng]) => {
-          const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
-          return { x: p.x, y: p.y };
-        });
-        ctx.setLineDash(seg.turn <= 1 ? [] : [6, 4]);
-        ctx.strokeStyle = ORDER_LINE_COLOR;
-        ctx.lineWidth = ORDER_LINE_WIDTH;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
-        lastPenultimate = points[points.length - 2] ?? null;
-        lastPoint = points[points.length - 1] ?? null;
-      }
-      ctx.setLineDash([]);
-      if (lastPenultimate && lastPoint) {
-        drawArrowheadOnly(ctx, lastPenultimate, lastPoint, ORDER_LINE_COLOR, { tipAtTargetCenter: true });
-      }
+      drawHumanMarchStyleRouteSegments(ctx, preview.segments);
     }
     ctx.restore();
   }
@@ -19222,20 +19234,24 @@
     }
     ctx.restore();
   }
-  function drawPendingFerryLines(ctx, ferryOrders, units, hexList, drawLineArrow2) {
+  function drawPendingFerryLines(ctx, ferryOrders, units, hexList) {
     if (ferryOrders.length === 0 || !hexList) return;
-    ctx.save();
     for (const ferry of ferryOrders) {
       const unit = units.find((u) => u.id === ferry.unitId);
       if (!unit) continue;
-      drawLineArrow2(
-        ctx,
-        hexCenterPx(unit.h3Index),
-        hexCenterPxRelativeTo(unit.h3Index, ferry.destinationH3Index),
-        ORDER_LINE_COLOR
-      );
+      if (unit.h3Index === ferry.destinationH3Index) continue;
+      const [originLat, originLng] = cellToLatLng(unit.h3Index);
+      const [destLat, destLng] = cellToLatLng(ferry.destinationH3Index);
+      drawHumanMarchStyleRouteSegments(ctx, [
+        {
+          turn: 1,
+          hexes: [
+            [originLat, originLng],
+            [destLat, destLng]
+          ]
+        }
+      ]);
     }
-    ctx.restore();
   }
   function buildResolutionPlaybackMoves(moves, units) {
     const byId = new Map(units.map((unit) => [unit.id, unit]));
@@ -19286,7 +19302,7 @@
       drawAirStrikeLines(ctx, rendererSharedState.pendingAirStrikes, unitsForOrderLines, hexList);
     }
     if (rendererSharedState.pendingFerryOrders.length > 0 && unitsForOrderLines.length > 0 && hexList.length > 0) {
-      drawPendingFerryLines(ctx, rendererSharedState.pendingFerryOrders, unitsForOrderLines, hexList, drawLineArrow);
+      drawPendingFerryLines(ctx, rendererSharedState.pendingFerryOrders, unitsForOrderLines, hexList);
     }
   }
   function drawMarchHoverPreviewStageIfEnabled(ctx, options) {
@@ -19308,18 +19324,6 @@
       options.state,
       options.hexList
     );
-  }
-
-  // src/renderer/rendering/canvasPreviewPolicy.ts
-  function shouldDrawCommittedOrderPaths() {
-    return !rendererSharedState.ctrlKeyActive;
-  }
-  function shouldDrawHoveredPathPreview() {
-    return !rendererSharedState.ctrlKeyActive && rendererSharedState.selectedUnitIds.length > 0;
-  }
-  function getCommittedOrderUnitsHiddenDuringPreview(shouldDrawPathPreview) {
-    if (!shouldDrawPathPreview || !rendererSharedState.hoverRoutePreview) return null;
-    return new Set(rendererSharedState.selectedUnitIds);
   }
 
   // src/renderer/core/selection.ts
@@ -20961,6 +20965,78 @@
     scheduleSlowerTooltipTtl();
   }
 
+  // src/shared/tacticalFerryHoverPreview.ts
+  var MIXED_AIR_NON_AIR_MOVEMENT_MESSAGE = "Cannot issue grouped movement for mixed air and non-air units.";
+  function invalidPreview(reason, showMarker = true) {
+    return {
+      valid: false,
+      showInvalidMarker: showMarker,
+      invalidReason: reason,
+      segments: []
+    };
+  }
+  function straightFerryPreview(originH3, destinationH3) {
+    if (originH3 === destinationH3) {
+      return { valid: true, showInvalidMarker: false, segments: [] };
+    }
+    const [originLat, originLng] = cellToLatLng(originH3);
+    const [destLat, destLng] = cellToLatLng(destinationH3);
+    return {
+      valid: true,
+      showInvalidMarker: false,
+      arrowLatLng: [destLat, destLng],
+      segments: [
+        {
+          turn: 1,
+          hexes: [
+            [originLat, originLng],
+            [destLat, destLng]
+          ]
+        }
+      ]
+    };
+  }
+  function buildTacticalMixedAirNonAirHoverEnvelope(unitIds) {
+    const uniqueIds = uniqueTacticalMarchPreviewUnitIds(unitIds);
+    const previews = uniqueIds.map((unitId) => ({
+      unitId,
+      preview: invalidPreview(MIXED_AIR_NON_AIR_MOVEMENT_MESSAGE)
+    }));
+    return buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange: 0 });
+  }
+  function buildTacticalFerryHoverPreview(battle, unitIds, hoveredH3Index, ferryValidation) {
+    const uniqueIds = uniqueTacticalMarchPreviewUnitIds(unitIds);
+    const selectedAir = uniqueIds.map((id) => battle.subUnits.find((u) => u.id === id && u.player === "human" && u.unitType === "air")).filter((u) => !!u);
+    if (!hoveredH3Index || selectedAir.length === 0) {
+      return {
+        validForAll: false,
+        showInvalidMarker: false,
+        slowestMovementRange: 0,
+        previews: []
+      };
+    }
+    const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
+      selectedAir.map((u) => ({ unitId: u.id, originH3: u.h3Index }))
+    );
+    const previews = previewUnitIds.map((unitId) => {
+      const sub = battle.subUnits.find((u) => u.id === unitId);
+      const originH3 = sub?.h3Index ?? "";
+      if (!ferryValidation.success) {
+        return {
+          unitId,
+          originH3Index: originH3,
+          preview: invalidPreview(ferryValidation.reason ?? "Invalid ferry destination")
+        };
+      }
+      return {
+        unitId,
+        originH3Index: originH3,
+        preview: straightFerryPreview(originH3, hoveredH3Index)
+      };
+    });
+    return buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange: 1 });
+  }
+
   // src/renderer/gameplay/gameApiHumanOrderPreview.ts
   function getValidateGroupRangedTarget() {
     return window.gameApi?.validateGroupRangedTarget;
@@ -21019,6 +21095,7 @@
     if (!preview) {
       showOrderBlockHexTooltip(null);
       hideOrderSlowerHexTooltip();
+      deps.dismissMapDetailPopoversForHoverPlanning?.();
       deps.requestRedraw();
       return;
     }
@@ -21052,6 +21129,7 @@
       showOrderBlockHexTooltip(null);
       showOrderSlowerHexTooltip(slowHtml);
     }
+    deps.dismissMapDetailPopoversForHoverPlanning?.();
     deps.requestRedraw();
   }
   async function refreshHoverRoutePreview(deps, options) {
@@ -21141,6 +21219,40 @@
           valid ? null : validation.reason ?? null,
           allowBlockingOrderTooltip
         );
+        return;
+      }
+      const selectedHumanTactical = unitIds.map((id) => tb.subUnits.find((s) => s.id === id && s.player === "human")).filter((u) => !!u);
+      const tacticalHasAir = selectedHumanTactical.some((u) => u.unitType === "air");
+      const tacticalHasNonAir = selectedHumanTactical.some((u) => u.unitType !== "air");
+      if (tacticalHasAir && tacticalHasNonAir) {
+        const data3 = buildTacticalMixedAirNonAirHoverEnvelope(unitIds);
+        if (!hoverRoutePreviewAsyncContextStillValid({
+          seqAtStart: seq,
+          hoveredH3,
+          unitIdsAtStart: unitIds
+        })) {
+          return;
+        }
+        publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data: data3 }, null, null, allowBlockingOrderTooltip);
+        return;
+      }
+      const allAirTactical = selectedHumanTactical.length > 0 && selectedHumanTactical.every((u) => u.unitType === "air");
+      if (allAirTactical) {
+        const validateFerry = window.gameApi?.validateGroupFerryTarget;
+        if (!validateFerry) {
+          publishHoverRoutePreview(deps, null, null, null, allowBlockingOrderTooltip);
+          return;
+        }
+        const validation = await validateFerry({ unitIds, destinationH3Index: hoveredH3 });
+        if (!hoverRoutePreviewAsyncContextStillValid({
+          seqAtStart: seq,
+          hoveredH3,
+          unitIdsAtStart: unitIds
+        })) {
+          return;
+        }
+        const data3 = buildTacticalFerryHoverPreview(tb, unitIds, hoveredH3, validation);
+        publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data: data3 }, null, null, allowBlockingOrderTooltip);
         return;
       }
       const data2 = buildTacticalMarchHoverPreview(tb, unitIds, hoveredH3);
@@ -22180,6 +22292,7 @@
       deps.scheduleTerrainTooltipRestoreAfterPopoverClose();
     }
     function showBuildPopup2(h3Index, clientX, clientY) {
+      if (isHoverOrderPlanningActive()) return;
       if (deps.shouldRenderRes4Hexes()) return;
       deps.hideStackCallout();
       deps.clearTerrainTooltipTimer();
@@ -22609,6 +22722,7 @@
     return clientX >= rect.left - padPx && clientX <= rect.right + padPx && clientY >= rect.top - padPx && clientY <= rect.bottom + padPx;
   }
   function tryHandleBuildEntryAtClientXY(clientX, clientY, deps) {
+    if (isHoverOrderPlanningActive()) return false;
     const layer = document.getElementById("build-entry-layer");
     if (!layer || layer.classList.contains("hidden")) return false;
     const buttons = Array.from(layer.querySelectorAll(".build-entry-btn"));
@@ -22739,7 +22853,7 @@
         ctx.restore();
       }
     } else {
-      if (!state) return;
+      if (!state && !tb) return;
       const slowestMovementRangeByOriginH3 = /* @__PURE__ */ new Map();
       if (tb) {
         const hovered = rendererSharedState.hoverRoutePreview?.hoveredH3Index;
@@ -22774,7 +22888,11 @@
           if (drawnOrigins.has(originH3)) continue;
           drawnOrigins.add(originH3);
         }
-        const perStackSolidCap = previewUnit && originH3 && slowestMovementRangeByOriginH3.has(originH3) ? slowestMovementRangeByOriginH3.get(originH3) : previewGroup.slowestMovementRange;
+        const previewEdgeCount = preview.segments.reduce((sum, seg) => {
+          if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) return sum;
+          return sum + seg.hexes.length - 1;
+        }, 0);
+        const perStackSolidCap = previewUnit && originH3 && previewUnit.unitType === "air" ? Math.max(1, previewEdgeCount) : previewUnit && originH3 && slowestMovementRangeByOriginH3.has(originH3) ? slowestMovementRangeByOriginH3.get(originH3) : previewGroup.slowestMovementRange;
         let lastSegmentPenultimate = null;
         let lastSegmentLast = null;
         let remainingSolidEdges = perStackSolidCap;
@@ -22896,8 +23014,10 @@
   function applySelectionFromSidebarUnitButton(unitId, event, deps) {
     const useMultiSelect = event.ctrlKey || rendererSharedState.ctrlKeyActive;
     if (useMultiSelect) {
+      if (shouldBlockToggleSelectionDuringHoverPlanning(unitId)) return;
       deps.toggleUnitSelection(unitId);
     } else {
+      if (shouldBlockSelectionReplaceDuringHoverPlanning([unitId])) return;
       deps.replaceSelection([unitId]);
     }
     deps.syncUiAfterSelectionChange();
@@ -24229,6 +24349,9 @@
   }
   function applyHumanUnitIconClickSelectionPolicy(args) {
     if (args.ctrlKey) {
+      if (shouldBlockToggleSelectionDuringHoverPlanning(args.unitId)) {
+        return;
+      }
       clearDeferredHumanUnitSingleSelectTimer();
       emitParityDiagnosticsBreadcrumb("selection.ctrlToggle", {
         unitId: args.unitId
@@ -24238,6 +24361,10 @@
       return;
     }
     if (rendererSharedState.pendingSelectTimeout !== null) {
+      if (shouldBlockSelectionReplaceDuringHoverPlanning([args.unitId])) {
+        clearDeferredHumanUnitSingleSelectTimer();
+        return;
+      }
       clearDeferredHumanUnitSingleSelectTimer();
       emitParityDiagnosticsBreadcrumb("selection.doubleClickFlushToSingleSelect", {
         unitId: args.unitId
@@ -24247,6 +24374,9 @@
       return;
     }
     const unitIdToSelect = args.unitId;
+    if (shouldBlockSelectionReplaceDuringHoverPlanning([unitIdToSelect])) {
+      return;
+    }
     emitParityDiagnosticsBreadcrumb("selection.deferSingleSelect", {
       unitId: unitIdToSelect,
       delayMs: HUMAN_UNIT_SINGLE_SELECT_DEBOUNCE_MS
@@ -24408,7 +24538,7 @@
           const state = deps.terrainStateForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, targetHex);
           const namingTarget = deps.namingLookupTargetForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, targetHex);
           void deps.showTerrainTooltip(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, state, namingTarget);
-        }, TERRAIN_TOOLTIP_DELAY_MS);
+        }, HEX_DETAILS_TOOLTIP_DELAY_MS);
         return;
       }
       const tipFollow = document.getElementById("hex-tooltip");
@@ -24535,6 +24665,9 @@
       const isLoneAi = unitsAtHit.length === 1 && unitsAtHit[0]?.player !== "human";
       const stackIconHit = !!hit && unitsAtHit.length > 0 && deps.containerPixelHitsDrawnUnitIcon(px, py, hit, unitsAtHit.length);
       if (hit && (isStack || isLoneAi) && stackIconHit) {
+        if (isHoverOrderPlanningActive()) {
+          return;
+        }
         rendererSharedState.ctrlKeyActive = e.ctrlKey;
         deps.showStackCallout(unitsAtHit, e.clientX, e.clientY);
         deps.updateSidebar();
@@ -24865,6 +24998,7 @@
       e.stopPropagation();
       const h3 = btn.dataset.h3Index;
       if (!h3) return;
+      if (isHoverOrderPlanningActive()) return;
       rendererSharedState.selectedHexIndex = h3;
       const popup = document.getElementById("build-popup");
       if (popup && !popup.classList.contains("hidden") && rendererSharedState.buildPopupHexH3 === h3) {
@@ -25735,7 +25869,14 @@
     return !!stack && !stack.classList.contains("hidden") || !!build && !build.classList.contains("hidden");
   }
   function shouldSuppressTerrainTooltip() {
-    return isStackOrBuildMapPopoverOpen() || rendererSharedState.buildEntryButtonPointerInside || rendererSharedState.tacticalEntryButtonPointerInside || isOrderBlockHexTooltipVisible() || isOrderSlowerHexTooltipVisible();
+    return isHoverOrderPlanningActive() || isStackOrBuildMapPopoverOpen() || rendererSharedState.buildEntryButtonPointerInside || rendererSharedState.tacticalEntryButtonPointerInside || isOrderBlockHexTooltipVisible() || isOrderSlowerHexTooltipVisible();
+  }
+  function dismissMapDetailPopoversIfHoverPlanningActive() {
+    if (!isHoverOrderPlanningActive()) return;
+    hideStackCallout();
+    hideBuildPopup();
+    clearTerrainTooltipTimer();
+    hideTerrainTooltipVisual();
   }
   function isClientPointInsideMainMapLeafletContainer(clientX, clientY) {
     const map = getMainLeafletMap();
@@ -25765,6 +25906,7 @@
       if (inSelection) {
         removeUnitsFromSelection2([unitId]);
       } else {
+        if (shouldBlockSelectionReplaceDuringHoverPlanning([unitId])) return;
         replaceSelection2([unitId]);
       }
       hideStackCallout();
@@ -25772,6 +25914,7 @@
       return;
     }
     activateStackCalloutModal();
+    if (shouldBlockToggleSelectionDuringHoverPlanning(unitId)) return;
     toggleUnitSelection2(unitId);
     showStackCallout(allUnitsAtHex, clientX, clientY);
     syncUiAfterSelectionChange2({ refreshHoverPreview: false });
@@ -25779,14 +25922,17 @@
   function onStackAllActionClick(action, selectableHumanIds, allUnitsAtHex, clientX, clientY) {
     if (selectableHumanIds.length === 0) return;
     if (action === "selectAll") {
+      if (shouldBlockSelectionReplaceDuringHoverPlanning(selectableHumanIds)) return;
       replaceSelection2(selectableHumanIds);
       hideStackCallout();
       syncUiAfterSelectionChange2({ refreshHoverPreview: false });
       return;
     }
     activateStackCalloutModal();
-    if (action === "addAll") addUnitsToSelection2(selectableHumanIds);
-    else removeUnitsFromSelection2(selectableHumanIds);
+    if (action === "addAll") {
+      if (shouldBlockSelectionReplaceDuringHoverPlanning(selectableHumanIds)) return;
+      addUnitsToSelection2(selectableHumanIds);
+    } else removeUnitsFromSelection2(selectableHumanIds);
     showStackCallout(allUnitsAtHex, clientX, clientY);
     syncUiAfterSelectionChange2({ refreshHoverPreview: false });
   }
@@ -25992,6 +26138,7 @@
     }
   }
   function showStackCallout(units, clientX, clientY) {
+    if (isHoverOrderPlanningActive()) return;
     const calloutEl = document.getElementById("stack-callout");
     const listEl = document.getElementById("stack-callout-list");
     if (!calloutEl || !listEl) return;
@@ -26107,6 +26254,10 @@
     return unitIds.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit);
   }
   function refreshStackCalloutIfOpen() {
+    if (isHoverOrderPlanningActive()) {
+      hideStackCallout();
+      return;
+    }
     const calloutEl = document.getElementById("stack-callout");
     if (!calloutEl || calloutEl.classList.contains("hidden")) return;
     const rawX = calloutEl.getAttribute("data-x");
@@ -27120,7 +27271,8 @@
       showMapToast,
       createSidebarOrderRow: createSidebarOrderRow2,
       formatUnitArrowLabel: formatUnitArrowLabel2,
-      applySelectionFromSidebarUnitButton: applySelectionFromSidebarUnitButton2
+      applySelectionFromSidebarUnitButton: applySelectionFromSidebarUnitButton2,
+      dismissMapDetailPopoversForHoverPlanning: dismissMapDetailPopoversIfHoverPlanningActive
     };
   }
   async function cancelOrderForUnit2(unitId) {
@@ -27142,7 +27294,8 @@
     return clearCommittedOrderDraftState(createTacticalSidebarDeps());
   }
   async function refreshHoverRoutePreview2(options) {
-    return refreshHoverRoutePreview(createTacticalSidebarDeps(), options);
+    await refreshHoverRoutePreview(createTacticalSidebarDeps(), options);
+    dismissMapDetailPopoversIfHoverPlanningActive();
   }
   function cancelFerryForUnit2(unitId) {
     return cancelFerryForUnit(unitId, createTacticalSidebarDeps());
@@ -27293,6 +27446,7 @@
       if (!btn) return;
       e.preventDefault();
       e.stopPropagation();
+      if (isHoverOrderPlanningActive()) return;
       const h3 = btn.dataset.h3Index;
       if (!h3) return;
       void startTacticalBattleFromEntryHex2(h3);

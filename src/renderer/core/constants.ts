@@ -139,25 +139,24 @@ export const AI_ORDER_LINE_COLOR = PLAYER_COLORS.opponent;
  */
 export const TOOLTIP_OFFSET_PX = 12;
 /**
- * Millisecond hover dwell before the terrain tooltip appears on the main map (res1 and tactical res4).
+ * Millisecond hover dwell before the res1/res4 hex details popup appears on the main map.
  *
- * Purpose: Shared delay for strategic hex inspection and tactical battle cells so neither mode feels snappier.
+ * Purpose: Deliberate disclosure delay for strategic res1 cells and tactical res4 battle cells.
  * When to use: `mainMapInteractions` deferred `showTerrainTooltip` timer after the pointer settles.
- * Expected outcome: Same disclosure timing when zoomed to res4 in strategy or when a tactical session is active.
+ * Expected outcome: Hex terrain/effects details appear after 750ms hover on the same cell.
  * Exceptions: None.
  */
-export const TERRAIN_TOOLTIP_DELAY_MS = 750;
+export const HEX_DETAILS_TOOLTIP_DELAY_MS = 750;
 
 /**
  * Wall-clock visibility for the transient “Blocked: …” and “Slower: …” order-preview tooltips that follow the pointer.
  *
- * Purpose: Shorter than map toasts so hints stay lightweight; set to **twice** the hex tooltip dwell delay so blocking
- * hints remain readable while the pointer settles without matching the full strategic terrain dwell.
+ * Purpose: Keeps order-preview hints readable without tying TTL to the hex details dwell delay.
  * When to use: `orderBlockHexTooltip` and `orderSlowerHexTooltip` auto-hide timers after each reveal / pointer refresh.
- * Expected outcome: Tooltip dismisses after this interval unless refreshed by a new hover evaluation.
+ * Expected outcome: Tooltip dismisses after 1500ms unless refreshed by a new hover evaluation.
  * Exceptions: None.
  */
-export const ORDER_BLOCK_HEX_TOOLTIP_TTL_MS = 2 * TERRAIN_TOOLTIP_DELAY_MS;
+export const ORDER_BLOCK_HEX_TOOLTIP_TTL_MS = 1500;
 
 /**
  * Documents the module-scope binding `WORLD_H3_RESOLUTION` (WORLD_H3_RESOLUTION).

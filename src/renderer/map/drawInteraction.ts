@@ -8,6 +8,7 @@ import {
   TACTICAL_ENTRY_HIT_PAD_PX,
 } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
+import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 import {
   resolutionAnimationElapsedMs,
   type ResolutionPlaybackState,
@@ -208,6 +209,7 @@ export function pointInExpandedClientRect(
  * Exceptions: None.
  */
 export function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number, deps: DrawInteractionDeps): boolean {
+  if (isHoverOrderPlanningActive()) return false;
   const layer = document.getElementById('build-entry-layer');
   if (!layer || layer.classList.contains('hidden')) return false;
   const buttons = Array.from(layer.querySelectorAll<HTMLButtonElement>('.build-entry-btn'));

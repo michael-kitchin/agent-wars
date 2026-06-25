@@ -59,7 +59,7 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
       ctx.restore();
     }
   } else {
-  if (!state) return;
+  if (!state && !tb) return;
   const slowestMovementRangeByOriginH3 = new Map<string, number>();
   if (tb) {
     const hovered = S.hoverRoutePreview?.hoveredH3Index;
@@ -96,10 +96,16 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
       if (drawnOrigins.has(originH3)) continue;
       drawnOrigins.add(originH3);
     }
+    const previewEdgeCount = preview.segments.reduce((sum, seg) => {
+      if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) return sum;
+      return sum + seg.hexes.length - 1;
+    }, 0);
     const perStackSolidCap =
-      previewUnit && originH3 && slowestMovementRangeByOriginH3.has(originH3)
-        ? slowestMovementRangeByOriginH3.get(originH3)!
-        : previewGroup.slowestMovementRange;
+      previewUnit && originH3 && previewUnit.unitType === 'air'
+        ? Math.max(1, previewEdgeCount)
+        : previewUnit && originH3 && slowestMovementRangeByOriginH3.has(originH3)
+          ? slowestMovementRangeByOriginH3.get(originH3)!
+          : previewGroup.slowestMovementRange;
     let lastSegmentPenultimate: { x: number; y: number } | null = null;
     let lastSegmentLast: { x: number; y: number } | null = null;
     let remainingSolidEdges = perStackSolidCap;

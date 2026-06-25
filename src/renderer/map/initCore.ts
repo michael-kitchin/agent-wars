@@ -2,6 +2,7 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { unitHasTacticalRangedBaseline } from '../../shared/tacticalRanges';
 import { panMapOneRes1Hex, shouldIgnoreGlobalKeydown } from './mapUtils';
 import { rendererSharedState as S } from '../core/state';
+import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 import { getActiveTerrainStyleBasemapId, renderTerrainLegend } from '../rendering/terrainVisualStyles';
 import { hideOrderBlockHexTooltip } from './orderBlockHexTooltip';
 import { hideOrderSlowerHexTooltip } from './orderSlowerHexTooltip';
@@ -506,6 +507,7 @@ export function wireInitCore(deps: InitCoreDeps): void {
     e.stopPropagation();
     const h3 = btn.dataset.h3Index;
     if (!h3) return;
+    if (isHoverOrderPlanningActive()) return;
     S.selectedHexIndex = h3;
     const popup = document.getElementById('build-popup');
     if (popup && !popup.classList.contains('hidden') && S.buildPopupHexH3 === h3) {

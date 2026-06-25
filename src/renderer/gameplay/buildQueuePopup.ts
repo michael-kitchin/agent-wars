@@ -3,6 +3,7 @@ import type { BuildUnitType, HexBuildQueueSnapshot } from '../../shared/ipcTypes
 import { estimateTurnsToCompleteQueuedProduction, sumQueuedProductionCost } from '../../shared/productionConfig';
 import { TOOLTIP_OFFSET_PX, UNIT_SELECT_GLYPH } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
+import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 
 /**
  * Defines the `sanitizeBuildCountInputText` function shape (export function sanitizeBuildCountInputText(raw: string): string).
@@ -429,6 +430,7 @@ export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
   }
 
   function showBuildPopup(h3Index: string, clientX: number, clientY: number): void {
+    if (isHoverOrderPlanningActive()) return;
     if (deps.shouldRenderRes4Hexes()) return;
     deps.hideStackCallout();
     deps.clearTerrainTooltipTimer();

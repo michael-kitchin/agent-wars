@@ -67,6 +67,9 @@ import {
 import { drawPendingMarchesHoverAndSupportOrderStack } from './rendering/orderOverlayStages';
 import {
   getCommittedOrderUnitsHiddenDuringPreview,
+  isHoverOrderPlanningActive,
+  shouldBlockSelectionReplaceDuringHoverPlanning,
+  shouldBlockToggleSelectionDuringHoverPlanning,
   shouldDrawCommittedOrderPaths,
   shouldDrawHoveredPathPreview,
 } from './rendering/canvasPreviewPolicy';
@@ -395,12 +398,29 @@ function isStackOrBuildMapPopoverOpen(): boolean {
  */
 function shouldSuppressTerrainTooltip(): boolean {
   return (
+    isHoverOrderPlanningActive() ||
     isStackOrBuildMapPopoverOpen() ||
     S.buildEntryButtonPointerInside ||
     S.tacticalEntryButtonPointerInside ||
     isOrderBlockHexTooltipVisible() ||
     isOrderSlowerHexTooltipVisible()
   );
+}
+
+/**
+ * Hides stack callout, build queue, and hex details chrome while hover order planning is active.
+ *
+ * Purpose: Keeps map inspection popovers from covering or competing with march/ferry/attack hover planning.
+ * When to use: After hover preview refresh and before opening stack/build popovers during planning gestures.
+ * Expected outcome: No-op when hover planning is inactive; otherwise stack callout, build popup, and terrain tooltip are cleared.
+ * Exceptions: None.
+ */
+function dismissMapDetailPopoversIfHoverPlanningActive(): void {
+  if (!isHoverOrderPlanningActive()) return;
+  hideStackCallout();
+  hideBuildPopup();
+  clearTerrainTooltipTimer();
+  hideTerrainTooltipVisual();
 }
 
 /**
@@ -473,6 +493,7 @@ function onStackSingleUnitToggleClick(
     if (inSelection) {
       removeUnitsFromSelection([unitId]);
     } else {
+      if (shouldBlockSelectionReplaceDuringHoverPlanning([unitId])) return;
       replaceSelection([unitId]);
     }
     hideStackCallout();
@@ -480,6 +501,7 @@ function onStackSingleUnitToggleClick(
     return;
   }
   activateStackCalloutModal();
+  if (shouldBlockToggleSelectionDuringHoverPlanning(unitId)) return;
   toggleUnitSelection(unitId);
   showStackCallout(allUnitsAtHex, clientX, clientY);
   syncUiAfterSelectionChange({ refreshHoverPreview: false });
@@ -502,14 +524,17 @@ function onStackAllActionClick(
 ): void {
   if (selectableHumanIds.length === 0) return;
   if (action === 'selectAll') {
+    if (shouldBlockSelectionReplaceDuringHoverPlanning(selectableHumanIds)) return;
     replaceSelection(selectableHumanIds);
     hideStackCallout();
     syncUiAfterSelectionChange({ refreshHoverPreview: false });
     return;
   }
   activateStackCalloutModal();
-  if (action === 'addAll') addUnitsToSelection(selectableHumanIds);
-  else removeUnitsFromSelection(selectableHumanIds);
+  if (action === 'addAll') {
+    if (shouldBlockSelectionReplaceDuringHoverPlanning(selectableHumanIds)) return;
+    addUnitsToSelection(selectableHumanIds);
+  } else removeUnitsFromSelection(selectableHumanIds);
   showStackCallout(allUnitsAtHex, clientX, clientY);
   syncUiAfterSelectionChange({ refreshHoverPreview: false });
 }
@@ -805,6 +830,7 @@ function showStackCallout(
   clientX: number,
   clientY: number
 ): void {
+  if (isHoverOrderPlanningActive()) return;
   const calloutEl = document.getElementById('stack-callout');
   const listEl = document.getElementById('stack-callout-list');
   if (!calloutEl || !listEl) return;
@@ -949,6 +975,10 @@ function resolveUnitsForStackCalloutRefresh(unitIds: string[], state: GameStateS
 }
 
 function refreshStackCalloutIfOpen(): void {
+  if (isHoverOrderPlanningActive()) {
+    hideStackCallout();
+    return;
+  }
   const calloutEl = document.getElementById('stack-callout');
   if (!calloutEl || calloutEl.classList.contains('hidden')) return;
   const rawX = calloutEl.getAttribute('data-x');
@@ -2846,6 +2876,7 @@ function createTacticalSidebarDeps() {
     createSidebarOrderRow,
     formatUnitArrowLabel,
     applySelectionFromSidebarUnitButton,
+    dismissMapDetailPopoversForHoverPlanning: dismissMapDetailPopoversIfHoverPlanningActive,
   };
 }
 
@@ -2934,7 +2965,8 @@ function clearCommittedOrderDraftState(): void {
  * Exceptions: None.
  */
 async function refreshHoverRoutePreview(options?: RefreshHoverRoutePreviewOptions): Promise<void> {
-  return refreshHoverRoutePreviewFromModule(createTacticalSidebarDeps(), options);
+  await refreshHoverRoutePreviewFromModule(createTacticalSidebarDeps(), options);
+  dismissMapDetailPopoversIfHoverPlanningActive();
 }
 
 /**
@@ -3180,6 +3212,7 @@ function init(): void {
     if (!btn) return;
     e.preventDefault();
     e.stopPropagation();
+    if (isHoverOrderPlanningActive()) return;
     const h3 = btn.dataset.h3Index;
     if (!h3) return;
     void startTacticalBattleFromEntryHex(h3);

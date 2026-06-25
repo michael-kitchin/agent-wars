@@ -1,6 +1,7 @@
 import type { AirStrikeTargetType, GameStateSnapshot } from '../../shared/ipcTypes';
 import type { NamingLookupTarget, TerrainTooltipState } from './terrainTooltipTypes';
-import { TERRAIN_TOOLTIP_DELAY_MS } from '../core/constants';
+import { HEX_DETAILS_TOOLTIP_DELAY_MS } from '../core/constants';
+import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 import { hitTestHexAtContainerPixel, hitTestTacticalRes4HexAtContainerPixel } from './mapUtils';
 import { withTacticalHumanDraftPrefetchInvalidation } from '../openRouter/openRouterRuntime';
 import { rendererSharedState as S } from '../core/state';
@@ -520,7 +521,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
         const state = deps.terrainStateForPointer(S.lastPointerClientX, S.lastPointerClientY, targetHex);
         const namingTarget = deps.namingLookupTargetForPointer(S.lastPointerClientX, S.lastPointerClientY, targetHex);
         void deps.showTerrainTooltip(S.lastPointerClientX, S.lastPointerClientY, state, namingTarget);
-      }, TERRAIN_TOOLTIP_DELAY_MS);
+      }, HEX_DETAILS_TOOLTIP_DELAY_MS);
       return;
     }
 
@@ -664,6 +665,9 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     const isLoneAi = unitsAtHit.length === 1 && unitsAtHit[0]?.player !== 'human';
     const stackIconHit = !!hit && unitsAtHit.length > 0 && deps.containerPixelHitsDrawnUnitIcon(px, py, hit, unitsAtHit.length);
     if (hit && (isStack || isLoneAi) && stackIconHit) {
+      if (isHoverOrderPlanningActive()) {
+        return;
+      }
       S.ctrlKeyActive = e.ctrlKey;
       deps.showStackCallout(unitsAtHit, e.clientX, e.clientY);
       deps.updateSidebar();

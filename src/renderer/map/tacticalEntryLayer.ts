@@ -1,6 +1,7 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { TACTICAL_ENTRY_HIT_PAD_PX } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
+import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 import { computeRes1OverlayTextY } from '../rendering/terrainRendering';
 import { getLeafletGlobal, hexCenterPx } from './mapUtils';
 import { shouldShowBuildEntryZoom } from './terrainView';
@@ -107,6 +108,7 @@ export async function tryHandleTacticalEntryAtClientXY(
   clientY: number,
   onStart: (h3: string) => Promise<void>
 ): Promise<boolean> {
+  if (isHoverOrderPlanningActive()) return false;
   const layer = document.getElementById('tactical-entry-layer');
   if (!layer || layer.classList.contains('hidden')) return false;
   const buttons = Array.from(layer.querySelectorAll<HTMLButtonElement>('.tactical-entry-btn'));

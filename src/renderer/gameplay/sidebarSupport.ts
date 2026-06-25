@@ -8,6 +8,10 @@ import { formatPendingFerryOrderSidebarLabel } from './orderLabelFormatting';
 import { UNIT_DESELECT_GLYPH, UNIT_SELECT_GLYPH } from '../core/constants';
 import { withTacticalHumanDraftPrefetchInvalidation } from '../openRouter/openRouterRuntime';
 import { rendererSharedState as S } from '../core/state';
+import {
+  shouldBlockSelectionReplaceDuringHoverPlanning,
+  shouldBlockToggleSelectionDuringHoverPlanning,
+} from '../rendering/canvasPreviewPolicy';
 
 /**
  * Documents the `SelectionActionDeps` interface as a named contract surface (interface SelectionActionDeps).
@@ -262,8 +266,10 @@ export function isPendingMovementOrderForDisplay(order: HumanStandingOrderSnapsh
 export function applySelectionFromSidebarUnitButton(unitId: string, event: MouseEvent, deps: SelectionActionDeps): void {
   const useMultiSelect = event.ctrlKey || S.ctrlKeyActive;
   if (useMultiSelect) {
+    if (shouldBlockToggleSelectionDuringHoverPlanning(unitId)) return;
     deps.toggleUnitSelection(unitId);
   } else {
+    if (shouldBlockSelectionReplaceDuringHoverPlanning([unitId])) return;
     deps.replaceSelection([unitId]);
   }
   deps.syncUiAfterSelectionChange();

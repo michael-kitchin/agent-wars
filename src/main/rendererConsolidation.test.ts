@@ -467,11 +467,11 @@ function testAirFerryDoubleClickContracts(): void {
       source.includes('drawPendingMarchesHoverAndSupportOrderStack({') &&
       overlayStagesSource.includes('drawPendingSupportOrderOverlays(') &&
       overlayStagesSource.includes(
-        'drawPendingFerryLines(ctx, S.pendingFerryOrders, unitsForOrderLines, hexList, drawLineArrow);'
+        'drawPendingFerryLines(ctx, S.pendingFerryOrders, unitsForOrderLines, hexList);'
       ) &&
       orderDrawingSource.includes('function drawPendingFerryLines(') &&
-      orderDrawingSource.includes('drawLineArrow('),
-    'pending ferry planning should render filled map arrows via shared overlay stage like other planned movement'
+      orderDrawingSource.includes('drawHumanMarchStyleRouteSegments'),
+    'pending ferry planning should render march-style map lines via shared overlay stage'
   );
 }
 
@@ -875,6 +875,71 @@ function testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves(): void {
 }
 
 /**
+ * Defines the `testHoverOrderPlanningInteractionLock` function shape.
+
+ * Purpose: Guards hover-planning UI lock wiring for selection, tactical entry, and build queue entry points.
+ * When to use: Regression signal when refactoring hover preview or map interaction handlers.
+ * Expected outcome: `isHoverOrderPlanningActive` and selection replace/toggle guards appear at documented boundaries.
+ * Exceptions: None.
+ */
+function testHoverOrderPlanningInteractionLock(): void {
+  const policyPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'canvasPreviewPolicy.ts');
+  const selectionPolicyPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'mapClickSelectionPolicy.ts');
+  const tacticalEntryPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'tacticalEntryLayer.ts');
+  const drawInteractionPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'drawInteraction.ts');
+  const buildPopupPath = path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'buildQueuePopup.ts');
+  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const policySource = fs.readFileSync(policyPath, 'utf8');
+  const selectionPolicySource = fs.readFileSync(selectionPolicyPath, 'utf8');
+  const tacticalEntrySource = fs.readFileSync(tacticalEntryPath, 'utf8');
+  const drawInteractionSource = fs.readFileSync(drawInteractionPath, 'utf8');
+  const buildPopupSource = fs.readFileSync(buildPopupPath, 'utf8');
+  const rendererSource = fs.readFileSync(rendererPath, 'utf8');
+
+  assert.ok(
+    policySource.includes('function isHoverOrderPlanningActive') &&
+      policySource.includes('function shouldBlockSelectionReplaceDuringHoverPlanning') &&
+      policySource.includes('function shouldBlockToggleSelectionDuringHoverPlanning'),
+    'canvas preview policy should expose hover-planning lock helpers'
+  );
+  assert.ok(
+    selectionPolicySource.includes('shouldBlockToggleSelectionDuringHoverPlanning') &&
+      selectionPolicySource.includes('shouldBlockSelectionReplaceDuringHoverPlanning'),
+    'map click selection policy should respect hover-planning selection guards'
+  );
+  const sidebarSupportPath = path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'sidebarSupport.ts');
+  const sidebarSupportSource = fs.readFileSync(sidebarSupportPath, 'utf8');
+  assert.ok(
+    sidebarSupportSource.includes('shouldBlockToggleSelectionDuringHoverPlanning') &&
+      sidebarSupportSource.includes('shouldBlockSelectionReplaceDuringHoverPlanning'),
+    'sidebar unit selection should respect hover-planning selection guards'
+  );
+  assert.ok(
+    rendererSource.includes('isHoverOrderPlanningActive()') &&
+      rendererSource.includes('dismissMapDetailPopoversIfHoverPlanningActive') &&
+      rendererSource.includes('dismissMapDetailPopoversForHoverPlanning'),
+    'renderer should wire hover-planning dismiss through tactical order deps and local helpers'
+  );
+  assert.ok(
+    tacticalEntrySource.includes('isHoverOrderPlanningActive()') &&
+      drawInteractionSource.includes('isHoverOrderPlanningActive()') &&
+      buildPopupSource.includes('isHoverOrderPlanningActive()'),
+    'tactical entry and build entry should block while hover planning is active'
+  );
+  const hoverRefreshPath = path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'hoverRoutePreviewRefresh.ts');
+  const hoverRefreshSource = fs.readFileSync(hoverRefreshPath, 'utf8');
+  assert.ok(
+    hoverRefreshSource.includes('dismissMapDetailPopoversForHoverPlanning?.()'),
+    'hover preview publish should dismiss map detail popovers when planning is active'
+  );
+  assert.ok(
+    rendererSource.includes('function shouldSuppressTerrainTooltip') &&
+      rendererSource.includes('isHoverOrderPlanningActive()'),
+    'hex details tooltip should be suppressed during hover order planning'
+  );
+}
+
+/**
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Supports maintainability by documenting why `run` exists.
@@ -901,6 +966,7 @@ function run(): void {
   testTacticalEntryLayerPlanningAndContestedContracts();
   testStrategicAndTacticalBranchesShareOrderOverlayPipeline();
   testMainMapInteractionsDelegatesHumanUnitIconSelectionToPolicyModule();
+  testHoverOrderPlanningInteractionLock();
   testParityDiagnosticsBreadcrumbsCoverPlanningAndPositionSourceBoundaries();
   testTacticalMapViewLocksZoomPanAndRestoresWorld();
   console.log('rendererConsolidation.test.ts passed');

@@ -1,6 +1,10 @@
 import { representativeMarchPreviewUnitIdsByOriginH3 } from '../../shared/humanMarchPreviewGroupAssembly';
 import { buildTacticalMarchHoverPreview } from '../../shared/tacticalMarchHoverPreview';
 import {
+  buildTacticalFerryHoverPreview,
+  buildTacticalMixedAirNonAirHoverEnvelope,
+} from '../../shared/tacticalFerryHoverPreview';
+import {
   collectTacticalRangedSlowTerrainLabels,
   formatOrderPreviewImpactHtml,
   sortSlowTerrainLabels,
@@ -34,6 +38,7 @@ function publishHoverRoutePreview(
   if (!preview) {
     showOrderBlockHexTooltip(null);
     hideOrderSlowerHexTooltip();
+    deps.dismissMapDetailPopoversForHoverPlanning?.();
     deps.requestRedraw();
     return;
   }
@@ -67,6 +72,7 @@ function publishHoverRoutePreview(
     showOrderBlockHexTooltip(null);
     showOrderSlowerHexTooltip(slowHtml);
   }
+  deps.dismissMapDetailPopoversForHoverPlanning?.();
   deps.requestRedraw();
 }
 
@@ -172,6 +178,47 @@ export async function refreshHoverRoutePreview(
         valid ? null : (validation.reason ?? null),
         allowBlockingOrderTooltip
       );
+      return;
+    }
+    const selectedHumanTactical = unitIds
+      .map((id) => tb.subUnits.find((s) => s.id === id && s.player === 'human'))
+      .filter((u): u is NonNullable<typeof u> => !!u);
+    const tacticalHasAir = selectedHumanTactical.some((u) => u.unitType === 'air');
+    const tacticalHasNonAir = selectedHumanTactical.some((u) => u.unitType !== 'air');
+    if (tacticalHasAir && tacticalHasNonAir) {
+      const data = buildTacticalMixedAirNonAirHoverEnvelope(unitIds);
+      if (
+        !hoverRoutePreviewAsyncContextStillValid({
+          seqAtStart: seq,
+          hoveredH3,
+          unitIdsAtStart: unitIds,
+        })
+      ) {
+        return;
+      }
+      publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data }, null, null, allowBlockingOrderTooltip);
+      return;
+    }
+    const allAirTactical =
+      selectedHumanTactical.length > 0 && selectedHumanTactical.every((u) => u.unitType === 'air');
+    if (allAirTactical) {
+      const validateFerry = window.gameApi?.validateGroupFerryTarget;
+      if (!validateFerry) {
+        publishHoverRoutePreview(deps, null, null, null, allowBlockingOrderTooltip);
+        return;
+      }
+      const validation = await validateFerry({ unitIds, destinationH3Index: hoveredH3 });
+      if (
+        !hoverRoutePreviewAsyncContextStillValid({
+          seqAtStart: seq,
+          hoveredH3,
+          unitIdsAtStart: unitIds,
+        })
+      ) {
+        return;
+      }
+      const data = buildTacticalFerryHoverPreview(tb, unitIds, hoveredH3, validation);
+      publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data }, null, null, allowBlockingOrderTooltip);
       return;
     }
     const data = buildTacticalMarchHoverPreview(tb, unitIds, hoveredH3);

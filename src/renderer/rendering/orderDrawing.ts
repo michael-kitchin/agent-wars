@@ -1,6 +1,6 @@
+import { cellToLatLng } from 'h3-js';
 import type { AirStrikeAnimationMove, AirStrikeOrder, FerryOrder, GameStateSnapshot, RangedAttackOrder } from '../../shared/ipcTypes';
 import {
-  ORDER_LINE_COLOR,
   RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION,
   RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX,
   RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX,
@@ -14,6 +14,7 @@ import {
   RANGE_PERIMETER_RANGED_COLOR,
 } from '../core/constants';
 import { hexCenterPx, hexCenterPxRelativeTo } from '../map/mapUtils';
+import { drawHumanMarchStyleRouteSegments } from './pathDrawing';
 import { getCurrentRangeSupportPlanLineWidth } from './terrainRendering';
 import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
 
@@ -139,38 +140,36 @@ export function drawAirStrikeLines(
 }
 
 /**
- * Defines the `drawPendingFerryLines` function shape (export function drawPendingFerryLines( ctx: CanvasRenderingContext2D, ferryOrders: FerryOrder[], units: GameStateSnapshot['units'], hexList: string[).
-
- * Purpose: Supports maintainability by documenting why `drawPendingFerryLines` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Draws pending human ferry orders using the same march-style polyline stroke as ground movement lines.
+ *
+ * Purpose: Keeps planned air ferry routes visually aligned with standing orders and march hover previews.
+ * When to use: From `drawPendingSupportOrderOverlays` when `S.pendingFerryOrders` is non-empty.
+ * Expected outcome: One solid turn-1 segment per ferry row with terminal arrowhead at destination hex center.
+ * Exceptions: Skips rows when the unit row is missing or origin equals destination.
  */
 export function drawPendingFerryLines(
   ctx: CanvasRenderingContext2D,
   ferryOrders: FerryOrder[],
   units: readonly PendingOrderLineUnit[],
-  hexList: string[] | undefined,
-  drawLineArrow: (
-    ctx: CanvasRenderingContext2D,
-    from: { x: number; y: number },
-    to: { x: number; y: number },
-    color: string
-  ) => void
+  hexList: string[] | undefined
 ): void {
   if (ferryOrders.length === 0 || !hexList) return;
-  ctx.save();
   for (const ferry of ferryOrders) {
     const unit = units.find((u) => u.id === ferry.unitId);
     if (!unit) continue;
-    drawLineArrow(
-      ctx,
-      hexCenterPx(unit.h3Index),
-      hexCenterPxRelativeTo(unit.h3Index, ferry.destinationH3Index),
-      ORDER_LINE_COLOR
-    );
+    if (unit.h3Index === ferry.destinationH3Index) continue;
+    const [originLat, originLng] = cellToLatLng(unit.h3Index);
+    const [destLat, destLng] = cellToLatLng(ferry.destinationH3Index);
+    drawHumanMarchStyleRouteSegments(ctx, [
+      {
+        turn: 1,
+        hexes: [
+          [originLat, originLng],
+          [destLat, destLng],
+        ],
+      },
+    ]);
   }
-  ctx.restore();
 }
 
 /**

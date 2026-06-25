@@ -47,3 +47,47 @@ export function getCommittedOrderUnitsHiddenDuringPreview(
   if (!shouldDrawPathPreview || !S.hoverRoutePreview) return null;
   return new Set(S.selectedUnitIds);
 }
+
+/**
+ * Whether hover order planning is active for the current pointer, selection, and preview payload.
+ *
+ * Purpose: Gates UI that must not interrupt in-progress march/ferry/ranged/air-strike hover planning.
+ * When to use: Selection mutations, tactical entry, and build-queue open handlers while the pointer targets a hex.
+ * Expected outcome: `true` when preview lines or invalid markers would draw for the current hover target; false while Ctrl suppresses preview drawing.
+ * Exceptions: None.
+ */
+export function isHoverOrderPlanningActive(): boolean {
+  return (
+    shouldDrawHoveredPathPreview() &&
+    S.hoverRoutePreview !== null &&
+    S.hoveredHexH3 !== null
+  );
+}
+
+/**
+ * Returns whether a proposed `replaceSelection` would add units not already selected during hover planning.
+ *
+ * Purpose: Allows deselect and subset removal while blocking exclusive swaps and multi-select expansion.
+ * When to use: Map, sidebar, and stack callout selection handlers before calling `replaceSelection`.
+ * Expected outcome: `false` for `[]` or subset-only proposals; `true` when any new unit id would be added.
+ * Exceptions: None.
+ */
+export function shouldBlockSelectionReplaceDuringHoverPlanning(proposedUnitIds: string[]): boolean {
+  if (!isHoverOrderPlanningActive()) return false;
+  if (proposedUnitIds.length === 0) return false;
+  const current = new Set(S.selectedUnitIds);
+  return proposedUnitIds.some((id) => !current.has(id));
+}
+
+/**
+ * Returns whether toggling a unit into the selection should be blocked during hover planning.
+ *
+ * Purpose: Blocks Ctrl-toggle adds while allowing toggle-off deselect of units already in the selection.
+ * When to use: Before `toggleUnitSelection` from map or sidebar handlers.
+ * Expected outcome: `true` when the unit is not currently selected and hover planning is active.
+ * Exceptions: None.
+ */
+export function shouldBlockToggleSelectionDuringHoverPlanning(unitId: string): boolean {
+  if (!isHoverOrderPlanningActive()) return false;
+  return !S.selectedUnitIds.includes(unitId);
+}

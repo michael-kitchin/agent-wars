@@ -121,4 +121,13 @@ export interface TacticalOrderDeps {
    * Exceptions: None.
    */
   applySelectionFromSidebarUnitButton: (unitId: string, event: MouseEvent) => void;
+  /**
+   * Specifies the contract for the `dismissMapDetailPopoversForHoverPlanning` member (dismissMapDetailPopoversForHoverPlanning?: () => void;).
+   *
+   * Contract: When invoked during active hover order planning, hides stack callout, build queue, and hex details chrome.
+   * When to use: Wired from `renderer.ts` into tactical order deps for `publishHoverRoutePreview`.
+   * Expected outcome: No-op when hover planning is inactive; otherwise competing map detail popovers are cleared.
+   * Exceptions: None.
+   */
+  dismissMapDetailPopoversForHoverPlanning?: () => void;
 }
