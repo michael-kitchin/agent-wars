@@ -20,12 +20,17 @@ import {
   submitOrders,
   updateSealiftSlot,
 } from './gameActions';
-import { getRes1ProductionContext } from './terrainClassificationCache';
+import { getRes1LandMassByH3, getRes1ProductionContext } from './terrainClassificationCache';
+import { resetHumanMarchPreviewDiagnosticsForTests } from './game-actions/humanMarchPreview';
 import { withTempGameDb } from './testSupport/withTempGameDb';
 import {
   EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON,
-  LAND_UNITS_CANNOT_MOVE_WATER_OR_ARCTIC_TO_WATER_OR_ARCTIC_REASON,
 } from './game-actions/landMovementConstraints';
+import {
+  LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON,
+  canLandUnitTraverseEdge,
+  landUnitCanOccupyHex,
+} from '../shared/landTraversalRes1';
 
 /**
  * Defines the `withTempDb` function shape (function withTempDb(runCase: () => void): void).
@@ -36,7 +41,10 @@ import {
  * Exceptions: None.
  */
 function withTempDb(runCase: () => void): void {
-  withTempGameDb('aw-gameactions-multi-', runCase);
+  withTempGameDb('aw-gameactions-multi-', () => {
+    resetHumanMarchPreviewDiagnosticsForTests();
+    runCase();
+  });
 }
 
 /**
@@ -48,10 +56,12 @@ function withTempDb(runCase: () => void): void {
  * Exceptions: None.
  */
 function findNearestLandSeaportHex(state: ReturnType<typeof getGameState>, originH3: string): string | null {
+  const landMass = getRes1LandMassByH3();
   const landSeaportHexes = state.hexes
     .filter(
       (hex) =>
         hex.terrain === 'land' &&
+        landUnitCanOccupyHex(hex.h3Index, landMass) &&
         getRes1ProductionContext({ h3Index: hex.h3Index }).seaportCount > 0 &&
         findAdjacentNonArcticLandHex(state, hex.h3Index) !== null
     )
@@ -87,23 +97,41 @@ function findAdjacentNavalPassableHex(state: ReturnType<typeof getGameState>, ce
 }
 
 /**
- * Defines the `findAdjacentWaterHex` function shape (function findAdjacentWaterHex(state: ReturnType<typeof getGameState>, centerH3: string): string | null).
+ * Defines the `isOpenOceanLandMass` function shape (function isOpenOceanLandMass(h3Index: string): boolean).
 
- * Purpose: Supports maintainability by documenting why `findAdjacentWaterHex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Detects hexes with no continent or qualifying island membership for land-unit rejection tests.
+ * When to use: Filtering candidate hexes in `findOpenOceanHexPair`.
+ * Expected outcome: True when land-mass data lists empty continent and island id arrays.
  * Exceptions: None.
  */
-function findAdjacentWaterHex(state: ReturnType<typeof getGameState>, centerH3: string): string | null {
-  const adjacentWaterHex = state.hexes.find((hex) => {
-    if (hex.terrain !== 'water') return false;
-    try {
-      return gridDistance(hex.h3Index, centerH3) === 1;
-    } catch {
-      return false;
+function isOpenOceanLandMass(h3Index: string): boolean {
+  const record = getRes1LandMassByH3().get(h3Index);
+  return !!record && record.continentIds.length === 0 && record.islandIds.length === 0;
+}
+
+/**
+ * Defines the `findOpenOceanHexPair` function shape (function findOpenOceanHexPair(state: ReturnType<typeof getGameState>): { originH3: string; destinationH3: string }).
+
+ * Purpose: Locates adjacent open-ocean hexes for land-unit movement rejection integration tests.
+ * When to use: Setting up preview and submit-order invalid land movement scenarios.
+ * Expected outcome: Returns a grid-adjacent pair with no land-mass membership on either hex.
+ * Exceptions: Throws when no qualifying pair exists in the seeded map.
+ */
+function findOpenOceanHexPair(state: ReturnType<typeof getGameState>): { originH3: string; destinationH3: string } {
+  for (const hex of state.hexes) {
+    if (!isOpenOceanLandMass(hex.h3Index)) continue;
+    for (const candidate of state.hexes) {
+      if (candidate.h3Index === hex.h3Index || !isOpenOceanLandMass(candidate.h3Index)) continue;
+      try {
+        if (gridDistance(hex.h3Index, candidate.h3Index) === 1) {
+          return { originH3: hex.h3Index, destinationH3: candidate.h3Index };
+        }
+      } catch {
+        // Ignore malformed test pairs.
+      }
     }
-  });
-  return adjacentWaterHex?.h3Index ?? null;
+  }
+  throw new Error('expected adjacent open-ocean hex pair in seeded map');
 }
 
 /**
@@ -188,14 +216,9 @@ function positionLandUnitOnAdjacentWaterPorts(
   state: ReturnType<typeof getGameState>,
   landUnitId: string
 ): { originWaterHex: string; destinationWaterHex: string } {
-  const originWaterHex = state.hexes.find((hex) => hex.terrain === 'water');
-  assert.ok(originWaterHex, 'expected a water origin hex');
-  const destinationWaterHex = originWaterHex ? findAdjacentWaterHex(state, originWaterHex.h3Index) : null;
-  assert.ok(destinationWaterHex, 'expected an adjacent water destination hex');
-  dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [originWaterHex!.h3Index, landUnitId]);
-  setHumanControlledPort(originWaterHex!.h3Index);
-  setHumanControlledPort(destinationWaterHex!);
-  return { originWaterHex: originWaterHex!.h3Index, destinationWaterHex: destinationWaterHex! };
+  const { originH3, destinationH3 } = findOpenOceanHexPair(state);
+  dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [originH3, landUnitId]);
+  return { originWaterHex: originH3, destinationWaterHex: destinationH3 };
 }
 
 /**
@@ -227,8 +250,13 @@ function findAdjacentHex(state: ReturnType<typeof getGameState>, originH3: strin
  * Exceptions: None.
  */
 function findAdjacentNonArcticLandHex(state: ReturnType<typeof getGameState>, originH3: string): string | null {
+  const landMass = getRes1LandMassByH3();
+  const originHex = state.hexes.find((hex) => hex.h3Index === originH3);
+  const originIsWater = originHex?.terrain === 'water';
   for (const hex of state.hexes) {
     if (hex.h3Index === originH3 || hex.terrain !== 'land' || hex.terrainKind === 'arctic') continue;
+    if (!landUnitCanOccupyHex(hex.h3Index, landMass)) continue;
+    if (!originIsWater && !canLandUnitTraverseEdge(originH3, hex.h3Index, landMass)) continue;
     try {
       if (gridDistance(originH3, hex.h3Index) === 1) return hex.h3Index;
     } catch {
@@ -778,7 +806,7 @@ function testPreviewShowsInvalidForLandWaterToWaterPortMovement(): void {
     const result = previewHumanMarchOrders([landUnit!.id], destinationWaterHex!);
     assert.strictEqual(result.validForAll, false);
     assert.strictEqual(result.showInvalidMarker, true);
-    assert.strictEqual(result.invalidReason, LAND_UNITS_CANNOT_MOVE_WATER_OR_ARCTIC_TO_WATER_OR_ARCTIC_REASON);
+    assert.strictEqual(result.invalidReason, LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON);
   });
 }
 

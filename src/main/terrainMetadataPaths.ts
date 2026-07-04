@@ -60,6 +60,15 @@ const RES4_ROAD_RAIL_SIDES_SEGMENTS = ['data', 'generated', 'terrain_res4_road_r
  * Exceptions: None.
  */
 const RES4_ROAD_RAIL_VECTORS_SEGMENTS = ['data', 'generated', 'terrain_res4_road_rail_vectors.json'] as const;
+/**
+ * Documents the module-scope binding `RES1_LANDMASS_SEGMENTS` (RES1_LANDMASS_SEGMENTS).
+
+ * Purpose: Candidate path segments for res-1 land-mass JSON used by strategic land-unit pathfinding.
+ * When to use: `resolveTerrainRes1LandMassPath` path probing.
+ * Expected outcome: Matches `data/generated/terrain_res1_landmass.json`.
+ * Exceptions: None.
+ */
+const RES1_LANDMASS_SEGMENTS = ['data', 'generated', 'terrain_res1_landmass.json'] as const;
 
 /**
  * Documents the module-scope binding `testOverrideRoot` (testOverrideRoot: string | null).
@@ -181,6 +190,19 @@ export function resolveTerrainRes1NamingPath(): string {
 export function resolveTerrainRes4NamingPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes4NamingPath');
   return resolveFirstExisting('terrain_res4_naming.json', [...RES4_NAMING_SEGMENTS]);
+}
+
+/**
+ * Defines the `resolveTerrainRes1LandMassPath` function shape (export function resolveTerrainRes1LandMassPath(): string).
+
+ * Purpose: Supports maintainability by documenting why `resolveTerrainRes1LandMassPath` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export function resolveTerrainRes1LandMassPath(): string {
+  logDebug('terrainMetadataPaths resolveTerrainRes1LandMassPath');
+  return resolveFirstExisting('terrain_res1_landmass.json', [...RES1_LANDMASS_SEGMENTS]);
 }
 
 /**

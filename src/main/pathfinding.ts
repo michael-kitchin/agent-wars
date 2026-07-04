@@ -8,6 +8,11 @@
 import { gridDisk } from 'h3-js';
 import { logDebug, logError, logTrace } from './logger';
 import { getMovementBudget } from './combatConstants';
+import {
+  allowsLandUnitStepWithOptionalSeaportDebark,
+  landUnitCanOccupyHex,
+  type LandMassByH3,
+} from '../shared/landTraversalRes1';
 
 /**
  * Documents the `PassableDomain` type alias (export type PassableDomain).
@@ -66,7 +71,9 @@ export function findPath(
   hexSet: Set<string>,
   terrainByH3: Map<string, string>,
   passableFor: PassableDomain,
-  blocked?: Set<string>
+  blocked?: Set<string>,
+  landMass?: LandMassByH3,
+  seaportDisembarkOriginH3?: string
 ): string[] | null {
   findPathInvocationCount += 1;
   logTrace('pathfinding findPath', {
@@ -84,6 +91,52 @@ export function findPath(
   }
   if (originH3 === destinationH3) return [originH3];
   if (!hexSet.has(originH3) || !hexSet.has(destinationH3)) return null;
+
+  if (passableFor === 'land') {
+    if (!landMass) {
+      logError('pathfinding findPath: land domain requires landMass map', new Error('missing landMass'));
+      return null;
+    }
+    if (blocked?.has(originH3) || blocked?.has(destinationH3)) return null;
+    if (!landUnitCanOccupyHex(destinationH3, landMass)) return null;
+
+    const queue: string[] = [originH3];
+    const parent = new Map<string, string>();
+    parent.set(originH3, originH3);
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (current === destinationH3) {
+        const path: string[] = [];
+        let p: string = destinationH3;
+        while (true) {
+          path.unshift(p);
+          const prev = parent.get(p);
+          if (prev === undefined || prev === p) break;
+          p = prev;
+        }
+        return path;
+      }
+      let neighbors: string[];
+      try {
+        neighbors = gridDisk(current, 1);
+      } catch (err) {
+        logError('pathfinding findPath: gridDisk threw', err);
+        continue;
+      }
+      for (const n of neighbors) {
+        if (n === current) continue;
+        if (parent.has(n)) continue;
+        if (!hexSet.has(n)) continue;
+        if (blocked?.has(n)) continue;
+        if (!allowsLandUnitStepWithOptionalSeaportDebark(current, n, landMass, seaportDisembarkOriginH3)) continue;
+        parent.set(n, current);
+        queue.push(n);
+      }
+    }
+    return null;
+  }
+
   const passable = (h3: string) => {
     if (!hexSet.has(h3)) return false;
     if (blocked?.has(h3)) return false;
@@ -140,8 +193,37 @@ export function getReachableHexes(
   hexSet: Set<string>,
   terrainByH3: Map<string, string>,
   passableFor: PassableDomain,
-  blocked?: Set<string>
+  blocked?: Set<string>,
+  landMass?: LandMassByH3,
+  seaportDisembarkOriginH3?: string
 ): Set<string> {
+  if (passableFor === 'land') {
+    if (!landMass) {
+      logError('pathfinding getReachableHexes: land domain requires landMass map', new Error('missing landMass'));
+      return new Set();
+    }
+    if (!hexSet.has(originH3) || blocked?.has(originH3)) return new Set();
+    const reachable = new Set<string>([originH3]);
+    const queue: string[] = [originH3];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      let neighbors: string[];
+      try {
+        neighbors = gridDisk(current, 1);
+      } catch {
+        continue;
+      }
+      for (const n of neighbors) {
+        if (n === current || !hexSet.has(n) || reachable.has(n)) continue;
+        if (blocked?.has(n)) continue;
+        if (!allowsLandUnitStepWithOptionalSeaportDebark(current, n, landMass, seaportDisembarkOriginH3)) continue;
+        reachable.add(n);
+        queue.push(n);
+      }
+    }
+    return reachable;
+  }
+
   const passable = (h3: string) => {
     if (!hexSet.has(h3)) return false;
     if (blocked?.has(h3)) return false;
@@ -221,10 +303,11 @@ export function getDistanceAndTurns(
   terrainByH3: Map<string, string>,
   passableFor: PassableDomain,
   movementBudget: number,
-  blocked?: Set<string>
+  blocked?: Set<string>,
+  landMass?: LandMassByH3
 ): { hexDistance: number; estimatedTurns: number } | null {
   logTrace('pathfinding getDistanceAndTurns', { passableFor });
-  const path = findPath(originH3, destinationH3, hexSet, terrainByH3, passableFor, blocked);
+  const path = findPath(originH3, destinationH3, hexSet, terrainByH3, passableFor, blocked, landMass);
   if (!path || path.length === 0) return null;
   const hexDistance = path.length - 1; // steps between hexes
   if (hexDistance <= 0) return { hexDistance: 0, estimatedTurns: 0 };

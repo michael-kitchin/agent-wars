@@ -4,23 +4,27 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { resolvePythonExecutable } = require('./resolve-python.cjs');
 
+const { GENERATED_TERRAIN_JSON_FILES } = require('./generated-data-manifest.cjs');
+
 const generatedDir = path.join(process.cwd(), 'data', 'generated');
-const REQUIRED_GENERATED_JSON_FILES = [
-  'terrain_res1_metadata.json',
-  'terrain_res4_metadata.json',
-  'terrain_res1_naming.json',
-  'terrain_res4_naming.json',
-  'terrain_res4_road_rail_sides.json',
-  'terrain_res4_road_rail_vectors.json',
-];
+const REQUIRED_GENERATED_JSON_FILES = GENERATED_TERRAIN_JSON_FILES;
 
 /** Archives named `<basename>.json.zip` (e.g. terrain_res1_metadata.json.zip, terrain_res1_naming.json.zip). */
 
-function shouldExtract(zipPath, jsonPath) {
+/**
+ * Returns whether an archive should be unpacked into its extracted JSON path.
+ *
+ * Purpose: Skip redundant extraction when JSON is already present and up to date.
+ * When to use: Before calling Python zip extraction in `main`.
+ * Expected outcome: True when JSON is missing, empty, or older than the archive.
+ */
+function shouldExtractGeneratedJson(zipPath, jsonPath) {
   if (!fs.existsSync(jsonPath)) return true;
   const jsonStat = fs.statSync(jsonPath);
   if (jsonStat.size <= 0) return true;
-  return false;
+  if (!fs.existsSync(zipPath)) return false;
+  const zipStat = fs.statSync(zipPath);
+  return zipStat.mtimeMs > jsonStat.mtimeMs;
 }
 
 function extractZip(pythonCmd, zipFilename, jsonFilename) {
@@ -85,16 +89,23 @@ function main() {
       const jsonFilename = zipFilename.slice(0, -4); // remove ".zip"
       const zipPath = path.join(generatedDir, zipFilename);
       const jsonPath = path.join(generatedDir, jsonFilename);
-      if (!shouldExtract(zipPath, jsonPath)) continue;
+      if (!shouldExtractGeneratedJson(zipPath, jsonPath)) continue;
       extractZip(pythonCmd, zipFilename, jsonFilename);
     }
   }
   assertRequiredGeneratedJsonFilesPresent();
 }
 
-try {
-  main();
-} catch (err) {
-  console.error(err instanceof Error ? err.message : String(err));
-  process.exit(1);
+module.exports = {
+  shouldExtractGeneratedJson,
+  REQUIRED_GENERATED_JSON_FILES,
+};
+
+if (require.main === module) {
+  try {
+    main();
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
 }

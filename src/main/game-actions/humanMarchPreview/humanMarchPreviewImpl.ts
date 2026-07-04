@@ -1,4 +1,4 @@
-import { cellToLatLng, gridDisk } from 'h3-js';
+import { cellToLatLng, gridDisk, gridDistance } from 'h3-js';
 import {
   getGameStateForPlayer,
   getHexController,
@@ -25,8 +25,14 @@ import {
 import { isWithinAirFerryGridRange } from '../gridRange';
 import { isEmbarkedLandUnitOnWater } from '../sealift';
 import {
+  allowsLandUnitStepWithOptionalSeaportDebark,
+  landUnitCanOccupyHex,
+  LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON,
+} from '../../../shared/landTraversalRes1';
+import {
   EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON,
   getLandMovementBlockReason,
+  isLandUnitSeaportDebarkHop,
   isLandUnitType,
 } from '../landMovementConstraints';
 import type { PlanRouteError, PlanRouteOk } from '../../tools/tool1Pathfinding';
@@ -698,17 +704,21 @@ function findNearbyReachablePreview(
       if (seen.has(candidateH3)) continue;
       seen.add(candidateH3);
       const passabilityTerrain = context.passabilityByH3.get(candidateH3) ?? 'land';
-      if (!terrainIsPassableForDomain(passabilityTerrain, passableFor)) continue;
+      if (passableFor === 'water' && !terrainIsPassableForDomain(passabilityTerrain, passableFor)) continue;
       if (isLandUnitType(unit.unitType) && candidateH3 !== unit.h3Index) {
-        const blockReason = getLandMovementBlockReason({
-          unitType: unit.unitType,
-          originH3Index: unit.h3Index,
-          destinationH3Index: candidateH3,
-          terrainByH3: context.terrainByH3,
-          terrainKindByH3: context.terrainKindByH3,
-          isEmbarkedAtSea: false,
-        });
-        if (blockReason) continue;
+        const landMass = context.pathfindingSession.landMass;
+        if (!landUnitCanOccupyHex(candidateH3, landMass)) continue;
+        const seaportDisembarkOriginH3 =
+          isEmbarkedLandUnitOnWater(unit.id) &&
+          getRes1InfrastructureForHex(unit.h3Index).seaportCount > 0
+            ? unit.h3Index
+            : undefined;
+        if (!allowsLandUnitStepWithOptionalSeaportDebark(
+          unit.h3Index,
+          candidateH3,
+          landMass,
+          seaportDisembarkOriginH3
+        )) continue;
       }
       attempts += 1;
       previewDiagnostics.fallbackAttemptCount += 1;
@@ -802,11 +812,24 @@ function computeHumanMarchPreviewForUnit(
   const unitIsLand = isLandUnitType(unit.unitType);
   const embarkedOnWater = unitIsLand && isEmbarkedLandUnitOnWater(unit.id);
   const originPassabilityTerrain = context.passabilityByH3.get(unit.h3Index) ?? 'land';
-  const embarkedAtSeaWithoutCoastalOrigin = embarkedOnWater && originPassabilityTerrain !== 'coastal';
+  const originSeaportCount = getRes1InfrastructureForHex(unit.h3Index).seaportCount;
+  let hoveredMoveDistance = 0;
+  if (hoveredH3Index !== unit.h3Index) {
+    try {
+      hoveredMoveDistance = gridDistance(unit.h3Index, hoveredH3Index);
+    } catch {
+      hoveredMoveDistance = Number.MAX_SAFE_INTEGER;
+    }
+  }
+  const seaportDebarkHop = isLandUnitSeaportDebarkHop({
+    isEmbarkedOnWater: embarkedOnWater,
+    originSeaportCount,
+    moveDistance: hoveredMoveDistance,
+  });
+  const embarkedAtSeaWithoutCoastalOrigin = embarkedOnWater && originPassabilityTerrain !== 'coastal' && !seaportDebarkHop;
   if (embarkedOnWater) {
     const hoveredPassabilityTerrain = context.passabilityByH3.get(hoveredH3Index) ?? 'land';
     const hoveredSeaportCount = getRes1InfrastructureForHex(hoveredH3Index).seaportCount;
-    const originSeaportCount = getRes1InfrastructureForHex(unit.h3Index).seaportCount;
     logDebug('gameActions previewHumanMarchOrder: embarked terrain classification', {
       unitId: unit.id,
       originH3Index: unit.h3Index,
@@ -828,10 +851,6 @@ function computeHumanMarchPreviewForUnit(
       showInvalidMarker: true,
       invalidReason: getLandMovementBlockReason({
         unitType: unit.unitType,
-        originH3Index: unit.h3Index,
-        destinationH3Index: unit.h3Index,
-        terrainByH3: context.terrainByH3,
-        terrainKindByH3: context.terrainKindByH3,
         isEmbarkedAtSea: true,
       }) ?? EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON,
       segments: [],
@@ -841,13 +860,21 @@ function computeHumanMarchPreviewForUnit(
     return result;
   }
   if (unitIsLand && hoveredH3Index !== unit.h3Index) {
+    if (!landUnitCanOccupyHex(hoveredH3Index, context.pathfindingSession.landMass)) {
+      result = {
+        valid: false,
+        showInvalidMarker: true,
+        invalidReason: LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON,
+        segments: [],
+      };
+      cacheSetBounded(previewResultCache, cacheKey, result, maxPreviewResultCacheEntries);
+      logPreviewOutcome(unitId, hoveredH3Index, result, 'computed');
+      return result;
+    }
     const blockReason = getLandMovementBlockReason({
       unitType: unit.unitType,
-      originH3Index: unit.h3Index,
-      destinationH3Index: hoveredH3Index,
-      terrainByH3: context.terrainByH3,
-      terrainKindByH3: context.terrainKindByH3,
       isEmbarkedAtSea: embarkedAtSeaWithoutCoastalOrigin,
+      isSeaportDebarkHop: seaportDebarkHop,
     });
     if (blockReason) {
       result = {
@@ -864,7 +891,10 @@ function computeHumanMarchPreviewForUnit(
 
   const passableFor = unit.unitType === 'naval' ? 'water' : 'land';
   const hoveredPassabilityTerrain = context.passabilityByH3.get(hoveredHex.h3Index) ?? 'land';
-  const hoveredPassable = terrainIsPassableForDomain(hoveredPassabilityTerrain, passableFor);
+  const hoveredPassable =
+    passableFor === 'land'
+      ? landUnitCanOccupyHex(hoveredHex.h3Index, context.pathfindingSession.landMass)
+      : terrainIsPassableForDomain(hoveredPassabilityTerrain, passableFor);
   const direct = hoveredPassable ? executePlanRouteCached(context, unitId, hoveredH3Index) : undefined;
   if (hoveredPassable && direct?.status === 'ok') {
     result = {
@@ -891,7 +921,10 @@ function computeHumanMarchPreviewForUnit(
   result = {
     valid: false,
     showInvalidMarker: true,
-    invalidReason: 'Destination is invalid for this unit type or unreachable.',
+    invalidReason:
+      unitIsLand && !landUnitCanOccupyHex(hoveredH3Index, context.pathfindingSession.landMass)
+        ? LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON
+        : 'Destination is invalid for this unit type or unreachable.',
     segments: [],
   };
   cacheSetBounded(previewResultCache, cacheKey, result, maxPreviewResultCacheEntries);

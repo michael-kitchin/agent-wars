@@ -4,17 +4,12 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { resolvePythonExecutable } = require('./resolve-python.cjs');
 
+const { GENERATED_TERRAIN_JSON_FILES } = require('./generated-data-manifest.cjs');
+
 const generatedDir = path.join(process.cwd(), 'data', 'generated');
 
 /** JSON blobs under data/generated that we archive for git + extract at build time (see extract-generated-data.cjs). */
-const GENERATED_JSON_TO_ZIP = [
-  'terrain_res1_metadata.json',
-  'terrain_res4_metadata.json',
-  'terrain_res1_naming.json',
-  'terrain_res4_naming.json',
-  'terrain_res4_road_rail_sides.json',
-  'terrain_res4_road_rail_vectors.json',
-];
+const GENERATED_JSON_TO_ZIP = GENERATED_TERRAIN_JSON_FILES;
 
 function zipJsonFile(pythonCmd, jsonFilename) {
   const zipFilename = `${jsonFilename}.zip`;

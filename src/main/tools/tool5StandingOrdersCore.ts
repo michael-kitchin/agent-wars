@@ -4,6 +4,8 @@ import { createPathfindingSession, executePlanRouteWithSession } from './tool1Pa
 import type { LatLng } from './tool1Pathfinding';
 import { terrainIsPassableForDomain } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
+import { landUnitCanOccupyHex } from '../../shared/landTraversalRes1';
+import { getRes1LandMassByH3 } from '../terrainClassificationCache';
 import { buildLatLngCoordinateMap } from '../mapData';
 import { logDebug, logError, logTrace } from '../logger';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
@@ -249,7 +251,14 @@ function assignOrder(
         };
       }
       const terrain = terrainByH3.get(h3) ?? 'land';
-      if (!terrainIsPassableForDomain(terrain, domain)) {
+      if (domain === 'land') {
+        if (!landUnitCanOccupyHex(h3, getRes1LandMassByH3())) {
+          return {
+            status: 'error',
+            error: `Patrol waypoint ${i + 1} is impassable for ${unit.unitType} on the operational map.`,
+          };
+        }
+      } else if (!terrainIsPassableForDomain(terrain, domain)) {
         return {
           status: 'error',
           error: `Patrol waypoint ${i + 1} is impassable for ${unit.unitType} on the operational map.`,

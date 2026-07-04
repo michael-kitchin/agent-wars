@@ -57,15 +57,18 @@ jobs:
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
-        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --win dir --publish never
+        run: npm run clean:release && npm run build && npm run generated:assert-pack-ready && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --win dir --publish never
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
-        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --linux dir --publish never
+        run: npm run clean:release && npm run build && npm run generated:assert-pack-ready && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --linux dir --publish never
 
       - name: Build (macOS)
         if: runner.os == 'macOS'
-        run: npm run clean:release && npm run build && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --mac dir --publish never
+        run: npm run clean:release && npm run build && npm run generated:assert-pack-ready && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --mac dir --publish never
+
+      - name: Assert packaged terrain JSON
+        run: npm run generated:assert-packaged
 
       - name: Remove intermediate build outputs
         shell: bash

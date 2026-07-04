@@ -12,7 +12,9 @@ import { logDebug, logError, logTrace } from '../logger';
 import type { GameStateSnapshot } from '../gameDb';
 import { dbGetOne, dbRun } from '../gameDb';
 import { LATLNG_DECIMAL_PLACES } from '../mapData';
-import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
+import { passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
+import { landUnitCanOccupyHex, LAND_UNIT_ROUTE_STEP_BLOCKED_REASON } from '../../shared/landTraversalRes1';
+import { getRes1LandMassByH3 } from '../terrainClassificationCache';
 import {
   getValidDestinations,
   resolveMovementTerrainForHex,
@@ -377,8 +379,13 @@ function validateAiOrder(
   if (unit.unitType === 'naval' && !passabilityAllowsNavalUnit(terrain)) {
     return { valid: false, reason: NAVAL_DESTINATION_MUST_BE_WATER_COASTAL };
   }
-  if ((unit.unitType === 'infantry' || unit.unitType === 'armor') && !passabilityAllowsLandUnit(terrain)) {
-    return { valid: false, reason: 'Land units must move to land, coastal, or wetlands hexes' };
+  if ((unit.unitType === 'infantry' || unit.unitType === 'armor') && !landUnitCanOccupyHex(order.toH3Index, getRes1LandMassByH3())) {
+    return { valid: false, reason: 'Land units must move to a hex that overlaps a continent or large island.' };
+  }
+  if (unit.unitType === 'infantry' || unit.unitType === 'armor') {
+    if (!getValidDestinations(unit, state).includes(order.toH3Index)) {
+      return { valid: false, reason: LAND_UNIT_ROUTE_STEP_BLOCKED_REASON };
+    }
   }
   return { valid: true };
 }
@@ -436,6 +443,14 @@ function validateAiRangedOrder(
 function formatLatLng(ll: [number, number]): string {
   return formatLatLngWithPrecision(ll, LATLNG_DECIMAL_PLACES);
 }
+/**
+ * Defines the `requestOrders` function shape (export async function requestOrders().
+
+ * Purpose: Supports maintainability by documenting why `requestOrders` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export async function requestOrders(
   state: GameStateSnapshot,
   modelId: string,

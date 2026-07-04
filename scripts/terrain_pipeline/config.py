@@ -54,6 +54,8 @@ class InputRasterSet:
     urban_shapefile_name: str = "ne_10m_urban_areas.shp"
     airport_shapefile_name: str = "ne_10m_airports.shp"
     seaport_shapefile_name: str = "ne_10m_ports.shp"
+    # Natural Earth geography regions for res-1 land-unit pathfinding (EPSG:4326 under ``root``).
+    geography_regions_shapefile_name: str = "ne_10m_geography_regions_polys.shp"
     landcover_by_class: Dict[int, str] = field(
         default_factory=lambda: {
             1: "consensus_full_class_1.tif",
@@ -169,6 +171,12 @@ class PipelineConfig:
     # Per-hex feature metadata (JSON) for TS / analytics; separate from terrain CSV classification outputs.
     terrain_res1_metadata_filename: str = "terrain_res1_metadata.json"
     terrain_res4_metadata_filename: str = "terrain_res4_metadata.json"
+    terrain_res1_landmass_filename: str = "terrain_res1_landmass.json"
+
+    # Minimum island area (km2) for res-1 land-unit island membership and continent<->island edges.
+    island_min_area_km2: float = 2000.0
+    # Water fraction above which a same-continent destination hex is impassable (percent 0-100).
+    land_water_threshold_pct: float = 85.0
 
 
 def build_default_config() -> PipelineConfig:

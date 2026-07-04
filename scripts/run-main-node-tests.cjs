@@ -102,9 +102,15 @@ function main() {
       process.exit(1);
     }
     files = collectTestJsUnderDir(mainDist).sort((a, b) => a.localeCompare(b));
-    const extra = path.join(repoRoot, 'scripts', 'electron-builder-config.test.cjs');
-    if (fs.existsSync(extra)) {
-      files.push(extra);
+    for (const extraName of [
+      'electron-builder-config.test.cjs',
+      'generated-data-packaging.test.cjs',
+      'generated-data-pack-assert.test.cjs',
+    ]) {
+      const extra = path.join(repoRoot, 'scripts', extraName);
+      if (fs.existsSync(extra)) {
+        files.push(extra);
+      }
     }
   }
 

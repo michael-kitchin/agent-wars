@@ -1,5 +1,6 @@
 import { getReachableHexes, getMovementBudgetForUnit, terrainIsPassableForDomain } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
+import { landUnitCanOccupyHex, type LandMassByH3 } from '../../shared/landTraversalRes1';
 import { isLandSeaportSpawnHex } from '../movementTerrain';
 import { logDebug } from '../logger';
 import {
@@ -174,6 +175,7 @@ export function resolveRoutePathForUnit(payload: {
   terrainByH3: Map<string, string>;
   session: PathfindingSession;
   blocked?: Set<string>;
+  seaportDisembarkOriginH3?: string;
 }): ResolveRoutePathForUnitOk | PlanRouteError {
   const passableFor: PassableDomain = payload.unitType === 'naval' ? 'water' : 'land';
   const navalOriginResolution = resolveNavalOriginForRouting({
@@ -217,6 +219,7 @@ export function resolveRoutePathForUnit(payload: {
       blocked: payload.blocked,
       warnings,
       blockedRetryWarning: 'Route passes through enemy-occupied hexes - avoidance was not possible.',
+      seaportDisembarkOriginH3: payload.seaportDisembarkOriginH3,
     });
     path = prependSeaportEgressStep(stateful.path, payload.originH3, seaportEgressHex);
     statefulStats = stateful.stats;
@@ -271,11 +274,19 @@ export function resolveRoutePathForUnit(payload: {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function planRouteNoPathHint(passableFor: PassableDomain, destTerrain: string): string {
-  if (passableFor === 'land' && destTerrain === 'water') {
-    return ' Destination is water; land units cannot move there. Route this unit to a land or coastal hex (e.g. an enemy land unit\'s position).';
+export function planRouteNoPathHint(
+  passableFor: PassableDomain,
+  destH3: string,
+  landMass?: LandMassByH3,
+  destTerrain?: string
+): string {
+  if (passableFor === 'land' && landMass && !landUnitCanOccupyHex(destH3, landMass)) {
+    return ' Destination has no continent or large-island land mass; land units cannot move there.';
   }
-  if (passableFor === 'land' && terrainIsPassableForDomain(destTerrain, 'land')) {
+  if (passableFor === 'land' && landMass && landUnitCanOccupyHex(destH3, landMass)) {
+    return ' No path found (destination may be on a different land mass).';
+  }
+  if (passableFor === 'land') {
     return ' No path found (destination may be on a different land mass).';
   }
   if (passableFor === 'water' && destTerrain === 'land') {

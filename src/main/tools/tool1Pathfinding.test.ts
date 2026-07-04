@@ -5,9 +5,33 @@
 
 import * as assert from 'assert';
 import { gridDisk, latLngToCell } from 'h3-js';
-import { createPathfindingSession, executePlanRoute, executePlanRouteWithSession } from './tool1Pathfinding';
+import { createPathfindingSession, executePlanRouteWithSession } from './tool1Pathfinding';
 import type { GameStateSnapshot } from '../gameDb';
-import { LAND_UNITS_CANNOT_MOVE_WATER_OR_ARCTIC_TO_WATER_OR_ARCTIC_REASON } from '../game-actions/landMovementConstraints';
+import type { Res1LandMassRecord } from '../../shared/landTraversalRes1';
+
+/**
+ * Defines the `landMassForHexes` function shape (function landMassForHexes().
+
+ * Purpose: Supports maintainability by documenting why `landMassForHexes` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+function landMassForHexes(
+  hexes: readonly string[],
+  opts?: { waterPct?: number; continentIds?: number[]; islandIds?: number[] }
+): Map<string, Res1LandMassRecord> {
+  const out = new Map<string, Res1LandMassRecord>();
+  for (const h3Index of hexes) {
+    out.set(h3Index, {
+      h3Index,
+      waterPct: opts?.waterPct ?? 10,
+      continentIds: opts?.continentIds ?? [1],
+      islandIds: opts?.islandIds ?? [],
+    });
+  }
+  return out;
+}
 
 /**
  * Defines the `buildAdjacentHexPair` function shape (function buildAdjacentHexPair():).
@@ -56,30 +80,41 @@ function testPlanRouteLandUnitToWaterHexReturnsTerrainHint(): void {
     return landH3;
   };
 
-  const result = executePlanRoute(
+  const landMass = landMassForHexes([landH3, waterH3], {
+    waterPct: 10,
+    continentIds: [1],
+    islandIds: [],
+  });
+  landMass.set(waterH3, {
+    h3Index: waterH3,
+    waterPct: 100,
+    continentIds: [],
+    islandIds: [],
+  });
+  const result = executePlanRouteWithSession(
     'opponent-armor-1',
     [0.9, 0.9],
     undefined,
-    state,
-    latLngByH3,
-    resolveToH3
+    createPathfindingSession(state, latLngByH3, resolveToH3, landMass)
   );
 
   assert.strictEqual(result.status, 'error');
   const err = (result as { error: string }).error;
-  assert.ok(err.includes('water'), 'error should mention destination is water');
-  assert.ok(err.includes('land units'), 'error should guide land units to a land hex');
+  assert.ok(
+    err.includes('continent') || err.includes('large-island') || err.includes('large island'),
+    'error should mention land-mass destination requirement'
+  );
 }
 
 /**
- * Defines the `testPlanRouteLandUnitRejectsWaterKindToWaterKindMovement` function shape (function testPlanRouteLandUnitRejectsWaterKindToWaterKindMovement(): void).
+ * Defines the `testPlanRouteLandUnitRejectsOpenWaterMassDestination` function shape (function testPlanRouteLandUnitRejectsOpenWaterMassDestination(): void).
 
- * Purpose: Supports maintainability by documenting why `testPlanRouteLandUnitRejectsWaterKindToWaterKindMovement` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Land units cannot route to hexes with no continent or island membership.
+ * When to use: Regression guard for land-mass pathfinding.
+ * Expected outcome: Error status with land-mass messaging.
  * Exceptions: None.
  */
-function testPlanRouteLandUnitRejectsWaterKindToWaterKindMovement(): void {
+function testPlanRouteLandUnitRejectsOpenWaterMassDestination(): void {
   const { originH3, destinationH3 } = buildAdjacentHexPair();
   const state: GameStateSnapshot = {
     hexes: [
@@ -100,17 +135,24 @@ function testPlanRouteLandUnitRejectsWaterKindToWaterKindMovement(): void {
     if (lat <= 0.2 && lng <= 0.2) return originH3;
     return destinationH3;
   };
+  const landMass = landMassForHexes([originH3, destinationH3], {
+    waterPct: 100,
+    continentIds: [],
+    islandIds: [],
+  });
 
-  const result = executePlanRoute(
+  const result = executePlanRouteWithSession(
     'opponent-armor-1',
     [0.9, 0.9],
     undefined,
-    state,
-    latLngByH3,
-    resolveToH3
+    createPathfindingSession(state, latLngByH3, resolveToH3, landMass)
   );
   assert.strictEqual(result.status, 'error');
-  assert.strictEqual((result as { error: string }).error, LAND_UNITS_CANNOT_MOVE_WATER_OR_ARCTIC_TO_WATER_OR_ARCTIC_REASON);
+  assert.ok(
+    (result as { error: string }).error.includes('continent') ||
+      (result as { error: string }).error.includes('large-island') ||
+      (result as { error: string }).error.includes('large island')
+  );
 }
 
 /**
@@ -143,28 +185,27 @@ function testPlanRouteSessionParity(): void {
     return destinationH3;
   };
 
-  const defaultResult = executePlanRoute(
+  const landMass = landMassForHexes([originH3, destinationH3]);
+  const defaultResult = executePlanRouteWithSession(
     'opponent-armor-1',
     [0.9, 0.9],
     { avoidEnemies: true },
-    state,
-    latLngByH3,
-    resolveToH3
+    createPathfindingSession(state, latLngByH3, resolveToH3, landMass)
   );
-  const session = createPathfindingSession(state, latLngByH3, resolveToH3);
+  const session = createPathfindingSession(state, latLngByH3, resolveToH3, landMass);
   const sessionResult = executePlanRouteWithSession('opponent-armor-1', [0.9, 0.9], { avoidEnemies: true }, session);
   assert.deepStrictEqual(sessionResult, defaultResult);
 }
 
 /**
- * Defines the `testPlanRouteAllowsSeparatedSpecialTransitions` function shape (function testPlanRouteAllowsSeparatedSpecialTransitions(): void).
+ * Defines the `testPlanRouteRejectsWaterCrossingWithoutLandMassEdge` function shape (function testPlanRouteRejectsWaterCrossingWithoutLandMassEdge(): void).
 
- * Purpose: Supports maintainability by documenting why `testPlanRouteAllowsSeparatedSpecialTransitions` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Land units no longer traverse open-water hexes without land-mass connectivity.
+ * When to use: Regression guard for removed single-water-hop rule.
+ * Expected outcome: No path when only a water hex bridges two land-mass cells.
  * Exceptions: None.
  */
-function testPlanRouteAllowsSeparatedSpecialTransitions(): void {
+function testPlanRouteRejectsWaterCrossingWithoutLandMassEdge(): void {
   const originH3 = latLngToCell(10, 10, 3);
   const middleH3 = gridDisk(originH3, 1).find((h3) => h3 !== originH3);
   assert.ok(middleH3, 'expected a neighboring middle hex');
@@ -192,18 +233,18 @@ function testPlanRouteAllowsSeparatedSpecialTransitions(): void {
     return originH3;
   };
 
-  const result = executePlanRoute(
+  const landMass = landMassForHexes([originH3, middleH3!, destinationH3!], { continentIds: [1] });
+  landMass.set(originH3, { h3Index: originH3, waterPct: 95, continentIds: [1], islandIds: [] });
+  landMass.set(destinationH3!, { h3Index: destinationH3!, waterPct: 95, continentIds: [1], islandIds: [] });
+
+  const result = executePlanRouteWithSession(
     'opponent-armor-1',
     [0.9, 0.9],
     undefined,
-    state,
-    latLngByH3,
-    resolveToH3
+    createPathfindingSession(state, latLngByH3, resolveToH3, landMass)
   );
 
-  assert.strictEqual(result.status, 'ok');
-  const okResult = result as { status: 'ok'; path: { hexes: [number, number][] }[] };
-  assert.ok(okResult.path.length > 0, 'expected a traversable path for separated special transitions');
+  assert.strictEqual(result.status, 'error');
 }
 
 /**
@@ -246,7 +287,8 @@ function testPlanRouteSessionDeadStateCacheUsesOriginDestinationCompositeKey(): 
     if (lat >= 0.4 && lng >= 0.4 && lat <= 0.6 && lng <= 0.6) return originB;
     return destinationH3;
   };
-  const session = createPathfindingSession(state, latLngByH3, resolveToH3);
+  const landMass = landMassForHexes([destinationH3, originA, originB]);
+  const session = createPathfindingSession(state, latLngByH3, resolveToH3, landMass);
   const resultA = executePlanRouteWithSession('opponent-armor-1', destinationLatLng, undefined, session);
   const resultB = executePlanRouteWithSession('opponent-armor-2', destinationLatLng, undefined, session);
   assert.strictEqual(resultA.status, 'ok');
@@ -297,7 +339,8 @@ function testPlanRouteSessionDeadStateCacheSeparatesBlockedAndUnblockedSearches(
     if (lat >= 0.4 && lng >= 0.4 && lat <= 0.6 && lng <= 0.6) return middleH3!;
     return originH3;
   };
-  const session = createPathfindingSession(state, latLngByH3, resolveToH3);
+  const landMass = landMassForHexes([originH3, middleH3!, destinationH3!]);
+  const session = createPathfindingSession(state, latLngByH3, resolveToH3, landMass);
   const result = executePlanRouteWithSession('opponent-armor-1', destinationLatLng, { avoidEnemies: true }, session);
   assert.strictEqual(result.status, 'ok');
   const warnings = (result as { warnings?: string[] }).warnings ?? [];
@@ -322,9 +365,9 @@ function testPlanRouteSessionDeadStateCacheSeparatesBlockedAndUnblockedSearches(
  */
 function run(): void {
   testPlanRouteLandUnitToWaterHexReturnsTerrainHint();
-  testPlanRouteLandUnitRejectsWaterKindToWaterKindMovement();
+  testPlanRouteLandUnitRejectsOpenWaterMassDestination();
   testPlanRouteSessionParity();
-  testPlanRouteAllowsSeparatedSpecialTransitions();
+  testPlanRouteRejectsWaterCrossingWithoutLandMassEdge();
   testPlanRouteSessionDeadStateCacheUsesOriginDestinationCompositeKey();
   testPlanRouteSessionDeadStateCacheSeparatesBlockedAndUnblockedSearches();
   console.log('tool1Pathfinding tests passed');

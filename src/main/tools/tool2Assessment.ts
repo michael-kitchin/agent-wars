@@ -8,7 +8,9 @@ import { cellToLatLng, gridDistance, gridDisk } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
 import { getDistanceAndTurns, getMovementBudgetForUnit, terrainIsPassableForDomain } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
-import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
+import { passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
+import { landUnitCanOccupyHex } from '../../shared/landTraversalRes1';
+import { getRes1LandMassByH3 } from '../terrainClassificationCache';
 import { getRange } from '../combatConstants';
 import { getStandingOrderForUnit } from './tool5StandingOrders';
 import { logDebug, logError, logTrace } from '../logger';
@@ -452,7 +454,7 @@ function executeAssessHex(
   }
   const terrain = terrainByH3.get(hexH3) ?? 'land';
   const passableBy: string[] = [];
-  if (passabilityAllowsLandUnit(terrain)) passableBy.push('infantry', 'armor');
+  if (landUnitCanOccupyHex(hexH3, getRes1LandMassByH3())) passableBy.push('infantry', 'armor');
   if (passabilityAllowsNavalUnit(terrain)) passableBy.push('naval');
   if (passableBy.length === 0) passableBy.push('none');
   const unitsAtHex = state.units

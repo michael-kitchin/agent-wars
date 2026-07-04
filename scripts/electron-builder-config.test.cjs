@@ -5,6 +5,11 @@ const packageJson = require('../package.json');
 const buildConfig = require('../electron-builder.config.cjs');
 const ciBuildConfig = require('../electron-builder.ci.cjs');
 const { getBuildIdentity } = require('./buildIdentity.cjs');
+const { GENERATED_TERRAIN_JSON_FILES } = require('./generated-data-manifest.cjs');
+const {
+  buildElectronBuilderGeneratedFileEntries,
+  buildElectronBuilderGeneratedResourceFilter,
+} = require('./electronBuilderGeneratedFiles.cjs');
 
 function testVersionedIdentityContract() {
   const versionText = String(packageJson.version || '0.0.0');
@@ -26,14 +31,15 @@ function testVersionedIdentityContract() {
 }
 
 function testGeneratedTerrainResourcesContract() {
-  const expected = [
-    'terrain_res1_metadata.json',
-    'terrain_res4_metadata.json',
-    'terrain_res1_naming.json',
-    'terrain_res4_naming.json',
-    'terrain_res4_road_rail_sides.json',
-    'terrain_res4_road_rail_vectors.json',
-  ];
+  const expected = [...GENERATED_TERRAIN_JSON_FILES];
+  const expectedFileEntries = buildElectronBuilderGeneratedFileEntries();
+  const expectedResourceFilter = buildElectronBuilderGeneratedResourceFilter();
+  assert.deepStrictEqual(
+    expectedFileEntries,
+    expected.map((filename) => `data/generated/${filename}`),
+    'electron-builder generated file entries must match manifest',
+  );
+  assert.deepStrictEqual(expectedResourceFilter, expected, 'electron-builder resource filter must match manifest');
   const entry =
     Array.isArray(buildConfig.extraResources) &&
     buildConfig.extraResources.find((item) => item && item.to === 'data/generated');
@@ -42,6 +48,10 @@ function testGeneratedTerrainResourcesContract() {
     assert.ok(
       Array.isArray(entry.filter) && entry.filter.includes(filename),
       `electron-builder extraResources filter must include ${filename}`
+    );
+    assert.ok(
+      Array.isArray(buildConfig.files) && buildConfig.files.includes(`data/generated/${filename}`),
+      `electron-builder files must include data/generated/${filename}`
     );
   }
 }

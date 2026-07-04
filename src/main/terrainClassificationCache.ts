@@ -30,6 +30,12 @@ import {
   type TerrainNamingRecordRes1,
   type TerrainNamingRecordRes4,
 } from './terrainNamingLoad';
+import {
+  assertLandMassMatchesHexList,
+  buildRes1LandMassByH3,
+  loadTerrainRes1LandMassBundled,
+} from './terrainLandMassLoad';
+import type { Res1LandMassRecord } from '../shared/landTraversalRes1';
 import { reduceRes4CityOverlayLabelsByH3 } from './terrainRes4CityOverlayReduce';
 import { loadTerrainRes4RoadRailSidesBundled } from './terrainRoadRailSidesLoad';
 import { loadTerrainRes4RoadRailVectorsBundled } from './terrainRoadRailVectorsLoad';
@@ -183,6 +189,15 @@ res4FeatureRows: ReadonlyArray<{
    * Exceptions: None.
    */
 res1NamingRecords: ReadonlyArray<TerrainNamingRecordRes1>;
+    /**
+   * Specifies the contract for the `res1LandMassByH3` member (res1LandMassByH3: ReadonlyMap<string, Res1LandMassRecord>;).
+
+   * Contract: Precomputed continent/island membership and water fraction per res-1 hex for land-unit pathfinding.
+   * When to use: Strategic land movement validation and routing after cache load.
+   * Expected outcome: One record per res-1 hex; keys match res1KindByH3.
+   * Exceptions: None.
+   */
+res1LandMassByH3: ReadonlyMap<string, Res1LandMassRecord>;
 }
 
 /**
@@ -356,6 +371,11 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     continentNamesRes1ByH3.set(row.h3_index, names);
   }
 
+  const landMassEnv = loadTerrainRes1LandMassBundled();
+  const res1LandMassByH3 = buildRes1LandMassByH3(landMassEnv);
+  const expectedRes1Hexes = res1Env.records.map((row) => row.h3_index);
+  assertLandMassMatchesHexList(res1LandMassByH3, expectedRes1Hexes);
+
   logDebug('terrainClassificationCache buildSnapshot: done', {
     res1Count: res1KindByH3.size,
     res4Records: res4Env.records.length,
@@ -369,6 +389,7 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     res4CityOverlayHexes: res4CityOverlayByH3.size,
     res4RoadRailOverlayHexes: res4RoadRailOverlayByH3.size,
     res4TransportVectorRows: res4TransportVectorOverlayRows.length,
+    res1LandMassHexes: res1LandMassByH3.size,
   });
   return {
     res1KindByH3,
@@ -384,6 +405,7 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     res4TransportVectorOverlayRows,
     res4FeatureRows,
     res1NamingRecords: namingRes1Env.records as TerrainNamingRecordRes1[],
+    res1LandMassByH3,
   };
 }
 
@@ -422,6 +444,20 @@ export function getTerrainRes1NamingRecordsFromSnapshot(): ReadonlyArray<Terrain
     throw err;
   }
   return cached.res1NamingRecords;
+}
+
+/**
+ * Defines the `getRes1LandMassByH3` function shape (export function getRes1LandMassByH3(): ReadonlyMap<string, Res1LandMassRecord>).
+
+ * Purpose: Supports maintainability by documenting why `getRes1LandMassByH3` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
+export function getRes1LandMassByH3(): ReadonlyMap<string, Res1LandMassRecord> {
+  logTrace('terrainClassificationCache getRes1LandMassByH3');
+  ensureTerrainClassificationCacheLoaded();
+  return cached!.res1LandMassByH3;
 }
 
 /**

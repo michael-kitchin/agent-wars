@@ -1,5 +1,9 @@
 import { gridDisk } from 'h3-js';
-import { terrainIsPassableForDomain } from '../pathfinding';
+import {
+  allowsLandUnitStepWithOptionalSeaportDebark,
+  landUnitCanOccupyHex,
+  type LandMassByH3,
+} from '../../shared/landTraversalRes1';
 import { logError } from '../logger';
 
 /**
@@ -89,15 +93,6 @@ export interface StatefulSearchStats {
    */
 expandedStateCount: number;
     /**
-   * Specifies the contract for the `rejectedConsecutiveSpecialCount` member (rejectedConsecutiveSpecialCount: number;).
-
-   * Contract: Describes stable behavior for callers of `rejectedConsecutiveSpecialCount` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-rejectedConsecutiveSpecialCount: number;
-    /**
    * Specifies the contract for the `deadStateCacheHitCount` member (deadStateCacheHitCount: number;).
 
    * Contract: Describes stable behavior for callers of `deadStateCacheHitCount` in this codebase.
@@ -127,32 +122,14 @@ export interface StatefulLandSearchSessionData {
    */
 hexSet: Set<string>;
     /**
-   * Specifies the contract for the `terrainByH3` member (terrainByH3: Map<string, string>;).
+   * Specifies the contract for the `landMass` member (landMass: LandMassByH3;).
 
-   * Contract: Describes stable behavior for callers of `terrainByH3` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Contract: Precomputed res-1 continent/island membership used for land-unit edge validation.
+   * When to use: Every land BFS expansion in this module.
+   * Expected outcome: Complete map keyed by res-1 h3 index.
    * Exceptions: None.
    */
-terrainByH3: Map<string, string>;
-    /**
-   * Specifies the contract for the `rawTerrainByH3` member (rawTerrainByH3: Map<string, string>;).
-
-   * Contract: Describes stable behavior for callers of `rawTerrainByH3` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-rawTerrainByH3: Map<string, string>;
-    /**
-   * Specifies the contract for the `terrainKindByH3` member (terrainKindByH3: Map<string, string>;).
-
-   * Contract: Describes stable behavior for callers of `terrainKindByH3` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-terrainKindByH3: Map<string, string>;
+landMass: LandMassByH3;
     /**
    * Specifies the contract for the `statefulCache` member (statefulCache: PathfindingSessionStatefulCache;).
 
@@ -162,33 +139,6 @@ terrainKindByH3: Map<string, string>;
    * Exceptions: None.
    */
 statefulCache: PathfindingSessionStatefulCache;
-}
-
-/**
- * Defines the `isSpecialWaterOrArcticHex` function shape (function isSpecialWaterOrArcticHex(h3Index: string, session: StatefulLandSearchSessionData): boolean).
-
- * Purpose: Supports maintainability by documenting why `isSpecialWaterOrArcticHex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function isSpecialWaterOrArcticHex(h3Index: string, session: StatefulLandSearchSessionData): boolean {
-  const terrainKind = session.terrainKindByH3.get(h3Index) ?? '';
-  if (terrainKind === 'water' || terrainKind === 'arctic') return true;
-  const terrain = session.rawTerrainByH3.get(h3Index) ?? '';
-  return terrain === 'water' || terrain === 'arctic';
-}
-
-/**
- * Defines the `buildStateKey` function shape (function buildStateKey(hexId: string, prevSpecial: boolean): string).
-
- * Purpose: Supports maintainability by documenting why `buildStateKey` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function buildStateKey(hexId: string, prevSpecial: boolean): string {
-  return `${hexId}|${prevSpecial ? '1' : '0'}`;
 }
 
 /**
@@ -271,35 +221,35 @@ function addDeadStatesBounded(deadStateSet: Set<string>, states: Iterable<string
 }
 
 /**
- * Defines the `findLandPathWithStatefulRule` function shape (function findLandPathWithStatefulRule(payload: { originH3: string; destinationH3: string; session: StatefulLandSearchSessionData; blocked?: Set<stri).
+ * Defines the `findLandPathWithLandMassRule` function shape (function findLandPathWithLandMassRule(payload:).
 
- * Purpose: Supports maintainability by documenting why `findLandPathWithStatefulRule` exists.
+ * Purpose: Supports maintainability by documenting why `findLandPathWithLandMassRule` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function findLandPathWithStatefulRule(payload: {
+function findLandPathWithLandMassRule(payload: {
   originH3: string;
   destinationH3: string;
   session: StatefulLandSearchSessionData;
   blocked?: Set<string>;
+  seaportDisembarkOriginH3?: string;
 }): { path: string[] | null; stats: StatefulSearchStats } {
   const stats: StatefulSearchStats = {
     expandedStateCount: 0,
-    rejectedConsecutiveSpecialCount: 0,
     deadStateCacheHitCount: 0,
   };
   if (payload.originH3 === payload.destinationH3) return { path: [payload.originH3], stats };
   if (!payload.session.hexSet.has(payload.originH3) || !payload.session.hexSet.has(payload.destinationH3)) {
     return { path: null, stats };
   }
-  const passable = (h3: string) => {
-    if (!payload.session.hexSet.has(h3)) return false;
-    if (payload.blocked?.has(h3)) return false;
-    const terrain = payload.session.terrainByH3.get(h3) ?? 'land';
-    return terrainIsPassableForDomain(terrain, 'land');
-  };
-  if (!passable(payload.originH3) || !passable(payload.destinationH3)) return { path: null, stats };
+  if (payload.blocked?.has(payload.originH3) || payload.blocked?.has(payload.destinationH3)) {
+    return { path: null, stats };
+  }
+  if (!landUnitCanOccupyHex(payload.destinationH3, payload.session.landMass)) {
+    return { path: null, stats };
+  }
+
   const destinationCache = getOrCreateStatefulDestinationCache(
     payload.session,
     payload.originH3,
@@ -308,73 +258,62 @@ function findLandPathWithStatefulRule(payload: {
   );
   const deadStateSet = destinationCache.deadStateSet;
 
-  const queue: Array<{ stateKey: string; h3: string; prevSpecial: boolean }> = [];
-  const parentByStateKey = new Map<string, string>();
-  const visitedDistanceByStateKey = new Map<string, number>();
-  const exploredStateKeys = new Set<string>();
-
-  const originSpecial = isSpecialWaterOrArcticHex(payload.originH3, payload.session);
-  const originStateKey = buildStateKey(payload.originH3, originSpecial);
-  queue.push({ stateKey: originStateKey, h3: payload.originH3, prevSpecial: originSpecial });
-  parentByStateKey.set(originStateKey, originStateKey);
-  visitedDistanceByStateKey.set(originStateKey, 0);
-  exploredStateKeys.add(originStateKey);
+  const queue: string[] = [payload.originH3];
+  const parentByH3 = new Map<string, string>();
+  parentByH3.set(payload.originH3, payload.originH3);
+  const exploredH3 = new Set<string>([payload.originH3]);
 
   let queueIndex = 0;
-  let foundStateKey: string | null = null;
+  let foundH3: string | null = null;
   while (queueIndex < queue.length) {
     const current = queue[queueIndex]!;
     queueIndex += 1;
     stats.expandedStateCount += 1;
-    if (current.h3 === payload.destinationH3) {
-      foundStateKey = current.stateKey;
+    if (current === payload.destinationH3) {
+      foundH3 = current;
       break;
     }
     let neighbors: string[] = [];
     try {
-      neighbors = gridDisk(current.h3, 1);
+      neighbors = gridDisk(current, 1);
     } catch (err) {
-      logError('tool1Pathfinding findLandPathWithStatefulRule: gridDisk threw', {
-        currentH3: current.h3,
+      logError('tool1Pathfinding findLandPathWithLandMassRule: gridDisk threw', {
+        currentH3: current,
         error: String(err),
       });
       continue;
     }
-    const currentDistance = visitedDistanceByStateKey.get(current.stateKey) ?? 0;
     for (const neighborH3 of neighbors) {
-      if (neighborH3 === current.h3) continue;
-      if (!passable(neighborH3)) continue;
-      const nextSpecial = isSpecialWaterOrArcticHex(neighborH3, payload.session);
-      if (current.prevSpecial && nextSpecial) {
-        stats.rejectedConsecutiveSpecialCount += 1;
-        continue;
-      }
-      const nextStateKey = buildStateKey(neighborH3, nextSpecial);
-      if (deadStateSet.has(nextStateKey)) {
+      if (neighborH3 === current) continue;
+      if (!payload.session.hexSet.has(neighborH3)) continue;
+      if (payload.blocked?.has(neighborH3)) continue;
+      if (parentByH3.has(neighborH3)) continue;
+      if (!allowsLandUnitStepWithOptionalSeaportDebark(
+        current,
+        neighborH3,
+        payload.session.landMass,
+        payload.seaportDisembarkOriginH3
+      )) continue;
+      if (deadStateSet.has(neighborH3)) {
         stats.deadStateCacheHitCount += 1;
         continue;
       }
-      const nextDistance = currentDistance + 1;
-      const knownDistance = visitedDistanceByStateKey.get(nextStateKey);
-      if (knownDistance != null && knownDistance <= nextDistance) continue;
-      visitedDistanceByStateKey.set(nextStateKey, nextDistance);
-      parentByStateKey.set(nextStateKey, current.stateKey);
-      exploredStateKeys.add(nextStateKey);
-      queue.push({ stateKey: nextStateKey, h3: neighborH3, prevSpecial: nextSpecial });
+      parentByH3.set(neighborH3, current);
+      exploredH3.add(neighborH3);
+      queue.push(neighborH3);
     }
   }
 
-  if (!foundStateKey) {
-    addDeadStatesBounded(deadStateSet, exploredStateKeys);
+  if (!foundH3) {
+    addDeadStatesBounded(deadStateSet, exploredH3);
     return { path: null, stats };
   }
 
   const path: string[] = [];
-  let cursor: string | undefined = foundStateKey;
+  let cursor: string | undefined = foundH3;
   while (cursor) {
-    const [cursorHex] = cursor.split('|');
-    if (cursorHex) path.unshift(cursorHex);
-    const previous = parentByStateKey.get(cursor);
+    path.unshift(cursor);
+    const previous = parentByH3.get(cursor);
     if (!previous || previous === cursor) break;
     cursor = previous;
   }
@@ -382,7 +321,7 @@ function findLandPathWithStatefulRule(payload: {
 }
 
 /**
- * Defines the `findLandPathWithStatefulOptionalAvoidanceRetry` function shape (export function findLandPathWithStatefulOptionalAvoidanceRetry(payload: { originH3: string; destinationH3: string; session: StatefulLandSearchSessionDa).
+ * Defines the `findLandPathWithStatefulOptionalAvoidanceRetry` function shape (export function findLandPathWithStatefulOptionalAvoidanceRetry(payload:).
 
  * Purpose: Supports maintainability by documenting why `findLandPathWithStatefulOptionalAvoidanceRetry` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -396,19 +335,22 @@ export function findLandPathWithStatefulOptionalAvoidanceRetry(payload: {
   blocked?: Set<string>;
   warnings?: string[];
   blockedRetryWarning?: string;
+  seaportDisembarkOriginH3?: string;
 }): { path: string[] | null; stats: StatefulSearchStats } {
-  const firstAttempt = findLandPathWithStatefulRule({
+  const firstAttempt = findLandPathWithLandMassRule({
     originH3: payload.originH3,
     destinationH3: payload.destinationH3,
     session: payload.session,
     blocked: payload.blocked,
+    seaportDisembarkOriginH3: payload.seaportDisembarkOriginH3,
   });
   if (firstAttempt.path || !payload.blocked) return firstAttempt;
-  const retryAttempt = findLandPathWithStatefulRule({
+  const retryAttempt = findLandPathWithLandMassRule({
     originH3: payload.originH3,
     destinationH3: payload.destinationH3,
     session: payload.session,
     blocked: undefined,
+    seaportDisembarkOriginH3: payload.seaportDisembarkOriginH3,
   });
   if (retryAttempt.path && payload.blockedRetryWarning && payload.warnings) {
     payload.warnings.push(payload.blockedRetryWarning);
@@ -417,31 +359,7 @@ export function findLandPathWithStatefulOptionalAvoidanceRetry(payload: {
     path: retryAttempt.path,
     stats: {
       expandedStateCount: firstAttempt.stats.expandedStateCount + retryAttempt.stats.expandedStateCount,
-      rejectedConsecutiveSpecialCount:
-        firstAttempt.stats.rejectedConsecutiveSpecialCount + retryAttempt.stats.rejectedConsecutiveSpecialCount,
       deadStateCacheHitCount: firstAttempt.stats.deadStateCacheHitCount + retryAttempt.stats.deadStateCacheHitCount,
     },
   };
-}
-
-/**
- * Defines the `countArcticBlockedHexes` function shape (export function countArcticBlockedHexes( blocked: Set<string> | undefined, session: Pick<StatefulLandSearchSessionData, 'terrainKindByH3' | 'rawTerrainByH).
-
- * Purpose: Supports maintainability by documenting why `countArcticBlockedHexes` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function countArcticBlockedHexes(
-  blocked: Set<string> | undefined,
-  session: Pick<StatefulLandSearchSessionData, 'terrainKindByH3' | 'rawTerrainByH3'>
-): number {
-  if (!blocked) return 0;
-  let count = 0;
-  for (const h3 of blocked) {
-    const terrainKind = session.terrainKindByH3.get(h3) ?? '';
-    const terrain = session.rawTerrainByH3.get(h3) ?? '';
-    if (terrainKind === 'arctic' || terrain === 'arctic') count += 1;
-  }
-  return count;
 }

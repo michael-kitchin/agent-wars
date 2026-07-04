@@ -32,7 +32,7 @@ import type {
 } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { clipTacticalMarchPathToDestination } from '../../shared/tacticalMarchPlaybackPath.js';
-import { passabilityAllowsLandUnit, passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
+import { passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
 import { executePlanRoute } from '../tools/tool1Pathfinding';
 import { normalizeMovementTerrain, isLandSeaportSpawnHex } from '../movementTerrain';
 import {
@@ -80,8 +80,15 @@ import {
 import { hexSupportsMixedLandAndNaval, selectionHasMixedLandAndNaval } from './humanMarchPreviewMixedSelection';
 import {
   getLandMovementBlockReason,
+  isLandUnitSeaportDebarkHop,
   isLandUnitType,
 } from './landMovementConstraints';
+import {
+  getLandMassRouteBlockReason,
+  landUnitCanOccupyHex,
+  LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON,
+} from '../../shared/landTraversalRes1';
+import { getRes1LandMassByH3 } from '../terrainClassificationCache';
 import { submitOrdersImpl } from './submitOrders';
 import {
   ORDER_PLAN_SANITIZE_CONTEXT,
@@ -309,35 +316,6 @@ function getMovementTerrainForH3(h3Index: string): string {
 }
 
 /**
- * Defines the `getTerrainMapsForH3Indexes` function shape (function getTerrainMapsForH3Indexes(h3Indexes: readonly string[]):).
-
- * Purpose: Supports maintainability by documenting why `getTerrainMapsForH3Indexes` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function getTerrainMapsForH3Indexes(h3Indexes: readonly string[]): {
-  terrainByH3: Map<string, string>;
-  terrainKindByH3: Map<string, string>;
-} {
-  if (h3Indexes.length === 0) {
-    return { terrainByH3: new Map<string, string>(), terrainKindByH3: new Map<string, string>() };
-  }
-  const placeholders = h3Indexes.map(() => '?').join(', ');
-  const rows = dbGetAll<{ h3Index: string; terrain: string | null; terrainKind: string | null }>(
-    `SELECT h3_index AS h3Index, terrain, terrain_kind AS terrainKind FROM hexes WHERE h3_index IN (${placeholders})`,
-    [...h3Indexes]
-  );
-  const terrainByH3 = new Map<string, string>();
-  const terrainKindByH3 = new Map<string, string>();
-  for (const row of rows) {
-    terrainByH3.set(row.h3Index, row.terrain ?? '');
-    terrainKindByH3.set(row.h3Index, row.terrainKind ?? '');
-  }
-  return { terrainByH3, terrainKindByH3 };
-}
-
-/**
  * Documents the module-scope binding `VALID_PHASE` (VALID_PHASE).
 
  * Purpose: Supports maintainability by documenting why `VALID_PHASE` exists.
@@ -494,12 +472,20 @@ function validateOrder(
       return { valid: false, reason: NAVAL_SEAPORT_EGRESS_REQUIRED };
     }
   }
-  if ((unit.unit_type === 'infantry' || unit.unit_type === 'armor') && !passabilityAllowsLandUnit(destinationTerrain)) {
-    return { valid: false, reason: 'Land units must move to land, coastal, or wetlands hexes' };
+  if ((unit.unit_type === 'infantry' || unit.unit_type === 'armor') && !landUnitCanOccupyHex(toH3Index, getRes1LandMassByH3())) {
+    return { valid: false, reason: LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON };
   }
   if (isLandUnitType(unit.unit_type)) {
+    const embarkedOnWater = isEmbarkedLandUnitOnWater(unitId);
+    const originSeaportCount = getRes1InfrastructureForHex(unit.h3_index).seaportCount;
+    const seaportDebarkHop = isLandUnitSeaportDebarkHop({
+      isEmbarkedOnWater: embarkedOnWater,
+      originSeaportCount,
+      moveDistance: dist,
+    });
     const embarkedAtSeaWithoutCoastalOrigin =
-      isEmbarkedLandUnitOnWater(unitId) && originTerrain !== 'coastal';
+      embarkedOnWater && originTerrain !== 'coastal' && !seaportDebarkHop;
+    const routeH3: string[] = [unit.h3_index];
     const traversedH3: string[] = [];
     if (dist > 1) {
       try {
@@ -508,24 +494,27 @@ function validateOrder(
         return { valid: false, reason: 'Invalid hex or path; try starting a new game.' };
       }
     }
-    const { terrainByH3, terrainKindByH3 } = getTerrainMapsForH3Indexes([unit.h3_index, toH3Index, ...traversedH3]);
+    for (const h3 of traversedH3) {
+      if (routeH3[routeH3.length - 1] !== h3) routeH3.push(h3);
+    }
+    if (routeH3[routeH3.length - 1] !== toH3Index) routeH3.push(toH3Index);
     const blockReason = getLandMovementBlockReason({
       unitType: unit.unit_type,
-      originH3Index: unit.h3_index,
-      destinationH3Index: toH3Index,
-      terrainByH3,
-      terrainKindByH3,
-      traversedH3Indices: traversedH3,
       isEmbarkedAtSea: embarkedAtSeaWithoutCoastalOrigin,
+      isSeaportDebarkHop: seaportDebarkHop,
     });
     if (blockReason) return { valid: false, reason: blockReason };
+    const landMassBlock = getLandMassRouteBlockReason(routeH3, getRes1LandMassByH3(), seaportDebarkHop
+      ? { seaportDisembarkOriginH3: unit.h3_index }
+      : undefined);
+    if (landMassBlock) return { valid: false, reason: landMassBlock };
   }
 
   return { valid: true };
 }
 
 /**
- * Defines the `validateRangedAttack` function shape (export function validateRangedAttack( unitId: string, targetH3Index: string, options?: { allowedPlayer?: string; displayLabelForUnit?: (id: string) => string } ): { valid: true } | { valid: false;).
+ * Defines the `validateRangedAttack` function shape (export function validateRangedAttack().
 
  * Purpose: Supports maintainability by documenting why `validateRangedAttack` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -1757,5 +1746,21 @@ export function submitOrders(payload: SubmitOrdersPayload): SubmitOrdersResult {
   });
 }
 
+/**
+ * Documents the module-scope binding `ready` (ready).
+
+ * Purpose: Supports maintainability by documenting why `ready` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const ready = readyImpl;
+/**
+ * Documents the module-scope binding `resolveMeleeIntercept` (resolveMeleeIntercept).
+
+ * Purpose: Supports maintainability by documenting why `resolveMeleeIntercept` exists.
+ * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+ * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Exceptions: None.
+ */
 export const resolveMeleeIntercept = resolveMeleeInterceptImpl;

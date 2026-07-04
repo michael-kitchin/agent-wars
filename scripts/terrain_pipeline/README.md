@@ -98,6 +98,61 @@ Debug dry-run with limited res-4 cells:
 python -m scripts.terrain_pipeline.metadata_cli run --max-child-cells 5000 --verbose
 ```
 
+### Res-1 land-mass export (strategic land-unit pathfinding)
+
+Per-res-1 hex continent/island membership and water percentage for strategic land-unit movement.
+
+**Polygon source:** `F:/Data/ne_10m_geography_regions_polys.shp`
+
+- Continent-tier: `FEATURECLA` in `Continent`, `Isthmus` → stored in `continent_ids` using `NE_ID`
+- Islands: `FEATURECLA == Island` with area ≥ **2000 km²** → stored in `island_ids` using `NE_ID`
+
+**Water source:** fraction of res4 child hexes classified as terrain `water` from `terrain_res4_metadata.json` (same classifier as UI tooltips).
+
+**Prerequisites:** run metadata export first:
+
+```powershell
+python -m scripts.terrain_pipeline.metadata_cli run
+```
+
+Output: `data/generated/terrain_res1_landmass.json` (842 records, schema 2.0.0).
+
+Validation:
+
+```powershell
+python -m scripts.terrain_pipeline.landmass_cli validate
+```
+
+Full export (intersection against all res-1 cells; can take ~10 minutes):
+
+```powershell
+python -m scripts.terrain_pipeline.landmass_cli run --verbose
+```
+
+Corridor QA after export:
+
+```powershell
+python scripts/terrain_pipeline/qa_landmass_corridor.py
+```
+
+Or via npm:
+
+```powershell
+npm run terrain:generate:landmass
+```
+
+QA summary: `data/generated/qa/terrain_res1_landmass_qa.json`.
+
+Archive for git (extracted JSON is gitignored; CI and `npm run build` extract from zip):
+
+```powershell
+npm run generated:zip
+```
+
+Commit `data/generated/terrain_res1_landmass.json.zip` (not the extracted `.json`).
+
+**Note:** USGS `USGSEsriWCMC_GlobalIslandsv2_*` shapefiles are no longer used by this project.
+
 ### Road/rail side-mask export (separate CLI)
 
 Per-touched-res4 JSON describing which cell sides are used by Natural Earth roads and railroads (for glyphs and pathfinding). Inputs default to `F:/Data/ne_10m_roads.shp` and `F:/Data/ne_10m_railroads.shp`. Output: `data/generated/terrain_res4_road_rail_sides.json` (naming-style envelope: `schema_version`, `resolution`, `generated_at_utc`, `record_count`, `side_ordering_contract`, `inputs`, `records`). Each record has `h3_index`, `road_sides`, and `rail_sides` (equal-length boolean arrays; length 5 or 6). Side index semantics are defined only by the global `side_ordering_contract` string. The Electron renderer draws these segments together with reduced city labels only while **res4 hexes are visible** and the **`t` inspection key is held**; that path is display-only and does not affect gameplay state.
