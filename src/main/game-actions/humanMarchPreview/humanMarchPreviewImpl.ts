@@ -12,8 +12,8 @@ import { isTacticalBattleActive } from '../../tacticalBattle/tacticalBattleSessi
 import { AIR_FERRY_RANGE_HEXES, MOVEMENT_RANGE_BY_UNIT_TYPE, formatFerryOutOfRangeReason } from '../../../shared/tacticalRanges';
 import {
   buildHumanOrderGroupPreviewEnvelope,
+  groupedStrategicMarchPreviewUnitIds,
   minMovementRangeAmongUnitTypes,
-  representativeMarchPreviewUnitIdsByOriginH3,
   uniqueStrategicMarchPreviewUnitIds,
 } from '../../../shared/humanMarchPreviewGroupAssembly';
 import type { OrderPreviewTerrainImpact } from '../../../shared/ipc/humanOrderPreviewTypes';
@@ -1036,9 +1036,11 @@ export function previewHumanMarchOrdersImpl(unitIds: string[], hoveredH3Index: s
         previews: [],
       };
     }
-    const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
-      selectedUnits.map((unit) => ({ unitId: unit.id, originH3: unit.h3Index }))
-    );
+    const hasMixedSelection = selectionHasMixedLandAndNaval(selectedUnits);
+    const previewUnitIds = groupedStrategicMarchPreviewUnitIds({
+      rows: selectedUnits.map((unit) => ({ unitId: unit.id, originH3: unit.h3Index })),
+      mixedLandAndNaval: hasMixedSelection,
+    });
     logDebug('gameActions previewHumanMarchOrders: unique source/destination checks', {
       selectedUnits: selectedUnits.length,
       uniqueOrigins: previewUnitIds.length,
@@ -1049,7 +1051,6 @@ export function previewHumanMarchOrdersImpl(unitIds: string[], hoveredH3Index: s
       preview: buildHumanMarchPreviewForUnit(context, unitId, hoveredH3Index),
     }));
     const hoveredHex = state.hexes.find((h) => h.h3Index === hoveredH3Index);
-    const hasMixedSelection = selectionHasMixedLandAndNaval(selectedUnits);
     const slowestMovementRange = minMovementRangeAmongUnitTypes(
       selectedUnits.map((unit) => unit.unitType),
       MOVEMENT_RANGE_BY_UNIT_TYPE,

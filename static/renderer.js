@@ -17780,6 +17780,11 @@
     }
     return Array.from(byOrigin.values());
   }
+  function selectionHasMixedLandAndNaval(units) {
+    const hasNaval = units.some((unit) => unit.unitType === "naval");
+    const hasLand = units.some((unit) => unit.unitType === "infantry" || unit.unitType === "armor");
+    return hasNaval && hasLand;
+  }
   var TACTICAL_MARCH_PREVIEW_TYPE_PRIORITY = {
     naval: 0,
     armor: 1,
@@ -17796,6 +17801,12 @@
       }
     }
     return Array.from(best.values()).map((v) => v.unitId);
+  }
+  function groupedTacticalMarchPreviewUnitIds(args) {
+    if (args.mixedLandAndNaval) {
+      return args.rows.map((row) => row.unitId);
+    }
+    return representativeTacticalMarchPreviewUnitIdsByOriginH3(args.rows);
   }
   function mergeOrderPreviewTerrainImpactsFromPreviews(previews) {
     const slower = /* @__PURE__ */ new Set();
@@ -17818,14 +17829,22 @@
     const mergedImpact = args.orderPreviewTerrainImpact !== void 0 ? args.orderPreviewTerrainImpact : mergeOrderPreviewTerrainImpactsFromPreviews(previews);
     const slowerFromImpact = mergedImpact && (mergedImpact.slower.length > 0 || mergedImpact.roadRail) ? mergedImpact.slower.length > 0 ? mergedImpact.slower.join(", ") : "Road/Rail" : null;
     const slowerTerrainDisplayTitle = explicit !== void 0 ? explicit : slowerFromImpact ?? fromRows ?? null;
+    const validForAll = invalid === void 0;
+    const normalizedPreviews = validForAll ? previews : previews.map((row) => ({
+      ...row,
+      preview: {
+        ...row.preview,
+        segments: []
+      }
+    }));
     return {
-      validForAll: invalid === void 0,
+      validForAll,
       showInvalidMarker: invalid !== void 0,
       invalidReason: invalid?.preview.invalidReason,
       slowestMovementRange: args.slowestMovementRange,
       slowerTerrainDisplayTitle: slowerTerrainDisplayTitle ?? null,
       orderPreviewTerrainImpact: mergedImpact ?? null,
-      previews
+      previews: normalizedPreviews
     };
   }
 
@@ -18533,13 +18552,15 @@
         previews: []
       };
     }
-    const previewUnitIds = representativeTacticalMarchPreviewUnitIdsByOriginH3(
-      selectedHuman.map((u) => ({
+    const hasMixedSelection = selectionHasMixedLandAndNaval(selectedHuman);
+    const previewUnitIds = groupedTacticalMarchPreviewUnitIds({
+      rows: selectedHuman.map((u) => ({
         unitId: u.id,
         originH3: tacticalMarchCommittedOriginH3(battle, u.id),
         unitType: u.unitType
-      }))
-    );
+      })),
+      mixedLandAndNaval: hasMixedSelection
+    });
     const previews = previewUnitIds.map((unitId) => ({
       unitId,
       preview: buildPreviewForSubUnit({
@@ -22879,93 +22900,95 @@
         }
       }
       const drawnOrigins = /* @__PURE__ */ new Set();
-      for (const perUnit of previewGroup.previews) {
-        const preview = perUnit.preview;
-        if (preview.segments.length === 0) continue;
-        const previewUnit = tb ? tb.subUnits.find((s) => s.id === perUnit.unitId) : state.units.find((u) => u.id === perUnit.unitId);
-        const originH3 = previewUnit?.h3Index;
-        if (previewUnit && originH3) {
-          if (drawnOrigins.has(originH3)) continue;
-          drawnOrigins.add(originH3);
-        }
-        const previewEdgeCount = preview.segments.reduce((sum, seg) => {
-          if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) return sum;
-          return sum + seg.hexes.length - 1;
-        }, 0);
-        const perStackSolidCap = previewUnit && originH3 && previewUnit.unitType === "air" ? Math.max(1, previewEdgeCount) : previewUnit && originH3 && slowestMovementRangeByOriginH3.has(originH3) ? slowestMovementRangeByOriginH3.get(originH3) : previewGroup.slowestMovementRange;
-        let lastSegmentPenultimate = null;
-        let lastSegmentLast = null;
-        let remainingSolidEdges = perStackSolidCap;
-        ctx.save();
-        ctx.globalAlpha = preview.valid ? 0.55 : 0.75;
-        for (const seg of preview.segments) {
-          if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
-          const points = seg.hexes.map(([lat, lng]) => {
-            const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
-            return { x: p.x, y: p.y };
-          });
-          const edgeCount = Math.max(0, points.length - 1);
-          if (remainingSolidEdges >= edgeCount) {
-            ctx.setLineDash([]);
-            ctx.strokeStyle = ORDER_LINE_COLOR;
-            ctx.lineWidth = ORDER_LINE_WIDTH;
-            ctx.lineCap = "round";
-            ctx.lineJoin = "round";
-            strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
-          } else if (remainingSolidEdges <= 0) {
-            ctx.setLineDash([6, 4]);
-            ctx.strokeStyle = ORDER_LINE_COLOR;
-            ctx.lineWidth = ORDER_LINE_WIDTH;
-            ctx.lineCap = "round";
-            ctx.lineJoin = "round";
-            strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
-          } else {
-            const splitIndex = Math.min(points.length - 1, remainingSolidEdges);
-            const solidPoints = points.slice(0, splitIndex + 1);
-            if (solidPoints.length >= 2) {
+      if (previewGroup.validForAll) {
+        for (const perUnit of previewGroup.previews) {
+          const preview = perUnit.preview;
+          if (preview.segments.length === 0) continue;
+          const previewUnit = tb ? tb.subUnits.find((s) => s.id === perUnit.unitId) : state.units.find((u) => u.id === perUnit.unitId);
+          const originH3 = previewUnit?.h3Index;
+          if (previewUnit && originH3) {
+            if (drawnOrigins.has(originH3)) continue;
+            drawnOrigins.add(originH3);
+          }
+          const previewEdgeCount = preview.segments.reduce((sum, seg) => {
+            if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) return sum;
+            return sum + seg.hexes.length - 1;
+          }, 0);
+          const perStackSolidCap = previewUnit && originH3 && previewUnit.unitType === "air" ? Math.max(1, previewEdgeCount) : previewUnit && originH3 && slowestMovementRangeByOriginH3.has(originH3) ? slowestMovementRangeByOriginH3.get(originH3) : previewGroup.slowestMovementRange;
+          let lastSegmentPenultimate = null;
+          let lastSegmentLast = null;
+          let remainingSolidEdges = perStackSolidCap;
+          ctx.save();
+          ctx.globalAlpha = preview.valid ? 0.55 : 0.75;
+          for (const seg of preview.segments) {
+            if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
+            const points = seg.hexes.map(([lat, lng]) => {
+              const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
+              return { x: p.x, y: p.y };
+            });
+            const edgeCount = Math.max(0, points.length - 1);
+            if (remainingSolidEdges >= edgeCount) {
               ctx.setLineDash([]);
               ctx.strokeStyle = ORDER_LINE_COLOR;
               ctx.lineWidth = ORDER_LINE_WIDTH;
               ctx.lineCap = "round";
               ctx.lineJoin = "round";
-              strokePolylineSkippingWrap(ctx, solidPoints, ctx.canvas.width * 0.5);
-            }
-            const dashedPoints = points.slice(splitIndex);
-            if (dashedPoints.length >= 2) {
+              strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
+            } else if (remainingSolidEdges <= 0) {
               ctx.setLineDash([6, 4]);
               ctx.strokeStyle = ORDER_LINE_COLOR;
               ctx.lineWidth = ORDER_LINE_WIDTH;
               ctx.lineCap = "round";
               ctx.lineJoin = "round";
-              strokePolylineSkippingWrap(ctx, dashedPoints, ctx.canvas.width * 0.5);
+              strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
+            } else {
+              const splitIndex = Math.min(points.length - 1, remainingSolidEdges);
+              const solidPoints = points.slice(0, splitIndex + 1);
+              if (solidPoints.length >= 2) {
+                ctx.setLineDash([]);
+                ctx.strokeStyle = ORDER_LINE_COLOR;
+                ctx.lineWidth = ORDER_LINE_WIDTH;
+                ctx.lineCap = "round";
+                ctx.lineJoin = "round";
+                strokePolylineSkippingWrap(ctx, solidPoints, ctx.canvas.width * 0.5);
+              }
+              const dashedPoints = points.slice(splitIndex);
+              if (dashedPoints.length >= 2) {
+                ctx.setLineDash([6, 4]);
+                ctx.strokeStyle = ORDER_LINE_COLOR;
+                ctx.lineWidth = ORDER_LINE_WIDTH;
+                ctx.lineCap = "round";
+                ctx.lineJoin = "round";
+                strokePolylineSkippingWrap(ctx, dashedPoints, ctx.canvas.width * 0.5);
+              }
+            }
+            remainingSolidEdges -= edgeCount;
+            lastSegmentPenultimate = points[points.length - 2] ?? null;
+            lastSegmentLast = points[points.length - 1] ?? null;
+          }
+          ctx.setLineDash([]);
+          if (lastSegmentPenultimate && lastSegmentLast) {
+            drawArrowheadOnly(ctx, lastSegmentPenultimate, lastSegmentLast, ORDER_LINE_COLOR, {
+              tipAtTargetCenter: true
+            });
+          } else if (preview.arrowLatLng && preview.segments.length > 0) {
+            const firstHex = preview.segments[0]?.hexes[0];
+            if (firstHex) {
+              const fromPoint = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(firstHex[0]), firstHex[1]));
+              const toPoint = map.latLngToContainerPoint(
+                L.latLng(clampLatForWebMercatorDisplay(preview.arrowLatLng[0]), preview.arrowLatLng[1])
+              );
+              drawArrowheadOnly(
+                ctx,
+                { x: fromPoint.x, y: fromPoint.y },
+                { x: toPoint.x, y: toPoint.y },
+                ORDER_LINE_COLOR,
+                { tipAtTargetCenter: true }
+              );
             }
           }
-          remainingSolidEdges -= edgeCount;
-          lastSegmentPenultimate = points[points.length - 2] ?? null;
-          lastSegmentLast = points[points.length - 1] ?? null;
+          ctx.restore();
         }
-        ctx.setLineDash([]);
-        if (lastSegmentPenultimate && lastSegmentLast) {
-          drawArrowheadOnly(ctx, lastSegmentPenultimate, lastSegmentLast, ORDER_LINE_COLOR, {
-            tipAtTargetCenter: true
-          });
-        } else if (preview.arrowLatLng && preview.segments.length > 0) {
-          const firstHex = preview.segments[0]?.hexes[0];
-          if (firstHex) {
-            const fromPoint = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(firstHex[0]), firstHex[1]));
-            const toPoint = map.latLngToContainerPoint(
-              L.latLng(clampLatForWebMercatorDisplay(preview.arrowLatLng[0]), preview.arrowLatLng[1])
-            );
-            drawArrowheadOnly(
-              ctx,
-              { x: fromPoint.x, y: fromPoint.y },
-              { x: toPoint.x, y: toPoint.y },
-              ORDER_LINE_COLOR,
-              { tipAtTargetCenter: true }
-            );
-          }
-        }
-        ctx.restore();
       }
     }
     if (previewGroup.showInvalidMarker && rendererSharedState.hoveredHexH3) {

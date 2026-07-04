@@ -6,7 +6,8 @@
 import { cellToLatLng, getResolution, gridDistance } from 'h3-js';
 import {
   buildHumanOrderGroupPreviewEnvelope,
-  representativeTacticalMarchPreviewUnitIdsByOriginH3,
+  groupedTacticalMarchPreviewUnitIds,
+  selectionHasMixedLandAndNaval,
   uniqueTacticalMarchPreviewUnitIds,
 } from './humanMarchPreviewGroupAssembly';
 import type { TacticalBattleSnapshot } from './tacticalBattleTypes';
@@ -206,7 +207,7 @@ function buildPreviewForSubUnit(args: {
  *
  * Purpose: Supplies `drawHoverRoutePreview` with the same data shape as strategic previews while respecting res4 footprint and §12.4 movement budgets.
  * When to use: Renderer `refreshHoverRoutePreview` when `S.tacticalBattleSnapshot` is set and ranged/air modes are off.
- * Expected outcome: One preview per distinct origin (stack parity with strategic), with solid edges for the current turn and dashed continuation for future turns.
+ * Expected outcome: One preview per selected sub-unit when the selection mixes land and naval; otherwise one preview per distinct origin (naval preferred on mixed stacks), with solid edges for the current turn and dashed continuation for future turns.
  * Exceptions: None; returns empty previews when there are no eligible human sub-units in `unitIds`.
  */
 export function buildTacticalMarchHoverPreview(
@@ -227,13 +228,15 @@ export function buildTacticalMarchHoverPreview(
       previews: [],
     };
   }
-  const previewUnitIds = representativeTacticalMarchPreviewUnitIdsByOriginH3(
-    selectedHuman.map((u) => ({
+  const hasMixedSelection = selectionHasMixedLandAndNaval(selectedHuman);
+  const previewUnitIds = groupedTacticalMarchPreviewUnitIds({
+    rows: selectedHuman.map((u) => ({
       unitId: u.id,
       originH3: tacticalMarchCommittedOriginH3(battle, u.id),
       unitType: u.unitType,
-    }))
-  );
+    })),
+    mixedLandAndNaval: hasMixedSelection,
+  });
   const previews: HumanOrderGroupPreviewUnitResult[] = previewUnitIds.map((unitId) => ({
     unitId,
     preview: buildPreviewForSubUnit({

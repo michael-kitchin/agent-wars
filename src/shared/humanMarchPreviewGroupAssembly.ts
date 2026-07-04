@@ -65,6 +65,39 @@ export function representativeMarchPreviewUnitIdsByOriginH3(
   return Array.from(byOrigin.values());
 }
 
+/**
+ * Resolves which unit ids receive per-unit march hover previews for a grouped selection.
+ *
+ * Purpose: Mixed land/naval stacks must preview every selected unit so `validForAll` reflects the whole selection;
+ * homogeneous stacks keep one representative preview line per origin hex.
+ * When to use: Strategic `previewHumanMarchOrdersImpl` before building per-unit previews.
+ * Expected outcome: All selected ids when `mixedLandAndNaval` is true; otherwise `representativeMarchPreviewUnitIdsByOriginH3`.
+ * Exceptions: None.
+ */
+export function groupedStrategicMarchPreviewUnitIds(args: {
+  rows: readonly { unitId: string; originH3: string }[];
+  mixedLandAndNaval: boolean;
+}): string[] {
+  if (args.mixedLandAndNaval) {
+    return args.rows.map((row) => row.unitId);
+  }
+  return representativeMarchPreviewUnitIdsByOriginH3(args.rows);
+}
+
+/**
+ * Returns whether the selection contains both naval units and land combat units (infantry or armor).
+ *
+ * Purpose: Drives grouped march preview unit resolution for mixed land/naval stacks in strategic and tactical modes.
+ * When to use: Before choosing representative vs all-unit preview ids for a grouped hover selection.
+ * Expected outcome: `true` only when both domains are represented in the selection.
+ * Exceptions: None.
+ */
+export function selectionHasMixedLandAndNaval(units: ReadonlyArray<{ unitType: string }>): boolean {
+  const hasNaval = units.some((unit) => unit.unitType === 'naval');
+  const hasLand = units.some((unit) => unit.unitType === 'infantry' || unit.unitType === 'armor');
+  return hasNaval && hasLand;
+}
+
 const TACTICAL_MARCH_PREVIEW_TYPE_PRIORITY: Readonly<Record<string, number>> = {
   naval: 0,
   armor: 1,
@@ -77,7 +110,7 @@ const TACTICAL_MARCH_PREVIEW_TYPE_PRIORITY: Readonly<Record<string, number>> = {
  *
  * Purpose: When infantry/armor share a res4 with a naval carrier, first-id-wins would often pick land units and
  * run §12.4 pathfinding as infantry/armor (land costs), producing long land previews and blocking water — the inverse of naval rules.
- * When to use: `buildTacticalMarchHoverPreview` only; strategic previews keep `representativeMarchPreviewUnitIdsByOriginH3`.
+ * When to use: `groupedTacticalMarchPreviewUnitIds` for homogeneous tactical selections only; mixed land/naval uses all selected ids.
  * Expected outcome: Lowest numeric priority among `naval` → `armor` → `infantry` → `air` per `originH3`; ties keep the first seen id.
  * Exceptions: None; unknown `unitType` sorts after `air`.
  */
@@ -93,6 +126,25 @@ export function representativeTacticalMarchPreviewUnitIdsByOriginH3(
     }
   }
   return Array.from(best.values()).map((v) => v.unitId);
+}
+
+/**
+ * Resolves which sub-unit ids receive per-unit tactical march hover previews for a grouped selection.
+ *
+ * Purpose: Mixed land/naval stacks must preview every selected sub-unit so `validForAll` reflects the whole selection;
+ * homogeneous stacks keep one representative preview per origin, preferring naval over land on the same res4 cell.
+ * When to use: `buildTacticalMarchHoverPreview` before building per-unit previews.
+ * Expected outcome: All selected ids when `mixedLandAndNaval` is true; otherwise `representativeTacticalMarchPreviewUnitIdsByOriginH3`.
+ * Exceptions: None.
+ */
+export function groupedTacticalMarchPreviewUnitIds(args: {
+  rows: readonly { unitId: string; originH3: string; unitType: string }[];
+  mixedLandAndNaval: boolean;
+}): string[] {
+  if (args.mixedLandAndNaval) {
+    return args.rows.map((row) => row.unitId);
+  }
+  return representativeTacticalMarchPreviewUnitIdsByOriginH3(args.rows);
 }
 
 /**
@@ -141,7 +193,7 @@ export function minMovementRangeAmongUnitTypes(
  *
  * Purpose: Single place for `validForAll`, `showInvalidMarker`, `invalidReason`, merged terrain tooltips, and movement-range aggregation.
  * When to use: Final assembly step after all per-unit previews are computed.
- * Expected outcome: Shallow-copied `previews`; when `orderPreviewTerrainImpact` is omitted, it is merged from row `preview.orderPreviewTerrainImpact` (union of `slower`, OR of `roadRail`); `slowerTerrainDisplayTitle` prefers explicit arg, then merged impact text, then first row string.
+ * Expected outcome: Shallow-copied `previews`; when any row is invalid, every row’s `segments` are cleared so grouped hovers draw only the blocked marker; when `orderPreviewTerrainImpact` is omitted, it is merged from row `preview.orderPreviewTerrainImpact` (union of `slower`, OR of `roadRail`); `slowerTerrainDisplayTitle` prefers explicit arg, then merged impact text, then first row string.
  * Exceptions: None.
  */
 export function buildHumanOrderGroupPreviewEnvelope(args: {
@@ -167,13 +219,23 @@ export function buildHumanOrderGroupPreviewEnvelope(args: {
       : null;
   const slowerTerrainDisplayTitle =
     explicit !== undefined ? explicit : (slowerFromImpact ?? fromRows) ?? null;
+  const validForAll = invalid === undefined;
+  const normalizedPreviews = validForAll
+    ? previews
+    : previews.map((row) => ({
+        ...row,
+        preview: {
+          ...row.preview,
+          segments: [],
+        },
+      }));
   return {
-    validForAll: invalid === undefined,
+    validForAll,
     showInvalidMarker: invalid !== undefined,
     invalidReason: invalid?.preview.invalidReason,
     slowestMovementRange: args.slowestMovementRange,
     slowerTerrainDisplayTitle: slowerTerrainDisplayTitle ?? null,
     orderPreviewTerrainImpact: mergedImpact ?? null,
-    previews,
+    previews: normalizedPreviews,
   };
 }

@@ -31,6 +31,11 @@ import {
   canLandUnitTraverseEdge,
   landUnitCanOccupyHex,
 } from '../shared/landTraversalRes1';
+import {
+  hexSupportsMixedLandAndNaval,
+} from './game-actions/humanMarchPreviewMixedSelection';
+
+const MIXED_LAND_NAVAL_COASTAL_ONLY_REASON = 'Mixed land/naval stacks can only move to coastal hexes.';
 
 /**
  * Defines the `withTempDb` function shape (function withTempDb(runCase: () => void): void).
@@ -110,12 +115,175 @@ function isOpenOceanLandMass(h3Index: string): boolean {
 }
 
 /**
- * Defines the `findOpenOceanHexPair` function shape (function findOpenOceanHexPair(state: ReturnType<typeof getGameState>): { originH3: string; destinationH3: string }).
+ * Locates a land hex that does not support both land and naval movement domains.
+ */
+function findPureLandDestinationHex(state: ReturnType<typeof getGameState>): string | null {
+  for (const hex of state.hexes) {
+    if (hex.terrain !== 'land') continue;
+    if (hexSupportsMixedLandAndNaval(hex)) continue;
+    return hex.h3Index;
+  }
+  return null;
+}
 
- * Purpose: Locates adjacent open-ocean hexes for land-unit movement rejection integration tests.
- * When to use: Setting up preview and submit-order invalid land movement scenarios.
- * Expected outcome: Returns a grid-adjacent pair with no land-mass membership on either hex.
- * Exceptions: Throws when no qualifying pair exists in the seeded map.
+/**
+ * Locates a hex that supports both land and naval movement domains for mixed-stack destination tests.
+ */
+function findMixedTerrainDestinationHex(state: ReturnType<typeof getGameState>, excludeH3?: string): string | null {
+  for (const hex of state.hexes) {
+    if (excludeH3 && hex.h3Index === excludeH3) continue;
+    if (hexSupportsMixedLandAndNaval(hex)) return hex.h3Index;
+  }
+  return null;
+}
+
+/**
+ * Regression guard: grouped preview rejects mixed land + naval stacks targeting non-coastal hexes.
+ */
+function testPreviewGroupedMixedLandNavalRejectsNonCoastalDestination(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const landUnit = state.units.find(
+      (u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor')
+    );
+    const navalUnit = state.units.find((u) => u.player === 'human' && u.unitType === 'naval');
+    const destination = findPureLandDestinationHex(state);
+    assert.ok(landUnit, 'expected seeded human land unit');
+    assert.ok(navalUnit, 'expected seeded human naval unit');
+    assert.ok(destination, 'expected a pure land destination hex without mixed-domain passability');
+    const seaportHex = findNearestLandSeaportHex(state, landUnit!.h3Index);
+    assert.ok(seaportHex, 'expected at least one land seaport hex');
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [seaportHex!, landUnit!.id]);
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [seaportHex!, navalUnit!.id]);
+
+    const result = previewHumanMarchOrders([landUnit!.id, navalUnit!.id], destination!);
+    assert.strictEqual(result.validForAll, false);
+    assert.strictEqual(result.showInvalidMarker, true);
+    assert.strictEqual(result.invalidReason, MIXED_LAND_NAVAL_COASTAL_ONLY_REASON);
+    assert.ok(result.previews.length >= 2, 'expected per-unit previews for mixed selection');
+    for (const row of result.previews) {
+      assert.strictEqual(row.preview.segments.length, 0, 'blocked mixed preview must not draw route lines');
+    }
+  });
+}
+
+/**
+ * Regression guard: when any mixed-stack unit cannot reach a coastal destination, grouped preview omits route lines.
+ */
+function testPreviewGroupedMixedLandNavalClearsSegmentsWhenAnyUnitBlocked(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const landUnit = state.units.find(
+      (u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor')
+    );
+    const navalUnit = state.units.find((u) => u.player === 'human' && u.unitType === 'naval');
+    assert.ok(landUnit, 'expected seeded human land unit');
+    assert.ok(navalUnit, 'expected seeded human naval unit');
+    const seaportHex = findNearestLandSeaportHex(state, landUnit!.h3Index);
+    assert.ok(seaportHex, 'expected at least one land seaport hex');
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [seaportHex!, landUnit!.id]);
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [seaportHex!, navalUnit!.id]);
+
+    let foundPartialFailure = false;
+    for (const hex of state.hexes) {
+      if (!hexSupportsMixedLandAndNaval(hex)) continue;
+      if (hex.h3Index === seaportHex) continue;
+      const result = previewHumanMarchOrders([landUnit!.id, navalUnit!.id], hex.h3Index);
+      if (result.validForAll) continue;
+      if (result.invalidReason === MIXED_LAND_NAVAL_COASTAL_ONLY_REASON) continue;
+      foundPartialFailure = true;
+      assert.strictEqual(result.showInvalidMarker, true);
+      assert.ok(result.previews.length >= 2, 'expected per-unit previews for mixed selection');
+      for (const row of result.previews) {
+        assert.strictEqual(
+          row.preview.segments.length,
+          0,
+          `blocked mixed preview must not draw route lines for ${row.unitId}`
+        );
+      }
+      break;
+    }
+    assert.ok(foundPartialFailure, 'expected at least one coastal destination with partial mixed-stack reachability');
+  });
+}
+
+/**
+ * Regression guard: grouped preview accepts mixed land + naval stacks when the destination is coastal/littoral.
+ */
+function testPreviewGroupedMixedLandNavalAcceptsCoastalDestination(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const landUnit = state.units.find(
+      (u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor')
+    );
+    const navalUnit = state.units.find((u) => u.player === 'human' && u.unitType === 'naval');
+    assert.ok(landUnit, 'expected seeded human land unit');
+    assert.ok(navalUnit, 'expected seeded human naval unit');
+    const seaportHex = findNearestLandSeaportHex(state, landUnit!.h3Index);
+    assert.ok(seaportHex, 'expected at least one land seaport hex');
+    const coastalDestination =
+      findMixedTerrainDestinationHex(state, seaportHex!) ?? seaportHex!;
+    assert.ok(hexSupportsMixedLandAndNaval(state.hexes.find((h) => h.h3Index === coastalDestination)!));
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [seaportHex!, landUnit!.id]);
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [seaportHex!, navalUnit!.id]);
+
+    const result = previewHumanMarchOrders([landUnit!.id, navalUnit!.id], coastalDestination!);
+    assert.strictEqual(result.validForAll, true, result.invalidReason ?? 'expected mixed-stack coastal preview to succeed');
+    assert.ok(result.previews.length >= 1, 'expected at least one representative preview row');
+  });
+}
+
+/**
+ * Regression guard: grouped assign rejects mixed land + naval stacks targeting non-coastal hexes.
+ */
+function testAssignGroupedMixedLandNavalRejectsNonCoastalDestination(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const landUnit = state.units.find(
+      (u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor')
+    );
+    const navalUnit = state.units.find((u) => u.player === 'human' && u.unitType === 'naval');
+    const destination = findPureLandDestinationHex(state);
+    assert.ok(landUnit, 'expected seeded human land unit');
+    assert.ok(navalUnit, 'expected seeded human naval unit');
+    assert.ok(destination, 'expected a pure land destination hex without mixed-domain passability');
+    const seaportHex = findNearestLandSeaportHex(state, landUnit!.h3Index);
+    assert.ok(seaportHex, 'expected at least one land seaport hex');
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [seaportHex!, landUnit!.id]);
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [seaportHex!, navalUnit!.id]);
+
+    const result = assignHumanMarchOrders([landUnit!.id, navalUnit!.id], destination!);
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.reason, MIXED_LAND_NAVAL_COASTAL_ONLY_REASON);
+  });
+}
+
+/**
+ * Regression guard: grouped assign accepts mixed land + naval stacks to a shared coastal destination.
+ */
+function testAssignGroupedMixedLandNavalAcceptsCoastalDestination(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const landUnit = state.units.find(
+      (u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor')
+    );
+    const navalUnit = state.units.find((u) => u.player === 'human' && u.unitType === 'naval');
+    assert.ok(landUnit, 'expected seeded human land unit');
+    assert.ok(navalUnit, 'expected seeded human naval unit');
+    const seaportHex = findNearestLandSeaportHex(state, landUnit!.h3Index);
+    assert.ok(seaportHex, 'expected at least one land seaport hex');
+    const coastalDestination =
+      findMixedTerrainDestinationHex(state, seaportHex!) ?? seaportHex!;
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [seaportHex!, landUnit!.id]);
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [seaportHex!, navalUnit!.id]);
+
+    const result = assignHumanMarchOrders([landUnit!.id, navalUnit!.id], coastalDestination!);
+    assert.strictEqual(result.success, true, result.reason ?? 'expected mixed-stack coastal assign to succeed');
+  });
+}
+
+/**
+ * Locates adjacent open-ocean hexes for land-unit movement rejection integration tests.
  */
 function findOpenOceanHexPair(state: ReturnType<typeof getGameState>): { originH3: string; destinationH3: string } {
   for (const hex of state.hexes) {
@@ -856,6 +1024,11 @@ function run(): void {
   testAssignGroupedHappyPathSingleUnit();
   testValidateGroupedRangedInfantryFailsWhenAdjacentHexHasNoEnemies();
   testNavalOrdersCanEgressFromLandSeaportToAdjacentWaterOrCoastal();
+  testPreviewGroupedMixedLandNavalRejectsNonCoastalDestination();
+  testPreviewGroupedMixedLandNavalClearsSegmentsWhenAnyUnitBlocked();
+  testPreviewGroupedMixedLandNavalAcceptsCoastalDestination();
+  testAssignGroupedMixedLandNavalRejectsNonCoastalDestination();
+  testAssignGroupedMixedLandNavalAcceptsCoastalDestination();
   testPreviewGroupedRejectsAirUnitsForMarchPlanning();
   testPreviewGroupedAcceptsAirFerryDestinationWithinRange();
   testAssignMarchRejectsAirUnits();

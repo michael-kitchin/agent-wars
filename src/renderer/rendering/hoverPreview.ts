@@ -87,6 +87,7 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
     }
   }
   const drawnOrigins = new Set<string>();
+  if (previewGroup.validForAll) {
   for (const perUnit of previewGroup.previews) {
     const preview = perUnit.preview;
     if (preview.segments.length === 0) continue;
@@ -179,6 +180,7 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
       }
     }
     ctx.restore();
+  }
   }
   }
   if (previewGroup.showInvalidMarker && S.hoveredHexH3) {

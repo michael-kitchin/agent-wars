@@ -11,6 +11,7 @@
 import { normalizeMovementTerrain } from '../movementTerrain';
 import { terrainIsPassableForDomain } from '../pathfinding';
 import { logTrace } from '../logger';
+import { selectionHasMixedLandAndNaval as selectionHasMixedLandAndNavalCore } from '../../shared/humanMarchPreviewGroupAssembly';
 
 /**
  * Minimal unit shape for detecting a land + naval selection mix.
@@ -40,11 +41,11 @@ export type MixedLandNavalTerrainHex = { h3Index: string; terrain: string; terra
  * Expected outcome: `true` only when both domains are represented in the selection.
  * Exceptions: None.
  */
-export function selectionHasMixedLandAndNaval(units: ReadonlyArray<MixedLandNavalSelectionUnit>): boolean {
+export function selectionHasMixedLandAndNaval(
+  units: ReadonlyArray<{ unitType: string }>
+): boolean {
   logTrace('humanMarchPreviewMixedSelection selectionHasMixedLandAndNaval', { unitCount: units.length });
-  const hasNaval = units.some((unit) => unit.unitType === 'naval');
-  const hasLand = units.some((unit) => unit.unitType === 'infantry' || unit.unitType === 'armor');
-  return hasNaval && hasLand;
+  return selectionHasMixedLandAndNavalCore(units);
 }
 
 /**

@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * Runs Node `node:test` entrypoints under `dist/main` (and optional extra roots) without listing every file in package.json.
+ * Runs Node `node:test` entrypoints under `dist/main` and `dist/shared` (and optional extra roots) without listing every file in package.json.
  *
  * Purpose: Keeps `npm test` / verify scripts stable when new `*.test.ts` files appear—only `build:main` output layout matters.
  * When to use: From npm `test`, `verify:modularization`, or locally after `npm run build:main`.
@@ -101,7 +101,10 @@ function main() {
       process.stderr.write('run-main-node-tests: dist/main not found; run npm run build:main first.\n');
       process.exit(1);
     }
-    files = collectTestJsUnderDir(mainDist).sort((a, b) => a.localeCompare(b));
+    files = collectTestJsUnderDir(mainDist);
+    const sharedDist = path.join(repoRoot, 'dist', 'shared');
+    collectTestJsUnderDir(sharedDist, files);
+    files.sort((a, b) => a.localeCompare(b));
     for (const extraName of [
       'electron-builder-config.test.cjs',
       'generated-data-packaging.test.cjs',
