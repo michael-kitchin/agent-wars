@@ -314,7 +314,7 @@ function testStackCalloutSingleUnitNonCtrlClosesPopup(): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function testStackSealiftWaterStateHidesDebarkAndEmbarkedSelectionControls(): void {
+function testStackSealiftEmbarkedSelectionAndDebarkControls(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
   const renderSealiftSectionFn = getFunctionSource(source, 'renderSealiftSection');
@@ -323,14 +323,15 @@ function testStackSealiftWaterStateHidesDebarkAndEmbarkedSelectionControls(): vo
   const showStackCalloutFn = getFunctionSource(source, 'showStackCallout');
 
   assert.ok(
-    renderSealiftSectionFn.includes('state.contextMode === \'water\'') &&
+    renderSealiftSectionFn.includes('.flatMap((row) => [row.slot1UnitId, row.slot2UnitId])') &&
       renderSealiftSectionFn.includes('setStackPopupNonSelectableUnitIds(calloutEl, nonSelectableEmbarkedIds);'),
-    'water-context sealift rendering should mark embarked land units as non-selectable in the stack popup'
+    'sealift rendering should mark all embarked slot occupants as non-selectable in the stack popup'
   );
   assert.ok(
-    renderSealiftSectionFn.includes('if (state.contextMode !== \'water\') {') &&
-      renderSealiftSectionFn.includes('debarkBtn'),
-    'water-context sealift rendering should hide debark controls instead of disabling them'
+    renderSealiftSectionFn.includes('if (debarkEnabled) {') &&
+      renderSealiftSectionFn.includes('debarkBtn') &&
+      renderSealiftSectionFn.includes('row.debarkSlot1Enabled'),
+    'sealift rendering should show debark controls when debarkSlot*Enabled (including controlled water ports)'
   );
   assert.ok(
     setNonSelectableFn.includes('applyStackCalloutSelectionButtonVisibility(calloutEl, nonSelectable);') &&
@@ -342,7 +343,7 @@ function testStackSealiftWaterStateHidesDebarkAndEmbarkedSelectionControls(): vo
       showStackCalloutFn.includes("onStackAllActionClick('selectAll'") &&
       showStackCalloutFn.includes("onStackAllActionClick('addAll'") &&
       showStackCalloutFn.includes("onStackAllActionClick('removeAll'"),
-    'stack callout all-actions should filter through selectable human IDs so embarked land units on water remain unselectable'
+    'stack callout all-actions should filter through selectable human IDs so embarked land units remain unselectable'
   );
 }
 
@@ -953,7 +954,7 @@ function run(): void {
   testCommittedPathsRemainVisibleDuringResolutionAnimation();
   testProductionLabelContractsForExploredVsUnexploredHexes();
   testStackCalloutSingleUnitNonCtrlClosesPopup();
-  testStackSealiftWaterStateHidesDebarkAndEmbarkedSelectionControls();
+  testStackSealiftEmbarkedSelectionAndDebarkControls();
   testModifierDrivenPopoverCloseRulesCentralized();
   testInfrastructureGlyphSetsComeFromRes4Overrides();
   testAirFerryDoubleClickContracts();

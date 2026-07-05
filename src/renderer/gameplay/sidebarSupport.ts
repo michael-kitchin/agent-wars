@@ -8,6 +8,7 @@ import { formatPendingFerryOrderSidebarLabel } from './orderLabelFormatting';
 import { UNIT_DESELECT_GLYPH, UNIT_SELECT_GLYPH } from '../core/constants';
 import { withTacticalHumanDraftPrefetchInvalidation } from '../openRouter/openRouterRuntime';
 import { rendererSharedState as S } from '../core/state';
+import { shouldBlockEmbarkedLandUnitSelect } from '../core/selection';
 import {
   shouldBlockSelectionReplaceDuringHoverPlanning,
   shouldBlockToggleSelectionDuringHoverPlanning,
@@ -264,6 +265,7 @@ export function isPendingMovementOrderForDisplay(order: HumanStandingOrderSnapsh
  * Exceptions: None.
  */
 export function applySelectionFromSidebarUnitButton(unitId: string, event: MouseEvent, deps: SelectionActionDeps): void {
+  if (shouldBlockEmbarkedLandUnitSelect(unitId)) return;
   const useMultiSelect = event.ctrlKey || S.ctrlKeyActive;
   if (useMultiSelect) {
     if (shouldBlockToggleSelectionDuringHoverPlanning(unitId)) return;

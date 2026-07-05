@@ -8,6 +8,9 @@
  */
 
 import { rendererSharedState as S } from '../core/state';
+import {
+  shouldBlockEmbarkedLandUnitSelect,
+} from '../core/selection';
 import { emitParityDiagnosticsBreadcrumb } from '../core/parityDiagnostics';
 import {
   shouldBlockSelectionReplaceDuringHoverPlanning,
@@ -72,6 +75,9 @@ export function applyHumanUnitIconClickSelectionPolicy(args: {
   unitId: string;
   deps: HumanUnitIconSelectionSideEffects;
 }): void {
+  if (shouldBlockEmbarkedLandUnitSelect(args.unitId)) {
+    return;
+  }
   if (args.ctrlKey) {
     if (shouldBlockToggleSelectionDuringHoverPlanning(args.unitId)) {
       return;

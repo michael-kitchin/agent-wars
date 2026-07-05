@@ -2,6 +2,38 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from './state';
 
 /**
+ * Returns whether a unit id refers to embarked cargo that must not be newly selected.
+ *
+ * Purpose: Shared guard for map icon, sidebar, and selection reconciliation paths.
+ * When to use: Before adding a land unit to `selectedUnitIds` during planning.
+ * Expected outcome: True for infantry/armor with an active embark link on strategic or tactical snapshots.
+ * Exceptions: None.
+ */
+export function isEmbarkedLandUnitBlockedForSelection(unitId: string): boolean {
+  if (S.tacticalBattleSnapshot) {
+    const sub = S.tacticalBattleSnapshot.subUnits.find((u) => u.id === unitId);
+    if (!sub || (sub.unitType !== 'infantry' && sub.unitType !== 'armor')) return false;
+    return !!sub.embarkedOnSubUnitId;
+  }
+  const unit = S.gameState?.units.find((u) => u.id === unitId);
+  if (!unit || (unit.unitType !== 'infantry' && unit.unitType !== 'armor')) return false;
+  return !!(unit.embarkedOnNavalUnitId && unit.embarkedOnNavalUnitId.length > 0);
+}
+
+/**
+ * Returns whether selecting `unitId` should be blocked (allows deselect when already selected).
+ *
+ * Purpose: Prevents adding embarked cargo to the active selection set from map or sidebar controls.
+ * When to use: At the start of click/toggle handlers before mutating `selectedUnitIds`.
+ * Expected outcome: True when the unit is embarked and not already in the selection list.
+ * Exceptions: None.
+ */
+export function shouldBlockEmbarkedLandUnitSelect(unitId: string): boolean {
+  if (!isEmbarkedLandUnitBlockedForSelection(unitId)) return false;
+  return !S.selectedUnitIds.includes(unitId);
+}
+
+/**
  * Defines the `reconcileSelectionToCurrentState` function shape (export function reconcileSelectionToCurrentState(): void).
 
  * Purpose: Supports maintainability by documenting why `reconcileSelectionToCurrentState` exists.
@@ -16,7 +48,9 @@ export function reconcileSelectionToCurrentState(): void {
         .filter((u) => u.player === 'human')
         .map((u) => u.id)
     );
-    S.selectedUnitIds = S.selectedUnitIds.filter((id) => validHumanUnitIds.has(id));
+    S.selectedUnitIds = S.selectedUnitIds.filter(
+      (id) => validHumanUnitIds.has(id) && !isEmbarkedLandUnitBlockedForSelection(id)
+    );
     return;
   }
   if (!S.gameState) {
@@ -24,7 +58,10 @@ export function reconcileSelectionToCurrentState(): void {
     return;
   }
   const validHumanUnitIds = new Set(S.gameState.units.filter((u) => u.player === 'human').map((u) => u.id));
-  S.selectedUnitIds = S.selectedUnitIds.filter((id) => validHumanUnitIds.has(id));
+  S.selectedUnitIds = S.selectedUnitIds.filter((id) => {
+    if (!validHumanUnitIds.has(id)) return false;
+    return !isEmbarkedLandUnitBlockedForSelection(id);
+  });
 }
 
 /**

@@ -17500,12 +17500,9 @@
       }
     };
   }
-  function tacticalMovementUnitTypeForPathfinding(unit, toH3Index) {
+  function tacticalMovementUnitTypeForPathfinding(unit, _toH3Index) {
     if (unit.unitType === "air") return "air";
     const embarked = (unit.unitType === "infantry" || unit.unitType === "armor") && !!unit.embarkedOnSubUnitId && unit.embarkedOnSubUnitId.length > 0;
-    if (embarked && toH3Index !== void 0 && toH3Index !== unit.h3Index) {
-      return unit.unitType;
-    }
     if (embarked) {
       return "naval";
     }
@@ -18466,6 +18463,14 @@
     if (origin === args.hoveredH3Index) {
       return { preview: { valid: true, showInvalidMarker: false, segments: [] }, pathH3Indexes: [origin] };
     }
+    if ((sub.unitType === "infantry" || sub.unitType === "armor") && sub.embarkedOnSubUnitId && args.hoveredH3Index !== origin) {
+      return invalid({
+        valid: false,
+        showInvalidMarker: true,
+        invalidReason: "Embarked land units cannot receive independent movement orders. Debark first.",
+        segments: []
+      });
+    }
     const moveType = tacticalMovementUnitTypeForPathfinding(sub, args.hoveredH3Index);
     if (moveType === "air") {
       return invalid({ valid: false, showInvalidMarker: true, invalidReason: "Air units do not use tactical march", segments: [] });
@@ -19348,12 +19353,28 @@
   }
 
   // src/renderer/core/selection.ts
+  function isEmbarkedLandUnitBlockedForSelection(unitId) {
+    if (rendererSharedState.tacticalBattleSnapshot) {
+      const sub = rendererSharedState.tacticalBattleSnapshot.subUnits.find((u) => u.id === unitId);
+      if (!sub || sub.unitType !== "infantry" && sub.unitType !== "armor") return false;
+      return !!sub.embarkedOnSubUnitId;
+    }
+    const unit = rendererSharedState.gameState?.units.find((u) => u.id === unitId);
+    if (!unit || unit.unitType !== "infantry" && unit.unitType !== "armor") return false;
+    return !!(unit.embarkedOnNavalUnitId && unit.embarkedOnNavalUnitId.length > 0);
+  }
+  function shouldBlockEmbarkedLandUnitSelect(unitId) {
+    if (!isEmbarkedLandUnitBlockedForSelection(unitId)) return false;
+    return !rendererSharedState.selectedUnitIds.includes(unitId);
+  }
   function reconcileSelectionToCurrentState() {
     if (rendererSharedState.tacticalBattleSnapshot) {
       const validHumanUnitIds2 = new Set(
         rendererSharedState.tacticalBattleSnapshot.subUnits.filter((u) => u.player === "human").map((u) => u.id)
       );
-      rendererSharedState.selectedUnitIds = rendererSharedState.selectedUnitIds.filter((id) => validHumanUnitIds2.has(id));
+      rendererSharedState.selectedUnitIds = rendererSharedState.selectedUnitIds.filter(
+        (id) => validHumanUnitIds2.has(id) && !isEmbarkedLandUnitBlockedForSelection(id)
+      );
       return;
     }
     if (!rendererSharedState.gameState) {
@@ -19361,7 +19382,10 @@
       return;
     }
     const validHumanUnitIds = new Set(rendererSharedState.gameState.units.filter((u) => u.player === "human").map((u) => u.id));
-    rendererSharedState.selectedUnitIds = rendererSharedState.selectedUnitIds.filter((id) => validHumanUnitIds.has(id));
+    rendererSharedState.selectedUnitIds = rendererSharedState.selectedUnitIds.filter((id) => {
+      if (!validHumanUnitIds.has(id)) return false;
+      return !isEmbarkedLandUnitBlockedForSelection(id);
+    });
   }
   function replaceSelection(unitIds) {
     const unique = [...new Set(unitIds)];
@@ -23035,6 +23059,7 @@
     return estimateHexesLeftForOrder(order) > 0;
   }
   function applySelectionFromSidebarUnitButton(unitId, event, deps) {
+    if (shouldBlockEmbarkedLandUnitSelect(unitId)) return;
     const useMultiSelect = event.ctrlKey || rendererSharedState.ctrlKeyActive;
     if (useMultiSelect) {
       if (shouldBlockToggleSelectionDuringHoverPlanning(unitId)) return;
@@ -24371,6 +24396,9 @@
     }
   }
   function applyHumanUnitIconClickSelectionPolicy(args) {
+    if (shouldBlockEmbarkedLandUnitSelect(args.unitId)) {
+      return;
+    }
     if (args.ctrlKey) {
       if (shouldBlockToggleSelectionDuringHoverPlanning(args.unitId)) {
         return;
@@ -26012,7 +26040,7 @@
       if (calloutEl.classList.contains("hidden")) return;
       if (calloutEl.getAttribute("data-h3-index") !== h3Index) return;
       if (!state.showSealiftSection) return;
-      const nonSelectableEmbarkedIds = state.contextMode === "water" ? state.navalRows.flatMap((row) => [row.slot1UnitId, row.slot2UnitId]).filter((unitId) => typeof unitId === "string" && unitId.length > 0) : [];
+      const nonSelectableEmbarkedIds = state.navalRows.flatMap((row) => [row.slot1UnitId, row.slot2UnitId]).filter((unitId) => typeof unitId === "string" && unitId.length > 0);
       setStackPopupNonSelectableUnitIds(calloutEl, nonSelectableEmbarkedIds);
       const section = document.createElement("div");
       section.className = "stack-sealift-section";
@@ -26100,7 +26128,7 @@
             requestRedraw();
           });
           slotRow.appendChild(select);
-          if (state.contextMode !== "water") {
+          if (debarkEnabled) {
             const debarkBtn = document.createElement("button");
             debarkBtn.type = "button";
             debarkBtn.className = "unit-select stack-unit-toggle";

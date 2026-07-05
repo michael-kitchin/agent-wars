@@ -7,9 +7,9 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 /**
  * Returns a snapshot copy whose unit rows reflect applied march orders and embarked-cargo hex sync.
  *
- * Contract: Only updates `units[].h3Index`; order list is treated as authoritative per unit id.
+ * Contract: Only updates `units[].h3Index`; opponent embarked cargo auto-debarks when moving independently.
  * When to use: After movement orders pass validation in tactical AI flow, before ranged/air/ferry/embark checks.
- * Expected outcome: Carriers move first by list order; cargo with `embarkedOnSubUnitId` snaps to carrier cells.
+ * Expected outcome: Carriers move first by list order; remaining cargo with `embarkedOnSubUnitId` snaps to carrier cells.
  * Exceptions: None.
  */
 export function applyMovementOrdersToPlanState(
@@ -21,11 +21,15 @@ export function applyMovementOrdersToPlanState(
   const units = state.units.map((u) => {
     const to = orderTo.get(u.id);
     if (to === undefined) return { ...u };
-    const disembarks =
+    const debarkingIndependently =
+      u.player === 'opponent' &&
       !!u.embarkedOnSubUnitId &&
       (u.unitType === 'infantry' || u.unitType === 'armor') &&
       to !== u.h3Index;
-    return disembarks ? { ...u, h3Index: to, embarkedOnSubUnitId: undefined } : { ...u, h3Index: to };
+    if (debarkingIndependently) {
+      return { ...u, h3Index: to, embarkedOnSubUnitId: undefined };
+    }
+    return { ...u, h3Index: to };
   });
   const byId = new Map(units.map((u) => [u.id, u] as const));
   for (const u of units) {

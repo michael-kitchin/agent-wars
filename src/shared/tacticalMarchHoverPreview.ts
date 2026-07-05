@@ -123,6 +123,18 @@ function buildPreviewForSubUnit(args: {
   if (origin === args.hoveredH3Index) {
     return { preview: { valid: true, showInvalidMarker: false, segments: [] }, pathH3Indexes: [origin] };
   }
+  if (
+    (sub.unitType === 'infantry' || sub.unitType === 'armor') &&
+    sub.embarkedOnSubUnitId &&
+    args.hoveredH3Index !== origin
+  ) {
+    return invalid({
+      valid: false,
+      showInvalidMarker: true,
+      invalidReason: 'Embarked land units cannot receive independent movement orders. Debark first.',
+      segments: [],
+    });
+  }
   const moveType = tacticalMovementUnitTypeForPathfinding(sub, args.hoveredH3Index);
   if (moveType === 'air') {
     return invalid({ valid: false, showInvalidMarker: true, invalidReason: 'Air units do not use tactical march', segments: [] });

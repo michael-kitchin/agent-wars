@@ -175,7 +175,6 @@ export function resolveRoutePathForUnit(payload: {
   terrainByH3: Map<string, string>;
   session: PathfindingSession;
   blocked?: Set<string>;
-  seaportDisembarkOriginH3?: string;
 }): ResolveRoutePathForUnitOk | PlanRouteError {
   const passableFor: PassableDomain = payload.unitType === 'naval' ? 'water' : 'land';
   const navalOriginResolution = resolveNavalOriginForRouting({
@@ -219,7 +218,6 @@ export function resolveRoutePathForUnit(payload: {
       blocked: payload.blocked,
       warnings,
       blockedRetryWarning: 'Route passes through enemy-occupied hexes - avoidance was not possible.',
-      seaportDisembarkOriginH3: payload.seaportDisembarkOriginH3,
     });
     path = prependSeaportEgressStep(stateful.path, payload.originH3, seaportEgressHex);
     statefulStats = stateful.stats;

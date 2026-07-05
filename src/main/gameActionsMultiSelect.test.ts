@@ -724,15 +724,27 @@ function testPreviewEmbarkedLandUnitOnWaterShowsInvalidWithoutPathPlanning(): vo
   });
 }
 
-/**
- * Defines the `testEmbarkedLandUnitCanPreviewAndAssignFromSeaportWaterToAdjacentLand` function shape (function testEmbarkedLandUnitCanPreviewAndAssignFromSeaportWaterToAdjacentLand(): void).
+function findCoastalHexWithAdjacentLand(
+  state: ReturnType<typeof getGameState>
+): { coastalHex: string; adjacentLandHex: string } | null {
+  for (const hex of state.hexes) {
+    const adjacentLandHex = findAdjacentNonArcticLandHex(state, hex.h3Index);
+    if (!adjacentLandHex) continue;
+    dbRun('UPDATE hexes SET terrain = ? WHERE h3_index = ?', ['coastal', hex.h3Index]);
+    return { coastalHex: hex.h3Index, adjacentLandHex };
+  }
+  return null;
+}
 
- * Purpose: Supports maintainability by documenting why `testEmbarkedLandUnitCanPreviewAndAssignFromSeaportWaterToAdjacentLand` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+/**
+ * Defines the `testEmbarkedLandUnitBlockedFromPreviewAndAssignAtSeaportWater` function shape (function testEmbarkedLandUnitBlockedFromPreviewAndAssignAtSeaportWater(): void).
+
+ * Purpose: Embarked land cannot receive independent march orders until manual debark, even at controlled water seaports.
+ * When to use: Regression guard after removing seaport debark hop from human march validation.
+ * Expected outcome: Preview and assign both fail; transport assignment row remains.
  * Exceptions: None.
  */
-function testEmbarkedLandUnitCanPreviewAndAssignFromSeaportWaterToAdjacentLand(): void {
+function testEmbarkedLandUnitBlockedFromPreviewAndAssignAtSeaportWater(): void {
   withTempDb(() => {
     const state = getGameState();
     const landUnit = state.units.find(
@@ -753,21 +765,25 @@ function testEmbarkedLandUnitCanPreviewAndAssignFromSeaportWaterToAdjacentLand()
     ]);
 
     const preview = previewHumanMarchOrders([landUnit!.id], waterWithAdjacentLand!.adjacentLandHex);
-    assert.strictEqual(preview.validForAll, true, preview.invalidReason ?? 'expected preview to allow seaport disembark move');
+    assert.strictEqual(preview.validForAll, false, 'expected preview to block embarked independent move');
     const assign = assignHumanMarchOrder(landUnit!.id, waterWithAdjacentLand!.adjacentLandHex);
-    assert.strictEqual(assign.success, true, assign.reason ?? 'expected assignment to allow seaport disembark move');
+    assert.strictEqual(assign.success, false, assign.reason ?? 'expected assignment to block embarked independent move');
+    const assignmentCount =
+      dbGetOne<{ count: number }>('SELECT COUNT(*) AS count FROM unit_transport_assignments WHERE land_unit_id = ?', [landUnit!.id])
+        ?.count ?? 0;
+    assert.strictEqual(assignmentCount, 1, 'expected embarked assignment to remain until manual debark');
   });
 }
 
 /**
- * Defines the `testAssignMarchForEmbarkedLandUnitImmediatelyDebarksAndClearsSealiftSlot` function shape (function testAssignMarchForEmbarkedLandUnitImmediatelyDebarksAndClearsSealiftSlot(): void).
+ * Defines the `testAssignMarchForEmbarkedLandUnitDoesNotAutoDebark` function shape (function testAssignMarchForEmbarkedLandUnitDoesNotAutoDebark(): void).
 
- * Purpose: Supports maintainability by documenting why `testAssignMarchForEmbarkedLandUnitImmediatelyDebarksAndClearsSealiftSlot` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Human march assignment must not clear sealift slots implicitly while cargo remains embarked.
+ * When to use: Regression guard after removing `clearEmbarkAssignmentForIndependentLandMove`.
+ * Expected outcome: Assignment rejected; sealift slot still occupied.
  * Exceptions: None.
  */
-function testAssignMarchForEmbarkedLandUnitImmediatelyDebarksAndClearsSealiftSlot(): void {
+function testAssignMarchForEmbarkedLandUnitDoesNotAutoDebark(): void {
   withTempDb(() => {
     const state = getGameState();
     const landUnit = state.units.find(
@@ -788,15 +804,58 @@ function testAssignMarchForEmbarkedLandUnitImmediatelyDebarksAndClearsSealiftSlo
     ]);
 
     const assign = assignHumanMarchOrder(landUnit!.id, waterWithAdjacentLand!.adjacentLandHex);
-    assert.strictEqual(assign.success, true, assign.reason ?? 'expected independent disembark move assignment to succeed');
+    assert.strictEqual(assign.success, false, assign.reason ?? 'expected embarked march assignment to be rejected');
     const assignmentCount =
       dbGetOne<{ count: number }>('SELECT COUNT(*) AS count FROM unit_transport_assignments WHERE land_unit_id = ?', [landUnit!.id])
         ?.count ?? 0;
-    assert.strictEqual(assignmentCount, 0, 'expected embarked assignment to be removed immediately');
+    assert.strictEqual(assignmentCount, 1, 'expected embarked assignment to remain');
     const sealiftState = getSealiftStackState(waterWithAdjacentLand!.waterHex);
     const navalRow = sealiftState.navalRows.find((row) => row.navalUnitId === navalUnit!.id);
     assert.ok(navalRow, 'expected naval row in sealift state');
-    assert.strictEqual(navalRow?.slot1UnitId ?? null, null, 'expected sealift slot to be deselected after debark move order');
+    assert.strictEqual(navalRow?.slot1UnitId ?? navalRow?.slot2UnitId, landUnit!.id, 'expected sealift slot to remain occupied');
+  });
+}
+
+/**
+ * Defines the `testEmbarkedLandOnCoastalHexBlockedUntilManualDebark` function shape (function testEmbarkedLandOnCoastalHexBlockedUntilManualDebark(): void).
+
+ * Purpose: Coastal embarked cargo also cannot march independently without manual debark first.
+ * When to use: Regression guard for general embarked movement block (not water-only).
+ * Expected outcome: March blocked while embarked; succeeds after manual debark via sealift slot.
+ * Exceptions: None.
+ */
+function testEmbarkedLandOnCoastalHexBlockedUntilManualDebark(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const landUnit = state.units.find(
+      (u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor')
+    );
+    const navalUnit = state.units.find((u) => u.player === 'human' && u.unitType === 'naval');
+    assert.ok(landUnit, 'expected seeded human land unit');
+    assert.ok(navalUnit, 'expected seeded human naval unit');
+    const coastalSetup = findCoastalHexWithAdjacentLand(state);
+    assert.ok(coastalSetup, 'expected coastal hex with adjacent land destination');
+    const { coastalHex, adjacentLandHex } = coastalSetup;
+
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [coastalHex, landUnit!.id]);
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [coastalHex, navalUnit!.id]);
+    dbRun('INSERT OR REPLACE INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', [
+      landUnit!.id,
+      navalUnit!.id,
+    ]);
+
+    const blocked = assignHumanMarchOrder(landUnit!.id, adjacentLandHex);
+    assert.strictEqual(blocked.success, false, blocked.reason ?? 'expected embarked coastal march to be blocked');
+
+    const sealiftBefore = getSealiftStackState(coastalHex);
+    const row = sealiftBefore.navalRows.find((r) => r.navalUnitId === navalUnit!.id);
+    assert.ok(row, 'expected naval row');
+    const debarkSlot: 1 | 2 = row!.slot1UnitId === landUnit!.id ? 1 : 2;
+    const debark = updateSealiftSlot(coastalHex, navalUnit!.id, debarkSlot, null);
+    assert.strictEqual(debark.success, true, debark.reason ?? 'expected manual debark at coastal hex');
+
+    const assign = assignHumanMarchOrder(landUnit!.id, adjacentLandHex);
+    assert.strictEqual(assign.success, true, assign.reason ?? 'expected march after manual debark');
   });
 }
 
@@ -1033,8 +1092,9 @@ function run(): void {
   testPreviewGroupedAcceptsAirFerryDestinationWithinRange();
   testAssignMarchRejectsAirUnits();
   testPreviewEmbarkedLandUnitOnWaterShowsInvalidWithoutPathPlanning();
-  testEmbarkedLandUnitCanPreviewAndAssignFromSeaportWaterToAdjacentLand();
-  testAssignMarchForEmbarkedLandUnitImmediatelyDebarksAndClearsSealiftSlot();
+  testEmbarkedLandUnitBlockedFromPreviewAndAssignAtSeaportWater();
+  testAssignMarchForEmbarkedLandUnitDoesNotAutoDebark();
+  testEmbarkedLandOnCoastalHexBlockedUntilManualDebark();
   testEmbarkImmediatelyCancelsExistingHumanMovementOrder();
   testReadyIncludesEmbarkedCargoFollowMoveForNavalMovement();
   testSubmitOrdersAllowsLandMovementToSingleArcticHex();

@@ -14,6 +14,7 @@ import { executeTool5 } from '../tools/tool5StandingOrders';
 import { executeTool6 } from '../tools/tool6Production';
 import { normalizeProductionOrders } from '../productionOrders';
 import type { AirStrikeOrder, AirStrikeTargetType, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
+import { clearEmbarkAssignmentForLandUnit, isEmbarkedLandUnit } from '../game-actions/sealift';
 /**
  * Documents the `MemoryUpdateItem` interface as a named contract surface (export interface MemoryUpdateItem).
 
@@ -601,8 +602,13 @@ function processV3OrdersArray(
       } catch {
         h3 = undefined;
       }
-      if (h3) movementOrders.push({ unitId, toH3Index: h3 });
-      else logDebug('openRouter processV3OrdersArray: explicit_move unresolved', { unitId, dest });
+      if (h3) {
+        if (isEmbarkedLandUnit(unitId)) {
+          logDebug('openRouter processV3OrdersArray: explicit_move auto-debarks embarked unit', { unitId, dest });
+          clearEmbarkAssignmentForLandUnit(unitId);
+        }
+        movementOrders.push({ unitId, toH3Index: h3 });
+      } else logDebug('openRouter processV3OrdersArray: explicit_move unresolved', { unitId, dest });
       continue;
     }
     if (action === 'ranged_attack') {
@@ -645,14 +651,21 @@ function processV3OrdersArray(
         logDebug('openRouter processV3OrdersArray: disembark missing destination code', { unitId });
         continue;
       }
+      if (!isEmbarkedLandUnit(unitId)) {
+        dropReasons.push(`disembark ${unitId}: unit is not embarked`);
+        logDebug('openRouter processV3OrdersArray: disembark rejected while not embarked', { unitId });
+        continue;
+      }
       let h3: string | undefined;
       try {
         h3 = codeToH3(dest, context);
       } catch {
         h3 = undefined;
       }
-      if (h3) movementOrders.push({ unitId, toH3Index: h3 });
-      else logDebug('openRouter processV3OrdersArray: disembark unresolved', { unitId, dest });
+      if (h3) {
+        clearEmbarkAssignmentForLandUnit(unitId);
+        movementOrders.push({ unitId, toH3Index: h3 });
+      } else logDebug('openRouter processV3OrdersArray: disembark unresolved', { unitId, dest });
       continue;
     }
     if (action === 'embark') {

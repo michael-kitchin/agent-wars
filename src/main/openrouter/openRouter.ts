@@ -23,6 +23,7 @@ import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildStrategicUnitDisplayLabelResolver } from '../../shared/unitDisplayNames';
 import { validateTacticalGroupRangedTarget } from '../game-actions/tacticalGroupRangedTargetValidation';
+import { isEmbarkedLandUnit } from '../game-actions/sealift';
 import { formatLatLng as formatLatLngWithPrecision } from './promptText';
 import { requestOrdersFlow } from './requestOrdersFlow';
 import { NAVAL_DESTINATION_MUST_BE_WATER_COASTAL } from '../navalMovementMessages';
@@ -362,12 +363,17 @@ function validateAiOrder(
   if (!hexIds.has(order.toH3Index)) return { valid: false, reason: 'Destination not on map' };
 
   const dist: number | null = computeGridDistancePure(unit.h3Index, order.toH3Index);
+  const assumeDebarkedForReachability =
+    !!unit.id &&
+    isEmbarkedLandUnit(unit.id) &&
+    order.toH3Index !== unit.h3Index;
+  const destinationOptions = assumeDebarkedForReachability ? { assumeDebarkedForReachability: true } : undefined;
   if (dist !== null) {
     const range = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
     if (dist > range) return { valid: false, reason: `${unit.unitType} can move at most ${range} hex(es)` };
     /* dist === 0 (same hex) is allowed: "hold" / no move is valid. */
   } else {
-    const validDests = getValidDestinations(unit, state);
+    const validDests = getValidDestinations(unit, state, destinationOptions);
     if (!validDests.includes(order.toH3Index)) {
       return { valid: false, reason: 'Invalid distance' };
     }
@@ -383,7 +389,7 @@ function validateAiOrder(
     return { valid: false, reason: 'Land units must move to a hex that overlaps a continent or large island.' };
   }
   if (unit.unitType === 'infantry' || unit.unitType === 'armor') {
-    if (!getValidDestinations(unit, state).includes(order.toH3Index)) {
+    if (!getValidDestinations(unit, state, destinationOptions).includes(order.toH3Index)) {
       return { valid: false, reason: LAND_UNIT_ROUTE_STEP_BLOCKED_REASON };
     }
   }

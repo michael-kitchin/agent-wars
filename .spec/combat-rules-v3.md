@@ -328,7 +328,7 @@ Each land unit has an `embarkedOn` field that identifies which naval unit it is 
 
 ### 9.2 Embark and disembark
 
-Embark requires a seaport. Disembark is permitted at any coastal hex — no seaport required. When a land unit with an `embarkedOn` assignment is given an independent movement order, it auto-disembarks as a pre-step in the movement phase. This enables "drop off and go" patterns where conflicting orders resolve naturally: the land unit disembarks first, then both units execute their movement orders independently.
+Embark requires a seaport. Manual debark is permitted at any coastal hex and at controlled water seaports (via stack popup or sealift slot `(none)`). Embarked land units cannot receive independent human or tactical movement orders until manually debarked. The LLM opponent auto-debarks when issuing independent movement orders (`explicit_move`, `disembark`, or standing-order expansion at Ready); humans must debark manually first.
 
 ### 9.3 Embarked unit combat
 
@@ -336,7 +336,7 @@ Embarked units can participate in melee on coastal hexes (the naval transport is
 
 ### 9.4 Transport loss
 
-If a naval unit carrying cargo is destroyed on a water hex, all embarked units are destroyed (fatal loss — they sink with the transport). If a naval unit carrying cargo is destroyed on a coastal hex, embarked units are auto-disembarked to the coastal hex before the naval unit is removed (incidental loss — they wade ashore).
+If a naval unit carrying cargo is destroyed, all embarked units are destroyed with it (fatal transport loss), regardless of terrain. Manually debarked co-located land units survive because they no longer have an `embarkedOn` assignment.
 
 ---
 
@@ -356,7 +356,7 @@ If a naval unit carrying cargo is destroyed on a water hex, all embarked units a
 - **Air strikes:** Air units strike first (range 3 from base airport), targeting units or infrastructure. Players choose one of four target types: units, urban hexes, airports, or seaports. When targeting units, counter-fire comes from defending units with range ≥ 1 (no range-to-base check). When targeting infrastructure, a fixed counter-fire roll applies regardless of hex occupation. Urban hex strikes destroy 3 res4 hexes per hit. One action per turn: strike or ferry.
 - **Infrastructure destruction:** Urban hexes, airports, and seaports can be permanently destroyed by air strikes. No rebuilding. Infrastructure counter-fire is independent of hex occupation.
 - **Ranged:** Naval 2 hexes, armor 1 hex; infantry melee only. Defenders with range may return fire (attack roll) when attackers are within range.
-- **Sealift:** Explicit cargo assignment via `embarkedOn` field. Embark at seaports, disembark at any coastal hex. Transport loss fatal on water, incidental on coast.
+- **Sealift:** Explicit cargo assignment via `embarkedOn` field. Embark at seaports; manual debark at coastal hexes and controlled water seaports for human players. Transport loss is always fatal for embarked cargo when the carrier is destroyed. LLM opponent movement orders auto-debark before marching.
 - **WEGO-friendly:** Five-phase resolution (air strike → ranged → ground/naval movement → ferry → melee); automatic casualty assignment by fixed priority; no player-to-player interaction or confirmations.
 
 This gives a concrete, implementable combat system that matches the current four-unit roster and can be extended in later milestones.

@@ -9,7 +9,7 @@ import { gridDisk } from 'h3-js';
 import { logDebug, logError, logTrace } from './logger';
 import { getMovementBudget } from './combatConstants';
 import {
-  allowsLandUnitStepWithOptionalSeaportDebark,
+  canLandUnitTraverseEdge,
   landUnitCanOccupyHex,
   type LandMassByH3,
 } from '../shared/landTraversalRes1';
@@ -72,8 +72,7 @@ export function findPath(
   terrainByH3: Map<string, string>,
   passableFor: PassableDomain,
   blocked?: Set<string>,
-  landMass?: LandMassByH3,
-  seaportDisembarkOriginH3?: string
+  landMass?: LandMassByH3
 ): string[] | null {
   findPathInvocationCount += 1;
   logTrace('pathfinding findPath', {
@@ -129,7 +128,7 @@ export function findPath(
         if (parent.has(n)) continue;
         if (!hexSet.has(n)) continue;
         if (blocked?.has(n)) continue;
-        if (!allowsLandUnitStepWithOptionalSeaportDebark(current, n, landMass, seaportDisembarkOriginH3)) continue;
+        if (!canLandUnitTraverseEdge(current, n, landMass)) continue;
         parent.set(n, current);
         queue.push(n);
       }
@@ -194,8 +193,7 @@ export function getReachableHexes(
   terrainByH3: Map<string, string>,
   passableFor: PassableDomain,
   blocked?: Set<string>,
-  landMass?: LandMassByH3,
-  seaportDisembarkOriginH3?: string
+  landMass?: LandMassByH3
 ): Set<string> {
   if (passableFor === 'land') {
     if (!landMass) {
@@ -216,7 +214,7 @@ export function getReachableHexes(
       for (const n of neighbors) {
         if (n === current || !hexSet.has(n) || reachable.has(n)) continue;
         if (blocked?.has(n)) continue;
-        if (!allowsLandUnitStepWithOptionalSeaportDebark(current, n, landMass, seaportDisembarkOriginH3)) continue;
+        if (!canLandUnitTraverseEdge(current, n, landMass)) continue;
         reachable.add(n);
         queue.push(n);
       }

@@ -79,8 +79,8 @@ import {
 } from './humanMarchPreview';
 import { hexSupportsMixedLandAndNaval, selectionHasMixedLandAndNaval } from './humanMarchPreviewMixedSelection';
 import {
+  EMBARKED_LAND_UNIT_MOVEMENT_BLOCK_REASON,
   getLandMovementBlockReason,
-  isLandUnitSeaportDebarkHop,
   isLandUnitType,
 } from './landMovementConstraints';
 import {
@@ -98,6 +98,7 @@ import {
 import {
   applyTacticalEmbarkCommittedOrdersToStrategicDb,
   getSealiftStackStateImpl,
+  isEmbarkedLandUnit,
   isEmbarkedLandUnitOnWater,
   updateSealiftSlotImpl,
 } from './sealift';
@@ -476,15 +477,13 @@ function validateOrder(
     return { valid: false, reason: LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON };
   }
   if (isLandUnitType(unit.unit_type)) {
-    const embarkedOnWater = isEmbarkedLandUnitOnWater(unitId);
-    const originSeaportCount = getRes1InfrastructureForHex(unit.h3_index).seaportCount;
-    const seaportDebarkHop = isLandUnitSeaportDebarkHop({
-      isEmbarkedOnWater: embarkedOnWater,
-      originSeaportCount,
-      moveDistance: dist,
-    });
-    const embarkedAtSeaWithoutCoastalOrigin =
-      embarkedOnWater && originTerrain !== 'coastal' && !seaportDebarkHop;
+    if (isEmbarkedLandUnit(unitId) && toH3Index !== unit.h3_index) {
+      const blockReason = getLandMovementBlockReason({
+        unitType: unit.unit_type,
+        isEmbarked: true,
+      });
+      if (blockReason) return { valid: false, reason: blockReason };
+    }
     const routeH3: string[] = [unit.h3_index];
     const traversedH3: string[] = [];
     if (dist > 1) {
@@ -498,15 +497,7 @@ function validateOrder(
       if (routeH3[routeH3.length - 1] !== h3) routeH3.push(h3);
     }
     if (routeH3[routeH3.length - 1] !== toH3Index) routeH3.push(toH3Index);
-    const blockReason = getLandMovementBlockReason({
-      unitType: unit.unit_type,
-      isEmbarkedAtSea: embarkedAtSeaWithoutCoastalOrigin,
-      isSeaportDebarkHop: seaportDebarkHop,
-    });
-    if (blockReason) return { valid: false, reason: blockReason };
-    const landMassBlock = getLandMassRouteBlockReason(routeH3, getRes1LandMassByH3(), seaportDebarkHop
-      ? { seaportDisembarkOriginH3: unit.h3_index }
-      : undefined);
+    const landMassBlock = getLandMassRouteBlockReason(routeH3, getRes1LandMassByH3());
     if (landMassBlock) return { valid: false, reason: landMassBlock };
   }
 
@@ -690,34 +681,6 @@ export function cancelHumanStrategicMarchOrdersForParentUnit(unitId: string): vo
  */
 function cancelHumanMovementOrdersForUnit(unitId: string): void {
   cancelHumanStrategicMarchOrdersForParentUnit(unitId);
-}
-
-/**
- * Defines the `clearEmbarkAssignmentForIndependentLandMove` function shape (function clearEmbarkAssignmentForIndependentLandMove(unitId: string, destinationH3Index: string): void).
-
- * Purpose: Supports maintainability by documenting why `clearEmbarkAssignmentForIndependentLandMove` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function clearEmbarkAssignmentForIndependentLandMove(unitId: string, destinationH3Index: string): void {
-  const assignment = dbGetOne<{ navalUnitId: string; navalH3Index: string }>(
-    `SELECT uta.naval_unit_id AS navalUnitId,
-            nu.h3_index AS navalH3Index
-     FROM unit_transport_assignments uta
-     JOIN units nu ON nu.id = uta.naval_unit_id
-     WHERE uta.land_unit_id = ?`,
-    [unitId]
-  );
-  if (!assignment) return;
-  if (destinationH3Index === assignment.navalH3Index) return;
-  dbRun('DELETE FROM unit_transport_assignments WHERE land_unit_id = ?', [unitId]);
-  logDebug('gameActions assignHumanMarchOrder: auto-disembarked land unit for independent move', {
-    unitId,
-    destinationH3Index,
-    navalUnitId: assignment.navalUnitId,
-    navalH3Index: assignment.navalH3Index,
-  });
 }
 
 /**
@@ -1230,6 +1193,9 @@ export function assignHumanMarchOrder(unitId: string, destinationH3Index: string
     const unitRow = state.units.find((unit) => unit.id === unitId && unit.player === HUMAN_PLAYER_ID);
     if (!unitRow) return { success: false, reason: 'Unit not found or not human-controlled' };
     if (unitRow.unitType === 'air') return { success: false, reason: AIR_UNITS_CANNOT_MARCH_REASON };
+    if (isLandUnitType(unitRow.unitType) && isEmbarkedLandUnit(unitId) && destinationH3Index !== unitRow.h3Index) {
+      return { success: false, reason: EMBARKED_LAND_UNIT_MOVEMENT_BLOCK_REASON };
+    }
     const destinationHex = state.hexes.find((hex) => hex.h3Index === destinationH3Index);
     if (!destinationHex) return { success: false, reason: 'Destination not on map' };
     const destinationTerrain = effectiveHexPassabilityTerrain(destinationHex);
@@ -1258,7 +1224,6 @@ export function assignHumanMarchOrder(unitId: string, destinationH3Index: string
       });
       return { success: false, reason: result.error ?? 'Failed to assign order' };
     }
-    clearEmbarkAssignmentForIndependentLandMove(unitId, destinationH3Index);
     return { success: true };
   } catch (err) {
     logError('assignHumanMarchOrder: exception', err);
@@ -1633,6 +1598,7 @@ export function getTacticalSealiftStackState(h3Index: string): SealiftStackState
       contextMode: 'unsupported',
       controlsDisabled: true,
       hasEmbarkedUnitsInStack: false,
+      debarkAllowedAtHex: false,
       navalRows: [],
       landOptions: [],
     };

@@ -368,25 +368,21 @@ export function buildTacticalTerrainKindResolverFromSnapshot(
 /**
  * Resolves which unit type row to use for tactical movement costs, including embarked sealift edge cases.
  *
- * Contract: While cargo stays aboard (`toH3Index` absent, same as origin, or identical to current `h3Index`), use `naval`
- * costs so carrier-only constraints apply. When cargo is ordered to a different hex, treat the march as a land
- * disembark path using the cargo's own `unitType` for §12.4 costs.
+ * Contract: While cargo stays aboard, use `naval` costs so carrier-only constraints apply. Human independent marches off the carrier
+ * are blocked in validation and preview before path planning runs; opponent LLM orders auto-debark and plan as land.
  * When to use: Before movement planning for a `TacticalSubUnitSnapshot` row when the march destination is known.
  * Expected outcome: A key understood by `tacticalEnterHexMovementCost` (`infantry` | `armor` | `naval` | `air`).
  * Exceptions: None.
  */
 export function tacticalMovementUnitTypeForPathfinding(
   unit: { unitType: string; h3Index: string; embarkedOnSubUnitId?: string | null },
-  toH3Index?: string
+  _toH3Index?: string
 ): string {
   if (unit.unitType === 'air') return 'air';
   const embarked =
     (unit.unitType === 'infantry' || unit.unitType === 'armor') &&
     !!unit.embarkedOnSubUnitId &&
     unit.embarkedOnSubUnitId.length > 0;
-  if (embarked && toH3Index !== undefined && toH3Index !== unit.h3Index) {
-    return unit.unitType;
-  }
   if (embarked) {
     return 'naval';
   }

@@ -25,8 +25,9 @@ import { resolveAirStrikePhase } from './airStrikeResolution';
 import {
   applyEmbarkOrdersForPlayer,
   applyTransportOutcomeForRemovedStrategicUnits,
-  autoDisembarkIndependentLandMoves,
+  autoDebarkOpponentLandUnitIfMovingIndependently,
   isEmbarkedLandUnitOnWater,
+  shouldSkipEmbarkedLandIndependentMove,
   syncEmbarkedLandUnitPositionsWithNaval,
 } from './sealift';
 import { rememberStrategicHexBeforeMove } from '../strategicUnitPreviousHex';
@@ -233,7 +234,6 @@ export function executeReadyStrategicTurn(
     ...Array.from(mergedHuman.entries()).map(([unitId, toH3Index]) => ({ unitId, toH3Index })),
     ...aiOrders,
   ];
-  autoDisembarkIndependentLandMoves(allOrders);
   const orderDestinationByUnitId = new Map(allOrders.map((order) => [order.unitId, order.toH3Index]));
   const movingNavalUnitIds = allOrders
     .filter((order) => unitsBeforeMove.find((unit) => unit.id === order.unitId)?.unitType === 'naval')
@@ -274,6 +274,14 @@ export function executeReadyStrategicTurn(
       return u?.player === 'opponent' && u.h3Index !== o.toH3Index;
     });
   for (const order of allOrders) {
+    autoDebarkOpponentLandUnitIfMovingIndependently(order.unitId, order.toH3Index);
+    if (shouldSkipEmbarkedLandIndependentMove(order.unitId, order.toH3Index)) {
+      logDebug('readyStrategicResolutionPipeline skip embarked independent move', {
+        unitId: order.unitId,
+        toH3Index: order.toH3Index,
+      });
+      continue;
+    }
     const prevUnit = unitsBeforeMove.find((u) => u.id === order.unitId);
     if (prevUnit && prevUnit.h3Index !== order.toH3Index) {
       rememberStrategicHexBeforeMove(order.unitId, prevUnit.h3Index, order.toH3Index);

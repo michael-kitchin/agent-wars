@@ -4,7 +4,7 @@
 
 import type { SealiftLandUnitOption, SealiftNavalRow, SealiftStackState } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import { getSealiftStackContextModeForHex } from '../game-actions/sealift';
+import { canManualDebarkFromHex, getSealiftStackContextModeForHex } from '../game-actions/sealift';
 import { getActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import { tacticalLogQuery } from './tacticalLogging';
 
@@ -65,6 +65,7 @@ export function getTacticalSealiftStackStateForHex(h3Index: string): SealiftStac
     contextMode: 'unsupported',
     controlsDisabled: true,
     hasEmbarkedUnitsInStack: false,
+    debarkAllowedAtHex: false,
     navalRows: [],
     landOptions: [],
   };
@@ -110,6 +111,7 @@ export function buildTacticalSealiftStackStateFromSnapshot(snap: TacticalBattleS
   const slotsByNavalId = tacticalSlotsByNavalSubIds(navalIds, assignments);
   normalizeTacticalSealiftSlots(navalIds, slotsByNavalId, landTypeById);
   const contextMode = getSealiftStackContextModeForHex(h3Index);
+  const debarkAllowed = canManualDebarkFromHex(h3Index, 'human');
   const navalRows: SealiftNavalRow[] = navalIds.map((navalUnitId) => {
     const slots = slotsByNavalId.get(navalUnitId) ?? { slot1UnitId: null, slot2UnitId: null };
     const controlsDisabled = contextMode === 'water' || contextMode === 'coastal_no_port';
@@ -120,8 +122,8 @@ export function buildTacticalSealiftStackStateFromSnapshot(snap: TacticalBattleS
       slot2UnitId: slots.slot2UnitId,
       slot2Disabled: controlsDisabled || slot1Armor,
       controlsDisabled,
-      debarkSlot1Enabled: contextMode !== 'water' && !!slots.slot1UnitId,
-      debarkSlot2Enabled: contextMode !== 'water' && !!slots.slot2UnitId,
+      debarkSlot1Enabled: debarkAllowed && !!slots.slot1UnitId,
+      debarkSlot2Enabled: debarkAllowed && !!slots.slot2UnitId,
     };
   });
   const hasEmbarkedUnitsInStack = assignments.length > 0;
@@ -132,6 +134,7 @@ export function buildTacticalSealiftStackStateFromSnapshot(snap: TacticalBattleS
     contextMode,
     controlsDisabled: contextMode === 'water' || contextMode === 'coastal_no_port',
     hasEmbarkedUnitsInStack,
+    debarkAllowedAtHex: debarkAllowed,
     navalRows,
     landOptions,
   };

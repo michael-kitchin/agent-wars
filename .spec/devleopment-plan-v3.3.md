@@ -336,13 +336,13 @@ INFRASTRUCTURE STATUS:
 
 **Build:** Add naval transport mechanics. Naval units can carry land units across water using an explicit cargo assignment model. The `embarkedOn` field on each land unit identifies which naval unit it is assigned to (e.g. `"embarkedOn": "naval-2"`). Explicit assignment was chosen over co-location inference because coastal hexes are passable by both land and naval units, making co-location ambiguous.
 
-**Embark/disembark rules:** Embark requires a seaport (land unit and naval unit must be in the same hex with a seaport). Disembark is permitted at any coastal hex — no seaport required. Auto-assignment on embark uses armor-priority ordering; players can reassign via the stack popup UI; the LLM assigns via the order format.
+**Embark/disembark rules:** Embark requires a seaport (land unit and naval unit must be in the same hex with a seaport). Human players debark manually at any coastal hex or controlled water seaport (stack popup or sealift slot `(none)`). Auto-assignment on embark uses armor-priority ordering; players can reassign via the stack popup UI; the LLM assigns via the order format.
 
-**Auto-disembark:** When a land unit with an `embarkedOn` assignment is given an independent movement order, it auto-disembarks as a pre-step in the movement phase. This enables "drop off and go" patterns where conflicting orders resolve naturally.
+**LLM auto-debark:** When an opponent land unit with an `embarkedOn` assignment receives an independent movement order (`explicit_move`, `disembark`, or standing-order march expansion at Ready), the engine clears cargo as a pre-step before applying the move. Human players cannot bypass manual debark.
 
 **Combat while embarked:** Embarked units can participate in melee on coastal hexes but cannot use ranged attacks. On water hexes, embarked units are pure cargo and cannot participate in combat.
 
-**Transport loss:** If a naval unit carrying cargo is destroyed on a water hex, all embarked units are destroyed (they sink). If destroyed on a coastal hex, embarked units are auto-disembarked before the naval unit is removed (they wade ashore).
+**Transport loss:** If a naval unit carrying cargo is destroyed, all embarked units are destroyed with it (fatal transport loss), regardless of terrain. Manually debarked co-located land units survive because they no longer have an `embarkedOn` assignment.
 
 **AI architecture impact:** The briefing format gains a transport section showing which naval units carry cargo, embark/disembark options at current positions, and nearby seaports. The LLM issues embark/disembark and cargo reassignment through the order format. Add sealift-specific fields to the `assess_unit` output for naval units (current cargo, available capacity, nearby embark/disembark points).
 

@@ -1,4 +1,4 @@
-import { cellToLatLng, gridDisk, gridDistance } from 'h3-js';
+import { cellToLatLng, gridDisk } from 'h3-js';
 import {
   getGameStateForPlayer,
   getHexController,
@@ -23,16 +23,17 @@ import {
   strategicMarchPathH3IndicesFromPlan,
 } from '../../../shared/orderPreviewSlowTerrainTooltip';
 import { isWithinAirFerryGridRange } from '../gridRange';
-import { isEmbarkedLandUnitOnWater } from '../sealift';
 import {
-  allowsLandUnitStepWithOptionalSeaportDebark,
+  isEmbarkedLandUnit,
+} from '../sealift';
+import {
+  canLandUnitTraverseEdge,
   landUnitCanOccupyHex,
   LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON,
 } from '../../../shared/landTraversalRes1';
 import {
-  EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON,
+  EMBARKED_LAND_UNIT_MOVEMENT_BLOCK_REASON,
   getLandMovementBlockReason,
-  isLandUnitSeaportDebarkHop,
   isLandUnitType,
 } from '../landMovementConstraints';
 import type { PlanRouteError, PlanRouteOk } from '../../tools/tool1Pathfinding';
@@ -708,17 +709,7 @@ function findNearbyReachablePreview(
       if (isLandUnitType(unit.unitType) && candidateH3 !== unit.h3Index) {
         const landMass = context.pathfindingSession.landMass;
         if (!landUnitCanOccupyHex(candidateH3, landMass)) continue;
-        const seaportDisembarkOriginH3 =
-          isEmbarkedLandUnitOnWater(unit.id) &&
-          getRes1InfrastructureForHex(unit.h3Index).seaportCount > 0
-            ? unit.h3Index
-            : undefined;
-        if (!allowsLandUnitStepWithOptionalSeaportDebark(
-          unit.h3Index,
-          candidateH3,
-          landMass,
-          seaportDisembarkOriginH3
-        )) continue;
+        if (!canLandUnitTraverseEdge(unit.h3Index, candidateH3, landMass)) continue;
       }
       attempts += 1;
       previewDiagnostics.fallbackAttemptCount += 1;
@@ -810,49 +801,13 @@ function computeHumanMarchPreviewForUnit(
   }
 
   const unitIsLand = isLandUnitType(unit.unitType);
-  const embarkedOnWater = unitIsLand && isEmbarkedLandUnitOnWater(unit.id);
-  const originPassabilityTerrain = context.passabilityByH3.get(unit.h3Index) ?? 'land';
-  const originSeaportCount = getRes1InfrastructureForHex(unit.h3Index).seaportCount;
-  let hoveredMoveDistance = 0;
-  if (hoveredH3Index !== unit.h3Index) {
-    try {
-      hoveredMoveDistance = gridDistance(unit.h3Index, hoveredH3Index);
-    } catch {
-      hoveredMoveDistance = Number.MAX_SAFE_INTEGER;
-    }
-  }
-  const seaportDebarkHop = isLandUnitSeaportDebarkHop({
-    isEmbarkedOnWater: embarkedOnWater,
-    originSeaportCount,
-    moveDistance: hoveredMoveDistance,
-  });
-  const embarkedAtSeaWithoutCoastalOrigin = embarkedOnWater && originPassabilityTerrain !== 'coastal' && !seaportDebarkHop;
-  if (embarkedOnWater) {
-    const hoveredPassabilityTerrain = context.passabilityByH3.get(hoveredH3Index) ?? 'land';
-    const hoveredSeaportCount = getRes1InfrastructureForHex(hoveredH3Index).seaportCount;
-    logDebug('gameActions previewHumanMarchOrder: embarked terrain classification', {
-      unitId: unit.id,
-      originH3Index: unit.h3Index,
-      originTerrainRaw: context.terrainByH3.get(unit.h3Index) ?? null,
-      originTerrainKind: context.terrainKindByH3.get(unit.h3Index) ?? null,
-      originNormalizedTerrain: originPassabilityTerrain,
-      originSeaportCount,
-      hoveredH3Index,
-      hoveredTerrainRaw: context.terrainByH3.get(hoveredH3Index) ?? null,
-      hoveredTerrainKind: context.terrainKindByH3.get(hoveredH3Index) ?? null,
-      hoveredNormalizedTerrain: hoveredPassabilityTerrain,
-      hoveredSeaportCount,
-      embarkedAtSeaWithoutCoastalOrigin,
-    });
-  }
-  if (embarkedAtSeaWithoutCoastalOrigin) {
+  if (unitIsLand && isEmbarkedLandUnit(unit.id) && hoveredH3Index !== unit.h3Index) {
     result = {
       valid: false,
       showInvalidMarker: true,
-      invalidReason: getLandMovementBlockReason({
-        unitType: unit.unitType,
-        isEmbarkedAtSea: true,
-      }) ?? EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON,
+      invalidReason:
+        getLandMovementBlockReason({ unitType: unit.unitType, isEmbarked: true }) ??
+        EMBARKED_LAND_UNIT_MOVEMENT_BLOCK_REASON,
       segments: [],
     };
     cacheSetBounded(previewResultCache, cacheKey, result, maxPreviewResultCacheEntries);
@@ -865,22 +820,6 @@ function computeHumanMarchPreviewForUnit(
         valid: false,
         showInvalidMarker: true,
         invalidReason: LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON,
-        segments: [],
-      };
-      cacheSetBounded(previewResultCache, cacheKey, result, maxPreviewResultCacheEntries);
-      logPreviewOutcome(unitId, hoveredH3Index, result, 'computed');
-      return result;
-    }
-    const blockReason = getLandMovementBlockReason({
-      unitType: unit.unitType,
-      isEmbarkedAtSea: embarkedAtSeaWithoutCoastalOrigin,
-      isSeaportDebarkHop: seaportDebarkHop,
-    });
-    if (blockReason) {
-      result = {
-        valid: false,
-        showInvalidMarker: true,
-        invalidReason: blockReason,
         segments: [],
       };
       cacheSetBounded(previewResultCache, cacheKey, result, maxPreviewResultCacheEntries);

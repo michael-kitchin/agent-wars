@@ -7,14 +7,11 @@ import { gridDisk, gridDistance } from 'h3-js';
 import type { GameStateSnapshot } from './gameDb';
 import { passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
 import {
-  allowsLandUnitStepWithOptionalSeaportDebark,
   getLandMassReachableHexes,
-  landUnitCanOccupyHex,
 } from '../shared/landTraversalRes1';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../shared/tacticalRanges';
-import { getRes1InfrastructureForHex } from './gameDb';
 import { getRes1LandMassByH3 } from './terrainClassificationCache';
-import { isEmbarkedLandUnitOnWater } from './game-actions/sealift';
+import { isEmbarkedLandUnit } from './game-actions/sealift';
 
 /**
  * Returns the effective movement terrain class for a hex, upgrading `land` to `coastal` when a seaport is present.
@@ -36,35 +33,28 @@ export function resolveMovementTerrainForHex(
  * Returns all legal destinations for a unit within movement range (including its current hex).
  *
  * Purpose: Single source of truth for AI order generation and order validation movement legality.
- * When to use: Pass the acting unit and the current game snapshot.
+ * When to use: Pass the acting unit and the current game snapshot; set `assumeDebarkedForReachability` when validating opponent movement that will auto-debark before marching.
  * Expected outcome: Land units: hexes reachable via land-mass edges within range. Naval: terrain-passable hexes within range.
  * Exceptions: Never throws; pentagon edges fall through to a legacy scan for naval only.
  */
 export function getValidDestinations(
   unit: { id?: string; h3Index: string; unitType: string },
-  state: GameStateSnapshot
+  state: GameStateSnapshot,
+  options?: { assumeDebarkedForReachability?: boolean }
 ): string[] {
   const range = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
   const wantLand = unit.unitType === 'infantry' || unit.unitType === 'armor';
   const hexSet = new Set(state.hexes.map((h) => h.h3Index));
 
   if (wantLand) {
-    let seaportDisembarkOriginH3: string | undefined;
-    let maxDepth = range;
-    if (
-      unit.id &&
-      isEmbarkedLandUnitOnWater(unit.id) &&
-      getRes1InfrastructureForHex(unit.h3Index).seaportCount > 0
-    ) {
-      seaportDisembarkOriginH3 = unit.h3Index;
-      maxDepth = 1;
+    if (unit.id && isEmbarkedLandUnit(unit.id) && !options?.assumeDebarkedForReachability) {
+      return [unit.h3Index];
     }
     return [...getLandMassReachableHexes({
       originH3: unit.h3Index,
       hexSet,
       data: getRes1LandMassByH3(),
-      maxDepth,
-      seaportDisembarkOriginH3,
+      maxDepth: range,
     })];
   }
 
@@ -115,8 +105,9 @@ export function getValidDestinations(
  */
 export function getValidDestinationsUnoccupied(
   unit: { id?: string; h3Index: string; unitType: string },
-  state: GameStateSnapshot
+  state: GameStateSnapshot,
+  options?: { assumeDebarkedForReachability?: boolean }
 ): string[] {
   const occupied = new Set(state.units.map((u) => u.h3Index));
-  return getValidDestinations(unit, state).filter((h3) => !occupied.has(h3));
+  return getValidDestinations(unit, state, options).filter((h3) => !occupied.has(h3));
 }

@@ -6,8 +6,19 @@
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/** @deprecated Use `EMBARKED_LAND_UNIT_MOVEMENT_BLOCK_REASON`. */
 export const EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON =
-  'Embarked land units cannot receive independent movement orders while at sea.';
+  'Embarked land units cannot receive independent movement orders. Debark first.';
+
+/**
+ * User-facing reason when an embarked land unit receives an independent movement order.
+ *
+ * Purpose: Shared validation message for march preview, assign, and Ready filtering.
+ * When to use: Return from `getLandMovementBlockReason` when cargo is still assigned to a naval carrier.
+ * Expected outcome: Stable string for UI and tests.
+ * Exceptions: None.
+ */
+export const EMBARKED_LAND_UNIT_MOVEMENT_BLOCK_REASON = EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON;
 
 /**
  * Documents the `TerrainMapsByH3` interface as a named contract surface (export interface TerrainMapsByH3).
@@ -80,27 +91,10 @@ export function buildTerrainMapsFromHexRows(
  */
 export function getLandMovementBlockReason(args: {
   unitType: string;
-  isEmbarkedAtSea?: boolean;
-  isSeaportDebarkHop?: boolean;
+  isEmbarked?: boolean;
 }): string | null {
-  if (isLandUnitType(args.unitType) && args.isEmbarkedAtSea && !args.isSeaportDebarkHop) {
-    return EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON;
+  if (isLandUnitType(args.unitType) && args.isEmbarked) {
+    return EMBARKED_LAND_UNIT_MOVEMENT_BLOCK_REASON;
   }
   return null;
-}
-
-/**
- * Defines the `isLandUnitSeaportDebarkHop` function shape (export function isLandUnitSeaportDebarkHop(args: { isEmbarkedOnWater: boolean; originSeaportCount: number; moveDistance: number }): boolean).
-
- * Purpose: Detects a single-grid-step debark from a seaport hex while embarked on water.
- * When to use: Order validation and march preview before applying land-mass edge rules.
- * Expected outcome: True only for one-step moves from a hex with at least one seaport while the unit is embarked at sea.
- * Exceptions: None.
- */
-export function isLandUnitSeaportDebarkHop(args: {
-  isEmbarkedOnWater: boolean;
-  originSeaportCount: number;
-  moveDistance: number;
-}): boolean {
-  return args.isEmbarkedOnWater && args.originSeaportCount > 0 && args.moveDistance === 1;
 }

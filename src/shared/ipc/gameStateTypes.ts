@@ -34,6 +34,15 @@ units: {
     h3Index: string;
     displayOrder?: number;
     /**
+     * Strategic sealift: naval carrier id when cargo is still assigned (`unit_transport_assignments`).
+     *
+     * Contract: Present on strategic snapshots from `listUnitsForSnapshot`; tactical battles may use `embarkedOnSubUnitId` instead.
+     * When to use: Block map/sidebar selection and show embark state without extra IPC.
+     * Expected outcome: When set, the land unit cannot receive independent movement until debarked.
+     * Exceptions: None.
+     */
+    embarkedOnNavalUnitId?: string | null;
+    /**
      * Tactical-only: land unit embarked on a naval sub-unit id for in-memory sealift parity.
      *
      * Contract: Present only on snapshots built from an active tactical battle for AI validation.

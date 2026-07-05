@@ -64,6 +64,15 @@ interface DbUnitSnapshotRow extends Record<string, unknown> {
    * Exceptions: None.
    */
   display_order: number | null;
+  /**
+   * Naval carrier id when this land unit has an active sealift assignment.
+   *
+   * Contract: SQL null when not embarked; maps to optional `embarkedOnNavalUnitId` on snapshot units.
+   * When to use: LEFT JOIN from `unit_transport_assignments` in the canonical units listing query.
+   * Expected outcome: Present on strategic snapshots for renderer selection guards.
+   * Exceptions: None.
+   */
+  embarked_on_naval_unit_id: string | null;
 }
 
 /**
@@ -75,13 +84,17 @@ interface DbUnitSnapshotRow extends Record<string, unknown> {
  * Exceptions: None.
  */
 function mapDbUnitSnapshotRow(row: DbUnitSnapshotRow): GameStateSnapshot['units'][number] {
-  return {
+  const unit: GameStateSnapshot['units'][number] = {
     id: row.id,
     player: row.player,
     unitType: row.unit_type,
     h3Index: row.h3_index,
     displayOrder: typeof row.display_order === 'number' ? row.display_order : undefined,
   };
+  if (typeof row.embarked_on_naval_unit_id === 'string' && row.embarked_on_naval_unit_id.length > 0) {
+    unit.embarkedOnNavalUnitId = row.embarked_on_naval_unit_id;
+  }
+  return unit;
 }
 
 /**
@@ -97,7 +110,14 @@ export function listUnitsForSnapshotWithGetAll(
 ): GameStateSnapshot['units'] {
   logTrace('gameDb unitSnapshotRead listUnitsForSnapshotWithGetAll');
   const rows = getAll<DbUnitSnapshotRow>(
-    'SELECT id, player, unit_type, h3_index, display_order FROM units'
+    `SELECT u.id,
+            u.player,
+            u.unit_type,
+            u.h3_index,
+            u.display_order,
+            uta.naval_unit_id AS embarked_on_naval_unit_id
+     FROM units u
+     LEFT JOIN unit_transport_assignments uta ON uta.land_unit_id = u.id`
   );
   logDebug('gameDb unitSnapshotRead listUnitsForSnapshotWithGetAll', { rowCount: rows.length });
   return rows.map(mapDbUnitSnapshotRow);

@@ -1,5 +1,6 @@
 import type { GameStateSnapshot } from '../gameDb';
 import { computeRoundedPercentage } from '../../shared/progressFormatting';
+import { getValidDestinations } from '../oneStepMoveDestinations';
 
 /**
  * Documents the `PromptToolFlags` interface as a named contract surface (export interface PromptToolFlags).
@@ -226,7 +227,7 @@ export function buildToolUsageGuidance(flags: PromptToolFlags, hasPrecomputedBri
     if (flags.planningEnabled && !hasPrecomputedBriefing) {
       lines.push('- For units several turns from combat, use assign_order (march/pursue) in final JSON instead of re-planning every turn.');
     }
-    lines.push('- Sealift: use the # Naval Transport Status section for each naval unit (capacity, co-located land, nearest embark hex); issue embark / transport_move / disembark in orders[] when crossing water.');
+    lines.push('- Sealift: use the # Naval Transport Status section for each naval unit (capacity, co-located land, nearest embark hex); issue embark / transport_move / disembark in orders[] when crossing water. While embarked, explicit_move and disembark both clear cargo and march in one action.');
   }
   if (flags.memoryEnabled) {
     lines.push(
@@ -264,10 +265,22 @@ export function buildAdjacentCellsFallbackBlock(
   getValidDestinationsUnoccupied: (unit: { h3Index: string; unitType: string }, state: GameStateSnapshot) => string[]
 ): string {
   const { latLngByH3, format } = coordMap;
+  const occupied = new Set(state.units.map((row) => row.h3Index));
   const lines: string[] = [];
   for (const u of opponentUnits.filter((unit) => latLngByH3.has(unit.h3Index))) {
     const current = format(u.h3Index);
-    const dests = getValidDestinationsUnoccupied(u, state)
+    const snapshotUnit = state.units.find((row) => row.id === u.id);
+    const assumeDebarkedForReachability = !!snapshotUnit?.embarkedOnNavalUnitId;
+    const dests = (
+      assumeDebarkedForReachability
+        ? getValidDestinations(
+            { id: u.id, h3Index: u.h3Index, unitType: u.unitType },
+            state,
+            { assumeDebarkedForReachability: true }
+          )
+        : getValidDestinationsUnoccupied(u, state)
+    )
+      .filter((h3) => h3 === u.h3Index || !occupied.has(h3))
       .filter((h3) => latLngByH3.has(h3))
       .map((h3) => format(h3));
     const cells = dests.length ? `${current} (hold), or move to: ${dests.join(', ')}` : `${current} (hold only; no empty adjacent cells)`;

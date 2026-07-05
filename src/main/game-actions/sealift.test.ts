@@ -10,9 +10,14 @@ import { withTempGameDb } from '../testSupport/withTempGameDb';
 import {
   applyEmbarkOrdersForPlayer,
   applyTransportLossForRemovedNavalUnits,
-  autoDisembarkIndependentLandMoves,
+  autoDebarkOpponentLandUnitIfMovingIndependently,
+  canManualDebarkFromHex,
+  clearEmbarkAssignmentForLandUnit,
   getSealiftStackStateImpl,
+  isEmbarkedLandUnit,
+  shouldSkipEmbarkedLandIndependentMove,
 } from './sealift';
+import { getRes1ProductionContext } from '../terrainClassificationCache';
 
 /**
  * Defines the `withTempDb` function shape (function withTempDb(runCase: () => void): void).
@@ -74,7 +79,12 @@ function setHexTerrain(h3Index: string, terrain: 'land' | 'coastal' | 'water'): 
  * Exceptions: None.
  */
 function setPortControl(h3Index: string, controllerPlayerId: 'human' | 'opponent', seaportCount = 1): void {
-  dbRun('UPDATE res1_infrastructure SET seaport_count = ? WHERE h3_index = ?', [seaportCount, h3Index]);
+  dbRun(
+    `INSERT INTO res1_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
+     VALUES (?, 0, 0, ?)
+     ON CONFLICT(h3_index) DO UPDATE SET seaport_count = excluded.seaport_count`,
+    [h3Index, seaportCount]
+  );
   dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, controllerPlayerId]);
 }
 
@@ -268,7 +278,7 @@ function testApplyEmbarkOrdersAllowsWaterAndArcticWhenPortPresent(): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function testTransportLossDestroysCargoOnWaterAndDebarksOnCoastal(): void {
+function testTransportLossDestroysAllEmbarkedCargoRegardlessOfTerrain(): void {
   withTempDb(() => {
     const waterHex = pickHex(4);
     const coastalHex = pickHex(5);
@@ -295,8 +305,8 @@ function testTransportLossDestroysCargoOnWaterAndDebarksOnCoastal(): void {
 
     assert.deepStrictEqual(
       removedCargo.map((unit) => unit.id).sort(),
-      ['human-inf-water-loss'],
-      'water transport loss should remove embarked land cargo'
+      ['human-inf-coastal-loss', 'human-inf-water-loss'],
+      'transport loss should remove all embarked land cargo'
     );
     assert.strictEqual(
       dbGetOne<{ count: number }>('SELECT COUNT(*) AS count FROM units WHERE id = ?', ['human-inf-water-loss'])?.count ?? 0,
@@ -305,8 +315,8 @@ function testTransportLossDestroysCargoOnWaterAndDebarksOnCoastal(): void {
     );
     assert.strictEqual(
       dbGetOne<{ count: number }>('SELECT COUNT(*) AS count FROM units WHERE id = ?', ['human-inf-coastal-loss'])?.count ?? 0,
-      1,
-      'coastal cargo should remain alive'
+      0,
+      'coastal cargo should also be deleted from units table'
     );
     assert.strictEqual(
       dbGetOne<{ count: number }>('SELECT COUNT(*) AS count FROM unit_transport_assignments WHERE naval_unit_id IN (?, ?)', [
@@ -320,32 +330,131 @@ function testTransportLossDestroysCargoOnWaterAndDebarksOnCoastal(): void {
 }
 
 /**
- * Defines the `testAutoDisembarkOnIndependentMoveWhenNotOnWater` function shape (function testAutoDisembarkOnIndependentMoveWhenNotOnWater(): void).
+ * Defines the `testClearEmbarkAssignmentForLandUnitRemovesRow` function shape (function testClearEmbarkAssignmentForLandUnitRemovesRow(): void).
 
- * Purpose: Supports maintainability by documenting why `testAutoDisembarkOnIndependentMoveWhenNotOnWater` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Regression guard for the shared manual/LLM debark primitive.
+ * When to use: After edits to `clearEmbarkAssignmentForLandUnit` or callers that depend on assignment removal.
+ * Expected outcome: Assignment row deleted; `isEmbarkedLandUnit` returns false afterward.
  * Exceptions: None.
  */
-function testAutoDisembarkOnIndependentMoveWhenNotOnWater(): void {
+function testClearEmbarkAssignmentForLandUnitRemovesRow(): void {
   withTempDb(() => {
     const landHex = pickHex(7);
-    const destinationHex = pickHex(8);
-    dbRun('UPDATE hexes SET terrain = ? WHERE h3_index = ?', ['land', landHex]);
-    insertUnit('human-naval-land-move', 'human', 'naval', landHex);
-    insertUnit('human-inf-land-move', 'human', 'infantry', landHex);
+    insertUnit('human-naval-debark', 'human', 'naval', landHex);
+    insertUnit('human-inf-debark', 'human', 'infantry', landHex);
     dbRun('INSERT OR REPLACE INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', [
-      'human-inf-land-move',
-      'human-naval-land-move',
+      'human-inf-debark',
+      'human-naval-debark',
     ]);
-
-    autoDisembarkIndependentLandMoves([{ unitId: 'human-inf-land-move', toH3Index: destinationHex }]);
-
+    assert.strictEqual(isEmbarkedLandUnit('human-inf-debark'), true);
+    clearEmbarkAssignmentForLandUnit('human-inf-debark');
     const remaining = dbGetOne<{ count: number }>(
       'SELECT COUNT(*) AS count FROM unit_transport_assignments WHERE land_unit_id = ?',
-      ['human-inf-land-move']
+      ['human-inf-debark']
     )?.count ?? 0;
-    assert.strictEqual(remaining, 0, 'expected independent move on non-water to auto-disembark');
+    assert.strictEqual(remaining, 0);
+    assert.strictEqual(isEmbarkedLandUnit('human-inf-debark'), false);
+  });
+}
+
+/**
+ * Defines the `testCanManualDebarkFromHexCoastalWaterPortAndOpenWater` function shape (function testCanManualDebarkFromHexCoastalWaterPortAndOpenWater(): void).
+
+ * Purpose: Contract tests for manual debark eligibility by terrain and port control.
+ * When to use: After edits to `canManualDebarkFromHex` or embark context queries.
+ * Expected outcome: Coastal always allowed; water requires controlled port; open water blocked.
+ * Exceptions: None.
+ */
+function testCanManualDebarkFromHexCoastalWaterPortAndOpenWater(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const coastalHex = pickHex(10);
+    const waterPortHex = pickHex(11);
+    setHexTerrain(coastalHex, 'coastal');
+    setHexTerrain(waterPortHex, 'water');
+    setPortControl(waterPortHex, 'human');
+    assert.strictEqual(canManualDebarkFromHex(coastalHex, 'human'), true);
+    assert.strictEqual(canManualDebarkFromHex(waterPortHex, 'human'), true);
+    const openWaterHex = state.hexes.find(
+      (hex) =>
+        hex.terrain === 'water' &&
+        hex.h3Index !== waterPortHex &&
+        getRes1ProductionContext({ h3Index: hex.h3Index }).seaportCount === 0
+    )?.h3Index;
+    assert.ok(openWaterHex, 'expected open water hex without seaport in classification cache');
+    dbRun(
+      `INSERT INTO res1_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
+       VALUES (?, 0, 0, 0)
+       ON CONFLICT(h3_index) DO UPDATE SET seaport_count = 0`,
+      [openWaterHex]
+    );
+    dbRun('DELETE FROM res1_control WHERE h3_index = ?', [openWaterHex]);
+    assert.strictEqual(canManualDebarkFromHex(openWaterHex, 'human'), false);
+  });
+}
+
+/**
+ * Defines the `testGameStateSnapshotIncludesEmbarkedOnNavalUnitId` function shape (function testGameStateSnapshotIncludesEmbarkedOnNavalUnitId(): void).
+
+ * Purpose: Ensures renderer selection guards can read embark state from strategic snapshots.
+ * When to use: After edits to `unitSnapshotRead` or transport assignment schema.
+ * Expected outcome: Embarked land unit row includes `embarkedOnNavalUnitId`; debarked land omits it.
+ * Exceptions: None.
+ */
+function testGameStateSnapshotIncludesEmbarkedOnNavalUnitId(): void {
+  withTempDb(() => {
+    const coastalHex = pickHex(13);
+    setHexTerrain(coastalHex, 'coastal');
+    insertUnit('human-naval-snap', 'human', 'naval', coastalHex);
+    insertUnit('human-inf-snap', 'human', 'infantry', coastalHex);
+    dbRun('INSERT OR REPLACE INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', [
+      'human-inf-snap',
+      'human-naval-snap',
+    ]);
+    const embarked = getGameState().units.find((u) => u.id === 'human-inf-snap');
+    assert.strictEqual(embarked?.embarkedOnNavalUnitId, 'human-naval-snap');
+    clearEmbarkAssignmentForLandUnit('human-inf-snap');
+    const debarked = getGameState().units.find((u) => u.id === 'human-inf-snap');
+    assert.ok(!debarked?.embarkedOnNavalUnitId);
+  });
+}
+
+/**
+ * Defines the `testTransportLossSparesManuallyDebarkedCoLocatedLand` function shape (function testTransportLossSparesManuallyDebarkedCoLocatedLand(): void).
+
+ * Purpose: Manually debarked co-located land has no assignment row and must survive naval destruction.
+ * When to use: Regression guard for terrain-neutral cargo loss applying only to embarked assignments.
+ * Expected outcome: Debarked infantry row remains; embarked sibling on same hex is deleted with the carrier.
+ * Exceptions: None.
+ */
+function testTransportLossSparesManuallyDebarkedCoLocatedLand(): void {
+  withTempDb(() => {
+    const coastalHex = pickHex(16);
+    setHexTerrain(coastalHex, 'coastal');
+    insertUnit('human-naval-debarked-survivor', 'human', 'naval', coastalHex);
+    insertUnit('human-inf-still-embarked', 'human', 'infantry', coastalHex);
+    insertUnit('human-inf-debarked-survivor', 'human', 'infantry', coastalHex);
+    dbRun('INSERT OR REPLACE INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', [
+      'human-inf-still-embarked',
+      'human-naval-debarked-survivor',
+    ]);
+
+    const removedCargo = applyTransportLossForRemovedNavalUnits([
+      { id: 'human-naval-debarked-survivor', player: 'human', unitType: 'naval', h3Index: coastalHex } as CombatUnit,
+    ]);
+
+    assert.deepStrictEqual(
+      removedCargo.map((unit) => unit.id),
+      ['human-inf-still-embarked']
+    );
+    assert.strictEqual(
+      dbGetOne<{ count: number }>('SELECT COUNT(*) AS count FROM units WHERE id = ?', ['human-inf-debarked-survivor'])?.count ?? 0,
+      1
+    );
+    assert.strictEqual(
+      dbGetOne<{ count: number }>('SELECT COUNT(*) AS count FROM units WHERE id = ?', ['human-inf-still-embarked'])?.count ?? 0,
+      0
+    );
   });
 }
 
@@ -357,7 +466,7 @@ function testAutoDisembarkOnIndependentMoveWhenNotOnWater(): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function testSealiftStateDisablesDebarkButtonsOnWater(): void {
+function testSealiftStateDisablesDebarkButtonsOnOpenWater(): void {
   withTempDb(() => {
     const waterHex = pickHex(9);
     setHexTerrain(waterHex, 'water');
@@ -371,9 +480,79 @@ function testSealiftStateDisablesDebarkButtonsOnWater(): void {
     const state = getSealiftStackStateImpl(waterHex);
     assert.strictEqual(state.contextMode, 'water');
     assert.strictEqual(state.controlsDisabled, true);
+    assert.strictEqual(state.debarkAllowedAtHex, false);
     assert.strictEqual(state.navalRows.length, 1);
     assert.strictEqual(state.navalRows[0]?.debarkSlot1Enabled, false);
     assert.strictEqual(state.navalRows[0]?.debarkSlot2Enabled, false);
+  });
+}
+
+/**
+ * Defines the `testSealiftStateEnablesDebarkAtControlledWaterPort` function shape (function testSealiftStateEnablesDebarkAtControlledWaterPort(): void).
+
+ * Purpose: Water seaports retain manual debark even when embark controls stay disabled at sea.
+ * When to use: After edits to `buildNavalRows` or `canManualDebarkFromHex`.
+ * Expected outcome: Debark slots enabled for occupied cargo at controlled water port hex.
+ * Exceptions: None.
+ */
+function testSealiftStateEnablesDebarkAtControlledWaterPort(): void {
+  withTempDb(() => {
+    const waterHex = pickHex(14);
+    setHexTerrain(waterHex, 'water');
+    setPortControl(waterHex, 'human');
+    insertUnit('human-naval-port-debark', 'human', 'naval', waterHex);
+    insertUnit('human-inf-port-debark', 'human', 'infantry', waterHex);
+    dbRun('INSERT OR REPLACE INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', [
+      'human-inf-port-debark',
+      'human-naval-port-debark',
+    ]);
+
+    const state = getSealiftStackStateImpl(waterHex);
+    assert.ok(state.contextMode === 'water' || state.contextMode === 'coastal_port');
+    assert.strictEqual(state.debarkAllowedAtHex, true);
+    assert.strictEqual(state.navalRows[0]?.debarkSlot1Enabled, true);
+    if (state.contextMode === 'water') {
+      assert.strictEqual(state.controlsDisabled, true);
+    }
+  });
+}
+
+/**
+ * Defines the `testAutoDebarkOpponentAndSkipHumanEmbarkedMoves` function shape (function testAutoDebarkOpponentAndSkipHumanEmbarkedMoves(): void).
+
+ * Purpose: LLM/opponent movement auto-debarks at Ready; human embarked independent moves remain blocked.
+ * When to use: After edits to `autoDebarkOpponentLandUnitIfMovingIndependently` or `shouldSkipEmbarkedLandIndependentMove`.
+ * Expected outcome: Opponent assignment cleared before move; human assignment preserved and move skipped.
+ * Exceptions: None.
+ */
+function testAutoDebarkOpponentAndSkipHumanEmbarkedMoves(): void {
+  withTempDb(() => {
+    const hexA = pickHex(3);
+    const hexB = pickHex(4);
+    insertUnit('opp-nav', 'opponent', 'naval', hexA);
+    insertUnit('opp-inf', 'opponent', 'infantry', hexA);
+    insertUnit('hum-nav', 'human', 'naval', hexA);
+    insertUnit('hum-inf', 'human', 'infantry', hexA);
+    dbRun('INSERT OR REPLACE INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', [
+      'opp-inf',
+      'opp-nav',
+    ]);
+    dbRun('INSERT OR REPLACE INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', [
+      'hum-inf',
+      'hum-nav',
+    ]);
+
+    assert.strictEqual(isEmbarkedLandUnit('opp-inf'), true);
+    assert.strictEqual(isEmbarkedLandUnit('hum-inf'), true);
+    assert.strictEqual(shouldSkipEmbarkedLandIndependentMove('hum-inf', hexB), true);
+    assert.strictEqual(shouldSkipEmbarkedLandIndependentMove('opp-inf', hexB), false);
+
+    autoDebarkOpponentLandUnitIfMovingIndependently('opp-inf', hexB);
+    assert.strictEqual(isEmbarkedLandUnit('opp-inf'), false);
+    assert.strictEqual(isEmbarkedLandUnit('hum-inf'), true);
+
+    autoDebarkOpponentLandUnitIfMovingIndependently('hum-inf', hexB);
+    assert.strictEqual(isEmbarkedLandUnit('hum-inf'), true);
   });
 }
 
@@ -390,9 +569,14 @@ function run(): void {
   testApplyEmbarkOrdersAllowsControlledSeaportRegardlessTerrainLabel();
   testApplyEmbarkOrdersRejectsAtSeaAndNoPort();
   testApplyEmbarkOrdersAllowsWaterAndArcticWhenPortPresent();
-  testTransportLossDestroysCargoOnWaterAndDebarksOnCoastal();
-  testAutoDisembarkOnIndependentMoveWhenNotOnWater();
-  testSealiftStateDisablesDebarkButtonsOnWater();
+  testTransportLossDestroysAllEmbarkedCargoRegardlessOfTerrain();
+  testClearEmbarkAssignmentForLandUnitRemovesRow();
+  testCanManualDebarkFromHexCoastalWaterPortAndOpenWater();
+  testGameStateSnapshotIncludesEmbarkedOnNavalUnitId();
+  testTransportLossSparesManuallyDebarkedCoLocatedLand();
+  testSealiftStateDisablesDebarkButtonsOnOpenWater();
+  testSealiftStateEnablesDebarkAtControlledWaterPort();
+  testAutoDebarkOpponentAndSkipHumanEmbarkedMoves();
   console.log('sealift.test.ts passed');
 }
 

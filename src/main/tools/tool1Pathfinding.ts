@@ -4,7 +4,7 @@
  * Internal geometry uses lat/lng tuples after the OpenRouter layer decodes briefing hex codes; outbound tool payloads to the model are rewritten to hex codes by `encodeOpenRouterToolResultForLlm`.
  */
 
-import { cellToLatLng, gridDistance } from 'h3-js';
+import { cellToLatLng } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
 import {
   getReachableHexes,
@@ -15,11 +15,8 @@ import {
 import type { PassableDomain } from '../pathfinding';
 import { logDebug, logError } from '../logger';
 import { buildNormalizedTerrainByH3 } from '../movementTerrain';
-import { getRes1InfrastructureForHex } from '../gameDb';
-import { isEmbarkedLandUnitOnWater } from '../game-actions/sealift';
 import {
   buildTerrainMapsFromHexRows,
-  isLandUnitType,
 } from '../game-actions/landMovementConstraints';
 import {
   PLAN_ROUTE_WARNING_ALREADY_AT_REDIRECTED_HEX,
@@ -741,20 +738,6 @@ export function executePlanRouteWithSession(
     statePerspective: state.playerPerspective ?? null,
     fogOfWarEnabled: state.fogOfWarEnabled ?? null,
   });
-  let seaportDisembarkOriginH3: string | undefined;
-  if (
-    isLandUnitType(unit.unitType) &&
-    isEmbarkedLandUnitOnWater(unitId) &&
-    getRes1InfrastructureForHex(originH3).seaportCount > 0
-  ) {
-    try {
-      if (gridDistance(originH3, destH3) === 1) {
-        seaportDisembarkOriginH3 = originH3;
-      }
-    } catch {
-      seaportDisembarkOriginH3 = undefined;
-    }
-  }
   const routeResolution = resolveRoutePathForUnit({
     unitType: unit.unitType,
     originH3,
@@ -763,7 +746,6 @@ export function executePlanRouteWithSession(
     terrainByH3: session.terrainByH3,
     session,
     blocked,
-    seaportDisembarkOriginH3,
   });
   if ('status' in routeResolution) return routeResolution;
   const { passableFor, destinationH3, path, movementBudget, warnings, statefulStats } = routeResolution;

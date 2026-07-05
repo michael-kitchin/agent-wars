@@ -490,6 +490,7 @@ function registerIpcHandlers(): void {
         contextMode: 'unsupported',
         controlsDisabled: true,
         hasEmbarkedUnitsInStack: false,
+        debarkAllowedAtHex: false,
         navalRows: [],
         landOptions: [],
       };
@@ -504,6 +505,7 @@ function registerIpcHandlers(): void {
         contextMode: 'unsupported',
         controlsDisabled: true,
         hasEmbarkedUnitsInStack: false,
+        debarkAllowedAtHex: false,
         navalRows: [],
         landOptions: [],
       };

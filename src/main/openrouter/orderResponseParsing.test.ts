@@ -7,7 +7,11 @@ import * as assert from 'assert';
 import { ensureStrategicCoordinateRegistryInitialized } from '../briefing/map/hex-coordinates';
 import { buildLatLngCoordinateMap } from '../mapData';
 import type { GameStateSnapshot } from '../gameDb';
+import { dbRun, getGameState } from '../gameDb';
+import { h3ToCode } from '../briefing/map/hex-code-translator';
 import { parseOrdersResponse } from './orderResponseParsing';
+import { withTempGameDb } from '../testSupport/withTempGameDb';
+import { isEmbarkedLandUnit } from '../game-actions/sealift';
 
 /**
  * Documents the module-scope binding `minimalState` (minimalState).
@@ -128,6 +132,103 @@ function testInvalidAssignOrderTypeSurfacesDropReason(): void {
 }
 
 /**
+ * Defines the `testDisembarkClearsAssignmentAndEnqueuesMovement` function shape.
+
+ * Purpose: LLM movement actions auto-debark embarked opponent cargo before enqueueing movement.
+ * When to use: After edits to `processV3OrdersArray` disembark handling.
+ * Expected outcome: Assignment row removed and one movement order emitted for destination hex.
+ * Exceptions: None.
+ */
+function testDisembarkClearsAssignmentAndEnqueuesMovement(): void {
+  withTempGameDb('aw-order-disembark-', () => {
+    ensureStrategicCoordinateRegistryInitialized();
+    const strategicCtx = { mode: 'strategic' as const };
+    const state = getGameState();
+    const landUnit = state.units.find(
+      (u) => u.player === 'opponent' && (u.unitType === 'infantry' || u.unitType === 'armor')
+    );
+    const navalUnit = state.units.find((u) => u.player === 'opponent' && u.unitType === 'naval');
+    assert.ok(landUnit, 'expected seeded opponent land unit');
+    assert.ok(navalUnit, 'expected seeded opponent naval unit');
+    const coastalHex = state.hexes[0]!.h3Index;
+    dbRun('UPDATE hexes SET terrain = ? WHERE h3_index = ?', ['coastal', coastalHex]);
+    const destHex = state.hexes[1]!.h3Index;
+    dbRun('INSERT OR REPLACE INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', [
+      landUnit!.id,
+      navalUnit!.id,
+    ]);
+    assert.strictEqual(isEmbarkedLandUnit(landUnit!.id), true);
+
+    const liveState = getGameState();
+    const hexList = liveState.hexes.map((h) => h.h3Index);
+    const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
+    const destCode = h3ToCode(destHex, strategicCtx);
+    const parsed = parseOrdersResponse(
+      `{"strategy":"debark","orders":[{"action":"disembark","unitId":"${landUnit!.id}","destination":"${destCode}"}],"airStrikes":[],"ferryOrders":[],"callbacks":[]}`,
+      resolveToH3,
+      liveState,
+      latLngByH3,
+      false,
+      strategicCtx
+    );
+    assert.ok(parsed);
+    assert.strictEqual(isEmbarkedLandUnit(landUnit!.id), false);
+    assert.strictEqual(parsed!.movementOrders.length, 1);
+    assert.strictEqual(parsed!.movementOrders[0]?.unitId, landUnit!.id);
+    assert.strictEqual(parsed!.movementOrders[0]?.toH3Index, destHex);
+  });
+}
+
+/**
+ * Defines the `testExplicitMoveWhileEmbarkedAutoDebarks` function shape.
+
+ * Purpose: LLM explicit_move auto-debarks embarked opponent cargo before enqueueing movement.
+ * When to use: After edits to embarked handling in `processV3OrdersArray`.
+ * Expected outcome: Assignment cleared and one movement row enqueued.
+ * Exceptions: None.
+ */
+function testExplicitMoveWhileEmbarkedAutoDebarks(): void {
+  withTempGameDb('aw-order-explicit-embarked-', () => {
+    ensureStrategicCoordinateRegistryInitialized();
+    const strategicCtx = { mode: 'strategic' as const };
+    const state = getGameState();
+    const landUnit = state.units.find(
+      (u) => u.player === 'opponent' && (u.unitType === 'infantry' || u.unitType === 'armor')
+    );
+    const navalUnit = state.units.find((u) => u.player === 'opponent' && u.unitType === 'naval');
+    assert.ok(landUnit && navalUnit, 'expected seeded opponent units');
+    const coastalHex = state.hexes[0]!.h3Index;
+    dbRun('UPDATE hexes SET terrain = ? WHERE h3_index = ?', ['coastal', coastalHex]);
+    const destHex = state.hexes[1]!.h3Index;
+
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [coastalHex, landUnit!.id]);
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [coastalHex, navalUnit!.id]);
+    dbRun('INSERT OR REPLACE INTO unit_transport_assignments (land_unit_id, naval_unit_id) VALUES (?, ?)', [
+      landUnit!.id,
+      navalUnit!.id,
+    ]);
+
+    const liveState = getGameState();
+    const hexList = liveState.hexes.map((h) => h.h3Index);
+    const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
+    const destCode = h3ToCode(destHex, strategicCtx);
+    const parsed = parseOrdersResponse(
+      `{"strategy":"hold","orders":[{"action":"explicit_move","unitId":"${landUnit!.id}","destination":"${destCode}"}],"airStrikes":[],"ferryOrders":[],"callbacks":[]}`,
+      resolveToH3,
+      liveState,
+      latLngByH3,
+      false,
+      strategicCtx
+    );
+    assert.ok(parsed);
+    assert.strictEqual(isEmbarkedLandUnit(landUnit!.id), false);
+    assert.strictEqual(parsed!.movementOrders.length, 1);
+    assert.strictEqual(parsed!.movementOrders[0]?.unitId, landUnit!.id);
+    assert.strictEqual(parsed!.movementOrders[0]?.toH3Index, destHex);
+  });
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
 
  * Purpose: Registers named cases for the manual test runner at the bottom of this file.
@@ -141,6 +242,8 @@ const tests = [
   { name: 'parseOrdersResponse tries fenced json after bad preamble', fn: testSkipsBadCandidateThenParsesFence },
   { name: 'parseOrdersResponse rejects top-level JSON array', fn: testRejectsTopLevelJsonArray },
   { name: 'parseOrdersResponse invalid assign_order type drop reason', fn: testInvalidAssignOrderTypeSurfacesDropReason },
+  { name: 'parseOrdersResponse disembark clears assignment and enqueues movement', fn: testDisembarkClearsAssignmentAndEnqueuesMovement },
+  { name: 'parseOrdersResponse explicit_move while embarked auto-debarks', fn: testExplicitMoveWhileEmbarkedAutoDebarks },
 ];
 
 /**

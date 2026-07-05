@@ -1,6 +1,6 @@
 import { gridDisk } from 'h3-js';
 import {
-  allowsLandUnitStepWithOptionalSeaportDebark,
+  canLandUnitTraverseEdge,
   landUnitCanOccupyHex,
   type LandMassByH3,
 } from '../../shared/landTraversalRes1';
@@ -233,7 +233,6 @@ function findLandPathWithLandMassRule(payload: {
   destinationH3: string;
   session: StatefulLandSearchSessionData;
   blocked?: Set<string>;
-  seaportDisembarkOriginH3?: string;
 }): { path: string[] | null; stats: StatefulSearchStats } {
   const stats: StatefulSearchStats = {
     expandedStateCount: 0,
@@ -288,12 +287,7 @@ function findLandPathWithLandMassRule(payload: {
       if (!payload.session.hexSet.has(neighborH3)) continue;
       if (payload.blocked?.has(neighborH3)) continue;
       if (parentByH3.has(neighborH3)) continue;
-      if (!allowsLandUnitStepWithOptionalSeaportDebark(
-        current,
-        neighborH3,
-        payload.session.landMass,
-        payload.seaportDisembarkOriginH3
-      )) continue;
+      if (!canLandUnitTraverseEdge(current, neighborH3, payload.session.landMass)) continue;
       if (deadStateSet.has(neighborH3)) {
         stats.deadStateCacheHitCount += 1;
         continue;
@@ -335,14 +329,12 @@ export function findLandPathWithStatefulOptionalAvoidanceRetry(payload: {
   blocked?: Set<string>;
   warnings?: string[];
   blockedRetryWarning?: string;
-  seaportDisembarkOriginH3?: string;
 }): { path: string[] | null; stats: StatefulSearchStats } {
   const firstAttempt = findLandPathWithLandMassRule({
     originH3: payload.originH3,
     destinationH3: payload.destinationH3,
     session: payload.session,
     blocked: payload.blocked,
-    seaportDisembarkOriginH3: payload.seaportDisembarkOriginH3,
   });
   if (firstAttempt.path || !payload.blocked) return firstAttempt;
   const retryAttempt = findLandPathWithLandMassRule({
@@ -350,7 +342,6 @@ export function findLandPathWithStatefulOptionalAvoidanceRetry(payload: {
     destinationH3: payload.destinationH3,
     session: payload.session,
     blocked: undefined,
-    seaportDisembarkOriginH3: payload.seaportDisembarkOriginH3,
   });
   if (retryAttempt.path && payload.blockedRetryWarning && payload.warnings) {
     payload.warnings.push(payload.blockedRetryWarning);

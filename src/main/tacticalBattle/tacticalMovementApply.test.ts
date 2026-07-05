@@ -66,7 +66,7 @@ test('projectTacticalSnapshot moves opponent sub-unit within res4 range', () => 
   assert.equal(next.subUnits[0]!.h3Index, dest);
 });
 
-test('projectTacticalSnapshot clears embark when opponent land disembarks to another res4 hex', () => {
+test('projectTacticalSnapshot auto-debarks embarked opponent land on independent march', () => {
   const res1 = tacticalRes1Cell(11, 12);
   const navalCell = tacticalRes4UnderRes1Corner(11, 12);
   const ring = gridDisk(navalCell, 1);
@@ -101,7 +101,7 @@ test('projectTacticalSnapshot clears embark when opponent land disembarks to ano
   const next = projectTacticalSnapshotAfterOpponentMovementOrders(snap, [{ unitId: 'land2', toH3Index: landDest }]);
   const land = next.subUnits.find((u) => u.id === 'land2');
   assert.equal(land?.h3Index, landDest);
-  assert.ok(!land?.embarkedOnSubUnitId);
+  assert.equal(land?.embarkedOnSubUnitId, undefined);
 });
 
 test('projectTacticalSnapshot moves embarked opponent land with its naval carrier', () => {

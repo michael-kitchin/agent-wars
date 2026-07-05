@@ -649,12 +649,9 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
     if (calloutEl.classList.contains('hidden')) return;
     if (calloutEl.getAttribute('data-h3-index') !== h3Index) return;
     if (!state.showSealiftSection) return;
-    const nonSelectableEmbarkedIds =
-      state.contextMode === 'water'
-        ? state.navalRows
-            .flatMap((row) => [row.slot1UnitId, row.slot2UnitId])
-            .filter((unitId): unitId is string => typeof unitId === 'string' && unitId.length > 0)
-        : [];
+    const nonSelectableEmbarkedIds = state.navalRows
+      .flatMap((row) => [row.slot1UnitId, row.slot2UnitId])
+      .filter((unitId): unitId is string => typeof unitId === 'string' && unitId.length > 0);
     setStackPopupNonSelectableUnitIds(calloutEl, nonSelectableEmbarkedIds);
 
     const section = document.createElement('div');
@@ -753,7 +750,7 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
         });
         slotRow.appendChild(select);
 
-        if (state.contextMode !== 'water') {
+        if (debarkEnabled) {
           const debarkBtn = document.createElement('button');
           debarkBtn.type = 'button';
           debarkBtn.className = 'unit-select stack-unit-toggle';

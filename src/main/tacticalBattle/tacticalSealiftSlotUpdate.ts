@@ -4,7 +4,7 @@
 
 import type { EmbarkOrder, SealiftStackState } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import { syncStrategicSealiftFromTacticalHexEmbarkPairs } from '../game-actions/sealift';
+import { canManualDebarkFromHex, syncStrategicSealiftFromTacticalHexEmbarkPairs } from '../game-actions/sealift';
 import { isDbReady } from '../gameDb';
 import { getActiveTacticalBattleSnapshotRef, setActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import { writeTacticalBattleSnapshotToGameConfig } from './tacticalBattlePersistence';
@@ -89,7 +89,12 @@ export function projectTacticalSealiftSlotChange(
   if (!navalIds.includes(args.navalUnitId)) {
     return { success: false, reason: 'Selected naval unit is not in this stack.' };
   }
-  if (baseState.contextMode === 'water') {
+  const isDebark = args.landUnitId === null;
+  if (isDebark) {
+    if (!canManualDebarkFromHex(args.h3Index, 'human')) {
+      return { success: false, reason: 'Debark is not available at this location.' };
+    }
+  } else if (baseState.contextMode === 'water') {
     return { success: false, reason: 'Sealift assignments cannot be changed while at sea.' };
   }
   const landKey = args.landUnitId?.trim() ?? '';

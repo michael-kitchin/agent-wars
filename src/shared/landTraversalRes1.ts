@@ -127,44 +127,19 @@ export function canLandUnitTraverseEdge(fromH3: string, toH3: string, data: Land
 }
 
 /**
- * Defines the `allowsLandUnitStepWithOptionalSeaportDebark` function shape (export function allowsLandUnitStepWithOptionalSeaportDebark(fromH3: string, toH3: string, data: LandMassByH3, seaportDisembarkOriginH3?: string): boolean).
-
- * Purpose: Applies normal land-mass edge rules, or permits a one-step debark from a seaport water hex to any occupiable adjacent land hex.
- * When to use: Pathfinding neighbor expansion and march preview when an embarked land unit debarks at a port.
- * Expected outcome: True when the step is a valid march or an allowed port debark hop from `seaportDisembarkOriginH3`.
- * Exceptions: None.
- */
-export function allowsLandUnitStepWithOptionalSeaportDebark(
-  fromH3: string,
-  toH3: string,
-  data: LandMassByH3,
-  seaportDisembarkOriginH3?: string
-): boolean {
-  if (canLandUnitTraverseEdge(fromH3, toH3, data)) return true;
-  if (seaportDisembarkOriginH3 != null && fromH3 === seaportDisembarkOriginH3) {
-    return landUnitCanOccupyHex(toH3, data);
-  }
-  return false;
-}
-
-/**
- * Defines the `getLandMassRouteBlockReason` function shape (export function getLandMassRouteBlockReason(routeH3: readonly string[], data: LandMassByH3, options?: { seaportDisembarkOriginH3?: string }): string | null).
+ * Defines the `getLandMassRouteBlockReason` function shape (export function getLandMassRouteBlockReason(routeH3: readonly string[], data: LandMassByH3): string | null).
 
  * Purpose: Reports the first land-mass step that blocks a proposed land-unit route.
- * When to use: Order validation after assembling a grid path; pass `seaportDisembarkOriginH3` for a one-step port debark hop that bypasses land-mass edge rules.
- * Expected outcome: Null when every checked step passes `allowsLandUnitStepWithOptionalSeaportDebark`; otherwise a stable human-facing reason string.
+ * When to use: Order validation after assembling a grid path.
+ * Expected outcome: Null when every checked step passes `canLandUnitTraverseEdge`; otherwise a stable human-facing reason string.
  * Exceptions: None.
  */
-export function getLandMassRouteBlockReason(
-  routeH3: readonly string[],
-  data: LandMassByH3,
-  options?: { seaportDisembarkOriginH3?: string }
-): string | null {
+export function getLandMassRouteBlockReason(routeH3: readonly string[], data: LandMassByH3): string | null {
   if (routeH3.length < 2) return null;
   for (let i = 1; i < routeH3.length; i++) {
     const from = routeH3[i - 1]!;
     const to = routeH3[i]!;
-    if (!allowsLandUnitStepWithOptionalSeaportDebark(from, to, data, options?.seaportDisembarkOriginH3)) {
+    if (!canLandUnitTraverseEdge(from, to, data)) {
       return LAND_UNIT_ROUTE_STEP_BLOCKED_REASON;
     }
   }
@@ -207,9 +182,8 @@ export function getLandMassReachableHexes(args: {
   data: LandMassByH3;
   maxDepth: number;
   blocked?: ReadonlySet<string>;
-  seaportDisembarkOriginH3?: string;
 }): Set<string> {
-  const { originH3, hexSet, data, maxDepth, blocked, seaportDisembarkOriginH3 } = args;
+  const { originH3, hexSet, data, maxDepth, blocked } = args;
   const reachable = new Set<string>();
   if (!hexSet.has(originH3)) return reachable;
   if (blocked?.has(originH3)) return reachable;
@@ -236,7 +210,7 @@ export function getLandMassReachableHexes(args: {
       if (neighbor === current || !hexSet.has(neighbor)) continue;
       if (blocked?.has(neighbor)) continue;
       if (reachable.has(neighbor)) continue;
-      if (!allowsLandUnitStepWithOptionalSeaportDebark(current, neighbor, data, seaportDisembarkOriginH3)) continue;
+      if (!canLandUnitTraverseEdge(current, neighbor, data)) continue;
       const nextDepth = depth + 1;
       if (nextDepth > maxDepth) continue;
       depthByH3.set(neighbor, nextDepth);

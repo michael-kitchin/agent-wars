@@ -251,7 +251,8 @@ export type TacticalMovementBlockReason =
   | 'non_human'
   | 'outside_footprint'
   | 'out_of_range'
-  | 'air_no_march';
+  | 'air_no_march'
+  | 'embarked_cargo';
 
 /**
  * Decides whether a single opponent movement order may mutate a tactical sub-unit row in the snapshot clone.
@@ -299,11 +300,16 @@ export function tacticalComputeMovementOrderOutcome(args: {
       context: { unitId: args.order.unitId, toH3Index: args.order.toH3Index },
     };
   }
-  const moveType = tacticalMovementUnitTypeForPathfinding(u, args.order.toH3Index);
+  const opponentDebarkingIndependently =
+    (u.unitType === 'infantry' || u.unitType === 'armor') &&
+    !!u.embarkedOnSubUnitId &&
+    args.order.toH3Index !== u.h3Index;
+  const pathfindUnit = opponentDebarkingIndependently ? { ...u, embarkedOnSubUnitId: undefined } : u;
+  const moveType = tacticalMovementUnitTypeForPathfinding(pathfindUnit, args.order.toH3Index);
   if (moveType === 'air') {
     return { ok: false, reason: 'air_no_march', context: { unitId: args.order.unitId } };
   }
-  const budget = effectiveTacticalMovementPointBudgetForMarchLeg(args.battle, u, args.sub, moveType);
+  const budget = effectiveTacticalMovementPointBudgetForMarchLeg(args.battle, pathfindUnit, args.sub, moveType);
   let plan = planTacticalRes4MarchWithSessionCache(args.battle, {
     fromH3: u.h3Index,
     toH3: args.order.toH3Index,
@@ -445,6 +451,17 @@ export function tacticalComputeHumanMovementOrderOutcome(args: {
     return {
       ok: false,
       reason: 'outside_footprint',
+      context: { unitId: args.order.unitId, toH3Index: args.order.toH3Index },
+    };
+  }
+  if (
+    (u.unitType === 'infantry' || u.unitType === 'armor') &&
+    u.embarkedOnSubUnitId &&
+    args.order.toH3Index !== u.h3Index
+  ) {
+    return {
+      ok: false,
+      reason: 'embarked_cargo',
       context: { unitId: args.order.unitId, toH3Index: args.order.toH3Index },
     };
   }

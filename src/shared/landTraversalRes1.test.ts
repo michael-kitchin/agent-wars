@@ -5,8 +5,6 @@
 
 import * as assert from 'assert';
 import {
-  LAND_UNIT_ROUTE_STEP_BLOCKED_REASON,
-  allowsLandUnitStepWithOptionalSeaportDebark,
   canLandUnitTraverseEdge,
   getLandMassRouteBlockReason,
   landUnitCanOccupyHex,
@@ -205,48 +203,6 @@ function testDifferentIslandBlocked(): void {
 }
 
 /**
- * Defines the `testSeaportDebarkBypassesLandMassEdge` function shape (function testSeaportDebarkBypassesLandMassEdge(): void).
-
- * Purpose: Port debark hops skip land-mass edge validation while still requiring an occupiable destination.
- * When to use: Regression guard for embarked land units debarking from seaport water hexes.
- * Expected outcome: Route validation allows the hop; step helper permits water-to-high-water landmass when debarking.
- * Exceptions: None.
- */
-function testSeaportDebarkBypassesLandMassEdge(): void {
-  const data = mapOf(record('W', 100), record('L', 95, [1]));
-  assert.strictEqual(canLandUnitTraverseEdge('W', 'L', data), false);
-  assert.strictEqual(
-    allowsLandUnitStepWithOptionalSeaportDebark('W', 'L', data, 'W'),
-    true
-  );
-  assert.strictEqual(
-    getLandMassRouteBlockReason(['W', 'L'], data, { seaportDisembarkOriginH3: 'W' }),
-    null
-  );
-}
-
-/**
- * Defines the `testSeaportDebarkToNonOccupiableHexBlockedInRouteValidation` function shape (function testSeaportDebarkToNonOccupiableHexBlockedInRouteValidation(): void).
-
- * Purpose: Route validation must reject port debark hops onto hexes with no continent or island membership.
- * When to use: Regression guard keeping `getLandMassRouteBlockReason` aligned with `allowsLandUnitStepWithOptionalSeaportDebark`.
- * Expected outcome: Both helpers reject a debark onto pure open-ocean landmass cells.
- * Exceptions: None.
- */
-function testSeaportDebarkToNonOccupiableHexBlockedInRouteValidation(): void {
-  const data = mapOf(record('W', 100), record('O', 100));
-  assert.strictEqual(landUnitCanOccupyHex('O', data), false);
-  assert.strictEqual(
-    allowsLandUnitStepWithOptionalSeaportDebark('W', 'O', data, 'W'),
-    false
-  );
-  assert.strictEqual(
-    getLandMassRouteBlockReason(['W', 'O'], data, { seaportDisembarkOriginH3: 'W' }),
-    LAND_UNIT_ROUTE_STEP_BLOCKED_REASON
-  );
-}
-
-/**
  * Defines the `testOccupancy` function shape (function testOccupancy(): void).
 
  * Purpose: Supports maintainability by documenting why `testOccupancy` exists.
@@ -308,8 +264,6 @@ function run(): void {
   testDifferentIslandsLinkedBySharedContinent();
   testIslandToContinentWithSharedIslandAllowed();
   testDifferentIslandBlocked();
-  testSeaportDebarkBypassesLandMassEdge();
-  testSeaportDebarkToNonOccupiableHexBlockedInRouteValidation();
   testOccupancy();
   console.log('landTraversalRes1 tests passed');
 }

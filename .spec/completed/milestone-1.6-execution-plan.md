@@ -2,6 +2,8 @@
 
 *Execution plan for a coding agent implementation of milestone 1.6, aligned to `.spec/devleopment-plan-v3.2.md` and `.spec/combat-rules-v2.2.md`.*
 
+> **Superseded rules (see `.spec/combat-rules-v3.md` §9):** Success criteria 12–14 below described coastal transport survival, coastal independent movement while embarked, and universal auto-debark on independent movement. Those behaviors are replaced by terrain-neutral transport loss, human manual debark before movement, and LLM-opponent auto-debark on independent movement orders.
+
 ---
 
 ## 1. Goal, non-goals, and success criteria
