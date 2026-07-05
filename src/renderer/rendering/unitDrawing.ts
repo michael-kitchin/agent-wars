@@ -2,6 +2,7 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { CASUALTY_X_COLOR, COUNT_BADGE_OFFSET, LIGHTNING_COLOR, MULTI_PLAYER_FILL, MULTI_PLAYER_STROKE, PLAYER_COLORS, STACK_OFFSET_X, STACK_OFFSET_Y, UNIT_RADIUS, UNIT_TYPE_LABELS } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { hexCenterPx } from '../map/mapUtils';
+import { shouldHideStrategicMapUnitsForRes4Zoom } from '../map/terrainView';
 
 /**
  * Documents the module-scope binding `TOKEN_ICON_FIT_RATIO` (TOKEN_ICON_FIT_RATIO).
@@ -290,6 +291,8 @@ export function drawStaleEnemyIntel(
       lastSeenTurn: state.turnNumber,
     });
   }
+
+  if (shouldHideStrategicMapUnitsForRes4Zoom()) return;
 
   if (!hasFogData) return;
 

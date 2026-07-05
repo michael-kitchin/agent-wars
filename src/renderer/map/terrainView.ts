@@ -83,6 +83,18 @@ export function shouldRenderRes4Hexes(): boolean {
 }
 
 /**
+ * Returns true when res4 detail zoom is active on the strategic map and unit markers should not be drawn or hit-tested.
+ *
+ * Purpose: Tactical battles always render res4 hexes but must still show units and stack callouts; strategic res4 zoom hides them for terrain inspection.
+ * When to use: Canvas unit draws, stale-intel marker suppression, stack callout lifecycle, and map pointer hit-testing on unit icons.
+ * Expected outcome: `true` only when `shouldRenderRes4Hexes()` is true and no tactical battle snapshot is active.
+ * Exceptions: None.
+ */
+export function shouldHideStrategicMapUnitsForRes4Zoom(): boolean {
+  return shouldRenderRes4Hexes() && !S.tacticalBattleSnapshot;
+}
+
+/**
  * Defines the `shouldShowBuildEntryZoom` function shape (export function shouldShowBuildEntryZoom(): boolean).
 
  * Purpose: Supports maintainability by documenting why `shouldShowBuildEntryZoom` exists.

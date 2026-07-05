@@ -15,6 +15,7 @@ import {
 import { emitParityDiagnosticsBreadcrumb } from '../core/parityDiagnostics';
 import { hideOrderBlockHexTooltip, repositionOrderBlockHexTooltipIfVisible } from './orderBlockHexTooltip';
 import { hideOrderSlowerHexTooltip, repositionOrderSlowerHexTooltipIfVisible } from './orderSlowerHexTooltip';
+import { shouldHideStrategicMapUnitsForRes4Zoom } from './terrainView';
 
 /**
  * Minimal unit row shape used for grouped march / ferry preflight on the map (strategic units or tactical sub-units).
@@ -663,7 +664,12 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     const unitsAtHit = hit ? unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id)) : [];
     const isStack = unitsAtHit.length >= 2;
     const isLoneAi = unitsAtHit.length === 1 && unitsAtHit[0]?.player !== 'human';
-    const stackIconHit = !!hit && unitsAtHit.length > 0 && deps.containerPixelHitsDrawnUnitIcon(px, py, hit, unitsAtHit.length);
+    const strategicUnitsHiddenOnMap = shouldHideStrategicMapUnitsForRes4Zoom();
+    const stackIconHit =
+      !strategicUnitsHiddenOnMap &&
+      !!hit &&
+      unitsAtHit.length > 0 &&
+      deps.containerPixelHitsDrawnUnitIcon(px, py, hit, unitsAtHit.length);
     if (hit && (isStack || isLoneAi) && stackIconHit) {
       if (isHoverOrderPlanningActive()) {
         return;
@@ -680,7 +686,10 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     if (hit) {
       const unit = deps.getUnitAtHex(hit);
       const drawnAtHit = unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id));
-      const unitIconHit = drawnAtHit.length > 0 && deps.containerPixelHitsDrawnUnitIcon(px, py, hit, drawnAtHit.length);
+      const unitIconHit =
+        !strategicUnitsHiddenOnMap &&
+        drawnAtHit.length > 0 &&
+        deps.containerPixelHitsDrawnUnitIcon(px, py, hit, drawnAtHit.length);
       if (unit?.player === 'human' && unitIconHit) {
         applyHumanUnitIconClickSelectionPolicy({
           ctrlKey: e.ctrlKey,

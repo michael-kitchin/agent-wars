@@ -15,6 +15,7 @@ import {
 } from '../rendering/resolutionPlayback';
 import { hexCenterPx, hitTestHexAtContainerPixel, hitTestTacticalRes4HexAtContainerPixel } from './mapUtils';
 import { getMainLeafletMap } from './worldLeafletMap';
+import { shouldHideStrategicMapUnitsForRes4Zoom } from './terrainView';
 
 /**
  * Documents the `DrawInteractionDeps` interface as a named contract surface (interface DrawInteractionDeps).
@@ -291,7 +292,11 @@ export function updateMapInteractionCursor(clientX: number, clientY: number, dep
     if (hit) {
       const { unitsToDraw, movingIds } = getUnitsForDrawWithMovingIds(S.gameState, deps);
       const drawnAtHit = unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id));
-      if (drawnAtHit.length > 0 && containerPixelHitsDrawnUnitIcon(px, py, hit, drawnAtHit.length)) {
+      if (
+        !shouldHideStrategicMapUnitsForRes4Zoom() &&
+        drawnAtHit.length > 0 &&
+        containerPixelHitsDrawnUnitIcon(px, py, hit, drawnAtHit.length)
+      ) {
         want = 'default';
       }
     }

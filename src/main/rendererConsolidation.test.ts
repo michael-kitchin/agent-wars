@@ -76,21 +76,88 @@ function testRedrawAndResizeDelegateToSharedScene(): void {
 }
 
 /**
- * Defines the `testSharedSceneStillRendersStaleIntel` function shape (function testSharedSceneStillRendersStaleIntel(): void).
-
- * Purpose: Supports maintainability by documenting why `testSharedSceneStillRendersStaleIntel` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Static regression tests for res4 strategic zoom hiding unit markers while preserving stale-intel tracking.
+ *
+ * Purpose: Guards res4 detail zoom from drawing or hit-testing strategic units, stacks, and stale intel markers on the strategic map.
+ * When to use: CI guard when refactoring `drawGameScene`, `drawStaleEnemyIntel`, stack callout, or map interactions.
+ * Expected outcome: Stale intel tracking always runs; marker draw and unit icons are gated behind `shouldHideStrategicMapUnitsForRes4Zoom`.
  * Exceptions: None.
  */
-function testSharedSceneStillRendersStaleIntel(): void {
+function testRes4ZoomHidesStrategicMapUnits(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
-  const source = fs.readFileSync(rendererPath, 'utf8');
-  const drawSceneFn = getFunctionSource(source, 'drawGameScene');
+  const terrainViewPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'terrainView.ts');
+  const mainMapInteractionsPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'mainMapInteractions.ts');
+  const drawInteractionPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'drawInteraction.ts');
+  const rendererSource = fs.readFileSync(rendererPath, 'utf8');
+  const terrainViewSource = fs.readFileSync(terrainViewPath, 'utf8');
+  const unitDrawingSource = fs.readFileSync(
+    path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'unitDrawing.ts'),
+    'utf8'
+  );
+  const mainMapInteractionsSource = fs.readFileSync(mainMapInteractionsPath, 'utf8');
+  const drawInteractionSource = fs.readFileSync(drawInteractionPath, 'utf8');
+  const drawSceneFn = getFunctionSource(rendererSource, 'drawGameScene');
+  const showStackCalloutFn = getFunctionSource(rendererSource, 'showStackCallout');
+  const refreshStackCalloutFn = getFunctionSource(rendererSource, 'refreshStackCalloutIfOpen');
+  const redrawFn = getFunctionSource(rendererSource, 'redraw');
+  const resizeAndRedrawFn = getFunctionSource(rendererSource, 'resizeAndRedraw');
+  const drawStaleIntelFn = getFunctionSource(unitDrawingSource, 'drawStaleEnemyIntel');
+
+  const tacticalIdx = drawSceneFn.indexOf('if (S.tacticalBattleSnapshot)');
+  assert.ok(tacticalIdx >= 0, 'drawGameScene should branch on tactical snapshot');
+  const tacticalReturnIdx = drawSceneFn.indexOf('return;', tacticalIdx);
+  assert.ok(tacticalReturnIdx > tacticalIdx, 'tactical branch should return before strategic-only overlays');
+  const strategicSlice = drawSceneFn.slice(tacticalReturnIdx);
 
   assert.ok(
-    drawSceneFn.includes('drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId);'),
-    'drawGameScene should render stale enemy intel markers'
+    terrainViewSource.includes('export function shouldHideStrategicMapUnitsForRes4Zoom(): boolean') &&
+      terrainViewSource.includes('return shouldRenderRes4Hexes() && !S.tacticalBattleSnapshot;'),
+    'terrainView should expose shouldHideStrategicMapUnitsForRes4Zoom combining res4 and non-tactical checks'
+  );
+  assert.ok(
+    strategicSlice.includes('drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId);'),
+    'strategic drawGameScene should always invoke drawStaleEnemyIntel for tracking'
+  );
+  assert.ok(
+    strategicSlice.includes('const hideStrategicUnits = shouldHideStrategicMapUnitsForRes4Zoom();') &&
+      strategicSlice.includes('if (!hideStrategicUnits) {') &&
+      strategicSlice.includes('drawUnits(ctx, unitsToDraw, effectiveMovingIdsStrategic);') &&
+      strategicSlice.includes('if (anim && hexList && !hideStrategicUnits)'),
+    'strategic drawGameScene should gate drawUnits and drawMovingUnits on res4 strategic zoom hide helper'
+  );
+  assert.ok(
+    drawStaleIntelFn.includes('if (shouldHideStrategicMapUnitsForRes4Zoom()) return;'),
+    'drawStaleEnemyIntel should suppress marker draw but keep tracking when res4 strategic zoom hides units'
+  );
+  assert.ok(
+    showStackCalloutFn.includes('if (shouldHideStrategicMapUnitsForRes4Zoom()) {') &&
+      showStackCalloutFn.includes('hideStackCallout();'),
+    'showStackCallout should dismiss and not open during res4 strategic zoom'
+  );
+  assert.ok(
+    refreshStackCalloutFn.includes('if (shouldHideStrategicMapUnitsForRes4Zoom()) {') &&
+      refreshStackCalloutFn.includes('hideStackCallout();'),
+    'refreshStackCalloutIfOpen should dismiss callout during res4 strategic zoom'
+  );
+  assert.ok(
+    redrawFn.includes('if (shouldHideStrategicMapUnitsForRes4Zoom()) {') &&
+      redrawFn.includes('hideStackCallout();'),
+    'redraw should dismiss open stack callout when res4 strategic zoom hides units'
+  );
+  assert.ok(
+    resizeAndRedrawFn.includes('if (shouldHideStrategicMapUnitsForRes4Zoom()) {') &&
+      resizeAndRedrawFn.includes('hideStackCallout();'),
+    'resizeAndRedraw should dismiss open stack callout when res4 strategic zoom hides units'
+  );
+  assert.ok(
+    mainMapInteractionsSource.includes('shouldHideStrategicMapUnitsForRes4Zoom()') &&
+      mainMapInteractionsSource.includes('const strategicUnitsHiddenOnMap = shouldHideStrategicMapUnitsForRes4Zoom();'),
+    'mainMapInteractions should zero out unit/stack icon hit-testing when res4 strategic zoom hides units'
+  );
+  assert.ok(
+    drawInteractionSource.includes('!shouldHideStrategicMapUnitsForRes4Zoom()') &&
+      drawInteractionSource.includes('containerPixelHitsDrawnUnitIcon(px, py, hit, drawnAtHit.length)'),
+    'updateMapInteractionCursor should skip unit-icon pointer cursor when res4 strategic zoom hides units'
   );
 }
 
@@ -950,7 +1017,7 @@ function testHoverOrderPlanningInteractionLock(): void {
  */
 function run(): void {
   testRedrawAndResizeDelegateToSharedScene();
-  testSharedSceneStillRendersStaleIntel();
+  testRes4ZoomHidesStrategicMapUnits();
   testCommittedPathsRemainVisibleDuringResolutionAnimation();
   testProductionLabelContractsForExploredVsUnexploredHexes();
   testStackCalloutSingleUnitNonCtrlClosesPopup();

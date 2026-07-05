@@ -16087,6 +16087,9 @@
     if (fillFraction >= RES4_SHOW_THRESHOLD_VIEW_FRACTION) rendererSharedState.res4Visible = true;
     return rendererSharedState.res4Visible;
   }
+  function shouldHideStrategicMapUnitsForRes4Zoom() {
+    return shouldRenderRes4Hexes() && !rendererSharedState.tacticalBattleSnapshot;
+  }
   function shouldShowBuildEntryZoom() {
     const map = getMainLeafletMap();
     if (!map) return false;
@@ -18817,6 +18820,7 @@
         lastSeenTurn: state.turnNumber
       });
     }
+    if (shouldHideStrategicMapUnitsForRes4Zoom()) return;
     if (!hasFogData) return;
     const persistedIntel = Array.isArray(state.enemyIntel) ? state.enemyIntel : [];
     const fallbackIntel = Array.from(rendererSharedState.clientStaleEnemyIntelByUnitId.values()).map((row) => ({
@@ -22839,7 +22843,7 @@
       if (hit) {
         const { unitsToDraw, movingIds } = getUnitsForDrawWithMovingIds(rendererSharedState.gameState, deps);
         const drawnAtHit = unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id));
-        if (drawnAtHit.length > 0 && containerPixelHitsDrawnUnitIcon(px, py, hit, drawnAtHit.length)) {
+        if (!shouldHideStrategicMapUnitsForRes4Zoom() && drawnAtHit.length > 0 && containerPixelHitsDrawnUnitIcon(px, py, hit, drawnAtHit.length)) {
           want = "default";
         }
       }
@@ -24714,7 +24718,8 @@
       const unitsAtHit = hit ? unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id)) : [];
       const isStack = unitsAtHit.length >= 2;
       const isLoneAi = unitsAtHit.length === 1 && unitsAtHit[0]?.player !== "human";
-      const stackIconHit = !!hit && unitsAtHit.length > 0 && deps.containerPixelHitsDrawnUnitIcon(px, py, hit, unitsAtHit.length);
+      const strategicUnitsHiddenOnMap = shouldHideStrategicMapUnitsForRes4Zoom();
+      const stackIconHit = !strategicUnitsHiddenOnMap && !!hit && unitsAtHit.length > 0 && deps.containerPixelHitsDrawnUnitIcon(px, py, hit, unitsAtHit.length);
       if (hit && (isStack || isLoneAi) && stackIconHit) {
         if (isHoverOrderPlanningActive()) {
           return;
@@ -24730,7 +24735,7 @@
       if (hit) {
         const unit = deps.getUnitAtHex(hit);
         const drawnAtHit = unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id));
-        const unitIconHit = drawnAtHit.length > 0 && deps.containerPixelHitsDrawnUnitIcon(px, py, hit, drawnAtHit.length);
+        const unitIconHit = !strategicUnitsHiddenOnMap && drawnAtHit.length > 0 && deps.containerPixelHitsDrawnUnitIcon(px, py, hit, drawnAtHit.length);
         if (unit?.player === "human" && unitIconHit) {
           applyHumanUnitIconClickSelectionPolicy({
             ctrlKey: e.ctrlKey,
@@ -25902,6 +25907,9 @@
   }
   function hideStackCallout() {
     const el = document.getElementById("stack-callout");
+    if (el?.classList.contains("hidden") && !rendererSharedState.stackCalloutModalActive) {
+      return;
+    }
     if (el) {
       el.classList.add("hidden");
       el.classList.remove("stack-modal");
@@ -26190,6 +26198,10 @@
   }
   function showStackCallout(units, clientX, clientY) {
     if (isHoverOrderPlanningActive()) return;
+    if (shouldHideStrategicMapUnitsForRes4Zoom()) {
+      hideStackCallout();
+      return;
+    }
     const calloutEl = document.getElementById("stack-callout");
     const listEl = document.getElementById("stack-callout-list");
     if (!calloutEl || !listEl) return;
@@ -26306,6 +26318,10 @@
   }
   function refreshStackCalloutIfOpen() {
     if (isHoverOrderPlanningActive()) {
+      hideStackCallout();
+      return;
+    }
+    if (shouldHideStrategicMapUnitsForRes4Zoom()) {
       hideStackCallout();
       return;
     }
@@ -27114,10 +27130,13 @@
     drawTerrainInfrastructureOverlays2(ctx);
     drawRangePerimeterOverlay(ctx);
     drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId);
-    if (unitsToDraw.length) {
-      drawUnits(ctx, unitsToDraw, effectiveMovingIdsStrategic);
+    const hideStrategicUnits = shouldHideStrategicMapUnitsForRes4Zoom();
+    if (!hideStrategicUnits) {
+      if (unitsToDraw.length) {
+        drawUnits(ctx, unitsToDraw, effectiveMovingIdsStrategic);
+      }
     }
-    if (anim && hexList) {
+    if (anim && hexList && !hideStrategicUnits) {
       if (playbackPhase?.inAirStrikeOutbound && airStrikeOutboundProgress < 1) {
         drawMovingUnits(ctx, width, height, airStrikeOutboundPlaybackMoves, hexList, airStrikeOutboundProgress);
       } else if (playbackPhase?.inAirStrikeReturn && airStrikeReturnProgress < 1) {
@@ -27186,6 +27205,9 @@
     syncTacticalEntryButtonOverlay();
     tacticalUpdateExitButtonVisibility();
     updateReadyButtonState();
+    if (shouldHideStrategicMapUnitsForRes4Zoom()) {
+      hideStackCallout();
+    }
   }
   function drawHoverRoutePreview2(ctx) {
     if (!shouldDrawHoveredPathPreview()) return;
@@ -27215,6 +27237,9 @@
     syncTacticalEntryButtonOverlay();
     tacticalUpdateExitButtonVisibility();
     updateReadyButtonState();
+    if (shouldHideStrategicMapUnitsForRes4Zoom()) {
+      hideStackCallout();
+    }
   }
   function tickResolutionMoveAnimation() {
     if (!rendererSharedState.resolutionMoveAnimation) return;

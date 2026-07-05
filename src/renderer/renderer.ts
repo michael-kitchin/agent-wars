@@ -54,6 +54,7 @@ import {
 } from './map/mapUtils';
 import {
   hideBuildEntryLayer,
+  shouldHideStrategicMapUnitsForRes4Zoom,
   shouldRenderRes4Hexes,
   shouldShowBuildEntryZoom,
 } from './map/terrainView';
@@ -359,6 +360,9 @@ function formatStackTooltip(units: GameStateSnapshot['units']): string {
  */
 function hideStackCallout(): void {
   const el = document.getElementById('stack-callout');
+  if (el?.classList.contains('hidden') && !S.stackCalloutModalActive) {
+    return;
+  }
   if (el) {
     el.classList.add('hidden');
     el.classList.remove('stack-modal');
@@ -828,6 +832,10 @@ function showStackCallout(
   clientY: number
 ): void {
   if (isHoverOrderPlanningActive()) return;
+  if (shouldHideStrategicMapUnitsForRes4Zoom()) {
+    hideStackCallout();
+    return;
+  }
   const calloutEl = document.getElementById('stack-callout');
   const listEl = document.getElementById('stack-callout-list');
   if (!calloutEl || !listEl) return;
@@ -973,6 +981,10 @@ function resolveUnitsForStackCalloutRefresh(unitIds: string[], state: GameStateS
 
 function refreshStackCalloutIfOpen(): void {
   if (isHoverOrderPlanningActive()) {
+    hideStackCallout();
+    return;
+  }
+  if (shouldHideStrategicMapUnitsForRes4Zoom()) {
     hideStackCallout();
     return;
   }
@@ -2453,10 +2465,13 @@ function drawGameScene(
   drawTerrainInfrastructureOverlays(ctx);
   drawRangePerimeterOverlay(ctx);
   drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId);
-  if (unitsToDraw.length) {
-    drawUnits(ctx, unitsToDraw, effectiveMovingIdsStrategic);
+  const hideStrategicUnits = shouldHideStrategicMapUnitsForRes4Zoom();
+  if (!hideStrategicUnits) {
+    if (unitsToDraw.length) {
+      drawUnits(ctx, unitsToDraw, effectiveMovingIdsStrategic);
+    }
   }
-  if (anim && hexList) {
+  if (anim && hexList && !hideStrategicUnits) {
     if (playbackPhase?.inAirStrikeOutbound && airStrikeOutboundProgress < 1) {
       drawMovingUnits(ctx, width, height, airStrikeOutboundPlaybackMoves, hexList, airStrikeOutboundProgress);
     } else if (playbackPhase?.inAirStrikeReturn && airStrikeReturnProgress < 1) {
@@ -2556,6 +2571,9 @@ function resizeAndRedraw(): void {
   syncTacticalEntryButtonOverlay();
   tacticalUpdateExitButtonVisibility();
   updateReadyButtonState();
+  if (shouldHideStrategicMapUnitsForRes4Zoom()) {
+    hideStackCallout();
+  }
 }
 
 /**
@@ -2606,6 +2624,9 @@ function redraw(): void {
   syncTacticalEntryButtonOverlay();
   tacticalUpdateExitButtonVisibility();
   updateReadyButtonState();
+  if (shouldHideStrategicMapUnitsForRes4Zoom()) {
+    hideStackCallout();
+  }
 }
 
 /**
