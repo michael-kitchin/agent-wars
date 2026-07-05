@@ -378,6 +378,7 @@ export function tacticalMovementUnitTypeForPathfinding(
   unit: { unitType: string; h3Index: string; embarkedOnSubUnitId?: string | null },
   _toH3Index?: string
 ): string {
+  void _toH3Index;
   if (unit.unitType === 'air') return 'air';
   const embarked =
     (unit.unitType === 'infantry' || unit.unitType === 'armor') &&

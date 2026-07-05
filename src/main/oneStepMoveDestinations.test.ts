@@ -32,7 +32,6 @@ function getValidDestinationsFullScan(
 ): string[] {
   const range = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
   const wantLand = unit.unitType === 'infantry' || unit.unitType === 'armor';
-  const hexSet = new Set(state.hexes.map((h) => h.h3Index));
 
   if (wantLand) {
     return getValidDestinations(unit, state);

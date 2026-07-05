@@ -8,6 +8,11 @@ import type { HumanOrderPreviewResult } from './ipc/humanOrderPreviewTypes';
 
 /**
  * Builds a minimal preview row for envelope assembly tests.
+ *
+ * Purpose: Reduces boilerplate when constructing grouped march preview envelopes in unit tests.
+ * When to use: From grouped preview assembly regression tests in this module.
+ * Expected outcome: Returns a `{ unitId, preview }` row with optional invalid marker and segment count.
+ * Exceptions: None.
  */
 function previewRow(unitId: string, valid: boolean, segmentCount: number): {
   unitId: string;
@@ -37,6 +42,11 @@ function previewRow(unitId: string, valid: boolean, segmentCount: number): {
 
 /**
  * Regression guard: grouped envelope strips route segments when any unit preview is invalid.
+ *
+ * Purpose: Ensures mixed or partial failures do not draw route lines for any unit in the envelope.
+ * When to use: Run via `npm test` after changes to `buildHumanOrderGroupPreviewEnvelope`.
+ * Expected outcome: `validForAll` is false and every preview row has empty segments.
+ * Exceptions: None.
  */
 function testBuildHumanOrderGroupPreviewEnvelopeClearsSegmentsWhenAnyInvalid(): void {
   const envelope = buildHumanOrderGroupPreviewEnvelope({
@@ -52,6 +62,11 @@ function testBuildHumanOrderGroupPreviewEnvelopeClearsSegmentsWhenAnyInvalid(): 
 
 /**
  * Regression guard: grouped envelope keeps route segments when every unit preview is valid.
+ *
+ * Purpose: Ensures successful grouped previews retain drawable route geometry for all units.
+ * When to use: Run via `npm test` after changes to `buildHumanOrderGroupPreviewEnvelope`.
+ * Expected outcome: `validForAll` is true and every preview row retains segments.
+ * Exceptions: None.
  */
 function testBuildHumanOrderGroupPreviewEnvelopeKeepsSegmentsWhenAllValid(): void {
   const envelope = buildHumanOrderGroupPreviewEnvelope({
@@ -64,6 +79,11 @@ function testBuildHumanOrderGroupPreviewEnvelopeKeepsSegmentsWhenAllValid(): voi
 
 /**
  * Regression guard: mixed land/naval strategic previews include every selected unit id.
+ *
+ * Purpose: Ensures grouped strategic march preview IPC includes all mixed-selection unit ids.
+ * When to use: Run via `npm test` after changes to `groupedStrategicMarchPreviewUnitIds`.
+ * Expected outcome: Returns every unit id when `mixedLandAndNaval` is true.
+ * Exceptions: None.
  */
 function testGroupedStrategicMarchPreviewUnitIdsIncludesAllMixedSelectionUnits(): void {
   const ids = groupedStrategicMarchPreviewUnitIds({
@@ -78,6 +98,11 @@ function testGroupedStrategicMarchPreviewUnitIdsIncludesAllMixedSelectionUnits()
 
 /**
  * Regression guard: homogeneous strategic previews keep one representative id per origin.
+ *
+ * Purpose: Ensures non-mixed grouped previews deduplicate same-origin stacks to one representative unit id.
+ * When to use: Run via `npm test` after changes to `groupedStrategicMarchPreviewUnitIds`.
+ * Expected outcome: Returns only the first unit id for a shared origin hex.
+ * Exceptions: None.
  */
 function testGroupedStrategicMarchPreviewUnitIdsUsesRepresentativeForHomogeneousSelection(): void {
   const ids = groupedStrategicMarchPreviewUnitIds({
@@ -92,6 +117,11 @@ function testGroupedStrategicMarchPreviewUnitIdsUsesRepresentativeForHomogeneous
 
 /**
  * Regression guard: homogeneous tactical previews keep one representative id per origin.
+ *
+ * Purpose: Ensures non-mixed tactical grouped previews deduplicate same-origin sub-units to one representative id.
+ * When to use: Run via `npm test` after changes to `groupedTacticalMarchPreviewUnitIds`.
+ * Expected outcome: Returns only the first sub-unit id for a shared origin hex.
+ * Exceptions: None.
  */
 function testGroupedTacticalMarchPreviewUnitIdsUsesRepresentativeForHomogeneousSelection(): void {
   const ids = groupedTacticalMarchPreviewUnitIds({
@@ -106,6 +136,11 @@ function testGroupedTacticalMarchPreviewUnitIdsUsesRepresentativeForHomogeneousS
 
 /**
  * Regression guard: mixed land/naval tactical previews include every selected sub-unit id.
+ *
+ * Purpose: Ensures grouped tactical march preview IPC includes all mixed-selection sub-unit ids.
+ * When to use: Run via `npm test` after changes to `groupedTacticalMarchPreviewUnitIds`.
+ * Expected outcome: Returns every sub-unit id when `mixedLandAndNaval` is true.
+ * Exceptions: None.
  */
 function testGroupedTacticalMarchPreviewUnitIdsIncludesAllMixedSelectionUnits(): void {
   const ids = groupedTacticalMarchPreviewUnitIds({
@@ -118,6 +153,14 @@ function testGroupedTacticalMarchPreviewUnitIdsIncludesAllMixedSelectionUnits():
   assert.deepStrictEqual(ids, ['inf-same-hex', 'nav-same-hex']);
 }
 
+/**
+ * Entry point for grouped march preview assembly unit tests.
+ *
+ * Purpose: Runs all tests in this module and prints a pass marker for CI harnesses.
+ * When to use: Invoked automatically when the compiled test file is executed by `npm test`.
+ * Expected outcome: All assertions pass and a success line is logged.
+ * Exceptions: Propagates assertion failures to the Node process exit code.
+ */
 function main(): void {
   testBuildHumanOrderGroupPreviewEnvelopeClearsSegmentsWhenAnyInvalid();
   testBuildHumanOrderGroupPreviewEnvelopeKeepsSegmentsWhenAllValid();

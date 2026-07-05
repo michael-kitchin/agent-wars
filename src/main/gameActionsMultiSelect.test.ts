@@ -116,6 +116,11 @@ function isOpenOceanLandMass(h3Index: string): boolean {
 
 /**
  * Locates a land hex that does not support both land and naval movement domains.
+ *
+ * Purpose: Finds a pure-land destination for mixed-stack rejection integration tests.
+ * When to use: From grouped mixed land/naval preview and assign regression tests.
+ * Expected outcome: Returns the first land hex that fails `hexSupportsMixedLandAndNaval`, or null.
+ * Exceptions: None.
  */
 function findPureLandDestinationHex(state: ReturnType<typeof getGameState>): string | null {
   for (const hex of state.hexes) {
@@ -128,6 +133,11 @@ function findPureLandDestinationHex(state: ReturnType<typeof getGameState>): str
 
 /**
  * Locates a hex that supports both land and naval movement domains for mixed-stack destination tests.
+ *
+ * Purpose: Finds a coastal/littoral destination where mixed land and naval stacks may march together.
+ * When to use: From grouped mixed land/naval preview and assign acceptance tests.
+ * Expected outcome: Returns the first mixed-domain hex, optionally skipping `excludeH3`.
+ * Exceptions: None.
  */
 function findMixedTerrainDestinationHex(state: ReturnType<typeof getGameState>, excludeH3?: string): string | null {
   for (const hex of state.hexes) {
@@ -139,6 +149,11 @@ function findMixedTerrainDestinationHex(state: ReturnType<typeof getGameState>, 
 
 /**
  * Regression guard: grouped preview rejects mixed land + naval stacks targeting non-coastal hexes.
+ *
+ * Purpose: Ensures mixed-stack march preview fails with the coastal-only reason for inland destinations.
+ * When to use: Run via `npm test` after changes to grouped human march preview validation.
+ * Expected outcome: Preview is invalid, shows invalid marker, and omits route segments.
+ * Exceptions: None.
  */
 function testPreviewGroupedMixedLandNavalRejectsNonCoastalDestination(): void {
   withTempDb(() => {
@@ -169,6 +184,11 @@ function testPreviewGroupedMixedLandNavalRejectsNonCoastalDestination(): void {
 
 /**
  * Regression guard: when any mixed-stack unit cannot reach a coastal destination, grouped preview omits route lines.
+ *
+ * Purpose: Ensures partial mixed-stack reachability clears segments for every unit in the grouped preview envelope.
+ * When to use: Run via `npm test` after changes to grouped human march preview assembly.
+ * Expected outcome: At least one coastal destination yields invalid preview rows with empty segments.
+ * Exceptions: None.
  */
 function testPreviewGroupedMixedLandNavalClearsSegmentsWhenAnyUnitBlocked(): void {
   withTempDb(() => {
@@ -209,6 +229,11 @@ function testPreviewGroupedMixedLandNavalClearsSegmentsWhenAnyUnitBlocked(): voi
 
 /**
  * Regression guard: grouped preview accepts mixed land + naval stacks when the destination is coastal/littoral.
+ *
+ * Purpose: Ensures valid mixed-stack march previews succeed for shared coastal destinations.
+ * When to use: Run via `npm test` after changes to grouped human march preview validation.
+ * Expected outcome: Preview is valid for all selected units with at least one representative row.
+ * Exceptions: None.
  */
 function testPreviewGroupedMixedLandNavalAcceptsCoastalDestination(): void {
   withTempDb(() => {
@@ -235,6 +260,11 @@ function testPreviewGroupedMixedLandNavalAcceptsCoastalDestination(): void {
 
 /**
  * Regression guard: grouped assign rejects mixed land + naval stacks targeting non-coastal hexes.
+ *
+ * Purpose: Ensures mixed-stack march assignment fails with the coastal-only reason for inland destinations.
+ * When to use: Run via `npm test` after changes to grouped human march assign validation.
+ * Expected outcome: Assign returns failure with `MIXED_LAND_NAVAL_COASTAL_ONLY_REASON`.
+ * Exceptions: None.
  */
 function testAssignGroupedMixedLandNavalRejectsNonCoastalDestination(): void {
   withTempDb(() => {
@@ -260,6 +290,11 @@ function testAssignGroupedMixedLandNavalRejectsNonCoastalDestination(): void {
 
 /**
  * Regression guard: grouped assign accepts mixed land + naval stacks to a shared coastal destination.
+ *
+ * Purpose: Ensures valid mixed-stack march assignment succeeds for shared coastal destinations.
+ * When to use: Run via `npm test` after changes to grouped human march assign validation.
+ * Expected outcome: Assign returns success for co-located land and naval units at a coastal hex.
+ * Exceptions: None.
  */
 function testAssignGroupedMixedLandNavalAcceptsCoastalDestination(): void {
   withTempDb(() => {
@@ -284,6 +319,11 @@ function testAssignGroupedMixedLandNavalAcceptsCoastalDestination(): void {
 
 /**
  * Locates adjacent open-ocean hexes for land-unit movement rejection integration tests.
+ *
+ * Purpose: Finds a neighboring open-ocean res1 pair for land movement rejection scenarios.
+ * When to use: From integration tests that require land units blocked from open-ocean hops.
+ * Expected outcome: Returns adjacent hex ids with empty continent and island membership, or throws if none found.
+ * Exceptions: None; callers assert when no pair exists in the seeded state.
  */
 function findOpenOceanHexPair(state: ReturnType<typeof getGameState>): { originH3: string; destinationH3: string } {
   for (const hex of state.hexes) {

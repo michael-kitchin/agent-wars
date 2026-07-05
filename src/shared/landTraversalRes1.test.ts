@@ -6,7 +6,6 @@
 import * as assert from 'assert';
 import {
   canLandUnitTraverseEdge,
-  getLandMassRouteBlockReason,
   landUnitCanOccupyHex,
   RES1_LAND_MAX_WATER_PCT,
   type Res1LandMassRecord,
@@ -221,10 +220,6 @@ function testOccupancy(): void {
 const NE_AFRICA = 1159104365;
 /** Natural Earth Asia ``NE_ID`` for landmass regression fixtures. */
 const NE_ASIA = 1159104597;
-/** Natural Earth North America ``NE_ID`` for landmass regression fixtures. */
-const NE_NORTH_AMERICA = 1159104607;
-/** Natural Earth South America ``NE_ID`` for landmass regression fixtures. */
-const NE_SOUTH_AMERICA = 1159104361;
 
 /**
  * Defines the `testAfricaAsiaCorridorSharedContinent` function shape (function testAfricaAsiaCorridorSharedContinent(): void).

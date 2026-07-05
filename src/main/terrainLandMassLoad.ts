@@ -24,10 +24,50 @@ export const EXPECTED_LANDMASS_SCHEMA_VERSION = '2.0.0';
  * Exceptions: None.
  */
 export interface LandMassPolygonSource {
+  /**
+   * Natural Earth shapefile path used to derive continent and island membership.
+   *
+   * Contract: Mirrors Python export metadata for audit trails.
+   * When to use: Loader DEBUG logs and pipeline QA cross-checks.
+   * Expected outcome: Non-empty relative or absolute path string from v2 landmass JSON.
+   * Exceptions: None.
+   */
   shapefile: string;
+  /**
+   * ``featurecla`` values treated as continents when building polygon membership.
+   *
+   * Contract: Read-only list of Natural Earth feature class names.
+   * When to use: Validating v2 envelope provenance or reproducing pipeline filters.
+   * Expected outcome: Includes ``Continent`` and related classes used by the Python exporter.
+   * Exceptions: None.
+   */
   continent_featurecla: readonly string[];
+  /**
+   * ``featurecla`` value used for island polygon membership.
+   *
+   * Contract: Single Natural Earth feature class name for islands.
+   * When to use: Validating v2 envelope provenance against Python export settings.
+   * Expected outcome: Typically ``Island`` or the pipeline's configured island class.
+   * Exceptions: None.
+   */
   island_featurecla: string;
+  /**
+   * Property name on Natural Earth features used as stable numeric ids.
+   *
+   * Contract: Names the id column joined into res1 landmass records.
+   * When to use: Cross-referencing ``continentIds`` / ``islandIds`` with source GIS data.
+   * Expected outcome: ``NE_ID`` for production v2 exports.
+   * Exceptions: None.
+   */
   id_property: string;
+  /**
+   * Minimum island polygon area in km² included in membership.
+   *
+   * Contract: Mirrors Python ``island_min_area_km2`` filter threshold.
+   * When to use: Explaining why small islands are absent from a hex's ``islandIds``.
+   * Expected outcome: Positive number consistent with bundled v2 JSON metadata.
+   * Exceptions: None.
+   */
   island_min_area_km2: number;
 }
 
@@ -40,7 +80,23 @@ export interface LandMassPolygonSource {
  * Exceptions: None.
  */
 export interface LandMassWaterPctSource {
+  /**
+   * Aggregation method used to derive res1 ``water_pct`` from res4 child cells.
+   *
+   * Contract: Names the Python reducer applied across res4 metadata.
+   * When to use: Loader DEBUG logs and landmass pipeline documentation.
+   * Expected outcome: Stable method label matching v2 export metadata.
+   * Exceptions: None.
+   */
   method: string;
+  /**
+   * Input artifacts required before ``water_pct`` can be computed.
+   *
+   * Contract: Read-only list of generated data file names or logical dependencies.
+   * When to use: Verifying regeneration order for v2 landmass exports.
+   * Expected outcome: Includes res4 terrain metadata paths used by the Python pipeline.
+   * Exceptions: None.
+   */
   requires: readonly string[];
 }
 

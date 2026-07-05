@@ -9,6 +9,14 @@ import {
   selectionHasMixedLandAndNaval,
 } from './humanMarchPreviewMixedSelection';
 
+/**
+ * Regression guard for mixed land and naval unit type detection in march preview selection.
+ *
+ * Purpose: Ensures `selectionHasMixedLandAndNaval` distinguishes infantry/armor from naval without treating air as land.
+ * When to use: Run via `npm test` after changes to mixed-stack march preview predicates.
+ * Expected outcome: Returns true only when selection includes land and naval unit types together.
+ * Exceptions: None.
+ */
 function testSelectionHasMixedLandAndNaval(): void {
   assert.strictEqual(
     selectionHasMixedLandAndNaval([{ unitType: 'infantry' }, { unitType: 'naval' }]),
@@ -19,6 +27,14 @@ function testSelectionHasMixedLandAndNaval(): void {
   assert.strictEqual(selectionHasMixedLandAndNaval([{ unitType: 'air' }, { unitType: 'naval' }]), false);
 }
 
+/**
+ * Regression guard for coastal-only mixed-stack destination eligibility.
+ *
+ * Purpose: Ensures `hexSupportsMixedLandAndNaval` accepts coastal/littoral res1 hexes and rejects pure land or water.
+ * When to use: Run via `npm test` after changes to mixed land/naval destination validation.
+ * Expected outcome: Coastal terrain kinds return true; plains, wetlands, and water return false.
+ * Exceptions: None.
+ */
 function testHexSupportsMixedLandAndNaval(): void {
   assert.strictEqual(
     hexSupportsMixedLandAndNaval({ h3Index: 'coastal', terrain: 'coastal', terrainKind: 'coastal' }),
@@ -38,6 +54,14 @@ function testHexSupportsMixedLandAndNaval(): void {
   );
 }
 
+/**
+ * Entry point for mixed land/naval predicate unit tests.
+ *
+ * Purpose: Runs all tests in this module and prints a pass marker for CI harnesses.
+ * When to use: Invoked automatically when the compiled test file is executed by `npm test`.
+ * Expected outcome: All assertions pass and a success line is logged.
+ * Exceptions: Propagates assertion failures to the Node process exit code.
+ */
 function run(): void {
   testSelectionHasMixedLandAndNaval();
   testHexSupportsMixedLandAndNaval();
