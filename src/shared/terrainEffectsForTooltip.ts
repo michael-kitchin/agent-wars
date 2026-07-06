@@ -21,7 +21,7 @@ type EffectSymbol = 'x' | '-' | '+';
 /** High-level effect category paired with a unit label in formatted output. */
 type EffectCategory = 'Movement' | 'Range';
 
-/** Title-case unit labels used in parenthetical suffixes. */
+/** Title-case unit labels used in formatted effect entries (`All`, `Armored`, etc.). */
 type UnitLabel = 'Air' | 'Armored' | 'Infantry' | 'Naval';
 
 /** Internal unit-type keys aligned with tactical movement tables. */
@@ -29,9 +29,6 @@ type MovementUnitType = 'infantry' | 'armor' | 'naval';
 
 /** Stable symbol ordering for exception B mixed labels (`x/-/+`). */
 const SYMBOL_ORDER: readonly EffectSymbol[] = ['x', '-', '+'];
-
-/** CSS class for tooltip effect polarity prefixes (`x`, `-`, `+`, and `/` combinations). */
-export const TERRAIN_EFFECT_SYMBOL_HTML_CLASS = 'terrain-effect-symbol';
 
 const MOVEMENT_UNIT_TYPES: readonly MovementUnitType[] = ['infantry', 'armor', 'naval'];
 
@@ -109,7 +106,7 @@ export interface TerrainEffectsInput {
    *
    * Contract: True when explored and `res4RoadRailSidesByH3` has any `true` road side.
    * When to use: Together with `hasRail` for exception C transport movement bonus.
-   * Expected outcome: Contributes to `+ Movement` for Infantry/Armored when not rubble.
+   * Expected outcome: Contributes to `(+) All Movement` for Infantry/Armored when not rubble.
    * Exceptions: Ignored when `isRubble` is true.
    */
   hasRoad: boolean;
@@ -118,25 +115,60 @@ export interface TerrainEffectsInput {
    *
    * Contract: True when explored and `res4RoadRailSidesByH3` has any `true` rail side.
    * When to use: Together with `hasRoad` for exception C transport movement bonus.
-   * Expected outcome: Contributes to `+ Movement` for Infantry/Armored when not rubble.
+   * Expected outcome: Contributes to `(+) All Movement` for Infantry/Armored when not rubble.
    * Exceptions: Ignored when `isRubble` is true.
    */
   hasRail: boolean;
 }
 
 /**
- * Wraps each x/-/+ glyph in tooltip HTML using per-character `<strong>` tags.
+ * Wraps a slash-joined symbol set in display parentheses.
  *
- * Purpose: Makes `-`, `+`, and `/` visibly bold at 12px where single-span weight changes are subtle.
+ * Purpose: Keeps tooltip polarity glyphs visually distinct from unit parentheticals.
+ * When to use: From plain and HTML effect entry formatters after `formatSymbolSet`.
+ * Expected outcome: `+` becomes `(+)`; `x/-` becomes `(x/-)`.
+ * Exceptions: Returns empty string when `symbols` is empty.
+ */
+function wrapTerrainEffectSymbolSetForDisplay(symbols: string): string {
+  if (!symbols) return '';
+  return `(${symbols})`;
+}
+
+/**
+ * Strips display parentheses from one parenthesized effect symbol prefix.
+ *
+ * Purpose: Parses plain tooltip entries back into internal slash-joined symbol sets.
+ * When to use: `formatTerrainEffectEntryHtml` when converting plain lines to HTML.
+ * Expected outcome: `(x/-)` becomes `x/-`; unrecognized values pass through unchanged.
+ * Exceptions: None.
+ */
+function unwrapTerrainEffectSymbolSetFromDisplay(display: string): string {
+  const match = /^\(([-x+/]+)\)$/.exec(display);
+  return match ? match[1]! : display;
+}
+
+/**
+ * Builds the unit-and-category label for one effect entry.
+ *
+ * Purpose: Puts unit scope before the effect name (`Armored Movement`, `All Range`).
+ * When to use: From plain and HTML effect entry formatters after resolving collapsed unit scope.
+ * Expected outcome: `All Movement` for collapsed occupiable sets; `Infantry Range` for per-unit lines.
+ * Exceptions: None.
+ */
+function formatTerrainEffectLabel(category: EffectCategory, unit: UnitLabel | 'All'): string {
+  return unit === 'All' ? `All ${category}` : `${unit} ${category}`;
+}
+
+/**
+ * Returns the parenthesized effect symbol prefix for tooltip HTML.
+ *
+ * Purpose: Shared display shape for res4 Effects tooltip symbol prefixes without extra styling.
  * When to use: While assembling res4 Effects tooltip entries from known symbol strings.
- * Expected outcome: One `<strong class="terrain-effect-symbol">` per symbol character.
+ * Expected outcome: `(+)`, `(-)`, or `(x/-)` with no surrounding markup.
  * Exceptions: Returns empty string when `symbols` is empty.
  */
 export function formatTerrainEffectSymbolPrefixHtml(symbols: string): string {
-  if (!symbols) return '';
-  return [...symbols]
-    .map((ch) => `<strong class="${TERRAIN_EFFECT_SYMBOL_HTML_CLASS}">${ch}</strong>`)
-    .join('');
+  return wrapTerrainEffectSymbolSetForDisplay(symbols);
 }
 
 /**
@@ -144,7 +176,7 @@ export function formatTerrainEffectSymbolPrefixHtml(symbols: string): string {
  *
  * Purpose: Shared plain-text shape for tests and `computeTerrainEffectsLine`.
  * When to use: From entry formatters after resolving category, unit, and symbol set.
- * Expected outcome: Strings like `- Movement (All)` or `x/-/+ Range (Armored)`.
+ * Expected outcome: Strings like `(-) All Movement` or `(x/-) Armored Range`.
  * Exceptions: None.
  */
 function formatTerrainEffectEntryPlain(
@@ -152,15 +184,15 @@ function formatTerrainEffectEntryPlain(
   category: EffectCategory,
   unit: UnitLabel | 'All'
 ): string {
-  return `${symbols} ${category} (${unit})`;
+  return `${wrapTerrainEffectSymbolSetForDisplay(symbols)} ${formatTerrainEffectLabel(category, unit)}`;
 }
 
 /**
  * Formats one HTML effect entry from grouped parts without regex parsing.
  *
- * Purpose: Keeps symbol emphasis reliable for `-`, `+`, and `/` combinations in the map tooltip.
+ * Purpose: Keeps res4 Effects tooltip entries aligned with plain-text formatting rules.
  * When to use: From `formatTerrainEffectEntriesHtml` and `computeTerrainEffectsLineHtml`.
- * Expected outcome: Bold symbol glyph(s), space, then unstyled category/unit suffix.
+ * Expected outcome: Parenthesized symbol prefix, space, then unit scope and category.
  * Exceptions: None.
  */
 function formatTerrainEffectEntryHtmlFromParts(
@@ -168,7 +200,7 @@ function formatTerrainEffectEntryHtmlFromParts(
   category: EffectCategory,
   unit: UnitLabel | 'All'
 ): string {
-  return `${formatTerrainEffectSymbolPrefixHtml(symbols)} ${category} (${unit})`;
+  return formatTerrainEffectEntryPlain(symbols, category, unit);
 }
 
 /**
@@ -176,7 +208,7 @@ function formatTerrainEffectEntryHtmlFromParts(
  *
  * Purpose: Validates exception B ordering and exception E sorting independent of terrain classification.
  * When to use: Tests that pass pre-built `category|unit` → symbol-set maps.
- * Expected outcome: Alphabetically sorted unique strings like `- Movement (All)`.
+ * Expected outcome: Alphabetically sorted unique strings like `(-) All Movement`.
  * Exceptions: None.
  */
 export function formatTerrainEffectEntries(
@@ -198,8 +230,8 @@ export function formatTerrainEffectEntries(
  * Formats grouped symbol sets into sorted unique HTML effect strings (exported for unit tests).
  *
  * Purpose: Tooltip HTML assembly without round-tripping through plain text and regex.
- * When to use: `computeTerrainEffectsLineHtml` and tests covering symbol emphasis.
- * Expected outcome: Alphabetically sorted unique strings with styled symbol prefixes only.
+ * When to use: `computeTerrainEffectsLineHtml` and tests covering symbol prefix formatting.
+ * Expected outcome: Same text shape as plain entries.
  * Exceptions: None.
  */
 export function formatTerrainEffectEntriesHtml(
@@ -218,29 +250,29 @@ export function formatTerrainEffectEntriesHtml(
 }
 
 /**
- * Wraps the x/-/+ symbol prefix of one plain effect entry in tooltip HTML.
+ * Parses one plain effect entry into the canonical tooltip HTML fragment.
  *
- * Purpose: Converts legacy plain entries (tests or cached plain lines) into styled tooltip fragments.
+ * Purpose: Converts plain entries (tests or cached plain lines) into tooltip HTML fragments.
  * When to use: `formatTerrainEffectsLineHtml` when only a plain comma-delimited line is available.
- * Expected outcome: Symbol span plus unstyled category/unit suffix for each matched entry.
+ * Expected outcome: Same text as the matched plain entry when formatting succeeds.
  * Exceptions: Returns the entry unchanged when it does not match the expected pattern.
  */
 export function formatTerrainEffectEntryHtml(entry: string): string {
-  const match = /^([-x+/]+) (Movement|Range) \((.+)\)$/.exec(entry);
+  const match = /^(\([-x+/]+\)) (All|Air|Armored|Infantry|Naval) (Movement|Range)$/.exec(entry);
   if (!match) return entry;
   return formatTerrainEffectEntryHtmlFromParts(
-    match[1],
-    match[2] as EffectCategory,
-    match[3] as UnitLabel | 'All'
+    unwrapTerrainEffectSymbolSetFromDisplay(match[1]!),
+    match[3] as EffectCategory,
+    match[2] as UnitLabel | 'All'
   );
 }
 
 /**
  * Converts a comma-delimited plain effects line into tooltip HTML with styled symbol prefixes.
  *
- * Purpose: Keeps `computeTerrainEffectsLine` plain for tests while rendering styled Effects copy in the map tooltip.
+ * Purpose: Keeps `computeTerrainEffectsLine` plain for tests while sharing HTML assembly helpers.
  * When to use: When only a plain effects line is available; prefer `computeTerrainEffectsLineHtml` at source.
- * Expected outcome: Each entry's x/-/+ prefix wrapped in `terrain-effect-symbol`; comma spacing unchanged.
+ * Expected outcome: Same text as the plain line with comma spacing unchanged.
  * Exceptions: None.
  */
 export function formatTerrainEffectsLineHtml(line: string): string {
@@ -295,7 +327,7 @@ export function computeTerrainEffectsLine(input: TerrainEffectsInput): string | 
  *
  * Purpose: Res4 tooltip `Effects:` body without plain-text round-trip so all symbol prefixes render consistently.
  * When to use: `formatTerrainTooltipHtml` when `namingTarget.resolution === 4`.
- * Expected outcome: Same ordering as `computeTerrainEffectsLine` with styled x/-/+ prefixes only.
+ * Expected outcome: Same ordering and text as `computeTerrainEffectsLine`.
  * Exceptions: None.
  */
 export function computeTerrainEffectsLineHtml(input: TerrainEffectsInput): string | null {

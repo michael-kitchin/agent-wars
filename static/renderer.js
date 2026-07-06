@@ -17504,6 +17504,7 @@
     };
   }
   function tacticalMovementUnitTypeForPathfinding(unit, _toH3Index) {
+    void _toH3Index;
     if (unit.unitType === "air") return "air";
     const embarked = (unit.unitType === "infantry" || unit.unitType === "armor") && !!unit.embarkedOnSubUnitId && unit.embarkedOnSubUnitId.length > 0;
     if (embarked) {
@@ -20222,19 +20223,24 @@
 
   // src/shared/terrainEffectsForTooltip.ts
   var SYMBOL_ORDER = ["x", "-", "+"];
-  var TERRAIN_EFFECT_SYMBOL_HTML_CLASS = "terrain-effect-symbol";
   var MOVEMENT_UNIT_TYPES = ["infantry", "armor", "naval"];
   var MOVEMENT_UNIT_LABEL = {
     infantry: "Infantry",
     armor: "Armored",
     naval: "Naval"
   };
-  function formatTerrainEffectSymbolPrefixHtml(symbols) {
+  function wrapTerrainEffectSymbolSetForDisplay(symbols) {
     if (!symbols) return "";
-    return [...symbols].map((ch) => `<strong class="${TERRAIN_EFFECT_SYMBOL_HTML_CLASS}">${ch}</strong>`).join("");
+    return `(${symbols})`;
+  }
+  function formatTerrainEffectLabel(category, unit) {
+    return unit === "All" ? `All ${category}` : `${unit} ${category}`;
+  }
+  function formatTerrainEffectEntryPlain(symbols, category, unit) {
+    return `${wrapTerrainEffectSymbolSetForDisplay(symbols)} ${formatTerrainEffectLabel(category, unit)}`;
   }
   function formatTerrainEffectEntryHtmlFromParts(symbols, category, unit) {
-    return `${formatTerrainEffectSymbolPrefixHtml(symbols)} ${category} (${unit})`;
+    return formatTerrainEffectEntryPlain(symbols, category, unit);
   }
   function formatTerrainEffectEntriesHtml(grouped) {
     const entries = [];
@@ -20377,18 +20383,22 @@
     const hx = rendererSharedState.gameState.hexes.find((h) => h.h3Index === parentH3);
     return hx?.terrain ?? "land";
   }
+  function res4RoadRailSideMasksForChild(detailH3) {
+    const roadRail = rendererSharedState.res4RoadRailSidesByH3.get(detailH3);
+    return { roadSides: roadRail?.roadSides, railSides: roadRail?.railSides };
+  }
   function res4EffectFieldsForChild(parentH3, detailH3) {
     if (!infraGlyphsAllowedForRes4Child(parentH3, detailH3)) {
       return { ...EMPTY_TERRAIN_EFFECT_FIELDS };
     }
     const parentKind = terrainKindForRes1Hex(parentH3);
-    const roadRail = rendererSharedState.res4RoadRailSidesByH3.get(detailH3);
+    const { roadSides, railSides } = res4RoadRailSideMasksForChild(detailH3);
     return {
       parentTerrain: parentPassabilityForRes1Hex(parentH3),
       parentTerrainKind: parentKind,
       isSeaport: rendererSharedState.terrainInfraRes4Seaport.has(detailH3),
-      hasRoad: transportSideMaskHasAnyTrue(roadRail?.roadSides),
-      hasRail: transportSideMaskHasAnyTrue(roadRail?.railSides)
+      hasRoad: transportSideMaskHasAnyTrue(roadSides),
+      hasRail: transportSideMaskHasAnyTrue(railSides)
     };
   }
   function clearTerrainTooltipTimer() {
@@ -20451,13 +20461,9 @@
     if (detail?.isRubble) labels.push("Rubble");
     if (rendererSharedState.terrainInfraRes4Airport.has(childH3)) labels.push("Airport");
     if (rendererSharedState.terrainInfraRes4Seaport.has(childH3)) labels.push("Seaport");
-    const tb = rendererSharedState.tacticalBattleSnapshot;
-    if (tb && tb.res4ChildH3Indexes.includes(childH3)) {
-      const roadMask = tb.res4RoadSidesByH3?.[childH3];
-      const railMask = tb.res4RailSidesByH3?.[childH3];
-      if (transportSideMaskHasAnyTrue(roadMask)) labels.push("Road");
-      if (transportSideMaskHasAnyTrue(railMask)) labels.push("Rail");
-    }
+    const { roadSides, railSides } = res4RoadRailSideMasksForChild(childH3);
+    if (transportSideMaskHasAnyTrue(roadSides)) labels.push("Road");
+    if (transportSideMaskHasAnyTrue(railSides)) labels.push("Rail");
     return labels;
   }
   function countUrbanRes4HexesInRes1Hex(parentH3) {

@@ -51,6 +51,22 @@ function parentPassabilityForRes1Hex(parentH3: string): string {
 }
 
 /**
+ * Returns road and rail side-boolean masks for one res4 child from the session-global overlay map.
+ *
+ * Purpose: Single lookup for res4 tooltip Features and Effects lines so strategic res4 zoom and tactical battles stay aligned.
+ * When to use: From `featureLabelsForRes4Child` and `res4EffectFieldsForChild` after the parent res1 exploration gate passes.
+ * Expected outcome: Undefined mask arrays when the child has no row in `S.res4RoadRailSidesByH3`.
+ * Exceptions: None.
+ */
+function res4RoadRailSideMasksForChild(detailH3: string): {
+  roadSides: readonly boolean[] | undefined;
+  railSides: readonly boolean[] | undefined;
+} {
+  const roadRail = S.res4RoadRailSidesByH3.get(detailH3);
+  return { roadSides: roadRail?.roadSides, railSides: roadRail?.railSides };
+}
+
+/**
  * Builds res4 effect-input fields from renderer terrain/infra caches for one child hex.
  *
  * Purpose: Keeps road/rail detection aligned with global map data (not tactical snapshot only).
@@ -66,13 +82,13 @@ function res4EffectFieldsForChild(
     return { ...EMPTY_TERRAIN_EFFECT_FIELDS };
   }
   const parentKind = terrainKindForRes1Hex(parentH3);
-  const roadRail = S.res4RoadRailSidesByH3.get(detailH3);
+  const { roadSides, railSides } = res4RoadRailSideMasksForChild(detailH3);
   return {
     parentTerrain: parentPassabilityForRes1Hex(parentH3),
     parentTerrainKind: parentKind,
     isSeaport: S.terrainInfraRes4Seaport.has(detailH3),
-    hasRoad: transportSideMaskHasAnyTrue(roadRail?.roadSides),
-    hasRail: transportSideMaskHasAnyTrue(roadRail?.railSides),
+    hasRoad: transportSideMaskHasAnyTrue(roadSides),
+    hasRail: transportSideMaskHasAnyTrue(railSides),
   };
 }
 
@@ -174,10 +190,10 @@ function featureLabelsForRes1Hex(h3: string): string[] {
 }
 
 /**
- * Defines the `transportSideMaskHasAnyTrue` function shape (function transportSideMaskHasAnyTrue(mask: readonly boolean[] | undefined): boolean).
-
- * Purpose: Detects whether a res4 road or rail side-boolean array carries any active edge for tooltip feature lists.
- * When to use: Only from `featureLabelsForRes4Child` when a tactical battle snapshot supplies `res4RoadSidesByH3` / `res4RailSidesByH3` rows.
+ * Detects whether a res4 road or rail side-boolean array carries any active edge.
+ *
+ * Purpose: Shared predicate for res4 tooltip Features labels and Effects transport bonuses.
+ * When to use: From `featureLabelsForRes4Child` and `res4EffectFieldsForChild` after loading masks from `S.res4RoadRailSidesByH3`.
  * Expected outcome: False for missing, empty, or all-false masks; true when at least one entry is strictly `true`.
  * Exceptions: None.
  */
@@ -186,6 +202,14 @@ function transportSideMaskHasAnyTrue(mask: readonly boolean[] | undefined): bool
   return mask.some((v) => v === true);
 }
 
+/**
+ * Builds res4 tooltip feature labels for one child hex under an explored res1 parent.
+ *
+ * Purpose: Lists visible res4 infrastructure and transport features for the hex tooltip Features line.
+ * When to use: Res4 branch of `terrainStateForPointer` after resolving parent/child ids.
+ * Expected outcome: Road/Rail labels when global side masks have any true edge; empty when parent is unexplored.
+ * Exceptions: None.
+ */
 function featureLabelsForRes4Child(parentH3: string, childH3: string): string[] {
   if (!infraGlyphsAllowedForRes4Child(parentH3, childH3)) return [];
   const labels: string[] = [];
@@ -193,13 +217,9 @@ function featureLabelsForRes4Child(parentH3: string, childH3: string): string[] 
   if (detail?.isRubble) labels.push('Rubble');
   if (S.terrainInfraRes4Airport.has(childH3)) labels.push('Airport');
   if (S.terrainInfraRes4Seaport.has(childH3)) labels.push('Seaport');
-  const tb = S.tacticalBattleSnapshot;
-  if (tb && tb.res4ChildH3Indexes.includes(childH3)) {
-    const roadMask = tb.res4RoadSidesByH3?.[childH3];
-    const railMask = tb.res4RailSidesByH3?.[childH3];
-    if (transportSideMaskHasAnyTrue(roadMask)) labels.push('Road');
-    if (transportSideMaskHasAnyTrue(railMask)) labels.push('Rail');
-  }
+  const { roadSides, railSides } = res4RoadRailSideMasksForChild(childH3);
+  if (transportSideMaskHasAnyTrue(roadSides)) labels.push('Road');
+  if (transportSideMaskHasAnyTrue(railSides)) labels.push('Rail');
   return labels;
 }
 

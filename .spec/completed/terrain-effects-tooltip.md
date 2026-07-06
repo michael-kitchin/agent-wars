@@ -8,7 +8,7 @@ Add an `Effects:` line to the **res4** terrain tooltip (after `Features:`) listi
 
 - Pure logic: `src/shared/terrainEffectsForTooltip.ts` → `computeTerrainEffectsLine(input)`
 - Renderer: `terrainStateForPointer` supplies `parentTerrain`, `isSeaport`, `hasRoad`, `hasRail`
-- HTML: `formatTerrainTooltipHtml` when `namingTarget?.resolution === 4`; `computeTerrainEffectsLineHtml` emits styled symbol spans directly
+- HTML: `formatTerrainTooltipHtml` when `namingTarget?.resolution === 4`; `computeTerrainEffectsLineHtml` emits the same text shape as the plain formatter
 
 ## Unit labels
 
@@ -22,7 +22,7 @@ Add an `Effects:` line to the **res4** terrain tooltip (after `Features:`) listi
 | `x` | Blocks |
 | `+` | Improves (road/rail) |
 
-Mixed symbols for one unit/category: join in order `x`, `-`, `+` with `/` (e.g. `x/- Range (Armored)`). One space between the symbol prefix and the category label (e.g. `- Movement (All)`). In tooltip HTML, each symbol character is wrapped in `<strong class="terrain-effect-symbol">`; category and unit labels are not emphasized.
+Mixed symbols for one unit/category: join in order `x`, `-`, `+` with `/`, then wrap the whole set in one pair of parentheses (e.g. `(x/-) Armored Range`). One space between the symbol prefix and the unit/category label (e.g. `(-) All Movement`, `(-) Armored Movement`). Prefix collapsed occupiable entries with `All` before the category (`All Movement`, `All Range`); prefix unit-specific entries with the unit label before the category (`Armored Movement`, `Infantry Range`). Symbol prefixes are plain text in tooltip HTML.
 
 ## Rules
 
@@ -46,7 +46,7 @@ Mixed symbols for one unit/category: join in order `x`, `-`, `+` with `/` (e.g. 
 
 - Comma-delimited after `Effects: `
 - Unique entries, sorted alphabetically
-- `(All)` when every **occupiable** unit with a symbol for that category shares the same symbol set
+- `(All)` collapse when every **occupiable** unit with a symbol for that category shares the same symbol set; render as `All Movement` / `All Range`
 
 ## Occupiable units
 
@@ -61,16 +61,16 @@ Mixed symbols for one unit/category: join in order `x`, `-`, `+` with `/` (e.g. 
 | Terrain + overlays | Effects |
 |---|---|
 | Plains | _(omit)_ |
-| Plains + road/rail | `+ Movement (All)` |
-| Coastal | `- Movement (Armored)` |
-| Coastal + road/rail | `+ Movement (All)` |
-| Forest | `- Movement (All), - Range (All)` |
-| Forest + road/rail | `- Range (All), + Movement (All)` |
-| Mountain | `- Movement (Infantry), x Movement (Armored), x Range (Air), x Range (Armored), x Range (Naval)` |
-| Mountain + road/rail | `+ Movement (All), x Range (Air), x Range (Armored), x Range (Naval)` |
-| Wetlands / Arctic | `x Movement (Armored)` |
-| Wetlands / Arctic + road/rail | `+ Movement (All)` |
+| Plains + road/rail | `(+) All Movement` |
+| Coastal | `(-) Armored Movement` |
+| Coastal + road/rail | `(+) All Movement` |
+| Forest | `(-) All Movement, (-) All Range` |
+| Forest + road/rail | `(-) All Range, (+) All Movement` |
+| Mountain | `(-) Infantry Movement, (x) Air Range, (x) Armored Movement, (x) Armored Range, (x) Naval Range` |
+| Mountain + road/rail | `(+) All Movement, (x) Air Range, (x) Armored Range, (x) Naval Range` |
+| Wetlands / Arctic | `(x) Armored Movement` |
+| Wetlands / Arctic + road/rail | `(+) All Movement` |
 | Desert / Water | _(omit)_ |
-| Urban | `- Movement (All), - Range (All)` |
-| Urban on Mountain | `- Movement (All), - Range (Infantry), x Range (Air), x Range (Naval), x/- Range (Armored)` |
-| Rubble (+ road masks) | `- Movement (All), - Range (All)` |
+| Urban | `(-) All Movement, (-) All Range` |
+| Urban on Mountain | `(-) All Movement, (-) Infantry Range, (x) Air Range, (x) Naval Range, (x/-) Armored Range` |
+| Rubble (+ road masks) | `(-) All Movement, (-) All Range` |
