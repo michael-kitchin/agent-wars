@@ -430,10 +430,10 @@ function testModifierDrivenPopoverCloseRulesCentralized(): void {
 
   assert.ok(
     modifierRulesFn.includes("if (reason === 'ctrl_pressed')") &&
-      modifierRulesFn.includes('hideBuildPopup();') &&
+      !modifierRulesFn.includes('hideBuildPopup();') &&
       modifierRulesFn.includes("if (reason === 'ctrl_released')") &&
       modifierRulesFn.includes('hideStackCallout();'),
-    'modifier-driven popover close rules should centralize ctrl pressed/released behavior'
+    'Ctrl press should preserve the build popup for multi-select while Ctrl release closes the stack callout'
   );
   assert.ok(
     keydownHandlerFn.includes("applyModifierDrivenPopoverCloseRules('ctrl_pressed');") &&

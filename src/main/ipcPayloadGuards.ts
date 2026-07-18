@@ -1,4 +1,9 @@
-import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../shared/ipcTypes';
+import type {
+  AirStrikeOrder,
+  BuildQueueTemplateEntry,
+  EmbarkOrder,
+  FerryOrder,
+} from '../shared/ipcTypes';
 import type { TacticalOpponentPlanPayload } from '../shared/ipc/readyTypes';
 
 /**
@@ -120,6 +125,40 @@ export function parseBuildQueueUpdatePayload(payload: {
     return null;
   }
   return { h3Index: payload.h3Index, entryId: payload.entryId, unitType: payload.unitType, count: payload.count };
+}
+
+/**
+ * Validates the renderer payload for applying a shared build queue template.
+ *
+ * Purpose: Keeps unknown IPC values out of the authoritative batch mutation.
+ * When to use: Main-process handler for `game:applyBuildQueueTemplateToHexes`.
+ * Expected outcome: Non-empty string hex ids and typed numeric template rows, or `null`.
+ * Exceptions: None; malformed input returns `null`.
+ */
+export function parseBuildQueueTemplatePayload(payload: unknown): {
+  h3Indexes: string[];
+  entries: BuildQueueTemplateEntry[];
+} | null {
+  if (payload === null || typeof payload !== 'object') return null;
+  const value = payload as { h3Indexes?: unknown; entries?: unknown };
+  if (!Array.isArray(value.h3Indexes) || !Array.isArray(value.entries)) return null;
+  if (!value.h3Indexes.every((h3Index) => typeof h3Index === 'string' && h3Index.length > 0)) return null;
+  const entries: BuildQueueTemplateEntry[] = [];
+  for (const entry of value.entries) {
+    if (entry === null || typeof entry !== 'object') return null;
+    const row = entry as { unitType?: unknown; count?: unknown };
+    if (
+      row.unitType !== 'infantry' &&
+      row.unitType !== 'armor' &&
+      row.unitType !== 'naval' &&
+      row.unitType !== 'air'
+    ) {
+      return null;
+    }
+    if (typeof row.count !== 'number' || !Number.isFinite(row.count)) return null;
+    entries.push({ unitType: row.unitType, count: row.count });
+  }
+  return { h3Indexes: value.h3Indexes, entries };
 }
 
 /**

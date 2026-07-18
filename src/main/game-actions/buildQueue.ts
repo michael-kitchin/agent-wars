@@ -16,7 +16,11 @@ import {
   isValidBuildCount,
   type BuildUnitType,
 } from '../productionRules';
-import type { Res1ProductionContextSnapshot } from '../../shared/ipcTypes';
+import type {
+  ApplyBuildQueueTemplateResult,
+  BuildQueueTemplateEntry,
+  Res1ProductionContextSnapshot,
+} from '../../shared/ipcTypes';
 import { isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession';
 
 /**
@@ -427,4 +431,80 @@ export function removeHexBuildQueueEntryImpl(
     logError('removeHexBuildQueueEntry: exception', err);
     return { success: false, reason: String(err) };
   }
+}
+
+/**
+ * Applies one ordered queue template independently to every requested production hex.
+ *
+ * Purpose: Provides the authoritative best-effort write used by the renderer's multi-hex queue editor.
+ * When to use: Synchronizing a shared template after a selected hex joins or a template row changes.
+ * Expected outcome: Valid hexes are replaced in request order, unavailable unit types are reported as
+ * skips, and a failure for one hex does not roll back successful sibling writes.
+ * Exceptions: Exceptions are captured as per-hex failures and logged at error level.
+ */
+export function applyBuildQueueTemplateToHexesImpl(
+  h3Indexes: string[],
+  entries: BuildQueueTemplateEntry[],
+  requestingPlayerId = 'human'
+): ApplyBuildQueueTemplateResult {
+  logDebug('gameActions applyBuildQueueTemplateToHexes', {
+    requestingPlayerId,
+    hexCount: h3Indexes.length,
+    entryCount: entries.length,
+  });
+  if (h3Indexes.length === 0) {
+    return {
+      success: false,
+      applied: [],
+      skipped: [],
+      failed: [],
+      reason: 'At least one build hex must be selected.',
+    };
+  }
+
+  const result: ApplyBuildQueueTemplateResult = {
+    success: true,
+    applied: [],
+    skipped: [],
+    failed: [],
+  };
+  const normalizedEntries = entries.map((entry) => ({
+    unitType: entry.unitType,
+    count: Number.isFinite(entry.count)
+      ? Math.min(BUILD_ENTRY_MAX_COUNT, Math.max(BUILD_ENTRY_MIN_COUNT, Math.trunc(entry.count)))
+      : BUILD_ENTRY_MIN_COUNT,
+  }));
+
+  for (const h3Index of [...new Set(h3Indexes)]) {
+    try {
+      const context = validateBuildQueueMutationContext({
+        h3Index,
+        requestingPlayerId,
+        requireBuildSectionVisible: true,
+      });
+      if (!context.valid) {
+        result.failed.push({ h3Index, reason: context.reason });
+        continue;
+      }
+      const availableTypes = new Set(context.queueView.availableUnitTypes);
+      const applicableEntries = normalizedEntries.flatMap((entry) => {
+        if (availableTypes.has(entry.unitType)) {
+          return [{ unitType: entry.unitType, remainingCount: entry.count }];
+        }
+        result.skipped.push({
+          h3Index,
+          unitType: entry.unitType,
+          reason: `Unit type "${entry.unitType}" is not available for this hex.`,
+        });
+        return [];
+      });
+      replaceBuildQueueForHex(h3Index, applicableEntries);
+      result.applied.push(h3Index);
+    } catch (err) {
+      logError('applyBuildQueueTemplateToHexes: exception', { h3Index, err });
+      result.failed.push({ h3Index, reason: String(err) });
+    }
+  }
+  result.success = result.failed.length === 0;
+  return result;
 }

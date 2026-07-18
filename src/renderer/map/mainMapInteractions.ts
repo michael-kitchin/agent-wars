@@ -229,14 +229,14 @@ getUnitsForDrawWithMovingIds: (state: GameStateSnapshot) => {
     movingIds: Set<string> | undefined;
   };
     /**
-   * Specifies the contract for the `tryHandleBuildEntryAtClientXY` member (tryHandleBuildEntryAtClientXY: (clientX: number, clientY: number) => boolean;).
+   * Specifies the contract for the `tryHandleBuildEntryAtClientXY` member (tryHandleBuildEntryAtClientXY: (clientX: number, clientY: number, eventCtrlKey?: boolean) => boolean;).
 
    * Contract: Describes stable behavior for callers of `tryHandleBuildEntryAtClientXY` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-tryHandleBuildEntryAtClientXY: (clientX: number, clientY: number) => boolean;
+tryHandleBuildEntryAtClientXY: (clientX: number, clientY: number, eventCtrlKey?: boolean) => boolean;
     /**
    * Specifies the contract for the `tryHandleTacticalEntryAtClientXY` member (tryHandleTacticalEntryAtClientXY: (clientX: number, clientY: number) => Promise<boolean>;).
 
@@ -654,7 +654,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       return;
     }
 
-    if (deps.tryHandleBuildEntryAtClientXY(e.clientX, e.clientY)) {
+    if (deps.tryHandleBuildEntryAtClientXY(e.clientX, e.clientY, e.ctrlKey)) {
       deps.updateSidebar();
       deps.updateRangedSidebar();
       deps.redraw();

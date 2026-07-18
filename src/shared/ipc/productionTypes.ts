@@ -224,3 +224,155 @@ noBuildReason: string | null;
    */
 entries: HexBuildQueueEntrySnapshot[];
 }
+
+/**
+ * One ordered row in a queue template applied across multiple production hexes.
+ *
+ * Purpose: Keeps batch build-queue writes independent of per-hex database entry ids.
+ * When to use: Renderer multi-hex queue editing and the corresponding IPC action.
+ * Expected outcome: The backend preserves row order while filtering unavailable types per hex.
+ * Exceptions: Counts are normalized to the configured build-count range by the backend.
+ */
+export interface BuildQueueTemplateEntry {
+  /**
+   * Buildable unit kind requested for this template row.
+   *
+   * Contract: Must be one canonical production unit type.
+   * When to use: Identifying the row to filter and persist per selected hex.
+   * Expected outcome: Eligible hexes receive this unit type in template order.
+   * Exceptions: None.
+   */
+  unitType: BuildUnitType;
+  /**
+   * Remaining unit count requested for each eligible selected hex.
+   *
+   * Contract: Numeric input is normalized to the configured production count range by the backend.
+   * When to use: Specifying how many units each eligible hex should retain in this row.
+   * Expected outcome: A per-hex remaining count from one through 99.
+   * Exceptions: None.
+   */
+  count: number;
+}
+
+/**
+ * A template row omitted from one hex because that hex cannot build its unit type.
+ *
+ * Purpose: Makes partial eligibility explicit for diagnostics without treating it as an error.
+ * When to use: Batch apply results; the renderer normally represents this through N-of-M labels.
+ * Expected outcome: Identifies the affected hex, type, and stable explanation.
+ * Exceptions: Skips do not make the overall operation fail.
+ */
+export interface BuildQueueTemplateSkip {
+  /**
+   * Hex that did not receive the template row.
+   *
+   * Contract: Identifies one requested selected hex.
+   * When to use: Correlating a skip with renderer eligibility summaries or diagnostics.
+   * Expected outcome: The skipped hex's H3 index.
+   * Exceptions: None.
+   */
+  h3Index: string;
+  /**
+   * Unit type unavailable at the affected hex.
+   *
+   * Contract: Identifies the template row filtered from this hex.
+   * When to use: Explaining partial eligibility.
+   * Expected outcome: One canonical production unit type.
+   * Exceptions: None.
+   */
+  unitType: BuildUnitType;
+  /**
+   * Human-readable eligibility explanation.
+   *
+   * Contract: Describes why the row was intentionally omitted rather than failed.
+   * When to use: Diagnostics; normal renderer UX uses N-of-M labels instead.
+   * Expected outcome: A non-empty explanation.
+   * Exceptions: None.
+   */
+  reason: string;
+}
+
+/**
+ * A hex-level validation or persistence failure during best-effort template application.
+ *
+ * Purpose: Lets callers report hard failures while preserving successful sibling writes.
+ * When to use: Batch apply results when one selected hex cannot be edited.
+ * Expected outcome: Identifies the failed hex and actionable reason.
+ * Exceptions: None.
+ */
+export interface BuildQueueTemplateFailure {
+  /**
+   * Hex whose queue was not replaced.
+   *
+   * Contract: Identifies one requested selected hex.
+   * When to use: Correlating a hard failure with selection state.
+   * Expected outcome: The failed hex's H3 index.
+   * Exceptions: None.
+   */
+  h3Index: string;
+  /**
+   * Human-readable validation or persistence failure.
+   *
+   * Contract: Explains why no queue write occurred for this hex.
+   * When to use: Error toast selection and diagnostics.
+   * Expected outcome: A non-empty actionable explanation.
+   * Exceptions: None.
+   */
+  reason: string;
+}
+
+/**
+ * Result of applying one ordered build-queue template to multiple hexes.
+ *
+ * Purpose: Separates successful writes, intentional eligibility skips, and hard failures.
+ * When to use: Main-to-renderer response for multi-hex build queue synchronization.
+ * Expected outcome: `success` is false only when at least one hard failure occurred.
+ * Exceptions: Empty selections return a hard failure and no applied hexes.
+ */
+export interface ApplyBuildQueueTemplateResult {
+  /**
+   * Indicates whether every requested hex avoided a hard failure.
+   *
+   * Contract: Eligibility skips do not make this value false.
+   * When to use: Choosing whether to show a hard-error toast.
+   * Expected outcome: False exactly when `failed` is non-empty or the request is invalid.
+   * Exceptions: None.
+   */
+  success: boolean;
+  /**
+   * Hexes whose queue was replaced.
+   *
+   * Contract: Includes successful replacement with an empty eligibility-filtered queue.
+   * When to use: Deciding whether renderer game state needs refresh.
+   * Expected outcome: Stable request-order H3 indexes without duplicates.
+   * Exceptions: None.
+   */
+  applied: string[];
+  /**
+   * Eligibility-filtered rows intentionally omitted from individual hexes.
+   *
+   * Contract: Contains no hard validation or persistence failures.
+   * When to use: Diagnostics and eligibility reconciliation.
+   * Expected outcome: Zero or more per-hex template-row skips.
+   * Exceptions: None.
+   */
+  skipped: BuildQueueTemplateSkip[];
+  /**
+   * Hexes not changed because validation or persistence failed.
+   *
+   * Contract: Successful siblings may still appear in `applied`.
+   * When to use: Reporting best-effort batch failures.
+   * Expected outcome: Zero or more actionable per-hex failures.
+   * Exceptions: None.
+   */
+  failed: BuildQueueTemplateFailure[];
+  /**
+   * Optional top-level explanation for a request-wide validation failure.
+   *
+   * Contract: Omitted for ordinary per-hex outcomes.
+   * When to use: Invalid requests such as an empty selected-hex list.
+   * Expected outcome: A concise explanation when present.
+   * Exceptions: None.
+   */
+  reason?: string;
+}

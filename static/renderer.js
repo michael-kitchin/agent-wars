@@ -15095,6 +15095,16 @@
        */
     selectedHexIndex: null,
     /**
+    * Ordered res1 hex ids controlled by the build-popup multi-selection (insertion order).
+    *
+    * Purpose: Keeps production-hex selection independent from unit selection and the scalar map hex.
+    * When to use: Build-entry button chrome, Ctrl-toggle policy, and multi-hex popup rendering.
+    * Expected outcome: Append on add and filter on remove preserve insertion order; the last entry is the
+    * deselect re-anchor. Plain click replaces the set and popup close clears it.
+    * Exceptions: Only build-entry button interactions may add or remove members.
+    */
+    selectedBuildHexH3s: [],
+    /**
        * Documents the object literal property `hoveredHexH3` (hoveredHexH3: null as string | null).
     
        * Purpose: Supports maintainability by documenting why `hoveredHexH3` exists.
@@ -15310,6 +15320,15 @@
        * Exceptions: None.
        */
     buildPopupHexH3: null,
+    /**
+    * Ordered queue rows broadcast across selected production hexes while multi-select is active.
+    *
+    * Purpose: Preserves rows unavailable at some hexes even though those rows are filtered from persistence.
+    * When to use: Selection size two or greater; clear when collapsing to one or closing the popup.
+    * Expected outcome: Multi-edit controls remain stable across per-hex eligibility differences and async edits via stable `rowKey`.
+    * Exceptions: Single-hex mode continues to read and mutate database entry ids directly.
+    */
+    buildQueueTemplate: [],
     /**
        * Documents the object literal property `buildPopupRequestSeq` (buildPopupRequestSeq: 0).
     
@@ -22089,6 +22108,275 @@
     return turns;
   }
 
+  // src/shared/ipc/productionTypes.ts
+  var ALL_BUILD_UNIT_TYPES = ["infantry", "armor", "naval", "air"];
+  function isBuildUnitType(value) {
+    return value === "infantry" || value === "armor" || value === "naval" || value === "air";
+  }
+
+  // src/renderer/gameplay/buildQueuePopupFormatting.ts
+  function escapeBuildPopupHtml(text) {
+    return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+  }
+  function formatGroupedBuildNamingLineHtml(namingLine) {
+    const groups = namingLine.split(";").map((group) => group.trim()).filter((group) => group.length > 0);
+    if (groups.length === 0) return escapeBuildPopupHtml(namingLine);
+    return groups.map((group) => {
+      const colonIndex = group.indexOf(":");
+      if (colonIndex < 0) return escapeBuildPopupHtml(group);
+      const heading = group.slice(0, colonIndex).trim();
+      const remainder = group.slice(colonIndex + 1).trim();
+      if (!heading) return escapeBuildPopupHtml(group);
+      if (!remainder) return `<strong>${escapeBuildPopupHtml(heading)}:</strong>`;
+      return `<strong>${escapeBuildPopupHtml(heading)}:</strong> ${escapeBuildPopupHtml(remainder)}`;
+    }).join("; ");
+  }
+
+  // src/renderer/gameplay/buildQueueMultiSelect.ts
+  var nextBuildQueueTemplateRowKey = 1;
+  function createBuildQueueTemplateRow(unitType, count) {
+    return { rowKey: nextBuildQueueTemplateRowKey++, unitType, count };
+  }
+  function toBuildQueueTemplateEntries(template) {
+    return template.map(({ unitType, count }) => ({ unitType, count }));
+  }
+  function formatSelectedBuildHexCodesHtml(h3Indexes) {
+    const labels = h3Indexes.map(
+      (h3Index) => `<strong>${escapeBuildPopupHtml(`(${getStrategicRes1HexCode(h3Index) ?? h3Index})`)}</strong>`
+    );
+    const suffix = ` (${h3Indexes.length} ${h3Indexes.length === 1 ? "hex" : "hexes"})`;
+    if (labels.length <= 1) return `${labels[0] ?? ""}${suffix}`;
+    if (labels.length === 2) return `${labels[0]} and ${labels[1]}${suffix}`;
+    return `${labels.slice(0, -1).join(", ")}, and ${labels.at(-1)}${suffix}`;
+  }
+  function buildQueueTemplateFromSnapshot(snapshot) {
+    return snapshot.entries.map((entry) => createBuildQueueTemplateRow(entry.unitType, entry.count));
+  }
+  function unionAvailableBuildUnitTypes(snapshots) {
+    const available = new Set(snapshots.flatMap((snapshot) => snapshot.availableUnitTypes));
+    return ALL_BUILD_UNIT_TYPES.filter((unitType) => available.has(unitType));
+  }
+  function countEligibleBuildHexes(snapshots, unitType) {
+    return snapshots.filter((snapshot) => snapshot.availableUnitTypes.includes(unitType)).length;
+  }
+  function formatBuildUnitTypeOptionLabel(unitType, eligibleCount, selectedHexCount) {
+    const typeLabel = unitType.charAt(0).toUpperCase() + unitType.slice(1);
+    if (selectedHexCount > 0 && eligibleCount >= selectedHexCount) {
+      return `${typeLabel} (all hexes)`;
+    }
+    if (eligibleCount === 1) return `${typeLabel} (1 hex)`;
+    return `${typeLabel} (${Math.max(0, eligibleCount)} hexes)`;
+  }
+  function filterTemplateForBuildHex(template, snapshot) {
+    const available = new Set(snapshot.availableUnitTypes);
+    return template.filter((entry) => available.has(entry.unitType));
+  }
+  function templateEntriesForTurnEstimate(template) {
+    return template.map((entry, queueIndex) => ({
+      id: queueIndex + 1,
+      queueIndex,
+      unitType: entry.unitType,
+      count: entry.count
+    }));
+  }
+
+  // src/renderer/gameplay/buildQueueMultiPopup.ts
+  function sanitizeCount(raw) {
+    const digitsOnly = raw.replaceAll(/\D/g, "").slice(0, 2);
+    if (digitsOnly.length === 0) return "1";
+    const parsed = parseInt(digitsOnly, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return "1";
+    return String(Math.min(99, parsed));
+  }
+  async function loadSelectedBuildSnapshots(h3Indexes) {
+    if (!window.gameApi?.getHexBuildQueue) return [];
+    const snapshots = await Promise.all(
+      h3Indexes.map(async (h3Index) => {
+        try {
+          return await window.gameApi.getHexBuildQueue({ h3Index });
+        } catch (err) {
+          console.error("getHexBuildQueue failed:", { h3Index, err });
+          return null;
+        }
+      })
+    );
+    return snapshots.filter((snapshot) => snapshot !== null);
+  }
+  function formatMultiQueueSummary(snapshots) {
+    if (rendererSharedState.buildQueueTemplate.length === 0) return "<strong>Queue:</strong> (none)";
+    const queueTotalCost = sumQueuedProductionCost(rendererSharedState.buildQueueTemplate);
+    const turns = snapshots.map(
+      (snapshot) => estimateTurnsToCompleteQueuedProduction(
+        templateEntriesForTurnEstimate(filterTemplateForBuildHex(rendererSharedState.buildQueueTemplate, snapshot)),
+        snapshot.storedPoints,
+        snapshot.urbanHexCount
+      )
+    );
+    const numericTurns = turns.filter((turn) => turn !== null);
+    if (numericTurns.length !== turns.length) {
+      return `<strong>Queue:</strong> $${queueTotalCost.toLocaleString()} / ? turns`;
+    }
+    const minimum = Math.min(...numericTurns);
+    const maximum = Math.max(...numericTurns);
+    const turnsDisplay = minimum === maximum ? String(minimum) : `${minimum}\u2013${maximum}`;
+    const turnLabel = minimum === 1 && maximum === 1 ? "turn" : "turns";
+    return `<strong>Queue:</strong> $${queueTotalCost.toLocaleString()} / ${turnsDisplay} ${turnLabel}`;
+  }
+  async function renderMultiBuildQueueIntoMount(deps) {
+    const requestSeq = ++rendererSharedState.buildPopupRequestSeq;
+    const selectedH3Indexes = [...rendererSharedState.selectedBuildHexH3s];
+    const selectionSignature = selectedH3Indexes.join("|");
+    const snapshots = await loadSelectedBuildSnapshots(selectedH3Indexes);
+    if (requestSeq !== rendererSharedState.buildPopupRequestSeq || rendererSharedState.buildPopupHexH3 !== deps.h3Index || rendererSharedState.selectedBuildHexH3s.join("|") !== selectionSignature) {
+      return;
+    }
+    if (snapshots.length !== selectedH3Indexes.length) {
+      console.error("renderMultiBuildQueueIntoMount: incomplete snapshot load", {
+        selectedCount: selectedH3Indexes.length,
+        loadedCount: snapshots.length
+      });
+      deps.mount.innerHTML = "";
+      const closeRow2 = document.createElement("div");
+      closeRow2.className = "build-popup-close-row";
+      const closeBtn2 = document.createElement("button");
+      closeBtn2.type = "button";
+      closeBtn2.className = "unit-select build-close-btn";
+      closeBtn2.textContent = "\xD7";
+      closeBtn2.addEventListener("click", deps.hideBuildPopup);
+      closeRow2.appendChild(closeBtn2);
+      deps.mount.appendChild(closeRow2);
+      const errorLine = document.createElement("div");
+      errorLine.className = "build-no-urban";
+      errorLine.textContent = "Failed to load build queues for the selected hexes.";
+      deps.mount.appendChild(errorLine);
+      return;
+    }
+    deps.mount.innerHTML = "";
+    const closeRow = document.createElement("div");
+    closeRow.className = "build-popup-close-row";
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "unit-select build-close-btn";
+    closeBtn.textContent = "\xD7";
+    closeBtn.addEventListener("click", deps.hideBuildPopup);
+    closeRow.appendChild(closeBtn);
+    deps.mount.appendChild(closeRow);
+    const section = document.createElement("div");
+    section.className = "build-queue-section";
+    const descriptionLine = document.createElement("div");
+    descriptionLine.innerHTML = formatSelectedBuildHexCodesHtml(selectedH3Indexes);
+    section.appendChild(descriptionLine);
+    const descriptionSpacer = document.createElement("div");
+    descriptionSpacer.style.height = "0.5em";
+    section.appendChild(descriptionSpacer);
+    const totalProduction = snapshots.reduce((sum, snapshot) => sum + snapshot.urbanHexCount, 0);
+    const pointsLine = document.createElement("div");
+    pointsLine.innerHTML = `<strong>Production:</strong> $${totalProduction.toLocaleString()} / turn`;
+    section.appendChild(pointsLine);
+    const queueSummaryLine = document.createElement("div");
+    queueSummaryLine.innerHTML = formatMultiQueueSummary(snapshots);
+    section.appendChild(queueSummaryLine);
+    const productionSpacer = document.createElement("div");
+    productionSpacer.style.height = "0.5em";
+    section.appendChild(productionSpacer);
+    const unionTypes = unionAvailableBuildUnitTypes(snapshots);
+    const head = document.createElement("div");
+    head.className = "build-queue-head";
+    const title = document.createElement("span");
+    title.className = "build-queue-title";
+    title.textContent = "Build Queue";
+    const buildBtn = document.createElement("button");
+    buildBtn.type = "button";
+    buildBtn.className = "unit-select stack-unit-toggle";
+    buildBtn.textContent = UNIT_SELECT_GLYPH;
+    buildBtn.addEventListener("click", async () => {
+      const defaultUnitType = unionTypes[0];
+      if (!defaultUnitType) return;
+      rendererSharedState.buildQueueTemplate = [...rendererSharedState.buildQueueTemplate, createBuildQueueTemplateRow(defaultUnitType, 1)];
+      await deps.applyTemplate([...rendererSharedState.selectedBuildHexH3s]);
+      void renderMultiBuildQueueIntoMount(deps);
+    });
+    head.appendChild(title);
+    head.appendChild(buildBtn);
+    section.appendChild(head);
+    const list = document.createElement("div");
+    list.className = "build-queue-list";
+    rendererSharedState.buildQueueTemplate.forEach((entry) => {
+      const rowKey = entry.rowKey;
+      const row = document.createElement("div");
+      row.className = "build-queue-row";
+      const typeSelect = document.createElement("select");
+      const rowTypes = ALL_BUILD_UNIT_TYPES.filter(
+        (unitType) => unionTypes.includes(unitType) || unitType === entry.unitType
+      );
+      for (const unitType of rowTypes) {
+        const eligibleCount = countEligibleBuildHexes(snapshots, unitType);
+        const opt = document.createElement("option");
+        opt.value = unitType;
+        opt.textContent = formatBuildUnitTypeOptionLabel(unitType, eligibleCount, snapshots.length);
+        typeSelect.appendChild(opt);
+      }
+      typeSelect.value = entry.unitType;
+      row.appendChild(typeSelect);
+      const countInput = document.createElement("input");
+      countInput.type = "text";
+      countInput.className = "build-count-input";
+      countInput.maxLength = 2;
+      countInput.inputMode = "numeric";
+      countInput.value = String(entry.count);
+      const readCurrentCount = () => {
+        const normalized = sanitizeCount(countInput.value);
+        if (countInput.value !== normalized) countInput.value = normalized;
+        return parseInt(normalized, 10);
+      };
+      countInput.addEventListener("keydown", (event) => {
+        const allowed = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Home", "End", "Tab"];
+        if (allowed.includes(event.key) || /^\d$/.test(event.key)) return;
+        event.preventDefault();
+      });
+      row.appendChild(countInput);
+      typeSelect.addEventListener("change", async () => {
+        const entryIndex = rendererSharedState.buildQueueTemplate.findIndex((row2) => row2.rowKey === rowKey);
+        if (entryIndex < 0) return;
+        const updated = [...rendererSharedState.buildQueueTemplate];
+        updated[entryIndex] = {
+          rowKey,
+          unitType: typeSelect.value,
+          count: readCurrentCount()
+        };
+        rendererSharedState.buildQueueTemplate = updated;
+        await deps.applyTemplate([...rendererSharedState.selectedBuildHexH3s]);
+        void renderMultiBuildQueueIntoMount(deps);
+      });
+      countInput.addEventListener("input", async () => {
+        const entryIndex = rendererSharedState.buildQueueTemplate.findIndex((row2) => row2.rowKey === rowKey);
+        if (entryIndex < 0) return;
+        const updated = [...rendererSharedState.buildQueueTemplate];
+        updated[entryIndex] = {
+          rowKey,
+          unitType: typeSelect.value,
+          count: readCurrentCount()
+        };
+        rendererSharedState.buildQueueTemplate = updated;
+        await deps.applyTemplate([...rendererSharedState.selectedBuildHexH3s]);
+        void renderMultiBuildQueueIntoMount(deps);
+      });
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "unit-select";
+      removeBtn.textContent = "x";
+      removeBtn.addEventListener("click", async () => {
+        rendererSharedState.buildQueueTemplate = rendererSharedState.buildQueueTemplate.filter((row2) => row2.rowKey !== rowKey);
+        await deps.applyTemplate([...rendererSharedState.selectedBuildHexH3s]);
+        void renderMultiBuildQueueIntoMount(deps);
+      });
+      row.appendChild(removeBtn);
+      list.appendChild(row);
+    });
+    section.appendChild(list);
+    deps.mount.appendChild(section);
+  }
+
   // src/renderer/gameplay/buildQueuePopup.ts
   function sanitizeBuildCountInputText(raw) {
     const digitsOnly = raw.replaceAll(/\D/g, "").slice(0, 2);
@@ -22111,24 +22399,9 @@
     const tacticalHud = document.getElementById("tactical-battle-hud");
     return !!(popup?.contains(target) || layer?.contains(target) || tacticalLayer?.contains(target) || tacticalHud?.contains(target));
   }
-  function escapeHtml2(text) {
-    return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
-  }
-  function formatGroupedNamingLineHtml2(namingLine) {
-    const groups = namingLine.split(";").map((g) => g.trim()).filter((g) => g.length > 0);
-    if (groups.length === 0) return escapeHtml2(namingLine);
-    const formattedGroups = groups.map((group) => {
-      const colonIdx = group.indexOf(":");
-      if (colonIdx < 0) return escapeHtml2(group);
-      const heading = group.slice(0, colonIdx).trim();
-      const remainder = group.slice(colonIdx + 1).trim();
-      if (!heading) return escapeHtml2(group);
-      if (!remainder) return `<strong>${escapeHtml2(heading)}:</strong>`;
-      return `<strong>${escapeHtml2(heading)}:</strong> ${escapeHtml2(remainder)}`;
-    });
-    return formattedGroups.join("; ");
-  }
   function createBuildQueuePopupController(deps) {
+    let buildEntryInteractionChain = Promise.resolve();
+    let popupLifecycleRevision = 0;
     async function runBuildQueueMutation(args) {
       try {
         const result = await args.mutate();
@@ -22144,7 +22417,36 @@
         return false;
       }
     }
+    async function applyCurrentTemplateToHexes(h3Indexes) {
+      if (!window.gameApi?.applyBuildQueueTemplateToHexes) return false;
+      try {
+        const result = await window.gameApi.applyBuildQueueTemplateToHexes({
+          h3Indexes,
+          entries: toBuildQueueTemplateEntries(rendererSharedState.buildQueueTemplate)
+        });
+        if (result.applied.length > 0) await deps.refreshGameStateAfterBuildQueueChange();
+        if (!result.success) {
+          const failureReason = result.reason ?? result.failed[0]?.reason ?? "Failed to synchronize build queues.";
+          deps.showMapToast(failureReason, { isError: true });
+          return false;
+        }
+        return true;
+      } catch (err) {
+        console.error("applyCurrentTemplateToHexes failed:", err);
+        deps.showMapToast("Failed to synchronize build queues.", { isError: true });
+        return false;
+      }
+    }
     async function renderBuildQueueIntoMount(mount, h3Index) {
+      if (rendererSharedState.selectedBuildHexH3s.length >= 2) {
+        await renderMultiBuildQueueIntoMount({
+          mount,
+          h3Index,
+          hideBuildPopup: hideBuildPopup2,
+          applyTemplate: applyCurrentTemplateToHexes
+        });
+        return;
+      }
       if (!window.gameApi?.getHexBuildQueue) return;
       const requestSeq = ++rendererSharedState.buildPopupRequestSeq;
       let snapshot = null;
@@ -22172,10 +22474,10 @@
       section.className = "build-queue-section";
       const trimmedNamingLine = namingLine?.trim() ?? "";
       const res1Code = getStrategicRes1HexCode(h3Index);
-      const llmPrefixHtml = res1Code ? `<strong>(${escapeHtml2(res1Code)})</strong> ` : "";
+      const llmPrefixHtml = res1Code ? `<strong>(${escapeBuildPopupHtml(res1Code)})</strong> ` : "";
       if (trimmedNamingLine.length > 0) {
         const descriptionLine = document.createElement("div");
-        descriptionLine.innerHTML = `${llmPrefixHtml}${formatGroupedNamingLineHtml2(trimmedNamingLine)}`;
+        descriptionLine.innerHTML = `${llmPrefixHtml}${formatGroupedBuildNamingLineHtml(trimmedNamingLine)}`;
         section.appendChild(descriptionLine);
         const descriptionSpacer = document.createElement("div");
         descriptionSpacer.style.height = "0.5em";
@@ -22330,9 +22632,86 @@
       section.appendChild(list);
       mount.appendChild(section);
     }
+    function clientPointForBuildEntryHex(h3Index, fallbackClientX, fallbackClientY) {
+      const layer = document.getElementById("build-entry-layer");
+      const button = layer?.querySelector(
+        `.build-entry-btn[data-h3-index="${CSS.escape(h3Index)}"]`
+      );
+      if (!button) return { clientX: fallbackClientX, clientY: fallbackClientY };
+      const rect = button.getBoundingClientRect();
+      return {
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2
+      };
+    }
+    async function processBuildEntryClick(h3Index, clientX, clientY, ctrlKey) {
+      const lifecycleRevision = popupLifecycleRevision;
+      if (isHoverOrderPlanningActive() || deps.shouldRenderRes4Hexes()) return;
+      rendererSharedState.selectedHexIndex = h3Index;
+      const popup = document.getElementById("build-popup");
+      const popupOpen = !!popup && !popup.classList.contains("hidden");
+      if (!ctrlKey) {
+        const togglesSinglePopup = rendererSharedState.selectedBuildHexH3s.length === 1 && rendererSharedState.selectedBuildHexH3s[0] === h3Index && popupOpen && rendererSharedState.buildPopupHexH3 === h3Index;
+        if (togglesSinglePopup) {
+          hideBuildPopup2();
+          return;
+        }
+        rendererSharedState.selectedBuildHexH3s = [h3Index];
+        rendererSharedState.buildQueueTemplate = [];
+        showBuildPopup2(h3Index, clientX, clientY);
+        return;
+      }
+      const existingIndex = rendererSharedState.selectedBuildHexH3s.indexOf(h3Index);
+      if (existingIndex >= 0) {
+        rendererSharedState.selectedBuildHexH3s = rendererSharedState.selectedBuildHexH3s.filter((selected) => selected !== h3Index);
+        if (rendererSharedState.selectedBuildHexH3s.length === 0) {
+          hideBuildPopup2();
+          return;
+        }
+        if (rendererSharedState.selectedBuildHexH3s.length === 1) rendererSharedState.buildQueueTemplate = [];
+        const remainingAnchor = rendererSharedState.selectedBuildHexH3s.at(-1);
+        rendererSharedState.selectedHexIndex = remainingAnchor;
+        const anchorPoint = clientPointForBuildEntryHex(remainingAnchor, clientX, clientY);
+        showBuildPopup2(remainingAnchor, anchorPoint.clientX, anchorPoint.clientY);
+        return;
+      }
+      const priorCount = rendererSharedState.selectedBuildHexH3s.length;
+      rendererSharedState.selectedBuildHexH3s = [...rendererSharedState.selectedBuildHexH3s, h3Index];
+      if (priorCount === 0) {
+        rendererSharedState.buildQueueTemplate = [];
+        showBuildPopup2(h3Index, clientX, clientY);
+        return;
+      }
+      if (priorCount === 1) {
+        const seedSnapshot = await window.gameApi?.getHexBuildQueue({ h3Index });
+        if (lifecycleRevision !== popupLifecycleRevision) return;
+        if (!seedSnapshot) {
+          deps.showMapToast("Failed to load the build queue template.", { isError: true });
+          rendererSharedState.selectedBuildHexH3s = rendererSharedState.selectedBuildHexH3s.filter((selected) => selected !== h3Index);
+          deps.requestRedraw();
+          return;
+        }
+        rendererSharedState.buildQueueTemplate = buildQueueTemplateFromSnapshot(seedSnapshot);
+        await applyCurrentTemplateToHexes([...rendererSharedState.selectedBuildHexH3s]);
+      } else {
+        await applyCurrentTemplateToHexes([h3Index]);
+      }
+      if (lifecycleRevision !== popupLifecycleRevision) return;
+      showBuildPopup2(h3Index, clientX, clientY);
+    }
+    function handleBuildEntryClick2(h3Index, clientX, clientY, ctrlKey) {
+      buildEntryInteractionChain = buildEntryInteractionChain.then(() => processBuildEntryClick(h3Index, clientX, clientY, ctrlKey)).catch((err) => {
+        console.error("handleBuildEntryClick failed:", err);
+        deps.showMapToast("Failed to update build selection.", { isError: true });
+      });
+      return buildEntryInteractionChain;
+    }
     function hideBuildPopup2() {
+      popupLifecycleRevision++;
       rendererSharedState.buildPopupHexH3 = null;
       rendererSharedState.buildPopupRequestSeq++;
+      rendererSharedState.selectedBuildHexH3s = [];
+      rendererSharedState.buildQueueTemplate = [];
       const el = document.getElementById("build-popup");
       const body = document.getElementById("build-popup-body");
       if (el) {
@@ -22376,7 +22755,7 @@
       if (!el || el.classList.contains("hidden") || !rendererSharedState.buildPopupHexH3 || !body) return;
       void renderBuildQueueIntoMount(body, rendererSharedState.buildPopupHexH3);
     }
-    return { hideBuildPopup: hideBuildPopup2, showBuildPopup: showBuildPopup2, refreshBuildPopupIfOpen: refreshBuildPopupIfOpen2 };
+    return { handleBuildEntryClick: handleBuildEntryClick2, hideBuildPopup: hideBuildPopup2, showBuildPopup: showBuildPopup2, refreshBuildPopupIfOpen: refreshBuildPopupIfOpen2 };
   }
 
   // src/renderer/gameplay/tacticalBattlePromptPreference.ts
@@ -22776,7 +23155,7 @@
   function pointInExpandedClientRect(clientX, clientY, rect, padPx) {
     return clientX >= rect.left - padPx && clientX <= rect.right + padPx && clientY >= rect.top - padPx && clientY <= rect.bottom + padPx;
   }
-  function tryHandleBuildEntryAtClientXY(clientX, clientY, deps) {
+  function tryHandleBuildEntryAtClientXY(clientX, clientY, deps, eventCtrlKey = false) {
     if (isHoverOrderPlanningActive()) return false;
     const layer = document.getElementById("build-entry-layer");
     if (!layer || layer.classList.contains("hidden")) return false;
@@ -22786,13 +23165,7 @@
       if (!pointInExpandedClientRect(clientX, clientY, r, BUILD_ENTRY_HIT_PAD_PX)) continue;
       const h3 = btn.dataset.h3Index;
       if (!h3) continue;
-      rendererSharedState.selectedHexIndex = h3;
-      const popup = document.getElementById("build-popup");
-      if (popup && !popup.classList.contains("hidden") && rendererSharedState.buildPopupHexH3 === h3) {
-        deps.hideBuildPopup();
-      } else {
-        deps.showBuildPopup(h3, clientX, clientY);
-      }
+      void deps.handleBuildEntryClick(h3, clientX, clientY, eventCtrlKey || rendererSharedState.ctrlKeyActive);
       return true;
     }
     return false;
@@ -23275,12 +23648,6 @@
   function clearSidebarError() {
     const el = document.getElementById("sidebar-error");
     if (el) el.style.display = "none";
-  }
-
-  // src/shared/ipc/productionTypes.ts
-  var ALL_BUILD_UNIT_TYPES = ["infantry", "armor", "naval", "air"];
-  function isBuildUnitType(value) {
-    return value === "infantry" || value === "armor" || value === "naval" || value === "air";
   }
 
   // src/shared/lossSummary.ts
@@ -24715,7 +25082,7 @@
         deps.redraw();
         return;
       }
-      if (deps.tryHandleBuildEntryAtClientXY(e.clientX, e.clientY)) {
+      if (deps.tryHandleBuildEntryAtClientXY(e.clientX, e.clientY, e.ctrlKey)) {
         deps.updateSidebar();
         deps.updateRangedSidebar();
         deps.redraw();
@@ -25061,13 +25428,7 @@
       const h3 = btn.dataset.h3Index;
       if (!h3) return;
       if (isHoverOrderPlanningActive()) return;
-      rendererSharedState.selectedHexIndex = h3;
-      const popup = document.getElementById("build-popup");
-      if (popup && !popup.classList.contains("hidden") && rendererSharedState.buildPopupHexH3 === h3) {
-        deps.hideBuildPopup();
-        return;
-      }
-      deps.showBuildPopup(h3, e.clientX, e.clientY);
+      void deps.handleBuildEntryClick(h3, e.clientX, e.clientY, e.ctrlKey || rendererSharedState.ctrlKeyActive);
     });
     const tacticalEntryLayer = document.getElementById("tactical-entry-layer");
     tacticalEntryLayer?.addEventListener("pointerover", (e) => {
@@ -25951,7 +26312,6 @@
   }
   function applyModifierDrivenPopoverCloseRules(reason) {
     if (reason === "ctrl_pressed") {
-      hideBuildPopup();
       refreshStackCalloutIfOpen();
       return;
     }
@@ -26359,6 +26719,9 @@
   function showBuildPopup(h3Index, clientX, clientY) {
     getBuildQueuePopupController().showBuildPopup(h3Index, clientX, clientY);
   }
+  async function handleBuildEntryClick(h3Index, clientX, clientY, ctrlKey) {
+    await getBuildQueuePopupController().handleBuildEntryClick(h3Index, clientX, clientY, ctrlKey);
+  }
   function refreshBuildPopupIfOpen() {
     getBuildQueuePopupController().refreshBuildPopupIfOpen();
   }
@@ -26661,6 +27024,7 @@
       return;
     }
     const visibleUnitHexes = new Set(rendererSharedState.gameState.units.map((u) => u.h3Index));
+    const selectedBuildHexes = new Set(rendererSharedState.selectedBuildHexH3s);
     const rows = [];
     for (const hx of rendererSharedState.gameState.hexes) {
       const explored = isHexExploredByPlayer2(hx.h3Index);
@@ -26681,7 +27045,8 @@
         label: formatProductionLabelForHumanControllerOnly(rendererSharedState.gameState, hx.h3Index, capacityPerTurn, "human"),
         left: Math.round(center.x),
         top: Math.round(textY),
-        hasCapacity: true
+        hasCapacity: true,
+        selected: selectedBuildHexes.has(hx.h3Index)
       });
     }
     if (rows.length === 0) {
@@ -26689,10 +27054,10 @@
       return;
     }
     rows.sort((a, b) => a.h3.localeCompare(b.h3));
-    const layerKey = rows.map((r) => `${r.h3}|${r.label}|${r.left}|${r.top}|${r.hasCapacity ? 1 : 0}`).join(";");
+    const layerKey = rows.map((r) => `${r.h3}|${r.label}|${r.left}|${r.top}|${r.hasCapacity ? 1 : 0}|${r.selected ? 1 : 0}`).join(";");
     if (layerKey !== rendererSharedState.lastBuildEntryLayerKey) {
       const html = rows.map(
-        (r) => `<button type="button" class="build-entry-btn${r.hasCapacity ? " has-capacity" : ""}" data-h3-index="${r.h3}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Open build queue for ${r.h3}">${r.label}</button>`
+        (r) => `<button type="button" class="build-entry-btn${r.hasCapacity ? " has-capacity" : ""}${r.selected ? " selected" : ""}" data-h3-index="${r.h3}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Open build queue for ${r.h3}" aria-pressed="${r.selected ? "true" : "false"}">${r.label}</button>`
       ).join("");
       layer.innerHTML = html;
       rendererSharedState.lastBuildEntryLayerKey = layerKey;
@@ -26849,13 +27214,12 @@
   function containerPixelHitsDrawnUnitIcon2(px, py, h3Index, unitCount) {
     return containerPixelHitsDrawnUnitIcon(px, py, h3Index, unitCount);
   }
-  function tryHandleBuildEntryAtClientXY2(clientX, clientY) {
+  function tryHandleBuildEntryAtClientXY2(clientX, clientY, eventCtrlKey = false) {
     return tryHandleBuildEntryAtClientXY(clientX, clientY, {
       backgroundColor: BACKGROUND_COLOR,
       buildResolutionPlaybackState: buildResolutionPlaybackState2,
-      hideBuildPopup,
-      showBuildPopup
-    });
+      handleBuildEntryClick
+    }, eventCtrlKey);
   }
   function refreshStrategicOrderSidebars() {
     updatePendingOrdersSidebar2();
@@ -27475,6 +27839,7 @@
       clearTerrainTooltipTimer,
       hideTerrainTooltipVisual,
       showBuildPopup,
+      handleBuildEntryClick,
       updateMapInteractionCursor: updateMapInteractionCursor2,
       redraw
     });

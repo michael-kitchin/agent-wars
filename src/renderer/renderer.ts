@@ -453,7 +453,6 @@ function isClientPointInsideMainMapLeafletContainer(clientX: number, clientY: nu
  */
 function applyModifierDrivenPopoverCloseRules(reason: 'ctrl_pressed' | 'ctrl_released' | 'window_blur'): void {
   if (reason === 'ctrl_pressed') {
-    hideBuildPopup();
     refreshStackCalloutIfOpen();
     return;
   }
@@ -1033,6 +1032,23 @@ function hideBuildPopup(): void {
  */
 function showBuildPopup(h3Index: string, clientX: number, clientY: number): void {
   getBuildQueuePopupController().showBuildPopup(h3Index, clientX, clientY);
+}
+
+/**
+ * Routes a build-entry activation through the shared plain/Ctrl selection policy.
+ *
+ * Purpose: Keeps direct DOM clicks and canvas hit-testing on one production-selection implementation.
+ * When to use: Every build-entry button activation.
+ * Expected outcome: Popup, selected button chrome, and queue synchronization remain consistent.
+ * Exceptions: Controller reports asynchronous write failures through the existing map toast.
+ */
+async function handleBuildEntryClick(
+  h3Index: string,
+  clientX: number,
+  clientY: number,
+  ctrlKey: boolean
+): Promise<void> {
+  await getBuildQueuePopupController().handleBuildEntryClick(h3Index, clientX, clientY, ctrlKey);
 }
 
 /**
@@ -1724,7 +1740,15 @@ function syncBuildEntryButton(): void {
     return;
   }
   const visibleUnitHexes = new Set(S.gameState.units.map((u) => u.h3Index));
-  const rows: Array<{ h3: string; label: string; left: number; top: number; hasCapacity: boolean }> = [];
+  const selectedBuildHexes = new Set(S.selectedBuildHexH3s);
+  const rows: Array<{
+    h3: string;
+    label: string;
+    left: number;
+    top: number;
+    hasCapacity: boolean;
+    selected: boolean;
+  }> = [];
   for (const hx of S.gameState.hexes) {
     const explored = isHexExploredByPlayer(hx.h3Index);
     if (!explored) continue;
@@ -1746,6 +1770,7 @@ function syncBuildEntryButton(): void {
       left: Math.round(center.x),
       top: Math.round(textY),
       hasCapacity: true,
+      selected: selectedBuildHexes.has(hx.h3Index),
     });
   }
   if (rows.length === 0) {
@@ -1754,13 +1779,13 @@ function syncBuildEntryButton(): void {
   }
   rows.sort((a, b) => a.h3.localeCompare(b.h3));
   const layerKey = rows
-    .map((r) => `${r.h3}|${r.label}|${r.left}|${r.top}|${r.hasCapacity ? 1 : 0}`)
+    .map((r) => `${r.h3}|${r.label}|${r.left}|${r.top}|${r.hasCapacity ? 1 : 0}|${r.selected ? 1 : 0}`)
     .join(';');
   if (layerKey !== S.lastBuildEntryLayerKey) {
     const html = rows
       .map(
         (r) =>
-          `<button type="button" class="build-entry-btn${r.hasCapacity ? ' has-capacity' : ''}" data-h3-index="${r.h3}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Open build queue for ${r.h3}">${r.label}</button>`
+          `<button type="button" class="build-entry-btn${r.hasCapacity ? ' has-capacity' : ''}${r.selected ? ' selected' : ''}" data-h3-index="${r.h3}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Open build queue for ${r.h3}" aria-pressed="${r.selected ? 'true' : 'false'}">${r.label}</button>`
       )
       .join('');
     layer.innerHTML = html;
@@ -2039,20 +2064,23 @@ function containerPixelHitsDrawnUnitIcon(
 }
 
 /**
- * Defines the `tryHandleBuildEntryAtClientXY` function shape (function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number): boolean).
+ * Defines the `tryHandleBuildEntryAtClientXY` function shape (function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number, eventCtrlKey?: boolean): boolean).
 
  * Purpose: Supports maintainability by documenting why `tryHandleBuildEntryAtClientXY` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number): boolean {
+function tryHandleBuildEntryAtClientXY(
+  clientX: number,
+  clientY: number,
+  eventCtrlKey = false
+): boolean {
   return tryHandleBuildEntryAtClientXYFromModule(clientX, clientY, {
     backgroundColor: BACKGROUND_COLOR,
     buildResolutionPlaybackState,
-    hideBuildPopup,
-    showBuildPopup,
-  });
+    handleBuildEntryClick,
+  }, eventCtrlKey);
 }
 
 /**
@@ -3164,6 +3192,7 @@ function init(): void {
     clearTerrainTooltipTimer,
     hideTerrainTooltipVisual,
     showBuildPopup,
+    handleBuildEntryClick,
     updateMapInteractionCursor,
     redraw,
   });

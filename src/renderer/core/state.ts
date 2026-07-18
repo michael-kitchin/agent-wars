@@ -20,6 +20,7 @@ import type { TacticalAnnihilationOutcomeKind } from '../../shared/tacticalAnnih
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { OPENROUTER_TOOL_GROUPS } from './constants';
 import type { HoverRoutePreviewState, ResolutionMove, ResolutionPlaybackMove } from './types';
+import type { BuildQueueTemplateRow } from '../gameplay/buildQueueMultiSelect';
 
 /**
  * Documents the `ResolutionMoveAnimationState` type alias (export type ResolutionMoveAnimationState).
@@ -441,6 +442,16 @@ terrainTooltipRestoreTimer: null as ReturnType<typeof setTimeout> | null,
    */
 selectedHexIndex: null as string | null,
     /**
+   * Ordered res1 hex ids controlled by the build-popup multi-selection (insertion order).
+   *
+   * Purpose: Keeps production-hex selection independent from unit selection and the scalar map hex.
+   * When to use: Build-entry button chrome, Ctrl-toggle policy, and multi-hex popup rendering.
+   * Expected outcome: Append on add and filter on remove preserve insertion order; the last entry is the
+   * deselect re-anchor. Plain click replaces the set and popup close clears it.
+   * Exceptions: Only build-entry button interactions may add or remove members.
+   */
+selectedBuildHexH3s: [] as string[],
+    /**
    * Documents the object literal property `hoveredHexH3` (hoveredHexH3: null as string | null).
 
    * Purpose: Supports maintainability by documenting why `hoveredHexH3` exists.
@@ -656,6 +667,15 @@ stackCalloutModalActive: false,
    * Exceptions: None.
    */
 buildPopupHexH3: null as string | null,
+    /**
+   * Ordered queue rows broadcast across selected production hexes while multi-select is active.
+   *
+   * Purpose: Preserves rows unavailable at some hexes even though those rows are filtered from persistence.
+   * When to use: Selection size two or greater; clear when collapsing to one or closing the popup.
+   * Expected outcome: Multi-edit controls remain stable across per-hex eligibility differences and async edits via stable `rowKey`.
+   * Exceptions: Single-hex mode continues to read and mutate database entry ids directly.
+   */
+buildQueueTemplate: [] as BuildQueueTemplateRow[],
     /**
    * Documents the object literal property `buildPopupRequestSeq` (buildPopupRequestSeq: 0).
 

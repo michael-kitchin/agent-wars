@@ -21,6 +21,8 @@ import type {
   HexNamingTooltipLineRequest,
   HexContinentNamesRequest,
   BuildUnitType,
+  ApplyBuildQueueTemplateResult,
+  BuildQueueTemplateEntry,
   AirStrikeTargetType,
   HexBuildQueueSnapshot,
   NewGameIpcPayload,
@@ -69,6 +71,7 @@ const IPC_GAME = {
   addHexBuildQueueEntry: 'game:addHexBuildQueueEntry',
   updateHexBuildQueueEntry: 'game:updateHexBuildQueueEntry',
   removeHexBuildQueueEntry: 'game:removeHexBuildQueueEntry',
+  applyBuildQueueTemplateToHexes: 'game:applyBuildQueueTemplateToHexes',
   getSealiftStackState: 'game:getSealiftStackState',
   getTacticalSealiftStackState: 'game:getTacticalSealiftStackState',
   updateTacticalSealiftSlot: 'game:updateTacticalSealiftSlot',
@@ -486,6 +489,19 @@ removeHexBuildQueueEntry: (payload: { h3Index: string; entryId: number }): Promi
     reason?: string;
     queue?: HexBuildQueueSnapshot;
   }> => ipcRenderer.invoke(IPC_GAME.removeHexBuildQueueEntry, payload),
+    /**
+   * Applies one shared queue template to selected production hexes.
+   *
+   * Purpose: Gives the renderer one authoritative best-effort batch write for multi-hex editing.
+   * When to use: A build hex joins a multi-selection or the shared template changes.
+   * Expected outcome: Applied, eligibility-skipped, and hard-failed details.
+   * Exceptions: IPC transport failures reject the promise.
+   */
+applyBuildQueueTemplateToHexes: (payload: {
+    h3Indexes: string[];
+    entries: BuildQueueTemplateEntry[];
+  }): Promise<ApplyBuildQueueTemplateResult> =>
+    ipcRenderer.invoke(IPC_GAME.applyBuildQueueTemplateToHexes, payload),
     /**
    * Documents the object literal property `getSealiftStackState` (getSealiftStackState: (payload: { h3Index: string }) => ipcRenderer.invoke('game:getSealiftStackState', payload)).
 

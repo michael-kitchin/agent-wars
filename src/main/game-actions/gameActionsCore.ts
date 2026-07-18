@@ -51,6 +51,10 @@ import {
 } from '../tacticalBattle/tacticalStandingOrderMarchMerge';
 import { resolveTacticalRangedTargetForSubUnit } from '../tacticalBattle/tacticalRangedTargetResolve';
 import { validateHumanTacticalMarchOrders } from '../tacticalBattle/tacticalBattleSession';
+import type {
+  ApplyBuildQueueTemplateResult,
+  BuildQueueTemplateEntry,
+} from '../../shared/ipcTypes';
 import type { BuildUnitType } from '../productionRules';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE, formatTargetOutOfRangeReason } from '../../shared/tacticalRanges';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
@@ -66,6 +70,7 @@ import { validateTacticalHumanAirStrikeGroup } from './tacticalHumanAirStrikeVal
 import { isWithinGridRangeSafe } from './gridRange';
 import {
   addHexBuildQueueEntryImpl,
+  applyBuildQueueTemplateToHexesImpl,
   getHexBuildQueueImpl,
   removeHexBuildQueueEntryImpl,
   updateHexBuildQueueEntryImpl,
@@ -1542,6 +1547,22 @@ export function removeHexBuildQueueEntry(
   requestingPlayerId = HUMAN_PLAYER_ID
 ): { success: boolean; reason?: string; queue?: HexBuildQueueView } {
   return removeHexBuildQueueEntryImpl(h3Index, entryId, requestingPlayerId);
+}
+
+/**
+ * Applies a shared ordered build queue template to multiple controlled production hexes.
+ *
+ * Purpose: Exposes the best-effort multi-hex production write through the public game-actions facade.
+ * When to use: Renderer synchronization after build-hex selection joins or shared template edits.
+ * Expected outcome: Successful, skipped, and failed hex/type details from the authoritative backend.
+ * Exceptions: Implementation exceptions are captured and reported by the delegated action.
+ */
+export function applyBuildQueueTemplateToHexes(
+  h3Indexes: string[],
+  entries: BuildQueueTemplateEntry[],
+  requestingPlayerId = HUMAN_PLAYER_ID
+): ApplyBuildQueueTemplateResult {
+  return applyBuildQueueTemplateToHexesImpl(h3Indexes, entries, requestingPlayerId);
 }
 
 /**

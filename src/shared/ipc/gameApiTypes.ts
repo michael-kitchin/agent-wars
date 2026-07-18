@@ -1,5 +1,10 @@
 import type { AirStrikeTargetType } from './ordersTypes';
-import type { BuildUnitType, HexBuildQueueSnapshot } from './productionTypes';
+import type {
+  ApplyBuildQueueTemplateResult,
+  BuildQueueTemplateEntry,
+  BuildUnitType,
+  HexBuildQueueSnapshot,
+} from './productionTypes';
 import type { GameStateSnapshot } from './gameStateTypes';
 import type {
   EndTacticalBattleIpcResult,
@@ -357,6 +362,18 @@ removeHexBuildQueueEntry: (payload: { h3Index: string; entryId: number }) => Pro
     reason?: string;
     queue?: HexBuildQueueSnapshot;
   }>;
+    /**
+   * Applies one queue template across selected production hexes with per-hex eligibility filtering.
+   *
+   * Contract: Valid hexes are updated best-effort while unavailable types are reported as non-failing skips.
+   * When to use: Multi-hex build selection joins and shared queue edits.
+   * Expected outcome: Applied, skipped, and hard-failed details for renderer reconciliation.
+   * Exceptions: Transport failures reject the promise; domain failures are returned in the result.
+   */
+applyBuildQueueTemplateToHexes: (payload: {
+    h3Indexes: string[];
+    entries: BuildQueueTemplateEntry[];
+  }) => Promise<ApplyBuildQueueTemplateResult>;
     /**
    * Specifies the contract for the `getSealiftStackState` member (getSealiftStackState: (payload: { h3Index: string }) => Promise<SealiftStackState>;).
 

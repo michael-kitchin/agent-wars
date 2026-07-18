@@ -4,6 +4,12 @@ import { estimateTurnsToCompleteQueuedProduction, sumQueuedProductionCost } from
 import { TOOLTIP_OFFSET_PX, UNIT_SELECT_GLYPH } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
+import { buildQueueTemplateFromSnapshot, toBuildQueueTemplateEntries } from './buildQueueMultiSelect';
+import { renderMultiBuildQueueIntoMount } from './buildQueueMultiPopup';
+import {
+  escapeBuildPopupHtml,
+  formatGroupedBuildNamingLineHtml,
+} from './buildQueuePopupFormatting';
 
 /**
  * Defines the `sanitizeBuildCountInputText` function shape (export function sanitizeBuildCountInputText(raw: string): string).
@@ -142,49 +148,6 @@ showMapToast: (message: string, options?: { isError?: boolean }) => void;
 }
 
 /**
- * Defines the `escapeHtml` function shape (function escapeHtml(text: string): string).
-
- * Purpose: Supports maintainability by documenting why `escapeHtml` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function escapeHtml(text: string): string {
-  return text
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
-
-/**
- * Defines the `formatGroupedNamingLineHtml` function shape (function formatGroupedNamingLineHtml(namingLine: string): string).
-
- * Purpose: Supports maintainability by documenting why `formatGroupedNamingLineHtml` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function formatGroupedNamingLineHtml(namingLine: string): string {
-  const groups = namingLine
-    .split(';')
-    .map((g) => g.trim())
-    .filter((g) => g.length > 0);
-  if (groups.length === 0) return escapeHtml(namingLine);
-  const formattedGroups = groups.map((group) => {
-    const colonIdx = group.indexOf(':');
-    if (colonIdx < 0) return escapeHtml(group);
-    const heading = group.slice(0, colonIdx).trim();
-    const remainder = group.slice(colonIdx + 1).trim();
-    if (!heading) return escapeHtml(group);
-    if (!remainder) return `<strong>${escapeHtml(heading)}:</strong>`;
-    return `<strong>${escapeHtml(heading)}:</strong> ${escapeHtml(remainder)}`;
-  });
-  return formattedGroups.join('; ');
-}
-
-/**
  * Defines the `createBuildQueuePopupController` function shape (export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) { async function runBuildQueueMutation(args: { mutate: () => Promise<{ succes).
 
  * Purpose: Supports maintainability by documenting why `createBuildQueuePopupController` exists.
@@ -193,6 +156,15 @@ function formatGroupedNamingLineHtml(namingLine: string): string {
  * Exceptions: None.
  */
 export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
+  /**
+   * Serializes asynchronous build-entry selection changes so template seeding cannot race later joins.
+   */
+  let buildEntryInteractionChain: Promise<void> = Promise.resolve();
+  /**
+   * Invalidates an in-flight selection operation when another path closes the popup.
+   */
+  let popupLifecycleRevision = 0;
+
   async function runBuildQueueMutation(args: {
     mutate: () => Promise<{ success: boolean; reason?: string }>;
     failureMessage: string;
@@ -213,7 +185,45 @@ export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
     }
   }
 
+  /**
+   * Applies the current shared template to selected target hexes and reconciles renderer state.
+   *
+   * Purpose: Keeps multi-hex writes on the batch API while preserving hard-failure feedback.
+   * When to use: Selection joins and every multi-mode template edit.
+   * Expected outcome: Successful siblings refresh immediately; eligibility skips stay silent.
+   * Exceptions: Transport and hard domain failures show one error toast and return `false`.
+   */
+  async function applyCurrentTemplateToHexes(h3Indexes: string[]): Promise<boolean> {
+    if (!window.gameApi?.applyBuildQueueTemplateToHexes) return false;
+    try {
+      const result = await window.gameApi.applyBuildQueueTemplateToHexes({
+        h3Indexes,
+        entries: toBuildQueueTemplateEntries(S.buildQueueTemplate),
+      });
+      if (result.applied.length > 0) await deps.refreshGameStateAfterBuildQueueChange();
+      if (!result.success) {
+        const failureReason = result.reason ?? result.failed[0]?.reason ?? 'Failed to synchronize build queues.';
+        deps.showMapToast(failureReason, { isError: true });
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('applyCurrentTemplateToHexes failed:', err);
+      deps.showMapToast('Failed to synchronize build queues.', { isError: true });
+      return false;
+    }
+  }
+
   async function renderBuildQueueIntoMount(mount: HTMLElement, h3Index: string): Promise<void> {
+    if (S.selectedBuildHexH3s.length >= 2) {
+      await renderMultiBuildQueueIntoMount({
+        mount,
+        h3Index,
+        hideBuildPopup,
+        applyTemplate: applyCurrentTemplateToHexes,
+      });
+      return;
+    }
     if (!window.gameApi?.getHexBuildQueue) return;
     const requestSeq = ++S.buildPopupRequestSeq;
     let snapshot: HexBuildQueueSnapshot | null = null;
@@ -243,10 +253,10 @@ export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
     section.className = 'build-queue-section';
     const trimmedNamingLine = namingLine?.trim() ?? '';
     const res1Code = getStrategicRes1HexCode(h3Index);
-    const llmPrefixHtml = res1Code ? `<strong>(${escapeHtml(res1Code)})</strong> ` : '';
+    const llmPrefixHtml = res1Code ? `<strong>(${escapeBuildPopupHtml(res1Code)})</strong> ` : '';
     if (trimmedNamingLine.length > 0) {
       const descriptionLine = document.createElement('div');
-      descriptionLine.innerHTML = `${llmPrefixHtml}${formatGroupedNamingLineHtml(trimmedNamingLine)}`;
+      descriptionLine.innerHTML = `${llmPrefixHtml}${formatGroupedBuildNamingLineHtml(trimmedNamingLine)}`;
       section.appendChild(descriptionLine);
       const descriptionSpacer = document.createElement('div');
       descriptionSpacer.style.height = '0.5em';
@@ -412,9 +422,137 @@ export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
     mount.appendChild(section);
   }
 
+  /**
+   * Resolves client coordinates for a build-entry button so the popup can re-anchor after selection changes.
+   *
+   * Purpose: Keeps deselect repositioning on the last remaining selected hex instead of the click that removed one.
+   * When to use: Ctrl-deselect when the selection remains non-empty.
+   * Expected outcome: Center of the matching `.build-entry-btn`, or the provided fallback when the button is missing.
+   * Exceptions: None.
+   */
+  function clientPointForBuildEntryHex(
+    h3Index: string,
+    fallbackClientX: number,
+    fallbackClientY: number
+  ): { clientX: number; clientY: number } {
+    const layer = document.getElementById('build-entry-layer');
+    const button = layer?.querySelector<HTMLButtonElement>(
+      `.build-entry-btn[data-h3-index="${CSS.escape(h3Index)}"]`
+    );
+    if (!button) return { clientX: fallbackClientX, clientY: fallbackClientY };
+    const rect = button.getBoundingClientRect();
+    return {
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+    };
+  }
+
+  /**
+   * Applies the locked plain/Ctrl build-entry selection policy and keeps the popup synchronized.
+   *
+   * Purpose: Gives DOM-layer and canvas hit-test paths one implementation so their behavior cannot drift.
+   * When to use: Every build-entry button activation.
+   * Expected outcome: Plain click replaces; Ctrl toggles; join writes follow last-clicked seeding rules.
+   * Exceptions: Hard batch failures are reported but do not discard the user's selection.
+   */
+  async function processBuildEntryClick(
+    h3Index: string,
+    clientX: number,
+    clientY: number,
+    ctrlKey: boolean
+  ): Promise<void> {
+    const lifecycleRevision = popupLifecycleRevision;
+    if (isHoverOrderPlanningActive() || deps.shouldRenderRes4Hexes()) return;
+    S.selectedHexIndex = h3Index;
+    const popup = document.getElementById('build-popup');
+    const popupOpen = !!popup && !popup.classList.contains('hidden');
+
+    if (!ctrlKey) {
+      const togglesSinglePopup =
+        S.selectedBuildHexH3s.length === 1 &&
+        S.selectedBuildHexH3s[0] === h3Index &&
+        popupOpen &&
+        S.buildPopupHexH3 === h3Index;
+      if (togglesSinglePopup) {
+        hideBuildPopup();
+        return;
+      }
+      S.selectedBuildHexH3s = [h3Index];
+      S.buildQueueTemplate = [];
+      showBuildPopup(h3Index, clientX, clientY);
+      return;
+    }
+
+    const existingIndex = S.selectedBuildHexH3s.indexOf(h3Index);
+    if (existingIndex >= 0) {
+      // Filter preserves insertion order of the remaining selected hexes.
+      S.selectedBuildHexH3s = S.selectedBuildHexH3s.filter((selected) => selected !== h3Index);
+      if (S.selectedBuildHexH3s.length === 0) {
+        hideBuildPopup();
+        return;
+      }
+      if (S.selectedBuildHexH3s.length === 1) S.buildQueueTemplate = [];
+      const remainingAnchor = S.selectedBuildHexH3s.at(-1)!;
+      S.selectedHexIndex = remainingAnchor;
+      const anchorPoint = clientPointForBuildEntryHex(remainingAnchor, clientX, clientY);
+      showBuildPopup(remainingAnchor, anchorPoint.clientX, anchorPoint.clientY);
+      return;
+    }
+
+    const priorCount = S.selectedBuildHexH3s.length;
+    S.selectedBuildHexH3s = [...S.selectedBuildHexH3s, h3Index];
+    if (priorCount === 0) {
+      S.buildQueueTemplate = [];
+      showBuildPopup(h3Index, clientX, clientY);
+      return;
+    }
+    if (priorCount === 1) {
+      const seedSnapshot = await window.gameApi?.getHexBuildQueue({ h3Index });
+      if (lifecycleRevision !== popupLifecycleRevision) return;
+      if (!seedSnapshot) {
+        deps.showMapToast('Failed to load the build queue template.', { isError: true });
+        S.selectedBuildHexH3s = S.selectedBuildHexH3s.filter((selected) => selected !== h3Index);
+        deps.requestRedraw();
+        return;
+      }
+      S.buildQueueTemplate = buildQueueTemplateFromSnapshot(seedSnapshot);
+      await applyCurrentTemplateToHexes([...S.selectedBuildHexH3s]);
+    } else {
+      await applyCurrentTemplateToHexes([h3Index]);
+    }
+    if (lifecycleRevision !== popupLifecycleRevision) return;
+    showBuildPopup(h3Index, clientX, clientY);
+  }
+
+  /**
+   * Queues one build-entry activation behind earlier asynchronous join synchronization.
+   *
+   * Purpose: Prevents rapid Ctrl+clicks from seeding or applying templates out of selection order.
+   * When to use: Public controller entry point for every build-entry activation.
+   * Expected outcome: Clicks execute in user order; a popup close invalidates pending visual updates.
+   * Exceptions: Unexpected errors are logged and reported without breaking later queued clicks.
+   */
+  function handleBuildEntryClick(
+    h3Index: string,
+    clientX: number,
+    clientY: number,
+    ctrlKey: boolean
+  ): Promise<void> {
+    buildEntryInteractionChain = buildEntryInteractionChain
+      .then(() => processBuildEntryClick(h3Index, clientX, clientY, ctrlKey))
+      .catch((err) => {
+        console.error('handleBuildEntryClick failed:', err);
+        deps.showMapToast('Failed to update build selection.', { isError: true });
+      });
+    return buildEntryInteractionChain;
+  }
+
   function hideBuildPopup(): void {
+    popupLifecycleRevision++;
     S.buildPopupHexH3 = null;
     S.buildPopupRequestSeq++;
+    S.selectedBuildHexH3s = [];
+    S.buildQueueTemplate = [];
     const el = document.getElementById('build-popup');
     const body = document.getElementById('build-popup-body');
     if (el) {
@@ -461,5 +599,5 @@ export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
     void renderBuildQueueIntoMount(body, S.buildPopupHexH3);
   }
 
-  return { hideBuildPopup, showBuildPopup, refreshBuildPopupIfOpen };
+  return { handleBuildEntryClick, hideBuildPopup, showBuildPopup, refreshBuildPopupIfOpen };
 }

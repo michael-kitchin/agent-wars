@@ -247,6 +247,15 @@ hideTerrainTooltipVisual: () => void;
    */
 showBuildPopup: (h3Index: string, clientX: number, clientY: number) => void;
     /**
+   * Applies plain/Ctrl build-entry selection semantics and popup synchronization.
+   *
+   * Contract: This is the only build-entry membership-changing path for direct DOM clicks.
+   * When to use: Build-entry layer click handler after resolving the target H3 index.
+   * Expected outcome: Same behavior as the canvas hit-test path.
+   * Exceptions: Async mutation failures are reported by the controller.
+   */
+handleBuildEntryClick: (h3Index: string, clientX: number, clientY: number, ctrlKey: boolean) => Promise<void>;
+    /**
    * Specifies the contract for the `updateMapInteractionCursor` member (updateMapInteractionCursor: (clientX: number, clientY: number) => void;).
 
    * Contract: Describes stable behavior for callers of `updateMapInteractionCursor` in this codebase.
@@ -508,13 +517,7 @@ export function wireInitCore(deps: InitCoreDeps): void {
     const h3 = btn.dataset.h3Index;
     if (!h3) return;
     if (isHoverOrderPlanningActive()) return;
-    S.selectedHexIndex = h3;
-    const popup = document.getElementById('build-popup');
-    if (popup && !popup.classList.contains('hidden') && S.buildPopupHexH3 === h3) {
-      deps.hideBuildPopup();
-      return;
-    }
-    deps.showBuildPopup(h3, e.clientX, e.clientY);
+    void deps.handleBuildEntryClick(h3, e.clientX, e.clientY, e.ctrlKey || S.ctrlKeyActive);
   });
 
   const tacticalEntryLayer = document.getElementById('tactical-entry-layer');

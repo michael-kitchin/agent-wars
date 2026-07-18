@@ -4,6 +4,7 @@ import {
   dbRun,
   dbGetOne,
   getGameState,
+  setBuildProgressPointsForHex,
   setRes1InfrastructureForHex,
 } from './gameDb';
 import {
@@ -11,6 +12,7 @@ import {
   addHexBuildQueueEntry,
   updateHexBuildQueueEntry,
   removeHexBuildQueueEntry,
+  applyBuildQueueTemplateToHexes,
   ready,
   submitOrders,
 } from './gameActions';
@@ -77,6 +79,22 @@ function findAnyHexExcluding(excluded: string): string {
 }
 
 /**
+ * Finds two distinct human-controlled hexes for multi-hex production contracts.
+ *
+ * Purpose: Keeps batch queue tests independent of any particular seeded H3 ids.
+ * When to use: Tests that require different infrastructure eligibility on sibling human hexes.
+ * Expected outcome: Two controlled hex ids from the temporary game database.
+ * Exceptions: Throws when the seeded scenario does not provide two human-controlled hexes.
+ */
+function findTwoHumanControlledHexes(): [string, string] {
+  const controlled = getGameState().hexes
+    .map((hex) => hex.h3Index)
+    .filter((h3Index) => getHexBuildQueue(h3Index, 'human').controlledByRequester);
+  if (controlled.length < 2) throw new Error('Expected at least two human-controlled hexes.');
+  return [controlled[0]!, controlled[1]!];
+}
+
+/**
  * Defines the `testBuildQueueMutationContracts` function shape (function testBuildQueueMutationContracts(): void).
 
  * Purpose: Supports maintainability by documenting why `testBuildQueueMutationContracts` exists.
@@ -132,6 +150,64 @@ function testTypeChangeAfterCountEditKeepsCount(): void {
     assert.strictEqual(updatedType.success, true);
     const after = getHexBuildQueue(h3, 'human');
     assert.strictEqual(after.entries[0]?.count, 23);
+  });
+}
+
+/**
+ * Verifies shared templates apply best-effort and filter unavailable types per hex.
+ *
+ * Purpose: Protects the core contract used by multi-hex renderer synchronization.
+ * When to use: Backend production regression suite.
+ * Expected outcome: Eligible rows preserve order, ineligible rows are reported, counts clamp, and
+ * an invalid sibling does not roll back a valid write.
+ * Exceptions: None.
+ */
+function testBatchBuildQueueTemplateContracts(): void {
+  withTempDb(() => {
+    const [coastalHex, inlandHex] = findTwoHumanControlledHexes();
+    setRes1InfrastructureForHex(coastalHex, { urbanHexCount: 10, airportCount: 0, seaportCount: 1 });
+    setRes1InfrastructureForHex(inlandHex, { urbanHexCount: 10, airportCount: 0, seaportCount: 0 });
+
+    const apply = applyBuildQueueTemplateToHexes(
+      [coastalHex, inlandHex, 'invalid-h3-index'],
+      [
+        { unitType: 'naval', count: 1 },
+        { unitType: 'infantry', count: 120 },
+      ],
+      'human'
+    );
+    assert.strictEqual(apply.success, false);
+    assert.deepStrictEqual(apply.applied, [coastalHex, inlandHex]);
+    assert.ok(apply.skipped.some((row) => row.h3Index === inlandHex && row.unitType === 'naval'));
+    assert.ok(apply.failed.some((row) => row.h3Index === 'invalid-h3-index'));
+    assert.deepStrictEqual(
+      getHexBuildQueue(coastalHex, 'human').entries.map((entry) => [entry.unitType, entry.count]),
+      [
+        ['naval', 1],
+        ['infantry', 99],
+      ]
+    );
+    assert.deepStrictEqual(
+      getHexBuildQueue(inlandHex, 'human').entries.map((entry) => [entry.unitType, entry.count]),
+      [['infantry', 99]]
+    );
+
+    setBuildProgressPointsForHex(coastalHex, 17);
+    const preservePoints = applyBuildQueueTemplateToHexes(
+      [coastalHex],
+      [{ unitType: 'infantry', count: 2 }],
+      'human'
+    );
+    assert.strictEqual(preservePoints.success, true);
+    assert.strictEqual(getHexBuildQueue(coastalHex, 'human').storedPoints, 17);
+    assert.deepStrictEqual(
+      getHexBuildQueue(coastalHex, 'human').entries.map((entry) => [entry.unitType, entry.count]),
+      [['infantry', 2]]
+    );
+
+    const empty = applyBuildQueueTemplateToHexes([], [], 'human');
+    assert.strictEqual(empty.success, false);
+    assert.match(empty.reason ?? '', /at least one/i);
   });
 }
 
@@ -579,6 +655,7 @@ function testNavalBuildRequiresSeaportAndUrbanInfrastructure(): void {
 function run(): void {
   testBuildQueueMutationContracts();
   testTypeChangeAfterCountEditKeepsCount();
+  testBatchBuildQueueTemplateContracts();
   testNoProductionBeforeReadyDuringPlanningEdits();
   testControlTakeoverClearsQueueAndProgress();
   testTraversedIntermediateHexCapturesControl();

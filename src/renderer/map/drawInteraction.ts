@@ -48,23 +48,14 @@ buildResolutionPlaybackState: (
     elapsed: number
   ) => ResolutionPlaybackState;
     /**
-   * Specifies the contract for the `hideBuildPopup` member (hideBuildPopup: () => void;).
-
-   * Contract: Describes stable behavior for callers of `hideBuildPopup` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+   * Applies the shared build-entry click policy for canvas hit-tested buttons.
+   *
+   * Contract: Plain click replaces the build-hex set; Ctrl click toggles membership.
+   * When to use: After identifying a build-entry hit from client coordinates.
+   * Expected outcome: Selection, queue synchronization, and popup state remain aligned.
+   * Exceptions: Async failures are surfaced by the popup controller.
    */
-hideBuildPopup: () => void;
-    /**
-   * Specifies the contract for the `showBuildPopup` member (showBuildPopup: (h3Index: string, clientX: number, clientY: number) => void;).
-
-   * Contract: Describes stable behavior for callers of `showBuildPopup` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-showBuildPopup: (h3Index: string, clientX: number, clientY: number) => void;
+handleBuildEntryClick: (h3Index: string, clientX: number, clientY: number, ctrlKey: boolean) => Promise<void>;
 }
 
 /**
@@ -202,14 +193,19 @@ export function pointInExpandedClientRect(
 }
 
 /**
- * Defines the `tryHandleBuildEntryAtClientXY` function shape (export function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number, deps: DrawInteractionDeps): boolean).
+ * Defines the `tryHandleBuildEntryAtClientXY` function shape (export function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number, deps: DrawInteractionDeps, eventCtrlKey?: boolean): boolean).
 
  * Purpose: Supports maintainability by documenting why `tryHandleBuildEntryAtClientXY` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number, deps: DrawInteractionDeps): boolean {
+export function tryHandleBuildEntryAtClientXY(
+  clientX: number,
+  clientY: number,
+  deps: DrawInteractionDeps,
+  eventCtrlKey = false
+): boolean {
   if (isHoverOrderPlanningActive()) return false;
   const layer = document.getElementById('build-entry-layer');
   if (!layer || layer.classList.contains('hidden')) return false;
@@ -219,13 +215,7 @@ export function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number, 
     if (!pointInExpandedClientRect(clientX, clientY, r, BUILD_ENTRY_HIT_PAD_PX)) continue;
     const h3 = btn.dataset.h3Index;
     if (!h3) continue;
-    S.selectedHexIndex = h3;
-    const popup = document.getElementById('build-popup');
-    if (popup && !popup.classList.contains('hidden') && S.buildPopupHexH3 === h3) {
-      deps.hideBuildPopup();
-    } else {
-      deps.showBuildPopup(h3, clientX, clientY);
-    }
+    void deps.handleBuildEntryClick(h3, clientX, clientY, eventCtrlKey || S.ctrlKeyActive);
     return true;
   }
   return false;
