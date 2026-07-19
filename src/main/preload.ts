@@ -23,6 +23,7 @@ import type {
   BuildUnitType,
   ApplyBuildQueueTemplateResult,
   BuildQueueTemplateEntry,
+  SetHexesKeepBuildingResult,
   AirStrikeTargetType,
   HexBuildQueueSnapshot,
   NewGameIpcPayload,
@@ -72,6 +73,7 @@ const IPC_GAME = {
   updateHexBuildQueueEntry: 'game:updateHexBuildQueueEntry',
   removeHexBuildQueueEntry: 'game:removeHexBuildQueueEntry',
   applyBuildQueueTemplateToHexes: 'game:applyBuildQueueTemplateToHexes',
+  setHexesKeepBuilding: 'game:setHexesKeepBuilding',
   getSealiftStackState: 'game:getSealiftStackState',
   getTacticalSealiftStackState: 'game:getTacticalSealiftStackState',
   updateTacticalSealiftSlot: 'game:updateTacticalSealiftSlot',
@@ -502,6 +504,18 @@ applyBuildQueueTemplateToHexes: (payload: {
     entries: BuildQueueTemplateEntry[];
   }): Promise<ApplyBuildQueueTemplateResult> =>
     ipcRenderer.invoke(IPC_GAME.applyBuildQueueTemplateToHexes, payload),
+  /**
+   * Arms or clears Keep building on selected production hexes.
+   *
+   * Purpose: Lets the build popup checkbox persist standing orders without rewriting queue rows.
+   * When to use: Single- or multi-hex Keep building toggles.
+   * Expected outcome: Best-effort applied/failed details.
+   * Exceptions: IPC transport failures reject the promise.
+   */
+  setHexesKeepBuilding: (payload: {
+    h3Indexes: string[];
+    keepBuilding: boolean;
+  }): Promise<SetHexesKeepBuildingResult> => ipcRenderer.invoke(IPC_GAME.setHexesKeepBuilding, payload),
     /**
    * Documents the object literal property `getSealiftStackState` (getSealiftStackState: (payload: { h3Index: string }) => ipcRenderer.invoke('game:getSealiftStackState', payload)).
 

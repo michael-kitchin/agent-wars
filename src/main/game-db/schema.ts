@@ -152,7 +152,12 @@ export function getFullDdl(): string {
 
     CREATE TABLE IF NOT EXISTS res1_build_progress (
       h3_index TEXT PRIMARY KEY,
-      stored_points INTEGER NOT NULL DEFAULT 0
+      stored_points INTEGER NOT NULL DEFAULT 0,
+      keep_building INTEGER NOT NULL DEFAULT 0 CHECK (keep_building IN (0, 1)),
+      keep_building_unit_type TEXT CHECK (
+        keep_building_unit_type IS NULL
+        OR keep_building_unit_type IN ('infantry', 'armor', 'naval', 'air')
+      )
     );
 
     CREATE TABLE IF NOT EXISTS res1_infrastructure (

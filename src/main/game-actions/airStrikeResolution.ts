@@ -1,5 +1,17 @@
 import { cellToParent } from 'h3-js';
-import { dbGetAll, dbGetOne, dbRun, getRes1InfrastructureForHex, listBuildQueueRowsForHex, listRes4FeatureOverridesForGame, replaceBuildQueueForHex, clearBuildQueueAndProgressForHex, updateRes4FeatureOverrideRow } from '../gameDb';
+import {
+  dbGetAll,
+  dbGetOne,
+  dbRun,
+  getKeepBuildingForHex,
+  getRes1InfrastructureForHex,
+  listBuildQueueRowsForHex,
+  listRes4FeatureOverridesForGame,
+  replaceBuildQueueForHex,
+  clearBuildQueueAndProgressForHex,
+  setKeepBuildingForHex,
+  updateRes4FeatureOverrideRow,
+} from '../gameDb';
 import { logDebug } from '../logger';
 import { getAvailableBuildUnitTypes } from '../productionRules';
 import { casualtyPriorityIndex, getAttack, getDefense, getRange } from '../combatConstants';
@@ -17,28 +29,61 @@ import { isEmbarkedLandUnitOnWater } from './sealift';
 const MAX_URBAN_RES4_CELLS_DESTROYED_PER_STRATEGIC_URBAN_AIR_STRIKE = 9;
 
 /**
- * Defines the `pruneBuildQueueForInfrastructureState` function shape (function pruneBuildQueueForInfrastructureState(h3Index: string): void).
-
- * Purpose: Supports maintainability by documenting why `pruneBuildQueueForInfrastructureState` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Removes illegal build-queue rows after infrastructure changes and syncs Keep building.
+ *
+ * Purpose: Keeps queued types and Keep-building standing orders aligned with current eligibility.
+ * When to use: After air-strike / tactical rubble (or any infra change) that may invalidate unit types.
+ * Expected outcome: Illegal rows removed; empty queues and illegal empty-gap standing orders clear Keep building;
+ * armed non-empty queues retarget Keep building to the new last remaining type. Urban wipe clears queue+progress.
  * Exceptions: None.
  */
 export function pruneBuildQueueForInfrastructureState(h3Index: string): void {
+  logDebug('pruneBuildQueueForInfrastructureState', { h3Index });
   const infra = getRes1InfrastructureForHex(h3Index);
-  const rows = listBuildQueueRowsForHex(h3Index);
-  if (rows.length === 0) return;
-  const allowed = new Set(getAvailableBuildUnitTypes(infra.urbanHexCount, infra.seaportCount, infra.airportCount));
   if (infra.urbanHexCount <= 0) {
     clearBuildQueueAndProgressForHex(h3Index);
     return;
   }
+
+  const allowed = new Set(getAvailableBuildUnitTypes(infra.urbanHexCount, infra.seaportCount, infra.airportCount));
+  const rows = listBuildQueueRowsForHex(h3Index);
+  const standing = getKeepBuildingForHex(h3Index);
+
+  if (rows.length === 0) {
+    if (
+      standing.keepBuilding &&
+      (!standing.keepBuildingUnitType || !allowed.has(standing.keepBuildingUnitType))
+    ) {
+      setKeepBuildingForHex(h3Index, false, null);
+      logDebug('pruneBuildQueueForInfrastructureState: cleared empty-gap standing order', { h3Index });
+    }
+    return;
+  }
+
   const filtered = rows.filter((row) => allowed.has(row.unitType));
-  if (filtered.length === rows.length) return;
-  replaceBuildQueueForHex(
-    h3Index,
-    filtered.map((row) => ({ unitType: row.unitType, remainingCount: row.remainingCount }))
-  );
+  if (filtered.length !== rows.length) {
+    replaceBuildQueueForHex(
+      h3Index,
+      filtered.map((row) => ({ unitType: row.unitType, remainingCount: row.remainingCount }))
+    );
+    logDebug('pruneBuildQueueForInfrastructureState: removed illegal queue rows', {
+      h3Index,
+      beforeCount: rows.length,
+      afterCount: filtered.length,
+    });
+  }
+
+  if (filtered.length === 0) {
+    if (standing.keepBuilding) {
+      setKeepBuildingForHex(h3Index, false, null);
+    }
+    return;
+  }
+
+  if (standing.keepBuilding) {
+    const lastType = filtered[filtered.length - 1]!.unitType;
+    setKeepBuildingForHex(h3Index, true, lastType);
+  }
 }
 
 /**

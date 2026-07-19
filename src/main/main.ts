@@ -32,6 +32,7 @@ import {
   updateHexBuildQueueEntry,
   removeHexBuildQueueEntry,
   applyBuildQueueTemplateToHexes,
+  setHexesKeepBuilding,
   getSealiftStackState,
   getTacticalSealiftStackState,
   updateTacticalSealiftSlot,
@@ -52,6 +53,7 @@ import {
   parseGroupedDestinationPayload,
   parseBuildQueueUpdatePayload,
   parseBuildQueueTemplatePayload,
+  parseSetHexesKeepBuildingPayload,
   parseUnitIdList,
   parseHumanTacticalCommitPayload,
 } from './ipcPayloadGuards';
@@ -496,6 +498,18 @@ function registerIpcHandlers(): void {
       };
     }
     return applyBuildQueueTemplateToHexes(parsed.h3Indexes, parsed.entries, 'human');
+  });
+  ipcMain.handle(IPC_GAME.setHexesKeepBuilding, (_event, payload: unknown) => {
+    const parsed = parseSetHexesKeepBuildingPayload(payload);
+    if (!parsed) {
+      return {
+        success: false,
+        applied: [],
+        failed: [],
+        reason: 'Invalid Keep building payload',
+      };
+    }
+    return setHexesKeepBuilding(parsed.h3Indexes, parsed.keepBuilding, 'human');
   });
   ipcMain.handle(IPC_GAME.getSealiftStackState, (_event, payload: { h3Index?: string }) => {
     if (typeof payload?.h3Index !== 'string') {

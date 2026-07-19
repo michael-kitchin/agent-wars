@@ -7,6 +7,10 @@ import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 import { buildQueueTemplateFromSnapshot, toBuildQueueTemplateEntries } from './buildQueueMultiSelect';
 import { renderMultiBuildQueueIntoMount } from './buildQueueMultiPopup';
 import {
+  appendKeepBuildingCheckbox,
+  canArmKeepBuilding,
+} from './buildQueueKeepBuilding';
+import {
   escapeBuildPopupHtml,
   formatGroupedBuildNamingLineHtml,
 } from './buildQueuePopupFormatting';
@@ -221,6 +225,18 @@ export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
         h3Index,
         hideBuildPopup,
         applyTemplate: applyCurrentTemplateToHexes,
+        setKeepBuilding: async (keepBuilding) => {
+          if (!window.gameApi?.setHexesKeepBuilding) return false;
+          return runBuildQueueMutation({
+            mutate: () =>
+              window.gameApi!.setHexesKeepBuilding({
+                h3Indexes: [...S.selectedBuildHexH3s],
+                keepBuilding,
+              }),
+            failureMessage: 'Failed to update Keep building.',
+            refreshState: true,
+          });
+        },
       });
       return;
     }
@@ -419,6 +435,25 @@ export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
       list.appendChild(row);
     }
     section.appendChild(list);
+    appendKeepBuildingCheckbox({
+      section,
+      checked: snapshot.keepBuilding,
+      disabled: !canArmKeepBuilding(snapshot),
+      onChange: async (keepBuilding) => {
+        if (!window.gameApi?.setHexesKeepBuilding) return;
+        const success = await runBuildQueueMutation({
+          mutate: () =>
+            window.gameApi!.setHexesKeepBuilding({
+              h3Indexes: [h3Index],
+              keepBuilding,
+            }),
+          failureMessage: 'Failed to update Keep building.',
+          refreshState: true,
+        });
+        void renderBuildQueueIntoMount(mount, h3Index);
+        if (!success) return;
+      },
+    });
     mount.appendChild(section);
   }
 

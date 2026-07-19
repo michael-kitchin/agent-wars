@@ -6,17 +6,24 @@ import {
   dbGetOne,
   dbRun,
   getBuildProgressPointsForHex,
+  getKeepBuildingForHex,
   getHexControlMap,
   getRes1InfrastructureForHex,
   listAllHexControls,
   listBuildQueueRowsForHex,
   replaceBuildQueueForHex,
   setBuildProgressPointsForHex,
+  setKeepBuildingForHex,
   setHexController,
 } from '../gameDb';
-import { logDebug } from '../logger';
+import { logDebug, logError } from '../logger';
 import { DEPLOYMENT_CAP_TYPE_ORDER, MAX_UNITS_PER_TYPE } from '../productionCaps';
-import { UNIT_COST_BY_TYPE, type BuildUnitType } from '../productionRules';
+import {
+  computeKeepBuildingRefillCount,
+  getAvailableBuildUnitTypes,
+  UNIT_COST_BY_TYPE,
+  type BuildUnitType,
+} from '../productionRules';
 
 /**
  * Documents the `DeployedUnitsByType` type alias (type DeployedUnitsByType).
@@ -262,12 +269,16 @@ export function resolveRes1ControlAfterCombatAndMovement(
 }
 
 /**
- * Defines the `processProductionAfterControlResolution` function shape (export function processProductionAfterControlResolution(): { deployedByPlayer: { human: DeployedUnitsByType; opponent: DeployedUnitsByType }; capReachedBy).
-
- * Purpose: Supports maintainability by documenting why `processProductionAfterControlResolution` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Runs the post-control production pulse for every controlled hex with urban capacity.
+ *
+ * Purpose: Accrues stored+urban points once per hex, spends the build queue head-first under costs and
+ * deployment caps, and when Keep building is armed refills the empty queue in-loop from leftover points
+ * until `$` or a cap stalls (leaving a planning residue when points cannot afford another unit).
+ * When to use: After control resolution in the Ready pipeline, before returning deployed/cap summaries.
+ * Expected outcome: Queues and stored points persisted; units spawned; Keep building cleared only when an
+ * armed type is ineligible at refill time; iteration guard logs an error if the refill/spend loop exceeds
+ * its safety cap.
+ * Exceptions: None (DB/spawn failures surface from callees).
  */
 export function processProductionAfterControlResolution(): {
   deployedByPlayer: { human: DeployedUnitsByType; opponent: DeployedUnitsByType };
@@ -292,10 +303,15 @@ export function processProductionAfterControlResolution(): {
   for (const control of controls) {
     const controllerPlayerId = control.controllerPlayerId;
     if (!controllerPlayerId) continue;
-    const queueRows = listBuildQueueRowsForHex(control.h3Index);
-    if (queueRows.length === 0) continue;
-    const { urbanHexCount } = getRes1InfrastructureForHex(control.h3Index);
+    const { urbanHexCount, seaportCount, airportCount } = getRes1InfrastructureForHex(control.h3Index);
     if (urbanHexCount <= 0) continue;
+
+    const queueRows = listBuildQueueRowsForHex(control.h3Index);
+    const standingAtStart = getKeepBuildingForHex(control.h3Index);
+    if (queueRows.length === 0 && !(standingAtStart.keepBuilding && standingAtStart.keepBuildingUnitType)) {
+      continue;
+    }
+
     const storedPoints = getBuildProgressPointsForHex(control.h3Index);
     const capArray = controllerPlayerId === 'opponent' ? capReachedByPlayer.opponent : capReachedByPlayer.human;
     const capSet = new Set(capArray);
@@ -314,9 +330,42 @@ export function processProductionAfterControlResolution(): {
     }
     const spawnedUnitTypes: BuildUnitType[] = [];
     let blockedByCapType: BuildUnitType | null = null;
-    const idx = 0;
-    while (idx < queueWorking.length) {
-      const entry = queueWorking[idx]!;
+    let lastDepletedUnitType: BuildUnitType | null = null;
+    const availableTypes = getAvailableBuildUnitTypes(urbanHexCount, seaportCount, airportCount);
+    const maxLoopIterations = 10_000;
+    let loopIterations = 0;
+
+    while (loopIterations < maxLoopIterations) {
+      loopIterations += 1;
+      if (queueWorking.length === 0) {
+        const standing = getKeepBuildingForHex(control.h3Index);
+        if (!standing.keepBuilding || !standing.keepBuildingUnitType) break;
+        if (!availableTypes.includes(standing.keepBuildingUnitType)) {
+          setKeepBuildingForHex(control.h3Index, false, null);
+          logDebug('gameActions processProductionAfterControlResolution: cleared ineligible Keep building', {
+            h3Index: control.h3Index,
+            unitType: standing.keepBuildingUnitType,
+          });
+          break;
+        }
+        const refillType = standing.keepBuildingUnitType;
+        const refillCount = computeKeepBuildingRefillCount(refillType, points);
+        queueWorking.push({
+          id: -1,
+          queueIndex: 0,
+          unitType: refillType,
+          remainingCount: refillCount,
+        });
+        logDebug('gameActions processProductionAfterControlResolution: Keep building refill', {
+          h3Index: control.h3Index,
+          unitType: refillType,
+          refillCount,
+          availablePoints: points,
+        });
+        continue;
+      }
+
+      const entry = queueWorking[0]!;
       const cost = UNIT_COST_BY_TYPE[entry.unitType];
       const currentCount = simulatedCountsByType.get(entry.unitType) ?? 0;
       const maxCount = MAX_UNITS_PER_TYPE[entry.unitType];
@@ -335,9 +384,17 @@ export function processProductionAfterControlResolution(): {
       simulatedCountsByType.set(entry.unitType, currentCount + built);
       for (let n = 0; n < built; n++) spawnedUnitTypes.push(entry.unitType);
       if (entry.remainingCount <= 0) {
-        queueWorking.splice(idx, 1);
+        lastDepletedUnitType = entry.unitType;
+        queueWorking.shift();
       }
     }
+    if (loopIterations >= maxLoopIterations) {
+      logError('gameActions processProductionAfterControlResolution: Keep building loop iteration guard hit', {
+        h3Index: control.h3Index,
+        loopIterations,
+      });
+    }
+
     for (let i = 0; i < queueWorking.length; i++) {
       queueWorking[i]!.queueIndex = i;
     }
@@ -346,6 +403,16 @@ export function processProductionAfterControlResolution(): {
       queueWorking.map((entry) => ({ unitType: entry.unitType, remainingCount: entry.remainingCount }))
     );
     setBuildProgressPointsForHex(control.h3Index, points);
+    const standingAfter = getKeepBuildingForHex(control.h3Index);
+    if (standingAfter.keepBuilding) {
+      const confirmedType =
+        (queueWorking.length > 0 ? queueWorking[queueWorking.length - 1]!.unitType : null) ??
+        lastDepletedUnitType ??
+        standingAfter.keepBuildingUnitType;
+      if (confirmedType) {
+        setKeepBuildingForHex(control.h3Index, true, confirmedType);
+      }
+    }
     const deployedForHex = spawnProducedUnitsForHex(
       control.h3Index,
       controllerPlayerId,
@@ -366,6 +433,7 @@ export function processProductionAfterControlResolution(): {
       storedPointsAfter: points,
       spawnedCount: deployedForHex.length,
       blockedByCapType,
+      loopIterations,
       cappedTypesForController:
         DEPLOYMENT_CAP_TYPE_ORDER.filter((unitType) => capSet.has(unitType)).join(', ') || 'none',
     });

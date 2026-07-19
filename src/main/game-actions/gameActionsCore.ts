@@ -54,6 +54,7 @@ import { validateHumanTacticalMarchOrders } from '../tacticalBattle/tacticalBatt
 import type {
   ApplyBuildQueueTemplateResult,
   BuildQueueTemplateEntry,
+  SetHexesKeepBuildingResult,
 } from '../../shared/ipcTypes';
 import type { BuildUnitType } from '../productionRules';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE, formatTargetOutOfRangeReason } from '../../shared/tacticalRanges';
@@ -73,6 +74,7 @@ import {
   applyBuildQueueTemplateToHexesImpl,
   getHexBuildQueueImpl,
   removeHexBuildQueueEntryImpl,
+  setHexesKeepBuildingImpl,
   updateHexBuildQueueEntryImpl,
   type HexBuildQueueView,
 } from './buildQueue';
@@ -1563,6 +1565,22 @@ export function applyBuildQueueTemplateToHexes(
   requestingPlayerId = HUMAN_PLAYER_ID
 ): ApplyBuildQueueTemplateResult {
   return applyBuildQueueTemplateToHexesImpl(h3Indexes, entries, requestingPlayerId);
+}
+
+/**
+ * Arms or clears Keep building across selected production hexes.
+ *
+ * Purpose: Public facade for the Keep building checkbox IPC path.
+ * When to use: Single- or multi-hex build popup toggles.
+ * Expected outcome: Best-effort applied/failed details from the authoritative implementation.
+ * Exceptions: Implementation exceptions are captured and reported by the delegated action.
+ */
+export function setHexesKeepBuilding(
+  h3Indexes: string[],
+  keepBuilding: boolean,
+  requestingPlayerId = HUMAN_PLAYER_ID
+): SetHexesKeepBuildingResult {
+  return setHexesKeepBuildingImpl(h3Indexes, keepBuilding, requestingPlayerId);
 }
 
 /**

@@ -22180,6 +22180,37 @@
     }));
   }
 
+  // src/renderer/gameplay/buildQueueKeepBuilding.ts
+  function canArmKeepBuilding(snapshot) {
+    return snapshot.entries.length > 0 || snapshot.keepBuilding && snapshot.keepBuildingUnitType !== null;
+  }
+  function areAllKeepBuildingArmed(snapshots) {
+    return snapshots.length > 0 && snapshots.every((snapshot) => snapshot.keepBuilding);
+  }
+  function canArmKeepBuildingForAll(snapshots) {
+    return snapshots.length > 0 && snapshots.every((snapshot) => canArmKeepBuilding(snapshot));
+  }
+  function appendKeepBuildingCheckbox(args) {
+    const row = document.createElement("div");
+    row.className = "build-keep-building-row";
+    const label = document.createElement("label");
+    label.className = "build-keep-building-label";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "build-keep-building-checkbox";
+    checkbox.checked = args.checked;
+    checkbox.disabled = args.disabled;
+    checkbox.addEventListener("change", () => {
+      void args.onChange(checkbox.checked);
+    });
+    const text = document.createElement("span");
+    text.textContent = "Keep building";
+    label.appendChild(checkbox);
+    label.appendChild(text);
+    row.appendChild(label);
+    args.section.appendChild(row);
+  }
+
   // src/renderer/gameplay/buildQueueMultiPopup.ts
   function sanitizeCount(raw) {
     const digitsOnly = raw.replaceAll(/\D/g, "").slice(0, 2);
@@ -22374,6 +22405,15 @@
       list.appendChild(row);
     });
     section.appendChild(list);
+    appendKeepBuildingCheckbox({
+      section,
+      checked: areAllKeepBuildingArmed(snapshots),
+      disabled: !canArmKeepBuildingForAll(snapshots),
+      onChange: async (keepBuilding) => {
+        await deps.setKeepBuilding(keepBuilding);
+        void renderMultiBuildQueueIntoMount(deps);
+      }
+    });
     deps.mount.appendChild(section);
   }
 
@@ -22443,7 +22483,18 @@
           mount,
           h3Index,
           hideBuildPopup: hideBuildPopup2,
-          applyTemplate: applyCurrentTemplateToHexes
+          applyTemplate: applyCurrentTemplateToHexes,
+          setKeepBuilding: async (keepBuilding) => {
+            if (!window.gameApi?.setHexesKeepBuilding) return false;
+            return runBuildQueueMutation({
+              mutate: () => window.gameApi.setHexesKeepBuilding({
+                h3Indexes: [...rendererSharedState.selectedBuildHexH3s],
+                keepBuilding
+              }),
+              failureMessage: "Failed to update Keep building.",
+              refreshState: true
+            });
+          }
         });
         return;
       }
@@ -22630,6 +22681,24 @@
         list.appendChild(row);
       }
       section.appendChild(list);
+      appendKeepBuildingCheckbox({
+        section,
+        checked: snapshot.keepBuilding,
+        disabled: !canArmKeepBuilding(snapshot),
+        onChange: async (keepBuilding) => {
+          if (!window.gameApi?.setHexesKeepBuilding) return;
+          const success = await runBuildQueueMutation({
+            mutate: () => window.gameApi.setHexesKeepBuilding({
+              h3Indexes: [h3Index],
+              keepBuilding
+            }),
+            failureMessage: "Failed to update Keep building.",
+            refreshState: true
+          });
+          void renderBuildQueueIntoMount(mount, h3Index);
+          if (!success) return;
+        }
+      });
       mount.appendChild(section);
     }
     function clientPointForBuildEntryHex(h3Index, fallbackClientX, fallbackClientY) {
@@ -24218,7 +24287,7 @@
               updateSelectionUi: false,
               updateGameOverUi: false,
               updateReadyButton: false,
-              refreshBuildPopup: false,
+              refreshBuildPopup: true,
               redraw: false
             });
           } catch (err) {
@@ -24383,7 +24452,7 @@
         updateSelectionUi: false,
         updateGameOverUi: false,
         updateReadyButton: false,
-        refreshBuildPopup: false,
+        refreshBuildPopup: true,
         redraw: false
       });
       const aiMoves = readyResult.aiMoves ?? [];

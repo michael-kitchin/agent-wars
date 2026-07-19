@@ -3,6 +3,11 @@ import { estimateTurnsToCompleteQueuedProduction, sumQueuedProductionCost } from
 import { UNIT_SELECT_GLYPH } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import {
+  appendKeepBuildingCheckbox,
+  areAllKeepBuildingArmed,
+  canArmKeepBuildingForAll,
+} from './buildQueueKeepBuilding';
+import {
   countEligibleBuildHexes,
   createBuildQueueTemplateRow,
   filterTemplateForBuildHex,
@@ -52,6 +57,15 @@ export interface MultiBuildQueueRenderDeps {
    * Exceptions: Resolves false after handled transport or domain failures.
    */
   applyTemplate: (h3Indexes: string[]) => Promise<boolean>;
+  /**
+   * Arms or clears Keep building on all currently selected build hexes.
+   *
+   * Contract: Best-effort backend write; returns false after handled failures.
+   * When to use: Multi-hex Keep building checkbox changes.
+   * Expected outcome: Standing orders updated for every selected hex that can apply.
+   * Exceptions: Resolves false after transport or domain failures.
+   */
+  setKeepBuilding: (keepBuilding: boolean) => Promise<boolean>;
 }
 
 /**
@@ -294,5 +308,14 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
     list.appendChild(row);
   });
   section.appendChild(list);
+  appendKeepBuildingCheckbox({
+    section,
+    checked: areAllKeepBuildingArmed(snapshots),
+    disabled: !canArmKeepBuildingForAll(snapshots),
+    onChange: async (keepBuilding) => {
+      await deps.setKeepBuilding(keepBuilding);
+      void renderMultiBuildQueueIntoMount(deps);
+    },
+  });
   deps.mount.appendChild(section);
 }

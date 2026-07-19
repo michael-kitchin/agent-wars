@@ -2,10 +2,12 @@ import {
   dbGetOne,
   dbRun,
   getBuildProgressPointsForHex,
+  getKeepBuildingForHex,
   getHexController,
   listBuildQueueRowsForHex,
   replaceBuildQueueForHex,
   getRes1InfrastructureForHex,
+  setKeepBuildingForHex,
 } from '../gameDb';
 import { logDebug, logError, logTrace } from '../logger';
 import {
@@ -20,6 +22,7 @@ import type {
   ApplyBuildQueueTemplateResult,
   BuildQueueTemplateEntry,
   Res1ProductionContextSnapshot,
+  SetHexesKeepBuildingResult,
 } from '../../shared/ipcTypes';
 import { isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession';
 
@@ -178,6 +181,24 @@ noBuildReason: string | null;
    * Exceptions: None.
    */
 entries: HexBuildQueueEntryView[];
+  /**
+   * Whether Keep building is armed for this hex.
+   *
+   * Contract: True when the hex should auto-refill after the queue empties.
+   * When to use: Snapshots for the build popup and production refill decisions.
+   * Expected outcome: Matches durable Keep-building state for the hex.
+   * Exceptions: None.
+   */
+  keepBuilding: boolean;
+  /**
+   * Unit type used for Keep-building refill when armed.
+   *
+   * Contract: Standing unit type, or null when Keep building is off.
+   * When to use: Popup state and engine refill.
+   * Expected outcome: Last synced valid type while armed; otherwise null.
+   * Exceptions: None.
+   */
+  keepBuildingUnitType: BuildUnitType | null;
 }
 
 /**
@@ -244,17 +265,41 @@ function buildProductionEligibilityView(
 }
 
 /**
- * Defines the `buildQueueViewForRequester` function shape (function buildQueueViewForRequester(h3Index: string, requestingPlayerId: string): HexBuildQueueView).
+ * Clears or retargets Keep building after a queue mutation.
+ *
+ * Purpose: Keeps the standing order aligned with player-driven queue changes.
+ * When to use: After add/update/remove/template writes that may empty the queue or change the last row.
+ * Expected outcome: Empty queues clear the standing order; armed non-empty queues sync type to the last row.
+ * Exceptions: None.
+ */
+function syncStandingOrderAfterQueueMutation(h3Index: string): void {
+  const rows = listBuildQueueRowsForHex(h3Index);
+  const standing = getKeepBuildingForHex(h3Index);
+  if (rows.length === 0) {
+    if (standing.keepBuilding) {
+      setKeepBuildingForHex(h3Index, false, null);
+    }
+    return;
+  }
+  if (standing.keepBuilding) {
+    const last = rows[rows.length - 1]!;
+    setKeepBuildingForHex(h3Index, true, last.unitType);
+  }
+}
 
- * Purpose: Supports maintainability by documenting why `buildQueueViewForRequester` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+/**
+ * Builds the requester-facing build-queue view for one hex.
+ *
+ * Purpose: Single place that maps DB queue, progress, infrastructure, and Keep-building standing order into IPC shape.
+ * When to use: Reads after mutations and for getHexBuildQueue.
+ * Expected outcome: Snapshot fields including keepBuilding / keepBuildingUnitType match durable state.
  * Exceptions: None.
  */
 function buildQueueViewForRequester(h3Index: string, requestingPlayerId: string): HexBuildQueueView {
   const controllerPlayerId = getHexController(h3Index);
   const controlledByRequester = controllerPlayerId === requestingPlayerId;
   const productionView = buildProductionEligibilityView(getRes1InfrastructureForHex(h3Index));
+  const standing = getKeepBuildingForHex(h3Index);
   return {
     h3Index,
     controllerPlayerId,
@@ -272,6 +317,8 @@ function buildQueueViewForRequester(h3Index: string, requestingPlayerId: string)
       unitType: row.unitType,
       count: row.remainingCount,
     })),
+    keepBuilding: standing.keepBuilding,
+    keepBuildingUnitType: standing.keepBuildingUnitType,
   };
 }
 
@@ -348,6 +395,7 @@ export function addHexBuildQueueEntryImpl(h3Index: string, requestingPlayerId = 
        VALUES (?, ?, ?, ?)`,
       [h3Index, currentRows.length, defaultUnitType, BUILD_ENTRY_MIN_COUNT]
     );
+    syncStandingOrderAfterQueueMutation(h3Index);
     return { success: true, queue: buildQueueViewForRequester(h3Index, requestingPlayerId) };
   } catch (err) {
     logError('addHexBuildQueueEntry: exception', err);
@@ -391,6 +439,7 @@ export function updateHexBuildQueueEntryImpl(
     const row = dbGetOne<{ id: number }>('SELECT id FROM res1_build_queue WHERE id = ? AND h3_index = ?', [entryId, h3Index]);
     if (!row) return { success: false, reason: 'Build queue entry not found.' };
     dbRun('UPDATE res1_build_queue SET unit_type = ?, remaining_count = ? WHERE id = ?', [unitType, count, entryId]);
+    syncStandingOrderAfterQueueMutation(h3Index);
     return { success: true, queue: buildQueueViewForRequester(h3Index, requestingPlayerId) };
   } catch (err) {
     logError('updateHexBuildQueueEntry: exception', err);
@@ -426,6 +475,7 @@ export function removeHexBuildQueueEntryImpl(
       h3Index,
       filtered.map((row) => ({ unitType: row.unitType, remainingCount: row.remainingCount }))
     );
+    syncStandingOrderAfterQueueMutation(h3Index);
     return { success: true, queue: buildQueueViewForRequester(h3Index, requestingPlayerId) };
   } catch (err) {
     logError('removeHexBuildQueueEntry: exception', err);
@@ -499,12 +549,93 @@ export function applyBuildQueueTemplateToHexesImpl(
         return [];
       });
       replaceBuildQueueForHex(h3Index, applicableEntries);
+      syncStandingOrderAfterQueueMutation(h3Index);
       result.applied.push(h3Index);
     } catch (err) {
       logError('applyBuildQueueTemplateToHexes: exception', { h3Index, err });
       result.failed.push({ h3Index, reason: String(err) });
     }
   }
+  result.success = result.failed.length === 0;
+  return result;
+}
+
+/**
+ * Arms or clears Keep building on one or more production hexes (best-effort).
+ *
+ * Purpose: Authoritative human IPC path for the Keep building checkbox (single- or multi-hex).
+ * When to use: After the player toggles Keep building in the build popup.
+ * Expected outcome: Enabling sets each hex's type from its last queue row (or keeps an existing standing
+ * order when the queue is empty); disabling clears the standing order. Sibling failures do not roll back applied hexes.
+ * Exceptions: Per-hex exceptions are captured as failures and logged at error level.
+ */
+export function setHexesKeepBuildingImpl(
+  h3Indexes: string[],
+  keepBuilding: boolean,
+  requestingPlayerId = 'human'
+): SetHexesKeepBuildingResult {
+  logDebug('gameActions setHexesKeepBuilding', {
+    requestingPlayerId,
+    hexCount: h3Indexes.length,
+    keepBuilding,
+  });
+  if (h3Indexes.length === 0) {
+    return {
+      success: false,
+      applied: [],
+      failed: [],
+      reason: 'At least one build hex must be selected.',
+    };
+  }
+
+  const result: SetHexesKeepBuildingResult = {
+    success: true,
+    applied: [],
+    failed: [],
+  };
+
+  for (const h3Index of [...new Set(h3Indexes)]) {
+    try {
+      const context = validateBuildQueueMutationContext({
+        h3Index,
+        requestingPlayerId,
+        requireBuildSectionVisible: false,
+      });
+      if (!context.valid) {
+        result.failed.push({ h3Index, reason: context.reason });
+        continue;
+      }
+
+      if (!keepBuilding) {
+        setKeepBuildingForHex(h3Index, false, null);
+        result.applied.push(h3Index);
+        continue;
+      }
+
+      const rows = listBuildQueueRowsForHex(h3Index);
+      const existing = getKeepBuildingForHex(h3Index);
+      if (rows.length === 0) {
+        if (existing.keepBuilding && existing.keepBuildingUnitType) {
+          setKeepBuildingForHex(h3Index, true, existing.keepBuildingUnitType);
+          result.applied.push(h3Index);
+          continue;
+        }
+        result.failed.push({
+          h3Index,
+          reason: 'Keep building requires at least one queued unit.',
+        });
+        continue;
+      }
+
+      const lastType = rows[rows.length - 1]!.unitType;
+      setKeepBuildingForHex(h3Index, true, lastType);
+      result.applied.push(h3Index);
+    } catch (err) {
+      logError('setHexesKeepBuilding: exception', { h3Index, err });
+      result.failed.push({ h3Index, reason: String(err) });
+    }
+  }
+
   result.success = result.failed.length === 0;
   return result;
 }

@@ -4,6 +4,7 @@ import type {
   BuildQueueTemplateEntry,
   BuildUnitType,
   HexBuildQueueSnapshot,
+  SetHexesKeepBuildingResult,
 } from './productionTypes';
 import type { GameStateSnapshot } from './gameStateTypes';
 import type {
@@ -374,6 +375,18 @@ applyBuildQueueTemplateToHexes: (payload: {
     h3Indexes: string[];
     entries: BuildQueueTemplateEntry[];
   }) => Promise<ApplyBuildQueueTemplateResult>;
+  /**
+   * Arms or clears Keep building on one or more production hexes.
+   *
+   * Contract: Best-effort per hex; enabling requires a queue entry or an existing standing order.
+   * When to use: Keep building checkbox in single- or multi-hex build popup.
+   * Expected outcome: Applied/failed details; standing order does not rewrite queue rows.
+   * Exceptions: Transport failures reject the promise; domain failures are returned in the result.
+   */
+  setHexesKeepBuilding: (payload: {
+    h3Indexes: string[];
+    keepBuilding: boolean;
+  }) => Promise<SetHexesKeepBuildingResult>;
     /**
    * Specifies the contract for the `getSealiftStackState` member (getSealiftStackState: (payload: { h3Index: string }) => Promise<SealiftStackState>;).
 

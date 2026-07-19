@@ -857,7 +857,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
             updateSelectionUi: false,
             updateGameOverUi: false,
             updateReadyButton: false,
-            refreshBuildPopup: false,
+            refreshBuildPopup: true,
             redraw: false,
           });
         } catch (err) {
@@ -1033,7 +1033,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       updateSelectionUi: false,
       updateGameOverUi: false,
       updateReadyButton: false,
-      refreshBuildPopup: false,
+      refreshBuildPopup: true,
       redraw: false,
     });
     const aiMoves = readyResult.aiMoves ?? [];

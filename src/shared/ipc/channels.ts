@@ -33,6 +33,7 @@ export const IPC_GAME = {
   updateHexBuildQueueEntry: 'game:updateHexBuildQueueEntry',
   removeHexBuildQueueEntry: 'game:removeHexBuildQueueEntry',
   applyBuildQueueTemplateToHexes: 'game:applyBuildQueueTemplateToHexes',
+  setHexesKeepBuilding: 'game:setHexesKeepBuilding',
   getSealiftStackState: 'game:getSealiftStackState',
   getTacticalSealiftStackState: 'game:getTacticalSealiftStackState',
   updateTacticalSealiftSlot: 'game:updateTacticalSealiftSlot',

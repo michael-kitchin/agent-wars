@@ -4,7 +4,10 @@ import {
   dbRun,
   dbGetOne,
   getGameState,
+  getKeepBuildingForHex,
+  replaceBuildQueueForHex,
   setBuildProgressPointsForHex,
+  setKeepBuildingForHex,
   setRes1InfrastructureForHex,
 } from './gameDb';
 import {
@@ -13,11 +16,14 @@ import {
   updateHexBuildQueueEntry,
   removeHexBuildQueueEntry,
   applyBuildQueueTemplateToHexes,
+  setHexesKeepBuilding,
   ready,
   submitOrders,
 } from './gameActions';
+import { pruneBuildQueueForInfrastructureState } from './game-actions/airStrikeResolution';
 import {
   collectTraversedHexesByPlayer,
+  processProductionAfterControlResolution,
   resolveRes1ControlAfterCombatAndMovement,
 } from './game-actions/controlAndProduction';
 import { MAX_UNITS_PER_TYPE } from './productionCaps';
@@ -652,6 +658,199 @@ function testNavalBuildRequiresSeaportAndUrbanInfrastructure(): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
+/**
+ * Keep-building arm/disarm, player-empty clear, and stored-points preservation.
+ *
+ * Purpose: Locks the human mutation contracts for the Keep building standing order.
+ * When to use: After changing Keep-building persistence or queue-empty sync.
+ * Expected outcome: Arm sets last type without rewriting rows; disarm and remove-last clear it;
+ * setBuildProgressPointsForHex preserves the standing order; removing the last entry while armed clears it.
+ * Exceptions: None.
+ */
+function testKeepBuildingMutationContracts(): void {
+  withTempDb(() => {
+    const h3 = findBuildableHumanControlledHex();
+    const add = addHexBuildQueueEntry(h3, 'human');
+    assert.strictEqual(add.success, true);
+    const entry = getHexBuildQueue(h3, 'human').entries[0]!;
+    assert.strictEqual(updateHexBuildQueueEntry(h3, entry.id, 'infantry', 3, 'human').success, true);
+
+    const armed = setHexesKeepBuilding([h3], true, 'human');
+    assert.strictEqual(armed.success, true);
+    const afterArm = getHexBuildQueue(h3, 'human');
+    assert.strictEqual(afterArm.keepBuilding, true);
+    assert.strictEqual(afterArm.keepBuildingUnitType, 'infantry');
+    assert.strictEqual(afterArm.entries.length, 1);
+    assert.strictEqual(afterArm.entries[0]?.count, 3);
+
+    setBuildProgressPointsForHex(h3, 11);
+    const afterPoints = getHexBuildQueue(h3, 'human');
+    assert.strictEqual(afterPoints.storedPoints, 11);
+    assert.strictEqual(afterPoints.keepBuilding, true);
+    assert.strictEqual(afterPoints.keepBuildingUnitType, 'infantry');
+
+    assert.strictEqual(updateHexBuildQueueEntry(h3, entry.id, 'armor', 3, 'human').success, true);
+    assert.strictEqual(getHexBuildQueue(h3, 'human').keepBuildingUnitType, 'armor');
+
+    assert.strictEqual(removeHexBuildQueueEntry(h3, entry.id, 'human').success, true);
+    const afterEmptyWhileArmed = getHexBuildQueue(h3, 'human');
+    assert.strictEqual(afterEmptyWhileArmed.entries.length, 0);
+    assert.strictEqual(afterEmptyWhileArmed.keepBuilding, false);
+    assert.strictEqual(afterEmptyWhileArmed.keepBuildingUnitType, null);
+    assert.strictEqual(setHexesKeepBuilding([h3], true, 'human').success, false);
+  });
+}
+
+/**
+ * Keep-building same-turn refill after draining during a production pulse.
+ *
+ * Purpose: Locks same-turn leftover spend, multi-refill loop, planning residue, and cap stall.
+ * When to use: After changing Keep-building production refill timing or sizing.
+ * Expected outcome: Owner $40/1-infantry example deploys 2 and leaves 1 queued; empty-start works;
+ * cap stall retains refilled rows without infinite looping; ineligible refill clears standing order;
+ * finite queues without Keep building still stop empty with leftover points banked.
+ * Exceptions: None.
+ */
+function testKeepBuildingSameTurnRefill(): void {
+  withTempDb(() => {
+    const h3 = findBuildableHumanControlledHex();
+
+    // Owner example: $40, 1 infantry queued, Keep building → 2 deployed, 1 residue.
+    setRes1InfrastructureForHex(h3, { urbanHexCount: 40, airportCount: 0, seaportCount: 0 });
+    replaceBuildQueueForHex(h3, [{ unitType: 'infantry', remainingCount: 1 }]);
+    setKeepBuildingForHex(h3, true, 'infantry');
+    setBuildProgressPointsForHex(h3, 0);
+    dbRun("DELETE FROM units WHERE player = 'human' AND unit_type = 'infantry'");
+    const infantryBefore =
+      dbGetOne<{ c: number }>(
+        "SELECT COUNT(*) AS c FROM units WHERE player = 'human' AND unit_type = 'infantry'"
+      )?.c ?? 0;
+
+    processProductionAfterControlResolution();
+    const infantryAfter =
+      dbGetOne<{ c: number }>(
+        "SELECT COUNT(*) AS c FROM units WHERE player = 'human' AND unit_type = 'infantry'"
+      )?.c ?? 0;
+    assert.strictEqual(infantryAfter - infantryBefore, 2);
+    const afterOwner = getHexBuildQueue(h3, 'human');
+    assert.strictEqual(afterOwner.entries.length, 1);
+    assert.strictEqual(afterOwner.entries[0]?.unitType, 'infantry');
+    assert.strictEqual(afterOwner.entries[0]?.count, 1);
+    assert.strictEqual(afterOwner.keepBuilding, true);
+    assert.strictEqual(afterOwner.storedPoints, 0);
+
+    // Empty start + Keep building + $40 → same 2 deployed + residue 1.
+    replaceBuildQueueForHex(h3, []);
+    setKeepBuildingForHex(h3, true, 'infantry');
+    setBuildProgressPointsForHex(h3, 0);
+    const infantryBeforeEmpty =
+      dbGetOne<{ c: number }>(
+        "SELECT COUNT(*) AS c FROM units WHERE player = 'human' AND unit_type = 'infantry'"
+      )?.c ?? 0;
+    processProductionAfterControlResolution();
+    const infantryAfterEmpty =
+      dbGetOne<{ c: number }>(
+        "SELECT COUNT(*) AS c FROM units WHERE player = 'human' AND unit_type = 'infantry'"
+      )?.c ?? 0;
+    assert.strictEqual(infantryAfterEmpty - infantryBeforeEmpty, 2);
+    const afterEmptyStart = getHexBuildQueue(h3, 'human');
+    assert.strictEqual(afterEmptyStart.entries.length, 1);
+    assert.strictEqual(afterEmptyStart.entries[0]?.count, 1);
+
+    // Cap stall: refill inserts 2 armor; spend blocked; standing order remains.
+    setRes1InfrastructureForHex(h3, { urbanHexCount: 100, airportCount: 0, seaportCount: 0 });
+    replaceBuildQueueForHex(h3, []);
+    setKeepBuildingForHex(h3, true, 'armor');
+    setBuildProgressPointsForHex(h3, 0);
+    dbRun("DELETE FROM units WHERE player = 'human' AND unit_type = 'armor'");
+    const armorCap = MAX_UNITS_PER_TYPE.armor;
+    for (let i = 0; i < armorCap; i++) {
+      dbRun(
+        `INSERT INTO units (id, player, unit_type, h3_index)
+         VALUES (?, 'human', 'armor', ?)`,
+        [`human-armor-cap-kb-${i}`, h3]
+      );
+    }
+    processProductionAfterControlResolution();
+    const armorPulse = getHexBuildQueue(h3, 'human');
+    assert.strictEqual(armorPulse.entries.length, 1);
+    assert.strictEqual(armorPulse.entries[0]?.unitType, 'armor');
+    assert.strictEqual(armorPulse.entries[0]?.count, 2);
+    assert.strictEqual(armorPulse.keepBuilding, true);
+    assert.strictEqual(armorPulse.keepBuildingUnitType, 'armor');
+
+    // Ineligible standing type at refill → clear Keep building; leave queue empty.
+    setRes1InfrastructureForHex(h3, { urbanHexCount: 40, airportCount: 0, seaportCount: 0 });
+    replaceBuildQueueForHex(h3, []);
+    setKeepBuildingForHex(h3, true, 'naval');
+    setBuildProgressPointsForHex(h3, 0);
+    processProductionAfterControlResolution();
+    const afterIneligible = getHexBuildQueue(h3, 'human');
+    assert.strictEqual(afterIneligible.entries.length, 0);
+    assert.strictEqual(afterIneligible.keepBuilding, false);
+    assert.strictEqual(afterIneligible.keepBuildingUnitType, null);
+
+    // Finite queue without Keep building still stops when empty (no auto-refill).
+    setRes1InfrastructureForHex(h3, { urbanHexCount: 40, airportCount: 0, seaportCount: 0 });
+    replaceBuildQueueForHex(h3, [{ unitType: 'infantry', remainingCount: 1 }]);
+    setKeepBuildingForHex(h3, false, null);
+    setBuildProgressPointsForHex(h3, 0);
+    dbRun("DELETE FROM units WHERE player = 'human' AND unit_type = 'infantry'");
+    const infantryBeforeFinite =
+      dbGetOne<{ c: number }>(
+        "SELECT COUNT(*) AS c FROM units WHERE player = 'human' AND unit_type = 'infantry'"
+      )?.c ?? 0;
+    processProductionAfterControlResolution();
+    const infantryAfterFinite =
+      dbGetOne<{ c: number }>(
+        "SELECT COUNT(*) AS c FROM units WHERE player = 'human' AND unit_type = 'infantry'"
+      )?.c ?? 0;
+    assert.strictEqual(infantryAfterFinite - infantryBeforeFinite, 1);
+    const afterFinite = getHexBuildQueue(h3, 'human');
+    assert.strictEqual(afterFinite.entries.length, 0);
+    assert.strictEqual(afterFinite.keepBuilding, false);
+    assert.strictEqual(afterFinite.storedPoints, 20);
+  });
+}
+
+/**
+ * Keep-building standing-order sync when infrastructure makes types illegal.
+ *
+ * Purpose: Extends pruneBuildQueueForInfrastructureState for Keep building.
+ * When to use: After changing prune / standing-order invalidation.
+ * Expected outcome: Illegal last type retargets to remaining last row; empty-gap illegal type clears.
+ * Exceptions: None.
+ */
+function testKeepBuildingPruneStandingOrderSync(): void {
+  withTempDb(() => {
+    const h3 = findBuildableHumanControlledHex();
+    setRes1InfrastructureForHex(h3, { urbanHexCount: 5, airportCount: 1, seaportCount: 0 });
+    replaceBuildQueueForHex(h3, [
+      { unitType: 'infantry', remainingCount: 1 },
+      { unitType: 'air', remainingCount: 1 },
+    ]);
+    setKeepBuildingForHex(h3, true, 'air');
+
+    setRes1InfrastructureForHex(h3, { urbanHexCount: 5, airportCount: 0, seaportCount: 0 });
+    pruneBuildQueueForInfrastructureState(h3);
+    const afterPrune = getHexBuildQueue(h3, 'human');
+    assert.deepStrictEqual(
+      afterPrune.entries.map((entry) => entry.unitType),
+      ['infantry']
+    );
+    assert.strictEqual(afterPrune.keepBuilding, true);
+    assert.strictEqual(afterPrune.keepBuildingUnitType, 'infantry');
+
+    replaceBuildQueueForHex(h3, []);
+    setKeepBuildingForHex(h3, true, 'air');
+    setRes1InfrastructureForHex(h3, { urbanHexCount: 5, airportCount: 0, seaportCount: 0 });
+    pruneBuildQueueForInfrastructureState(h3);
+    const emptyGap = getKeepBuildingForHex(h3);
+    assert.strictEqual(emptyGap.keepBuilding, false);
+    assert.strictEqual(emptyGap.keepBuildingUnitType, null);
+  });
+}
+
 function run(): void {
   testBuildQueueMutationContracts();
   testTypeChangeAfterCountEditKeepsCount();
@@ -666,6 +865,9 @@ function run(): void {
   testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap();
   testAirBuildRequiresAirportInfrastructure();
   testNavalBuildRequiresSeaportAndUrbanInfrastructure();
+  testKeepBuildingMutationContracts();
+  testKeepBuildingSameTurnRefill();
+  testKeepBuildingPruneStandingOrderSync();
   console.log('gameActionsProduction.test.ts passed');
 }
 

@@ -268,3 +268,20 @@ export function estimateTurnsToCompleteQueuedProduction(
   }
   return turns;
 }
+
+/**
+ * Computes how many units of one type Keep building should enqueue from current available points.
+ *
+ * Purpose: Single pure source of truth for same-turn Keep-building refill sizing.
+ * When to use: Engine refill inside a production pulse (after accrual or mid-loop leftover points).
+ * Expected outcome: `clamp(max(1, floor(availablePoints / unitCost)), 1, 99)` — including count `1` when
+ * points are 0 so a residue unit remains for the next planning phase. The engine must not call this when
+ * `urbanHexCount <= 0`.
+ * Exceptions: None; negative points are treated as 0 after truncation.
+ */
+export function computeKeepBuildingRefillCount(unitType: BuildUnitType, availablePoints: number): number {
+  const points = Math.max(0, Math.trunc(availablePoints));
+  const cost = UNIT_COST_BY_TYPE[unitType];
+  const raw = Math.max(1, Math.floor(points / cost));
+  return Math.min(99, Math.max(1, raw));
+}

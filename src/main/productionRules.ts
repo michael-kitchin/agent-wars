@@ -4,6 +4,7 @@
 
 import {
   applyProduction as applyProductionShared,
+  computeKeepBuildingRefillCount as computeKeepBuildingRefillCountShared,
   UNIT_COST_BY_TYPE as SHARED_UNIT_COST_BY_TYPE,
 } from '../shared/productionConfig';
 import {
@@ -261,4 +262,16 @@ export function applyProduction(
   urbanHexCount: number
 ): ProductionApplyResult {
   return applyProductionShared(entries, storedPoints, urbanHexCount);
+}
+
+/**
+ * Re-exports Keep-building refill sizing for main-process callers.
+ *
+ * Purpose: Keeps productionRules as the familiar import surface for production helpers used by game actions.
+ * When to use: Engine same-turn refill and tests that already import from productionRules.
+ * Expected outcome: Same result as `computeKeepBuildingRefillCount` in shared productionConfig (points-based).
+ * Exceptions: None.
+ */
+export function computeKeepBuildingRefillCount(unitType: BuildUnitType, availablePoints: number): number {
+  return computeKeepBuildingRefillCountShared(unitType, availablePoints);
 }

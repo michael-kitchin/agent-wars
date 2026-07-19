@@ -223,6 +223,71 @@ noBuildReason: string | null;
    * Exceptions: None.
    */
 entries: HexBuildQueueEntrySnapshot[];
+  /**
+   * Whether Keep building is armed for this hex.
+   *
+   * Contract: True when the hex should auto-refill after the queue empties.
+   * When to use: Build popup checkbox state and engine same-turn refill.
+   * Expected outcome: Matches `res1_build_progress.keep_building` for the hex.
+   * Exceptions: None.
+   */
+  keepBuilding: boolean;
+  /**
+   * Unit type used for Keep-building refill when armed.
+   *
+   * Contract: Last valid standing unit type, or null when Keep building is off.
+   * When to use: Checkbox labeling/diagnostics and engine refill.
+   * Expected outcome: Matches `res1_build_progress.keep_building_unit_type`, or null when disarmed.
+   * Exceptions: None.
+   */
+  keepBuildingUnitType: BuildUnitType | null;
+}
+
+/**
+ * Result of setting Keep building on one or more production hexes.
+ *
+ * Purpose: Best-effort batch arm/disarm matching multi-hex template apply style.
+ * When to use: Build popup checkbox changes for single- or multi-hex selection.
+ * Expected outcome: `success` is false only when at least one hex failed validation/persistence.
+ * Exceptions: None.
+ */
+export interface SetHexesKeepBuildingResult {
+  /**
+   * True when every requested hex applied without a hard failure.
+   *
+   * Contract: Failures populate `failed`; successful hexes populate `applied`.
+   * When to use: Deciding whether to toast an error after a checkbox change.
+   * Expected outcome: False iff `failed.length > 0`.
+   * Exceptions: None.
+   */
+  success: boolean;
+  /**
+   * Optional top-level reason (e.g. empty hex list).
+   *
+   * Contract: Present for call-level validation failures before per-hex work.
+   * When to use: Error messaging when nothing could be attempted.
+   * Expected outcome: Undefined when per-hex processing ran.
+   * Exceptions: None.
+   */
+  reason?: string;
+  /**
+   * Hexes whose standing order was successfully updated.
+   *
+   * Contract: Stable request order among successes.
+   * When to use: Refreshing snapshots after a batch write.
+   * Expected outcome: H3 indexes that accepted the Keep-building mutation.
+   * Exceptions: None.
+   */
+  applied: string[];
+  /**
+   * Hexes that rejected the mutation.
+   *
+   * Contract: Each entry includes an actionable reason.
+   * When to use: Error toast / diagnostics; does not roll back siblings.
+   * Expected outcome: Zero or more failure records.
+   * Exceptions: None.
+   */
+  failed: Array<{ h3Index: string; reason: string }>;
 }
 
 /**

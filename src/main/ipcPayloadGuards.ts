@@ -162,6 +162,25 @@ export function parseBuildQueueTemplatePayload(payload: unknown): {
 }
 
 /**
+ * Validates the renderer payload for Keep-building arm/disarm.
+ *
+ * Purpose: Keeps unknown IPC values out of the authoritative Keep-building mutation.
+ * When to use: Main-process handler for `game:setHexesKeepBuilding`.
+ * Expected outcome: Non-empty string hex ids and a boolean flag, or `null`.
+ * Exceptions: None; malformed input returns `null`.
+ */
+export function parseSetHexesKeepBuildingPayload(payload: unknown): {
+  h3Indexes: string[];
+  keepBuilding: boolean;
+} | null {
+  if (payload === null || typeof payload !== 'object') return null;
+  const value = payload as { h3Indexes?: unknown; keepBuilding?: unknown };
+  if (!Array.isArray(value.h3Indexes) || typeof value.keepBuilding !== 'boolean') return null;
+  if (!value.h3Indexes.every((h3Index) => typeof h3Index === 'string' && h3Index.length > 0)) return null;
+  return { h3Indexes: value.h3Indexes, keepBuilding: value.keepBuilding };
+}
+
+/**
  * Normalized tactical Ready commit rows after IPC `unknown` validation.
  *
  * Purpose: Gives `commitHumanTacticalDraftOrders` typed inputs without duplicating guard loops in `main.ts`.

@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import {
   applyProduction,
+  computeKeepBuildingRefillCount,
   getAvailableBuildUnitTypes,
   isValidBuildCount,
 } from './productionRules';
@@ -151,13 +152,22 @@ function testQueuedCostAndCompletionTurnEstimates(): void {
 }
 
 /**
- * Defines the `run` function shape (function run(): void).
-
- * Purpose: Supports maintainability by documenting why `run` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Locks Keep-building refill sizing from available production points (min 1, clamp 99).
+ *
+ * Purpose: Prevents regressions in same-turn Keep-building refill counts used by the production engine.
+ * When to use: After changing unit costs or Keep-building refill rules.
+ * Expected outcome: Matches points-based sizing including enqueue-1 at 0 points.
  * Exceptions: None.
  */
+function testKeepBuildingRefillCount(): void {
+  assert.strictEqual(computeKeepBuildingRefillCount('infantry', 0), 1);
+  assert.strictEqual(computeKeepBuildingRefillCount('infantry', 1), 1);
+  assert.strictEqual(computeKeepBuildingRefillCount('infantry', 20), 1);
+  assert.strictEqual(computeKeepBuildingRefillCount('armor', 100), 2);
+  assert.strictEqual(computeKeepBuildingRefillCount('naval', 100), 1);
+  assert.strictEqual(computeKeepBuildingRefillCount('infantry', 20 * 200), 99);
+}
+
 function run(): void {
   testBuildTypeAvailabilityGates();
   testBuildCountValidationBounds();
@@ -165,6 +175,7 @@ function run(): void {
   testTurnsToNextSpawnEstimateUsesNextUnitOnly();
   testDeploymentCapsMatchMilestone14Values();
   testQueuedCostAndCompletionTurnEstimates();
+  testKeepBuildingRefillCount();
   console.log('productionRules.test.ts passed');
 }
 

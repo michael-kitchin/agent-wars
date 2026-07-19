@@ -486,19 +486,84 @@ export function getBuildProgressPointsForHex(ops: ControlDbOps, h3Index: string)
 }
 
 /**
+ * Reads the Keep-building standing order for one production hex.
+ *
+ * Purpose: Exposes durable Keep-building flag/type for snapshots, prune sync, and production refill.
+ * When to use: Anytime callers need whether a hex should auto-refill after its queue empties.
+ * Expected outcome: `{ keepBuilding: false, keepBuildingUnitType: null }` when no progress row or flag off;
+ * when armed, `keepBuildingUnitType` is a valid build unit type (invalid stored values are treated as disarmed).
+ * Exceptions: None.
+ */
+export function getKeepBuildingForHex(
+  ops: ControlDbOps,
+  h3Index: string
+): { keepBuilding: boolean; keepBuildingUnitType: BuildUnitType | null } {
+  logTrace('gameDb getKeepBuildingForHex', { h3Index });
+  const row = ops.getOne<{ keepBuilding: number; keepBuildingUnitType: string | null }>(
+    `SELECT keep_building AS keepBuilding, keep_building_unit_type AS keepBuildingUnitType
+     FROM res1_build_progress WHERE h3_index = ?`,
+    [h3Index]
+  );
+  if (!row || row.keepBuilding !== 1) {
+    return { keepBuilding: false, keepBuildingUnitType: null };
+  }
+  const unitType = row.keepBuildingUnitType;
+  if (
+    unitType !== 'infantry' &&
+    unitType !== 'armor' &&
+    unitType !== 'naval' &&
+    unitType !== 'air'
+  ) {
+    return { keepBuilding: false, keepBuildingUnitType: null };
+  }
+  return { keepBuilding: true, keepBuildingUnitType: unitType };
+}
+
+/**
+ * Writes or clears the Keep-building standing order for one production hex.
+ *
+ * Purpose: Persists checkbox arm/disarm and prune/engine standing-order updates without touching stored points.
+ * When to use: Human Keep-building mutations, last-type sync after queue edits, and prune/refill invalidation.
+ * Expected outcome: When `keepBuilding` is false, both columns clear; when true, requires a unit type and upserts
+ * a progress row (creating one with `stored_points = 0` if missing) without changing existing stored points.
+ * Exceptions: Throws if `keepBuilding` is true and `keepBuildingUnitType` is null.
+ */
+export function setKeepBuildingForHex(
+  ops: ControlDbOps,
+  h3Index: string,
+  keepBuilding: boolean,
+  keepBuildingUnitType: BuildUnitType | null
+): void {
+  if (keepBuilding && !keepBuildingUnitType) {
+    throw new Error('Keep building requires a unit type when enabled.');
+  }
+  const flag = keepBuilding ? 1 : 0;
+  const unitType = keepBuilding ? keepBuildingUnitType : null;
+  logDebug('gameDb setKeepBuildingForHex', { h3Index, keepBuilding, keepBuildingUnitType: unitType });
+  ops.run(
+    `INSERT INTO res1_build_progress (h3_index, stored_points, keep_building, keep_building_unit_type)
+     VALUES (?, 0, ?, ?)
+     ON CONFLICT(h3_index) DO UPDATE SET
+       keep_building = excluded.keep_building,
+       keep_building_unit_type = excluded.keep_building_unit_type`,
+    [h3Index, flag, unitType]
+  );
+}
+
+/**
  * Defines the `setBuildProgressPointsForHex` function shape (export function setBuildProgressPointsForHex(ops: ControlDbOps, h3Index: string, storedPoints: number): void).
 
- * Purpose: Supports maintainability by documenting why `setBuildProgressPointsForHex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Updates banked production points without clearing Keep-building columns.
+ * When to use: After a production spend pulse or test setup that only adjusts stored points.
+ * Expected outcome: `stored_points` set; existing `keep_building` / `keep_building_unit_type` preserved on conflict.
  * Exceptions: None.
  */
 export function setBuildProgressPointsForHex(ops: ControlDbOps, h3Index: string, storedPoints: number): void {
   const safePoints = Math.max(0, Math.trunc(storedPoints));
   logDebug('gameDb setBuildProgressPointsForHex', { h3Index, storedPoints: safePoints });
   ops.run(
-    `INSERT INTO res1_build_progress (h3_index, stored_points)
-     VALUES (?, ?)
+    `INSERT INTO res1_build_progress (h3_index, stored_points, keep_building, keep_building_unit_type)
+     VALUES (?, ?, 0, NULL)
      ON CONFLICT(h3_index) DO UPDATE SET stored_points = excluded.stored_points`,
     [h3Index, safePoints]
   );

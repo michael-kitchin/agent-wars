@@ -42,6 +42,7 @@ import { listUnitsForSnapshotWithGetAll } from './game-db/unitSnapshotRead';
 import {
   clearBuildQueueAndProgressForHex as clearBuildQueueAndProgressForHexFromModule,
   getBuildProgressPointsForHex as getBuildProgressPointsForHexFromModule,
+  getKeepBuildingForHex as getKeepBuildingForHexFromModule,
   getHexController as getHexControllerFromModule,
   getRes1InfrastructureForHex as getRes1InfrastructureForHexFromModule,
   getRes4TerrainOverridesForRendererFromGame as getRes4TerrainOverridesForRendererFromGameFromModule,
@@ -53,6 +54,7 @@ import {
   reconcileRes1InfrastructureCountsFromRes4Overrides as reconcileRes1InfrastructureCountsFromRes4OverridesFromModule,
   replaceBuildQueueForHex as replaceBuildQueueForHexFromModule,
   setBuildProgressPointsForHex as setBuildProgressPointsForHexFromModule,
+  setKeepBuildingForHex as setKeepBuildingForHexFromModule,
   setHexController as setHexControllerFromModule,
   setRes1InfrastructureForHex as setRes1InfrastructureForHexFromModule,
   insertRes4FeatureOverrideRubbleRow as insertRes4FeatureOverrideRubbleRowFromModule,
@@ -121,7 +123,7 @@ export type { BuildQueueRow, HexControlRow, Res1InfrastructureRow, Res4FeatureOv
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const EXPECTED_USER_VERSION = 12;
+export const EXPECTED_USER_VERSION = 13;
 
 /**
  * Documents the module-scope binding `GAME_DB_FILE_NAME` (GAME_DB_FILE_NAME).
@@ -972,6 +974,37 @@ export function listBuildQueueRowsForHex(h3Index: string): BuildQueueRow[] {
  */
 export function getBuildProgressPointsForHex(h3Index: string): number {
   return getBuildProgressPointsForHexFromModule({ run, getOne, getAll }, h3Index);
+}
+
+/**
+ * Reads Keep-building standing order for a hex through the game DB handle.
+ *
+ * Purpose: Facade over controlInfrastructure Keep-building reads for game-actions callers.
+ * When to use: Snapshots, prune sync, production refill, and Keep-building mutations.
+ * Expected outcome: Same contract as `getKeepBuildingForHex` in controlInfrastructure.
+ * Exceptions: None.
+ */
+export function getKeepBuildingForHex(h3Index: string): {
+  keepBuilding: boolean;
+  keepBuildingUnitType: BuildUnitType | null;
+} {
+  return getKeepBuildingForHexFromModule({ run, getOne, getAll }, h3Index);
+}
+
+/**
+ * Writes Keep-building standing order for a hex through the game DB handle.
+ *
+ * Purpose: Facade over controlInfrastructure Keep-building writes for game-actions callers.
+ * When to use: Arm/disarm, last-type sync, prune invalidation, and refill-path clears.
+ * Expected outcome: Same contract as `setKeepBuildingForHex` in controlInfrastructure.
+ * Exceptions: Propagates when enabling without a unit type.
+ */
+export function setKeepBuildingForHex(
+  h3Index: string,
+  keepBuilding: boolean,
+  keepBuildingUnitType: BuildUnitType | null
+): void {
+  setKeepBuildingForHexFromModule({ run, getOne, getAll }, h3Index, keepBuilding, keepBuildingUnitType);
 }
 
 /**
