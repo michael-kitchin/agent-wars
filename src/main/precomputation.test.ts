@@ -4,6 +4,7 @@
  */
 
 import * as assert from 'assert';
+import { gridDisk } from 'h3-js';
 import type { GameStateSnapshot } from './gameDb';
 import { getOrderedHexList } from './mapData';
 import { buildLatLngCoordinateMap } from './mapData';
@@ -12,6 +13,47 @@ import {
   runPrecomputation,
   type PrecomputationCoordMap,
 } from './precomputation';
+import { getRes1LandMassByH3 } from './terrainClassificationCache';
+import {
+  canLandUnitTraverseEdge,
+  landUnitCanOccupyHex,
+} from '../shared/landTraversalRes1';
+
+/**
+ * Picks two adjacent hexes that land units can traverse, then fills to `hexCount`.
+ *
+ * Purpose: Fixture units must sit on a landMass-legal edge so assess_unit path
+ * distances exercise real land BFS instead of grid-distance fallback.
+ * When to use: Precomputation tests that run Tool 2 against the live map.
+ * Expected outcome: At least two hexes; first pair is land-connected when landMass data allows.
+ * Exceptions: Throws when no land-connected adjacent pair exists in the ordered hex list.
+ */
+function buildLandConnectedHexList(hexCount: number): string[] {
+  const allHexes = getOrderedHexList();
+  const allSet = new Set(allHexes);
+  const landMass = getRes1LandMassByH3();
+  let originH3: string | undefined;
+  let neighborH3: string | undefined;
+  for (const candidate of allHexes) {
+    if (!landUnitCanOccupyHex(candidate, landMass)) continue;
+    for (const neighbor of gridDisk(candidate, 1)) {
+      if (neighbor === candidate || !allSet.has(neighbor)) continue;
+      if (!landUnitCanOccupyHex(neighbor, landMass)) continue;
+      if (!canLandUnitTraverseEdge(candidate, neighbor, landMass)) continue;
+      originH3 = candidate;
+      neighborH3 = neighbor;
+      break;
+    }
+    if (originH3 && neighborH3) break;
+  }
+  assert.ok(originH3 && neighborH3, 'expected a land-connected adjacent hex pair');
+  const selected = new Set<string>([originH3!, neighborH3!]);
+  for (const h3 of allHexes) {
+    if (selected.size >= hexCount) break;
+    selected.add(h3);
+  }
+  return [originH3!, neighborH3!, ...[...selected].filter((h) => h !== originH3 && h !== neighborH3)];
+}
 
 /**
  * Defines the `buildFixtureState` function shape (function buildFixtureState().
@@ -24,7 +66,7 @@ import {
 function buildFixtureState(
   hexCount: number
 ): { state: GameStateSnapshot; coordMap: PrecomputationCoordMap } {
-  const hexList = getOrderedHexList().slice(0, hexCount);
+  const hexList = buildLandConnectedHexList(hexCount);
   const state: GameStateSnapshot = {
     hexes: hexList.map((h3Index) => ({ h3Index, terrain: 'land', terrainKind: 'plains' })),
     units: [
@@ -63,6 +105,19 @@ function testRunUnitAssessments(): void {
   assert.ok(
     results.every((a, i) => results.findIndex((b) => b.unitId === a.unitId) === i),
     'no duplicate unitIds'
+  );
+  // Cross-hex land assessment must pass landMass into pathfinding; otherwise
+  // estimatedTurnsToReach stays null while enemies still appear via grid distance.
+  const infantryAssessment = results.find((r) => r.unitId === 'opponent-infantry-1');
+  assert.ok(infantryAssessment, 'expected opponent-infantry-1 assessment');
+  const humanEnemy = infantryAssessment!.result.nearbyEnemies.find(
+    (e) => e.unitId === 'human-infantry-1'
+  );
+  assert.ok(humanEnemy, 'opponent-infantry-1 should see human-infantry-1 nearby');
+  assert.strictEqual(
+    typeof humanEnemy!.estimatedTurnsToReach,
+    'number',
+    'land path distance/turns must resolve when landMass is available'
   );
 }
 

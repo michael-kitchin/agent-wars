@@ -71,6 +71,7 @@ result: {
     nearbyEnemies: Array<{
       unitId: string;
       hexDistance: number;
+      estimatedTurnsToReach?: number | null;
       inRangedRange: boolean;
       inMeleeRange: boolean;
       confidence?: string;

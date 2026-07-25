@@ -148,7 +148,18 @@ function getPathDistanceAndTurns(
   logTrace('tool2Assessment getPathDistanceAndTurns', { unitType });
   const passableFor: PassableDomain = unitType === 'naval' ? 'water' : 'land';
   const movementBudget = getMovementBudgetForUnit(unitType);
-  return getDistanceAndTurns(originH3, destH3, hexSet, terrainByH3, passableFor, movementBudget, blocked);
+  // Land BFS requires continent/island connectivity; omit only for naval water paths.
+  const landMass = passableFor === 'land' ? getRes1LandMassByH3() : undefined;
+  return getDistanceAndTurns(
+    originH3,
+    destH3,
+    hexSet,
+    terrainByH3,
+    passableFor,
+    movementBudget,
+    blocked,
+    landMass
+  );
 }
 
 /**
