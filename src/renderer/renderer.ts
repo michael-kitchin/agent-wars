@@ -213,6 +213,7 @@ import { syncRes4TransportVectorLeafletLayer } from './map/res4TransportVectorLa
 import {
   applyGameStateSnapshot as applyGameStateSnapshotFromModule,
   refreshGameStateAfterBuildQueueChange as refreshGameStateAfterBuildQueueChangeFromModule,
+  refreshGameStateAfterSealiftChange as refreshGameStateAfterSealiftChangeFromModule,
   updateClientStaleEnemyIntel as updateClientStaleEnemyIntelFromModule,
 } from './core/stateSnapshot';
 import {
@@ -742,11 +743,12 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
           });
           if (!result.success) {
             showMapToast(formatTargetingValidationReason(result.reason, 'Failed to update sealift assignment.'));
-          } else if (selected.length > 0) {
-            // Embarking can cancel existing movement orders server-side, so refresh client order state immediately.
-            await refreshHumanStandingOrders();
-            updatePendingOrdersSidebar();
-            await refreshHoverRoutePreview();
+          } else {
+            // Embark/debark changes `embarkedOnNavalUnitId` in main; refresh so selection/march use current flags.
+            await refreshGameStateAfterSealiftChange({ refreshStandingOrders: selected.length > 0 });
+            if (selected.length > 0) {
+              await refreshHoverRoutePreview();
+            }
           }
           refreshStackCalloutIfOpen();
           requestRedraw();
@@ -797,6 +799,8 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
             });
             if (!result.success) {
               showMapToast(formatTargetingValidationReason(result.reason, 'Failed to debark unit.'));
+            } else {
+              await refreshGameStateAfterSealiftChange();
             }
             refreshStackCalloutIfOpen();
             requestRedraw();
@@ -1159,6 +1163,18 @@ function getTacticalBattleActivationSideEffects(): TacticalRendererStartBattleSi
  */
 async function refreshGameStateAfterBuildQueueChange(): Promise<void> {
   return refreshGameStateAfterBuildQueueChangeFromModule({ applyGameStateSnapshot });
+}
+
+/**
+ * Reloads strategic state after sealift embark/debark so selection uses current embark flags.
+ *
+ * Purpose: Stack sealift mutates transport assignments without Ready; client must refresh `embarkedOnNavalUnitId`.
+ * When to use: After successful strategic `updateSealiftSlot` in `renderSealiftSection`.
+ * Expected outcome: Debarked land units become selectable/movable same turn; embark cancels refresh standing orders when requested.
+ * Exceptions: None (errors logged inside the module helper).
+ */
+async function refreshGameStateAfterSealiftChange(options: { refreshStandingOrders?: boolean } = {}): Promise<void> {
+  return refreshGameStateAfterSealiftChangeFromModule({ applyGameStateSnapshot }, options);
 }
 
 /**

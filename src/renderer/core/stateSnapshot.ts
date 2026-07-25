@@ -208,6 +208,36 @@ export async function refreshGameStateAfterBuildQueueChange(deps: RefreshBuildQu
 }
 
 /**
+ * Reloads strategic game state after a successful sealift embark/debark so embark flags stay current.
+ *
+ * Purpose: Selection and march preview read `embarkedOnNavalUnitId` from `S.gameState`; without a refresh,
+ * manually debarked land units remain blocked for same-turn select/move even though SQLite cleared the assignment.
+ * When to use: After successful strategic `updateSealiftSlot` (embark or debark) in the stack callout.
+ * Expected outcome: Client unit rows match main-process embark state; optional standing-order refresh after embark cancels.
+ * Exceptions: Swallows getGameState/apply failures after logging (sealift IPC already succeeded).
+ */
+export async function refreshGameStateAfterSealiftChange(
+  deps: RefreshBuildQueueDeps,
+  options: { refreshStandingOrders?: boolean } = {}
+): Promise<void> {
+  if (!window.gameApi?.getGameState) return;
+  try {
+    const nextState = (await window.gameApi.getGameState()) as GameStateSnapshot;
+    await deps.applyGameStateSnapshot(nextState, {
+      refreshStandingOrders: options.refreshStandingOrders === true,
+      updateGameStateSidebarUi: true,
+      updateSelectionUi: true,
+      updateGameOverUi: false,
+      updateReadyButton: false,
+      refreshBuildPopup: false,
+      redraw: true,
+    });
+  } catch (err) {
+    console.error('refreshGameStateAfterSealiftChange failed:', err);
+  }
+}
+
+/**
  * Defines the `applyGameStateSnapshot` function shape (export async function applyGameStateSnapshot( deps: ApplySnapshotDeps, nextState: GameStateSnapshot, options: { refreshStandingOrders?: boolean;).
 
  * Purpose: Supports maintainability by documenting why `applyGameStateSnapshot` exists.

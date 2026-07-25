@@ -412,6 +412,11 @@ function testStackSealiftEmbarkedSelectionAndDebarkControls(): void {
       showStackCalloutFn.includes("onStackAllActionClick('removeAll'"),
     'stack callout all-actions should filter through selectable human IDs so embarked land units remain unselectable'
   );
+  assert.ok(
+    renderSealiftSectionFn.includes('refreshGameStateAfterSealiftChange') &&
+      renderSealiftSectionFn.includes('await refreshGameStateAfterSealiftChange()'),
+    'strategic sealift embark/debark must refresh game state so same-turn select/move sees cleared embark flags'
+  );
 }
 
 /**

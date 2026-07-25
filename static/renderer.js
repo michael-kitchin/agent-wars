@@ -26222,6 +26222,23 @@
       console.error("refreshGameStateAfterBuildQueueChange failed:", err);
     }
   }
+  async function refreshGameStateAfterSealiftChange(deps, options = {}) {
+    if (!window.gameApi?.getGameState) return;
+    try {
+      const nextState = await window.gameApi.getGameState();
+      await deps.applyGameStateSnapshot(nextState, {
+        refreshStandingOrders: options.refreshStandingOrders === true,
+        updateGameStateSidebarUi: true,
+        updateSelectionUi: true,
+        updateGameOverUi: false,
+        updateReadyButton: false,
+        refreshBuildPopup: false,
+        redraw: true
+      });
+    } catch (err) {
+      console.error("refreshGameStateAfterSealiftChange failed:", err);
+    }
+  }
   async function applyGameStateSnapshot(deps, nextState, options = {}) {
     const previousState = rendererSharedState.gameState;
     rendererSharedState.gameState = nextState;
@@ -26562,10 +26579,11 @@
             });
             if (!result.success) {
               showMapToast(formatTargetingValidationReason2(result.reason, "Failed to update sealift assignment."));
-            } else if (selected.length > 0) {
-              await refreshHumanStandingOrders2();
-              updatePendingOrdersSidebar2();
-              await refreshHoverRoutePreview2();
+            } else {
+              await refreshGameStateAfterSealiftChange2({ refreshStandingOrders: selected.length > 0 });
+              if (selected.length > 0) {
+                await refreshHoverRoutePreview2();
+              }
             }
             refreshStackCalloutIfOpen();
             requestRedraw();
@@ -26613,6 +26631,8 @@
               });
               if (!result.success) {
                 showMapToast(formatTargetingValidationReason2(result.reason, "Failed to debark unit."));
+              } else {
+                await refreshGameStateAfterSealiftChange2();
               }
               refreshStackCalloutIfOpen();
               requestRedraw();
@@ -26836,6 +26856,9 @@
   }
   async function refreshGameStateAfterBuildQueueChange2() {
     return refreshGameStateAfterBuildQueueChange({ applyGameStateSnapshot: applyGameStateSnapshot2 });
+  }
+  async function refreshGameStateAfterSealiftChange2(options = {}) {
+    return refreshGameStateAfterSealiftChange({ applyGameStateSnapshot: applyGameStateSnapshot2 }, options);
   }
   async function applyGameStateSnapshot2(nextState, options = {}) {
     return applyGameStateSnapshot(
