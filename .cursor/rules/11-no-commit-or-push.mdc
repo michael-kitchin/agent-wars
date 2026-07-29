@@ -1,0 +1,8 @@
+---
+description: "11 — Never commit or push; user reviews all changes before sharing"
+alwaysApply: true
+---
+
+# 11 — No Commit or Push
+
+Never commit or push changes under any circumstances. I intend to review all changes before sharing them with other developers.

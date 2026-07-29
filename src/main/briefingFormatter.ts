@@ -147,24 +147,28 @@ function sanitizeCallbackParamsForPrompt(params: unknown, ctx: CoordinateContext
 
 /**
  * Defines the `buildStrategicNarrative` function shape (function buildStrategicNarrative().
-
- * Purpose: Supports maintainability by documenting why `buildStrategicNarrative` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ *
+ * Purpose: Short turn-opening sentences for the Commander briefing (contact, optional standing-order gaps, critical threats).
+ * When to use: Strategic `formatBriefing` after assessments are ready.
+ * Expected outcome: Up to five sentences; omits standing-order coaching when Orders tools are disabled.
  * Exceptions: None.
  */
-function buildStrategicNarrative(
+export function buildStrategicNarrative(
   state: GameStateSnapshot,
-  unitAssessments: UnitAssessmentResult[]
+  unitAssessments: UnitAssessmentResult[],
+  /**
+   * When false, skip “no standing order” sentences (Orders tools off — assign_order is unavailable).
+   */
+  standingOrdersActive = true
 ): string {
   const aiUnits = state.units.filter((u) => u.player === 'opponent');
   const humanUnits = state.units.filter((u) => u.player === 'human');
   const inContact = unitAssessments.filter(
     (a) => (a.result.threats?.length ?? 0) > 0 && a.result.nearbyEnemies?.some((e) => e.inRangedRange || e.inMeleeRange)
   ).length;
-  const noOrder = unitAssessments.filter(
-    (a) => a.result.unit?.currentStandingOrder == null
-  ).length;
+  const noOrder = standingOrdersActive
+    ? unitAssessments.filter((a) => a.result.unit?.currentStandingOrder == null).length
+    : 0;
   const critical = unitAssessments.filter((a) =>
     (a.result.threats ?? []).some((t) => t.severity === 'critical')
   ).length;
@@ -190,30 +194,63 @@ function buildStrategicNarrative(
 }
 
 /**
- * Defines the `needsAction` function shape (function needsAction(assessment: UnitAssessmentResult): boolean).
-
- * Purpose: Supports maintainability by documenting why `needsAction` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * True when assessment threats include moderate or critical severity.
+ *
+ * Purpose: Action needed / Attention triage ignores low-only threat noise when standing orders are inactive (and for SO-gap threat bullets).
+ * When to use: `needsAction` and Attention Flags severity wording.
+ * Expected outcome: false for empty or low-only threat lists.
  * Exceptions: None.
  */
-function needsAction(assessment: UnitAssessmentResult): boolean {
+function hasActionableThreat(assessment: UnitAssessmentResult): boolean {
+  return (assessment.result.threats ?? []).some(
+    (t) => t.severity === 'critical' || t.severity === 'moderate'
+  );
+}
+
+/**
+ * Highest threat severity among assessment threats for Attention Flags wording.
+ *
+ * Purpose: Avoid labeling low threats as “moderate”.
+ * When to use: After deciding a unit deserves an attention bullet for threat contact.
+ * Expected outcome: `critical` | `moderate` | `low`, or null when there are no threats.
+ * Exceptions: None.
+ */
+function maxThreatSeverity(
+  threats: ReadonlyArray<{ severity?: string }>
+): 'critical' | 'moderate' | 'low' | null {
+  if (threats.some((t) => t.severity === 'critical')) return 'critical';
+  if (threats.some((t) => t.severity === 'moderate')) return 'moderate';
+  if (threats.some((t) => t.severity === 'low')) return 'low';
+  return null;
+}
+
+/**
+ * Marks units that deserve Attention Flags / Action needed = yes.
+ *
+ * Purpose: Triage Unit Status and Attention Flags without flooding on distant low threats.
+ * When to use: Unit Status rows and Attention Flags assembly.
+ * Expected outcome: When standing orders are inactive, only moderate/critical threats; when active, also missing/warning standing orders (threat gaps use moderate/critical only).
+ * Exceptions: None.
+ */
+function needsAction(assessment: UnitAssessmentResult, standingOrdersActive: boolean): boolean {
+  const actionable = hasActionableThreat(assessment);
+  if (!standingOrdersActive) return actionable;
   const order = assessment.result.unit?.currentStandingOrder as { status?: string } | null | undefined;
-  const hasThreat = (assessment.result.threats?.length ?? 0) > 0;
-  if (!order && hasThreat) return true;
+  if (!order && actionable) return true;
   if (order && typeof order.status === 'string' && WARNING_STATUSES.has(order.status)) return true;
   return false;
 }
 
 /**
  * Defines the `isQuiet` function shape (function isQuiet(assessment: UnitAssessmentResult): boolean).
-
- * Purpose: Supports maintainability by documenting why `isQuiet` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ *
+ * Purpose: Softens Action needed for units with a healthy standing order and only low threats.
+ * When to use: Strategic Unit Status rows when Orders tools are enabled.
+ * Expected outcome: false when standing orders are inactive or threats are non-low / order missing/warning.
  * Exceptions: None.
  */
-function isQuiet(assessment: UnitAssessmentResult): boolean {
+function isQuiet(assessment: UnitAssessmentResult, standingOrdersActive: boolean): boolean {
+  if (!standingOrdersActive) return false;
   const order = assessment.result.unit?.currentStandingOrder as { status?: string } | null | undefined;
   const threats = assessment.result.threats ?? [];
   const hasNonLow = threats.some((t) => t.severity !== 'low');
@@ -224,48 +261,30 @@ function isQuiet(assessment: UnitAssessmentResult): boolean {
 }
 
 /**
- * Defines the `formatOrderCell` function shape (function formatOrderCell(assessment: UnitAssessmentResult): string).
-
- * Purpose: Supports maintainability by documenting why `formatOrderCell` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Builds the Unit Status and Threats markdown table for Commander briefings.
+ *
+ * Purpose: One dense per-unit type/threat/nearest/action table; standing-order detail lives in `# Standing Order Status` when Orders are enabled.
+ * When to use: Strategic `formatBriefing` and tactical `formatTacticalBriefing` after assessments are ready.
+ * Expected outcome: GFM table with Type; no standing-order column (avoids duplicating Standing Order Status / former Unit Roster).
+ * Exceptions: None; empty assessments yield an empty-state row.
  */
-function formatOrderCell(assessment: UnitAssessmentResult, ctx: CoordinateContext): string {
-  const order = assessment.result.unit?.currentStandingOrder as
-    | { type?: string; destination?: [number, number]; defendHex?: [number, number]; status?: string }
-    | null
-    | undefined;
-  if (!order) return '—';
-  const type = (order.type ?? '').toUpperCase();
-  let dest = '';
-  if (order.destination) dest = ` to ${formatPosStrategicHex(order.destination, ctx)}`;
-  if (order.defendHex) dest = ` ${formatPosStrategicHex(order.defendHex, ctx)}`;
-  const status = order.status ?? '';
-  return `${type}${dest} — ${status}`.trim() || '—';
-}
-
-/**
- * Defines the `buildUnitStatusTable` function shape (function buildUnitStatusTable().
-
- * Purpose: Supports maintainability by documenting why `buildUnitStatusTable` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function buildUnitStatusTable(
+export function buildUnitStatusTable(
   unitAssessments: UnitAssessmentResult[],
-  ctx: CoordinateContext
+  ctx: CoordinateContext,
+  /**
+   * When false, Action needed uses moderate/critical threats only (no standing-order gaps).
+   */
+  standingOrdersActive = true
 ): string {
   const header =
-    '| Unit ID | Hex | Standing order + status | Nearest enemy + distance | Threat severity | Action needed |';
-  const sep = '|---------|-----|------------------------|---------------------------|-----------------|---------------|';
+    '| Unit ID | Type | Hex | Nearest enemy + distance | Threat severity | Action needed |';
+  const sep = '|---------|------|-----|---------------------------|-----------------|---------------|';
   const rows: string[] = [];
   for (const a of unitAssessments) {
     const pos = Array.isArray(a.result.unit?.position)
       ? formatPosStrategicHex(a.result.unit.position as [number, number], ctx)
       : '—';
-    const orderCell = formatOrderCell(a, ctx);
+    const type = typeof a.result.unit?.type === 'string' ? a.result.unit.type : '—';
     const nearest = a.result.nearbyEnemies?.[0];
     const nearestStr = nearest
       ? `${formatUnitDisplayRef(nearest.unitId)} @ ${nearest.hexDistance} (${nearest.confidence ?? 'current'}${nearest.lastSeen != null ? `, seen t${nearest.lastSeen}` : ''})`
@@ -279,13 +298,11 @@ function buildUnitStatusTable(
           : severities.includes('moderate')
             ? 'moderate'
             : 'low';
-    const action = needsAction(a) ? 'yes' : 'no';
+    const action = needsAction(a, standingOrdersActive) ? 'yes' : 'no';
     const selfLabel = formatUnitDisplayRef(a.unitId);
-    if (isQuiet(a)) {
-      rows.push(`| ${selfLabel} | ${pos} | ${orderCell} | ${nearestStr} | ${severity} | ${action} (quiet) |`);
-    } else {
-      rows.push(`| ${selfLabel} | ${pos} | ${orderCell} | ${nearestStr} | ${severity} | ${action} |`);
-    }
+    const actionCell =
+      ctx.mode === 'strategic' && isQuiet(a, standingOrdersActive) ? `${action} (quiet)` : action;
+    rows.push(`| ${selfLabel} | ${type} | ${pos} | ${nearestStr} | ${severity} | ${actionCell} |`);
   }
   if (rows.length === 0) return `${header}\n${sep}\n(No AI units)\n`;
   return `${[header, sep, ...rows].join('\n')}\n`;
@@ -316,25 +333,43 @@ function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntr
 
 /**
  * Defines the `buildAttentionFlags` function shape (function buildAttentionFlags().
-
- * Purpose: Supports maintainability by documenting why `buildAttentionFlags` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ *
+ * Purpose: Short triage bullets for units that need attention this consultation.
+ * When to use: Strategic and tactical Commander briefings after assessments.
+ * Expected outcome: Up to three bullets, or `None.`; omits standing-order language in tactical mode or when Orders tools are off.
  * Exceptions: None.
  */
-function buildAttentionFlags(
-  unitAssessments: UnitAssessmentResult[]
+export function buildAttentionFlags(
+  unitAssessments: UnitAssessmentResult[],
+  /**
+   * When `tactical`, attention bullets omit standing-order language (orders do not apply in-battle).
+   */
+  coordinateMode: 'strategic' | 'tactical' = 'strategic',
+  /**
+   * When false, strategic bullets ignore standing-order gaps/warnings and only flag moderate/critical threats.
+   */
+  standingOrdersActive = true
 ): string {
   const bullets: string[] = [];
+  const soActive = coordinateMode === 'tactical' ? false : standingOrdersActive;
   for (const a of unitAssessments) {
-    if (!needsAction(a)) continue;
-    const order = a.result.unit?.currentStandingOrder as { status?: string } | null | undefined;
+    if (!needsAction(a, soActive)) continue;
     const threats = a.result.threats ?? [];
     const nearest = a.result.nearbyEnemies?.[0];
-    if (!order && threats.length > 0 && nearest) {
-      const sev = threats.some((t) => t.severity === 'critical') ? 'critical' : 'moderate';
+    if (!soActive) {
+      const sev = maxThreatSeverity(threats);
+      if ((sev === 'critical' || sev === 'moderate') && nearest) {
+        bullets.push(
+          `${formatUnitDisplayRef(a.unitId)} faces a ${sev} threat (nearest enemy: ${formatUnitDisplayRef(nearest.unitId)}, distance ${nearest.hexDistance}).`
+        );
+      }
+      continue;
+    }
+    const order = a.result.unit?.currentStandingOrder as { status?: string } | null | undefined;
+    if (!order && hasActionableThreat(a) && nearest) {
+      const sev = maxThreatSeverity(threats);
       bullets.push(
-        `${formatUnitDisplayRef(a.unitId)} has no standing order and faces a ${sev} threat (nearest enemy: ${formatUnitDisplayRef(nearest.unitId)}, distance ${nearest.hexDistance}).`
+        `${formatUnitDisplayRef(a.unitId)} has no standing order and faces a ${sev ?? 'moderate'} threat (nearest enemy: ${formatUnitDisplayRef(nearest.unitId)}, distance ${nearest.hexDistance}).`
       );
     } else if (order?.status && WARNING_STATUSES.has(order.status)) {
       bullets.push(
@@ -384,7 +419,7 @@ function formatCallbackLine(sub: CallbackSubscription, ctx: CoordinateContext): 
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function buildActiveCallbacksSection(subscriptions: CallbackSubscription[], ctx: CoordinateContext): string {
+export function buildActiveCallbacksSection(subscriptions: CallbackSubscription[], ctx: CoordinateContext): string {
   const header = '| Event | Details |';
   const sep = '| --- | --- |';
   if (subscriptions.length === 0) {
@@ -395,11 +430,11 @@ function buildActiveCallbacksSection(subscriptions: CallbackSubscription[], ctx:
 }
 
 /**
- * Defines the `formatBriefing` function shape (export function formatBriefing( state: GameStateSnapshot, precomputed: PrecomputationResult, standingOrderText: string, memoryText: string, subsc).
-
- * Purpose: Supports maintainability by documenting why `formatBriefing` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Assembles the strategic Commander briefing markdown for the opponent AI system prompt.
+ *
+ * Purpose: Single map-first briefing (status, attention, operational map, memory, optional Standing Order Status, callbacks).
+ * When to use: `requestOrdersFlow` when building strategic `briefingOverride`.
+ * Expected outcome: Full briefing string; `# Standing Order Status` appears only when `standingOrderText` is non-empty (Orders enabled).
  * Exceptions: None.
  */
 export function formatBriefing(
@@ -417,10 +452,12 @@ export function formatBriefing(
     hexAssessmentCount: precomputed.hexAssessments.length,
     callbackCount: subscriptions?.length ?? 0,
     hasProductionText: productionText.trim().length > 0,
+    standingOrdersInBriefing: standingOrderText.trim().length > 0,
     reusedLatLngByH3: Boolean(sharedContext?.latLngByH3),
   });
   ensureStrategicCoordinateRegistryInitialized();
   const coordCtx: CoordinateContext = { mode: 'strategic' };
+  const standingOrdersActive = standingOrderText.trim().length > 0;
   const latLngByH3 =
     sharedContext?.latLngByH3 ??
     (() => {
@@ -433,14 +470,13 @@ export function formatBriefing(
     })();
   const sections: string[] = [];
   sections.push(markdownHeading1("Commander's Briefing"));
-  sections.push(buildStrategicNarrative(state, precomputed.unitAssessments));
+  sections.push(buildStrategicNarrative(state, precomputed.unitAssessments, standingOrdersActive));
   sections.push(markdownHeading2('Unit Status and Threats'));
-  sections.push(buildUnitStatusTable(precomputed.unitAssessments, coordCtx));
+  sections.push(buildUnitStatusTable(precomputed.unitAssessments, coordCtx, standingOrdersActive));
   sections.push(markdownHeading2('Attention Flags'));
-  sections.push(buildAttentionFlags(precomputed.unitAssessments));
+  sections.push(buildAttentionFlags(precomputed.unitAssessments, 'strategic', standingOrdersActive));
   const operational = buildStrategicOperationalMapSectionMarkdown({
     state,
-    precomputed,
     latLngByH3,
     indexedState: sharedContext?.indexedState,
   });
@@ -464,19 +500,23 @@ export function formatBriefing(
     sections.push('\n\n' + productionText.trim());
   }
   const mem = memoryText ?? '';
-  const hasStrategicMemoryHeader =
-    mem.includes('=== YOUR STRATEGIC MEMORY') ||
-    mem.includes('# YOUR STRATEGIC MEMORY') ||
-    mem.includes('# Your strategic memory') ||
-    mem.includes('# Your Strategic Memory');
-  if (hasStrategicMemoryHeader) {
-    sections.push('\n\n' + (memoryText || '(none)'));
-  } else {
-    sections.push(markdownHeading1('Your Strategic Memory'));
-    sections.push(memoryText || '(none)');
+  if (mem.trim().length > 0) {
+    const hasStrategicMemoryHeader =
+      mem.includes('=== YOUR STRATEGIC MEMORY') ||
+      mem.includes('# YOUR STRATEGIC MEMORY') ||
+      mem.includes('# Your strategic memory') ||
+      mem.includes('# Your Strategic Memory');
+    if (hasStrategicMemoryHeader) {
+      sections.push('\n\n' + mem);
+    } else {
+      sections.push(markdownHeading1('Your Strategic Memory'));
+      sections.push(mem);
+    }
   }
-  sections.push('\n\n');
-  sections.push(standingOrderText || '');
+  if (standingOrdersActive) {
+    sections.push('\n\n');
+    sections.push(standingOrderText);
+  }
   sections.push(markdownHeading2('Active Callbacks'));
   sections.push(buildActiveCallbacksSection(subscriptions ?? [], coordCtx));
   return sections.join('');

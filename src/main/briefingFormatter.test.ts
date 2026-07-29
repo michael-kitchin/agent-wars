@@ -7,7 +7,7 @@ import * as assert from 'assert';
 import { gridDisk, latLngToCell } from 'h3-js';
 import type { GameStateSnapshot } from './gameDb';
 import type { PrecomputationResult, UnitAssessmentResult } from './precomputation';
-import { formatBriefing } from './briefingFormatter';
+import { buildAttentionFlags, buildUnitStatusTable, formatBriefing } from './briefingFormatter';
 
 /**
  * Documents the module-scope binding `fixtureOriginH3` (fixtureOriginH3).
@@ -179,8 +179,11 @@ function testFormatBriefingContainsSections(): void {
   assert.ok(out.includes("# Commander's Briefing"), 'title');
   assert.ok(out.includes('Turn 2:'), 'Section 1 narrative');
   assert.ok(out.match(/\.\s+[A-Z]/), 'Section 1 has multiple sentences');
-  assert.ok(out.includes('| Unit ID |'), 'unit table header');
+  assert.ok(out.includes('| Unit ID | Type | Hex |'), 'unit table has Type column');
   assert.ok(out.includes('# Operational Map'), 'operational map section');
+  assert.ok(!out.includes('### Unit Roster'), 'no Unit Roster; Unit Status covers threats');
+  assert.ok(!out.includes('Standing order + status'), 'no SO column on Unit Status');
+  assert.ok(out.includes('| armor |') || out.includes('| armor '), 'unit type on Unit Status');
   assert.ok(!out.includes('## Recent Turn Notes'), 'no recent turn notes on empty history');
   assert.ok(out.includes('opponent-armor-1'), 'unit table has unit');
   assert.ok(
@@ -195,9 +198,25 @@ function testFormatBriefingContainsSections(): void {
   assert.ok(out.includes('Your Strategic Memory'), 'memory block');
   assert.ok(out.includes('Remember: push south.'), 'memory text');
   assert.ok(out.includes('# Standing Order Status'), 'standing order block');
+  assert.ok(out.includes('MARCH to AB — en_route'), 'SO detail stays in Standing Order Status');
   assert.ok(out.includes('## Active Callbacks'), 'Active Callbacks section');
   assert.ok(out.includes('None. You may add callbacks'), 'callbacks hint when none');
   assert.ok(!out.includes('undefined'), 'no raw undefined');
+}
+
+/**
+ * Ensures empty standing-order injection omits Standing Order Status and SO narrative coaching.
+ *
+ * Purpose: Orders-tools-off path must not coach assign_order via briefing sections.
+ * When to use: After gating `standingOrderText` on `ordersEnabled` in `requestOrdersFlow`.
+ * Expected outcome: No `# Standing Order Status`; no “no standing order” narrative sentence.
+ * Exceptions: None.
+ */
+function testFormatBriefingOmitsStandingOrderWhenInjectionEmpty(): void {
+  const out = formatBriefing(fixtureState, precomputed, '', 'Remember: hold.');
+  assert.ok(!out.includes('# Standing Order Status'), 'no SO status when injection empty');
+  assert.ok(!out.includes('have no standing order'), 'no SO gap narrative when Orders off');
+  assert.ok(out.includes('Remember: hold.'), 'memory still present when provided');
 }
 
 /**
@@ -229,10 +248,12 @@ function testFormatBriefingActiveCallbacksWithSubscriptions(): void {
  */
 function testFormatBriefingUnitTableRows(): void {
   const out = formatBriefing(fixtureState, precomputed, '', '');
-  const unitTableStart = out.indexOf('| Unit ID |');
+  const unitTableStart = out.indexOf('| Unit ID | Type | Hex |');
   const unitTableEnd = out.indexOf('# Operational Map');
   const unitTable = out.slice(unitTableStart, unitTableEnd);
+  assert.ok(unitTableStart >= 0, 'expected Unit Status header with Type');
   assert.ok(unitTable.includes('opponent-armor-1') && unitTable.includes('opponent-infantry-1'));
+  assert.ok(unitTable.includes('armor') && unitTable.includes('infantry'), 'type column populated');
   assert.ok(unitTable.includes('yes') || unitTable.includes('no'), 'action needed column');
 }
 
@@ -252,6 +273,52 @@ function testFormatBriefingPossibleActionsArmorRanged(): void {
 }
 
 /**
+ * Ensures SO-inactive triage ignores low-only threats for Action needed and Attention Flags.
+ *
+ * Purpose: Regression for distant low-threat units flooding Action needed = yes / false “moderate” attention.
+ * When to use: After edits to `needsAction` / `buildAttentionFlags` standingOrdersActive=false path.
+ * Expected outcome: low → Action needed no and no attention bullet; moderate → yes + “moderate” wording.
+ * Exceptions: None.
+ */
+function testUnitStatusAndAttentionIgnoreLowThreatsWhenStandingOrdersInactive(): void {
+  const assessments: UnitAssessmentResult[] = [
+    {
+      unitId: 'opp-low',
+      result: {
+        status: 'ok',
+        unit: { unitId: 'opp-low', type: 'armor', position: [1, 1], currentStandingOrder: null },
+        nearbyEnemies: [
+          { unitId: 'hum-1', hexDistance: 6, inRangedRange: false, inMeleeRange: false } as UnitAssessmentResult['result']['nearbyEnemies'][0],
+        ],
+        threats: [{ description: 'distant', severity: 'low', sourceUnit: 'hum-1' }],
+        canAttackThisTurn: [],
+      } as unknown as UnitAssessmentResult['result'],
+    },
+    {
+      unitId: 'opp-mod',
+      result: {
+        status: 'ok',
+        unit: { unitId: 'opp-mod', type: 'armor', position: [2, 2], currentStandingOrder: null },
+        nearbyEnemies: [
+          { unitId: 'hum-1', hexDistance: 2, inRangedRange: true, inMeleeRange: false } as UnitAssessmentResult['result']['nearbyEnemies'][0],
+        ],
+        threats: [{ description: 'near', severity: 'moderate', sourceUnit: 'hum-1' }],
+        canAttackThisTurn: [],
+      } as unknown as UnitAssessmentResult['result'],
+    },
+  ];
+  const ctx = { mode: 'strategic' as const };
+  const table = buildUnitStatusTable(assessments, ctx, false);
+  const lowRow = table.split('\n').find((l) => l.includes('opp-low'));
+  const modRow = table.split('\n').find((l) => l.includes('opp-mod'));
+  assert.ok(lowRow && lowRow.includes('| no |'), `low threat Action needed no: ${lowRow}`);
+  assert.ok(modRow && modRow.includes('| yes |') && modRow.includes('moderate'), `moderate Action needed yes: ${modRow}`);
+  const flags = buildAttentionFlags(assessments, 'strategic', false);
+  assert.ok(!flags.includes('opp-low'), 'no attention for low-only');
+  assert.ok(flags.includes('opp-mod') && flags.includes('moderate threat'), 'attention for moderate with correct severity');
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
 
  * Purpose: Supports maintainability by documenting why `tests` exists.
@@ -261,9 +328,14 @@ function testFormatBriefingPossibleActionsArmorRanged(): void {
  */
 const tests = [
   { name: 'formatBriefing contains all sections', fn: testFormatBriefingContainsSections },
+  { name: 'formatBriefing omits standing order when injection empty', fn: testFormatBriefingOmitsStandingOrderWhenInjectionEmpty },
   { name: 'formatBriefing unit table rows', fn: testFormatBriefingUnitTableRows },
   { name: 'formatBriefing possible actions armor ranged', fn: testFormatBriefingPossibleActionsArmorRanged },
   { name: 'formatBriefing Active callbacks with subscriptions', fn: testFormatBriefingActiveCallbacksWithSubscriptions },
+  {
+    name: 'unit status and attention ignore low threats when standing orders inactive',
+    fn: testUnitStatusAndAttentionIgnoreLowThreatsWhenStandingOrdersInactive,
+  },
 ];
 
 /**

@@ -41,6 +41,11 @@ import {
 } from './tacticalTransportBaseline';
 import { TacticalEmbarkValidationRejected } from './tacticalValidationResult';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/readyTypes';
+import {
+  stashOpponentCallbackSubscriptionsForTacticalBattle,
+  restoreOpponentCallbackSubscriptionsAfterTacticalBattle,
+  hydrateOpponentCallbackStashFromGameConfig,
+} from '../openrouter/tacticalCallbackSubscriptionLifecycle';
 
 /**
  * Returns a user-facing validation error when any opponent tactical march order is illegal on the current snapshot, or null when all pass.
@@ -198,6 +203,7 @@ function endTacticalBattleSessionCore(applyHumanVoluntaryBailoutResolution: bool
       });
     }
   }
+  restoreOpponentCallbackSubscriptionsAfterTacticalBattle();
   commitActiveTacticalBattle(null);
 }
 
@@ -254,6 +260,7 @@ export function startTacticalBattleForEnclosingRes1Hex(enclosingRes1H3Index: str
     commitActiveTacticalBattle(snapshot);
     clearTacticalTurnNotes();
     captureTacticalTransportBaselineForParentUnitIds([...new Set(snapshot.subUnits.map((u) => u.parentUnitId))]);
+    stashOpponentCallbackSubscriptionsForTacticalBattle();
     if (skippedParentDisplayNames.length > 0) {
       tacticalLogMutate('startTacticalBattleForEnclosingRes1Hex skipped parents', { skippedParentDisplayNames });
     }
@@ -313,9 +320,11 @@ function humanTacticalMarchBlockMessage(reason: TacticalMovementBlockReason): st
     case 'outside_footprint':
       return 'That destination lies outside the tactical battle footprint.';
     case 'out_of_range':
-      return 'That destination is out of movement range for one or more selected units.';
+      return 'No valid march path to that destination for one or more selected units (terrain, transport links, or blocked cells).';
     case 'air_no_march':
       return 'Air units cannot receive tactical march orders.';
+    case 'embarked_cargo':
+      return 'Embarked land units cannot receive independent movement orders. Debark first.';
     default:
       return `Movement order rejected (${reason}).`;
   }
@@ -704,6 +713,7 @@ export function restorePersistedTacticalBattleSession(): void {
   if (!tacticalTransportBaselineConfigExists()) {
     captureTacticalTransportBaselineForParentUnitIds([...new Set(snap.subUnits.map((u) => u.parentUnitId))]);
   }
+  hydrateOpponentCallbackStashFromGameConfig();
   tacticalLogMutate('restorePersistedTacticalBattleSession installed', {
     battleId: snap.battleId,
     subUnitCount: snap.subUnits.length,

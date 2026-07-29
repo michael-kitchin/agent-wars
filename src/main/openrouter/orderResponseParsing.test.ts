@@ -4,6 +4,7 @@
  */
 
 import * as assert from 'assert';
+import { cellToLatLng } from 'h3-js';
 import { ensureStrategicCoordinateRegistryInitialized } from '../briefing/map/hex-coordinates';
 import { buildLatLngCoordinateMap } from '../mapData';
 import type { GameStateSnapshot } from '../gameDb';
@@ -132,6 +133,42 @@ function testInvalidAssignOrderTypeSurfacesDropReason(): void {
 }
 
 /**
+ * Drops assign_order / cancel_order when parsing under tactical coordinate context.
+ *
+ * Purpose: Prevents strategic `standing_orders` pollution from sub-unit ids shown in tactical briefings.
+ * When to use: After edits to tactical guards in `processV3OrdersArray`.
+ * Expected outcome: dropReasons mention tactical skip; no movement orders from those actions.
+ * Exceptions: None.
+ */
+function testTacticalModeSkipsAssignAndCancelOrder(): void {
+  ensureStrategicCoordinateRegistryInitialized();
+  const latLngByH3 = new Map(minimalState.hexes.map((h) => [h.h3Index, cellToLatLng(h.h3Index) as [number, number]]));
+  const resolveToH3 = (lat: number, lng: number): string | undefined => {
+    for (const [h3, ll] of latLngByH3) {
+      if (Math.abs(ll[0] - lat) < 1e-9 && Math.abs(ll[1] - lng) < 1e-9) return h3;
+    }
+    return undefined;
+  };
+  const parsed = parseOrdersResponse(
+    '{"strategy":"x","orders":[{"action":"assign_order","unitId":"parent:01","order":{"type":"hold_fire"}},{"action":"cancel_order","unitId":"parent:01"}],"airStrikes":[],"ferryOrders":[],"callbacks":[]}',
+    resolveToH3,
+    minimalState,
+    latLngByH3,
+    false,
+    { mode: 'tactical', battleId: 'parse-tactical-so-guard' }
+  );
+  assert.ok(parsed);
+  assert.ok(
+    parsed!.dropReasons?.some((r) => r.includes('assign_order') && r.includes('tactical')),
+    'expected tactical assign_order skip'
+  );
+  assert.ok(
+    parsed!.dropReasons?.some((r) => r.includes('cancel_order') && r.includes('tactical')),
+    'expected tactical cancel_order skip'
+  );
+}
+
+/**
  * Defines the `testDisembarkClearsAssignmentAndEnqueuesMovement` function shape.
 
  * Purpose: LLM movement actions auto-debark embarked opponent cargo before enqueueing movement.
@@ -242,6 +279,7 @@ const tests = [
   { name: 'parseOrdersResponse tries fenced json after bad preamble', fn: testSkipsBadCandidateThenParsesFence },
   { name: 'parseOrdersResponse rejects top-level JSON array', fn: testRejectsTopLevelJsonArray },
   { name: 'parseOrdersResponse invalid assign_order type drop reason', fn: testInvalidAssignOrderTypeSurfacesDropReason },
+  { name: 'parseOrdersResponse tactical skips assign_order and cancel_order', fn: testTacticalModeSkipsAssignAndCancelOrder },
   { name: 'parseOrdersResponse disembark clears assignment and enqueues movement', fn: testDisembarkClearsAssignmentAndEnqueuesMovement },
   { name: 'parseOrdersResponse explicit_move while embarked auto-debarks', fn: testExplicitMoveWhileEmbarkedAutoDebarks },
 ];

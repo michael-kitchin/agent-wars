@@ -7,6 +7,7 @@ import { planTacticalRes4March, type TacticalMarchPlanResult } from '../../share
 import {
   buildRes4FootprintAdjacencyMap,
   res4FootprintNeighborLookupFromMap,
+  res4NeighborsInFootprint,
   type Res4FootprintNeighborLookup,
 } from '../../shared/tacticalRes4TransportLink';
 import {
@@ -46,6 +47,8 @@ let cachedLayerRefs: TerrainLayerRefs | null = null;
 let cachedTerrain: TacticalTerrainKindResolver | null = null;
 let cachedFootprintAdjacency: Map<string, string[]> | null = null;
 let cachedFootprintNeighbors: Res4FootprintNeighborLookup | null = null;
+/** Cell count of the adjacency map’s source set (full battle footprint when `res4ChildH3Indexes` is present). */
+let cachedFullFootprintSize = 0;
 const planMemo = new Map<string, TacticalMarchPlanResult>();
 
 /**
@@ -159,6 +162,7 @@ export function resetTacticalMovementPlanningCacheForTests(): void {
   cachedTerrain = null;
   cachedFootprintAdjacency = null;
   cachedFootprintNeighbors = null;
+  cachedFullFootprintSize = 0;
   planMemo.clear();
 }
 
@@ -179,28 +183,85 @@ function evictOldestPlanMemoIfFull(): void {
 }
 
 /**
- * Ensures terrain resolver and footprint adjacency are cached for the current battle terrain and footprint set.
+ * Snapshot fields required to identity terrain and rebuild the full-footprint adjacency cache.
  *
- * Purpose: Rebuilds resolver/adjacency only on terrain-key change; the footprint (`res4ChildH3Indexes`) is fixed for
- * a given battle so adjacency is built once per terrain-key and reused for all subsequent planning calls.
+ * Purpose: Keeps `ensureTerrainAndFootprintCache` / `planTacticalRes4MarchWithSessionCache` aligned on battle identity
+ * without requiring callers to pass every tactical snapshot field.
+ * When to use: Typing the `battle` argument for session-cached march planning.
+ * Expected outcome: Same shape as terrain identity plus optional `res4ChildH3Indexes` for full-footprint adjacency.
+ * Exceptions: None.
+ */
+type TacticalMarchSessionCacheBattle = Pick<
+  TacticalBattleSnapshot,
+  | 'battleId'
+  | 'tacticalTurnNumber'
+  | 'subUnits'
+  | 'res4TerrainKindByH3'
+  | 'strategicHexTerrain'
+  | 'strategicHexTerrainKind'
+  | 'res4IsSeaportByH3'
+  | 'res4IsUrbanByH3'
+  | 'res4IsRubbleByH3'
+  | 'res4RoadSidesByH3'
+  | 'res4RailSidesByH3'
+> &
+  Partial<Pick<TacticalBattleSnapshot, 'res4ChildH3Indexes'>>;
+
+/**
+ * Builds a stable memo tag so avoid-enemies subsets cannot reuse full-footprint plan rows (and vice versa).
+ *
+ * Purpose: Plan memo keys omit the full H3 list for speed; this tag distinguishes the battle footprint from Tool1
+ * filtered sets that remove enemy-occupied cells.
+ * When to use: Building `qk` inside `planTacticalRes4MarchWithSessionCache`.
+ * Expected outcome: `'F'` when `res4Set` matches the full battle footprint size; otherwise a size+hash tag.
+ * Exceptions: None.
+ */
+function res4SetMemoTag(res4Set: ReadonlySet<string>, fullFootprintSize: number): string {
+  if (fullFootprintSize > 0 && res4Set.size === fullFootprintSize) return 'F';
+  let h = 2166136261;
+  for (const x of res4Set) {
+    for (let i = 0; i < x.length; i++) {
+      h ^= x.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+  }
+  return `S${res4Set.size}:${h >>> 0}`;
+}
+
+/**
+ * Returns footprint neighbors restricted to the caller's active `res4Set` (full battle or avoid-enemies subset).
+ *
+ * Purpose: Session adjacency is always built from the full tactical footprint; Dijkstra must still honor per-call
+ * exclusions (e.g. enemy-occupied cells) without permanently poisoning the adjacency cache.
+ * When to use: Passed as `footprintNeighbors` into `planTacticalRes4March` from the session cache.
+ * Expected outcome: Only neighbors present in `res4Set`; empty when the origin has no footprint adjacency.
+ * Exceptions: None.
+ */
+function footprintNeighborsRestrictedToSet(res4Set: ReadonlySet<string>): Res4FootprintNeighborLookup {
+  const full = cachedFootprintNeighbors;
+  if (!full) {
+    return (h: string) => res4NeighborsInFootprint(h, res4Set);
+  }
+  return (h: string) => {
+    const nbs = full(h);
+    if (nbs.length === 0) return nbs;
+    return nbs.filter((n) => res4Set.has(n));
+  };
+}
+
+/**
+ * Ensures terrain resolver and footprint adjacency are cached for the current battle terrain.
+ *
+ * Purpose: Rebuilds resolver/adjacency only on terrain-key change. Adjacency is always built from the **full**
+ * battle footprint (`res4ChildH3Indexes` when present), never from a per-call avoid-enemies subset — otherwise the
+ * first Tool1 `plan_route` permanently drops human-occupied cells from neighbor lists and human marches fail with
+ * instant `no_path`.
  * When to use: From `planTacticalRes4MarchWithSessionCache` before plan memo lookup.
  * Expected outcome: `cachedTerrain` and `cachedFootprintNeighbors` ready for `planTacticalRes4March`.
  * Exceptions: None.
  */
 function ensureTerrainAndFootprintCache(
-  battle: Pick<
-    TacticalBattleSnapshot,
-    | 'battleId'
-    | 'tacticalTurnNumber'
-    | 'res4TerrainKindByH3'
-    | 'strategicHexTerrain'
-    | 'strategicHexTerrainKind'
-    | 'res4IsSeaportByH3'
-    | 'res4IsUrbanByH3'
-    | 'res4IsRubbleByH3'
-    | 'res4RoadSidesByH3'
-    | 'res4RailSidesByH3'
-  >,
+  battle: TacticalMarchSessionCacheBattle,
   res4Set: ReadonlySet<string>
 ): void {
   const terrainKey = resolveTerrainIdentity(battle);
@@ -211,9 +272,14 @@ function ensureTerrainAndFootprintCache(
     planMemo.clear();
     cachedFootprintAdjacency = null;
     cachedFootprintNeighbors = null;
+    cachedFullFootprintSize = 0;
   }
   if (cachedFootprintAdjacency === null) {
-    cachedFootprintAdjacency = buildRes4FootprintAdjacencyMap(res4Set);
+    const fullIndexes = battle.res4ChildH3Indexes;
+    const adjacencySource =
+      fullIndexes != null && fullIndexes.length > 0 ? new Set(fullIndexes) : res4Set;
+    cachedFullFootprintSize = adjacencySource.size;
+    cachedFootprintAdjacency = buildRes4FootprintAdjacencyMap(adjacencySource);
     cachedFootprintNeighbors = res4FootprintNeighborLookupFromMap(cachedFootprintAdjacency);
   }
 }
@@ -227,20 +293,7 @@ function ensureTerrainAndFootprintCache(
  * Exceptions: Caught internal errors log at error and fall back to a fresh uncached plan attempt.
  */
 export function planTacticalRes4MarchWithSessionCache(
-  battle: Pick<
-    TacticalBattleSnapshot,
-    | 'battleId'
-    | 'tacticalTurnNumber'
-    | 'subUnits'
-    | 'res4TerrainKindByH3'
-    | 'strategicHexTerrain'
-    | 'strategicHexTerrainKind'
-    | 'res4IsSeaportByH3'
-    | 'res4IsUrbanByH3'
-    | 'res4IsRubbleByH3'
-    | 'res4RoadSidesByH3'
-    | 'res4RailSidesByH3'
-  >,
+  battle: TacticalMarchSessionCacheBattle,
   args: {
     fromH3: string;
     toH3: string;
@@ -251,8 +304,9 @@ export function planTacticalRes4MarchWithSessionCache(
 ): TacticalMarchPlanResult {
   ensureTerrainAndFootprintCache(battle, args.res4Set);
   const terrain = cachedTerrain ?? buildTacticalTerrainKindResolverFromSnapshot(battle);
-  const footprintNeighbors = cachedFootprintNeighbors ?? undefined;
-  const qk = `${args.fromH3}|${args.toH3}|${args.unitTypeForMovement}|${args.movementPointBudget}`;
+  const footprintNeighbors = footprintNeighborsRestrictedToSet(args.res4Set);
+  const setTag = res4SetMemoTag(args.res4Set, cachedFullFootprintSize);
+  const qk = `${args.fromH3}|${args.toH3}|${args.unitTypeForMovement}|${args.movementPointBudget}|${setTag}`;
   const hit = planMemo.get(qk);
   if (hit) {
     tacticalLogQuery('planTacticalRes4MarchWithSessionCache hit', { qk });

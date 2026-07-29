@@ -45,10 +45,6 @@ import {
   cancelHumanStandingOrder,
   queryHumanStandingOrders,
 } from '../tools/tool5StandingOrders';
-import {
-  mergeHumanStandingOrdersIntoTacticalMarchOrders,
-  mergeHumanTacticalDefendEngagementOrders,
-} from '../tacticalBattle/tacticalStandingOrderMarchMerge';
 import { resolveTacticalRangedTargetForSubUnit } from '../tacticalBattle/tacticalRangedTargetResolve';
 import { validateHumanTacticalMarchOrders } from '../tacticalBattle/tacticalBattleSession';
 import type {
@@ -907,26 +903,21 @@ export function commitHumanTacticalDraftOrders(args: {
       return { success: false, reason: 'No tactical battle is active.' };
     }
     const opponentTacticalDraft = sanitizeOpponentTacticalDraftForReadyCommit(preBattle, args.opponentTacticalDraft);
-    const effectiveHumanMarches = mergeHumanStandingOrdersIntoTacticalMarchOrders(preBattle, args.movementOrders);
-    logDebug('gameActions commitHumanTacticalDraftOrders standing-order march merge', {
-      explicitMarchCount: args.movementOrders.length,
-      effectiveMarchCount: effectiveHumanMarches.length,
+    // Explicit drafts only: strategic standing orders do not auto-move or auto-fire in tactical (aligned with AI).
+    const effectiveHumanMarches = [...args.movementOrders];
+    logDebug('gameActions commitHumanTacticalDraftOrders explicit marches only', {
+      explicitMarchCount: effectiveHumanMarches.length,
     });
     const mergedMarchCheck = validateHumanTacticalMarchOrders(effectiveHumanMarches);
     if (!mergedMarchCheck.success) {
-      logDebug('gameActions commitHumanTacticalDraftOrders rejected merged marches', { reason: mergedMarchCheck.reason });
+      logDebug('gameActions commitHumanTacticalDraftOrders rejected marches', { reason: mergedMarchCheck.reason });
       return mergedMarchCheck;
     }
-    const defendMerged = mergeHumanTacticalDefendEngagementOrders(
-      preBattle,
-      args.rangedAttacks ?? [],
-      args.airStrikes ?? []
-    );
-    logDebug('gameActions commitHumanTacticalDraftOrders DEFEND engagement merge', {
-      explicitRangedCount: args.rangedAttacks?.length ?? 0,
-      explicitAirCount: args.airStrikes?.length ?? 0,
-      mergedRangedCount: defendMerged.rangedAttacks.length,
-      mergedAirCount: defendMerged.airStrikes.length,
+    const explicitRanged = [...(args.rangedAttacks ?? [])];
+    const explicitAir = [...(args.airStrikes ?? [])];
+    logDebug('gameActions commitHumanTacticalDraftOrders explicit fire orders', {
+      explicitRangedCount: explicitRanged.length,
+      explicitAirCount: explicitAir.length,
     });
     const res4Set = new Set(preBattle.res4ChildH3Indexes);
     const terrainBattle = {
@@ -978,8 +969,8 @@ export function commitHumanTacticalDraftOrders(args: {
     }
     const beat = applyHumanTacticalDraftBeatInStrategicOrder({
       movementOrders: appliedMovementOrders,
-      rangedAttacks: defendMerged.rangedAttacks,
-      airStrikes: defendMerged.airStrikes,
+      rangedAttacks: explicitRanged,
+      airStrikes: explicitAir,
       ferryOrders: args.ferryOrders,
       embarkOrders: args.embarkOrders,
       opponentTacticalDraft,
@@ -1075,7 +1066,7 @@ export function commitHumanTacticalDraftOrders(args: {
     }
     const rangedRemovedUnits = support.removedUnits;
     const rangedCombatHexSet = new Set<string>();
-    for (const r of defendMerged.rangedAttacks) {
+    for (const r of explicitRanged) {
       rangedCombatHexSet.add(r.targetH3Index);
     }
     for (const r of od?.rangedAttacks ?? []) {
@@ -1085,7 +1076,7 @@ export function commitHumanTacticalDraftOrders(args: {
     const casualtyHexSet = new Set(rangedRemovedUnits.map((v) => v.h3Index));
     const rangedCasualtyHexes = rangedCombatHexes.filter((h) => casualtyHexSet.has(h));
     const humanBeatHadSubmittedRangedOrAirOrders =
-      defendMerged.rangedAttacks.length > 0 || defendMerged.airStrikes.length > 0;
+      explicitRanged.length > 0 || explicitAir.length > 0;
     const opponentBeatHadSubmittedRangedOrAirOrders =
       !!od && ((od.rangedAttacks?.length ?? 0) > 0 || (od.airStrikes?.length ?? 0) > 0);
     const tacticalResolutionPlayback: TacticalCommitResolutionPlayback = {

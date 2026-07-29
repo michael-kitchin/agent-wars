@@ -313,3 +313,61 @@ export function dedupeByUnitKeepLast<T extends { unitId: string }>(rows: T[]): T
   keptReversed.reverse();
   return keptReversed;
 }
+
+/**
+ * Merges per-request pathfinding counters into the turn aggregate and emits end-of-request debug logs.
+ *
+ * Purpose: Keeps the `requestOrdersFlow` `finally` block thin while preserving telemetry shape.
+ * When to use: In `requestOrdersFlow` `finally` after the tool loop exits (success, fail, or cancel).
+ * Expected outcome: Aggregate counters increase; strategic and optional tactical latency debug lines are written.
+ * Exceptions: None.
+ */
+export function finalizeRequestOrdersPathfindingMetrics(args: {
+  turnNumber: number;
+  modelId: string;
+  wallClockStart: number;
+  requestMetrics: AiPathfindingSessionMetrics;
+  turnAggregateMetrics: AiPathfindingTurnAggregateMetrics;
+  tacticalBattleId: string | null;
+}): void {
+  const {
+    turnNumber,
+    modelId,
+    wallClockStart,
+    requestMetrics,
+    turnAggregateMetrics,
+    tacticalBattleId,
+  } = args;
+  turnAggregateMetrics.requestCount += 1;
+  turnAggregateMetrics.created += requestMetrics.created;
+  turnAggregateMetrics.reused += requestMetrics.reused;
+  turnAggregateMetrics.planRouteToolCalls += requestMetrics.planRouteToolCalls;
+  turnAggregateMetrics.checkDistanceToolCalls += requestMetrics.checkDistanceToolCalls;
+  turnAggregateMetrics.totalToolCalls += requestMetrics.totalToolCalls;
+  logDebug('openRouter requestOrders: pathfinding session metrics', {
+    turnNumber,
+    modelId,
+    requestMetrics,
+    turnAggregateMetrics: {
+      turnNumber: turnAggregateMetrics.turnNumber,
+      requestCount: turnAggregateMetrics.requestCount,
+      created: turnAggregateMetrics.created,
+      reused: turnAggregateMetrics.reused,
+      planRouteToolCalls: turnAggregateMetrics.planRouteToolCalls,
+      checkDistanceToolCalls: turnAggregateMetrics.checkDistanceToolCalls,
+      totalToolCalls: turnAggregateMetrics.totalToolCalls,
+    },
+  });
+  if (tacticalBattleId) {
+    logDebug('openRouter requestOrders tactical latency diagnostics', {
+      battleId: tacticalBattleId,
+      wallClockMs: Date.now() - wallClockStart,
+      turnNumber,
+      modelId,
+      planRouteToolCalls: requestMetrics.planRouteToolCalls,
+      checkDistanceToolCalls: requestMetrics.checkDistanceToolCalls,
+      totalToolCalls: requestMetrics.totalToolCalls,
+    });
+  }
+}
+

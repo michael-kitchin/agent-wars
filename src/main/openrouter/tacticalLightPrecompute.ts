@@ -3,7 +3,7 @@ import { logDebug } from '../logger';
 /**
  * Developer-only experiment: further restrict tactical OpenRouter tool names to reduce wall-clock latency.
  *
- * Purpose: Phase 6 “light precompute” spike — strips heavy assessment tools from the tactical tool loop while leaving
+ * Purpose: Optional light-precompute mode — strips heavy assessment tools from the tactical tool loop while leaving
  * routing and distance checks available (default **off** so production behavior is unchanged).
  * When to use: Set to `true` locally when profiling tactical `requestAiOrders`; never ship enabled without re-validating
  * prompt/tool parity.
@@ -23,8 +23,6 @@ export const TACTICAL_LIGHT_PRECOMPUTE_ENABLED = false;
 const TACTICAL_LIGHT_TOOL_NAMES = new Set([
   'plan_route',
   'check_distance',
-  'query_orders',
-  'cancel_order',
 ]);
 
 /**

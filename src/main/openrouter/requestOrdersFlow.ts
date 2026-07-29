@@ -12,16 +12,17 @@ import { executeTool5, getInjectionText as getStandingOrderInjectionText, genera
 import { executeTool6 } from '../tools/tool6Production';
 import { runPrecomputation } from '../precomputation';
 import { formatBriefing } from '../briefingFormatter';
+import { formatTacticalBriefing } from './formatTacticalBriefing';
 import { resetHexControllerParityCheckDedupForTurn } from '../snapshotDbParity';
 import { buildPossibleActionsIndexedState } from './possibleUnitActions';
-import { getSubscriptions, replaceSubscriptions } from '../callbackSubscriptions';
+import { getSubscriptions } from '../callbackSubscriptions';
+import { applyParsedOpponentCallbackSubscriptions } from './applyParsedOpponentCallbacks';
 import {
   clearAiLossEventsSinceConsultation,
   setAiLastConsultationTurn,
   setAiToolLimitExceededLastTurn,
   upsertTurnStrategyNote,
 } from '../gameDb';
-import { buildRecentTurnNotesSection } from '../briefing/recentTurnNotesSection';
 import type { GameStateSnapshot } from '../gameDb';
 import { buildProductionBriefingBlock } from './briefingSections';
 import { getInitialUserMessage } from './promptText';
@@ -36,11 +37,7 @@ import {
   validateTacticalOpponentFerryOrder,
 } from '../tacticalBattle/tacticalOpponentOrderValidation';
 import { tacticalComputeMovementOrderOutcome } from '../tacticalBattle/tacticalSnapshotGuards';
-import { expandOpponentStandingOrdersForTacticalBattle } from '../tacticalBattle/tacticalStandingOrderMarchMerge';
-import {
-  buildStrategicOperationalMapSectionMarkdown,
-  buildTacticalOperationalMapSectionMarkdown,
-} from '../briefing/map/briefing-map-section';
+import { buildStrategicOperationalMapSectionMarkdown } from '../briefing/map/briefing-map-section';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import { ensureStrategicCoordinateRegistryInitialized, initTacticalCoordinateRegistry } from '../briefing/map/hex-coordinates';
 import { decodeOpenRouterToolArgsForExecution } from './openRouterToolArgsHex';
@@ -52,6 +49,7 @@ import type { RequestOrdersError, RequestOrdersOptions, RequestOrdersResult } fr
 import {
   REQUEST_ORDERS_MAX_WALL_CLOCK_MS,
   dedupeByUnitKeepLast,
+  finalizeRequestOrdersPathfindingMetrics,
   getAiPathfindingTurnAggregateMetrics,
   isAgentWarsFullPromptLoggingEnabled,
   logPromptPreview,
@@ -216,7 +214,7 @@ export async function requestOrdersFlow(
     const stripStrategicOnlyTools = (names: string[]): string[] =>
       names.filter((n) => {
         const g = getGroupIdForToolName(n);
-        return g !== 'memory' && g !== 'production';
+        return g !== 'memory' && g !== 'production' && g !== 'orders';
       });
     enabledToolNames =
       enabledToolNames !== undefined
@@ -330,8 +328,10 @@ export async function requestOrdersFlow(
       toolInvocationCounts['precomputation'] =
         precomputed.unitAssessments.length + precomputed.hexAssessments.length;
     }
-    const standingOrderText = getStandingOrderInjectionText('opponent', state, { mode: 'strategic' });
-    const memoryText = getInjectionText('opponent', state.turnNumber);
+    const standingOrderText = flags.ordersEnabled
+      ? getStandingOrderInjectionText('opponent', state, { mode: 'strategic' })
+      : '';
+    const memoryText = flags.memoryEnabled ? getInjectionText('opponent', state.turnNumber) : '';
     const subscriptions = getSubscriptions('opponent');
     const productionBriefing = getToolFlags(enabledToolNames).productionEnabled
       ? buildProductionBriefingBlock({
@@ -367,33 +367,21 @@ export async function requestOrdersFlow(
     });
   }
   if (tacticalBattle) {
-    const tacticalSection = buildTacticalOperationalMapSectionMarkdown({
-      state: planState,
+    const tacticalBrief = formatTacticalBriefing({
+      planState,
       latLngByH3,
       tacticalBattle,
     });
-    if (tacticalSection.trim().length === 0) {
-      logError('openRouter requestOrders: tactical map generation returned empty section', {
+    if (tacticalBrief.trim().length === 0 || !tacticalBrief.includes('Operational Map')) {
+      logError('openRouter requestOrders: tactical briefing generation failed', {
         battleId: tacticalBattle.battleId,
       });
       return failRequest('Operational map generation failed for tactical prompt.');
     }
-    const tacticalBlockParts = [`## Operational Map\n\n${tacticalSection.trim()}`];
-    const beatNotes = buildRecentTurnNotesSection({
-      scope: 'tactical',
+    briefingOverride = tacticalBrief;
+    logDebug('openRouter requestOrders: tactical briefing prepared', {
       battleId: tacticalBattle.battleId,
-      currentTurnNumber: tacticalBattle.tacticalTurnNumber,
-      heading: 'Recent Turn Notes',
-    });
-    if (beatNotes.trim().length > 0) tacticalBlockParts.push(beatNotes.trim());
-    const tacticalBlock = tacticalBlockParts.join('\n\n');
-    briefingOverride =
-      briefingOverride && briefingOverride.trim().length > 0
-        ? `${briefingOverride}\n\n${tacticalBlock}`
-        : tacticalBlock;
-    logDebug('openRouter requestOrders: tactical operational map briefing appended', {
-      battleId: tacticalBattle.battleId,
-      tacticalBriefChars: tacticalBlock.length,
+      tacticalBriefChars: tacticalBrief.length,
     });
   }
   if (!briefingOverride || !briefingOverride.includes('Operational Map')) {
@@ -404,7 +392,11 @@ export async function requestOrdersFlow(
     return failRequest('Operational map is required for AI prompting and was not generated.');
   }
   const systemPrompt = buildSystemPromptForTools(planState, coordMap, enabledToolNames, briefingOverride, coordinateContext);
-  const userMessage = getInitialUserMessage(flags, briefingOverride != null && briefingOverride.length > 0);
+  const userMessage = getInitialUserMessage(
+    flags,
+    briefingOverride != null && briefingOverride.length > 0,
+    tacticalBattle ? 'tactical' : 'strategic'
+  );
 
   const tools = buildToolDefinitions(enabledToolNames);
 
@@ -422,10 +414,8 @@ export async function requestOrdersFlow(
     !systemPrompt.includes('Operational Map')
   ) {
     try {
-      const precomputedLite = runPrecomputation(planState, { latLngByH3, resolveToH3 }, { skipHexAssessments: true });
       fullLogOperationalMapSupplement = buildStrategicOperationalMapSectionMarkdown({
         state: planState,
-        precomputed: precomputedLite,
         latLngByH3,
       });
       logDebug('openRouter requestOrders: full-prompt disk log will include operational map supplement', {
@@ -623,7 +613,10 @@ export async function requestOrdersFlow(
                         toolState,
                         latLngByH3,
                         resolveToH3,
-                        isPathfindingTool ? getOrCreateAiPlanningPathfindingSession() : undefined
+                        isPathfindingTool && !tacticalBattle
+                          ? getOrCreateAiPlanningPathfindingSession()
+                          : undefined,
+                        tacticalBattle
                       );
           const encoded =
             typeof result === 'object' && result !== null && !Array.isArray(result)
@@ -712,43 +705,38 @@ export async function requestOrdersFlow(
         return failRequest('Invalid response: could not parse orders');
       }
 
-      if (parsed.callbacks?.length) replaceSubscriptions('opponent', parsed.callbacks, state.turnNumber);
-      toolInvocationCounts['events'] = parsed.callbacks?.length ?? 0;
+      toolInvocationCounts['events'] = applyParsedOpponentCallbackSubscriptions({
+        callbacks: parsed.callbacks,
+        turnNumber: state.turnNumber,
+        battleSubUnitIds: tacticalBattle ? new Set(tacticalBattle.subUnits.map((u) => u.id)) : null,
+        battleId: tacticalBattle?.battleId,
+      });
 
-      const standingGenerated = flags.ordersEnabled
-        ? generateOrdersForStandingOrders('opponent', state, latLngByH3, resolveToH3, {
-            mutateProgress: tacticalBattle == null,
-            pathfindingSession: tacticalBattle == null ? getOrCreateAiPlanningPathfindingSession() : undefined,
-          })
-        : {
-            movementOrders: [] as { unitId: string; toH3Index: string }[],
-            rangedAttacks: [] as { unitId: string; targetH3Index: string }[],
-            airStrikes: [] as { unitId: string; targetH3Index: string; targetType: 'units' | 'urban' | 'airport' | 'seaport' }[],
-          };
-      let standingOrderMovement = standingGenerated.movementOrders;
-      let standingOrderRanged = standingGenerated.rangedAttacks;
-      const standingOrderAir = standingGenerated.airStrikes;
-      let standingOrderAirExpanded = standingOrderAir;
-      if (tacticalBattle) {
-        const expanded = expandOpponentStandingOrdersForTacticalBattle(
-          tacticalBattle,
-          standingOrderMovement,
-          standingOrderRanged,
-          standingOrderAir
-        );
-        standingOrderMovement = expanded.movementOrders;
-        standingOrderRanged = expanded.rangedAttacks;
-        standingOrderAirExpanded = expanded.airStrikes;
-        logDebug('openRouter requestOrdersFlow standing orders expanded for tactical opponent', {
+      // Tactical beats omit strategic standing-order expansion: assign_order/cancel_order are blocked for sub-unit ids,
+      // so auto-generated pursue/march from parents must not substitute for explicit_move this beat.
+      const standingGenerated =
+        flags.ordersEnabled && !tacticalBattle
+          ? generateOrdersForStandingOrders('opponent', state, latLngByH3, resolveToH3, {
+              mutateProgress: true,
+              pathfindingSession: getOrCreateAiPlanningPathfindingSession(),
+            })
+          : {
+              movementOrders: [] as { unitId: string; toH3Index: string }[],
+              rangedAttacks: [] as { unitId: string; targetH3Index: string }[],
+              airStrikes: [] as {
+                unitId: string;
+                targetH3Index: string;
+                targetType: 'units' | 'urban' | 'airport' | 'seaport';
+              }[],
+            };
+      if (tacticalBattle && flags.ordersEnabled) {
+        logDebug('openRouter requestOrdersFlow skipping standing-order generation for tactical opponent', {
           battleId: tacticalBattle.battleId,
-          parentMovementCount: standingGenerated.movementOrders.length,
-          parentRangedCount: standingGenerated.rangedAttacks.length,
-          parentAirCount: standingGenerated.airStrikes.length,
-          subMovementCount: expanded.movementOrders.length,
-          subRangedCount: expanded.rangedAttacks.length,
-          subAirCount: expanded.airStrikes.length,
         });
       }
+      const standingOrderMovement = standingGenerated.movementOrders;
+      const standingOrderRanged = standingGenerated.rangedAttacks;
+      const standingOrderAirExpanded = standingGenerated.airStrikes;
       const llmMovementOrders = dedupeByUnitKeepLast(parsed.movementOrders ?? []);
       const llmRangedOrders = dedupeByUnitKeepLast(parsed.rangedAttacks ?? []);
       const llmAirStrikes = dedupeByUnitKeepLast(parsed.airStrikes ?? []);
@@ -990,36 +978,13 @@ export async function requestOrdersFlow(
     if (onLog) onLog(String(err), true);
     return failRequest(String(err));
   } finally {
-    aiTurnAggregateMetrics.requestCount += 1;
-    aiTurnAggregateMetrics.created += aiPathfindingSessionMetrics.created;
-    aiTurnAggregateMetrics.reused += aiPathfindingSessionMetrics.reused;
-    aiTurnAggregateMetrics.planRouteToolCalls += aiPathfindingSessionMetrics.planRouteToolCalls;
-    aiTurnAggregateMetrics.checkDistanceToolCalls += aiPathfindingSessionMetrics.checkDistanceToolCalls;
-    aiTurnAggregateMetrics.totalToolCalls += aiPathfindingSessionMetrics.totalToolCalls;
-    logDebug('openRouter requestOrders: pathfinding session metrics', {
+    finalizeRequestOrdersPathfindingMetrics({
       turnNumber: state.turnNumber,
       modelId,
+      wallClockStart,
       requestMetrics: aiPathfindingSessionMetrics,
-      turnAggregateMetrics: {
-        turnNumber: aiTurnAggregateMetrics.turnNumber,
-        requestCount: aiTurnAggregateMetrics.requestCount,
-        created: aiTurnAggregateMetrics.created,
-        reused: aiTurnAggregateMetrics.reused,
-        planRouteToolCalls: aiTurnAggregateMetrics.planRouteToolCalls,
-        checkDistanceToolCalls: aiTurnAggregateMetrics.checkDistanceToolCalls,
-        totalToolCalls: aiTurnAggregateMetrics.totalToolCalls,
-      },
+      turnAggregateMetrics: aiTurnAggregateMetrics,
+      tacticalBattleId: tacticalBattle?.battleId ?? null,
     });
-    if (tacticalBattle) {
-      logDebug('openRouter requestOrders tactical latency diagnostics (phase 6)', {
-        battleId: tacticalBattle.battleId,
-        wallClockMs: Date.now() - wallClockStart,
-        turnNumber: state.turnNumber,
-        modelId,
-        planRouteToolCalls: aiPathfindingSessionMetrics.planRouteToolCalls,
-        checkDistanceToolCalls: aiPathfindingSessionMetrics.checkDistanceToolCalls,
-        totalToolCalls: aiPathfindingSessionMetrics.totalToolCalls,
-      });
-    }
   }
 }

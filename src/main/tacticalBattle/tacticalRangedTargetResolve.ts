@@ -13,8 +13,8 @@ import { logDebug, logTrace } from '../logger';
 /**
  * Picks the closest enemy-occupied res4 cell the attacker may legally ranged-fire this beat.
  *
- * Purpose: Standing-order expansion and draft sanitization must not map strategic res1 targets onto the footprint anchor when enemies occupy other res4 cells (e.g. naval vs land on a coastal hex).
- * When to use: `expandOpponentStandingOrdersForTacticalBattle` and `sanitizeOpponentTacticalDraftForReadyCommit` when a proposed ranged target is missing or invalid.
+ * Purpose: Draft sanitization must not map strategic res1 targets onto the footprint anchor when enemies occupy other res4 cells (e.g. naval vs land on a coastal hex).
+ * When to use: `sanitizeOpponentTacticalDraftForReadyCommit` when a proposed ranged target is missing or invalid.
  * Expected outcome: An enemy sub-unit `h3Index` in the battle footprint that passes tactical range and mountain LOS, or `undefined` when none exist.
  * Exceptions: None; invalid grid pairs are skipped.
  */
@@ -92,7 +92,7 @@ export function resolveTacticalRangedTargetForSubUnit(
  * Generates DEFEND standing-order engagement rows for all in-battle sub-units of a player whose parent carries a DEFEND order.
  *
  * Purpose: Each tactical beat, DEFEND sub-units auto-fire at the closest legal enemy res4 cell — mirroring the strategic per-turn auto-engage added by `appendDefendStandingOrderEngagement`, but operating on the res4 grid inside the active tactical footprint.
- * When to use: `commitHumanTacticalDraftOrders` (human player) and `expandOpponentStandingOrdersForTacticalBattle` (opponent player) before merging with explicitly submitted orders; explicit/LLM orders for the same sub-unit id override standing-generated ones.
+ * When to use: Tests and any remaining caller that needs DEFEND auto-engagement rows for a player; human Ready no longer merges standing DEFEND in tactical.
  * Expected outcome: At most one ranged or air-strike row per sub-unit; air sub-units go into `airStrikes` (AA-defense phase applies); non-air go into `rangedAttacks`. No-op when no legal enemy exists for a given sub-unit.
  * Exceptions: None; grid errors on individual targets are silently skipped.
  */

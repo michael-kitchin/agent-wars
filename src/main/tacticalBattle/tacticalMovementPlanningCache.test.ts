@@ -47,6 +47,7 @@ test('terrain override edits invalidate cached resolver when key count is unchan
     subUnits: [sub],
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
+    res4ChildH3Indexes: [...footprint],
     res4TerrainKindByH3: { [neighbor]: 'mountain' },
   };
   const p1 = planTacticalRes4MarchWithSessionCache(base, {
@@ -86,6 +87,7 @@ test('tactical turn advance resets session so planner sees updated terrain', () 
     subUnits: [sub],
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
+    res4ChildH3Indexes: [...footprint],
     res4TerrainKindByH3: { [neighbor]: 'mountain' },
   };
   const first = planTacticalRes4MarchWithSessionCache(b1, {
@@ -130,6 +132,7 @@ test('plan memo and results survive sub-unit placement change within unchanged t
     subUnits: [sub],
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
+    res4ChildH3Indexes: [...footprint],
     res4TerrainKindByH3: { [goal]: 'plains' },
   };
   const planArgs = {
@@ -177,6 +180,7 @@ test('naval plan is invariant to unrelated sub-unit placement when terrain is un
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'water',
     strategicHexTerrainKind: 'water',
+    res4ChildH3Indexes: [...footprint],
     res4TerrainKindByH3: {
       [water]: 'water',
       [coastal]: 'coastal',
@@ -196,4 +200,69 @@ test('naval plan is invariant to unrelated sub-unit placement when terrain is un
     planArgs
   );
   assert.deepStrictEqual(landMoved, withLandUnit);
+});
+
+/**
+ * Regression: AI avoid-enemies Tool1 must not poison session adjacency so human cells become unreachable.
+ *
+ * Purpose: Locks the fix where the first `planTacticalRes4MarchWithSessionCache` call after a terrain reset used a
+ * filtered res4Set (enemy hexes removed) to build the process-global adjacency map, leaving human-occupied cells with
+ * empty neighbor lists and instant `no_path` on every human march.
+ * When to use: After changes to session footprint caching or Tool1 avoid-enemies set construction.
+ * Expected outcome: After planning with a subset that omits the human cell, a full-footprint plan from that cell still reaches its neighbor.
+ * Exceptions: None.
+ */
+test('avoid-enemies subset plan does not leave human origin cells with empty adjacency', () => {
+  const center = tacticalRes4Cell(40, 50);
+  const ring = res4GridDiskNeighborsOrdered(center);
+  const humanCell = ring[0]!;
+  const aiFrom = ring[1]!;
+  const aiTo = ring[2] ?? ring[1]!;
+  const humanNeighbor = ring.find((h) => h !== humanCell && res4GridDiskNeighborsOrdered(humanCell).includes(h)) ?? ring[3] ?? aiFrom;
+  const footprintList = [center, ...ring];
+  const footprint = new Set(footprintList);
+  const kinds: Record<string, string> = {};
+  for (const h of footprintList) kinds[h] = 'plains';
+  const battle = {
+    battleId: 'b-avoid-poison',
+    tacticalTurnNumber: 3,
+    subUnits: [
+      infantryAt(humanCell),
+      {
+        id: 'ai-1',
+        parentUnitId: 'ai-parent',
+        player: 'opponent' as const,
+        unitType: 'infantry' as const,
+        h3Index: aiFrom,
+        displayName: 'AI',
+      },
+    ],
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4ChildH3Indexes: footprintList,
+    res4TerrainKindByH3: kinds,
+  };
+  const avoidSet = new Set(footprintList.filter((h) => h !== humanCell));
+  avoidSet.add(aiFrom);
+  avoidSet.add(aiTo);
+  const aiPlan = planTacticalRes4MarchWithSessionCache(battle, {
+    fromH3: aiFrom,
+    toH3: aiTo,
+    res4Set: avoidSet,
+    unitTypeForMovement: 'infantry',
+    movementPointBudget: 3,
+  });
+  assert.equal(aiPlan.reachable, true, 'AI subset plan should succeed');
+  const humanPlan = planTacticalRes4MarchWithSessionCache(battle, {
+    fromH3: humanCell,
+    toH3: humanNeighbor,
+    res4Set: footprint,
+    unitTypeForMovement: 'infantry',
+    movementPointBudget: 3,
+  });
+  assert.equal(humanPlan.reachable, true, 'human march must remain pathable after avoid-enemies session cache seed');
+  assert.ok(
+    (humanPlan.pathToDestination?.length ?? 0) >= 2,
+    'human plan should include a real path'
+  );
 });

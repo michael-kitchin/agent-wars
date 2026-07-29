@@ -1,0 +1,8 @@
+---
+description: "09 — Source file size limits: desirable 600 lines, hard limit 1000"
+alwaysApply: true
+---
+
+# 09 — Source File Size Limits
+
+The desirable size limit for all source files is 600 lines, and a hard limit is 1000. When you reach these limits, move and/or decompose functionality to reasonably partitioned and organized sub-modules.

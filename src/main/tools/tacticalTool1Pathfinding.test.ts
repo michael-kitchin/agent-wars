@@ -1,0 +1,285 @@
+/**
+ * Tests for tactical Tool1 plan_route / check_distance (res4 march planner, not strategic land-mass).
+ */
+
+import * as assert from 'assert';
+import { cellToLatLng, cellToParent, gridDisk, gridDistance } from 'h3-js';
+import type { GameStateSnapshot } from '../gameDb';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { buildTacticalAiPlanState } from '../tacticalBattle/buildTacticalAiPlanState';
+import { tacticalRes1Cell, tacticalRes4UnderRes1Corner } from '../tacticalBattle/testSupport/tacticalRes4HexFixtures';
+import { executeTool1 } from './tool1Pathfinding';
+
+/**
+ * Builds a two-cell plains tactical footprint with opponent armor adjacent to human infantry.
+ *
+ * Purpose: Shared fixture for tactical Tool1 success paths without land-mass coupling.
+ * When to use: plan_route / check_distance happy-path tests in this file.
+ * Expected outcome: Adjacent res4 cells under one res1 parent with planState + latLng map.
+ * Exceptions: Throws when no adjacent neighbor exists under the parent.
+ */
+function buildAdjacentArmorFixture(): {
+  battle: TacticalBattleSnapshot;
+  planState: GameStateSnapshot;
+  latLngByH3: Map<string, [number, number]>;
+  resolveToH3: (lat: number, lng: number) => string | undefined;
+  oppId: string;
+  res4Opp: string;
+  res4Human: string;
+} {
+  const res1 = tacticalRes1Cell(12, 34);
+  const res4Opp = tacticalRes4UnderRes1Corner(12, 34);
+  const sameParent = [...gridDisk(res4Opp, 4)].filter((h) => cellToParent(h, 1) === res1);
+  const res4Human = sameParent.find((h) => h !== res4Opp && gridDistance(res4Opp, h) === 1);
+  if (!res4Human) throw new Error('expected adjacent res4 neighbor');
+  const battle: TacticalBattleSnapshot = {
+    battleId: 't-tool1-adj',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: [res4Opp, res4Human],
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: { [res4Opp]: 'plains', [res4Human]: 'plains' },
+    subUnits: [
+      {
+        id: 'opp-arm-1',
+        parentUnitId: 'parent-arm',
+        player: 'opponent',
+        unitType: 'armor',
+        h3Index: res4Opp,
+        displayName: 'Armor',
+      },
+      {
+        id: 'hum-inf-1',
+        parentUnitId: 'parent-inf',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: res4Human,
+        displayName: 'Infantry',
+      },
+    ],
+  };
+  const strategic: GameStateSnapshot = {
+    turnNumber: 1,
+    phase: 'planning',
+    hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+    units: [],
+    pendingOrders: [],
+  };
+  const planState = buildTacticalAiPlanState(strategic, battle);
+  const latLngByH3 = new Map<string, [number, number]>();
+  for (const h of planState.hexes) {
+    latLngByH3.set(h.h3Index, cellToLatLng(h.h3Index) as [number, number]);
+  }
+  const resolveToH3 = (lat: number, lng: number): string | undefined => {
+    for (const [h3, ll] of latLngByH3) {
+      if (Math.abs(ll[0] - lat) < 1e-9 && Math.abs(ll[1] - lng) < 1e-9) return h3;
+    }
+    return undefined;
+  };
+  return { battle, planState, latLngByH3, resolveToH3, oppId: 'opp-arm-1', res4Opp, res4Human };
+}
+
+/**
+ * Ensures tactical plan_route returns first-leg orderToH3 toward an adjacent enemy without land-mass failure.
+ *
+ * Purpose: Regression for the UI/no-movement bug where strategic land-mass rejected every res4 destination.
+ * When to use: After edits to `executeTacticalPlanRoute` / `executeTool1` tactical branch.
+ * Expected outcome: status ok, orderToH3 is the adjacent human hex (reachable this turn).
+ * Exceptions: Assertion failure on contract drift.
+ */
+function testTacticalPlanRouteAdjacentEnemyOk(): void {
+  const { battle, planState, latLngByH3, resolveToH3, oppId, res4Human } = buildAdjacentArmorFixture();
+  const destLl = latLngByH3.get(res4Human)!;
+  const result = executeTool1(
+    'plan_route',
+    { unitId: oppId, destination: destLl },
+    planState,
+    latLngByH3,
+    resolveToH3,
+    undefined,
+    battle
+  ) as { status: string; orderToH3?: string; reachable?: boolean; error?: string };
+  assert.strictEqual(result.status, 'ok', result.error ?? 'expected ok');
+  assert.strictEqual(result.orderToH3, res4Human);
+  assert.strictEqual(result.reachable, true);
+}
+
+/**
+ * Ensures strategic executeTool1 without tacticalBattle still fails land-mass on res4 planState (no accidental tactical default).
+ *
+ * Purpose: Guards against routing all plan_route calls through the tactical branch.
+ * When to use: After executeTool1 signature changes.
+ * Expected outcome: Without tacticalBattle, plan_route to the adjacent res4 human hex errors (land-mass).
+ * Exceptions: None.
+ */
+function testStrategicPlanRouteOnRes4PlanStateStillUsesLandMass(): void {
+  const { planState, latLngByH3, resolveToH3, oppId, res4Human } = buildAdjacentArmorFixture();
+  const destLl = latLngByH3.get(res4Human)!;
+  const result = executeTool1(
+    'plan_route',
+    { unitId: oppId, destination: destLl },
+    planState,
+    latLngByH3,
+    resolveToH3
+  ) as { status: string; error?: string };
+  assert.strictEqual(result.status, 'error');
+  assert.ok(result.error && /path|land mass|impassable/i.test(result.error), result.error);
+}
+
+/**
+ * Ensures tactical check_distance reports a reachable path between adjacent footprint cells.
+ *
+ * Purpose: Same land-mass bypass for distance estimates the model uses before plan_route.
+ * When to use: After edits to `executeTacticalCheckDistance`.
+ * Expected outcome: reachable true with positive hexDistance.
+ * Exceptions: None.
+ */
+function testTacticalCheckDistanceAdjacentOk(): void {
+  const { battle, planState, latLngByH3, resolveToH3, res4Opp, res4Human } = buildAdjacentArmorFixture();
+  const fromLl = latLngByH3.get(res4Opp)!;
+  const toLl = latLngByH3.get(res4Human)!;
+  const result = executeTool1(
+    'check_distance',
+    { from: fromLl, to: toLl, unitType: 'armor' },
+    planState,
+    latLngByH3,
+    resolveToH3,
+    undefined,
+    battle
+  ) as { status: string; reachable?: boolean; hexDistance?: number; error?: string };
+  assert.strictEqual(result.status, 'ok', result.error ?? 'expected ok');
+  assert.strictEqual(result.reachable, true);
+  assert.ok((result.hexDistance ?? 0) >= 1);
+}
+
+/**
+ * Ensures tactical plan_route rejects air units with an air-strike guidance error.
+ *
+ * Purpose: Contract parity with strategic Tool1 air handling.
+ * When to use: After edits to `executeTacticalPlanRoute` air branch.
+ * Expected outcome: status error mentioning air strikes.
+ * Exceptions: None.
+ */
+function testTacticalPlanRouteRejectsAir(): void {
+  const { battle, planState, latLngByH3, resolveToH3, res4Human } = buildAdjacentArmorFixture();
+  const airBattle: TacticalBattleSnapshot = {
+    ...battle,
+    subUnits: [
+      ...battle.subUnits,
+      {
+        id: 'opp-air-1',
+        parentUnitId: 'parent-air',
+        player: 'opponent',
+        unitType: 'air',
+        h3Index: battle.subUnits[0]!.h3Index,
+        displayName: 'Air',
+      },
+    ],
+  };
+  const airPlan = {
+    ...planState,
+    units: [
+      ...planState.units,
+      { id: 'opp-air-1', player: 'opponent' as const, unitType: 'air' as const, h3Index: battle.subUnits[0]!.h3Index },
+    ],
+  };
+  const destLl = latLngByH3.get(res4Human)!;
+  const result = executeTool1(
+    'plan_route',
+    { unitId: 'opp-air-1', destination: destLl },
+    airPlan,
+    latLngByH3,
+    resolveToH3,
+    undefined,
+    airBattle
+  ) as { status: string; error?: string };
+  assert.strictEqual(result.status, 'error');
+  assert.ok(result.error && /air/i.test(result.error), result.error);
+}
+
+/**
+ * Ensures embarked cargo cannot plan_route until disembarked.
+ *
+ * Purpose: Align Tool1 with Best Options (embarked movers offer no march rows).
+ * When to use: After edits to embarked guards in `executeTacticalPlanRoute`.
+ * Expected outcome: status error mentioning embarked / disembark.
+ * Exceptions: None.
+ */
+function testTacticalPlanRouteRejectsEmbarked(): void {
+  const { battle, planState, latLngByH3, resolveToH3, res4Opp, res4Human } = buildAdjacentArmorFixture();
+  const navalId = 'opp-nav-1';
+  const cargoId = 'opp-cargo-1';
+  const embarkedBattle: TacticalBattleSnapshot = {
+    ...battle,
+    subUnits: [
+      {
+        id: navalId,
+        parentUnitId: 'parent-nav',
+        player: 'opponent',
+        unitType: 'naval',
+        h3Index: res4Opp,
+        displayName: 'Naval',
+      },
+      {
+        id: cargoId,
+        parentUnitId: 'parent-inf',
+        player: 'opponent',
+        unitType: 'infantry',
+        h3Index: res4Opp,
+        embarkedOnSubUnitId: navalId,
+        displayName: 'Cargo',
+      },
+      battle.subUnits.find((s) => s.player === 'human')!,
+    ],
+  };
+  const embarkedPlan = {
+    ...planState,
+    units: [
+      { id: navalId, player: 'opponent' as const, unitType: 'naval' as const, h3Index: res4Opp },
+      {
+        id: cargoId,
+        player: 'opponent' as const,
+        unitType: 'infantry' as const,
+        h3Index: res4Opp,
+        embarkedOnSubUnitId: navalId,
+      },
+      ...planState.units.filter((u) => u.player === 'human'),
+    ],
+  };
+  const destLl = latLngByH3.get(res4Human)!;
+  const result = executeTool1(
+    'plan_route',
+    { unitId: cargoId, destination: destLl },
+    embarkedPlan,
+    latLngByH3,
+    resolveToH3,
+    undefined,
+    embarkedBattle
+  ) as { status: string; error?: string };
+  assert.strictEqual(result.status, 'error');
+  assert.ok(result.error && /embark/i.test(result.error), result.error);
+}
+
+const tests = [
+  { name: 'tactical plan_route adjacent enemy ok', fn: testTacticalPlanRouteAdjacentEnemyOk },
+  { name: 'strategic plan_route on res4 planState still land-mass', fn: testStrategicPlanRouteOnRes4PlanStateStillUsesLandMass },
+  { name: 'tactical check_distance adjacent ok', fn: testTacticalCheckDistanceAdjacentOk },
+  { name: 'tactical plan_route rejects air', fn: testTacticalPlanRouteRejectsAir },
+  { name: 'tactical plan_route rejects embarked', fn: testTacticalPlanRouteRejectsEmbarked },
+];
+
+function run(): void {
+  for (const t of tests) {
+    try {
+      t.fn();
+      console.log(`OK ${t.name}`);
+    } catch (err) {
+      console.error(`FAIL ${t.name}`, err);
+      process.exit(1);
+    }
+  }
+}
+
+run();

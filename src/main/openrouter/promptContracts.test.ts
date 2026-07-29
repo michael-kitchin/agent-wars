@@ -26,6 +26,24 @@ function testExampleBlockParsesWithParser(): void {
 }
 
 /**
+ * Ensures the tactical illustrative JSON example leads with explicit_move and omits assign_order.
+ *
+ * Purpose: Keeps the tactical final-JSON example aligned with blocked standing-order actions.
+ * When to use: After edits to `getFinalJsonOrdersExampleBlock` tactical branch.
+ * Expected outcome: Example contains explicit_move and does not contain assign_order.
+ * Exceptions: Assertion failure on contract drift.
+ */
+function testTacticalExampleBlockLeadsWithExplicitMove(): void {
+  const block = getFinalJsonOrdersExampleBlock({
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+    coordinateMode: 'tactical',
+  });
+  assert.ok(block.includes('"explicit_move"'));
+  assert.ok(!block.includes('"assign_order"'));
+}
+
+/**
  * Defines the `testExampleBlockIncludesOptionalTails` function shape (function testExampleBlockIncludesOptionalTails(): void).
 
  * Purpose: Supports maintainability by documenting why `testExampleBlockIncludesOptionalTails` exists.
@@ -72,6 +90,8 @@ function testTacticalCallbacksClauseMentionsBeat(): void {
   });
   assert.ok(tactical.includes('tactical beat'));
   assert.ok(tactical.includes('event-driven'));
+  assert.ok(tactical.includes('Do not emit assign_order'));
+  assert.ok(!tactical.includes('Actions: assign_order'), 'tactical contract must not list assign_order as a live action');
   const strategic = buildFinalJsonContractInstruction({
     includeMemoryUpdates: false,
     includeProductionOrders: false,
@@ -81,6 +101,7 @@ function testTacticalCallbacksClauseMentionsBeat(): void {
     coordinateMode: 'strategic',
   });
   assert.ok(!strategic.includes('tactical beat'));
+  assert.ok(strategic.includes('Actions: assign_order'));
 }
 
 function testExampleBlockIncludesOptionalTails(): void {
@@ -101,6 +122,7 @@ function testExampleBlockIncludesOptionalTails(): void {
 const tests = [
   { name: 'getFinalJsonOrdersExampleBlock contains parseable JSON', fn: testExampleBlockParsesWithParser },
   { name: 'getFinalJsonOrdersExampleBlock optional tails', fn: testExampleBlockIncludesOptionalTails },
+  { name: 'getFinalJsonOrdersExampleBlock tactical leads with explicit_move', fn: testTacticalExampleBlockLeadsWithExplicitMove },
   { name: 'buildFinalJsonContractInstruction tactical callbacks clause', fn: testTacticalCallbacksClauseMentionsBeat },
   {
     name: 'getMovementOrderInstruction tactical planning adds march reachability clause',

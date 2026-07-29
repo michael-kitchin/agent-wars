@@ -569,6 +569,18 @@ async function run(): Promise<void> {
       !tacticalSystemPrompt.includes('(4) Protect your home region'),
       'tactical prompt omits strategic five-goal list'
     );
+    assert.ok(
+      !tacticalSystemPrompt.includes('# Scenario Objective (Required)'),
+      'tactical prompt omits Scenario Objective section'
+    );
+    assert.ok(
+      tacticalSystemPrompt.includes('tactical sub-unit ids'),
+      'tactical prompt JSON contract mentions sub-unit callback ids'
+    );
+    assert.ok(
+      !tacticalSystemPrompt.includes('prioritize scouting this turn'),
+      'tactical prompt omits strategic scouting directive'
+    );
 
     console.log(`openRouter.matrix.test.ts passed (${combosChecked} combinations)`);
   } finally {

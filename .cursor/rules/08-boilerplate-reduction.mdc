@@ -1,0 +1,8 @@
+---
+description: "08 — Use boilerplate reduction and related language features where reasonable"
+alwaysApply: true
+---
+
+# 08 — Boilerplate Reduction
+
+Use boilerplate reduction techniques and related language features where reasonable (example: Lombok annotations and record classes in Java).

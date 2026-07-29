@@ -1,0 +1,256 @@
+/**
+ * Stashes opponent AI callback subscriptions around a tactical battle session (memory + game_config).
+ *
+ * Purpose: Preserves pre-battle strategic subscriptions across tactical replace-all and process restarts,
+ * drops ephemeral sub-unit callbacks on battle end, and filters invalid unit-scoped ids mid-battle.
+ * When to use: Stash after tactical start; hydrate on persisted session restore; filter before tactical replaceSubscriptions; restore on every end path.
+ * Expected outcome: Pre-battle rows return after end when a stash was captured; missing stash (upgrade) clears only parent:slot unitId/side params.
+ * Exceptions: Logs at error on restore failures without throwing across IPC.
+ */
+
+import {
+  clearSubscriptions,
+  getSubscriptions,
+  replaceSubscriptions,
+  type CallbackSubscription,
+} from '../callbackSubscriptions';
+import { logDebug, logError, logTrace } from '../logger';
+import {
+  clearTacticalCallbackStashFromGameConfig,
+  readTacticalCallbackStashFromGameConfig,
+  writeTacticalCallbackStashToGameConfig,
+} from '../tacticalBattle/tacticalCallbackStashPersistence';
+
+/**
+ * Events that require `params.unitId` to name a rostered tactical sub-unit during battle.
+ *
+ * Purpose: Shared vocabulary for mid-battle drop rules without duplicating event lists at call sites.
+ * When to use: `filterCallbackSubscriptionsForTacticalBattleRoster` only.
+ * Expected outcome: Fixed set aligned with callback evaluation unit-id matching.
+ * Exceptions: None.
+ */
+const UNIT_ID_SCOPED_CALLBACK_EVENTS = new Set(['unit_engaged', 'unit_arrived', 'threat_escalation']);
+
+/**
+ * In-memory copy of pre-battle opponent subscriptions for the active tactical session.
+ *
+ * Purpose: Fast restore without re-reading SQLite when the process never restarted.
+ * When to use: Set by stash/hydrate; cleared after restore completes. `null` means no stash was captured in this process.
+ * Expected outcome: Deep-copied rows, including an empty array when the opponent had no subscriptions at battle start.
+ * Exceptions: None.
+ */
+let stashedOpponentSubscriptions: CallbackSubscription[] | null = null;
+
+/**
+ * Returns whether `id` matches the tactical sub-unit id shape `${parentUnitId}:${twoDigitSlot}`.
+ *
+ * Purpose: Upgrade-path cleanup and heuristic detection of ephemeral battle callbacks without a roster.
+ * When to use: Missing-stash end path and tests asserting selective clear.
+ * Expected outcome: True only when a trailing `:` is followed by exactly two digits.
+ * Exceptions: None.
+ */
+export function looksLikeTacticalSubUnitId(id: string): boolean {
+  logTrace('tacticalCallbackSubscriptionLifecycle looksLikeTacticalSubUnitId', { id });
+  return /^.+:\d{2}$/.test(id);
+}
+
+/**
+ * Deep-copies subscription rows for stash persistence.
+ *
+ * Purpose: Prevents later mutate-in-place of live params from corrupting the pre-battle snapshot.
+ * When to use: Before writing memory or `game_config`.
+ * Expected outcome: New array and new `params` objects; `subscribedTurn` preserved when present.
+ * Exceptions: None.
+ */
+function cloneSubscriptions(rows: readonly CallbackSubscription[]): CallbackSubscription[] {
+  return rows.map((s) => ({
+    event: s.event,
+    params: { ...(s.params ?? {}) },
+    subscribedTurn: s.subscribedTurn,
+  }));
+}
+
+/**
+ * Snapshots opponent callback subscriptions at tactical battle start into memory and `game_config`.
+ *
+ * Purpose: Preserves strategic (or prior) subscriptions so sub-unit tactical callbacks can be discarded on battle end.
+ * When to use: Immediately after a successful `startTacticalBattleForEnclosingRes1Hex` installs the session.
+ * Expected outcome: In-memory stash overwritten with a deep copy; durable key written (including empty list).
+ * Exceptions: None.
+ */
+export function stashOpponentCallbackSubscriptionsForTacticalBattle(): void {
+  const current = getSubscriptions('opponent');
+  stashedOpponentSubscriptions = cloneSubscriptions(current);
+  writeTacticalCallbackStashToGameConfig(stashedOpponentSubscriptions);
+  logDebug('tacticalCallbackSubscriptionLifecycle stashOpponentCallbackSubscriptionsForTacticalBattle', {
+    count: stashedOpponentSubscriptions.length,
+  });
+}
+
+/**
+ * Reloads a persisted callback stash into process memory after tactical session restore.
+ *
+ * Purpose: Rebuilds the in-memory stash after main-process restart so end can full-restore strategic callbacks.
+ * When to use: `restorePersistedTacticalBattleSession` after a consistent snapshot is installed.
+ * Expected outcome: Memory matches `game_config` when present; memory left null when the key is absent (upgrade path).
+ * Exceptions: None.
+ */
+export function hydrateOpponentCallbackStashFromGameConfig(): void {
+  const fromDisk = readTacticalCallbackStashFromGameConfig();
+  stashedOpponentSubscriptions = fromDisk === null ? null : cloneSubscriptions(fromDisk);
+  logDebug('tacticalCallbackSubscriptionLifecycle hydrateOpponentCallbackStashFromGameConfig', {
+    hydrated: fromDisk !== null,
+    count: fromDisk?.length ?? 0,
+  });
+}
+
+/**
+ * Drops unit-scoped callback entries whose unit id is not in the active battle roster; keeps valid siblings.
+ *
+ * Purpose: Prevents strategic parent ids (and invented ids) from being stored during tactical consultations.
+ * When to use: Immediately before `replaceSubscriptions` when `tacticalAiBattle` is set.
+ * Expected outcome: Kept list omits bad unit-scoped rows; non-unit events and `unit_destroyed` with side own/enemy pass through.
+ * Exceptions: None.
+ */
+export function filterCallbackSubscriptionsForTacticalBattleRoster(
+  subscriptions: readonly CallbackSubscription[],
+  battleSubUnitIds: ReadonlySet<string>
+): { kept: CallbackSubscription[]; droppedCount: number } {
+  logDebug('tacticalCallbackSubscriptionLifecycle filterCallbackSubscriptionsForTacticalBattleRoster', {
+    inputCount: subscriptions.length,
+    rosterSize: battleSubUnitIds.size,
+  });
+  const kept: CallbackSubscription[] = [];
+  let droppedCount = 0;
+  for (const sub of subscriptions) {
+    const unitId = typeof sub.params?.unitId === 'string' ? sub.params.unitId.trim() : '';
+    const side = typeof sub.params?.side === 'string' ? sub.params.side.trim() : '';
+
+    if (UNIT_ID_SCOPED_CALLBACK_EVENTS.has(sub.event)) {
+      if (!unitId || !battleSubUnitIds.has(unitId)) {
+        droppedCount += 1;
+        continue;
+      }
+      kept.push(sub);
+      continue;
+    }
+
+    if (sub.event === 'unit_destroyed') {
+      if (unitId) {
+        if (!battleSubUnitIds.has(unitId)) {
+          droppedCount += 1;
+          continue;
+        }
+        kept.push(sub);
+        continue;
+      }
+      if (side && side !== 'own' && side !== 'enemy') {
+        if (!battleSubUnitIds.has(side)) {
+          droppedCount += 1;
+          continue;
+        }
+      }
+      kept.push(sub);
+      continue;
+    }
+
+    kept.push(sub);
+  }
+  logDebug('tacticalCallbackSubscriptionLifecycle filterCallbackSubscriptionsForTacticalBattleRoster done', {
+    keptCount: kept.length,
+    droppedCount,
+  });
+  return { kept, droppedCount };
+}
+
+/**
+ * Removes live opponent subscriptions whose `unitId` or `side` looks like a tactical sub-unit id.
+ *
+ * Purpose: Upgrade / missing-stash end path that must not wipe strategic callbacks.
+ * When to use: Battle end when no in-memory or persisted stash is available.
+ * Expected outcome: Strategic and non-sub-unit rows remain; `parent:slot` unit-scoped rows are removed.
+ * Exceptions: None.
+ */
+export function clearTacticalLookingOpponentCallbackSubscriptions(): void {
+  const current = getSubscriptions('opponent');
+  const kept = current.filter((s) => {
+    const unitId = typeof s.params?.unitId === 'string' ? s.params.unitId : '';
+    const side = typeof s.params?.side === 'string' ? s.params.side : '';
+    if (looksLikeTacticalSubUnitId(unitId)) return false;
+    if (looksLikeTacticalSubUnitId(side)) return false;
+    return true;
+  });
+  if (kept.length === current.length) {
+    logDebug('tacticalCallbackSubscriptionLifecycle clearTacticalLookingOpponentCallbackSubscriptions: none removed', {
+      count: current.length,
+    });
+    return;
+  }
+  const turn =
+    kept.find((s) => typeof s.subscribedTurn === 'number')?.subscribedTurn ??
+    current.find((s) => typeof s.subscribedTurn === 'number')?.subscribedTurn ??
+    0;
+  if (kept.length === 0) {
+    clearSubscriptions('opponent');
+  } else {
+    replaceSubscriptions('opponent', kept, turn);
+  }
+  logDebug('tacticalCallbackSubscriptionLifecycle clearTacticalLookingOpponentCallbackSubscriptions', {
+    before: current.length,
+    after: kept.length,
+  });
+}
+
+/**
+ * Restores pre-battle opponent subscriptions after tactical exit, or applies missing-stash path C.
+ *
+ * Purpose: Removes ephemeral sub-unit callbacks after tactical exit without losing pre-battle strategic subscriptions when a stash exists.
+ * When to use: `endTacticalBattleSessionCore` on every teardown path.
+ * Expected outcome: Full clear+restore when stash (memory or disk) exists; otherwise only `parent:slot` unitId/side rows are removed. Safe on double-end.
+ * Exceptions: Logs and continues if restore fails after clear.
+ */
+export function restoreOpponentCallbackSubscriptionsAfterTacticalBattle(): void {
+  let snapshot = stashedOpponentSubscriptions;
+  if (snapshot === null) {
+    snapshot = readTacticalCallbackStashFromGameConfig();
+  }
+  stashedOpponentSubscriptions = null;
+  try {
+    if (snapshot !== null) {
+      clearSubscriptions('opponent');
+      if (snapshot.length > 0) {
+        const turn =
+          snapshot.find((s) => typeof s.subscribedTurn === 'number')?.subscribedTurn ?? 0;
+        replaceSubscriptions('opponent', snapshot, turn);
+      }
+      clearTacticalCallbackStashFromGameConfig();
+      logDebug('tacticalCallbackSubscriptionLifecycle restoreOpponentCallbackSubscriptionsAfterTacticalBattle', {
+        mode: 'full_restore',
+        restoredCount: snapshot.length,
+      });
+      return;
+    }
+    clearTacticalLookingOpponentCallbackSubscriptions();
+    clearTacticalCallbackStashFromGameConfig();
+    logDebug('tacticalCallbackSubscriptionLifecycle restoreOpponentCallbackSubscriptionsAfterTacticalBattle', {
+      mode: 'missing_stash_selective_clear',
+    });
+  } catch (err) {
+    logError(
+      'tacticalCallbackSubscriptionLifecycle restoreOpponentCallbackSubscriptionsAfterTacticalBattle failed',
+      err
+    );
+  }
+}
+
+/**
+ * Test helper: clears the in-memory stash without touching the database.
+ *
+ * Purpose: Isolates lifecycle unit tests.
+ * When to use: After tests that call stash without a matching restore, or before asserting missing-stash behavior.
+ * Expected outcome: Next stash starts clean in memory; `game_config` unchanged.
+ * Exceptions: None.
+ */
+export function resetTacticalCallbackSubscriptionStashForTests(): void {
+  stashedOpponentSubscriptions = null;
+}

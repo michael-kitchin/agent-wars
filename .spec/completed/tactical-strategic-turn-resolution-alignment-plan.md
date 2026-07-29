@@ -312,7 +312,9 @@ node dist/main/tacticalBattle/<ordering-tests>.js
 
 ### Phase 5 — Movement / standing-order parity (optional)
 
-**Objective:** Align human tactical march sourcing with strategic standing-order merge (parent → sub-units).
+> **Superseded:** Tactical battles no longer merge strategic standing orders into AI or human Ready marches/fire. Explicit drafts only; see `.spec/completed/tactical-prompt-section-parity-execution-plan.md`.
+
+**Objective (historical):** Align human tactical march sourcing with strategic standing-order merge (parent → sub-units).
 
 **Deliverables:**
 

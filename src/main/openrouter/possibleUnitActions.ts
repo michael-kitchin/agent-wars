@@ -2,14 +2,15 @@
  * Builds the "Possible unit actions" markdown block for AI Commander's Briefings.
  * Derives legal one-step moves/melee reach, air ferry destinations, ranged attacks, and air strikes from order validation rules.
  *
- * When `tacticalBattle` is passed, **ranged** rows use `collectTacticalLegalRangedTargetRes4Hexes` (terrain caps + mountain LOS,
- * enemy **or** strikeable infrastructure targets, DB rows for the enclosing res1) on the res4 footprint; movement and strikes
- * still use the same strategic-style helpers on the projected `state`.
+ * When `tacticalBattle` is passed, **ranged** rows use `collectTacticalLegalRangedTargetRes4Hexes` and **ground move** rows use
+ * `collectTacticalLegalMoveDestinationRes4Hexes` (terrain-weighted MP this beat); air ferry/strike lists still use strategic-style
+ * helpers on the projected `state`.
  */
 
 import { gridDistance, gridDisk } from 'h3-js';
 import { type GameStateSnapshot, listRes4FeatureOverridesForGame } from '../gameDb';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { collectTacticalLegalMoveDestinationRes4Hexes } from '../../shared/collectTacticalLegalMoveDestinationRes4Hexes';
 import { getRange } from '../combatConstants';
 import { getValidDestinations } from '../oneStepMoveDestinations';
 import { collectTacticalLegalRangedTargetRes4Hexes } from '../../shared/tacticalTerrainCombatModifiers';
@@ -438,7 +439,7 @@ function collectLegalFerryDestinationHexes(
  * Defines the `filterGroundMoveHexesForThisTurnOptionsTable` function shape (function filterGroundMoveHexesForThisTurnOptionsTable(indexed: IndexedState, hexes: string[]): string[]).
 
  * Purpose: Restricts **Best Options This Turn** move/melee rows to enemy-occupied hexes or uncontrolled res1 cells that still show urban, airport, or seaport infrastructure.
- * When to use: Only from `collectAggregatedPossibleActionRows` when `forThisTurnOptionsTable` is true for non-air units (air ferry lists skip this filter).
+ * When to use: Only from `collectAggregatedPossibleActionRows` when `forThisTurnOptionsTable` is true for non-air units in **strategic** mode (air ferry lists skip this filter).
  * Expected outcome: Filtered subset of `hexes` in caller iteration order.
  * Exceptions: None.
  */
@@ -449,6 +450,80 @@ function filterGroundMoveHexesForThisTurnOptionsTable(indexed: IndexedState, hex
     if (controller !== null) return false;
     const inf = getInfra(indexed, h3);
     return inf.urban > 0 || inf.airport > 0 || inf.seaport > 0;
+  });
+}
+
+/**
+ * Restricts tactical Best Options move/melee rows to human-occupied res4 cells or urban/airport/seaport infrastructure.
+ *
+ * Purpose: Mirrors the strategic ground-move Best Options intent without using res1 control maps that do not apply inside a tactical footprint.
+ * When to use: Only from `collectAggregatedPossibleActionRows` when `forThisTurnOptionsTable` and `tacticalBattle` are set for non-air units.
+ * Expected outcome: Subset of `hexes` in caller iteration order.
+ * Exceptions: None.
+ */
+function filterTacticalGroundMoveHexesForThisTurnOptionsTable(
+  battle: TacticalBattleSnapshot,
+  hexes: string[],
+  humanOccupiedH3: ReadonlySet<string>,
+  tacticalRangedRows: ReadonlyArray<{
+    h3Index: string;
+    isUrban: boolean;
+    isAirport: boolean;
+    isSeaport: boolean;
+    isRubble: boolean;
+  }>
+): string[] {
+  const rowByH3 = new Map(tacticalRangedRows.map((r) => [r.h3Index, r] as const));
+  return hexes.filter((h3) => {
+    if (humanOccupiedH3.has(h3)) return true;
+    if (battle.res4IsUrbanByH3?.[h3]) return true;
+    if (battle.res4IsSeaportByH3?.[h3]) return true;
+    const row = rowByH3.get(h3);
+    if (row && !row.isRubble && (row.isUrban || row.isAirport || row.isSeaport)) return true;
+    return false;
+  });
+}
+
+/**
+ * Keeps this-beat-reachable tactical move hexes that strictly reduce H3 distance to the nearest human-occupied cell.
+ *
+ * Purpose: Best Options fallback when the interest filter (enemy/infra) yields no rows but units can still approach.
+ * When to use: Only after `filterTacticalGroundMoveHexesForThisTurnOptionsTable` returns empty for a unit.
+ * Expected outcome: Subset of `hexes` that approach at least one human cell; empty when no human is observed or no hex improves distance.
+ * Exceptions: Hexes with invalid `gridDistance` are skipped.
+ */
+function filterTacticalApproachMoveHexesForThisTurnOptionsTable(
+  unitH3: string,
+  hexes: string[],
+  humanOccupiedH3: ReadonlySet<string>
+): string[] {
+  if (humanOccupiedH3.size === 0 || hexes.length === 0) return [];
+  let nearestDist = Infinity;
+  const nearestHumans: string[] = [];
+  for (const humanH3 of humanOccupiedH3) {
+    try {
+      const d = gridDistance(unitH3, humanH3);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearestHumans.length = 0;
+        nearestHumans.push(humanH3);
+      } else if (d === nearestDist) {
+        nearestHumans.push(humanH3);
+      }
+    } catch {
+      /* skip bad pair */
+    }
+  }
+  if (!Number.isFinite(nearestDist) || nearestHumans.length === 0) return [];
+  return hexes.filter((h3) => {
+    try {
+      for (const humanH3 of nearestHumans) {
+        if (gridDistance(h3, humanH3) < nearestDist) return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
   });
 }
 
@@ -526,7 +601,7 @@ export function collectAggregatedPossibleActionRows(args: {
 
    * Contract: When true, narrows move/ranged candidate hexes for the operational-map Best Options This Turn table; when false or omitted, preserves legacy full-table row generation.
    * When to use: Set only from `buildStrategicOperationalMapSectionMarkdown` / `buildTacticalOperationalMapSectionMarkdown`.
-   * Expected outcome: Ground move/melee filter for non-air units; strategic ranged lists only enemy-occupied hexes in range (same as full markdown); tactical ranged excludes transport-only cells; air ferry lists unchanged.
+   * Expected outcome: Ground move/melee filter for non-air units (strategic: enemy/uncontrolled+infra; tactical: human-occupied/infra); strategic ranged lists only enemy-occupied hexes in range (same as full markdown); tactical ranged excludes transport-only cells; air ferry lists unchanged.
    * Exceptions: None.
    */
   forThisTurnOptionsTable?: boolean;
@@ -578,11 +653,30 @@ export function collectAggregatedPossibleActionRows(args: {
       unit.h3Index,
       unit.unitType === 'air'
         ? collectLegalFerryDestinationHexes(unit, indexed)
-        : getValidDestinations(unit, state)
+        : tacticalBattle
+          ? collectTacticalLegalMoveDestinationRes4Hexes(tacticalBattle, unit.id)
+          : getValidDestinations(unit, state)
     );
     if (forThisTurn && unit.unitType !== 'air') {
       const before = moveHexes.length;
-      moveHexes = filterGroundMoveHexesForThisTurnOptionsTable(indexed, moveHexes);
+      if (tacticalBattle && tacticalHumanOccupiedH3) {
+        const interest = filterTacticalGroundMoveHexesForThisTurnOptionsTable(
+          tacticalBattle,
+          moveHexes,
+          tacticalHumanOccupiedH3,
+          tacticalRangedRowsForFootprint ?? []
+        );
+        moveHexes =
+          interest.length > 0
+            ? interest
+            : filterTacticalApproachMoveHexesForThisTurnOptionsTable(
+                unit.h3Index,
+                moveHexes,
+                tacticalHumanOccupiedH3
+              );
+      } else {
+        moveHexes = filterGroundMoveHexesForThisTurnOptionsTable(indexed, moveHexes);
+      }
       if (thisTurnFilterStats) {
         thisTurnFilterStats.moveIn += before;
         thisTurnFilterStats.moveOut += moveHexes.length;

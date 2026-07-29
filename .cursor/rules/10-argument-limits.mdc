@@ -1,0 +1,8 @@
+---
+description: "10 — Method argument limits: desirable 6, hard limit 10"
+alwaysApply: true
+---
+
+# 10 — Method Argument Limits
+
+The desirable limit of named method/function arguments is 6 and a hard limit is 10. When you reach these limits, move and/or decompose functionality to reasonably partitioned and organized sub-methods/-functions. Parameter objects are an acceptable alternative, as long as they otherwise comply with my rules.

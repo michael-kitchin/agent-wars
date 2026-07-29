@@ -1,0 +1,8 @@
+---
+description: "12 — Keep plan/debug workflow identifiers out of version-controlled artifacts"
+alwaysApply: true
+---
+
+# 12 — No Plan or Workflow Identifiers in Version Control
+
+Identifiers used in phases, stages, hypotheses, or other divisions in plans, debugging workflows, or files in the `.spec` or `.test` folders should never be included in code, comments, configuration files, documentation, or anything else that is (or is likely to be) in version control.

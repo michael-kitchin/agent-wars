@@ -1,0 +1,8 @@
+---
+description: "04 — Orienting comments on fields and non-overriding methods"
+alwaysApply: true
+---
+
+# 04 — Orienting Comments
+
+Please ensure all new and updated fields and non-overriding methods of all cardinalities (static/instance, outer/inner) and access levels (public, private, and package-private) have correctly formatted orienting comments. An orienting comment explains why a field or method exists and generally when to use it, how to use it, and what to expect in terms of results and exceptions. Comments for interface and abstract methods focus on code contracts, while those for implementation methods focus on high-level implementation details.

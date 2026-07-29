@@ -1,0 +1,8 @@
+---
+description: "05 — Spec, design, and guidance docs as markdown under .spec"
+alwaysApply: true
+---
+
+# 05 — Spec Documents
+
+Please ensure all spec, design, and similar guidance documents are written as markdown files to the `.spec` directory.

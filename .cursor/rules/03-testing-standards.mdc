@@ -1,0 +1,8 @@
+---
+description: "03 — Test happy paths and essential failure contracts only; skip boilerplate"
+alwaysApply: true
+---
+
+# 03 — Testing Standards
+
+Please ensure that we're only testing happy paths and essential failure cases for all new and updated code. We want to test essential code contracts and not implementation details. We do not need to test REST controller methods that directly delegate to component calls, DTO constructors, accessors, or similar boilerplate. Please remove any test cases or classes made unnecessary by these restrictions.

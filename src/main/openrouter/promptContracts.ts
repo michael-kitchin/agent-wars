@@ -15,7 +15,12 @@ export function buildFinalJsonContractInstruction(args: {
   submitMemoryClause: string;
   productionSubmitClause: string;
   /**
-   * When `tactical`, expands the callbacks clause so the model knows subscriptions apply to tactical beats under event-driven mode.
+   * When `tactical`, expands the callbacks/orders clauses for in-battle consultations.
+   *
+   * Contract: Optional; omit or `strategic` for strategic Ready prompts.
+   * When to use: Pass from `buildSystemPromptForTools` when assembling tactical system prompts.
+   * Expected outcome: Tactical text omits live assign_order actions and expands callback beat guidance.
+   * Exceptions: None.
    */
   coordinateMode?: 'strategic' | 'tactical';
 }): string {
@@ -35,13 +40,15 @@ export function buildFinalJsonContractInstruction(args: {
   const strictSchemaClause =
     'Strict schema: top-level must be a JSON object with "strategy" (string) and "orders" (array); do not return a top-level array.';
   const ordersClause =
-    'The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: assign_order (include "order": { "type": "defend"|"march"|"pursue"|"patrol"|"hold_fire", ... } — pursue uses targetUnitId string for the enemy only; march/patrol/defend use two-character briefing hex codes where a place is required), cancel_order, explicit_move (include "destination": briefing hex code for this turn\'s move; auto-debarks embarked cargo before marching), ranged_attack (include exactly one of targetHexCode or targetUnitId; ranged-only units/actions), transport_move (include "navalUnitId" and "destination" hex code), disembark (include "unitId" and "destination" hex code — clears cargo assignment then moves in one action), embark (include "unitId" and "navalUnitId").';
+    coordinateMode === 'tactical'
+      ? 'The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: explicit_move (include "destination": briefing hex code for this beat\'s march; auto-debarks embarked cargo before marching), ranged_attack (include exactly one of targetHexCode or targetUnitId; ranged-only units/actions), transport_move (include "navalUnitId" and "destination" hex code), disembark (include "unitId" and "destination" hex code — clears cargo assignment then moves in one action), embark (include "unitId" and "navalUnitId"). Do not emit assign_order or cancel_order for tactical sub-unit ids.'
+      : 'The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: assign_order (include "order": { "type": "defend"|"march"|"pursue"|"patrol"|"hold_fire", ... } — pursue uses targetUnitId string for the enemy only; march/patrol/defend use two-character briefing hex codes where a place is required), cancel_order, explicit_move (include "destination": briefing hex code for this turn\'s move; auto-debarks embarked cargo before marching), ranged_attack (include exactly one of targetHexCode or targetUnitId; ranged-only units/actions), transport_move (include "navalUnitId" and "destination" hex code), disembark (include "unitId" and "destination" hex code — clears cargo assignment then moves in one action), embark (include "unitId" and "navalUnitId").';
   const airClause =
     'Optional top-level air actions: airStrikes[] entries use { "unitId": "...", exactly one of "targetHexCode" or "targetUnitId", "targetType": "units"|"urban"|"airport"|"seaport" }, ferryOrders[] entries use { "unitId": "...", "destination": "<hex code>" }.';
   const legacyClause = 'Do not use top-level movementOrders or rangedAttacks (legacy).';
   const callbacksClause =
     coordinateMode === 'tactical'
-      ? 'Include optional "callbacks" for re-consultation: the same subscription events as strategic (e.g. turns(N), unit_destroyed, infrastructure_destroyed, unit_engaged) are evaluated after each tactical beat when event-driven mode is on; each consultation replaces the full callback list.'
+      ? 'Include optional "callbacks" for re-consultation: use tactical sub-unit ids (not strategic parent ids) for unit-scoped events (e.g. unit_destroyed, unit_engaged); subscriptions are evaluated after each tactical beat when event-driven mode is on and are cleared when the battle ends; each consultation replaces the full callback list.'
       : 'Include optional "callbacks" for re-consultation planning.';
   return `${submitHeader} ${strictSchemaClause} ${ordersClause} ${airClause} ${legacyClause}${movementOrderInstruction} ${callbacksClause}${submitMemoryClause} ${productionSubmitClause}`;
 }
@@ -73,6 +80,15 @@ includeMemoryUpdates: boolean;
    * Exceptions: None.
    */
 includeProductionOrders: boolean;
+  /**
+   * When `tactical`, the illustrative orders[] example leads with explicit_move / ranged_attack (assign_order stays blocked for sub-unit ids).
+   *
+   * Contract: Optional coordinate mode for example/contract text; omit or `strategic` for strategic prompts.
+   * When to use: Pass `tactical` from tactical `buildSystemPromptForTools` / contract builders.
+   * Expected outcome: Callers get tactical-appropriate action lists and examples.
+   * Exceptions: None.
+   */
+  coordinateMode?: 'strategic' | 'tactical';
 }
 
 /**
@@ -161,14 +177,23 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
   logDebug('promptContracts getFinalJsonOrdersExampleBlock', {
     includeMemoryUpdates: flags.includeMemoryUpdates,
     includeProductionOrders: flags.includeProductionOrders,
+    coordinateMode: flags.coordinateMode ?? 'strategic',
   });
+  const tactical = flags.coordinateMode === 'tactical';
   const example: FinalOrdersExamplePayload = {
-    strategy: 'Close with observed enemies and keep production moving.',
-    orders: [
-      { action: 'assign_order', unitId: 'opponent-infantry-1', order: { type: 'march', destination: 'AB' } },
-      { action: 'explicit_move', unitId: 'opponent-armor-2', destination: 'CD' },
-      { action: 'ranged_attack', unitId: 'opponent-naval-1', targetUnitId: 'human-armor-1' },
-    ],
+    strategy: tactical
+      ? 'Close with observed enemies this beat using explicit moves and fire.'
+      : 'Close with observed enemies and keep production moving.',
+    orders: tactical
+      ? [
+          { action: 'explicit_move', unitId: 'opp-parent:01', destination: 'AB' },
+          { action: 'ranged_attack', unitId: 'opp-parent:02', targetUnitId: 'hum-parent:01' },
+        ]
+      : [
+          { action: 'assign_order', unitId: 'opponent-infantry-1', order: { type: 'march', destination: 'AB' } },
+          { action: 'explicit_move', unitId: 'opponent-armor-2', destination: 'CD' },
+          { action: 'ranged_attack', unitId: 'opponent-naval-1', targetUnitId: 'human-armor-1' },
+        ],
     airStrikes: [],
     ferryOrders: [],
     callbacks: [],

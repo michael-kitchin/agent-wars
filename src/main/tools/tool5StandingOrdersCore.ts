@@ -126,7 +126,7 @@ attention: 'yes' | 'no';
  * Resolves a stored lat/lng tuple to the briefing hex code shown alongside rosters and maps.
  *
  * Purpose: Keeps standing-order status tables aligned with the JSON hex-code contract while DB rows remain lat/lng.
- * When to use: Only when formatting `getInjectionText` rows for the active strategic or tactical coordinate context.
+ * When to use: Only when formatting strategic `getInjectionText` rows.
  * Expected outcome: Two-character code when the tuple snaps to a registered cell; em dash when off-registry or unmapped.
  * Exceptions: None; failures downgrade to an em dash rather than throwing into the prompt builder.
  */
@@ -580,11 +580,11 @@ export function getStandingOrderForUnit(
 }
 
 /**
- * Defines the `getInjectionText` function shape (export function getInjectionText(playerId: string, state: GameStateSnapshot, coordinateContext?: CoordinateContext): string).
-
- * Purpose: Supports maintainability by documenting why `getInjectionText` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Builds the strategic Standing Order Status briefing block for the opponent AI.
+ *
+ * Purpose: Injects parent-unit standing-order tables into strategic Commander prompts only.
+ * When to use: Strategic `formatBriefing` / `buildSystemPromptForTools` when Orders tools are enabled.
+ * Expected outcome: Markdown `# Standing Order Status` (+ units without orders); empty string in tactical mode.
  * Exceptions: None.
  */
 export function getInjectionText(
@@ -593,14 +593,18 @@ export function getInjectionText(
   coordinateContext?: CoordinateContext
 ): string {
   const ctx: CoordinateContext = coordinateContext ?? { mode: 'strategic' };
-  if (ctx.mode === 'strategic') {
-    ensureStrategicCoordinateRegistryInitialized();
+  if (ctx.mode === 'tactical') {
+    logDebug('tool5StandingOrders getInjectionText: omitted in tactical mode', {
+      playerId,
+      battleId: ctx.battleId ?? null,
+    });
+    return '';
   }
+  ensureStrategicCoordinateRegistryInitialized();
   logDebug('tool5StandingOrders getInjectionText', {
     playerId,
     turnNumber: state.turnNumber,
     coordinateMode: ctx.mode,
-    battleId: ctx.battleId ?? null,
   });
 
   const hexList = state.hexes.map((h) => h.h3Index);
@@ -613,14 +617,16 @@ export function getInjectionText(
   );
   const aiUnits = state.units.filter((u) => u.player === playerId);
   const aiUnitIds = aiUnits.map((u) => u.id);
-  const aiUnitIdSet = new Set(aiUnitIds);
   const aiUnitTypeById = new Map(aiUnits.map((u) => [u.id, u.unitType]));
-  const unitIdsWithOrders = new Set(rows.map((r) => r.unit_id));
-  const unitIdsWithoutOrders = aiUnitIds.filter((id) => !unitIdsWithOrders.has(id));
 
   const lines: string[] = [];
   lines.push('# Standing Order Status');
   lines.push('');
+
+  const aiUnitIdSet = new Set(aiUnitIds);
+  const unitIdsWithOrders = new Set(rows.map((r) => r.unit_id));
+  const unitIdsWithoutOrders = aiUnitIds.filter((id) => !unitIdsWithOrders.has(id));
+
   const standingOrderRows = rows
     .filter((row) => aiUnitIdSet.has(row.unit_id))
     .map((row) => toStandingOrderPromptRow(row, aiUnitTypeById, ctx, resolveToH3))

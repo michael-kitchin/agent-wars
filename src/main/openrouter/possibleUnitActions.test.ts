@@ -9,7 +9,7 @@ import { getOrderedHexList, LATLNG_DECIMAL_PLACES } from '../mapData';
 import { buildTacticalAiPlanState } from '../tacticalBattle/buildTacticalAiPlanState';
 import { tacticalRes1Cell, tacticalRes4UnderRes1Corner } from '../tacticalBattle/testSupport/tacticalRes4HexFixtures';
 import { formatLatLng } from './promptText';
-import { buildPossibleUnitActionsMarkdown, partitionHomelandNearestOther } from './possibleUnitActions';
+import { buildPossibleUnitActionsMarkdown, collectAggregatedPossibleActionRows, partitionHomelandNearestOther } from './possibleUnitActions';
 import type { GameStateSnapshot } from '../gameDb';
 
 /**
@@ -304,6 +304,176 @@ function testTacticalPossibleActionsMarkdownUsesTacticalRangedLegality(): void {
 }
 
 /**
+ * Ensures tactical Best Options ground moves use res4 march reachability (not strategic land-mass), keeping enemy-occupied cells.
+ *
+ * Purpose: Regression for `collectTacticalLegalMoveDestinationRes4Hexes` wiring in Best Options.
+ * When to use: After edits to tactical possible-actions move collection or this-turn filters.
+ * Expected outcome: Tactical table offers a ground-move row onto the adjacent human-occupied res4 hex.
+ * Exceptions: Throws if the fixture cannot find an adjacent res4 neighbor under the parent.
+ */
+function testTacticalBestOptionsGroundMovesIncludeAdjacentEnemyHex(): void {
+  const res1 = tacticalRes1Cell(12, 34);
+  const res4Opp = tacticalRes4UnderRes1Corner(12, 34);
+  const sameParent = [...gridDisk(res4Opp, 4)].filter((h) => cellToParent(h, 1) === res1);
+  const res4Human = sameParent.find((h) => h !== res4Opp && gridDistance(res4Opp, h) === 1);
+  if (!res4Human) {
+    throw new Error('expected adjacent res4 neighbor under the same res1 parent');
+  }
+  const tactical: TacticalBattleSnapshot = {
+    battleId: 't-best-options-move',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: [res4Opp, res4Human],
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: {
+      [res4Opp]: 'plains',
+      [res4Human]: 'plains',
+    },
+    subUnits: [
+      {
+        id: 'opp-arm-move',
+        parentUnitId: 'parent-arm',
+        player: 'opponent',
+        unitType: 'armor',
+        h3Index: res4Opp,
+        displayName: 'Armor',
+      },
+      {
+        id: 'hum-adj',
+        parentUnitId: 'parent-inf',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: res4Human,
+        displayName: 'Infantry',
+      },
+    ],
+  };
+  const strategic: GameStateSnapshot = {
+    turnNumber: 1,
+    phase: 'planning',
+    hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+    units: [],
+    pendingOrders: [],
+    humanHomeRegionHexes: [res4Human],
+    res1Control: [{ h3Index: res1, controllerPlayerId: 'opponent' }],
+  };
+  const plan = buildTacticalAiPlanState(strategic, tactical);
+  const latLngByH3 = new Map<string, [number, number]>();
+  for (const h of plan.hexes.map((x) => x.h3Index)) {
+    latLngByH3.set(h, cellToLatLng(h) as [number, number]);
+  }
+  const fmt = (ll: [number, number]) => formatLatLng(ll, LATLNG_DECIMAL_PLACES);
+  const rowsStrategicFilter = collectAggregatedPossibleActionRows({
+    state: plan,
+    latLngByH3,
+    formatLatLng: fmt,
+    forThisTurnOptionsTable: true,
+  });
+  const rowsTactical = collectAggregatedPossibleActionRows({
+    state: plan,
+    latLngByH3,
+    formatLatLng: fmt,
+    tacticalBattle: tactical,
+    forThisTurnOptionsTable: true,
+  });
+  const strategicMove = rowsStrategicFilter.filter(
+    (r) => r.unitId === 'opp-arm-move' && (r.actionTypes.includes('move') || r.actionTypes.includes('melee'))
+  );
+  const tacticalMove = rowsTactical.filter(
+    (r) => r.unitId === 'opp-arm-move' && (r.actionTypes.includes('move') || r.actionTypes.includes('melee'))
+  );
+  assert.strictEqual(strategicMove.length, 0, 'strategic land-mass destinations should not apply on res4 planState');
+  assert.ok(tacticalMove.length >= 1, 'tactical Best Options should offer a move onto the adjacent human hex');
+  assert.ok(tacticalMove.some((r) => r.targetH3 === res4Human));
+}
+
+/**
+ * Ensures Best Options falls back to approach hexes when no enemy/infra hex is reachable this beat.
+ *
+ * Purpose: Distant contact should still show legal closing moves (top-5 cap applied later by selectTopRowsPerUnit).
+ * When to use: After edits to tactical this-turn ground-move filters.
+ * Expected outcome: At least one move row whose target reduces H3 distance to the distant human.
+ * Exceptions: Throws when the fixture cannot place a human three steps away under the same parent.
+ */
+function testTacticalBestOptionsApproachFallbackWhenEnemyOutOfReach(): void {
+  const res1 = tacticalRes1Cell(12, 34);
+  const res4Opp = tacticalRes4UnderRes1Corner(12, 34);
+  const sameParent = [...gridDisk(res4Opp, 8)].filter((h) => cellToParent(h, 1) === res1);
+  const res4Human = sameParent.find((h) => h !== res4Opp && gridDistance(res4Opp, h) === 5);
+  if (!res4Human) {
+    throw new Error('expected a res4 cell five steps from the opponent under the same res1 parent');
+  }
+  const footprint = sameParent.filter((h) => {
+    try {
+      return gridDistance(res4Opp, h) <= 5 || gridDistance(res4Human, h) <= 5;
+    } catch {
+      return false;
+    }
+  });
+  const terrain: Record<string, string> = {};
+  for (const h of footprint) terrain[h] = 'plains';
+  const tactical: TacticalBattleSnapshot = {
+    battleId: 't-best-options-approach',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: footprint,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: terrain,
+    subUnits: [
+      {
+        id: 'opp-arm-far',
+        parentUnitId: 'parent-arm',
+        player: 'opponent',
+        unitType: 'armor',
+        h3Index: res4Opp,
+        displayName: 'Armor',
+      },
+      {
+        id: 'hum-far',
+        parentUnitId: 'parent-inf',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: res4Human,
+        displayName: 'Infantry',
+      },
+    ],
+  };
+  const strategic: GameStateSnapshot = {
+    turnNumber: 1,
+    phase: 'planning',
+    hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+    units: [],
+    pendingOrders: [],
+  };
+  const plan = buildTacticalAiPlanState(strategic, tactical);
+  const latLngByH3 = new Map<string, [number, number]>();
+  for (const h of plan.hexes.map((x) => x.h3Index)) {
+    latLngByH3.set(h, cellToLatLng(h) as [number, number]);
+  }
+  const fmt = (ll: [number, number]) => formatLatLng(ll, LATLNG_DECIMAL_PLACES);
+  const rows = collectAggregatedPossibleActionRows({
+    state: plan,
+    latLngByH3,
+    formatLatLng: fmt,
+    tacticalBattle: tactical,
+    forThisTurnOptionsTable: true,
+  });
+  const moves = rows.filter(
+    (r) => r.unitId === 'opp-arm-far' && (r.actionTypes.includes('move') || r.actionTypes.includes('melee'))
+  );
+  assert.ok(moves.length >= 1, 'expected approach move rows when enemy is out of this-beat reach');
+  assert.ok(
+    moves.every((r) => gridDistance(r.targetH3, res4Human) < 5),
+    'approach targets must reduce distance to the nearest human'
+  );
+  assert.ok(!moves.some((r) => r.targetH3 === res4Human), 'distant human hex itself is not this-beat reachable');
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
 
  * Purpose: Supports maintainability by documenting why `tests` exists.
@@ -321,6 +491,14 @@ const tests = [
   {
     name: 'buildPossibleUnitActionsMarkdown tacticalBattle uses res4 ranged rules vs strategic getRange',
     fn: testTacticalPossibleActionsMarkdownUsesTacticalRangedLegality,
+  },
+  {
+    name: 'collectAggregatedPossibleActionRows tactical Best Options ground moves include adjacent enemy',
+    fn: testTacticalBestOptionsGroundMovesIncludeAdjacentEnemyHex,
+  },
+  {
+    name: 'collectAggregatedPossibleActionRows tactical Best Options approach fallback when enemy out of reach',
+    fn: testTacticalBestOptionsApproachFallbackWhenEnemyOutOfReach,
   },
 ];
 

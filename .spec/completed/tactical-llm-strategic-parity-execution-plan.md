@@ -53,7 +53,7 @@
 | Post-resolution LLM | `handleGameReady` **awaits** `runEventDrivenAfterResolutionConsultation` | `commitHumanTacticalDraftOrders` IPC **awaits** `runEventDrivenAfterTacticalBeatConsultation` before return (no push) |
 | Opponent buffer | DB pending orders / IPC payload | Renderer `S.tacticalOpponentDraft` from commit IPC + prefetch; **no** `postResolutionConsultPush` |
 | Idle / observable policy | `afterResolution` + rich `ReadyResult` slice | `afterTacticalBeatResolution` + `TacticalCommitResolutionPlayback` + `consultationPolicy.ts` (incl. ranged/air submission flags) |
-| Standing orders in `requestOrders` | Merged when strategic | **Merged for tactical** with parent→sub expansion (`expandOpponentStandingOrdersForTacticalBattle`) |
+| Standing orders in `requestOrders` | Merged when strategic | **Not merged in tactical** — AI and human use explicit orders only; `assign_order`/`cancel_order`/`query_orders` blocked or hidden |
 | Precomputation | Can be on for strategic | **Forced off** when `tacticalAiBattle` set |
 
 **Key files (extend as you touch code):**

@@ -1,0 +1,8 @@
+---
+description: "06 — Prefer reusable code when it does not risk reliability, performance, or UX"
+alwaysApply: true
+---
+
+# 06 — Reusable Code
+
+Please look for, create, and evolve reusable code and other elements, to the extent this doesn't put reliability, performance, user experience, or other goals at significant risk.

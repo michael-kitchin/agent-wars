@@ -130,13 +130,21 @@ export function buildSystemPromptForTools(
       ? 'assess the tactical situation'
       : undefined;
   const hasPrecomputedBriefing = briefingOverride != null && briefingOverride.length > 0;
+  const selectiveToolHints: string[] = ['exact routing (plan_route)'];
+  if (flags.ordersEnabled && coordinateContext.mode !== 'tactical') {
+    selectiveToolHints.push('standing-order status is already in the briefing (query_orders only for rare detail)');
+  }
+  if (flags.memoryEnabled) selectiveToolHints.push('memory lookup (memory_read)');
+  if (flags.productionEnabled) selectiveToolHints.push('production queue checks/sets');
   const toolsIntro = toolsIntroPurpose
     ? hasPrecomputedBriefing
-      ? 'Use the Commander\'s Briefing above for assessments and possible unit actions; use tools selectively for exact routing (plan_route), standing-order checks (query_orders), memory lookup (memory_read), and production queue checks/sets when needed.'
+      ? coordinateContext.mode === 'tactical'
+        ? 'Use the Commander\'s Briefing above for assessments and possible unit actions; use tools selectively for exact routing (plan_route) when needed.'
+        : `Use the Commander's Briefing above for assessments and possible unit actions; use tools selectively for ${selectiveToolHints.join(', ')} when needed.`
       : `Use these tools to ${toolsIntroPurpose} before submitting orders. You may use multiple rounds of tool calls and mix tool types if that helps.` +
         (flags.memoryEnabled ? ' Memory: use memory_read as needed; persist notes via memoryUpdates in your final JSON.' : '')
     : 'Use only the tools listed below. Do not call tools that are not in the list.';
-  const toolGuidance = buildToolUsageGuidance(flags, hasPrecomputedBriefing);
+  const toolGuidance = buildToolUsageGuidance(flags, hasPrecomputedBriefing, coordinateContext.mode);
   const toolsSection =
     filtered.length === 0
       ? '# Available Tools\n\nNo tools available.'
@@ -161,21 +169,27 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
         },
       }) + '\n\n'
     : '';
-  const airOpsBlock = buildAirOperationsBriefingBlock(state, format) + '\n\n';
-  const sealiftBlock = buildSealiftBriefingBlock(state, format) + '\n\n';
+  const airOpsRaw = buildAirOperationsBriefingBlock(state, format, coordinateContext.mode);
+  const sealiftRaw = buildSealiftBriefingBlock(state, format, coordinateContext.mode);
+  const airOpsBlock = airOpsRaw ? `${airOpsRaw}\n\n` : '';
+  const sealiftBlock = sealiftRaw ? `${sealiftRaw}\n\n` : '';
 
   const hasNaval = opponentUnits.some((u) => u.unitType === 'naval');
   const hasRanged = opponentUnits.some((u) => getRange(u.unitType as 'infantry' | 'armor' | 'naval') >= 1);
 
-  const combatTargetHint = flags.estimationEnabled ? ' (e.g. use estimate_combat to pick the best)' : '';
+  const combatTargetHint =
+    flags.estimationEnabled && !hasPrecomputedBriefing
+      ? ' (e.g. use estimate_combat to pick the best)'
+      : '';
   const navalCoaching = hasNaval
     ? ` Naval units can attack land units at 1 or 2 hexes (range 2). Add ranged_attack when a naval unit is within 2 hexes of an enemy at turn start. ${NAVAL_MOVEMENT_PROMPT_RULE}${flags.planningEnabled ? NAVAL_PLAN_ROUTE_LAND_TARGET_HINT : ''}`
     : '';
-  const combatAssessHint = flags.assessmentEnabled && hasRanged
-    ? ' When assess_unit reports canAttackThisTurn with attackType "ranged" for an enemy, add ranged_attack with targetHexCode as that enemy\'s cell code from the operational map (or targetUnitId).' +
-      (hasNaval ? ' Naval inRangedRange: add ranged_attack for that naval unit.' : '') +
-      ' Note: inEnemyRangedRange = enemy can fire at you; inRangedRange = you can fire at them.'
-    : '';
+  const combatAssessHint =
+    flags.assessmentEnabled && hasRanged && !hasPrecomputedBriefing
+      ? ' When assess_unit reports canAttackThisTurn with attackType "ranged" for an enemy, add ranged_attack with targetHexCode as that enemy\'s cell code from the operational map (or targetUnitId).' +
+        (hasNaval ? ' Naval inRangedRange: add ranged_attack for that naval unit.' : '') +
+        ' Note: inEnemyRangedRange = enemy can fire at you; inRangedRange = you can fire at them.'
+      : '';
 
   const adjacentCellsBlock = flags.fallbackMovementEnabled
     ? buildAdjacentCellsFallbackBlock(state, opponentUnits, coordMap, getValidDestinationsUnoccupied)
@@ -186,6 +200,10 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
     : ' When Memory tools are not listed above, omit "memoryUpdates" or use []; any entries are ignored.';
 
   const humanUnitsLine = buildHumanUnitsPromptLine(humanRoster);
+  const ownUnitsLine =
+    hasPrecomputedBriefing
+      ? ''
+      : `Your units (ID, type, briefing hex): ${opponentRoster || 'none'}\n`;
   const landHexes = state.hexes.filter((hex) => hex.terrain === 'land');
   const totalLandHexes = landHexes.length;
   const landHexSet = new Set(landHexes.map((hex) => hex.h3Index));
@@ -240,10 +258,11 @@ ${COACHING_STRATEGY_BLOCK}
   const coachingContextBlock =
     coordinateContext.mode === 'tactical' ? tacticalContextBlock : strategicContextBlock;
 
-  const scenarioObjectiveBlock = buildRegionVsRegionScenarioObjectiveBlock(state);
+  const scenarioObjectiveBlock =
+    coordinateContext.mode === 'tactical' ? '' : buildRegionVsRegionScenarioObjectiveBlock(state);
   const mainBlock = briefingOverride != null && briefingOverride.length > 0
-    ? `${briefingOverride}\n\n${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${coachingContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, briefing hex): ${opponentRoster || 'none'}\n${humanUnitsLine}`
-    : `${memoryBlock}${standingOrderBlock}${productionBlock}${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${coachingContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\nYour units (ID, type, briefing hex): ${opponentRoster || 'none'}\n${humanUnitsLine}${adjacentCellsBlock}`;
+    ? `${briefingOverride}\n\n${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${coachingContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\n${humanUnitsLine}`
+    : `${memoryBlock}${standingOrderBlock}${productionBlock}${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${coachingContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\n${ownUnitsLine}${humanUnitsLine}${adjacentCellsBlock}`;
 
   const finalJsonContract = buildFinalJsonContractInstruction({
     includeMemoryUpdates: flags.memoryEnabled,
@@ -256,11 +275,14 @@ ${COACHING_STRATEGY_BLOCK}
   const finalJsonExample = getFinalJsonOrdersExampleBlock({
     includeMemoryUpdates: flags.memoryEnabled,
     includeProductionOrders: flags.productionEnabled,
+    coordinateMode: coordinateContext.mode,
   });
   const scoutingDirective =
-    humanRoster.length === 0
-      ? '\n\nNo human units are currently observed: prioritize scouting this turn by moving units along plausible approach routes to reveal enemy positions; do not remain static unless required for immediate defense.'
-      : '';
+    coordinateContext.mode === 'tactical'
+      ? ''
+      : humanRoster.length === 0
+        ? '\n\nNo human units are currently observed: prioritize scouting this turn by moving units along plausible approach routes to reveal enemy positions; do not remain static unless required for immediate defense.'
+        : '';
   const winConditionReminder = buildWinConditionReminderClause();
   const latLngBlock =
     coordinateContext.mode === 'tactical'

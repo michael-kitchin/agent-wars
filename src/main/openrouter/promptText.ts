@@ -127,7 +127,7 @@ const PRODUCTION_REQUIREMENT_PRIORITY_INITIAL =
  */
 export function buildLatLngPreamble(h3Resolution: number, decimalPlaces: number): string {
   void decimalPlaces;
-  return `Global Earth map, H3 resolution ${h3Resolution}. Positions are two-character briefing hex codes (A–Z and 0–9) from the operational map and roster tables — copy exactly; never invent codes. Distances are hex counts where shown.
+  return `Global Earth map, H3 resolution ${h3Resolution}. Positions are two-character briefing hex codes (A–Z and 0–9) from the operational map and Unit Status table — copy exactly; never invent codes. Distances are hex counts where shown.
 
 Final JSON: use briefing hex codes for cells; standing-order pursue uses enemy unit id (targetUnitId). Never emit raw H3 strings or latitude/longitude pairs.`;
 }
@@ -142,9 +142,9 @@ Final JSON: use briefing hex codes for cells; standing-order pursue uses enemy u
  */
 export function buildTacticalLatLngPreamble(decimalPlaces: number): string {
   void decimalPlaces;
-  return `Tactical battle map: H3 resolution 4 children inside the enclosing strategic res1 hex. Positions are two-character tactical briefing hex codes (A–Z and 0–9) from the operational map and roster tables — copy exactly; never invent codes. Distances are res4 hex steps where shown.
+  return `Tactical battle map: H3 resolution 4 children inside the enclosing strategic res1 hex. Positions are two-character tactical briefing hex codes (A–Z and 0–9) from the operational map and Unit Status table — copy exactly; never invent codes. Distances are res4 hex steps where shown.
 
-Final JSON: use tactical briefing hex codes for cells; standing-order pursue uses enemy sub-unit id (targetUnitId). Never emit raw H3 strings or latitude/longitude pairs.`;
+Final JSON: use tactical briefing hex codes for cells and enemy sub-unit ids for targetUnitId. Never emit raw H3 strings or latitude/longitude pairs.`;
 }
 
 /**
@@ -172,25 +172,41 @@ export function formatLatLng(ll: [number, number], decimalPlaces: number): strin
 }
 
 /**
- * Defines the `buildToolUsageGuidance` function shape (export function buildToolUsageGuidance(flags: PromptToolFlags, hasPrecomputedBriefing = false): string).
-
- * Purpose: Supports maintainability by documenting why `buildToolUsageGuidance` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Builds mode-aware tool-usage coaching bullets for the Available Tools section.
+ *
+ * Purpose: Keeps strategic vs tactical briefing guidance aligned with which sections and tools are actually present.
+ * When to use: `buildSystemPromptForTools` after computing tool flags and whether a briefing override is attached.
+ * Expected outcome: Markdown bullet lines; tactical mode omits supplemental-hex / assign_order coaching that does not apply in-battle.
  * Exceptions: None.
  */
-export function buildToolUsageGuidance(flags: PromptToolFlags, hasPrecomputedBriefing = false): string {
+export function buildToolUsageGuidance(
+  flags: PromptToolFlags,
+  hasPrecomputedBriefing = false,
+  coordinateMode: 'strategic' | 'tactical' = 'strategic'
+): string {
   const lines: string[] = [];
   if (hasPrecomputedBriefing) {
     lines.push(
-      '- The Commander\'s Briefing above already contains unit status, attention flags, possible unit actions, and supplemental hex intelligence for this turn. Do NOT call assess_unit, assess_hex, or estimate_combat — that information is already in the briefing. Use the briefing to decide targets and priorities.'
+      coordinateMode === 'tactical'
+        ? '- The Commander\'s Briefing above already contains unit status, attention flags, and possible unit actions for this tactical beat. Do NOT call assess_unit, assess_hex, or estimate_combat — that information is already in the briefing. Use the briefing to decide targets and priorities.'
+        : '- The Commander\'s Briefing above already contains unit status, attention flags, possible unit actions, and supplemental hex intelligence for this turn. Do NOT call assess_unit, assess_hex, or estimate_combat — that information is already in the briefing. Use the briefing to decide targets and priorities.'
     );
     if (flags.planningEnabled) {
       lines.push(
-        '- Use plan_route only when you need the exact orderToHexCode for a unit\'s move. Call it sparingly (e.g. one per unit that needs to move); the briefing already summarizes nearest enemies, distances, and legal tactical options. After you have orderToHexCode for each unit that needs orders, submit — do not re-assess or re-route.'
+        '- Use plan_route only when you need the exact orderToHexCode for a unit\'s move. Call it sparingly (e.g. one per unit that needs to move); the briefing already summarizes nearest enemies, distances, and legal options. After you have orderToHexCode for each unit that needs orders, submit — do not re-assess or re-route.'
       );
     }
-    if (flags.ordersEnabled) {
+    if (coordinateMode === 'tactical') {
+      lines.push(
+        '- Do not emit assign_order or cancel_order for tactical sub-unit ids (blocked this beat). Issue explicit_move for every sub-unit that should march this beat, plus ranged_attack and air strikes as needed. Standing orders do not move units in tactical battle.'
+      );
+      lines.push(
+        '- Tempo rule: if any unit can make a legal ranged_attack or air strike this turn, do it now. Ranged attacks and air strikes use turn-start positions and can be combined with movement orders in the same turn.'
+      );
+      lines.push(
+        '- Sealift (when Naval Transport Status is present): issue embark / transport_move / disembark in orders[] as needed; while embarked, explicit_move and disembark both clear cargo and march in one action.'
+      );
+    } else if (flags.ordersEnabled) {
       lines.push(
         '- Standing orders: for every unit listed under ## Units Without Standing Orders in the briefing, add an orders[] entry with action assign_order (march/pursue for closing; defend to hold). Then use plan_route and explicit_move in orders[] only where you need a one-step move this turn.'
       );
@@ -222,7 +238,7 @@ export function buildToolUsageGuidance(flags: PromptToolFlags, hasPrecomputedBri
       '- memoryUpdates / tiers: "persistent" entries appear in every briefing (limit 5); "stored" are retrieved via memory_read (limit 15).'
     );
   }
-  if (flags.ordersEnabled) {
+  if (flags.ordersEnabled && coordinateMode !== 'tactical') {
     lines.push('- Units with standing orders do not need explicit orders from you unless you want to override their current mission this turn.');
     if (flags.planningEnabled && !hasPrecomputedBriefing) {
       lines.push('- For units several turns from combat, use assign_order (march/pursue) in final JSON instead of re-planning every turn.');
@@ -369,14 +385,18 @@ export function buildHumanUnitsPromptLine(humanRoster: string): string {
 }
 
 /**
- * Defines the `getInitialUserMessage` function shape (export function getInitialUserMessage(flags: PromptToolFlags, hasPrecomputedBriefing = false): string).
+ * Defines the `getInitialUserMessage` function shape (export function getInitialUserMessage(flags: PromptToolFlags, hasPrecomputedBriefing = false, coordinateMode?: 'strategic' | 'tactical'): string).
 
  * Purpose: Supports maintainability by documenting why `getInitialUserMessage` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getInitialUserMessage(flags: PromptToolFlags, hasPrecomputedBriefing = false): string {
+export function getInitialUserMessage(
+  flags: PromptToolFlags,
+  hasPrecomputedBriefing = false,
+  coordinateMode: 'strategic' | 'tactical' = 'strategic'
+): string {
   const productionSuffix = flags.productionEnabled
     ? ', optional "productionOrders" (EVERY item must include action + required fields)'
     : '';
@@ -391,6 +411,9 @@ export function getInitialUserMessage(flags: PromptToolFlags, hasPrecomputedBrie
       ? ` Also ensure production is actively queued when viable: ${PRODUCTION_REQUIREMENT_BASE}, include at least one production action. ${PRODUCTION_REQUIREMENT_PRIORITY_INITIAL} Prefer setting queues on every eligible controlled hex so production survives territory swings and reinforcements stay close to the front. `
       : '';
     if (hasPrecomputedBriefing) {
+      if (coordinateMode === 'tactical') {
+        return `Use the Commander's Briefing above for unit status, attention flags, and possible unit actions this tactical beat. Call plan_route for each sub-unit that needs a move (orderToHexCode). Then submit final JSON with "strategy", "orders" (explicit_move / ranged_attack as needed; do not use assign_order or cancel_order)${jsonOptionalTail}.`;
+      }
       const ordersNudge = flags.ordersEnabled
         ? ' For units without standing orders in the briefing, include assign_order entries in orders[]. Then use plan_route and explicit_move only where needed this turn. '
         : '';

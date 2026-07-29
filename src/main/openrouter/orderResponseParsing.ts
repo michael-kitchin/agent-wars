@@ -556,6 +556,13 @@ function processV3OrdersArray(
     if (!unitId) continue;
 
     if (action === 'assign_order') {
+      if (context.mode === 'tactical') {
+        dropReasons.push(
+          `assign_order ${unitId}: standing orders cannot be assigned to tactical sub-unit ids; use explicit_move / ranged_attack / air strikes this beat`
+        );
+        logDebug('openRouter processV3OrdersArray: assign_order skipped in tactical mode', { unitId });
+        continue;
+      }
       logDebug('openRouter processV3OrdersArray: assign_order', { unitId });
       let orderPayload: unknown = o.order;
       if (orderPayload && typeof orderPayload === 'object' && !Array.isArray(orderPayload)) {
@@ -586,6 +593,13 @@ function processV3OrdersArray(
       continue;
     }
     if (action === 'cancel_order') {
+      if (context.mode === 'tactical') {
+        dropReasons.push(
+          `cancel_order ${unitId}: standing orders cannot be cancelled via tactical sub-unit ids this beat`
+        );
+        logDebug('openRouter processV3OrdersArray: cancel_order skipped in tactical mode', { unitId });
+        continue;
+      }
       logDebug('openRouter processV3OrdersArray: cancel_order', { unitId });
       executeTool5('cancel_order', { unitId }, state, latLngByH3, resolveToH3);
       continue;

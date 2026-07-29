@@ -348,21 +348,41 @@ export function buildProductionBriefingBlock(args: {
 }
 
 /**
- * Defines the `buildAirOperationsBriefingBlock` function shape (export function buildAirOperationsBriefingBlock().
-
- * Purpose: Supports maintainability by documenting why `buildAirOperationsBriefingBlock` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Builds the Air Operations Status briefing block (strategic full table, or tactical unit-target slice).
+ *
+ * Purpose: Shared shell section after the Commander's Briefing; tactical mode omits ferry/infra columns and empty battles.
+ * When to use: `buildSystemPromptForTools` for both modes.
+ * Expected outcome: Strategic always returns a section (empty-state rows when no air). Tactical returns '' when no opponent air.
  * Exceptions: None.
  */
 export function buildAirOperationsBriefingBlock(
   state: GameStateSnapshot,
-  format: (h3: string) => string
+  format: (h3: string) => string,
+  mode: 'strategic' | 'tactical' = 'strategic'
 ): string {
-  logDebug('briefingSections buildAirOperationsBriefingBlock', { turnNumber: state.turnNumber });
+  logDebug('briefingSections buildAirOperationsBriefingBlock', { turnNumber: state.turnNumber, mode });
   const opponentAir = state.units.filter((u) => u.player === 'opponent' && u.unitType === 'air');
   const humanAir = state.units.filter((u) => u.player === 'human' && u.unitType === 'air');
   const humanUnits = state.units.filter((u) => u.player === 'human');
+
+  if (mode === 'tactical') {
+    if (opponentAir.length === 0) return '';
+    const lines: string[] = [];
+    lines.push('# Air Operations Status');
+    lines.push('');
+    lines.push(
+      'Air rules (tactical): strikes may target enemy sub-units anywhere in this battle footprint; one air action per unit per beat.'
+    );
+    lines.push(`Air units: yours=${opponentAir.length}, enemy=${humanAir.length}.`);
+    lines.push('');
+    const airStatusRows: Array<Array<unknown>> = opponentAir.map((air) => {
+      const targetableEnemyUnits = humanUnits.length;
+      return [air.id, format(air.h3Index), targetableEnemyUnits];
+    });
+    lines.push(...buildPromptTableLines(['Unit ID', 'Hex', 'Enemy Unit Targets'], airStatusRows));
+    return lines.join('\n');
+  }
+
   const infraRows = state.res1Infrastructure ?? [];
   const hexUniverse = new Set(state.hexes.map((h) => h.h3Index));
   const controllerByHex = new Map((state.res1Control ?? []).map((r) => [r.h3Index, r.controllerPlayerId]));
@@ -389,7 +409,6 @@ export function buildAirOperationsBriefingBlock(
   const airStatusRows: Array<Array<unknown>> = [];
 
   if (opponentAir.length === 0) {
-    // Keep explicit empty-state row for stable section shape.
     airStatusRows.push(['—', '—', '—', '—', '—', '—', '—', '—', '—']);
   } else {
     for (const air of opponentAir) {
@@ -491,23 +510,46 @@ function findNearestOpponentEmbarkHex(
 }
 
 /**
- * Defines the `buildSealiftBriefingBlock` function shape (export function buildSealiftBriefingBlock().
-
- * Purpose: Supports maintainability by documenting why `buildSealiftBriefingBlock` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Builds the Naval Transport Status briefing block (strategic embark table, or tactical embark links).
+ *
+ * Purpose: Shared shell sealift section; tactical uses `embarkedOnSubUnitId` and omits empty battles.
+ * When to use: `buildSystemPromptForTools` for both modes.
+ * Expected outcome: Strategic always returns a section. Tactical returns '' when no opponent naval.
  * Exceptions: None.
  */
 export function buildSealiftBriefingBlock(
   state: GameStateSnapshot,
-  format: (h3: string) => string
+  format: (h3: string) => string,
+  mode: 'strategic' | 'tactical' = 'strategic'
 ): string {
-  logDebug('briefingSections buildSealiftBriefingBlock', { turnNumber: state.turnNumber });
+  logDebug('briefingSections buildSealiftBriefingBlock', { turnNumber: state.turnNumber, mode });
   const lines: string[] = [];
   const opponentNaval = state.units.filter((unit) => unit.player === 'opponent' && unit.unitType === 'naval');
   const opponentLand = state.units.filter(
     (unit) => unit.player === 'opponent' && (unit.unitType === 'infantry' || unit.unitType === 'armor')
   );
+
+  if (mode === 'tactical') {
+    if (opponentNaval.length === 0) return '';
+    lines.push('# Naval Transport Status');
+    lines.push('');
+    lines.push('Tactical sealift: capacity 1 armor or 2 infantry per naval sub-unit. Debark before independent land marches.');
+    lines.push('');
+    const navalRows: Array<Array<unknown>> = [];
+    for (const naval of opponentNaval) {
+      const embarked = opponentLand.filter(
+        (land) => (land as { embarkedOnSubUnitId?: string }).embarkedOnSubUnitId === naval.id
+      );
+      const armor = embarked.filter((u) => u.unitType === 'armor').length;
+      const infantry = embarked.filter((u) => u.unitType === 'infantry').length;
+      const capacityUsed = armor >= 1 ? 2 : Math.min(infantry, 2);
+      const aboardIds = embarked.map((u) => u.id).join(', ') || '—';
+      navalRows.push([naval.id, format(naval.h3Index), aboardIds, `${capacityUsed}/2`]);
+    }
+    lines.push(...buildPromptTableLines(['Unit ID', 'Hex', 'Aboard', 'Capacity Used'], navalRows));
+    return lines.join('\n');
+  }
+
   const infraByHex = new Map((state.res1Infrastructure ?? []).map((row) => [row.h3Index, row]));
   const controlByHex = new Map((state.res1Control ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
   const landByHex = new Map<string, { infantry: number; armor: number }>();

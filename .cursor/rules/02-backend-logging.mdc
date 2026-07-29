@@ -1,0 +1,8 @@
+---
+description: "02 — Backend logging levels for invocations, exceptions, and getters"
+alwaysApply: true
+---
+
+# 02 — Backend Logging
+
+Please ensure that all new and updated public backend method invocations generate debug-level log messages, all caught exceptions generate error-level log messages, and all getter-style methods that don't modify state generate trace-level messages. Ensure all new and updated log messages include a reasonable level of detail for troubleshooting, and use the existing logging APIs. Note that these logging APIs check log levels before building message strings, so it's unnecessary to check the log level beforehand unless potentially large strings are being constructed inline with the logging call itself.

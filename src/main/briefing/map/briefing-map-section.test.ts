@@ -11,7 +11,6 @@ import * as assert from 'assert';
 import { cellToChildren, cellToLatLng, latLngToCell } from 'h3-js';
 import type { GameStateSnapshot } from '../../gameDb';
 import { buildLatLngCoordinateMap } from '../../mapData';
-import type { PrecomputationResult } from '../../precomputation';
 import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
 import { buildTacticalAiPlanState } from '../../tacticalBattle/buildTacticalAiPlanState';
 import { tacticalRes1Cell, tacticalRes4UnderRes1Corner } from '../../tacticalBattle/testSupport/tacticalRes4HexFixtures';
@@ -28,16 +27,6 @@ import { projectTacticalRes4FootprintToAsciiGrid } from './tacticalAsciiGridProj
  * Exceptions: None.
  */
 const STRATEGIC_CTX = { mode: 'strategic' as const };
-
-/**
- * Documents the module-scope binding `EMPTY_PRECOMPUTED` (EMPTY_PRECOMPUTED).
- *
- * Purpose: Minimal `PrecomputationResult` for map section builders that require the shape but no rows.
- * When to use: Map-only tests that do not exercise roster or hex assessment tables meaningfully.
- * Expected outcome: Empty arrays satisfy `buildStrategicOperationalMapSectionMarkdown` callers.
- * Exceptions: None.
- */
-const EMPTY_PRECOMPUTED: PrecomputationResult = { unitAssessments: [], hexAssessments: [] };
 
 /**
  * Extracts the first fenced code block body from markdown (``` ... ```).
@@ -93,7 +82,6 @@ function testStrategicOperationalMapIncludesAllRes1Codes(): void {
   const latLngByH3 = new Map<string, [number, number]>([[res1Unit, [lat, lng]]]);
   const md = buildStrategicOperationalMapSectionMarkdown({
     state,
-    precomputed: EMPTY_PRECOMPUTED,
     latLngByH3,
   });
   const body = firstFenceBody(md);
@@ -124,7 +112,6 @@ function testStrategicOperationalMapNoUnitsFallback(): void {
   };
   const md = buildStrategicOperationalMapSectionMarkdown({
     state,
-    precomputed: EMPTY_PRECOMPUTED,
     latLngByH3: new Map(),
   });
   assert.ok(md.includes('(No units — map not rendered.)'));
@@ -136,7 +123,7 @@ function testStrategicOperationalMapNoUnitsFallback(): void {
  *
  * Purpose: Ensures the LLM prompt omits the **Best Options This Turn** subsection title when there are no opponent rows to tabulate.
  * When to use: Regression guard for empty-table prompt noise (human-only forces still render the ASCII map).
- * Expected outcome: Markdown includes **Unit Roster** but not `### Best Options This Turn`.
+ * Expected outcome: Markdown renders the ASCII map without Unit Roster and without `### Best Options This Turn`.
  * Exceptions: None.
  */
 function testStrategicOperationalMapOmitsBestOptionsHeadingWhenEmpty(): void {
@@ -152,10 +139,10 @@ function testStrategicOperationalMapOmitsBestOptionsHeadingWhenEmpty(): void {
   };
   const md = buildStrategicOperationalMapSectionMarkdown({
     state,
-    precomputed: EMPTY_PRECOMPUTED,
     latLngByH3: new Map([[res1Human, [lat, lng]]]),
   });
-  assert.ok(md.includes('### Unit Roster'), 'expected roster heading when map renders');
+  assert.ok(md.includes('```'), 'expected ASCII map fence when units exist');
+  assert.ok(!md.includes('### Unit Roster'), 'strategic omits Unit Roster; Unit Status covers threats');
   assert.ok(!md.includes('### Best Options This Turn'), 'expected no empty Best Options heading');
 }
 
@@ -195,7 +182,6 @@ function testStrategicFogHidesEnemyMarkersOnMap(): void {
   };
   const hiddenMd = buildStrategicOperationalMapSectionMarkdown({
     state: hiddenState,
-    precomputed: EMPTY_PRECOMPUTED,
     latLngByH3,
   });
   assert.ok(!firstFenceBody(hiddenMd).includes('!'), 'hidden human should not render ! overlay in fenced map');
@@ -206,7 +192,6 @@ function testStrategicFogHidesEnemyMarkersOnMap(): void {
   };
   const visibleMd = buildStrategicOperationalMapSectionMarkdown({
     state: visibleState,
-    precomputed: EMPTY_PRECOMPUTED,
     latLngByH3,
   });
   assert.ok(firstFenceBody(visibleMd).includes('!'), 'visible human cell should render ! in fenced map');

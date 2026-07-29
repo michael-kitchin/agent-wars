@@ -40,6 +40,8 @@ import {
   planRouteNoPathHint,
   resolveRoutePathForUnit,
 } from './tool1PathfindingRouteResolution';
+import { executeTacticalCheckDistance, executeTacticalPlanRoute } from './tacticalTool1Pathfinding';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 
 /**
  * Defines the `h3ToLatLng` function shape (function h3ToLatLng(h3: string, latLngByH3: Map<string, LatLng>): LatLng).
@@ -921,9 +923,17 @@ export function executeTool1(
   state: GameStateSnapshot,
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined,
-  pathfindingSession?: PathfindingSession
+  pathfindingSession?: PathfindingSession,
+  /**
+   * When set, plan_route / check_distance use the tactical res4 march planner (Ready truncation) instead of strategic land-mass pathfinding.
+   */
+  tacticalBattle?: TacticalBattleSnapshot
 ): Record<string, unknown> {
-  logDebug('tool1Pathfinding executeTool1', { toolName, stateTurn: state.turnNumber });
+  logDebug('tool1Pathfinding executeTool1', {
+    toolName,
+    stateTurn: state.turnNumber,
+    tactical: Boolean(tacticalBattle),
+  });
   try {
     if (toolName === 'plan_route') {
       const a = args as { unitId?: string; destination?: unknown; options?: PlanRouteOptions };
@@ -944,6 +954,17 @@ export function executeTool1(
             'plan_route requires destination as a two-character briefing hex code from the operational map (see Available Tools schema); arguments are decoded before routing.',
         };
       }
+      if (tacticalBattle) {
+        return executeTacticalPlanRoute(
+          a.unitId,
+          dest,
+          a.options,
+          tacticalBattle,
+          state,
+          latLngByH3,
+          resolveToH3
+        ) as unknown as Record<string, unknown>;
+      }
       const result = pathfindingSession
         ? executePlanRouteWithSession(a.unitId, dest, a.options, pathfindingSession)
         : executePlanRoute(a.unitId, dest, a.options, state, latLngByH3, resolveToH3);
@@ -963,6 +984,16 @@ export function executeTool1(
           error:
             'check_distance requires from, to, and unitType. from and to must each be a two-character briefing hex code (decoded to map cells before this tool runs).',
         };
+      }
+      if (tacticalBattle) {
+        return executeTacticalCheckDistance(
+          from,
+          to,
+          a.unitType,
+          tacticalBattle,
+          latLngByH3,
+          resolveToH3
+        ) as unknown as Record<string, unknown>;
       }
       const result = executeCheckDistance(from, to, a.unitType, state, latLngByH3, resolveToH3);
       return result as unknown as Record<string, unknown>;

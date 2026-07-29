@@ -11,6 +11,7 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { dbGetOne, dbRun, isDbReady, saveDatabase } from '../gameDb';
 import { logDebug, logError } from '../logger';
 import { clearTacticalTransportBaselineFromGameConfig } from './tacticalTransportBaseline';
+import { clearTacticalCallbackStashFromGameConfig } from './tacticalCallbackStashPersistence';
 
 /**
  * Game-config key that stores the serialized active tactical battle session payload.
@@ -62,6 +63,7 @@ export function clearTacticalBattleSnapshotFromGameConfig(): void {
   try {
     dbRun('DELETE FROM game_config WHERE key = ?', [TACTICAL_BATTLE_SNAPSHOT_CONFIG_KEY]);
     clearTacticalTransportBaselineFromGameConfig();
+    clearTacticalCallbackStashFromGameConfig();
     saveDatabase();
   } catch (err) {
     logError('clearTacticalBattleSnapshotFromGameConfig: delete failed', err);

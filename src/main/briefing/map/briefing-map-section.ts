@@ -1,14 +1,13 @@
 /**
  * Assembles the full "Operational Map" markdown section for Commander briefings.
  *
- * Purpose: Phase 6 integration point: map + displaced footnote + Best Options This Turn table + unit roster.
- * When to use: Replace the legacy `# Possible Unit Actions` block for strategic precomputed briefings.
+ * Purpose: Map + displaced footnote + Best Options This Turn when non-empty (no Unit Roster — Unit Status covers threats/nearest).
+ * When to use: Replace the legacy `# Possible Unit Actions` block for strategic and tactical precomputed briefings.
  * Expected outcome: Self-contained markdown with legend, ASCII map, and compact tables using hex codes.
  * Exceptions: Returns a short fallback message if no friendly/enemy units exist (strategic map not rendered in that case).
  */
 
 import type { GameStateSnapshot } from '../../gameDb';
-import type { PrecomputationResult } from '../../precomputation';
 import { logDebug } from '../../logger';
 import { collectAggregatedPossibleActionRows, type PossibleActionsIndexedState } from '../../openrouter/possibleUnitActions';
 import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
@@ -25,8 +24,6 @@ import { renderHexAsciiMap } from './hex-map-renderer';
 import {
   renderDisplacedFeaturesLine,
   renderThisTurnOptionsTableMarkdown,
-  renderTacticalOpponentRosterMarkdown,
-  renderUnitRosterTableMarkdown,
 } from './briefing-tables';
 
 /**
@@ -54,7 +51,6 @@ function formatBestOptionsThisTurnSubsection(optionsMd: string): string {
  */
 export function buildStrategicOperationalMapSectionMarkdown(args: {
   state: GameStateSnapshot;
-  precomputed: PrecomputationResult;
   latLngByH3: Map<string, [number, number]>;
   indexedState?: PossibleActionsIndexedState;
 }): string {
@@ -92,7 +88,6 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
     indexedState: args.indexedState,
   });
   const optionsMd = renderThisTurnOptionsTableMarkdown(aggRows, args.latLngByH3, context);
-  const rosterMd = renderUnitRosterTableMarkdown(args.precomputed.unitAssessments, context);
   const displacedLine = renderDisplacedFeaturesLine(displacedFeatures);
 
   const legend =
@@ -105,8 +100,7 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
   return (
     `# Operational Map\n\n${legend}\`\`\`\n${mapString}\n\`\`\`\n\n` +
     `${displacedLine}\n` +
-    `${formatBestOptionsThisTurnSubsection(optionsMd)}` +
-    `### Unit Roster\n\n${rosterMd}\n`
+    `${formatBestOptionsThisTurnSubsection(optionsMd)}`
   );
 }
 
@@ -166,7 +160,7 @@ function buildStrategicHexGameStateMap(state: GameStateSnapshot, mapHexes: strin
  *
  * Purpose: Tactical AI consultations reuse the same ASCII format with a res4 registry scoped to one battle.
  * When to use: `requestOrdersFlow` appends this under a tactical heading after the strategic briefing block.
- * Expected outcome: Compact tactical map plus the same companion tables, all using res4 hex codes.
+ * Expected outcome: Compact tactical map plus Best Options This Turn when non-empty, all using res4 hex codes.
  * Exceptions: None beyond missing tactical registry initialization (handled via `initTacticalCoordinateRegistry`).
  */
 export function buildTacticalOperationalMapSectionMarkdown(args: {
@@ -204,7 +198,6 @@ export function buildTacticalOperationalMapSectionMarkdown(args: {
     forThisTurnOptionsTable: true,
   });
   const optionsMd = renderThisTurnOptionsTableMarkdown(aggRows, args.latLngByH3, context);
-  const rosterMd = renderTacticalOpponentRosterMarkdown(args.state, context);
   const displacedLine = renderDisplacedFeaturesLine(displacedFeatures);
 
   const legend =
@@ -216,8 +209,7 @@ export function buildTacticalOperationalMapSectionMarkdown(args: {
   return (
     `${legend}\`\`\`\n${mapString}\n\`\`\`\n\n` +
     `${displacedLine}\n` +
-    `${formatBestOptionsThisTurnSubsection(optionsMd)}` +
-    `### Unit Roster\n\n${rosterMd}\n`
+    `${formatBestOptionsThisTurnSubsection(optionsMd)}`
   );
 }
 
