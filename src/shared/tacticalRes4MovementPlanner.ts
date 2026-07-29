@@ -412,3 +412,51 @@ export function planTacticalRes4March(args: {
     firstStopWithinBudget: { stopH3, consumedFullPath },
   };
 }
+
+/**
+ * Single-source naval (non-land-continuity) reachability within one beat’s MP budget.
+ *
+ * Purpose: Tactical Best Options analogue of strategic naval `gridDisk` + passability listing — one Dijkstra from the origin
+ * using the same `enterCostForHex` rules as `planTacticalRes4March`, instead of one plan per disk candidate.
+ * When to use: `collectTacticalLegalMoveDestinationRes4Hexes` for naval (and any future non-infantry/armor march types that share this enter-cost path).
+ * Expected outcome: Destination hexes with total enter cost ≤ budget, excluding the origin.
+ * Exceptions: None; never throws.
+ */
+export function collectSimpleEnterCostReachableWithinBudget(args: {
+  fromH3: string;
+  res4Set: ReadonlySet<string>;
+  unitTypeForMovement: string;
+  movementPointBudget: number;
+  terrain: TacticalTerrainKindResolver;
+  footprintNeighbors?: Res4FootprintNeighborLookup;
+}): string[] {
+  const { fromH3, res4Set, unitTypeForMovement, movementPointBudget, terrain } = args;
+  const neighborsOf = args.footprintNeighbors ?? ((h: string) => res4NeighborsInFootprint(h, res4Set));
+  if (!res4Set.has(fromH3) || movementPointBudget < 1) return [];
+  const dist = new Map<string, number>([[fromH3, 0]]);
+  const heap: NumericPriorityHeapEntry<string>[] = [];
+  pushNumericPriorityMinHeap(heap, fromH3, 0);
+  while (heap.length > 0) {
+    const node = popNumericPriorityMinHeap(heap);
+    if (!node) break;
+    const { payload: h, d } = node;
+    if (d !== dist.get(h)) continue;
+    if (d > movementPointBudget) continue;
+    for (const nb of neighborsOf(h)) {
+      const w = enterCostForHex(nb, unitTypeForMovement, terrain, h);
+      if (!Number.isFinite(w) || w <= 0) continue;
+      const nd = d + w;
+      if (nd > movementPointBudget) continue;
+      const prev = dist.get(nb);
+      if (prev === undefined || nd < prev) {
+        dist.set(nb, nd);
+        pushNumericPriorityMinHeap(heap, nb, nd);
+      }
+    }
+  }
+  const out: string[] = [];
+  for (const [h, cost] of dist) {
+    if (h !== fromH3 && cost <= movementPointBudget) out.push(h);
+  }
+  return out;
+}

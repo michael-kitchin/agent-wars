@@ -30,6 +30,7 @@ import { tacticalLogMutate } from './tacticalBattle/tacticalLogging';
 import { logHybridPipelineBoundary } from './hybridTurnPipeline';
 import { logDebug } from './logger';
 import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
+import { tacticalOpponentPlanFromRequestOrdersSuccess } from '../shared/ipc/tacticalOpponentPlanMerge';
 import type {
   GameReadyIpcPayload,
   RequestAiOrdersResult,
@@ -39,7 +40,6 @@ import type {
   FerryOrder,
   ReadyResult,
   ResolveMeleeInterceptIpcPayload,
-  TacticalOpponentPlanPayload,
 } from '../shared/ipcTypes';
 import { buildStrategicUnitDisplayLabelResolver } from '../shared/unitDisplayNames';
 export type { RequestAiOrdersResult } from '../shared/ipcTypes';
@@ -207,13 +207,7 @@ export async function handleRequestAiOrders(
       tacticalAiBattle: activeTactical ?? undefined,
     });
     if (activeTactical && raw.success === true) {
-      const tacticalOpponentPlan: TacticalOpponentPlanPayload = {
-        movementOrders: [...raw.orders],
-        rangedAttacks: [...(raw.rangedAttacks ?? [])],
-        airStrikes: [...(raw.airStrikes ?? [])],
-        ferryOrders: [...(raw.ferryOrders ?? [])],
-        embarkOrders: [...(raw.embarkOrders ?? [])],
-      };
+      const tacticalOpponentPlan = tacticalOpponentPlanFromRequestOrdersSuccess(raw);
       logDebug('handleRequestAiOrders tactical opponent plan buffered', {
         movementCount: tacticalOpponentPlan.movementOrders.length,
         rangedCount: tacticalOpponentPlan.rangedAttacks.length,

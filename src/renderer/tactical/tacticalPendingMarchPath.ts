@@ -5,6 +5,7 @@
 import { findPathTailFromCurrentPosition } from '../../shared/marchPathUtils';
 import type { TacticalPendingMarchRow } from '../../shared/ipc/humanOrderPreviewTypes';
 import { buildTacticalMarchDraftDestinationPreview } from '../../shared/tacticalMarchHoverPreview';
+import { filterTacticalMarchContinuationsToPresentSubUnits } from '../../shared/tacticalMarchContinuations';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 
 /**
@@ -12,7 +13,7 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
  *
  * Purpose: Keeps tactical march overlay polylines stable across beats by advancing stored H3 paths instead of replanning.
  * When to use: `readyHandler` after tactical Ready commit when `tacticalMarchContinuations` is non-empty.
- * Expected outcome: Each row includes `pathH3Indexes` and `cachedSegments` when a valid route exists; falls back to fresh planning when off-path.
+ * Expected outcome: Each row includes `pathH3Indexes` and `cachedSegments` when a valid route exists; falls back to fresh planning when off-path. Continuations for sub-units absent from `battle.subUnits` are omitted.
  * Exceptions: None.
  */
 export function buildTacticalPendingMarchRowsFromContinuations(args: {
@@ -20,7 +21,12 @@ export function buildTacticalPendingMarchRowsFromContinuations(args: {
   continuations: readonly { subUnitId: string; destinationH3Index: string }[];
   previousBySubUnitId: ReadonlyMap<string, TacticalPendingMarchRow>;
 }): TacticalPendingMarchRow[] {
-  return args.continuations.map((cont) => {
+  const livingIds = new Set(args.battle.subUnits.map((u) => u.id));
+  const livingContinuations = filterTacticalMarchContinuationsToPresentSubUnits(
+    args.continuations,
+    livingIds
+  );
+  return livingContinuations.map((cont) => {
     const prev = args.previousBySubUnitId.get(cont.subUnitId);
     const sub = args.battle.subUnits.find((u) => u.id === cont.subUnitId);
     const newUnitH3 = sub?.h3Index;

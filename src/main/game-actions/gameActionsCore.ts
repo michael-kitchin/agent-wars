@@ -32,6 +32,7 @@ import type {
 } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { clipTacticalMarchPathToDestination } from '../../shared/tacticalMarchPlaybackPath.js';
+import { filterTacticalMarchContinuationsToPresentSubUnits } from '../../shared/tacticalMarchContinuations';
 import { committedOpponentTacticalDraftFieldAfterConsume } from '../../shared/ipc/tacticalOpponentPlanMerge';
 import { passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
 import { executePlanRoute } from '../tools/tool1Pathfinding';
@@ -179,10 +180,10 @@ reason?: string;
   /**
    * Specifies the contract for the `tacticalMarchContinuations` member (tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];).
 
-   * Contract: Present when human march drafts were truncated to per-turn range; renderer re-queues these as pending marches for later tactical turns.
+   * Contract: Present when human march drafts were truncated to per-turn range; renderer re-queues these as pending marches for later tactical turns. Rows are limited to sub-units still on the post-beat roster (combat removals in the same beat are omitted).
    * When to use: Successful `commitHumanTacticalDraftOrders` only, alongside `tacticalBattle` refresh.
-   * Expected outcome: Each row is a human sub-unit id plus the original ordered destination still to reach.
-   * Exceptions: None; omit when every march completed in one apply step.
+   * Expected outcome: Each row is a living human sub-unit id plus the original ordered destination still to reach.
+   * Exceptions: None; omit when every march completed in one apply step or every continuing marcher was removed.
    */
   tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
   /**
@@ -864,7 +865,7 @@ export function sanitizeOpponentTacticalDraftForReadyCommit(
  *
  * Purpose: Tactical parity with strategic Ready by applying all tactical draft types in one commit boundary.
  * When to use: `game:commitHumanTacticalDraftOrders` IPC with renderer draft lists at tactical Ready time.
- * Expected outcome: `success: true` with `tacticalBattle` snapshot for immediate redraw, or failure with reason. Human marches apply at most one range-limited leg per commit; any remaining distance returns as `tacticalMarchContinuations` for the renderer pending list. Successful commits with `embarkOrders` also persist parent-level sealift rows in SQLite (same boundary as strategic Ready embark).
+ * Expected outcome: `success: true` with `tacticalBattle` snapshot for immediate redraw, or failure with reason. Human marches apply at most one range-limited leg per commit; any remaining distance returns as `tacticalMarchContinuations` for living sub-units only (combat removals in the same beat are omitted). Successful commits with `embarkOrders` also persist parent-level sealift rows in SQLite (same boundary as strategic Ready embark).
  * Exceptions: Caught and logged at error; returns `success: false` with stringified message.
  */
 export function commitHumanTacticalDraftOrders(args: {
@@ -1104,6 +1105,20 @@ export function commitHumanTacticalDraftOrders(args: {
       meleeCasualtyHexes: meleePack.meleeCasualtyHexes.length > 0 ? meleePack.meleeCasualtyHexes : undefined,
       meleeRemovedUnits: meleePack.meleeRemovedUnits.length > 0 ? meleePack.meleeRemovedUnits : undefined,
     };
+    const livingSubUnitIds = new Set(finalBattle.subUnits.map((u) => u.id));
+    const livingMarchContinuations = filterTacticalMarchContinuationsToPresentSubUnits(
+      tacticalMarchContinuations,
+      livingSubUnitIds
+    );
+    if (livingMarchContinuations.length !== tacticalMarchContinuations.length) {
+      logDebug('gameActions commitHumanTacticalDraftOrders dropped march continuations for removed sub-units', {
+        beforeCount: tacticalMarchContinuations.length,
+        afterCount: livingMarchContinuations.length,
+        droppedSubUnitIds: tacticalMarchContinuations
+          .filter((row) => !livingSubUnitIds.has(row.subUnitId))
+          .map((row) => row.subUnitId),
+      });
+    }
     logDebug('gameActions commitHumanTacticalDraftOrders playback', {
       humanMoveCount: humanMoves.length,
       opponentMoveCount: opponentMoves.length,
@@ -1117,7 +1132,7 @@ export function commitHumanTacticalDraftOrders(args: {
       airStrikeKillEdgeCount: support.killsByAirStrike.length,
       meleeKillEdgeCount: meleePack.killsByMelee.length,
       meleeRemovedCount: meleePack.meleeRemovedUnits.length,
-      marchContinuationCount: tacticalMarchContinuations.length,
+      marchContinuationCount: livingMarchContinuations.length,
     });
     /**
      * Persists human tactical embark onto strategic `unit_transport_assignments` after the beat succeeded.
@@ -1162,7 +1177,7 @@ export function commitHumanTacticalDraftOrders(args: {
       tacticalBattle: finalBattle,
       tacticalResolutionPlayback,
       tacticalMarchContinuations:
-        tacticalMarchContinuations.length > 0 ? tacticalMarchContinuations : undefined,
+        livingMarchContinuations.length > 0 ? livingMarchContinuations : undefined,
       ...committedOpponentTacticalDraftFieldAfterConsume(Boolean(args.opponentTacticalDraft)),
     };
   } catch (err) {

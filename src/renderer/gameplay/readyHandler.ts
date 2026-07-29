@@ -31,6 +31,8 @@ import {
 } from '../openRouter/aiPlanningState';
 import { buildTacticalPendingMarchRowsFromContinuations } from '../tactical/tacticalPendingMarchPath';
 import { enqueueResolutionPlaybackCompleteNotify } from '../openRouter/resolutionPlaybackDeferral';
+import { reconcileSelectionToCurrentState } from '../core/selection';
+import { applyToolInvocationCountsAfterReady } from '../openRouter/openRouterUiHelpers';
 
 /**
  * Documents the `ReadyHandlerDeps` interface as a named contract surface (export interface ReadyHandlerDeps).
@@ -700,11 +702,17 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
   }
   deps.clearSidebarError();
   S.readyRequestInFlight = true;
+  const toolCountsBeforeReadyClick = { ...S.toolInvocationCounts };
+  const cachedPrecomputedToolCountsAtReadyStart = S.precomputedToolInvocationCounts
+    ? { ...S.precomputedToolInvocationCounts }
+    : null;
   S.toolInvocationCounts = Object.fromEntries(S.openRouterToolGroups.map((g) => [g.id, 0]));
   deps.updateOpenRouterToolCountLabels();
   deps.updateReadyButtonState();
   try {
     if (isWaitingForPrecomputedAiOrders()) {
+      S.toolInvocationCounts = toolCountsBeforeReadyClick;
+      deps.updateOpenRouterToolCountLabels();
       deps.startBackgroundRequestIfAllowed();
       deps.showMapToast('AI planning is still running. Ready will unlock once precomputed orders are available.', { isError: false });
       deps.updateReadyButtonState();
@@ -713,11 +721,20 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     if (S.tacticalBattleSnapshot && S.tacticalPhasePlanning) {
       const commit = window.gameApi.commitHumanTacticalDraftOrders;
       if (!commit) {
+        S.toolInvocationCounts = toolCountsBeforeReadyClick;
+        deps.updateOpenRouterToolCountLabels();
         deps.showSidebarError('Tactical commit is not available in this build.');
         deps.updateReadyButtonState();
         return;
       }
-      const movementOrders = S.tacticalPendingMarches.map((r) => ({ unitId: r.subUnitId, toH3Index: r.destinationH3Index }));
+      const livingSubUnitIds = new Set(S.tacticalBattleSnapshot.subUnits.map((u) => u.id));
+      S.tacticalPendingMarches = S.tacticalPendingMarches.filter((row) =>
+        livingSubUnitIds.has(row.subUnitId)
+      );
+      const movementOrders = S.tacticalPendingMarches.map((r) => ({
+        unitId: r.subUnitId,
+        toH3Index: r.destinationH3Index,
+      }));
       const commitResult = (await commit({
         movementOrders,
         rangedAttacks: [...S.pendingRangedAttacks],
@@ -742,6 +759,8 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         tacticalPostBeatConsultDeferred?: boolean;
       };
       if (!commitResult.success) {
+        S.toolInvocationCounts = toolCountsBeforeReadyClick;
+        deps.updateOpenRouterToolCountLabels();
         deps.showSidebarError(commitResult.reason ?? 'Tactical commit failed');
         deps.updateReadyButtonState();
         return;
@@ -808,6 +827,8 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       if (commitResult.tacticalBattle) {
         S.tacticalBattleSnapshot = commitResult.tacticalBattle;
       }
+      // Drop selection / drafts that referenced sub-units removed during this beat before the next planning click.
+      reconcileSelectionToCurrentState();
       // Consume any opponent draft that was just applied (or emptied by sanitize). Post-beat consult may refill below.
       if ('committedOpponentTacticalDraft' in commitResult) {
         S.tacticalOpponentDraft = null;
@@ -823,11 +844,13 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         }
         if (commitResult.aiStrategy) deps.showAiStrategyToast(commitResult.aiStrategy);
         else deps.hideAiStrategyToast();
-        if (commitResult.toolInvocationCounts) {
-          S.toolInvocationCounts = { ...S.toolInvocationCounts, ...commitResult.toolInvocationCounts };
-          deps.updateOpenRouterToolCountLabels();
-        }
       }
+      // Same rule as strategic Ready: prefer this beat's consult counts, else keep prefetch telemetry visible.
+      applyToolInvocationCountsAfterReady({
+        fromResult: commitResult.toolInvocationCounts,
+        cachedPrecomputed: cachedPrecomputedToolCountsAtReadyStart,
+        allowPrecomputedFallback: S.runButtonOn && cachedPrecomputedToolCountsAtReadyStart != null,
+      });
       // Intentionally no `withTacticalHumanDraftPrefetchInvalidation` here: Phase-4 prefetch cancel on *human edits*
       // during tactical planning uses that wrapper on sidebar/map paths. This block replaces pending rows from the
       // successful commit IPC (continuations + cleared ranged/air/ferry/embark), not a mid-flight draft tweak.
@@ -964,9 +987,9 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     const enabledToolGroupsPayload = Array.from(S.enabledToolGroups).filter((id) => id !== 'events');
     const useEventDriven = S.useEventDrivenConsultation;
     const usePrecomputed = S.runButtonOn && S.precomputedAiOrders !== null;
-    const cachedPrecomputedToolCounts = S.precomputedToolInvocationCounts
-      ? { ...S.precomputedToolInvocationCounts }
-      : null;
+    const cachedPrecomputedToolCounts =
+      cachedPrecomputedToolCountsAtReadyStart ??
+      (S.precomputedToolInvocationCounts ? { ...S.precomputedToolInvocationCounts } : null);
     const readyPayload = buildReadyPayload({
       enabledToolGroupsPayload,
       useEventDriven,
@@ -976,6 +999,8 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     let readyResult = await deps.callReadyWithTimeout(readyPayload);
     let resolutionPlaybackNotifyKind: 'strategic' | 'melee' = 'strategic';
     if (!readyResult.success) {
+      S.toolInvocationCounts = toolCountsBeforeReadyClick;
+      deps.updateOpenRouterToolCountLabels();
       deps.showSidebarError(readyResult.reason ?? 'Ready failed');
       deps.updateReadyButtonState();
       return;
@@ -983,6 +1008,8 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
 
     if (readyResult.awaitingMeleeDecision) {
       if (!window.gameApi.resolveMeleeIntercept) {
+        S.toolInvocationCounts = toolCountsBeforeReadyClick;
+        deps.updateOpenRouterToolCountLabels();
         deps.showSidebarError('Melee intercept resolve is not available in this build.');
         deps.updateReadyButtonState();
         return;
@@ -1013,6 +1040,8 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         enabledToolGroups: enabledToolGroupsPayload,
       });
       if (!resolveResult.success) {
+        S.toolInvocationCounts = toolCountsBeforeReadyClick;
+        deps.updateOpenRouterToolCountLabels();
         deps.showSidebarError(resolveResult.reason ?? 'Melee resolve failed');
         deps.updateReadyButtonState();
         return;
@@ -1043,14 +1072,11 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     if (readyResult.aiStrategy) deps.showAiStrategyToast(readyResult.aiStrategy);
     else deps.hideAiStrategyToast();
 
-    if (readyResult.toolInvocationCounts) {
-      S.toolInvocationCounts = readyResult.toolInvocationCounts;
-      deps.updateOpenRouterToolCountLabels();
-    } else if (usePrecomputed && cachedPrecomputedToolCounts) {
-      S.toolInvocationCounts = Object.assign({}, cachedPrecomputedToolCounts);
-      deps.updateOpenRouterToolCountLabels();
-    }
-    S.precomputedToolInvocationCounts = null;
+    applyToolInvocationCountsAfterReady({
+      fromResult: readyResult.toolInvocationCounts,
+      cachedPrecomputed: cachedPrecomputedToolCounts,
+      allowPrecomputedFallback: usePrecomputed,
+    });
     if (readyResult.cost !== undefined) {
       S.openRouterGameCost += readyResult.cost;
       deps.updateOpenRouterCostLabel();

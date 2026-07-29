@@ -36,11 +36,11 @@ const LAND_STATE_SEP = '\u0000';
  * Encodes land march Dijkstra state as a single map key: current hex plus the hex we entered from (null at the origin state).
  *
  * Purpose: Distinguishes identical cells reached with different transport-continuity histories without allocating objects per heap push.
- * When to use: Stateful land march search only.
+ * When to use: Stateful land march search and single-source within-budget reachability collectors.
  * Expected outcome: Round-trips with `parseLandStateKey`.
  * Exceptions: None.
  */
-function landStateKey(h: string, prev: string | null): string {
+export function landStateKey(h: string, prev: string | null): string {
   return `${h}${LAND_STATE_SEP}${prev ?? ''}`;
 }
 
@@ -48,11 +48,11 @@ function landStateKey(h: string, prev: string | null): string {
  * Decodes a `landStateKey` string into `{ h, prev }` for path reconstruction.
  *
  * Purpose: Reverses `landStateKey` after Dijkstra completes.
- * When to use: Rebuilding the cheapest land path from predecessor links.
+ * When to use: Rebuilding the cheapest land path from predecessor links, or aggregating best cost per hex in multi-sink searches.
  * Expected outcome: `prev` is null when the key’s predecessor segment is empty (origin).
  * Exceptions: None.
  */
-function parseLandStateKey(key: string): { h: string; prev: string | null } {
+export function parseLandStateKey(key: string): { h: string; prev: string | null } {
   const i = key.indexOf(LAND_STATE_SEP);
   if (i < 0) return { h: key, prev: null };
   const h = key.slice(0, i);
@@ -179,11 +179,12 @@ function landTransportPlainsEnterAllowed(args: {
  * Purpose: Prevents **transiting** through a hex that is impassable without transport (e.g. armor in `mountains`, infantry in `water`)
  * unless road/rail masks on `h` admit a corridor `prev → h → nb`. March start and goal cells skip this check so blocked destinations
  * still follow `landTransportPlainsEnterAllowed` / first-step witness rules only.
- * When to use: Neighbor expansion inside `planInfantryArmorLandContinuityMarch` for `infantry` / `armor` only.
+ * When to use: Neighbor expansion inside `planInfantryArmorLandContinuityMarch` for `infantry` / `armor` only; also single-source
+ * reachability collectors that must match that search.
  * Expected outcome: False when `h` is blocked, `prev` is set, `h` is neither start nor goal, and `tacticalRes4TransportMarchInteriorContinuity` fails (or legacy `transportFromTo` lacks both legs).
  * Exceptions: None.
  */
-function blockedHexLandTransitAllowsRelaxation(args: {
+export function blockedHexLandTransitAllowsRelaxation(args: {
   unitTypeForMovement: string;
   terrain: TacticalTerrainKindResolver;
   h: string;

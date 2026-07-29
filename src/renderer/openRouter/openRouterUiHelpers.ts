@@ -2,6 +2,7 @@ import type { GameApi, GameReadyIpcPayload } from '../../shared/ipcTypes';
 import { READY_REQUEST_TIMEOUT_MS, TOAST_DURATION_MS } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { isDeferredResolutionPlaybackConsultPending, isWaitingForPrecomputedAiOrders } from './aiPlanningState';
+import { resolveToolInvocationCountsAfterReady } from '../../shared/openRouterToolInvocationCounts';
 
 /**
  * Defines the `formatElapsedMmSs` function shape (export function formatElapsedMmSs(ms: number): string).
@@ -101,6 +102,30 @@ export function updateOpenRouterToolCountLabels(): void {
     const btn = document.querySelector(`.openrouter-tool-toggle[data-tool-group="${group.id}"]`);
     if (btn) btn.textContent = String(S.toolInvocationCounts[group.id] ?? 0);
   }
+}
+
+/**
+ * Applies tool-group counts after strategic Ready or tactical commit, with precomputed fallback.
+ *
+ * Purpose: Ready zeros the UI counters at click time; strategic Ready restores from the IPC result or cached
+ * precomputed counts. Tactical commit must use the same rule so prefetch tool usage is not wiped when post-beat
+ * consultation omits or defers `toolInvocationCounts`.
+ * When to use: After a successful strategic `ready` / melee resolve, or after a successful tactical draft commit.
+ * Expected outcome: Replaces `S.toolInvocationCounts` from `fromResult` when present; otherwise restores
+ * `cachedPrecomputed` when `allowPrecomputedFallback` is true; always clears `S.precomputedToolInvocationCounts`.
+ * Exceptions: None.
+ */
+export function applyToolInvocationCountsAfterReady(args: {
+  fromResult?: Record<string, number>;
+  cachedPrecomputed: Record<string, number> | null;
+  allowPrecomputedFallback: boolean;
+}): void {
+  const next = resolveToolInvocationCountsAfterReady(args);
+  if (next) {
+    S.toolInvocationCounts = next;
+    updateOpenRouterToolCountLabels();
+  }
+  S.precomputedToolInvocationCounts = null;
 }
 
 /**

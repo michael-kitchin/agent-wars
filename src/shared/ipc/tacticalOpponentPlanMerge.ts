@@ -1,3 +1,4 @@
+import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from './ordersTypes';
 import type { TacticalOpponentPlanPayload } from './readyTypes';
 
 /**
@@ -15,11 +16,39 @@ export function tacticalOpponentPlanPayloadHasAnyOrders(
   if (plan == null) return false;
   return (
     plan.movementOrders.length +
-    plan.rangedAttacks.length +
-    plan.airStrikes.length +
-    plan.ferryOrders.length +
-    plan.embarkOrders.length
-  ) > 0;
+      plan.rangedAttacks.length +
+      plan.airStrikes.length +
+      plan.ferryOrders.length +
+      plan.embarkOrders.length >
+    0
+  );
+}
+
+/**
+ * Builds a buffered tactical opponent plan from a successful `requestOrders` / `requestOrdersFlow` payload.
+ *
+ * Purpose: `requestOrdersFlow` returns strategic-shaped `orders` arrays; tactical IPC and post-beat consultation need the
+ * renderer `tacticalOpponentPlan` shape. Without this wrap, post-beat consult treated success as “missing plan” and dropped
+ * `toolInvocationCounts` / strategy even though tools ran.
+ * When to use: `handleRequestAiOrders` after a tactical consultation, and `afterTacticalBeatResolution` when the injected
+ * `requestOrders` does not already attach `tacticalOpponentPlan`.
+ * Expected outcome: All five plan lists populated (possibly empty) from the success result’s order arrays.
+ * Exceptions: None.
+ */
+export function tacticalOpponentPlanFromRequestOrdersSuccess(raw: {
+  orders: readonly { unitId: string; toH3Index: string }[];
+  rangedAttacks?: readonly { unitId: string; targetH3Index: string }[];
+  airStrikes?: readonly AirStrikeOrder[];
+  ferryOrders?: readonly FerryOrder[];
+  embarkOrders?: readonly EmbarkOrder[];
+}): TacticalOpponentPlanPayload {
+  return {
+    movementOrders: [...raw.orders],
+    rangedAttacks: [...(raw.rangedAttacks ?? [])],
+    airStrikes: [...(raw.airStrikes ?? [])],
+    ferryOrders: [...(raw.ferryOrders ?? [])],
+    embarkOrders: [...(raw.embarkOrders ?? [])],
+  };
 }
 
 /**

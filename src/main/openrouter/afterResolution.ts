@@ -26,6 +26,7 @@ import {
 } from '../callbackEvaluation';
 import type { RequestAiOrdersResult, TacticalCommitResolutionPlayback } from '../../shared/ipcTypes';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/readyTypes';
+import { tacticalOpponentPlanFromRequestOrdersSuccess } from '../../shared/ipc/tacticalOpponentPlanMerge';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { getTacticalAnnihilationOutcome } from '../../shared/tacticalAnnihilation';
 import {
@@ -131,7 +132,7 @@ toolInvocationCounts?: Record<string, number>;
 
  * Purpose: Supports maintainability by documenting why `afterResolution` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Expected outcome: When consultation runs, pending opponent orders are stored (including empty movement lists) and `strategy` / `toolInvocationCounts` are returned for Ready IPC telemetry—same success gate as `afterTacticalBeatResolution`.
  * Exceptions: None.
  */
 export async function afterResolution(
@@ -195,7 +196,7 @@ export async function afterResolution(
         enabledToolNames: deps.enabledToolNames,
         usePrecomputation: true,
       });
-      if (result.success && result.orders) {
+      if (result.success === true) {
         setAiPendingOrders(
           'opponent',
           result.orders,
@@ -206,17 +207,22 @@ export async function afterResolution(
         );
         setAiLastConsultationTurn(state.turnNumber);
         clearOpponentCombatSinceConsultation();
-        logDebug('afterResolution: consultation completed, pending orders stored', { turnNumber: state.turnNumber });
+        logDebug('afterResolution: consultation completed, pending orders stored', {
+          turnNumber: state.turnNumber,
+          movementCount: result.orders.length,
+          hasToolInvocationCounts: Boolean(result.toolInvocationCounts),
+        });
         return {
           consulted: true,
           strategy: result.strategy,
           toolInvocationCounts: result.toolInvocationCounts,
         };
-      } else {
-        logDebug('afterResolution: requestOrders failed or returned no orders', result.success ? 'no orders' : (result as { error?: string }).error);
-        clearAiPendingOrders('opponent');
-        return { consulted: false };
       }
+      logDebug('afterResolution: requestOrders failed', {
+        error: (result as { error?: string }).error,
+      });
+      clearAiPendingOrders('opponent');
+      return { consulted: false };
     } catch (err) {
       logError('afterResolution: requestOrders exception', err);
       clearAiPendingOrders('opponent');
@@ -382,7 +388,7 @@ export interface AfterTacticalBeatResolutionResult {
  *
  * Purpose: Mirrors strategic `afterResolution` for res4 battles without writing strategic `setAiPendingOrders`.
  * When to use: After a successful `commitHumanTacticalDraftOrders` when the renderer sent event-driven flags.
- * Expected outcome: Buffered `tacticalOpponentPlan` when subscriptions, tactical mandatory rules, idle-opponent policy, or observable human beat actions demand a consultation pass.
+ * Expected outcome: Buffered `tacticalOpponentPlan` when subscriptions, tactical mandatory rules, idle-opponent policy, or observable human beat actions demand a consultation pass. Successful `requestOrders` results without a prebuilt `tacticalOpponentPlan` are normalized from `orders` arrays so tool counts and strategy still reach IPC.
  * Exceptions: Swallows LLM failures after logging; clears strategic pending orders when skipping or failing.
  * Annihilation: When `getTacticalAnnihilationOutcome(tacticalBattle.subUnits)` is non-null, skips immediately so no LLM runs while the renderer shows the tactical game-over modal.
  */
@@ -460,21 +466,25 @@ export async function afterTacticalBeatResolution(
       usePrecomputation: false,
       tacticalAiBattle: tacticalBattle,
     });
-    if (result.success === true && result.tacticalOpponentPlan) {
+    if (result.success === true) {
+      const tacticalOpponentPlan =
+        result.tacticalOpponentPlan ?? tacticalOpponentPlanFromRequestOrdersSuccess(result);
       setAiLastConsultationTurn(state.turnNumber);
       clearOpponentCombatSinceConsultation();
       logDebug('afterTacticalBeatResolution: tactical consultation completed', {
-        movementCount: result.tacticalOpponentPlan.movementOrders.length,
+        movementCount: tacticalOpponentPlan.movementOrders.length,
+        rangedCount: tacticalOpponentPlan.rangedAttacks.length,
+        hasToolInvocationCounts: Boolean(result.toolInvocationCounts),
       });
       return {
         consulted: true,
-        tacticalOpponentPlan: result.tacticalOpponentPlan,
+        tacticalOpponentPlan,
         strategy: result.strategy,
         toolInvocationCounts: result.toolInvocationCounts,
         attachTacticalOpponentPlanToIpc: true,
       };
     }
-    logDebug('afterTacticalBeatResolution: requestOrders missing tactical plan', { success: result.success });
+    logDebug('afterTacticalBeatResolution: requestOrders failed', { success: result.success });
     clearAiPendingOrders('opponent');
     return { consulted: false, attachTacticalOpponentPlanToIpc: true };
   } catch (err) {

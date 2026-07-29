@@ -1,10 +1,12 @@
 /**
  * Builds the "Possible unit actions" markdown block for AI Commander's Briefings.
- * Derives legal one-step moves/melee reach, air ferry destinations, ranged attacks, and air strikes from order validation rules.
+ * Derives legal moves/melee reach, air ferry destinations, ranged attacks, and air strikes from order validation rules.
  *
- * When `tacticalBattle` is passed, **ranged** rows use `collectTacticalLegalRangedTargetRes4Hexes` and **ground move** rows use
- * `collectTacticalLegalMoveDestinationRes4Hexes` (terrain-weighted MP this beat); air ferry/strike lists still use strategic-style
- * helpers on the projected `state`.
+ * Strategic vs tactical reachability (intentional parity of *pipeline*, not hex sets):
+ * - Strategic ground: `getValidDestinations` → res1 `getLandMassReachableHexes` (hop BFS).
+ * - Tactical ground: `collectTacticalLegalMoveDestinationRes4Hexes` → single-source MP reachability (Ready rules).
+ * Best Options This Turn interest filters share `keepsBestOptionsThisTurnInterestHex` (enemy ∪ interesting infra);
+ * tactical alone adds approach when interest is empty.
  */
 
 import { gridDistance, gridDisk } from 'h3-js';
@@ -465,27 +467,43 @@ function collectLegalFerryDestinationHexes(
   return [...out];
 }
 /**
- * Defines the `filterGroundMoveHexesForThisTurnOptionsTable` function shape (function filterGroundMoveHexesForThisTurnOptionsTable(indexed: IndexedState, hexes: string[]): string[]).
+ * Shared Best Options This Turn interest predicate (enemy contact or interesting infrastructure).
+ *
+ * Purpose: Keeps strategic and tactical Best Options ground/ranged interest filters on the same rule shape.
+ * When to use: After mode-specific adapters compute `enemyOccupied` / `interestingInfrastructure` for a hex.
+ * Expected outcome: True when either signal is set.
+ * Exceptions: None.
+ */
+function keepsBestOptionsThisTurnInterestHex(signals: {
+  enemyOccupied: boolean;
+  interestingInfrastructure: boolean;
+}): boolean {
+  return signals.enemyOccupied || signals.interestingInfrastructure;
+}
 
- * Purpose: Restricts **Best Options This Turn** move/melee rows to enemy-occupied hexes or uncontrolled res1 cells that still show urban, airport, or seaport infrastructure.
+/**
+ * Restricts **Best Options This Turn** move/melee rows to enemy-occupied hexes or uncontrolled res1 cells that still show urban, airport, or seaport infrastructure.
+ *
+ * Purpose: Strategic interest filter for the Commander Best Options table (same shape as tactical: enemy ∪ interesting infra).
  * When to use: Only from `collectAggregatedPossibleActionRows` when `forThisTurnOptionsTable` is true for non-air units in **strategic** mode (air ferry lists skip this filter).
  * Expected outcome: Filtered subset of `hexes` in caller iteration order.
  * Exceptions: None.
  */
 function filterGroundMoveHexesForThisTurnOptionsTable(indexed: IndexedState, hexes: string[]): string[] {
   return hexes.filter((h3) => {
-    if ((indexed.enemyUnitsByHex.get(h3)?.length ?? 0) > 0) return true;
+    const enemyOccupied = (indexed.enemyUnitsByHex.get(h3)?.length ?? 0) > 0;
     const controller = indexed.controlByHex.get(h3) ?? null;
-    if (controller !== null) return false;
     const inf = getInfra(indexed, h3);
-    return inf.urban > 0 || inf.airport > 0 || inf.seaport > 0;
+    const interestingInfrastructure =
+      controller === null && (inf.urban > 0 || inf.airport > 0 || inf.seaport > 0);
+    return keepsBestOptionsThisTurnInterestHex({ enemyOccupied, interestingInfrastructure });
   });
 }
 
 /**
  * Restricts tactical Best Options move/melee rows to human-occupied res4 cells or urban/airport/seaport infrastructure.
  *
- * Purpose: Mirrors the strategic ground-move Best Options intent without using res1 control maps that do not apply inside a tactical footprint.
+ * Purpose: Same Best Options interest shape as strategic (`keepsBestOptionsThisTurnInterestHex`) without res1 control maps.
  * When to use: Only from `collectAggregatedPossibleActionRows` when `forThisTurnOptionsTable` and `tacticalBattle` are set for non-air units.
  * Expected outcome: Subset of `hexes` in caller iteration order.
  * Exceptions: None.
@@ -504,12 +522,13 @@ function filterTacticalGroundMoveHexesForThisTurnOptionsTable(
 ): string[] {
   const rowByH3 = new Map(tacticalRangedRows.map((r) => [r.h3Index, r] as const));
   return hexes.filter((h3) => {
-    if (humanOccupiedH3.has(h3)) return true;
-    if (battle.res4IsUrbanByH3?.[h3]) return true;
-    if (battle.res4IsSeaportByH3?.[h3]) return true;
+    const enemyOccupied = humanOccupiedH3.has(h3);
     const row = rowByH3.get(h3);
-    if (row && !row.isRubble && (row.isUrban || row.isAirport || row.isSeaport)) return true;
-    return false;
+    const interestingInfrastructure =
+      !!battle.res4IsUrbanByH3?.[h3] ||
+      !!battle.res4IsSeaportByH3?.[h3] ||
+      (!!row && !row.isRubble && (row.isUrban || row.isAirport || row.isSeaport));
+    return keepsBestOptionsThisTurnInterestHex({ enemyOccupied, interestingInfrastructure });
   });
 }
 
@@ -581,12 +600,13 @@ function filterTacticalRangedHexesForThisTurnOptionsTable(
   if (!self) return hexes;
   const rowByH3 = new Map(tacticalRangedRows.map((r) => [r.h3Index, r] as const));
   return hexes.filter((h3) => {
-    if (humanOccupiedH3.has(h3)) return true;
-    if (battle.res4IsUrbanByH3?.[h3]) return true;
-    if (battle.res4IsSeaportByH3?.[h3]) return true;
+    const enemyOccupied = humanOccupiedH3.has(h3);
     const row = rowByH3.get(h3);
-    if (row && !row.isRubble && (row.isUrban || row.isAirport || row.isSeaport)) return true;
-    return false;
+    const interestingInfrastructure =
+      !!battle.res4IsUrbanByH3?.[h3] ||
+      !!battle.res4IsSeaportByH3?.[h3] ||
+      (!!row && !row.isRubble && (row.isUrban || row.isAirport || row.isSeaport));
+    return keepsBestOptionsThisTurnInterestHex({ enemyOccupied, interestingInfrastructure });
   });
 }
 

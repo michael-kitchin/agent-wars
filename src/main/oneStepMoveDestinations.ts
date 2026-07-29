@@ -32,10 +32,13 @@ export function resolveMovementTerrainForHex(
 /**
  * Returns all legal destinations for a unit within movement range (including its current hex).
  *
- * Purpose: Single source of truth for AI order generation and order validation movement legality.
+ * Purpose: Single source of truth for AI order generation and order validation movement legality on the strategic map.
  * When to use: Pass the acting unit and the current game snapshot; set `assumeDebarkedForReachability` when validating opponent movement that will auto-debark before marching.
  * Expected outcome: Land units: hexes reachable via land-mass edges within range. Naval: terrain-passable hexes within range.
  * Exceptions: Never throws; pentagon edges fall through to a legacy scan for naval only.
+ *
+ * Tactical Best Options uses `collectTacticalLegalMoveDestinationRes4Hexes` instead (res4 MP reachability with the same
+ * “one origin search → list destinations” shape as `getLandMassReachableHexes` here).
  */
 export function getValidDestinations(
   unit: { id?: string; h3Index: string; unitType: string },

@@ -15735,6 +15735,13 @@
     return rendererSharedState.precomputedAiOrders === null;
   }
 
+  // src/shared/openRouterToolInvocationCounts.ts
+  function resolveToolInvocationCountsAfterReady(args) {
+    if (args.fromResult) return { ...args.fromResult };
+    if (args.allowPrecomputedFallback && args.cachedPrecomputed) return { ...args.cachedPrecomputed };
+    return null;
+  }
+
   // src/renderer/openRouter/openRouterUiHelpers.ts
   function formatElapsedMmSs(ms) {
     const totalSeconds = Math.floor(ms / 1e3);
@@ -15785,6 +15792,14 @@
       const btn = document.querySelector(`.openrouter-tool-toggle[data-tool-group="${group.id}"]`);
       if (btn) btn.textContent = String(rendererSharedState.toolInvocationCounts[group.id] ?? 0);
     }
+  }
+  function applyToolInvocationCountsAfterReady(args) {
+    const next = resolveToolInvocationCountsAfterReady(args);
+    if (next) {
+      rendererSharedState.toolInvocationCounts = next;
+      updateOpenRouterToolCountLabels();
+    }
+    rendererSharedState.precomputedToolInvocationCounts = null;
   }
   function formatOpenRouterCost(dollars) {
     return new Intl.NumberFormat("en-US", {
@@ -23958,9 +23973,19 @@
     return null;
   }
 
+  // src/shared/tacticalMarchContinuations.ts
+  function filterTacticalMarchContinuationsToPresentSubUnits(continuations, presentSubUnitIds) {
+    return continuations.filter((row) => presentSubUnitIds.has(row.subUnitId));
+  }
+
   // src/renderer/tactical/tacticalPendingMarchPath.ts
   function buildTacticalPendingMarchRowsFromContinuations(args) {
-    return args.continuations.map((cont) => {
+    const livingIds = new Set(args.battle.subUnits.map((u) => u.id));
+    const livingContinuations = filterTacticalMarchContinuationsToPresentSubUnits(
+      args.continuations,
+      livingIds
+    );
+    return livingContinuations.map((cont) => {
       const prev = args.previousBySubUnitId.get(cont.subUnitId);
       const sub = args.battle.subUnits.find((u) => u.id === cont.subUnitId);
       const newUnitH3 = sub?.h3Index;
@@ -24174,11 +24199,15 @@
     }
     deps.clearSidebarError();
     rendererSharedState.readyRequestInFlight = true;
+    const toolCountsBeforeReadyClick = { ...rendererSharedState.toolInvocationCounts };
+    const cachedPrecomputedToolCountsAtReadyStart = rendererSharedState.precomputedToolInvocationCounts ? { ...rendererSharedState.precomputedToolInvocationCounts } : null;
     rendererSharedState.toolInvocationCounts = Object.fromEntries(rendererSharedState.openRouterToolGroups.map((g) => [g.id, 0]));
     deps.updateOpenRouterToolCountLabels();
     deps.updateReadyButtonState();
     try {
       if (isWaitingForPrecomputedAiOrders()) {
+        rendererSharedState.toolInvocationCounts = toolCountsBeforeReadyClick;
+        deps.updateOpenRouterToolCountLabels();
         deps.startBackgroundRequestIfAllowed();
         deps.showMapToast("AI planning is still running. Ready will unlock once precomputed orders are available.", { isError: false });
         deps.updateReadyButtonState();
@@ -24187,11 +24216,20 @@
       if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning) {
         const commit = window.gameApi.commitHumanTacticalDraftOrders;
         if (!commit) {
+          rendererSharedState.toolInvocationCounts = toolCountsBeforeReadyClick;
+          deps.updateOpenRouterToolCountLabels();
           deps.showSidebarError("Tactical commit is not available in this build.");
           deps.updateReadyButtonState();
           return;
         }
-        const movementOrders = rendererSharedState.tacticalPendingMarches.map((r) => ({ unitId: r.subUnitId, toH3Index: r.destinationH3Index }));
+        const livingSubUnitIds = new Set(rendererSharedState.tacticalBattleSnapshot.subUnits.map((u) => u.id));
+        rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter(
+          (row) => livingSubUnitIds.has(row.subUnitId)
+        );
+        const movementOrders = rendererSharedState.tacticalPendingMarches.map((r) => ({
+          unitId: r.subUnitId,
+          toH3Index: r.destinationH3Index
+        }));
         const commitResult = await commit({
           movementOrders,
           rangedAttacks: [...rendererSharedState.pendingRangedAttacks],
@@ -24203,6 +24241,8 @@
           aiPlanningRunEnabled: rendererSharedState.runButtonOn
         });
         if (!commitResult.success) {
+          rendererSharedState.toolInvocationCounts = toolCountsBeforeReadyClick;
+          deps.updateOpenRouterToolCountLabels();
           deps.showSidebarError(commitResult.reason ?? "Tactical commit failed");
           deps.updateReadyButtonState();
           return;
@@ -24246,6 +24286,7 @@
         if (commitResult.tacticalBattle) {
           rendererSharedState.tacticalBattleSnapshot = commitResult.tacticalBattle;
         }
+        reconcileSelectionToCurrentState();
         if ("committedOpponentTacticalDraft" in commitResult) {
           rendererSharedState.tacticalOpponentDraft = null;
         }
@@ -24260,11 +24301,12 @@
           }
           if (commitResult.aiStrategy) deps.showAiStrategyToast(commitResult.aiStrategy);
           else deps.hideAiStrategyToast();
-          if (commitResult.toolInvocationCounts) {
-            rendererSharedState.toolInvocationCounts = { ...rendererSharedState.toolInvocationCounts, ...commitResult.toolInvocationCounts };
-            deps.updateOpenRouterToolCountLabels();
-          }
         }
+        applyToolInvocationCountsAfterReady({
+          fromResult: commitResult.toolInvocationCounts,
+          cachedPrecomputed: cachedPrecomputedToolCountsAtReadyStart,
+          allowPrecomputedFallback: rendererSharedState.runButtonOn && cachedPrecomputedToolCountsAtReadyStart != null
+        });
         const previousPendingMarches = new Map(rendererSharedState.tacticalPendingMarches.map((row) => [row.subUnitId, row]));
         rendererSharedState.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length ? buildTacticalPendingMarchRowsFromContinuations({
           battle: commitResult.tacticalBattle ?? rendererSharedState.tacticalBattleSnapshot,
@@ -24389,7 +24431,7 @@
       const enabledToolGroupsPayload = Array.from(rendererSharedState.enabledToolGroups).filter((id) => id !== "events");
       const useEventDriven = rendererSharedState.useEventDrivenConsultation;
       const usePrecomputed = rendererSharedState.runButtonOn && rendererSharedState.precomputedAiOrders !== null;
-      const cachedPrecomputedToolCounts = rendererSharedState.precomputedToolInvocationCounts ? { ...rendererSharedState.precomputedToolInvocationCounts } : null;
+      const cachedPrecomputedToolCounts = cachedPrecomputedToolCountsAtReadyStart ?? (rendererSharedState.precomputedToolInvocationCounts ? { ...rendererSharedState.precomputedToolInvocationCounts } : null);
       const readyPayload = buildReadyPayload({
         enabledToolGroupsPayload,
         useEventDriven,
@@ -24399,12 +24441,16 @@
       let readyResult = await deps.callReadyWithTimeout(readyPayload);
       let resolutionPlaybackNotifyKind = "strategic";
       if (!readyResult.success) {
+        rendererSharedState.toolInvocationCounts = toolCountsBeforeReadyClick;
+        deps.updateOpenRouterToolCountLabels();
         deps.showSidebarError(readyResult.reason ?? "Ready failed");
         deps.updateReadyButtonState();
         return;
       }
       if (readyResult.awaitingMeleeDecision) {
         if (!window.gameApi.resolveMeleeIntercept) {
+          rendererSharedState.toolInvocationCounts = toolCountsBeforeReadyClick;
+          deps.updateOpenRouterToolCountLabels();
           deps.showSidebarError("Melee intercept resolve is not available in this build.");
           deps.updateReadyButtonState();
           return;
@@ -24433,6 +24479,8 @@
           enabledToolGroups: enabledToolGroupsPayload
         });
         if (!resolveResult.success) {
+          rendererSharedState.toolInvocationCounts = toolCountsBeforeReadyClick;
+          deps.updateOpenRouterToolCountLabels();
           deps.showSidebarError(resolveResult.reason ?? "Melee resolve failed");
           deps.updateReadyButtonState();
           return;
@@ -24460,14 +24508,11 @@
       const airStrikeReturnMoves = deps.buildAirStrikeReturnPlaybackMoves(readyResult.airStrikeMoves);
       if (readyResult.aiStrategy) deps.showAiStrategyToast(readyResult.aiStrategy);
       else deps.hideAiStrategyToast();
-      if (readyResult.toolInvocationCounts) {
-        rendererSharedState.toolInvocationCounts = readyResult.toolInvocationCounts;
-        deps.updateOpenRouterToolCountLabels();
-      } else if (usePrecomputed && cachedPrecomputedToolCounts) {
-        rendererSharedState.toolInvocationCounts = Object.assign({}, cachedPrecomputedToolCounts);
-        deps.updateOpenRouterToolCountLabels();
-      }
-      rendererSharedState.precomputedToolInvocationCounts = null;
+      applyToolInvocationCountsAfterReady({
+        fromResult: readyResult.toolInvocationCounts,
+        cachedPrecomputed: cachedPrecomputedToolCounts,
+        allowPrecomputedFallback: usePrecomputed
+      });
       if (readyResult.cost !== void 0) {
         rendererSharedState.openRouterGameCost += readyResult.cost;
         deps.updateOpenRouterCostLabel();

@@ -15,6 +15,7 @@ import type { TacticalOpponentPlanPayload } from '../shared/ipc/readyTypes';
 import {
   committedOpponentTacticalDraftFieldAfterConsume,
   nextTacticalOpponentDraftAfterPostBeatPlan,
+  tacticalOpponentPlanFromRequestOrdersSuccess,
   tacticalOpponentPlanPayloadHasAnyOrders,
 } from '../shared/ipc/tacticalOpponentPlanMerge';
 
@@ -75,4 +76,20 @@ test('committedOpponentTacticalDraftFieldAfterConsume clears buffer instead of r
     committedOpponentTacticalDraft: null,
   });
   assert.deepEqual(committedOpponentTacticalDraftFieldAfterConsume(false), {});
+});
+
+test('tacticalOpponentPlanFromRequestOrdersSuccess maps strategic-shaped order arrays into the plan payload', () => {
+  assert.deepEqual(
+    tacticalOpponentPlanFromRequestOrdersSuccess({
+      orders: [{ unitId: 'opp-1', toH3Index: 'h1' }],
+      rangedAttacks: [{ unitId: 'opp-2', targetH3Index: 'h2' }],
+    }),
+    {
+      movementOrders: [{ unitId: 'opp-1', toH3Index: 'h1' }],
+      rangedAttacks: [{ unitId: 'opp-2', targetH3Index: 'h2' }],
+      airStrikes: [],
+      ferryOrders: [],
+      embarkOrders: [],
+    }
+  );
 });
