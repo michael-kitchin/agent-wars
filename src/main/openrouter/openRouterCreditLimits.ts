@@ -155,15 +155,29 @@ export function resolveOpenRouterCompletionMaxTokens(): number {
 }
 
 /**
+ * Preferred completion budget for order-planning chat completions (tool loop + repair).
+ *
+ * Purpose: Large `orders[]` / callback payloads need headroom beyond the prepaid-credit-friendly default of 2048.
+ * When to use: `requestOrdersFlow` when building `max_tokens` for model and repair passes.
+ * Expected outcome: Upper bound before session affordable-cap clamping; may still be reduced by OpenRouter 402 learning.
+ * Exceptions: None.
+ */
+export const OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS = 8192;
+
+/**
  * Resolves the effective completion budget for the next OpenRouter chat request in this session.
  *
  * Purpose: Applies the learned affordable cap so tool-loop rounds do not reset to an unaffordable default.
- * When to use: Every chat completion body built by `requestOrdersFlow`.
- * Expected outcome: `min(configuredDefault, sessionAffordableCap)` when a cap exists; otherwise configured default.
+ * When to use: Every chat completion body built by `requestOrdersFlow`, and chat transport before each POST.
+ * Expected outcome: `min(preferredOrConfigured, sessionAffordableCap)` when a cap exists (floored at
+ * `OPENROUTER_MIN_COMPLETION_MAX_TOKENS`); otherwise the preferred budget or env/default.
  * Exceptions: None.
  */
-export function resolveEffectiveOpenRouterCompletionMaxTokens(): number {
-  const configured = resolveOpenRouterCompletionMaxTokens();
+export function resolveEffectiveOpenRouterCompletionMaxTokens(preferredMaxTokens?: number): number {
+  const configured =
+    preferredMaxTokens != null && Number.isFinite(preferredMaxTokens) && preferredMaxTokens > 0
+      ? Math.floor(preferredMaxTokens)
+      : resolveOpenRouterCompletionMaxTokens();
   if (sessionAffordableMaxTokens == null) return configured;
   return Math.max(OPENROUTER_MIN_COMPLETION_MAX_TOKENS, Math.min(configured, sessionAffordableMaxTokens));
 }

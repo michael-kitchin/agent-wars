@@ -26,6 +26,10 @@ import {
 import type { GameStateSnapshot } from '../gameDb';
 import { buildProductionBriefingBlock } from './briefingSections';
 import { getInitialUserMessage } from './promptText';
+import {
+  OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS,
+  resolveEffectiveOpenRouterCompletionMaxTokens,
+} from './openRouterCreditLimits';
 import { TOOL2_NAMES } from '../tools/tool2Assessment';
 import { TOOL3_NAMES } from '../tools/tool3CombatEstimation';
 import { buildTacticalAiPlanState } from '../tacticalBattle/buildTacticalAiPlanState';
@@ -211,15 +215,17 @@ export async function requestOrdersFlow(
         ? toolGroupRegistry.flatMap((g) => [...g.toolNames]).filter((n) => !precomputationExcluded.has(n))
         : requestedToolNames;
   if (tacticalBattle) {
-    const stripStrategicOnlyTools = (names: string[]): string[] =>
+    const assessmentToolNames = new Set<string>([...TOOL2_NAMES, ...TOOL3_NAMES]);
+    const stripTacticalDisallowedTools = (names: string[]): string[] =>
       names.filter((n) => {
+        if (assessmentToolNames.has(n)) return false;
         const g = getGroupIdForToolName(n);
         return g !== 'memory' && g !== 'production' && g !== 'orders';
       });
     enabledToolNames =
       enabledToolNames !== undefined
-        ? stripStrategicOnlyTools(enabledToolNames)
-        : stripStrategicOnlyTools(toolGroupRegistry.flatMap((g) => [...g.toolNames]));
+        ? stripTacticalDisallowedTools(enabledToolNames)
+        : stripTacticalDisallowedTools(toolGroupRegistry.flatMap((g) => [...g.toolNames]));
     enabledToolNames = maybeApplyTacticalLightPrecomputeToolAllowlist(tacticalBattle.battleId, enabledToolNames);
     logDebug('openRouter requestOrders tactical tool filter applied', {
       battleId: tacticalBattle.battleId,
@@ -267,7 +273,11 @@ export async function requestOrdersFlow(
   const hexList = planState.hexes.map((h) => h.h3Index);
   const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
   const coordinateContext: CoordinateContext = tacticalBattle
-    ? { mode: 'tactical', battleId: tacticalBattle.battleId }
+    ? {
+        mode: 'tactical',
+        battleId: tacticalBattle.battleId,
+        tacticalTurnNumber: tacticalBattle.tacticalTurnNumber,
+      }
     : { mode: 'strategic' };
   ensureStrategicCoordinateRegistryInitialized();
   if (tacticalBattle) {
@@ -431,14 +441,15 @@ export async function requestOrdersFlow(
 
   /**
    * Both tactical and strategic final-json passes can emit large `orders[]` (many units + subscriptions + production).
-   * Keeping completion/repair budgets aligned avoids `finish_reason: length` mid-JSON, which breaks parsing and spams repair attempts.
+   * Prefer a high completion budget, but clamp to any session affordable cap learned from OpenRouter 402s.
    */
-  const completionMaxTokens = 8192;
-  const repairMaxTokens = 8192;
+  const resolveOrderFlowMaxTokens = (): number =>
+    resolveEffectiveOpenRouterCompletionMaxTokens(OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS);
   logDebug('openRouter requestOrders: completion token budgets', {
     tacticalAiBattle: tacticalBattle?.battleId ?? null,
-    completionMaxTokens,
-    repairMaxTokens,
+    preferredCompletionMaxTokens: OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS,
+    completionMaxTokens: resolveOrderFlowMaxTokens(),
+    repairMaxTokens: resolveOrderFlowMaxTokens(),
   });
 
   const wallClockStart = Date.now();
@@ -475,6 +486,7 @@ export async function requestOrdersFlow(
             (tacticalBattle ? ' (tactical).' : '.')
         );
       }
+      const completionMaxTokens = resolveOrderFlowMaxTokens();
       const body: Record<string, unknown> = {
         model: modelId,
         messages,
@@ -657,6 +669,7 @@ export async function requestOrdersFlow(
               `Your previous response was not parseable JSON. Reply now with JSON only (no prose, no markdown, no code fences) using exactly this top-level object schema (orders[] only; no movementOrders/rangedAttacks; never a top-level array): ${buildJsonAssistantRepairSchema(productionEnabledForParse)}. Omit optional arrays when empty.`,
           },
         ];
+        const repairMaxTokens = resolveOrderFlowMaxTokens();
         const repairResponse = await postOpenRouterChatWithTimeoutAndRetry({
           key,
           body: { model: modelId, messages: repairMessages, max_tokens: repairMaxTokens, tool_choice: 'none' },

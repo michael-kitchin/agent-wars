@@ -11,6 +11,15 @@ import { logDebug } from '../logger';
 export function buildFinalJsonContractInstruction(args: {
   includeMemoryUpdates: boolean;
   includeProductionOrders: boolean;
+  /**
+   * When false, omit airStrikes/ferryOrders from the submit header and schema (no air units on the roster).
+   *
+   * Contract: Defaults to true for backward-compatible strategic prompts.
+   * When to use: Pass from `buildSystemPromptForTools` based on opponent air presence.
+   * Expected outcome: No-air consultations do not advertise unused air/ferry fields.
+   * Exceptions: None.
+   */
+  includeAirActions?: boolean;
   movementOrderInstruction: string;
   submitMemoryClause: string;
   productionSubmitClause: string;
@@ -27,6 +36,7 @@ export function buildFinalJsonContractInstruction(args: {
   const {
     includeMemoryUpdates,
     includeProductionOrders,
+    includeAirActions = true,
     movementOrderInstruction,
     submitMemoryClause,
     productionSubmitClause,
@@ -35,22 +45,24 @@ export function buildFinalJsonContractInstruction(args: {
   const optionalTail =
     (includeMemoryUpdates ? ', "memoryUpdates": [...]' : '') +
     (includeProductionOrders ? ', "productionOrders": [...]' : '');
+  const airFields = includeAirActions ? ', "airStrikes": [ ... ], "ferryOrders": [ ... ]' : '';
   const submitHeader =
-    `Submit your final JSON only (valid JSON, no comments): { "strategy": "<one-line>", "orders": [ ... ], "airStrikes": [ ... ], "ferryOrders": [ ... ], "callbacks": [...]${optionalTail} }.`;
+    `Submit your final JSON only (valid JSON, no comments): { "strategy": "<one-line>", "orders": [ ... ]${airFields}, "callbacks": [...]${optionalTail} }.`;
   const strictSchemaClause =
     'Strict schema: top-level must be a JSON object with "strategy" (string) and "orders" (array); do not return a top-level array.';
   const ordersClause =
     coordinateMode === 'tactical'
       ? 'The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: explicit_move (include "destination": briefing hex code for this beat\'s march; auto-debarks embarked cargo before marching), ranged_attack (include exactly one of targetHexCode or targetUnitId; ranged-only units/actions), transport_move (include "navalUnitId" and "destination" hex code), disembark (include "unitId" and "destination" hex code — clears cargo assignment then moves in one action), embark (include "unitId" and "navalUnitId"). Do not emit assign_order or cancel_order for tactical sub-unit ids.'
       : 'The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: assign_order (include "order": { "type": "defend"|"march"|"pursue"|"patrol"|"hold_fire", ... } — pursue uses targetUnitId string for the enemy only; march/patrol/defend use two-character briefing hex codes where a place is required), cancel_order, explicit_move (include "destination": briefing hex code for this turn\'s move; auto-debarks embarked cargo before marching), ranged_attack (include exactly one of targetHexCode or targetUnitId; ranged-only units/actions), transport_move (include "navalUnitId" and "destination" hex code), disembark (include "unitId" and "destination" hex code — clears cargo assignment then moves in one action), embark (include "unitId" and "navalUnitId").';
-  const airClause =
-    'Optional top-level air actions: airStrikes[] entries use { "unitId": "...", exactly one of "targetHexCode" or "targetUnitId", "targetType": "units"|"urban"|"airport"|"seaport" }, ferryOrders[] entries use { "unitId": "...", "destination": "<hex code>" }.';
+  const airClause = includeAirActions
+    ? 'Optional top-level air actions: airStrikes[] entries use { "unitId": "...", exactly one of "targetHexCode" or "targetUnitId", "targetType": "units"|"urban"|"airport"|"seaport" }, ferryOrders[] entries use { "unitId": "...", "destination": "<hex code>" }. '
+    : '';
   const legacyClause = 'Do not use top-level movementOrders or rangedAttacks (legacy).';
   const callbacksClause =
     coordinateMode === 'tactical'
       ? 'Include optional "callbacks" for re-consultation: use tactical sub-unit ids (not strategic parent ids) for unit-scoped events (e.g. unit_destroyed, unit_engaged); subscriptions are evaluated after each tactical beat when event-driven mode is on and are cleared when the battle ends; each consultation replaces the full callback list.'
       : 'Include optional "callbacks" for re-consultation planning.';
-  return `${submitHeader} ${strictSchemaClause} ${ordersClause} ${airClause} ${legacyClause}${movementOrderInstruction} ${callbacksClause}${submitMemoryClause} ${productionSubmitClause}`;
+  return `${submitHeader} ${strictSchemaClause} ${ordersClause} ${airClause}${legacyClause}${movementOrderInstruction} ${callbacksClause}${submitMemoryClause} ${productionSubmitClause}`;
 }
 
 /**
@@ -80,6 +92,15 @@ includeMemoryUpdates: boolean;
    * Exceptions: None.
    */
 includeProductionOrders: boolean;
+  /**
+   * When false, illustrative JSON omits airStrikes/ferryOrders fields.
+   *
+   * Contract: Optional; defaults to true.
+   * When to use: Pass false when the opponent roster has no air units.
+   * Expected outcome: Example matches the contract instruction for the consultation.
+   * Exceptions: None.
+   */
+  includeAirActions?: boolean;
   /**
    * When `tactical`, the illustrative orders[] example leads with explicit_move / ranged_attack (assign_order stays blocked for sub-unit ids).
    *
@@ -126,7 +147,7 @@ orders: Array<Record<string, unknown>>;
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-airStrikes: unknown[];
+airStrikes?: unknown[];
     /**
    * Specifies the contract for the `ferryOrders` member (ferryOrders: unknown[];).
 
@@ -135,7 +156,7 @@ airStrikes: unknown[];
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-ferryOrders: unknown[];
+ferryOrders?: unknown[];
     /**
    * Specifies the contract for the `callbacks` member (callbacks: unknown[];).
 
@@ -177,9 +198,11 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
   logDebug('promptContracts getFinalJsonOrdersExampleBlock', {
     includeMemoryUpdates: flags.includeMemoryUpdates,
     includeProductionOrders: flags.includeProductionOrders,
+    includeAirActions: flags.includeAirActions !== false,
     coordinateMode: flags.coordinateMode ?? 'strategic',
   });
   const tactical = flags.coordinateMode === 'tactical';
+  const includeAir = flags.includeAirActions !== false;
   const example: FinalOrdersExamplePayload = {
     strategy: tactical
       ? 'Close with observed enemies this beat using explicit moves and fire.'
@@ -194,10 +217,12 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
           { action: 'explicit_move', unitId: 'opponent-armor-2', destination: 'CD' },
           { action: 'ranged_attack', unitId: 'opponent-naval-1', targetUnitId: 'human-armor-1' },
         ],
-    airStrikes: [],
-    ferryOrders: [],
     callbacks: [],
   };
+  if (includeAir) {
+    example.airStrikes = [];
+    example.ferryOrders = [];
+  }
   if (flags.includeMemoryUpdates) example.memoryUpdates = [];
   if (flags.includeProductionOrders) {
     example.productionOrders = [{ action: 'set_build_queue', hex: 'AB', unitType: 'infantry', count: 1 }];

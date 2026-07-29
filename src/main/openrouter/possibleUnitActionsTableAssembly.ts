@@ -231,6 +231,16 @@ export const FRIENDLY_PLAYER = 'opponent';
 /** Action label for one-step move/melee destinations in the possible-actions table. */
 export const ACTION_MOVES_MELEE = 'move/melee';
 
+/**
+ * Action label for tactical Best Options approach rows (close toward nearest enemy when no enemy/infra hex is in reach this beat).
+ *
+ * Purpose: Distinguishes interest-filtered move/melee targets from distance-reducing approach hexes in the Commander table.
+ * When to use: Approach fallback branch in `collectAggregatedPossibleActionRows` only.
+ * Expected outcome: Rendered Action column shows `approach`.
+ * Exceptions: None.
+ */
+export const ACTION_APPROACH = 'approach';
+
 /** Action label for ranged attack rows. */
 export const ACTION_RANGED = 'ranged attack';
 
@@ -268,9 +278,10 @@ export const BUCKET_PRIORITY: Record<PossibleActionBucket, number> = {
 const TABLE_HEADERS = ['Unit ID', 'Unit Type', 'Action Types', 'Hex', 'Distance', 'Enemy Units', 'Hex Features'];
 
 const ACTION_TYPE_ORDER: Record<string, number> = {
-  [ACTION_MOVES_MELEE]: 0,
-  [ACTION_RANGED]: 1,
-  [ACTION_AIR_STRIKES]: 2,
+  [ACTION_APPROACH]: 0,
+  [ACTION_MOVES_MELEE]: 1,
+  [ACTION_RANGED]: 2,
+  [ACTION_AIR_STRIKES]: 3,
 };
 
 /**
@@ -290,12 +301,13 @@ export function excludeUnitCurrentHex(unitH3: string, hexes: string[]): string[]
  *
  * Purpose: Single source for rendered action text in the **Best Options This Turn** markdown table.
  * When to use: `renderThisTurnOptionsTableMarkdown` (via import).
- * Expected outcome: One of `air strike`, `ranged`, `move/melee`, or the raw `actionTypes` string as fallback.
+ * Expected outcome: One of `air strike`, `ranged`, `approach`, `move/melee`, or the raw `actionTypes` string as fallback.
  * Exceptions: None.
  */
 export function deriveThisTurnOptionsActionColumn(r: PossibleActionTableRow): string {
   if (r.actionTypes.includes('air strike') || r.actionTypes.includes('air_strike')) return 'air strike';
   if (r.actionTypes.includes('ranged')) return 'ranged';
+  if (r.actionTypes.includes('approach')) return 'approach';
   if (r.actionTypes.includes('move') || r.actionTypes.includes('melee')) return 'move/melee';
   return r.actionTypes;
 }

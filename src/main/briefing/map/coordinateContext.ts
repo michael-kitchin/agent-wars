@@ -44,6 +44,15 @@ export interface CoordinateContext {
    * Exceptions: None.
    */
   battleId?: string;
+  /**
+   * Current tactical beat number for prompt headers (strategic mode ignores this field).
+   *
+   * Contract: Optional; when present with `mode === 'tactical'`, the system prompt labels Strategic turn vs Tactical beat.
+   * When to use: Populate from `TacticalBattleSnapshot.tacticalTurnNumber` for tactical AI consultations.
+   * Expected outcome: Models see beat numbering that matches the Commander briefing narrative.
+   * Exceptions: None.
+   */
+  tacticalTurnNumber?: number;
 }
 
 /**

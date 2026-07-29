@@ -38,7 +38,11 @@ export function formatTacticalBriefing(args: {
     beat: tacticalBattle.tacticalTurnNumber,
     subUnitCount: tacticalBattle.subUnits.length,
   });
-  const coordCtx: CoordinateContext = { mode: 'tactical', battleId: tacticalBattle.battleId };
+  const coordCtx: CoordinateContext = {
+    mode: 'tactical',
+    battleId: tacticalBattle.battleId,
+    tacticalTurnNumber: tacticalBattle.tacticalTurnNumber,
+  };
   const assessments = buildLightweightTacticalUnitAssessments(tacticalBattle);
   const sections: string[] = [];
 

@@ -336,7 +336,7 @@ function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntr
  *
  * Purpose: Short triage bullets for units that need attention this consultation.
  * When to use: Strategic and tactical Commander briefings after assessments.
- * Expected outcome: Up to three bullets, or `None.`; omits standing-order language in tactical mode or when Orders tools are off.
+ * Expected outcome: Up to five bullets sorted critical→moderate→other, or `None.`; omits standing-order language in tactical mode or when Orders tools are off.
  * Exceptions: None.
  */
 export function buildAttentionFlags(
@@ -350,7 +350,14 @@ export function buildAttentionFlags(
    */
   standingOrdersActive = true
 ): string {
-  const bullets: string[] = [];
+  const severityRank = (sev: 'critical' | 'moderate' | 'low' | null): number => {
+    if (sev === 'critical') return 0;
+    if (sev === 'moderate') return 1;
+    if (sev === 'low') return 2;
+    return 3;
+  };
+  type AttentionCandidate = { text: string; rank: number };
+  const candidates: AttentionCandidate[] = [];
   const soActive = coordinateMode === 'tactical' ? false : standingOrdersActive;
   for (const a of unitAssessments) {
     if (!needsAction(a, soActive)) continue;
@@ -359,26 +366,33 @@ export function buildAttentionFlags(
     if (!soActive) {
       const sev = maxThreatSeverity(threats);
       if ((sev === 'critical' || sev === 'moderate') && nearest) {
-        bullets.push(
-          `${formatUnitDisplayRef(a.unitId)} faces a ${sev} threat (nearest enemy: ${formatUnitDisplayRef(nearest.unitId)}, distance ${nearest.hexDistance}).`
-        );
+        candidates.push({
+          rank: severityRank(sev),
+          text: `${formatUnitDisplayRef(a.unitId)} faces a ${sev} threat (nearest enemy: ${formatUnitDisplayRef(nearest.unitId)}, distance ${nearest.hexDistance}).`,
+        });
       }
       continue;
     }
     const order = a.result.unit?.currentStandingOrder as { status?: string } | null | undefined;
     if (!order && hasActionableThreat(a) && nearest) {
       const sev = maxThreatSeverity(threats);
-      bullets.push(
-        `${formatUnitDisplayRef(a.unitId)} has no standing order and faces a ${sev ?? 'moderate'} threat (nearest enemy: ${formatUnitDisplayRef(nearest.unitId)}, distance ${nearest.hexDistance}).`
-      );
+      candidates.push({
+        rank: severityRank(sev),
+        text: `${formatUnitDisplayRef(a.unitId)} has no standing order and faces a ${sev ?? 'moderate'} threat (nearest enemy: ${formatUnitDisplayRef(nearest.unitId)}, distance ${nearest.hexDistance}).`,
+      });
     } else if (order?.status && WARNING_STATUSES.has(order.status)) {
-      bullets.push(
-        `${formatUnitDisplayRef(a.unitId)} standing order is in warning state (${order.status}) — decide follow-on orders.`
-      );
+      candidates.push({
+        rank: 2,
+        text: `${formatUnitDisplayRef(a.unitId)} standing order is in warning state (${order.status}) — decide follow-on orders.`,
+      });
     }
   }
-  if (bullets.length === 0) return 'None.';
-  return bullets.slice(0, 3).map((b) => `- ${b}`).join('\n');
+  if (candidates.length === 0) return 'None.';
+  candidates.sort((a, b) => a.rank - b.rank || a.text.localeCompare(b.text));
+  return candidates
+    .slice(0, 5)
+    .map((c) => `- ${c.text}`)
+    .join('\n');
 }
 
 /**
@@ -406,6 +420,10 @@ function formatCallbackLine(sub: CallbackSubscription, ctx: CoordinateContext): 
   if (sub.event === 'territory_changed') {
     const hexId = sub.params?.hexId != null ? String(sub.params.hexId) : '';
     return hexId ? `territory_changed(${formatTerritoryTarget(hexId, ctx)})` : 'territory_changed';
+  }
+  if (sub.event === 'infrastructure_destroyed') {
+    const targetType = sub.params?.targetType != null ? String(sub.params.targetType) : '';
+    return targetType ? `infrastructure_destroyed(${targetType})` : 'infrastructure_destroyed';
   }
   const sanitizedParams = sanitizeCallbackParamsForPrompt(sub.params ?? {}, ctx);
   return `${sub.event}(${JSON.stringify(sanitizedParams)})`;

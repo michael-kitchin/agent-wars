@@ -42,7 +42,8 @@ export function isTacticalPostBeatConsultOnCommit(obj: unknown): obj is Tactical
  * Applies `TacticalPostBeatConsultFields` from the commit IPC result (same behavior as the former push listener).
  *
  * Purpose: Hydrates `S.tacticalOpponentDraft`, optional prefetch, strategy toast, and tool telemetry once main finishes
- * post-beat consultation inside the same invoke round-trip.
+ * post-beat consultation inside the same invoke round-trip. When attach is false, clears any just-consumed draft so
+ * applied marches are not resent next Ready.
  * When to use: After a successful tactical commit when `isTacticalPostBeatConsultOnCommit` is true and `battleId` matches.
  * Expected outcome: Renderer state matches main’s consultation outcome for the active tactical session.
  * Exceptions: None.
@@ -58,8 +59,10 @@ export function applyTacticalPostBeatConsultSideEffects(
     S.tacticalOpponentDraft = draft;
     if (startBackgroundPrefetch) deps.startBackgroundRequestIfAllowed();
   } else {
+    // Opponent already acted from the draft just consumed on Ready — do not keep those rows for the next beat.
+    S.tacticalOpponentDraft = null;
     const oppAlive = S.tacticalBattleSnapshot?.subUnits.some((u) => u.player === 'opponent') ?? false;
-    if (S.runButtonOn && oppAlive && S.tacticalOpponentDraft === null) {
+    if (S.runButtonOn && oppAlive) {
       deps.startBackgroundRequestIfAllowed();
     }
   }

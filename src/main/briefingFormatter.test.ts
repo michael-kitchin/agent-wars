@@ -319,6 +319,51 @@ function testUnitStatusAndAttentionIgnoreLowThreatsWhenStandingOrdersInactive():
 }
 
 /**
+ * Ensures Attention Flags severity-sort then cap at five bullets.
+ *
+ * Purpose: Regression for triage flooding when many units need attention.
+ * When to use: After edits to `buildAttentionFlags` ranking/slice.
+ * Expected outcome: Critical before moderate; at most five bullets; sixth critical omitted when five criticals already listed.
+ * Exceptions: None.
+ */
+function testAttentionFlagsSeveritySortAndCapFive(): void {
+  const assessments: UnitAssessmentResult[] = [];
+  for (let i = 0; i < 6; i++) {
+    assessments.push({
+      unitId: `opp-crit-${i}`,
+      result: {
+        status: 'ok',
+        unit: { unitId: `opp-crit-${i}`, type: 'armor', position: [i, i], currentStandingOrder: null },
+        nearbyEnemies: [
+          { unitId: 'hum-1', hexDistance: 1, inRangedRange: true, inMeleeRange: true } as UnitAssessmentResult['result']['nearbyEnemies'][0],
+        ],
+        threats: [{ description: 'close', severity: 'critical', sourceUnit: 'hum-1' }],
+        canAttackThisTurn: [],
+      } as unknown as UnitAssessmentResult['result'],
+    });
+  }
+  assessments.push({
+    unitId: 'opp-mod-0',
+    result: {
+      status: 'ok',
+      unit: { unitId: 'opp-mod-0', type: 'infantry', position: [20, 0], currentStandingOrder: null },
+      nearbyEnemies: [
+        { unitId: 'hum-1', hexDistance: 2, inRangedRange: true, inMeleeRange: false } as UnitAssessmentResult['result']['nearbyEnemies'][0],
+      ],
+      threats: [{ description: 'near', severity: 'moderate', sourceUnit: 'hum-1' }],
+      canAttackThisTurn: [],
+    } as unknown as UnitAssessmentResult['result'],
+  });
+  const flags = buildAttentionFlags(assessments, 'tactical', false);
+  const bullets = flags.split('\n').filter((l) => l.startsWith('- '));
+  assert.equal(bullets.length, 5, `expected 5 attention bullets, got ${bullets.length}`);
+  assert.ok(bullets.every((b) => b.includes('critical threat')), 'cap prefers critical over moderate');
+  assert.ok(!flags.includes('opp-mod-0'), 'moderate omitted when five criticals fill the cap');
+  const critIdsListed = [0, 1, 2, 3, 4, 5].filter((i) => flags.includes(`opp-crit-${i}`));
+  assert.equal(critIdsListed.length, 5, 'exactly five of six critical units appear');
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
 
  * Purpose: Supports maintainability by documenting why `tests` exists.
@@ -335,6 +380,10 @@ const tests = [
   {
     name: 'unit status and attention ignore low threats when standing orders inactive',
     fn: testUnitStatusAndAttentionIgnoreLowThreatsWhenStandingOrdersInactive,
+  },
+  {
+    name: 'attention flags severity sort and cap five',
+    fn: testAttentionFlagsSeveritySortAndCapFive,
   },
 ];
 

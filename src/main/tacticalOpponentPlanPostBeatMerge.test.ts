@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { TacticalOpponentPlanPayload } from '../shared/ipc/readyTypes';
 import {
+  committedOpponentTacticalDraftFieldAfterConsume,
   nextTacticalOpponentDraftAfterPostBeatPlan,
   tacticalOpponentPlanPayloadHasAnyOrders,
 } from '../shared/ipc/tacticalOpponentPlanMerge';
@@ -67,4 +68,11 @@ test('nextTacticalOpponentDraftAfterPostBeatPlan keeps non-empty plans and reque
     draft: null,
     startBackgroundPrefetch: true,
   });
+});
+
+test('committedOpponentTacticalDraftFieldAfterConsume clears buffer instead of recycling applied marches', () => {
+  assert.deepEqual(committedOpponentTacticalDraftFieldAfterConsume(true), {
+    committedOpponentTacticalDraft: null,
+  });
+  assert.deepEqual(committedOpponentTacticalDraftFieldAfterConsume(false), {});
 });

@@ -187,7 +187,7 @@ export type TacticalOpponentPlanPayload = {
  *
  * Purpose: Single shape for opponent draft refresh, optional strategy toast, and tool-count telemetry after `afterTacticalBeatResolution`.
  * When to use: Main attaches to successful `commitHumanTacticalDraftOrders` when event-driven Run consult completes; renderer matches `battleId` to `S.tacticalBattleSnapshot`.
- * Expected outcome: When `attachTacticalOpponentPlanToIpc` is true, `tacticalOpponentPlan` may be null or empty to clear draft and trigger prefetch; when false, prior draft is preserved unless prefetch rules apply.
+ * Expected outcome: When `attachTacticalOpponentPlanToIpc` is true, `tacticalOpponentPlan` may be null or empty to clear draft and trigger prefetch; when false, the consumed Ready draft is cleared and prefetch may refill for the next beat.
  * Exceptions: None.
  */
 export type TacticalPostBeatConsultFields = {

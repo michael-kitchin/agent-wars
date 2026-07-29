@@ -32,6 +32,7 @@ import type {
 } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { clipTacticalMarchPathToDestination } from '../../shared/tacticalMarchPlaybackPath.js';
+import { committedOpponentTacticalDraftFieldAfterConsume } from '../../shared/ipc/tacticalOpponentPlanMerge';
 import { passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
 import { executePlanRoute } from '../tools/tool1Pathfinding';
 import { normalizeMovementTerrain, isLandSeaportSpawnHex } from '../movementTerrain';
@@ -212,11 +213,11 @@ reason?: string;
    */
   aiStrategy?: string;
   /**
-   * Opponent tactical rows actually applied this Ready after sanitization (invalid AI rows removed).
+   * Sentinel that the incoming opponent tactical draft was consumed on this Ready.
    *
-   * Contract: Present only when the renderer sent `opponentTacticalDraft`; value is the filtered plan or `null` if every row was dropped.
-   * When to use: Renderer refreshes `S.tacticalOpponentDraft` when no `tacticalOpponentPlan` merge runs so the sidebar does not keep stale illegal rows.
-   * Expected outcome: Omitted when there was no incoming opponent draft.
+   * Contract: Present only when the renderer sent `opponentTacticalDraft`; always `null` after consume so the renderer does not resend the same marches next beat.
+   * When to use: Renderer clears `S.tacticalOpponentDraft` when no fresh `tacticalOpponentPlan` merge runs (post-beat consult may refill afterward).
+   * Expected outcome: Omitted when there was no incoming opponent draft; never echoes applied/sanitized rows back into the buffer.
    * Exceptions: None.
    */
   committedOpponentTacticalDraft?: TacticalOpponentPlanPayload | null;
@@ -689,7 +690,7 @@ function cancelHumanMovementOrdersForUnit(unitId: string): void {
 /**
  * Drops opponent tactical draft rows that no longer pass footprint / strike / embark rules so Ready can complete with the remaining valid rows.
  *
- * Purpose: Buffered AI plans can go stale (e.g. ranged target hex cleared of enemies) before the human clicks Ready; failing the whole beat was too strict. No-op marches (destination equals current hex) are dropped so recycled drafts do not loop when LLM consultation is skipped — same rule as `requestOrdersFlow` ingest.
+ * Purpose: Buffered AI plans can go stale (e.g. ranged target hex cleared of enemies) before the human clicks Ready; failing the whole beat was too strict. No-op marches (destination equals current hex) are dropped as a belt-and-suspenders guard; the primary anti-stagger fix is clearing `committedOpponentTacticalDraft` after Ready consume so applied rows are not recycled.
  * When to use: `commitHumanTacticalDraftOrders` after resolving `preBattle` and before `applyHumanTacticalDraftBeatInStrategicOrder`.
  * Expected outcome: Returns a subset plan or `undefined` when nothing remains; each dropped row is logged at debug with reason; a single info summary when any row was dropped.
  * Exceptions: None; never throws.
@@ -1162,9 +1163,7 @@ export function commitHumanTacticalDraftOrders(args: {
       tacticalResolutionPlayback,
       tacticalMarchContinuations:
         tacticalMarchContinuations.length > 0 ? tacticalMarchContinuations : undefined,
-      ...(args.opponentTacticalDraft
-        ? { committedOpponentTacticalDraft: opponentTacticalDraft ?? null }
-        : {}),
+      ...committedOpponentTacticalDraftFieldAfterConsume(Boolean(args.opponentTacticalDraft)),
     };
   } catch (err) {
     logError('commitHumanTacticalDraftOrders: exception', err);

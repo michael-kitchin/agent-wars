@@ -23,10 +23,11 @@ import {
   getMovementOrderInstruction,
 } from './promptText';
 import { ALL_BUILD_UNIT_TYPES } from '../../shared/ipc/productionTypes';
-import { buildRegionVsRegionScenarioObjectiveBlock, buildWinConditionReminderClause } from './scenarioGoals';
+import { buildRegionVsRegionScenarioObjectiveBlock, buildTacticalBattleGoalClause, buildWinConditionReminderClause } from './scenarioGoals';
 import {
   NAVAL_MOVEMENT_PROMPT_RULE,
   NAVAL_PLAN_ROUTE_LAND_TARGET_HINT,
+  NAVAL_PLAN_ROUTE_PROMPT_SUFFIX,
 } from '../navalMovementMessages';
 import { getFilteredToolMetadata } from './openRouterToolCatalog';
 import { getToolFlags } from './openRouterToolGroups';
@@ -124,6 +125,14 @@ export function buildSystemPromptForTools(
     .join('; ');
 
   const filtered = getFilteredToolMetadata(enabledToolNames);
+  const hasNaval = opponentUnits.some((u) => u.unitType === 'naval');
+  const hasAir = opponentUnits.some((u) => u.unitType === 'air');
+  const toolPromptLines = filtered.map((m) => {
+    if (m.name === 'plan_route' && !hasNaval) {
+      return m.promptLine.replace(NAVAL_PLAN_ROUTE_PROMPT_SUFFIX, '');
+    }
+    return m.promptLine;
+  });
   const toolsIntroPurpose = flags.planningEnabled
     ? 'plan movement and assess the battlefield'
     : flags.assessmentEnabled
@@ -151,7 +160,7 @@ export function buildSystemPromptForTools(
       : `# Available Tools
 
 ${toolsIntro}
-${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}`;
+${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidance}`;
 
   const memoryBlock = flags.memoryEnabled ? getInjectionText('opponent', state.turnNumber) + '\n\n' : '';
   const standingOrderBlock = flags.ordersEnabled
@@ -174,7 +183,6 @@ ${filtered.map((m, i) => `${i + 1}. ${m.promptLine}`).join('\n')}${toolGuidance}
   const airOpsBlock = airOpsRaw ? `${airOpsRaw}\n\n` : '';
   const sealiftBlock = sealiftRaw ? `${sealiftRaw}\n\n` : '';
 
-  const hasNaval = opponentUnits.some((u) => u.unitType === 'naval');
   const hasRanged = opponentUnits.some((u) => getRange(u.unitType as 'infantry' | 'armor' | 'naval') >= 1);
 
   const combatTargetHint =
@@ -267,6 +275,7 @@ ${COACHING_STRATEGY_BLOCK}
   const finalJsonContract = buildFinalJsonContractInstruction({
     includeMemoryUpdates: flags.memoryEnabled,
     includeProductionOrders: flags.productionEnabled,
+    includeAirActions: hasAir,
     movementOrderInstruction,
     submitMemoryClause,
     productionSubmitClause: buildProductionSubmitClause(flags),
@@ -275,6 +284,7 @@ ${COACHING_STRATEGY_BLOCK}
   const finalJsonExample = getFinalJsonOrdersExampleBlock({
     includeMemoryUpdates: flags.memoryEnabled,
     includeProductionOrders: flags.productionEnabled,
+    includeAirActions: hasAir,
     coordinateMode: coordinateContext.mode,
   });
   const scoutingDirective =
@@ -283,7 +293,8 @@ ${COACHING_STRATEGY_BLOCK}
       : humanRoster.length === 0
         ? '\n\nNo human units are currently observed: prioritize scouting this turn by moving units along plausible approach routes to reveal enemy positions; do not remain static unless required for immediate defense.'
         : '';
-  const winConditionReminder = buildWinConditionReminderClause();
+  const winConditionReminder =
+    coordinateContext.mode === 'tactical' ? buildTacticalBattleGoalClause() : buildWinConditionReminderClause();
   const latLngBlock =
     coordinateContext.mode === 'tactical'
       ? buildTacticalLatLngPreamble(LATLNG_DECIMAL_PLACES)
@@ -292,13 +303,20 @@ ${COACHING_STRATEGY_BLOCK}
     coordinateContext.mode === 'tactical'
       ? 'Infantry may use ranged_attack only at tactical res4 range 1 (adjacent res4 hex on the tactical map); use movement and melee when that is not enough.'
       : 'Infantry may use ranged_attack only at strategic range 1 (adjacent res1 hex); use movement and melee when that is not enough.';
-  const prompt = `You are the enemy commander in a WEGO (simultaneous movement) hex wargame. Current turn: ${state.turnNumber}, phase: ${state.phase}.
+  const combatTempoClause = hasAir
+    ? 'If a legal ranged_attack or air strike is available this turn, take it — these attacks resolve from turn-start positions and do not prevent movement in the same turn.'
+    : 'If a legal ranged_attack is available this turn, take it — ranged attacks resolve from turn-start positions and do not prevent movement in the same turn.';
+  const turnPhaseHeader =
+    coordinateContext.mode === 'tactical'
+      ? `Strategic turn: ${state.turnNumber}, tactical beat: ${coordinateContext.tacticalTurnNumber ?? '?'}, phase: ${state.phase}.`
+      : `Current turn: ${state.turnNumber}, phase: ${state.phase}.`;
+  const prompt = `You are the enemy commander in a WEGO (simultaneous movement) hex wargame. ${turnPhaseHeader}
 
 ${winConditionReminder}${scoutingDirective}${warning}
 
 ${latLngBlock}
 
-Combat: d6 per shot — attack hits on roll ≤ attack stat; defense hits on roll ≤ defense. ${combatSummary}. Ranged uses pre-move positions. At most one ranged_attack per unit from turn-start range; use exactly one of targetHexCode (enemy cell from the map) or targetUnitId (not your move destination)${combatTargetHint}. ${infantryRangedScope} If a legal ranged_attack or air strike is available this turn, take it — these attacks resolve from turn-start positions and do not prevent movement in the same turn. Drop invalid attacks before submit.${navalCoaching}${combatAssessHint}
+Combat: d6 per shot — attack hits on roll ≤ attack stat; defense hits on roll ≤ defense. ${combatSummary}. Ranged uses pre-move positions. At most one ranged_attack per unit from turn-start range; use exactly one of targetHexCode (enemy cell from the map) or targetUnitId (not your move destination)${combatTargetHint}. ${infantryRangedScope} ${combatTempoClause} Drop invalid attacks before submit.${navalCoaching}${combatAssessHint}
 
 ${mainBlock}
 

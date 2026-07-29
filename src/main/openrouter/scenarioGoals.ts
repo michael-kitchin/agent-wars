@@ -25,13 +25,26 @@ const REGION_VS_REGION_SCENARIO_WIN_BLOCK =
  * Defines the `buildWinConditionReminderClause` function shape (export function buildWinConditionReminderClause(): string).
 
  * Purpose: Early paragraph in the system prompt after turn/phase; states win conditions consistent with `region_vs_region` rules and how combat vs strikes apply.
- * When to use: Always appended in `buildSystemPromptForTools` after the opening line so the model sees objectives alongside combat coaching.
+ * When to use: Strategic `buildSystemPromptForTools` after the opening line so the model sees objectives alongside combat coaching.
  * Expected outcome: Plain-language reminder referencing enemy-home hex control or destruction of enemy-home production capacity; unchanged when scenario rules evolve (update here and Scenario Objective in tandem).
  * Exceptions: None.
  */
 export function buildWinConditionReminderClause(): string {
   logDebug('scenarioGoals buildWinConditionReminderClause', {});
   return `${WIN_CONDITION_REMINDER_FIRST_SENTENCE} ${WIN_CONDITION_REMINDER_SECOND_SENTENCE}`;
+}
+
+/**
+ * Battle-local goal sentence for tactical system prompts (no regional win-condition text).
+ *
+ * Purpose: Keeps tactical beats focused on engaging forces inside the footprint without restating strategic home-region victory.
+ * When to use: `buildSystemPromptForTools` when `coordinateContext.mode === 'tactical'`.
+ * Expected outcome: Short engage-and-defeat reminder plus pointer to combat/order rules below.
+ * Exceptions: None.
+ */
+export function buildTacticalBattleGoalClause(): string {
+  logDebug('scenarioGoals buildTacticalBattleGoalClause', {});
+  return 'Your goal is to engage and defeat enemy forces in this battle. Review the rules, below, for how to order this.';
 }
 
 /**

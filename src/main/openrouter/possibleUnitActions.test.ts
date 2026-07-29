@@ -462,15 +462,17 @@ function testTacticalBestOptionsApproachFallbackWhenEnemyOutOfReach(): void {
     tacticalBattle: tactical,
     forThisTurnOptionsTable: true,
   });
-  const moves = rows.filter(
-    (r) => r.unitId === 'opp-arm-far' && (r.actionTypes.includes('move') || r.actionTypes.includes('melee'))
-  );
+  const moves = rows.filter((r) => r.unitId === 'opp-arm-far' && r.actionTypes.includes('approach'));
   assert.ok(moves.length >= 1, 'expected approach move rows when enemy is out of this-beat reach');
   assert.ok(
     moves.every((r) => gridDistance(r.targetH3, res4Human) < 5),
     'approach targets must reduce distance to the nearest human'
   );
   assert.ok(!moves.some((r) => r.targetH3 === res4Human), 'distant human hex itself is not this-beat reachable');
+  assert.ok(
+    moves.every((r) => typeof r.enemySummary === 'string' && r.enemySummary.includes('hum-far')),
+    'approach Target Units lists nearest enemy unit id'
+  );
 }
 
 /**

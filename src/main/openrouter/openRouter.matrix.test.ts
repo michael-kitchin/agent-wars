@@ -122,6 +122,7 @@ function buildFixtureState(hexes: string[]): {
     hexes: hexes.map((h3Index) => ({ h3Index, terrain: 'land', terrainKind: 'plains' })),
     units: [
       { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: hexes[0]! },
+      { id: 'opponent-air-1', player: 'opponent', unitType: 'air', h3Index: hexes[0]! },
       { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: hexes[1]! },
     ],
     exploredHexes: [hexes[0]!, hexes[1]!, hexes[2]!],
@@ -559,7 +560,14 @@ async function run(): Promise<void> {
       !tacticalSystemPrompt.includes('Move toward observed enemy forces to bring them into ranged'),
       'tactical prompt omits removed passive-movement coaching'
     );
-    assert.ok(tacticalSystemPrompt.includes(WIN_CONDITION_REMINDER_FIRST_SENTENCE), 'tactical prompt includes win-condition reminder');
+    assert.ok(
+      !tacticalSystemPrompt.includes(WIN_CONDITION_REMINDER_FIRST_SENTENCE),
+      'tactical prompt omits strategic win-condition reminder'
+    );
+    assert.ok(
+      tacticalSystemPrompt.includes('engage and defeat enemy forces in this battle'),
+      'tactical prompt includes battle-local engage goal'
+    );
     assert.ok(
       tacticalSystemPrompt.includes('- Your priority is to engage enemy forces and inflict losses when advantageous'),
       'tactical prompt includes single engage priority'

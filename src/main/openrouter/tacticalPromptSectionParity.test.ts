@@ -49,6 +49,7 @@ import {
   tacticalCallbackStashConfigExists,
 } from '../tacticalBattle/tacticalCallbackStashPersistence';
 import { buildSystemPromptForTools } from './openRouterBuildSystemPrompt';
+import { WIN_CONDITION_REMINDER_FIRST_SENTENCE } from './scenarioGoals';
 import { initTacticalCoordinateRegistry } from '../briefing/map/hex-coordinates';
 
 /**
@@ -420,7 +421,7 @@ test('filterCallbackSubscriptionsForTacticalBattleRoster drops invalid unit ids 
   assert.ok(!kept.some((s) => s.params?.unitId === 'not-in-roster:01'));
 });
 
-test('tactical system prompt omits Scenario Objective and includes win-condition plus adapted air when air present', () => {
+test('tactical system prompt omits Scenario Objective and includes battle goal plus adapted air when air present', () => {
   withTempDb(() => {
     const { battle, planState, latLngByH3 } = buildLandBattleFixture({
       battleId: 'parity-shell-scenario',
@@ -445,15 +446,19 @@ test('tactical system prompt omits Scenario Objective and includes win-condition
       coordMap,
       ['plan_route'],
       briefing,
-      { mode: 'tactical', battleId: battle.battleId }
+      { mode: 'tactical', battleId: battle.battleId, tacticalTurnNumber: battle.tacticalTurnNumber }
     );
     assert.ok(!prompt.includes('# Scenario Objective (Required)'));
+    assert.ok(!prompt.includes(WIN_CONDITION_REMINDER_FIRST_SENTENCE));
+    assert.ok(prompt.includes('engage and defeat enemy forces in this battle'));
+    assert.ok(prompt.includes(`tactical beat: ${battle.tacticalTurnNumber}`));
     assert.ok(!prompt.includes('- Explored:'));
     assert.ok(!prompt.includes('# Production Status'));
     assert.ok(!prompt.includes('# Your Strategic Memory'));
     assert.ok(prompt.includes("# Commander's Briefing"));
     assert.ok(prompt.includes('# Air Operations Status'));
     assert.ok(prompt.includes('Air rules (tactical)'));
+    assert.ok(prompt.includes('airStrikes'));
     assert.ok(prompt.includes('tactical sub-unit ids'));
     assert.ok(prompt.includes('Do not emit assign_order'));
     assert.ok(prompt.includes('Standing orders do not move units'));

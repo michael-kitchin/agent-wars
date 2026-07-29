@@ -41,3 +41,17 @@ export function nextTacticalOpponentDraftAfterPostBeatPlan(
   }
   return { draft: null, startBackgroundPrefetch: true };
 }
+
+/**
+ * IPC fragment for `committedOpponentTacticalDraft` after Ready consumes an incoming opponent draft.
+ *
+ * Purpose: Prevents the renderer from recycling applied marches into the next beat (every-other-beat / `already_at_destination` stagger).
+ * When to use: `commitHumanTacticalDraftOrders` success return when `opponentTacticalDraft` was present on the request.
+ * Expected outcome: `{ committedOpponentTacticalDraft: null }` when a draft was sent; `{}` when none was sent.
+ * Exceptions: None.
+ */
+export function committedOpponentTacticalDraftFieldAfterConsume(
+  hadIncomingOpponentDraft: boolean
+): { committedOpponentTacticalDraft: null } | Record<string, never> {
+  return hadIncomingOpponentDraft ? { committedOpponentTacticalDraft: null } : {};
+}

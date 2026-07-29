@@ -112,6 +112,34 @@ function testExampleBlockIncludesOptionalTails(): void {
 }
 
 /**
+ * Ensures air/ferry JSON example fields appear only when includeAirActions is enabled.
+ *
+ * Purpose: Keeps final-order examples aligned with opponents that have no air units.
+ * When to use: After edits to `getFinalJsonOrdersExampleBlock` / `buildFinalJsonContractInstruction` air gating.
+ * Expected outcome: Default includes airStrikes/ferryOrders; includeAirActions:false omits both from example and contract header.
+ * Exceptions: None.
+ */
+function testAirFieldsGatedByIncludeAirActions(): void {
+  const withAir = getFinalJsonOrdersExampleBlock({ includeMemoryUpdates: false, includeProductionOrders: false });
+  assert.ok(withAir.includes('"airStrikes"') && withAir.includes('"ferryOrders"'), 'default example includes air fields');
+  const withoutAir = getFinalJsonOrdersExampleBlock({
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+    includeAirActions: false,
+  });
+  assert.ok(!withoutAir.includes('"airStrikes"') && !withoutAir.includes('"ferryOrders"'), 'no-air example omits air fields');
+  const contractNoAir = buildFinalJsonContractInstruction({
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+    includeAirActions: false,
+    movementOrderInstruction: '',
+    submitMemoryClause: '',
+    productionSubmitClause: '',
+  });
+  assert.ok(!contractNoAir.includes('airStrikes') && !contractNoAir.includes('ferryOrders'), 'no-air contract omits air fields');
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
 
  * Purpose: Supports maintainability by documenting why `tests` exists.
@@ -122,6 +150,7 @@ function testExampleBlockIncludesOptionalTails(): void {
 const tests = [
   { name: 'getFinalJsonOrdersExampleBlock contains parseable JSON', fn: testExampleBlockParsesWithParser },
   { name: 'getFinalJsonOrdersExampleBlock optional tails', fn: testExampleBlockIncludesOptionalTails },
+  { name: 'air fields gated by includeAirActions', fn: testAirFieldsGatedByIncludeAirActions },
   { name: 'getFinalJsonOrdersExampleBlock tactical leads with explicit_move', fn: testTacticalExampleBlockLeadsWithExplicitMove },
   { name: 'buildFinalJsonContractInstruction tactical callbacks clause', fn: testTacticalCallbacksClauseMentionsBeat },
   {

@@ -2,6 +2,13 @@ import { request as httpsRequest } from 'node:https';
 import { URL } from 'node:url';
 import { brotliDecompressSync, gunzipSync, inflateSync } from 'node:zlib';
 import { logDebug, logError } from '../logger';
+import {
+  formatOpenRouterChatApiError,
+  noteOpenRouterAffordableMaxTokens,
+  OPENROUTER_MIN_COMPLETION_MAX_TOKENS,
+  parseAffordableMaxTokensFromOpenRouterError,
+  resolveEffectiveOpenRouterCompletionMaxTokens,
+} from './openRouterCreditLimits';
 
 /**
  * HTTPS chat completion transport, timeouts, retries, and test overrides for OpenRouter.
@@ -74,12 +81,33 @@ function delayMs(ms: number): Promise<void> {
 }
 
 /**
- * Defines the `postOpenRouterChatWithTimeoutAndRetry` function shape (async function postOpenRouterChatWithTimeoutAndRetry(payload: { key: string; body: Record<string, unknown>; signal?: AbortSignal; onLog?: (line: str).
-
- * Purpose: Supports maintainability by documenting why `postOpenRouterChatWithTimeoutAndRetry` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Clamps `body.max_tokens` to the session affordable cap when OpenRouter previously reported a lower budget.
+ *
+ * Purpose: Prevents repeating unaffordable 8192-style reservations after a "can only afford N" 402 in this process.
+ * When to use: Before each HTTPS chat POST in `defaultPostOpenRouterChatWithTimeoutAndRetry`.
+ * Expected outcome: Same body when no numeric `max_tokens` or no session cap; otherwise a shallow copy with clamped budget.
  * Exceptions: None.
+ */
+function applySessionAffordableMaxTokensToBody(body: Record<string, unknown>): Record<string, unknown> {
+  const requested = body.max_tokens;
+  if (typeof requested !== 'number' || !Number.isFinite(requested) || requested <= 0) return body;
+  const effective = resolveEffectiveOpenRouterCompletionMaxTokens(requested);
+  if (effective === requested) return body;
+  logDebug('openRouterChatTransport: clamping max_tokens to session affordable cap', {
+    requested,
+    effective,
+  });
+  return { ...body, max_tokens: effective };
+}
+
+/**
+ * Posts an OpenRouter chat completion with timeouts, network retries, and one credit-cap `max_tokens` retry.
+ *
+ * Purpose: Central transport for order-flow completions; learns affordable caps from 402 bodies so depleted prepaid
+ * headroom does not hard-fail when a slightly lower `max_tokens` would succeed.
+ * When to use: Via `resolveOpenRouterChatTransport` / `postOpenRouterChatWithTimeoutAndRetry` deps.
+ * Expected outcome: Success payload on 2xx; actionable credit/auth errors on terminal failures.
+ * Exceptions: Propagates abort/timeout as user-facing cancel/timeout strings.
  */
 async function defaultPostOpenRouterChatWithTimeoutAndRetry(payload: {
   key: string;
@@ -89,7 +117,11 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(payload: {
   requestLabel: string;
 }): Promise<{ ok: true; status: number; headers: Record<string, string>; bodyText: string } | { ok: false; error: string }> {
   let lastError = `${payload.requestLabel} failed.`;
-  for (let attempt = 0; attempt <= OPENROUTER_REQUEST_RETRY_COUNT; attempt++) {
+  let requestBody = applySessionAffordableMaxTokensToBody(payload.body);
+  let creditClampRetried = false;
+  let networkAttempt = 0;
+  let sendOrdinal = 0;
+  while (networkAttempt <= OPENROUTER_REQUEST_RETRY_COUNT) {
     const controller = new AbortController();
     const parentSignal = payload.signal;
     const onParentAbort = () => controller.abort();
@@ -98,39 +130,67 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(payload: {
       else parentSignal.addEventListener('abort', onParentAbort, { once: true });
     }
     const timeoutId = setTimeout(() => controller.abort(), OPENROUTER_REQUEST_TIMEOUT_MS);
+    sendOrdinal += 1;
     try {
+      requestBody = applySessionAffordableMaxTokensToBody(requestBody);
       logDebug(`openRouter ${payload.requestLabel}: request attempt start`, {
-        attempt: attempt + 1,
+        attempt: sendOrdinal,
+        networkAttempt: networkAttempt + 1,
         timeoutMs: OPENROUTER_REQUEST_TIMEOUT_MS,
+        maxTokens: typeof requestBody.max_tokens === 'number' ? requestBody.max_tokens : null,
       });
       const chatResponse = await postChatViaHttps({
         key: payload.key,
-        requestBody: payload.body,
+        requestBody,
         signal: controller.signal,
         timeoutMs: OPENROUTER_REQUEST_TIMEOUT_MS,
         responseIdleTimeoutMs: OPENROUTER_RESPONSE_IDLE_TIMEOUT_MS,
         responseHardTimeoutMs: OPENROUTER_RESPONSE_HARD_TIMEOUT_MS,
-        attempt: attempt + 1,
+        attempt: sendOrdinal,
         requestLabel: payload.requestLabel,
       });
       logDebug(`openRouter ${payload.requestLabel}: request attempt completed`, {
-        attempt: attempt + 1,
+        attempt: sendOrdinal,
         ok: chatResponse.status >= 200 && chatResponse.status < 300,
         status: chatResponse.status,
       });
       if (chatResponse.status >= 200 && chatResponse.status < 300) {
         return { ok: true, status: chatResponse.status, headers: chatResponse.headers, bodyText: chatResponse.bodyText };
       }
-      lastError = chatResponse.status === 401 ? 'Invalid API key' : `API error: ${chatResponse.status}`;
+      lastError = formatOpenRouterChatApiError(chatResponse.status, chatResponse.bodyText);
       logError(`openRouter ${payload.requestLabel}: API error`, chatResponse.status, chatResponse.bodyText.slice(0, 200));
       if (chatResponse.status === 401) return { ok: false, error: lastError };
-      if (attempt < OPENROUTER_REQUEST_RETRY_COUNT && isRetryableStatus(chatResponse.status)) {
+      if (chatResponse.status === 402 && !creditClampRetried) {
+        const affordable = parseAffordableMaxTokensFromOpenRouterError(chatResponse.bodyText);
+        const currentMax = typeof requestBody.max_tokens === 'number' ? requestBody.max_tokens : null;
+        if (
+          affordable != null &&
+          affordable >= OPENROUTER_MIN_COMPLETION_MAX_TOKENS &&
+          currentMax != null &&
+          affordable < currentMax
+        ) {
+          noteOpenRouterAffordableMaxTokens(affordable);
+          requestBody = { ...requestBody, max_tokens: affordable };
+          creditClampRetried = true;
+          logDebug(`openRouter ${payload.requestLabel}: retrying after affordable max_tokens 402`, {
+            attempt: sendOrdinal,
+            previousMaxTokens: currentMax,
+            affordableMaxTokens: affordable,
+          });
+          if (payload.onLog) {
+            payload.onLog(`OpenRouter credit headroom: retrying with max_tokens=${affordable}.`);
+          }
+          continue;
+        }
+      }
+      if (networkAttempt < OPENROUTER_REQUEST_RETRY_COUNT && isRetryableStatus(chatResponse.status)) {
         const waitMs = getRetryDelayMs();
         logDebug(`openRouter ${payload.requestLabel}: retrying after API error`, {
-          attempt: attempt + 1,
+          attempt: sendOrdinal,
           status: chatResponse.status,
           retryInMs: waitMs,
         });
+        networkAttempt += 1;
         await delayMs(waitMs);
         continue;
       }
@@ -147,13 +207,13 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(payload: {
         if (payload.onLog) payload.onLog(lastError, true);
         logError(`openRouter ${payload.requestLabel}: timeout`, {
           timeoutMs: OPENROUTER_REQUEST_TIMEOUT_MS,
-          attempt: attempt + 1,
+          attempt: sendOrdinal,
         });
       } else if (isResponseStreamStall) {
         lastError = 'AI response stream stalled. Please try again.';
         if (payload.onLog) payload.onLog(lastError, true);
         logError(`openRouter ${payload.requestLabel}: response stream timeout`, {
-          attempt: attempt + 1,
+          attempt: sendOrdinal,
           error: String(err),
         });
         return { ok: false, error: lastError };
@@ -161,12 +221,13 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(payload: {
         lastError = `Network error while requesting AI orders: ${String(err)}`;
         logError(`openRouter ${payload.requestLabel}: fetch exception`, err);
       }
-      if (attempt < OPENROUTER_REQUEST_RETRY_COUNT) {
+      if (networkAttempt < OPENROUTER_REQUEST_RETRY_COUNT) {
         const waitMs = getRetryDelayMs();
         logDebug(`openRouter ${payload.requestLabel}: retrying after exception`, {
-          attempt: attempt + 1,
+          attempt: sendOrdinal,
           retryInMs: waitMs,
         });
+        networkAttempt += 1;
         await delayMs(waitMs);
         continue;
       }

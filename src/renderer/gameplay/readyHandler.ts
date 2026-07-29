@@ -808,8 +808,9 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       if (commitResult.tacticalBattle) {
         S.tacticalBattleSnapshot = commitResult.tacticalBattle;
       }
-      if (commitResult.tacticalPostBeatConsultDeferred && 'committedOpponentTacticalDraft' in commitResult) {
-        S.tacticalOpponentDraft = commitResult.committedOpponentTacticalDraft ?? null;
+      // Consume any opponent draft that was just applied (or emptied by sanitize). Post-beat consult may refill below.
+      if ('committedOpponentTacticalDraft' in commitResult) {
+        S.tacticalOpponentDraft = null;
       }
       if (commitResult.tacticalPostBeatConsultDeferred) {
         S.pendingDeferredTacticalPostBeatConsult = true;
@@ -819,8 +820,6 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       } else if (!commitResult.tacticalPostBeatConsultDeferred) {
         if ('tacticalOpponentPlan' in commitResult) {
           S.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
-        } else if ('committedOpponentTacticalDraft' in commitResult) {
-          S.tacticalOpponentDraft = commitResult.committedOpponentTacticalDraft ?? null;
         }
         if (commitResult.aiStrategy) deps.showAiStrategyToast(commitResult.aiStrategy);
         else deps.hideAiStrategyToast();

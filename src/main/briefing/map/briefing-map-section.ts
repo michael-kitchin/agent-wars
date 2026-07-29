@@ -172,7 +172,11 @@ export function buildTacticalOperationalMapSectionMarkdown(args: {
     battleId: args.tacticalBattle.battleId,
   });
   initTacticalCoordinateRegistry(args.tacticalBattle.battleId, args.tacticalBattle.enclosingRes1H3Index);
-  const context: CoordinateContext = { mode: 'tactical', battleId: args.tacticalBattle.battleId };
+  const context: CoordinateContext = {
+    mode: 'tactical',
+    battleId: args.tacticalBattle.battleId,
+    tacticalTurnNumber: args.tacticalBattle.tacticalTurnNumber,
+  };
 
   const mapHexes = [...args.tacticalBattle.res4ChildH3Indexes];
   if (mapHexes.length === 0) {
@@ -203,7 +207,7 @@ export function buildTacticalOperationalMapSectionMarkdown(args: {
   const legend =
     'Each cell: top = tactical hex code, bottom = terrain + overlay.\n' +
     'Terrain: x = land, . = water.\n' +
-    'Overlay: * = your units, ! = enemy units, # = contested, ? = undiscovered intel.\n' +
+    'Overlay: * = your units, ! = enemy units, # = contested.\n' +
     'Odd rows are indented one space. Use only hex codes from this map or tables.\n\n';
 
   return (

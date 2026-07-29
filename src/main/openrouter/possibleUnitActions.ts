@@ -21,6 +21,7 @@ import { logHexControllerParityMismatch } from '../snapshotDbParity';
 import { compareHexIds, partitionHomelandNearestOther } from './possibleUnitActionsPartition';
 import {
   ACTION_AIR_STRIKES,
+  ACTION_APPROACH,
   ACTION_MOVES_MELEE,
   ACTION_RANGED,
   aggregateRows,
@@ -107,14 +108,14 @@ interface IndexedState {
    */
  controlByHex: Map<string, string | null>;
    /**
-   * Specifies the contract for the `enemyUnitsByHex` member (enemyUnitsByHex: Map<string, Array<{ unitType: string }>>;).
+   * Specifies the contract for the `enemyUnitsByHex` member (enemyUnitsByHex: Map<string, Array<{ id: string; unitType: string }>>;).
 
    * Contract: Describes stable behavior for callers of `enemyUnitsByHex` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
- enemyUnitsByHex: Map<string, Array<{ unitType: string }>>;
+ enemyUnitsByHex: Map<string, Array<{ id: string; unitType: string }>>;
    /**
    * Specifies the contract for the `hexSet` member (hexSet: Set<string>;).
 
@@ -147,11 +148,11 @@ function buildIndexedState(state: GameStateSnapshot): IndexedState {
   for (const row of state.res1Control ?? []) {
     controlByHex.set(row.h3Index, row.controllerPlayerId ?? null);
   }
-  const enemyUnitsByHex = new Map<string, Array<{ unitType: string }>>();
+  const enemyUnitsByHex = new Map<string, Array<{ id: string; unitType: string }>>();
   for (const unit of state.units) {
     if (unit.player !== ENEMY_PLAYER) continue;
     const list = enemyUnitsByHex.get(unit.h3Index) ?? [];
-    list.push({ unitType: unit.unitType });
+    list.push({ id: unit.id, unitType: unit.unitType });
     enemyUnitsByHex.set(unit.h3Index, list);
   }
   return {
@@ -320,6 +321,32 @@ function featuresCellForHex(indexed: IndexedState, h3: string): string {
 function enemyCell(indexed: IndexedState, h3: string): string {
   return describeEnemyUnitsAtHex(indexed, h3) ?? '—';
 }
+
+/**
+ * Summarizes nearest human unit ids from `fromH3` for Best Options approach rows (Target Units column).
+ *
+ * Purpose: Approach hexes are usually empty of enemies; the table still needs to show who the move closes on.
+ * When to use: When appending approach fallback move rows in `collectAggregatedPossibleActionRows`.
+ * Expected outcome: Comma-separated enemy unit ids at the minimum H3 distance; `—` when none are observed.
+ * Exceptions: None; invalid distance pairs are skipped.
+ */
+function nearestEnemyUnitIdsSummary(indexed: IndexedState, fromH3: string): string {
+  let nearestDist = Infinity;
+  const ids: string[] = [];
+  for (const [h3, units] of indexed.enemyUnitsByHex) {
+    const d = safeGridDistance(fromH3, h3);
+    if (d === null) continue;
+    if (d < nearestDist) {
+      nearestDist = d;
+      ids.length = 0;
+      for (const u of units) ids.push(u.id);
+    } else if (d === nearestDist) {
+      for (const u of units) ids.push(u.id);
+    }
+  }
+  if (!Number.isFinite(nearestDist) || ids.length === 0) return '—';
+  return [...new Set(ids)].sort((a, b) => a.localeCompare(b)).join(', ');
+}
 /**
  * Defines the `safeGridDistance` function shape (function safeGridDistance(from: string, to: string): number | null).
 
@@ -357,6 +384,8 @@ function appendRowsForLegalHexes(args: {
   indexed: IndexedState;
   latLngByH3: Map<string, [number, number]>;
   isAirStrike: boolean;
+  /** When set, overrides per-hex enemy occupancy text (used for approach rows targeting empty approach cells). */
+  enemySummaryOverride?: string;
 }): void {
   const parts = partitionHomelandNearestOther(args.legalHexes, args.homeland);
   const addForBucket = (bucket: PossibleActionTableRow['bucket'], hexList: string[]): void => {
@@ -370,7 +399,7 @@ function appendRowsForLegalHexes(args: {
         actionType: args.actionType,
         targetH3: h3,
         distance: d,
-        enemySummary: enemyCell(args.indexed, h3),
+        enemySummary: args.enemySummaryOverride ?? enemyCell(args.indexed, h3),
         featuresSummary: args.isAirStrike ? featuresCellForStrike(args.indexed, h3) : featuresCellForHex(args.indexed, h3),
         enemyUnitCount: (args.indexed.enemyUnitsByHex.get(h3) ?? []).length,
         urbanHexCount: getInfra(args.indexed, h3).urban,
@@ -657,6 +686,8 @@ export function collectAggregatedPossibleActionRows(args: {
           ? collectTacticalLegalMoveDestinationRes4Hexes(tacticalBattle, unit.id)
           : getValidDestinations(unit, state)
     );
+    let moveActionType = ACTION_MOVES_MELEE;
+    let moveEnemySummaryOverride: string | undefined;
     if (forThisTurn && unit.unitType !== 'air') {
       const before = moveHexes.length;
       if (tacticalBattle && tacticalHumanOccupiedH3) {
@@ -666,14 +697,19 @@ export function collectAggregatedPossibleActionRows(args: {
           tacticalHumanOccupiedH3,
           tacticalRangedRowsForFootprint ?? []
         );
-        moveHexes =
-          interest.length > 0
-            ? interest
-            : filterTacticalApproachMoveHexesForThisTurnOptionsTable(
-                unit.h3Index,
-                moveHexes,
-                tacticalHumanOccupiedH3
-              );
+        if (interest.length > 0) {
+          moveHexes = interest;
+        } else {
+          moveHexes = filterTacticalApproachMoveHexesForThisTurnOptionsTable(
+            unit.h3Index,
+            moveHexes,
+            tacticalHumanOccupiedH3
+          );
+          if (moveHexes.length > 0) {
+            moveActionType = ACTION_APPROACH;
+            moveEnemySummaryOverride = nearestEnemyUnitIdsSummary(indexed, unit.h3Index);
+          }
+        }
       } else {
         moveHexes = filterGroundMoveHexesForThisTurnOptionsTable(indexed, moveHexes);
       }
@@ -688,12 +724,13 @@ export function collectAggregatedPossibleActionRows(args: {
         unitId: unit.id,
         unitType: unit.unitType,
         unitH3: unit.h3Index,
-        actionType: ACTION_MOVES_MELEE,
+        actionType: moveActionType,
         legalHexes: moveHexes,
         homeland,
         indexed,
         latLngByH3,
         isAirStrike: false,
+        enemySummaryOverride: moveEnemySummaryOverride,
       });
     }
 

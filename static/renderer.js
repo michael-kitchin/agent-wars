@@ -22871,8 +22871,9 @@
       rendererSharedState.tacticalOpponentDraft = draft;
       if (startBackgroundPrefetch) deps.startBackgroundRequestIfAllowed();
     } else {
+      rendererSharedState.tacticalOpponentDraft = null;
       const oppAlive = rendererSharedState.tacticalBattleSnapshot?.subUnits.some((u) => u.player === "opponent") ?? false;
-      if (rendererSharedState.runButtonOn && oppAlive && rendererSharedState.tacticalOpponentDraft === null) {
+      if (rendererSharedState.runButtonOn && oppAlive) {
         deps.startBackgroundRequestIfAllowed();
       }
     }
@@ -24245,8 +24246,8 @@
         if (commitResult.tacticalBattle) {
           rendererSharedState.tacticalBattleSnapshot = commitResult.tacticalBattle;
         }
-        if (commitResult.tacticalPostBeatConsultDeferred && "committedOpponentTacticalDraft" in commitResult) {
-          rendererSharedState.tacticalOpponentDraft = commitResult.committedOpponentTacticalDraft ?? null;
+        if ("committedOpponentTacticalDraft" in commitResult) {
+          rendererSharedState.tacticalOpponentDraft = null;
         }
         if (commitResult.tacticalPostBeatConsultDeferred) {
           rendererSharedState.pendingDeferredTacticalPostBeatConsult = true;
@@ -24256,8 +24257,6 @@
         } else if (!commitResult.tacticalPostBeatConsultDeferred) {
           if ("tacticalOpponentPlan" in commitResult) {
             rendererSharedState.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
-          } else if ("committedOpponentTacticalDraft" in commitResult) {
-            rendererSharedState.tacticalOpponentDraft = commitResult.committedOpponentTacticalDraft ?? null;
           }
           if (commitResult.aiStrategy) deps.showAiStrategyToast(commitResult.aiStrategy);
           else deps.hideAiStrategyToast();
