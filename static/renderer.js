@@ -15930,6 +15930,10 @@
     const el = document.getElementById("ai-strategy-toast");
     if (el) el.classList.add("hidden");
   }
+  function hidePlanningChromeToasts() {
+    hideMapToast();
+    hideAiStrategyToast();
+  }
   async function callReadyWithTimeout(payload) {
     if (!window.gameApi?.ready) {
       throw new Error("Ready action unavailable.");
@@ -19422,6 +19426,13 @@
     );
   }
 
+  // src/shared/selectionUnitIdSets.ts
+  function selectionUnitIdSetsDiffer(before, after) {
+    if (before.length !== after.length) return true;
+    const beforeSet = new Set(before);
+    return after.some((id) => !beforeSet.has(id));
+  }
+
   // src/renderer/core/selection.ts
   function isEmbarkedLandUnitBlockedForSelection(unitId) {
     if (rendererSharedState.tacticalBattleSnapshot) {
@@ -19458,6 +19469,7 @@
     });
   }
   function replaceSelection(unitIds) {
+    const previousIds = [...rendererSharedState.selectedUnitIds];
     const unique = [...new Set(unitIds)];
     rendererSharedState.selectedUnitIds = unique;
     reconcileSelectionToCurrentState();
@@ -19468,6 +19480,9 @@
       rendererSharedState.rangedModeActive = false;
       rendererSharedState.airStrikeModeActive = false;
       return;
+    }
+    if (selectionUnitIdSetsDiffer(previousIds, rendererSharedState.selectedUnitIds)) {
+      hidePlanningChromeToasts();
     }
     const tb = rendererSharedState.tacticalBattleSnapshot;
     const primary = tb ? tb.subUnits.find((u) => u.id === rendererSharedState.selectedUnitIds[0]) : rendererSharedState.gameState?.units.find((u) => u.id === rendererSharedState.selectedUnitIds[0]);
@@ -19759,6 +19774,7 @@
     const sw = { lat: Math.max(-WEB_MERCATOR_MAX_ABS_LAT, minLat - padLat), lng: minLng - padLng };
     const ne = { lat: Math.min(WEB_MERCATOR_MAX_ABS_LAT, maxLat + padLat), lng: maxLng + padLng };
     const tacticalBounds = L.latLngBounds(L.latLng(sw.lat, sw.lng), L.latLng(ne.lat, ne.lng));
+    hidePlanningChromeToasts();
     if (rendererSharedState.preTacticalLeafletMinZoom == null && typeof map.getMinZoom === "function") {
       rendererSharedState.preTacticalLeafletMinZoom = map.getMinZoom();
     }
@@ -22849,6 +22865,7 @@
       const el = document.getElementById("build-popup");
       const body = document.getElementById("build-popup-body");
       if (!el || !body) return;
+      hidePlanningChromeToasts();
       rendererSharedState.buildPopupHexH3 = h3Index;
       el.setAttribute("data-open", "true");
       el.setAttribute("data-x", String(clientX));
@@ -25421,11 +25438,13 @@
         const allAir = selectedUnits.length > 0 && selectedUnits.every((unit) => unit.unitType === "air");
         const allHaveRanged = selectedUnits.length > 0 && selectedUnits.every((unit) => unitHasTacticalRangedBaseline(unit.unitType));
         if (allAir) {
+          hidePlanningChromeToasts();
           rendererSharedState.airStrikeModeActive = true;
           rendererSharedState.rangedModeActive = false;
           rendererSharedState.hoverPreviewRequestSeq++;
           rendererSharedState.hoverRoutePreview = null;
         } else if (allHaveRanged) {
+          hidePlanningChromeToasts();
           rendererSharedState.rangedModeActive = true;
           rendererSharedState.airStrikeModeActive = false;
           rendererSharedState.hoverPreviewRequestSeq++;

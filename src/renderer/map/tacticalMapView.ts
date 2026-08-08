@@ -2,6 +2,7 @@ import { getHexBoundaryLatLngForLeafletOverlay, WEB_MERCATOR_MAX_ABS_LAT } from 
 import { getLeafletGlobal } from './mapUtils';
 import { getMainLeafletMap } from './worldLeafletMap';
 import { rendererSharedState as S } from '../core/state';
+import { hidePlanningChromeToasts } from '../openRouter/openRouterUiHelpers';
 
 type LeafletMapLike = {
   getMinZoom?: () => number;
@@ -22,6 +23,12 @@ type LeafletMapLike = {
 
 /**
  * Tightens Leaflet pan/zoom limits to the tactical footprint and animates a zoomed-in view.
+ *
+ * Purpose: Frames the res4 battle area when entering tactical mode from strategic.
+ * When to use: After a tactical battle session starts and child res4 indexes are known.
+ * Expected outcome: Map flies/fits to the tactical bounds, min/max zoom are adjusted,
+ * and planning chrome toasts are dismissed once at entry (hide only; later shows still work).
+ * Exceptions: No-ops when the Leaflet map, global, fitBounds, or bounds are unavailable.
  */
 export function enterTacticalMapView(childRes4H3Indexes: string[]): void {
   const map = getMainLeafletMap() as LeafletMapLike | null;
@@ -52,6 +59,7 @@ export function enterTacticalMapView(childRes4H3Indexes: string[]): void {
   const sw = { lat: Math.max(-WEB_MERCATOR_MAX_ABS_LAT, minLat - padLat), lng: minLng - padLng };
   const ne = { lat: Math.min(WEB_MERCATOR_MAX_ABS_LAT, maxLat + padLat), lng: maxLng + padLng };
   const tacticalBounds = L.latLngBounds(L.latLng(sw.lat, sw.lng), L.latLng(ne.lat, ne.lng));
+  hidePlanningChromeToasts();
 
   if (S.preTacticalLeafletMinZoom == null && typeof map.getMinZoom === 'function') {
     S.preTacticalLeafletMinZoom = map.getMinZoom();

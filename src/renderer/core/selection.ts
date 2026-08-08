@@ -1,4 +1,6 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import { selectionUnitIdSetsDiffer } from '../../shared/selectionUnitIdSets';
+import { hidePlanningChromeToasts } from '../openRouter/openRouterUiHelpers';
 import { rendererSharedState as S } from './state';
 
 /**
@@ -65,14 +67,19 @@ export function reconcileSelectionToCurrentState(): void {
 }
 
 /**
- * Defines the `replaceSelection` function shape (export function replaceSelection(unitIds: string[]): void).
-
- * Purpose: Supports maintainability by documenting why `replaceSelection` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Replaces the active human unit selection and clears order-draft chrome when empty.
+ *
+ * Purpose: Single mutation point for `selectedUnitIds` so map, sidebar, and mode
+ * toggles stay consistent; also dismisses map chrome toasts when the player’s
+ * non-empty selection set changes (planning initiation).
+ * When to use: Any path that sets, adds, removes, toggles, or clears unit selection.
+ * Expected outcome: Selection is uniqued and reconciled to living human units; empty
+ * selection clears hex/hover/ranged/air draft state; a changed non-empty set hides
+ * planning chrome toasts without suppressing later toast shows.
  * Exceptions: None.
  */
 export function replaceSelection(unitIds: string[]): void {
+  const previousIds = [...S.selectedUnitIds];
   const unique = [...new Set(unitIds)];
   S.selectedUnitIds = unique;
   reconcileSelectionToCurrentState();
@@ -83,6 +90,9 @@ export function replaceSelection(unitIds: string[]): void {
     S.rangedModeActive = false;
     S.airStrikeModeActive = false;
     return;
+  }
+  if (selectionUnitIdSetsDiffer(previousIds, S.selectedUnitIds)) {
+    hidePlanningChromeToasts();
   }
   const tb = S.tacticalBattleSnapshot;
   const primary = tb ? tb.subUnits.find((u) => u.id === S.selectedUnitIds[0]) : S.gameState?.units.find((u) => u.id === S.selectedUnitIds[0]);

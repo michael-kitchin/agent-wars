@@ -2,6 +2,7 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { unitHasTacticalRangedBaseline } from '../../shared/tacticalRanges';
 import { panMapOneRes1Hex, shouldIgnoreGlobalKeydown } from './mapUtils';
 import { rendererSharedState as S } from '../core/state';
+import { hidePlanningChromeToasts } from '../openRouter/openRouterUiHelpers';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 import { getActiveTerrainStyleBasemapId, renderTerrainLegend } from '../rendering/terrainVisualStyles';
 import { hideOrderBlockHexTooltip } from './orderBlockHexTooltip';
@@ -359,11 +360,13 @@ export function wireInitCore(deps: InitCoreDeps): void {
       const allHaveRanged =
         selectedUnits.length > 0 && selectedUnits.every((unit) => unitHasTacticalRangedBaseline(unit.unitType));
       if (allAir) {
+        hidePlanningChromeToasts();
         S.airStrikeModeActive = true;
         S.rangedModeActive = false;
         S.hoverPreviewRequestSeq++;
         S.hoverRoutePreview = null;
       } else if (allHaveRanged) {
+        hidePlanningChromeToasts();
         S.rangedModeActive = true;
         S.airStrikeModeActive = false;
         S.hoverPreviewRequestSeq++;

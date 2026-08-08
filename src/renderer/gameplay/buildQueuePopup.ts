@@ -3,6 +3,7 @@ import type { BuildUnitType, HexBuildQueueSnapshot } from '../../shared/ipcTypes
 import { estimateTurnsToCompleteQueuedProduction, sumQueuedProductionCost } from '../../shared/productionConfig';
 import { TOOLTIP_OFFSET_PX, UNIT_SELECT_GLYPH } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
+import { hidePlanningChromeToasts } from '../openRouter/openRouterUiHelpers';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 import { buildQueueTemplateFromSnapshot, toBuildQueueTemplateEntries } from './buildQueueMultiSelect';
 import { renderMultiBuildQueueIntoMount } from './buildQueueMultiPopup';
@@ -602,6 +603,18 @@ export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
     deps.scheduleTerrainTooltipRestoreAfterPopoverClose();
   }
 
+  /**
+   * Opens the build-queue popup for a hex and clears overlapping map chrome toasts.
+   *
+   * Purpose: Presents production controls at the click point while dismissing
+   * upper/lower-right toasts that would obscure planning UI.
+   * When to use: After a successful build-entry click that is not blocked by hover
+   * order planning or res4 tactical hex rendering.
+   * Expected outcome: Popup is positioned and shown with queue content; planning
+   * chrome toasts are hidden once (not suppressed for later show calls). Early
+   * returns leave toast visibility unchanged.
+   * Exceptions: None.
+   */
   function showBuildPopup(h3Index: string, clientX: number, clientY: number): void {
     if (isHoverOrderPlanningActive()) return;
     if (deps.shouldRenderRes4Hexes()) return;
@@ -611,6 +624,7 @@ export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
     const el = document.getElementById('build-popup');
     const body = document.getElementById('build-popup-body');
     if (!el || !body) return;
+    hidePlanningChromeToasts();
     S.buildPopupHexH3 = h3Index;
     el.setAttribute('data-open', 'true');
     el.setAttribute('data-x', String(clientX));

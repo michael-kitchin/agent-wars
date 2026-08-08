@@ -386,6 +386,22 @@ export function hideAiStrategyToast(): void {
 }
 
 /**
+ * Dismisses the lower-right map toast and upper-right AI strategy toast together.
+ *
+ * Purpose: Gives planning entry points one call that clears both chrome toasts without
+ * suppressing later `showMapToast` / `showAiStrategyToast` traffic.
+ * When to use: At the start of human planning initiations (unit selection change, build
+ * popup open, ranged/air targeting arm, tactical zoom-in entry).
+ * Expected outcome: Both toast elements are hidden and their auto-hide timers are cleared;
+ * subsequent show helpers still display normally.
+ * Exceptions: None.
+ */
+export function hidePlanningChromeToasts(): void {
+  hideMapToast();
+  hideAiStrategyToast();
+}
+
+/**
  * Defines the `callReadyWithTimeout` function shape (export async function callReadyWithTimeout().
 
  * Purpose: Supports maintainability by documenting why `callReadyWithTimeout` exists.
