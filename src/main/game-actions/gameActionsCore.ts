@@ -1089,6 +1089,8 @@ export function commitHumanTacticalDraftOrders(args: {
       rangedCombatHexes: rangedCombatHexes.length > 0 ? rangedCombatHexes : undefined,
       rangedCasualtyHexes: rangedCasualtyHexes.length > 0 ? rangedCasualtyHexes : undefined,
       rangedRemovedUnits: rangedRemovedUnits.length > 0 ? rangedRemovedUnits : undefined,
+      rangedResolutionShotLines:
+        support.rangedResolutionShotLines.length > 0 ? support.rangedResolutionShotLines : undefined,
       killsByDirectFire: support.killsByDirectFire.length > 0 ? support.killsByDirectFire : undefined,
       killsByReturnFire: support.killsByReturnFire.length > 0 ? support.killsByReturnFire : undefined,
       killsByAirStrike: support.killsByAirStrike.length > 0 ? support.killsByAirStrike : undefined,
@@ -1133,6 +1135,7 @@ export function commitHumanTacticalDraftOrders(args: {
       meleeKillEdgeCount: meleePack.killsByMelee.length,
       meleeRemovedCount: meleePack.meleeRemovedUnits.length,
       marchContinuationCount: livingMarchContinuations.length,
+      shotLineCount: support.rangedResolutionShotLines.length,
     });
     /**
      * Persists human tactical embark onto strategic `unit_transport_assignments` after the beat succeeded.

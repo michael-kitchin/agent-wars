@@ -3,7 +3,8 @@ import type {
   TacticalBattleSnapshot,
 } from '../../shared/tacticalBattleTypes';
 import type { AirStrikeAnimationMove, AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
-import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
+import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot, TacticalOpponentPlanPayload } from '../../shared/ipc/readyTypes';
+import type { RangedResolutionShotLine } from '../../shared/rangedResolutionShotLines';
 import { tacticalBoundaryConcurrentSessionAllowed } from '../../shared/tacticalStateAssertions';
 import { createCombatRng } from '../combatResolution';
 import { getGameSeed, clearTacticalTurnNotes } from '../gameDb';
@@ -40,7 +41,6 @@ import {
   tacticalTransportBaselineConfigExists,
 } from './tacticalTransportBaseline';
 import { TacticalEmbarkValidationRejected } from './tacticalValidationResult';
-import type { TacticalOpponentPlanPayload } from '../../shared/ipc/readyTypes';
 import {
   stashOpponentCallbackSubscriptionsForTacticalBattle,
   restoreOpponentCallbackSubscriptionsAfterTacticalBattle,
@@ -459,6 +459,7 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
       airStrikePlaybackMoves: AirStrikeAnimationMove[];
       airStrikePlaybackStrikeHexes: string[];
       airStrikePlaybackCasualtyHexes: string[];
+      rangedResolutionShotLines: RangedResolutionShotLine[];
       meleePack: ReturnType<typeof applyTacticalMeleeAfterSupportOrders>;
     }
   | { success: false; reason: string } {
@@ -554,6 +555,7 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
       airStrikePlaybackMoves: acc.airStrikePlaybackMoves,
       airStrikePlaybackStrikeHexes: acc.airStrikePlaybackStrikeHexes,
       airStrikePlaybackCasualtyHexes: acc.airStrikePlaybackCasualtyHexes,
+      rangedResolutionShotLines: acc.rangedResolutionShotLines,
       meleePack: {
         ...meleePack,
         battle: battleAdvancedTurn,

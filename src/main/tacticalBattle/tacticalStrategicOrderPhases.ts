@@ -21,6 +21,11 @@ import {
 import { tacticalRes4CellHasActiveTransportCorridor } from '../../shared/tacticalRes4TransportLink';
 import { casualtyPriorityIndex, getAttack, getDefense, getRange } from '../combatConstants';
 import { runRangedPhase } from '../combatResolution';
+import {
+  dedupeRangedResolutionShotLines,
+  directShotLinesFromOrders,
+  type RangedResolutionShotLine,
+} from '../../shared/rangedResolutionShotLines';
 import type { CombatUnit } from '../combatUnitTypes';
 import { deleteStrategicParentUnitAndApplyTransportOutcome } from '../game-actions/sealift';
 import { applyInfrastructureDestructionEffects } from '../game-actions/airStrikeResolution';
@@ -345,6 +350,15 @@ export type TacticalAirRangedPhaseAccum = {
    * Exceptions: None.
    */
   airStrikePlaybackCasualtyHexes: string[];
+  /**
+   * Hex-to-hex ranged connectors for resolution lightning (direct fire + return-fire attempts).
+   *
+   * Purpose: Feeds `TacticalCommitResolutionPlayback.rangedResolutionShotLines` with the same contract as strategic Ready.
+   * When to use: Read by `commitHumanTacticalDraftOrders` when assembling playback.
+   * Expected outcome: Deduped pairs covering all submitted ranged orders this phase plus return-fire eligibility edges; empty when none.
+   * Exceptions: None.
+   */
+  rangedResolutionShotLines: RangedResolutionShotLine[];
 };
 
 /**
@@ -560,12 +574,23 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     }
   }
 
+  const unitByIdForShotLines = new Map(
+    workBattle.subUnits.map((u) => [u.id, { h3Index: u.h3Index }] as const)
+  );
+  let rangedResolutionShotLines = dedupeRangedResolutionShotLines(
+    directShotLinesFromOrders(rangedOrders, unitByIdForShotLines)
+  );
+
   let rangedTerrainMutated = false;
   if (rangedOrdersCombat.length > 0) {
     const subBeforeRanged = workBattle.subUnits.map((u) => ({ ...u }));
     const byIdBefore = new Map(subBeforeRanged.map((u) => [u.id, u] as const));
     const rangedInput = tacticalSubUnitsToRangedCombatUnits(workBattle, workBattle.subUnits);
     const rangedResult = runRangedPhase(rangedInput, workBattle.res4ChildH3Indexes, rangedOrdersCombat, next);
+    rangedResolutionShotLines = dedupeRangedResolutionShotLines([
+      ...rangedResolutionShotLines,
+      ...(rangedResult.rangedResolutionShotLines ?? []),
+    ]);
     const removedSet = new Set(rangedResult.removedUnitIds);
     const byId = new Map(workBattle.subUnits.map((u) => [u.id, u] as const));
     for (const id of rangedResult.removedUnitIds) {
@@ -666,6 +691,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     airCasualtyHexPlaybackCount: airStrikeCasualtyHexSet.size,
     rangedOrderCount: rangedOrders.length,
     removedCount: removedUnits.length,
+    shotLineCount: rangedResolutionShotLines.length,
   });
   syncStrategicUnitsDbWhenTacticalParentsEliminated(battle.subUnits, workBattle.subUnits);
   return {
@@ -679,6 +705,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     airStrikePlaybackMoves: strikeMoves,
     airStrikePlaybackStrikeHexes: [...strikeHexesSet],
     airStrikePlaybackCasualtyHexes: [...airStrikeCasualtyHexSet],
+    rangedResolutionShotLines,
   };
 }
 

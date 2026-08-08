@@ -819,6 +819,9 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
           rangedCombatHexes: playback.rangedCombatHexes,
           rangedCasualtyHexes: playback.rangedCasualtyHexes,
           rangedRemovedUnits: playback.rangedRemovedUnits,
+          ...(playback.rangedResolutionShotLines?.length
+            ? { rangedResolutionShotLines: playback.rangedResolutionShotLines }
+            : {}),
           meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : undefined,
           meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : undefined,
           meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : undefined,
@@ -1136,6 +1139,9 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         rangedCombatHexes: readyResult.rangedCombatHexes?.length ? readyResult.rangedCombatHexes : undefined,
         rangedCasualtyHexes: readyResult.rangedCasualtyHexes?.length ? readyResult.rangedCasualtyHexes : undefined,
         rangedRemovedUnits: readyResult.rangedRemovedUnits?.length ? readyResult.rangedRemovedUnits : undefined,
+        ...(readyResult.rangedResolutionShotLines?.length
+          ? { rangedResolutionShotLines: readyResult.rangedResolutionShotLines }
+          : {}),
         meleeCombatHexes: readyResult.meleeCombatHexes?.length ? readyResult.meleeCombatHexes : undefined,
         controlLossLightningHexes: readyResult.controlLossLightningHexes?.length ? readyResult.controlLossLightningHexes : undefined,
         meleeCasualtyHexes: readyResult.meleeCasualtyHexes?.length ? readyResult.meleeCasualtyHexes : undefined,

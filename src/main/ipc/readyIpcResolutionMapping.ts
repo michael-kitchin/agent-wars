@@ -67,6 +67,7 @@ export type ReadyResolutionIpcMirrorSource = Pick<
   | 'rangedCombatHexes'
   | 'rangedCasualtyHexes'
   | 'rangedRemovedUnits'
+  | 'rangedResolutionShotLines'
   | 'airStrikeHexes'
   | 'airStrikeCasualtyHexes'
   | 'airStrikeRemovedUnits'
@@ -110,6 +111,7 @@ export function pickReadyResolutionIpcMirrorFields(source: ReadyResolutionIpcMir
     rangedCombatHexes: source.rangedCombatHexes,
     rangedCasualtyHexes: source.rangedCasualtyHexes,
     rangedRemovedUnits: source.rangedRemovedUnits,
+    rangedResolutionShotLines: source.rangedResolutionShotLines,
     airStrikeHexes: source.airStrikeHexes,
     airStrikeCasualtyHexes: source.airStrikeCasualtyHexes,
     airStrikeRemovedUnits: source.airStrikeRemovedUnits,

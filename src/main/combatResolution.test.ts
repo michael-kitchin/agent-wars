@@ -4,6 +4,7 @@
  */
 
 import * as assert from 'assert';
+import { gridDisk } from 'h3-js';
 import { runMeleePhase, runRangedPhase, type CombatUnit } from './combatResolution';
 
 /**
@@ -100,6 +101,78 @@ function testRangedMixedStackTargetsEnemiesOnlyAndEnemyReturnFireOnly(): void {
     ['human-armor-1'],
     'return fire should attribute kills only to enemy-side defenders'
   );
+  assert.ok(
+    (out.rangedResolutionShotLines?.length ?? 0) >= 1,
+    'submitted orders must produce direct-fire shot lines'
+  );
+  assert.ok(
+    out.rangedResolutionShotLines?.some((l) => l.fromH3Index === hex && l.toH3Index === hex),
+    'direct-fire lines use attacker hex → target even for same-hex stacks'
+  );
+}
+
+/**
+ * Verifies adjacent-hex return fire emits defender→attacker shot lines (including when rolls miss).
+ *
+ * Purpose: Regression for resolution connectors when attacker and defender are not stacked.
+ * When to use: After changing `runRangedPhase` shot-line emit or return-fire eligibility.
+ * Expected outcome: Direct line attacker→defender plus return-fire line defender→attacker; combat hexes non-empty.
+ * Exceptions: None.
+ */
+function testRangedAdjacentReturnFireEmitsShotLinesIncludingMisses(): void {
+  // Valid res-9 cell (same fixture family as rangedResolutionShotLines tests).
+  const defenderHex = '89283082807ffff';
+  const attackerHex = gridDisk(defenderHex, 1).find((h) => h !== defenderHex);
+  assert.ok(attackerHex, 'need a neighbor hex');
+  const units: CombatUnit[] = [
+    makeUnit('atk', 'human', 'armor', attackerHex!),
+    makeUnit('def', 'opponent', 'armor', defenderHex),
+  ];
+  // High rolls → every shot misses, but return-fire eligibility edges must still emit.
+  const rollAlwaysMiss = () => 0.999;
+  const out = runRangedPhase(
+    units,
+    [defenderHex, attackerHex!],
+    [{ unitId: 'atk', targetH3Index: defenderHex }],
+    rollAlwaysMiss
+  );
+  assert.ok((out.combatHexes?.length ?? 0) > 0, 'engagement must arm lightning hexes');
+  assert.ok(
+    out.rangedResolutionShotLines?.some(
+      (l) => l.fromH3Index === attackerHex && l.toH3Index === defenderHex
+    ),
+    'direct-fire connector required'
+  );
+  assert.ok(
+    out.rangedResolutionShotLines?.some(
+      (l) => l.fromH3Index === defenderHex && l.toH3Index === attackerHex
+    ),
+    'return-fire connector required even on miss'
+  );
+  assert.deepStrictEqual(out.removedUnitIds, []);
+}
+
+/**
+ * Verifies empty-target orders do not attach shot lines when no combat hexes (no lightning window).
+ *
+ * Purpose: Keeps IPC payload aligned with lightning-gated draw policy.
+ * When to use: After changing `runRangedPhase` shot-line gating.
+ * Expected outcome: `rangedResolutionShotLines` omitted; `combatHexes` empty.
+ * Exceptions: None.
+ */
+function testRangedEmptyTargetOmitsShotLinesWithoutCombatHexes(): void {
+  const attackerHex = '89283082807ffff';
+  const emptyTarget = gridDisk(attackerHex, 1).find((h) => h !== attackerHex);
+  assert.ok(emptyTarget, 'need an empty neighbor target');
+  const units: CombatUnit[] = [makeUnit('atk', 'human', 'armor', attackerHex)];
+  const out = runRangedPhase(
+    units,
+    [attackerHex, emptyTarget!],
+    [{ unitId: 'atk', targetH3Index: emptyTarget! }],
+    () => 0
+  );
+  assert.deepStrictEqual(out.combatHexes, []);
+  assert.equal(out.rangedResolutionShotLines, undefined);
 }
 
 /**
@@ -114,6 +187,8 @@ function run(): void {
   testMeleePhaseSkipHexLeavesThatHexUnresolved();
   testMeleePhaseNoSkipResolvesMoreThanSkipOneHex();
   testRangedMixedStackTargetsEnemiesOnlyAndEnemyReturnFireOnly();
+  testRangedAdjacentReturnFireEmitsShotLinesIncludingMisses();
+  testRangedEmptyTargetOmitsShotLinesWithoutCombatHexes();
   console.log('combatResolution tests passed');
 }
 

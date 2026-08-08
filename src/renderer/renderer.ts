@@ -100,6 +100,7 @@ import {
   buildAirStrikeOutboundPlaybackMoves,
   buildAirStrikeReturnPlaybackMoves,
   buildResolutionPlaybackMoves,
+  drawRangedResolutionShotLines,
 } from './rendering/orderDrawing';
 import {
   drawCasualtyOverlay,
@@ -2422,6 +2423,9 @@ function drawGameScene(
         drawCombatLightning(ctx, width, height, knownCombatHexes, hexList, pulseOpacity);
         drawUnknownBattleMarkers(ctx, unknownCombatHexes, pulseOpacity);
       }
+      if (phase.inRangedLightning && (anim.rangedResolutionShotLines?.length ?? 0) > 0) {
+        drawRangedResolutionShotLines(ctx, anim.rangedResolutionShotLines!, hexList, null);
+      }
       const casualtyHexes = phase.inAirStrikeCasualty
         ? anim.airStrikeCasualtyHexes
         : phase.inRangedCasualty
@@ -2545,6 +2549,14 @@ function drawGameScene(
       const unknownCombatHexes = combatHexes.filter((h3) => unknownSet.has(h3));
       drawCombatLightning(ctx, width, height, knownCombatHexes, hexList, pulseOpacity);
       drawUnknownBattleMarkers(ctx, unknownCombatHexes, pulseOpacity);
+    }
+    if (phase.inRangedLightning && (anim.rangedResolutionShotLines?.length ?? 0) > 0) {
+      drawRangedResolutionShotLines(
+        ctx,
+        anim.rangedResolutionShotLines!,
+        hexList,
+        getVisibleHexSet(state)
+      );
     }
     const casualtyHexes = phase.inAirStrikeCasualty
       ? anim.airStrikeCasualtyHexes

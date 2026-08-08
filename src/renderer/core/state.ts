@@ -16,6 +16,7 @@ import type {
   TacticalOpponentPlanPayload,
   TacticalPendingMarchRow,
 } from '../../shared/ipcTypes';
+import type { RangedResolutionShotLine } from '../../shared/rangedResolutionShotLines';
 import type { TacticalAnnihilationOutcomeKind } from '../../shared/tacticalAnnihilation';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { OPENROUTER_TOOL_GROUPS } from './constants';
@@ -151,7 +152,16 @@ rangedCasualtyHexes?: string[];
    * Exceptions: None.
    */
 rangedRemovedUnits?: RemovedUnitSnapshot[];
-    /**
+  /**
+   * Hex-to-hex ranged connectors drawn during the ranged lightning playback window.
+   *
+   * Purpose: Carries IPC `rangedResolutionShotLines` for strategic Ready and tactical commit until the anim ends.
+   * When to use: Set when arming `resolutionMoveAnimation`; drawn only while `inRangedLightning`.
+   * Expected outcome: Deduped pairs; cleared when anim is nulled.
+   * Exceptions: None.
+   */
+  rangedResolutionShotLines?: RangedResolutionShotLine[];
+  /**
    * Specifies the contract for the `meleeCombatHexes` member (meleeCombatHexes?: string[];).
 
    * Contract: Describes stable behavior for callers of `meleeCombatHexes` in this codebase.

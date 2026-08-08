@@ -19230,6 +19230,14 @@
     }
   }
 
+  // src/shared/rangedResolutionShotLines.ts
+  function filterShotLinesByVisibleEndpoints(lines, visibleHexes) {
+    if (!visibleHexes) return [...lines];
+    return lines.filter(
+      (line) => visibleHexes.has(line.fromH3Index) && visibleHexes.has(line.toH3Index)
+    );
+  }
+
   // src/renderer/rendering/orderDrawing.ts
   function rangePerimeterStaticLineStyle(mode) {
     const lineWidth = getCurrentRangeSupportPlanLineWidth();
@@ -19270,6 +19278,29 @@
       if (!unit) continue;
       const from = hexCenterPx(unit.h3Index);
       const to = hexCenterPxRelativeTo(unit.h3Index, r.targetH3Index);
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function drawRangedResolutionShotLines(ctx, lines, hexList, visibleHexes) {
+    if (lines.length === 0 || !hexList) return;
+    const filtered = filterShotLinesByVisibleEndpoints(lines, visibleHexes);
+    if (filtered.length === 0) return;
+    const style = rangePerimeterStaticLineStyle("ranged");
+    ctx.save();
+    ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
+    ctx.setLineDash(style.dash);
+    ctx.strokeStyle = style.strokeColor;
+    ctx.lineWidth = style.lineWidth;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    for (const line of filtered) {
+      if (line.fromH3Index === line.toH3Index) continue;
+      const from = hexCenterPx(line.fromH3Index);
+      const to = hexCenterPxRelativeTo(line.fromH3Index, line.toH3Index);
       ctx.beginPath();
       ctx.moveTo(from.x, from.y);
       ctx.lineTo(to.x, to.y);
@@ -24278,6 +24309,7 @@
             rangedCombatHexes: playback.rangedCombatHexes,
             rangedCasualtyHexes: playback.rangedCasualtyHexes,
             rangedRemovedUnits: playback.rangedRemovedUnits,
+            ...playback.rangedResolutionShotLines?.length ? { rangedResolutionShotLines: playback.rangedResolutionShotLines } : {},
             meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : void 0,
             meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : void 0,
             meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : void 0
@@ -24560,6 +24592,7 @@
           rangedCombatHexes: readyResult.rangedCombatHexes?.length ? readyResult.rangedCombatHexes : void 0,
           rangedCasualtyHexes: readyResult.rangedCasualtyHexes?.length ? readyResult.rangedCasualtyHexes : void 0,
           rangedRemovedUnits: readyResult.rangedRemovedUnits?.length ? readyResult.rangedRemovedUnits : void 0,
+          ...readyResult.rangedResolutionShotLines?.length ? { rangedResolutionShotLines: readyResult.rangedResolutionShotLines } : {},
           meleeCombatHexes: readyResult.meleeCombatHexes?.length ? readyResult.meleeCombatHexes : void 0,
           controlLossLightningHexes: readyResult.controlLossLightningHexes?.length ? readyResult.controlLossLightningHexes : void 0,
           meleeCasualtyHexes: readyResult.meleeCasualtyHexes?.length ? readyResult.meleeCasualtyHexes : void 0,
@@ -27559,6 +27592,9 @@
           drawCombatLightning(ctx, width, height, knownCombatHexes, hexList2, pulseOpacity);
           drawUnknownBattleMarkers(ctx, unknownCombatHexes, pulseOpacity);
         }
+        if (phase.inRangedLightning && (anim2.rangedResolutionShotLines?.length ?? 0) > 0) {
+          drawRangedResolutionShotLines(ctx, anim2.rangedResolutionShotLines, hexList2, null);
+        }
         const casualtyHexes = phase.inAirStrikeCasualty ? anim2.airStrikeCasualtyHexes : phase.inRangedCasualty ? anim2.rangedCasualtyHexes ?? anim2.casualtyHexes : phase.inMeleeCasualty ? anim2.meleeCasualtyHexes : void 0;
         if (casualtyHexes?.length) {
           const casualtyElapsed = phase.inAirStrikeCasualty ? elapsed - phase.airStrikeCasualtyStart : phase.inRangedCasualty ? elapsed - phase.rangedCasualtyStart : elapsed - phase.meleeCasualtyStart;
@@ -27666,6 +27702,14 @@
         const unknownCombatHexes = combatHexes.filter((h3) => unknownSet.has(h3));
         drawCombatLightning(ctx, width, height, knownCombatHexes, hexList, pulseOpacity);
         drawUnknownBattleMarkers(ctx, unknownCombatHexes, pulseOpacity);
+      }
+      if (phase.inRangedLightning && (anim.rangedResolutionShotLines?.length ?? 0) > 0) {
+        drawRangedResolutionShotLines(
+          ctx,
+          anim.rangedResolutionShotLines,
+          hexList,
+          getVisibleHexSet2(state)
+        );
       }
       const casualtyHexes = phase.inAirStrikeCasualty ? anim.airStrikeCasualtyHexes : phase.inRangedCasualty ? anim.rangedCasualtyHexes ?? anim.casualtyHexes : phase.inMeleeCasualty ? anim.meleeCasualtyHexes : void 0;
       if (casualtyHexes?.length) {

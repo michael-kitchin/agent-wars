@@ -11,8 +11,15 @@ import { createSeededRng } from './seededRng';
 import { logDebug } from './logger';
 import type { RangedAttackOrder } from './gameActions';
 import type { CombatUnit } from './combatUnitTypes';
+import {
+  dedupeRangedResolutionShotLines,
+  directShotLinesFromOrders,
+  returnFireShotLinesForEngagement,
+  type RangedResolutionShotLine,
+} from '../shared/rangedResolutionShotLines';
 
 export type { CombatUnit } from './combatUnitTypes';
+export type { RangedResolutionShotLine };
 
 /**
  * Documents the `OneEngagementResult` interface as a named contract surface (export interface OneEngagementResult).
@@ -270,6 +277,15 @@ killsByDirectFire?: KillRecord[];
    * Exceptions: None.
    */
 killsByReturnFire?: KillRecord[];
+  /**
+   * Hex-to-hex connectors for resolution lightning playback (direct fire + return-fire attempts).
+   *
+   * Contract: Deduped pairs from every submitted order in this phase plus return-fire eligibility edges; omit when empty.
+   * When to use: Mirrored onto `ReadyResult` / tactical playback as `rangedResolutionShotLines`.
+   * Expected outcome: Includes misses; not limited to kill edges.
+   * Exceptions: None.
+   */
+  rangedResolutionShotLines?: RangedResolutionShotLine[];
 }
 
 /**
@@ -375,11 +391,11 @@ function buildRangedEngagementGroups(
 }
 
 /**
- * Defines the `runRangedPhase` function shape (export function runRangedPhase( units: CombatUnit[], hexList: string[], rangedOrders: RangedAttackOrder[], next: () => number ): CombatResolutionRe).
-
- * Purpose: Supports maintainability by documenting why `runRangedPhase` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Resolves declared ranged attacks (direct fire + return fire) and attaches lightning playback shot lines.
+ *
+ * Purpose: Single strategic/tactical combat entry for the ranged phase; shot lines mirror orders + return-fire eligibility.
+ * When to use: Strategic Ready and tactical combat-order batches that call into shared combat resolution.
+ * Expected outcome: Casualties applied; `rangedResolutionShotLines` present only when combat hexes are non-empty.
  * Exceptions: None.
  */
 export function runRangedPhase(
@@ -401,6 +417,9 @@ export function runRangedPhase(
   const kills: KillRecord[] = [];
   const killsByDirectFire: KillRecord[] = [];
   const killsByReturnFire: KillRecord[] = [];
+  const shotLineAcc: RangedResolutionShotLine[] = [
+    ...directShotLinesFromOrders(rangedOrders, unitById),
+  ];
 
   const engagementGroups = buildRangedEngagementGroups(rangedOrders, unitById, removed);
   for (const group of engagementGroups) {
@@ -414,6 +433,15 @@ export function runRangedPhase(
     const attackerHexes = [...new Set(attackerUnits.map((u) => u.h3Index))];
     combatHexes.push(group.defenderHex);
     for (const ah of attackerHexes) combatHexes.push(ah);
+
+    shotLineAcc.push(
+      ...returnFireShotLinesForEngagement({
+        defenderHex: group.defenderHex,
+        attackerHexes,
+        defenderUnits,
+        getRange,
+      })
+    );
 
     const { attackerRemovedIds, defenderRemovedIds } = resolveOneRangedEngagement(
       attackerUnits,
@@ -459,7 +487,14 @@ export function runRangedPhase(
   const combatHexSet = new Set(combatHexes);
   const removedIds = Array.from(removed);
   const casualtyHexes = Array.from(casualtyHexSet);
-  logDebug('runRangedPhase complete', { combatHexCount: combatHexes.length, removedCount: removedIds.length });
+  // Shot lines only travel with a non-empty lightning hex set (renderer draws them solely in `inRangedLightning`).
+  const rangedResolutionShotLines =
+    combatHexSet.size > 0 ? dedupeRangedResolutionShotLines(shotLineAcc) : [];
+  logDebug('runRangedPhase complete', {
+    combatHexCount: combatHexes.length,
+    removedCount: removedIds.length,
+    shotLineCount: rangedResolutionShotLines.length,
+  });
   return {
     combatHexes: hexList.filter((h) => combatHexSet.has(h)),
     removedUnitIds: removedIds,
@@ -468,6 +503,7 @@ export function runRangedPhase(
     kills,
     killsByDirectFire: killsByDirectFire.length > 0 ? killsByDirectFire : undefined,
     killsByReturnFire: killsByReturnFire.length > 0 ? killsByReturnFire : undefined,
+    ...(rangedResolutionShotLines.length > 0 ? { rangedResolutionShotLines } : {}),
   };
 }
 

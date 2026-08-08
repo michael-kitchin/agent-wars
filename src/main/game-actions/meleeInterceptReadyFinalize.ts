@@ -345,6 +345,10 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     rangedCombatHexes: rangedResult.combatHexes.length > 0 ? rangedResult.combatHexes : undefined,
     rangedCasualtyHexes: rangedResult.casualtyHexes.length > 0 ? rangedResult.casualtyHexes : undefined,
     rangedRemovedUnits: rangedResult.removedUnits.length > 0 ? rangedResult.removedUnits : undefined,
+    rangedResolutionShotLines:
+      rangedResult.rangedResolutionShotLines && rangedResult.rangedResolutionShotLines.length > 0
+        ? rangedResult.rangedResolutionShotLines
+        : undefined,
     airStrikeHexes: airStrikeResult.strikeHexes.length > 0 ? airStrikeResult.strikeHexes : undefined,
     airStrikeCasualtyHexes: airStrikeResult.casualtyHexes.length > 0 ? airStrikeResult.casualtyHexes : undefined,
     airStrikeRemovedUnits: airStrikeResult.removedUnits.length > 0 ? airStrikeResult.removedUnits : undefined,

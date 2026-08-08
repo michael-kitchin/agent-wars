@@ -8,7 +8,9 @@ import type {
   RangedAttackOrder,
 } from './ordersTypes';
 import type { BuildUnitType } from './productionTypes';
+import type { RangedResolutionShotLine } from '../rangedResolutionShotLines';
 
+export type { RangedResolutionShotLine };
 export interface GameReadyIpcPayload {
     /**
    * Specifies the contract for the `enabledToolGroups` member (enabledToolGroups?: string[];).
@@ -262,6 +264,15 @@ export type TacticalCommitResolutionPlayback = {
   rangedCombatHexes?: string[];
   rangedCasualtyHexes?: string[];
   rangedRemovedUnits?: RemovedUnitSnapshot[];
+  /**
+   * Hex-to-hex ranged connectors for the lightning playback window (direct fire + return-fire attempts).
+   *
+   * Purpose: Lets strategic and tactical resolution draw planned-style shot lines without reconstructing from kills.
+   * When to use: Set by `commitHumanTacticalDraftOrders` from combat resolution / order merge; copied onto anim state.
+   * Expected outcome: Deduped pairs; omitted when empty.
+   * Exceptions: None.
+   */
+  rangedResolutionShotLines?: RangedResolutionShotLine[];
   /**
    * Kill edges from human tactical **ranged** orders only (mirrors `ReadyResult.killsByDirectFire`).
    *
@@ -599,6 +610,15 @@ rangedCasualtyHexes?: string[];
    * Exceptions: None.
    */
 rangedRemovedUnits?: RemovedUnitSnapshot[];
+    /**
+   * Hex-to-hex ranged connectors for the lightning playback window (direct fire + return-fire attempts).
+   *
+   * Contract: Deduped `{ fromH3Index, toH3Index }` pairs from every submitted ranged order plus return-fire eligibility edges; omit when empty.
+   * When to use: Renderer copies onto `resolutionMoveAnimation` and draws only while `inRangedLightning`.
+   * Expected outcome: Includes misses; not limited to kill edges. Same field name as tactical playback.
+   * Exceptions: None.
+   */
+rangedResolutionShotLines?: RangedResolutionShotLine[];
     /**
    * Specifies the contract for the `airStrikeHexes` member (airStrikeHexes?: string[];).
 

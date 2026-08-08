@@ -1,5 +1,7 @@
 import { cellToLatLng } from 'h3-js';
 import type { AirStrikeAnimationMove, AirStrikeOrder, FerryOrder, GameStateSnapshot, RangedAttackOrder } from '../../shared/ipcTypes';
+import type { RangedResolutionShotLine } from '../../shared/rangedResolutionShotLines';
+import { filterShotLinesByVisibleEndpoints } from '../../shared/rangedResolutionShotLines';
 import {
   RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION,
   RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX,
@@ -32,7 +34,7 @@ export type PendingOrderLineUnit = { id: string; h3Index: string };
  * Returns the static stroke style shared by planned support lines and their matching range perimeter.
  *
  * Purpose: Keeps planned and hover ranged/air-strike lines visually consistent with the targeting perimeter (color, width, dash) while leaving dash animation to the perimeter only.
- * When to use: `drawRangedAttackLines`, `drawAirStrikeLines`, and support-targeting hover previews.
+ * When to use: `drawRangedAttackLines`, `drawRangedResolutionShotLines`, `drawAirStrikeLines`, and support-targeting hover previews.
  * Expected outcome: Mode-colored line style at 1.5× home-region border width with 50/50 dash spacing.
  * Exceptions: None.
  */
@@ -95,6 +97,43 @@ export function drawRangedAttackLines(
     if (!unit) continue;
     const from = hexCenterPx(unit.h3Index);
     const to = hexCenterPxRelativeTo(unit.h3Index, r.targetH3Index);
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * Draws resolution-phase ranged shot lines (direct fire + return fire) in planned-ranged style.
+ *
+ * Purpose: Shows attacker↔target connectors during the ranged lightning window only, matching pending order strokes.
+ * When to use: `drawGameScene` when `inRangedLightning` and anim carries `rangedResolutionShotLines`.
+ * Expected outcome: Dashed burnt-orange hex-center lines; when `visibleHexes` is set, skips pairs with any fogged endpoint.
+ * Exceptions: None.
+ */
+export function drawRangedResolutionShotLines(
+  ctx: CanvasRenderingContext2D,
+  lines: readonly RangedResolutionShotLine[],
+  hexList: string[] | undefined,
+  visibleHexes?: ReadonlySet<string> | null
+): void {
+  if (lines.length === 0 || !hexList) return;
+  const filtered = filterShotLinesByVisibleEndpoints(lines, visibleHexes);
+  if (filtered.length === 0) return;
+  const style = rangePerimeterStaticLineStyle('ranged');
+  ctx.save();
+  ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
+  ctx.setLineDash(style.dash);
+  ctx.strokeStyle = style.strokeColor;
+  ctx.lineWidth = style.lineWidth;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (const line of filtered) {
+    if (line.fromH3Index === line.toH3Index) continue;
+    const from = hexCenterPx(line.fromH3Index);
+    const to = hexCenterPxRelativeTo(line.fromH3Index, line.toH3Index);
     ctx.beginPath();
     ctx.moveTo(from.x, from.y);
     ctx.lineTo(to.x, to.y);
