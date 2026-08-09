@@ -45,6 +45,7 @@ import {
 import { collectTraversedHexesByPlayer } from './controlAndProduction';
 import { generateOrdersForStandingOrders } from '../tools/tool5StandingOrders';
 import { isWithinAirFerryGridRange } from './gridRange';
+import { hasIntactAirportAtStrategicAirBase } from '../returnFireAirportLookup';
 
 /**
  * Planning identity constants injected from `gameActions` so this module stays free of duplicate literals.
@@ -211,7 +212,10 @@ export function executeReadyStrategicTurn(
       h3Index: u.h3Index,
       displayOrder: u.displayOrder,
     }));
-  const rangedResult = runRangedPhase(rangedInputUnits, hexList, allRanged, next);
+  const rangedResult = runRangedPhase(rangedInputUnits, hexList, allRanged, next, {
+    theater: 'strategic',
+    hasIntactAirportAtAirBase: hasIntactAirportAtStrategicAirBase,
+  });
   for (const id of rangedResult.removedUnitIds) {
     dbRun('DELETE FROM units WHERE id = ?', [id]);
   }

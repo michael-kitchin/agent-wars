@@ -6,7 +6,8 @@
  * 1. **Mountain ranged block (air, armor, naval):** Tactical ranged uses implicit **line of sight (LOS)** via
  *    `gridPathCells(attackerH3, targetH3)` on res4 indexes. If **any** cell on that trace is **mountain**, the attack
  *    is not allowed for air, armor, or naval. **Infantry** is excluded from this rule. If `gridPathCells` throws,
- *    treat as **blocked** (fail closed). Return fire is **not** re-checked here—only order validation / apply filters.
+ *    treat as **blocked** (fail closed). Ranged-phase return fire for ground units reuses this module via
+ *    `returnFireEligibility` / `tacticalRangedDirectFirePassesTerrainAndRange` (planning parity).
  * 2. **Forest / urban / rubble ranged cap (armor, infantry):** When the attacker’s **terrain anchor** cell is forest-class,
  *    **urban** (`res4IsUrbanByH3`), or **rubble** (`res4IsRubbleByH3`), **effective max ranged range is 1** H3 grid step.
  * 3. **Forest movement (armor):** From a **forest** anchor cell, armor uses the **same movement point budget as infantry**

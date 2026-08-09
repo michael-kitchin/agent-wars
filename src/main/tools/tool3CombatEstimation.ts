@@ -10,6 +10,14 @@ import type { GameStateSnapshot } from '../gameDb';
 import { getAttack, getDefense, getRange } from '../combatConstants';
 import { type CombatUnit } from '../combatResolution';
 import { logDebug, logError, logTrace } from '../logger';
+import {
+  canDefenderReturnFireAtAnyAttackerHex,
+  type ReturnFireEligibilityContext,
+} from '../../shared/returnFireEligibility';
+import { AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
+import { strategicRangedRangeHexesForUnitType } from '../../shared/rangePerimeterModel';
+import { computeGridDistancePure } from '../../shared/h3GridRangePure';
+import { hasIntactAirportAtStrategicAirBase } from '../returnFireAirportLookup';
 
 /**
  * Documents the `LatLng` type alias (export type LatLng).
@@ -296,25 +304,39 @@ export function executeEstimateCombat(
       warnings.push('Using assumed attackers - return fire not evaluated (attacker position unknown)');
     } else {
       const attackerHexes = [...new Set(attackerCombat.map((u) => u.h3Index))];
+      const returnFireContext: ReturnFireEligibilityContext = {
+        theater: 'strategic',
+        hasIntactAirportAtAirBase: hasIntactAirportAtStrategicAirBase,
+      };
       const whoCan: string[] = [];
       for (const u of defenderCombat) {
-        const r = getRange(u.unitType);
-        if (r < 1) continue;
-        const inRange = attackerHexes.some((h) => {
-          try { return gridDistance(targetHexH3, h) <= r; } catch { return false; }
-        });
-        if (inRange) {
-          canReturnFire = true;
-          defenderReturnFireProbs.push(getAttack(u.unitType) / 6);
-          try {
-            const dist = attackerHexes.length ? gridDistance(targetHexH3, attackerHexes[0]!) : 0;
-            whoCan.push(`${u.id} (${u.unitType}, range ${r}) can return fire - attacker at distance ${dist}, within range`);
-          } catch {
-            whoCan.push(`${u.id} (${u.unitType}, range ${r}) can return fire`);
-          }
+        const defender = { unitType: u.unitType, h3Index: u.h3Index || targetHexH3 };
+        if (!canDefenderReturnFireAtAnyAttackerHex(defender, attackerHexes, returnFireContext)) {
+          continue;
+        }
+        canReturnFire = true;
+        defenderReturnFireProbs.push(getAttack(u.unitType) / 6);
+        const dist = attackerHexes.length
+          ? computeGridDistancePure(targetHexH3, attackerHexes[0]!)
+          : 0;
+        const distLabel = dist === null ? 'unknown' : String(dist);
+        if (u.unitType === 'air') {
+          whoCan.push(
+            `${u.id} (air, strike range ${AIR_STRIKE_RANGE_HEXES}, airport intact) can return fire - attacker at distance ${distLabel}`
+          );
+        } else {
+          const r = strategicRangedRangeHexesForUnitType(u.unitType);
+          whoCan.push(
+            `${u.id} (${u.unitType}, range ${r}) can return fire - attacker at distance ${distLabel}, within range`
+          );
         }
       }
       returnFireDetails = whoCan.length > 0 ? whoCan.join('; ') : null;
+      logDebug('tool3CombatEstimation return fire eligibility', {
+        canReturnFire,
+        defenderCount: defenderCombat.length,
+        eligibleCount: whoCan.length,
+      });
     }
   }
 

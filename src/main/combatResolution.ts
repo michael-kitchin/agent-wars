@@ -1,12 +1,11 @@
 /**
  * Combat resolution per combat spec: participant IDs, ranged phase (declared attacks;
- * defenders with range may return fire when attackers are in range), then melee phase.
+ * defenders may return fire when planning-parity reverse reach allows), then melee phase.
  * One d6 per unit, hit when roll ≤ attack/defense; casualty priority lowest defense first,
  * then infantry → armor → naval. Uses seeded RNG for determinism.
  */
 
-import { gridDistance } from 'h3-js';
-import { getAttack, getDefense, getRange, casualtyPriorityIndex } from './combatConstants';
+import { getAttack, getDefense, casualtyPriorityIndex } from './combatConstants';
 import { createSeededRng } from './seededRng';
 import { logDebug } from './logger';
 import type { RangedAttackOrder } from './gameActions';
@@ -17,9 +16,43 @@ import {
   returnFireShotLinesForEngagement,
   type RangedResolutionShotLine,
 } from '../shared/rangedResolutionShotLines';
+import {
+  canDefenderReturnFireAtAnyAttackerHex,
+  type ReturnFireEligibilityContext,
+} from '../shared/returnFireEligibility';
 
 export type { CombatUnit } from './combatUnitTypes';
 export type { RangedResolutionShotLine };
+export type { ReturnFireEligibilityContext };
+
+/**
+ * Options for one ranged engagement’s return-fire evaluation.
+ *
+ * Purpose: Carries skip flag plus planning-parity context for dice and shot lines.
+ * When to use: `resolveOneRangedEngagement` and Tool 3 Monte Carlo trials.
+ * Expected outcome: Default context is strategic theater (airport callback omitted ⇒ air ineligible).
+ * Exceptions: None.
+ */
+export type ResolveOneRangedEngagementOptions = {
+  /**
+   * When true, skip all defender return-fire rolls (e.g. assumed attackers with unknown positions).
+   *
+   * Purpose: Tool 3 assumed-attacker path.
+   * When to use: Only when attacker hexes are unavailable.
+   * Expected outcome: No defender hits from return fire.
+   * Exceptions: None.
+   */
+  skipReturnFire?: boolean;
+  /**
+   * Theater / airport / tactical terrain bag for return-fire eligibility.
+   *
+   * Purpose: Aligns dice with `returnFireShotLinesForEngagement` and Tool 3.
+   * When to use: Production callers pass a complete bag; tests may use `{ theater: 'strategic' }`.
+   * Expected outcome: Defaults to `{ theater: 'strategic' }` when omitted.
+   * Exceptions: None.
+   */
+  returnFireContext?: ReturnFireEligibilityContext;
+};
 
 /**
  * Documents the `OneEngagementResult` interface as a named contract surface (export interface OneEngagementResult).
@@ -51,11 +84,11 @@ defenderRemovedIds: string[];
 }
 
 /**
- * Defines the `resolveOneRangedEngagement` function shape (export function resolveOneRangedEngagement( attackerUnits: CombatUnit[], defenderUnits: CombatUnit[], defenderHexH3: string, rollD6: () => number,).
-
- * Purpose: Supports maintainability by documenting why `resolveOneRangedEngagement` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Resolves one ranged engagement: attacker rolls, then planning-parity return fire, then casualty assignment.
+ *
+ * Purpose: Shared dice core for `runRangedPhase` and Tool 3 Monte Carlo.
+ * When to use: After grouping ranged orders by defender hex / attacker player.
+ * Expected outcome: Removed attacker/defender IDs for this engagement only.
  * Exceptions: None.
  */
 export function resolveOneRangedEngagement(
@@ -63,11 +96,20 @@ export function resolveOneRangedEngagement(
   defenderUnits: CombatUnit[],
   defenderHexH3: string,
   rollD6: () => number,
-  options?: { skipReturnFire?: boolean }
+  options?: ResolveOneRangedEngagementOptions
 ): OneEngagementResult {
+  logDebug('resolveOneRangedEngagement', {
+    attackerCount: attackerUnits.length,
+    defenderCount: defenderUnits.length,
+    defenderHexH3,
+    skipReturnFire: !!options?.skipReturnFire,
+    theater: options?.returnFireContext?.theater ?? 'strategic',
+  });
   const attackerRemovedIds: string[] = [];
   const defenderRemovedIds: string[] = [];
   const removedAtk = new Set<string>();
+  const returnFireContext: ReturnFireEligibilityContext =
+    options?.returnFireContext ?? { theater: 'strategic' };
 
   const attackerHexes = [...new Set(attackerUnits.map((u) => u.h3Index))];
   let attackerHits = 0;
@@ -77,15 +119,8 @@ export function resolveOneRangedEngagement(
   let defenderHits = 0;
   if (!options?.skipReturnFire) {
     for (const u of defenderUnits) {
-      const range = getRange(u.unitType);
-      if (range < 1) continue;
-      const canReturnFire = attackerHexes.some((h) => {
-        try {
-          return gridDistance(defenderHexH3, h) <= range;
-        } catch {
-          return false;
-        }
-      });
+      const defender = { unitType: u.unitType, h3Index: u.h3Index || defenderHexH3 };
+      const canReturnFire = canDefenderReturnFireAtAnyAttackerHex(defender, attackerHexes, returnFireContext);
       if (canReturnFire && rollD6() <= getAttack(u.unitType)) defenderHits++;
     }
   }
@@ -402,9 +437,23 @@ export function runRangedPhase(
   units: CombatUnit[],
   hexList: string[],
   rangedOrders: RangedAttackOrder[],
-  next: () => number
+  next: () => number,
+  /**
+   * Planning-parity return-fire context (theater, airport, tactical terrain).
+   *
+   * Purpose: Threads the same eligibility into dice and shot lines.
+   * When to use: Production Ready / tactical callers pass a complete bag; omit defaults to strategic theater.
+   * Expected outcome: Defaults to `{ theater: 'strategic' }`.
+   * Exceptions: None.
+   */
+  returnFireContext?: ReturnFireEligibilityContext
 ): CombatResolutionResult {
-  logDebug('runRangedPhase', { unitCount: units.length, rangedOrderCount: rangedOrders.length });
+  const rfContext: ReturnFireEligibilityContext = returnFireContext ?? { theater: 'strategic' };
+  logDebug('runRangedPhase', {
+    unitCount: units.length,
+    rangedOrderCount: rangedOrders.length,
+    theater: rfContext.theater,
+  });
   const removed = new Set<string>();
   const removedUnits: CombatUnit[] = [];
   const casualtyHexSet = new Set<string>();
@@ -439,7 +488,7 @@ export function runRangedPhase(
         defenderHex: group.defenderHex,
         attackerHexes,
         defenderUnits,
-        getRange,
+        returnFireContext: rfContext,
       })
     );
 
@@ -448,7 +497,7 @@ export function runRangedPhase(
       defenderUnits,
       group.defenderHex,
       rollD6,
-      {}
+      { returnFireContext: rfContext }
     );
     const attackerUnitIds = attackerUnits.map((u) => u.id);
     const defenderUnitIds = defenderUnits.map((u) => u.id);

@@ -141,7 +141,7 @@ Within each phase, process engagements in a **deterministic order** (e.g. by att
 
 For simplicity, use **one round of fire per phase** per combat (or per attack):
 - Air strike phase: each striking air unit rolls once. Counter-fire depends on target type: for unit targets, defending units with range ≥ 1 in the target hex each roll once (attack value); for infrastructure targets, a single fixed counter-fire roll is made (see §8). Hits are applied via automatic casualty rules.
-- Ranged phase: each eligible attacker rolls once per eligible target hex. **Return fire:** defending units that have ranged capability (range ≥ 1) and for which at least one attacking unit's hex is within that defender unit type's range each roll once (**attack** value); those hits are assigned to attacker hexes. Hits are applied via automatic casualty rules.
+- Ranged phase: each eligible attacker rolls once per eligible target hex. **Return fire:** a defending unit returns fire only when it could legally plan the reverse shot at that attacker hex (planning parity — see below). Each eligible defender rolls once (**attack** value); those hits are assigned to attacker hexes. Hits are applied via automatic casualty rules.
 - Melee phase: same — one round of rolls, then apply hits.
 
 No "continue or retreat" — no player choices. If both sides remain in the same hex after melee, they will fight again in the **next turn's** resolution (no multi-round within the same resolution).
@@ -150,7 +150,7 @@ No "continue or retreat" — no player choices. If both sides remain in the same
 
 - **Roll:** One die per unit (d6, result 1–6).
 - **Hit:** For **attack** (including return fire), hit if `roll ≤ attack value`. For **defense** (melee only), hit if `roll ≤ defense value`.
-- **Return fire (ranged phase):** Only defending units with range ≥ 1 may return fire. A defending unit returns fire only if at least one attacker hex is within that unit type's range (H3 grid distance). Each such defender rolls once (attack value); hits are assigned to attacker hexes. Infantry (range 0) does not return fire at range.
+- **Return fire (ranged phase):** A defending unit returns fire only if at least one attacker hex is a legal reverse shot under planning rules (same reach a human would need to order the reverse attack). **Strategic ground** (infantry/armor/naval): strategic ranged range + H3 grid distance. **Tactical ground:** tactical ranged baselines with terrain caps and mountain LOS (same as direct-fire validation). **Air** in the ranged phase: strike-planning rules — intact airport at base, and on the strategic map within air strike range of the attacker hex; in a tactical battle, airport only (engagement hexes are already in footprint). No new terrain gates for air return fire. Air-strike phase counter-fire (§8) is separate and still has **no** range-to-base check. Each eligible defender rolls once (attack value); hits are assigned to attacker hexes.
 - **Counter-fire against air (air strike phase):** See §8.1 for unit targets and §8.3 for infrastructure targets. Counter-fire mechanics vary by target type.
 - **Casualty assignment (automatic):** When a side receives N hits, remove N of its units in that combat using a **fixed priority** so no player chooses. Remove units in order of **lowest defense value first** (so high-value units survive when possible). Ties: use unit-type order **infantry → armor → naval → air**. If the combat is ranged and the "defender" is a hex with mixed unit types, apply the same priority to that hex's stack.
 
@@ -196,9 +196,10 @@ High-level flow: **air strikes → ranged at pre-move positions → ground/naval
    For each ranged engagement (one defender hex D, set of attacker hexes):
    - All units in attacker hexes that have D in range each roll once.
      Attacker hits = sum of hits (roll ≤ attack).
-   - Return fire: defending units in D with range ≥ 1 roll once (attack
-     value) if an attacker hex is in range. Defender return-fire hits =
-     sum of those hits.
+   - Return fire: defending units in D that pass planning-parity reverse
+     reach (strategic ranged / tactical terrain+LOS / air strike+airport)
+     each roll once (attack value). Defender return-fire hits = sum of
+     those hits.
    - Assign attacker hits to D using casualty priority; remove casualties
      from DB.
    - Assign defender return-fire hits to attacker hexes (most units
@@ -355,7 +356,7 @@ If a naval unit carrying cargo is destroyed, all embarked units are destroyed wi
 - **A&A-style:** One die per unit, hit when roll ≤ attack (when attacking) or ≤ defense (when defending in melee).
 - **Air strikes:** Air units strike first (range 3 from base airport), targeting units or infrastructure. Players choose one of four target types: units, urban hexes, airports, or seaports. When targeting units, counter-fire comes from defending units with range ≥ 1 (no range-to-base check). When targeting infrastructure, a fixed counter-fire roll applies regardless of hex occupation. Urban hex strikes destroy 3 res4 hexes per hit. One action per turn: strike or ferry.
 - **Infrastructure destruction:** Urban hexes, airports, and seaports can be permanently destroyed by air strikes. No rebuilding. Infrastructure counter-fire is independent of hex occupation.
-- **Ranged:** Naval 2 hexes, armor 1 hex; infantry melee only. Defenders with range may return fire (attack roll) when attackers are within range.
+- **Ranged:** Naval 2 hexes, armor 1 hex; infantry melee only on strategic map (tactical uses larger res4 baselines). Defenders may return fire (attack roll) only when planning-parity reverse reach allows (including tactical terrain/LOS; air uses strike range + airport).
 - **Sealift:** Explicit cargo assignment via `embarkedOn` field. Embark at seaports; manual debark at coastal hexes and controlled water seaports for human players. Transport loss is always fatal for embarked cargo when the carrier is destroyed. LLM opponent movement orders auto-debark before marching.
 - **WEGO-friendly:** Five-phase resolution (air strike → ranged → ground/naval movement → ferry → melee); automatic casualty assignment by fixed priority; no player-to-player interaction or confirmations.
 

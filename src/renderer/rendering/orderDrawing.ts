@@ -1,7 +1,10 @@
 import { cellToLatLng } from 'h3-js';
 import type { AirStrikeAnimationMove, AirStrikeOrder, FerryOrder, GameStateSnapshot, RangedAttackOrder } from '../../shared/ipcTypes';
 import type { RangedResolutionShotLine } from '../../shared/rangedResolutionShotLines';
-import { filterShotLinesByVisibleEndpoints } from '../../shared/rangedResolutionShotLines';
+import {
+  filterShotLinesByVisibleEndpoints,
+  resolutionShotLineStyle,
+} from '../../shared/rangedResolutionShotLines';
 import {
   RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION,
   RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX,
@@ -106,11 +109,11 @@ export function drawRangedAttackLines(
 }
 
 /**
- * Draws resolution-phase ranged shot lines (direct fire + return fire) in planned-ranged style.
+ * Draws resolution-phase shot lines (direct fire + return fire) using planned ranged or air-strike strokes.
  *
  * Purpose: Shows attacker↔target connectors during the ranged lightning window only, matching pending order strokes.
  * When to use: `drawGameScene` when `inRangedLightning` and anim carries `rangedResolutionShotLines`.
- * Expected outcome: Dashed burnt-orange hex-center lines; when `visibleHexes` is set, skips pairs with any fogged endpoint.
+ * Expected outcome: Ground edges use ranged style; air-only return-fire edges use air-strike style; fog may clip endpoints.
  * Exceptions: None.
  */
 export function drawRangedResolutionShotLines(
@@ -122,24 +125,32 @@ export function drawRangedResolutionShotLines(
   if (lines.length === 0 || !hexList) return;
   const filtered = filterShotLinesByVisibleEndpoints(lines, visibleHexes);
   if (filtered.length === 0) return;
-  const style = rangePerimeterStaticLineStyle('ranged');
-  ctx.save();
-  ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
-  ctx.setLineDash(style.dash);
-  ctx.strokeStyle = style.strokeColor;
-  ctx.lineWidth = style.lineWidth;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  for (const line of filtered) {
-    if (line.fromH3Index === line.toH3Index) continue;
-    const from = hexCenterPx(line.fromH3Index);
-    const to = hexCenterPxRelativeTo(line.fromH3Index, line.toH3Index);
-    ctx.beginPath();
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(to.x, to.y);
-    ctx.stroke();
+  const byStyle = {
+    ranged: filtered.filter((l) => resolutionShotLineStyle(l) === 'ranged'),
+    airStrike: filtered.filter((l) => resolutionShotLineStyle(l) === 'airStrike'),
+  } as const;
+  for (const mode of ['ranged', 'airStrike'] as const) {
+    const group = byStyle[mode];
+    if (group.length === 0) continue;
+    const style = rangePerimeterStaticLineStyle(mode);
+    ctx.save();
+    ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
+    ctx.setLineDash(style.dash);
+    ctx.strokeStyle = style.strokeColor;
+    ctx.lineWidth = style.lineWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (const line of group) {
+      if (line.fromH3Index === line.toH3Index) continue;
+      const from = hexCenterPx(line.fromH3Index);
+      const to = hexCenterPxRelativeTo(line.fromH3Index, line.toH3Index);
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
-  ctx.restore();
 }
 
 /**

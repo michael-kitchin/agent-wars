@@ -18,7 +18,7 @@ Implement four combat-design behaviors on the **tactical res4 footprint** only (
 - Changing **strategic** ranged or movement rules (`validateRangedAttack` on DB units, strategic grid range) except where code is **unavoidably shared**—then branch on `isTacticalBattleActive()` like `validateGroupRangedTarget` already does.
 - Changing **melee**, **air strikes** (separate pipeline), **ferry**, or **naval** movement topology rules beyond the stated ranged mountain block for **naval** *ranged attacks*.
 - Inventing new terrain types; use **existing** res4 terrain strings and **feature flags** already loaded for tactical snapshots.
-- **Post-validation return fire:** Do **not** add new terrain or LOS checks inside `runRangedPhase` / `resolveOneRangedEngagement` that could forbid **return fire** for an engagement that **already passed** order validation. If the attack is **allowed**, **return fire is allowed** (existing dice rules).
+- **Post-validation return fire:** Do **not** add new terrain or LOS checks inside `runRangedPhase` / `resolveOneRangedEngagement` that could forbid **return fire** for an engagement that **already passed** order validation. If the attack is **allowed**, **return fire is allowed** (existing dice rules). **Superseded** by `.spec/return-fire-planning-parity.md` (return fire now uses planning-parity reach / terrain checks).
 
 ## Stakeholder decisions and open questions (resolve before coding if ambiguous)
 

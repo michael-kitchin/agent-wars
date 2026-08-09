@@ -34,6 +34,7 @@ import {
   type TacticalRangedRubbleApplyOptions,
 } from '../game-actions/tacticalRangedInfrastructureRubble';
 import { listRes4FeatureOverridesForGame } from '../gameDb';
+import { hasIntactAirportAtTacticalAirBase } from '../returnFireAirportLookup';
 import { refreshTacticalBattleRes4TerrainFromGameDb } from './computeTacticalBattleSnapshot';
 import { tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 import {
@@ -586,7 +587,13 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     const subBeforeRanged = workBattle.subUnits.map((u) => ({ ...u }));
     const byIdBefore = new Map(subBeforeRanged.map((u) => [u.id, u] as const));
     const rangedInput = tacticalSubUnitsToRangedCombatUnits(workBattle, workBattle.subUnits);
-    const rangedResult = runRangedPhase(rangedInput, workBattle.res4ChildH3Indexes, rangedOrdersCombat, next);
+    const tacticalFootprint = new Set(workBattle.res4ChildH3Indexes);
+    const rangedResult = runRangedPhase(rangedInput, workBattle.res4ChildH3Indexes, rangedOrdersCombat, next, {
+      theater: 'tactical',
+      tacticalBattle: workBattle,
+      tacticalFootprint,
+      hasIntactAirportAtAirBase: hasIntactAirportAtTacticalAirBase,
+    });
     rangedResolutionShotLines = dedupeRangedResolutionShotLines([
       ...rangedResolutionShotLines,
       ...(rangedResult.rangedResolutionShotLines ?? []),

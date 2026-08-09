@@ -4,8 +4,13 @@
  */
 
 import * as assert from 'assert';
-import { gridDisk } from 'h3-js';
-import { runMeleePhase, runRangedPhase, type CombatUnit } from './combatResolution';
+import { gridDisk, gridDistance, latLngToCell } from 'h3-js';
+import {
+  resolveOneRangedEngagement,
+  runMeleePhase,
+  runRangedPhase,
+  type CombatUnit,
+} from './combatResolution';
 
 /**
  * Defines the `makeUnit` function shape (function makeUnit(id: string, player: string, unitType: string, h3Index: string): CombatUnit).
@@ -176,6 +181,141 @@ function testRangedEmptyTargetOmitsShotLinesWithoutCombatHexes(): void {
 }
 
 /**
+ * Verifies out-of-range naval does not return fire or emit return-fire shot lines.
+ *
+ * Purpose: Planning-parity strategic reach gate for return fire.
+ * When to use: After changing `resolveOneRangedEngagement` eligibility.
+ * Expected outcome: Direct-fire kill possible; no return-fire kill or connector.
+ * Exceptions: None.
+ */
+function testStrategicNavalOutOfRangeDoesNotReturnFire(): void {
+  const defenderHex = '89283082807ffff';
+  const far = gridDisk(defenderHex, 3).find((h) => {
+    try {
+      return gridDistance(defenderHex, h) === 3;
+    } catch {
+      return false;
+    }
+  });
+  assert.ok(far, 'need a distance-3 attacker hex');
+  const units: CombatUnit[] = [
+    makeUnit('atk', 'human', 'armor', far!),
+    makeUnit('def', 'opponent', 'naval', defenderHex),
+  ];
+  const out = runRangedPhase(
+    units,
+    [defenderHex, far!],
+    [{ unitId: 'atk', targetH3Index: defenderHex }],
+    () => 0,
+    { theater: 'strategic' }
+  );
+  assert.ok(
+    !out.rangedResolutionShotLines?.some(
+      (l) => l.fromH3Index === defenderHex && l.toH3Index === far
+    ),
+    'out-of-range naval must not emit return-fire connectors'
+  );
+  assert.equal(out.killsByReturnFire?.length ?? 0, 0, 'out-of-range naval must not score return-fire kills');
+}
+
+/**
+ * Verifies air without airport cannot return fire.
+ *
+ * Purpose: Strike-planning airport gate on ranged-phase return fire.
+ * When to use: After changing air return-fire eligibility.
+ * Expected outcome: No return-fire kills or connectors.
+ * Exceptions: None.
+ */
+function testStrategicAirWithoutAirportDoesNotReturnFire(): void {
+  const defenderHex = '89283082807ffff';
+  const attackerHex = gridDisk(defenderHex, 1).find((h) => h !== defenderHex);
+  assert.ok(attackerHex, 'need a neighbor hex');
+  const units: CombatUnit[] = [
+    makeUnit('atk', 'human', 'armor', attackerHex!),
+    makeUnit('def', 'opponent', 'air', defenderHex),
+  ];
+  const out = runRangedPhase(
+    units,
+    [defenderHex, attackerHex!],
+    [{ unitId: 'atk', targetH3Index: defenderHex }],
+    () => 0,
+    { theater: 'strategic', hasIntactAirportAtAirBase: () => false }
+  );
+  assert.equal(out.killsByReturnFire?.length ?? 0, 0);
+  assert.ok(
+    !out.rangedResolutionShotLines?.some(
+      (l) => l.fromH3Index === defenderHex && l.toH3Index === attackerHex
+    )
+  );
+}
+
+/**
+ * Verifies tactical armor at distance 2 can return fire on clear plains (reach expansion).
+ *
+ * Purpose: Documents intentional expansion beyond strategic getRange(armor)=1.
+ * When to use: After changing tactical return-fire context plumbing.
+ * Expected outcome: Return fire removes the attacker when rolls always hit.
+ * Exceptions: None.
+ */
+function testTacticalArmorDistance2ReturnFireOnPlains(): void {
+  const defenderHex = latLngToCell(46.2, 56.2, 4);
+  const at2 = gridDisk(defenderHex, 2).find((h) => {
+    try {
+      return gridDistance(defenderHex, h) === 2;
+    } catch {
+      return false;
+    }
+  });
+  assert.ok(at2);
+  const footprint = new Set(gridDisk(defenderHex, 2));
+  const battle = {
+    strategicHexTerrain: 'land' as const,
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: { [defenderHex]: 'plains', [at2!]: 'plains' },
+  };
+  const attackers = [makeUnit('atk', 'human', 'armor', at2!)];
+  const defenders = [makeUnit('def', 'opponent', 'armor', defenderHex)];
+  const out = resolveOneRangedEngagement(attackers, defenders, defenderHex, () => 1, {
+    returnFireContext: {
+      theater: 'tactical',
+      tacticalBattle: battle,
+      tacticalFootprint: footprint,
+    },
+  });
+  assert.ok(out.attackerRemovedIds.includes('atk'), 'tactical armor at dist 2 must return fire');
+}
+
+/**
+ * Verifies tactical mountain LOS blocks armor return fire.
+ *
+ * Purpose: Terrain planning parity for return fire.
+ * When to use: After changing tactical return-fire eligibility wiring.
+ * Expected outcome: No attacker removals from return fire when rolls would otherwise hit.
+ * Exceptions: None.
+ */
+function testTacticalMountainBlocksArmorReturnFire(): void {
+  const defenderHex = latLngToCell(48.2, 58.2, 4);
+  const neighbor = gridDisk(defenderHex, 1).find((h) => h !== defenderHex);
+  assert.ok(neighbor);
+  const footprint = new Set([defenderHex, neighbor!]);
+  const battle = {
+    strategicHexTerrain: 'land' as const,
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: { [defenderHex]: 'plains', [neighbor!]: 'mountain' },
+  };
+  const attackers = [makeUnit('atk', 'human', 'armor', neighbor!)];
+  const defenders = [makeUnit('def', 'opponent', 'armor', defenderHex)];
+  const out = resolveOneRangedEngagement(attackers, defenders, defenderHex, () => 1, {
+    returnFireContext: {
+      theater: 'tactical',
+      tacticalBattle: battle,
+      tacticalFootprint: footprint,
+    },
+  });
+  assert.deepStrictEqual(out.attackerRemovedIds, [], 'mountain LOS must block armor return fire');
+}
+
+/**
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Supports maintainability by documenting why `run` exists.
@@ -189,6 +329,10 @@ function run(): void {
   testRangedMixedStackTargetsEnemiesOnlyAndEnemyReturnFireOnly();
   testRangedAdjacentReturnFireEmitsShotLinesIncludingMisses();
   testRangedEmptyTargetOmitsShotLinesWithoutCombatHexes();
+  testStrategicNavalOutOfRangeDoesNotReturnFire();
+  testStrategicAirWithoutAirportDoesNotReturnFire();
+  testTacticalArmorDistance2ReturnFireOnPlains();
+  testTacticalMountainBlocksArmorReturnFire();
   console.log('combatResolution tests passed');
 }
 

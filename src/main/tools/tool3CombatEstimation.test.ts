@@ -77,6 +77,27 @@ function testResolveOneRangedNoReturnFire(): void {
 }
 
 /**
+ * Verifies air without airport cannot return fire under strategic planning-parity context.
+ *
+ * Purpose: Keeps Tool 3 / resolution eligibility aligned for air strike-base gate.
+ * When to use: After changing return-fire eligibility wiring.
+ * Expected outcome: Attacker not removed by return fire when rolls always hit.
+ * Exceptions: None.
+ */
+function testResolveOneRangedAirWithoutAirportNoReturnFire(): void {
+  const rollAlways1 = () => 1;
+  const atk = [makeUnit('a1', 'p1', 'armor', 'hexA')];
+  const def = [makeUnit('d1', 'p2', 'air', 'hexD')];
+  const out = resolveOneRangedEngagement(atk, def, 'hexD', rollAlways1, {
+    returnFireContext: {
+      theater: 'strategic',
+      hasIntactAirportAtAirBase: () => false,
+    },
+  });
+  assert.strictEqual(out.attackerRemovedIds.length, 0);
+}
+
+/**
  * Defines the `testExecuteEstimateCombatUncontested` function shape (function testExecuteEstimateCombatUncontested(): void).
 
  * Purpose: Supports maintainability by documenting why `testExecuteEstimateCombatUncontested` exists.
@@ -266,6 +287,7 @@ export function runTool3Verification(): void {
   testGetAssessmentCategory();
   testResolveOneMeleeDeterministic();
   testResolveOneRangedNoReturnFire();
+  testResolveOneRangedAirWithoutAirportNoReturnFire();
   testPoissonBinomialPMF();
   testExactCombatProbabilities();
   testExecuteEstimateCombatUncontested();

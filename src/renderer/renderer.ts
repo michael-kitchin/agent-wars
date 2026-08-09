@@ -2391,6 +2391,9 @@ function drawGameScene(
         drawResolutionMoveLines(ctx, width, height, regularPlaybackMoves, hexList, 1);
       }
     }
+    if (anim && hexList && playbackPhase?.inRangedLightning && (anim.rangedResolutionShotLines?.length ?? 0) > 0) {
+      drawRangedResolutionShotLines(ctx, anim.rangedResolutionShotLines!, hexList, null);
+    }
     if (unitsToDraw.length) drawUnits(ctx, unitsToDraw, effectiveMovingIds);
     if (anim && hexList) {
       if (playbackPhase?.inAirStrikeOutbound && airStrikeOutboundProgress < 1) {
@@ -2422,9 +2425,6 @@ function drawGameScene(
         const unknownCombatHexes = combatHexes.filter((h3) => unknownSet.has(h3));
         drawCombatLightning(ctx, width, height, knownCombatHexes, hexList, pulseOpacity);
         drawUnknownBattleMarkers(ctx, unknownCombatHexes, pulseOpacity);
-      }
-      if (phase.inRangedLightning && (anim.rangedResolutionShotLines?.length ?? 0) > 0) {
-        drawRangedResolutionShotLines(ctx, anim.rangedResolutionShotLines!, hexList, null);
       }
       const casualtyHexes = phase.inAirStrikeCasualty
         ? anim.airStrikeCasualtyHexes
@@ -2514,6 +2514,14 @@ function drawGameScene(
   drawRangePerimeterOverlay(ctx);
   drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId);
   const hideStrategicUnits = shouldHideStrategicMapUnitsForRes4Zoom();
+  if (anim && hexList && playbackPhase?.inRangedLightning && (anim.rangedResolutionShotLines?.length ?? 0) > 0) {
+    drawRangedResolutionShotLines(
+      ctx,
+      anim.rangedResolutionShotLines!,
+      hexList,
+      getVisibleHexSet(state)
+    );
+  }
   if (!hideStrategicUnits) {
     if (unitsToDraw.length) {
       drawUnits(ctx, unitsToDraw, effectiveMovingIdsStrategic);
@@ -2549,14 +2557,6 @@ function drawGameScene(
       const unknownCombatHexes = combatHexes.filter((h3) => unknownSet.has(h3));
       drawCombatLightning(ctx, width, height, knownCombatHexes, hexList, pulseOpacity);
       drawUnknownBattleMarkers(ctx, unknownCombatHexes, pulseOpacity);
-    }
-    if (phase.inRangedLightning && (anim.rangedResolutionShotLines?.length ?? 0) > 0) {
-      drawRangedResolutionShotLines(
-        ctx,
-        anim.rangedResolutionShotLines!,
-        hexList,
-        getVisibleHexSet(state)
-      );
     }
     const casualtyHexes = phase.inAirStrikeCasualty
       ? anim.airStrikeCasualtyHexes

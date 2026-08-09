@@ -19234,7 +19234,56 @@
     }
   }
 
+  // src/shared/rangePerimeterModel.ts
+  function strategicRangedRangeHexesForUnitType(unitType) {
+    const table = { infantry: 1, armor: 1, naval: 2, air: 3 };
+    return table[unitType] ?? 0;
+  }
+  function buildStrategicRangedRangeSet(units) {
+    const out = /* @__PURE__ */ new Set();
+    for (const u of units) {
+      const range = strategicRangedRangeHexesForUnitType(u.unitType);
+      if (range < 1) continue;
+      try {
+        for (const h of gridDisk(u.h3Index, range)) out.add(h);
+      } catch {
+      }
+    }
+    return out;
+  }
+  function buildStrategicAirStrikeRangeSet(units) {
+    const out = /* @__PURE__ */ new Set();
+    for (const u of units) {
+      try {
+        for (const h of gridDisk(u.h3Index, AIR_STRIKE_RANGE_HEXES)) out.add(h);
+      } catch {
+      }
+    }
+    return out;
+  }
+  function buildTacticalRangedRangeSet(battle, subUnits, footprint) {
+    const out = /* @__PURE__ */ new Set();
+    for (const u of subUnits) {
+      const anchor = tacticalMovementTerrainAnchorH3(u, battle.subUnits);
+      const range = effectiveTacticalRangedMaxRangeForAttacker(battle, u.unitType, anchor);
+      if (range < 1) continue;
+      try {
+        for (const h of gridDisk(anchor, range)) {
+          if (footprint.has(h)) out.add(h);
+        }
+      } catch {
+      }
+    }
+    return out;
+  }
+  function buildTacticalAirStrikeRangeSet(footprint) {
+    return new Set(footprint);
+  }
+
   // src/shared/rangedResolutionShotLines.ts
+  function resolutionShotLineStyle(line) {
+    return line.lineStyle === "airStrike" ? "airStrike" : "ranged";
+  }
   function filterShotLinesByVisibleEndpoints(lines, visibleHexes) {
     if (!visibleHexes) return [...lines];
     return lines.filter(
@@ -19293,24 +19342,32 @@
     if (lines.length === 0 || !hexList) return;
     const filtered = filterShotLinesByVisibleEndpoints(lines, visibleHexes);
     if (filtered.length === 0) return;
-    const style = rangePerimeterStaticLineStyle("ranged");
-    ctx.save();
-    ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
-    ctx.setLineDash(style.dash);
-    ctx.strokeStyle = style.strokeColor;
-    ctx.lineWidth = style.lineWidth;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    for (const line of filtered) {
-      if (line.fromH3Index === line.toH3Index) continue;
-      const from = hexCenterPx(line.fromH3Index);
-      const to = hexCenterPxRelativeTo(line.fromH3Index, line.toH3Index);
-      ctx.beginPath();
-      ctx.moveTo(from.x, from.y);
-      ctx.lineTo(to.x, to.y);
-      ctx.stroke();
+    const byStyle = {
+      ranged: filtered.filter((l) => resolutionShotLineStyle(l) === "ranged"),
+      airStrike: filtered.filter((l) => resolutionShotLineStyle(l) === "airStrike")
+    };
+    for (const mode of ["ranged", "airStrike"]) {
+      const group = byStyle[mode];
+      if (group.length === 0) continue;
+      const style = rangePerimeterStaticLineStyle(mode);
+      ctx.save();
+      ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
+      ctx.setLineDash(style.dash);
+      ctx.strokeStyle = style.strokeColor;
+      ctx.lineWidth = style.lineWidth;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      for (const line of group) {
+        if (line.fromH3Index === line.toH3Index) continue;
+        const from = hexCenterPx(line.fromH3Index);
+        const to = hexCenterPxRelativeTo(line.fromH3Index, line.toH3Index);
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+        ctx.stroke();
+      }
+      ctx.restore();
     }
-    ctx.restore();
   }
   function drawAirStrikeLines(ctx, airStrikes, units, hexList) {
     if (airStrikes.length === 0 || !hexList) return;
@@ -25717,52 +25774,6 @@
     }
   }
 
-  // src/shared/rangePerimeterModel.ts
-  function strategicRangedRangeHexesForUnitType(unitType) {
-    const table = { infantry: 1, armor: 1, naval: 2, air: 3 };
-    return table[unitType] ?? 0;
-  }
-  function buildStrategicRangedRangeSet(units) {
-    const out = /* @__PURE__ */ new Set();
-    for (const u of units) {
-      const range = strategicRangedRangeHexesForUnitType(u.unitType);
-      if (range < 1) continue;
-      try {
-        for (const h of gridDisk(u.h3Index, range)) out.add(h);
-      } catch {
-      }
-    }
-    return out;
-  }
-  function buildStrategicAirStrikeRangeSet(units) {
-    const out = /* @__PURE__ */ new Set();
-    for (const u of units) {
-      try {
-        for (const h of gridDisk(u.h3Index, AIR_STRIKE_RANGE_HEXES)) out.add(h);
-      } catch {
-      }
-    }
-    return out;
-  }
-  function buildTacticalRangedRangeSet(battle, subUnits, footprint) {
-    const out = /* @__PURE__ */ new Set();
-    for (const u of subUnits) {
-      const anchor = tacticalMovementTerrainAnchorH3(u, battle.subUnits);
-      const range = effectiveTacticalRangedMaxRangeForAttacker(battle, u.unitType, anchor);
-      if (range < 1) continue;
-      try {
-        for (const h of gridDisk(anchor, range)) {
-          if (footprint.has(h)) out.add(h);
-        }
-      } catch {
-      }
-    }
-    return out;
-  }
-  function buildTacticalAirStrikeRangeSet(footprint) {
-    return new Set(footprint);
-  }
-
   // src/renderer/rendering/polygonOutline.ts
   function drawClosedPolygonPath(ctx, points) {
     ctx.beginPath();
@@ -27585,6 +27596,9 @@
           drawResolutionMoveLines(ctx, width, height, regularPlaybackMoves2, hexList2, 1);
         }
       }
+      if (anim2 && hexList2 && playbackPhase2?.inRangedLightning && (anim2.rangedResolutionShotLines?.length ?? 0) > 0) {
+        drawRangedResolutionShotLines(ctx, anim2.rangedResolutionShotLines, hexList2, null);
+      }
       if (unitsToDraw2.length) drawUnits(ctx, unitsToDraw2, effectiveMovingIds);
       if (anim2 && hexList2) {
         if (playbackPhase2?.inAirStrikeOutbound && airStrikeOutboundProgress2 < 1) {
@@ -27610,9 +27624,6 @@
           const unknownCombatHexes = combatHexes.filter((h3) => unknownSet.has(h3));
           drawCombatLightning(ctx, width, height, knownCombatHexes, hexList2, pulseOpacity);
           drawUnknownBattleMarkers(ctx, unknownCombatHexes, pulseOpacity);
-        }
-        if (phase.inRangedLightning && (anim2.rangedResolutionShotLines?.length ?? 0) > 0) {
-          drawRangedResolutionShotLines(ctx, anim2.rangedResolutionShotLines, hexList2, null);
         }
         const casualtyHexes = phase.inAirStrikeCasualty ? anim2.airStrikeCasualtyHexes : phase.inRangedCasualty ? anim2.rangedCasualtyHexes ?? anim2.casualtyHexes : phase.inMeleeCasualty ? anim2.meleeCasualtyHexes : void 0;
         if (casualtyHexes?.length) {
@@ -27692,6 +27703,14 @@
     drawRangePerimeterOverlay(ctx);
     drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId);
     const hideStrategicUnits = shouldHideStrategicMapUnitsForRes4Zoom();
+    if (anim && hexList && playbackPhase?.inRangedLightning && (anim.rangedResolutionShotLines?.length ?? 0) > 0) {
+      drawRangedResolutionShotLines(
+        ctx,
+        anim.rangedResolutionShotLines,
+        hexList,
+        getVisibleHexSet2(state)
+      );
+    }
     if (!hideStrategicUnits) {
       if (unitsToDraw.length) {
         drawUnits(ctx, unitsToDraw, effectiveMovingIdsStrategic);
@@ -27721,14 +27740,6 @@
         const unknownCombatHexes = combatHexes.filter((h3) => unknownSet.has(h3));
         drawCombatLightning(ctx, width, height, knownCombatHexes, hexList, pulseOpacity);
         drawUnknownBattleMarkers(ctx, unknownCombatHexes, pulseOpacity);
-      }
-      if (phase.inRangedLightning && (anim.rangedResolutionShotLines?.length ?? 0) > 0) {
-        drawRangedResolutionShotLines(
-          ctx,
-          anim.rangedResolutionShotLines,
-          hexList,
-          getVisibleHexSet2(state)
-        );
       }
       const casualtyHexes = phase.inAirStrikeCasualty ? anim.airStrikeCasualtyHexes : phase.inRangedCasualty ? anim.rangedCasualtyHexes ?? anim.casualtyHexes : phase.inMeleeCasualty ? anim.meleeCasualtyHexes : void 0;
       if (casualtyHexes?.length) {
