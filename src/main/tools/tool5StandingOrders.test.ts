@@ -520,17 +520,15 @@ function testDefendAutoEngagementAirUnitUsesAirStrikeNotRanged(): void {
       console.log('testDefendAutoEngagementAirUnitUsesAirStrikeNotRanged: skip — no human air unit in seed');
       return;
     }
-    const adjacentToAir = gridDisk(airUnit.h3Index, 1).find(
-      (h3) => h3 !== airUnit.h3Index && state.hexes.some((h) => h.h3Index === h3 && h.terrain !== 'water')
-    );
-    if (!adjacentToAir) {
-      console.log('testDefendAutoEngagementAirUnitUsesAirStrikeNotRanged: skip — no adjacent non-water hex for air unit');
-      return;
-    }
-    const opponentId = 'opponent-infantry-air-test';
+    const hexByH3 = new Map(state.hexes.map((h) => [h.h3Index, h]));
+    const adjacentToAir = gridDisk(airUnit.h3Index, 1).find((h3) => h3 !== airUnit.h3Index && hexByH3.has(h3));
+    assert.ok(adjacentToAir, 'seeded map should place the air unit next to at least one mapped hex');
+    // The air unit can start stationed over open water, so the target type has to suit the neighbouring terrain.
+    const enemyType = hexByH3.get(adjacentToAir!)!.terrain === 'water' ? 'naval' : 'infantry';
+    const opponentId = 'opponent-air-test-target';
     dbRun(
-      `INSERT INTO units (id, player, unit_type, h3_index, display_order) VALUES (?, 'opponent', 'infantry', ?, 99)`,
-      [opponentId, adjacentToAir]
+      `INSERT INTO units (id, player, unit_type, h3_index, display_order) VALUES (?, 'opponent', ?, ?, 99)`,
+      [opponentId, enemyType, adjacentToAir]
     );
     const [defLat, defLng] = cellToLatLng(airUnit.h3Index);
     const latLngByH3 = new Map(state.hexes.map((h) => [h.h3Index, cellToLatLng(h.h3Index) as [number, number]]));
@@ -557,6 +555,89 @@ function testDefendAutoEngagementAirUnitUsesAirStrikeNotRanged(): void {
   }
 }
 
+/**
+ * Verifies a DEFEND order pointing away from an air unit's hex never turns into a march.
+ *
+ * Purpose: Regression for the air branch of defend handling; air units reposition by ferry only, and routing
+ * them asks for a land path they can never satisfy.
+ * When to use: After edits to the `defend` branch of `generateOrdersForStandingOrders`.
+ * Expected outcome: The air unit gets no movement order, while an infantry unit staged identically does —
+ * the infantry leg proves the scenario can produce one, so the air assertion is not vacuous.
+ * Exceptions: Skips when the seeded map lacks the required units or an empty adjacent land pair.
+ */
+function testAirDefendDoesNotProduceMovementOrder(): void {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-tool5-air-defend-'));
+  const dbPath = path.join(tempDir, 't.sqlite');
+  try {
+    openGameDatabaseAtPathForTests(dbPath);
+    resetGameForNewMatch();
+    const state = getGameState();
+    const airUnit = state.units.find((u) => u.player === 'human' && u.unitType === 'air');
+    const infantryUnit = state.units.find((u) => u.player === 'human' && u.unitType === 'infantry');
+    if (!airUnit || !infantryUnit) {
+      console.log('testAirDefendDoesNotProduceMovementOrder: skip — seed lacks a human air or infantry unit');
+      return;
+    }
+    const hexByH3 = new Map(state.hexes.map((h) => [h.h3Index, h]));
+    const occupied = new Set(state.units.map((u) => u.h3Index));
+    let stationH3: string | undefined;
+    let defendTargetH3: string | undefined;
+    for (const hex of state.hexes) {
+      if (hex.terrain !== 'land' || occupied.has(hex.h3Index)) continue;
+      const neighbour = gridDisk(hex.h3Index, 1).find(
+        (n) => n !== hex.h3Index && !occupied.has(n) && hexByH3.get(n)?.terrain === 'land'
+      );
+      if (neighbour) {
+        stationH3 = hex.h3Index;
+        defendTargetH3 = neighbour;
+        break;
+      }
+    }
+    if (!stationH3 || !defendTargetH3) {
+      console.log('testAirDefendDoesNotProduceMovementOrder: skip — no empty adjacent land pair in seed');
+      return;
+    }
+
+    const latLngByH3 = new Map(state.hexes.map((h) => [h.h3Index, cellToLatLng(h.h3Index) as [number, number]]));
+    const resolveToH3 = (a: number, b: number): string | undefined => {
+      try { return latLngToCell(a, b, 1); } catch { return undefined; }
+    };
+    const [defendLat, defendLng] = cellToLatLng(defendTargetH3);
+
+    const movementOrderCountFor = (unitId: string, originalH3: string): number => {
+      dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [stationH3, unitId]);
+      dbRun('DELETE FROM standing_orders WHERE player_id = ?', ['human']);
+      dbRun(
+        `INSERT INTO standing_orders (player_id, unit_id, order_type, params, computed_route, status, created_turn, origin_hex)
+         VALUES (?, ?, 'defend', ?, NULL, 'en_route', ?, ?)`,
+        [
+          'human',
+          unitId,
+          JSON.stringify({ type: 'defend', defendHex: [defendLat, defendLng] }),
+          state.turnNumber,
+          JSON.stringify(cellToLatLng(stationH3!)),
+        ]
+      );
+      const generated = generateOrdersForStandingOrders('human', getGameState(), latLngByH3, resolveToH3);
+      dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [originalH3, unitId]);
+      return generated.movementOrders.filter((m) => m.unitId === unitId).length;
+    };
+
+    assert.strictEqual(
+      movementOrderCountFor(infantryUnit.id, infantryUnit.h3Index),
+      1,
+      'infantry defending an adjacent hex should march to it'
+    );
+    assert.strictEqual(
+      movementOrderCountFor(airUnit.id, airUnit.h3Index),
+      0,
+      'air unit defending an adjacent hex must not receive a movement order'
+    );
+  } finally {
+    closeGameDatabaseForTests();
+  }
+}
+
 function run(): void {
   testAssignOrderUnitNotFound();
   testAssignOrderPursueTargetNotFound();
@@ -569,6 +650,7 @@ function run(): void {
   testGenerateRemovesArrivedMarchOrder();
   testDefendAutoEngagementClosestInRangeEnemy();
   testDefendAutoEngagementAirUnitUsesAirStrikeNotRanged();
+  testAirDefendDoesNotProduceMovementOrder();
   testHumanMarchDefaultsAvoidEnemiesFalse();
   console.log('tool5StandingOrders tests passed');
 }
