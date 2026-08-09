@@ -500,6 +500,10 @@
     #order-slower-tooltip {
       z-index: 6450;
     }
+    /* Body-level peer of #sidebar so the Model-tab tip is not trapped under canvas stacking. */
+    #model-description-tooltip {
+      z-index: 6505;
+    }
     .build-entry-layer {
       position: absolute;
       inset: 0;
@@ -994,6 +998,7 @@
       </div>
     </div>
   </aside>
+  <div id="model-description-tooltip" class="hex-tooltip model-description-tooltip hidden" aria-hidden="true"></div>
   <script src="vendor/leaflet/leaflet.js"></script>
   <script type="module" src="renderer.js"></script>
 </body>

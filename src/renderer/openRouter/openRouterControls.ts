@@ -1,10 +1,13 @@
 import type { PostResolutionConsultationPushPayload } from '../../shared/ipcTypes';
+import type { OpenRouterModel } from '../../shared/ipc/openRouterTypes';
+import { formatModelOptionLabel } from '../../shared/openRouterModelDisplay';
 import { rendererSharedState as S } from '../core/state';
 import {
   readTacticalBattlesInterceptPromptEnabled,
   writeTacticalBattlesInterceptPromptEnabled,
 } from '../gameplay/tacticalBattlePromptPreference';
 import { applyTacticalPostBeatConsultSideEffects } from '../tactical/applyTacticalPostBeatConsultSideEffects';
+import { attachModelDescriptionTooltip } from './modelDescriptionTooltip';
 import { resetPrecomputedAiState } from './precomputedAiState';
 
 /**
@@ -258,6 +261,26 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
   let modelRefreshInFlight = false;
   let startupModelRetryTimer: ReturnType<typeof setTimeout> | null = null;
   let startupModelRetryConsumed = false;
+  /**
+   * Latest successful model list keyed by id for labels and the description tooltip.
+
+   * Purpose: Lets the closed-select tooltip resolve trimmed descriptions without another IPC round-trip.
+   * When to use: Rebuilt on each successful `listModels`; cleared on refresh errors.
+   * Expected outcome: `get` returns the mapped `OpenRouterModel` for a selected id when known.
+   * Exceptions: None.
+   */
+  const modelsById = new Map<string, OpenRouterModel>();
+  const modelDescriptionTooltip = modelSelect
+    ? attachModelDescriptionTooltip({
+        select: modelSelect,
+        getDescriptionForModelId: (modelId) => {
+          const description = modelsById.get(modelId)?.description;
+          if (typeof description !== 'string') return null;
+          const trimmed = description.trim();
+          return trimmed || null;
+        },
+      })
+    : null;
 
   function clearStartupModelRetryTimer(): void {
     if (startupModelRetryTimer !== null) {
@@ -285,10 +308,13 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
   function refreshModels(retryOnFailure = false): void {
     if (modelRefreshInFlight) return;
     modelRefreshInFlight = true;
+    modelDescriptionTooltip?.clear();
     api.listModels().then((result) => {
       if (!modelSelect) return;
       const kept = modelSelect.value;
       modelSelect.innerHTML = '<option value="">— Select model —</option>';
+      modelsById.clear();
+      modelDescriptionTooltip?.clear();
       if ('error' in result && result.error) {
         deps.appendOpenRouterLog(`Models: ${result.error}`, true);
         if (retryOnFailure && shouldRetryStartupModelFetch(result.error)) scheduleStartupModelRetry();
@@ -297,9 +323,10 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       }
       const models = 'models' in result ? result.models ?? [] : [];
       for (const m of models) {
+        modelsById.set(m.id, m);
         const opt = document.createElement('option');
         opt.value = m.id;
-        opt.textContent = m.name ?? m.id;
+        opt.textContent = formatModelOptionLabel(m);
         modelSelect.appendChild(opt);
       }
       const targetModelId = kept || persistedSelectedModelId;
@@ -309,6 +336,8 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       clearStartupModelRetryTimer();
       void deps.syncOpenRouterRunToggleInteractable();
     }).catch((err) => {
+      modelsById.clear();
+      modelDescriptionTooltip?.clear();
       const message = String(err);
       deps.appendOpenRouterLog(`Models: ${message}`, true);
       if (retryOnFailure && shouldRetryStartupModelFetch(message)) scheduleStartupModelRetry();
@@ -365,6 +394,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
     modelSelect.addEventListener('change', () => {
       api.setSelectedModel(modelSelect.value);
       if (modelSelect.value) deps.hideMapToast();
+      else modelDescriptionTooltip?.clear();
       void deps.syncOpenRouterRunToggleInteractable();
     });
   }

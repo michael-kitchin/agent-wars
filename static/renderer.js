@@ -23105,6 +23105,54 @@
     return { handleBuildEntryClick: handleBuildEntryClick2, hideBuildPopup: hideBuildPopup2, showBuildPopup: showBuildPopup2, refreshBuildPopupIfOpen: refreshBuildPopupIfOpen2 };
   }
 
+  // src/shared/openRouterModelDisplay.ts
+  function parseFinitePrice(value) {
+    if (value === null || value === void 0) return null;
+    if (typeof value === "number") {
+      return Number.isFinite(value) ? value : null;
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      const n2 = Number(trimmed);
+      return Number.isFinite(n2) ? n2 : null;
+    }
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  function formatUsdPerMillion(perMillion) {
+    const fixed = perMillion.toFixed(4);
+    return fixed.replace(/(\.\d*?[1-9])0+$/u, "$1").replace(/\.0+$/u, "");
+  }
+  function formatReasoningStatusPart(model) {
+    const reasoning = model.reasoning;
+    const enabled = reasoning?.default_enabled === true;
+    const mandatory = reasoning?.mandatory === true;
+    if (!enabled && !mandatory) return null;
+    const effortRaw = reasoning?.default_effort;
+    const effort = effortRaw !== void 0 && effortRaw !== null ? String(effortRaw).trim() : "";
+    return effort ? `reasoning: ${effort}` : "reasoning: default";
+  }
+  function formatModelOptionSuffix(model) {
+    const parts = [];
+    const prompt = parseFinitePrice(model.pricing?.prompt);
+    const completion = parseFinitePrice(model.pricing?.completion);
+    if (prompt !== null || completion !== null) {
+      const sumPerToken = (prompt ?? 0) + (completion ?? 0);
+      const perMillion = sumPerToken * 1e6;
+      if (Number.isFinite(perMillion)) {
+        parts.push(`$${formatUsdPerMillion(perMillion)}/M`);
+      }
+    }
+    const reasoningPart = formatReasoningStatusPart(model);
+    if (reasoningPart) parts.push(reasoningPart);
+    if (parts.length === 0) return "";
+    return ` [${parts.join(", ")}]`;
+  }
+  function formatModelOptionLabel(model) {
+    return `${model.name ?? model.id}${formatModelOptionSuffix(model)}`;
+  }
+
   // src/renderer/gameplay/tacticalBattlePromptPreference.ts
   var STORAGE_KEY = "agentWars.tacticalBattlesInterceptPrompt";
   function readTacticalBattlesInterceptPromptEnabled() {
@@ -23164,6 +23212,119 @@
     deps.appendOpenRouterLog("Tactical post-beat consultation applied.", false);
     deps.redraw();
     deps.updateReadyButtonState();
+  }
+
+  // src/renderer/openRouter/modelDescriptionTooltip.ts
+  function getTooltipEl() {
+    return document.getElementById("model-description-tooltip");
+  }
+  function hideTooltipVisual() {
+    const el = getTooltipEl();
+    if (!el) return;
+    el.classList.add("hidden");
+    el.setAttribute("aria-hidden", "true");
+    el.textContent = "";
+  }
+  function showTooltipAt(clientX, clientY, text) {
+    const el = getTooltipEl();
+    if (!el) return;
+    el.textContent = text;
+    el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
+    el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
+    el.classList.remove("hidden");
+    el.setAttribute("aria-hidden", "false");
+    el.setAttribute("role", "tooltip");
+  }
+  function keyOpensNativeList(ev) {
+    if (ev.key === " " || ev.key === "Spacebar" || ev.key === "Enter") return true;
+    if (ev.key === "ArrowDown" && ev.altKey) return true;
+    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") return true;
+    return false;
+  }
+  function attachModelDescriptionTooltip(options) {
+    const { select, getDescriptionForModelId } = options;
+    let delayTimer = null;
+    let pointerInside = false;
+    let suppressedUntilClosed = false;
+    let lastClientX = 0;
+    let lastClientY = 0;
+    function clearDelayTimer() {
+      if (delayTimer !== null) {
+        clearTimeout(delayTimer);
+        delayTimer = null;
+      }
+    }
+    function resolveDescription() {
+      const id = select.value.trim();
+      if (!id) return null;
+      const raw = getDescriptionForModelId(id);
+      if (typeof raw !== "string") return null;
+      const trimmed = raw.trim();
+      return trimmed || null;
+    }
+    function clear() {
+      clearDelayTimer();
+      hideTooltipVisual();
+    }
+    function scheduleShow() {
+      clearDelayTimer();
+      if (suppressedUntilClosed || !pointerInside) return;
+      const text = resolveDescription();
+      if (!text) {
+        hideTooltipVisual();
+        return;
+      }
+      delayTimer = setTimeout(() => {
+        delayTimer = null;
+        if (suppressedUntilClosed || !pointerInside) return;
+        const next = resolveDescription();
+        if (!next) {
+          hideTooltipVisual();
+          return;
+        }
+        showTooltipAt(lastClientX, lastClientY, next);
+      }, HEX_DETAILS_TOOLTIP_DELAY_MS);
+    }
+    function suppressForOpenList() {
+      suppressedUntilClosed = true;
+      clear();
+    }
+    select.addEventListener("pointerenter", (ev) => {
+      pointerInside = true;
+      lastClientX = ev.clientX;
+      lastClientY = ev.clientY;
+      if (!suppressedUntilClosed) scheduleShow();
+    });
+    select.addEventListener("pointerleave", () => {
+      pointerInside = false;
+      suppressedUntilClosed = false;
+      clear();
+    });
+    select.addEventListener("pointermove", (ev) => {
+      lastClientX = ev.clientX;
+      lastClientY = ev.clientY;
+      const el = getTooltipEl();
+      if (el && !el.classList.contains("hidden")) {
+        el.style.left = `${lastClientX + TOOLTIP_OFFSET_PX}px`;
+        el.style.top = `${lastClientY + TOOLTIP_OFFSET_PX}px`;
+      }
+    });
+    select.addEventListener("mousedown", () => {
+      suppressForOpenList();
+    });
+    select.addEventListener("keydown", (ev) => {
+      if (keyOpensNativeList(ev)) suppressForOpenList();
+    });
+    select.addEventListener("blur", () => {
+      suppressedUntilClosed = false;
+      pointerInside = false;
+      clear();
+    });
+    select.addEventListener("change", () => {
+      suppressedUntilClosed = true;
+      clear();
+    });
+    return { clear };
   }
 
   // src/renderer/openRouter/openRouterControls.ts
@@ -23264,6 +23425,16 @@
     let modelRefreshInFlight = false;
     let startupModelRetryTimer = null;
     let startupModelRetryConsumed = false;
+    const modelsById = /* @__PURE__ */ new Map();
+    const modelDescriptionTooltip = modelSelect ? attachModelDescriptionTooltip({
+      select: modelSelect,
+      getDescriptionForModelId: (modelId) => {
+        const description = modelsById.get(modelId)?.description;
+        if (typeof description !== "string") return null;
+        const trimmed = description.trim();
+        return trimmed || null;
+      }
+    }) : null;
     function clearStartupModelRetryTimer() {
       if (startupModelRetryTimer !== null) {
         clearTimeout(startupModelRetryTimer);
@@ -23287,10 +23458,13 @@
     function refreshModels(retryOnFailure = false) {
       if (modelRefreshInFlight) return;
       modelRefreshInFlight = true;
+      modelDescriptionTooltip?.clear();
       api.listModels().then((result) => {
         if (!modelSelect) return;
         const kept = modelSelect.value;
         modelSelect.innerHTML = '<option value="">\u2014 Select model \u2014</option>';
+        modelsById.clear();
+        modelDescriptionTooltip?.clear();
         if ("error" in result && result.error) {
           deps.appendOpenRouterLog(`Models: ${result.error}`, true);
           if (retryOnFailure && shouldRetryStartupModelFetch(result.error)) scheduleStartupModelRetry();
@@ -23299,9 +23473,10 @@
         }
         const models = "models" in result ? result.models ?? [] : [];
         for (const m of models) {
+          modelsById.set(m.id, m);
           const opt = document.createElement("option");
           opt.value = m.id;
-          opt.textContent = m.name ?? m.id;
+          opt.textContent = formatModelOptionLabel(m);
           modelSelect.appendChild(opt);
         }
         const targetModelId = kept || persistedSelectedModelId;
@@ -23311,6 +23486,8 @@
         clearStartupModelRetryTimer();
         void deps.syncOpenRouterRunToggleInteractable();
       }).catch((err) => {
+        modelsById.clear();
+        modelDescriptionTooltip?.clear();
         const message = String(err);
         deps.appendOpenRouterLog(`Models: ${message}`, true);
         if (retryOnFailure && shouldRetryStartupModelFetch(message)) scheduleStartupModelRetry();
@@ -23364,6 +23541,7 @@
       modelSelect.addEventListener("change", () => {
         api.setSelectedModel(modelSelect.value);
         if (modelSelect.value) deps.hideMapToast();
+        else modelDescriptionTooltip?.clear();
         void deps.syncOpenRouterRunToggleInteractable();
       });
     }

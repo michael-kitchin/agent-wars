@@ -35,6 +35,80 @@ id: string;
    * Exceptions: None.
    */
 name?: string;
+  /**
+   * Optional model blurb from OpenRouter for the Model-tab description tooltip.
+
+   * Contract: Trimmed plain text when present; whitespace-only values should be omitted by mappers.
+   * When to use: Selected-model tooltip on the closed `#openrouter-model` select.
+   * Expected outcome: Callers show trimmed text via `textContent`; missing/empty means no tooltip.
+   * Exceptions: None.
+   */
+  description?: string;
+  /**
+   * Optional per-token USD pricing used to build the dropdown cost suffix.
+
+   * Contract: `prompt` / `completion` are string forms of finite numbers when present.
+   * When to use: `formatModelOptionSuffix` when building Model-tab option labels.
+   * Expected outcome: Usable rates contribute to `$…/M`; both missing/invalid omits the cost part.
+   * Exceptions: None.
+   */
+  pricing?: {
+    /**
+     * Per-token USD prompt rate as a decimal string when known.
+
+     * Contract: Finite numeric string when set; invalid values are ignored by formatters.
+     * When to use: Cost part of the model option suffix.
+     * Expected outcome: Parsed with `Number` and summed with `completion` when usable.
+     * Exceptions: None.
+     */
+    prompt?: string;
+    /**
+     * Per-token USD completion rate as a decimal string when known.
+
+     * Contract: Finite numeric string when set; invalid values are ignored by formatters.
+     * When to use: Cost part of the model option suffix.
+     * Expected outcome: Parsed with `Number` and summed with `prompt` when usable.
+     * Exceptions: None.
+     */
+    completion?: string;
+  };
+  /**
+   * Optional reasoning defaults used for the Model-tab reasoning suffix phrase.
+
+   * Contract: `default_effort` is a trimmed string when set; `default_enabled` / `mandatory` are booleans when set.
+   * When to use: `formatModelOptionSuffix` for Model-tab option labels.
+   * Expected outcome: Drives `reasoning: <effort>` / `reasoning: default` when on; omits the part when off/unknown.
+   * Exceptions: None.
+   */
+  reasoning?: {
+    /**
+     * Default reasoning effort label from OpenRouter when provided.
+
+     * Contract: Trimmed non-empty string when set.
+     * When to use: Value after `reasoning:` when reasoning is on by default or mandatory.
+     * Expected outcome: `reasoning: high` style phrases; omitted value yields `reasoning: default`.
+     * Exceptions: None.
+     */
+    default_effort?: string;
+    /**
+     * Whether reasoning is enabled by default for this model.
+
+     * Contract: Strict boolean when set (`=== true` / `=== false` only).
+     * When to use: With `mandatory` to choose the on-style reasoning phrase vs omitting it.
+     * Expected outcome: `true` (or mandatory) → on phrase; off/unknown → omit reasoning part.
+     * Exceptions: None.
+     */
+    default_enabled?: boolean;
+    /**
+     * Whether reasoning cannot be disabled for this model.
+
+     * Contract: Strict boolean when set; `true` forces the on-style reasoning suffix phrase.
+     * When to use: OpenRouter `reasoning.mandatory` from the models list API.
+     * Expected outcome: Treated like enabled-for-display when formatting the option suffix.
+     * Exceptions: None.
+     */
+    mandatory?: boolean;
+  };
 }
 
 /**

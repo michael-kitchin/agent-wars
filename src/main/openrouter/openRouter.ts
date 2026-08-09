@@ -44,6 +44,8 @@ import {
   type ToolFlags,
   type ToolGroupEntry,
 } from './openRouterToolGroups';
+import type { OpenRouterModel } from '../../shared/ipc/openRouterTypes';
+import { mapOpenRouterModelRow } from './mapOpenRouterModelRow';
 
 export type { MemoryUpdateItem } from './orderResponseParsing';
 
@@ -272,33 +274,14 @@ export type {
 export { setChatTransportOverrideForTests } from './openRouterChatTransport';
 
 /**
- * Documents the `ModelItem` interface as a named contract surface (export interface ModelItem).
+ * Alias for the shared OpenRouter model IPC shape used by `listModels`.
 
- * Purpose: Supports maintainability by documenting why `ModelItem` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Preserves the historical `ModelItem` export name while avoiding field drift.
+ * When to use: Callers that still import `ModelItem` from this module.
+ * Expected outcome: Same contract as `OpenRouterModel` in shared IPC types.
  * Exceptions: None.
  */
-export interface ModelItem {
-    /**
-   * Specifies the contract for the `id` member (id: string;).
-
-   * Contract: Describes stable behavior for callers of `id` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-id: string;
-    /**
-   * Specifies the contract for the `name` member (name?: string;).
-
-   * Contract: Describes stable behavior for callers of `name` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-name?: string;
-}
+export type ModelItem = OpenRouterModel;
 
 /**
  * Defines the `listModels` function shape (export async function listModels(): Promise<).
@@ -324,16 +307,17 @@ export async function listModels(): Promise<{ models: ModelItem[] } | { error: s
       logError('openRouter listModels: API error', res.status, text.slice(0, 200));
       return { error: res.status === 401 ? 'Invalid API key' : `API error: ${res.status}` };
     }
-    const json = (await res.json()) as { data?: Array<{ id?: string; name?: string }> };
-    const data = json.data ?? [];
+    const json = (await res.json()) as { data?: unknown[] };
+    const data = Array.isArray(json.data) ? json.data : [];
     const models: ModelItem[] = data
-      .filter((m) => m && typeof m.id === 'string')
-      .map((m) => ({ id: m.id!, name: typeof m.name === 'string' ? m.name : undefined }));
+      .map((row) => mapOpenRouterModelRow(row))
+      .filter((m): m is ModelItem => m !== null);
     models.sort((a, b) => {
       const nameA = (a.name ?? a.id).toLowerCase();
       const nameB = (b.name ?? b.id).toLowerCase();
       return nameA.localeCompare(nameB);
     });
+    logDebug('openRouter listModels: mapped models', { count: models.length });
     return { models };
   } catch (err) {
     logError('openRouter listModels: exception', err);
