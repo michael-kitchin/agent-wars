@@ -1,15 +1,26 @@
 # Agent Wars
 
-Grand strategy wargame with LLM opponents. The codebase has grown through milestones **0.5–0.7** (tools, hybrid AI, callbacks); **package version 1.1.0** marked the **production baseline** transition (see [.spec/milestone-1.1-execution-plan.md](.spec/milestone-1.1-execution-plan.md)). The current shipping version is **2.3.0** (`package.json`).
+Grand strategy wargame with LLM opponents on a real-Earth H3 map. Early milestones **0.5–0.7** validated tools, hybrid AI, and event-driven callbacks; **1.1** established the production baseline (see [.spec/completed/milestone-1.1-execution-plan.md](.spec/completed/milestone-1.1-execution-plan.md)). The current shipping version is **2.4.0** (`package.json`).
+
+Development roadmap: [.spec/devleopment-plan-v3.3.md](.spec/devleopment-plan-v3.3.md).
 
 ## Repository status
 
-- **Release version:** **2.3.0** (developer / side-load distribution only; no store or notarization requirements in this milestone)
+- **Release version:** **2.4.0** (developer / side-load distribution only; no store or notarization requirements yet)
+- **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 tactical battles are complete through **milestone 2.4** (integration and balance). Next planned milestone is **2.5** (save/load and session management). Post-2.4 work on this branch is playtest hardening and UX polish (pathfinding, build queue, return-fire visuals, keyboard pan, and related fixes).
 - CI: GitHub Actions matrix build and test on Windows/Linux/macOS
+
+## Current capabilities (2.4)
+
+- **Strategic map (H3 res 1):** Global Earth hexes with terrain, fog of war, economy/production, standing orders, and WEGO resolution (ranged → movement → melee, plus air/ferry phases where applicable).
+- **Tactical battles (H3 res 4):** Optional zoom-in fights when forces contest a strategic hex — sub-unit maneuver, terrain-aware movement, ranged/return fire, melee, bail-out back to strategic resolution, and LLM tactical play.
+- **Hybrid AI:** Pre-computed briefings, ad-hoc planning tools, standing orders, and callback-driven consultations via OpenRouter (BYOK). Tool-capable models only.
+- **Units:** Infantry, armor, naval, and air — with sealift, production, and infrastructure interactions at the strategic layer.
+- **Packaging:** `npm run dist` / `dist:win` / `dist:linux` / `dist:mac` via electron-builder (see [.spec/completed/packaging.md](.spec/completed/packaging.md)).
 
 ## Prerequisites
 
-- Node.js 24+
+- Node.js 24+ (`.nvmrc` pins 24)
 - npm 10+
 
 ## Quick start
@@ -19,26 +30,6 @@ npm install
 npm run build
 npm start
 ```
-
-## What Milestone 0.5 (first MCP tool) adds
-
-- **Tool-calling AI:** The opponent uses OpenRouter’s native tool-calling API. It can call **plan_route** (optimal path for a unit to a destination) and **check_distance** (distance and turn estimate between two hexes) before submitting orders. Movement planning is done via tools; the prompt no longer lists per-unit move options.
-- **Only tool-capable models:** Use a model that supports tools (e.g. filter by “tools” on OpenRouter). If the model does not support tools, the request may fail or return no orders.
-- **Tool-call limit:** Planning is capped at **10 round-trips**. If the model has not submitted final order JSON after 10 iterations, the turn ends with no explicit AI orders and a warning is shown in the next turn’s prompt.
-
-## What Milestone 0.4 adds
-
-- **Combat resolution:** Resolution order is **ranged (at current positions) → apply all movement → melee (at final positions)**. Ranged is resolved before movement so targets are where you aimed. One d6 per unit; hit when roll ≤ attack/defense. Casualties by priority (lowest defense first, then infantry → armor → naval). A single **game seed** is used for the whole game so replay is deterministic.
-- **Ranged attacks:** Armor (range 1) and naval (range 2) can declare a target hex (enemy, in range). Human: select the unit, click **Ranged attack**, then click a valid target hex. Ranged declarations are submitted with movement orders when you click Ready. The AI can also declare ranged attacks via the prompt.
-- **Win condition:** Eliminate all enemy units. When one side has no units left, the game ends and the winner is shown. Use **New game** to reset and play again.
-- **Combat and stacking visuals:** Resolution animates in five phases: ranged lightning and casualties (units at pre-move positions), then movement, then melee lightning and casualties (units at post-move positions). Combat (yellow lightning) and death (red X) overlays are drawn on the correct hexes for each phase. Stacks show a second layered icon and a unit count in the lower-right of the hex; mixed unit types show an asterisk (*); multi-player stacks use light grey and a black border.
-
-## What Milestone 0.2 adds
-
-- **~37-hex map** (k-ring 3) with **two terrain types**: land and water. Terrain is stored in SQLite and drives map colors.
-- **Two players**, each with **3–5 units** of three types: infantry (I), armor (A), naval (N). Units are placed at game start; naval on water, others on land.
-- **WEGO turn structure:** In the **planning phase**, click a friendly unit (blue), then click an adjacent destination hex to add a movement order. Orders are listed in the sidebar. Click **Ready** to end planning and **resolve** all movement simultaneously. Turn number and phase are shown in the sidebar.
-- **Game state** is stored in **SQLite** in the main process (file in Electron user data directory). No combat yet — units only move. The opponent’s units do not move in 0.2 (no AI).
 
 ## OpenRouter setup (required for AI turns)
 
@@ -57,33 +48,33 @@ Notes:
 
 ## Run and verify
 
-- **Build:** Compiles the main process and preload with TypeScript (`dist/`) and bundles the renderer with esbuild (`static/renderer.js`).
+- **Build:** Compiles the main process and preload with TypeScript (`dist/`) and bundles the renderer with esbuild (`static/renderer.js`). Generated terrain data is extracted as part of the build.
 - **Start:** Runs Electron; the window loads the renderer from `static/index.html`.
 
 **Note:** Game state is stored in SQLite via **better-sqlite3** (native module). The database file is created in your Electron user data directory.
 
 ## How to play
 
-1. **Pan:** Drag with the left mouse button.
-2. **Zoom:** Mouse wheel (zooms toward the cursor).
+1. **Pan:** Drag with the left mouse button, or use WASD / arrow keys.
+2. **Zoom:** Mouse wheel (zooms toward the cursor). At high zoom over a contested strategic hex, tactical battle entry may be available.
 3. **Select a unit:** Click a hex that contains a blue (human) unit. The hex highlights and the sidebar shows hex info.
-4. **Issue a move order:** With a unit selected, click a valid destination hex (within movement range; land/water rules apply). The order appears under “Pending orders.”
-5. **Ranged attack (armor or naval):** With an armor or naval unit selected, click **Ranged attack (click target hex)**, then click an enemy-occupied hex within range (1 for armor, 2 for naval). The ranged declaration appears under “Ranged attacks” and is submitted with Ready.
-6. **Ready:** Click **Ready** to submit orders and resolve the turn. Ranged combat is resolved at current positions, then all movement is applied, then melee combat is resolved at final positions. The resolution animation shows ranged lightning and casualties, then movement, then melee lightning and casualties, each on the correct unit positions. When one side has no units left, the game ends; use **New game** to play again.
+4. **Issue a move order:** With a unit selected, click a valid destination hex (within movement range; land/water/terrain rules apply). The order appears under “Pending orders.” Standing march orders can also be set for multi-turn movement.
+5. **Ranged attack (armor or naval on strategic; broader types on tactical):** With a capable unit selected, click **Ranged attack (click target hex)**, then click an enemy-occupied hex within range. Declarations are submitted with Ready.
+6. **Ready:** Click **Ready** to submit orders and resolve the turn. When one side has no units left, the game ends; use **New game** to play again.
 7. You can issue multiple movement and ranged orders (one per unit each) before clicking Ready.
 
 ## Where messages appear
 
-- **Lower-left (floating log over the map):** User actions and errors — e.g. submit/ready failures, invalid ranged target, AI move summary after Ready. Use the × to dismiss.
+- **Lower-left (floating log over the map):** User actions and errors — e.g. submit/ready failures, invalid ranged target, AI move summary after Ready. Use the × to dismiss. Planning toasts are suppressed while you are still issuing orders.
 - **Lower-right (OpenRouter panel, Status):** AI interactions and errors only — e.g. "Requesting AI orders…", model list errors, turn resolved. AI move and attack counts are still summarized in the lower-left toast.
 
 ## UI controls summary
 
-- Pan: drag with left mouse.
+- Pan: drag with left mouse, or WASD / arrows.
 - Zoom in/out: mouse wheel.
 - Select hex/unit: click on hex.
 - Add move order: select unit, then click destination.
-- Ranged attack: select armor/naval, click “Ranged attack”, then click enemy hex in range.
+- Ranged attack: select capable unit, click “Ranged attack”, then click enemy hex in range.
 - Resolve turn: Ready button.
 - New game: after game over, click “New game”.
 
@@ -105,7 +96,7 @@ Runs core main-process and tool contract tests.
 
 ## Terrain generation pipeline
 
-**Electron runtime** loads `data/generated/terrain_res1_metadata.json` and `terrain_res4_metadata.json`, classifies hex kinds in the main process, and seeds SQLite from that cache. Packaged builds include those JSON files; regenerate them with `npm run terrain:generate` when the metadata pipeline changes. Startup fails fast if required metadata is missing or invalid (including empty res-4 metadata).
+**Electron runtime** loads generated metadata under `data/generated/` (extracted from the pack on build/start), classifies hex kinds in the main process, and seeds SQLite from that cache. Packaged builds include those JSON files; regenerate them with `npm run terrain:generate` when the metadata or road/rail pipeline changes. Startup fails fast if required metadata is missing or invalid (including empty res-4 metadata).
 
 **Classification outputs** (res-1 base + res-4 exceptions CSVs and run metadata) are produced by the main Python CLI:
 
@@ -114,14 +105,15 @@ python -m scripts.terrain_pipeline.cli validate --verbose
 python -m scripts.terrain_pipeline.cli run --verbose
 ```
 
-**Per-hex feature metadata JSON** (res-1/res-4 metadata only) uses the metadata CLI:
+**Per-hex feature metadata and road/rail sides** use:
 
 ```bash
 python -m scripts.terrain_pipeline.metadata_cli validate --verbose
 npm run terrain:generate
 ```
 
-- `npm run terrain:generate` → `python -m scripts.terrain_pipeline.metadata_cli run --verbose`
+- `npm run terrain:generate` → metadata CLI, then road/rail sides CLI (`fast` mode)
+- Related: `terrain:generate:landmass`, `terrain:generate:road-rail:high-fidelity`, `terrain:generate:road-rail-vectors`
 
 Shared Python tests for the terrain scripts:
 
@@ -129,7 +121,7 @@ Shared Python tests for the terrain scripts:
 npm run terrain:test
 ```
 
-Classification environment check (same npm name as before):
+Classification environment check:
 
 ```bash
 npm run terrain:validate
@@ -137,6 +129,14 @@ npm run terrain:validate
 
 Setup and troubleshooting are documented in `scripts/terrain_pipeline/README.md`.
 
+## Early prototype notes (milestones 0.2–0.5)
+
+These describe the throwaway Phase 0 loop that validated combat, tools, and AI before the production baseline. The live game is the 2.x global + tactical build above.
+
+- **0.2:** Small hex map, WEGO movement only, SQLite state, no AI.
+- **0.4:** Combat (ranged → move → melee), win condition, resolution visuals and stacking.
+- **0.5:** OpenRouter tool-calling AI (`plan_route`, `check_distance`), tool-capable models only, capped planning round-trips.
+
 ## License
 
-ISC. See `LICENSE`.
+ISC (`package.json`).
