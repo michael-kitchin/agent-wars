@@ -11,6 +11,12 @@ import { rendererSharedState as S } from '../core/state';
 import type { PanDirection } from '../core/types';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import {
+  isNetPanAxesZero,
+  panAxisKeyToNetAxes,
+  scoreNeighborForPanAxes,
+  type PanAxisKey,
+} from '../../shared/mapKeyboardPanLogic';
 
 /**
  * Defines the `shouldIgnoreGlobalKeydown` function shape (export function shouldIgnoreGlobalKeydown(e: KeyboardEvent): boolean).
@@ -28,38 +34,43 @@ export function shouldIgnoreGlobalKeydown(e: KeyboardEvent): boolean {
 }
 
 /**
- * Defines the `getNeighborForPan` function shape (export function getNeighborForPan(centerH3: string, direction: PanDirection): string | null).
-
- * Purpose: Supports maintainability by documenting why `getNeighborForPan` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Returns true when the event target is an editable field that should not keep map pan running.
+ *
+ * Purpose: Shared focusin clear check matching `shouldIgnoreGlobalKeydown` target rules.
+ * When to use: On `focusin` before calling `clearMapKeyboardPan`.
+ * Expected outcome: true for input/textarea/select/contentEditable.
  * Exceptions: None.
  */
-export function getNeighborForPan(centerH3: string, direction: PanDirection): string | null {
+export function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName.toLowerCase();
+  return tag === 'input' || tag === 'textarea' || tag === 'select' || !!target.isContentEditable;
+}
+
+/**
+ * Picks the res-1 neighbor that best matches signed north/south and east/west pan axes.
+ *
+ * Purpose: One hex step toward a cardinal or diagonal net vector for hold-to-continue pan.
+ * When to use: From `panMapByNetAxes` and as the implementation behind single-axis pan wrappers.
+ * Expected outcome: Neighbor h3 with maximum `scoreNeighborForPanAxes`, or null when axes are zero / no neighbors.
+ * Exceptions: None (invalid h3 from `gridDisk` is skipped via empty neighbor lists).
+ */
+export function getNeighborForPanAxes(
+  centerH3: string,
+  ns: -1 | 0 | 1,
+  ew: -1 | 0 | 1
+): string | null {
+  if (ns === 0 && ew === 0) return null;
   const [centerLat, centerLng] = cellToLatLng(centerH3);
   const neighbors = Array.from(gridDisk(centerH3, 1)).filter((h3) => h3 !== centerH3);
   if (neighbors.length === 0) return null;
   let bestH3: string | null = null;
-  let bestScore = direction === 'north' || direction === 'east' ? -Infinity : Infinity;
+  let bestScore = -Infinity;
   for (const h3 of neighbors) {
     const [lat, lng] = cellToLatLng(h3);
     const alignedLng = alignLngToReference(lng, centerLng);
-    const deltaLng = alignedLng - centerLng;
-    const deltaLat = lat - centerLat;
-    const score =
-      direction === 'north'
-        ? deltaLat
-        : direction === 'south'
-          ? deltaLat
-          : direction === 'east'
-            ? deltaLng
-            : deltaLng;
-    if (direction === 'north' || direction === 'east') {
-      if (score > bestScore) {
-        bestScore = score;
-        bestH3 = h3;
-      }
-    } else if (score < bestScore) {
+    const score = scoreNeighborForPanAxes(lat - centerLat, alignedLng - centerLng, ns, ew);
+    if (score > bestScore) {
       bestScore = score;
       bestH3 = h3;
     }
@@ -68,14 +79,28 @@ export function getNeighborForPan(centerH3: string, direction: PanDirection): st
 }
 
 /**
- * Defines the `panMapOneRes1Hex` function shape (export function panMapOneRes1Hex(direction: PanDirection): void).
+ * Defines the `getNeighborForPan` function shape (export function getNeighborForPan(centerH3: string, direction: PanDirection): string | null).
 
- * Purpose: Supports maintainability by documenting why `panMapOneRes1Hex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Single-axis wrapper over net-axis neighbor selection (legacy call sites and tests).
+ * When to use: When only one cardinal direction is known.
+ * Expected outcome: Same neighbor as `getNeighborForPanAxes` with the matching unit vector.
  * Exceptions: None.
  */
-export function panMapOneRes1Hex(direction: PanDirection): void {
+export function getNeighborForPan(centerH3: string, direction: PanDirection): string | null {
+  const { ns, ew } = panAxisKeyToNetAxes(direction as PanAxisKey);
+  return getNeighborForPanAxes(centerH3, ns, ew);
+}
+
+/**
+ * Pans the main Leaflet map one res-1 hex toward the given net axes.
+ *
+ * Purpose: View update used by the hold-to-continue keyboard pan controller.
+ * When to use: From the renderer pan wire module; no-ops when axes are zero or the map is unavailable.
+ * Expected outcome: `setView` on the best neighbor hex center, preserving zoom and lng alignment.
+ * Exceptions: None (swallows invalid center→h3 conversion).
+ */
+export function panMapByNetAxes(ns: -1 | 0 | 1, ew: -1 | 0 | 1): void {
+  if (isNetPanAxesZero({ ns, ew })) return;
   const map = getMainLeafletMap() as {
     getCenter: () => { lat: number; lng: number };
     setView: (center: unknown, zoom: number) => unknown;
@@ -90,11 +115,24 @@ export function panMapOneRes1Hex(direction: PanDirection): void {
   } catch {
     return;
   }
-  const neighbor = getNeighborForPan(centerH3, direction);
+  const neighbor = getNeighborForPanAxes(centerH3, ns, ew);
   if (!neighbor) return;
   const [nextLat, nextLngRaw] = cellToLatLng(neighbor);
   const nextLng = alignLngToReference(nextLngRaw, center.lng);
   map.setView(Lref.latLng(clampLatForWebMercatorDisplay(nextLat), nextLng), map.getZoom());
+}
+
+/**
+ * Defines the `panMapOneRes1Hex` function shape (export function panMapOneRes1Hex(direction: PanDirection): void).
+
+ * Purpose: Single-axis wrapper over `panMapByNetAxes` for callers that still pass one cardinal.
+ * When to use: Prefer `panMapByNetAxes` for hold-to-continue; keep this for one-shot cardinal pan.
+ * Expected outcome: Same as `panMapByNetAxes` with the matching unit vector.
+ * Exceptions: None.
+ */
+export function panMapOneRes1Hex(direction: PanDirection): void {
+  const { ns, ew } = panAxisKeyToNetAxes(direction as PanAxisKey);
+  panMapByNetAxes(ns, ew);
 }
 
 /**

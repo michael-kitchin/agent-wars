@@ -14485,6 +14485,8 @@
       worldCopyJump: true,
       maxBounds: worldBounds,
       maxBoundsViscosity: 1,
+      /* App-owned WASD/arrow hex pan; avoid Leaflet’s default keyboard panBy. */
+      keyboard: false,
       /* Keep raster tiles and canvas overlay in lockstep (no CSS zoom/pan lag vs hex draw). */
       zoomAnimation: false,
       fadeAnimation: false,
@@ -15949,6 +15951,138 @@
     ]);
   }
 
+  // src/shared/mapKeyboardPanLogic.ts
+  var MAP_PAN_BASELINE_INTERVAL_MS = 200;
+  var MAP_PAN_HOLD_INTERVAL_MS = Math.round(MAP_PAN_BASELINE_INTERVAL_MS / 1.5);
+  function panKeyToDirection(key) {
+    switch (key.toLowerCase()) {
+      case "w":
+      case "arrowup":
+        return "north";
+      case "s":
+      case "arrowdown":
+        return "south";
+      case "a":
+      case "arrowleft":
+        return "west";
+      case "d":
+      case "arrowright":
+        return "east";
+      default:
+        return null;
+    }
+  }
+  function panCodeToDirection(code) {
+    switch (code) {
+      case "KeyW":
+      case "ArrowUp":
+        return "north";
+      case "KeyS":
+      case "ArrowDown":
+        return "south";
+      case "KeyA":
+      case "ArrowLeft":
+        return "west";
+      case "KeyD":
+      case "ArrowRight":
+        return "east";
+      default:
+        return null;
+    }
+  }
+  function panBindingToDirection(code, key) {
+    return panCodeToDirection(code) ?? panKeyToDirection(key);
+  }
+  function panPhysicalKeyId(code, key) {
+    return code || key;
+  }
+  function resolveNetPanAxes(held) {
+    const north = held.has("north");
+    const south = held.has("south");
+    const east = held.has("east");
+    const west = held.has("west");
+    const ns = north === south ? 0 : north ? 1 : -1;
+    const ew = east === west ? 0 : east ? 1 : -1;
+    return { ns, ew };
+  }
+  function netPanAxesEqual(a, b) {
+    return a.ns === b.ns && a.ew === b.ew;
+  }
+  function scoreNeighborForPanAxes(deltaLat, deltaLng, ns, ew) {
+    return ns * deltaLat + ew * deltaLng;
+  }
+  function isNetPanAxesZero(axes) {
+    return axes.ns === 0 && axes.ew === 0;
+  }
+  function directionsFromPhysicalKeys(heldPhysical) {
+    return new Set(heldPhysical.values());
+  }
+  function createMapKeyboardPanController(deps) {
+    const heldPhysical = /* @__PURE__ */ new Map();
+    let intervalHandle = null;
+    const stopInterval = () => {
+      if (intervalHandle !== null) {
+        deps.clearInterval(intervalHandle);
+        intervalHandle = null;
+      }
+    };
+    const startInterval = () => {
+      stopInterval();
+      intervalHandle = deps.setInterval(() => {
+        if (heldPhysical.size === 0) {
+          stopInterval();
+          return;
+        }
+        const axes = resolveNetPanAxes(directionsFromPhysicalKeys(heldPhysical));
+        if (isNetPanAxesZero(axes)) {
+          stopInterval();
+          return;
+        }
+        deps.pan(axes.ns, axes.ew);
+      }, MAP_PAN_HOLD_INTERVAL_MS);
+    };
+    const panImmediateAndSchedule = (axes) => {
+      deps.pan(axes.ns, axes.ew);
+      startInterval();
+    };
+    const syncAfterPhysicalChange = (previousAxes) => {
+      if (heldPhysical.size === 0) {
+        stopInterval();
+        return;
+      }
+      const nextAxes = resolveNetPanAxes(directionsFromPhysicalKeys(heldPhysical));
+      if (netPanAxesEqual(previousAxes, nextAxes)) {
+        if (!isNetPanAxesZero(nextAxes) && intervalHandle === null) {
+          startInterval();
+        }
+        return;
+      }
+      if (isNetPanAxesZero(nextAxes)) {
+        stopInterval();
+        return;
+      }
+      panImmediateAndSchedule(nextAxes);
+    };
+    return {
+      onPanKeyDown(physicalKeyId, direction) {
+        if (heldPhysical.has(physicalKeyId)) return;
+        const previousAxes = resolveNetPanAxes(directionsFromPhysicalKeys(heldPhysical));
+        heldPhysical.set(physicalKeyId, direction);
+        syncAfterPhysicalChange(previousAxes);
+      },
+      onPanKeyUp(physicalKeyId) {
+        if (!heldPhysical.has(physicalKeyId)) return;
+        const previousAxes = resolveNetPanAxes(directionsFromPhysicalKeys(heldPhysical));
+        heldPhysical.delete(physicalKeyId);
+        syncAfterPhysicalChange(previousAxes);
+      },
+      clear() {
+        heldPhysical.clear();
+        stopInterval();
+      }
+    };
+  }
+
   // src/renderer/map/mapUtils.ts
   function shouldIgnoreGlobalKeydown(e) {
     const target = e.target;
@@ -15956,31 +16090,31 @@
     const tag = target.tagName.toLowerCase();
     return tag === "input" || tag === "textarea" || tag === "select" || !!target.isContentEditable;
   }
-  function getNeighborForPan(centerH3, direction) {
+  function isEditableKeyboardTarget(target) {
+    if (!(target instanceof HTMLElement)) return false;
+    const tag = target.tagName.toLowerCase();
+    return tag === "input" || tag === "textarea" || tag === "select" || !!target.isContentEditable;
+  }
+  function getNeighborForPanAxes(centerH3, ns, ew) {
+    if (ns === 0 && ew === 0) return null;
     const [centerLat, centerLng] = cellToLatLng(centerH3);
     const neighbors = Array.from(gridDisk(centerH3, 1)).filter((h3) => h3 !== centerH3);
     if (neighbors.length === 0) return null;
     let bestH3 = null;
-    let bestScore = direction === "north" || direction === "east" ? -Infinity : Infinity;
+    let bestScore = -Infinity;
     for (const h3 of neighbors) {
       const [lat, lng] = cellToLatLng(h3);
       const alignedLng = alignLngToReference(lng, centerLng);
-      const deltaLng = alignedLng - centerLng;
-      const deltaLat = lat - centerLat;
-      const score = direction === "north" ? deltaLat : direction === "south" ? deltaLat : direction === "east" ? deltaLng : deltaLng;
-      if (direction === "north" || direction === "east") {
-        if (score > bestScore) {
-          bestScore = score;
-          bestH3 = h3;
-        }
-      } else if (score < bestScore) {
+      const score = scoreNeighborForPanAxes(lat - centerLat, alignedLng - centerLng, ns, ew);
+      if (score > bestScore) {
         bestScore = score;
         bestH3 = h3;
       }
     }
     return bestH3;
   }
-  function panMapOneRes1Hex(direction) {
+  function panMapByNetAxes(ns, ew) {
+    if (isNetPanAxesZero({ ns, ew })) return;
     const map = getMainLeafletMap();
     const Lref = globalThis.L;
     if (!map || !Lref) return;
@@ -15991,7 +16125,7 @@
     } catch {
       return;
     }
-    const neighbor = getNeighborForPan(centerH3, direction);
+    const neighbor = getNeighborForPanAxes(centerH3, ns, ew);
     if (!neighbor) return;
     const [nextLat, nextLngRaw] = cellToLatLng(neighbor);
     const nextLng = alignLngToReference(nextLngRaw, center.lng);
@@ -25459,6 +25593,24 @@
     });
   }
 
+  // src/renderer/map/mapKeyboardPan.ts
+  var mapKeyboardPanController = createMapKeyboardPanController({
+    pan: (ns, ew) => {
+      panMapByNetAxes(ns, ew);
+    },
+    setInterval: (callback, ms) => globalThis.setInterval(callback, ms),
+    clearInterval: (handle) => globalThis.clearInterval(handle)
+  });
+  function mapPanKeyDown(physicalKeyId, direction) {
+    mapKeyboardPanController.onPanKeyDown(physicalKeyId, direction);
+  }
+  function mapPanKeyUp(physicalKeyId) {
+    mapKeyboardPanController.onPanKeyUp(physicalKeyId);
+  }
+  function clearMapKeyboardPan() {
+    mapKeyboardPanController.clear();
+  }
+
   // src/renderer/map/initCore.ts
   function dismissTerrainTooltipWhenPointerLeavesMapPanel(deps) {
     hideOrderBlockHexTooltip();
@@ -25584,21 +25736,26 @@
         }
       }
       if (shouldIgnoreGlobalKeydown(e)) return;
-      if (e.repeat) return;
-      if (e.key === "Control") {
-        rendererSharedState.ctrlKeyActive = true;
-        deps.applyModifierDrivenPopoverCloseRules("ctrl_pressed");
+      if (e.key === "Control" || e.key === "Alt" || e.key === "Meta") {
+        clearMapKeyboardPan();
+        if (e.key === "Control") {
+          rendererSharedState.ctrlKeyActive = true;
+          deps.applyModifierDrivenPopoverCloseRules("ctrl_pressed");
+        }
         return;
       }
+      if (e.repeat) return;
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
       const key = e.key.toLowerCase();
       if (key === "t") {
         rendererSharedState.hideTerrainFillWhileHeld = true;
         deps.requestRedraw();
         return;
       }
-      if (key === "w" || key === "a" || key === "s" || key === "d") {
-        const direction = key === "w" ? "north" : key === "a" ? "west" : key === "s" ? "south" : "east";
-        panMapOneRes1Hex(direction);
+      const panDirection = panBindingToDirection(e.code, e.key);
+      if (panDirection) {
+        e.preventDefault();
+        mapPanKeyDown(panPhysicalKeyId(e.code, e.key), panDirection);
       }
     });
     window.addEventListener("keyup", (e) => {
@@ -25610,15 +25767,28 @@
       if (e.key.toLowerCase() === "t") {
         rendererSharedState.hideTerrainFillWhileHeld = false;
         deps.requestRedraw();
+        return;
       }
+      mapPanKeyUp(panPhysicalKeyId(e.code, e.key));
     });
     window.addEventListener("blur", () => {
+      clearMapKeyboardPan();
       dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
       rendererSharedState.ctrlKeyActive = false;
       deps.applyModifierDrivenPopoverCloseRules("window_blur");
       if (!deps.isMapInspectionModeHeld()) return;
       rendererSharedState.hideTerrainFillWhileHeld = false;
       deps.requestRedraw();
+    });
+    window.addEventListener("focusin", (e) => {
+      if (isEditableKeyboardTarget(e.target)) {
+        clearMapKeyboardPan();
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        clearMapKeyboardPan();
+      }
     });
     window.addEventListener(
       "pointerdown",

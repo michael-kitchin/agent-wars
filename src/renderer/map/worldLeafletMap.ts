@@ -318,6 +318,8 @@ export function initWorldLeafletMaps(
     worldCopyJump: true,
     maxBounds: worldBounds,
     maxBoundsViscosity: 1,
+    /* App-owned WASD/arrow hex pan; avoid Leaflet’s default keyboard panBy. */
+    keyboard: false,
     /* Keep raster tiles and canvas overlay in lockstep (no CSS zoom/pan lag vs hex draw). */
     zoomAnimation: false,
     fadeAnimation: false,

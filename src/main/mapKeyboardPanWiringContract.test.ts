@@ -1,0 +1,57 @@
+/**
+ * Guards renderer wiring for hold-to-continue keyboard map pan.
+ *
+ * The renderer is not executed by Node tests, so these assert against source text
+ * the same way `tacticalPrefetchRestartContract.test.ts` does.
+ * Run: `node dist/main/mapKeyboardPanWiringContract.test.js`
+ */
+
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import * as fs from 'fs';
+import * as path from 'path';
+
+/**
+ * Reads a source file under `src/` relative to the repository root.
+ *
+ * Purpose: Keeps path plumbing out of the assertions.
+ * When to use: Each wiring contract in this file.
+ * Expected outcome: UTF-8 file contents.
+ * Exceptions: Throws when the file has moved.
+ */
+function readSrc(...segments: string[]): string {
+  return fs.readFileSync(path.resolve(process.cwd(), 'src', ...segments), 'utf8');
+}
+
+test('initCore uses hold pan controller instead of one-shot panMapOneRes1Hex for WASD', () => {
+  const initCore = readSrc('renderer', 'map', 'initCore.ts');
+  assert.equal(
+    initCore.includes('panMapOneRes1Hex'),
+    false,
+    'initCore must not call panMapOneRes1Hex directly'
+  );
+  assert.match(initCore, /panBindingToDirection/);
+  assert.match(initCore, /panPhysicalKeyId/);
+  assert.match(initCore, /mapPanKeyDown/);
+  assert.match(initCore, /mapPanKeyUp/);
+  assert.match(initCore, /clearMapKeyboardPan/);
+});
+
+test('initCore clears map pan on blur, focusin editable, and visibility hidden', () => {
+  const initCore = readSrc('renderer', 'map', 'initCore.ts');
+  assert.match(initCore, /addEventListener\('blur'/);
+  assert.match(initCore, /addEventListener\('focusin'/);
+  assert.match(initCore, /visibilitychange/);
+  assert.match(initCore, /isEditableKeyboardTarget/);
+  const blurIdx = initCore.indexOf("addEventListener('blur'");
+  const blurSlice = initCore.slice(blurIdx, blurIdx + 400);
+  assert.match(blurSlice, /clearMapKeyboardPan/);
+});
+
+test('main Leaflet map disables built-in keyboard pan', () => {
+  const worldMap = readSrc('renderer', 'map', 'worldLeafletMap.ts');
+  const mainMapIdx = worldMap.indexOf('mainMap = Lref.map');
+  assert.ok(mainMapIdx >= 0, 'expected mainMap = Lref.map');
+  const optionsBlock = worldMap.slice(mainMapIdx, mainMapIdx + 600);
+  assert.match(optionsBlock, /keyboard:\s*false/);
+});

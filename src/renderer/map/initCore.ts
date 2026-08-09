@@ -1,6 +1,8 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { unitHasTacticalRangedBaseline } from '../../shared/tacticalRanges';
-import { panMapOneRes1Hex, shouldIgnoreGlobalKeydown } from './mapUtils';
+import { panBindingToDirection, panPhysicalKeyId } from '../../shared/mapKeyboardPanLogic';
+import { clearMapKeyboardPan, mapPanKeyDown, mapPanKeyUp } from './mapKeyboardPan';
+import { isEditableKeyboardTarget, shouldIgnoreGlobalKeydown } from './mapUtils';
 import { rendererSharedState as S } from '../core/state';
 import { hidePlanningChromeToasts } from '../openRouter/openRouterUiHelpers';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
@@ -430,21 +432,26 @@ export function wireInitCore(deps: InitCoreDeps): void {
       }
     }
     if (shouldIgnoreGlobalKeydown(e)) return;
-    if (e.repeat) return;
-    if (e.key === 'Control') {
-      S.ctrlKeyActive = true;
-      deps.applyModifierDrivenPopoverCloseRules('ctrl_pressed');
+    if (e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') {
+      clearMapKeyboardPan();
+      if (e.key === 'Control') {
+        S.ctrlKeyActive = true;
+        deps.applyModifierDrivenPopoverCloseRules('ctrl_pressed');
+      }
       return;
     }
+    if (e.repeat) return;
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
     const key = e.key.toLowerCase();
     if (key === 't') {
       S.hideTerrainFillWhileHeld = true;
       deps.requestRedraw();
       return;
     }
-    if (key === 'w' || key === 'a' || key === 's' || key === 'd') {
-      const direction = key === 'w' ? 'north' : key === 'a' ? 'west' : key === 's' ? 'south' : 'east';
-      panMapOneRes1Hex(direction);
+    const panDirection = panBindingToDirection(e.code, e.key);
+    if (panDirection) {
+      e.preventDefault();
+      mapPanKeyDown(panPhysicalKeyId(e.code, e.key), panDirection);
     }
   });
   window.addEventListener('keyup', (e) => {
@@ -456,15 +463,29 @@ export function wireInitCore(deps: InitCoreDeps): void {
     if (e.key.toLowerCase() === 't') {
       S.hideTerrainFillWhileHeld = false;
       deps.requestRedraw();
+      return;
     }
+    // Always release by physical id so same-direction overlaps (W + ArrowUp) cannot stick or drop early.
+    mapPanKeyUp(panPhysicalKeyId(e.code, e.key));
   });
   window.addEventListener('blur', () => {
+    clearMapKeyboardPan();
     dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
     S.ctrlKeyActive = false;
     deps.applyModifierDrivenPopoverCloseRules('window_blur');
     if (!deps.isMapInspectionModeHeld()) return;
     S.hideTerrainFillWhileHeld = false;
     deps.requestRedraw();
+  });
+  window.addEventListener('focusin', (e) => {
+    if (isEditableKeyboardTarget(e.target)) {
+      clearMapKeyboardPan();
+    }
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      clearMapKeyboardPan();
+    }
   });
   window.addEventListener(
     'pointerdown',
