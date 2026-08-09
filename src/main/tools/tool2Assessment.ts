@@ -4,7 +4,7 @@
  * Internal assessment payloads use lat/lng tuples; values returned to the LLM are redacted to briefing hex codes via `encodeOpenRouterToolResultForLlm`.
  */
 
-import { cellToLatLng, gridDistance, gridDisk } from 'h3-js';
+import { gridDistance, gridDisk } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
 import { getDistanceAndTurns, getMovementBudgetForUnit, terrainIsPassableForDomain } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
@@ -14,26 +14,17 @@ import { getRes1LandMassByH3 } from '../terrainClassificationCache';
 import { getRange } from '../combatConstants';
 import { getStandingOrderForUnit } from './tool5StandingOrders';
 import { logDebug, logError, logTrace } from '../logger';
+import { h3ToLatLng, type LatLng, type LatLngMap } from './h3LatLng';
 
 /**
- * Documents the `LatLng` type alias (export type LatLng).
-
- * Purpose: Supports maintainability by documenting why `LatLng` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Re-exports shared lat/lng tuple type for consumers that imported it from this module.
+ *
+ * Purpose: Preserves historical import paths after `LatLng` moved to `h3LatLng.ts`.
+ * When to use: Prefer `./h3LatLng` for new code.
+ * Expected outcome: Same `LatLng` alias as `h3LatLng`.
  * Exceptions: None.
  */
-export type LatLng = [number, number];
-
-/**
- * Documents the `LatLngMap` type alias (type LatLngMap).
-
- * Purpose: Supports maintainability by documenting why `LatLngMap` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-type LatLngMap = Map<string, LatLng>;
+export type { LatLng } from './h3LatLng';
 
 /**
  * Documents the `EnemyIntelEntry` interface as a named contract surface (interface EnemyIntelEntry).
@@ -112,21 +103,6 @@ function getEnemyIntelForPlayer(state: GameStateSnapshot): EnemyIntelEntry[] {
  */
 function shouldIncludeStaleEnemyIntel(state: GameStateSnapshot): boolean {
   return state.playerPerspective !== 'opponent';
-}
-
-/**
- * Defines the `h3ToLatLng` function shape (function h3ToLatLng(h3: string, latLngByH3: LatLngMap): LatLng).
-
- * Purpose: Supports maintainability by documenting why `h3ToLatLng` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function h3ToLatLng(h3: string, latLngByH3: LatLngMap): LatLng {
-  const ll = latLngByH3.get(h3);
-  if (ll) return ll;
-  const [lat, lng] = cellToLatLng(h3);
-  return [lat, lng];
 }
 
 /**
@@ -267,7 +243,7 @@ function executeAssessUnit(
   }
   const movementBudget = getMovementBudgetForUnit(unit.unitType);
   const terrain = terrainByH3.get(unit.h3Index) ?? 'land';
-  const unitPosition = h3ToLatLng(unit.h3Index, latLngByH3);
+  const unitPosition = h3ToLatLng(unit.h3Index, latLngByH3, 'cellCenter');
 
   const nearbyEnemies: Array<{
     unitId: string;
@@ -328,7 +304,7 @@ function executeAssessUnit(
       nearbyEnemies.push({
         unitId: other.id,
         type: other.unitType,
-        position: h3ToLatLng(other.h3Index, latLngByH3),
+        position: h3ToLatLng(other.h3Index, latLngByH3, 'cellCenter'),
         hexDistance,
         estimatedTurnsToReach,
         inRangedRange,
@@ -369,7 +345,7 @@ function executeAssessUnit(
       nearbyFriendlies.push({
         unitId: other.id,
         type: other.unitType,
-        position: h3ToLatLng(other.h3Index, latLngByH3),
+        position: h3ToLatLng(other.h3Index, latLngByH3, 'cellCenter'),
         hexDistance,
         estimatedTurnsToReach,
       });
@@ -398,7 +374,7 @@ function executeAssessUnit(
       nearbyEnemies.push({
         unitId: intel.unitId,
         type: 'unknown',
-        position: h3ToLatLng(intel.lastKnownH3Index, latLngByH3),
+        position: h3ToLatLng(intel.lastKnownH3Index, latLngByH3, 'cellCenter'),
         hexDistance,
         estimatedTurnsToReach: distResult !== null ? distResult.estimatedTurns : null,
         inRangedRange: gridDist <= myRange,
@@ -470,7 +446,7 @@ function executeAssessHex(
   if (passableBy.length === 0) passableBy.push('none');
   const unitsAtHex = state.units
     .filter((u) => u.h3Index === hexH3)
-    .map((u) => ({ unitId: u.id, type: u.unitType, position: h3ToLatLng(u.h3Index, latLngByH3) as LatLng }));
+    .map((u) => ({ unitId: u.id, type: u.unitType, position: h3ToLatLng(u.h3Index, latLngByH3, 'cellCenter') as LatLng }));
 
   const aiPlayerId = 'opponent';
   const enemies = state.units.filter((u) => u.player !== aiPlayerId);
@@ -484,7 +460,7 @@ function executeAssessHex(
       const entry = {
         unitId: e.id,
         type: e.unitType,
-        position: h3ToLatLng(e.h3Index, latLngByH3) as LatLng,
+        position: h3ToLatLng(e.h3Index, latLngByH3, 'cellCenter') as LatLng,
         hexDistance: d,
         confidence: 'current' as const,
         lastSeen: state.turnNumber,
@@ -504,7 +480,7 @@ function executeAssessHex(
         const entry = {
           unitId: intel.unitId,
           type: 'unknown',
-          position: h3ToLatLng(intel.lastKnownH3Index, latLngByH3) as LatLng,
+          position: h3ToLatLng(intel.lastKnownH3Index, latLngByH3, 'cellCenter') as LatLng,
           hexDistance: d,
           confidence: 'stale' as const,
           lastSeen: intel.lastSeenTurn,
@@ -555,7 +531,7 @@ function executeAssessHex(
   return {
     status: 'ok',
     error: null,
-    position: h3ToLatLng(hexH3, latLngByH3),
+    position: h3ToLatLng(hexH3, latLngByH3, 'cellCenter'),
     terrain,
     passableBy,
     unitsAtHex,

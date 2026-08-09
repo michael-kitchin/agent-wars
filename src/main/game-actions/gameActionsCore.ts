@@ -30,6 +30,7 @@ import type {
   SealiftStackState,
   GameStateSnapshot,
 } from '../../shared/ipcTypes';
+import { emptySealiftStackState } from '../../shared/sealiftStackState';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { clipTacticalMarchPathToDestination } from '../../shared/tacticalMarchPlaybackPath.js';
 import { filterTacticalMarchContinuationsToPresentSubUnits } from '../../shared/tacticalMarchContinuations';
@@ -1639,16 +1640,7 @@ export function getSealiftStackState(h3Index: string): SealiftStackState {
 export function getTacticalSealiftStackState(h3Index: string): SealiftStackState {
   logTrace('gameActions getTacticalSealiftStackState', { h3Index });
   if (!isTacticalBattleActive()) {
-    return {
-      h3Index,
-      showSealiftSection: false,
-      contextMode: 'unsupported',
-      controlsDisabled: true,
-      hasEmbarkedUnitsInStack: false,
-      debarkAllowedAtHex: false,
-      navalRows: [],
-      landOptions: [],
-    };
+    return emptySealiftStackState(h3Index);
   }
   return getTacticalSealiftStackStateForHex(h3Index);
 }

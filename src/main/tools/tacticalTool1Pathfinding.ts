@@ -12,8 +12,7 @@ import {
 } from '../../shared/tacticalTerrainMovement';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logError } from '../logger';
-
-type LatLng = [number, number];
+import { h3ToLatLng, type LatLng } from './h3LatLng';
 
 /** Minimal plan_route options used by the tactical Tool1 branch (mirrors strategic `PlanRouteOptions`). */
 type TacticalPlanRouteOptions = { avoidEnemies?: boolean; maxTurns?: number };
@@ -52,19 +51,6 @@ type CheckDistanceOk = {
 };
 
 type CheckDistanceError = { status: 'error'; error: string };
-
-/**
- * Resolves lat/lng for a res4 H3 using the consultation coordinate map, with a safe fallback.
- *
- * Purpose: Tool1 results still expose lat/lng fields that the hex encoder redacts to briefing codes.
- * When to use: Building tactical plan_route / check_distance success payloads.
- * Expected outcome: A finite [lat, lng] pair for every footprint cell present in `latLngByH3`.
- * Exceptions: Missing map entries yield [0, 0] (should not occur for footprint cells after planState build).
- */
-function h3ToLatLng(h3: string, latLngByH3: Map<string, LatLng>): LatLng {
-  const ll = latLngByH3.get(h3);
-  return ll ? [ll[0], ll[1]] : [0, 0];
-}
 
 /**
  * Builds the res4 footprint set for a tactical plan_route, optionally excluding other-player hexes.
@@ -225,7 +211,7 @@ export function executeTacticalPlanRoute(
       }
     }
     if (originH3 === destH3) {
-      const ll = h3ToLatLng(originH3, latLngByH3);
+      const ll = h3ToLatLng(originH3, latLngByH3, 'origin');
       return {
         status: 'ok',
         unitId,
@@ -308,9 +294,9 @@ export function executeTacticalPlanRoute(
     const firstIdx = Math.max(1, path.indexOf(firstStop));
     const firstLegHexes = path.slice(0, firstIdx + 1);
     const turnsRequired = estimateTacticalTurnsRequired(plan.totalCostToDestination, budget, path.length);
-    const originLl = h3ToLatLng(originH3, latLngByH3);
-    const destLl = h3ToLatLng(destH3, latLngByH3);
-    const orderLl = h3ToLatLng(firstStop, latLngByH3);
+    const originLl = h3ToLatLng(originH3, latLngByH3, 'origin');
+    const destLl = h3ToLatLng(destH3, latLngByH3, 'origin');
+    const orderLl = h3ToLatLng(firstStop, latLngByH3, 'origin');
 
     logDebug('tacticalTool1Pathfinding executeTacticalPlanRoute: ok', {
       battleId: battle.battleId,
@@ -337,7 +323,7 @@ export function executeTacticalPlanRoute(
       path: [
         {
           turn: 1,
-          hexes: firstLegHexes.map((h) => h3ToLatLng(h, latLngByH3)),
+          hexes: firstLegHexes.map((h) => h3ToLatLng(h, latLngByH3, 'origin')),
           movementSpent: Math.min(budget, plan.totalCostToDestination),
           movementBudget: budget,
           endHex: orderLl,
@@ -442,8 +428,8 @@ export function executeTacticalCheckDistance(
   if (!fromH3 || !toH3 || !footprint.has(fromH3) || !footprint.has(toH3)) {
     return { status: 'error', error: 'Invalid hex position' };
   }
-  const fromLl = h3ToLatLng(fromH3, latLngByH3);
-  const toLl = h3ToLatLng(toH3, latLngByH3);
+  const fromLl = h3ToLatLng(fromH3, latLngByH3, 'origin');
+  const toLl = h3ToLatLng(toH3, latLngByH3, 'origin');
   if (unitType === 'air') {
     return { status: 'ok', from: fromLl, to: toLl, hexDistance: 0, estimatedTurns: 0, reachable: false };
   }
@@ -462,7 +448,7 @@ export function executeTacticalCheckDistance(
     }
   }
   if (fromH3 === toH3Resolved) {
-    return { status: 'ok', from: fromLl, to: h3ToLatLng(toH3Resolved, latLngByH3), hexDistance: 0, estimatedTurns: 0, reachable: true };
+    return { status: 'ok', from: fromLl, to: h3ToLatLng(toH3Resolved, latLngByH3, 'origin'), hexDistance: 0, estimatedTurns: 0, reachable: true };
   }
   const budget = effectiveTacticalMovementPointBudgetForMarchLeg(
     battle,
@@ -478,13 +464,13 @@ export function executeTacticalCheckDistance(
     movementPointBudget: Math.max(0, budget),
   });
   if (!plan.reachable || !plan.pathToDestination) {
-    return { status: 'ok', from: fromLl, to: h3ToLatLng(toH3Resolved, latLngByH3), hexDistance: 0, estimatedTurns: 0, reachable: false };
+    return { status: 'ok', from: fromLl, to: h3ToLatLng(toH3Resolved, latLngByH3, 'origin'), hexDistance: 0, estimatedTurns: 0, reachable: false };
   }
   const pathLen = plan.pathToDestination.length;
   return {
     status: 'ok',
     from: fromLl,
-    to: h3ToLatLng(toH3Resolved, latLngByH3),
+    to: h3ToLatLng(toH3Resolved, latLngByH3, 'origin'),
     hexDistance: Math.max(0, pathLen - 1),
     estimatedTurns: estimateTacticalTurnsRequired(plan.totalCostToDestination, budget, pathLen),
     reachable: true,

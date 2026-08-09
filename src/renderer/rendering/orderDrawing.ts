@@ -69,6 +69,50 @@ export function rangePerimeterStaticLineStyle(mode: 'ranged' | 'airStrike'): {
 }
 
 /**
+ * Hex-center segment for support-order and resolution shot connectors.
+ *
+ * Purpose: Lets ranged, air-strike, and resolution drawers share one stroke setup without repeating canvas state.
+ * When to use: Pass pairs of H3 indexes into `strokeSupportOrderLines`.
+ * Expected outcome: Drawn from `fromH3Index` center toward `toH3Index` (dateline-aware relative center).
+ * Exceptions: None.
+ */
+type SupportOrderLineSegment = { fromH3Index: string; toH3Index: string };
+
+/**
+ * Strokes dashed support-order connectors with the shared ranged or air-strike perimeter style.
+ *
+ * Purpose: Single save/alpha/dash/stroke/restore path for planned and resolution shot lines.
+ * When to use: From `drawRangedAttackLines`, `drawAirStrikeLines`, and `drawRangedResolutionShotLines`.
+ * Expected outcome: Each unequal endpoint pair is stroked; equal endpoints are skipped.
+ * Exceptions: None.
+ */
+function strokeSupportOrderLines(
+  ctx: CanvasRenderingContext2D,
+  mode: 'ranged' | 'airStrike',
+  segments: readonly SupportOrderLineSegment[]
+): void {
+  if (segments.length === 0) return;
+  const style = rangePerimeterStaticLineStyle(mode);
+  ctx.save();
+  ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
+  ctx.setLineDash(style.dash);
+  ctx.strokeStyle = style.strokeColor;
+  ctx.lineWidth = style.lineWidth;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (const segment of segments) {
+    if (segment.fromH3Index === segment.toH3Index) continue;
+    const from = hexCenterPx(segment.fromH3Index);
+    const to = hexCenterPxRelativeTo(segment.fromH3Index, segment.toH3Index);
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
  * Defines the `drawRangedAttackLines` function shape (export function drawRangedAttackLines( ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, ranged: RangedAttackOrder[], uni).
 
  * Purpose: Supports maintainability by documenting why `drawRangedAttackLines` exists.
@@ -87,25 +131,13 @@ export function drawRangedAttackLines(
   void canvasWidth;
   void canvasHeight;
   if (ranged.length === 0 || !hexList) return;
-  const style = rangePerimeterStaticLineStyle('ranged');
-  ctx.save();
-  ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
-  ctx.setLineDash(style.dash);
-  ctx.strokeStyle = style.strokeColor;
-  ctx.lineWidth = style.lineWidth;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
+  const segments: SupportOrderLineSegment[] = [];
   for (const r of ranged) {
     const unit = units.find((u) => u.id === r.unitId);
     if (!unit) continue;
-    const from = hexCenterPx(unit.h3Index);
-    const to = hexCenterPxRelativeTo(unit.h3Index, r.targetH3Index);
-    ctx.beginPath();
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(to.x, to.y);
-    ctx.stroke();
+    segments.push({ fromH3Index: unit.h3Index, toH3Index: r.targetH3Index });
   }
-  ctx.restore();
+  strokeSupportOrderLines(ctx, 'ranged', segments);
 }
 
 /**
@@ -132,24 +164,11 @@ export function drawRangedResolutionShotLines(
   for (const mode of ['ranged', 'airStrike'] as const) {
     const group = byStyle[mode];
     if (group.length === 0) continue;
-    const style = rangePerimeterStaticLineStyle(mode);
-    ctx.save();
-    ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
-    ctx.setLineDash(style.dash);
-    ctx.strokeStyle = style.strokeColor;
-    ctx.lineWidth = style.lineWidth;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    for (const line of group) {
-      if (line.fromH3Index === line.toH3Index) continue;
-      const from = hexCenterPx(line.fromH3Index);
-      const to = hexCenterPxRelativeTo(line.fromH3Index, line.toH3Index);
-      ctx.beginPath();
-      ctx.moveTo(from.x, from.y);
-      ctx.lineTo(to.x, to.y);
-      ctx.stroke();
-    }
-    ctx.restore();
+    strokeSupportOrderLines(
+      ctx,
+      mode,
+      group.map((line) => ({ fromH3Index: line.fromH3Index, toH3Index: line.toH3Index }))
+    );
   }
 }
 
@@ -168,25 +187,13 @@ export function drawAirStrikeLines(
   hexList: string[] | undefined
 ): void {
   if (airStrikes.length === 0 || !hexList) return;
-  const style = rangePerimeterStaticLineStyle('airStrike');
-  ctx.save();
-  ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
-  ctx.setLineDash(style.dash);
-  ctx.strokeStyle = style.strokeColor;
-  ctx.lineWidth = style.lineWidth;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
+  const segments: SupportOrderLineSegment[] = [];
   for (const strike of airStrikes) {
     const unit = units.find((u) => u.id === strike.unitId);
     if (!unit) continue;
-    const from = hexCenterPx(unit.h3Index);
-    const to = hexCenterPxRelativeTo(unit.h3Index, strike.targetH3Index);
-    ctx.beginPath();
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(to.x, to.y);
-    ctx.stroke();
+    segments.push({ fromH3Index: unit.h3Index, toH3Index: strike.targetH3Index });
   }
-  ctx.restore();
+  strokeSupportOrderLines(ctx, 'airStrike', segments);
 }
 
 /**

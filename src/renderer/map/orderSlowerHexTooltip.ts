@@ -1,33 +1,10 @@
-import { ORDER_BLOCK_HEX_TOOLTIP_TTL_MS, TOOLTIP_OFFSET_PX } from '../core/constants';
-import { rendererSharedState as S } from '../core/state';
-import { clearTerrainTooltipTimer, hideTerrainTooltipVisual } from './terrainTooltipRes1State';
-import { createTransientPointerTooltipTtl } from './transientPointerTooltipTtl';
+import { ORDER_BLOCK_HEX_TOOLTIP_TTL_MS } from '../core/constants';
+import { createTransientPointerTooltip } from './createTransientPointerTooltip';
 
-const slowerTtl = createTransientPointerTooltipTtl(ORDER_BLOCK_HEX_TOOLTIP_TTL_MS);
-
-/**
- * Clears the auto-dismiss timer for the “Slower: …” hover tooltip without hiding the element.
- *
- * Purpose: Prevents stacked timers when the transient message changes between pointer moves.
- * When to use: Before scheduling a new TTL or when tearing down hover state globally.
- * Expected outcome: No pending expiry callback remains on this module's TTL handle.
- * Exceptions: None.
- */
-function clearSlowerTooltipTimer(): void {
-  slowerTtl.clear();
-}
-
-/**
- * (Re)starts the auto-dismiss countdown for the visible slower-terrain hover tooltip.
- *
- * Purpose: Pointer moves extend the transient so it stays readable while scrubbing the map.
- * When to use: After each reposition and when first showing `#order-slower-tooltip`.
- * Expected outcome: Single pending timer using the same TTL as `#order-block-tooltip` (`ORDER_BLOCK_HEX_TOOLTIP_TTL_MS`).
- * Exceptions: None.
- */
-function scheduleSlowerTooltipTtl(): void {
-  slowerTtl.schedule(() => hideOrderSlowerHexTooltip());
-}
+const orderSlowerTooltip = createTransientPointerTooltip({
+  elementId: 'order-slower-tooltip',
+  ttlMs: ORDER_BLOCK_HEX_TOOLTIP_TTL_MS,
+});
 
 /**
  * Hides `#order-slower-tooltip` and clears its dismiss timer.
@@ -38,12 +15,7 @@ function scheduleSlowerTooltipTtl(): void {
  * Exceptions: None.
  */
 export function hideOrderSlowerHexTooltip(): void {
-  clearSlowerTooltipTimer();
-  const el = document.getElementById('order-slower-tooltip');
-  if (el) {
-    el.classList.add('hidden');
-    el.setAttribute('aria-hidden', 'true');
-  }
+  orderSlowerTooltip.hide();
 }
 
 /**
@@ -55,8 +27,7 @@ export function hideOrderSlowerHexTooltip(): void {
  * Exceptions: None.
  */
 export function isOrderSlowerHexTooltipVisible(): boolean {
-  const el = document.getElementById('order-slower-tooltip');
-  return !!el && !el.classList.contains('hidden');
+  return orderSlowerTooltip.isVisible();
 }
 
 /**
@@ -64,25 +35,17 @@ export function isOrderSlowerHexTooltipVisible(): boolean {
  *
  * Purpose: Gives immediate “Slower: …” or “Using: Road/Rail” feedback for terrain-throttled valid hovers without waiting for the terrain dwell delay.
  * When to use: After `publishHoverRoutePreview` when no blocking message applies and a slow terrain title is present.
- * Expected outcome: HTML tooltip follows `S.lastPointerClientX/Y`; auto-hides after `ORDER_BLOCK_HEX_TOOLTIP_TTL_MS` (caller supplies escaped game-built markup).
+ * Expected outcome: HTML tooltip follows pointer; auto-hides after `ORDER_BLOCK_HEX_TOOLTIP_TTL_MS` (caller supplies escaped game-built markup).
  * Exceptions: Missing DOM nodes no-op without throwing.
  */
 export function showOrderSlowerHexTooltip(tooltipHtml: string | null): void {
-  clearSlowerTooltipTimer();
   if (!tooltipHtml) {
     hideOrderSlowerHexTooltip();
     return;
   }
-  clearTerrainTooltipTimer();
-  hideTerrainTooltipVisual();
-  const el = document.getElementById('order-slower-tooltip');
-  if (!el) return;
-  el.innerHTML = tooltipHtml;
-  el.style.left = `${S.lastPointerClientX + TOOLTIP_OFFSET_PX}px`;
-  el.style.top = `${S.lastPointerClientY + TOOLTIP_OFFSET_PX}px`;
-  el.classList.remove('hidden');
-  el.setAttribute('aria-hidden', 'false');
-  scheduleSlowerTooltipTtl();
+  orderSlowerTooltip.show((el) => {
+    el.innerHTML = tooltipHtml;
+  });
 }
 
 /**
@@ -94,9 +57,5 @@ export function showOrderSlowerHexTooltip(tooltipHtml: string | null): void {
  * Exceptions: None.
  */
 export function repositionOrderSlowerHexTooltipIfVisible(): void {
-  const el = document.getElementById('order-slower-tooltip');
-  if (!el || el.classList.contains('hidden')) return;
-  el.style.left = `${S.lastPointerClientX + TOOLTIP_OFFSET_PX}px`;
-  el.style.top = `${S.lastPointerClientY + TOOLTIP_OFFSET_PX}px`;
-  scheduleSlowerTooltipTtl();
+  orderSlowerTooltip.repositionIfVisible();
 }

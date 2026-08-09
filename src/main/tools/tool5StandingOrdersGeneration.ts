@@ -9,6 +9,7 @@ import { createPathfindingSession, executePlanRouteWithSession, type Pathfinding
 import type { LatLng } from './tool1Pathfinding';
 import { logDebug } from '../logger';
 import {
+  AIR_INELIGIBLE_ORDER_TYPES,
   parseComputedRoute,
   parseOrderParams,
   toComputedRoutePayload,
@@ -148,6 +149,20 @@ export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot
       deleteStandingOrder(playerId, row.unit_id);
       continue;
     }
+    // Clears movement orders stored for air units before assign_order began rejecting them; leaving one
+    // in place would request an unsatisfiable land route every turn.
+    if (AIR_INELIGIBLE_ORDER_TYPES.has(row.order_type)) {
+      const orderedUnit = state.units.find((u) => u.id === row.unit_id);
+      if (orderedUnit?.unitType === 'air') {
+        logDebug('tool5StandingOrders expireAndUpdateStatus: removed unusable air movement order', {
+          playerId,
+          unitId: row.unit_id,
+          orderType: row.order_type,
+        });
+        deleteStandingOrder(playerId, row.unit_id);
+        continue;
+      }
+    }
     if (row.order_type === 'march') {
       const params = parseOrderParams(row);
       const dest = params.destination as [number, number] | undefined;
@@ -243,7 +258,8 @@ export function generateOrdersForStandingOrders(
     if (row.order_type === 'defend') {
       const defendHex = (params.defendHex as [number, number] | undefined) ?? latLngByH3.get(unit.h3Index) ?? [0, 0];
       const defendH3 = resolveToH3(defendHex[0], defendHex[1]);
-      if (defendH3 && unit.h3Index !== defendH3) {
+      // Air units hold station rather than marching to the defend hex; they reposition only by ferry.
+      if (defendH3 && unit.h3Index !== defendH3 && unit.unitType !== 'air') {
         const routeResult = executePlanRouteWithSession(
           row.unit_id,
           defendHex,

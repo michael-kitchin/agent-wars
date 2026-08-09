@@ -1018,6 +1018,83 @@ function testHoverOrderPlanningInteractionLock(): void {
   );
 }
 
+
+/**
+ * Verifies consolidation seams: sanitizer import, stroke helper, tooltip factory, combat overlay extract, draw order.
+ *
+ * Purpose: Source-text contracts for renderer maintainability extractions that lack canvas unit tests.
+ * When to use: After consolidating build-count, support strokes, tooltips, or resolution combat overlays.
+ * Expected outcome: Assertions pass when public exports and draw-order call sequences remain intact.
+ * Exceptions: None.
+ */
+function testMaintainabilityConsolidationSeams(): void {
+  const multiPopupPath = path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'buildQueueMultiPopup.ts');
+  const multiPopupSource = fs.readFileSync(multiPopupPath, 'utf8');
+  assert.ok(
+    multiPopupSource.includes("from './buildQueuePopupFormatting'") &&
+      multiPopupSource.includes('sanitizeBuildCountInputText') &&
+      !multiPopupSource.includes('function sanitizeCount'),
+    'multi build popup should reuse sanitizeBuildCountInputText from formatting leaf'
+  );
+
+  const orderDrawingPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'orderDrawing.ts');
+  const orderDrawingSource = fs.readFileSync(orderDrawingPath, 'utf8');
+  assert.ok(
+    orderDrawingSource.includes('function strokeSupportOrderLines') &&
+      orderDrawingSource.includes('export function drawRangedAttackLines') &&
+      orderDrawingSource.includes('export function drawAirStrikeLines') &&
+      orderDrawingSource.includes('export function drawRangedResolutionShotLines'),
+    'support-order drawers should share strokeSupportOrderLines while keeping public exports'
+  );
+
+  const blockTooltipPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'orderBlockHexTooltip.ts');
+  const slowerTooltipPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'orderSlowerHexTooltip.ts');
+  const blockTooltipSource = fs.readFileSync(blockTooltipPath, 'utf8');
+  const slowerTooltipSource = fs.readFileSync(slowerTooltipPath, 'utf8');
+  assert.ok(
+    blockTooltipSource.includes("from './createTransientPointerTooltip'") &&
+      slowerTooltipSource.includes("from './createTransientPointerTooltip'") &&
+      blockTooltipSource.includes('export function hideOrderBlockHexTooltip') &&
+      slowerTooltipSource.includes('export function hideOrderSlowerHexTooltip'),
+    'order block/slower tooltips should use createTransientPointerTooltip with stable public exports'
+  );
+
+  const tacticalOrdersPath = path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'tacticalOrders.ts');
+  const tacticalOrdersSource = fs.readFileSync(tacticalOrdersPath, 'utf8');
+  assert.ok(
+    tacticalOrdersSource.includes('function replacePendingOrdersForSelected') &&
+      tacticalOrdersSource.includes('export function replacePendingRangedAttacksForSelected') &&
+      tacticalOrdersSource.includes('export function replacePendingAirStrikesForSelected') &&
+      tacticalOrdersSource.includes('export function replacePendingFerryOrdersForSelected'),
+    'pending order replacements should share a helper while keeping public exports'
+  );
+
+  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const rendererSource = fs.readFileSync(rendererPath, 'utf8');
+  const overlaysPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'resolutionCombatOverlays.ts');
+  const overlaysSource = fs.readFileSync(overlaysPath, 'utf8');
+  assert.ok(
+    rendererSource.includes("from './rendering/resolutionCombatOverlays'") &&
+      rendererSource.includes('drawResolutionCombatAndCasualtyOverlays') &&
+      overlaysSource.includes('drawCombatLightning') &&
+      overlaysSource.includes('drawCasualtyOverlay'),
+    'resolution combat overlays should be extracted and draw lightning before casualties'
+  );
+
+  const drawGameSceneFn = getFunctionSource(rendererSource, 'drawGameScene');
+  const shotIdx = drawGameSceneFn.indexOf('drawRangedResolutionShotLines');
+  const unitsIdx = drawGameSceneFn.indexOf('drawUnits');
+  const combatIdx = drawGameSceneFn.indexOf('drawResolutionCombatAndCasualtyOverlays');
+  assert.ok(shotIdx >= 0 && unitsIdx >= 0 && combatIdx >= 0, 'drawGameScene should call shot lines, units, and combat overlays');
+  assert.ok(shotIdx < unitsIdx, 'shot connectors should be drawn before units');
+  assert.ok(unitsIdx < combatIdx, 'units should be drawn before lightning/casualty overlays');
+  assert.ok(
+    (drawGameSceneFn.match(/drawRangedResolutionShotLines/g) ?? []).length >= 2 &&
+      (drawGameSceneFn.match(/drawResolutionCombatAndCasualtyOverlays/g) ?? []).length >= 2,
+    'tactical and strategic branches should each draw shot lines and combat overlays'
+  );
+}
+
 /**
  * Defines the `run` function shape (function run(): void).
 
@@ -1048,6 +1125,7 @@ function run(): void {
   testHoverOrderPlanningInteractionLock();
   testParityDiagnosticsBreadcrumbsCoverPlanningAndPositionSourceBoundaries();
   testTacticalMapViewLocksZoomPanAndRestoresWorld();
+  testMaintainabilityConsolidationSeams();
   console.log('rendererConsolidation.test.ts passed');
 }
 

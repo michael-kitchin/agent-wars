@@ -4,6 +4,7 @@ import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTy
 import { buildLatLngCoordinateMap } from '../mapData';
 import { logDebug, logError } from '../logger';
 import { buildJsonAssistantRepairSchema, parseOrdersResponse } from './orderResponseParsing';
+import { resolveMalformedCompletionRetry } from './malformedCompletionRetry';
 import { createPathfindingSession, executeTool1 } from '../tools/tool1Pathfinding';
 import { executeTool2 } from '../tools/tool2Assessment';
 import { executeTool3 } from '../tools/tool3CombatEstimation';
@@ -468,6 +469,7 @@ export async function requestOrdersFlow(
   try {
     let iteration = 0;
     let parseRepairAttempted = false;
+    let malformedRetryCount = 0;
     while (iteration < 50) {
       if (Date.now() - wallClockStart > REQUEST_ORDERS_MAX_WALL_CLOCK_MS) {
         const timeoutMsg = 'AI planning took too long and was cancelled. Please try again.';
@@ -559,6 +561,28 @@ export async function requestOrdersFlow(
         usageIn != null && usageOut != null ? ` (+${usageIn} / ${usageOut} tokens this call)` : '';
 
       const toolCalls = assistantMessage.tool_calls;
+      const malformedOutcome = await resolveMalformedCompletionRetry({
+        completion: {
+          toolCalls,
+          content: assistantMessage.content,
+          finishReason,
+          nativeFinishReason: nativeFinish,
+        },
+        retryCount: malformedRetryCount,
+        iteration,
+        turnNumber: state.turnNumber,
+        tacticalBattleId: tacticalBattle?.battleId ?? null,
+        onLog,
+      });
+      if (malformedOutcome.status === 'fail') return failRequest(malformedOutcome.error);
+      if (malformedOutcome.status === 'retry') {
+        malformedRetryCount = malformedOutcome.retryCount;
+        if (malformedOutcome.correctiveMessage) {
+          messages.push({ role: 'user', content: malformedOutcome.correctiveMessage });
+        }
+        continue;
+      }
+
       if (toolCalls && toolCalls.length > 0) {
         if (onLog) {
           onLog(

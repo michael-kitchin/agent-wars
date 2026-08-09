@@ -13,6 +13,7 @@ import { ensureStrategicCoordinateRegistryInitialized } from '../briefing/map/he
 import { h3ToCode } from '../briefing/map/hex-code-translator';
 import { buildPromptTableLines } from '../promptTableUtils';
 import {
+  AIR_INELIGIBLE_ORDER_TYPES,
   parseComputedRoute,
   parseStandingOrderComputedRoute,
   parseOrderParams,
@@ -230,6 +231,13 @@ function assignOrder(
     return { status: 'error', error: 'assign_order requires order.type: defend | march | pursue | patrol | hold_fire' };
   }
 
+  if (unit.unitType === 'air' && AIR_INELIGIBLE_ORDER_TYPES.has(orderType)) {
+    return {
+      status: 'error',
+      error: `Air units cannot take a ${orderType} standing order because they do not move hex by hex. Use an air strike to attack, a ferry order to reposition, or a defend order to keep striking targets in range.`,
+    };
+  }
+
   const hexSet = new Set(state.hexes.map((h) => h.h3Index));
   const terrainByH3 = new Map(state.hexes.map((h) => [h.h3Index, h.terrain]));
 
@@ -242,7 +250,12 @@ function assignOrder(
     const domain: PassableDomain = unit.unitType === 'naval' ? 'water' : 'land';
     for (let i = 0; i < waypoints.length; i++) {
       const wp = waypoints[i];
-      if (!Array.isArray(wp) || wp.length < 2) continue;
+      if (!Array.isArray(wp) || wp.length < 2) {
+        return {
+          status: 'error',
+          error: `Patrol waypoint ${i + 1} is not a place on the operational map (expected a briefing hex code).`,
+        };
+      }
       const h3 = resolveToH3(Number(wp[0]), Number(wp[1]));
       if (!h3 || !hexSet.has(h3)) {
         return {

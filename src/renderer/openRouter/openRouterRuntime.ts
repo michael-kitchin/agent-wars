@@ -327,9 +327,19 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
         } else if (!result.success) {
           if (result.error === 'Cancelled') {
             // Intentional cancel triggered by a human draft change; invalidateTacticalPrefetchIfHumanDraftChangedSinceRequestStart
-            // already logged the event — no error toast needed. Unblock and restart planning against the new draft.
-            unblockPrecomputedAiPlanningAfterBackgroundFailure();
+            // already logged the event — no error toast needed. Restart against the new draft before releasing the
+            // Ready latch: unblocking first installs an empty tactical draft, which makes isWaitingForPrecomputedAiOrders
+            // false and causes the restart to decline, leaving the beat with no opponent orders at all.
             startBackgroundRequestIfAllowed(deps);
+            if (!S.backgroundRequestInFlight) {
+              if (S.runButtonOn) {
+                deps.appendOpenRouterLog(
+                  'AI planning did not restart after the cancel; this beat proceeds without opponent orders.',
+                  true
+                );
+              }
+              unblockPrecomputedAiPlanningAfterBackgroundFailure();
+            }
           } else {
             deps.appendOpenRouterLog(`Background planning failed: ${result.error ?? 'Unknown error'}`, true);
             deps.showSidebarError(result.error ?? 'Background AI request failed');

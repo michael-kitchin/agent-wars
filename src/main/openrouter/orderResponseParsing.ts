@@ -8,6 +8,7 @@ import { logDebug, logError } from '../logger';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import { HEX_CODE_PATTERN } from '../briefing/map/coordinateContext';
 import { codeToH3, codeToLatLngRounded } from '../briefing/map/hex-code-translator';
+import { translateAssignOrderHexCodeParams } from './assignOrderHexParams';
 import type { CallbackSubscription } from '../callbackSubscriptions';
 import type { LatLng } from '../tools/tool1Pathfinding';
 import { executeTool5 } from '../tools/tool5StandingOrders';
@@ -564,19 +565,7 @@ function processV3OrdersArray(
         continue;
       }
       logDebug('openRouter processV3OrdersArray: assign_order', { unitId });
-      let orderPayload: unknown = o.order;
-      if (orderPayload && typeof orderPayload === 'object' && !Array.isArray(orderPayload)) {
-        const ord = { ...(orderPayload as Record<string, unknown>) };
-        const dest = ord.destination;
-        if (typeof dest === 'string' && HEX_CODE_PATTERN.test(dest)) {
-          try {
-            ord.destination = codeToLatLngRounded(dest, context);
-          } catch {
-            logDebug('openRouter processV3OrdersArray: assign_order destination code invalid', { unitId, dest });
-          }
-        }
-        orderPayload = ord;
-      }
+      const orderPayload = translateAssignOrderHexCodeParams(o.order, context, unitId);
       const assignResult = executeTool5('assign_order', { unitId, order: orderPayload }, state, latLngByH3, resolveToH3);
       if (assignResult.status === 'error' && typeof assignResult.error === 'string') {
         const orderType =

@@ -1,4 +1,4 @@
-import { ORDER_BLOCK_HEX_TOOLTIP_TTL_MS, TOOLTIP_OFFSET_PX } from '../core/constants';
+import { ORDER_BLOCK_HEX_TOOLTIP_TTL_MS } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import {
   blockingHoverMessageFromAirStrikeReason,
@@ -7,34 +7,12 @@ import {
   blockingHoverMessageHtmlFromPlainMessage,
 } from '../../shared/orderPreviewBlockingCopy';
 import type { HumanOrderGroupPreviewResult } from '../../shared/ipc/humanOrderPreviewTypes';
-import { clearTerrainTooltipTimer, hideTerrainTooltipVisual } from './terrainTooltipRes1State';
-import { createTransientPointerTooltipTtl } from './transientPointerTooltipTtl';
+import { createTransientPointerTooltip } from './createTransientPointerTooltip';
 
-const orderBlockTtl = createTransientPointerTooltipTtl(ORDER_BLOCK_HEX_TOOLTIP_TTL_MS);
-
-/**
- * Clears the auto-dismiss timer for the order-blocking hover tooltip without hiding the element.
- *
- * Purpose: Lets `showOrderBlockHexTooltip` replace an existing transient without stacking timers.
- * When to use: Immediately before scheduling a new TTL or when tearing down hover state globally.
- * Expected outcome: No pending expiry callback remains on this module's TTL handle.
- * Exceptions: None.
- */
-function clearOrderBlockTooltipTimer(): void {
-  orderBlockTtl.clear();
-}
-
-/**
- * (Re)starts the auto-dismiss countdown for the visible order-blocking tooltip.
- *
- * Purpose: Pointer moves should extend the transient so it does not vanish mid-drag; idle still clears after `ORDER_BLOCK_HEX_TOOLTIP_TTL_MS`.
- * When to use: After each `repositionOrderBlockHexTooltipIfVisible` and when first showing the element.
- * Expected outcome: A single pending timer; hiding clears it via `clearOrderBlockTooltipTimer`.
- * Exceptions: None.
- */
-function scheduleOrderBlockTooltipTtl(): void {
-  orderBlockTtl.schedule(() => hideOrderBlockHexTooltip());
-}
+const orderBlockTooltip = createTransientPointerTooltip({
+  elementId: 'order-block-tooltip',
+  ttlMs: ORDER_BLOCK_HEX_TOOLTIP_TTL_MS,
+});
 
 /**
  * Hides `#order-block-tooltip` and clears its dismiss timer.
@@ -45,12 +23,7 @@ function scheduleOrderBlockTooltipTtl(): void {
  * Exceptions: None.
  */
 export function hideOrderBlockHexTooltip(): void {
-  clearOrderBlockTooltipTimer();
-  const el = document.getElementById('order-block-tooltip');
-  if (el) {
-    el.classList.add('hidden');
-    el.setAttribute('aria-hidden', 'true');
-  }
+  orderBlockTooltip.hide();
 }
 
 /**
@@ -62,8 +35,7 @@ export function hideOrderBlockHexTooltip(): void {
  * Exceptions: None.
  */
 export function isOrderBlockHexTooltipVisible(): boolean {
-  const el = document.getElementById('order-block-tooltip');
-  return !!el && !el.classList.contains('hidden');
+  return orderBlockTooltip.isVisible();
 }
 
 /**
@@ -142,21 +114,13 @@ export function resolveOrderBlockHexTooltipMessage(
  * Exceptions: Missing DOM nodes no-op without throwing.
  */
 export function showOrderBlockHexTooltip(message: string | null): void {
-  clearOrderBlockTooltipTimer();
   if (!message) {
     hideOrderBlockHexTooltip();
     return;
   }
-  clearTerrainTooltipTimer();
-  hideTerrainTooltipVisual();
-  const el = document.getElementById('order-block-tooltip');
-  if (!el) return;
-  el.innerHTML = blockingHoverMessageHtmlFromPlainMessage(message);
-  el.style.left = `${S.lastPointerClientX + TOOLTIP_OFFSET_PX}px`;
-  el.style.top = `${S.lastPointerClientY + TOOLTIP_OFFSET_PX}px`;
-  el.classList.remove('hidden');
-  el.setAttribute('aria-hidden', 'false');
-  scheduleOrderBlockTooltipTtl();
+  orderBlockTooltip.show((el) => {
+    el.innerHTML = blockingHoverMessageHtmlFromPlainMessage(message);
+  });
 }
 
 /**
@@ -168,9 +132,5 @@ export function showOrderBlockHexTooltip(message: string | null): void {
  * Exceptions: None.
  */
 export function repositionOrderBlockHexTooltipIfVisible(): void {
-  const el = document.getElementById('order-block-tooltip');
-  if (!el || el.classList.contains('hidden')) return;
-  el.style.left = `${S.lastPointerClientX + TOOLTIP_OFFSET_PX}px`;
-  el.style.top = `${S.lastPointerClientY + TOOLTIP_OFFSET_PX}px`;
-  scheduleOrderBlockTooltipTtl();
+  orderBlockTooltip.repositionIfVisible();
 }

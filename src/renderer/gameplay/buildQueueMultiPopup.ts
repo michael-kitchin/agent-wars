@@ -16,6 +16,7 @@ import {
   templateEntriesForTurnEstimate,
   unionAvailableBuildUnitTypes,
 } from './buildQueueMultiSelect';
+import { sanitizeBuildCountInputText } from './buildQueuePopupFormatting';
 
 /**
  * Dependencies that keep multi-popup rendering independent from popup lifecycle and mutation policy.
@@ -66,22 +67,6 @@ export interface MultiBuildQueueRenderDeps {
    * Exceptions: Resolves false after transport or domain failures.
    */
   setKeepBuilding: (keepBuilding: boolean) => Promise<boolean>;
-}
-
-/**
- * Normalizes a build count input to the existing one-to-99 contract.
- *
- * Purpose: Keeps multi-row input behavior aligned with the single-hex editor.
- * When to use: Before persisting a changed multi-template count.
- * Expected outcome: Decimal string from one through 99.
- * Exceptions: None.
- */
-function sanitizeCount(raw: string): string {
-  const digitsOnly = raw.replaceAll(/\D/g, '').slice(0, 2);
-  if (digitsOnly.length === 0) return '1';
-  const parsed = parseInt(digitsOnly, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return '1';
-  return String(Math.min(99, parsed));
 }
 
 /**
@@ -257,7 +242,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
     countInput.inputMode = 'numeric';
     countInput.value = String(entry.count);
     const readCurrentCount = (): number => {
-      const normalized = sanitizeCount(countInput.value);
+      const normalized = sanitizeBuildCountInputText(countInput.value);
       if (countInput.value !== normalized) countInput.value = normalized;
       return parseInt(normalized, 10);
     };

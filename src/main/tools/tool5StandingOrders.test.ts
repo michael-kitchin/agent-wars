@@ -171,6 +171,43 @@ function testAssignOrderPatrolTooFewWaypoints(): void {
 }
 
 /**
+ * Defines the `testAssignOrderAirUnitRejectsMovementOrders` function shape (function testAssignOrderAirUnitRejectsMovementOrders(): void).
+
+ * Purpose: Guards the contract that air units cannot take hex-by-hex movement standing orders, which would
+ * otherwise persist an order that re-requests an unsatisfiable land route on every turn.
+ * When to use: Runs as part of the Tool 5 suite; extend it if a new movement order type is added.
+ * Expected outcome: Each of march, patrol, and pursue is rejected for an air unit with a message naming the type.
+ * Exceptions: None.
+ */
+function testAssignOrderAirUnitRejectsMovementOrders(): void {
+  const stateWithAirUnit: GameStateSnapshot = {
+    ...emptyState,
+    hexes: [
+      { h3Index: 'a', terrain: 'land', terrainKind: 'plains' },
+      { h3Index: 'b', terrain: 'land', terrainKind: 'plains' },
+    ],
+    units: [
+      { id: 'opponent-air-1', player: 'opponent', unitType: 'air', h3Index: 'a' },
+      { id: 'human-armor-1', player: 'human', unitType: 'armor', h3Index: 'b' },
+    ],
+  };
+  const resolve = (lat: number, lng: number): string | undefined =>
+    lat === 0 && lng === 0 ? 'a' : lat === 1 && lng === 1 ? 'b' : undefined;
+  const movementOrders = [
+    { type: 'march', destination: [1, 1] },
+    { type: 'patrol', waypoints: [[0, 0], [1, 1]] },
+    { type: 'pursue', targetUnitId: 'human-armor-1' },
+  ];
+  for (const order of movementOrders) {
+    const result = executeTool5('assign_order', { unitId: 'opponent-air-1', order }, stateWithAirUnit, emptyMap, resolve);
+    assert.strictEqual(result.status, 'error', `air ${order.type} should be rejected`);
+    const message = (result as { error?: string }).error ?? '';
+    assert.ok(message.includes('Air units cannot take'), `unexpected message for ${order.type}: ${message}`);
+    assert.ok(message.includes(order.type), `message should name the order type: ${message}`);
+  }
+}
+
+/**
  * Defines the `testQueryOrdersRequiresUnitIdOrAll` function shape (function testQueryOrdersRequiresUnitIdOrAll(): void).
 
  * Purpose: Supports maintainability by documenting why `testQueryOrdersRequiresUnitIdOrAll` exists.
@@ -524,6 +561,7 @@ function run(): void {
   testAssignOrderUnitNotFound();
   testAssignOrderPursueTargetNotFound();
   testAssignOrderPatrolTooFewWaypoints();
+  testAssignOrderAirUnitRejectsMovementOrders();
   testQueryOrdersRequiresUnitIdOrAll();
   testCancelOrderWhenNoOrder();
   testGetInjectionTextEmpty();

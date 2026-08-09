@@ -58,6 +58,8 @@ import {
   parseHumanTacticalCommitPayload,
 } from './ipcPayloadGuards';
 import { IPC_GAME, IPC_OPENROUTER } from '../shared/ipc/channels';
+import { emptySealiftStackState } from '../shared/sealiftStackState';
+import { registerLoggedIpcHandler } from './ipc/loggedIpcHandler';
 import {
   saveKey,
   hasKey,
@@ -273,33 +275,27 @@ function buildSharedHumanReadyConsultationDeps(
 function registerIpcHandlers(): void {
   ipcMain.handle(IPC_GAME.getState, () => getGameStateForPlayer('human', { maskUnexploredTerrain: false }));
   ipcMain.handle(IPC_GAME.getRes4TerrainOverrides, () => getRes4TerrainOverridesForRendererFromGame());
-  ipcMain.handle(IPC_GAME.getRes4CityOverlays, () => {
-    logDebug('main IPC_GAME.getRes4CityOverlays');
-    try {
-      return getRes4CityOverlaysForRenderer();
-    } catch (err) {
-      logError('main IPC_GAME.getRes4CityOverlays: failed', err);
-      return [];
-    }
-  });
-  ipcMain.handle(IPC_GAME.getRes4RoadRailOverlays, () => {
-    logDebug('main IPC_GAME.getRes4RoadRailOverlays');
-    try {
-      return getRes4RoadRailOverlaysForRenderer();
-    } catch (err) {
-      logError('main IPC_GAME.getRes4RoadRailOverlays: failed', err);
-      return [];
-    }
-  });
-  ipcMain.handle(IPC_GAME.getRes4TransportVectorOverlays, () => {
-    logDebug('main IPC_GAME.getRes4TransportVectorOverlays');
-    try {
-      return getRes4TransportVectorOverlaysForRenderer();
-    } catch (err) {
-      logError('main IPC_GAME.getRes4TransportVectorOverlays: failed', err);
-      return [];
-    }
-  });
+  registerLoggedIpcHandler(
+    ipcMain,
+    IPC_GAME.getRes4CityOverlays,
+    'main IPC_GAME.getRes4CityOverlays',
+    () => getRes4CityOverlaysForRenderer(),
+    []
+  );
+  registerLoggedIpcHandler(
+    ipcMain,
+    IPC_GAME.getRes4RoadRailOverlays,
+    'main IPC_GAME.getRes4RoadRailOverlays',
+    () => getRes4RoadRailOverlaysForRenderer(),
+    []
+  );
+  registerLoggedIpcHandler(
+    ipcMain,
+    IPC_GAME.getRes4TransportVectorOverlays,
+    'main IPC_GAME.getRes4TransportVectorOverlays',
+    () => getRes4TransportVectorOverlaysForRenderer(),
+    []
+  );
   ipcMain.handle(
     IPC_GAME.getHexNamingTooltipLine,
     (_event, payload: { h3Index?: string; resolution?: number }) => {
@@ -513,31 +509,13 @@ function registerIpcHandlers(): void {
   });
   ipcMain.handle(IPC_GAME.getSealiftStackState, (_event, payload: { h3Index?: string }) => {
     if (typeof payload?.h3Index !== 'string') {
-      return {
-        h3Index: '',
-        showSealiftSection: false,
-        contextMode: 'unsupported',
-        controlsDisabled: true,
-        hasEmbarkedUnitsInStack: false,
-        debarkAllowedAtHex: false,
-        navalRows: [],
-        landOptions: [],
-      };
+      return emptySealiftStackState();
     }
     return getSealiftStackState(payload.h3Index);
   });
   ipcMain.handle(IPC_GAME.getTacticalSealiftStackState, (_event, payload: { h3Index?: string }) => {
     if (typeof payload?.h3Index !== 'string') {
-      return {
-        h3Index: '',
-        showSealiftSection: false,
-        contextMode: 'unsupported',
-        controlsDisabled: true,
-        hasEmbarkedUnitsInStack: false,
-        debarkAllowedAtHex: false,
-        navalRows: [],
-        landOptions: [],
-      };
+      return emptySealiftStackState();
     }
     return getTacticalSealiftStackState(payload.h3Index);
   });

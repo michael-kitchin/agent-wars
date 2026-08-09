@@ -25,20 +25,9 @@ export { refreshHoverRoutePreview };
 export function getRepresentativeSelectedUnitIdsByOrigin(): string[] {
   if (!S.gameState) return [...S.selectedUnitIds];
   const tb = S.tacticalBattleSnapshot;
-  if (tb) {
-    const byId = new Map(tb.subUnits.map((u) => [u.id, u]));
-    const seenOrigins = new Set<string>();
-    const representatives: string[] = [];
-    for (const unitId of S.selectedUnitIds) {
-      const unit = byId.get(unitId);
-      if (!unit || unit.player !== 'human') continue;
-      if (seenOrigins.has(unit.h3Index)) continue;
-      seenOrigins.add(unit.h3Index);
-      representatives.push(unitId);
-    }
-    return representatives;
-  }
-  const byId = new Map(S.gameState.units.map((u) => [u.id, u]));
+  const byId = new Map(
+    (tb ? tb.subUnits : S.gameState.units).map((u) => [u.id, u] as const)
+  );
   const seenOrigins = new Set<string>();
   const representatives: string[] = [];
   for (const unitId of S.selectedUnitIds) {
@@ -52,6 +41,29 @@ export function getRepresentativeSelectedUnitIdsByOrigin(): string[] {
 }
 
 /**
+ * Replaces pending support-order rows for the selected unit ids via a row builder.
+ *
+ * Purpose: Shared filter/push + draft-prefetch invalidation for ranged, air, and ferry pending arrays.
+ * When to use: From `replacePending*ForSelected` only.
+ * Expected outcome: Prior rows for `selectedIds` removed; one new row per selected id; prefetch invalidated.
+ * Exceptions: None.
+ */
+function replacePendingOrdersForSelected<T extends { unitId: string }>(
+  getRows: () => T[],
+  setRows: (next: T[]) => void,
+  selectedIds: string[],
+  buildRow: (unitId: string) => T
+): void {
+  withTacticalHumanDraftPrefetchInvalidation(() => {
+    const kept = getRows().filter((row) => !selectedIds.includes(row.unitId));
+    for (const unitId of selectedIds) {
+      kept.push(buildRow(unitId));
+    }
+    setRows(kept);
+  });
+}
+
+/**
  * Defines the `replacePendingRangedAttacksForSelected` function shape (export function replacePendingRangedAttacksForSelected(selectedIds: string[], targetH3Index: string): void).
 
  * Purpose: Supports maintainability by documenting why `replacePendingRangedAttacksForSelected` exists.
@@ -60,12 +72,14 @@ export function getRepresentativeSelectedUnitIdsByOrigin(): string[] {
  * Exceptions: None.
  */
 export function replacePendingRangedAttacksForSelected(selectedIds: string[], targetH3Index: string): void {
-  withTacticalHumanDraftPrefetchInvalidation(() => {
-    S.pendingRangedAttacks = S.pendingRangedAttacks.filter((row) => !selectedIds.includes(row.unitId));
-    for (const unitId of selectedIds) {
-      S.pendingRangedAttacks.push({ unitId, targetH3Index });
-    }
-  });
+  replacePendingOrdersForSelected(
+    () => S.pendingRangedAttacks,
+    (next) => {
+      S.pendingRangedAttacks = next;
+    },
+    selectedIds,
+    (unitId) => ({ unitId, targetH3Index })
+  );
 }
 
 /**
@@ -81,12 +95,14 @@ export function replacePendingAirStrikesForSelected(
   targetH3Index: string,
   targetType: AirStrikeTargetType
 ): void {
-  withTacticalHumanDraftPrefetchInvalidation(() => {
-    S.pendingAirStrikes = S.pendingAirStrikes.filter((row) => !selectedIds.includes(row.unitId));
-    for (const unitId of selectedIds) {
-      S.pendingAirStrikes.push({ unitId, targetH3Index, targetType });
-    }
-  });
+  replacePendingOrdersForSelected(
+    () => S.pendingAirStrikes,
+    (next) => {
+      S.pendingAirStrikes = next;
+    },
+    selectedIds,
+    (unitId) => ({ unitId, targetH3Index, targetType })
+  );
 }
 
 /**
@@ -98,12 +114,14 @@ export function replacePendingAirStrikesForSelected(
  * Exceptions: None.
  */
 export function replacePendingFerryOrdersForSelected(selectedIds: string[], destinationH3Index: string): void {
-  withTacticalHumanDraftPrefetchInvalidation(() => {
-    S.pendingFerryOrders = S.pendingFerryOrders.filter((row) => !selectedIds.includes(row.unitId));
-    for (const unitId of selectedIds) {
-      S.pendingFerryOrders.push({ unitId, destinationH3Index });
-    }
-  });
+  replacePendingOrdersForSelected(
+    () => S.pendingFerryOrders,
+    (next) => {
+      S.pendingFerryOrders = next;
+    },
+    selectedIds,
+    (unitId) => ({ unitId, destinationH3Index })
+  );
 }
 
 /**

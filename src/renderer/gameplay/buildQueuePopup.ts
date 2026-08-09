@@ -14,24 +14,18 @@ import {
 import {
   escapeBuildPopupHtml,
   formatGroupedBuildNamingLineHtml,
+  sanitizeBuildCountInputText,
 } from './buildQueuePopupFormatting';
 
 /**
- * Defines the `sanitizeBuildCountInputText` function shape (export function sanitizeBuildCountInputText(raw: string): string).
-
- * Purpose: Supports maintainability by documenting why `sanitizeBuildCountInputText` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Re-exports build-count sanitizer for existing `buildQueuePopup` import paths.
+ *
+ * Purpose: Preserves call sites that imported `sanitizeBuildCountInputText` from this module.
+ * When to use: Prefer `./buildQueuePopupFormatting` for new code.
+ * Expected outcome: Same function as the formatting-module export.
  * Exceptions: None.
  */
-export function sanitizeBuildCountInputText(raw: string): string {
-  const digitsOnly = raw.replaceAll(/\D/g, '').slice(0, 2);
-  if (digitsOnly.length === 0) return '1';
-  const parsed = parseInt(digitsOnly, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return '1';
-  if (parsed > 99) return '99';
-  return String(parsed);
-}
+export { sanitizeBuildCountInputText };
 
 /**
  * Defines the `isBuildQueueSelectInPopupFocused` function shape (export function isBuildQueueSelectInPopupFocused(): boolean).

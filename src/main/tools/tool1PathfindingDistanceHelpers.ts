@@ -1,6 +1,7 @@
 import { cellToLatLng, gridDistance, gridDisk } from 'h3-js';
 import { findPath } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
+import type { LandMassByH3 } from '../../shared/landTraversalRes1';
 import { terrainIsPassableForDomain } from '../pathfinding';
 import { logDebug, logError } from '../logger';
 
@@ -279,6 +280,7 @@ export function prependSeaportEgressStep(path: string[] | null, originH3: string
  * Purpose: Supports maintainability by documenting why `findPathWithOptionalAvoidanceRetry` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * A `land` search additionally requires `landMass`; omitting it makes every land route fail.
  * Exceptions: None.
  */
 export function findPathWithOptionalAvoidanceRetry(payload: {
@@ -292,6 +294,7 @@ export function findPathWithOptionalAvoidanceRetry(payload: {
   seaportEgressHex?: string;
   warnings?: string[];
   blockedRetryWarning?: string;
+  landMass?: LandMassByH3;
 }): string[] | null {
   const first = prependSeaportEgressStep(
     findPath(
@@ -300,7 +303,8 @@ export function findPathWithOptionalAvoidanceRetry(payload: {
       payload.hexSet,
       payload.terrainByH3,
       payload.passableFor,
-      payload.blocked
+      payload.blocked,
+      payload.landMass
     ),
     payload.originH3,
     payload.seaportEgressHex
@@ -313,7 +317,8 @@ export function findPathWithOptionalAvoidanceRetry(payload: {
       payload.hexSet,
       payload.terrainByH3,
       payload.passableFor,
-      undefined
+      undefined,
+      payload.landMass
     ),
     payload.originH3,
     payload.seaportEgressHex

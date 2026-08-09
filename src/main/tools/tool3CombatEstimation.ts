@@ -5,7 +5,7 @@
  * tool results use briefing hex codes after `encodeOpenRouterToolResultForLlm`.
  */
 
-import { cellToLatLng, gridDistance } from 'h3-js';
+import { gridDistance } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
 import { getAttack, getDefense, getRange } from '../combatConstants';
 import { type CombatUnit } from '../combatResolution';
@@ -18,26 +18,17 @@ import { AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { strategicRangedRangeHexesForUnitType } from '../../shared/rangePerimeterModel';
 import { computeGridDistancePure } from '../../shared/h3GridRangePure';
 import { hasIntactAirportAtStrategicAirBase } from '../returnFireAirportLookup';
+import { h3ToLatLng, type LatLng, type LatLngMap } from './h3LatLng';
 
 /**
- * Documents the `LatLng` type alias (export type LatLng).
-
- * Purpose: Supports maintainability by documenting why `LatLng` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Re-exports shared lat/lng tuple type for consumers that imported it from this module.
+ *
+ * Purpose: Preserves historical import paths after `LatLng` moved to `h3LatLng.ts`.
+ * When to use: Prefer `./h3LatLng` for new code.
+ * Expected outcome: Same `LatLng` alias as `h3LatLng`.
  * Exceptions: None.
  */
-export type LatLng = [number, number];
-
-/**
- * Documents the `LatLngMap` type alias (type LatLngMap).
-
- * Purpose: Supports maintainability by documenting why `LatLngMap` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-type LatLngMap = Map<string, LatLng>;
+export type { LatLng } from './h3LatLng';
 
 /**
  * Documents the module-scope binding `AI_PLAYER_ID` (AI_PLAYER_ID).
@@ -48,21 +39,6 @@ type LatLngMap = Map<string, LatLng>;
  * Exceptions: None.
  */
 const AI_PLAYER_ID = 'opponent';
-
-/**
- * Defines the `h3ToLatLng` function shape (function h3ToLatLng(h3: string, latLngByH3: LatLngMap): LatLng).
-
- * Purpose: Supports maintainability by documenting why `h3ToLatLng` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function h3ToLatLng(h3: string, latLngByH3: LatLngMap): LatLng {
-  const ll = latLngByH3.get(h3);
-  if (ll) return ll;
-  const [lat, lng] = cellToLatLng(h3);
-  return [lat, lng];
-}
 
 /**
  * Defines the `poissonBinomialPMF` function shape (export function poissonBinomialPMF(probs: number[]): number[]).
@@ -183,7 +159,7 @@ export function executeEstimateCombat(
         unitId: u.id,
         type: u.unitType,
         attackValue: getAttack(u.unitType),
-        position: h3ToLatLng(u.h3Index, latLngByH3),
+        position: h3ToLatLng(u.h3Index, latLngByH3, 'cellCenter'),
       });
     }
     if (engagementType === 'ranged') {
@@ -268,7 +244,7 @@ export function executeEstimateCombat(
   }
 
   if (defenderCombat.length === 0 && defenderSource === 'auto') {
-    const targetLatLng = h3ToLatLng(targetHexH3, latLngByH3);
+    const targetLatLng = h3ToLatLng(targetHexH3, latLngByH3, 'cellCenter');
     return {
       status: 'ok',
       error: null,
@@ -385,7 +361,7 @@ export function executeEstimateCombat(
     ? `${attackerCombat[0]?.unitType ?? 'attacker'} attacks at value ${attackerCount > 0 ? getAttack(attackerCombat[0]!.unitType) : 0} (${hitPct}% hit chance).${returnFrag} ${expectedFrag}`
     : expectedFrag;
 
-  const targetLatLng = h3ToLatLng(targetHexH3, latLngByH3);
+  const targetLatLng = h3ToLatLng(targetHexH3, latLngByH3, 'cellCenter');
   return {
     status: 'ok',
     error: null,

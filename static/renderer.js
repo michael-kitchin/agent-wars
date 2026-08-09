@@ -19314,11 +19314,9 @@
       ]
     };
   }
-  function drawRangedAttackLines(ctx, canvasWidth, canvasHeight, ranged, units, hexList) {
-    void canvasWidth;
-    void canvasHeight;
-    if (ranged.length === 0 || !hexList) return;
-    const style = rangePerimeterStaticLineStyle("ranged");
+  function strokeSupportOrderLines(ctx, mode, segments) {
+    if (segments.length === 0) return;
+    const style = rangePerimeterStaticLineStyle(mode);
     ctx.save();
     ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
     ctx.setLineDash(style.dash);
@@ -19326,17 +19324,28 @@
     ctx.lineWidth = style.lineWidth;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    for (const r of ranged) {
-      const unit = units.find((u) => u.id === r.unitId);
-      if (!unit) continue;
-      const from = hexCenterPx(unit.h3Index);
-      const to = hexCenterPxRelativeTo(unit.h3Index, r.targetH3Index);
+    for (const segment of segments) {
+      if (segment.fromH3Index === segment.toH3Index) continue;
+      const from = hexCenterPx(segment.fromH3Index);
+      const to = hexCenterPxRelativeTo(segment.fromH3Index, segment.toH3Index);
       ctx.beginPath();
       ctx.moveTo(from.x, from.y);
       ctx.lineTo(to.x, to.y);
       ctx.stroke();
     }
     ctx.restore();
+  }
+  function drawRangedAttackLines(ctx, canvasWidth, canvasHeight, ranged, units, hexList) {
+    void canvasWidth;
+    void canvasHeight;
+    if (ranged.length === 0 || !hexList) return;
+    const segments = [];
+    for (const r of ranged) {
+      const unit = units.find((u) => u.id === r.unitId);
+      if (!unit) continue;
+      segments.push({ fromH3Index: unit.h3Index, toH3Index: r.targetH3Index });
+    }
+    strokeSupportOrderLines(ctx, "ranged", segments);
   }
   function drawRangedResolutionShotLines(ctx, lines, hexList, visibleHexes) {
     if (lines.length === 0 || !hexList) return;
@@ -19349,47 +19358,22 @@
     for (const mode of ["ranged", "airStrike"]) {
       const group = byStyle[mode];
       if (group.length === 0) continue;
-      const style = rangePerimeterStaticLineStyle(mode);
-      ctx.save();
-      ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
-      ctx.setLineDash(style.dash);
-      ctx.strokeStyle = style.strokeColor;
-      ctx.lineWidth = style.lineWidth;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      for (const line of group) {
-        if (line.fromH3Index === line.toH3Index) continue;
-        const from = hexCenterPx(line.fromH3Index);
-        const to = hexCenterPxRelativeTo(line.fromH3Index, line.toH3Index);
-        ctx.beginPath();
-        ctx.moveTo(from.x, from.y);
-        ctx.lineTo(to.x, to.y);
-        ctx.stroke();
-      }
-      ctx.restore();
+      strokeSupportOrderLines(
+        ctx,
+        mode,
+        group.map((line) => ({ fromH3Index: line.fromH3Index, toH3Index: line.toH3Index }))
+      );
     }
   }
   function drawAirStrikeLines(ctx, airStrikes, units, hexList) {
     if (airStrikes.length === 0 || !hexList) return;
-    const style = rangePerimeterStaticLineStyle("airStrike");
-    ctx.save();
-    ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
-    ctx.setLineDash(style.dash);
-    ctx.strokeStyle = style.strokeColor;
-    ctx.lineWidth = style.lineWidth;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
+    const segments = [];
     for (const strike of airStrikes) {
       const unit = units.find((u) => u.id === strike.unitId);
       if (!unit) continue;
-      const from = hexCenterPx(unit.h3Index);
-      const to = hexCenterPxRelativeTo(unit.h3Index, strike.targetH3Index);
-      ctx.beginPath();
-      ctx.moveTo(from.x, from.y);
-      ctx.lineTo(to.x, to.y);
-      ctx.stroke();
+      segments.push({ fromH3Index: unit.h3Index, toH3Index: strike.targetH3Index });
     }
-    ctx.restore();
+    strokeSupportOrderLines(ctx, "airStrike", segments);
   }
   function drawPendingFerryLines(ctx, ferryOrders, units, hexList) {
     if (ferryOrders.length === 0 || !hexList) return;
@@ -20072,8 +20056,16 @@
           }
         } else if (!result.success) {
           if (result.error === "Cancelled") {
-            unblockPrecomputedAiPlanningAfterBackgroundFailure();
             startBackgroundRequestIfAllowed(deps);
+            if (!rendererSharedState.backgroundRequestInFlight) {
+              if (rendererSharedState.runButtonOn) {
+                deps.appendOpenRouterLog(
+                  "AI planning did not restart after the cancel; this beat proceeds without opponent orders.",
+                  true
+                );
+              }
+              unblockPrecomputedAiPlanningAfterBackgroundFailure();
+            }
           } else {
             deps.appendOpenRouterLog(`Background planning failed: ${result.error ?? "Unknown error"}`, true);
             deps.showSidebarError(result.error ?? "Background AI request failed");
@@ -21036,25 +21028,54 @@
     };
   }
 
-  // src/renderer/map/orderBlockHexTooltip.ts
-  var orderBlockTtl = createTransientPointerTooltipTtl(ORDER_BLOCK_HEX_TOOLTIP_TTL_MS);
-  function clearOrderBlockTooltipTimer() {
-    orderBlockTtl.clear();
-  }
-  function scheduleOrderBlockTooltipTtl() {
-    orderBlockTtl.schedule(() => hideOrderBlockHexTooltip());
-  }
-  function hideOrderBlockHexTooltip() {
-    clearOrderBlockTooltipTimer();
-    const el = document.getElementById("order-block-tooltip");
-    if (el) {
-      el.classList.add("hidden");
-      el.setAttribute("aria-hidden", "true");
+  // src/renderer/map/createTransientPointerTooltip.ts
+  function createTransientPointerTooltip(options) {
+    const ttl = createTransientPointerTooltipTtl(options.ttlMs);
+    function hide() {
+      ttl.clear();
+      const el = document.getElementById(options.elementId);
+      if (el) {
+        el.classList.add("hidden");
+        el.setAttribute("aria-hidden", "true");
+      }
     }
+    function isVisible() {
+      const el = document.getElementById(options.elementId);
+      return !!el && !el.classList.contains("hidden");
+    }
+    function show(applyContent) {
+      ttl.clear();
+      clearTerrainTooltipTimer();
+      hideTerrainTooltipVisual();
+      const el = document.getElementById(options.elementId);
+      if (!el) return;
+      applyContent(el);
+      el.style.left = `${rendererSharedState.lastPointerClientX + TOOLTIP_OFFSET_PX}px`;
+      el.style.top = `${rendererSharedState.lastPointerClientY + TOOLTIP_OFFSET_PX}px`;
+      el.classList.remove("hidden");
+      el.setAttribute("aria-hidden", "false");
+      ttl.schedule(() => hide());
+    }
+    function repositionIfVisible() {
+      const el = document.getElementById(options.elementId);
+      if (!el || el.classList.contains("hidden")) return;
+      el.style.left = `${rendererSharedState.lastPointerClientX + TOOLTIP_OFFSET_PX}px`;
+      el.style.top = `${rendererSharedState.lastPointerClientY + TOOLTIP_OFFSET_PX}px`;
+      ttl.schedule(() => hide());
+    }
+    return { hide, isVisible, show, repositionIfVisible };
+  }
+
+  // src/renderer/map/orderBlockHexTooltip.ts
+  var orderBlockTooltip = createTransientPointerTooltip({
+    elementId: "order-block-tooltip",
+    ttlMs: ORDER_BLOCK_HEX_TOOLTIP_TTL_MS
+  });
+  function hideOrderBlockHexTooltip() {
+    orderBlockTooltip.hide();
   }
   function isOrderBlockHexTooltipVisible() {
-    const el = document.getElementById("order-block-tooltip");
-    return !!el && !el.classList.contains("hidden");
+    return orderBlockTooltip.isVisible();
   }
   function terrainKindForHoveredHex(h3) {
     if (!h3) return null;
@@ -21089,73 +21110,40 @@
     return blockingHoverMessageFromMarchInvalidReason(marchReason, kind);
   }
   function showOrderBlockHexTooltip(message) {
-    clearOrderBlockTooltipTimer();
     if (!message) {
       hideOrderBlockHexTooltip();
       return;
     }
-    clearTerrainTooltipTimer();
-    hideTerrainTooltipVisual();
-    const el = document.getElementById("order-block-tooltip");
-    if (!el) return;
-    el.innerHTML = blockingHoverMessageHtmlFromPlainMessage(message);
-    el.style.left = `${rendererSharedState.lastPointerClientX + TOOLTIP_OFFSET_PX}px`;
-    el.style.top = `${rendererSharedState.lastPointerClientY + TOOLTIP_OFFSET_PX}px`;
-    el.classList.remove("hidden");
-    el.setAttribute("aria-hidden", "false");
-    scheduleOrderBlockTooltipTtl();
+    orderBlockTooltip.show((el) => {
+      el.innerHTML = blockingHoverMessageHtmlFromPlainMessage(message);
+    });
   }
   function repositionOrderBlockHexTooltipIfVisible() {
-    const el = document.getElementById("order-block-tooltip");
-    if (!el || el.classList.contains("hidden")) return;
-    el.style.left = `${rendererSharedState.lastPointerClientX + TOOLTIP_OFFSET_PX}px`;
-    el.style.top = `${rendererSharedState.lastPointerClientY + TOOLTIP_OFFSET_PX}px`;
-    scheduleOrderBlockTooltipTtl();
+    orderBlockTooltip.repositionIfVisible();
   }
 
   // src/renderer/map/orderSlowerHexTooltip.ts
-  var slowerTtl = createTransientPointerTooltipTtl(ORDER_BLOCK_HEX_TOOLTIP_TTL_MS);
-  function clearSlowerTooltipTimer() {
-    slowerTtl.clear();
-  }
-  function scheduleSlowerTooltipTtl() {
-    slowerTtl.schedule(() => hideOrderSlowerHexTooltip());
-  }
+  var orderSlowerTooltip = createTransientPointerTooltip({
+    elementId: "order-slower-tooltip",
+    ttlMs: ORDER_BLOCK_HEX_TOOLTIP_TTL_MS
+  });
   function hideOrderSlowerHexTooltip() {
-    clearSlowerTooltipTimer();
-    const el = document.getElementById("order-slower-tooltip");
-    if (el) {
-      el.classList.add("hidden");
-      el.setAttribute("aria-hidden", "true");
-    }
+    orderSlowerTooltip.hide();
   }
   function isOrderSlowerHexTooltipVisible() {
-    const el = document.getElementById("order-slower-tooltip");
-    return !!el && !el.classList.contains("hidden");
+    return orderSlowerTooltip.isVisible();
   }
   function showOrderSlowerHexTooltip(tooltipHtml) {
-    clearSlowerTooltipTimer();
     if (!tooltipHtml) {
       hideOrderSlowerHexTooltip();
       return;
     }
-    clearTerrainTooltipTimer();
-    hideTerrainTooltipVisual();
-    const el = document.getElementById("order-slower-tooltip");
-    if (!el) return;
-    el.innerHTML = tooltipHtml;
-    el.style.left = `${rendererSharedState.lastPointerClientX + TOOLTIP_OFFSET_PX}px`;
-    el.style.top = `${rendererSharedState.lastPointerClientY + TOOLTIP_OFFSET_PX}px`;
-    el.classList.remove("hidden");
-    el.setAttribute("aria-hidden", "false");
-    scheduleSlowerTooltipTtl();
+    orderSlowerTooltip.show((el) => {
+      el.innerHTML = tooltipHtml;
+    });
   }
   function repositionOrderSlowerHexTooltipIfVisible() {
-    const el = document.getElementById("order-slower-tooltip");
-    if (!el || el.classList.contains("hidden")) return;
-    el.style.left = `${rendererSharedState.lastPointerClientX + TOOLTIP_OFFSET_PX}px`;
-    el.style.top = `${rendererSharedState.lastPointerClientY + TOOLTIP_OFFSET_PX}px`;
-    scheduleSlowerTooltipTtl();
+    orderSlowerTooltip.repositionIfVisible();
   }
 
   // src/shared/tacticalFerryHoverPreview.ts
@@ -21559,29 +21547,44 @@
   }
 
   // src/renderer/gameplay/tacticalOrders.ts
-  function replacePendingRangedAttacksForSelected(selectedIds, targetH3Index) {
+  function replacePendingOrdersForSelected(getRows, setRows, selectedIds, buildRow) {
     withTacticalHumanDraftPrefetchInvalidation(() => {
-      rendererSharedState.pendingRangedAttacks = rendererSharedState.pendingRangedAttacks.filter((row) => !selectedIds.includes(row.unitId));
+      const kept = getRows().filter((row) => !selectedIds.includes(row.unitId));
       for (const unitId of selectedIds) {
-        rendererSharedState.pendingRangedAttacks.push({ unitId, targetH3Index });
+        kept.push(buildRow(unitId));
       }
+      setRows(kept);
     });
+  }
+  function replacePendingRangedAttacksForSelected(selectedIds, targetH3Index) {
+    replacePendingOrdersForSelected(
+      () => rendererSharedState.pendingRangedAttacks,
+      (next) => {
+        rendererSharedState.pendingRangedAttacks = next;
+      },
+      selectedIds,
+      (unitId) => ({ unitId, targetH3Index })
+    );
   }
   function replacePendingAirStrikesForSelected(selectedIds, targetH3Index, targetType) {
-    withTacticalHumanDraftPrefetchInvalidation(() => {
-      rendererSharedState.pendingAirStrikes = rendererSharedState.pendingAirStrikes.filter((row) => !selectedIds.includes(row.unitId));
-      for (const unitId of selectedIds) {
-        rendererSharedState.pendingAirStrikes.push({ unitId, targetH3Index, targetType });
-      }
-    });
+    replacePendingOrdersForSelected(
+      () => rendererSharedState.pendingAirStrikes,
+      (next) => {
+        rendererSharedState.pendingAirStrikes = next;
+      },
+      selectedIds,
+      (unitId) => ({ unitId, targetH3Index, targetType })
+    );
   }
   function replacePendingFerryOrdersForSelected(selectedIds, destinationH3Index) {
-    withTacticalHumanDraftPrefetchInvalidation(() => {
-      rendererSharedState.pendingFerryOrders = rendererSharedState.pendingFerryOrders.filter((row) => !selectedIds.includes(row.unitId));
-      for (const unitId of selectedIds) {
-        rendererSharedState.pendingFerryOrders.push({ unitId, destinationH3Index });
-      }
-    });
+    replacePendingOrdersForSelected(
+      () => rendererSharedState.pendingFerryOrders,
+      (next) => {
+        rendererSharedState.pendingFerryOrders = next;
+      },
+      selectedIds,
+      (unitId) => ({ unitId, destinationH3Index })
+    );
   }
   function clearPendingTacticalOrders() {
     withTacticalHumanDraftPrefetchInvalidation(() => {
@@ -21898,6 +21901,34 @@
       rendererSharedState.humanStandingOrders = await window.gameApi.listHumanStandingOrders();
     } catch {
       rendererSharedState.humanStandingOrders = [];
+    }
+  }
+
+  // src/renderer/rendering/resolutionCombatOverlays.ts
+  function drawResolutionCombatAndCasualtyOverlays(ctx, width, height, anim, hexList, elapsed) {
+    const { phase } = buildResolutionPlaybackState(anim, elapsed);
+    const meleeCombatHexes = [
+      ...anim.meleeCombatHexes ?? [],
+      ...anim.controlLossLightningHexes ?? []
+    ].filter((h3, idx, arr) => arr.indexOf(h3) === idx);
+    const combatHexes = phase.inAirStrikeLightning ? anim.airStrikeCombatHexes : phase.inRangedLightning ? anim.rangedCombatHexes ?? anim.combatHexes : phase.inMeleeLightning ? meleeCombatHexes : void 0;
+    if (combatHexes?.length) {
+      const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * 8e-3);
+      const unknownSet = new Set(anim.unknownCombatHexes ?? []);
+      const knownCombatHexes = combatHexes.filter((h3) => !unknownSet.has(h3));
+      const unknownCombatHexes = combatHexes.filter((h3) => unknownSet.has(h3));
+      drawCombatLightning(ctx, width, height, knownCombatHexes, hexList, pulseOpacity);
+      drawUnknownBattleMarkers(ctx, unknownCombatHexes, pulseOpacity);
+    }
+    const casualtyHexes = phase.inAirStrikeCasualty ? anim.airStrikeCasualtyHexes : phase.inRangedCasualty ? anim.rangedCasualtyHexes ?? anim.casualtyHexes : phase.inMeleeCasualty ? anim.meleeCasualtyHexes : void 0;
+    if (casualtyHexes?.length) {
+      const casualtyElapsed = phase.inAirStrikeCasualty ? elapsed - phase.airStrikeCasualtyStart : phase.inRangedCasualty ? elapsed - phase.rangedCasualtyStart : elapsed - phase.meleeCasualtyStart;
+      const pulseOpacity = 0.5 + 0.5 * Math.sin(casualtyElapsed * 8e-3);
+      const unknownSet = new Set(anim.unknownCasualtyHexes ?? []);
+      const knownCasualtyHexes = casualtyHexes.filter((h3) => !unknownSet.has(h3));
+      const unknownCasualtyHexes = casualtyHexes.filter((h3) => unknownSet.has(h3));
+      drawCasualtyOverlay(ctx, width, height, knownCasualtyHexes, hexList, pulseOpacity);
+      drawUnknownBattleMarkers(ctx, unknownCasualtyHexes, pulseOpacity);
     }
   }
 
@@ -22234,6 +22265,14 @@
   }
 
   // src/renderer/gameplay/buildQueuePopupFormatting.ts
+  function sanitizeBuildCountInputText(raw) {
+    const digitsOnly = raw.replaceAll(/\D/g, "").slice(0, 2);
+    if (digitsOnly.length === 0) return "1";
+    const parsed = parseInt(digitsOnly, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return "1";
+    if (parsed > 99) return "99";
+    return String(parsed);
+  }
   function escapeBuildPopupHtml(text) {
     return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
   }
@@ -22331,13 +22370,6 @@
   }
 
   // src/renderer/gameplay/buildQueueMultiPopup.ts
-  function sanitizeCount(raw) {
-    const digitsOnly = raw.replaceAll(/\D/g, "").slice(0, 2);
-    if (digitsOnly.length === 0) return "1";
-    const parsed = parseInt(digitsOnly, 10);
-    if (!Number.isFinite(parsed) || parsed <= 0) return "1";
-    return String(Math.min(99, parsed));
-  }
   async function loadSelectedBuildSnapshots(h3Indexes) {
     if (!window.gameApi?.getHexBuildQueue) return [];
     const snapshots = await Promise.all(
@@ -22475,7 +22507,7 @@
       countInput.inputMode = "numeric";
       countInput.value = String(entry.count);
       const readCurrentCount = () => {
-        const normalized = sanitizeCount(countInput.value);
+        const normalized = sanitizeBuildCountInputText(countInput.value);
         if (countInput.value !== normalized) countInput.value = normalized;
         return parseInt(normalized, 10);
       };
@@ -22537,14 +22569,6 @@
   }
 
   // src/renderer/gameplay/buildQueuePopup.ts
-  function sanitizeBuildCountInputText(raw) {
-    const digitsOnly = raw.replaceAll(/\D/g, "").slice(0, 2);
-    if (digitsOnly.length === 0) return "1";
-    const parsed = parseInt(digitsOnly, 10);
-    if (!Number.isFinite(parsed) || parsed <= 0) return "1";
-    if (parsed > 99) return "99";
-    return String(parsed);
-  }
   function isBuildQueueSelectInPopupFocused() {
     const popup = document.getElementById("build-popup");
     const active = document.activeElement;
@@ -27610,31 +27634,14 @@
         }
       }
       if (anim2 && hexList2) {
-        const elapsed = resolutionAnimationElapsedMs2(anim2);
-        const { phase } = buildResolutionPlaybackState2(anim2, elapsed);
-        const meleeCombatHexes = [
-          ...anim2.meleeCombatHexes ?? [],
-          ...anim2.controlLossLightningHexes ?? []
-        ].filter((h3, idx, arr) => arr.indexOf(h3) === idx);
-        const combatHexes = phase.inAirStrikeLightning ? anim2.airStrikeCombatHexes : phase.inRangedLightning ? anim2.rangedCombatHexes ?? anim2.combatHexes : phase.inMeleeLightning ? meleeCombatHexes : void 0;
-        if (combatHexes?.length) {
-          const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * 8e-3);
-          const unknownSet = new Set(anim2.unknownCombatHexes ?? []);
-          const knownCombatHexes = combatHexes.filter((h3) => !unknownSet.has(h3));
-          const unknownCombatHexes = combatHexes.filter((h3) => unknownSet.has(h3));
-          drawCombatLightning(ctx, width, height, knownCombatHexes, hexList2, pulseOpacity);
-          drawUnknownBattleMarkers(ctx, unknownCombatHexes, pulseOpacity);
-        }
-        const casualtyHexes = phase.inAirStrikeCasualty ? anim2.airStrikeCasualtyHexes : phase.inRangedCasualty ? anim2.rangedCasualtyHexes ?? anim2.casualtyHexes : phase.inMeleeCasualty ? anim2.meleeCasualtyHexes : void 0;
-        if (casualtyHexes?.length) {
-          const casualtyElapsed = phase.inAirStrikeCasualty ? elapsed - phase.airStrikeCasualtyStart : phase.inRangedCasualty ? elapsed - phase.rangedCasualtyStart : elapsed - phase.meleeCasualtyStart;
-          const pulseOpacity = 0.5 + 0.5 * Math.sin(casualtyElapsed * 8e-3);
-          const unknownSet = new Set(anim2.unknownCasualtyHexes ?? []);
-          const knownCasualtyHexes = casualtyHexes.filter((h3) => !unknownSet.has(h3));
-          const unknownCasualtyHexes = casualtyHexes.filter((h3) => unknownSet.has(h3));
-          drawCasualtyOverlay(ctx, width, height, knownCasualtyHexes, hexList2, pulseOpacity);
-          drawUnknownBattleMarkers(ctx, unknownCasualtyHexes, pulseOpacity);
-        }
+        drawResolutionCombatAndCasualtyOverlays(
+          ctx,
+          width,
+          height,
+          anim2,
+          hexList2,
+          resolutionAnimationElapsedMs2(anim2)
+        );
       }
       ensureRangePerimeterAnimation(redraw);
       return;
@@ -27726,31 +27733,7 @@
       }
     }
     if (anim && hexList) {
-      const elapsed = elapsedStrategic;
-      const { phase } = buildResolutionPlaybackState2(anim, elapsed);
-      const meleeCombatHexes = [
-        ...anim.meleeCombatHexes ?? [],
-        ...anim.controlLossLightningHexes ?? []
-      ].filter((h3, idx, arr) => arr.indexOf(h3) === idx);
-      const combatHexes = phase.inAirStrikeLightning ? anim.airStrikeCombatHexes : phase.inRangedLightning ? anim.rangedCombatHexes ?? anim.combatHexes : phase.inMeleeLightning ? meleeCombatHexes : void 0;
-      if (combatHexes?.length) {
-        const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * 8e-3);
-        const unknownSet = new Set(anim.unknownCombatHexes ?? []);
-        const knownCombatHexes = combatHexes.filter((h3) => !unknownSet.has(h3));
-        const unknownCombatHexes = combatHexes.filter((h3) => unknownSet.has(h3));
-        drawCombatLightning(ctx, width, height, knownCombatHexes, hexList, pulseOpacity);
-        drawUnknownBattleMarkers(ctx, unknownCombatHexes, pulseOpacity);
-      }
-      const casualtyHexes = phase.inAirStrikeCasualty ? anim.airStrikeCasualtyHexes : phase.inRangedCasualty ? anim.rangedCasualtyHexes ?? anim.casualtyHexes : phase.inMeleeCasualty ? anim.meleeCasualtyHexes : void 0;
-      if (casualtyHexes?.length) {
-        const casualtyElapsed = phase.inAirStrikeCasualty ? elapsed - phase.airStrikeCasualtyStart : phase.inRangedCasualty ? elapsed - phase.rangedCasualtyStart : elapsed - phase.meleeCasualtyStart;
-        const pulseOpacity = 0.5 + 0.5 * Math.sin(casualtyElapsed * 8e-3);
-        const unknownSet = new Set(anim.unknownCasualtyHexes ?? []);
-        const knownCasualtyHexes = casualtyHexes.filter((h3) => !unknownSet.has(h3));
-        const unknownCasualtyHexes = casualtyHexes.filter((h3) => unknownSet.has(h3));
-        drawCasualtyOverlay(ctx, width, height, knownCasualtyHexes, hexList, pulseOpacity);
-        drawUnknownBattleMarkers(ctx, unknownCasualtyHexes, pulseOpacity);
-      }
+      drawResolutionCombatAndCasualtyOverlays(ctx, width, height, anim, hexList, elapsedStrategic);
     }
     ensureRangePerimeterAnimation(redraw);
   }

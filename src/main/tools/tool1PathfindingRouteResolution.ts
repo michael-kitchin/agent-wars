@@ -233,6 +233,7 @@ export function resolveRoutePathForUnit(payload: {
       seaportEgressHex,
       warnings,
       blockedRetryWarning: 'Route passes through enemy-occupied hexes - avoidance was not possible.',
+      landMass: passableFor === 'land' ? payload.session.landMass : undefined,
     });
   }
   if (seaportEgressHex) warnings.push(PLAN_ROUTE_WARNING_SEAPORT_EGRESS);
@@ -257,6 +258,7 @@ export function resolveRoutePathForUnit(payload: {
         blocked: payload.blocked,
         originH3: payload.originH3,
         seaportEgressHex,
+        landMass: passableFor === 'land' ? payload.session.landMass : undefined,
       });
       if (path) warnings.push(PLAN_ROUTE_WARNING_WATER_BODY_FALLBACK);
     }

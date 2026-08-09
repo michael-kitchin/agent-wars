@@ -102,13 +102,8 @@ import {
   buildResolutionPlaybackMoves,
   drawRangedResolutionShotLines,
 } from './rendering/orderDrawing';
-import {
-  drawCasualtyOverlay,
-  drawCombatLightning,
-  drawStaleEnemyIntel,
-  drawUnits,
-  drawUnknownBattleMarkers,
-} from './rendering/unitDrawing';
+import { drawResolutionCombatAndCasualtyOverlays } from './rendering/resolutionCombatOverlays';
+import { drawStaleEnemyIntel, drawUnits } from './rendering/unitDrawing';
 import { rendererSharedState as S } from './core/state';
 import { mergePendingTacticalEmbarkOrdersIntoSealiftState } from './tactical/tacticalEmbarkSealiftMerge';
 import {
@@ -2405,47 +2400,14 @@ function drawGameScene(
       }
     }
     if (anim && hexList) {
-      const elapsed = resolutionAnimationElapsedMs(anim);
-      const { phase } = buildResolutionPlaybackState(anim, elapsed);
-      const meleeCombatHexes = [
-        ...(anim.meleeCombatHexes ?? []),
-        ...(anim.controlLossLightningHexes ?? []),
-      ].filter((h3, idx, arr) => arr.indexOf(h3) === idx);
-      const combatHexes = phase.inAirStrikeLightning
-        ? anim.airStrikeCombatHexes
-        : phase.inRangedLightning
-          ? (anim.rangedCombatHexes ?? anim.combatHexes)
-          : phase.inMeleeLightning
-            ? meleeCombatHexes
-            : undefined;
-      if (combatHexes?.length) {
-        const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * 0.008);
-        const unknownSet = new Set(anim.unknownCombatHexes ?? []);
-        const knownCombatHexes = combatHexes.filter((h3) => !unknownSet.has(h3));
-        const unknownCombatHexes = combatHexes.filter((h3) => unknownSet.has(h3));
-        drawCombatLightning(ctx, width, height, knownCombatHexes, hexList, pulseOpacity);
-        drawUnknownBattleMarkers(ctx, unknownCombatHexes, pulseOpacity);
-      }
-      const casualtyHexes = phase.inAirStrikeCasualty
-        ? anim.airStrikeCasualtyHexes
-        : phase.inRangedCasualty
-          ? (anim.rangedCasualtyHexes ?? anim.casualtyHexes)
-          : phase.inMeleeCasualty
-            ? anim.meleeCasualtyHexes
-            : undefined;
-      if (casualtyHexes?.length) {
-        const casualtyElapsed = phase.inAirStrikeCasualty
-          ? elapsed - phase.airStrikeCasualtyStart
-          : phase.inRangedCasualty
-            ? elapsed - phase.rangedCasualtyStart
-            : elapsed - phase.meleeCasualtyStart;
-        const pulseOpacity = 0.5 + 0.5 * Math.sin(casualtyElapsed * 0.008);
-        const unknownSet = new Set(anim.unknownCasualtyHexes ?? []);
-        const knownCasualtyHexes = casualtyHexes.filter((h3) => !unknownSet.has(h3));
-        const unknownCasualtyHexes = casualtyHexes.filter((h3) => unknownSet.has(h3));
-        drawCasualtyOverlay(ctx, width, height, knownCasualtyHexes, hexList, pulseOpacity);
-        drawUnknownBattleMarkers(ctx, unknownCasualtyHexes, pulseOpacity);
-      }
+      drawResolutionCombatAndCasualtyOverlays(
+        ctx,
+        width,
+        height,
+        anim,
+        hexList,
+        resolutionAnimationElapsedMs(anim)
+      );
     }
     ensureRangePerimeterAnimation(redraw);
     return;
@@ -2537,47 +2499,7 @@ function drawGameScene(
     }
   }
   if (anim && hexList) {
-    const elapsed = elapsedStrategic;
-    const { phase } = buildResolutionPlaybackState(anim, elapsed);
-    const meleeCombatHexes = [
-      ...(anim.meleeCombatHexes ?? []),
-      ...(anim.controlLossLightningHexes ?? []),
-    ].filter((h3, idx, arr) => arr.indexOf(h3) === idx);
-    const combatHexes = phase.inAirStrikeLightning
-      ? anim.airStrikeCombatHexes
-      : phase.inRangedLightning
-        ? (anim.rangedCombatHexes ?? anim.combatHexes)
-        : phase.inMeleeLightning
-          ? meleeCombatHexes
-          : undefined;
-    if (combatHexes?.length) {
-      const pulseOpacity = 0.5 + 0.5 * Math.sin(elapsed * 0.008);
-      const unknownSet = new Set(anim.unknownCombatHexes ?? []);
-      const knownCombatHexes = combatHexes.filter((h3) => !unknownSet.has(h3));
-      const unknownCombatHexes = combatHexes.filter((h3) => unknownSet.has(h3));
-      drawCombatLightning(ctx, width, height, knownCombatHexes, hexList, pulseOpacity);
-      drawUnknownBattleMarkers(ctx, unknownCombatHexes, pulseOpacity);
-    }
-    const casualtyHexes = phase.inAirStrikeCasualty
-      ? anim.airStrikeCasualtyHexes
-      : phase.inRangedCasualty
-        ? (anim.rangedCasualtyHexes ?? anim.casualtyHexes)
-        : phase.inMeleeCasualty
-          ? anim.meleeCasualtyHexes
-          : undefined;
-    if (casualtyHexes?.length) {
-      const casualtyElapsed = phase.inAirStrikeCasualty
-        ? elapsed - phase.airStrikeCasualtyStart
-        : phase.inRangedCasualty
-          ? elapsed - phase.rangedCasualtyStart
-          : elapsed - phase.meleeCasualtyStart;
-      const pulseOpacity = 0.5 + 0.5 * Math.sin(casualtyElapsed * 0.008);
-      const unknownSet = new Set(anim.unknownCasualtyHexes ?? []);
-      const knownCasualtyHexes = casualtyHexes.filter((h3) => !unknownSet.has(h3));
-      const unknownCasualtyHexes = casualtyHexes.filter((h3) => unknownSet.has(h3));
-      drawCasualtyOverlay(ctx, width, height, knownCasualtyHexes, hexList, pulseOpacity);
-      drawUnknownBattleMarkers(ctx, unknownCasualtyHexes, pulseOpacity);
-    }
+    drawResolutionCombatAndCasualtyOverlays(ctx, width, height, anim, hexList, elapsedStrategic);
   }
   ensureRangePerimeterAnimation(redraw);
 }

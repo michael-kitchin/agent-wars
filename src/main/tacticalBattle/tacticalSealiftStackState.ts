@@ -4,6 +4,7 @@
 
 import type { SealiftLandUnitOption, SealiftNavalRow, SealiftStackState } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { emptySealiftStackState } from '../../shared/sealiftStackState';
 import { canManualDebarkFromHex, getSealiftStackContextModeForHex } from '../game-actions/sealift';
 import { getActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import { tacticalLogQuery } from './tacticalLogging';
@@ -59,16 +60,7 @@ function tacticalSlotsByNavalSubIds(
  */
 export function getTacticalSealiftStackStateForHex(h3Index: string): SealiftStackState {
   tacticalLogQuery('getTacticalSealiftStackStateForHex', { h3Index });
-  const empty: SealiftStackState = {
-    h3Index,
-    showSealiftSection: false,
-    contextMode: 'unsupported',
-    controlsDisabled: true,
-    hasEmbarkedUnitsInStack: false,
-    debarkAllowedAtHex: false,
-    navalRows: [],
-    landOptions: [],
-  };
+  const empty = emptySealiftStackState(h3Index);
   const snap = getActiveTacticalBattleSnapshotRef();
   if (!snap) return empty;
   const footprint = new Set(snap.res4ChildH3Indexes);

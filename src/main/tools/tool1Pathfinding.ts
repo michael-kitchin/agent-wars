@@ -4,7 +4,6 @@
  * Internal geometry uses lat/lng tuples after the OpenRouter layer decodes briefing hex codes; outbound tool payloads to the model are rewritten to hex codes by `encodeOpenRouterToolResultForLlm`.
  */
 
-import { cellToLatLng } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
 import {
   getReachableHexes,
@@ -42,31 +41,17 @@ import {
 } from './tool1PathfindingRouteResolution';
 import { executeTacticalCheckDistance, executeTacticalPlanRoute } from './tacticalTool1Pathfinding';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { h3ToLatLng, type LatLng } from './h3LatLng';
 
 /**
- * Defines the `h3ToLatLng` function shape (function h3ToLatLng(h3: string, latLngByH3: Map<string, LatLng>): LatLng).
-
- * Purpose: Supports maintainability by documenting why `h3ToLatLng` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Re-exports shared lat/lng tuple type for existing tool1Pathfinding LatLng importers.
+ *
+ * Purpose: Preserves the historical import path after `LatLng` moved to `h3LatLng.ts`.
+ * When to use: Prefer the h3LatLng module for new code; keep this re-export for downstream tools.
+ * Expected outcome: Same `LatLng` alias as `h3LatLng`.
  * Exceptions: None.
  */
-function h3ToLatLng(h3: string, latLngByH3: Map<string, LatLng>): LatLng {
-  const ll = latLngByH3.get(h3);
-  if (ll) return ll;
-  const [lat, lng] = cellToLatLng(h3);
-  return [lat, lng];
-}
-
-/**
- * Documents the `LatLng` type alias (export type LatLng).
-
- * Purpose: Supports maintainability by documenting why `LatLng` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export type LatLng = [number, number];
+export type { LatLng } from './h3LatLng';
 
 /**
  * Documents the `PathfindingSession` interface as a named contract surface (export interface PathfindingSession).
@@ -785,7 +770,7 @@ export function executePlanRouteWithSession(
           localBlocked,
           domain === 'land' ? session.landMass : undefined
         ),
-      h3ToLatLng: (h3) => h3ToLatLng(h3, session.latLngByH3),
+      h3ToLatLng: (h3) => h3ToLatLng(h3, session.latLngByH3, 'cellCenter'),
     });
   }
 
@@ -817,7 +802,7 @@ export function executePlanRouteWithSession(
     movementBudget,
     warnings,
     maxTurns: options?.maxTurns,
-    h3ToLatLng: (h3) => h3ToLatLng(h3, session.latLngByH3),
+    h3ToLatLng: (h3) => h3ToLatLng(h3, session.latLngByH3, 'cellCenter'),
     partitionPathByTurn,
   });
   } catch (err) {
@@ -879,16 +864,16 @@ export function executeCheckDistance(
   if (!result) {
     return {
       status: 'ok',
-      from: h3ToLatLng(fromH3, latLngByH3),
-      to: h3ToLatLng(toH3, latLngByH3),
+      from: h3ToLatLng(fromH3, latLngByH3, 'cellCenter'),
+      to: h3ToLatLng(toH3, latLngByH3, 'cellCenter'),
       hexDistance: 0,
       estimatedTurns: 0,
       reachable: false,
     };
   }
 
-  const fromLl = h3ToLatLng(fromH3, latLngByH3);
-  const toLl = h3ToLatLng(toH3, latLngByH3);
+  const fromLl = h3ToLatLng(fromH3, latLngByH3, 'cellCenter');
+  const toLl = h3ToLatLng(toH3, latLngByH3, 'cellCenter');
   return {
     status: 'ok',
     from: fromLl,

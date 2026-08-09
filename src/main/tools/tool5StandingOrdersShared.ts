@@ -2,6 +2,19 @@ import type { PlanRouteOk } from './tool1Pathfinding';
 import type { HumanOrderPreviewSegment } from '../../shared/ipc/humanOrderPreviewTypes';
 
 /**
+ * Standing-order types that steer a unit hex by hex and therefore cannot apply to air units.
+ *
+ * Purpose: Air units reposition by ferry and attack by air strike; they never march across hexes, so such an
+ * order leaves a stored row that re-requests an unsatisfiable land route on every turn.
+ * When to use: Checked by `assignOrder` before persisting a new order, and by `expireAndUpdateStatus` to
+ * clear rows persisted before this restriction existed.
+ * Expected outcome: Contains the movement order types only; `defend` and `hold_fire` stay valid for air
+ * because they drive air-strike engagement rather than movement.
+ * Exceptions: None.
+ */
+export const AIR_INELIGIBLE_ORDER_TYPES: ReadonlySet<string> = new Set(['march', 'pursue', 'patrol']);
+
+/**
  * JSON payload persisted in `standing_orders.computed_route` for march and pursue orders.
  *
  * Purpose: Stores turn progress plus optional display cache so `listHumanStandingOrders` can reuse polylines without replanning.
