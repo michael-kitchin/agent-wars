@@ -19,8 +19,12 @@ function testExampleBlockParsesWithParser(): void {
   const block = getFinalJsonOrdersExampleBlock({ includeMemoryUpdates: false, includeProductionOrders: false });
   const jsonMatch = block.match(/```json\s*([\s\S]*?)```/);
   assert.ok(jsonMatch, 'example should be fenced json');
-  const parsed = JSON.parse(jsonMatch[1]!.trim()) as { strategy?: string; orders?: unknown[] };
+  const parsed = JSON.parse(jsonMatch[1]!.trim()) as { message?: string; strategy?: string; orders?: unknown[] };
+  assert.strictEqual(parsed.message, 'You will not find safety in delay.');
   assert.strictEqual(typeof parsed.strategy, 'string');
+  const messageKeyAt = jsonMatch[1]!.indexOf('"message"');
+  const strategyKeyAt = jsonMatch[1]!.indexOf('"strategy"');
+  assert.ok(messageKeyAt >= 0 && messageKeyAt < strategyKeyAt, 'example JSON must list message before strategy');
   assert.ok(Array.isArray(parsed.orders));
   assert.ok(parsed.orders!.length >= 3);
 }
@@ -41,6 +45,10 @@ function testTacticalExampleBlockLeadsWithExplicitMove(): void {
   });
   assert.ok(block.includes('"explicit_move"'));
   assert.ok(!block.includes('"assign_order"'));
+  assert.ok(block.includes('This close, hesitation is already a casualty.'));
+  const messageKeyAt = block.indexOf('"message"');
+  const strategyKeyAt = block.indexOf('"strategy"');
+  assert.ok(messageKeyAt >= 0 && messageKeyAt < strategyKeyAt, 'tactical example JSON must list message before strategy');
 }
 
 /**
@@ -90,6 +98,7 @@ function testTacticalCallbacksClauseMentionsBeat(): void {
   });
   assert.ok(tactical.includes('tactical beat'));
   assert.ok(tactical.includes('event-driven'));
+  assert.ok(tactical.includes('"message" (string)'));
   assert.ok(tactical.includes('Do not emit assign_order'));
   assert.ok(!tactical.includes('Actions: assign_order'), 'tactical contract must not list assign_order as a live action');
   const strategic = buildFinalJsonContractInstruction({

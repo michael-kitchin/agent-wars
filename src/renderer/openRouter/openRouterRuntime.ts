@@ -1,4 +1,5 @@
 import { isLikelyAbortError } from '../../shared/abortError';
+import { hasAiStrategyToastContent, type AiStrategyToastFields } from '../../shared/aiStrategyToastContent';
 import { buildTacticalHumanDraftPrefetchFingerprint } from '../../shared/tacticalHumanDraftPrefetchFingerprint';
 import { rendererSharedState as S } from '../core/state';
 import {
@@ -182,14 +183,14 @@ updateOpenRouterCostLabel: () => void;
    */
   showSidebarError: (message: string) => void;
     /**
-   * Specifies the contract for the `showAiStrategyToast` member (showAiStrategyToast: (content: string) => void;).
+   * Specifies the contract for the `showAiStrategyToast` member (showAiStrategyToast: (content: AiStrategyToastFields) => void;).
 
-   * Contract: Displays the same LLM strategy toast used after strategic Ready when the model returns a `strategy` field.
-   * When to use: After a successful tactical background `requestAiOrders` when `result.strategy` is present and the player is in tactical planning.
-   * Expected outcome: Non-empty strategy text becomes visible until timeout or dismiss.
+   * Contract: Displays Message and Strategy sections from a background `requestAiOrders` during tactical planning.
+   * When to use: After a successful tactical background request when either field is present.
+   * Expected outcome: Non-empty fields become visible until timeout or dismiss.
    * Exceptions: None.
    */
-  showAiStrategyToast: (content: string) => void;
+  showAiStrategyToast: (content: AiStrategyToastFields) => void;
     /**
    * Specifies the contract for the `requestRedraw` member (requestRedraw?: () => void;).
 
@@ -305,8 +306,12 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
             return;
           }
           applySuccessfulPrecomputedAiResult(result);
-          if (S.tacticalBattleSnapshot && S.tacticalPhasePlanning && result.strategy) {
-            deps.showAiStrategyToast(result.strategy);
+          if (
+            S.tacticalBattleSnapshot &&
+            S.tacticalPhasePlanning &&
+            hasAiStrategyToastContent({ message: result.message, strategy: result.strategy })
+          ) {
+            deps.showAiStrategyToast({ message: result.message, strategy: result.strategy });
           }
           if (result.tacticalBattle) {
             deps.requestRedraw?.();

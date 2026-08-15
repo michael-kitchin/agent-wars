@@ -21,11 +21,28 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { TacticalPostBeatConsultFields, TacticalPostBeatConsultMergeSource } from '../../shared/ipc/readyTypes';
 
 /**
+ * Spreads optional `aiMessage` / `aiStrategy` IPC fields when the trimmed text is non-empty.
+ *
+ * Purpose: One omit-empty rule so Ready, melee-resolve, and tactical post-beat payloads cannot drift.
+ * When to use: Mapping consultation `message`/`strategy` onto renderer-facing IPC.
+ * Expected outcome: Empty or whitespace values are omitted entirely.
+ * Exceptions: None.
+ */
+function optionalConsultToastFields(message?: string, strategy?: string): { aiMessage?: string; aiStrategy?: string } {
+  const msg = message?.trim() ?? '';
+  const strat = strategy?.trim() ?? '';
+  return {
+    ...(strat ? { aiStrategy: strat } : {}),
+    ...(msg ? { aiMessage: msg } : {}),
+  };
+}
+
+/**
  * Maps runner merge source plus `battleId` into the renderer-facing tactical post-beat consultation IPC fields.
  *
- * Purpose: Single attach/`tacticalOpponentPlan`/`aiStrategy`/`toolInvocationCounts` wiring for `commitHumanTacticalDraftOrders` so `main.ts` and `runEventDrivenAfterTacticalBeatConsultation` cannot drift.
+ * Purpose: Single attach/`tacticalOpponentPlan`/`aiStrategy`/`aiMessage`/`toolInvocationCounts` wiring for `commitHumanTacticalDraftOrders` so `main.ts` and `runEventDrivenAfterTacticalBeatConsultation` cannot drift.
  * When to use: After `runEventDrivenAfterTacticalBeatConsultation` resolves, or whenever converting an `afterTacticalBeatResolution`-shaped merge source into `TacticalPostBeatConsultFields`.
- * Expected outcome: `kind` and `battleId` always set; `strategy` from the merge source is exposed as `aiStrategy` when present.
+ * Expected outcome: `kind` and `battleId` always set; strategy/message from the merge source are exposed as `aiStrategy`/`aiMessage` when present.
  * Exceptions: None; pure data transform.
  */
 export function toTacticalPostBeatConsultFields(
@@ -33,19 +50,21 @@ export function toTacticalPostBeatConsultFields(
   post: TacticalPostBeatConsultMergeSource
 ): TacticalPostBeatConsultFields {
   const attach = post.attachTacticalOpponentPlanToIpc === true;
+  const strategyText = post.aiStrategy ?? post.strategy;
+  const messageText = post.message ?? post.aiMessage;
   logDebug('ipc toTacticalPostBeatConsultFields', {
     battleId,
     attachTacticalOpponentPlanToIpc: attach,
-    hasStrategy: Boolean(post.aiStrategy ?? post.strategy),
+    hasStrategy: Boolean(strategyText?.trim()),
+    hasMessage: Boolean(messageText?.trim()),
     hasToolInvocationCounts: Boolean(post.toolInvocationCounts),
   });
-  const strategyText = post.aiStrategy ?? post.strategy;
   return {
     kind: 'tactical',
     battleId,
     attachTacticalOpponentPlanToIpc: attach,
     ...(attach ? { tacticalOpponentPlan: post.tacticalOpponentPlan ?? null } : {}),
-    ...(strategyText ? { aiStrategy: strategyText } : {}),
+    ...optionalConsultToastFields(messageText, strategyText),
     ...(post.toolInvocationCounts ? { toolInvocationCounts: post.toolInvocationCounts } : {}),
   };
 }
@@ -211,7 +230,7 @@ export async function runEventDrivenAfterResolutionConsultation(args: {
   ) => Promise<RequestAiOrdersResult>;
   timeoutMs: number;
   errorLogMessage: string;
-}): Promise<{ aiStrategy?: string; toolInvocationCounts?: Record<string, number> }> {
+}): Promise<{ aiStrategy?: string; aiMessage?: string; toolInvocationCounts?: Record<string, number> }> {
   if (!args.useEventDrivenConsultation || !args.resolutionSuccess || !args.aiPlanningRunEnabled) {
     return {};
   }
@@ -232,7 +251,7 @@ export async function runEventDrivenAfterResolutionConsultation(args: {
       }),
     ]);
     return {
-      ...(postResolution.strategy ? { aiStrategy: postResolution.strategy } : {}),
+      ...optionalConsultToastFields(postResolution.message, postResolution.strategy),
       ...(postResolution.toolInvocationCounts ? { toolInvocationCounts: postResolution.toolInvocationCounts } : {}),
     };
   } catch (err) {
@@ -293,6 +312,7 @@ export async function runEventDrivenAfterTacticalBeatConsultation(args: {
       attachTacticalOpponentPlanToIpc: post.attachTacticalOpponentPlanToIpc,
       tacticalOpponentPlan: post.tacticalOpponentPlan,
       strategy: post.strategy,
+      message: post.message,
       toolInvocationCounts: post.toolInvocationCounts,
     };
   } catch (err) {

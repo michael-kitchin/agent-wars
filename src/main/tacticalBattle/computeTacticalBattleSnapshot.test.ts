@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import { isInfantryOrArmorTacticalSpawnCell } from '../../shared/tacticalTerrainMovement';
+import {
+  isInfantryOrArmorTacticalSpawnCell,
+  tacticalLandUnitMayOccupyCellWithoutTransport,
+  type TacticalTerrainKindResolver,
+} from '../../shared/tacticalTerrainMovement';
 import {
   tacticalSnapshotHasPlacedUnitsForBothSides,
   tacticalSubUnitCountForStrategicUnitType,
@@ -43,6 +47,66 @@ test('isInfantryOrArmorTacticalSpawnCell rejects water and arctic normalized til
     }),
     true
   );
+});
+
+/**
+ * Minimal terrain resolver for occupancy tests (kind map plus optional urban/rubble).
+ *
+ * Purpose: Exercises `tacticalLandUnitMayOccupyCellWithoutTransport` without a full battle snapshot.
+ * When to use: Snapshot placement contract tests in this file.
+ * Expected outcome: `effectiveKindForRes4Hex` returns mapped kinds; urban/rubble flags match the sets.
+ * Exceptions: None.
+ */
+function occupancyResolver(args: {
+  kinds: Record<string, string>;
+  urban?: ReadonlySet<string>;
+  rubble?: ReadonlySet<string>;
+}): TacticalTerrainKindResolver {
+  return {
+    parentTerrain: 'land',
+    parentTerrainKind: 'plains',
+    effectiveKindForRes4Hex(h3: string): string {
+      return args.kinds[h3] ?? 'plains';
+    },
+    isUrbanRes4(h3: string): boolean {
+      return args.urban?.has(h3) === true;
+    },
+    isRubbleRes4(h3: string): boolean {
+      return args.rubble?.has(h3) === true;
+    },
+  };
+}
+
+test('tacticalLandUnitMayOccupyCellWithoutTransport blocks armor on wetlands and mountains', () => {
+  const terrain = occupancyResolver({
+    kinds: { wet: 'wetlands', mtn: 'mountain', forest: 'forest', arctic: 'arctic', water: 'water', coast: 'coastal' },
+  });
+  assert.equal(tacticalLandUnitMayOccupyCellWithoutTransport('armor', 'wet', terrain), false);
+  assert.equal(tacticalLandUnitMayOccupyCellWithoutTransport('armor', 'mtn', terrain), false);
+  assert.equal(tacticalLandUnitMayOccupyCellWithoutTransport('armor', 'arctic', terrain), false);
+  assert.equal(tacticalLandUnitMayOccupyCellWithoutTransport('armor', 'water', terrain), false);
+  assert.equal(tacticalLandUnitMayOccupyCellWithoutTransport('armor', 'forest', terrain), true);
+  assert.equal(tacticalLandUnitMayOccupyCellWithoutTransport('armor', 'coast', terrain), true);
+  assert.equal(tacticalLandUnitMayOccupyCellWithoutTransport('infantry', 'wet', terrain), true);
+  assert.equal(tacticalLandUnitMayOccupyCellWithoutTransport('infantry', 'mtn', terrain), true);
+  assert.equal(tacticalLandUnitMayOccupyCellWithoutTransport('infantry', 'arctic', terrain), true);
+  assert.equal(tacticalLandUnitMayOccupyCellWithoutTransport('infantry', 'water', terrain), false);
+});
+
+test('tacticalLandUnitMayOccupyCellWithoutTransport allows armor on urban wetlands', () => {
+  const terrain = occupancyResolver({
+    kinds: { wet: 'wetlands' },
+    urban: new Set(['wet']),
+  });
+  assert.equal(tacticalLandUnitMayOccupyCellWithoutTransport('armor', 'wet', terrain), true);
+});
+
+test('tacticalLandUnitMayOccupyCellWithoutTransport allows armor on rubble wetlands', () => {
+  const terrain = occupancyResolver({
+    kinds: { wet: 'wetlands' },
+    rubble: new Set(['wet']),
+  });
+  assert.equal(tacticalLandUnitMayOccupyCellWithoutTransport('armor', 'wet', terrain), true);
 });
 
 test('tacticalSnapshotHasPlacedUnitsForBothSides requires at least one human and one opponent sub-unit', () => {

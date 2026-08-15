@@ -10,7 +10,7 @@ const orderSlowerTooltip = createTransientPointerTooltip({
  * Hides `#order-slower-tooltip` and clears its dismiss timer.
  *
  * Purpose: Central teardown for pointer-leave, invalid previews, and blocking tooltip takeover.
- * When to use: Whenever march/ranged preview is blocked or the pointer leaves the map surface.
+ * When to use: Whenever a march preview is blocked or the pointer leaves the map surface.
  * Expected outcome: Element has `hidden` and `aria-hidden=true`.
  * Exceptions: None.
  */
@@ -19,7 +19,7 @@ export function hideOrderSlowerHexTooltip(): void {
 }
 
 /**
- * Returns whether `#order-slower-tooltip` is currently shown (valid march / ranged terrain throttle hint).
+ * Returns whether `#order-slower-tooltip` is currently shown (valid tactical march terrain throttle hint).
  *
  * Purpose: Lets `#hex-tooltip` defer while the slower hint owns the pointer readout.
  * When to use: `shouldSuppressTerrainTooltip` in `renderer.ts`.
@@ -33,8 +33,8 @@ export function isOrderSlowerHexTooltipVisible(): boolean {
 /**
  * Shows or hides `#order-slower-tooltip` near the last pointer position, suppressing the terrain tooltip while visible.
  *
- * Purpose: Gives immediate “Slower: …” or “Using: Road/Rail” feedback for terrain-throttled valid hovers without waiting for the terrain dwell delay.
- * When to use: After `publishHoverRoutePreview` when no blocking message applies and a slow terrain title is present.
+ * Purpose: Gives immediate “Slower: …” or “Using: Road/Rail” feedback for terrain-throttled valid tactical marches without waiting for the terrain dwell delay.
+ * When to use: After `publishHoverRoutePreview` when no blocking message applies and a tactical march slowdown is present.
  * Expected outcome: HTML tooltip follows pointer; auto-hides after `ORDER_BLOCK_HEX_TOOLTIP_TTL_MS` (caller supplies escaped game-built markup).
  * Exceptions: Missing DOM nodes no-op without throwing.
  */

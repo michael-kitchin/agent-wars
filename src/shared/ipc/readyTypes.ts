@@ -85,6 +85,15 @@ precomputedAiEmbarkOrders?: EmbarkOrder[];
    */
 precomputedAiStrategy?: string;
     /**
+   * Cached opponent message (taunt/threat) from a background `requestAiOrders` to show after Ready.
+
+   * Contract: Optional trimmed string; omit when empty.
+   * When to use: Renderer `buildReadyPayload` and main `applyPrecomputedOrdersFromPayload`.
+   * Expected outcome: Copied onto `ReadyResult.aiMessage` when precomputed orders are used.
+   * Exceptions: None.
+   */
+precomputedAiMessage?: string;
+    /**
    * Specifies the contract for the `aiPlanningRunEnabled` member (aiPlanningRunEnabled?: boolean;).
 
    * Contract: Describes stable behavior for callers of `aiPlanningRunEnabled` in this codebase.
@@ -198,6 +207,15 @@ export type TacticalPostBeatConsultFields = {
   attachTacticalOpponentPlanToIpc: boolean;
   tacticalOpponentPlan?: TacticalOpponentPlanPayload | null;
   aiStrategy?: string;
+  /**
+   * Player-facing taunt/threat from the same consultation as `aiStrategy`.
+   *
+   * Contract: Optional; omit when empty after trim.
+   * When to use: Renderer strategy toast Message section after a tactical beat consult.
+   * Expected outcome: Independent of `aiStrategy` so message-only consults still display.
+   * Exceptions: None.
+   */
+  aiMessage?: string;
   toolInvocationCounts?: Record<string, number>;
 };
 
@@ -206,7 +224,7 @@ export type TacticalPostBeatConsultFields = {
  *
  * Purpose: Lets `runEventDrivenAfterTacticalBeatConsultation` return the same intermediate shape `afterTacticalBeatResolution` uses (`strategy` name) while `toTacticalPostBeatConsultFields` maps to `TacticalPostBeatConsultFields` (`aiStrategy`) in one place.
  * When to use: As the resolve type of `runEventDrivenAfterTacticalBeatConsultation` and as input to `toTacticalPostBeatConsultFields` from `main.ts`.
- * Expected outcome: Empty object when consultation is skipped or fails; otherwise optional attach flag, plan, strategy text, and tool counts.
+ * Expected outcome: Empty object when consultation is skipped or fails; otherwise optional attach flag, plan, strategy/message text, and tool counts.
  * Exceptions: None.
  */
 export type TacticalPostBeatConsultMergeSource = {
@@ -214,6 +232,16 @@ export type TacticalPostBeatConsultMergeSource = {
   tacticalOpponentPlan?: TacticalOpponentPlanPayload | null;
   strategy?: string;
   aiStrategy?: string;
+  /**
+   * Player-facing taunt/threat from the merge source (`message` from afterResolution, or already-mapped `aiMessage`).
+   *
+   * Contract: Optional; mapper prefers `message` then `aiMessage`.
+   * When to use: `toTacticalPostBeatConsultFields`.
+   * Expected outcome: Exposed as `aiMessage` on the IPC fields when non-empty.
+   * Exceptions: None.
+   */
+  message?: string;
+  aiMessage?: string;
   toolInvocationCounts?: Record<string, number>;
 };
 
@@ -854,6 +882,15 @@ controlLossLightningHexes?: string[];
    */
 aiStrategy?: string;
     /**
+   * Player-facing taunt/threat from the consultation that produced `aiStrategy`.
+
+   * Contract: Optional; omit when empty after trim.
+   * When to use: Renderer upper-right toast Message section after Ready.
+   * Expected outcome: Independent of `aiStrategy` so message-only consults still display.
+   * Exceptions: None.
+   */
+aiMessage?: string;
+    /**
    * Specifies the contract for the `toolInvocationCounts` member (toolInvocationCounts?: Record<string, number>;).
 
    * Contract: Describes stable behavior for callers of `toolInvocationCounts` in this codebase.
@@ -1015,6 +1052,15 @@ export type NotifyResolutionPlaybackCompletePayload =
 export type PostResolutionConsultationPushPayload = {
   planningTurnNumber: number;
   aiStrategy?: string;
+  /**
+   * Player-facing taunt/threat from the deferred post-resolution consultation.
+   *
+   * Contract: Optional; omit when empty after trim.
+   * When to use: Renderer post-resolution consultation listener.
+   * Expected outcome: Shown in the Message toast section independently of `aiStrategy`.
+   * Exceptions: None.
+   */
+  aiMessage?: string;
   toolInvocationCounts?: Record<string, number>;
 };
 

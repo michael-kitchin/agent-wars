@@ -53,14 +53,14 @@ export interface BuildRecentTurnNotesSectionArgs {
 }
 
 /**
- * Formats strategy text for prompt bullets, using `(none)` when empty.
+ * Formats note text for prompt bullets, using `(none)` when empty.
  *
- * Purpose: Keeps recent-turn notes readable when the AI omitted strategy.
+ * Purpose: Keeps recent-turn notes readable when the AI omitted strategy or message.
  * When to use: Inside per-turn block formatting.
- * Expected outcome: Trimmed strategy or the literal `(none)`.
+ * Expected outcome: Trimmed text or the literal `(none)`.
  * Exceptions: None.
  */
-function strategyDisplayText(raw: string | null | undefined): string {
+function noteDisplayText(raw: string | null | undefined): string {
   const trimmed = raw?.trim() ?? '';
   return trimmed.length > 0 ? trimmed : '(none)';
 }
@@ -68,20 +68,21 @@ function strategyDisplayText(raw: string | null | undefined): string {
 /**
  * Returns whether a persisted row should appear in the recent-turn prompt section.
  *
- * Purpose: Suppresses turns with no strategy and no losses on either side.
+ * Purpose: Suppresses turns with no message, no strategy, and no losses on either side.
  * When to use: After loading rows from `getRecentTurnNotes`.
- * Expected outcome: False for turns with no content; true when any field has content.
+ * Expected outcome: False when message, strategy, and both loss summaries are empty; true when any of those has content.
  * Exceptions: None.
  */
 function rowHasPromptContent(row: TurnNoteRow): boolean {
   const strategy = row.strategyText?.trim() ?? '';
+  const message = row.messageText?.trim() ?? '';
   const human = parsePlayerLossSummaryJson(row.humanLossJson);
   const ai = parsePlayerLossSummaryJson(row.aiLossJson);
-  return strategy.length > 0 || playerHasAnyLoss(human) || playerHasAnyLoss(ai);
+  return strategy.length > 0 || message.length > 0 || playerHasAnyLoss(human) || playerHasAnyLoss(ai);
 }
 
 /**
- * Formats one turn block with Strategy and optional loss bullets.
+ * Formats one turn block with Message, Strategy, and optional loss bullets.
  *
  * Purpose: Emits the per-entry shape inside Recent Turn Notes sections for both strategic and tactical scopes.
  * When to use: For each qualifying row returned from the DB query.
@@ -91,7 +92,8 @@ function rowHasPromptContent(row: TurnNoteRow): boolean {
 function formatTurnBlock(row: TurnNoteRow): string {
   const label = `Turn ${row.turnNumber}`;
   const lines: string[] = [`${label}:`];
-  lines.push(`- Strategy: ${strategyDisplayText(row.strategyText)}`);
+  lines.push(`- Message: ${noteDisplayText(row.messageText)}`);
+  lines.push(`- Strategy: ${noteDisplayText(row.strategyText)}`);
   const human = parsePlayerLossSummaryJson(row.humanLossJson);
   const ai = parsePlayerLossSummaryJson(row.aiLossJson);
   const humanInline = formatPlayerLossInline(human);

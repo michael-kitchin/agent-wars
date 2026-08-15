@@ -1012,6 +1012,20 @@ function testHoverOrderPlanningInteractionLock(): void {
     'hover preview publish should dismiss map detail popovers when planning is active'
   );
   assert.ok(
+    hoverRefreshSource.includes('resolveOrderSlowerTooltipHtml') &&
+      !hoverRefreshSource.includes('collectTacticalRangedSlowTerrainLabels'),
+    'hover preview slower tooltip should omit ranged collection and use resolveOrderSlowerTooltipHtml'
+  );
+  const initCorePath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'initCore.ts');
+  const initCoreSource = fs.readFileSync(initCorePath, 'utf8');
+  assert.ok(
+    initCoreSource.includes('function beginHoverSupportTargetingMode') &&
+      initCoreSource.includes("beginHoverSupportTargetingMode(deps, 'ranged')") &&
+      initCoreSource.includes("beginHoverSupportTargetingMode(deps, 'air')") &&
+      initCoreSource.includes('hideOrderSlowerHexTooltip()'),
+    'enabling ranged or air-strike mode should hide leftover slower hints and refresh hover preview'
+  );
+  assert.ok(
     rendererSource.includes('function shouldSuppressTerrainTooltip') &&
       rendererSource.includes('isHoverOrderPlanningActive()'),
     'hex details tooltip should be suppressed during hover order planning'

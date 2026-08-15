@@ -215,6 +215,15 @@ reason?: string;
    */
   aiStrategy?: string;
   /**
+   * Player-facing taunt/threat from the post–tactical-beat LLM pass (IPC merge only).
+   *
+   * Contract: Populated by `game:commitHumanTacticalDraftOrders` in the main process after consultation, mirroring `aiStrategy`.
+   * When to use: Renderer Message toast section after a tactical Ready beat.
+   * Expected outcome: Omitted when consultation is skipped or the model returns no message field.
+   * Exceptions: None.
+   */
+  aiMessage?: string;
+  /**
    * Sentinel that the incoming opponent tactical draft was consumed on this Ready.
    *
    * Contract: Present only when the renderer sent `opponentTacticalDraft`; always `null` after consume so the renderer does not resend the same marches next beat.

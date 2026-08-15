@@ -117,6 +117,15 @@ consulted: boolean;
    */
 strategy?: string;
     /**
+   * One-line in-character taunt or threat from the consultation, when provided.
+
+   * Contract: Opaque prose for the player-facing toast and later prompts; not parsed for mechanics.
+   * When to use: Map onto Ready IPC `aiMessage` after post-resolution consultation.
+   * Expected outcome: Undefined when the model did not emit a message.
+   * Exceptions: None.
+   */
+message?: string;
+    /**
    * Specifies the contract for the `toolInvocationCounts` member (toolInvocationCounts?: Record<string, number>;).
 
    * Contract: Describes stable behavior for callers of `toolInvocationCounts` in this codebase.
@@ -211,10 +220,12 @@ export async function afterResolution(
           turnNumber: state.turnNumber,
           movementCount: result.orders.length,
           hasToolInvocationCounts: Boolean(result.toolInvocationCounts),
+          hasMessage: Boolean(result.message?.trim()),
         });
         return {
           consulted: true,
           strategy: result.strategy,
+          message: result.message,
           toolInvocationCounts: result.toolInvocationCounts,
         };
       }
@@ -364,6 +375,15 @@ export interface AfterTacticalBeatResolutionResult {
    */
   strategy?: string;
   /**
+   * One-line in-character taunt or threat from the tactical consultation, when provided.
+   *
+   * Contract: Opaque prose for the player-facing toast and later prompts; not authoritative for game rules.
+   * When to use: Map onto tactical IPC `aiMessage` after post-beat consultation.
+   * Expected outcome: Undefined when the model did not emit a message.
+   * Exceptions: None.
+   */
+  message?: string;
+  /**
    * Tool invocation counts for the tactical consultation pass, when collected.
    *
    * Contract: Map of tool name to non-negative invocation count for that single pass.
@@ -475,11 +495,13 @@ export async function afterTacticalBeatResolution(
         movementCount: tacticalOpponentPlan.movementOrders.length,
         rangedCount: tacticalOpponentPlan.rangedAttacks.length,
         hasToolInvocationCounts: Boolean(result.toolInvocationCounts),
+        hasMessage: Boolean(result.message?.trim()),
       });
       return {
         consulted: true,
         tacticalOpponentPlan,
         strategy: result.strategy,
+        message: result.message,
         toolInvocationCounts: result.toolInvocationCounts,
         attachTacticalOpponentPlanToIpc: true,
       };

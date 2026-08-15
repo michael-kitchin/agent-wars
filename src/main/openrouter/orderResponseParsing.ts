@@ -361,9 +361,10 @@ function normalizeMemoryUpdates(raw: unknown): MemoryUpdateItem[] {
  * Exceptions: None.
  */
 export function buildJsonAssistantRepairSchema(includeProductionOrders: boolean): string {
+  logDebug('openRouter buildJsonAssistantRepairSchema', { includeProductionOrders });
   return includeProductionOrders
-    ? `{"strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":"CF"}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":"CG"},{"unitId":"opponent-armor-1","action":"ranged_attack","targetHexCode":"CH"},{"unitId":"opponent-armor-1","action":"cancel_order"}],"airStrikes":[{"unitId":"opponent-air-1","targetHexCode":"CI","targetType":"units"}],"ferryOrders":[{"unitId":"opponent-air-2","destination":"CJ"}],"callbacks":[],"memoryUpdates":[],"productionOrders":[{"action":"set_build_queue","hex":"CF","unitType":"infantry","count":1}]}`
-    : `{"strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":"CF"}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":"CG"},{"unitId":"opponent-armor-1","action":"ranged_attack","targetHexCode":"CH"},{"unitId":"opponent-armor-1","action":"cancel_order"}],"airStrikes":[{"unitId":"opponent-air-1","targetHexCode":"CI","targetType":"units"}],"ferryOrders":[{"unitId":"opponent-air-2","destination":"CJ"}],"callbacks":[],"memoryUpdates":[]}`;
+    ? `{"message":"...","strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":"CF"}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":"CG"},{"unitId":"opponent-armor-1","action":"ranged_attack","targetHexCode":"CH"},{"unitId":"opponent-armor-1","action":"cancel_order"}],"airStrikes":[{"unitId":"opponent-air-1","targetHexCode":"CI","targetType":"units"}],"ferryOrders":[{"unitId":"opponent-air-2","destination":"CJ"}],"callbacks":[],"memoryUpdates":[],"productionOrders":[{"action":"set_build_queue","hex":"CF","unitType":"infantry","count":1}]}`
+    : `{"message":"...","strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":"CF"}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":"CG"},{"unitId":"opponent-armor-1","action":"ranged_attack","targetHexCode":"CH"},{"unitId":"opponent-armor-1","action":"cancel_order"}],"airStrikes":[{"unitId":"opponent-air-1","targetHexCode":"CI","targetType":"units"}],"ferryOrders":[{"unitId":"opponent-air-2","destination":"CJ"}],"callbacks":[],"memoryUpdates":[]}`;
 }
 
 /**
@@ -744,6 +745,15 @@ export function parseOrdersResponse(
   airStrikes: AirStrikeOrder[];
   ferryOrders: FerryOrder[];
   strategy?: string;
+  /**
+   * One-line in-character taunt or threat from the orders envelope `"message"` field.
+   *
+   * Contract: Trimmed string; missing or non-string values become `''`. Read from the orders object, not the chat completion wrapper.
+   * When to use: Persist and surface beside `strategy` after a successful parse.
+   * Expected outcome: Empty string when the model omitted the field.
+   * Exceptions: None.
+   */
+  message?: string;
   callbacks?: CallbackSubscription[];
   memoryUpdates?: MemoryUpdateItem[];
   productionAppliedCount?: number;
@@ -808,6 +818,12 @@ export function parseOrdersResponse(
           });
         }
         const strategy = typeof obj.strategy === 'string' ? obj.strategy.trim() : '';
+        if (obj.message != null && typeof obj.message !== 'string') {
+          logDebug('openRouter parseOrdersResponse: non-string message coerced to empty', {
+            messageType: typeof obj.message,
+          });
+        }
+        const message = typeof obj.message === 'string' ? obj.message.trim() : '';
         const { movementOrders, rangedAttacks, embarkOrders, dropReasons: assignOrderDropReasons } = processV3OrdersArray(
           ordersArray,
           state,
@@ -841,6 +857,7 @@ export function parseOrdersResponse(
           airStrikes: normalizedAirStrikes.airStrikes,
           ferryOrders: normalizedFerryOrders.ferryOrders,
           strategy,
+          message,
           callbacks: callbacks.length > 0 ? callbacks : undefined,
           memoryUpdates: memoryUpdates.length > 0 ? memoryUpdates : undefined,
           productionAppliedCount: productionAppliedCount > 0 ? productionAppliedCount : undefined,

@@ -25,6 +25,10 @@ import {
   tacticalRes4UnderRes1Corner,
 } from '../tacticalBattle/testSupport/tacticalRes4HexFixtures';
 import { afterTacticalBeatResolution } from './afterResolution';
+import {
+  runEventDrivenAfterTacticalBeatConsultation,
+  toTacticalPostBeatConsultFields,
+} from '../ipc/readyIpcResolutionMapping';
 
 const emptyTacticalPlan: TacticalOpponentPlanPayload = {
   movementOrders: [],
@@ -379,6 +383,7 @@ test('afterTacticalBeatResolution builds plan from orders and forwards tool coun
         success: true,
         orders: [{ unitId: 'opp-sub-1', toH3Index: res4 }],
         strategy: 'push armor',
+        message: 'This close, hesitation is already a casualty.',
         toolInvocationCounts: { planning: 7, assessment: 0 },
       }),
     });
@@ -387,6 +392,70 @@ test('afterTacticalBeatResolution builds plan from orders and forwards tool coun
     assert.equal(res.tacticalOpponentPlan?.movementOrders.length, 1);
     assert.equal(res.tacticalOpponentPlan?.movementOrders[0]?.unitId, 'opp-sub-1');
     assert.equal(res.strategy, 'push armor');
+    assert.equal(res.message, 'This close, hesitation is already a casualty.');
     assert.deepEqual(res.toolInvocationCounts, { planning: 7, assessment: 0 });
+  });
+});
+
+test('runEventDrivenAfterTacticalBeatConsultation forwards message onto IPC consult fields', async () => {
+  await withFreshDb(async () => {
+    const res1 = tacticalRes1Cell(12, 34);
+    const res4 = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01 });
+    const state: GameStateSnapshot = {
+      turnNumber: 2,
+      phase: 'planning',
+      hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+      units: [
+        { id: 'human-1', player: 'human', unitType: 'infantry', h3Index: res4 },
+        { id: 'opp-sub-1', player: 'opponent', unitType: 'armor', h3Index: res4 },
+      ],
+      pendingOrders: [],
+    };
+    const tacticalBattle: TacticalBattleSnapshot = {
+      battleId: 'bt-message-ipc',
+      enclosingRes1H3Index: res1,
+      res4ChildH3Indexes: [res4],
+      strategicTurnNumber: 2,
+      tacticalTurnNumber: 1,
+      subUnits: [
+        {
+          id: 'hum-sub-1',
+          parentUnitId: 'hum-p',
+          player: 'human',
+          unitType: 'infantry',
+          h3Index: res4,
+          displayName: 'Hum A',
+        },
+        {
+          id: 'opp-sub-1',
+          parentUnitId: 'opp-parent-1',
+          player: 'opponent',
+          unitType: 'armor',
+          h3Index: res4,
+          displayName: 'Opp A',
+        },
+      ],
+    };
+    const merge = await runEventDrivenAfterTacticalBeatConsultation({
+      useEventDrivenConsultation: true,
+      aiPlanningRunEnabled: true,
+      opponentState: state,
+      tacticalBattle,
+      tacticalResolutionPlayback: { humanMoves: [] },
+      modelId: 'test-model',
+      enabledToolNames: [],
+      hasKey: () => true,
+      requestOrders: async () => ({
+        success: true,
+        orders: [],
+        strategy: 'push armor',
+        message: 'This close, hesitation is already a casualty.',
+      }),
+      timeoutMs: 5000,
+      errorLogMessage: 'test: afterTacticalBeatResolution failed',
+    });
+    const fields = toTacticalPostBeatConsultFields(tacticalBattle.battleId, merge);
+    assert.equal(fields.aiStrategy, 'push armor');
+    assert.equal(fields.aiMessage, 'This close, hesitation is already a casualty.');
   });
 });

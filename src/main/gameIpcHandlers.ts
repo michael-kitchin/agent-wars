@@ -421,6 +421,7 @@ export async function handleGameReady(
   let turnOutputTokens: number | undefined;
   let aiSkipReason: string | undefined;
   let aiStrategy: string | undefined;
+  let aiMessage: string | undefined;
   const applyPrecomputedOrdersFromPayload = (precomputedPayload: GameReadyIpcPayload | undefined): void => {
     aiOrders = precomputedPayload?.precomputedAiOrders ?? [];
     aiRangedOrders = precomputedPayload?.precomputedAiRangedOrders ?? [];
@@ -428,6 +429,7 @@ export async function handleGameReady(
     aiFerryOrders = precomputedPayload?.precomputedAiFerryOrders ?? [];
     aiEmbarkOrders = precomputedPayload?.precomputedAiEmbarkOrders ?? [];
     aiStrategy = precomputedPayload?.precomputedAiStrategy;
+    aiMessage = precomputedPayload?.precomputedAiMessage;
   };
 
   const usePrecomputed =
@@ -476,6 +478,7 @@ export async function handleGameReady(
       aiFerryOrders = result.ferryOrders ?? [];
       aiEmbarkOrders = result.embarkOrders ?? [];
       aiStrategy = result.strategy;
+      aiMessage = result.message;
       aiDropped = result.dropped;
       aiDropReasons = result.dropReasons?.length ? result.dropReasons : undefined;
       toolInvocationCounts = result.toolInvocationCounts;
@@ -529,6 +532,7 @@ export async function handleGameReady(
       aiMoves: aiMovesAwait.length > 0 ? aiMovesAwait : undefined,
       aiConsulted: useEventDrivenConsultation ? aiConsulted : undefined,
       aiStrategy,
+      aiMessage,
       toolInvocationCounts,
       cost: turnCost,
       wallClockMs: turnWallClockMs,
@@ -580,6 +584,9 @@ export async function handleGameReady(
     if (postConsult.aiStrategy) {
       aiStrategy = postConsult.aiStrategy;
     }
+    if (postConsult.aiMessage) {
+      aiMessage = postConsult.aiMessage;
+    }
     if (postConsult.toolInvocationCounts) {
       toolInvocationCounts = postConsult.toolInvocationCounts;
     }
@@ -602,6 +609,7 @@ export async function handleGameReady(
     aiConsulted: useEventDrivenConsultation ? aiConsulted : undefined,
     ...pickReadyResolutionIpcMirrorFields(readyResult),
     aiStrategy,
+    aiMessage,
     toolInvocationCounts,
     cost: turnCost,
     wallClockMs: turnWallClockMs,
@@ -646,6 +654,7 @@ export async function handleResolveMeleeIntercept(
   const aiPlanningRunEnabled = payload?.aiPlanningRunEnabled === true;
 
   let aiStrategy: string | undefined;
+  let aiMessage: string | undefined;
   let toolInvocationCounts: Record<string, number> | undefined;
   let turnCost: number | undefined;
   let turnWallClockMs: number | undefined;
@@ -695,6 +704,9 @@ export async function handleResolveMeleeIntercept(
     if (resolvePostConsult.aiStrategy) {
       aiStrategy = resolvePostConsult.aiStrategy;
     }
+    if (resolvePostConsult.aiMessage) {
+      aiMessage = resolvePostConsult.aiMessage;
+    }
     if (resolvePostConsult.toolInvocationCounts) {
       toolInvocationCounts = resolvePostConsult.toolInvocationCounts;
     }
@@ -708,6 +720,7 @@ export async function handleResolveMeleeIntercept(
     removedOpponentUnitIds: resolveResult.removedOpponentUnitIds,
     tacticalAutoStartRes1H3Index: resolveResult.tacticalAutoStartRes1H3Index,
     aiStrategy,
+    aiMessage,
     toolInvocationCounts,
     cost: turnCost,
     wallClockMs: turnWallClockMs,

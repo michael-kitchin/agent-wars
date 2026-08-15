@@ -457,13 +457,16 @@ export async function requestOrdersFlow(
   let requestCost = 0;
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
-  const markSuccessfulConsultation = (strategyText?: string | null): void => {
+  const markSuccessfulConsultation = (strategyText?: string | null, messageText?: string | null): void => {
     setAiLastConsultationTurn(state.turnNumber);
     clearAiLossEventsSinceConsultation('opponent');
     if (tacticalBattle) {
-      upsertTurnStrategyNote('tactical', tacticalBattle.battleId, tacticalBattle.tacticalTurnNumber, strategyText);
+      upsertTurnStrategyNote('tactical', tacticalBattle.battleId, tacticalBattle.tacticalTurnNumber, {
+        strategyText,
+        messageText,
+      });
     } else {
-      upsertTurnStrategyNote('strategic', '', state.turnNumber, strategyText);
+      upsertTurnStrategyNote('strategic', '', state.turnNumber, { strategyText, messageText });
     }
   };
   try {
@@ -952,7 +955,7 @@ export async function requestOrdersFlow(
         outEmbark = validatedEmb;
       }
 
-      markSuccessfulConsultation(parsed.strategy);
+      markSuccessfulConsultation(parsed.strategy, parsed.message);
       if (onLog) {
         const ms = Date.now() - wallClockStart;
         const bits: string[] = [
@@ -979,6 +982,7 @@ export async function requestOrdersFlow(
         ferryOrders: outFerry.length > 0 ? outFerry : undefined,
         embarkOrders: outEmbark.length > 0 ? outEmbark : undefined,
         strategy: parsed.strategy,
+        message: parsed.message,
         dropped: dropReasons.length,
         dropReasons: dropReasons.length > 0 ? dropReasons : undefined,
         toolInvocationCounts,
@@ -989,7 +993,7 @@ export async function requestOrdersFlow(
       };
     }
     setAiToolLimitExceededLastTurn();
-    markSuccessfulConsultation(null);
+    markSuccessfulConsultation(null, null);
     if (onLog) {
       onLog(
         `AI planning stopped after ${iteration} round(s) without a completed order JSON (max tool rounds or empty final reply). Returning no movement orders.`,

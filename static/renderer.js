@@ -14878,6 +14878,25 @@
     };
   }
 
+  // src/shared/aiStrategyToastContent.ts
+  var AI_STRATEGY_TOAST_MESSAGE_TITLE = "Message";
+  var AI_STRATEGY_TOAST_STRATEGY_TITLE = "Strategy";
+  function trimToastField(raw) {
+    const trimmed = raw?.trim() ?? "";
+    return trimmed.length > 0 ? trimmed : void 0;
+  }
+  function buildAiStrategyToastSections(fields) {
+    const sections = [];
+    const message = trimToastField(fields.message);
+    const strategy = trimToastField(fields.strategy);
+    if (message) sections.push({ title: AI_STRATEGY_TOAST_MESSAGE_TITLE, body: message });
+    if (strategy) sections.push({ title: AI_STRATEGY_TOAST_STRATEGY_TITLE, body: strategy });
+    return sections;
+  }
+  function hasAiStrategyToastContent(fields) {
+    return buildAiStrategyToastSections(fields).length > 0;
+  }
+
   // src/renderer/core/state.ts
   var rendererSharedState = {
     /**
@@ -15629,6 +15648,15 @@
        */
     precomputedAiStrategy: null,
     /**
+       * Documents the object literal property `precomputedAiMessage` (precomputedAiMessage: null as string | null).
+    
+       * Purpose: Caches the opponent taunt/threat from background `requestAiOrders` until Ready consumes it.
+       * When to use: Set from a successful prefetch; cleared with the rest of precomputed AI state.
+       * Expected outcome: Copied onto `GameReadyIpcPayload.precomputedAiMessage`.
+       * Exceptions: None.
+       */
+    precomputedAiMessage: null,
+    /**
        * Documents the object literal property `precomputedToolInvocationCounts` (precomputedToolInvocationCounts: null as Record<string, number> | null).
     
        * Purpose: Supports maintainability by documenting why `precomputedToolInvocationCounts` exists.
@@ -15895,7 +15923,11 @@
     const el = document.getElementById("map-toast");
     if (el) el.classList.add("hidden");
   }
-  function showAiStrategyToast(message, modelName) {
+  function showAiStrategyToast(content) {
+    if (!hasAiStrategyToastContent(content)) {
+      hideAiStrategyToast();
+      return;
+    }
     if (rendererSharedState.aiStrategyToastHideTimer !== null) {
       clearTimeout(rendererSharedState.aiStrategyToastHideTimer);
       rendererSharedState.aiStrategyToastHideTimer = null;
@@ -15907,14 +15939,15 @@
         el,
         textEl,
         (target) => {
-          if (modelName) {
-            const strong = document.createElement("strong");
-            strong.textContent = modelName;
-            target.appendChild(strong);
-            target.appendChild(document.createTextNode(": " + message));
-          } else {
-            target.appendChild(document.createTextNode(message));
-          }
+          const sections = buildAiStrategyToastSections(content);
+          sections.forEach((section, index) => {
+            if (index > 0) target.appendChild(document.createElement("br"));
+            appendMapToastSectionHeader(target, section.title);
+            const span = document.createElement("span");
+            span.style.display = "block";
+            span.textContent = section.body;
+            target.appendChild(span);
+          });
         },
         true
       );
@@ -17557,6 +17590,13 @@
     const cat = normalizeDbTerrainKindToTacticalCategory(k, args.parentTerrain);
     return cat !== "water" && cat !== "arctic";
   }
+  function tacticalLandUnitMayOccupyCellWithoutTransport(unitType, cellH3, terrain) {
+    if (unitType !== "infantry" && unitType !== "armor") return false;
+    if (terrain.isUrbanRes4?.(cellH3) || terrain.isRubbleRes4?.(cellH3)) return true;
+    const raw = terrain.effectiveKindForRes4Hex(cellH3);
+    const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
+    return Number.isFinite(tacticalEnterHexMovementCost(unitType, cat));
+  }
   function isNavalRes4TacticalCellNavigable(args) {
     const { resolvedKindForCell, parentTerrain, parentTerrainKind, isSeaportCell } = args;
     if (isSeaportCell) return true;
@@ -17821,6 +17861,14 @@
     }
     return out;
   }
+  function resolveOrderSlowerTooltipHtml(args) {
+    if (args.hasBlockedMessage) return null;
+    if (args.supportTargeting === "ranged" || args.supportTargeting === "air") return null;
+    if (!args.validForAll || !args.tacticalBattleActive) return null;
+    const imp = args.marchImpact;
+    if (!imp || imp.slower.length === 0 && !imp.roadRail) return null;
+    return formatOrderPreviewImpactHtml({ slower: [...imp.slower], roadRail: imp.roadRail });
+  }
   function displayTitleForSlowTerrainBucket(bucket) {
     switch (bucket) {
       case "forests":
@@ -17905,33 +17953,6 @@
       }
     }
     return { slower: slowerOrder, roadRail };
-  }
-  function pickTacticalRangedSlowTerrainDisplayTitle(battle, unitType, attackerSubUnitId) {
-    if (unitType !== "infantry" && unitType !== "armor") return null;
-    const u = battle.subUnits.find((s) => s.id === attackerSubUnitId);
-    if (!u) return null;
-    const anchor = tacticalMovementTerrainAnchorH3(u, battle.subUnits);
-    const baseline = RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0;
-    const eff = effectiveTacticalRangedMaxRangeForAttacker(battle, unitType, anchor);
-    if (eff >= baseline) return null;
-    if (battle.res4IsRubbleByH3?.[anchor]) return "Rubble";
-    if (battle.res4IsUrbanByH3?.[anchor]) return "Urban";
-    if (tacticalRes4CellIsForestClass(battle, anchor)) return "Forest";
-    return null;
-  }
-  function collectTacticalRangedSlowTerrainLabels(battle, previewUnitIds) {
-    const order = [];
-    const seen = /* @__PURE__ */ new Set();
-    for (const id of previewUnitIds) {
-      const sub = battle.subUnits.find((s) => s.id === id);
-      if (!sub || sub.player !== "human") continue;
-      const t = pickTacticalRangedSlowTerrainDisplayTitle(battle, sub.unitType, id);
-      if (t && !seen.has(t)) {
-        seen.add(t);
-        order.push(t);
-      }
-    }
-    return order;
   }
 
   // src/shared/humanMarchPreviewGroupAssembly.ts
@@ -18071,10 +18092,7 @@
   }
   function landTerrainBlocksWithoutTransport(unitTypeForMovement, terrain, h) {
     if (unitTypeForMovement !== "infantry" && unitTypeForMovement !== "armor") return false;
-    if (terrain.isUrbanRes4?.(h) || terrain.isRubbleRes4?.(h)) return false;
-    const raw = terrain.effectiveKindForRes4Hex(h);
-    const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
-    return !Number.isFinite(tacticalEnterHexMovementCost(unitTypeForMovement, cat));
+    return !tacticalLandUnitMayOccupyCellWithoutTransport(unitTypeForMovement, h, terrain);
   }
   function legacyLandTransportPlainsEnterAllowed(args) {
     const { terrain, fromH3, toH3, unitTypeForMovement } = args;
@@ -19845,6 +19863,7 @@
       rendererSharedState.precomputedAiEmbarkOrders = null;
     }
     rendererSharedState.precomputedAiStrategy = null;
+    rendererSharedState.precomputedAiMessage = null;
     rendererSharedState.precomputedToolInvocationCounts = null;
   }
   function unblockPrecomputedAiPlanningAfterBackgroundFailure() {
@@ -19864,6 +19883,7 @@
       rendererSharedState.precomputedAiEmbarkOrders = result.embarkOrders ?? [];
     }
     rendererSharedState.precomputedAiStrategy = result.strategy ?? null;
+    rendererSharedState.precomputedAiMessage = result.message ?? null;
     if (result.tacticalBattle) {
       rendererSharedState.tacticalBattleSnapshot = result.tacticalBattle;
     }
@@ -20169,8 +20189,8 @@
             return;
           }
           applySuccessfulPrecomputedAiResult(result);
-          if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning && result.strategy) {
-            deps.showAiStrategyToast(result.strategy);
+          if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning && hasAiStrategyToastContent({ message: result.message, strategy: result.strategy })) {
+            deps.showAiStrategyToast({ message: result.message, strategy: result.strategy });
           }
           if (result.tacticalBattle) {
             deps.requestRedraw?.();
@@ -21422,17 +21442,13 @@
       preview.renderAsSupportTargeting === "ranged" ? rangedValidationReason : null,
       preview.renderAsSupportTargeting === "air" ? airStrikeValidationReason : null
     );
-    let slowHtml = null;
-    if (!msg && preview.renderAsSupportTargeting === "ranged" && preview.data.validForAll && rendererSharedState.tacticalBattleSnapshot) {
-      const ids = preview.data.previews.map((p) => p.unitId);
-      const labels = sortSlowTerrainLabels(collectTacticalRangedSlowTerrainLabels(rendererSharedState.tacticalBattleSnapshot, ids));
-      slowHtml = formatOrderPreviewImpactHtml({ slower: labels, roadRail: false });
-    } else if (!msg && !preview.renderAsSupportTargeting && preview.data.validForAll) {
-      const imp = preview.data.orderPreviewTerrainImpact ?? null;
-      if (imp && (imp.slower.length > 0 || imp.roadRail)) {
-        slowHtml = formatOrderPreviewImpactHtml({ slower: [...imp.slower], roadRail: imp.roadRail });
-      }
-    }
+    const slowHtml = resolveOrderSlowerTooltipHtml({
+      hasBlockedMessage: Boolean(msg),
+      supportTargeting: preview.renderAsSupportTargeting,
+      validForAll: preview.data.validForAll,
+      tacticalBattleActive: Boolean(rendererSharedState.tacticalBattleSnapshot),
+      marchImpact: preview.data.orderPreviewTerrainImpact ?? null
+    });
     if (msg) {
       hideOrderSlowerHexTooltip();
       if (allowBlockingOrderTooltip) {
@@ -23203,8 +23219,7 @@
         deps.startBackgroundRequestIfAllowed();
       }
     }
-    if (payload.aiStrategy) deps.showAiStrategyToast(payload.aiStrategy);
-    else deps.hideAiStrategyToast();
+    deps.showAiStrategyToast({ message: payload.aiMessage, strategy: payload.aiStrategy });
     if (payload.toolInvocationCounts) {
       rendererSharedState.toolInvocationCounts = { ...rendererSharedState.toolInvocationCounts, ...payload.toolInvocationCounts };
       deps.updateOpenRouterToolCountLabels();
@@ -23337,8 +23352,7 @@
         return;
       }
       rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
-      if (payload.aiStrategy) deps.showAiStrategyToast(payload.aiStrategy);
-      else deps.hideAiStrategyToast();
+      deps.showAiStrategyToast({ message: payload.aiMessage, strategy: payload.aiStrategy });
       if (payload.toolInvocationCounts) {
         rendererSharedState.toolInvocationCounts = { ...rendererSharedState.toolInvocationCounts, ...payload.toolInvocationCounts };
         deps.updateOpenRouterToolCountLabels();
@@ -23571,6 +23585,7 @@
           resetPrecomputedAiState("null");
           rendererSharedState.precomputedAiEmbarkOrders = null;
           rendererSharedState.precomputedAiStrategy = null;
+          rendererSharedState.precomputedAiMessage = null;
           rendererSharedState.eventDrivenInitialConsultationDone = false;
           deps.updateReadyButtonState();
         }
@@ -24491,6 +24506,7 @@
     base.precomputedAiRangedOrders = rendererSharedState.precomputedAiRangedOrders ?? [];
     base.precomputedAiEmbarkOrders = rendererSharedState.precomputedAiEmbarkOrders ?? [];
     base.precomputedAiStrategy = rendererSharedState.precomputedAiStrategy ?? void 0;
+    base.precomputedAiMessage = rendererSharedState.precomputedAiMessage ?? void 0;
     return base;
   }
   function deriveCombatVisibilityClassification(readyResult, visibleHexes) {
@@ -24741,8 +24757,7 @@
           if ("tacticalOpponentPlan" in commitResult) {
             rendererSharedState.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
           }
-          if (commitResult.aiStrategy) deps.showAiStrategyToast(commitResult.aiStrategy);
-          else deps.hideAiStrategyToast();
+          deps.showAiStrategyToast({ message: commitResult.aiMessage, strategy: commitResult.aiStrategy });
         }
         applyToolInvocationCountsAfterReady({
           fromResult: commitResult.toolInvocationCounts,
@@ -24948,8 +24963,7 @@
       const resolutionMoves = [...humanMoves, ...aiMoves];
       const airStrikeOutboundMoves = deps.buildAirStrikeOutboundPlaybackMoves(readyResult.airStrikeMoves);
       const airStrikeReturnMoves = deps.buildAirStrikeReturnPlaybackMoves(readyResult.airStrikeMoves);
-      if (readyResult.aiStrategy) deps.showAiStrategyToast(readyResult.aiStrategy);
-      else deps.hideAiStrategyToast();
+      deps.showAiStrategyToast({ message: readyResult.aiMessage, strategy: readyResult.aiStrategy });
       applyToolInvocationCountsAfterReady({
         fromResult: readyResult.toolInvocationCounts,
         cachedPrecomputed: cachedPrecomputedToolCounts,
@@ -25790,6 +25804,16 @@
   }
 
   // src/renderer/map/initCore.ts
+  function beginHoverSupportTargetingMode(deps, mode) {
+    hidePlanningChromeToasts();
+    hideOrderBlockHexTooltip();
+    hideOrderSlowerHexTooltip();
+    rendererSharedState.rangedModeActive = mode === "ranged";
+    rendererSharedState.airStrikeModeActive = mode === "air";
+    rendererSharedState.hoverPreviewRequestSeq++;
+    rendererSharedState.hoverRoutePreview = null;
+    void deps.refreshHoverRoutePreview();
+  }
   function dismissTerrainTooltipWhenPointerLeavesMapPanel(deps) {
     hideOrderBlockHexTooltip();
     hideOrderSlowerHexTooltip();
@@ -25849,17 +25873,9 @@
         const allAir = selectedUnits.length > 0 && selectedUnits.every((unit) => unit.unitType === "air");
         const allHaveRanged = selectedUnits.length > 0 && selectedUnits.every((unit) => unitHasTacticalRangedBaseline(unit.unitType));
         if (allAir) {
-          hidePlanningChromeToasts();
-          rendererSharedState.airStrikeModeActive = true;
-          rendererSharedState.rangedModeActive = false;
-          rendererSharedState.hoverPreviewRequestSeq++;
-          rendererSharedState.hoverRoutePreview = null;
+          beginHoverSupportTargetingMode(deps, "air");
         } else if (allHaveRanged) {
-          hidePlanningChromeToasts();
-          rendererSharedState.rangedModeActive = true;
-          rendererSharedState.airStrikeModeActive = false;
-          rendererSharedState.hoverPreviewRequestSeq++;
-          rendererSharedState.hoverRoutePreview = null;
+          beginHoverSupportTargetingMode(deps, "ranged");
         }
       }
       deps.updateRangedSidebar();
@@ -25875,6 +25891,8 @@
     });
     document.getElementById("air-strike-cancel-btn")?.addEventListener("click", () => {
       rendererSharedState.airStrikeModeActive = false;
+      hideOrderSlowerHexTooltip();
+      void deps.refreshHoverRoutePreview();
       deps.updateRangedSidebar();
       deps.redraw();
     });

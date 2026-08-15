@@ -42,14 +42,20 @@ export function buildFinalJsonContractInstruction(args: {
     productionSubmitClause,
     coordinateMode = 'strategic',
   } = args;
+  logDebug('promptContracts buildFinalJsonContractInstruction', {
+    includeMemoryUpdates,
+    includeProductionOrders,
+    includeAirActions,
+    coordinateMode,
+  });
   const optionalTail =
     (includeMemoryUpdates ? ', "memoryUpdates": [...]' : '') +
     (includeProductionOrders ? ', "productionOrders": [...]' : '');
   const airFields = includeAirActions ? ', "airStrikes": [ ... ], "ferryOrders": [ ... ]' : '';
   const submitHeader =
-    `Submit your final JSON only (valid JSON, no comments): { "strategy": "<one-line>", "orders": [ ... ]${airFields}, "callbacks": [...]${optionalTail} }.`;
+    `Submit your final JSON only (valid JSON, no comments): { "message": "<one-line taunt or threat>", "strategy": "<one-line>", "orders": [ ... ]${airFields}, "callbacks": [...]${optionalTail} }.`;
   const strictSchemaClause =
-    'Strict schema: top-level must be a JSON object with "strategy" (string) and "orders" (array); do not return a top-level array.';
+    'Strict schema: top-level must be a JSON object with "message" (string), "strategy" (string) and "orders" (array); do not return a top-level array. The "message" field is a one-line in-character taunt or threat addressed to the human player (psychological warfare only: do not reveal real orders, hex codes, unit ids, or operational intent). The "strategy" field is a one-line summary of your plan for this turn.';
   const airUnitOrderNote = includeAirActions
     ? ' Air units never move hex by hex, so "march", "patrol", and "pursue" are rejected for them — use airStrikes for attacks, ferryOrders to reposition, or a "defend" order to keep striking targets in range'
     : ' Air units never move hex by hex, so "march", "patrol", and "pursue" are rejected for them — give them a "defend" order instead';
@@ -126,6 +132,15 @@ includeProductionOrders: boolean;
  * Exceptions: None.
  */
 interface FinalOrdersExamplePayload {
+  /**
+   * One-line in-character taunt or threat to the human player in the illustrative envelope.
+   *
+   * Contract: Plain string; no hex codes, unit ids, or operational intent.
+   * When to use: Example JSON shown in the system prompt.
+   * Expected outcome: Emitted first in the fenced example object.
+   * Exceptions: None.
+   */
+  message: string;
     /**
    * Specifies the contract for the `strategy` member (strategy: string;).
 
@@ -209,6 +224,7 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
   const tactical = flags.coordinateMode === 'tactical';
   const includeAir = flags.includeAirActions !== false;
   const example: FinalOrdersExamplePayload = {
+    message: tactical ? 'This close, hesitation is already a casualty.' : 'You will not find safety in delay.',
     strategy: tactical
       ? 'Close with observed enemies this beat using explicit moves and fire.'
       : 'Close with observed enemies and keep production moving.',

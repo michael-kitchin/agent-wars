@@ -54,6 +54,15 @@ export type CommitHumanTacticalDraftOrdersIpcResult = {
   toolInvocationCounts?: Record<string, number>;
   aiStrategy?: string;
   /**
+   * Player-facing taunt/threat from the post–tactical-beat LLM pass (IPC merge only).
+   *
+   * Contract: Same source as `aiStrategy`; omit when empty.
+   * When to use: Renderer Message toast section after tactical Ready.
+   * Expected outcome: Independent of `aiStrategy`.
+   * Exceptions: None.
+   */
+  aiMessage?: string;
+  /**
    * True when main deferred `runEventDrivenAfterTacticalBeatConsultation` until resolution playback notify + push.
    *
    * Purpose: Distinguishes invoke responses that omit merged `TacticalPostBeatConsultFields` from those that include them inline.

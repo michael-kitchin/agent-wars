@@ -85,6 +85,7 @@ import {
   getRecentTurnNotes as getRecentTurnNotesFromModule,
   upsertTurnLossNote as upsertTurnLossNoteFromModule,
   upsertTurnStrategyNote as upsertTurnStrategyNoteFromModule,
+  type TurnConsultationNoteTexts,
   type TurnNoteRow,
   type TurnNotesScope,
 } from './game-db/turnNotesHistory';
@@ -112,7 +113,7 @@ import {
 
 export type { GameStateSnapshot } from '../shared/ipcTypes';
 export type { AiLossEventSinceConsultation } from './game-db/aiState';
-export type { TurnNoteRow, TurnNotesScope } from './game-db/turnNotesHistory';
+export type { TurnConsultationNoteTexts, TurnNoteRow, TurnNotesScope } from './game-db/turnNotesHistory';
 export type { BuildQueueRow, HexControlRow, Res1InfrastructureRow, Res4FeatureOverrideRow } from './game-db/controlInfrastructure';
 
 /**
@@ -123,7 +124,7 @@ export type { BuildQueueRow, HexControlRow, Res1InfrastructureRow, Res4FeatureOv
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const EXPECTED_USER_VERSION = 13;
+export const EXPECTED_USER_VERSION = 14;
 
 /**
  * Documents the module-scope binding `GAME_DB_FILE_NAME` (GAME_DB_FILE_NAME).
@@ -1446,7 +1447,7 @@ export function clearAiPendingOrders(playerId: string): void {
 }
 
 /**
- * Persists AI strategy text for one strategic turn or tactical beat.
+ * Persists AI strategy and message text for one strategic turn or tactical beat.
  *
  * Purpose: Public facade over `turnNotesHistory.upsertTurnStrategyNote` for OpenRouter consultation capture.
  * When to use: After successful AI order planning in `requestOrdersFlow`.
@@ -1457,9 +1458,9 @@ export function upsertTurnStrategyNote(
   scope: TurnNotesScope,
   battleId: string,
   turnNumber: number,
-  strategyText: string | null | undefined
+  texts: TurnConsultationNoteTexts
 ): void {
-  upsertTurnStrategyNoteFromModule(getAiStateDbOps(), scope, battleId, turnNumber, strategyText);
+  upsertTurnStrategyNoteFromModule(getAiStateDbOps(), scope, battleId, turnNumber, texts);
 }
 
 /**

@@ -227,6 +227,7 @@ export async function handleNotifyResolutionPlaybackComplete(
     const push: PostResolutionConsultationPushPayload = {
       planningTurnNumber: pending.planningTurnNumber,
       ...(postConsult.aiStrategy ? { aiStrategy: postConsult.aiStrategy } : {}),
+      ...(postConsult.aiMessage ? { aiMessage: postConsult.aiMessage } : {}),
       ...(postConsult.toolInvocationCounts ? { toolInvocationCounts: postConsult.toolInvocationCounts } : {}),
     };
     sender.send(IPC_GAME.postResolutionConsultation, push);
@@ -239,6 +240,7 @@ export async function handleNotifyResolutionPlaybackComplete(
     const push: PostResolutionConsultationPushPayload = {
       planningTurnNumber: pending.planningTurnNumber,
       ...(postConsult.aiStrategy ? { aiStrategy: postConsult.aiStrategy } : {}),
+      ...(postConsult.aiMessage ? { aiMessage: postConsult.aiMessage } : {}),
       ...(postConsult.toolInvocationCounts ? { toolInvocationCounts: postConsult.toolInvocationCounts } : {}),
     };
     sender.send(IPC_GAME.postResolutionConsultation, push);

@@ -83,6 +83,15 @@ export interface RequestOrdersResult {
    */
   strategy?: string;
   /**
+   * One-line in-character taunt or threat from the model when provided.
+   *
+   * Contract: Opaque prose for the player-facing toast and later prompts; not parsed for mechanics.
+   * When to use: Surface beside `strategy` after a successful consultation.
+   * Expected outcome: Trimmed string or omitted when the model did not emit a message.
+   * Exceptions: None.
+   */
+  message?: string;
+  /**
    * Count of tool rows dropped during validation.
    *
    * Contract: Non-negative integer when present; aligns with `dropReasons` length when both provided.

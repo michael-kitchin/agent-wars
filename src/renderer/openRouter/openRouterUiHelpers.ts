@@ -1,4 +1,10 @@
 import type { GameApi, GameReadyIpcPayload } from '../../shared/ipcTypes';
+import {
+  buildAiStrategyToastSections,
+  hasAiStrategyToastContent,
+  type AiStrategyToastFields,
+} from '../../shared/aiStrategyToastContent';
+import { READY_REQUEST_TIMEOUT_MS, TOAST_DURATION_MS } from '../core/constants';
 import { READY_REQUEST_TIMEOUT_MS, TOAST_DURATION_MS } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { isDeferredResolutionPlaybackConsultPending, isWaitingForPrecomputedAiOrders } from './aiPlanningState';
@@ -226,7 +232,15 @@ function appendMapToastBulletLine(target: HTMLElement, line: string, indent: boo
   target.appendChild(span);
 }
 
-function appendMapToastSectionHeader(target: HTMLElement, title: string): void {
+/**
+ * Appends a bold block section title with a trailing colon, matching lower-right map-toast headers.
+ *
+ * Purpose: Shared title styling for `#map-toast` and `#ai-strategy-toast`.
+ * When to use: From `appendMapToastMessageBody` and `showAiStrategyToast`.
+ * Expected outcome: A `display:block` `<strong>` whose text ends with `:`.
+ * Exceptions: None.
+ */
+export function appendMapToastSectionHeader(target: HTMLElement, title: string): void {
   const strong = document.createElement('strong');
   strong.style.display = 'block';
   strong.textContent = title.endsWith(':') ? title : `${title}:`;
@@ -331,14 +345,18 @@ export function hideMapToast(): void {
 }
 
 /**
- * Defines the `showAiStrategyToast` function shape (export function showAiStrategyToast(message: string, modelName?: string): void).
-
- * Purpose: Supports maintainability by documenting why `showAiStrategyToast` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Shows the upper-right toast with Message then Strategy sections, or hides it when both are empty.
+ *
+ * Purpose: Surfaces the opponent's taunt/threat and plan summary after consultation.
+ * When to use: After Ready, tactical commit, deferred consult push, or tactical prefetch.
+ * Expected outcome: Bold section titles matching the lower-right toast; plain (non-bulleted) body text; empty sections omitted; both empty hides a stale toast.
  * Exceptions: None.
  */
-export function showAiStrategyToast(message: string, modelName?: string): void {
+export function showAiStrategyToast(content: AiStrategyToastFields): void {
+  if (!hasAiStrategyToastContent(content)) {
+    hideAiStrategyToast();
+    return;
+  }
   if (S.aiStrategyToastHideTimer !== null) {
     clearTimeout(S.aiStrategyToastHideTimer);
     S.aiStrategyToastHideTimer = null;
@@ -350,14 +368,15 @@ export function showAiStrategyToast(message: string, modelName?: string): void {
       el,
       textEl,
       (target) => {
-        if (modelName) {
-          const strong = document.createElement('strong');
-          strong.textContent = modelName;
-          target.appendChild(strong);
-          target.appendChild(document.createTextNode(': ' + message));
-        } else {
-          target.appendChild(document.createTextNode(message));
-        }
+        const sections = buildAiStrategyToastSections(content);
+        sections.forEach((section, index) => {
+          if (index > 0) target.appendChild(document.createElement('br'));
+          appendMapToastSectionHeader(target, section.title);
+          const span = document.createElement('span');
+          span.style.display = 'block';
+          span.textContent = section.body;
+          target.appendChild(span);
+        });
       },
       true
     );

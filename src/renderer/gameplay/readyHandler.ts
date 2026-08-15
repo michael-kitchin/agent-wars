@@ -1,13 +1,13 @@
 import type {
   AirStrikeAnimationMove,
+  CommitHumanTacticalDraftOrdersIpcResult,
   GameReadyIpcPayload,
   GameStateSnapshot,
   ReadyResult,
   RemovedUnitSnapshot,
   TacticalCommitResolutionPlayback,
 } from '../../shared/ipcTypes';
-import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import type { TacticalOpponentPlanPayload } from '../../shared/ipc/readyTypes';
+import type { AiStrategyToastFields } from '../../shared/aiStrategyToastContent';
 import {
   applyTacticalPostBeatConsultSideEffects,
   isTacticalPostBeatConsultOnCommit,
@@ -136,14 +136,14 @@ buildAirStrikeOutboundPlaybackMoves: (moves: AirStrikeAnimationMove[] | undefine
    */
 buildAirStrikeReturnPlaybackMoves: (moves: AirStrikeAnimationMove[] | undefined) => ResolutionPlaybackMove[];
     /**
-   * Specifies the contract for the `showAiStrategyToast` member (showAiStrategyToast: (content: string) => void;).
+   * Specifies the contract for the `showAiStrategyToast` member (showAiStrategyToast: (content: AiStrategyToastFields) => void;).
 
-   * Contract: Describes stable behavior for callers of `showAiStrategyToast` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Contract: Displays Message and Strategy sections from consultation IPC when either field is present.
+   * When to use: Strategic Ready handler, tactical Ready handler, or other consultation merge sites.
+   * Expected outcome: Non-empty fields become visible until timeout or dismiss; both empty hides a stale toast.
    * Exceptions: None.
    */
-showAiStrategyToast: (content: string) => void;
+showAiStrategyToast: (content: AiStrategyToastFields) => void;
     /**
    * Specifies the contract for the `hideAiStrategyToast` member (hideAiStrategyToast: () => void;).
 
@@ -409,6 +409,7 @@ function buildReadyPayload(args: ReadyPayloadBuildArgs): GameReadyIpcPayload {
   base.precomputedAiRangedOrders = S.precomputedAiRangedOrders ?? [];
   base.precomputedAiEmbarkOrders = S.precomputedAiEmbarkOrders ?? [];
   base.precomputedAiStrategy = S.precomputedAiStrategy ?? undefined;
+  base.precomputedAiMessage = S.precomputedAiMessage ?? undefined;
   return base;
 }
 
@@ -746,18 +747,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
           : {}),
         useEventDrivenConsultation: S.useEventDrivenConsultation,
         aiPlanningRunEnabled: S.runButtonOn,
-      })) as {
-        success: boolean;
-        reason?: string;
-        tacticalBattle?: TacticalBattleSnapshot;
-        tacticalResolutionPlayback?: TacticalCommitResolutionPlayback;
-        tacticalMarchContinuations?: { subUnitId: string; destinationH3Index: string }[];
-        tacticalOpponentPlan?: TacticalOpponentPlanPayload | null;
-        committedOpponentTacticalDraft?: TacticalOpponentPlanPayload | null;
-        toolInvocationCounts?: Record<string, number>;
-        aiStrategy?: string;
-        tacticalPostBeatConsultDeferred?: boolean;
-      };
+      })) as CommitHumanTacticalDraftOrdersIpcResult;
       if (!commitResult.success) {
         S.toolInvocationCounts = toolCountsBeforeReadyClick;
         deps.updateOpenRouterToolCountLabels();
@@ -845,8 +835,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         if ('tacticalOpponentPlan' in commitResult) {
           S.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
         }
-        if (commitResult.aiStrategy) deps.showAiStrategyToast(commitResult.aiStrategy);
-        else deps.hideAiStrategyToast();
+        deps.showAiStrategyToast({ message: commitResult.aiMessage, strategy: commitResult.aiStrategy });
       }
       // Same rule as strategic Ready: prefer this beat's consult counts, else keep prefetch telemetry visible.
       applyToolInvocationCountsAfterReady({
@@ -1072,8 +1061,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     const airStrikeOutboundMoves = deps.buildAirStrikeOutboundPlaybackMoves(readyResult.airStrikeMoves);
     const airStrikeReturnMoves = deps.buildAirStrikeReturnPlaybackMoves(readyResult.airStrikeMoves);
 
-    if (readyResult.aiStrategy) deps.showAiStrategyToast(readyResult.aiStrategy);
-    else deps.hideAiStrategyToast();
+    deps.showAiStrategyToast({ message: readyResult.aiMessage, strategy: readyResult.aiStrategy });
 
     applyToolInvocationCountsAfterReady({
       fromResult: readyResult.toolInvocationCounts,

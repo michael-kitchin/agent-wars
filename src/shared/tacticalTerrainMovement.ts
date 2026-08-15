@@ -156,10 +156,10 @@ export function nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(kind: strin
 }
 
 /**
- * Returns whether infantry or armor may be placed on a res4 cell at tactical battle start.
+ * Returns whether infantry or armor may occupy a hex for terrain-tooltip `(All)` collapse.
  *
  * Contract: Blocks normalized categories `water` and `arctic`; all other tactical land categories are allowed.
- * When to use: `computeTacticalBattleSnapshot` placement alongside naval/air rules.
+ * When to use: `terrainEffectsForTooltip` occupiable sets. Do **not** use for tactical battle spawn (armor wetlands/mountains differ).
  * Expected outcome: False on pure water or arctic tiles (including inherited parent kinds when the child has no override).
  * Exceptions: None.
  */
@@ -171,6 +171,26 @@ export function isInfantryOrArmorTacticalSpawnCell(args: {
   const k = args.resolvedKindForCell || args.parentTerrainKind;
   const cat = normalizeDbTerrainKindToTacticalCategory(k, args.parentTerrain);
   return cat !== 'water' && cat !== 'arctic';
+}
+
+/**
+ * Returns whether infantry or armor may occupy `cellH3` without a road/rail plains override.
+ *
+ * Purpose: One occupancy gate for tactical spawn and `landTerrainBlocksWithoutTransport`.
+ * When to use: Snapshot placement before the transport-link spawn fallback; march helpers via the block predicate.
+ * Expected outcome: True on urban/rubble; otherwise true iff §12.4 enter cost for `unitType` is finite.
+ * Exceptions: False for non-land unit types.
+ */
+export function tacticalLandUnitMayOccupyCellWithoutTransport(
+  unitType: string,
+  cellH3: string,
+  terrain: TacticalTerrainKindResolver
+): boolean {
+  if (unitType !== 'infantry' && unitType !== 'armor') return false;
+  if (terrain.isUrbanRes4?.(cellH3) || terrain.isRubbleRes4?.(cellH3)) return true;
+  const raw = terrain.effectiveKindForRes4Hex(cellH3);
+  const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
+  return Number.isFinite(tacticalEnterHexMovementCost(unitType, cat));
 }
 
 /**

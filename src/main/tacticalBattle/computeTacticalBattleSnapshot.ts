@@ -17,8 +17,8 @@ import {
 import { tacticalRes4UrbanRubbleFlagRecordsForFootprint } from '../../shared/tacticalTerrainCombatModifiers';
 import type { TacticalTerrainKindResolver } from '../../shared/tacticalTerrainMovement';
 import {
-  isInfantryOrArmorTacticalSpawnCell,
   isNavalRes4TacticalCellNavigable,
+  tacticalLandUnitMayOccupyCellWithoutTransport,
   tacticalTerrainTransportResolverFnsFromRoadRailMap,
 } from '../../shared/tacticalTerrainMovement';
 import { tacticalLogError, tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
@@ -201,32 +201,37 @@ function dot(a: { lat: number; lng: number }, b: { lat: number; lng: number }): 
 /**
  * Returns true if a res4 cell's effective terrain is passable for the given strategic unit type for placement.
  *
- * Purpose: Filters impossible tactical spawn cells without invoking full movement rules.
+ * Purpose: Filters impossible tactical spawn cells using the same occupancy rules as marching.
  * When to use: Before assigning sub-units to res4 children during snapshot build.
- * Expected outcome: Naval favors water/coastal; air forbids pure water; land forbids water.
+ * Expected outcome: Naval favors water/coastal; air requires airport; infantry/armor require occupiable terrain or a transport link.
  * Exceptions: None.
- *
- * @param isSeaportCell When true, the res4 child hosts a seaport facility so naval may spawn there even if the terrain kind is land-like.
- * @param isAirportCell When true, the res4 child hosts an airport facility (required for air tactical spawns).
- * @param cellH3 Active res4 index (naval spawn checks use footprint neighbors from this cell).
- * @param childFootprint Full res1→res4 child set for naval first-step connectivity.
- * @param placementTerrain Resolver mirroring post-snapshot march rules for the enclosing hex.
- * @param roadRailByH3 Bundled road/rail side masks keyed by res4 index for transport-linked spawn relaxation.
- * @param rubbleByH3 Optional snapshot rubble map so transport benefits never apply through rubble endpoints.
  */
-function isRes4CellPassableForUnitType(
-  unitType: string,
-  effectiveKind: string,
-  parentTerrain: string,
-  parentTerrainKind: string,
-  isSeaportCell: boolean,
-  isAirportCell: boolean,
-  cellH3: string,
-  childFootprint: ReadonlySet<string>,
-  placementTerrain: TacticalTerrainKindResolver,
-  roadRailByH3: ReadonlyMap<string, { roadSides: readonly boolean[]; railSides: readonly boolean[] }>,
-  rubbleByH3?: Readonly<Record<string, boolean>>
-): boolean {
+function isRes4CellPassableForUnitType(args: {
+  unitType: string;
+  effectiveKind: string;
+  parentTerrain: string;
+  parentTerrainKind: string;
+  isSeaportCell: boolean;
+  isAirportCell: boolean;
+  cellH3: string;
+  childFootprint: ReadonlySet<string>;
+  placementTerrain: TacticalTerrainKindResolver;
+  roadRailByH3: ReadonlyMap<string, { roadSides: readonly boolean[]; railSides: readonly boolean[] }>;
+  rubbleByH3?: Readonly<Record<string, boolean>>;
+}): boolean {
+  const {
+    unitType,
+    effectiveKind,
+    parentTerrain,
+    parentTerrainKind,
+    isSeaportCell,
+    isAirportCell,
+    cellH3,
+    childFootprint,
+    placementTerrain,
+    roadRailByH3,
+    rubbleByH3,
+  } = args;
   const kind = effectiveKind || parentTerrainKind;
   if (unitType === 'naval') {
     if (
@@ -249,13 +254,7 @@ function isRes4CellPassableForUnitType(
     return isAirportCell;
   }
   if (unitType === 'infantry' || unitType === 'armor') {
-    if (
-      isInfantryOrArmorTacticalSpawnCell({
-        resolvedKindForCell: effectiveKind,
-        parentTerrain,
-        parentTerrainKind,
-      })
-    ) {
+    if (tacticalLandUnitMayOccupyCellWithoutTransport(unitType, cellH3, placementTerrain)) {
       return true;
     }
     if (roadRailByH3.size === 0) return false;
@@ -399,6 +398,12 @@ export function computeTacticalBattleSnapshot(
       isSeaportRes4(h3: string): boolean {
         return !!res4IsSeaportByH3[h3];
       },
+      isUrbanRes4(h3: string): boolean {
+        return !!urbanRubbleForPlacement.res4IsUrbanByH3?.[h3];
+      },
+      isRubbleRes4(h3: string): boolean {
+        return !!urbanRubbleForPlacement.res4IsRubbleByH3?.[h3];
+      },
       transportFromTo: transportFns.transportFromTo,
       landTransportMarchContext: transportFns.landTransportMarchContext,
     };
@@ -440,19 +445,19 @@ export function computeTacticalBattleSnapshot(
         const seaportHere = !!res4IsSeaportByH3[cell];
         const airportHere = !!res4IsAirportByH3[cell];
         if (
-          !isRes4CellPassableForUnitType(
-            parent.unitType,
-            effKind,
-            hexRow.terrain,
-            hexRow.terrain_kind,
-            seaportHere,
-            airportHere,
-            cell,
-            childSet,
+          !isRes4CellPassableForUnitType({
+            unitType: parent.unitType,
+            effectiveKind: effKind,
+            parentTerrain: hexRow.terrain,
+            parentTerrainKind: hexRow.terrain_kind,
+            isSeaportCell: seaportHere,
+            isAirportCell: airportHere,
+            cellH3: cell,
+            childFootprint: childSet,
             placementTerrain,
             roadRailByH3,
-            urbanRubbleForPlacement.res4IsRubbleByH3
-          )
+            rubbleByH3: urbanRubbleForPlacement.res4IsRubbleByH3,
+          })
         ) {
           continue;
         }

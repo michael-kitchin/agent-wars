@@ -111,6 +111,31 @@ function testSessionInvalidatesOnVisibleOccupancyChange(): void {
 }
 
 /**
+ * Ensures strategic march previews never attach slower-terrain tooltip fields.
+ *
+ * Purpose: Res1 movement has no §12.4 slowdowns; `#order-slower-tooltip` must stay dark on the strategic map.
+ * When to use: After edits to `strategicMarchTerrainForPlan` or grouped envelope merge.
+ * Expected outcome: Envelope and per-row `slowerTerrainDisplayTitle` / `orderPreviewTerrainImpact` are null.
+ * Exceptions: None.
+ */
+function testStrategicPreviewOmitsSlowerTerrainImpact(): void {
+  withTempDb(() => {
+    const state = getGameState();
+    const landUnit = state.units.find((u) => u.player === 'human' && (u.unitType === 'armor' || u.unitType === 'infantry'));
+    assert.ok(landUnit, 'expected a seeded human land unit');
+    const hovered = state.hexes.find((hex) => hex.h3Index !== landUnit!.h3Index && hex.terrain !== 'water')?.h3Index;
+    assert.ok(hovered, 'expected a non-water destination hex');
+    const result = previewHumanMarchOrdersImpl([landUnit!.id], hovered);
+    assert.equal(result.slowerTerrainDisplayTitle ?? null, null);
+    assert.equal(result.orderPreviewTerrainImpact ?? null, null);
+    for (const row of result.previews) {
+      assert.equal(row.preview.slowerTerrainDisplayTitle ?? null, null);
+      assert.equal(row.preview.orderPreviewTerrainImpact ?? null, null);
+    }
+  });
+}
+
+/**
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Supports maintainability by documenting why `run` exists.
@@ -122,6 +147,7 @@ function run(): void {
   testSessionInvalidatesOnSelectionChange();
   testCacheEvictionRespectsConfiguredBounds();
   testSessionInvalidatesOnVisibleOccupancyChange();
+  testStrategicPreviewOmitsSlowerTerrainImpact();
   console.log('humanMarchPreview tests passed');
 }
 

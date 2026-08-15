@@ -162,8 +162,8 @@ segments: HumanOrderPreviewSegment[];
     /**
    * Optional title-case terrain word when this preview is **valid** but terrain throttles movement (e.g. `Forest`, `Urban`).
    *
-   * Contract: Omitted or `null` when not applicable; never set alongside `valid: false` except transitional payloads.
-   * When to use: March hover envelopes from strategic `previewHumanMarchOrders` and tactical `buildTacticalMarchHoverPreview`.
+   * Contract: Omitted or `null` on strategic marches (no res1 slowdowns) and when not applicable; never required with `valid: false`.
+   * When to use: Tactical `buildTacticalMarchHoverPreview` and merged grouped envelopes; strategic `previewHumanMarchOrders` leaves it null.
    * Expected outcome: Plain-text aggregate for logs/sidebar; comma-separated when multiple terrains apply; renderer prefers `orderPreviewTerrainImpact` for tooltips.
    * Exceptions: None.
    */
@@ -171,9 +171,9 @@ slowerTerrainDisplayTitle?: string | null;
     /**
    * Terrain throttle + road/rail transport flags for HTML order-preview tooltips (`#order-slower-tooltip`).
    *
-   * Contract: Present only when `valid` and at least one of `slower.length > 0` or `roadRail` is true.
-   * When to use: Strategic `previewHumanMarchOrders`, tactical `buildTacticalMarchHoverPreview`, merged grouped envelopes.
-   * Expected outcome: Renderer calls `formatOrderPreviewImpactHtml` without recomputing tactical/strategic paths.
+   * Contract: Present only when `valid` and at least one of `slower.length > 0` or `roadRail` is true. Strategic marches omit this.
+   * When to use: Tactical `buildTacticalMarchHoverPreview` and merged grouped envelopes.
+   * Expected outcome: Renderer passes this payload to `resolveOrderSlowerTooltipHtml` without recomputing paths.
    * Exceptions: None.
    */
 orderPreviewTerrainImpact?: OrderPreviewTerrainImpact | null;
@@ -350,18 +350,18 @@ previews: HumanOrderGroupPreviewUnitResult[];
     /**
    * Aggregated slow-terrain label for grouped march hover when any representative preview is terrain-throttled.
    *
-   * Contract: First non-null `preview.slowerTerrainDisplayTitle` among `previews` order, or explicit envelope override.
-   * When to use: Renderer `publishHoverRoutePreview` for march modes after `buildHumanOrderGroupPreviewEnvelope`.
-   * Expected outcome: Title-case words, comma-separated when merged across origins; `null` when no row is slowed.
+   * Contract: First non-null `preview.slowerTerrainDisplayTitle` among `previews` order, or explicit envelope override. Strategic grouped previews omit this.
+   * When to use: Renderer `publishHoverRoutePreview` for tactical march modes after `buildHumanOrderGroupPreviewEnvelope`.
+   * Expected outcome: Title-case words, comma-separated when merged across origins; `null` when no row is slowed or the preview is strategic.
    * Exceptions: None.
    */
 slowerTerrainDisplayTitle?: string | null;
     /**
    * Merged `orderPreviewTerrainImpact` across grouped march previews (union of `slower`, OR of `roadRail`).
    *
-   * Contract: Same shape as per-row `HumanOrderPreviewResult.orderPreviewTerrainImpact`; omitted when nothing applies.
-   * When to use: After `buildHumanOrderGroupPreviewEnvelope` for strategic and tactical grouped hovers.
-   * Expected outcome: Superset of contributing rows for tooltip HTML.
+   * Contract: Same shape as per-row `HumanOrderPreviewResult.orderPreviewTerrainImpact`; omitted when nothing applies or the preview is strategic.
+   * When to use: After `buildHumanOrderGroupPreviewEnvelope` for tactical grouped hovers.
+   * Expected outcome: Superset of contributing rows for tooltip HTML; null on strategic grouped previews.
    * Exceptions: None.
    */
 orderPreviewTerrainImpact?: OrderPreviewTerrainImpact | null;

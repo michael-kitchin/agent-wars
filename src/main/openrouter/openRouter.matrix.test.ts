@@ -288,7 +288,7 @@ async function run(): Promise<void> {
       const payloadToolNames = new Set(payloadTools.map((t: { function: { name: string } }) => t.function.name));
 
       assert.ok(
-        systemPrompt.includes('Strict schema: top-level must be a JSON object with "strategy" (string) and "orders" (array); do not return a top-level array.'),
+        systemPrompt.includes('Strict schema: top-level must be a JSON object with "message" (string), "strategy" (string) and "orders" (array); do not return a top-level array.'),
         `strict-schema prompt guidance missing for mask=${mask}`
       );
       assert.ok(systemPrompt.includes('# Air Operations Status'), `air-ops status guidance missing for mask=${mask}`);
@@ -347,6 +347,7 @@ async function run(): Promise<void> {
         `goal (5) coaching missing for mask=${mask}`
       );
       assert.ok(systemPrompt.includes('- Your strategy is:'), `strategy coaching header missing for mask=${mask}`);
+      assert.ok(systemPrompt.includes('- Your message is:'), `message coaching header missing for mask=${mask}`);
       assert.ok(
         systemPrompt.includes('(1) Use speed, surprise, and initiative to break the enemy\'s cohesion and morale'),
         `strategy (1) coaching missing for mask=${mask}`
@@ -573,6 +574,7 @@ async function run(): Promise<void> {
       'tactical prompt includes single engage priority'
     );
     assert.ok(tacticalSystemPrompt.includes('- Your strategy is:'), 'tactical prompt includes strategy coaching');
+    assert.ok(tacticalSystemPrompt.includes('- Your message is:'), 'tactical prompt includes message coaching');
     assert.ok(
       !tacticalSystemPrompt.includes('(4) Protect your home region'),
       'tactical prompt omits strategic five-goal list'

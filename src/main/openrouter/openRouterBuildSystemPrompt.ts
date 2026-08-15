@@ -64,6 +64,10 @@ const COACHING_STRATEGY_BLOCK = `- Your strategy is:
     (2) Attack the enemy's weaknesses (gaps) and avoid their strengths (surfaces)
     (3) Create maximum disruption with minimum force`;
 
+/** Coaching for the JSON `"message"` field (player-facing taunt/threat), not operational doctrine. */
+const COACHING_MESSAGE_BLOCK = `- Your message is:
+    Address the human player in character as their enemy commander. Deliver a one-line taunt or threat meant to unnerve them. Psychological warfare only — do not reveal real orders, hex codes, unit ids, or operational intent.`;
+
 const COACHING_STRATEGIC_PRIORITIES = `- Your goals are:
     (1) Engage enemy forces to reduce their combat effectiveness
     (2) Disperse your units to maximize visibility
@@ -254,12 +258,14 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
 
   const tacticalContextBlock = `Strategic context:
 ${COACHING_TACTICAL_PRIORITY}
-${COACHING_STRATEGY_BLOCK}`;
+${COACHING_STRATEGY_BLOCK}
+${COACHING_MESSAGE_BLOCK}`;
 
   const strategicContextBlock = `Strategic context:
 ${STRATEGIC_CONTEXT_OPENING}
 ${COACHING_STRATEGIC_PRIORITIES}
 ${COACHING_STRATEGY_BLOCK}
+${COACHING_MESSAGE_BLOCK}
 - ${formatControlProgressLine('Explored', exploredLandHexes, totalLandHexes, 'land hexes').slice(2)}
 - ${formatControlProgressLine('Controlled', controlledLandHexes, totalLandHexes, 'land hexes').slice(2)}${regionHomeProgressAndHexBullets}`;
 

@@ -4,11 +4,7 @@ import {
   buildTacticalFerryHoverPreview,
   buildTacticalMixedAirNonAirHoverEnvelope,
 } from '../../shared/tacticalFerryHoverPreview';
-import {
-  collectTacticalRangedSlowTerrainLabels,
-  formatOrderPreviewImpactHtml,
-  sortSlowTerrainLabels,
-} from '../../shared/orderPreviewSlowTerrainTooltip';
+import { resolveOrderSlowerTooltipHtml } from '../../shared/orderPreviewSlowTerrainTooltip';
 import { rendererSharedState as S } from '../core/state';
 import type { HoverRoutePreviewState } from '../core/types';
 import { resolveOrderBlockHexTooltipMessage, showOrderBlockHexTooltip } from '../map/orderBlockHexTooltip';
@@ -24,7 +20,7 @@ import type { TacticalOrderDeps } from './tacticalOrderDeps';
  *
  * Purpose: Keeps tactical and strategic preview paths aligned on when to show terrain vs range blocking copy (air: range only).
  * When to use: Only from `refreshHoverRoutePreview` after validation / preview envelopes are computed.
- * Expected outcome: Redraw requested; `#order-block-tooltip` / `#order-slower-tooltip` hidden when `preview` is null or neither hint applies.
+ * Expected outcome: Redraw requested; `#order-block-tooltip` shows for invalid previews on both maps; `#order-slower-tooltip` only for valid tactical marches.
  * Exceptions: None.
  */
 function publishHoverRoutePreview(
@@ -50,17 +46,13 @@ function publishHoverRoutePreview(
     preview.renderAsSupportTargeting === 'ranged' ? rangedValidationReason : null,
     preview.renderAsSupportTargeting === 'air' ? airStrikeValidationReason : null
   );
-  let slowHtml: string | null = null;
-  if (!msg && preview.renderAsSupportTargeting === 'ranged' && preview.data.validForAll && S.tacticalBattleSnapshot) {
-    const ids = preview.data.previews.map((p) => p.unitId);
-    const labels = sortSlowTerrainLabels(collectTacticalRangedSlowTerrainLabels(S.tacticalBattleSnapshot, ids));
-    slowHtml = formatOrderPreviewImpactHtml({ slower: labels, roadRail: false });
-  } else if (!msg && !preview.renderAsSupportTargeting && preview.data.validForAll) {
-    const imp = preview.data.orderPreviewTerrainImpact ?? null;
-    if (imp && (imp.slower.length > 0 || imp.roadRail)) {
-      slowHtml = formatOrderPreviewImpactHtml({ slower: [...imp.slower], roadRail: imp.roadRail });
-    }
-  }
+  const slowHtml = resolveOrderSlowerTooltipHtml({
+    hasBlockedMessage: Boolean(msg),
+    supportTargeting: preview.renderAsSupportTargeting,
+    validForAll: preview.data.validForAll,
+    tacticalBattleActive: Boolean(S.tacticalBattleSnapshot),
+    marchImpact: preview.data.orderPreviewTerrainImpact ?? null,
+  });
   if (msg) {
     hideOrderSlowerHexTooltip();
     if (allowBlockingOrderTooltip) {

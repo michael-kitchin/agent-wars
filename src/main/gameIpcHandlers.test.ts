@@ -208,6 +208,7 @@ async function testRequestAiOrdersSuccess(): Promise<void> {
       success: true,
       orders: [{ unitId: 'opponent-1', toH3Index: '891f1d48b9fffff' }],
       strategy: 'hold',
+      message: 'You will not find safety in delay.',
       toolInvocationCounts: { planning: 1 },
     }),
     controllerRef,
@@ -216,6 +217,7 @@ async function testRequestAiOrdersSuccess(): Promise<void> {
   assert.strictEqual(result.success, true);
   assert.strictEqual((result as { orders: unknown[] }).orders.length, 1);
   assert.strictEqual((result as { strategy?: string }).strategy, 'hold');
+  assert.strictEqual((result as { message?: string }).message, 'You will not find safety in delay.');
 }
 
 /**

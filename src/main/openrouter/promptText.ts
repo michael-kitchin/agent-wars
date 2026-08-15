@@ -412,17 +412,18 @@ export function getInitialUserMessage(
       : '';
     if (hasPrecomputedBriefing) {
       if (coordinateMode === 'tactical') {
-        return `Use the Commander's Briefing above for unit status, attention flags, and possible unit actions this tactical beat. Call plan_route for each sub-unit that needs a move (orderToHexCode). Then submit final JSON with "strategy", "orders" (explicit_move / ranged_attack as needed; do not use assign_order or cancel_order)${jsonOptionalTail}.`;
+        return `Use the Commander's Briefing above for unit status, attention flags, and possible unit actions this tactical beat. Call plan_route for each sub-unit that needs a move (orderToHexCode). Then submit final JSON with "message", "strategy", "orders" (explicit_move / ranged_attack as needed; do not use assign_order or cancel_order)${jsonOptionalTail}.`;
       }
       const ordersNudge = flags.ordersEnabled
         ? ' For units without standing orders in the briefing, include assign_order entries in orders[]. Then use plan_route and explicit_move only where needed this turn. '
         : '';
-      return `Use the Commander's Briefing above for unit status, attention flags, possible unit actions, and supplemental hex intelligence.${ordersNudge}Call plan_route for each unit that needs a move (orderToHexCode).${memoryNote}${productionNote} Then submit final JSON with "strategy", "orders" (assign_order / explicit_move / ranged_attack / cancel_order as needed)${jsonOptionalTail}.`;
+      return `Use the Commander's Briefing above for unit status, attention flags, possible unit actions, and supplemental hex intelligence.${ordersNudge}Call plan_route for each unit that needs a move (orderToHexCode).${memoryNote}${productionNote} Then submit final JSON with "message", "strategy", "orders" (assign_order / explicit_move / ranged_attack / cancel_order as needed)${jsonOptionalTail}.`;
     }
-    return `Use the tools as needed to plan movement.${memoryNote}${productionNote} Then submit final JSON with "strategy", "orders"${jsonOptionalTail}.`;
+    return `Use the tools as needed to plan movement.${memoryNote}${productionNote} Then submit final JSON with "message", "strategy", "orders"${jsonOptionalTail}.`;
   }
 
-  const submitEmpty = ' Then submit final JSON with "strategy": "<one-line>", "orders": [].';
+  const submitEmpty =
+    ' Then submit final JSON with "message": "<one-line taunt or threat>", "strategy": "<one-line>", "orders": [].';
   if (flags.ordersEnabled && flags.memoryEnabled) {
     return `You have no movement planning tools: use assign_order in orders[] and memoryUpdates for notes.${submitEmpty}`;
   }
@@ -431,11 +432,11 @@ export function getInitialUserMessage(
   }
   if (flags.fallbackMovementEnabled) {
     const memoryNudge = flags.memoryEnabled ? ' Include memoryUpdates if needed. ' : '';
-    return `${memoryNudge}Use explicit_move from the Adjacent cells list only. Submit JSON with "strategy", "orders"${jsonOptionalTail}.`;
+    return `${memoryNudge}Use explicit_move from the Adjacent cells list only. Submit JSON with "message", "strategy", "orders"${jsonOptionalTail}.`;
   }
   if (flags.memoryEnabled) {
     return `You have no movement planning tools. Use memoryUpdates in final JSON.${submitEmpty}`;
   }
 
-  return 'You have no movement planning tools. Submit JSON with "strategy", "orders": [].';
+  return 'You have no movement planning tools. Submit JSON with "message", "strategy", "orders": [].';
 }

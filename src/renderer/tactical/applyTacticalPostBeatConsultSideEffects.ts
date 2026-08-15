@@ -1,4 +1,5 @@
 import type { TacticalPostBeatConsultFields } from '../../shared/ipc/readyTypes';
+import type { AiStrategyToastFields } from '../../shared/aiStrategyToastContent';
 import { nextTacticalOpponentDraftAfterPostBeatPlan } from '../../shared/ipc/tacticalOpponentPlanMerge';
 import { rendererSharedState as S } from '../core/state';
 
@@ -12,7 +13,7 @@ import { rendererSharedState as S } from '../core/state';
  */
 export type TacticalPostBeatConsultSideEffectDeps = {
   startBackgroundRequestIfAllowed: () => void;
-  showAiStrategyToast: (content: string) => void;
+  showAiStrategyToast: (content: AiStrategyToastFields) => void;
   hideAiStrategyToast: () => void;
   updateOpenRouterToolCountLabels: () => void;
   appendOpenRouterLog: (line: string, isError?: boolean) => void;
@@ -66,8 +67,7 @@ export function applyTacticalPostBeatConsultSideEffects(
       deps.startBackgroundRequestIfAllowed();
     }
   }
-  if (payload.aiStrategy) deps.showAiStrategyToast(payload.aiStrategy);
-  else deps.hideAiStrategyToast();
+  deps.showAiStrategyToast({ message: payload.aiMessage, strategy: payload.aiStrategy });
   if (payload.toolInvocationCounts) {
     S.toolInvocationCounts = { ...S.toolInvocationCounts, ...payload.toolInvocationCounts };
     deps.updateOpenRouterToolCountLabels();

@@ -12,6 +12,7 @@
 import {
   normalizeDbTerrainKindToTacticalCategory,
   tacticalEnterHexMovementCost,
+  tacticalLandUnitMayOccupyCellWithoutTransport,
   type TacticalMovementCategory,
   type TacticalTerrainKindResolver,
 } from './tacticalTerrainMovement';
@@ -75,10 +76,7 @@ export function landTerrainBlocksWithoutTransport(
   h: string
 ): boolean {
   if (unitTypeForMovement !== 'infantry' && unitTypeForMovement !== 'armor') return false;
-  if (terrain.isUrbanRes4?.(h) || terrain.isRubbleRes4?.(h)) return false;
-  const raw = terrain.effectiveKindForRes4Hex(h);
-  const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
-  return !Number.isFinite(tacticalEnterHexMovementCost(unitTypeForMovement, cat));
+  return !tacticalLandUnitMayOccupyCellWithoutTransport(unitTypeForMovement, h, terrain);
 }
 
 /**

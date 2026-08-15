@@ -1,8 +1,7 @@
 /**
- * Copy and light terrain classification for transient “Slower: …” hover hints during valid march / ranged previews.
+ * Copy and light terrain classification for transient “Slower: …” hover hints during valid tactical marches.
  *
- * Purpose: Keeps strategic march (main), tactical march (renderer), and tactical ranged cap messaging aligned on
- * title-case terrain labels without importing renderer or Electron main modules.
+ * Purpose: Keeps tactical march preview labels aligned without importing renderer or Electron main modules.
  * When to use: `humanMarchPreviewImpl`, `buildTacticalMarchHoverPreview`, `publishHoverRoutePreview`, and HTML tooltip formatters.
  * Expected outcome: Structured `OrderPreviewTerrainImpact` for IPC plus HTML fragments with bold section labels; `null` when no slowdown applies.
  * Exceptions: None; invalid inputs yield `null` or empty collections.
@@ -62,7 +61,7 @@ export function escapeHtmlForOrderPreviewTooltip(text: string): string {
  * Sorts distinct slow-terrain UI labels for stable comma-list rendering.
  *
  * Purpose: Matches product expectation that multi-hex previews list terrains in a predictable order (not path order).
- * When to use: After collecting union labels for strategic paths, grouped ranged unions, or envelope merge.
+ * When to use: After collecting union labels for tactical march paths or envelope merge.
  * Expected outcome: Known labels follow `SLOW_TERRAIN_LABEL_SORT_PRIORITY`; unknown labels sort last then `localeCompare`.
  * Exceptions: None; mutates no inputs.
  */
@@ -92,8 +91,8 @@ export type OrderPreviewImpactHtmlInput = {
 /**
  * Builds safe HTML for order-preview terrain/transport impact (bold `Blocked:` / `Slower:` / `Using:` labels only).
  *
- * Purpose: Unifies march and ranged slower hints with hex tooltip vertical rhythm via `TOOLTIP_SECTION_GAP_HTML`.
- * When to use: Renderer `publishHoverRoutePreview` when showing `#order-slower-tooltip` with `innerHTML`.
+ * Purpose: Unifies blocked vs slower HTML with hex tooltip vertical rhythm via `TOOLTIP_SECTION_GAP_HTML`.
+ * When to use: `resolveOrderSlowerTooltipHtml` and tests that assert escaped tooltip markup.
  * Expected outcome: At most one terrain line (`Blocked` wins over `Slower`); optional second line `Using: Road/Rail`; `null` if nothing applies.
  * Exceptions: None; empty arrays treated as absent.
  */
@@ -115,7 +114,30 @@ export function formatOrderPreviewImpactHtml(args: OrderPreviewImpactHtmlInput):
 }
 
 /**
- * Builds the legacy one-line hover string for terrain-throttled movement or ranged planning (plain text).
+ * Decides `#order-slower-tooltip` HTML for the current hover, or `null` to hide it.
+ *
+ * Purpose: One omit rule so ranged/air planning and strategic marches never show Slower/Using hints.
+ * When to use: `publishHoverRoutePreview` after the blocked-message resolve.
+ * Expected outcome: HTML only for a valid tactical march with slower terrain or road/rail; `null` when blocked, support-targeting, strategic, or no impact.
+ * Exceptions: None.
+ */
+export function resolveOrderSlowerTooltipHtml(args: {
+  hasBlockedMessage: boolean;
+  supportTargeting?: 'ranged' | 'air';
+  validForAll: boolean;
+  tacticalBattleActive: boolean;
+  marchImpact: { slower: readonly string[]; roadRail: boolean } | null;
+}): string | null {
+  if (args.hasBlockedMessage) return null;
+  if (args.supportTargeting === 'ranged' || args.supportTargeting === 'air') return null;
+  if (!args.validForAll || !args.tacticalBattleActive) return null;
+  const imp = args.marchImpact;
+  if (!imp || (imp.slower.length === 0 && !imp.roadRail)) return null;
+  return formatOrderPreviewImpactHtml({ slower: [...imp.slower], roadRail: imp.roadRail });
+}
+
+/**
+ * Builds the legacy one-line hover string for terrain-throttled movement (plain text).
  *
  * Purpose: Backward-compatible helper for callers that still expect `Slower: …` / `Using: Road/Rail` without HTML.
  * When to use: Non-renderer tests or transitional string consumers only; prefer `formatOrderPreviewImpactHtml` in UI.
@@ -366,7 +388,7 @@ export function pickTacticalMarchSlowTerrainDisplayTitle(args: {
  * Resolves tactical ranged “slow terrain” when forest/urban/rubble caps range below the unit’s baseline.
  *
  * Purpose: Surfaces the attacker-anchor terrain that triggers the max-range-1 cap for infantry/armor.
- * When to use: Per-unit ranged hover while a tactical battle snapshot is active and ranged validation succeeded.
+ * When to use: Tests and callers that still expect `string | null` for the range-cap terrain; order-preview tooltips no longer show it.
  * Expected outcome: `Rubble` / `Urban` / `Forest` priority on the anchor cell, or `null` when the cap is inactive.
  * Exceptions: None.
  */
@@ -391,8 +413,8 @@ export function pickTacticalRangedSlowTerrainDisplayTitle(
 /**
  * Collects ranged slow terrain labels across selected human infantry/armor (union, stable preview-unit order).
  *
- * Purpose: Grouped ranged hover shows every throttling terrain type present among origins, not only the first unit.
- * When to use: `publishHoverRoutePreview` tactical ranged branch with `formatOrderPreviewImpactHtml`.
+ * Purpose: Grouped ranged hover can list every throttling terrain type present among origins, not only the first unit.
+ * When to use: Tests and `pickFirstTacticalRangedSlowTerrainDisplayTitle`; order-preview tooltips no longer show ranged slower hints.
  * Expected outcome: Distinct labels in `previewUnitIds` traversal order.
  * Exceptions: None.
  */

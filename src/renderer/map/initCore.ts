@@ -279,6 +279,25 @@ redraw: () => void;
 }
 
 /**
+ * Starts ranged or air-strike hover planning and drops leftover march order hints.
+ *
+ * Purpose: Enabling support targeting must not leave a march “Slower:” / “Blocked:” tooltip visible until the next pointermove.
+ * When to use: `#ranged-attack-btn` after the selection is known to be all-air (air) or all ranged-capable (ranged).
+ * Expected outcome: Mode flags set; both order-preview tooltips hidden; in-flight march preview invalidated; hover refresh starts for the current hex.
+ * Exceptions: None.
+ */
+function beginHoverSupportTargetingMode(deps: InitCoreDeps, mode: 'ranged' | 'air'): void {
+  hidePlanningChromeToasts();
+  hideOrderBlockHexTooltip();
+  hideOrderSlowerHexTooltip();
+  S.rangedModeActive = mode === 'ranged';
+  S.airStrikeModeActive = mode === 'air';
+  S.hoverPreviewRequestSeq++;
+  S.hoverRoutePreview = null;
+  void deps.refreshHoverRoutePreview();
+}
+
+/**
  * Clears terrain tooltip timers/visuals and map hover state when the pointer leaves the map panel or the window loses focus.
  *
  * Purpose: `#hex-tooltip` sits in `#canvas-container`; `pointerleave` on `#main-map` misses moves onto the sidebar or OS chrome.
@@ -362,17 +381,9 @@ export function wireInitCore(deps: InitCoreDeps): void {
       const allHaveRanged =
         selectedUnits.length > 0 && selectedUnits.every((unit) => unitHasTacticalRangedBaseline(unit.unitType));
       if (allAir) {
-        hidePlanningChromeToasts();
-        S.airStrikeModeActive = true;
-        S.rangedModeActive = false;
-        S.hoverPreviewRequestSeq++;
-        S.hoverRoutePreview = null;
+        beginHoverSupportTargetingMode(deps, 'air');
       } else if (allHaveRanged) {
-        hidePlanningChromeToasts();
-        S.rangedModeActive = true;
-        S.airStrikeModeActive = false;
-        S.hoverPreviewRequestSeq++;
-        S.hoverRoutePreview = null;
+        beginHoverSupportTargetingMode(deps, 'ranged');
       }
     }
     deps.updateRangedSidebar();
@@ -388,6 +399,8 @@ export function wireInitCore(deps: InitCoreDeps): void {
   });
   document.getElementById('air-strike-cancel-btn')?.addEventListener('click', () => {
     S.airStrikeModeActive = false;
+    hideOrderSlowerHexTooltip();
+    void deps.refreshHoverRoutePreview();
     deps.updateRangedSidebar();
     deps.redraw();
   });

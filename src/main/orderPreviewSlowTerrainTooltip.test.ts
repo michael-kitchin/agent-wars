@@ -9,6 +9,7 @@ import {
   collectTacticalRangedSlowTerrainLabels,
   formatOrderPreviewImpactHtml,
   formatSlowerHoverTooltipMessage,
+  resolveOrderSlowerTooltipHtml,
   pickStrategicMarchSlowTerrainDisplayTitle,
   pickTacticalMarchSlowTerrainDisplayTitle,
 } from '../shared/orderPreviewSlowTerrainTooltip';
@@ -54,6 +55,90 @@ test('formatOrderPreviewImpactHtml Using-only when roadRail and no terrain line'
 
 test('formatOrderPreviewImpactHtml returns null when empty', () => {
   assert.equal(formatOrderPreviewImpactHtml({}), null);
+});
+
+test('resolveOrderSlowerTooltipHtml omits ranged and air even with march impact', () => {
+  const marchImpact = { slower: ['Forest'], roadRail: false };
+  const base = {
+    hasBlockedMessage: false,
+    validForAll: true,
+    tacticalBattleActive: true,
+    marchImpact,
+  };
+  assert.equal(resolveOrderSlowerTooltipHtml({ ...base, supportTargeting: 'ranged' }), null);
+  assert.equal(resolveOrderSlowerTooltipHtml({ ...base, supportTargeting: 'air' }), null);
+});
+
+test('resolveOrderSlowerTooltipHtml omits strategic and blocked and empty impact', () => {
+  const marchImpact = { slower: ['Forest'], roadRail: true };
+  assert.equal(
+    resolveOrderSlowerTooltipHtml({
+      hasBlockedMessage: false,
+      validForAll: true,
+      tacticalBattleActive: false,
+      marchImpact,
+    }),
+    null
+  );
+  assert.equal(
+    resolveOrderSlowerTooltipHtml({
+      hasBlockedMessage: true,
+      validForAll: true,
+      tacticalBattleActive: true,
+      marchImpact,
+    }),
+    null
+  );
+  assert.equal(
+    resolveOrderSlowerTooltipHtml({
+      hasBlockedMessage: false,
+      validForAll: true,
+      tacticalBattleActive: true,
+      marchImpact: { slower: [], roadRail: false },
+    }),
+    null
+  );
+  assert.equal(
+    resolveOrderSlowerTooltipHtml({
+      hasBlockedMessage: false,
+      validForAll: false,
+      tacticalBattleActive: true,
+      marchImpact,
+    }),
+    null
+  );
+  assert.equal(
+    resolveOrderSlowerTooltipHtml({
+      hasBlockedMessage: false,
+      validForAll: true,
+      tacticalBattleActive: true,
+      marchImpact: null,
+    }),
+    null
+  );
+});
+
+test('resolveOrderSlowerTooltipHtml formats valid tactical march impact', () => {
+  const html = resolveOrderSlowerTooltipHtml({
+    hasBlockedMessage: false,
+    validForAll: true,
+    tacticalBattleActive: true,
+    marchImpact: { slower: ['Forest'], roadRail: true },
+  });
+  assert.ok(html?.includes('<strong>Slower:</strong> Forest'));
+  assert.ok(html?.includes('<strong>Using:</strong> Road/Rail'));
+});
+
+test('resolveOrderSlowerTooltipHtml formats road/rail-only tactical march impact', () => {
+  assert.equal(
+    resolveOrderSlowerTooltipHtml({
+      hasBlockedMessage: false,
+      validForAll: true,
+      tacticalBattleActive: true,
+      marchImpact: { slower: [], roadRail: true },
+    }),
+    '<strong>Using:</strong> Road/Rail'
+  );
 });
 
 test('mergeOrderPreviewTerrainImpactsFromPreviews unions slower labels and ORs roadRail', () => {

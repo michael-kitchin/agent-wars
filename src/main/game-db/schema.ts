@@ -182,6 +182,7 @@ export function getFullDdl(): string {
       battle_id TEXT NOT NULL DEFAULT '',
       turn_number INTEGER NOT NULL,
       strategy_text TEXT,
+      message_text TEXT,
       human_loss_json TEXT,
       ai_loss_json TEXT,
       PRIMARY KEY (scope, battle_id, turn_number)

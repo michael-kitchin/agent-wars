@@ -437,7 +437,7 @@ export function tacticalRes4CellHasActiveTransportCorridor(args: {
  * Returns true when infantry or armor may spawn on a cell that is normally blocked (e.g. water) but lies on a transport link into the footprint.
  *
  * Purpose: Bridge / causeway tiles inside the tactical parent without widening spawn to arbitrary open water.
- * When to use: `computeTacticalBattleSnapshot` placement after the baseline `isInfantryOrArmorTacticalSpawnCell` check fails.
+ * When to use: `computeTacticalBattleSnapshot` placement after `tacticalLandUnitMayOccupyCellWithoutTransport` fails.
  * Expected outcome: True only when at least one footprint neighbor forms a march transport pair with `cellH3` (both cells any road/rail).
  * Exceptions: None.
  */

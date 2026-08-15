@@ -17,11 +17,6 @@ import {
   uniqueStrategicMarchPreviewUnitIds,
 } from '../../../shared/humanMarchPreviewGroupAssembly';
 import type { OrderPreviewTerrainImpact } from '../../../shared/ipc/humanOrderPreviewTypes';
-import {
-  collectStrategicMarchSlowTerrainLabels,
-  sortSlowTerrainLabels,
-  strategicMarchPathH3IndicesFromPlan,
-} from '../../../shared/orderPreviewSlowTerrainTooltip';
 import { isWithinAirFerryGridRange } from '../gridRange';
 import {
   isEmbarkedLandUnit,
@@ -111,33 +106,18 @@ displayOrder?: number };
 type PlanRouteResult = PlanRouteOk | PlanRouteError;
 
 /**
- * Resolves the grouped march “slow terrain” label for a successful strategic `PlanRouteOk` path.
+ * Strategic marches have no terrain slowdown; slower tooltips are tactical-only.
  *
- * Purpose: Feeds `HumanOrderPreviewResult.slowerTerrainDisplayTitle` and `orderPreviewTerrainImpact` without duplicating latLng→H3 conversion rules in multiple branches.
- * When to use: After `executePlanRouteCached` / nearby fallback returns `status: 'ok'` for land/naval march previews.
- * Expected outcome: Comma-separated sorted terrain tokens for legacy string fields; structured impact for HTML tooltips; `null` when the path does not traverse slower-than-plains cells.
- * Exceptions: None; malformed plans yield `null` fields.
+ * Purpose: Keeps grouped preview IPC from attaching `orderPreviewTerrainImpact` on the strategic map.
+ * When to use: After a successful strategic `PlanRouteOk` for land/naval march previews.
+ * Expected outcome: Both fields null so `#order-slower-tooltip` stays hidden; blocked previews still use `invalidReason`.
+ * Exceptions: None.
  */
 function strategicMarchTerrainForPlan(
-  unit: HumanOwnedUnit,
-  context: PreviewComputationContext,
-  planned: PlanRouteOk
+  unit: HumanOwnedUnit
 ): { slowerTerrainDisplayTitle: string | null; orderPreviewTerrainImpact: OrderPreviewTerrainImpact | null } {
   logTrace('humanMarchPreview strategicMarchTerrainForPlan', { unitId: unit.id, unitType: unit.unitType });
-  if (unit.unitType === 'air') return { slowerTerrainDisplayTitle: null, orderPreviewTerrainImpact: null };
-  const pathH3 = strategicMarchPathH3IndicesFromPlan(planned);
-  const collected = collectStrategicMarchSlowTerrainLabels(
-    unit.unitType,
-    pathH3,
-    context.terrainKindByH3,
-    context.terrainByH3
-  );
-  if (collected.length === 0) return { slowerTerrainDisplayTitle: null, orderPreviewTerrainImpact: null };
-  const slower = sortSlowTerrainLabels(collected);
-  return {
-    slowerTerrainDisplayTitle: slower.join(', '),
-    orderPreviewTerrainImpact: { slower, roadRail: false },
-  };
+  return { slowerTerrainDisplayTitle: null, orderPreviewTerrainImpact: null };
 }
 
 /**
@@ -401,20 +381,20 @@ arrowLatLng?: [number, number];
    */
 segments: HumanOrderPreviewSegment[];
     /**
-   * Optional title-case terrain word when this preview is valid but terrain throttles movement (parity with `humanOrderPreviewTypes`).
+   * Optional title-case terrain word when a tactical preview is valid but terrain throttles movement.
    *
-   * Contract: Omitted when not applicable.
-   * When to use: Strategic march hover rows after a successful `PlanRouteOk`.
-   * Expected outcome: Matches shared IPC typing for renderer slower tooltips.
+   * Contract: Strategic march previews omit this (no §12.4 slowdowns at res1).
+   * When to use: Tactical hover rows; strategic `PlanRouteOk` paths leave it null.
+   * Expected outcome: Null on strategic previews; matches shared IPC typing when set.
    * Exceptions: None.
    */
 slowerTerrainDisplayTitle?: string | null;
     /**
    * Terrain throttle hints for HTML order-preview tooltips (parity with `humanOrderPreviewTypes`).
    *
-   * Contract: Present only when valid march previews include slower-than-plains cells along the planned path.
-   * When to use: Strategic march hover rows after a successful `PlanRouteOk`.
-   * Expected outcome: Sorted `slower` labels; strategic march never sets `roadRail`.
+   * Contract: Strategic march previews omit this; tactical rows may set `slower` / `roadRail`.
+   * When to use: Tactical hover after a successful res4 plan; not used for strategic `PlanRouteOk`.
+   * Expected outcome: Null on strategic previews.
    * Exceptions: None.
    */
 orderPreviewTerrainImpact?: OrderPreviewTerrainImpact | null;
@@ -526,7 +506,7 @@ slowerTerrainDisplayTitle?: string | null;
    *
    * Contract: Union of contributing per-row impacts after envelope assembly.
    * When to use: Returned from `previewHumanMarchOrdersImpl` after `buildHumanOrderGroupPreviewEnvelope`.
-   * Expected outcome: Sorted union of `slower`; `roadRail` false for strategic-only payloads today.
+   * Expected outcome: Sorted union of `slower`; omitted on strategic grouped previews.
    * Exceptions: None.
    */
 orderPreviewTerrainImpact?: OrderPreviewTerrainImpact | null;
@@ -720,7 +700,7 @@ function findNearbyReachablePreview(
         showInvalidMarker: false,
         arrowLatLng: planned.destination,
         segments: planned.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes })),
-        ...strategicMarchTerrainForPlan(unit, context, planned),
+        ...strategicMarchTerrainForPlan(unit),
       };
     }
   }
@@ -841,7 +821,7 @@ function computeHumanMarchPreviewForUnit(
       showInvalidMarker: false,
       arrowLatLng: direct.destination,
       segments: direct.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes })),
-      ...strategicMarchTerrainForPlan(unit, context, direct),
+      ...strategicMarchTerrainForPlan(unit),
     };
     cacheSetBounded(previewResultCache, cacheKey, result, maxPreviewResultCacheEntries);
     logPreviewOutcome(unitId, hoveredH3Index, result, 'computed');

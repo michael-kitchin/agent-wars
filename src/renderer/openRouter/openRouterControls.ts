@@ -1,4 +1,5 @@
 import type { PostResolutionConsultationPushPayload } from '../../shared/ipcTypes';
+import type { AiStrategyToastFields } from '../../shared/aiStrategyToastContent';
 import type { OpenRouterModel } from '../../shared/ipc/openRouterTypes';
 import { formatModelOptionLabel } from '../../shared/openRouterModelDisplay';
 import { rendererSharedState as S } from '../core/state';
@@ -92,14 +93,14 @@ openNewGameOverlayFromModelTab: () => void;
    */
 startBackgroundRequestIfAllowed: () => void;
     /**
-   * Specifies the contract for the `showAiStrategyToast` member (showAiStrategyToast: (content: string) => void;).
+   * Specifies the contract for the `showAiStrategyToast` member (showAiStrategyToast: (content: AiStrategyToastFields) => void;).
 
-   * Contract: Displays tactical post-beat strategy text from `game:ready` or tactical commit IPC when present.
-   * When to use: Strategic Ready handler, tactical Ready handler, or other consultation merge sites that surface strategy.
-   * Expected outcome: Non-empty strategy becomes visible until timeout or dismiss.
+   * Contract: Displays Message and Strategy sections from consultation IPC when either field is present.
+   * When to use: Strategic Ready handler, tactical Ready handler, or deferred consultation listeners.
+   * Expected outcome: Non-empty fields become visible until timeout or dismiss; both empty hides a stale toast.
    * Exceptions: None.
    */
-showAiStrategyToast: (content: string) => void;
+showAiStrategyToast: (content: AiStrategyToastFields) => void;
     /**
    * Specifies the contract for the `updateOpenRouterToolCountLabels` member (updateOpenRouterToolCountLabels: () => void;).
 
@@ -163,8 +164,7 @@ function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): vo
       return;
     }
     S.pendingDeferredStrategicPostResolutionConsult = false;
-    if (payload.aiStrategy) deps.showAiStrategyToast(payload.aiStrategy);
-    else deps.hideAiStrategyToast();
+    deps.showAiStrategyToast({ message: payload.aiMessage, strategy: payload.aiStrategy });
     if (payload.toolInvocationCounts) {
       S.toolInvocationCounts = { ...S.toolInvocationCounts, ...payload.toolInvocationCounts };
       deps.updateOpenRouterToolCountLabels();
@@ -427,6 +427,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
         resetPrecomputedAiState('null');
         S.precomputedAiEmbarkOrders = null;
         S.precomputedAiStrategy = null;
+        S.precomputedAiMessage = null;
         S.eventDrivenInitialConsultationDone = false;
         deps.updateReadyButtonState();
       }

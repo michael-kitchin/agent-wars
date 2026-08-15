@@ -72,6 +72,7 @@ export function resetPrecomputedAiState(mode: PrecomputedResetMode): void {
     S.precomputedAiEmbarkOrders = null;
   }
   S.precomputedAiStrategy = null;
+  S.precomputedAiMessage = null;
   S.precomputedToolInvocationCounts = null;
 }
 
@@ -110,6 +111,7 @@ export function applySuccessfulPrecomputedAiResult(result: Extract<RequestAiOrde
     S.precomputedAiEmbarkOrders = result.embarkOrders ?? [];
   }
   S.precomputedAiStrategy = result.strategy ?? null;
+  S.precomputedAiMessage = result.message ?? null;
   if (result.tacticalBattle) {
     S.tacticalBattleSnapshot = result.tacticalBattle;
   }

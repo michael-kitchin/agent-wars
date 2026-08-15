@@ -46,7 +46,7 @@ async function testRecentTurnNotesFormatting(): Promise<void> {
 
     gameDb.openGameDatabaseAtPathForTests(dbPath);
 
-    gameDb.upsertTurnStrategyNote('strategic', '', 1, '');
+    gameDb.upsertTurnStrategyNote('strategic', '', 1, { strategyText: '', messageText: null });
 
     gameDb.upsertTurnLossNote(
 
@@ -62,7 +62,7 @@ async function testRecentTurnNotesFormatting(): Promise<void> {
 
     );
 
-    gameDb.upsertTurnStrategyNote('strategic', '', 3, 'Counterattack');
+    gameDb.upsertTurnStrategyNote('strategic', '', 3, { strategyText: 'Counterattack', messageText: null });
 
     const out = buildRecentTurnNotesSection({
 
@@ -84,6 +84,8 @@ async function testRecentTurnNotesFormatting(): Promise<void> {
 
     assert.ok(out.includes('Strategy: (none)'), 'losses-only turn shows (none) strategy');
 
+    assert.ok(out.includes('Message: (none)'), 'losses-only turn shows (none) message');
+
     assert.ok(out.includes('Human Losses: Ranged attack: I'));
 
     assert.ok(!out.includes('AI Losses:'), 'empty AI loss line suppressed on turn 2');
@@ -92,7 +94,27 @@ async function testRecentTurnNotesFormatting(): Promise<void> {
 
     assert.ok(out.includes('Strategy: Counterattack'));
 
-    gameDb.upsertTurnStrategyNote('tactical', 'tb-x', 1, 'Hold the line');
+    gameDb.upsertTurnStrategyNote('strategic', '', 4, { strategyText: null, messageText: 'You will not find safety in delay.' });
+
+    const withMessageOnly = buildRecentTurnNotesSection({
+
+      scope: 'strategic',
+
+      battleId: '',
+
+      currentTurnNumber: 5,
+
+      heading: 'Recent Turn Notes',
+
+    });
+
+    assert.ok(withMessageOnly.includes('Turn 4:'));
+
+    assert.ok(withMessageOnly.includes('Message: You will not find safety in delay.'));
+
+    assert.ok(withMessageOnly.includes('Strategy: (none)'), 'message-only turn shows (none) strategy');
+
+    gameDb.upsertTurnStrategyNote('tactical', 'tb-x', 1, { strategyText: 'Hold the line', messageText: null });
 
     const tactical = buildRecentTurnNotesSection({
 
@@ -158,7 +180,7 @@ async function testThreeEntryWindow(): Promise<void> {
 
     for (let turn = 1; turn <= 4; turn += 1) {
 
-      gameDb.upsertTurnStrategyNote('strategic', '', turn, `Plan ${turn}`);
+      gameDb.upsertTurnStrategyNote('strategic', '', turn, { strategyText: `Plan ${turn}`, messageText: null });
 
     }
 

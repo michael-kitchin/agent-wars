@@ -1003,6 +1003,15 @@ precomputedAiEmbarkOrders: null as EmbarkOrder[] | null,
    */
 precomputedAiStrategy: null as string | null,
     /**
+   * Documents the object literal property `precomputedAiMessage` (precomputedAiMessage: null as string | null).
+
+   * Purpose: Caches the opponent taunt/threat from background `requestAiOrders` until Ready consumes it.
+   * When to use: Set from a successful prefetch; cleared with the rest of precomputed AI state.
+   * Expected outcome: Copied onto `GameReadyIpcPayload.precomputedAiMessage`.
+   * Exceptions: None.
+   */
+precomputedAiMessage: null as string | null,
+    /**
    * Documents the object literal property `precomputedToolInvocationCounts` (precomputedToolInvocationCounts: null as Record<string, number> | null).
 
    * Purpose: Supports maintainability by documenting why `precomputedToolInvocationCounts` exists.
