@@ -50,7 +50,7 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
       ctx.setLineDash(style.dash);
       ctx.strokeStyle = style.strokeColor;
       ctx.lineWidth = style.lineWidth;
-      ctx.lineCap = 'round';
+      ctx.lineCap = style.lineCap;
       ctx.lineJoin = 'round';
       ctx.beginPath();
       ctx.moveTo(from.x, from.y);

@@ -6,21 +6,18 @@ import {
   resolutionShotLineStyle,
 } from '../../shared/rangedResolutionShotLines';
 import {
-  RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION,
-  RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX,
-  RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX,
-  RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION,
   RANGE_PERIMETER_AIR_STRIKE_COLOR,
   RANGE_PERIMETER_ALPHA,
-  RANGE_PERIMETER_DASH_GAP_FRACTION,
-  RANGE_PERIMETER_DASH_MIN_GAP_PX,
-  RANGE_PERIMETER_DASH_MIN_SOLID_PX,
-  RANGE_PERIMETER_DASH_SOLID_FRACTION,
   RANGE_PERIMETER_RANGED_COLOR,
 } from '../core/constants';
 import { hexCenterPx, hexCenterPxRelativeTo } from '../map/mapUtils';
 import { drawHumanMarchStyleRouteSegments } from './pathDrawing';
-import { getCurrentRangeSupportPlanLineWidth } from './terrainRendering';
+import {
+  buildRangeOverlayDashArray,
+  getCurrentRangeOverlayLineWidth,
+  getRangeOverlayLineCap,
+  type RangeOverlayStrokeKind,
+} from './rangeOverlayStroke';
 import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
 
 /**
@@ -36,35 +33,27 @@ export type PendingOrderLineUnit = { id: string; h3Index: string };
 /**
  * Returns the static stroke style shared by planned support lines and their matching range perimeter.
  *
- * Purpose: Keeps planned and hover ranged/air-strike lines visually consistent with the targeting perimeter (color, width, dash) while leaving dash animation to the perimeter only.
- * When to use: `drawRangedAttackLines`, `drawRangedResolutionShotLines`, `drawAirStrikeLines`, and support-targeting hover previews.
- * Expected outcome: Mode-colored line style at 1.5× home-region border width with 50/50 dash spacing.
+ * Purpose: Keeps planned, hover, resolution, and perimeter ranged/air-strike strokes on one color/dash contract while leaving dash animation to the perimeter only.
+ * When to use: `drawRangePerimeterOverlay` (kind `'perimeter'`), `drawRangedAttackLines`, `drawRangedResolutionShotLines`, `drawAirStrikeLines`, and support-targeting hover previews (kind `'connector'`).
+ * Expected outcome: Mode-colored 50/50 dash style with kind-specific cap; tactical width is `ORDER_LINE_WIDTH`; strategic perimeter is 2× home border and connectors are 1.5× home border. Perimeter dashes scale to 2× line width with butt caps so thick strokes still flow.
  * Exceptions: None.
  */
-export function rangePerimeterStaticLineStyle(mode: 'ranged' | 'airStrike'): {
+export function rangePerimeterStaticLineStyle(
+  mode: 'ranged' | 'airStrike',
+  kind: RangeOverlayStrokeKind = 'connector'
+): {
   lineWidth: number;
   dash: [number, number];
   strokeColor: string;
+  lineCap: 'butt' | 'round';
 } {
-  const lineWidth = getCurrentRangeSupportPlanLineWidth();
+  const lineWidth = getCurrentRangeOverlayLineWidth(kind);
   const strokeColor = mode === 'airStrike' ? RANGE_PERIMETER_AIR_STRIKE_COLOR : RANGE_PERIMETER_RANGED_COLOR;
-  if (mode === 'airStrike') {
-    return {
-      lineWidth,
-      strokeColor,
-      dash: [
-        Math.max(RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX, lineWidth * RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION),
-        Math.max(RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX, lineWidth * RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION),
-      ],
-    };
-  }
   return {
     lineWidth,
     strokeColor,
-    dash: [
-      Math.max(RANGE_PERIMETER_DASH_MIN_SOLID_PX, lineWidth * RANGE_PERIMETER_DASH_SOLID_FRACTION),
-      Math.max(RANGE_PERIMETER_DASH_MIN_GAP_PX, lineWidth * RANGE_PERIMETER_DASH_GAP_FRACTION),
-    ],
+    dash: buildRangeOverlayDashArray(lineWidth, kind, mode),
+    lineCap: getRangeOverlayLineCap(kind),
   };
 }
 
@@ -98,7 +87,7 @@ function strokeSupportOrderLines(
   ctx.setLineDash(style.dash);
   ctx.strokeStyle = style.strokeColor;
   ctx.lineWidth = style.lineWidth;
-  ctx.lineCap = 'round';
+  ctx.lineCap = style.lineCap;
   ctx.lineJoin = 'round';
   for (const segment of segments) {
     if (segment.fromH3Index === segment.toH3Index) continue;

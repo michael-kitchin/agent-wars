@@ -424,24 +424,54 @@ export const RANGE_PERIMETER_RANGED_COLOR = '#a06020';
 export const RANGE_PERIMETER_AIR_STRIKE_COLOR = '#7a3db5';
 
 /**
- * Multiplier applied to home-region outer ownership line width for the range perimeter stroke.
+ * Multiplier applied to home-region outer ownership line width for strategic range perimeter strokes.
  *
- * Purpose: Scales perimeter outline thickness relative to the outer home-region ownership border at the current zoom.
- * When to use: `getRangePerimeterOutlineLineWidth`.
- * Expected outcome: `getHomeRegionOwnershipLineWidth(zoom) * RANGE_PERIMETER_WIDTH_MULTIPLIER` (2× home border).
+ * Purpose: Restores the thicker strategic perimeter relative to the outer home-region ownership border at the current zoom.
+ * When to use: `getRangePerimeterOutlineLineWidth` when not in a tactical battle.
+ * Expected outcome: Strategic perimeter width is `getHomeRegionOwnershipLineWidth(zoom) * this` (2× home border).
  * Exceptions: None.
  */
 export const RANGE_PERIMETER_WIDTH_MULTIPLIER = 2;
 
 /**
- * Multiplier applied to home-region outer ownership line width for planned and planning ranged/air-strike connector lines.
+ * Multiplier applied to home-region outer ownership line width for strategic planned and planning connector lines.
  *
- * Purpose: Scales support connector thickness relative to the outer home-region ownership border at the current zoom.
- * When to use: `getRangeSupportPlanLineWidth`.
- * Expected outcome: `getHomeRegionOwnershipLineWidth(zoom) * RANGE_SUPPORT_LINE_WIDTH_MULTIPLIER` (1.5× home border).
+ * Purpose: Restores strategic support-connector thickness relative to the outer home-region ownership border at the current zoom.
+ * When to use: `getRangeSupportPlanLineWidth` when not in a tactical battle.
+ * Expected outcome: Strategic connector width is `getHomeRegionOwnershipLineWidth(zoom) * this` (1.5× home border).
  * Exceptions: None.
  */
 export const RANGE_SUPPORT_LINE_WIDTH_MULTIPLIER = 1.5;
+
+/**
+ * Canvas line cap for the animated range perimeter outline.
+ *
+ * Purpose: Prevents round caps from filling dash gaps when the strategic perimeter is 2× the home-region border.
+ * When to use: `drawRangePerimeterOverlay` via `rangePerimeterStaticLineStyle` kind `'perimeter'`.
+ * Expected outcome: Square dash ends so the trough stays visible at thick strategic widths.
+ * Exceptions: None.
+ */
+export const RANGE_PERIMETER_LINE_CAP = 'butt';
+
+/**
+ * Canvas line cap for planned, hover, and resolution ranged/air-strike connectors.
+ *
+ * Purpose: Keeps short hex-to-hex support segments rounded without affecting perimeter dash animation.
+ * When to use: `rangePerimeterStaticLineStyle` kind `'connector'`.
+ * Expected outcome: Round end caps on planned, hover, and shot lines.
+ * Exceptions: None.
+ */
+export const RANGE_SUPPORT_CONNECTOR_LINE_CAP = 'round';
+
+/**
+ * Perimeter dash and gap length as a multiple of line width (50/50 pattern).
+ *
+ * Purpose: At 2× home-border thickness, a 1×-width dash/gap is too short to read as a flowing trough; 2× width keeps the pattern open with butt caps.
+ * When to use: `buildRangeOverlayDashArray` for kind `'perimeter'`.
+ * Expected outcome: Each solid and gap is `Math.max(8px floor, lineWidth * this)`.
+ * Exceptions: None.
+ */
+export const RANGE_PERIMETER_ANIMATED_DASH_VS_WIDTH = 2;
 
 /**
  * Opacity for ranged/air-strike perimeter, planning hover, and planned support lines.
@@ -456,8 +486,8 @@ export const RANGE_PERIMETER_ALPHA = 0.75;
 /**
  * Solid segment length as a fraction of perimeter line width (dash portion of 1:1 solid:gap).
  *
- * Purpose: Keeps dash scale proportional when zoom changes home-border-derived width.
- * When to use: `setLineDash` first element for range perimeter.
+ * Purpose: Keeps dash scale proportional to the active overlay line width while remaining above the pixel floor.
+ * When to use: `setLineDash` first element for connector (non-perimeter) support strokes.
  * Expected outcome: Dash length equals line width when above minimum pixel floor.
  * Exceptions: None.
  */
@@ -467,7 +497,7 @@ export const RANGE_PERIMETER_DASH_SOLID_FRACTION = 1.0;
  * Gap length as a fraction of perimeter line width (gap portion of 1:1 solid:gap).
  *
  * Purpose: Equal-length gaps and solid segments for the range perimeter stroke.
- * When to use: `setLineDash` second element for range perimeter.
+ * When to use: `setLineDash` second element for connector (non-perimeter) support strokes.
  * Expected outcome: Gap length matches solid segment scaling (`lineWidth * this` above minimum).
  * Exceptions: None.
  */
@@ -476,7 +506,7 @@ export const RANGE_PERIMETER_DASH_GAP_FRACTION = 1.0;
 /**
  * Minimum solid dash length in screen pixels for the range perimeter stroke.
  *
- * Purpose: Keeps dashes readable when line width matches the thin home border (1×).
+ * Purpose: Keeps dashes readable at tactical `ORDER_LINE_WIDTH` and at thicker strategic overlay widths.
  * When to use: `drawRangePerimeterOverlay` dash array sizing.
  * Expected outcome: `Math.max(this, lineWidth * RANGE_PERIMETER_DASH_SOLID_FRACTION)` for the solid segment.
  * Exceptions: None.
@@ -486,7 +516,7 @@ export const RANGE_PERIMETER_DASH_MIN_SOLID_PX = 8;
 /**
  * Minimum gap length in screen pixels between range perimeter dashes.
  *
- * Purpose: Ensures visible gaps at 1× home-border stroke width.
+ * Purpose: Ensures visible gaps at tactical `ORDER_LINE_WIDTH` and at thicker strategic overlay widths.
  * When to use: `drawRangePerimeterOverlay` dash array sizing.
  * Expected outcome: `Math.max(this, lineWidth * RANGE_PERIMETER_DASH_GAP_FRACTION)` for the gap segment.
  * Exceptions: None.

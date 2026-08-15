@@ -11,25 +11,12 @@ import {
   buildTacticalRangedRangeSet,
   type RangePerimeterUnitInput,
 } from '../../shared/rangePerimeterModel';
-import {
-  RANGE_PERIMETER_ALPHA,
-  RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION,
-  RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX,
-  RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX,
-  RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION,
-  RANGE_PERIMETER_AIR_STRIKE_COLOR,
-  RANGE_PERIMETER_DASH_GAP_FRACTION,
-  RANGE_PERIMETER_DASH_MIN_GAP_PX,
-  RANGE_PERIMETER_DASH_MIN_SOLID_PX,
-  RANGE_PERIMETER_DASH_SOLID_FRACTION,
-  RANGE_PERIMETER_FLOW_PX_PER_SEC,
-  RANGE_PERIMETER_RANGED_COLOR,
-} from '../core/constants';
-import { getCurrentRangePerimeterOutlineLineWidth } from './terrainRendering';
+import { RANGE_PERIMETER_ALPHA, RANGE_PERIMETER_FLOW_PX_PER_SEC } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { alignLngToReference } from '../map/hexGrid';
 import { getLeafletGlobal } from '../map/mapUtils';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
+import { rangePerimeterStaticLineStyle } from './orderDrawing';
 import { drawClosedPolygonPath, type ScreenPoint } from './polygonOutline';
 
 /** True while `tickRangePerimeterAnimation` is inside `redraw()` — prevents double RAF scheduling from `ensure`. */
@@ -210,9 +197,9 @@ function projectLoopsToScreen(
 /**
  * Draws the animated dashed range perimeter when ranged or air-strike planning is active.
  *
- * Purpose: Visualizes max range for the selected group without LOS or target validity filtering.
+ * Purpose: Visualizes max range for the selected group without LOS or target validity filtering, using the same stroke as planned/hover support lines plus flowing dashes.
  * When to use: In both tactical and strategic `drawGameScene` branches before unit icons.
- * Expected outcome: Mode-colored flowing dashed outline around union range hex perimeter; no-op when mode off.
+ * Expected outcome: Mode-colored flowing dashed outline around the union range hex perimeter; tactical width matches movement lines; strategic width uses the thicker home-border scale with butt caps and 2×-width dashes so the trough stays visible; no-op when mode off.
  * Exceptions: None; failures are logged and skipped.
  */
 export function drawRangePerimeterOverlay(ctx: CanvasRenderingContext2D): void {
@@ -221,15 +208,8 @@ export function drawRangePerimeterOverlay(ctx: CanvasRenderingContext2D): void {
   const loops = S.rangePerimeterLoopsLatLng;
   if (!loops?.length) return;
 
-  const lineWidth = getCurrentRangePerimeterOutlineLineWidth();
-  const airStrike = S.airStrikeModeActive;
-  const solidFraction = airStrike ? RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION : RANGE_PERIMETER_DASH_SOLID_FRACTION;
-  const gapFraction = airStrike ? RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION : RANGE_PERIMETER_DASH_GAP_FRACTION;
-  const minSolid = airStrike ? RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX : RANGE_PERIMETER_DASH_MIN_SOLID_PX;
-  const minGap = airStrike ? RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX : RANGE_PERIMETER_DASH_MIN_GAP_PX;
-  const dashSolid = Math.max(minSolid, lineWidth * solidFraction);
-  const dashGap = Math.max(minGap, lineWidth * gapFraction);
-  const patternLength = dashSolid + dashGap;
+  const style = rangePerimeterStaticLineStyle(S.airStrikeModeActive ? 'airStrike' : 'ranged', 'perimeter');
+  const patternLength = style.dash[0] + style.dash[1];
   const phase =
     patternLength > 0
       ? -(((performance.now() / 1000) * RANGE_PERIMETER_FLOW_PX_PER_SEC) % patternLength)
@@ -241,11 +221,11 @@ export function drawRangePerimeterOverlay(ctx: CanvasRenderingContext2D): void {
 
   ctx.save();
   ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
-  ctx.strokeStyle = airStrike ? RANGE_PERIMETER_AIR_STRIKE_COLOR : RANGE_PERIMETER_RANGED_COLOR;
-  ctx.lineWidth = lineWidth;
-  ctx.lineCap = 'round';
+  ctx.strokeStyle = style.strokeColor;
+  ctx.lineWidth = style.lineWidth;
+  ctx.lineCap = style.lineCap;
   ctx.lineJoin = 'round';
-  ctx.setLineDash([dashSolid, dashGap]);
+  ctx.setLineDash(style.dash);
   ctx.lineDashOffset = phase;
   for (const pts of screenLoops) {
     drawClosedPolygonPath(ctx, pts);

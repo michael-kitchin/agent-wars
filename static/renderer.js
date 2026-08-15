@@ -14299,6 +14299,9 @@
   var RANGE_PERIMETER_AIR_STRIKE_COLOR = "#7a3db5";
   var RANGE_PERIMETER_WIDTH_MULTIPLIER = 2;
   var RANGE_SUPPORT_LINE_WIDTH_MULTIPLIER = 1.5;
+  var RANGE_PERIMETER_LINE_CAP = "butt";
+  var RANGE_SUPPORT_CONNECTOR_LINE_CAP = "round";
+  var RANGE_PERIMETER_ANIMATED_DASH_VS_WIDTH = 2;
   var RANGE_PERIMETER_ALPHA = 0.75;
   var RANGE_PERIMETER_DASH_SOLID_FRACTION = 1;
   var RANGE_PERIMETER_DASH_GAP_FRACTION = 1;
@@ -17019,22 +17022,6 @@
     const zoomStrokeScale = getMapZoomStrokeScale(zoom);
     return Math.max(stroke.width * zoomStrokeScale * 3, 2.7);
   }
-  function getRangePerimeterOutlineLineWidth(zoom) {
-    return getHomeRegionOwnershipLineWidth(zoom) * RANGE_PERIMETER_WIDTH_MULTIPLIER;
-  }
-  function getRangeSupportPlanLineWidth(zoom) {
-    return getHomeRegionOwnershipLineWidth(zoom) * RANGE_SUPPORT_LINE_WIDTH_MULTIPLIER;
-  }
-  function resolveMainLeafletMapZoom(defaultZoom = 4) {
-    const map = getMainLeafletMap();
-    return map && typeof map.getZoom === "function" ? map.getZoom() : defaultZoom;
-  }
-  function getCurrentRangePerimeterOutlineLineWidth() {
-    return getRangePerimeterOutlineLineWidth(resolveMainLeafletMapZoom());
-  }
-  function getCurrentRangeSupportPlanLineWidth() {
-    return getRangeSupportPlanLineWidth(resolveMainLeafletMapZoom());
-  }
   function buildControlByHex(state) {
     return new Map((state.res1Control ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
   }
@@ -19443,27 +19430,46 @@
     );
   }
 
-  // src/renderer/rendering/orderDrawing.ts
-  function rangePerimeterStaticLineStyle(mode) {
-    const lineWidth = getCurrentRangeSupportPlanLineWidth();
-    const strokeColor = mode === "airStrike" ? RANGE_PERIMETER_AIR_STRIKE_COLOR : RANGE_PERIMETER_RANGED_COLOR;
-    if (mode === "airStrike") {
-      return {
-        lineWidth,
-        strokeColor,
-        dash: [
-          Math.max(RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX, lineWidth * RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION),
-          Math.max(RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX, lineWidth * RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION)
-        ]
-      };
+  // src/renderer/rendering/rangeOverlayStroke.ts
+  function getRangePerimeterOutlineLineWidth(zoom) {
+    return getHomeRegionOwnershipLineWidth(zoom) * RANGE_PERIMETER_WIDTH_MULTIPLIER;
+  }
+  function getRangeSupportPlanLineWidth(zoom) {
+    return getHomeRegionOwnershipLineWidth(zoom) * RANGE_SUPPORT_LINE_WIDTH_MULTIPLIER;
+  }
+  function resolveMainLeafletMapZoom(defaultZoom = 4) {
+    const map = getMainLeafletMap();
+    return map && typeof map.getZoom === "function" ? map.getZoom() : defaultZoom;
+  }
+  function getCurrentRangeOverlayLineWidth(kind) {
+    if (rendererSharedState.tacticalBattleSnapshot) return ORDER_LINE_WIDTH;
+    const zoom = resolveMainLeafletMapZoom();
+    return kind === "perimeter" ? getRangePerimeterOutlineLineWidth(zoom) : getRangeSupportPlanLineWidth(zoom);
+  }
+  function getRangeOverlayLineCap(kind) {
+    return kind === "perimeter" ? RANGE_PERIMETER_LINE_CAP : RANGE_SUPPORT_CONNECTOR_LINE_CAP;
+  }
+  function buildRangeOverlayDashArray(lineWidth, kind, mode) {
+    const minSolid = mode === "airStrike" ? RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX : RANGE_PERIMETER_DASH_MIN_SOLID_PX;
+    const minGap = mode === "airStrike" ? RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX : RANGE_PERIMETER_DASH_MIN_GAP_PX;
+    if (kind === "perimeter") {
+      const segment = Math.max(minSolid, minGap, lineWidth * RANGE_PERIMETER_ANIMATED_DASH_VS_WIDTH);
+      return [segment, segment];
     }
+    const solidFraction = mode === "airStrike" ? RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION : RANGE_PERIMETER_DASH_SOLID_FRACTION;
+    const gapFraction = mode === "airStrike" ? RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION : RANGE_PERIMETER_DASH_GAP_FRACTION;
+    return [Math.max(minSolid, lineWidth * solidFraction), Math.max(minGap, lineWidth * gapFraction)];
+  }
+
+  // src/renderer/rendering/orderDrawing.ts
+  function rangePerimeterStaticLineStyle(mode, kind = "connector") {
+    const lineWidth = getCurrentRangeOverlayLineWidth(kind);
+    const strokeColor = mode === "airStrike" ? RANGE_PERIMETER_AIR_STRIKE_COLOR : RANGE_PERIMETER_RANGED_COLOR;
     return {
       lineWidth,
       strokeColor,
-      dash: [
-        Math.max(RANGE_PERIMETER_DASH_MIN_SOLID_PX, lineWidth * RANGE_PERIMETER_DASH_SOLID_FRACTION),
-        Math.max(RANGE_PERIMETER_DASH_MIN_GAP_PX, lineWidth * RANGE_PERIMETER_DASH_GAP_FRACTION)
-      ]
+      dash: buildRangeOverlayDashArray(lineWidth, kind, mode),
+      lineCap: getRangeOverlayLineCap(kind)
     };
   }
   function strokeSupportOrderLines(ctx, mode, segments) {
@@ -19474,7 +19480,7 @@
     ctx.setLineDash(style.dash);
     ctx.strokeStyle = style.strokeColor;
     ctx.lineWidth = style.lineWidth;
-    ctx.lineCap = "round";
+    ctx.lineCap = style.lineCap;
     ctx.lineJoin = "round";
     for (const segment of segments) {
       if (segment.fromH3Index === segment.toH3Index) continue;
@@ -23839,7 +23845,7 @@
         ctx.setLineDash(style.dash);
         ctx.strokeStyle = style.strokeColor;
         ctx.lineWidth = style.lineWidth;
-        ctx.lineCap = "round";
+        ctx.lineCap = style.lineCap;
         ctx.lineJoin = "round";
         ctx.beginPath();
         ctx.moveTo(from.x, from.y);
@@ -26318,26 +26324,19 @@
     refreshRangePerimeterCacheIfNeeded();
     const loops = rendererSharedState.rangePerimeterLoopsLatLng;
     if (!loops?.length) return;
-    const lineWidth = getCurrentRangePerimeterOutlineLineWidth();
-    const airStrike = rendererSharedState.airStrikeModeActive;
-    const solidFraction = airStrike ? RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION : RANGE_PERIMETER_DASH_SOLID_FRACTION;
-    const gapFraction = airStrike ? RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION : RANGE_PERIMETER_DASH_GAP_FRACTION;
-    const minSolid = airStrike ? RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX : RANGE_PERIMETER_DASH_MIN_SOLID_PX;
-    const minGap = airStrike ? RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX : RANGE_PERIMETER_DASH_MIN_GAP_PX;
-    const dashSolid = Math.max(minSolid, lineWidth * solidFraction);
-    const dashGap = Math.max(minGap, lineWidth * gapFraction);
-    const patternLength = dashSolid + dashGap;
+    const style = rangePerimeterStaticLineStyle(rendererSharedState.airStrikeModeActive ? "airStrike" : "ranged", "perimeter");
+    const patternLength = style.dash[0] + style.dash[1];
     const phase = patternLength > 0 ? -(performance.now() / 1e3 * RANGE_PERIMETER_FLOW_PX_PER_SEC % patternLength) : 0;
     const refLng = resolveReferenceLngForPerimeter();
     const screenLoops = projectLoopsToScreen(loops, refLng);
     if (screenLoops.length === 0) return;
     ctx.save();
     ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
-    ctx.strokeStyle = airStrike ? RANGE_PERIMETER_AIR_STRIKE_COLOR : RANGE_PERIMETER_RANGED_COLOR;
-    ctx.lineWidth = lineWidth;
-    ctx.lineCap = "round";
+    ctx.strokeStyle = style.strokeColor;
+    ctx.lineWidth = style.lineWidth;
+    ctx.lineCap = style.lineCap;
     ctx.lineJoin = "round";
-    ctx.setLineDash([dashSolid, dashGap]);
+    ctx.setLineDash(style.dash);
     ctx.lineDashOffset = phase;
     for (const pts of screenLoops) {
       drawClosedPolygonPath(ctx, pts);
