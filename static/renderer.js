@@ -21890,6 +21890,27 @@
     }
   }
 
+  // src/renderer/openRouter/resolutionPlaybackDeferral.ts
+  var playbackCompleteNotifyQueue = [];
+  function enqueueResolutionPlaybackCompleteNotify(fn) {
+    playbackCompleteNotifyQueue.length = 0;
+    playbackCompleteNotifyQueue.push(fn);
+  }
+  function dropQueuedResolutionPlaybackCompleteNotifies() {
+    playbackCompleteNotifyQueue.length = 0;
+  }
+  function flushResolutionPlaybackCompleteNotifyCallbacks() {
+    const queue = [...playbackCompleteNotifyQueue];
+    playbackCompleteNotifyQueue.length = 0;
+    for (const fn of queue) {
+      try {
+        fn();
+      } catch (err) {
+        console.error("resolutionPlaybackDeferral: notify callback failed", err);
+      }
+    }
+  }
+
   // src/renderer/tactical/tacticalUiOrchestration.ts
   function clearResolutionPlaybackAnimationState() {
     if (rendererSharedState.resolutionMoveAnimationFrameId !== null) {
@@ -21897,6 +21918,7 @@
     }
     rendererSharedState.resolutionMoveAnimationFrameId = null;
     rendererSharedState.resolutionMoveAnimation = null;
+    dropQueuedResolutionPlaybackCompleteNotifies();
   }
   function tacticalBattleExitTeardownTransientRendererState() {
     cancelInFlightBackgroundAiRequestForRendererTeardown(OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_TACTICAL_BATTLE_EXIT);
@@ -23345,6 +23367,10 @@
   // src/renderer/openRouter/openRouterControls.ts
   function initDeferredResolutionPlaybackPushListeners(deps) {
     window.gameApi?.registerPostResolutionConsultationListener?.((payload) => {
+      if (payload.abandoned === true) {
+        applyAbandonedDeferredConsultRecovery("strategic", deps);
+        return;
+      }
       if (!rendererSharedState.gameState || payload.planningTurnNumber !== rendererSharedState.gameState.turnNumber) {
         deps.appendOpenRouterLog("Ignored stale post-resolution consultation push.", false);
         rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
@@ -23363,6 +23389,10 @@
       deps.updateReadyButtonState();
     });
     window.gameApi?.registerPostTacticalBeatConsultationListener?.((fields) => {
+      if (fields.abandoned === true) {
+        applyAbandonedDeferredConsultRecovery("tactical", deps);
+        return;
+      }
       if (fields.kind !== "tactical" || fields.battleId !== rendererSharedState.tacticalBattleSnapshot?.battleId) {
         deps.appendOpenRouterLog("Ignored stale tactical post-beat consultation push.", false);
         rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
@@ -23380,6 +23410,19 @@
         updateReadyButtonState: deps.updateReadyButtonState
       });
     });
+  }
+  function applyAbandonedDeferredConsultRecovery(kind, deps) {
+    if (kind === "tactical") {
+      rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
+      rendererSharedState.tacticalOpponentDraft = null;
+      const oppAlive = rendererSharedState.tacticalBattleSnapshot?.subUnits.some((u) => u.player === "opponent") ?? false;
+      if (rendererSharedState.runButtonOn && oppAlive) deps.startBackgroundRequestIfAllowed();
+    } else {
+      rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
+      if (rendererSharedState.runButtonOn) deps.startBackgroundRequestIfAllowed();
+    }
+    deps.requestRedraw();
+    deps.updateReadyButtonState();
   }
   function initOpenRouterUI(deps) {
     initDeferredResolutionPlaybackPushListeners(deps);
@@ -23594,23 +23637,6 @@
     document.getElementById("map-toast-dismiss")?.addEventListener("click", deps.hideMapToast);
     document.getElementById("ai-strategy-toast-dismiss")?.addEventListener("click", deps.hideAiStrategyToast);
     void deps.syncOpenRouterRunToggleInteractable();
-  }
-
-  // src/renderer/openRouter/resolutionPlaybackDeferral.ts
-  var playbackCompleteNotifyQueue = [];
-  function enqueueResolutionPlaybackCompleteNotify(fn) {
-    playbackCompleteNotifyQueue.push(fn);
-  }
-  function flushResolutionPlaybackCompleteNotifyCallbacks() {
-    const queue = [...playbackCompleteNotifyQueue];
-    playbackCompleteNotifyQueue.length = 0;
-    for (const fn of queue) {
-      try {
-        fn();
-      } catch (err) {
-        console.error("resolutionPlaybackDeferral: notify callback failed", err);
-      }
-    }
   }
 
   // src/renderer/map/drawInteraction.ts
@@ -24860,6 +24886,7 @@
             if (needsResolutionPlayback) {
               enqueueResolutionPlaybackCompleteNotify(sendTacticalNotify);
             } else {
+              dropQueuedResolutionPlaybackCompleteNotifies();
               sendTacticalNotify();
             }
           }
@@ -24999,6 +25026,7 @@
         if (needsAnimation) {
           enqueueResolutionPlaybackCompleteNotify(sendStrategicNotify);
         } else {
+          dropQueuedResolutionPlaybackCompleteNotifies();
           sendStrategicNotify();
         }
       }
@@ -25803,6 +25831,11 @@
     mapKeyboardPanController.clear();
   }
 
+  // src/shared/stackCalloutCtrlKeydown.ts
+  function shouldRefreshStackCalloutOnControlKeydown(ctrlKeyAlreadyActive) {
+    return !ctrlKeyAlreadyActive;
+  }
+
   // src/renderer/map/initCore.ts
   function beginHoverSupportTargetingMode(deps, mode) {
     hidePlanningChromeToasts();
@@ -25935,8 +25968,11 @@
       if (e.key === "Control" || e.key === "Alt" || e.key === "Meta") {
         clearMapKeyboardPan();
         if (e.key === "Control") {
+          const ctrlKeyAlreadyActive = rendererSharedState.ctrlKeyActive;
           rendererSharedState.ctrlKeyActive = true;
-          deps.applyModifierDrivenPopoverCloseRules("ctrl_pressed");
+          if (shouldRefreshStackCalloutOnControlKeydown(ctrlKeyAlreadyActive)) {
+            deps.applyModifierDrivenPopoverCloseRules("ctrl_pressed");
+          }
         }
         return;
       }

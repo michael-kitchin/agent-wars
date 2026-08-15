@@ -6,6 +6,7 @@ import { isEditableKeyboardTarget, shouldIgnoreGlobalKeydown } from './mapUtils'
 import { rendererSharedState as S } from '../core/state';
 import { hidePlanningChromeToasts } from '../openRouter/openRouterUiHelpers';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
+import { shouldRefreshStackCalloutOnControlKeydown } from '../../shared/stackCalloutCtrlKeydown';
 import { getActiveTerrainStyleBasemapId, renderTerrainLegend } from '../rendering/terrainVisualStyles';
 import { hideOrderBlockHexTooltip } from './orderBlockHexTooltip';
 import { hideOrderSlowerHexTooltip } from './orderSlowerHexTooltip';
@@ -448,8 +449,11 @@ export function wireInitCore(deps: InitCoreDeps): void {
     if (e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') {
       clearMapKeyboardPan();
       if (e.key === 'Control') {
+        const ctrlKeyAlreadyActive = S.ctrlKeyActive;
         S.ctrlKeyActive = true;
-        deps.applyModifierDrivenPopoverCloseRules('ctrl_pressed');
+        if (shouldRefreshStackCalloutOnControlKeydown(ctrlKeyAlreadyActive)) {
+          deps.applyModifierDrivenPopoverCloseRules('ctrl_pressed');
+        }
       }
       return;
     }

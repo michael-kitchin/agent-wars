@@ -30,7 +30,10 @@ import {
   isWaitingForPrecomputedAiOrders,
 } from '../openRouter/aiPlanningState';
 import { buildTacticalPendingMarchRowsFromContinuations } from '../tactical/tacticalPendingMarchPath';
-import { enqueueResolutionPlaybackCompleteNotify } from '../openRouter/resolutionPlaybackDeferral';
+import {
+  dropQueuedResolutionPlaybackCompleteNotifies,
+  enqueueResolutionPlaybackCompleteNotify,
+} from '../openRouter/resolutionPlaybackDeferral';
 import { reconcileSelectionToCurrentState } from '../core/selection';
 import { applyToolInvocationCountsAfterReady } from '../openRouter/openRouterUiHelpers';
 
@@ -948,6 +951,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
           if (needsResolutionPlayback) {
             enqueueResolutionPlaybackCompleteNotify(sendTacticalNotify);
           } else {
+            dropQueuedResolutionPlaybackCompleteNotifies();
             sendTacticalNotify();
           }
         }
@@ -1110,6 +1114,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       if (needsAnimation) {
         enqueueResolutionPlaybackCompleteNotify(sendStrategicNotify);
       } else {
+        dropQueuedResolutionPlaybackCompleteNotifies();
         sendStrategicNotify();
       }
     }

@@ -443,9 +443,12 @@ function isClientPointInsideMainMapLeafletContainer(clientX: number, clientY: nu
 /**
  * Defines the `applyModifierDrivenPopoverCloseRules` function shape (function applyModifierDrivenPopoverCloseRules(reason: 'ctrl_pressed' | 'ctrl_released' | 'window_blur'): void).
 
- * Purpose: Supports maintainability by documenting why `applyModifierDrivenPopoverCloseRules` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Ctrl-pressed rebuilds stack chrome (Select All vs Add All/Remove All); Ctrl-released
+ * closes the stack callout; blur refreshes without assuming the modifier is still down.
+ * When to use: Window Control keydown/keyup and window blur. Call `ctrl_pressed` only on the
+ * inactive→active Control transition — key-repeat rebuilds cancel clicks on the open popup.
+ * Expected outcome: Stack/build popovers follow modifier rules without a full rebuild on every
+ * Control repeat while the key is held.
  * Exceptions: None.
  */
 function applyModifierDrivenPopoverCloseRules(reason: 'ctrl_pressed' | 'ctrl_released' | 'window_blur'): void {

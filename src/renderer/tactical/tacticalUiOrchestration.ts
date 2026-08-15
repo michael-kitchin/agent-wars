@@ -16,13 +16,15 @@ import {
   OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_TACTICAL_BATTLE_EXIT,
 } from '../openRouter/openRouterRuntime';
 import { clearPendingTacticalOrders } from '../gameplay/tacticalOrders';
+import { dropQueuedResolutionPlaybackCompleteNotifies } from '../openRouter/resolutionPlaybackDeferral';
 
 /**
  * Stops resolution playback bookkeeping without touching combat outcomes (shared voluntary exit and forced session release).
  *
  * Purpose: `tacticalBattleExitTeardownTransientRendererState` and `tacticalReleaseRendererSessionForNewStrategicMatch` both must cancel the RAF loop and clear `resolutionMoveAnimation` to avoid stale playback after tactical teardown.
  * When to use: Only from tactical orchestration teardown paths that already handle broader state; not from Ready resolution ticks.
- * Expected outcome: No in-flight `requestAnimationFrame` callback from resolution playback; animation fields null.
+ * Expected outcome: No in-flight `requestAnimationFrame` callback from resolution playback; animation fields null;
+ * leftover playback-complete notifies are dropped so they cannot flush after a later strategic/melee animation.
  * Exceptions: None.
  */
 function clearResolutionPlaybackAnimationState(): void {
@@ -31,6 +33,7 @@ function clearResolutionPlaybackAnimationState(): void {
   }
   S.resolutionMoveAnimationFrameId = null;
   S.resolutionMoveAnimation = null;
+  dropQueuedResolutionPlaybackCompleteNotifies();
 }
 
 /**

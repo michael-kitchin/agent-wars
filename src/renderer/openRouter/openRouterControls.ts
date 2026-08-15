@@ -153,10 +153,15 @@ syncOpenRouterRunToggleInteractable: () => Promise<void>;
  * Purpose: Centralizes listener registration next to OpenRouter UI bootstrap so prefetch + Ready gates stay aligned.
  * When to use: Once from `initOpenRouterUI`.
  * Expected outcome: Push payloads apply strategy toasts, tool counts, and tactical opponent drafts after playback notify.
- * Exceptions: Stale `planningTurnNumber` merges log and clear strategic latch only.
+ * Exceptions: Stale `planningTurnNumber` merges log and clear strategic latch only. `abandoned` pushes unlatch and
+ * resume Run prefetch without applying a plan; the player-visible skip line is sent on `openRouter:log`.
  */
 function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): void {
   window.gameApi?.registerPostResolutionConsultationListener?.((payload: PostResolutionConsultationPushPayload) => {
+    if (payload.abandoned === true) {
+      applyAbandonedDeferredConsultRecovery('strategic', deps);
+      return;
+    }
     if (!S.gameState || payload.planningTurnNumber !== S.gameState.turnNumber) {
       deps.appendOpenRouterLog('Ignored stale post-resolution consultation push.', false);
       S.pendingDeferredStrategicPostResolutionConsult = false;
@@ -175,6 +180,10 @@ function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): vo
     deps.updateReadyButtonState();
   });
   window.gameApi?.registerPostTacticalBeatConsultationListener?.((fields) => {
+    if (fields.abandoned === true) {
+      applyAbandonedDeferredConsultRecovery('tactical', deps);
+      return;
+    }
     if (
       fields.kind !== 'tactical' ||
       fields.battleId !== S.tacticalBattleSnapshot?.battleId
@@ -195,6 +204,28 @@ function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): vo
       updateReadyButtonState: deps.updateReadyButtonState,
     });
   });
+}
+
+/**
+ * Unlatches deferred consultation and restarts Run prefetch after main abandons a mismatched playback notify.
+ *
+ * Purpose: The AI-planning latch must clear even when consultation did not run, or Ready stays disabled.
+ * When to use: `abandoned` strategic/melee or tactical consult pushes.
+ * Expected outcome: Matching latch false; tactical opponent draft cleared; prefetch starts when Run is on.
+ * Exceptions: None.
+ */
+function applyAbandonedDeferredConsultRecovery(kind: 'strategic' | 'tactical', deps: OpenRouterUiDeps): void {
+  if (kind === 'tactical') {
+    S.pendingDeferredTacticalPostBeatConsult = false;
+    S.tacticalOpponentDraft = null;
+    const oppAlive = S.tacticalBattleSnapshot?.subUnits.some((u) => u.player === 'opponent') ?? false;
+    if (S.runButtonOn && oppAlive) deps.startBackgroundRequestIfAllowed();
+  } else {
+    S.pendingDeferredStrategicPostResolutionConsult = false;
+    if (S.runButtonOn) deps.startBackgroundRequestIfAllowed();
+  }
+  deps.requestRedraw();
+  deps.updateReadyButtonState();
 }
 
 export function initOpenRouterUI(deps: OpenRouterUiDeps): void {

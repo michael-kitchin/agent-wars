@@ -217,6 +217,15 @@ export type TacticalPostBeatConsultFields = {
    */
   aiMessage?: string;
   toolInvocationCounts?: Record<string, number>;
+  /**
+   * True when main abandoned this consult because playback notify metadata did not match.
+   *
+   * Contract: Omit on successful consultation; renderer must unlatch and resume planning without applying a plan.
+   * When to use: `notifyResolutionPlaybackComplete` mismatch or invalid payload while a tactical consult is pending.
+   * Expected outcome: Latch cleared, opponent draft dropped, prefetch may restart; AI log comes from `openRouter:log`.
+   * Exceptions: None.
+   */
+  abandoned?: boolean;
 };
 
 /**
@@ -1047,7 +1056,7 @@ export type NotifyResolutionPlaybackCompletePayload =
  * Purpose: Separates mechanical Ready IPC from post-resolution consultation results when deferring LLM work.
  * When to use: `webContents.send` on `IPC_GAME.postResolutionConsultation`.
  * Expected outcome: Renderer merges strategy toast + tool counts once `planningTurnNumber` matches `gameState.turnNumber`.
- * Exceptions: None.
+ * Exceptions: `abandoned` skips toast/tool merge and resumes planning after a notify mismatch.
  */
 export type PostResolutionConsultationPushPayload = {
   planningTurnNumber: number;
@@ -1062,6 +1071,15 @@ export type PostResolutionConsultationPushPayload = {
    */
   aiMessage?: string;
   toolInvocationCounts?: Record<string, number>;
+  /**
+   * True when main abandoned this consult because playback notify metadata did not match.
+   *
+   * Contract: Omit on successful consultation; renderer must unlatch and resume planning without applying strategy.
+   * When to use: `notifyResolutionPlaybackComplete` mismatch or invalid payload while a strategic/melee consult is pending.
+   * Expected outcome: Latch cleared and Run prefetch may restart; AI log comes from `openRouter:log`.
+   * Exceptions: None.
+   */
+  abandoned?: boolean;
 };
 
 /**

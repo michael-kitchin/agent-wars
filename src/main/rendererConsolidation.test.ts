@@ -431,7 +431,9 @@ function testModifierDrivenPopoverCloseRulesCentralized(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
   const modifierRulesFn = getFunctionSource(source, 'applyModifierDrivenPopoverCloseRules');
-  const keydownHandlerFn = getFunctionSource(source, 'init');
+  const initCorePath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'initCore.ts');
+  const initCoreSource = fs.readFileSync(initCorePath, 'utf8');
+  const wireInitCoreFn = getFunctionSource(initCoreSource, 'wireInitCore');
 
   assert.ok(
     modifierRulesFn.includes("if (reason === 'ctrl_pressed')") &&
@@ -441,9 +443,14 @@ function testModifierDrivenPopoverCloseRulesCentralized(): void {
     'Ctrl press should preserve the build popup for multi-select while Ctrl release closes the stack callout'
   );
   assert.ok(
-    keydownHandlerFn.includes("applyModifierDrivenPopoverCloseRules('ctrl_pressed');") &&
-      keydownHandlerFn.includes("applyModifierDrivenPopoverCloseRules('ctrl_released');"),
+    wireInitCoreFn.includes("applyModifierDrivenPopoverCloseRules('ctrl_pressed')") &&
+      wireInitCoreFn.includes("applyModifierDrivenPopoverCloseRules('ctrl_released')"),
     'init key handlers should delegate popover-close behavior to shared modifier rule helper'
+  );
+  assert.ok(
+    wireInitCoreFn.includes('shouldRefreshStackCalloutOnControlKeydown(ctrlKeyAlreadyActive)') &&
+      wireInitCoreFn.includes("applyModifierDrivenPopoverCloseRules('ctrl_pressed')"),
+    'Control keydown should rebuild stack-callout chrome only on the inactive-to-active transition'
   );
 }
 

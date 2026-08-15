@@ -5,6 +5,7 @@ export * from './ordersTypes';
 export * from './gameStateTypes';
 export * from './openRouterTypes';
 export * from './readyTypes';
+export * from './deferredPlaybackConsultAbandoned';
 export * from './humanOrderPreviewTypes';
 export * from './sealiftTypes';
 export * from './gameApiTypes';

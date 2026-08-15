@@ -18,9 +18,17 @@ While pending:
 
 Pending is cleared when:
 
-- `game:notifyResolutionPlaybackComplete` completes successfully (after push), or
-- Payload validation fails critically (logged; mutex cleared to avoid deadlock), or
+- `game:notifyResolutionPlaybackComplete` matches the pending kind/id and completes (after push), or
+- Notify kind/id mismatches or the payload is invalid (pending is **abandoned**: mutex cleared, `abandoned` consult push, OpenRouter log line), or
 - `game:newGame`, `game:endTacticalBattle`, or `clearDeferredPlaybackConsultPending()` runs.
+
+The renderer holds at most one queued playback-complete callback. Enqueue replaces any prior callback. Tactical exit and new-game teardown drop the queue without sending notify, so leftover tactical callbacks should not reach main. If a mismatch still arrives, abandonment unlatches planning and resumes Run prefetch so the session cannot hang.
+
+Abandoned pushes:
+
+- Strategic/melee: `IPC_GAME.postResolutionConsultation` with `{ planningTurnNumber, abandoned: true }`
+- Tactical: `IPC_GAME.postTacticalBeatConsultation` with `{ kind: 'tactical', battleId, attachTacticalOpponentPlanToIpc: false, abandoned: true }`
+- Player-visible line via `IPC_OPENROUTER.log` (`DEFERRED_PLAYBACK_CONSULT_ABANDONED_LOG`, error-styled)
 
 ## Renderer sequence
 

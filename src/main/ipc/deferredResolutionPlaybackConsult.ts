@@ -8,19 +8,22 @@
  * and `endTacticalBattle`.
  * Expected outcome: At most one pending deferred consult; notify validates ids, runs the deferred runner, pushes results
  * to the renderer, then clears pending.
- * Exceptions: Notify mismatches clear pending after logging so the session cannot deadlock.
+ * Exceptions: Mismatched or invalid notifies abandon pending (clear mutex, push `abandoned`, log to OpenRouter) so Ready
+ * cannot hang; leftover tactical notifies are also dropped in the renderer queue before they fire.
  */
 
 import type { WebContents } from 'electron';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logError, logTrace } from '../logger';
-import { IPC_GAME } from '../../shared/ipc/channels';
+import { IPC_GAME, IPC_OPENROUTER } from '../../shared/ipc/channels';
+import { DEFERRED_PLAYBACK_CONSULT_ABANDONED_LOG } from '../../shared/ipc/deferredPlaybackConsultAbandoned';
 import type { RequestAiOrdersResult } from '../../shared/ipc/openRouterTypes';
 import type {
   NotifyResolutionPlaybackCompletePayload,
   PostResolutionConsultationPushPayload,
   ReadyResult,
   TacticalCommitResolutionPlayback,
+  TacticalPostBeatConsultFields,
   TacticalPostBeatConsultMergeSource,
 } from '../../shared/ipc/readyTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
@@ -110,9 +113,9 @@ export function hasDeferredPlaybackConsultPending(): boolean {
  * Drops any pending deferred consultation without running LLM work (new match, tactical teardown, recovery).
  *
  * Purpose: Prevents stale mutex records from blocking the next session after abandoning a battle or starting fresh.
- * When to use: `game:newGame`, `game:endTacticalBattle`, and defensive clears when mismatched notify payloads arrive.
+ * When to use: `game:newGame`, `game:endTacticalBattle`, and other session teardowns that abandon deferred work.
  * Expected outcome: `hasDeferredPlaybackConsultPending` becomes false; no renderer push.
- * Exceptions: None.
+ * Exceptions: Notify mismatch recovery uses `abandonDeferredPlaybackConsult` instead so the renderer unlatches.
  */
 export function clearDeferredPlaybackConsultPending(): void {
   logDebug('clearDeferredPlaybackConsultPending', { hadPending: pendingPlaybackConsult !== null });
@@ -194,12 +197,54 @@ function tacticalPayloadMatchesPending(
 }
 
 /**
+ * Clears pending consultation after a notify mismatch or invalid payload and unlatches the renderer.
+ *
+ * Purpose: A true metadata mismatch must not leave Ready blocked or the AI-planning latch set; the player should see
+ * why consultation was skipped and Run should resume prefetch.
+ * When to use: Invalid notify shape or kind/id mismatch while `pendingPlaybackConsult` is set.
+ * Expected outcome: Mutex cleared; `openRouter:log` error line; `abandoned` consult push on the pending kind's channel.
+ * Exceptions: Does not run LLM consultation or write opponent orders.
+ */
+function abandonDeferredPlaybackConsult(
+  sender: WebContents,
+  pending: PendingPlaybackConsult,
+  detail: Record<string, unknown>
+): void {
+  logError('handleNotifyResolutionPlaybackComplete: abandoning deferred consultation', {
+    pendingTag: pending.tag,
+    ...detail,
+  });
+  pendingPlaybackConsult = null;
+  sender.send(IPC_OPENROUTER.log, {
+    line: DEFERRED_PLAYBACK_CONSULT_ABANDONED_LOG,
+    isError: true,
+  });
+  if (pending.tag === 'tactical-beat') {
+    const fields: TacticalPostBeatConsultFields = {
+      kind: 'tactical',
+      battleId: pending.battleId,
+      attachTacticalOpponentPlanToIpc: false,
+      abandoned: true,
+    };
+    sender.send(IPC_GAME.postTacticalBeatConsultation, fields);
+    return;
+  }
+  const push: PostResolutionConsultationPushPayload = {
+    planningTurnNumber: pending.planningTurnNumber,
+    abandoned: true,
+  };
+  sender.send(IPC_GAME.postResolutionConsultation, push);
+}
+
+/**
  * Runs deferred consultation after the renderer finishes resolution playback and validates pending mutex metadata.
  *
  * Purpose: IPC handler body for `game:notifyResolutionPlaybackComplete` — performs LLM consultation + `webContents.send`.
  * When to use: Registered once in `main.ts`; invoked from preload `invoke`.
- * Expected outcome: Resolves `{ ok: true }` after push, or `{ ok: false, reason }` when idle/mismatched/cleared.
- * Exceptions: Consult runners swallow LLM errors (logged upstream); mutex clears after attempt.
+ * Expected outcome: Resolves `{ ok: true }` after a matching consult push, or `{ ok: false, reason }` when idle or after
+ * mismatch recovery.
+ * Exceptions: Consult runners swallow LLM errors (logged upstream); matching notifies clear mutex after the consult
+ * attempt; mismatched/invalid notifies abandon pending and unlatch the renderer.
  */
 export async function handleNotifyResolutionPlaybackComplete(
   sender: WebContents,
@@ -213,11 +258,9 @@ export async function handleNotifyResolutionPlaybackComplete(
   }
 
   const pending = pendingPlaybackConsult;
-  const pendingTagForLog = pending.tag;
 
   if (!payload || typeof payload !== 'object' || !('kind' in payload)) {
-    logError('handleNotifyResolutionPlaybackComplete: invalid payload shape', { rawPayload });
-    clearDeferredPlaybackConsultPending();
+    abandonDeferredPlaybackConsult(sender, pending, { reason: 'invalid payload shape', rawPayload });
     return { ok: false, reason: 'Invalid notify payload.' };
   }
 
@@ -258,10 +301,6 @@ export async function handleNotifyResolutionPlaybackComplete(
     return { ok: true };
   }
 
-  logError('handleNotifyResolutionPlaybackComplete: payload did not match pending record', {
-    payload,
-    pendingTag: pendingTagForLog,
-  });
-  clearDeferredPlaybackConsultPending();
+  abandonDeferredPlaybackConsult(sender, pending, { reason: 'metadata mismatch', payload });
   return { ok: false, reason: 'Deferred consultation metadata mismatch.' };
 }
