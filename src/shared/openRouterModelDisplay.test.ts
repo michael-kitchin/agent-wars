@@ -22,9 +22,9 @@ function model(overrides: Partial<OpenRouterModel> = {}): OpenRouterModel {
 /**
  * Verifies cost suffix from string prompt and completion rates.
 
- * Purpose: Locks `(prompt + completion) * 1e6` → `$…/M` formatting.
+ * Purpose: Locks `(prompt + completion) * 1e6` → `$/…M` formatting.
  * When to use: After changing cost scaling or decimal trimming.
- * Expected outcome: `$18/M` alone when reasoning is absent.
+ * Expected outcome: `$/18M` alone when reasoning is absent.
  * Exceptions: None.
  */
 function testBothStringPrices(): void {
@@ -32,7 +32,7 @@ function testBothStringPrices(): void {
     formatModelOptionSuffix(
       model({ pricing: { prompt: '0.000003', completion: '0.000015' } })
     ),
-    ' [$18/M]'
+    ' [$/18M]'
   );
 }
 
@@ -41,7 +41,7 @@ function testBothStringPrices(): void {
 
  * Purpose: Guards OpenRouter rows that emit numbers instead of decimal strings.
  * When to use: After changing price coercion.
- * Expected outcome: Same `$18/M` as the string case.
+ * Expected outcome: Same `$/18M` as the string case.
  * Exceptions: None.
  */
 function testNumericPrices(): void {
@@ -54,7 +54,7 @@ function testNumericPrices(): void {
         },
       })
     ),
-    ' [$18/M]'
+    ' [$/18M]'
   );
 }
 
@@ -63,13 +63,13 @@ function testNumericPrices(): void {
 
  * Purpose: Missing sibling price must not drop the whole cost part.
  * When to use: After changing “usable field” rules.
- * Expected outcome: `$3/M` from prompt only.
+ * Expected outcome: `$/3M` from prompt only.
  * Exceptions: None.
  */
 function testOnePriceOnly(): void {
   assert.equal(
     formatModelOptionSuffix(model({ pricing: { prompt: '0.000003' } })),
-    ' [$3/M]'
+    ' [$/3M]'
   );
 }
 
@@ -165,7 +165,7 @@ function testReasoningStatusParts(): void {
 
  * Purpose: Locks the bracket assembly order from the display contract.
  * When to use: After changing suffix join logic.
- * Expected outcome: ` [$9/M, reasoning: high]`.
+ * Expected outcome: ` [$/9M, reasoning: high]`.
  * Exceptions: None.
  */
 function testFullComboOrder(): void {
@@ -176,7 +176,7 @@ function testFullComboOrder(): void {
         reasoning: { default_effort: 'high', default_enabled: true },
       })
     ),
-    ' [$9/M, reasoning: high]'
+    ' [$/9M, reasoning: high]'
   );
   assert.equal(
     formatModelOptionSuffix(
@@ -185,26 +185,26 @@ function testFullComboOrder(): void {
         reasoning: { default_enabled: true },
       })
     ),
-    ' [$9/M, reasoning: default]'
+    ' [$/9M, reasoning: default]'
   );
 }
 
 /**
- * Verifies trailing zeros are stripped from the `/M` amount.
+ * Verifies trailing zeros are stripped from the `$/…M` amount.
 
- * Purpose: Keeps labels compact (`$1.5/M` not `$1.5000/M`).
+ * Purpose: Keeps labels compact (`$/1.5M` not `$/1.5000M`).
  * When to use: After changing `toFixed` trimming.
- * Expected outcome: `$1.5/M` and `$0.15/M`.
+ * Expected outcome: `$/1.5M` and `$/0.15M`.
  * Exceptions: None.
  */
 function testTrailingZeroStripping(): void {
   assert.equal(
     formatModelOptionSuffix(model({ pricing: { prompt: '0.0000015' } })),
-    ' [$1.5/M]'
+    ' [$/1.5M]'
   );
   assert.equal(
     formatModelOptionSuffix(model({ pricing: { prompt: '0.00000015' } })),
-    ' [$0.15/M]'
+    ' [$/0.15M]'
   );
 }
 
@@ -224,7 +224,7 @@ function testLabelIgnoresDescription(): void {
       pricing: { prompt: '0.000001' },
     })
   );
-  assert.equal(labeled, 'GPT [$1/M]');
+  assert.equal(labeled, 'GPT [$/1M]');
   assert.equal(formatModelOptionLabel(model({ id: 'only-id' })), 'only-id');
 }
 

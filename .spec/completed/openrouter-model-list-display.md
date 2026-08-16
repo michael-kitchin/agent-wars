@@ -22,7 +22,7 @@ Suffix shape: a single space, then `[` … `]` with present parts joined by `", 
 
 Part order when present:
 
-1. **Cost** (optional) — `$<value>/M` where `<value>` is the sum of usable per-token `prompt` and `completion` rates, multiplied by `1_000_000`.
+1. **Cost** (optional) — `$/<value>M` where `<value>` is the sum of usable per-token `prompt` and `completion` rates, multiplied by `1_000_000`.
 2. **Reasoning status** (optional) — see below.
 
 Omit empty parts and their commas. If neither part applies, omit the whole bracket suffix.
@@ -33,7 +33,7 @@ Omit empty parts and their commas. If neither part applies, omit the whole brack
 - A field is usable only when `Number(...)` is finite.
 - Sum usable fields only; omit the cost part when neither field is usable.
 - After scaling by `1e6`, omit the cost part if the result is not finite.
-- Format with up to 4 fractional digits, then strip trailing zeros and a trailing decimal point (examples: `$18/M`, `$0.15/M`, `$1.5/M`).
+- Format with up to 4 fractional digits, then strip trailing zeros and a trailing decimal point (examples: `$/18M`, `$/0.15M`, `$/1.5M`).
 
 ### Reasoning status
 
@@ -47,8 +47,8 @@ Omit empty parts and their commas. If neither part applies, omit the whole brack
 
 | Inputs | Suffix |
 | --- | --- |
-| cost only (no reasoning section) | ` [$9/M]` |
-| cost + enabled + effort `high` | ` [$9/M, reasoning: high]` |
+| cost only (no reasoning section) | ` [$/9M]` |
+| cost + enabled + effort `high` | ` [$/9M, reasoning: high]` |
 | enabled, no effort | ` [reasoning: default]` |
 | mandatory + effort `medium` | ` [reasoning: medium]` |
 | explicitly off (`enabled` and `mandatory` false) | _(no suffix / no reasoning text)_ |

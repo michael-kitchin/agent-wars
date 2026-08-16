@@ -23185,7 +23185,7 @@
       const sumPerToken = (prompt ?? 0) + (completion ?? 0);
       const perMillion = sumPerToken * 1e6;
       if (Number.isFinite(perMillion)) {
-        parts.push(`$${formatUsdPerMillion(perMillion)}/M`);
+        parts.push(`$/${formatUsdPerMillion(perMillion)}M`);
       }
     }
     const reasoningPart = formatReasoningStatusPart(model);
