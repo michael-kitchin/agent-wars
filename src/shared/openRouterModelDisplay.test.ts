@@ -22,9 +22,9 @@ function model(overrides: Partial<OpenRouterModel> = {}): OpenRouterModel {
 /**
  * Verifies cost suffix from string prompt and completion rates.
 
- * Purpose: Locks `(prompt + completion) * 1e6` → `$/…M` formatting.
- * When to use: After changing cost scaling or decimal trimming.
- * Expected outcome: `$/18M` alone when reasoning is absent.
+ * Purpose: Locks `(prompt + completion) * 1e6` → `$…/M` cents formatting.
+ * When to use: After changing cost scaling or decimal rounding.
+ * Expected outcome: `$18.00/M` alone when reasoning is absent.
  * Exceptions: None.
  */
 function testBothStringPrices(): void {
@@ -32,7 +32,7 @@ function testBothStringPrices(): void {
     formatModelOptionSuffix(
       model({ pricing: { prompt: '0.000003', completion: '0.000015' } })
     ),
-    ' [$/18M]'
+    ' [$18.00/M]'
   );
 }
 
@@ -41,7 +41,7 @@ function testBothStringPrices(): void {
 
  * Purpose: Guards OpenRouter rows that emit numbers instead of decimal strings.
  * When to use: After changing price coercion.
- * Expected outcome: Same `$/18M` as the string case.
+ * Expected outcome: Same `$18.00/M` as the string case.
  * Exceptions: None.
  */
 function testNumericPrices(): void {
@@ -54,7 +54,7 @@ function testNumericPrices(): void {
         },
       })
     ),
-    ' [$/18M]'
+    ' [$18.00/M]'
   );
 }
 
@@ -63,13 +63,13 @@ function testNumericPrices(): void {
 
  * Purpose: Missing sibling price must not drop the whole cost part.
  * When to use: After changing “usable field” rules.
- * Expected outcome: `$/3M` from prompt only.
+ * Expected outcome: `$3.00/M` from prompt only.
  * Exceptions: None.
  */
 function testOnePriceOnly(): void {
   assert.equal(
     formatModelOptionSuffix(model({ pricing: { prompt: '0.000003' } })),
-    ' [$/3M]'
+    ' [$3.00/M]'
   );
 }
 
@@ -165,7 +165,7 @@ function testReasoningStatusParts(): void {
 
  * Purpose: Locks the bracket assembly order from the display contract.
  * When to use: After changing suffix join logic.
- * Expected outcome: ` [$/9M, reasoning: high]`.
+ * Expected outcome: ` [$9.00/M, reasoning: high]`.
  * Exceptions: None.
  */
 function testFullComboOrder(): void {
@@ -176,7 +176,7 @@ function testFullComboOrder(): void {
         reasoning: { default_effort: 'high', default_enabled: true },
       })
     ),
-    ' [$/9M, reasoning: high]'
+    ' [$9.00/M, reasoning: high]'
   );
   assert.equal(
     formatModelOptionSuffix(
@@ -185,26 +185,34 @@ function testFullComboOrder(): void {
         reasoning: { default_enabled: true },
       })
     ),
-    ' [$/9M, reasoning: default]'
+    ' [$9.00/M, reasoning: default]'
   );
 }
 
 /**
- * Verifies trailing zeros are stripped from the `$/…M` amount.
+ * Verifies `$…/M` amounts round to cents with two fractional digits.
 
- * Purpose: Keeps labels compact (`$/1.5M` not `$/1.5000M`).
- * When to use: After changing `toFixed` trimming.
- * Expected outcome: `$/1.5M` and `$/0.15M`.
+ * Purpose: Locks dollar-and-cent display (half-up to nearest cent).
+ * When to use: After changing cost rounding or `toFixed` digits.
+ * Expected outcome: `$1.50/M`, `$0.15/M`, `$0.16/M` from values that round up.
  * Exceptions: None.
  */
-function testTrailingZeroStripping(): void {
+function testCentsRounding(): void {
   assert.equal(
     formatModelOptionSuffix(model({ pricing: { prompt: '0.0000015' } })),
-    ' [$/1.5M]'
+    ' [$1.50/M]'
   );
   assert.equal(
     formatModelOptionSuffix(model({ pricing: { prompt: '0.00000015' } })),
-    ' [$/0.15M]'
+    ' [$0.15/M]'
+  );
+  assert.equal(
+    formatModelOptionSuffix(model({ pricing: { prompt: '0.000000154' } })),
+    ' [$0.15/M]'
+  );
+  assert.equal(
+    formatModelOptionSuffix(model({ pricing: { prompt: '0.000000156' } })),
+    ' [$0.16/M]'
   );
 }
 
@@ -224,7 +232,7 @@ function testLabelIgnoresDescription(): void {
       pricing: { prompt: '0.000001' },
     })
   );
-  assert.equal(labeled, 'GPT [$/1M]');
+  assert.equal(labeled, 'GPT [$1.00/M]');
   assert.equal(formatModelOptionLabel(model({ id: 'only-id' })), 'only-id');
 }
 
@@ -244,7 +252,7 @@ function run(): void {
   testNonFiniteRejected();
   testReasoningStatusParts();
   testFullComboOrder();
-  testTrailingZeroStripping();
+  testCentsRounding();
   testLabelIgnoresDescription();
   console.log('openRouterModelDisplay.test.ts passed');
 }

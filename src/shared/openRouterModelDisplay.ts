@@ -26,14 +26,13 @@ function parseFinitePrice(value: unknown): number | null {
 /**
  * Formats a per-million-token USD amount for the cost suffix.
 
- * Purpose: Keeps `$/…M` rendering consistent (up to 4 decimals, trimmed trailing zeros).
+ * Purpose: Keeps `$…/M` rendering as dollars and cents (two fractional digits).
  * When to use: After summing usable per-token rates and multiplying by `1e6`.
- * Expected outcome: Compact decimal string without a trailing `.` or useless zeros.
+ * Expected outcome: Always two decimal places, rounded half-up to the nearest cent.
  * Exceptions: None.
  */
 function formatUsdPerMillion(perMillion: number): string {
-  const fixed = perMillion.toFixed(4);
-  return fixed.replace(/(\.\d*?[1-9])0+$/u, '$1').replace(/\.0+$/u, '');
+  return (Math.round(perMillion * 100) / 100).toFixed(2);
 }
 
 /**
@@ -60,7 +59,7 @@ function formatReasoningStatusPart(model: OpenRouterModel): string | null {
 
  * Purpose: Encodes optional cost and optional reasoning status into Model-tab list lines.
  * When to use: When rendering OpenRouter model `<option>` labels after a successful list fetch.
- * Expected outcome: `""`, `" [$/…M]"`, `" [reasoning: …]"`, or both parts joined; omit empty parts.
+ * Expected outcome: `""`, `" [$…/M]"`, `" [reasoning: …]"`, or both parts joined; omit empty parts.
  * Exceptions: None.
  */
 export function formatModelOptionSuffix(model: OpenRouterModel): string {
@@ -72,7 +71,7 @@ export function formatModelOptionSuffix(model: OpenRouterModel): string {
     const sumPerToken = (prompt ?? 0) + (completion ?? 0);
     const perMillion = sumPerToken * 1_000_000;
     if (Number.isFinite(perMillion)) {
-      parts.push(`$/${formatUsdPerMillion(perMillion)}M`);
+      parts.push(`$${formatUsdPerMillion(perMillion)}/M`);
     }
   }
 

@@ -39,7 +39,7 @@ export type TacticalExitSessionAccessor = {
  *
  * Contract: `endTacticalBattle` IPC is optional; failures surface through `showMapToast` and swallow to preserve UX.
  * When to use: `tacticalPerformBattleExit` wiring from renderer click handlers.
- * Expected outcome: Main tactical session clears before Ready-equivalent continuation.
+ * Expected outcome: Main tactical session clears, post-exit strategic state applies, living-unit stash restores, then Ready-equivalent continuation.
  * Exceptions: `endTacticalBattle` errors are logged to console and toast; caller returns early without clearing local snapshot.
  */
 export type TacticalBattleExitIo = {
@@ -48,14 +48,23 @@ export type TacticalBattleExitIo = {
   redraw: () => void;
   runReadyAfterExit: () => Promise<void>;
   /**
-   * Syncs DOM sidebars after tactical draft slices are cleared so the right-hand panel does not retain ranged/air/march rows until the next redraw.
+   * Syncs DOM sidebars after living-unit strategic drafts are restored so the right-hand panel does not keep tactical rows or omit restored standing orders until the next redraw.
    *
-   * Purpose: `clearPendingTacticalOrders` updates shared state immediately; pending-orders and ranged sidebar nodes must refresh before strategic chrome and `runReadyAfterExit`.
+   * Purpose: Teardown clears shared ranged/air/ferry arrays; restore then refills living-unit strategic drafts; pending-orders and ranged sidebar nodes must refresh before `runReadyAfterExit`.
    * When to use: Wired from the renderer with `hideStackCallout`, `updatePendingOrdersSidebar`, `updateRangedSidebar`, and `updateSidebar`.
-   * Expected outcome: Empty tactical order UI; stack callout closed if it referenced tactical-only selection.
+   * Expected outcome: DOM pending/ranged/unit panels match restored living-unit strategic drafts; stack callout closed if it referenced tactical-only selection.
    * Exceptions: None when omitted (optional).
    */
   refreshSidebarAfterTacticalDraftTeardown?: () => void;
+  /**
+   * Reloads strategic game state after main-process exit so stash restore can drop orders for parents eliminated on bailout.
+   *
+   * Purpose: `endTacticalBattle` may delete strategic parents after the last renderer snapshot; restore filters against `S.gameState.units`.
+   * When to use: After local snapshot and map teardown, before `restoreStrategicOrderDraftsAfterTacticalSession`.
+   * Expected outcome: `S.gameState` matches the post-exit roster; standing-order lists are not reloaded from the database.
+   * Exceptions: Optional; caller swallows failures so exit still restores against the last-beat snapshot.
+   */
+  refreshStrategicSnapshotAfterExit?: () => Promise<void>;
 };
 
 /**
@@ -81,8 +90,8 @@ export function tacticalMaybeScheduleAnnihilationExit(session: TacticalExitSessi
  *
  * Contract: Early return when boundary check fails; does not throw on IPC errors (toast + return).
  * When to use: Tactical exit button and annihilation modal confirmation.
- * Expected outcome: In-flight Run-mode AI canceled, tactical drafts cleared, sidebar DOM refreshed, local snapshot cleared, Leaflet bounds restored, Ready pipeline invoked on success path.
- * Exceptions: `endTacticalBattle` failures keep renderer snapshot unchanged after toast.
+ * Expected outcome: In-flight Run-mode AI canceled, tactical drafts cleared, post-exit strategic snapshot applied, living-unit stash restored, sidebar DOM refreshed, Ready pipeline invoked on success path.
+ * Exceptions: `endTacticalBattle` failures keep renderer snapshot unchanged after toast; post-exit `getGameState` failures log and continue with the last-beat snapshot.
  */
 export async function tacticalPerformBattleExit(session: TacticalExitSessionAccessor, io: TacticalBattleExitIo): Promise<void> {
   const boundary = tacticalBoundaryPlanningExitAllowed(session.getBattleSnapshot(), session.getPhasePlanning());
@@ -106,6 +115,11 @@ export async function tacticalPerformBattleExit(session: TacticalExitSessionAcce
   const tel = document.getElementById('tactical-entry-layer');
   if (tel) hideTacticalEntryLayer(tel, false);
   tacticalUpdateExitButtonVisibility();
+  try {
+    await io.refreshStrategicSnapshotAfterExit?.();
+  } catch (err) {
+    console.error('refreshStrategicSnapshotAfterExit failed:', err);
+  }
   updateGameStateSidebar(S.gameState);
   restoreStrategicOrderDraftsAfterTacticalSession();
   io.refreshSidebarAfterTacticalDraftTeardown?.();

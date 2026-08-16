@@ -1148,7 +1148,10 @@ function getTacticalBattleActivationSideEffects(): TacticalRendererStartBattleSi
     },
     scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
     rebuildUnitDisplayNameLookup: () => rebuildUnitDisplayNameLookup(S.gameState),
-    refreshOrderSidebars: refreshStrategicOrderSidebars,
+    refreshOrderSidebars: () => {
+      hideStackCallout();
+      refreshStrategicOrderSidebars();
+    },
   });
 }
 
@@ -2245,7 +2248,7 @@ function maybeScheduleTacticalAnnihilationExit(): void {
  *
  * Purpose: Delegates boundary checks and DOM restoration to `tacticalPerformBattleExit` while preserving renderer IPC wiring.
  * When to use: Tactical HUD exit button and annihilation modal `Exit Battle` confirmation.
- * Expected outcome: Clears renderer tactical snapshot and invokes Ready pipeline on success.
+ * Expected outcome: Clears renderer tactical snapshot, applies post-exit strategic state without reloading standing orders, restores living-unit stash drafts, then invokes Ready pipeline on success.
  * Exceptions: Surfaces toasts when IPC fails per tactical helper contract.
  */
 async function performTacticalBattleExit(): Promise<void> {
@@ -2256,6 +2259,19 @@ async function performTacticalBattleExit(): Promise<void> {
     refreshSidebarAfterTacticalDraftTeardown: () => {
       hideStackCallout();
       refreshStrategicOrderSidebars();
+    },
+    refreshStrategicSnapshotAfterExit: async () => {
+      if (!window.gameApi?.getGameState) return;
+      const nextState = (await window.gameApi.getGameState()) as GameStateSnapshot;
+      await applyGameStateSnapshot(nextState, {
+        refreshStandingOrders: false,
+        updateGameStateSidebarUi: false,
+        updateSelectionUi: false,
+        updateGameOverUi: false,
+        updateReadyButton: false,
+        refreshBuildPopup: false,
+        redraw: false,
+      });
     },
   });
 }

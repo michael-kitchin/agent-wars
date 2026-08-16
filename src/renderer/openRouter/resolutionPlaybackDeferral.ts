@@ -42,7 +42,7 @@ export function dropQueuedResolutionPlaybackCompleteNotifies(): void {
  * Drains all queued playback-complete notifies (typically from `tickResolutionMoveAnimation` end branch).
  *
  * Purpose: Single choke point so playback-complete IPC fires after canvas animation teardown.
- * When to use: Only from `tickResolutionMoveAnimation` when elapsed exceeds duration.
+ * When to use: From `tickResolutionMoveAnimation` when elapsed exceeds duration, and from tactical activation when interrupting in-flight strategic playback so deferred consult still runs.
  * Expected outcome: Queue empty after return; the current callback (at most one) is invoked.
  * Exceptions: Swallows per-callback errors after `console.error`.
  */

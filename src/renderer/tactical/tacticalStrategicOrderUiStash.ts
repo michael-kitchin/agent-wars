@@ -8,6 +8,7 @@ import type {
   HumanStandingOrderSnapshot,
   RangedAttackOrder,
 } from '../../shared/ipcTypes';
+import { filterOrdersToLivingUnitIds } from '../../shared/filterOrdersToLivingUnitIds';
 import { rendererSharedState as S } from '../core/state';
 
 /**
@@ -55,19 +56,48 @@ export function stashStrategicOrderDraftsForTacticalSession(): void {
 }
 
 /**
- * Restores strategic draft lists captured at tactical entry after tactical teardown completes.
+ * Returns stash rows kept for units that still exist, or the original list when no snapshot is available.
+ *
+ * Purpose: Restore applies the same living-unit rule to standing, ranged, air, and ferry drafts without repeating the null-snapshot branch.
+ * When to use: Only from `restoreStrategicOrderDraftsAfterTacticalSession`.
+ * Expected outcome: Filtered copy when `livingUnitIds` is set; original row array when the strategic snapshot is missing.
+ * Exceptions: None.
+ */
+function restoreDraftRowsForLivingUnits<T extends { unitId: string }>(
+  rows: T[],
+  livingUnitIds: Set<string> | null
+): T[] {
+  return livingUnitIds ? filterOrdersToLivingUnitIds(rows, livingUnitIds) : rows;
+}
+
+/**
+ * Restores living-unit strategic draft lists captured at tactical entry after tactical teardown completes.
  *
  * Contract: No-op without a prior stash; clears tactical march rows because strategic drafts return.
- * When to use: After tactical exit Ready-equivalent flow and when strategic reconciliation tears down a stale tactical session.
- * Expected outcome: Sidebar pending lists match what the player had before tactical mode unless a new-game reset cleared stash.
- * Exceptions: None.
+ * When to use: After tactical exit has applied the post-exit strategic snapshot, and when strategic reconciliation tears down a stale tactical session.
+ * Expected outcome: Sidebar pending lists match pre-tactical drafts except rows whose unit is missing from the current strategic snapshot.
+ * Exceptions: When `S.gameState` is absent, the stash is restored unfiltered so a missing snapshot cannot wipe living drafts.
  */
 export function restoreStrategicOrderDraftsAfterTacticalSession(): void {
   if (!strategicOrderDraftStash) return;
-  S.humanStandingOrders = strategicOrderDraftStash.humanStandingOrders;
-  S.pendingRangedAttacks = strategicOrderDraftStash.pendingRangedAttacks;
-  S.pendingAirStrikes = strategicOrderDraftStash.pendingAirStrikes;
-  S.pendingFerryOrders = strategicOrderDraftStash.pendingFerryOrders;
+  const units = S.gameState?.units;
+  const livingUnitIds = units ? new Set(units.map((u) => u.id)) : null;
+  S.humanStandingOrders = restoreDraftRowsForLivingUnits(
+    strategicOrderDraftStash.humanStandingOrders,
+    livingUnitIds
+  );
+  S.pendingRangedAttacks = restoreDraftRowsForLivingUnits(
+    strategicOrderDraftStash.pendingRangedAttacks,
+    livingUnitIds
+  );
+  S.pendingAirStrikes = restoreDraftRowsForLivingUnits(
+    strategicOrderDraftStash.pendingAirStrikes,
+    livingUnitIds
+  );
+  S.pendingFerryOrders = restoreDraftRowsForLivingUnits(
+    strategicOrderDraftStash.pendingFerryOrders,
+    livingUnitIds
+  );
   strategicOrderDraftStash = null;
   // No `withTacticalHumanDraftPrefetchInvalidation`: restoring strategic drafts after tactical exit; tactical prefetch
   // lifecycle does not apply to these arrays until the player is back in res4 tactical planning with Run prefetch rules.

@@ -3,9 +3,42 @@
  */
 
 import type { StartTacticalBattleIpcResult, TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { reconcileSelectionToCurrentState } from '../core/selection';
 import { updateGameStateSidebar } from '../core/uiState';
 import { rendererSharedState as S } from '../core/state';
+import { flushResolutionPlaybackCompleteNotifyCallbacks } from '../openRouter/resolutionPlaybackDeferral';
 import { stashStrategicOrderDraftsForTacticalSession } from './tacticalStrategicOrderUiStash';
+
+/**
+ * Clears strategic selection/hover chrome and any overlapping strategic resolution playback after the tactical snapshot is assigned.
+ *
+ * Purpose: Fight → tactical can activate while strategic Ready still holds parent-unit selection ids and a hover route
+ * preview; `isHoverOrderPlanningActive` then blocks selecting tactical sub-units for the whole battle until that chrome clears.
+ * When to use: Immediately after `assignBattleSnapshot` on tactical IPC start and restored-session activation.
+ * Expected outcome: Selection reconciled to living tactical humans (usually empty); hover preview and hex hover cleared;
+ * in-flight strategic resolution RAF cancelled. Playback-complete notifies flush only when playback was interrupted so
+ * deferred consult still runs; magnifier/restore with no animation do not fire a stray notify.
+ * Exceptions: None.
+ */
+function clearStrategicPlanningChromeAfterTacticalSnapshotAssigned(): void {
+  const interruptedStrategicPlayback =
+    S.resolutionMoveAnimation !== null || S.resolutionMoveAnimationFrameId !== null;
+  if (S.resolutionMoveAnimationFrameId !== null) {
+    cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
+  }
+  S.resolutionMoveAnimationFrameId = null;
+  S.resolutionMoveAnimation = null;
+  if (interruptedStrategicPlayback) {
+    flushResolutionPlaybackCompleteNotifyCallbacks();
+  }
+  reconcileSelectionToCurrentState();
+  S.hoverRoutePreview = null;
+  S.hoverPreviewRequestSeq++;
+  S.hoveredHexH3 = null;
+  S.hoveredDetailHexH3 = null;
+  S.selectedUnitIdsAtMouseDown = [];
+  S.hideCommittedOrderLinesAfterReady = false;
+}
 
 /**
  * Side-effect surface used after a successful `startTacticalBattle` IPC call to update renderer DOM and shared state.
@@ -30,7 +63,7 @@ export type TacticalRendererStartBattleSideEffects = {
    * Rebuilds pending-movement, ranged/air, and selected-unit sidebars immediately after stash clears strategic drafts so the DOM matches tactical mode.
    *
    * Purpose: `updateGameStateSidebar` only updates phase/turn lines; `#pending-orders-list` would otherwise keep stale strategic rows until the next unrelated refresh.
-   * When to use: Wired from the renderer after successful tactical IPC / restore activation.
+   * When to use: Wired from the renderer after successful tactical IPC / restore activation (typically closes the stack callout then refreshes the three order panels).
    * Expected outcome: Tactical pending-order UI or empty placeholders replace strategic standing-order rows right away.
    * Exceptions: Optional when tests stub minimal side effects.
    */
@@ -41,7 +74,7 @@ export type TacticalRendererStartBattleSideEffects = {
  * Applies `startTacticalBattle` IPC outcomes to renderer state and map chrome, including skipped-parent warnings.
  *
  * Contract: Mutates renderer only through `fx` callbacks; does not call IPC itself.
- * When to use: Tactical magnifier click handler after `window.gameApi.startTacticalBattle` resolves successfully.
+ * When to use: Tactical magnifier click handler and melee Fight auto-start after `window.gameApi.startTacticalBattle` resolves successfully.
  * Expected outcome: Same toast, map, sidebar, and redraw sequencing as the pre-refactor inline implementation.
  * Exceptions: None.
  */
@@ -55,6 +88,7 @@ export function tacticalRendererApplyStartBattleIpcResult(
   }
   stashStrategicOrderDraftsForTacticalSession();
   fx.assignBattleSnapshot(result.battle);
+  clearStrategicPlanningChromeAfterTacticalSnapshotAssigned();
   fx.setPhasePlanning(true);
   const skipped = result.skippedParentDisplayNames;
   if (skipped && skipped.length > 0) {
@@ -85,6 +119,7 @@ export function tacticalRendererActivateRestoredBattleSnapshot(
 ): void {
   stashStrategicOrderDraftsForTacticalSession();
   fx.assignBattleSnapshot(battle);
+  clearStrategicPlanningChromeAfterTacticalSnapshotAssigned();
   fx.setPhasePlanning(true);
   fx.enterRes4View(battle.res4ChildH3Indexes);
   fx.setStrategicSidebarTactical(true);

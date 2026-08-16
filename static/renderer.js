@@ -20032,6 +20032,11 @@
     }
   }
 
+  // src/shared/filterOrdersToLivingUnitIds.ts
+  function filterOrdersToLivingUnitIds(rows, livingUnitIds) {
+    return rows.filter((row) => livingUnitIds.has(row.unitId));
+  }
+
   // src/renderer/tactical/tacticalStrategicOrderUiStash.ts
   var strategicOrderDraftStash = null;
   function stashStrategicOrderDraftsForTacticalSession() {
@@ -20052,12 +20057,29 @@
     rendererSharedState.rangedModeActive = false;
     rendererSharedState.airStrikeModeActive = false;
   }
+  function restoreDraftRowsForLivingUnits(rows, livingUnitIds) {
+    return livingUnitIds ? filterOrdersToLivingUnitIds(rows, livingUnitIds) : rows;
+  }
   function restoreStrategicOrderDraftsAfterTacticalSession() {
     if (!strategicOrderDraftStash) return;
-    rendererSharedState.humanStandingOrders = strategicOrderDraftStash.humanStandingOrders;
-    rendererSharedState.pendingRangedAttacks = strategicOrderDraftStash.pendingRangedAttacks;
-    rendererSharedState.pendingAirStrikes = strategicOrderDraftStash.pendingAirStrikes;
-    rendererSharedState.pendingFerryOrders = strategicOrderDraftStash.pendingFerryOrders;
+    const units = rendererSharedState.gameState?.units;
+    const livingUnitIds = units ? new Set(units.map((u) => u.id)) : null;
+    rendererSharedState.humanStandingOrders = restoreDraftRowsForLivingUnits(
+      strategicOrderDraftStash.humanStandingOrders,
+      livingUnitIds
+    );
+    rendererSharedState.pendingRangedAttacks = restoreDraftRowsForLivingUnits(
+      strategicOrderDraftStash.pendingRangedAttacks,
+      livingUnitIds
+    );
+    rendererSharedState.pendingAirStrikes = restoreDraftRowsForLivingUnits(
+      strategicOrderDraftStash.pendingAirStrikes,
+      livingUnitIds
+    );
+    rendererSharedState.pendingFerryOrders = restoreDraftRowsForLivingUnits(
+      strategicOrderDraftStash.pendingFerryOrders,
+      livingUnitIds
+    );
     strategicOrderDraftStash = null;
     rendererSharedState.tacticalPendingMarches = [];
     rendererSharedState.pendingEmbarkOrders = [];
@@ -22191,6 +22213,11 @@
     const tel = document.getElementById("tactical-entry-layer");
     if (tel) hideTacticalEntryLayer(tel, false);
     tacticalUpdateExitButtonVisibility();
+    try {
+      await io.refreshStrategicSnapshotAfterExit?.();
+    } catch (err) {
+      console.error("refreshStrategicSnapshotAfterExit failed:", err);
+    }
     updateGameStateSidebar(rendererSharedState.gameState);
     restoreStrategicOrderDraftsAfterTacticalSession();
     io.refreshSidebarAfterTacticalDraftTeardown?.();
@@ -22199,6 +22226,24 @@
   }
 
   // src/renderer/tactical/tacticalIpcHandlers.ts
+  function clearStrategicPlanningChromeAfterTacticalSnapshotAssigned() {
+    const interruptedStrategicPlayback = rendererSharedState.resolutionMoveAnimation !== null || rendererSharedState.resolutionMoveAnimationFrameId !== null;
+    if (rendererSharedState.resolutionMoveAnimationFrameId !== null) {
+      cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
+    }
+    rendererSharedState.resolutionMoveAnimationFrameId = null;
+    rendererSharedState.resolutionMoveAnimation = null;
+    if (interruptedStrategicPlayback) {
+      flushResolutionPlaybackCompleteNotifyCallbacks();
+    }
+    reconcileSelectionToCurrentState();
+    rendererSharedState.hoverRoutePreview = null;
+    rendererSharedState.hoverPreviewRequestSeq++;
+    rendererSharedState.hoveredHexH3 = null;
+    rendererSharedState.hoveredDetailHexH3 = null;
+    rendererSharedState.selectedUnitIdsAtMouseDown = [];
+    rendererSharedState.hideCommittedOrderLinesAfterReady = false;
+  }
   function tacticalRendererApplyStartBattleIpcResult(result, fx) {
     if (!result.success || !result.battle) {
       fx.showMapToast(result.reason ?? "Could not start tactical battle.", { isError: true });
@@ -22206,6 +22251,7 @@
     }
     stashStrategicOrderDraftsForTacticalSession();
     fx.assignBattleSnapshot(result.battle);
+    clearStrategicPlanningChromeAfterTacticalSnapshotAssigned();
     fx.setPhasePlanning(true);
     const skipped = result.skippedParentDisplayNames;
     if (skipped && skipped.length > 0) {
@@ -22224,6 +22270,7 @@
   function tacticalRendererActivateRestoredBattleSnapshot(battle, fx) {
     stashStrategicOrderDraftsForTacticalSession();
     fx.assignBattleSnapshot(battle);
+    clearStrategicPlanningChromeAfterTacticalSnapshotAssigned();
     fx.setPhasePlanning(true);
     fx.enterRes4View(battle.res4ChildH3Indexes);
     fx.setStrategicSidebarTactical(true);
@@ -22281,10 +22328,8 @@
   }
   async function performTacticalBattleExitWithGameApi(session, io) {
     await tacticalPerformBattleExit(session, {
-      endTacticalBattle: window.gameApi?.endTacticalBattle,
-      showMapToast: io.showMapToast,
-      redraw: io.redraw,
-      runReadyAfterExit: io.runReadyAfterExit
+      ...io,
+      endTacticalBattle: window.gameApi?.endTacticalBattle
     });
   }
 
@@ -23165,8 +23210,7 @@
     return Number.isFinite(n) ? n : null;
   }
   function formatUsdPerMillion(perMillion) {
-    const fixed = perMillion.toFixed(4);
-    return fixed.replace(/(\.\d*?[1-9])0+$/u, "$1").replace(/\.0+$/u, "");
+    return (Math.round(perMillion * 100) / 100).toFixed(2);
   }
   function formatReasoningStatusPart(model) {
     const reasoning = model.reasoning;
@@ -23185,7 +23229,7 @@
       const sumPerToken = (prompt ?? 0) + (completion ?? 0);
       const perMillion = sumPerToken * 1e6;
       if (Number.isFinite(perMillion)) {
-        parts.push(`$/${formatUsdPerMillion(perMillion)}M`);
+        parts.push(`$${formatUsdPerMillion(perMillion)}/M`);
       }
     }
     const reasoningPart = formatReasoningStatusPart(model);
@@ -27383,7 +27427,10 @@
       },
       scheduleAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
       rebuildUnitDisplayNameLookup: () => rebuildUnitDisplayNameLookup(rendererSharedState.gameState),
-      refreshOrderSidebars: refreshStrategicOrderSidebars
+      refreshOrderSidebars: () => {
+        hideStackCallout();
+        refreshStrategicOrderSidebars();
+      }
     });
   }
   async function refreshGameStateAfterBuildQueueChange2() {
@@ -27932,6 +27979,19 @@
       refreshSidebarAfterTacticalDraftTeardown: () => {
         hideStackCallout();
         refreshStrategicOrderSidebars();
+      },
+      refreshStrategicSnapshotAfterExit: async () => {
+        if (!window.gameApi?.getGameState) return;
+        const nextState = await window.gameApi.getGameState();
+        await applyGameStateSnapshot2(nextState, {
+          refreshStandingOrders: false,
+          updateGameStateSidebarUi: false,
+          updateSelectionUi: false,
+          updateGameOverUi: false,
+          updateReadyButton: false,
+          refreshBuildPopup: false,
+          redraw: false
+        });
       }
     });
   }

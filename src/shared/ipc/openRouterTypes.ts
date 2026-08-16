@@ -49,7 +49,7 @@ name?: string;
 
    * Contract: `prompt` / `completion` are string forms of finite numbers when present.
    * When to use: `formatModelOptionSuffix` when building Model-tab option labels.
-   * Expected outcome: Usable rates contribute to `$/…M`; both missing/invalid omits the cost part.
+   * Expected outcome: Usable rates contribute to `$…/M`; both missing/invalid omits the cost part.
    * Exceptions: None.
    */
   pricing?: {

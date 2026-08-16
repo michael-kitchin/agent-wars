@@ -169,9 +169,9 @@ export function activateRestoredTacticalBattleFromMainSnapshot(
 /**
  * Ends the tactical session in the main process then resumes strategic Ready handling.
  *
- * Contract: Injects current `window.gameApi.endTacticalBattle` per call like the renderer button handler did.
+ * Contract: Spreads caller IO and injects current `window.gameApi.endTacticalBattle` after the spread so IPC always wins.
  * When to use: Tactical HUD exit button and annihilation modal `Exit Battle` confirmation.
- * Expected outcome: Clears renderer tactical snapshot and invokes Ready pipeline on success.
+ * Expected outcome: Clears renderer tactical snapshot, applies post-exit strategic state, restores living-unit stash drafts, refreshes order sidebars, then invokes Ready pipeline on success.
  * Exceptions: Surfaces toasts when IPC fails per `tacticalPerformBattleExit` contract.
  */
 export async function performTacticalBattleExitWithGameApi(
@@ -179,10 +179,8 @@ export async function performTacticalBattleExitWithGameApi(
   io: Omit<TacticalBattleExitIo, 'endTacticalBattle'>
 ): Promise<void> {
   await tacticalPerformBattleExit(session, {
+    ...io,
     endTacticalBattle: window.gameApi?.endTacticalBattle,
-    showMapToast: io.showMapToast,
-    redraw: io.redraw,
-    runReadyAfterExit: io.runReadyAfterExit,
   });
 }
 
