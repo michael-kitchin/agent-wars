@@ -19,7 +19,8 @@ import {
   tacticalRes4HasStrikeableInfrastructure,
 } from '../../shared/tacticalTerrainCombatModifiers';
 import { tacticalRes4CellHasActiveTransportCorridor } from '../../shared/tacticalRes4TransportLink';
-import { casualtyPriorityIndex, getAttack, getDefense, getRange } from '../combatConstants';
+import { unitHasTacticalRangedBaseline } from '../../shared/tacticalRanges';
+import { casualtyPriorityIndex, getAttack, getDefense } from '../combatConstants';
 import { runRangedPhase } from '../combatResolution';
 import {
   dedupeRangedResolutionShotLines,
@@ -198,7 +199,7 @@ function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(
   for (const defender of eligibleForAa) {
     if (toRemove.has(attacker.id)) break;
     if (toRemove.has(defender.id)) continue;
-    if (getRange(defender.unitType) < 1) continue;
+    if (!unitHasTacticalRangedBaseline(defender.unitType)) continue;
     if (rollD6() > getAttack(defender.unitType)) continue;
     markTacticalSubUnitCasualty(sub, toRemove, attacker.id, [defender.id], killsByReturnFire);
     tacticalLogMutate('resolveTacticalAirStrikeAgainstUnitsOnSubUnits attacker lost to AA', {

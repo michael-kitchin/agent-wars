@@ -1,5 +1,5 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
-import { unitHasTacticalRangedBaseline } from '../../shared/tacticalRanges';
+import { unitHasDirectRangedPlanning } from '../../shared/rangePerimeterModel';
 import { panBindingToDirection, panPhysicalKeyId } from '../../shared/mapKeyboardPanLogic';
 import { clearMapKeyboardPan, mapPanKeyDown, mapPanKeyUp } from './mapKeyboardPan';
 import { isEditableKeyboardTarget, shouldIgnoreGlobalKeydown } from './mapUtils';
@@ -380,7 +380,8 @@ export function wireInitCore(deps: InitCoreDeps): void {
             .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
       const allAir = selectedUnits.length > 0 && selectedUnits.every((unit) => unit.unitType === 'air');
       const allHaveRanged =
-        selectedUnits.length > 0 && selectedUnits.every((unit) => unitHasTacticalRangedBaseline(unit.unitType));
+        selectedUnits.length > 0 &&
+        selectedUnits.every((unit) => unitHasDirectRangedPlanning(unit.unitType, !!tb));
       if (allAir) {
         beginHoverSupportTargetingMode(deps, 'air');
       } else if (allHaveRanged) {

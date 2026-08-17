@@ -128,6 +128,52 @@ function testSystemPromptHasNoBracketedLatLngTuples(): void {
   const prompt = buildSystemPromptForTools(state, coordMap, enabledToolNames, undefined, strategicCtx);
   const hit = prompt.match(LATLNG_TUPLE_IN_PROMPT);
   assert.strictEqual(hit, null, `prompt should not contain lat/lng tuple pattern; first hit: ${hit?.[0] ?? ''}`);
+  assert.ok(
+    prompt.includes('infantry: 1 attack / 2 defense, melee only'),
+    'strategic combat summary must list infantry as melee only'
+  );
+  assert.ok(
+    prompt.includes('Infantry has no strategic ranged_attack (melee only)'),
+    'strategic coaching must not invite infantry ranged_attack'
+  );
+  assert.ok(
+    !prompt.includes('Infantry may use ranged_attack only at strategic range 1'),
+    'stale strategic infantry range-1 coaching must stay gone'
+  );
+}
+
+/**
+ * Ensures tactical system-prompt combat coaching still grants infantry ranged_attack.
+ *
+ * Purpose: Theater split for infantry range must appear in LLM-visible Combat text, not only in validation.
+ * When to use: After edits to `formatCombatStatRangeClause` or `infantryRangedScope`.
+ * Expected outcome: Tactical prompt lists infantry range from the tactical baseline and does not say melee only for infantry.
+ * Exceptions: None.
+ */
+function testTacticalSystemPromptAllowsInfantryRanged(): void {
+  ensureStrategicCoordinateRegistryInitialized();
+  const hexes = getOrderedHexList().slice(0, 8);
+  const state = buildFixtureState(hexes);
+  const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexes);
+  const tacticalCtx = { mode: 'tactical' as const, battleId: 'tb-inf-range', tacticalTurnNumber: 1 };
+  const coordMap = {
+    latLngByH3,
+    resolveToH3,
+    format: (h3: string) => h3ToCode(h3, { mode: 'strategic' }),
+  };
+  const prompt = buildSystemPromptForTools(state, coordMap, ['plan_route'], undefined, tacticalCtx);
+  assert.ok(
+    prompt.includes('infantry: 1 attack / 2 defense, range 2'),
+    'tactical combat summary must list infantry ranged baseline'
+  );
+  assert.ok(
+    prompt.includes('Infantry may use ranged_attack at tactical res4 range'),
+    'tactical coaching must allow infantry ranged_attack'
+  );
+  assert.ok(
+    !prompt.includes('infantry: 1 attack / 2 defense, melee only'),
+    'tactical prompt must not describe infantry as melee only'
+  );
 }
 
 /**
@@ -143,6 +189,7 @@ function run(): void {
   const restoreElectron = installElectronMock(userDataDir);
   try {
     testSystemPromptHasNoBracketedLatLngTuples();
+    testTacticalSystemPromptAllowsInfantryRanged();
     console.log('promptHexExclusiveAudit.test.ts passed');
   } finally {
     restoreElectron();

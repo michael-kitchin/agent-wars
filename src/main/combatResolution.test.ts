@@ -181,6 +181,38 @@ function testRangedEmptyTargetOmitsShotLinesWithoutCombatHexes(): void {
 }
 
 /**
+ * Verifies strategic infantry does not return fire or emit return-fire shot lines.
+ *
+ * Purpose: Infantry is melee-only on the res1 map; adjacent bombardment must not draw reverse connectors or kills.
+ * When to use: After changing `RANGE.infantry` or return-fire eligibility.
+ * Expected outcome: Direct-fire connector may exist; no return-fire kill or connector.
+ * Exceptions: None.
+ */
+function testStrategicInfantryDoesNotReturnFire(): void {
+  const defenderHex = '89283082807ffff';
+  const attackerHex = gridDisk(defenderHex, 1).find((h) => h !== defenderHex);
+  assert.ok(attackerHex, 'need a neighbor hex');
+  const units: CombatUnit[] = [
+    makeUnit('atk', 'human', 'armor', attackerHex!),
+    makeUnit('def', 'opponent', 'infantry', defenderHex),
+  ];
+  const out = runRangedPhase(
+    units,
+    [defenderHex, attackerHex!],
+    [{ unitId: 'atk', targetH3Index: defenderHex }],
+    () => 0,
+    { theater: 'strategic' }
+  );
+  assert.ok(
+    !out.rangedResolutionShotLines?.some(
+      (l) => l.fromH3Index === defenderHex && l.toH3Index === attackerHex
+    ),
+    'strategic infantry must not emit return-fire connectors'
+  );
+  assert.equal(out.killsByReturnFire?.length ?? 0, 0, 'strategic infantry must not score return-fire kills');
+}
+
+/**
  * Verifies out-of-range naval does not return fire or emit return-fire shot lines.
  *
  * Purpose: Planning-parity strategic reach gate for return fire.
@@ -329,6 +361,7 @@ function run(): void {
   testRangedMixedStackTargetsEnemiesOnlyAndEnemyReturnFireOnly();
   testRangedAdjacentReturnFireEmitsShotLinesIncludingMisses();
   testRangedEmptyTargetOmitsShotLinesWithoutCombatHexes();
+  testStrategicInfantryDoesNotReturnFire();
   testStrategicNavalOutOfRangeDoesNotReturnFire();
   testStrategicAirWithoutAirportDoesNotReturnFire();
   testTacticalArmorDistance2ReturnFireOnPlains();

@@ -81,7 +81,7 @@ The game has four unit types. Unit caps are 10 infantry, 5 armor, 5 naval, and 3
 - **Land vs. land:** Infantry and armor fight on land; both can melee in the same hex; armor can also fire into an adjacent hex.
 - **Naval vs. naval:** In water hexes, naval units can melee (same hex) or use range 2 to hit other naval units in nearby water hexes.
 - **Naval vs. land:** Naval can use range 2 to hit land units in hexes within 2 of the naval unit (e.g. coastal hexes). Armor in a land hex may attack naval in an adjacent water hex; infantry may not. See §6 (Coastal bombardment).
-- **Air vs. ground/naval:** Air units strike during the air strike phase (before ranged). When targeting units, defending ground/naval units with range ≥ 1 in the target hex may return fire at their attack value — no range-to-base check; the aircraft flies to the target, so defenders are shooting at aircraft overhead. Infantry (range 0) cannot return fire against air strikes. When targeting infrastructure, only the infrastructure's fixed counter-fire roll applies — units in the hex do not participate, regardless of hex occupation status. See §4.1 and §8 for full air strike and infrastructure strike rules.
+- **Air vs. ground/naval:** Air units strike during the air strike phase (before ranged). When targeting units, defending ground/naval units with **strategic** range ≥ 1 in the target hex may return fire at their attack value — no range-to-base check; the aircraft flies to the target, so defenders are shooting at aircraft overhead. Infantry (strategic range 0) cannot return fire against air strikes on the strategic map. In a tactical battle, defending sub-units with a tactical ranged baseline (including infantry) may counter-fire; see §12.5. When targeting infrastructure, only the infrastructure's fixed counter-fire roll applies — units in the hex do not participate, regardless of hex occupation status. See §4.1 and §8 for full air strike and infrastructure strike rules.
 - **Ground vs. air (base attack):** Air units do not participate in melee. If an enemy ground unit enters a hex containing an airport with a based air unit, the air unit is destroyed (see §6).
 - **Terrain modifiers (optional / future):** Not required for first implementation. Later, armor could suffer a penalty in certain terrain (e.g. forest/mountain); infantry could get a defensive bonus in forest. Left out of the core resolution below for simplicity.
 
@@ -106,7 +106,7 @@ Using the **current** (pre-movement) positions, after air strike casualties are 
 - Build ranged attacks: for each unit with range ≥ 1 (armor, naval — **not** air, which resolves in §4.1), determine enemy-occupied hexes within range; each (attacker hex, defender hex) is a ranged attack.
 - Resolve all ranged engagements. Apply casualties and remove eliminated units. No melee yet.
 
-**DEFEND standing orders (strategic):** Each turn, a unit holding a DEFEND order automatically issues one ranged attack (infantry/armor/naval) or one air strike against enemy units (air only, `targetType: units`) at the closest enemy within weapon range, measured from the unit's **current** hex — including while still marching toward its defend post. Explicit human pending orders override standing-generated attack rows for the same unit id.
+**DEFEND standing orders (strategic):** Each turn, a unit holding a DEFEND order automatically issues one ranged attack (armor/naval) or one air strike against enemy units (air only, `targetType: units`) at the closest enemy within weapon range, measured from the unit's **current** hex — including while still marching toward its defend post. Infantry has no strategic ranged attack and does not auto-fire. Explicit human pending orders override standing-generated attack rows for the same unit id.
 
 **DEFEND standing orders (tactical):** The same per-beat auto-engagement applies during tactical battles. Each tactical beat, sub-units whose strategic parent carries a DEFEND order fire ranged (non-air) or air strikes (air, `targetType: units`) at the closest legal enemy res4 cell — regardless of whether the unit has yet reached its defend post. Explicit/LLM orders for the same sub-unit override standing-generated rows. Opponent standing-order air strikes are expanded from strategic parent ids to tactical sub-unit ids targeting the closest enemy sub-unit res4 hex.
 
@@ -150,7 +150,7 @@ No "continue or retreat" — no player choices. If both sides remain in the same
 
 - **Roll:** One die per unit (d6, result 1–6).
 - **Hit:** For **attack** (including return fire), hit if `roll ≤ attack value`. For **defense** (melee only), hit if `roll ≤ defense value`.
-- **Return fire (ranged phase):** A defending unit returns fire only if at least one attacker hex is a legal reverse shot under planning rules (same reach a human would need to order the reverse attack). **Strategic ground** (infantry/armor/naval): strategic ranged range + H3 grid distance. **Tactical ground:** tactical ranged baselines with terrain caps and mountain LOS (same as direct-fire validation). **Air** in the ranged phase: strike-planning rules — intact airport at base, and on the strategic map within air strike range of the attacker hex; in a tactical battle, airport only (engagement hexes are already in footprint). No new terrain gates for air return fire. Air-strike phase counter-fire (§8) is separate and still has **no** range-to-base check. Each eligible defender rolls once (attack value); hits are assigned to attacker hexes.
+- **Return fire (ranged phase):** A defending unit returns fire only if at least one attacker hex is a legal reverse shot under planning rules (same reach a human would need to order the reverse attack). **Strategic ground** (infantry/armor/naval): strategic ranged range + H3 grid distance. Infantry strategic range is 0, so infantry never returns fire on the strategic map. **Tactical ground:** tactical ranged baselines with terrain caps and mountain LOS (same as direct-fire validation), including infantry. **Air** in the ranged phase: strike-planning rules — intact airport at base, and on the strategic map within air strike range of the attacker hex; in a tactical battle, airport only (engagement hexes are already in footprint). No new terrain gates for air return fire. Air-strike phase counter-fire (§8) is separate and still has **no** range-to-base check. Each eligible defender rolls once (attack value); hits are assigned to attacker hexes.
 - **Counter-fire against air (air strike phase):** See §8.1 for unit targets and §8.3 for infrastructure targets. Counter-fire mechanics vary by target type.
 - **Casualty assignment (automatic):** When a side receives N hits, remove N of its units in that combat using a **fixed priority** so no player chooses. Remove units in order of **lowest defense value first** (so high-value units survive when possible). Ties: use unit-type order **infantry → armor → naval → air**. If the combat is ranged and the "defender" is a hex with mixed unit types, apply the same priority to that hex's stack.
 
@@ -276,11 +276,13 @@ An air unit with a strike order targeting an enemy-occupied hex resolves as foll
 
 1. The air unit rolls d6. Hit if roll ≤ 3 (attack value).
 2. If hit, assign one casualty to the target hex using the standard casualty priority (lowest defense first; ties: infantry → armor → naval → air).
-3. **Counter-fire:** Every defending unit in the target hex with range ≥ 1 rolls d6; hit if roll ≤ that unit's attack value. If any counter-fire roll hits, the air unit is destroyed. There is no range-to-base check — the aircraft flies to the target hex, so defenders are shooting at aircraft overhead, not at a distant airfield.
+3. **Counter-fire:** Every defending unit in the target hex with **strategic** range ≥ 1 rolls d6; hit if roll ≤ that unit's attack value. If any counter-fire roll hits, the air unit is destroyed. There is no range-to-base check — the aircraft flies to the target hex, so defenders are shooting at aircraft overhead, not at a distant airfield.
    - Armor (range 1, attack 3): returns fire, hitting on 1–3.
    - Naval (range 2, attack 2): returns fire, hitting on 1–2.
-   - Infantry (range 0): cannot return fire against air.
+   - Infantry (range 0): cannot return fire against air on the strategic map.
    - Air units at the target hex: cannot return fire (air units only act during their own strike order).
+
+These §8.1 counter-fire rules use **strategic** range. In a tactical battle, defending sub-units with a tactical ranged baseline (including infantry) may counter-fire; see §12.5.
 
 **Target selection:** Players order air strikes against "units" as a generic target type. The player does not choose which unit type to hit — the standard casualty priority assigns the hit automatically (lowest defense first; ties: infantry → armor → naval → air).
 
@@ -421,7 +423,7 @@ At the tactical level, all unit types gain ranged attack capability, reflecting 
 - **Naval:** Range 20 res4 hexes. Long-range naval gunfire dominating coastal approaches.
 - **Air:** Can strike any hex within the res1 hex. No range limit within the tactical battlefield.
 
-Ranged attacks use the same A&A-style dice resolution as strategic combat: roll d6, hit if roll ≤ attack value. Counter-fire applies if the target has range to reach the attacker. Casualty assignment follows the standard fixed priority.
+Ranged attacks use the same A&A-style dice resolution as strategic combat: roll d6, hit if roll ≤ attack value. Counter-fire applies if the target has **tactical** range to reach the attacker. Casualty assignment follows the standard fixed priority. **Air-strike AA:** unlike the strategic map, tactical infantry may counter-fire when an air strike targets their hex, because infantry has a positive tactical ranged baseline.
 
 Ranged attacks are not blocked by terrain — line of sight is not modeled at the tactical level. This is a deliberate simplification consistent with the strategic level's approach. If playtesting reveals that terrain-blocked LOS adds meaningful tactical depth without overwhelming the player or AI, it can be added later.
 

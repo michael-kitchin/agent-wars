@@ -304,6 +304,91 @@ function testTacticalPossibleActionsMarkdownUsesTacticalRangedLegality(): void {
 }
 
 /**
+ * Ensures tactical infantry still receive ranged-attack briefing rows after strategic infantry range became 0.
+ *
+ * Purpose: `buildPossibleUnitActionsMarkdown` must gate ranged rows with theater-aware planning, not strategic `getRange`.
+ * When to use: After changing the ranged-row eligibility check or infantry strategic/tactical range split.
+ * Expected outcome: Strategic markdown has no infantry ranged rows; tactical markdown lists ranged attack at res4 distances 1 and 2.
+ * Exceptions: Throws if the fixture cannot find res4 neighbors at distances 1 and 2 under the same parent.
+ */
+function testTacticalInfantryPossibleActionsIncludeRangedRows(): void {
+  const res1 = tacticalRes1Cell(12, 34);
+  const res4Inf = tacticalRes4UnderRes1Corner(12, 34);
+  const sameParent = [...gridDisk(res4Inf, 6)].filter((h) => cellToParent(h, 1) === res1);
+  const res4NearHuman = sameParent.find((h) => h !== res4Inf && gridDistance(res4Inf, h) === 1);
+  const res4FarHuman = sameParent.find((h) => h !== res4Inf && gridDistance(res4Inf, h) === 2);
+  if (!res4NearHuman || !res4FarHuman) {
+    throw new Error('expected res4 ring neighbors at distances 1 and 2 under the same res1 parent');
+  }
+  const tactical: TacticalBattleSnapshot = {
+    battleId: 't-inf-ranged-cap-md',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: [res4Inf, res4NearHuman, res4FarHuman],
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: {
+      [res4Inf]: 'plains',
+      [res4NearHuman]: 'plains',
+      [res4FarHuman]: 'plains',
+    },
+    subUnits: [
+      {
+        id: 'opp-inf-ranged-cap',
+        parentUnitId: 'parent-inf',
+        player: 'opponent',
+        unitType: 'infantry',
+        h3Index: res4Inf,
+        displayName: 'Infantry',
+      },
+      {
+        id: 'hum-near',
+        parentUnitId: 'parent-inf-n',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: res4NearHuman,
+        displayName: 'Infantry near',
+      },
+      {
+        id: 'hum-far',
+        parentUnitId: 'parent-inf-f',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: res4FarHuman,
+        displayName: 'Infantry far',
+      },
+    ],
+  };
+  const strategic: GameStateSnapshot = {
+    turnNumber: 1,
+    phase: 'planning',
+    hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+    units: [],
+    pendingOrders: [],
+    humanHomeRegionHexes: [res4FarHuman],
+    res1Control: [{ h3Index: res1, controllerPlayerId: 'opponent' }],
+  };
+  const plan = buildTacticalAiPlanState(strategic, tactical);
+  const latLngByH3 = new Map<string, [number, number]>();
+  for (const h of plan.hexes.map((x) => x.h3Index)) {
+    latLngByH3.set(h, cellToLatLng(h) as [number, number]);
+  }
+  const fmt = (ll: [number, number]) => formatLatLng(ll, LATLNG_DECIMAL_PLACES);
+  const mdStrategic = buildPossibleUnitActionsMarkdown({ state: plan, latLngByH3, formatLatLng: fmt });
+  const mdTactical = buildPossibleUnitActionsMarkdown({
+    state: plan,
+    latLngByH3,
+    formatLatLng: fmt,
+    tacticalBattle: tactical,
+  });
+  const strategicRows = mdStrategic.split('\n').filter((line) => line.includes('opp-inf-ranged-cap') && line.includes('ranged attack'));
+  const tacticalRows = mdTactical.split('\n').filter((line) => line.includes('opp-inf-ranged-cap') && line.includes('ranged attack'));
+  assert.strictEqual(strategicRows.length, 0, 'strategic infantry must not list ranged attack');
+  assert.strictEqual(tacticalRows.length, 2, 'tactical infantry plains baseline reaches res4 distances 1 and 2');
+}
+
+/**
  * Ensures tactical Best Options ground moves use res4 march reachability (not strategic land-mass), keeping enemy-occupied cells.
  *
  * Purpose: Regression for `collectTacticalLegalMoveDestinationRes4Hexes` wiring in Best Options.
@@ -493,6 +578,10 @@ const tests = [
   {
     name: 'buildPossibleUnitActionsMarkdown tacticalBattle uses res4 ranged rules vs strategic getRange',
     fn: testTacticalPossibleActionsMarkdownUsesTacticalRangedLegality,
+  },
+  {
+    name: 'buildPossibleUnitActionsMarkdown tactical infantry still lists ranged rows',
+    fn: testTacticalInfantryPossibleActionsIncludeRangedRows,
   },
   {
     name: 'collectAggregatedPossibleActionRows tactical Best Options ground moves include adjacent enemy',

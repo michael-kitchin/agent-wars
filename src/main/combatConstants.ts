@@ -1,3 +1,5 @@
+import { strategicRangedRangeHexesForUnitType } from '../shared/rangePerimeterModel';
+
 /**
  * Documents the `UnitType` type alias (export type UnitType).
 
@@ -103,53 +105,6 @@ air: 1,
 };
 
 /**
- * Documents the module-scope binding `RANGE` (RANGE: Record<UnitType, number>).
-
- * Purpose: Supports maintainability by documenting why `RANGE` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const RANGE: Record<UnitType, number> = {
-    /**
-   * Documents the object literal property `infantry` (infantry: 1).
-
-   * Purpose: Supports maintainability by documenting why `infantry` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: One res1 hex of standoff ranged on the strategic map, matching tactical sub-map ranged feel and the renderer ranged-mode gate (`RANGED_RANGE_BY_UNIT_TYPE`).
-   * Exceptions: None.
-   */
-infantry: 1,
-    /**
-   * Documents the object literal property `armor` (armor: 1).
-
-   * Purpose: Supports maintainability by documenting why `armor` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-armor: 1,
-    /**
-   * Documents the object literal property `naval` (naval: 2).
-
-   * Purpose: Supports maintainability by documenting why `naval` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-naval: 2,
-    /**
-   * Documents the object literal property `air` (air: 3).
-
-   * Purpose: Supports maintainability by documenting why `air` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-air: 3,
-};
-
-/**
  * Documents the module-scope binding `MOVEMENT_BUDGET` (MOVEMENT_BUDGET: Record<UnitType, number>).
 
  * Purpose: Supports maintainability by documenting why `MOVEMENT_BUDGET` exists.
@@ -224,12 +179,12 @@ export function getDefense(unitType: string): number {
  * Defines the `getRange` function shape (export function getRange(unitType: string): number).
 
  * Purpose: **Strategic (res1) combat** max ranged distance in H3 hex steps for dice resolution, pre-computation, and strategic order validation (`validateRangedAttack`, tool assessments, etc.).
- * When to use: Any **strategic** path that must stay aligned with the small `RANGE` table in this file—not res4 tactical battles.
- * Expected outcome: Values intentionally differ from tactical baselines in `src/shared/tacticalRanges.ts` (`RANGED_RANGE_BY_UNIT_TYPE`); for tactical ranged legality use `effectiveTacticalRangedMaxRangeForAttacker` and related helpers in `src/shared/tacticalTerrainCombatModifiers.ts`.
+ * When to use: Any **strategic** path that must stay aligned with `strategicRangedRangeHexesForUnitType`—not res4 tactical battles.
+ * Expected outcome: Delegates to the shared strategic range table (infantry 0 / melee only). Tactical ranged legality uses `RANGED_RANGE_BY_UNIT_TYPE` and `effectiveTacticalRangedMaxRangeForAttacker`.
  * Exceptions: None.
  */
 export function getRange(unitType: string): number {
-  return RANGE[unitType as UnitType] ?? 0;
+  return strategicRangedRangeHexesForUnitType(unitType);
 }
 
 /**

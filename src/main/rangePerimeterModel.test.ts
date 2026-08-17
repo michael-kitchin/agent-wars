@@ -3,33 +3,96 @@
  */
 
 import * as assert from 'assert';
+import * as fs from 'fs';
+import * as path from 'path';
 import { cellToChildren, gridDisk } from 'h3-js';
 import { AIR_STRIKE_RANGE_HEXES } from '../shared/tacticalRanges';
 import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
+import { getRange } from './combatConstants';
 import {
   buildStrategicAirStrikeRangeSet,
   buildStrategicRangedRangeSet,
   buildTacticalAirStrikeRangeSet,
   buildTacticalRangedRangeSet,
   strategicRangedRangeHexesForUnitType,
+  unitHasDirectRangedPlanning,
+  unitHasStrategicRangedBaseline,
 } from '../shared/rangePerimeterModel';
 
 const ORIGIN = '81283ffffffffff';
 
 /**
- * Defines the `testStrategicRangedInfantryDiskSize` function shape (function testStrategicRangedInfantryDiskSize(): void).
+ * Defines the `testStrategicRangedInfantryHasEmptyDisk` function shape (function testStrategicRangedInfantryHasEmptyDisk(): void).
  *
- * Purpose: Ensures strategic ranged range set matches `gridDisk` for infantry.
- * When to use: Regression test for `buildStrategicRangedRangeSet`.
- * Expected outcome: Set equals the infantry range disk around the origin.
+ * Purpose: Ensures strategic infantry is melee-only and contributes no ranged perimeter cells.
+ * When to use: Regression test for `buildStrategicRangedRangeSet` after infantry range is 0.
+ * Expected outcome: Empty set; `strategicRangedRangeHexesForUnitType('infantry')` is 0.
  * Exceptions: None.
  */
-function testStrategicRangedInfantryDiskSize(): void {
-  const units = [{ h3Index: ORIGIN, unitType: 'infantry' }];
+function testStrategicRangedInfantryHasEmptyDisk(): void {
+  assert.strictEqual(strategicRangedRangeHexesForUnitType('infantry'), 0);
+  const set = buildStrategicRangedRangeSet([{ h3Index: ORIGIN, unitType: 'infantry' }]);
+  assert.strictEqual(set.size, 0);
+}
+
+/**
+ * Defines the `testStrategicRangedArmorDiskSize` function shape (function testStrategicRangedArmorDiskSize(): void).
+ *
+ * Purpose: Ensures strategic ranged range set matches `gridDisk` for armor (range 1).
+ * When to use: Regression test for `buildStrategicRangedRangeSet`.
+ * Expected outcome: Set equals the armor range disk around the origin.
+ * Exceptions: None.
+ */
+function testStrategicRangedArmorDiskSize(): void {
+  const units = [{ h3Index: ORIGIN, unitType: 'armor' }];
   const set = buildStrategicRangedRangeSet(units);
-  const expected = new Set(gridDisk(ORIGIN, strategicRangedRangeHexesForUnitType('infantry')));
+  const expected = new Set(gridDisk(ORIGIN, strategicRangedRangeHexesForUnitType('armor')));
   assert.strictEqual(set.size, expected.size);
   for (const h of expected) assert.ok(set.has(h));
+}
+
+/**
+ * Defines the `testStrategicVsTacticalRangedPlanningGate` function shape (function testStrategicVsTacticalRangedPlanningGate(): void).
+ *
+ * Purpose: Locks the renderer theater split: infantry cannot enter strategic Ranged mode but can in tactical.
+ * When to use: After changing `unitHasDirectRangedPlanning` or strategic infantry range.
+ * Expected outcome: Infantry false/true; armor true in both theaters; unknown false.
+ * Exceptions: None.
+ */
+function testStrategicVsTacticalRangedPlanningGate(): void {
+  for (const t of ['infantry', 'armor', 'naval', 'air'] as const) {
+    assert.equal(strategicRangedRangeHexesForUnitType(t), getRange(t), `perimeter table must match getRange(${t})`);
+  }
+  assert.equal(unitHasStrategicRangedBaseline('infantry'), false);
+  assert.equal(unitHasStrategicRangedBaseline('armor'), true);
+  assert.equal(unitHasDirectRangedPlanning('infantry', false), false);
+  assert.equal(unitHasDirectRangedPlanning('infantry', true), true);
+  assert.equal(unitHasDirectRangedPlanning('armor', false), true);
+  assert.equal(unitHasDirectRangedPlanning('unknown', false), false);
+}
+
+/**
+ * Locks the strategic vs tactical air-strike AA split in source so a later `getRange` swap cannot silently disable tactical infantry AA.
+ *
+ * Purpose: Strategic AA must skip melee-only types via `getRange`; tactical AA must use `unitHasTacticalRangedBaseline`.
+ * When to use: After changing air-strike counter-fire eligibility in either theater.
+ * Expected outcome: Both files contain the theater-specific skip predicates.
+ * Exceptions: None.
+ */
+function testAirStrikeAaTheaterSplitInSource(): void {
+  const strategic = fs.readFileSync(path.resolve(process.cwd(), 'src', 'main', 'game-actions', 'airStrikeResolution.ts'), 'utf8');
+  const tactical = fs.readFileSync(
+    path.resolve(process.cwd(), 'src', 'main', 'tacticalBattle', 'tacticalStrategicOrderPhases.ts'),
+    'utf8'
+  );
+  assert.ok(
+    strategic.includes('if (getRange(defender.unit_type) < 1) continue;'),
+    'strategic air-strike AA must skip types with getRange < 1 (infantry melee-only)'
+  );
+  assert.ok(
+    tactical.includes('if (!unitHasTacticalRangedBaseline(defender.unitType)) continue;'),
+    'tactical air-strike AA must use tactical ranged baseline so infantry can still AA'
+  );
 }
 
 /**
@@ -120,7 +183,10 @@ function testTacticalRangedClipsToFootprint(): void {
  * Exceptions: None.
  */
 const tests = [
-  { name: 'strategic ranged infantry disk size', fn: testStrategicRangedInfantryDiskSize },
+  { name: 'strategic ranged infantry has empty disk', fn: testStrategicRangedInfantryHasEmptyDisk },
+  { name: 'strategic ranged armor disk size', fn: testStrategicRangedArmorDiskSize },
+  { name: 'strategic vs tactical ranged planning gate', fn: testStrategicVsTacticalRangedPlanningGate },
+  { name: 'air-strike AA theater split in source', fn: testAirStrikeAaTheaterSplitInSource },
   { name: 'strategic air strike disk size', fn: testStrategicAirStrikeDiskSize },
   { name: 'tactical air strike equals footprint', fn: testTacticalAirStrikeEqualsFootprint },
   { name: 'tactical ranged clips to footprint', fn: testTacticalRangedClipsToFootprint },

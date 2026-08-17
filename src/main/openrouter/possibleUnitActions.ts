@@ -13,7 +13,7 @@ import { gridDistance, gridDisk } from 'h3-js';
 import { type GameStateSnapshot, listRes4FeatureOverridesForGame } from '../gameDb';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { collectTacticalLegalMoveDestinationRes4Hexes } from '../../shared/collectTacticalLegalMoveDestinationRes4Hexes';
-import { getRange } from '../combatConstants';
+import { unitHasDirectRangedPlanning } from '../../shared/rangePerimeterModel';
 import { getValidDestinations } from '../oneStepMoveDestinations';
 import { collectTacticalLegalRangedTargetRes4Hexes } from '../../shared/tacticalTerrainCombatModifiers';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
@@ -775,7 +775,7 @@ export function collectAggregatedPossibleActionRows(args: {
       }
     }
 
-    if (unit.unitType !== 'air' && getRange(unit.unitType as 'infantry' | 'armor' | 'naval' | 'air') >= 1) {
+    if (unit.unitType !== 'air' && unitHasDirectRangedPlanning(unit.unitType, Boolean(tacticalBattle))) {
       const tacticalRangedRows = tacticalRangedRowsForFootprint;
       let rangedHexes = excludeUnitCurrentHex(
         unit.h3Index,

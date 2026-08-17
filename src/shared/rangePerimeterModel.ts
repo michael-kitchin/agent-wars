@@ -3,7 +3,7 @@
  */
 
 import { gridDisk } from 'h3-js';
-import { AIR_STRIKE_RANGE_HEXES } from './tacticalRanges';
+import { AIR_STRIKE_RANGE_HEXES, unitHasTacticalRangedBaseline } from './tacticalRanges';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from './tacticalBattleTypes';
 import {
   effectiveTacticalRangedMaxRangeForAttacker,
@@ -14,16 +14,55 @@ import {
 export type RangePerimeterUnitInput = { readonly h3Index: string; readonly unitType: string };
 
 /**
- * Strategic res1 ranged distance in hex steps (mirrors `getRange` in `src/main/combatConstants.ts`).
+ * Strategic res1 ranged distance in hex steps. Source of truth for `getRange` in `src/main/combatConstants.ts`.
  *
- * Purpose: Keeps renderer perimeter logic free of main-process imports while staying aligned with validation.
- * When to use: `buildStrategicRangedRangeSet` only.
- * Expected outcome: Same values as `getRange` for known unit types; `0` for unknown types.
+ * Purpose: One table for renderer perimeters, strategic validation, return fire, DEFEND auto-ranged, and air-strike AA.
+ * When to use: Strategic (res1) ranged distance only — not tactical `RANGED_RANGE_BY_UNIT_TYPE`.
+ * Expected outcome: infantry 0 (melee only), armor 1, naval 2, air 3; `0` for unknown types.
  * Exceptions: None.
  */
 export function strategicRangedRangeHexesForUnitType(unitType: string): number {
-  const table: Record<string, number> = { infantry: 1, armor: 1, naval: 2, air: 3 };
+  const table: Record<string, number> = {
+    /**
+     * Strategic infantry is melee-only on the res1 map.
+     *
+     * Purpose: Gates ranged orders, planning-parity return fire, DEFEND auto-ranged, and strategic air-strike AA.
+     * When to use: Keep at `0`. Tactical infantry ranged and tactical AA use `RANGED_RANGE_BY_UNIT_TYPE`.
+     * Expected outcome: `getRange('infantry') < 1` denies strategic ranged attacks and return fire.
+     * Exceptions: None.
+     */
+    infantry: 0,
+    armor: 1,
+    naval: 2,
+    air: 3,
+  };
   return table[unitType] ?? 0;
+}
+
+/**
+ * Returns whether a unit type can issue strategic (res1) direct ranged attacks.
+ *
+ * Purpose: Keeps the renderer Ranged-mode gate aligned with `getRange` without importing main-process combat constants.
+ * When to use: Strategic map UI only — not tactical battles (use `unitHasTacticalRangedBaseline`).
+ * Expected outcome: True for armor and naval with current constants; false for infantry (melee only), unknown types, and callers that should treat air as Strike rather than Ranged.
+ * Exceptions: Air is `true` in this table because `getRange('air')` is 3; the renderer still routes all-air selections to Strike first.
+ */
+export function unitHasStrategicRangedBaseline(unitType: string): boolean {
+  return strategicRangedRangeHexesForUnitType(unitType) >= 1;
+}
+
+/**
+ * Returns whether a unit type may enter direct ranged planning for the current theater.
+ *
+ * Purpose: One predicate for the Ranged button so strategic infantry stay melee-only while tactical infantry keep res4 ranged.
+ * When to use: Renderer ranged-mode enable/show paths that already know whether a tactical battle snapshot is active.
+ * Expected outcome: Strategic uses `unitHasStrategicRangedBaseline`; tactical uses `unitHasTacticalRangedBaseline`.
+ * Exceptions: None.
+ */
+export function unitHasDirectRangedPlanning(unitType: string, tacticalBattleActive: boolean): boolean {
+  return tacticalBattleActive
+    ? unitHasTacticalRangedBaseline(unitType)
+    : unitHasStrategicRangedBaseline(unitType);
 }
 
 /**

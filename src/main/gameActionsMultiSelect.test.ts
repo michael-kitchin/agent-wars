@@ -573,14 +573,14 @@ function testAssignGroupedHappyPathSingleUnit(): void {
 }
 
 /**
- * Defines the `testValidateGroupedRangedInfantryFailsWhenAdjacentHexHasNoEnemies` function shape (function testValidateGroupedRangedInfantryFailsWhenAdjacentHexHasNoEnemies(): void).
+ * Defines the `testValidateGroupedRangedInfantryRejectedAsMeleeOnly` function shape (function testValidateGroupedRangedInfantryRejectedAsMeleeOnly(): void).
 
- * Purpose: Ensures strategic infantry (range 1) still requires an enemy stack on the target hex after range checks pass.
- * When to use: Regression guard paired with tactical/strategic ranged UX parity for infantry.
- * Expected outcome: Clearing a neighbor res1 cell of units yields a reason mentioning no enemy units on the target hex.
+ * Purpose: Ensures strategic infantry cannot issue ranged attacks (range 0 / melee only).
+ * When to use: Regression guard so infantry range is not reintroduced on the strategic map.
+ * Expected outcome: `validateGroupRangedTarget` fails with a melee-only / no-ranged-attack reason.
  * Exceptions: None.
  */
-function testValidateGroupedRangedInfantryFailsWhenAdjacentHexHasNoEnemies(): void {
+function testValidateGroupedRangedInfantryRejectedAsMeleeOnly(): void {
   withTempDb(() => {
     const state = getGameState();
     const infantry = state.units.find((u) => u.player === 'human' && u.unitType === 'infantry');
@@ -589,12 +589,11 @@ function testValidateGroupedRangedInfantryFailsWhenAdjacentHexHasNoEnemies(): vo
     const neighbors = [...gridDisk(infantry!.h3Index, 1)].filter((h) => h !== infantry!.h3Index && mapHex.has(h));
     assert.ok(neighbors.length > 0, 'expected at least one on-map neighbor for seeded infantry');
     const target = neighbors[0]!;
-    dbRun('DELETE FROM units WHERE h3_index = ?', [target]);
     const result = validateGroupRangedTarget([infantry!.id], target);
     assert.strictEqual(result.success, false);
     assert.ok(
-      result.reason?.includes('no enemy'),
-      `expected no-enemy failure, got: ${result.reason ?? '(none)'}`
+      /no ranged attack|melee only/i.test(result.reason ?? ''),
+      `expected melee-only failure, got: ${result.reason ?? '(none)'}`
     );
   });
 }
@@ -1121,7 +1120,7 @@ function run(): void {
   testPreviewGroupedFailsForUnknownUnit();
   testAssignGroupedRejectsEmptySelection();
   testAssignGroupedHappyPathSingleUnit();
-  testValidateGroupedRangedInfantryFailsWhenAdjacentHexHasNoEnemies();
+  testValidateGroupedRangedInfantryRejectedAsMeleeOnly();
   testNavalOrdersCanEgressFromLandSeaportToAdjacentWaterOrCoastal();
   testPreviewGroupedMixedLandNavalRejectsNonCoastalDestination();
   testPreviewGroupedMixedLandNavalClearsSegmentsWhenAnyUnitBlocked();

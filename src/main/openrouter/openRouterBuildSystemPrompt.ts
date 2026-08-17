@@ -1,6 +1,8 @@
 import type { GameStateSnapshot } from '../gameDb';
 import { getAndClearAiToolLimitExceededLastTurn } from '../gameDb';
 import { getAttack, getDefense, getRange } from '../combatConstants';
+import { RANGED_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
+import { unitHasDirectRangedPlanning } from '../../shared/rangePerimeterModel';
 import { H3_RESOLUTION, LATLNG_DECIMAL_PLACES } from '../mapData';
 import { getValidDestinationsUnoccupied } from '../oneStepMoveDestinations';
 import { getInjectionText } from '../tools/tool4Memory';
@@ -80,6 +82,24 @@ const COACHING_TACTICAL_PRIORITY = `- Your priority is to engage enemy forces an
 const STRATEGIC_CONTEXT_OPENING =
   '- At least one enemy unit remains in play, and the human player is actively searching for your forces with intent to destroy them.';
 
+/**
+ * Formats the per-type range clause for the Combat stats line in the system prompt.
+ *
+ * Purpose: Keeps strategic infantry melee-only in LLM coaching while tactical infantry still shows a positive res4 range.
+ * When to use: `buildSystemPromptForTools` combat summary only.
+ * Expected outcome: Strategic uses `getRange` (`melee only` when range is 0). Tactical uses `RANGED_RANGE_BY_UNIT_TYPE` (air is "strike anywhere in the battle" instead of the large footprint cap).
+ * Exceptions: None.
+ */
+function formatCombatStatRangeClause(unitType: string, tacticalBattleActive: boolean): string {
+  if (tacticalBattleActive) {
+    if (unitType === 'air') return ', strike anywhere in the battle';
+    const r = RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0;
+    return r >= 1 ? `, range ${r}` : ', melee only';
+  }
+  const r = getRange(unitType);
+  return r >= 1 ? `, range ${r}` : ', melee only';
+}
+
 export function buildSystemPromptForTools(
   state: GameStateSnapshot,
   coordMap: {
@@ -121,10 +141,11 @@ export function buildSystemPromptForTools(
     .join('; ');
 
   const unitTypes = [...ALL_BUILD_UNIT_TYPES];
+  const tacticalBattleActive = coordinateContext.mode === 'tactical';
   const combatSummary = unitTypes
     .map(
       (t) =>
-        `${t}: ${getAttack(t)} attack / ${getDefense(t)} defense${getRange(t) >= 1 ? `, range ${getRange(t)}` : ', melee only'}`
+        `${t}: ${getAttack(t)} attack / ${getDefense(t)} defense${formatCombatStatRangeClause(t, tacticalBattleActive)}`
     )
     .join('; ');
 
@@ -187,7 +208,7 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
   const airOpsBlock = airOpsRaw ? `${airOpsRaw}\n\n` : '';
   const sealiftBlock = sealiftRaw ? `${sealiftRaw}\n\n` : '';
 
-  const hasRanged = opponentUnits.some((u) => getRange(u.unitType as 'infantry' | 'armor' | 'naval') >= 1);
+  const hasRanged = opponentUnits.some((u) => unitHasDirectRangedPlanning(u.unitType, tacticalBattleActive));
 
   const combatTargetHint =
     flags.estimationEnabled && !hasPrecomputedBriefing
@@ -305,10 +326,9 @@ ${COACHING_MESSAGE_BLOCK}
     coordinateContext.mode === 'tactical'
       ? buildTacticalLatLngPreamble(LATLNG_DECIMAL_PLACES)
       : buildLatLngPreamble(H3_RESOLUTION, LATLNG_DECIMAL_PLACES);
-  const infantryRangedScope =
-    coordinateContext.mode === 'tactical'
-      ? 'Infantry may use ranged_attack only at tactical res4 range 1 (adjacent res4 hex on the tactical map); use movement and melee when that is not enough.'
-      : 'Infantry may use ranged_attack only at strategic range 1 (adjacent res1 hex); use movement and melee when that is not enough.';
+  const infantryRangedScope = tacticalBattleActive
+    ? `Infantry may use ranged_attack at tactical res4 range (baseline ${RANGED_RANGE_BY_UNIT_TYPE.infantry}; terrain may reduce it); use movement and melee when out of range.`
+    : 'Infantry has no strategic ranged_attack (melee only); use movement and melee.';
   const combatTempoClause = hasAir
     ? 'If a legal ranged_attack or air strike is available this turn, take it — these attacks resolve from turn-start positions and do not prevent movement in the same turn.'
     : 'If a legal ranged_attack is available this turn, take it — ranged attacks resolve from turn-start positions and do not prevent movement in the same turn.';

@@ -63,7 +63,7 @@ function testReturnFireEligibleEmitsEdgesWithoutKill(): void {
   const lines = returnFireShotLinesForEngagement({
     defenderHex: origin,
     attackerHexes: [attackerHex],
-    defenderUnits: [{ unitType: 'infantry', h3Index: origin }],
+    defenderUnits: [{ unitType: 'armor', h3Index: origin }],
     returnFireContext: { theater: 'strategic' },
   });
   assert.deepStrictEqual(lines, [

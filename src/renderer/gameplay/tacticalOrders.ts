@@ -1,5 +1,5 @@
 import type { AirStrikeTargetType } from '../../shared/ipcTypes';
-import { unitHasTacticalRangedBaseline } from '../../shared/tacticalRanges';
+import { unitHasDirectRangedPlanning } from '../../shared/rangePerimeterModel';
 import {
   formatPendingAirStrikeSidebarLabel,
   formatPendingRangedAttackSidebarLabel,
@@ -323,7 +323,8 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
           .filter((unit): unit is NonNullable<typeof unit> => !!unit);
     const allAir = selectedUnits.length > 0 && selectedUnits.every((unit) => unit.unitType === 'air');
     const allHaveRanged =
-      selectedUnits.length > 0 && selectedUnits.every((unit) => unitHasTacticalRangedBaseline(unit.unitType));
+      selectedUnits.length > 0 &&
+      selectedUnits.every((unit) => unitHasDirectRangedPlanning(unit.unitType, !!tb));
     if (allAir) {
       btnEl.textContent = 'Strike';
       btnEl.style.display = S.airStrikeModeActive ? 'none' : 'inline-block';

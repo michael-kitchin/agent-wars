@@ -40,7 +40,7 @@ export const MOVEMENT_RANGE_BY_UNIT_TYPE: Readonly<Record<string, number>> = Obj
  * Expected outcome: Infantry 2, armor 5, naval 10, air 99 (effectively unlimited within the tactical map) before terrain modifiers.
  * Exceptions: None.
  *
- * **Strategic vs tactical:** For **res1 strategic** ranged distance (smaller standoff values), use `getRange` in `src/main/combatConstants.ts` (`RANGE`). Do not substitute this table into strategic `validateRangedAttack` without an explicit tactical-active branch.
+ * **Strategic vs tactical:** For **res1 strategic** ranged distance (smaller standoff values), use `getRange` / `strategicRangedRangeHexesForUnitType`. Do not substitute this table into strategic `validateRangedAttack` without an explicit tactical-active branch.
  */
 export const RANGED_RANGE_BY_UNIT_TYPE: Readonly<Record<string, number>> = Object.freeze({
   infantry: 2,

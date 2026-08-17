@@ -51,6 +51,16 @@ function res1(lat: number, lng: number): string {
 }
 
 describe('canDefenderReturnFireAtAttackerHex', () => {
+  it('denies strategic infantry at distance 1', () => {
+    const defenderHex = res1(40, -106);
+    const attackerHex = [...gridDisk(defenderHex, 1)].find((h) => h !== defenderHex)!;
+    const ctx: ReturnFireEligibilityContext = { theater: 'strategic' };
+    assert.equal(
+      canDefenderReturnFireAtAttackerHex({ unitType: 'infantry', h3Index: defenderHex }, attackerHex, ctx),
+      false
+    );
+  });
+
   it('allows strategic armor at distance 1', () => {
     const defenderHex = res1(40, -105);
     const attackerHex = [...gridDisk(defenderHex, 1)].find((h) => h !== defenderHex)!;

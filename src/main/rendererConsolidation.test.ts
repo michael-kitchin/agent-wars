@@ -1089,6 +1089,13 @@ function testMaintainabilityConsolidationSeams(): void {
       tacticalOrdersSource.includes('export function replacePendingFerryOrdersForSelected'),
     'pending order replacements should share a helper while keeping public exports'
   );
+  const initCorePath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'initCore.ts');
+  const initCoreSource = fs.readFileSync(initCorePath, 'utf8');
+  assert.ok(
+    initCoreSource.includes('unitHasDirectRangedPlanning(unit.unitType, !!tb)') &&
+      tacticalOrdersSource.includes('unitHasDirectRangedPlanning(unit.unitType, !!tb)'),
+    'Ranged button enable/show must use theater-aware planning, not tactical baseline on the strategic map'
+  );
 
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const rendererSource = fs.readFileSync(rendererPath, 'utf8');

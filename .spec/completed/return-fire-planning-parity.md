@@ -27,7 +27,8 @@ This work **supersedes** the non-goal in `.spec/completed/tactical-terrain-movem
 
 | Theater | Defender | Eligible when |
 |---------|----------|---------------|
-| Strategic | Infantry / armor / naval | `strategicRangedRangeHexesForUnitType >= 1` and `isWithinGridRangePure(defender, attacker, range)` |
+| Strategic | Infantry | Never (`strategicRangedRangeHexesForUnitType` is 0; melee only) |
+| Strategic | Armor / naval | `strategicRangedRangeHexesForUnitType >= 1` and `isWithinGridRangePure(defender, attacker, range)` |
 | Strategic | Air | Intact airport at base hex **and** within `AIR_STRIKE_RANGE_HEXES` of attacker hex |
 | Tactical | Infantry / armor / naval | `tacticalRangedDirectFirePassesTerrainAndRange(battle, footprint, type, defenderHex, attackerHex)` |
 | Tactical | Air | Intact airport on parent res1 (engagement hexes already in footprint); no mountain/forest gates |

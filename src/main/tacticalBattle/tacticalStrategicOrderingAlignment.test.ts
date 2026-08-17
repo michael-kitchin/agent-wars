@@ -482,3 +482,71 @@ test('tactical infrastructure counterattack removes attacker without killsByAirS
     );
   });
 });
+
+test('tactical infantry in the target hex can AA a striking air sub-unit', () => {
+  const res1 = tacticalRes1Cell(12, 34);
+  const res4Inf = tacticalRes4UnderRes1Corner(12, 34);
+  const res4Air = firstRingCellDistinctFrom(res4Inf);
+  const ring = [...new Set([res4Inf, res4Air, ...gridDisk(res4Inf, 2)])];
+  const terrain: Record<string, string> = {};
+  for (const h of ring) terrain[h] = 'plains';
+  const snap: TacticalBattleSnapshot = {
+    battleId: 'tb-inf-aa',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: ring,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: terrain,
+    subUnits: [
+      {
+        id: 'hum-air-aa',
+        parentUnitId: 'p-air',
+        player: 'human',
+        unitType: 'air',
+        h3Index: res4Air,
+        displayName: 'Air',
+      },
+      {
+        id: 'hum-air-aa-sibling',
+        parentUnitId: 'p-air',
+        player: 'human',
+        unitType: 'air',
+        h3Index: res4Air,
+        displayName: 'Air sibling',
+      },
+      {
+        id: 'opp-inf-aa',
+        parentUnitId: 'p-inf',
+        player: 'opponent',
+        unitType: 'infantry',
+        h3Index: res4Inf,
+        displayName: 'Infantry',
+      },
+    ],
+  };
+  const out = applyTacticalAirStrikeThenRangedPhaseOnBattle(
+    snap,
+    [{ unitId: 'hum-air-aa', targetH3Index: res4Inf, targetType: 'units' }],
+    undefined,
+    'human',
+    tacticalSequencedRandom([
+      tacticalUniformForD6Face(6),
+      tacticalUniformForD6Face(1),
+    ]),
+    'singlePlayer'
+  );
+  assert.equal(out.killsByAirStrike.length, 0, 'strike miss must not kill the infantry defender');
+  assert.equal(out.killsByReturnFire.length, 1, 'tactical infantry must still get an AA roll');
+  assert.equal(out.killsByReturnFire[0]?.victimId, 'hum-air-aa');
+  assert.deepEqual(out.killsByReturnFire[0]?.killerIds, ['opp-inf-aa']);
+  assert.ok(
+    out.removedUnits.some((u) => u.id === 'hum-air-aa'),
+    'infantry AA hit should remove the striking air sub-unit'
+  );
+  assert.ok(
+    out.battle.subUnits.some((u) => u.id === 'opp-inf-aa'),
+    'infantry defender should survive a missed strike'
+  );
+});
