@@ -9,12 +9,13 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { logDebug, logError } from '../logger';
+import type { CoordinateContextMode } from '../briefing/map/coordinateContext';
+import { logDebug, logError, logTrace } from '../logger';
 
 /**
  * Documents the module-scope binding `FULL_PROMPT_LOG_PREVIEW_CHARS` (FULL_PROMPT_LOG_PREVIEW_CHARS).
 
- * Purpose: Caps preview logging size for system/user prompts unless full logging env is enabled.
+ * Purpose: Caps preview logging size for system and user prompts unless full logging env is enabled.
  * When to use: `logPromptPreview` when env full logging is off.
  * Expected outcome: At most this many characters appear in debug preview payloads.
  * Exceptions: None.
@@ -235,19 +236,93 @@ function writeFullLogArtifact(fileName: string, content: string): string | null 
 }
 
 /**
+ * Distinguishes which full-prompt disk file a consultation should overwrite.
+ *
+ * Contract: `'user'` is the initial user message. `'strategic'` and `'tactical'` match
+ * `CoordinateContextMode` so a new coordinate mode fails to compile until it has a filename.
+ * When to use: Pass from `logPromptPreview` (and tests) instead of inferring a name from log labels.
+ * Expected outcome: Callers can resolve a stable `debug-last-*-prompt.txt` name via `resolveFullPromptLogFileName`.
+ * Exceptions: None.
+ */
+export type PromptLogArtifactKind = 'user' | CoordinateContextMode;
+
+/**
+ * Maps a prompt-log artifact kind to the cwd filename used when full prompt logging is enabled.
+ *
+ * Purpose: Keeps strategic and tactical system prompts on separate last-write files, and keeps the
+ * user message on its own file, without inferring names from debug labels.
+ * When to use: Before `writeFullLogArtifact` in `logPromptPreview`.
+ * Expected outcome: `'user'` → `debug-last-user-prompt.txt`; `'strategic'` →
+ * `debug-last-strategic-prompt.txt`; `'tactical'` → `debug-last-tactical-prompt.txt`.
+ * Exceptions: Throws if `kind` is not a supported artifact kind (exhaustive-check fallback).
+ */
+export function resolveFullPromptLogFileName(kind: PromptLogArtifactKind): string {
+  let fileName: string;
+  switch (kind) {
+    case 'user':
+      fileName = 'debug-last-user-prompt.txt';
+      break;
+    case 'strategic':
+      fileName = 'debug-last-strategic-prompt.txt';
+      break;
+    case 'tactical':
+      fileName = 'debug-last-tactical-prompt.txt';
+      break;
+    default: {
+      const exhaustive: never = kind;
+      throw new Error(`Unsupported prompt log artifact kind: ${String(exhaustive)}`);
+    }
+  }
+  logTrace('openRouter resolveFullPromptLogFileName', { kind, fileName });
+  return fileName;
+}
+
+/**
+ * Optional disk-only extras and the artifact kind for `logPromptPreview`.
+ *
+ * Purpose: Keeps the filename independent of the debug log label so strategic and tactical
+ * system prompts cannot overwrite each other.
+ * When to use: Third argument to `logPromptPreview` after the system or user prompt is finalized.
+ * Expected outcome: `artifactKind` selects the cwd file when full prompt logging is enabled.
+ * Exceptions: None.
+ */
+export interface LogPromptPreviewOptions {
+  /**
+   * Which last-write prompt file this consultation should overwrite.
+   *
+   * Contract: `'user'` for the initial user message; `'strategic'` or `'tactical'` for the
+   * matching system prompt (`coordinateContext.mode`).
+   * When to use: Always pass explicitly from `requestOrdersFlow`.
+   * Expected outcome: Resolved via `resolveFullPromptLogFileName`.
+   * Exceptions: Unsupported kinds throw from the resolver.
+   */
+  artifactKind: PromptLogArtifactKind;
+  /**
+   * Diagnostic text appended to the disk file only (not sent to the model).
+   *
+   * Contract: Optional; ignored when empty or whitespace. Used for the strategic operational-map
+   * supplement when the system prompt omitted the map.
+   * When to use: Strategic system-prompt logging only.
+   * Expected outcome: Appended after a separator when non-empty.
+   * Exceptions: None.
+   */
+  supplementalDiskOnlyBody?: string;
+}
+
+/**
  * Logs a prompt string either in full (to disk) or as a truncated preview based on env flags.
  *
  * Purpose: Keeps default logs small while allowing full capture when explicitly enabled.
  * When to use: After system and user prompts are finalized for the OpenRouter request.
- * Expected outcome: `logDebug` with preview or full metadata; optional file write.
+ * Expected outcome: `logDebug` with preview or full metadata; optional write to
+ * `debug-last-user-prompt.txt`, `debug-last-strategic-prompt.txt`, or `debug-last-tactical-prompt.txt`.
  * Exceptions: None.
  */
-export function logPromptPreview(label: string, content: string, supplementalDiskOnlyBody?: string): void {
+export function logPromptPreview(label: string, content: string, options: LogPromptPreviewOptions): void {
+  const fileName = resolveFullPromptLogFileName(options.artifactKind);
   const fullPromptLoggingEnabled = isFullLogEnvEnabled(FULL_PROMPT_LOG_ENV_FLAG);
   if (fullPromptLoggingEnabled) {
-    const fileName = label.includes('user message')
-      ? 'debug-last-user-prompt.txt'
-      : 'debug-last-system-prompt.txt';
+    const supplementalDiskOnlyBody = options.supplementalDiskOnlyBody;
     const diskBody =
       supplementalDiskOnlyBody != null && supplementalDiskOnlyBody.trim().length > 0
         ? `${content}\n\n---\n\n## Full-prompt log supplement (not sent to the model)\n\n${supplementalDiskOnlyBody.trim()}`

@@ -436,8 +436,13 @@ export async function requestOrdersFlow(
       logError('openRouter requestOrders: failed to build operational map for full-prompt disk log', err);
     }
   }
-  logPromptPreview('openRouter requestOrders: system prompt', systemPrompt, fullLogOperationalMapSupplement);
-  logPromptPreview('openRouter requestOrders: user message', userMessage);
+  logPromptPreview('openRouter requestOrders: system prompt', systemPrompt, {
+    artifactKind: coordinateContext.mode,
+    supplementalDiskOnlyBody: fullLogOperationalMapSupplement,
+  });
+  logPromptPreview('openRouter requestOrders: user message', userMessage, {
+    artifactKind: 'user',
+  });
   logDebug('openRouter requestOrders: starting tool loop', { turnNumber: state.turnNumber });
 
   /**
