@@ -19375,8 +19375,27 @@
 
   // src/shared/rangePerimeterModel.ts
   function strategicRangedRangeHexesForUnitType(unitType) {
-    const table = { infantry: 1, armor: 1, naval: 2, air: 3 };
+    const table = {
+      /**
+       * Strategic infantry is melee-only on the res1 map.
+       *
+       * Purpose: Gates ranged orders, planning-parity return fire, DEFEND auto-ranged, and strategic air-strike AA.
+       * When to use: Keep at `0`. Tactical infantry ranged and tactical AA use `RANGED_RANGE_BY_UNIT_TYPE`.
+       * Expected outcome: `getRange('infantry') < 1` denies strategic ranged attacks and return fire.
+       * Exceptions: None.
+       */
+      infantry: 0,
+      armor: 1,
+      naval: 2,
+      air: 3
+    };
     return table[unitType] ?? 0;
+  }
+  function unitHasStrategicRangedBaseline(unitType) {
+    return strategicRangedRangeHexesForUnitType(unitType) >= 1;
+  }
+  function unitHasDirectRangedPlanning(unitType, tacticalBattleActive) {
+    return tacticalBattleActive ? unitHasTacticalRangedBaseline(unitType) : unitHasStrategicRangedBaseline(unitType);
   }
   function buildStrategicRangedRangeSet(units) {
     const out = /* @__PURE__ */ new Set();
@@ -21892,7 +21911,7 @@
       const tb = rendererSharedState.tacticalBattleSnapshot;
       const selectedUnits = tb ? rendererSharedState.selectedUnitIds.map((id) => tb.subUnits.find((u) => u.id === id)).filter((unit) => !!unit) : rendererSharedState.selectedUnitIds.map((id) => rendererSharedState.gameState?.units.find((u) => u.id === id)).filter((unit) => !!unit);
       const allAir = selectedUnits.length > 0 && selectedUnits.every((unit) => unit.unitType === "air");
-      const allHaveRanged = selectedUnits.length > 0 && selectedUnits.every((unit) => unitHasTacticalRangedBaseline(unit.unitType));
+      const allHaveRanged = selectedUnits.length > 0 && selectedUnits.every((unit) => unitHasDirectRangedPlanning(unit.unitType, !!tb));
       if (allAir) {
         btnEl.textContent = "Strike";
         btnEl.style.display = rendererSharedState.airStrikeModeActive ? "none" : "inline-block";
@@ -25954,7 +25973,7 @@
         const tb = rendererSharedState.tacticalBattleSnapshot;
         const selectedUnits = tb ? rendererSharedState.selectedUnitIds.map((id) => tb.subUnits.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human") : rendererSharedState.selectedUnitIds.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human");
         const allAir = selectedUnits.length > 0 && selectedUnits.every((unit) => unit.unitType === "air");
-        const allHaveRanged = selectedUnits.length > 0 && selectedUnits.every((unit) => unitHasTacticalRangedBaseline(unit.unitType));
+        const allHaveRanged = selectedUnits.length > 0 && selectedUnits.every((unit) => unitHasDirectRangedPlanning(unit.unitType, !!tb));
         if (allAir) {
           beginHoverSupportTargetingMode(deps, "air");
         } else if (allHaveRanged) {

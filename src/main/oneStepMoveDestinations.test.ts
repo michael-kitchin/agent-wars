@@ -1,22 +1,76 @@
 /**
- * Equivalence tests for bounded `getValidDestinations` vs a reference full-hex scan.
+ * Equivalence tests for bounded `getValidDestinations` vs a reference scan.
  *
- * Purpose: Guards that the `gridDisk` fast path returns the same destination sets as the reference scan.
+ * Purpose: Guards that naval destinations follow berth/egress edges rather than disk + seaport promotion.
  * When to use: Run via `npm test` after changes to `oneStepMoveDestinations.ts`.
- * Expected outcome: Sorted destination sets match for sample units; disk branch returns at least the origin hex.
+ * Expected outcome: Sorted destination sets match for sample units; infantry disk branch returns at least the origin hex.
  * Exceptions: None.
  */
 
 import * as assert from 'assert';
-import { gridDisk, gridDistance } from 'h3-js';
+import { gridDisk } from 'h3-js';
 import type { GameStateSnapshot } from './gameDb';
-import { getValidDestinations, resolveMovementTerrainForHex } from './oneStepMoveDestinations';
+import { getValidDestinations } from './oneStepMoveDestinations';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../shared/tacticalRanges';
-import { passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
 import { getOrderedHexList } from './mapData';
 import {
   ensureTerrainClassificationCacheLoaded,
 } from './terrainClassificationCache';
+import {
+  isLandSeaportHex,
+  navalMayOccupyHex,
+  navalMayTraverseStrategicEdge,
+  type NavalStrategicHexAttrs,
+} from '../shared/navalStrategicEdges';
+import {
+  createNavalStrategicHexLookup,
+  seaportCountByH3ForNavalLookup,
+} from './navalStrategicPath';
+
+/**
+ * Walks naval berth/egress edges out to `range` without calling `getNavalStrategicReachableHexes`.
+ *
+ * Purpose: Independent reference scan so the production BFS cannot silently match a disk+promotion filter.
+ * When to use: Naval branch of `getValidDestinationsFullScan`.
+ * Expected outcome: Origin included when occupiable; land seaports appear only as last-step berths.
+ * Exceptions: None.
+ */
+function navalReachableByEdgeScan(
+  originH3: string,
+  range: number,
+  lookup: (h3: string) => NavalStrategicHexAttrs | undefined
+): string[] {
+  const originAttrs = lookup(originH3);
+  if (!originAttrs || !navalMayOccupyHex(originAttrs)) return [];
+  const seen = new Set<string>([originH3]);
+  const depth = new Map<string, number>([[originH3, 0]]);
+  const queue = [originH3];
+  const cap = isLandSeaportHex(originAttrs) ? Math.min(range, 1) : range;
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const currentDepth = depth.get(current) ?? 0;
+    if (currentDepth >= cap) continue;
+    const currentAttrs = lookup(current);
+    if (!currentAttrs) continue;
+    if (isLandSeaportHex(currentAttrs) && current !== originH3) continue;
+    let ring: string[] = [];
+    try {
+      ring = gridDisk(current, 1);
+    } catch {
+      continue;
+    }
+    for (const neighbor of ring) {
+      if (neighbor === current || seen.has(neighbor)) continue;
+      const neighborAttrs = lookup(neighbor);
+      if (!neighborAttrs || !navalMayOccupyHex(neighborAttrs)) continue;
+      if (!navalMayTraverseStrategicEdge(currentAttrs, neighborAttrs)) continue;
+      seen.add(neighbor);
+      depth.set(neighbor, currentDepth + 1);
+      queue.push(neighbor);
+    }
+  }
+  return [...seen];
+}
 
 /**
  * Defines the `getValidDestinationsFullScan` function shape (function getValidDestinationsFullScan().
@@ -30,29 +84,15 @@ function getValidDestinationsFullScan(
   unit: { id?: string; h3Index: string; unitType: string },
   state: GameStateSnapshot
 ): string[] {
-  const range = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
-  const wantLand = unit.unitType === 'infantry' || unit.unitType === 'armor';
-
-  if (wantLand) {
+  if (unit.unitType === 'infantry' || unit.unitType === 'armor' || unit.unitType === 'air') {
     return getValidDestinations(unit, state);
   }
-
-  const seaportCountByHex = new Map((state.res1Infrastructure ?? []).map((row) => [row.h3Index, row.seaportCount] as const));
-  const valid: string[] = [unit.h3Index];
-  for (const h of state.hexes) {
-    if (h.h3Index === unit.h3Index) continue;
-    let dist: number;
-    try {
-      dist = gridDistance(unit.h3Index, h.h3Index);
-    } catch {
-      continue;
-    }
-    if (dist < 1 || dist > range) continue;
-    const movementTerrain = resolveMovementTerrainForHex(h, seaportCountByHex);
-    if (unit.unitType === 'naval' && !passabilityAllowsNavalUnit(movementTerrain)) continue;
-    valid.push(h.h3Index);
-  }
-  return valid;
+  const range = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
+  const lookup = createNavalStrategicHexLookup(
+    state.hexes,
+    seaportCountByH3ForNavalLookup(state.hexes, state.res1Infrastructure)
+  );
+  return navalReachableByEdgeScan(unit.h3Index, range, lookup);
 }
 
 /**

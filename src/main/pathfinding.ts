@@ -249,27 +249,41 @@ export function getReachableHexes(
 }
 
 /**
- * Defines the `partitionPathByTurn` function shape (export function partitionPathByTurn( pathH3: string[], movementBudget: number ): { turn: number; hexes: string[]; movementSpent: number; movementBudget:).
-
- * Purpose: Supports maintainability by documenting why `partitionPathByTurn` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Splits an inclusive H3 path into per-turn segments using a movement budget.
+ *
+ * Purpose: `plan_route` and standing-order overlays need one segment per turn, with land-seaport
+ * egress using a smaller first-turn budget than later sailing turns.
+ * When to use: After a full path is known; pass `firstTurnMovementBudget` only when turn 1 differs.
+ * Expected outcome: Empty when the path has fewer than two hexes or a budget is not positive; otherwise
+ * turn 1 uses `firstTurnMovementBudget` (or `movementBudget` if omitted) and later turns use `movementBudget`.
  * Exceptions: None.
  */
 export function partitionPathByTurn(
   pathH3: string[],
-  movementBudget: number
+  movementBudget: number,
+  /**
+   * Optional first-turn step cap (land-seaport egress).
+   *
+   * Contract: Defaults to `movementBudget`.
+   * When to use: Pass 1 when the voyage starts on a land seaport.
+   * Expected outcome: Turn 1 spends at most this many edges; later turns use `movementBudget`.
+   * Exceptions: Values below 1 yield no segments.
+   */
+  firstTurnMovementBudget?: number
 ): { turn: number; hexes: string[]; movementSpent: number; movementBudget: number; endHex: string }[] {
-  logTrace('pathfinding partitionPathByTurn', { pathLength: pathH3.length, movementBudget });
+  logTrace('pathfinding partitionPathByTurn', { pathLength: pathH3.length, movementBudget, firstTurnMovementBudget });
   if (pathH3.length <= 1) return [];
   if (movementBudget <= 0) return [];
+  const firstBudget = firstTurnMovementBudget ?? movementBudget;
+  if (firstBudget <= 0) return [];
   const segments: { turn: number; hexes: string[]; movementSpent: number; movementBudget: number; endHex: string }[] = [];
   let turn = 1;
   let i = 0;
   while (i < pathH3.length - 1) {
+    const turnBudget = turn === 1 ? firstBudget : movementBudget;
     let spent = 0;
     const hexes: string[] = [pathH3[i]!];
-    while (i + 1 < pathH3.length && spent < movementBudget) {
+    while (i + 1 < pathH3.length && spent < turnBudget) {
       i++;
       hexes.push(pathH3[i]!);
       spent++;
@@ -278,7 +292,7 @@ export function partitionPathByTurn(
       turn,
       hexes,
       movementSpent: spent,
-      movementBudget: movementBudget,
+      movementBudget: turnBudget,
       endHex: pathH3[i]!,
     });
     turn++;

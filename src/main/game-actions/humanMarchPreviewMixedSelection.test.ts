@@ -52,6 +52,14 @@ function testHexSupportsMixedLandAndNaval(): void {
     hexSupportsMixedLandAndNaval({ h3Index: 'water', terrain: 'water', terrainKind: 'water' }),
     false
   );
+  assert.strictEqual(
+    hexSupportsMixedLandAndNaval({ h3Index: 'port', terrain: 'land', terrainKind: 'plains', hasSeaport: true }),
+    true
+  );
+  assert.strictEqual(
+    hexSupportsMixedLandAndNaval({ h3Index: 'portless', terrain: 'land', terrainKind: 'plains', hasSeaport: false }),
+    false
+  );
 }
 
 /**

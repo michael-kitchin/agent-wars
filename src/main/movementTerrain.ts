@@ -1,6 +1,6 @@
 import { getRes1InfrastructureForHex } from './gameDb';
-import { getRes1ProductionContext, isTerrainClassificationCacheLoaded } from './terrainClassificationCache';
 import { logTrace } from './logger';
+import { isNativeNavalTransitTerrain } from '../shared/navalStrategicEdges';
 
 /**
  * Documents the `HexMovementTerrainInput` interface as a named contract surface (export interface HexMovementTerrainInput).
@@ -41,18 +41,16 @@ terrainKind?: string;
 }
 
 /**
- * Defines the `hexHasSeaport` function shape (function hexHasSeaport(h3Index: string): boolean).
-
- * Purpose: Supports maintainability by documenting why `hexHasSeaport` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Returns whether live res-1 infrastructure currently has a seaport on this hex.
+ *
+ * Purpose: Spawn, mixed occupancy, and related checks must follow destroyed counts, not world metadata.
+ * When to use: Single-hex seaport presence. Naval routing uses snapshot merge (`seaportCountByH3ForNavalLookup`).
+ * Expected outcome: True only when `res1_infrastructure.seaport_count > 0`. A missing row counts as 0.
  * Exceptions: None.
  */
-function hexHasSeaport(h3Index: string): boolean {
-  const live = getRes1InfrastructureForHex(h3Index);
-  if (live.seaportCount > 0) return true;
-  if (!isTerrainClassificationCacheLoaded()) return false;
-  return getRes1ProductionContext({ h3Index }).seaportCount > 0;
+export function hexHasSeaport(h3Index: string): boolean {
+  logTrace('movementTerrain hexHasSeaport', { h3Index });
+  return getRes1InfrastructureForHex(h3Index).seaportCount > 0;
 }
 
 /**
@@ -65,8 +63,6 @@ function hexHasSeaport(h3Index: string): boolean {
  */
 export function normalizeMovementTerrain(input: HexMovementTerrainInput): string {
   logTrace('movementTerrain normalizeMovementTerrain', input);
-  // Naval routing/validation treats any seaport hex as littoral-passable.
-  if (hexHasSeaport(input.h3Index)) return 'coastal';
   if (input.terrainKind === 'coastal' || input.terrainKind === 'wetlands') return input.terrainKind;
   return input.terrain;
 }
@@ -101,8 +97,8 @@ export function buildNormalizedTerrainByH3(
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function isLandSeaportSpawnHex(input: { h3Index: string; normalizedTerrain: string }): boolean {
+export function isLandSeaportSpawnHex(input: { h3Index: string; normalizedTerrain: string; terrainKind?: string }): boolean {
   logTrace('movementTerrain isLandSeaportSpawnHex', input);
-  if (input.normalizedTerrain !== 'land') return false;
+  if (isNativeNavalTransitTerrain(input.normalizedTerrain, input.terrainKind)) return false;
   return hexHasSeaport(input.h3Index);
 }

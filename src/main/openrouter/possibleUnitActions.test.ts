@@ -11,6 +11,8 @@ import { tacticalRes1Cell, tacticalRes4UnderRes1Corner } from '../tacticalBattle
 import { formatLatLng } from './promptText';
 import { buildPossibleUnitActionsMarkdown, collectAggregatedPossibleActionRows, partitionHomelandNearestOther } from './possibleUnitActions';
 import type { GameStateSnapshot } from '../gameDb';
+import { getRes1LandMassByH3, ensureTerrainClassificationCacheLoaded } from '../terrainClassificationCache';
+import { canLandUnitTraverseEdge, landUnitCanOccupyHex } from '../../shared/landTraversalRes1';
 
 /**
  * Defines the `minDistToHomeland` function shape (function minDistToHomeland(h: string, homeland: Set<string>): number).
@@ -110,6 +112,29 @@ function testPartitionIncludesAllTiesAtMinDistance(): void {
 }
 
 /**
+ * Picks two adjacent on-map hexes that land units can actually traverse.
+ *
+ * Purpose: Possible-actions tables are empty when the first world hex is ocean; this keeps the markdown contract on a real land edge.
+ * When to use: `testBuildPossibleUnitActionsUsesTables` fixture setup.
+ * Expected outcome: Origin and dest share a land-mass edge.
+ * Exceptions: Throws if the world map has no such pair.
+ */
+function findAdjacentLandMassHexPair(): { originH3: string; destH3: string } {
+  ensureTerrainClassificationCacheLoaded();
+  const data = getRes1LandMassByH3();
+  const allHexes = getOrderedHexList();
+  const onMap = new Set(allHexes);
+  for (const originH3 of allHexes) {
+    if (!landUnitCanOccupyHex(originH3, data)) continue;
+    for (const destH3 of gridDisk(originH3, 1)) {
+      if (destH3 === originH3 || !onMap.has(destH3)) continue;
+      if (canLandUnitTraverseEdge(originH3, destH3, data)) return { originH3, destH3 };
+    }
+  }
+  throw new Error('expected an adjacent land-mass hex pair for possible-actions tables');
+}
+
+/**
  * Defines the `testBuildPossibleUnitActionsUsesTables` function shape (function testBuildPossibleUnitActionsUsesTables(): void).
 
  * Purpose: Supports maintainability by documenting why `testBuildPossibleUnitActionsUsesTables` exists.
@@ -118,10 +143,8 @@ function testPartitionIncludesAllTiesAtMinDistance(): void {
  * Exceptions: None.
  */
 function testBuildPossibleUnitActionsUsesTables(): void {
-  const allHexes = getOrderedHexList();
-  const h0 = allHexes[0]!;
-  const h1 = gridDisk(h0, 1).find((h) => h !== h0 && allHexes.includes(h))!;
-  const hexList = [h0, h1];
+  const pair = findAdjacentLandMassHexPair();
+  const hexList = [pair.originH3, pair.destH3];
   const latLngByH3 = new Map<string, [number, number]>();
   for (const h of hexList) {
     latLngByH3.set(h, cellToLatLng(h) as [number, number]);
@@ -129,17 +152,17 @@ function testBuildPossibleUnitActionsUsesTables(): void {
   const state: GameStateSnapshot = {
     hexes: hexList.map((h3Index) => ({ h3Index, terrain: 'land', terrainKind: 'plains' })),
     units: [
-      { id: 'opponent-infantry-1', player: 'opponent', unitType: 'infantry', h3Index: h0 },
-      { id: 'human-inf-1', player: 'human', unitType: 'infantry', h3Index: h1 },
+      { id: 'opponent-infantry-1', player: 'opponent', unitType: 'infantry', h3Index: pair.originH3 },
+      { id: 'human-inf-1', player: 'human', unitType: 'infantry', h3Index: pair.destH3 },
     ],
-    humanHomeRegionHexes: [h1],
+    humanHomeRegionHexes: [pair.destH3],
     phase: 'planning',
     turnNumber: 1,
     pendingOrders: [],
     res1Infrastructure: [],
     res1Control: [
-      { h3Index: h0, controllerPlayerId: 'opponent' },
-      { h3Index: h1, controllerPlayerId: 'human' },
+      { h3Index: pair.originH3, controllerPlayerId: 'opponent' },
+      { h3Index: pair.destH3, controllerPlayerId: 'human' },
     ],
   };
   const md = buildPossibleUnitActionsMarkdown({

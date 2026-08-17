@@ -139,6 +139,30 @@ function testExactBudgetMatch(): void {
 }
 
 /**
+ * Guards first-turn egress then later sailing budget on a 4-edge path.
+ *
+ * Purpose: Land-seaport voyages must not treat every turn as a single step, and must not spend a full
+ * naval budget on the egress turn.
+ * When to use: After changes to `partitionPathByTurn`'s optional first-turn cap.
+ * Expected outcome: 3 segments for 4 edges with first budget 1 and later budget 2: 1 + 2 + 1 steps.
+ * Exceptions: None.
+ */
+function testFirstTurnEgressThenSailingBudget(): void {
+  const path = ['PORT', 'W1', 'W2', 'W3', 'W4'];
+  const segments = partitionPathByTurn(path, 2, 1);
+  assert.strictEqual(segments.length, 3);
+  assert.deepStrictEqual(segments[0]!.hexes, ['PORT', 'W1']);
+  assert.strictEqual(segments[0]!.movementSpent, 1);
+  assert.strictEqual(segments[0]!.movementBudget, 1);
+  assert.deepStrictEqual(segments[1]!.hexes, ['W1', 'W2', 'W3']);
+  assert.strictEqual(segments[1]!.movementSpent, 2);
+  assert.strictEqual(segments[1]!.movementBudget, 2);
+  assert.deepStrictEqual(segments[2]!.hexes, ['W3', 'W4']);
+  assert.strictEqual(segments[2]!.movementSpent, 1);
+  assert.strictEqual(segments[2]!.endHex, 'W4');
+}
+
+/**
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Supports maintainability by documenting why `run` exists.
@@ -155,6 +179,7 @@ function run(): void {
   testEmptyPathReturnsEmpty();
   testNoZeroMovementSegments();
   testExactBudgetMatch();
+  testFirstTurnEgressThenSailingBudget();
   console.log('pathfinding tests passed');
 }
 

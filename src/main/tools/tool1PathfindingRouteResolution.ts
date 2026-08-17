@@ -1,7 +1,6 @@
 import { getReachableHexes, getMovementBudgetForUnit, terrainIsPassableForDomain } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
 import { landUnitCanOccupyHex, type LandMassByH3 } from '../../shared/landTraversalRes1';
-import { isLandSeaportSpawnHex } from '../movementTerrain';
 import { logDebug } from '../logger';
 import {
   PLAN_ROUTE_ERR_NAVAL_START,
@@ -13,13 +12,16 @@ import {
   PLAN_ROUTE_WARNING_WATER_BODY_FALLBACK,
 } from '../navalMovementMessages';
 import {
-  findPathWithOptionalAvoidanceRetry,
-  nearestAdjacentWaterOrCoastalHex,
   nearestReachableWaterHexTo,
-  prependSeaportEgressStep,
 } from './tool1PathfindingDistanceHelpers';
 import { findLandPathWithStatefulOptionalAvoidanceRetry, type StatefulSearchStats } from './tool1PathfindingStateful';
 import type { PathfindingSession, PlanRouteError } from './tool1Pathfinding';
+import {
+  findNavalStrategicPath,
+  getNavalStrategicReachableHexes,
+  navalLookupForHexState,
+} from '../navalStrategicPath';
+import { isLandSeaportHex, navalMayOccupyHex } from '../../shared/navalStrategicEdges';
 
 /**
  * Documents the `ResolveRoutePathForUnitOk` type alias (export type ResolveRoutePathForUnitOk).
@@ -84,53 +86,16 @@ warnings: string[];
    * Exceptions: None.
    */
 statefulStats?: StatefulSearchStats;
+    /**
+     * First-turn step cap when it differs from `movementBudget` (land-seaport egress).
+     *
+     * Contract: Omit when every turn uses `movementBudget`. Partitioning uses this for turn 1 only.
+     * When to use: Naval routes that start on a land seaport.
+     * Expected outcome: First path segment is at most this many edges; later segments use `movementBudget`.
+     * Exceptions: None.
+     */
+    firstTurnMovementBudget?: number;
 };
-
-/**
- * Defines the `resolveNavalOriginForRouting` function shape (function resolveNavalOriginForRouting(payload: { unitType: string; originH3: string; destinationH3: string; hexSet: Set<string>; terrainByH3: Map).
-
- * Purpose: Supports maintainability by documenting why `resolveNavalOriginForRouting` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function resolveNavalOriginForRouting(payload: {
-  unitType: string;
-  originH3: string;
-  destinationH3: string;
-  hexSet: Set<string>;
-  terrainByH3: Map<string, string>;
-  blocked?: Set<string>;
-}): { reachableOriginH3: string; seaportEgressHex?: string } | PlanRouteError {
-  if (payload.unitType !== 'naval') return { reachableOriginH3: payload.originH3 };
-  const originTerrain = payload.terrainByH3.get(payload.originH3) ?? 'land';
-  if (terrainIsPassableForDomain(originTerrain, 'water')) return { reachableOriginH3: payload.originH3 };
-
-  const seaportSpawnHex = isLandSeaportSpawnHex({
-    h3Index: payload.originH3,
-    normalizedTerrain: originTerrain,
-  });
-  if (!seaportSpawnHex) return { status: 'error', error: PLAN_ROUTE_ERR_NAVAL_START };
-
-  let seaportEgressHex = nearestAdjacentWaterOrCoastalHex(
-    payload.originH3,
-    payload.destinationH3,
-    payload.hexSet,
-    payload.terrainByH3,
-    payload.blocked
-  );
-  if (!seaportEgressHex && payload.blocked) {
-    seaportEgressHex = nearestAdjacentWaterOrCoastalHex(
-      payload.originH3,
-      payload.destinationH3,
-      payload.hexSet,
-      payload.terrainByH3,
-      undefined
-    );
-  }
-  if (!seaportEgressHex) return { status: 'error', error: PLAN_ROUTE_ERR_SEAPORT_EGRESS };
-  return { reachableOriginH3: seaportEgressHex, seaportEgressHex };
-}
 
 /**
  * Defines the `buildBlockedEnemySetForUnit` function shape (export function buildBlockedEnemySetForUnit( unit: PathfindingSession['state']['units'][number], session: PathfindingSession, avoidEnemies: boolean ):).
@@ -176,24 +141,66 @@ export function resolveRoutePathForUnit(payload: {
   session: PathfindingSession;
   blocked?: Set<string>;
 }): ResolveRoutePathForUnitOk | PlanRouteError {
-  const passableFor: PassableDomain = payload.unitType === 'naval' ? 'water' : 'land';
-  const navalOriginResolution = resolveNavalOriginForRouting({
-    unitType: payload.unitType,
+  if (payload.unitType === 'naval') {
+    return resolveNavalStrategicRoutePath(payload);
+  }
+  const warnings: string[] = [];
+  const destinationH3 = payload.destinationH3;
+  if (payload.blocked) payload.blocked.delete(destinationH3);
+  const stateful = findLandPathWithStatefulOptionalAvoidanceRetry({
+    originH3: payload.originH3,
+    destinationH3,
+    session: payload.session,
+    blocked: payload.blocked,
+    warnings,
+    blockedRetryWarning: 'Route passes through enemy-occupied hexes - avoidance was not possible.',
+  });
+  return {
+    passableFor: 'land',
+    destinationH3,
+    path: stateful.path,
+    movementBudget: getMovementBudgetForUnit(payload.unitType),
+    warnings,
+    statefulStats: stateful.stats,
+  };
+}
+
+/**
+ * Plans a naval strategic route using berth/egress edges instead of water-passable BFS.
+ *
+ * Purpose: Land seaport destinations stay legal; land without a seaport still redirects to nearest transit.
+ * When to use: `resolveRoutePathForUnit` naval branch only.
+ * Expected outcome: Inclusive H3 path; origin land seaport uses first-turn budget 1 then the naval budget.
+ * Exceptions: Returns plan_route error objects when origin is not occupiable or egress is impossible.
+ */
+function resolveNavalStrategicRoutePath(payload: {
+  originH3: string;
+  destinationH3: string;
+  hexSet: Set<string>;
+  terrainByH3: Map<string, string>;
+  session: PathfindingSession;
+  blocked?: Set<string>;
+}): ResolveRoutePathForUnitOk | PlanRouteError {
+  logDebug('tool1Pathfinding resolveNavalStrategicRoutePath', {
     originH3: payload.originH3,
     destinationH3: payload.destinationH3,
-    hexSet: payload.hexSet,
-    terrainByH3: payload.terrainByH3,
-    blocked: payload.blocked,
   });
-  if ('status' in navalOriginResolution) return navalOriginResolution;
-  const { reachableOriginH3: navalReachableOrigin, seaportEgressHex } = navalOriginResolution;
+  const lookup = navalLookupForHexState(
+    payload.session,
+    payload.session.state.hexes,
+    payload.session.state.res1Infrastructure
+  );
+  const originAttrs = lookup(payload.originH3);
+  if (!originAttrs || !navalMayOccupyHex(originAttrs)) {
+    return { status: 'error', error: PLAN_ROUTE_ERR_NAVAL_START };
+  }
   const warnings: string[] = [];
   let destinationH3 = payload.destinationH3;
   let navalRedirectedToWater = false;
-  const destinationTerrain = payload.terrainByH3.get(destinationH3) ?? 'land';
-  if (payload.unitType === 'naval' && destinationTerrain === 'land') {
+  const destAttrs = lookup(destinationH3);
+  if (destAttrs && !navalMayOccupyHex(destAttrs)) {
     const waterHex = nearestReachableWaterHexTo(
-      navalReachableOrigin,
+      payload.originH3,
       destinationH3,
       payload.hexSet,
       payload.terrainByH3,
@@ -207,40 +214,32 @@ export function resolveRoutePathForUnit(payload: {
   }
   if (payload.blocked) payload.blocked.delete(destinationH3);
 
-  const movementBudget = seaportEgressHex ? 1 : getMovementBudgetForUnit(payload.unitType);
-  let statefulStats: StatefulSearchStats | undefined;
-  let path: string[] | null;
-  if (payload.unitType === 'infantry' || payload.unitType === 'armor') {
-    const stateful = findLandPathWithStatefulOptionalAvoidanceRetry({
-      originH3: navalReachableOrigin,
-      destinationH3,
-      session: payload.session,
-      blocked: payload.blocked,
-      warnings,
-      blockedRetryWarning: 'Route passes through enemy-occupied hexes - avoidance was not possible.',
-    });
-    path = prependSeaportEgressStep(stateful.path, payload.originH3, seaportEgressHex);
-    statefulStats = stateful.stats;
-  } else {
-    path = findPathWithOptionalAvoidanceRetry({
-      routeOriginH3: navalReachableOrigin,
-      destinationH3,
-      hexSet: payload.hexSet,
-      terrainByH3: payload.terrainByH3,
-      passableFor,
-      blocked: payload.blocked,
+  if (isLandSeaportHex(originAttrs) && destinationH3 !== payload.originH3) {
+    const egress = getNavalStrategicReachableHexes({
       originH3: payload.originH3,
-      seaportEgressHex,
-      warnings,
-      blockedRetryWarning: 'Route passes through enemy-occupied hexes - avoidance was not possible.',
-      landMass: passableFor === 'land' ? payload.session.landMass : undefined,
+      maxSteps: 1,
+      lookup,
+      blocked: payload.blocked,
     });
+    if (egress.size <= 1) return { status: 'error', error: PLAN_ROUTE_ERR_SEAPORT_EGRESS };
   }
-  if (seaportEgressHex) warnings.push(PLAN_ROUTE_WARNING_SEAPORT_EGRESS);
+
+  const movementBudget = getMovementBudgetForUnit('naval');
+  const firstTurnMovementBudget = isLandSeaportHex(originAttrs) ? 1 : undefined;
+  let path = findNavalStrategicPath({
+    originH3: payload.originH3,
+    destinationH3,
+    maxSteps: Math.max(payload.hexSet.size, 1),
+    lookup,
+    blocked: payload.blocked,
+    clampLandSeaportOriginToOneStep: false,
+  });
+  if (isLandSeaportHex(originAttrs)) warnings.push(PLAN_ROUTE_WARNING_SEAPORT_EGRESS);
   if (navalRedirectedToWater) warnings.push(PLAN_ROUTE_WARNING_LAND_REDIRECT);
-  if (!path && payload.unitType === 'naval') {
+  const destAfterRoute = lookup(destinationH3);
+  if (!path && !(destAfterRoute && isLandSeaportHex(destAfterRoute))) {
     const fallbackWater = nearestReachableWaterHexTo(
-      navalReachableOrigin,
+      payload.originH3,
       destinationH3,
       payload.hexSet,
       payload.terrainByH3,
@@ -249,21 +248,18 @@ export function resolveRoutePathForUnit(payload: {
     );
     if (fallbackWater && fallbackWater !== destinationH3) {
       destinationH3 = fallbackWater;
-      path = findPathWithOptionalAvoidanceRetry({
-        routeOriginH3: navalReachableOrigin,
-        destinationH3,
-        hexSet: payload.hexSet,
-        terrainByH3: payload.terrainByH3,
-        passableFor,
-        blocked: payload.blocked,
+      path = findNavalStrategicPath({
         originH3: payload.originH3,
-        seaportEgressHex,
-        landMass: passableFor === 'land' ? payload.session.landMass : undefined,
+        destinationH3,
+        maxSteps: Math.max(payload.hexSet.size, 1),
+        lookup,
+        blocked: payload.blocked,
+        clampLandSeaportOriginToOneStep: false,
       });
       if (path) warnings.push(PLAN_ROUTE_WARNING_WATER_BODY_FALLBACK);
     }
   }
-  return { passableFor, destinationH3, path, movementBudget, warnings, statefulStats };
+  return { passableFor: 'water', destinationH3, path, movementBudget, firstTurnMovementBudget, warnings };
 }
 
 /**

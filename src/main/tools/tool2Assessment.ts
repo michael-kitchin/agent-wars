@@ -11,6 +11,10 @@ import type { PassableDomain } from '../pathfinding';
 import { passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
 import { landUnitCanOccupyHex } from '../../shared/landTraversalRes1';
 import { getRes1LandMassByH3 } from '../terrainClassificationCache';
+import {
+  getNavalStrategicDistanceAndTurns,
+  navalLookupForHexState,
+} from '../navalStrategicPath';
 import { getRange } from '../combatConstants';
 import { getStandingOrderForUnit } from './tool5StandingOrders';
 import { logDebug, logError, logTrace } from '../logger';
@@ -119,13 +123,24 @@ function getPathDistanceAndTurns(
   unitType: string,
   hexSet: Set<string>,
   terrainByH3: Map<string, string>,
+  state: GameStateSnapshot,
   blocked?: Set<string>
 ): { hexDistance: number; estimatedTurns: number } | null {
   logTrace('tool2Assessment getPathDistanceAndTurns', { unitType });
-  const passableFor: PassableDomain = unitType === 'naval' ? 'water' : 'land';
   const movementBudget = getMovementBudgetForUnit(unitType);
-  // Land BFS requires continent/island connectivity; omit only for naval water paths.
-  const landMass = passableFor === 'land' ? getRes1LandMassByH3() : undefined;
+  if (unitType === 'naval') {
+    const lookup = navalLookupForHexState(state, state.hexes, state.res1Infrastructure);
+    return getNavalStrategicDistanceAndTurns({
+      originH3,
+      destinationH3: destH3,
+      lookup,
+      movementBudget,
+      blocked,
+      maxSteps: hexSet.size,
+    });
+  }
+  const passableFor: PassableDomain = 'land';
+  const landMass = getRes1LandMassByH3();
   return getDistanceAndTurns(
     originH3,
     destH3,
@@ -282,7 +297,7 @@ function executeAssessUnit(
     // radius at grid level can't be within radius by path either. 999 means the
     // h3 gridDistance call failed (cross-pentagon), so we conservatively keep those.
     if (gridDist > radius && gridDist !== 999) { preFilteredCount++; continue; }
-    const distResult = getPathDistanceAndTurns(unit.h3Index, other.h3Index, unit.unitType, hexSet, terrainByH3);
+    const distResult = getPathDistanceAndTurns(unit.h3Index, other.h3Index, unit.unitType, hexSet, terrainByH3, state);
     const pathWithinRadius = distResult !== null && distResult.hexDistance <= radius;
     const gridWithinRadius = gridDist <= radius;
     if (!pathWithinRadius && !gridWithinRadius) continue;
@@ -297,7 +312,7 @@ function executeAssessUnit(
       const estimatedTurnsToReach = distResult !== null
         ? distResult.estimatedTurns
         : null;
-      const enemyToMe = getPathDistanceAndTurns(other.h3Index, unit.h3Index, other.unitType, hexSet, terrainByH3);
+      const enemyToMe = getPathDistanceAndTurns(other.h3Index, unit.h3Index, other.unitType, hexSet, terrainByH3, state);
       const enemyTurnsToReachMe: number | null = enemyToMe
         ? enemyToMe.estimatedTurns
         : (distResult !== null ? Math.ceil(hexDistance / getMovementBudgetForUnit(other.unitType)) : null);
@@ -340,7 +355,7 @@ function executeAssessUnit(
       }
     } else {
       if (!pathWithinRadius) continue;
-      const friendlyTurns = getPathDistanceAndTurns(other.h3Index, unit.h3Index, other.unitType, hexSet, terrainByH3);
+      const friendlyTurns = getPathDistanceAndTurns(other.h3Index, unit.h3Index, other.unitType, hexSet, terrainByH3, state);
       const estimatedTurnsToReach = friendlyTurns ? friendlyTurns.estimatedTurns : Math.ceil(hexDistance / getMovementBudgetForUnit(other.unitType));
       nearbyFriendlies.push({
         unitId: other.id,
@@ -366,7 +381,7 @@ function executeAssessUnit(
         }
       })();
       if (gridDist > radius && gridDist !== 999) continue;
-      const distResult = getPathDistanceAndTurns(unit.h3Index, intel.lastKnownH3Index, unit.unitType, hexSet, terrainByH3);
+      const distResult = getPathDistanceAndTurns(unit.h3Index, intel.lastKnownH3Index, unit.unitType, hexSet, terrainByH3, state);
       const pathWithinRadius = distResult !== null && distResult.hexDistance <= radius;
       const gridWithinRadius = gridDist <= radius;
       if (!pathWithinRadius && !gridWithinRadius) continue;

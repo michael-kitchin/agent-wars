@@ -647,6 +647,19 @@ export function isTerrainClassificationCacheLoaded(): boolean {
 }
 
 /**
+ * Returns the classification-cache seaport counts keyed by res-1 H3, or null when unloaded.
+ *
+ * Purpose: Naval berth lookup merges world seaports in bulk for hexes omitted from snapshot infra.
+ * When to use: `seaportCountByH3ForNavalLookup` when building a strategic naval hex lookup.
+ * Expected outcome: The cache map (including zeros) when loaded; null before `ensureTerrainClassificationCacheLoaded`.
+ * Exceptions: None.
+ */
+export function getCachedSeaportCountByRes1H3(): ReadonlyMap<string, number> | null {
+  logTrace('terrainClassificationCache getCachedSeaportCountByRes1H3');
+  return cached?.seaportCountByRes1H3 ?? null;
+}
+
+/**
  * Defines the `clearTerrainClassificationCacheForTests` function shape (export function clearTerrainClassificationCacheForTests(): void).
 
  * Purpose: Supports maintainability by documenting why `clearTerrainClassificationCacheForTests` exists.

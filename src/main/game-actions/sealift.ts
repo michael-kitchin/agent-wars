@@ -5,6 +5,7 @@ import type { CombatUnit } from '../combatUnitTypes';
 import { logDebug, logTrace } from '../logger';
 import { normalizeMovementTerrain } from '../movementTerrain';
 import { rememberStrategicHexBeforeMove } from '../strategicUnitPreviousHex';
+import { canEmbarkAtHex, canManualDebarkAtHex } from '../../shared/sealiftEmbarkEligibility';
 
 /**
  * Documents the `UnitRow` interface as a named contract surface (interface UnitRow).
@@ -139,6 +140,24 @@ interface HexEmbarkContext {
    */
 normalizedMovementTerrain: string;
     /**
+   * Native hex terrain bucket before kind normalization.
+   *
+   * Contract: Must not be seaport-promoted coastal.
+   * When to use: Sealift eligibility together with `terrainKind` and `seaportCount`.
+   * Expected outcome: Distinguishes land seaports from native coastal.
+   * Exceptions: None.
+   */
+nativeTerrain: string;
+    /**
+   * Optional pipeline terrain kind.
+   *
+   * Contract: `coastal` is native coastal embark terrain.
+   * When to use: Pass `hexes.terrain_kind`.
+   * Expected outcome: Combined with `nativeTerrain` for transit vs land seaport.
+   * Exceptions: None.
+   */
+terrainKind?: string;
+    /**
    * Specifies the contract for the `seaportCount` member (seaportCount: number;).
 
    * Contract: Describes stable behavior for callers of `seaportCount` in this codebase.
@@ -235,6 +254,8 @@ function getHexEmbarkContext(h3Index: string): HexEmbarkContext | null {
   });
   return {
     normalizedMovementTerrain,
+    nativeTerrain: terrainRow.terrain,
+    terrainKind: terrainRow.terrainKind ?? undefined,
     seaportCount: infra?.seaportCount ?? 0,
     controllerPlayerId: control?.controllerPlayerId ?? null,
   };
@@ -251,10 +272,12 @@ function getHexEmbarkContext(h3Index: string): HexEmbarkContext | null {
 function canPlayerEmbarkFromHex(h3Index: string, playerId: string): boolean {
   const context = getHexEmbarkContext(h3Index);
   if (!context) return false;
-  // Coastal embark/debark is always allowed for units already occupying the stack hex.
-  if (context.normalizedMovementTerrain === 'coastal') return true;
-  // Keep the existing controlled-seaport rule for non-coastal terrain labels.
-  return context.seaportCount > 0 && context.controllerPlayerId === playerId;
+  return canEmbarkAtHex({
+    nativeTerrain: context.nativeTerrain,
+    terrainKind: context.terrainKind,
+    hasSeaport: context.seaportCount > 0,
+    hexControlledByPlayer: context.controllerPlayerId === playerId,
+  });
 }
 
 /**
@@ -269,11 +292,12 @@ export function canManualDebarkFromHex(h3Index: string, playerId: string): boole
   logTrace('sealift canManualDebarkFromHex', { h3Index, playerId });
   const context = getHexEmbarkContext(h3Index);
   if (!context) return false;
-  if (context.normalizedMovementTerrain === 'coastal' || context.normalizedMovementTerrain === 'wetlands') return true;
-  if (context.normalizedMovementTerrain === 'water') {
-    return context.seaportCount > 0 && context.controllerPlayerId === playerId;
-  }
-  return canPlayerEmbarkFromHex(h3Index, playerId);
+  return canManualDebarkAtHex({
+    nativeTerrain: context.nativeTerrain,
+    terrainKind: context.terrainKind,
+    hasSeaport: context.seaportCount > 0,
+    hexControlledByPlayer: context.controllerPlayerId === playerId,
+  });
 }
 
 /**

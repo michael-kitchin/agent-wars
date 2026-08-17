@@ -6,6 +6,11 @@
 
 import type { GameStateSnapshot } from '../gameDb';
 import {
+  getNavalStrategicDistanceAndTurns,
+  navalLookupForHexState,
+} from '../navalStrategicPath';
+import { navalMayOccupyHex } from '../../shared/navalStrategicEdges';
+import {
   getReachableHexes,
   partitionPathByTurn,
   getDistanceAndTurns,
@@ -735,7 +740,8 @@ export function executePlanRouteWithSession(
     blocked,
   });
   if ('status' in routeResolution) return routeResolution;
-  const { passableFor, destinationH3, path, movementBudget, warnings, statefulStats } = routeResolution;
+  const { passableFor, destinationH3, path, movementBudget, firstTurnMovementBudget, warnings, statefulStats } =
+    routeResolution;
   destH3 = destinationH3;
   if (statefulStats && (unit.unitType === 'infantry' || unit.unitType === 'armor')) {
     logDebug('tool1Pathfinding executePlanRouteWithSession: stateful search summary', {
@@ -800,6 +806,7 @@ export function executePlanRouteWithSession(
     destinationH3: destH3,
     path,
     movementBudget,
+    firstTurnMovementBudget,
     warnings,
     maxTurns: options?.maxTurns,
     h3ToLatLng: (h3) => h3ToLatLng(h3, session.latLngByH3, 'cellCenter'),
@@ -829,9 +836,15 @@ export function executeCheckDistance(
   unitType: string,
   state: GameStateSnapshot,
   latLngByH3: Map<string, LatLng>,
-  resolveToH3: (lat: number, lng: number) => string | undefined
+  resolveToH3: (lat: number, lng: number) => string | undefined,
+  pathfindingSession?: PathfindingSession
 ): CheckDistanceOk | CheckDistanceError {
-  logDebug('tool1Pathfinding executeCheckDistance', { from: from.join(','), to: to.join(','), unitType });
+  logDebug('tool1Pathfinding executeCheckDistance', {
+    from: from.join(','),
+    to: to.join(','),
+    unitType,
+    hasPathfindingSession: Boolean(pathfindingSession),
+  });
   const hexList = state.hexes.map((h) => h.h3Index);
   const hexSet = new Set(hexList);
   const terrainByH3 = buildNormalizedTerrainByH3(state.hexes);
@@ -844,10 +857,44 @@ export function executeCheckDistance(
 
   const passableFor: PassableDomain = unitType === 'naval' ? 'water' : 'land';
   const movementBudget = getMovementBudgetForUnit(unitType);
-  const toTerrain = terrainByH3.get(toH3) ?? 'land';
-  if (unitType === 'naval' && toTerrain === 'land') {
-    const waterHex = nearestWaterHexTo(toH3, hexSet, terrainByH3);
-    if (waterHex) toH3 = waterHex;
+  const navalLookup =
+    unitType === 'naval'
+      ? navalLookupForHexState(
+          pathfindingSession ?? state,
+          state.hexes,
+          state.res1Infrastructure
+        )
+      : undefined;
+  if (unitType === 'naval' && navalLookup) {
+    const destAttrs = navalLookup(toH3);
+    if (destAttrs && !navalMayOccupyHex(destAttrs)) {
+      const waterHex = nearestWaterHexTo(toH3, hexSet, terrainByH3);
+      if (waterHex) toH3 = waterHex;
+    }
+    const navalDist = getNavalStrategicDistanceAndTurns({
+      originH3: fromH3,
+      destinationH3: toH3,
+      lookup: navalLookup,
+      movementBudget,
+    });
+    if (!navalDist) {
+      return {
+        status: 'ok',
+        from: h3ToLatLng(fromH3, latLngByH3, 'cellCenter'),
+        to: h3ToLatLng(toH3, latLngByH3, 'cellCenter'),
+        hexDistance: 0,
+        estimatedTurns: 0,
+        reachable: false,
+      };
+    }
+    return {
+      status: 'ok',
+      from: h3ToLatLng(fromH3, latLngByH3, 'cellCenter'),
+      to: h3ToLatLng(toH3, latLngByH3, 'cellCenter'),
+      hexDistance: navalDist.hexDistance,
+      estimatedTurns: navalDist.estimatedTurns,
+      reachable: true,
+    };
   }
 
   const landMass = passableFor === 'land' ? getRes1LandMassByH3() : undefined;
@@ -980,7 +1027,15 @@ export function executeTool1(
           resolveToH3
         ) as unknown as Record<string, unknown>;
       }
-      const result = executeCheckDistance(from, to, a.unitType, state, latLngByH3, resolveToH3);
+      const result = executeCheckDistance(
+        from,
+        to,
+        a.unitType,
+        state,
+        latLngByH3,
+        resolveToH3,
+        pathfindingSession
+      );
       return result as unknown as Record<string, unknown>;
     }
     return { status: 'error', error: `Unknown tool: ${toolName}` };

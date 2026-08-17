@@ -1,4 +1,4 @@
-import { cellToLatLng, gridDisk } from 'h3-js';
+import { cellToLatLng } from 'h3-js';
 import {
   getGameStateForPlayer,
   getHexController,
@@ -6,7 +6,6 @@ import {
   isDbReady,
 } from '../../gameDb';
 import { executePlanRouteWithSession } from '../../tools/tool1Pathfinding';
-import { terrainIsPassableForDomain } from '../../pathfinding';
 import { logDebug, logError, logTrace } from '../../logger';
 import { isTacticalBattleActive } from '../../tacticalBattle/tacticalBattleSession';
 import { AIR_FERRY_RANGE_HEXES, MOVEMENT_RANGE_BY_UNIT_TYPE, formatFerryOutOfRangeReason } from '../../../shared/tacticalRanges';
@@ -22,7 +21,6 @@ import {
   isEmbarkedLandUnit,
 } from '../sealift';
 import {
-  canLandUnitTraverseEdge,
   landUnitCanOccupyHex,
   LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON,
 } from '../../../shared/landTraversalRes1';
@@ -45,6 +43,8 @@ import type { HumanMarchPreviewComputationContext } from '../humanMarchPreviewCo
 import { buildHumanMarchPreviewComputationContextFromState } from '../humanMarchPreviewComputationContext';
 import { cacheSetBounded } from '../humanMarchPreviewCache';
 import { hexSupportsMixedLandAndNaval, selectionHasMixedLandAndNaval } from '../humanMarchPreviewMixedSelection';
+import { resolveLandOrNavalMarchPreview } from './humanMarchPreviewGroundRoute';
+import { hexHasSeaport } from '../../movementTerrain';
 /**
  * Documents the `HumanOwnedUnit` type alias (type HumanOwnedUnit).
 
@@ -104,21 +104,6 @@ displayOrder?: number };
  * Exceptions: None.
  */
 type PlanRouteResult = PlanRouteOk | PlanRouteError;
-
-/**
- * Strategic marches have no terrain slowdown; slower tooltips are tactical-only.
- *
- * Purpose: Keeps grouped preview IPC from attaching `orderPreviewTerrainImpact` on the strategic map.
- * When to use: After a successful strategic `PlanRouteOk` for land/naval march previews.
- * Expected outcome: Both fields null so `#order-slower-tooltip` stays hidden; blocked previews still use `invalidReason`.
- * Exceptions: None.
- */
-function strategicMarchTerrainForPlan(
-  unit: HumanOwnedUnit
-): { slowerTerrainDisplayTitle: string | null; orderPreviewTerrainImpact: OrderPreviewTerrainImpact | null } {
-  logTrace('humanMarchPreview strategicMarchTerrainForPlan', { unitId: unit.id, unitType: unit.unitType });
-  return { slowerTerrainDisplayTitle: null, orderPreviewTerrainImpact: null };
-}
 
 /**
  * Documents the `PreviewComputationContext` type alias (type PreviewComputationContext).
@@ -231,33 +216,6 @@ let maxPreviewRouteCacheEntries = DEFAULT_MAX_PREVIEW_ROUTE_CACHE_ENTRIES;
  * Exceptions: None.
  */
 let maxPreviewResultCacheEntries = DEFAULT_MAX_PREVIEW_RESULT_CACHE_ENTRIES;
-/**
- * Documents the module-scope binding `MAX_NEARBY_FALLBACK_ATTEMPTS` (MAX_NEARBY_FALLBACK_ATTEMPTS).
-
- * Purpose: Supports maintainability by documenting why `MAX_NEARBY_FALLBACK_ATTEMPTS` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const MAX_NEARBY_FALLBACK_ATTEMPTS = 16;
-/**
- * Documents the module-scope binding `MAX_NEARBY_FALLBACK_RADIUS` (MAX_NEARBY_FALLBACK_RADIUS).
-
- * Purpose: Supports maintainability by documenting why `MAX_NEARBY_FALLBACK_RADIUS` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const MAX_NEARBY_FALLBACK_RADIUS = 6;
-/**
- * Documents the module-scope binding `MAX_NEARBY_FALLBACK_BUDGET_MS` (MAX_NEARBY_FALLBACK_BUDGET_MS).
-
- * Purpose: Supports maintainability by documenting why `MAX_NEARBY_FALLBACK_BUDGET_MS` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const MAX_NEARBY_FALLBACK_BUDGET_MS = 20;
 
 /**
  * Documents the module-scope binding `previewDiagnostics` (previewDiagnostics: HumanMarchPreviewDiagnostics).
@@ -649,65 +607,6 @@ function executePlanRouteCached(context: PreviewComputationContext, unitId: stri
 }
 
 /**
- * Defines the `findNearbyReachablePreview` function shape (function findNearbyReachablePreview( context: PreviewComputationContext, unit: HumanOwnedUnit, hoveredH3Index: string, passableFor: 'land' | 'water').
-
- * Purpose: Supports maintainability by documenting why `findNearbyReachablePreview` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function findNearbyReachablePreview(
-  context: PreviewComputationContext,
-  unit: HumanOwnedUnit,
-  hoveredH3Index: string,
-  passableFor: 'land' | 'water'
-): HumanOrderPreviewResult | null {
-  const startedAtMs = Date.now();
-  let attempts = 0;
-  const seen = new Set<string>([hoveredH3Index]);
-  for (let radius = 1; radius <= MAX_NEARBY_FALLBACK_RADIUS; radius++) {
-    if (Date.now() - startedAtMs >= MAX_NEARBY_FALLBACK_BUDGET_MS) {
-      previewDiagnostics.fallbackBudgetAbortCount += 1;
-      return null;
-    }
-    let ring: string[] = [];
-    try {
-      ring = gridDisk(hoveredH3Index, radius);
-    } catch {
-      break;
-    }
-    for (const candidateH3 of ring) {
-      if (Date.now() - startedAtMs >= MAX_NEARBY_FALLBACK_BUDGET_MS) {
-        previewDiagnostics.fallbackBudgetAbortCount += 1;
-        return null;
-      }
-      if (attempts >= MAX_NEARBY_FALLBACK_ATTEMPTS) return null;
-      if (seen.has(candidateH3)) continue;
-      seen.add(candidateH3);
-      const passabilityTerrain = context.passabilityByH3.get(candidateH3) ?? 'land';
-      if (passableFor === 'water' && !terrainIsPassableForDomain(passabilityTerrain, passableFor)) continue;
-      if (isLandUnitType(unit.unitType) && candidateH3 !== unit.h3Index) {
-        const landMass = context.pathfindingSession.landMass;
-        if (!landUnitCanOccupyHex(candidateH3, landMass)) continue;
-        if (!canLandUnitTraverseEdge(unit.h3Index, candidateH3, landMass)) continue;
-      }
-      attempts += 1;
-      previewDiagnostics.fallbackAttemptCount += 1;
-      const planned = executePlanRouteCached(context, unit.id, candidateH3);
-      if (planned.status !== 'ok') continue;
-      return {
-        valid: true,
-        showInvalidMarker: false,
-        arrowLatLng: planned.destination,
-        segments: planned.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes })),
-        ...strategicMarchTerrainForPlan(unit),
-      };
-    }
-  }
-  return null;
-}
-
-/**
  * Defines the `computeHumanMarchPreviewForUnit` function shape (function computeHumanMarchPreviewForUnit().
 
  * Purpose: Supports maintainability by documenting why `computeHumanMarchPreviewForUnit` exists.
@@ -808,33 +707,22 @@ function computeHumanMarchPreviewForUnit(
     }
   }
 
-  const passableFor = unit.unitType === 'naval' ? 'water' : 'land';
-  const hoveredPassabilityTerrain = context.passabilityByH3.get(hoveredHex.h3Index) ?? 'land';
-  const hoveredPassable =
-    passableFor === 'land'
-      ? landUnitCanOccupyHex(hoveredHex.h3Index, context.pathfindingSession.landMass)
-      : terrainIsPassableForDomain(hoveredPassabilityTerrain, passableFor);
-  const direct = hoveredPassable ? executePlanRouteCached(context, unitId, hoveredH3Index) : undefined;
-  if (hoveredPassable && direct?.status === 'ok') {
-    result = {
-      valid: true,
-      showInvalidMarker: false,
-      arrowLatLng: direct.destination,
-      segments: direct.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes })),
-      ...strategicMarchTerrainForPlan(unit),
-    };
-    cacheSetBounded(previewResultCache, cacheKey, result, maxPreviewResultCacheEntries);
-    logPreviewOutcome(unitId, hoveredH3Index, result, 'computed');
-    return result;
-  }
-
-  // Nearby fallback is only useful for passable hover hexes whose direct route failed.
-  // Skips expensive probing for obviously invalid terrain (e.g., land unit over open water).
-  const nearby = hoveredPassable ? findNearbyReachablePreview(context, unit, hoveredH3Index, passableFor) : null;
-  if (nearby) {
-    cacheSetBounded(previewResultCache, cacheKey, nearby, maxPreviewResultCacheEntries);
-    logPreviewOutcome(unitId, hoveredH3Index, nearby, 'computed');
-    return nearby;
+  const groundPreview = resolveLandOrNavalMarchPreview({
+    context,
+    unit,
+    hoveredH3Index,
+    planRoute: (id, dest) => executePlanRouteCached(context, id, dest),
+    noteFallbackAttempt: () => {
+      previewDiagnostics.fallbackAttemptCount += 1;
+    },
+    noteFallbackBudgetAbort: () => {
+      previewDiagnostics.fallbackBudgetAbortCount += 1;
+    },
+  });
+  if (groundPreview) {
+    cacheSetBounded(previewResultCache, cacheKey, groundPreview, maxPreviewResultCacheEntries);
+    logPreviewOutcome(unitId, hoveredH3Index, groundPreview, 'computed');
+    return groundPreview;
   }
 
   result = {
@@ -975,7 +863,8 @@ export function previewHumanMarchOrdersImpl(unitIds: string[], hoveredH3Index: s
       MOVEMENT_RANGE_BY_UNIT_TYPE,
       1
     );
-    const sharedMixedTerrain = !!hoveredHex && hexSupportsMixedLandAndNaval(hoveredHex);
+    const sharedMixedTerrain =
+      !!hoveredHex && hexSupportsMixedLandAndNaval({ ...hoveredHex, hasSeaport: hexHasSeaport(hoveredHex.h3Index) });
     if (hasMixedSelection && !sharedMixedTerrain) {
       const reason = 'Mixed land/naval stacks can only move to coastal hexes.';
       logDebug('gameActions parity previewBuild: mixed-domain rejection', {

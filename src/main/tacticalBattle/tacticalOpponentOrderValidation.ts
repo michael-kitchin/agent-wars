@@ -8,7 +8,7 @@ import type { TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { AIR_FERRY_RANGE_HEXES, formatFerryOutOfRangeReason } from '../../shared/tacticalRanges';
 import { tacticalSubUnitLabelForUserMessage } from '../../shared/unitDisplayNames';
 import { dbGetOne, getHexController, getRes1InfrastructureForHex, isDbReady } from '../gameDb';
-import { normalizeMovementTerrain } from '../movementTerrain';
+import { canEmbarkAtHex } from '../../shared/sealiftEmbarkEligibility';
 import { isWithinAirFerryGridRange } from '../game-actions/gridRange';
 import { tacticalLogQuery } from './tacticalLogging';
 import { tacticalInvalidResult, tacticalValidResult, type TacticalValidationResult } from './tacticalValidationResult';
@@ -36,15 +36,14 @@ export function canPlayerEmbarkFromTacticalRes4Hex(h3Index: string, playerId: st
     'SELECT controller_player_id AS controllerPlayerId FROM res1_control WHERE h3_index = ?',
     [res1]
   );
-  const normalizedMovementTerrain = normalizeMovementTerrain({
-    h3Index: res1,
-    terrain: terrainRow.terrain,
-    terrainKind: terrainRow.terrainKind ?? undefined,
-  });
   const seaportCount = infra?.seaportCount ?? 0;
   const controllerPlayerId = control?.controllerPlayerId ?? null;
-  if (normalizedMovementTerrain === 'coastal') return true;
-  return seaportCount > 0 && controllerPlayerId === playerId;
+  return canEmbarkAtHex({
+    nativeTerrain: terrainRow.terrain,
+    terrainKind: terrainRow.terrainKind ?? undefined,
+    hasSeaport: seaportCount > 0,
+    hexControlledByPlayer: controllerPlayerId === playerId,
+  });
 }
 
 /**

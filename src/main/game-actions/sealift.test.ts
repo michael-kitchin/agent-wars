@@ -13,6 +13,7 @@ import {
   autoDebarkOpponentLandUnitIfMovingIndependently,
   canManualDebarkFromHex,
   clearEmbarkAssignmentForLandUnit,
+  getSealiftStackContextModeForHex,
   getSealiftStackStateImpl,
   isEmbarkedLandUnit,
   shouldSkipEmbarkedLandIndependentMove,
@@ -390,6 +391,16 @@ function testCanManualDebarkFromHexCoastalWaterPortAndOpenWater(): void {
     );
     dbRun('DELETE FROM res1_control WHERE h3_index = ?', [openWaterHex]);
     assert.strictEqual(canManualDebarkFromHex(openWaterHex, 'human'), false);
+    const uncontrolledWaterPort = pickHex(12);
+    setHexTerrain(uncontrolledWaterPort, 'water');
+    dbRun(
+      `INSERT INTO res1_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
+       VALUES (?, 0, 0, 1)
+       ON CONFLICT(h3_index) DO UPDATE SET seaport_count = 1`,
+      [uncontrolledWaterPort]
+    );
+    dbRun('DELETE FROM res1_control WHERE h3_index = ?', [uncontrolledWaterPort]);
+    assert.strictEqual(canManualDebarkFromHex(uncontrolledWaterPort, 'human'), false);
   });
 }
 
@@ -557,6 +568,39 @@ function testAutoDebarkOpponentAndSkipHumanEmbarkedMoves(): void {
 }
 
 /**
+ * Defines the `testLandSeaportSealiftWithoutControl` function shape (function testLandSeaportSealiftWithoutControl(): void).
+
+ * Purpose: Occupied land seaports embark/debark like coastal without a control check.
+ * When to use: After changes to land-seaport sealift eligibility.
+ * Expected outcome: Embark writes an assignment; manual debark is allowed; stack mode is coastal_port.
+ * Exceptions: None.
+ */
+function testLandSeaportSealiftWithoutControl(): void {
+  withTempDb(() => {
+    const landPortHex = pickHex(7);
+    setHexTerrain(landPortHex, 'land');
+    dbRun(
+      `INSERT INTO res1_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
+       VALUES (?, 0, 0, 1)
+       ON CONFLICT(h3_index) DO UPDATE SET seaport_count = 1`,
+      [landPortHex]
+    );
+    dbRun('DELETE FROM res1_control WHERE h3_index = ?', [landPortHex]);
+    insertUnit('human-naval-land-port', 'human', 'naval', landPortHex);
+    insertUnit('human-inf-land-port', 'human', 'infantry', landPortHex);
+    applyEmbarkOrdersForPlayer(
+      [{ unitId: 'human-inf-land-port', navalUnitId: 'human-naval-land-port' }],
+      'human'
+    );
+    assert.deepStrictEqual(loadAssignments(), [
+      { landUnitId: 'human-inf-land-port', navalUnitId: 'human-naval-land-port' },
+    ]);
+    assert.strictEqual(canManualDebarkFromHex(landPortHex, 'human'), true);
+    assert.strictEqual(getSealiftStackContextModeForHex(landPortHex), 'coastal_port');
+  });
+}
+
+/**
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Supports maintainability by documenting why `run` exists.
@@ -572,6 +616,7 @@ function run(): void {
   testTransportLossDestroysAllEmbarkedCargoRegardlessOfTerrain();
   testClearEmbarkAssignmentForLandUnitRemovesRow();
   testCanManualDebarkFromHexCoastalWaterPortAndOpenWater();
+  testLandSeaportSealiftWithoutControl();
   testGameStateSnapshotIncludesEmbarkedOnNavalUnitId();
   testTransportLossSparesManuallyDebarkedCoLocatedLand();
   testSealiftStateDisablesDebarkButtonsOnOpenWater();

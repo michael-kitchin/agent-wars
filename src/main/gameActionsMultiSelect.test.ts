@@ -20,7 +20,8 @@ import {
   submitOrders,
   updateSealiftSlot,
 } from './gameActions';
-import { getRes1LandMassByH3, getRes1ProductionContext } from './terrainClassificationCache';
+import { getRes1LandMassByH3 } from './terrainClassificationCache';
+import { hexHasSeaport } from './movementTerrain';
 import { resetHumanMarchPreviewDiagnosticsForTests } from './game-actions/humanMarchPreview';
 import { withTempGameDb } from './testSupport/withTempGameDb';
 import {
@@ -67,7 +68,7 @@ function findNearestLandSeaportHex(state: ReturnType<typeof getGameState>, origi
       (hex) =>
         hex.terrain === 'land' &&
         landUnitCanOccupyHex(hex.h3Index, landMass) &&
-        getRes1ProductionContext({ h3Index: hex.h3Index }).seaportCount > 0 &&
+        hexHasSeaport(hex.h3Index) &&
         findAdjacentNonArcticLandHex(state, hex.h3Index) !== null
     )
     .sort((a, b) => {
@@ -125,24 +126,31 @@ function isOpenOceanLandMass(h3Index: string): boolean {
 function findPureLandDestinationHex(state: ReturnType<typeof getGameState>): string | null {
   for (const hex of state.hexes) {
     if (hex.terrain !== 'land') continue;
-    if (hexSupportsMixedLandAndNaval(hex)) continue;
+    const hasSeaport = hexHasSeaport(hex.h3Index);
+    if (hexSupportsMixedLandAndNaval({ ...hex, hasSeaport })) continue;
     return hex.h3Index;
   }
   return null;
 }
 
 /**
- * Locates a hex that supports both land and naval movement domains for mixed-stack destination tests.
+ * Locates an adjacent native-coastal hex for mixed-stack destination tests.
  *
- * Purpose: Finds a coastal/littoral destination where mixed land and naval stacks may march together.
- * When to use: From grouped mixed land/naval preview and assign acceptance tests.
- * Expected outcome: Returns the first mixed-domain hex, optionally skipping `excludeH3`.
+ * Purpose: From a land seaport, naval may only egress one transit step this turn, so mixed previews must use that rim.
+ * When to use: Grouped mixed land/naval preview and assign acceptance tests.
+ * Expected outcome: Adjacent coastal hex, or null so callers can hold on the origin seaport.
  * Exceptions: None.
  */
-function findMixedTerrainDestinationHex(state: ReturnType<typeof getGameState>, excludeH3?: string): string | null {
+function findAdjacentMixedTransitHex(state: ReturnType<typeof getGameState>, originH3: string): string | null {
   for (const hex of state.hexes) {
-    if (excludeH3 && hex.h3Index === excludeH3) continue;
-    if (hexSupportsMixedLandAndNaval(hex)) return hex.h3Index;
+    try {
+      if (gridDistance(hex.h3Index, originH3) !== 1) continue;
+    } catch {
+      continue;
+    }
+    const hasSeaport = hexHasSeaport(hex.h3Index);
+    if (!hexSupportsMixedLandAndNaval({ ...hex, hasSeaport })) continue;
+    if (hex.terrain === 'coastal' || hex.terrainKind === 'coastal') return hex.h3Index;
   }
   return null;
 }
@@ -206,7 +214,8 @@ function testPreviewGroupedMixedLandNavalClearsSegmentsWhenAnyUnitBlocked(): voi
 
     let foundPartialFailure = false;
     for (const hex of state.hexes) {
-      if (!hexSupportsMixedLandAndNaval(hex)) continue;
+      const hasSeaport = hexHasSeaport(hex.h3Index);
+      if (!hexSupportsMixedLandAndNaval({ ...hex, hasSeaport })) continue;
       if (hex.h3Index === seaportHex) continue;
       const result = previewHumanMarchOrders([landUnit!.id, navalUnit!.id], hex.h3Index);
       if (result.validForAll) continue;
@@ -247,8 +256,10 @@ function testPreviewGroupedMixedLandNavalAcceptsCoastalDestination(): void {
     const seaportHex = findNearestLandSeaportHex(state, landUnit!.h3Index);
     assert.ok(seaportHex, 'expected at least one land seaport hex');
     const coastalDestination =
-      findMixedTerrainDestinationHex(state, seaportHex!) ?? seaportHex!;
-    assert.ok(hexSupportsMixedLandAndNaval(state.hexes.find((h) => h.h3Index === coastalDestination)!));
+      findAdjacentMixedTransitHex(state, seaportHex!) ?? seaportHex!;
+    const destHex = state.hexes.find((h) => h.h3Index === coastalDestination)!;
+    const destHasSeaport = hexHasSeaport(coastalDestination!);
+    assert.ok(hexSupportsMixedLandAndNaval({ ...destHex, hasSeaport: destHasSeaport }));
     dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [seaportHex!, landUnit!.id]);
     dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [seaportHex!, navalUnit!.id]);
 
@@ -308,7 +319,7 @@ function testAssignGroupedMixedLandNavalAcceptsCoastalDestination(): void {
     const seaportHex = findNearestLandSeaportHex(state, landUnit!.h3Index);
     assert.ok(seaportHex, 'expected at least one land seaport hex');
     const coastalDestination =
-      findMixedTerrainDestinationHex(state, seaportHex!) ?? seaportHex!;
+      findAdjacentMixedTransitHex(state, seaportHex!) ?? seaportHex!;
     dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [seaportHex!, landUnit!.id]);
     dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [seaportHex!, navalUnit!.id]);
 

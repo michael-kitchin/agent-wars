@@ -12,12 +12,10 @@ import { logDebug, logError, logTrace } from '../logger';
 import type { GameStateSnapshot } from '../gameDb';
 import { dbGetOne, dbRun } from '../gameDb';
 import { LATLNG_DECIMAL_PLACES } from '../mapData';
-import { passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
 import { landUnitCanOccupyHex, LAND_UNIT_ROUTE_STEP_BLOCKED_REASON } from '../../shared/landTraversalRes1';
 import { getRes1LandMassByH3 } from '../terrainClassificationCache';
 import {
   getValidDestinations,
-  resolveMovementTerrainForHex,
 } from '../oneStepMoveDestinations';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
@@ -363,11 +361,11 @@ function validateAiOrder(
     }
   }
 
-  const seaportCountByHex = new Map((state.res1Infrastructure ?? []).map((row) => [row.h3Index, row.seaportCount] as const));
-  const destHex = state.hexes.find((h) => h.h3Index === order.toH3Index);
-  const terrain = resolveMovementTerrainForHex(destHex, seaportCountByHex);
-  if (unit.unitType === 'naval' && !passabilityAllowsNavalUnit(terrain)) {
-    return { valid: false, reason: NAVAL_DESTINATION_MUST_BE_WATER_COASTAL };
+  if (unit.unitType === 'naval') {
+    const navalDests = getValidDestinations(unit, state, destinationOptions);
+    if (!navalDests.includes(order.toH3Index)) {
+      return { valid: false, reason: NAVAL_DESTINATION_MUST_BE_WATER_COASTAL };
+    }
   }
   if ((unit.unitType === 'infantry' || unit.unitType === 'armor') && !landUnitCanOccupyHex(order.toH3Index, getRes1LandMassByH3())) {
     return { valid: false, reason: 'Land units must move to a hex that overlaps a continent or large island.' };

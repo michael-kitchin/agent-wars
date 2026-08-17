@@ -35,9 +35,9 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { clipTacticalMarchPathToDestination } from '../../shared/tacticalMarchPlaybackPath.js';
 import { filterTacticalMarchContinuationsToPresentSubUnits } from '../../shared/tacticalMarchContinuations';
 import { committedOpponentTacticalDraftFieldAfterConsume } from '../../shared/ipc/tacticalOpponentPlanMerge';
-import { passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
 import { executePlanRoute } from '../tools/tool1Pathfinding';
 import { normalizeMovementTerrain, isLandSeaportSpawnHex } from '../movementTerrain';
+import { getValidDestinations } from '../oneStepMoveDestinations';
 import {
   NAVAL_DESTINATION_MUST_BE_WATER_COASTAL,
   NAVAL_SEAPORT_EGRESS_REQUIRED,
@@ -471,21 +471,24 @@ function validateOrder(
   if (dist > range) return { valid: false, reason: `${unit.unit_type} can move at most ${range} hex(es)` };
   /* dist === 0 (same hex) is allowed: "hold" / no move is valid. */
 
-  const originTerrain = getMovementTerrainForH3(unit.h3_index);
-  const destinationTerrain = getMovementTerrainForH3(toH3Index);
-  if (unit.unit_type === 'naval' && !passabilityAllowsNavalUnit(destinationTerrain)) {
-    return { valid: false, reason: NAVAL_DESTINATION_MUST_BE_WATER_COASTAL };
-  }
-  if (unit.unit_type === 'naval' && !passabilityAllowsNavalUnit(originTerrain)) {
-    const seaportSpawnHex = isLandSeaportSpawnHex({
-      h3Index: unit.h3_index,
-      normalizedTerrain: originTerrain,
-    });
-    if (!seaportSpawnHex) {
-      return { valid: false, reason: NAVAL_START_MUST_BE_WATER_COASTAL };
-    }
-    if (dist !== 1 || !passabilityAllowsNavalUnit(destinationTerrain)) {
-      return { valid: false, reason: NAVAL_SEAPORT_EGRESS_REQUIRED };
+  if (unit.unit_type === 'naval') {
+    const navalDests = getValidDestinations(
+      { id: unitId, h3Index: unit.h3_index, unitType: 'naval' },
+      humanPerspectiveStateSnapshot()
+    );
+    if (!navalDests.includes(toH3Index)) {
+      const originTerrain = getMovementTerrainForH3(unit.h3_index);
+      const seaportSpawnHex = isLandSeaportSpawnHex({
+        h3Index: unit.h3_index,
+        normalizedTerrain: originTerrain,
+      });
+      if (seaportSpawnHex) {
+        return { valid: false, reason: NAVAL_SEAPORT_EGRESS_REQUIRED };
+      }
+      if (dist === 0) {
+        return { valid: false, reason: NAVAL_START_MUST_BE_WATER_COASTAL };
+      }
+      return { valid: false, reason: NAVAL_DESTINATION_MUST_BE_WATER_COASTAL };
     }
   }
   if ((unit.unit_type === 'infantry' || unit.unit_type === 'armor') && !landUnitCanOccupyHex(toH3Index, getRes1LandMassByH3())) {
@@ -1286,7 +1289,10 @@ export function assignHumanMarchOrders(unitIds: string[], destinationH3Index: st
     }
     const destinationTerrain = effectiveHexPassabilityTerrain(destinationHex);
     const destinationSeaportCount = getRes1InfrastructureForHex(destinationH3Index).seaportCount;
-    const sharedMixedTerrain = hexSupportsMixedLandAndNaval(destinationHex);
+    const sharedMixedTerrain = hexSupportsMixedLandAndNaval({
+      ...destinationHex,
+      hasSeaport: destinationSeaportCount > 0,
+    });
     const hasMixedSelection = selectionHasMixedLandAndNaval(selectedUnits);
     logDebug('gameActions assignHumanMarchOrders: destination terrain classification', {
       destinationH3Index,

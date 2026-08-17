@@ -1,5 +1,6 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import type { PassableDomain } from '../pathfinding';
+import { logDebug } from '../logger';
 
 /**
  * Documents the `LatLng` type alias (type LatLng).
@@ -382,12 +383,22 @@ export function buildPlanRouteSuccessResult(payload: {
   destinationH3: string;
   path: string[];
   movementBudget: number;
+  /**
+   * First-turn step cap when it differs from `movementBudget`.
+   *
+   * Contract: Omit when every turn uses `movementBudget`.
+   * When to use: Naval land-seaport origins (egress is one step).
+   * Expected outcome: Turn 1 of the returned path uses this cap; later turns use `movementBudget`.
+   * Exceptions: None.
+   */
+  firstTurnMovementBudget?: number;
   warnings: string[];
   maxTurns?: number;
   h3ToLatLng: (h3: string) => LatLng;
   partitionPathByTurn: (
     path: string[],
-    movementBudget: number
+    movementBudget: number,
+    firstTurnMovementBudget?: number
   ) => Array<{
     turn: number;
     hexes: string[];
@@ -396,15 +407,35 @@ export function buildPlanRouteSuccessResult(payload: {
     endHex: string;
   }>;
 }): PlanRouteOk {
+  logDebug('tool1Pathfinding buildPlanRouteSuccessResult', {
+    unitId: payload.unitId,
+    unitType: payload.unitType,
+    originH3: payload.originH3,
+    destinationH3: payload.destinationH3,
+    pathLength: payload.path.length,
+    movementBudget: payload.movementBudget,
+    firstTurnMovementBudget: payload.firstTurnMovementBudget ?? null,
+    maxTurns: payload.maxTurns ?? null,
+  });
+  const firstTurnBudget = payload.firstTurnMovementBudget ?? payload.movementBudget;
   let turnsRequired = 0;
-  const segments = payload.partitionPathByTurn(payload.path, payload.movementBudget);
+  const segments = payload.partitionPathByTurn(
+    payload.path,
+    payload.movementBudget,
+    payload.firstTurnMovementBudget
+  );
   turnsRequired = segments.length;
   const maxTurns = payload.maxTurns;
   if (maxTurns != null && turnsRequired > maxTurns) {
     payload.warnings.push(`Route truncated at maxTurns limit - destination not reached in ${maxTurns} turns`);
-    const stepsAllowed = maxTurns * payload.movementBudget;
+    const stepsAllowed =
+      maxTurns <= 0 ? 0 : firstTurnBudget + Math.max(0, maxTurns - 1) * payload.movementBudget;
     const truncatedPath = payload.path.slice(0, Math.min(payload.path.length, stepsAllowed + 1));
-    const truncatedSegments = payload.partitionPathByTurn(truncatedPath, payload.movementBudget);
+    const truncatedSegments = payload.partitionPathByTurn(
+      truncatedPath,
+      payload.movementBudget,
+      payload.firstTurnMovementBudget
+    );
     turnsRequired = maxTurns;
     const pathForResponse = truncatedSegments.map((seg) => ({
       turn: seg.turn,

@@ -1,10 +1,11 @@
 /**
  * One-step legal move destinations for AI order validation and prompt precomputation.
- * Land units use res-1 land-mass edge reachability; naval units use terrain passability.
+ * Land units use res-1 land-mass edge reachability; naval units use berth/egress strategic edges.
  */
 
 import { gridDisk, gridDistance } from 'h3-js';
 import type { GameStateSnapshot } from './gameDb';
+import { logDebug } from './logger';
 import { passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
 import {
   getLandMassReachableHexes,
@@ -12,30 +13,33 @@ import {
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../shared/tacticalRanges';
 import { getRes1LandMassByH3 } from './terrainClassificationCache';
 import { isEmbarkedLandUnit } from './game-actions/sealift';
+import {
+  getNavalStrategicReachableHexes,
+  navalLookupForHexState,
+} from './navalStrategicPath';
 
 /**
- * Returns the effective movement terrain class for a hex, upgrading `land` to `coastal` when a seaport is present.
+ * Returns native movement terrain for a hex without promoting seaports to coastal.
  *
- * Purpose: Centralizes the seaport-promotion rule so naval destination checks stay consistent.
- * When to use: Pass any hex row and the seaport-count map built from `res1Infrastructure`.
- * Expected outcome: `'coastal'` when at least one seaport exists on the hex; otherwise the hex's own terrain value or `'land'` for unknown hexes.
+ * Purpose: Remaining call sites that still need a terrain string must not treat inland ports as water.
+ * When to use: Pass any hex row; seaport counts are ignored for classification.
+ * Expected outcome: The hex's own `terrain`, or `'land'` when the hex is missing.
  * Exceptions: None.
  */
 export function resolveMovementTerrainForHex(
-  hex: { h3Index: string; terrain: string } | undefined,
-  seaportCountByHex: Map<string, number>
+  hex: { h3Index: string; terrain: string } | undefined
 ): string {
   if (!hex) return 'land';
-  return (seaportCountByHex.get(hex.h3Index) ?? 0) > 0 ? 'coastal' : hex.terrain;
+  return hex.terrain;
 }
 
 /**
- * Returns all legal destinations for a unit within movement range (including its current hex).
+ * Returns all legal destinations for a unit within movement range (including its current hex when occupiable).
  *
  * Purpose: Single source of truth for AI order generation and order validation movement legality on the strategic map.
  * When to use: Pass the acting unit and the current game snapshot; set `assumeDebarkedForReachability` when validating opponent movement that will auto-debark before marching.
- * Expected outcome: Land units: hexes reachable via land-mass edges within range. Naval: terrain-passable hexes within range.
- * Exceptions: Never throws; pentagon edges fall through to a legacy scan for naval only.
+ * Expected outcome: Land units: hexes reachable via land-mass edges within range. Naval: berth/egress BFS within range.
+ * Exceptions: Never throws; pentagon edges fall through to a legacy scan for non-naval water-like types only.
  *
  * Tactical Best Options uses `collectTacticalLegalMoveDestinationRes4Hexes` instead (res4 MP reachability with the same
  * “one origin search → list destinations” shape as `getLandMassReachableHexes` here).
@@ -45,6 +49,11 @@ export function getValidDestinations(
   state: GameStateSnapshot,
   options?: { assumeDebarkedForReachability?: boolean }
 ): string[] {
+  logDebug('oneStepMoveDestinations getValidDestinations', {
+    unitId: unit.id,
+    unitType: unit.unitType,
+    originH3: unit.h3Index,
+  });
   const range = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
   const wantLand = unit.unitType === 'infantry' || unit.unitType === 'armor';
   const hexSet = new Set(state.hexes.map((h) => h.h3Index));
@@ -61,14 +70,21 @@ export function getValidDestinations(
     })];
   }
 
-  const seaportCountByHex = new Map((state.res1Infrastructure ?? []).map((row) => [row.h3Index, row.seaportCount] as const));
+  if (unit.unitType === 'naval') {
+    const lookup = navalLookupForHexState(state, state.hexes, state.res1Infrastructure);
+    return [...getNavalStrategicReachableHexes({
+      originH3: unit.h3Index,
+      maxSteps: range,
+      lookup,
+    })];
+  }
+
   const hexByH3 = new Map(state.hexes.map((h) => [h.h3Index, h]));
   const valid: string[] = [unit.h3Index];
 
   const applyNavalFilter = (h3Index: string): boolean => {
     const hex = hexByH3.get(h3Index);
-    const movementTerrain = resolveMovementTerrainForHex(hex, seaportCountByHex);
-    return passabilityAllowsNavalUnit(movementTerrain);
+    return passabilityAllowsNavalUnit(resolveMovementTerrainForHex(hex));
   };
 
   try {
