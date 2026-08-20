@@ -1,5 +1,5 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
-import { CASUALTY_X_COLOR, COUNT_BADGE_OFFSET, LIGHTNING_COLOR, MULTI_PLAYER_FILL, MULTI_PLAYER_STROKE, PLAYER_COLORS, STACK_OFFSET_X, STACK_OFFSET_Y, UNIT_RADIUS, UNIT_TYPE_LABELS } from '../core/constants';
+import { CASUALTY_X_COLOR, COUNT_BADGE_OFFSET, LIGHTNING_COLOR, MULTI_PLAYER_FILL, MULTI_PLAYER_GLYPH_FILTER, MULTI_PLAYER_STROKE, PLAYER_COLORS, STACK_OFFSET_X, STACK_OFFSET_Y, UNIT_RADIUS, UNIT_TYPE_LABELS } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { hexCenterPx } from '../map/mapUtils';
 import { shouldHideStrategicMapUnitsForRes4Zoom } from '../map/terrainView';
@@ -179,33 +179,28 @@ export function drawOneUnitMarker(
   strokeColor: string = '#fff',
   unitPlayer?: string
 ): void {
+  const stackedNeutral = color === MULTI_PLAYER_FILL;
   ctx.beginPath();
   ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
   ctx.fillStyle = color;
   ctx.fill();
-  ctx.strokeStyle = strokeColor;
+  ctx.strokeStyle = stackedNeutral ? MULTI_PLAYER_STROKE : strokeColor;
   ctx.lineWidth = 2;
   ctx.stroke();
+  ctx.save();
+  if (stackedNeutral) ctx.filter = MULTI_PLAYER_GLYPH_FILTER;
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 14px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  if (label === UNIT_TYPE_LABELS.armor && drawUnitSvgIcon(ctx, x, y, 'armor', unitPlayer)) {
-    return;
-  }
-  if (label === UNIT_TYPE_LABELS.infantry && drawUnitSvgIcon(ctx, x, y, 'infantry', unitPlayer)) {
-    return;
-  }
-  if (label === UNIT_TYPE_LABELS.air && drawUnitSvgIcon(ctx, x, y, 'air', unitPlayer)) {
-    return;
-  }
-  if (label === UNIT_TYPE_LABELS.naval && drawUnitSvgIcon(ctx, x, y, 'naval', unitPlayer)) {
-    return;
-  }
-  if (label === '*' && drawUnitSvgIcon(ctx, x, y, 'mixed', unitPlayer, false, 0.5)) {
-    return;
-  }
-  ctx.fillText(label, x, y);
+  const drewIcon =
+    (label === UNIT_TYPE_LABELS.armor && drawUnitSvgIcon(ctx, x, y, 'armor', unitPlayer)) ||
+    (label === UNIT_TYPE_LABELS.infantry && drawUnitSvgIcon(ctx, x, y, 'infantry', unitPlayer)) ||
+    (label === UNIT_TYPE_LABELS.air && drawUnitSvgIcon(ctx, x, y, 'air', unitPlayer)) ||
+    (label === UNIT_TYPE_LABELS.naval && drawUnitSvgIcon(ctx, x, y, 'naval', unitPlayer)) ||
+    (label === '*' && drawUnitSvgIcon(ctx, x, y, 'mixed', unitPlayer, false, 0.5));
+  if (!drewIcon) ctx.fillText(label, x, y);
+  ctx.restore();
 }
 
 /**

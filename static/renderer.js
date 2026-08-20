@@ -14291,7 +14291,8 @@
   var STACK_OFFSET_Y = -3;
   var COUNT_BADGE_OFFSET = 16;
   var MULTI_PLAYER_FILL = "#b0b0b0";
-  var MULTI_PLAYER_STROKE = "#000";
+  var MULTI_PLAYER_STROKE = "#222222";
+  var MULTI_PLAYER_GLYPH_FILTER = "brightness(0.133)";
   var OWNERSHIP_BORDER_ALPHA = 0.75;
   var LIGHTNING_COLOR = "#f0d000";
   var CASUALTY_X_COLOR = "#c03030";
@@ -18913,33 +18914,23 @@
     return true;
   }
   function drawOneUnitMarker(ctx, x, y, color, label, strokeColor = "#fff", unitPlayer) {
+    const stackedNeutral = color === MULTI_PLAYER_FILL;
     ctx.beginPath();
     ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
     ctx.fillStyle = color;
     ctx.fill();
-    ctx.strokeStyle = strokeColor;
+    ctx.strokeStyle = stackedNeutral ? MULTI_PLAYER_STROKE : strokeColor;
     ctx.lineWidth = 2;
     ctx.stroke();
+    ctx.save();
+    if (stackedNeutral) ctx.filter = MULTI_PLAYER_GLYPH_FILTER;
     ctx.fillStyle = "#fff";
     ctx.font = "bold 14px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    if (label === UNIT_TYPE_LABELS.armor && drawUnitSvgIcon(ctx, x, y, "armor", unitPlayer)) {
-      return;
-    }
-    if (label === UNIT_TYPE_LABELS.infantry && drawUnitSvgIcon(ctx, x, y, "infantry", unitPlayer)) {
-      return;
-    }
-    if (label === UNIT_TYPE_LABELS.air && drawUnitSvgIcon(ctx, x, y, "air", unitPlayer)) {
-      return;
-    }
-    if (label === UNIT_TYPE_LABELS.naval && drawUnitSvgIcon(ctx, x, y, "naval", unitPlayer)) {
-      return;
-    }
-    if (label === "*" && drawUnitSvgIcon(ctx, x, y, "mixed", unitPlayer, false, 0.5)) {
-      return;
-    }
-    ctx.fillText(label, x, y);
+    const drewIcon = label === UNIT_TYPE_LABELS.armor && drawUnitSvgIcon(ctx, x, y, "armor", unitPlayer) || label === UNIT_TYPE_LABELS.infantry && drawUnitSvgIcon(ctx, x, y, "infantry", unitPlayer) || label === UNIT_TYPE_LABELS.air && drawUnitSvgIcon(ctx, x, y, "air", unitPlayer) || label === UNIT_TYPE_LABELS.naval && drawUnitSvgIcon(ctx, x, y, "naval", unitPlayer) || label === "*" && drawUnitSvgIcon(ctx, x, y, "mixed", unitPlayer, false, 0.5);
+    if (!drewIcon) ctx.fillText(label, x, y);
+    ctx.restore();
   }
   function drawUnits(ctx, units, movingUnitIds) {
     const byHex = /* @__PURE__ */ new Map();

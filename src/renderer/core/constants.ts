@@ -367,12 +367,21 @@ export const MULTI_PLAYER_FILL = '#b0b0b0';
 /**
  * Documents the module-scope binding `MULTI_PLAYER_STROKE` (MULTI_PLAYER_STROKE).
 
- * Purpose: Supports maintainability by documenting why `MULTI_PLAYER_STROKE` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Stacked mixed-side tokens use this for the circle stroke; keep `.game-over-size-token` in `static/index.html` on the same hex.
+ * When to use: Mixed-player stack markers and any token filled with `MULTI_PLAYER_FILL`.
+ * Expected outcome: Very dark gray `#222222`, not pure black.
  * Exceptions: None.
  */
-export const MULTI_PLAYER_STROKE = '#000';
+export const MULTI_PLAYER_STROKE = '#222222';
+/**
+ * Canvas/CSS brightness filter that tints white unit SVGs to `MULTI_PLAYER_STROKE`.
+ *
+ * Purpose: White symbol art on a light-gray token needs a near-black glyph without a second icon set.
+ * When to use: With `ctx.filter` or CSS `filter` when drawing stacked-neutral token icons.
+ * Expected outcome: `0x22 / 255` so white pixels become `#222222`.
+ * Exceptions: None.
+ */
+export const MULTI_PLAYER_GLYPH_FILTER = 'brightness(0.133)';
 
 /**
  * Opacity for res1 region-control and home-region ownership border strokes.
