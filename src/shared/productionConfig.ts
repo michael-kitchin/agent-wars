@@ -50,9 +50,9 @@ air: 60,
 /**
  * Documents the module-scope binding `MAX_UNITS_PER_TYPE` (MAX_UNITS_PER_TYPE: Readonly<Record<BuildUnitType, number>>).
 
- * Purpose: Supports maintainability by documenting why `MAX_UNITS_PER_TYPE` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Small-match per-type unit cap table (infantry 12, armor 8, naval 8, air 6).
+ * When to use: Only as the baseline for `getMaxUnitsPerType`; do not use as the live match ceiling.
+ * Expected outcome: Medium/Large caps are this table multiplied by 2 and 4.
  * Exceptions: None.
  */
 export const MAX_UNITS_PER_TYPE: Readonly<Record<BuildUnitType, number>> = {

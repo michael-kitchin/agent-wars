@@ -74,6 +74,7 @@ function testAirportPresentSeedsAir(): void {
     passableLandCandidates: [candidate(landHex, 'land')],
     navalCandidates: [candidate(navalHex, 'water')],
     usedH3: new Set<string>(),
+    maxUnitsPerType: MAX_UNITS_PER_TYPE,
     plannedCountsAfterSacrifice: { infantry: 0, armor: 0, naval: 0, air: 0 },
   });
   assert.deepStrictEqual(result, { unitType: 'air', h3Index: homeHex });
@@ -96,6 +97,7 @@ function testNoAirportFallsBackToArmorFirst(): void {
     passableLandCandidates: [candidate(landHex, 'land')],
     navalCandidates: [candidate(navalHex, 'water')],
     usedH3: new Set<string>(),
+    maxUnitsPerType: MAX_UNITS_PER_TYPE,
     plannedCountsAfterSacrifice: { infantry: 0, armor: 0, naval: 0, air: 0 },
   });
   assert.deepStrictEqual(result, { unitType: 'armor', h3Index: landHex });
@@ -118,6 +120,7 @@ function testArmorCappedFallsBackToInfantry(): void {
     passableLandCandidates: [candidate(landHex, 'land')],
     navalCandidates: [candidate(navalHex, 'water')],
     usedH3: new Set<string>(),
+    maxUnitsPerType: MAX_UNITS_PER_TYPE,
     plannedCountsAfterSacrifice: {
       infantry: 0,
       armor: MAX_UNITS_PER_TYPE.armor,
@@ -145,6 +148,7 @@ function testArmorAndInfantryCappedFallsBackToNaval(): void {
     passableLandCandidates: [candidate(landHex, 'land')],
     navalCandidates: [candidate(navalHex, 'water')],
     usedH3: new Set<string>(),
+    maxUnitsPerType: MAX_UNITS_PER_TYPE,
     plannedCountsAfterSacrifice: {
       infantry: MAX_UNITS_PER_TYPE.infantry,
       armor: MAX_UNITS_PER_TYPE.armor,
@@ -172,6 +176,7 @@ function testAllFallbackOptionsInvalidReturnsNull(): void {
     passableLandCandidates: [candidate(landHex, 'land')],
     navalCandidates: [candidate(navalHex, 'water')],
     usedH3: new Set<string>(),
+    maxUnitsPerType: MAX_UNITS_PER_TYPE,
     plannedCountsAfterSacrifice: {
       infantry: MAX_UNITS_PER_TYPE.infantry,
       armor: MAX_UNITS_PER_TYPE.armor,

@@ -1,3 +1,5 @@
+import type { GameSize } from '../gameSize';
+
 export interface MovementOrder {
     /**
    * Specifies the contract for the `unitId` member (unitId: string;).
@@ -349,6 +351,15 @@ humanHomeRegion?: string;
    * Exceptions: None.
    */
 aiHomeRegion?: string;
+    /**
+   * Specifies the contract for the `gameSize` member (gameSize?: GameSize;).
+
+   * Contract: New-match size that scales unit caps. Main parses with `parseGameSize`; omitted means Small.
+   * When to use: `game:newGame` from the new-game dialog dropdown.
+   * Expected outcome: Persist as `game_config.game_size` before unit seeding.
+   * Exceptions: None; invalid values become Small.
+   */
+gameSize?: GameSize;
 }
 
 /**

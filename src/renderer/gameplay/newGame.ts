@@ -8,6 +8,7 @@ import {
   initializeScenarioRegionSelectorsOnOverlayOpen,
   randomizeScenarioRegionSelect,
 } from './newGameRegionUi';
+import { readSelectedGameSizeFromDocument, registerGameSizeSelect, syncGameSizeCapPreview } from './newGameSizeUi';
 
 /**
  * Defines the `registerRegionRandomizeButtons` function shape (function registerRegionRandomizeButtons(): void).
@@ -220,6 +221,7 @@ setMainUIControlsEnabled: (enabled: boolean) => void;
 export function registerNewGameButton(deps: NewGameDeps): void {
   void initializeScenarioRegionSelectorsOnOverlayOpen();
   registerRegionRandomizeButtons();
+  registerGameSizeSelect();
   document.getElementById('new-game-btn')?.addEventListener('click', async () => {
     if (!window.gameApi?.newGame) return;
     try {
@@ -229,6 +231,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
         fogOfWarEnabled: fogCheckbox?.checked !== false,
         humanHomeRegion: selectedRegions.humanHomeRegion,
         aiHomeRegion: selectedRegions.aiHomeRegion,
+        gameSize: readSelectedGameSizeFromDocument(),
       })) as GameStateSnapshot;
       await deps.refreshRes4TerrainOverridesForRenderer({ reloadStaticOverlays: true });
       S.gameState = state;
@@ -302,6 +305,7 @@ export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enable
   if (newGameBtn) newGameBtn.textContent = 'Start game';
   if (fogCheckbox) fogCheckbox.checked = true;
   void initializeScenarioRegionSelectorsOnOverlayOpen();
+  syncGameSizeCapPreview();
   overlay?.classList.remove('hidden');
   setMainUIControlsEnabled(false);
   updateReadyButtonState();

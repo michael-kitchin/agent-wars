@@ -21,6 +21,7 @@ import {
 import { pipelineTerrainToPassability } from './terrainPassability';
 import { logDebug, logError, logTrace } from './logger';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, GameStateSnapshot, MovementOrder, RangedAttackOrder } from '../shared/ipcTypes';
+import type { GameSize } from '../shared/gameSize';
 import type { BuildUnitType } from './productionRules';
 import { seedUnits as seedUnitsFromModule } from './game-db/seeding/seedUnits';
 import {
@@ -1522,6 +1523,7 @@ export function resetGameForNewMatch(options?: {
   fogOfWarEnabled?: boolean;
   humanHomeRegion?: string;
   aiHomeRegion?: string;
+  gameSize?: GameSize;
 }): void {
   resetGameForNewMatchFromModule(
     {

@@ -26,7 +26,8 @@ import {
   processProductionAfterControlResolution,
   resolveRes1ControlAfterCombatAndMovement,
 } from './game-actions/controlAndProduction';
-import { MAX_UNITS_PER_TYPE } from './productionCaps';
+import { getMaxUnitsPerType } from './productionCaps';
+import { persistGameSize } from './game-db/gameSizeConfig';
 import { withTempGameDb } from './testSupport/withTempGameDb';
 
 /**
@@ -541,7 +542,7 @@ function testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap(): void {
     assert.strictEqual(forceInfantry.success, true);
 
     dbRun("DELETE FROM units WHERE player = 'human' AND unit_type = 'infantry'");
-    const infantryCap = MAX_UNITS_PER_TYPE.infantry;
+    const infantryCap = getMaxUnitsPerType('small').infantry;
     for (let i = 0; i < infantryCap; i++) {
       dbRun(
         `INSERT INTO units (id, player, unit_type, h3_index)
@@ -571,6 +572,85 @@ function testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap(): void {
       [targetHex]
     )?.stored_points ?? 0;
     assert.ok(progressAfter > 9, 'stored points should continue accumulating while blocked by cap');
+  });
+}
+
+/**
+ * Locks Medium caps allowing spawn past the Small infantry ceiling, then blocking at Medium.
+ *
+ * Purpose: Match size must change the live deployment ceiling, not only snapshot metadata.
+ * When to use: After changing production cap reads or `game_size` persistence.
+ * Expected outcome: 12 infantry still spawn on Medium; 24 infantry block and accumulate points.
+ * Exceptions: None.
+ */
+function testProductionSpawnsPastSmallCapWhenMedium(): void {
+  withTempDb(() => {
+    persistGameSize({ run: dbRun, hasDb: () => true }, 'medium');
+    const targetHex = findBuildableHumanControlledHex();
+    const add = addHexBuildQueueEntry(targetHex, 'human');
+    assert.strictEqual(add.success, true);
+    const queue = getHexBuildQueue(targetHex, 'human');
+    const entry = queue.entries[0]!;
+    const forceInfantry = updateHexBuildQueueEntry(targetHex, entry.id, 'infantry', 1, 'human');
+    assert.strictEqual(forceInfantry.success, true);
+
+    dbRun("DELETE FROM units WHERE player = 'human' AND unit_type = 'infantry'");
+    const smallCap = getMaxUnitsPerType('small').infantry;
+    for (let i = 0; i < smallCap; i++) {
+      dbRun(
+        `INSERT INTO units (id, player, unit_type, h3_index)
+         VALUES (?, 'human', 'infantry', ?)`,
+        [`human-infantry-medium-under-${i}`, targetHex]
+      );
+    }
+    dbRun(
+      `INSERT OR REPLACE INTO res1_build_progress (h3_index, stored_points)
+       VALUES (?, 20)`,
+      [targetHex]
+    );
+
+    const underResult = ready();
+    assert.strictEqual(underResult.success, true);
+    assert.ok(!underResult.humanDeploymentCapReachedUnitTypes?.includes('infantry'));
+    const infantryAfterUnder = dbGetOne<{ c: number }>(
+      "SELECT COUNT(*) AS c FROM units WHERE player = 'human' AND unit_type = 'infantry'"
+    )?.c ?? 0;
+    assert.strictEqual(infantryAfterUnder, smallCap + 1);
+
+    dbRun("DELETE FROM units WHERE player = 'human' AND unit_type = 'infantry'");
+    const mediumCap = getMaxUnitsPerType('medium').infantry;
+    for (let i = 0; i < mediumCap; i++) {
+      dbRun(
+        `INSERT INTO units (id, player, unit_type, h3_index)
+         VALUES (?, 'human', 'infantry', ?)`,
+        [`human-infantry-medium-at-${i}`, targetHex]
+      );
+    }
+    dbRun(
+      `INSERT OR REPLACE INTO res1_build_progress (h3_index, stored_points)
+       VALUES (?, 9)`,
+      [targetHex]
+    );
+    const queued = getHexBuildQueue(targetHex, 'human');
+    if (queued.entries.length === 0) {
+      const addAgain = addHexBuildQueueEntry(targetHex, 'human');
+      assert.strictEqual(addAgain.success, true);
+      const againEntry = getHexBuildQueue(targetHex, 'human').entries[0]!;
+      assert.strictEqual(updateHexBuildQueueEntry(targetHex, againEntry.id, 'infantry', 1, 'human').success, true);
+    }
+
+    const blocked = ready();
+    assert.strictEqual(blocked.success, true);
+    assert.ok(blocked.humanDeploymentCapReachedUnitTypes?.includes('infantry'));
+    const infantryAfterBlock = dbGetOne<{ c: number }>(
+      "SELECT COUNT(*) AS c FROM units WHERE player = 'human' AND unit_type = 'infantry'"
+    )?.c ?? 0;
+    assert.strictEqual(infantryAfterBlock, mediumCap);
+    const progressAfter = dbGetOne<{ stored_points: number }>(
+      'SELECT stored_points FROM res1_build_progress WHERE h3_index = ?',
+      [targetHex]
+    )?.stored_points ?? 0;
+    assert.ok(progressAfter > 9, 'stored points should continue accumulating while blocked by medium cap');
   });
 }
 
@@ -763,7 +843,7 @@ function testKeepBuildingSameTurnRefill(): void {
     setKeepBuildingForHex(h3, true, 'armor');
     setBuildProgressPointsForHex(h3, 0);
     dbRun("DELETE FROM units WHERE player = 'human' AND unit_type = 'armor'");
-    const armorCap = MAX_UNITS_PER_TYPE.armor;
+    const armorCap = getMaxUnitsPerType('small').armor;
     for (let i = 0; i < armorCap; i++) {
       dbRun(
         `INSERT INTO units (id, player, unit_type, h3_index)
@@ -863,6 +943,7 @@ function run(): void {
   testLandArmorPlusEnemyAirContestsControl();
   testNavalTraversedIntermediateHexCapturesControl();
   testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap();
+  testProductionSpawnsPastSmallCapWhenMedium();
   testAirBuildRequiresAirportInfrastructure();
   testNavalBuildRequiresSeaportAndUrbanInfrastructure();
   testKeepBuildingMutationContracts();

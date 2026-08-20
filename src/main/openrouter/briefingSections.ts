@@ -1,6 +1,7 @@
 import { gridDistance } from 'h3-js';
 import { executeTool6 } from '../tools/tool6Production';
-import { MAX_UNITS_PER_TYPE, getMaxedUnitTypesForPlayer, getPlayerUnitCountsByType } from '../productionCaps';
+import { getMaxedUnitTypesForPlayer, getPlayerUnitCountsByType } from '../productionCaps';
+import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
@@ -297,7 +298,9 @@ export function buildProductionBriefingBlock(args: {
   }
   const queues = snapshot.production?.controlledHexQueues ?? [];
   const opponentCounts = getPlayerUnitCountsByType(args.state.units, 'opponent');
-  const maxedTypes = getMaxedUnitTypesForPlayer(args.state.units, 'opponent');
+  const gameSize = parseGameSize(args.state.gameSize);
+  const caps = getMaxUnitsPerType(gameSize);
+  const maxedTypes = getMaxedUnitTypesForPlayer(args.state.units, 'opponent', gameSize);
   const lines: string[] = [];
   lines.push('# Production Status');
   lines.push('');
@@ -305,10 +308,10 @@ export function buildProductionBriefingBlock(args: {
     'Rules: infantry cost 20 (min urban 1), armor cost 40 (min urban 2), naval cost 100 (min urban 10 + min seaports 1), air cost 60 (min urban 5 + requires airport).'
   );
   lines.push(
-    `Deployment caps (per side): infantry ${MAX_UNITS_PER_TYPE.infantry}, armor ${MAX_UNITS_PER_TYPE.armor}, naval ${MAX_UNITS_PER_TYPE.naval}, air ${MAX_UNITS_PER_TYPE.air}.`
+    `Deployment caps (per side): infantry ${caps.infantry}, armor ${caps.armor}, naval ${caps.naval}, air ${caps.air}.`
   );
   lines.push(
-    `Your current unit counts: infantry ${opponentCounts.infantry}/${MAX_UNITS_PER_TYPE.infantry}, armor ${opponentCounts.armor}/${MAX_UNITS_PER_TYPE.armor}, naval ${opponentCounts.naval}/${MAX_UNITS_PER_TYPE.naval}, air ${opponentCounts.air}/${MAX_UNITS_PER_TYPE.air}.`
+    `Your current unit counts: infantry ${opponentCounts.infantry}/${caps.infantry}, armor ${opponentCounts.armor}/${caps.armor}, naval ${opponentCounts.naval}/${caps.naval}, air ${opponentCounts.air}/${caps.air}.`
   );
   if (maxedTypes.length > 0) {
     lines.push(`You are currently at maximum for: ${maxedTypes.join(', ')}.`);

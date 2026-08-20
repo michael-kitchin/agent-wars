@@ -2,8 +2,12 @@ import type { BuildUnitType } from './productionRules';
 import { ALL_BUILD_UNIT_TYPES } from '../shared/ipc/productionTypes';
 import { MAX_UNITS_PER_TYPE } from '../shared/productionConfig';
 import { getPlayerUnitCountsByType } from '../shared/unitCountsByType';
+import type { GameSize } from '../shared/gameSize';
+import { getMaxUnitsPerType, parseGameSize } from '../shared/gameSize';
+import { logTrace } from './logger';
 
-export { MAX_UNITS_PER_TYPE, getPlayerUnitCountsByType };
+export { MAX_UNITS_PER_TYPE, getPlayerUnitCountsByType, getMaxUnitsPerType, parseGameSize };
+export type { GameSize };
 
 /**
  * Stable iteration order for deployment-cap checks and maxed-type lists (infantry → armor → naval → air).
@@ -20,13 +24,16 @@ export const DEPLOYMENT_CAP_TYPE_ORDER: BuildUnitType[] = [...ALL_BUILD_UNIT_TYP
  *
  * Purpose: Briefing and Ready UI can warn when the human cannot spawn more of a type.
  * When to use: After reading units from snapshot or DB rows shaped like `{ player, unitType }`.
- * Expected outcome: Subset of `DEPLOYMENT_CAP_TYPE_ORDER`, only types where count ≥ `MAX_UNITS_PER_TYPE`.
+ * Expected outcome: Subset of `DEPLOYMENT_CAP_TYPE_ORDER`, only types where count ≥ `getMaxUnitsPerType(gameSize)`.
  * Exceptions: None.
  */
 export function getMaxedUnitTypesForPlayer(
   units: Array<{ player: string; unitType: string }>,
-  playerId: string
+  playerId: string,
+  gameSize: GameSize
 ): BuildUnitType[] {
+  logTrace('productionCaps getMaxedUnitTypesForPlayer', { playerId, gameSize, unitCount: units.length });
   const counts = getPlayerUnitCountsByType(units, playerId);
-  return DEPLOYMENT_CAP_TYPE_ORDER.filter((unitType) => counts[unitType] >= MAX_UNITS_PER_TYPE[unitType]);
+  const caps = getMaxUnitsPerType(gameSize);
+  return DEPLOYMENT_CAP_TYPE_ORDER.filter((unitType) => counts[unitType] >= caps[unitType]);
 }

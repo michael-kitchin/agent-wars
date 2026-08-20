@@ -1,5 +1,6 @@
 import type { BuildUnitType } from './productionTypes';
 import type { TacticalBattleSnapshot } from './tacticalTypes';
+import type { GameSize } from '../gameSize';
 
 /**
  * Documents the `GameStateSnapshot` interface as a named contract surface (export interface GameStateSnapshot).
@@ -113,6 +114,15 @@ playerPerspective?: string;
    * Exceptions: None.
    */
 fogOfWarEnabled?: boolean;
+    /**
+   * Specifies the contract for the `gameSize` member (gameSize?: GameSize;).
+
+   * Contract: Match size that scales per-type unit caps. Readers must `parseGameSize` so omitted/invalid values behave as Small.
+   * When to use: Production overlay, briefings, and any UI that needs the live deployment ceiling.
+   * Expected outcome: `'small' | 'medium' | 'large'` when the snapshot was built from a persisted match; may be omitted on test fixtures.
+   * Exceptions: None; missing means Small.
+   */
+gameSize?: GameSize;
     /**
    * Specifies the contract for the `scenarioId` member (scenarioId?: 'region_vs_region';).
 

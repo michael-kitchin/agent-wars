@@ -18,6 +18,7 @@ import type { FlexAirSlotDeps } from './initialFlexAirSlot';
 import { applySacrificeToBaselineCounts, resolveFlexUnitPlacement } from './initialFlexAirSlot';
 import { countPlannedUnitsOfType, insertPlannedUnitsForPlayer, type PlannedUnitOwner, type PlannedUnitTuple } from './plannedUnits';
 import { trySeedScenarioRegionVsRegion } from './regionScenarioSeeding';
+import { readPersistedMaxUnitsPerType } from '../gameSizeConfig';
 
 /**
  * Documents the `SeedUnitsDeps` interface as a named contract surface (interface SeedUnitsDeps extends GuardedDbRunAndGetAllOps).
@@ -99,6 +100,7 @@ function buildSideUnits(args: {
   homeHexSet: Set<string>;
   passableLandCandidates: SpawnCandidate[];
   sacrificed: { infantry: number; armor: number; naval: number } | null;
+  maxUnitsPerType: Readonly<Record<BuildUnitType, number>>;
 }): SeedUnitEntry[] {
   const units: SeedUnitEntry[] = [];
   let idx = 0;
@@ -127,6 +129,7 @@ function buildSideUnits(args: {
       navalCandidates: mergeNavalCandidatePools(args.navalPools),
       usedH3: usedSideHexes,
       plannedCountsAfterSacrifice: { ...args.counts, air: 0 },
+      maxUnitsPerType: args.maxUnitsPerType,
     });
     if (flex) {
       const ord = countPlannedUnitsOfType(units, flex.unitType) + 1;
@@ -161,6 +164,7 @@ export function seedUnits(deps: SeedUnitsDeps): void {
     return { h3, lat, lng, terrain: row?.terrain ?? 'land' };
   });
   const sacrificed = applySacrificeToBaselineCounts(counts);
+  const maxUnitsPerType = readPersistedMaxUnitsPerType(deps);
   const eff = sacrificed ?? counts;
   const landPerSide = eff.infantry + eff.armor;
   const usedH3 = new Set<string>();
@@ -207,6 +211,7 @@ export function seedUnits(deps: SeedUnitsDeps): void {
     homeHexSet: humanHomeHexSet,
     passableLandCandidates: passableHumanLand,
     sacrificed,
+    maxUnitsPerType,
   });
   const opponentUnits = buildSideUnits({
     deps,
@@ -220,6 +225,7 @@ export function seedUnits(deps: SeedUnitsDeps): void {
     homeHexSet: opponentHomeHexSet,
     passableLandCandidates: passableOpponentLand,
     sacrificed,
+    maxUnitsPerType,
   });
 
   insertPlannedUnitsForPlayer(deps, 'human', humanUnits);

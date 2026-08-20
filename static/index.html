@@ -454,6 +454,52 @@
       font-size: 11px;
       font-weight: 700;
     }
+    .game-over-size-caps {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 1.1rem;
+      margin: 0 0 0.9rem 0;
+    }
+    .game-over-size-cap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.28rem;
+    }
+    .game-over-size-token {
+      position: relative;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #b0b0b0;
+      border: 2px solid #fff;
+      box-sizing: content-box;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .game-over-size-token img {
+      width: 32px;
+      height: 32px;
+      pointer-events: none;
+    }
+    .game-over-size-badge {
+      position: absolute;
+      left: calc(50% + 16px);
+      top: calc(50% - 16px);
+      transform: translate(-50%, -50%);
+      font: bold 13px system-ui, sans-serif;
+      color: #000;
+      -webkit-text-stroke: 2px #fff;
+      paint-order: stroke fill;
+      pointer-events: none;
+    }
+    .game-over-size-name {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #222;
+    }
     .map-toast p { margin: 0; flex: 1; white-space: pre-line; }
     #map-toast-dismiss {
       flex-shrink: 0;
@@ -790,6 +836,12 @@
     .compact-blue-btn:hover {
       background: #3a6a8f;
     }
+    .compact-opponent-btn {
+      background: #9d174d;
+    }
+    .compact-opponent-btn:hover {
+      background: #be185d;
+    }
     .compact-square-btn {
       width: 1.1rem;
       min-width: 1.1rem;
@@ -894,8 +946,50 @@
             <label for="new-game-ai-region-select">AI Player:</label>
             <div class="game-over-region-controls">
               <select id="new-game-ai-region-select"></select>
-              <button type="button" id="new-game-ai-region-randomize" class="compact-blue-btn compact-square-btn game-over-region-randomize" aria-label="Randomize AI home region">↻</button>
+              <button type="button" id="new-game-ai-region-randomize" class="compact-blue-btn compact-square-btn compact-opponent-btn game-over-region-randomize" aria-label="Randomize AI home region">↻</button>
             </div>
+          </div>
+        </div>
+        <div class="game-over-region-row">
+          <div class="game-over-region-cell">
+            <label for="new-game-size-select">Game size:</label>
+            <div class="game-over-region-controls">
+              <select id="new-game-size-select">
+                <option value="small" selected>Small</option>
+                <option value="medium">Medium</option>
+                <option value="large">Large</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="game-over-size-caps" aria-live="polite">
+          <div class="game-over-size-cap">
+            <div class="game-over-size-token">
+              <img src="../symbols/infantry-1.svg" alt="" />
+              <span id="new-game-size-cap-infantry" class="game-over-size-badge">12</span>
+            </div>
+            <div class="game-over-size-name">Infantry</div>
+          </div>
+          <div class="game-over-size-cap">
+            <div class="game-over-size-token">
+              <img src="../symbols/armor-1.svg" alt="" />
+              <span id="new-game-size-cap-armor" class="game-over-size-badge">8</span>
+            </div>
+            <div class="game-over-size-name">Armor</div>
+          </div>
+          <div class="game-over-size-cap">
+            <div class="game-over-size-token">
+              <img src="../symbols/naval-1.svg" alt="" />
+              <span id="new-game-size-cap-naval" class="game-over-size-badge">8</span>
+            </div>
+            <div class="game-over-size-name">Naval</div>
+          </div>
+          <div class="game-over-size-cap">
+            <div class="game-over-size-token">
+              <img src="../symbols/air-1.svg" alt="" />
+              <span id="new-game-size-cap-air" class="game-over-size-badge">6</span>
+            </div>
+            <div class="game-over-size-name">Air</div>
           </div>
         </div>
         <label class="game-over-options" for="new-game-fog-checkbox">

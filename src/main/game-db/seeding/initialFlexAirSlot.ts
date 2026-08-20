@@ -6,7 +6,6 @@
 import { cellToLatLng } from 'h3-js';
 import { logDebug, logError } from '../../logger';
 import type { BuildUnitType } from '../../productionRules';
-import { MAX_UNITS_PER_TYPE } from '../../productionCaps';
 import type { GuardedDbRunAndGetAllOps } from '../dbOps';
 import type { SpawnCandidate } from './spawnSelection';
 
@@ -158,6 +157,7 @@ export function resolveFlexUnitPlacement(args: {
   navalCandidates: SpawnCandidate[];
   usedH3: Set<string>;
   plannedCountsAfterSacrifice: { infantry: number; armor: number; naval: number; air: number };
+  maxUnitsPerType: Readonly<Record<BuildUnitType, number>>;
 }): { unitType: BuildUnitType; h3Index: string } | null {
   logDebug('initialFlexAirSlot resolveFlexUnitPlacement', {
     player: args.player,
@@ -167,7 +167,7 @@ export function resolveFlexUnitPlacement(args: {
   });
   const latLngByH3 = buildLatLngMap(args.regionHexSet);
   const capRoom = (t: BuildUnitType): boolean =>
-    args.plannedCountsAfterSacrifice[t] + 1 <= MAX_UNITS_PER_TYPE[t];
+    args.plannedCountsAfterSacrifice[t] + 1 <= args.maxUnitsPerType[t];
 
   const airportHexes = sortH3Deterministic(airportH3InRegion(args.deps, args.regionHexSet), latLngByH3);
   if (capRoom('air') && airportHexes.length > 0) {

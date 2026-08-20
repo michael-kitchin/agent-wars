@@ -13,6 +13,7 @@ import type { Res1InfrastructureRow } from './controlInfrastructure';
 import type { GuardedDbOps } from './dbOps';
 import { getScenarioHomeRegionHexes } from '../regionScenario';
 import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from './scenarioState';
+import { readPersistedGameSize } from './gameSizeConfig';
 
 /**
  * Documents the module-scope binding `STALE_INTEL_TURNS` (STALE_INTEL_TURNS).
@@ -238,6 +239,7 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
     res1Infrastructure: infrastructureRows,
     gameOver: gameOver || undefined,
     winner,
+    gameSize: readPersistedGameSize(ops),
   };
   return withFogMetadata(withScenarioMetadata(snapshot, ops), isFogOfWarEnabled(ops));
 }

@@ -17,7 +17,8 @@ import {
   setHexController,
 } from '../gameDb';
 import { logDebug, logError } from '../logger';
-import { DEPLOYMENT_CAP_TYPE_ORDER, MAX_UNITS_PER_TYPE } from '../productionCaps';
+import { DEPLOYMENT_CAP_TYPE_ORDER } from '../productionCaps';
+import { readPersistedMaxUnitsPerType } from '../game-db/gameSizeConfig';
 import {
   computeKeepBuildingRefillCount,
   getAvailableBuildUnitTypes,
@@ -168,7 +169,8 @@ function spawnProducedUnitsForHex(
   controllerPlayerId: string,
   unitTypes: BuildUnitType[],
   unitCountsByPlayerType: Map<string, number>,
-  capReachedByPlayer: DeploymentCapReachedByPlayer
+  capReachedByPlayer: DeploymentCapReachedByPlayer,
+  maxUnitsPerType: Readonly<Record<BuildUnitType, number>>
 ): BuildUnitType[] {
   if (unitTypes.length === 0) return [];
   const turnNumber = currentPlanningTurnNumber();
@@ -181,7 +183,7 @@ function spawnProducedUnitsForHex(
   for (const unitType of unitTypes) {
     const key = `${controllerPlayerId}:${unitType}`;
     const currentCount = unitCountsByPlayerType.get(key) ?? 0;
-    const maxCount = MAX_UNITS_PER_TYPE[unitType];
+    const maxCount = maxUnitsPerType[unitType];
     if (currentCount >= maxCount) {
       capSet.add(unitType);
       continue;
@@ -285,6 +287,7 @@ export function processProductionAfterControlResolution(): {
   capReachedByPlayer: DeploymentCapReachedByPlayer;
 } {
   logDebug('gameActions processProductionAfterControlResolution');
+  const maxUnitsPerType = readPersistedMaxUnitsPerType({ run: dbRun, getOne: dbGetOne });
   const deployedByPlayer: { human: DeployedUnitsByType; opponent: DeployedUnitsByType } = {
     human: {},
     opponent: {},
@@ -368,7 +371,7 @@ export function processProductionAfterControlResolution(): {
       const entry = queueWorking[0]!;
       const cost = UNIT_COST_BY_TYPE[entry.unitType];
       const currentCount = simulatedCountsByType.get(entry.unitType) ?? 0;
-      const maxCount = MAX_UNITS_PER_TYPE[entry.unitType];
+      const maxCount = maxUnitsPerType[entry.unitType];
       if (currentCount >= maxCount) {
         blockedByCapType = entry.unitType;
         capSet.add(entry.unitType);
@@ -418,7 +421,8 @@ export function processProductionAfterControlResolution(): {
       controllerPlayerId,
       spawnedUnitTypes,
       unitCountsByPlayerType,
-      capReachedByPlayer
+      capReachedByPlayer,
+      maxUnitsPerType
     );
     const deployedForController = controllerPlayerId === 'opponent' ? deployedByPlayer.opponent : deployedByPlayer.human;
     for (const unitType of deployedForHex) {

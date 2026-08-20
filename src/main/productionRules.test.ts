@@ -5,7 +5,8 @@ import {
   getAvailableBuildUnitTypes,
   isValidBuildCount,
 } from './productionRules';
-import { MAX_UNITS_PER_TYPE as MAX_UNITS_PER_TYPE_MAIN } from './productionCaps';
+import { MAX_UNITS_PER_TYPE as MAX_UNITS_PER_TYPE_MAIN, getMaxedUnitTypesForPlayer } from './productionCaps';
+import { getMaxUnitsPerType } from '../shared/gameSize';
 import {
   estimateTurnsToCompleteQueuedProduction,
   estimateTurnsToNextSpawn,
@@ -106,14 +107,14 @@ function testTurnsToNextSpawnEstimateUsesNextUnitOnly(): void {
 }
 
 /**
- * Defines the `testDeploymentCapsMatchMilestone14Values` function shape (function testDeploymentCapsMatchMilestone14Values(): void).
-
- * Purpose: Supports maintainability by documenting why `testDeploymentCapsMatchMilestone14Values` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Locks the Small unit-cap table and Medium/Large integer scaling.
+ *
+ * Purpose: Prevents the Small baseline from drifting from 12/8/8/6 and ensures size multipliers stay exact.
+ * When to use: After changing `MAX_UNITS_PER_TYPE` or `getMaxUnitsPerType`.
+ * Expected outcome: Shared and main re-exports match; medium is 2× small; large is 4× small.
  * Exceptions: None.
  */
-function testDeploymentCapsMatchMilestone14Values(): void {
+function testSmallUnitCapsMatchBaseline(): void {
   assert.deepStrictEqual(MAX_UNITS_PER_TYPE_SHARED, {
     infantry: 12,
     armor: 8,
@@ -121,6 +122,36 @@ function testDeploymentCapsMatchMilestone14Values(): void {
     air: 6,
   });
   assert.deepStrictEqual(MAX_UNITS_PER_TYPE_MAIN, MAX_UNITS_PER_TYPE_SHARED);
+  assert.deepStrictEqual(getMaxUnitsPerType('medium'), {
+    infantry: 24,
+    armor: 16,
+    naval: 16,
+    air: 12,
+  });
+  assert.deepStrictEqual(getMaxUnitsPerType('large'), {
+    infantry: 48,
+    armor: 32,
+    naval: 32,
+    air: 24,
+  });
+}
+
+/**
+ * Locks maxed-type detection against the selected match size rather than the Small table alone.
+ *
+ * Purpose: Briefing "at maximum" lines must not fire at 12 infantry on Medium.
+ * When to use: After changing `getMaxedUnitTypesForPlayer`.
+ * Expected outcome: 12 infantry is maxed on small and not on medium.
+ * Exceptions: None.
+ */
+function testMaxedTypesRespectMatchSize(): void {
+  const units = Array.from({ length: 12 }, (_, i) => ({
+    player: 'human',
+    unitType: 'infantry',
+    id: `u-${i}`,
+  }));
+  assert.deepStrictEqual(getMaxedUnitTypesForPlayer(units, 'human', 'small'), ['infantry']);
+  assert.deepStrictEqual(getMaxedUnitTypesForPlayer(units, 'human', 'medium'), []);
 }
 
 /**
@@ -173,7 +204,8 @@ function run(): void {
   testBuildCountValidationBounds();
   testProductionExamplesFromSpec();
   testTurnsToNextSpawnEstimateUsesNextUnitOnly();
-  testDeploymentCapsMatchMilestone14Values();
+  testSmallUnitCapsMatchBaseline();
+  testMaxedTypesRespectMatchSize();
   testQueuedCostAndCompletionTurnEstimates();
   testKeepBuildingRefillCount();
   console.log('productionRules.test.ts passed');

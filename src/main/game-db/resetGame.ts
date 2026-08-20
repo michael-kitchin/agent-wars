@@ -1,6 +1,8 @@
 import { logDebug } from '../logger';
 import { getScenarioHomeRegionHexes, resolveScenarioHomeRegions } from '../regionScenario';
 import type { GuardedDbRunAndGetAllOps } from './dbOps';
+import { persistGameSize } from './gameSizeConfig';
+import { parseGameSize, type GameSize } from '../../shared/gameSize';
 import { logHomeRegionControlParity } from './seeding/initialFlexAirSlot';
 import { persistRegionVsRegionScenarioState } from './scenarioState';
 
@@ -149,7 +151,7 @@ function seedInitialHexControlFromHomeRegions(
 }
 
 /**
- * Defines the `resetGameForNewMatch` function shape (export function resetGameForNewMatch( deps: ResetGameDeps, options?: { fogOfWarEnabled?: boolean; humanHomeRegion?: string; aiHomeRegion?: string } ): vo).
+ * Defines the `resetGameForNewMatch` function shape (export function resetGameForNewMatch( deps: ResetGameDeps, options?: { fogOfWarEnabled?: boolean; humanHomeRegion?: string; aiHomeRegion?: string; gameSize?: GameSize } ): vo).
 
  * Purpose: Supports maintainability by documenting why `resetGameForNewMatch` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -158,17 +160,19 @@ function seedInitialHexControlFromHomeRegions(
  */
 export function resetGameForNewMatch(
   deps: ResetGameDeps,
-  options?: { fogOfWarEnabled?: boolean; humanHomeRegion?: string; aiHomeRegion?: string }
+  options?: { fogOfWarEnabled?: boolean; humanHomeRegion?: string; aiHomeRegion?: string; gameSize?: GameSize }
 ): void {
   const fogOfWarEnabled = options?.fogOfWarEnabled !== false;
+  const gameSize = parseGameSize(options?.gameSize);
   const { humanHomeRegion, aiHomeRegion } = resolveScenarioHomeRegions(options);
-  logDebug('gameDb resetGameForNewMatch', { fogOfWarEnabled, humanHomeRegion, aiHomeRegion });
+  logDebug('gameDb resetGameForNewMatch', { fogOfWarEnabled, gameSize, humanHomeRegion, aiHomeRegion });
   if (!deps.hasDb()) return;
   const { run } = deps;
   run('DELETE FROM units');
   run('DELETE FROM hexes');
   run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('map_size', 'world')");
   run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['fog_of_war_enabled', fogOfWarEnabled ? '1' : '0']);
+  persistGameSize({ run, hasDb: deps.hasDb }, gameSize);
   persistRegionVsRegionScenarioState({ run }, { humanHomeRegion, aiHomeRegion });
   run("DELETE FROM game_config WHERE key = 'game_seed'");
   run("DELETE FROM game_config WHERE key LIKE 'unit_display_sequence_%'");

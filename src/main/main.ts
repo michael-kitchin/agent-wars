@@ -72,6 +72,7 @@ import {
   TOOL_GROUP_REGISTRY,
 } from './openrouter/openRouter';
 import { logDebug, logError } from './logger';
+import { parseGameSize } from '../shared/gameSize';
 import {
   getHexNamingTooltipLineForRenderer,
   getHexContinentNamesForRenderer,
@@ -314,13 +315,16 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_GAME.listScenarioHomeRegions, () => listScenarioHomeRegions());
   ipcMain.handle(IPC_GAME.newGame, (_event, payload: NewGameIpcPayload | undefined) => {
     const fogOfWarEnabled = payload?.fogOfWarEnabled !== false;
+    const gameSize = parseGameSize(payload?.gameSize);
     logDebug('main game:newGame', {
       fogOfWarEnabled,
+      gameSize,
       requestedHumanHomeRegion: payload?.humanHomeRegion ?? '',
       requestedAiHomeRegion: payload?.aiHomeRegion ?? '',
     });
     resetGameForNewMatch({
       fogOfWarEnabled,
+      gameSize,
       humanHomeRegion: payload?.humanHomeRegion,
       aiHomeRegion: payload?.aiHomeRegion,
     });

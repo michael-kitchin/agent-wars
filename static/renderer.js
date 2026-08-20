@@ -19785,6 +19785,217 @@
     };
   }
 
+  // src/shared/ipc/productionTypes.ts
+  var ALL_BUILD_UNIT_TYPES = ["infantry", "armor", "naval", "air"];
+  function isBuildUnitType(value) {
+    return value === "infantry" || value === "armor" || value === "naval" || value === "air";
+  }
+
+  // src/shared/productionConfig.ts
+  var UNIT_COST_BY_TYPE = {
+    /**
+       * Documents the object literal property `infantry` (infantry: 20).
+    
+       * Purpose: Supports maintainability by documenting why `infantry` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    infantry: 20,
+    /**
+       * Documents the object literal property `armor` (armor: 40).
+    
+       * Purpose: Supports maintainability by documenting why `armor` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    armor: 40,
+    /**
+       * Documents the object literal property `naval` (naval: 100).
+    
+       * Purpose: Supports maintainability by documenting why `naval` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    naval: 100,
+    /**
+       * Documents the object literal property `air` (air: 60).
+    
+       * Purpose: Supports maintainability by documenting why `air` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    air: 60
+  };
+  var MAX_UNITS_PER_TYPE = {
+    /**
+       * Documents the object literal property `infantry` (infantry: 12).
+    
+       * Purpose: Supports maintainability by documenting why `infantry` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    infantry: 12,
+    /**
+       * Documents the object literal property `armor` (armor: 8).
+    
+       * Purpose: Supports maintainability by documenting why `armor` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    armor: 8,
+    /**
+       * Documents the object literal property `naval` (naval: 8).
+    
+       * Purpose: Supports maintainability by documenting why `naval` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    naval: 8,
+    /**
+       * Documents the object literal property `air` (air: 6).
+    
+       * Purpose: Supports maintainability by documenting why `air` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    air: 6
+  };
+  function estimateTurnsToNextSpawn(nextUnitType, storedPoints, capacityPerTurn) {
+    if (!nextUnitType) return null;
+    const unitCost = UNIT_COST_BY_TYPE[nextUnitType];
+    const safeCapacity = Math.max(0, Math.trunc(capacityPerTurn));
+    if (safeCapacity <= 0) return null;
+    const safeStoredPoints = Math.max(0, Math.trunc(storedPoints));
+    const deficit = Math.max(0, unitCost - safeStoredPoints);
+    return Math.max(1, Math.ceil(deficit / safeCapacity));
+  }
+  function applyProduction(entries, storedPoints, urbanHexCount) {
+    const sorted = [...entries].sort((a, b) => a.queueIndex - b.queueIndex || a.id - b.id);
+    const updated = sorted.map((entry) => ({ ...entry }));
+    const spawnedUnitTypes = [];
+    let points = Math.max(0, Math.trunc(storedPoints)) + Math.max(0, Math.trunc(urbanHexCount));
+    let idx = 0;
+    while (idx < updated.length) {
+      const entry = updated[idx];
+      const unitCost = UNIT_COST_BY_TYPE[entry.unitType];
+      if (points < unitCost) break;
+      const maxBuildable = Math.floor(points / unitCost);
+      const built = Math.min(maxBuildable, entry.remainingCount);
+      if (built <= 0) break;
+      for (let i = 0; i < built; i++) spawnedUnitTypes.push(entry.unitType);
+      points -= built * unitCost;
+      entry.remainingCount -= built;
+      if (entry.remainingCount <= 0) {
+        updated.splice(idx, 1);
+        continue;
+      }
+      idx++;
+    }
+    for (let i = 0; i < updated.length; i++) {
+      updated[i].queueIndex = i;
+    }
+    return { updatedEntries: updated, storedPoints: points, spawnedUnitTypes };
+  }
+  function sumQueuedProductionCost(entries) {
+    let sum = 0;
+    for (const row of entries) {
+      const cost = UNIT_COST_BY_TYPE[row.unitType];
+      sum += cost * Math.max(0, Math.trunc(row.count));
+    }
+    return sum;
+  }
+  function estimateTurnsToCompleteQueuedProduction(entries, storedPoints, capacityPerTurn) {
+    let working = entries.map((e) => ({
+      id: e.id,
+      queueIndex: e.queueIndex,
+      unitType: e.unitType,
+      remainingCount: Math.max(0, Math.trunc(e.count))
+    })).sort((a, b) => a.queueIndex - b.queueIndex || a.id - b.id);
+    let stored = Math.max(0, Math.trunc(storedPoints));
+    const cap = Math.max(0, Math.trunc(capacityPerTurn));
+    const remainingUnits = () => working.reduce((acc, row) => acc + row.remainingCount, 0);
+    if (remainingUnits() === 0) return 0;
+    if (cap < 1) return null;
+    let turns = 0;
+    const maxTurns = 1e6;
+    while (remainingUnits() > 0) {
+      const before = JSON.stringify({ working, stored });
+      const result = applyProduction(working, stored, cap);
+      working = result.updatedEntries;
+      stored = result.storedPoints;
+      turns++;
+      const after = JSON.stringify({ working, stored });
+      if (after === before) return null;
+      if (turns > maxTurns) return null;
+    }
+    return turns;
+  }
+
+  // src/shared/gameSize.ts
+  var GAME_SIZE_MULTIPLIER = {
+    small: 1,
+    medium: 2,
+    large: 4
+  };
+  var UNIT_TYPE_DISPLAY_NAME = {
+    infantry: "Infantry",
+    armor: "Armor",
+    naval: "Naval",
+    air: "Air"
+  };
+  function parseGameSize(raw) {
+    if (typeof raw !== "string") return "small";
+    const normalized = raw.trim().toLowerCase();
+    if (normalized === "small" || normalized === "medium" || normalized === "large") return normalized;
+    return "small";
+  }
+  function getMaxUnitsPerType(size) {
+    const multiplier = GAME_SIZE_MULTIPLIER[parseGameSize(size)];
+    return {
+      infantry: MAX_UNITS_PER_TYPE.infantry * multiplier,
+      armor: MAX_UNITS_PER_TYPE.armor * multiplier,
+      naval: MAX_UNITS_PER_TYPE.naval * multiplier,
+      air: MAX_UNITS_PER_TYPE.air * multiplier
+    };
+  }
+  function gameSizeCapPreviewRows(size) {
+    const caps = getMaxUnitsPerType(size);
+    return ALL_BUILD_UNIT_TYPES.map((unitType) => ({
+      unitType,
+      displayName: UNIT_TYPE_DISPLAY_NAME[unitType],
+      cap: caps[unitType]
+    }));
+  }
+
+  // src/renderer/gameplay/newGameSizeUi.ts
+  var NEW_GAME_SIZE_SELECT_ID = "new-game-size-select";
+  function readSelectedGameSizeFromDocument() {
+    const select = document.getElementById(NEW_GAME_SIZE_SELECT_ID);
+    return parseGameSize(select?.value);
+  }
+  function syncGameSizeCapPreview() {
+    const rows = gameSizeCapPreviewRows(readSelectedGameSizeFromDocument());
+    for (const row of rows) {
+      const badge = document.getElementById(`new-game-size-cap-${row.unitType}`);
+      if (badge) badge.textContent = String(row.cap);
+    }
+  }
+  function registerGameSizeSelect() {
+    const select = document.getElementById(NEW_GAME_SIZE_SELECT_ID);
+    select?.addEventListener("change", () => {
+      syncGameSizeCapPreview();
+    });
+    syncGameSizeCapPreview();
+  }
+
   // src/renderer/core/uiState.ts
   function formatStrategicPhaseLabelForSidebar(phase) {
     if (!phase) return phase;
@@ -19849,6 +20060,7 @@
     if (wasHidden) {
       void initializeScenarioRegionSelectorsOnOverlayOpen();
     }
+    syncGameSizeCapPreview();
     setMainUIControlsEnabled(false);
     if (messageEl) {
       if (gameOver) {
@@ -22034,6 +22246,7 @@
   function registerNewGameButton(deps) {
     void initializeScenarioRegionSelectorsOnOverlayOpen();
     registerRegionRandomizeButtons();
+    registerGameSizeSelect();
     document.getElementById("new-game-btn")?.addEventListener("click", async () => {
       if (!window.gameApi?.newGame) return;
       try {
@@ -22042,7 +22255,8 @@
         const state = await window.gameApi.newGame({
           fogOfWarEnabled: fogCheckbox?.checked !== false,
           humanHomeRegion: selectedRegions.humanHomeRegion,
-          aiHomeRegion: selectedRegions.aiHomeRegion
+          aiHomeRegion: selectedRegions.aiHomeRegion,
+          gameSize: readSelectedGameSizeFromDocument()
         });
         await deps.refreshRes4TerrainOverridesForRenderer({ reloadStaticOverlays: true });
         rendererSharedState.gameState = state;
@@ -22107,6 +22321,7 @@
     if (newGameBtn) newGameBtn.textContent = "Start game";
     if (fogCheckbox) fogCheckbox.checked = true;
     void initializeScenarioRegionSelectorsOnOverlayOpen();
+    syncGameSizeCapPreview();
     overlay?.classList.remove("hidden");
     setMainUIControlsEnabled3(false);
     updateReadyButtonState2();
@@ -22350,160 +22565,6 @@
       ...io,
       endTacticalBattle: window.gameApi?.endTacticalBattle
     });
-  }
-
-  // src/shared/productionConfig.ts
-  var UNIT_COST_BY_TYPE = {
-    /**
-       * Documents the object literal property `infantry` (infantry: 20).
-    
-       * Purpose: Supports maintainability by documenting why `infantry` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    infantry: 20,
-    /**
-       * Documents the object literal property `armor` (armor: 40).
-    
-       * Purpose: Supports maintainability by documenting why `armor` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    armor: 40,
-    /**
-       * Documents the object literal property `naval` (naval: 100).
-    
-       * Purpose: Supports maintainability by documenting why `naval` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    naval: 100,
-    /**
-       * Documents the object literal property `air` (air: 60).
-    
-       * Purpose: Supports maintainability by documenting why `air` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    air: 60
-  };
-  var MAX_UNITS_PER_TYPE = {
-    /**
-       * Documents the object literal property `infantry` (infantry: 12).
-    
-       * Purpose: Supports maintainability by documenting why `infantry` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    infantry: 12,
-    /**
-       * Documents the object literal property `armor` (armor: 8).
-    
-       * Purpose: Supports maintainability by documenting why `armor` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    armor: 8,
-    /**
-       * Documents the object literal property `naval` (naval: 8).
-    
-       * Purpose: Supports maintainability by documenting why `naval` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    naval: 8,
-    /**
-       * Documents the object literal property `air` (air: 6).
-    
-       * Purpose: Supports maintainability by documenting why `air` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    air: 6
-  };
-  function estimateTurnsToNextSpawn(nextUnitType, storedPoints, capacityPerTurn) {
-    if (!nextUnitType) return null;
-    const unitCost = UNIT_COST_BY_TYPE[nextUnitType];
-    const safeCapacity = Math.max(0, Math.trunc(capacityPerTurn));
-    if (safeCapacity <= 0) return null;
-    const safeStoredPoints = Math.max(0, Math.trunc(storedPoints));
-    const deficit = Math.max(0, unitCost - safeStoredPoints);
-    return Math.max(1, Math.ceil(deficit / safeCapacity));
-  }
-  function applyProduction(entries, storedPoints, urbanHexCount) {
-    const sorted = [...entries].sort((a, b) => a.queueIndex - b.queueIndex || a.id - b.id);
-    const updated = sorted.map((entry) => ({ ...entry }));
-    const spawnedUnitTypes = [];
-    let points = Math.max(0, Math.trunc(storedPoints)) + Math.max(0, Math.trunc(urbanHexCount));
-    let idx = 0;
-    while (idx < updated.length) {
-      const entry = updated[idx];
-      const unitCost = UNIT_COST_BY_TYPE[entry.unitType];
-      if (points < unitCost) break;
-      const maxBuildable = Math.floor(points / unitCost);
-      const built = Math.min(maxBuildable, entry.remainingCount);
-      if (built <= 0) break;
-      for (let i = 0; i < built; i++) spawnedUnitTypes.push(entry.unitType);
-      points -= built * unitCost;
-      entry.remainingCount -= built;
-      if (entry.remainingCount <= 0) {
-        updated.splice(idx, 1);
-        continue;
-      }
-      idx++;
-    }
-    for (let i = 0; i < updated.length; i++) {
-      updated[i].queueIndex = i;
-    }
-    return { updatedEntries: updated, storedPoints: points, spawnedUnitTypes };
-  }
-  function sumQueuedProductionCost(entries) {
-    let sum = 0;
-    for (const row of entries) {
-      const cost = UNIT_COST_BY_TYPE[row.unitType];
-      sum += cost * Math.max(0, Math.trunc(row.count));
-    }
-    return sum;
-  }
-  function estimateTurnsToCompleteQueuedProduction(entries, storedPoints, capacityPerTurn) {
-    let working = entries.map((e) => ({
-      id: e.id,
-      queueIndex: e.queueIndex,
-      unitType: e.unitType,
-      remainingCount: Math.max(0, Math.trunc(e.count))
-    })).sort((a, b) => a.queueIndex - b.queueIndex || a.id - b.id);
-    let stored = Math.max(0, Math.trunc(storedPoints));
-    const cap = Math.max(0, Math.trunc(capacityPerTurn));
-    const remainingUnits = () => working.reduce((acc, row) => acc + row.remainingCount, 0);
-    if (remainingUnits() === 0) return 0;
-    if (cap < 1) return null;
-    let turns = 0;
-    const maxTurns = 1e6;
-    while (remainingUnits() > 0) {
-      const before = JSON.stringify({ working, stored });
-      const result = applyProduction(working, stored, cap);
-      working = result.updatedEntries;
-      stored = result.storedPoints;
-      turns++;
-      const after = JSON.stringify({ working, stored });
-      if (after === before) return null;
-      if (turns > maxTurns) return null;
-    }
-    return turns;
-  }
-
-  // src/shared/ipc/productionTypes.ts
-  var ALL_BUILD_UNIT_TYPES = ["infantry", "armor", "naval", "air"];
-  function isBuildUnitType(value) {
-    return value === "infantry" || value === "armor" || value === "naval" || value === "air";
   }
 
   // src/renderer/gameplay/buildQueuePopupFormatting.ts
@@ -25235,7 +25296,7 @@
     }
     if (controller === "human" || controller === "opponent") {
       const countsByType = controller === "human" ? unitCountsByPlayer?.human ?? getUnitCountsByTypeForPlayer(state, "human") : unitCountsByPlayer?.opponent ?? getUnitCountsByTypeForPlayer(state, "opponent");
-      if (countsByType[nextUnitType] >= MAX_UNITS_PER_TYPE[nextUnitType]) {
+      if (countsByType[nextUnitType] >= getMaxUnitsPerType(parseGameSize(state.gameSize))[nextUnitType]) {
         return `${capacityText} / \u221Et`;
       }
     }

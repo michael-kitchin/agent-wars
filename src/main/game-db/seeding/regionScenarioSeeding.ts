@@ -2,7 +2,7 @@ import { cellToLatLng } from 'h3-js';
 import { getOrderedHexList, getWorldUnitCounts } from '../../mapData';
 import { logDebug } from '../../logger';
 import type { BuildUnitType } from '../../productionRules';
-import { MAX_UNITS_PER_TYPE } from '../../productionCaps';
+import { readPersistedMaxUnitsPerType } from '../gameSizeConfig';
 import { getScenarioHomeRegionHexes, isScenarioPassableLandTerrainKind } from '../../regionScenario';
 import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from '../scenarioState';
 import type { GuardedDbRunAndGetAllOps } from '../dbOps';
@@ -170,11 +170,14 @@ function applyScenarioSubstitutions(
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function enforceScenarioCaps(entries: UnitPlanEntry[]): ScenarioSpawnPlan {
+function enforceScenarioCaps(
+  entries: UnitPlanEntry[],
+  maxUnitsPerType: Readonly<Record<BuildUnitType, number>>
+): ScenarioSpawnPlan {
   const droppedReasons: string[] = [];
   let working = [...entries];
   const trimType = (unitType: BuildUnitType): void => {
-    const allowed = MAX_UNITS_PER_TYPE[unitType];
+    const allowed = maxUnitsPerType[unitType];
     const typeEntries = working.filter((entry) => entry.unitType === unitType);
     const overflow = Math.max(0, typeEntries.length - allowed);
     if (overflow <= 0) return;
@@ -350,7 +353,8 @@ export function trySeedScenarioRegionVsRegion(deps: RegionScenarioSeedDeps): boo
       passableLandCandidates.length > 0,
       navalCandidates.length > 0
     );
-    const capped = enforceScenarioCaps(substituted);
+    const caps = readPersistedMaxUnitsPerType(deps);
+    const capped = enforceScenarioCaps(substituted, caps);
     const terrainFiltered = dropUnitsWithoutTerrainCandidates(
       capped.entries,
       passableLandCandidates.length > 0,
@@ -386,6 +390,7 @@ export function trySeedScenarioRegionVsRegion(deps: RegionScenarioSeedDeps): boo
       navalCandidates,
       usedH3,
       plannedCountsAfterSacrifice: { ...finalCounts, air: 0 },
+      maxUnitsPerType: caps,
     });
     if (flex) {
       const ord = countPlannedUnitsOfType(units, flex.unitType) + 1;

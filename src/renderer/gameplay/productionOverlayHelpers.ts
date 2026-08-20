@@ -3,7 +3,8 @@
  */
 
 import type { BuildUnitType, GameStateSnapshot } from '../../shared/ipcTypes';
-import { estimateTurnsToNextSpawn, MAX_UNITS_PER_TYPE } from '../../shared/productionConfig';
+import { estimateTurnsToNextSpawn } from '../../shared/productionConfig';
+import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
 import { getPlayerUnitCountsByType } from '../../shared/unitCountsByType';
 import { getUrbanProductionCapacityForHex as getUrbanProductionCapacityForHexFromTooltipState } from '../map/terrainTooltipRes1State';
 import { rendererSharedState as S } from '../core/state';
@@ -144,7 +145,7 @@ export function formatProductionQueueAwareLabel(
       controller === 'human'
         ? (unitCountsByPlayer?.human ?? getUnitCountsByTypeForPlayer(state, 'human'))
         : (unitCountsByPlayer?.opponent ?? getUnitCountsByTypeForPlayer(state, 'opponent'));
-    if (countsByType[nextUnitType] >= MAX_UNITS_PER_TYPE[nextUnitType]) {
+    if (countsByType[nextUnitType] >= getMaxUnitsPerType(parseGameSize(state.gameSize))[nextUnitType]) {
       return `${capacityText} / ∞t`;
     }
   }

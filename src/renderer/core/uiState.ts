@@ -1,6 +1,7 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from './state';
 import { initializeScenarioRegionSelectorsOnOverlayOpen } from '../gameplay/newGameRegionUi';
+import { syncGameSizeCapPreview } from '../gameplay/newGameSizeUi';
 
 /**
  * Title-cases the strategic phase id from main (`planning` / `resolution`) for the sidebar line.
@@ -118,6 +119,7 @@ export function updateGameOverUI(
   if (wasHidden) {
     void initializeScenarioRegionSelectorsOnOverlayOpen();
   }
+  syncGameSizeCapPreview();
   setMainUIControlsEnabled(false);
   if (messageEl) {
     if (gameOver) {
