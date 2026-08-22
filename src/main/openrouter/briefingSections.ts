@@ -1,4 +1,3 @@
-import { gridDistance } from 'h3-js';
 import { executeTool6 } from '../tools/tool6Production';
 import { getMaxedUnitTypesForPlayer, getPlayerUnitCountsByType } from '../productionCaps';
 import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
@@ -7,6 +6,8 @@ import { logDebug } from '../logger';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { buildPromptTableLines } from '../promptTableUtils';
 import { getRangeEnvelopeByBase, type RangeEnvelopeCache } from './rangeSupport';
+import { canEmbarkAtHex } from '../../shared/sealiftEmbarkEligibility';
+import { gridHopDistancesFrom } from '../tools/assessUnitProximity';
 
 /**
  * Defines the `countStrikeableEnemyInfrastructure` function shape (function countStrikeableEnemyInfrastructure(args: { strikeEnvelope: Set<string>; infraRows: NonNullable<GameStateSnapshot['res1Infrastructure']>; contr).
@@ -480,12 +481,12 @@ export function buildAirOperationsBriefingBlock(
 }
 
 /**
- * Defines the `findNearestOpponentEmbarkHex` function shape (function findNearestOpponentEmbarkHex().
-
- * Purpose: Supports maintainability by documenting why `findNearestOpponentEmbarkHex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Returns the closest hex where this player may embark, using the same rule as stack sealift.
+ *
+ * Purpose: Naval Transport Status "Nearest Embark Hex" must match `canEmbarkAtHex` (coastal and land seaports without control; water seaports only when controlled).
+ * When to use: Strategic `buildSealiftBriefingBlock` for each opponent naval unit.
+ * Expected outcome: Formatted hex plus hop count, or `—` when no eligible hex is in the snapshot. Hops use neighbor BFS so pentagon-crossing pairs still score.
+ * Exceptions: Unreachable or invalid cells are omitted.
  */
 function findNearestOpponentEmbarkHex(
   navalH3: string,
@@ -494,19 +495,27 @@ function findNearestOpponentEmbarkHex(
 ): string {
   const infraByHex = new Map((state.res1Infrastructure ?? []).map((row) => [row.h3Index, row]));
   const controlByHex = new Map((state.res1Control ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
-  let best: { h3: string; d: number } | null = null;
+  const legalH3: string[] = [];
   for (const hex of state.hexes) {
-    const h3 = hex.h3Index;
-    if (controlByHex.get(h3) !== 'opponent') continue;
-    const seaport = Number(infraByHex.get(h3)?.seaportCount ?? 0);
-    const canEmbark = hex.terrain === 'coastal' || seaport > 0;
-    if (!canEmbark) continue;
-    try {
-      const d = gridDistance(navalH3, h3);
-      if (best === null || d < best.d) best = { h3, d };
-    } catch {
-      continue;
+    const seaport = Number(infraByHex.get(hex.h3Index)?.seaportCount ?? 0);
+    if (
+      canEmbarkAtHex({
+        nativeTerrain: hex.terrain,
+        terrainKind: hex.terrainKind,
+        hasSeaport: seaport > 0,
+        hexControlledByPlayer: controlByHex.get(hex.h3Index) === 'opponent',
+      })
+    ) {
+      legalH3.push(hex.h3Index);
     }
+  }
+  if (legalH3.length === 0) return '—';
+  const hops = gridHopDistancesFrom(navalH3, legalH3);
+  let best: { h3: string; d: number } | null = null;
+  for (const h3 of legalH3) {
+    const d = hops.get(h3);
+    if (d === undefined) continue;
+    if (best === null || d < best.d) best = { h3, d };
   }
   if (!best) return '—';
   return `${format(best.h3)} at hex distance ${best.d}`;
@@ -525,12 +534,16 @@ export function buildSealiftBriefingBlock(
   format: (h3: string) => string,
   mode: 'strategic' | 'tactical' = 'strategic'
 ): string {
-  logDebug('briefingSections buildSealiftBriefingBlock', { turnNumber: state.turnNumber, mode });
   const lines: string[] = [];
   const opponentNaval = state.units.filter((unit) => unit.player === 'opponent' && unit.unitType === 'naval');
   const opponentLand = state.units.filter(
     (unit) => unit.player === 'opponent' && (unit.unitType === 'infantry' || unit.unitType === 'armor')
   );
+  logDebug('briefingSections buildSealiftBriefingBlock', {
+    turnNumber: state.turnNumber,
+    mode,
+    opponentNavalCount: opponentNaval.length,
+  });
 
   if (mode === 'tactical') {
     if (opponentNaval.length === 0) return '';
@@ -555,17 +568,12 @@ export function buildSealiftBriefingBlock(
 
   const infraByHex = new Map((state.res1Infrastructure ?? []).map((row) => [row.h3Index, row]));
   const controlByHex = new Map((state.res1Control ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
-  const landByHex = new Map<string, { infantry: number; armor: number }>();
-  for (const unit of opponentLand) {
-    const row = landByHex.get(unit.h3Index) ?? { infantry: 0, armor: 0 };
-    if (unit.unitType === 'armor') row.armor += 1;
-    else row.infantry += 1;
-    landByHex.set(unit.h3Index, row);
-  }
 
   lines.push('# Naval Transport Status');
   lines.push('');
-  lines.push('Embark: your-controlled coastal hex, or non-coastal with seaport+control. Capacity: 1 armor or 2 infantry per naval unit.');
+  lines.push(
+    'Embark: coastal or land seaport (control not required), or a water seaport you control. Capacity: 1 armor or 2 infantry per naval unit.'
+  );
   lines.push('');
   const navalRows: Array<Array<unknown>> = [];
   if (opponentNaval.length <= 0) {
@@ -583,10 +591,12 @@ export function buildSealiftBriefingBlock(
     const infra = infraByHex.get(naval.h3Index);
     const hasPort = (infra?.seaportCount ?? 0) > 0;
     const controlled = controlByHex.get(naval.h3Index) === 'opponent';
-    const coLocated = landByHex.get(naval.h3Index) ?? { infantry: 0, armor: 0 };
+    const embarked = opponentLand.filter((land) => land.embarkedOnNavalUnitId === naval.id);
+    const armor = embarked.filter((unit) => unit.unitType === 'armor').length;
+    const infantry = embarked.filter((unit) => unit.unitType === 'infantry').length;
     const nearestEmbark = findNearestOpponentEmbarkHex(naval.h3Index, state, format);
-    const capacityUsed = coLocated.armor >= 1 ? 2 : Math.min(coLocated.infantry, 2);
-    const aboard = `infantry ${coLocated.infantry}, armor ${coLocated.armor}`;
+    const capacityUsed = armor >= 1 ? 2 : Math.min(infantry, 2);
+    const aboard = `infantry ${infantry}, armor ${armor}`;
     navalRows.push([
       naval.id,
       format(naval.h3Index),

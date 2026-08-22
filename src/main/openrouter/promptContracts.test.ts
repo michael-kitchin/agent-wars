@@ -5,7 +5,7 @@
 import * as assert from 'assert';
 import { getToolFlags } from './openRouterToolGroups';
 import { buildFinalJsonContractInstruction, getFinalJsonOrdersExampleBlock } from './promptContracts';
-import { getMovementOrderInstruction } from './promptText';
+import { getMovementOrderInstruction, buildToolUsageGuidance } from './promptText';
 
 /**
  * Defines the `testExampleBlockParsesWithParser` function shape (function testExampleBlockParsesWithParser(): void).
@@ -87,6 +87,22 @@ function testTacticalPlanningMovementInstructionAddsReachabilityClause(): void {
   assert.ok(!strategic.includes('first leg'));
 }
 
+/**
+ * Locks strategic sealift tool-use copy to cargo already aboard, not co-located land.
+ *
+ * Purpose: Naval Transport Status Aboard is assignment-based; the HOW TO USE line must not promise co-located land.
+ * When to use: After edits to `buildToolUsageGuidance` strategic sealift bullet.
+ * Expected outcome: Mentions cargo already aboard and nearest embark; does not mention co-located land.
+ * Exceptions: Assertion failure on contract drift.
+ */
+function testStrategicSealiftGuidanceUsesCargoAboard(): void {
+  const flags = getToolFlags(undefined);
+  const text = buildToolUsageGuidance(flags, true, 'strategic');
+  assert.ok(text.includes('cargo already aboard'));
+  assert.ok(text.includes('nearest embark hex'));
+  assert.ok(!text.includes('co-located land'));
+}
+
 function testTacticalCallbacksClauseMentionsBeat(): void {
   const tactical = buildFinalJsonContractInstruction({
     includeMemoryUpdates: false,
@@ -165,6 +181,10 @@ const tests = [
   {
     name: 'getMovementOrderInstruction tactical planning adds march reachability clause',
     fn: testTacticalPlanningMovementInstructionAddsReachabilityClause,
+  },
+  {
+    name: 'buildToolUsageGuidance strategic sealift uses cargo aboard',
+    fn: testStrategicSealiftGuidanceUsesCargoAboard,
   },
 ];
 

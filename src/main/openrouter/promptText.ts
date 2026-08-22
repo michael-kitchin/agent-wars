@@ -243,7 +243,7 @@ export function buildToolUsageGuidance(
     if (flags.planningEnabled && !hasPrecomputedBriefing) {
       lines.push('- For units several turns from combat, use assign_order (march/pursue) in final JSON instead of re-planning every turn.');
     }
-    lines.push('- Sealift: use the # Naval Transport Status section for each naval unit (capacity, co-located land, nearest embark hex); issue embark / transport_move / disembark in orders[] when crossing water. While embarked, explicit_move and disembark both clear cargo and march in one action.');
+    lines.push('- Sealift: use the # Naval Transport Status section for each naval unit (capacity, cargo already aboard, nearest embark hex); issue embark / transport_move / disembark in orders[] when crossing water. While embarked, explicit_move and disembark both clear cargo and march in one action.');
   }
   if (flags.memoryEnabled) {
     lines.push(
