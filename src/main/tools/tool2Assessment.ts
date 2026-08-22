@@ -19,6 +19,10 @@ import { getRange } from '../combatConstants';
 import { getStandingOrderForUnit } from './tool5StandingOrders';
 import { logDebug, logError, logTrace } from '../logger';
 import { h3ToLatLng, type LatLng, type LatLngMap } from './h3LatLng';
+import {
+  collectOmniscientNearbyUnits,
+  usesOmniscientGridProximity,
+} from './assessUnitProximity';
 
 /**
  * Re-exports shared lat/lng tuple type for consumers that imported it from this module.
@@ -243,7 +247,6 @@ function executeAssessUnit(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- signature aligned with assess_hex path
   _resolveToH3: (lat: number, lng: number) => string | undefined
 ): { status: string; error: string | null; [k: string]: unknown } {
-  logDebug('tool2Assessment executeAssessUnit', { unitId, radius, stateTurn: state.turnNumber });
   const hexList = state.hexes.map((h) => h.h3Index);
   const hexSet = new Set(hexList);
   const terrainByH3 = new Map(state.hexes.map((h) => [h.h3Index, h.terrain]));
@@ -256,6 +259,16 @@ function executeAssessUnit(
     logError('tool2Assessment executeAssessUnit: unit not on map', unitId);
     return { status: 'error', error: `Unit not found: ${unitId}` };
   }
+  const omniscientGridProximity = usesOmniscientGridProximity({
+    fogOfWarEnabled: state.fogOfWarEnabled,
+    h3Index: unit.h3Index,
+  });
+  logDebug('tool2Assessment executeAssessUnit', {
+    unitId,
+    radius,
+    stateTurn: state.turnNumber,
+    omniscientGridProximity,
+  });
   const movementBudget = getMovementBudgetForUnit(unit.unitType);
   const terrain = terrainByH3.get(unit.h3Index) ?? 'land';
   const unitPosition = h3ToLatLng(unit.h3Index, latLngByH3, 'cellCenter');
@@ -277,130 +290,148 @@ function executeAssessUnit(
     type: string;
     position: LatLng;
     hexDistance: number;
-    estimatedTurnsToReach: number;
+    estimatedTurnsToReach: number | null;
   }> = [];
   const threats: Array<{ description: string; severity: string; sourceUnit: string }> = [];
   const canAttackThisTurn: Array<{ unitId: string; attackType: string; reason: string }> = [];
 
-  const myRange = getRange(unit.unitType);
   let preFilteredCount = 0;
-  for (const other of state.units) {
-    if (other.id === unitId) continue;
-    const gridDist = (() => {
-      try {
-        return getGridDistance(unit.h3Index, other.h3Index);
-      } catch {
-        return 999;
-      }
-    })();
-    // Grid distance is a lower bound on BFS path distance, so units beyond the
-    // radius at grid level can't be within radius by path either. 999 means the
-    // h3 gridDistance call failed (cross-pentagon), so we conservatively keep those.
-    if (gridDist > radius && gridDist !== 999) { preFilteredCount++; continue; }
-    const distResult = getPathDistanceAndTurns(unit.h3Index, other.h3Index, unit.unitType, hexSet, terrainByH3, state);
-    const pathWithinRadius = distResult !== null && distResult.hexDistance <= radius;
-    const gridWithinRadius = gridDist <= radius;
-    if (!pathWithinRadius && !gridWithinRadius) continue;
-    const hexDistance = distResult !== null ? distResult.hexDistance : gridDist;
-    const isEnemy = other.player !== unit.player;
-    const enemyRange = getRange(other.unitType);
-    const inRangedRange = gridDist <= myRange;
-    const inMeleeRange = gridDist === 0;
-    const enemyCanShootMe = gridDist <= enemyRange;
-
-    if (isEnemy) {
-      const estimatedTurnsToReach = distResult !== null
-        ? distResult.estimatedTurns
-        : null;
-      const enemyToMe = getPathDistanceAndTurns(other.h3Index, unit.h3Index, other.unitType, hexSet, terrainByH3, state);
-      const enemyTurnsToReachMe: number | null = enemyToMe
-        ? enemyToMe.estimatedTurns
-        : (distResult !== null ? Math.ceil(hexDistance / getMovementBudgetForUnit(other.unitType)) : null);
-      nearbyEnemies.push({
-        unitId: other.id,
-        type: other.unitType,
-        position: h3ToLatLng(other.h3Index, latLngByH3, 'cellCenter'),
-        hexDistance,
-        estimatedTurnsToReach,
-        inRangedRange,
-        inMeleeRange,
-        inEnemyRangedRange: enemyCanShootMe,
-        confidence: 'current',
-        lastSeen: state.turnNumber,
-      });
-      let severity: string;
-      if (enemyCanShootMe || inMeleeRange) {
-        severity = 'critical';
-      } else if (enemyTurnsToReachMe !== null && enemyTurnsToReachMe <= 2) {
-        severity = 'moderate';
-      } else {
-        severity = 'low';
-      }
-      threats.push({
-        description: enemyTurnsToReachMe !== null
-          ? `${other.id} (${other.unitType}) can reach your hex in ${enemyTurnsToReachMe} turns`
-          : `${other.id} (${other.unitType}) at grid distance ${gridDist} (no path; e.g. different domain)`,
-        severity,
-        sourceUnit: other.id,
-      });
-      if (gridDist <= myRange) {
-        const attackType = gridDist === 0 ? 'melee' : 'ranged';
-        canAttackThisTurn.push({ unitId: other.id, attackType, reason: '' });
-      } else {
-        canAttackThisTurn.push({
-          unitId: other.id,
-          attackType: 'none',
-          reason: `Out of range (distance ${gridDist}, ${unit.unitType} range ${myRange})`,
-        });
-      }
-    } else {
-      if (!pathWithinRadius) continue;
-      const friendlyTurns = getPathDistanceAndTurns(other.h3Index, unit.h3Index, other.unitType, hexSet, terrainByH3, state);
-      const estimatedTurnsToReach = friendlyTurns ? friendlyTurns.estimatedTurns : Math.ceil(hexDistance / getMovementBudgetForUnit(other.unitType));
-      nearbyFriendlies.push({
-        unitId: other.id,
-        type: other.unitType,
-        position: h3ToLatLng(other.h3Index, latLngByH3, 'cellCenter'),
-        hexDistance,
-        estimatedTurnsToReach,
-      });
-    }
-  }
-
-  if (shouldIncludeStaleEnemyIntel(state)) {
-    const staleIntel = getEnemyIntelForPlayer(state);
-    const currentEnemyIds = new Set(nearbyEnemies.map((e) => e.unitId));
-    for (const intel of staleIntel) {
-      if (currentEnemyIds.has(intel.unitId)) continue;
-      if (!hexSet.has(intel.lastKnownH3Index)) continue;
+  if (omniscientGridProximity) {
+    const collected = collectOmniscientNearbyUnits({
+      assessedUnit: {
+        id: unit.id,
+        player: unit.player,
+        unitType: unit.unitType,
+        h3Index: unit.h3Index,
+      },
+      units: state.units,
+      turnNumber: state.turnNumber,
+      latLngByH3,
+    });
+    nearbyEnemies.push(...collected.nearbyEnemies);
+    nearbyFriendlies.push(...collected.nearbyFriendlies);
+    threats.push(...collected.threats);
+    canAttackThisTurn.push(...collected.canAttackThisTurn);
+  } else {
+    const myRange = getRange(unit.unitType);
+    for (const other of state.units) {
+      if (other.id === unitId) continue;
       const gridDist = (() => {
         try {
-          return getGridDistance(unit.h3Index, intel.lastKnownH3Index);
+          return getGridDistance(unit.h3Index, other.h3Index);
         } catch {
           return 999;
         }
       })();
-      if (gridDist > radius && gridDist !== 999) continue;
-      const distResult = getPathDistanceAndTurns(unit.h3Index, intel.lastKnownH3Index, unit.unitType, hexSet, terrainByH3, state);
+      // Grid distance is a lower bound on BFS path distance, so units beyond the
+      // radius at grid level can't be within radius by path either. 999 means the
+      // h3 gridDistance call failed (cross-pentagon), so we conservatively keep those.
+      if (gridDist > radius && gridDist !== 999) { preFilteredCount++; continue; }
+      const distResult = getPathDistanceAndTurns(unit.h3Index, other.h3Index, unit.unitType, hexSet, terrainByH3, state);
       const pathWithinRadius = distResult !== null && distResult.hexDistance <= radius;
       const gridWithinRadius = gridDist <= radius;
       if (!pathWithinRadius && !gridWithinRadius) continue;
       const hexDistance = distResult !== null ? distResult.hexDistance : gridDist;
-      nearbyEnemies.push({
-        unitId: intel.unitId,
-        type: 'unknown',
-        position: h3ToLatLng(intel.lastKnownH3Index, latLngByH3, 'cellCenter'),
-        hexDistance,
-        estimatedTurnsToReach: distResult !== null ? distResult.estimatedTurns : null,
-        inRangedRange: gridDist <= myRange,
-        inMeleeRange: gridDist === 0,
-        inEnemyRangedRange: false,
-        confidence: 'stale',
-        lastSeen: intel.lastSeenTurn,
-      });
+      const isEnemy = other.player !== unit.player;
+      const enemyRange = getRange(other.unitType);
+      const inRangedRange = gridDist <= myRange;
+      const inMeleeRange = gridDist === 0;
+      const enemyCanShootMe = gridDist <= enemyRange;
+
+      if (isEnemy) {
+        const estimatedTurnsToReach = distResult !== null
+          ? distResult.estimatedTurns
+          : null;
+        const enemyToMe = getPathDistanceAndTurns(other.h3Index, unit.h3Index, other.unitType, hexSet, terrainByH3, state);
+        const enemyTurnsToReachMe: number | null = enemyToMe
+          ? enemyToMe.estimatedTurns
+          : (distResult !== null ? Math.ceil(hexDistance / getMovementBudgetForUnit(other.unitType)) : null);
+        nearbyEnemies.push({
+          unitId: other.id,
+          type: other.unitType,
+          position: h3ToLatLng(other.h3Index, latLngByH3, 'cellCenter'),
+          hexDistance,
+          estimatedTurnsToReach,
+          inRangedRange,
+          inMeleeRange,
+          inEnemyRangedRange: enemyCanShootMe,
+          confidence: 'current',
+          lastSeen: state.turnNumber,
+        });
+        let severity: string;
+        if (enemyCanShootMe || inMeleeRange) {
+          severity = 'critical';
+        } else if (enemyTurnsToReachMe !== null && enemyTurnsToReachMe <= 2) {
+          severity = 'moderate';
+        } else {
+          severity = 'low';
+        }
+        threats.push({
+          description: enemyTurnsToReachMe !== null
+            ? `${other.id} (${other.unitType}) can reach your hex in ${enemyTurnsToReachMe} turns`
+            : `${other.id} (${other.unitType}) at grid distance ${gridDist} (no path; e.g. different domain)`,
+          severity,
+          sourceUnit: other.id,
+        });
+        if (gridDist <= myRange) {
+          const attackType = gridDist === 0 ? 'melee' : 'ranged';
+          canAttackThisTurn.push({ unitId: other.id, attackType, reason: '' });
+        } else {
+          canAttackThisTurn.push({
+            unitId: other.id,
+            attackType: 'none',
+            reason: `Out of range (distance ${gridDist}, ${unit.unitType} range ${myRange})`,
+          });
+        }
+      } else {
+        if (!pathWithinRadius) continue;
+        const friendlyTurns = getPathDistanceAndTurns(other.h3Index, unit.h3Index, other.unitType, hexSet, terrainByH3, state);
+        const estimatedTurnsToReach = friendlyTurns ? friendlyTurns.estimatedTurns : Math.ceil(hexDistance / getMovementBudgetForUnit(other.unitType));
+        nearbyFriendlies.push({
+          unitId: other.id,
+          type: other.unitType,
+          position: h3ToLatLng(other.h3Index, latLngByH3, 'cellCenter'),
+          hexDistance,
+          estimatedTurnsToReach,
+        });
+      }
     }
-  } else {
-    logTrace('tool2Assessment executeAssessUnit: omitting stale enemy intel for opponent perspective', { unitId });
+
+    if (shouldIncludeStaleEnemyIntel(state)) {
+      const staleIntel = getEnemyIntelForPlayer(state);
+      const currentEnemyIds = new Set(nearbyEnemies.map((e) => e.unitId));
+      for (const intel of staleIntel) {
+        if (currentEnemyIds.has(intel.unitId)) continue;
+        if (!hexSet.has(intel.lastKnownH3Index)) continue;
+        const gridDist = (() => {
+          try {
+            return getGridDistance(unit.h3Index, intel.lastKnownH3Index);
+          } catch {
+            return 999;
+          }
+        })();
+        if (gridDist > radius && gridDist !== 999) continue;
+        const distResult = getPathDistanceAndTurns(unit.h3Index, intel.lastKnownH3Index, unit.unitType, hexSet, terrainByH3, state);
+        const pathWithinRadius = distResult !== null && distResult.hexDistance <= radius;
+        const gridWithinRadius = gridDist <= radius;
+        if (!pathWithinRadius && !gridWithinRadius) continue;
+        const hexDistance = distResult !== null ? distResult.hexDistance : gridDist;
+        nearbyEnemies.push({
+          unitId: intel.unitId,
+          type: 'unknown',
+          position: h3ToLatLng(intel.lastKnownH3Index, latLngByH3, 'cellCenter'),
+          hexDistance,
+          estimatedTurnsToReach: distResult !== null ? distResult.estimatedTurns : null,
+          inRangedRange: gridDist <= myRange,
+          inMeleeRange: gridDist === 0,
+          inEnemyRangedRange: false,
+          confidence: 'stale',
+          lastSeen: intel.lastSeenTurn,
+        });
+      }
+    } else {
+      logTrace('tool2Assessment executeAssessUnit: omitting stale enemy intel for opponent perspective', { unitId });
+    }
   }
 
   nearbyEnemies.sort((a, b) => a.hexDistance - b.hexDistance);

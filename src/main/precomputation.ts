@@ -8,6 +8,7 @@
 
 import type { GameStateSnapshot } from './gameDb';
 import { executeTool2 } from './tools/tool2Assessment';
+import { usesOmniscientGridProximity } from './tools/assessUnitProximity';
 import { logDebug, logError } from './logger';
 
 /**
@@ -84,25 +85,30 @@ result: {
 }
 
 /**
- * Defines the `runUnitAssessments` function shape (export function runUnitAssessments().
-
- * Purpose: Supports maintainability by documenting why `runUnitAssessments` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Runs assess_unit for every opponent unit and collects successful payloads.
+ *
+ * Purpose: Feeds Unit Status / Attention Flags. When fog is off on res1, each call uses grid hops for all other units.
+ * When to use: Strategic precomputation before formatBriefing.
+ * Expected outcome: One result per opponent unit whose assess_unit returned ok with nearbyEnemies.
+ * Exceptions: Failed assessments are logged and omitted.
  */
 export function runUnitAssessments(
   state: GameStateSnapshot,
   coordMap: PrecomputationCoordMap
 ): UnitAssessmentResult[] {
-  logDebug('precomputation runUnitAssessments', {
-    turnNumber: state.turnNumber,
-    aiUnitCount: state.units.filter((u) => u.player === 'opponent').length,
-  });
   const { latLngByH3, resolveToH3 } = coordMap;
   const opponentUnits = state.units
     .filter((u) => u.player === 'opponent')
     .sort((a, b) => a.id.localeCompare(b.id));
+  const representativeH3 = state.hexes[0]?.h3Index ?? opponentUnits[0]?.h3Index ?? '';
+  logDebug('precomputation runUnitAssessments', {
+    turnNumber: state.turnNumber,
+    aiUnitCount: opponentUnits.length,
+    omniscientGridProximity: usesOmniscientGridProximity({
+      fogOfWarEnabled: state.fogOfWarEnabled,
+      h3Index: representativeH3,
+    }),
+  });
   const results: UnitAssessmentResult[] = [];
   for (const unit of opponentUnits) {
     const out = executeTool2(

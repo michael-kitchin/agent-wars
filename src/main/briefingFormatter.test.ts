@@ -8,6 +8,8 @@ import { gridDisk, latLngToCell } from 'h3-js';
 import type { GameStateSnapshot } from './gameDb';
 import type { PrecomputationResult, UnitAssessmentResult } from './precomputation';
 import { buildAttentionFlags, buildUnitStatusTable, formatBriefing } from './briefingFormatter';
+import { getOrderedHexList } from './mapData';
+import { OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE } from './tools/assessUnitProximity';
 
 /**
  * Documents the module-scope binding `fixtureOriginH3` (fixtureOriginH3).
@@ -364,6 +366,49 @@ function testAttentionFlagsSeveritySortAndCapFive(): void {
 }
 
 /**
+ * Verifies the grid-hops honesty line appears only for fog-off strategic (res1) snapshots.
+ *
+ * Purpose: Fog-off Unit Status distances are grid hops; the model must be told they are not march paths.
+ * When to use: After changing formatBriefing omniscient copy.
+ * Expected outcome: Line present for fog false + res1; absent for fog true + res1, and for the shared res3 fixture even with fog false.
+ * Exceptions: None.
+ */
+function testFormatBriefingGridProximityHonestyLine(): void {
+  const res1 = getOrderedHexList()[0]!;
+  const res1State: GameStateSnapshot = {
+    ...fixtureState,
+    fogOfWarEnabled: false,
+    hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+    units: fixtureState.units.map((u) => ({ ...u, h3Index: res1 })),
+  };
+  const fogOffRes1 = formatBriefing(res1State, precomputed, '', '');
+  assert.ok(
+    fogOffRes1.includes(
+      `## Unit Status and Threats\n\n${OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE}\n\n| Unit ID | Type | Hex |`
+    ),
+    'fog-off res1 briefing places grid-hops sentence immediately after Unit Status heading, then the table'
+  );
+
+  const fogOnRes1: GameStateSnapshot = { ...res1State, fogOfWarEnabled: true };
+  const fogOnOut = formatBriefing(fogOnRes1, precomputed, '', '');
+  assert.ok(
+    !fogOnOut.includes(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE),
+    'fog-on res1 briefing omits grid-hops sentence'
+  );
+
+  const fogOffRes3: GameStateSnapshot = { ...fixtureState, fogOfWarEnabled: false };
+  const fogOffRes3Out = formatBriefing(fogOffRes3, precomputed, '', '');
+  assert.ok(
+    !fogOffRes3Out.includes(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE),
+    'fog-off non-res1 fixture omits grid-hops sentence'
+  );
+  assert.ok(
+    !formatBriefing(fixtureState, precomputed, '', '').includes(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE),
+    'shared fixture without fog flag omits grid-hops sentence'
+  );
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
 
  * Purpose: Supports maintainability by documenting why `tests` exists.
@@ -384,6 +429,10 @@ const tests = [
   {
     name: 'attention flags severity sort and cap five',
     fn: testAttentionFlagsSeveritySortAndCapFive,
+  },
+  {
+    name: 'formatBriefing grid proximity honesty line',
+    fn: testFormatBriefingGridProximityHonestyLine,
   },
 ];
 

@@ -16,6 +16,10 @@ import { ensureStrategicCoordinateRegistryInitialized } from './briefing/map/hex
 import { h3ToCode } from './briefing/map/hex-code-translator';
 import type { CoordinateContext } from './briefing/map/coordinateContext';
 import type { PossibleActionsIndexedState } from './openrouter/possibleUnitActions';
+import {
+  OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE,
+  usesOmniscientGridProximity,
+} from './tools/assessUnitProximity';
 
 /**
  * Optional shared coordinate/index data to avoid rebuilding within one AI request.
@@ -448,6 +452,26 @@ export function buildActiveCallbacksSection(subscriptions: CallbackSubscription[
 }
 
 /**
+ * Honesty sentence when Unit Status distances use grid hops instead of march paths.
+ *
+ * Purpose: Fog-off strategic assessments report H3 grid distance; the model must not treat that as a legal march ETA.
+ * When to use: formatBriefing immediately after the Unit Status heading (caller appends a blank line before the table).
+ * Expected outcome: The shared briefing line when fog is off and hexes are res1; otherwise empty.
+ * Exceptions: Empty hex list yields empty string.
+ */
+function omniscientGridProximityBriefingLine(state: GameStateSnapshot): string {
+  logTrace('briefingFormatter omniscientGridProximityBriefingLine', {
+    turnNumber: state.turnNumber,
+    fogOfWarEnabled: state.fogOfWarEnabled ?? null,
+    hexCount: state.hexes.length,
+  });
+  const h3Index = state.hexes[0]?.h3Index;
+  if (!h3Index) return '';
+  if (!usesOmniscientGridProximity({ fogOfWarEnabled: state.fogOfWarEnabled, h3Index })) return '';
+  return OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE;
+}
+
+/**
  * Assembles the strategic Commander briefing markdown for the opponent AI system prompt.
  *
  * Purpose: Single map-first briefing (status, attention, operational map, memory, optional Standing Order Status, callbacks).
@@ -490,6 +514,10 @@ export function formatBriefing(
   sections.push(markdownHeading1("Commander's Briefing"));
   sections.push(buildStrategicNarrative(state, precomputed.unitAssessments, standingOrdersActive));
   sections.push(markdownHeading2('Unit Status and Threats'));
+  const gridProximityLine = omniscientGridProximityBriefingLine(state);
+  if (gridProximityLine.length > 0) {
+    sections.push(gridProximityLine + '\n\n');
+  }
   sections.push(buildUnitStatusTable(precomputed.unitAssessments, coordCtx, standingOrdersActive));
   sections.push(markdownHeading2('Attention Flags'));
   sections.push(buildAttentionFlags(precomputed.unitAssessments, 'strategic', standingOrdersActive));

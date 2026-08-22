@@ -4,7 +4,7 @@
  */
 
 import * as assert from 'assert';
-import { gridDisk } from 'h3-js';
+import { gridDisk, gridDistance } from 'h3-js';
 import type { GameStateSnapshot } from './gameDb';
 import { getOrderedHexList } from './mapData';
 import { buildLatLngCoordinateMap } from './mapData';
@@ -157,6 +157,60 @@ function testRunPrecomputationSkipHexAssessments(): void {
 }
 
 /**
+ * Verifies fog-off res1 precomputation lists a human beyond radius 4.
+ *
+ * Purpose: Unit Status nearest-enemy must see omniscient grid targets when fog is off.
+ * When to use: After changing runUnitAssessments / assess_unit omniscient scan.
+ * Expected outcome: opponent-armor-1 nearbyEnemies includes the distant human at grid distance 5.
+ * Exceptions: None.
+ */
+function testRunUnitAssessmentsFogOffIncludesDistantHuman(): void {
+  const hexes = getOrderedHexList();
+  let origin = hexes[0]!;
+  let far: string | undefined;
+  for (const candidate of hexes) {
+    let ring: string[];
+    try {
+      ring = gridDisk(candidate, 5);
+    } catch {
+      continue;
+    }
+    for (const h3 of ring) {
+      if (h3 === candidate) continue;
+      try {
+        if (gridDistance(candidate, h3) === 5) {
+          origin = candidate;
+          far = h3;
+          break;
+        }
+      } catch {
+        continue;
+      }
+    }
+    if (far) break;
+  }
+  assert.ok(far, 'expected a res1 pair at grid distance 5');
+  const hexList = [origin, far];
+  const state: GameStateSnapshot = {
+    hexes: hexList.map((h3Index) => ({ h3Index, terrain: 'land', terrainKind: 'plains' })),
+    units: [
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: origin },
+      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: far },
+    ],
+    phase: 'planning',
+    turnNumber: 3,
+    pendingOrders: [],
+    fogOfWarEnabled: false,
+  };
+  const coordMap = buildLatLngCoordinateMap(hexList);
+  const results = runUnitAssessments(state, coordMap);
+  assert.strictEqual(results.length, 1);
+  const human = results[0]!.result.nearbyEnemies.find((e) => e.unitId === 'human-infantry-1');
+  assert.ok(human, 'distant human must appear in fog-off precomputation');
+  assert.strictEqual(human!.hexDistance, 5);
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
 
  * Purpose: Supports maintainability by documenting why `tests` exists.
@@ -168,6 +222,7 @@ const tests = [
   { name: 'runUnitAssessments', fn: testRunUnitAssessments },
   { name: 'runPrecomputation', fn: testRunPrecomputation },
   { name: 'runPrecomputation skipHexAssessments', fn: testRunPrecomputationSkipHexAssessments },
+  { name: 'runUnitAssessments fog off includes distant human', fn: testRunUnitAssessmentsFogOffIncludesDistantHuman },
 ];
 
 /**

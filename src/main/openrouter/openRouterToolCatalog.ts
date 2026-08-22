@@ -134,7 +134,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
       type: 'object',
       properties: {
         unitId: { type: 'string', description: 'ID of the unit to assess (e.g. opponent-armor-1)' },
-        radius: { type: 'number', description: 'How far out to scan in hexes (default 4)' },
+        radius: { type: 'number', description: 'How far out to scan in hexes (default 4). Ignored when fog of war is off on the strategic map: all units are included using H3 grid hops.' },
       },
       required: ['unitId'],
     },
