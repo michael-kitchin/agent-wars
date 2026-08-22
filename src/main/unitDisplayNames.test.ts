@@ -105,6 +105,100 @@ function testProductionUnitsUseDisplayOrderNotSpawnSequence(): void {
 }
 
 /**
+ * Verifies fallback formation numbers stay independent when both sides share a unit type.
+ *
+ * Purpose: Guards the contract that human ordinals and opponent roman numerals each start at 1
+ * and continue only their own sequence, matching `allocateNextUnitDisplayOrder`.
+ * When to use: After changing `buildUnitDisplayNameLookup` grouping or fallback ordinal assignment.
+ * Expected outcome: A human production row without a usable `displayOrder` becomes the next human
+ * number, not one past the opponent’s highest persisted order; opponent spawn-sequence corruption
+ * continues the opponent sequence only.
+ * Exceptions: None.
+ */
+function testLookupFallbackOrdinalsStayIndependentPerPlayer(): void {
+  const lookup = buildUnitDisplayNameLookup([
+    { id: 'human-naval-1', unitType: 'naval', displayOrder: 1 },
+    { id: 'human-naval-2', unitType: 'naval', displayOrder: 2 },
+    { id: 'opponent-naval-1', unitType: 'naval', displayOrder: 1 },
+    { id: 'opponent-naval-2', unitType: 'naval', displayOrder: 2 },
+    { id: 'opponent-naval-3', unitType: 'naval', displayOrder: 3 },
+    { id: 'opponent-naval-4', unitType: 'naval', displayOrder: 4 },
+    { id: 'opponent-naval-5', unitType: 'naval', displayOrder: 5 },
+    { id: 'human-naval-prod-15-413', unitType: 'naval' },
+    { id: 'opponent-naval-prod-15-414', unitType: 'naval', displayOrder: 414 },
+  ]);
+  assert.strictEqual(lookup.get('human-naval-1'), '1st Fleet');
+  assert.strictEqual(lookup.get('opponent-naval-1'), 'I Fleet');
+  assert.strictEqual(
+    lookup.get('human-naval-prod-15-413'),
+    '3rd Fleet',
+    'human fallback must continue the human sequence, not the opponent max'
+  );
+  assert.strictEqual(
+    lookup.get('opponent-naval-prod-15-414'),
+    'VI Fleet',
+    'opponent spawn-sequence displayOrder must fall back within the opponent sequence'
+  );
+}
+
+/**
+ * Verifies destroyed formations keep their numbers instead of compacting the living roster.
+ *
+ * Purpose: Display order is a stable formation id, not a dense living index.
+ * When to use: After changing persisted-order labeling in `buildUnitDisplayNameLookup`.
+ * Expected outcome: Missing ordinals stay missing; surviving units keep 1st/3rd and I/VI.
+ * Exceptions: None.
+ */
+function testLookupKeepsFormationGapsWhenUnitsAreMissing(): void {
+  const lookup = buildUnitDisplayNameLookup([
+    { id: 'human-infantry-1', unitType: 'infantry', displayOrder: 1 },
+    { id: 'human-infantry-3', unitType: 'infantry', displayOrder: 3 },
+    { id: 'opponent-infantry-1', unitType: 'infantry', displayOrder: 1 },
+    { id: 'opponent-infantry-6', unitType: 'infantry', displayOrder: 6 },
+  ]);
+  assert.strictEqual(lookup.get('human-infantry-1'), '1st Infantry');
+  assert.strictEqual(lookup.get('human-infantry-3'), '3rd Infantry');
+  assert.strictEqual(lookup.get('opponent-infantry-1'), 'I Infantry');
+  assert.strictEqual(lookup.get('opponent-infantry-6'), 'VI Infantry');
+}
+
+/**
+ * Verifies duplicate roster rows for one id cannot replace a persisted formation with a fallback number.
+ *
+ * Purpose: Kill-toast construction concatenates fog-filtered snapshot units with kill-label rows.
+ * When to use: After changing `buildUnitDisplayNameLookup` grouping or map writes.
+ * Expected outcome: The persisted label wins when the same id appears with and without `displayOrder`.
+ * Exceptions: None.
+ */
+function testLookupDedupesDuplicateIdsPreferringPersistedOrder(): void {
+  const lookup = buildUnitDisplayNameLookup([
+    { id: 'human-armor-1', unitType: 'armor' },
+    { id: 'human-armor-1', unitType: 'armor', displayOrder: 1 },
+    { id: 'human-armor-2', unitType: 'armor', displayOrder: 2 },
+  ]);
+  assert.strictEqual(lookup.get('human-armor-1'), '1st Armored');
+  assert.strictEqual(lookup.get('human-armor-2'), '2nd Armored');
+}
+
+/**
+ * Verifies `player` is used for sequence grouping when the id does not carry a side prefix.
+ *
+ * Purpose: Snapshot rows include `player`; labels should not depend solely on `human-` / `opponent-` id prefixes.
+ * When to use: After changing owner resolution in `buildUnitDisplayNameLookup`.
+ * Expected outcome: An opponent row without a prefix stays on the roman sequence and does not continue human ordinals.
+ * Exceptions: None.
+ */
+function testLookupGroupsByPlayerWhenIdPrefixIsAbsent(): void {
+  const lookup = buildUnitDisplayNameLookup([
+    { id: 'human-naval-1', unitType: 'naval', player: 'human', displayOrder: 1 },
+    { id: 'human-naval-2', unitType: 'naval', player: 'human', displayOrder: 2 },
+    { id: 'ghost-fleet', unitType: 'naval', player: 'opponent' },
+  ]);
+  assert.strictEqual(lookup.get('human-naval-1'), '1st Fleet');
+  assert.strictEqual(lookup.get('ghost-fleet'), 'I Fleet');
+}
+
+/**
  * Verifies kill-label roster rows let toast formatters name fog-hidden production killers by display order.
  *
  * Purpose: Regression guard for update lines like `VIII Armored destroyed 1st Armored` when the killer is absent from fog-filtered snapshot units.
@@ -187,6 +281,10 @@ function run(): void {
   testBuildLookupUsesRomanNumeralsForAiAndOrdinalsForHuman();
   testFallbackUsesRomanNumeralsForAiAndLeavesUnknownIdsUntouched();
   testProductionUnitsUseDisplayOrderNotSpawnSequence();
+  testLookupFallbackOrdinalsStayIndependentPerPlayer();
+  testLookupKeepsFormationGapsWhenUnitsAreMissing();
+  testLookupDedupesDuplicateIdsPreferringPersistedOrder();
+  testLookupGroupsByPlayerWhenIdPrefixIsAbsent();
   testKillLabelRosterResolvesHiddenProductionKillers();
   testFormatTacticalSubUnitDisplayName();
   testBuildStrategicResolverMatchesLookupAndFallback();

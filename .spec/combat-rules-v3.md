@@ -327,11 +327,11 @@ Naval units can transport land units across water. Transport uses an explicit ca
 
 ### 9.1 Cargo assignment
 
-Each land unit has an `embarkedOn` field that identifies which naval unit it is assigned to (e.g. `"embarkedOn": "naval-2"`). Assignment requires the land unit and the naval unit to be in the same hex, and that hex must contain a seaport. Armor units are assigned before infantry (priority order). Players can reassign cargo via the stack popup UI; the LLM assigns cargo via the order format.
+Each land unit has an `embarkedOn` field that identifies which naval unit it is assigned to (e.g. `"embarkedOn": "naval-2"`). Assignment requires the land unit and the naval unit to be in the same hex, and that hex must contain a seaport (a water seaport must be controlled by the acting player). Armor units are assigned before infantry (priority order). Players can reassign cargo via the stack popup UI; the LLM assigns cargo via the order format.
 
 ### 9.2 Embark and disembark
 
-Embark requires a seaport. Manual debark is permitted at any coastal hex and at controlled water seaports (via stack popup or sealift slot `(none)`). Embarked land units cannot receive independent human or tactical movement orders until manually debarked. The LLM opponent auto-debarks when issuing independent movement orders (`explicit_move`, `disembark`, or standing-order expansion at Ready); humans must debark manually first.
+Embark requires a seaport, including a water seaport the acting player controls. Manual debark is permitted at any coastal hex and at controlled water seaports (via stack popup or sealift slot `(none)`). Embarked land units cannot receive independent human or tactical movement orders until manually debarked. The LLM opponent auto-debarks when issuing independent movement orders (`explicit_move`, `disembark`, or standing-order expansion at Ready); humans must debark manually first.
 
 ### 9.3 Embarked unit combat
 
@@ -359,7 +359,7 @@ If a naval unit carrying cargo is destroyed, all embarked units are destroyed wi
 - **Air strikes:** Air units strike first (range 3 from base airport), targeting units or infrastructure. Players choose one of four target types: units, urban hexes, airports, or seaports. When targeting units, counter-fire comes from defending units with range ≥ 1 (no range-to-base check). When targeting infrastructure, a fixed counter-fire roll applies regardless of hex occupation. Urban hex strikes destroy 3 res4 hexes per hit. One action per turn: strike or ferry.
 - **Infrastructure destruction:** Urban hexes, airports, and seaports can be permanently destroyed by air strikes. No rebuilding. Infrastructure counter-fire is independent of hex occupation.
 - **Ranged:** Naval 2 hexes, armor 1 hex; infantry melee only on strategic map (tactical uses larger res4 baselines). Defenders may return fire (attack roll) only when planning-parity reverse reach allows (including tactical terrain/LOS; air uses strike range + airport).
-- **Sealift:** Explicit cargo assignment via `embarkedOn` field. Embark at seaports; manual debark at coastal hexes and controlled water seaports for human players. Transport loss is always fatal for embarked cargo when the carrier is destroyed. LLM opponent movement orders auto-debark before marching.
+- **Sealift:** Explicit cargo assignment via `embarkedOn` field. Embark at seaports, including water seaports the acting player controls; manual debark at coastal hexes and controlled water seaports for human players. Transport loss is always fatal for embarked cargo when the carrier is destroyed. LLM opponent movement orders auto-debark before marching.
 - **WEGO-friendly:** Five-phase resolution (air strike → ranged → ground/naval movement → ferry → melee); automatic casualty assignment by fixed priority; no player-to-player interaction or confirmations.
 
 This gives a concrete, implementable combat system that matches the current four-unit roster and can be extended in later milestones.

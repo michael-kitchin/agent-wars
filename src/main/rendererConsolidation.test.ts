@@ -385,9 +385,12 @@ function testStackSealiftEmbarkedSelectionAndDebarkControls(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
   const renderSealiftSectionFn = getFunctionSource(source, 'renderSealiftSection');
+  const removeSealiftSectionFn = getFunctionSource(source, 'removeSealiftSection');
   const setNonSelectableFn = getFunctionSource(source, 'setStackPopupNonSelectableUnitIds');
   const applyVisibilityFn = getFunctionSource(source, 'applyStackCalloutSelectionButtonVisibility');
   const showStackCalloutFn = getFunctionSource(source, 'showStackCallout');
+  const stackSingleUnitHandlerFn = getFunctionSource(source, 'onStackSingleUnitToggleClick');
+  const stackAllActionHandlerFn = getFunctionSource(source, 'onStackAllActionClick');
 
   assert.ok(
     renderSealiftSectionFn.includes('.flatMap((row) => [row.slot1UnitId, row.slot2UnitId])') &&
@@ -416,6 +419,17 @@ function testStackSealiftEmbarkedSelectionAndDebarkControls(): void {
     renderSealiftSectionFn.includes('refreshGameStateAfterSealiftChange') &&
       renderSealiftSectionFn.includes('await refreshGameStateAfterSealiftChange()'),
     'strategic sealift embark/debark must refresh game state so same-turn select/move sees cleared embark flags'
+  );
+  assert.ok(
+    removeSealiftSectionFn.includes("querySelectorAll('.stack-sealift-section')") &&
+      renderSealiftSectionFn.includes('generation !== sealiftSectionRenderGeneration'),
+    'sealift section must drop stale overlapping renders and remove every existing section before append'
+  );
+  assert.ok(
+    stackSingleUnitHandlerFn.includes('refreshStackCallout: false') &&
+      stackAllActionHandlerFn.includes('refreshStackCallout: false') &&
+      setNonSelectableFn.includes('refreshStackCallout: false'),
+    'callers that already rebuilt the open stack popup must not start a second sealift render via selection sync'
   );
 }
 

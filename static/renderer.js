@@ -14721,8 +14721,14 @@
     }
     return out;
   }
-  function formatUnitNumberLabel(unitId, value, locale) {
-    return unitId.startsWith("opponent-") ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
+  function unitDisplayOwner(unit) {
+    if (unit.player === "human" || unit.player === "opponent") return unit.player;
+    if (unit.id.startsWith("opponent-")) return "opponent";
+    if (unit.id.startsWith("human-")) return "human";
+    return "other";
+  }
+  function formatUnitNumberLabel(unit, value, locale) {
+    return unitDisplayOwner(unit) === "opponent" ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
   }
   function parseSeedUnitIdParts(unitId) {
     const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-(\d+)$/);
@@ -14743,6 +14749,23 @@
     if (spawnSequence !== null && unit.displayOrder === spawnSequence) return void 0;
     return unit.displayOrder;
   }
+  function unitDisplaySequenceGroupKey(unit) {
+    return `${unitDisplayOwner(unit)}:${unit.unitType}`;
+  }
+  function uniqueUnitsPreferringPersistedOrder(units) {
+    const byId = /* @__PURE__ */ new Map();
+    for (const unit of units) {
+      const existing = byId.get(unit.id);
+      if (!existing) {
+        byId.set(unit.id, unit);
+        continue;
+      }
+      const existingOrder = resolvePersistedDisplayOrderForUnitLabel(existing);
+      const nextOrder = resolvePersistedDisplayOrderForUnitLabel(unit);
+      if (existingOrder === void 0 && nextOrder !== void 0) byId.set(unit.id, unit);
+    }
+    return [...byId.values()];
+  }
   function formatOrdinalLabel(value, locale) {
     const normalized = Math.max(1, Math.trunc(value));
     const numberText = new Intl.NumberFormat(locale).format(normalized);
@@ -14753,14 +14776,15 @@
   }
   function buildUnitDisplayNameLookup(units, locale) {
     const byGroup = /* @__PURE__ */ new Map();
-    for (const unit of units) {
-      const key = unit.unitType;
+    for (const unit of uniqueUnitsPreferringPersistedOrder(units)) {
+      const key = unitDisplaySequenceGroupKey(unit);
       const existing = byGroup.get(key);
       if (existing) existing.push(unit);
       else byGroup.set(key, [unit]);
     }
     const result = /* @__PURE__ */ new Map();
-    for (const [unitType, group] of byGroup.entries()) {
+    for (const group of byGroup.values()) {
+      const unitType = group[0]?.unitType ?? "";
       const withPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) !== void 0).sort(
         (a, b) => resolvePersistedDisplayOrderForUnitLabel(a) - resolvePersistedDisplayOrderForUnitLabel(b) || NATURAL_ID_COLLATOR.compare(a.id, b.id)
       );
@@ -14768,7 +14792,7 @@
       const noun = getUnitDisplayNoun(unitType);
       for (const unit of withPersisted) {
         const ordinal = resolvePersistedDisplayOrderForUnitLabel(unit);
-        const numberLabel = formatUnitNumberLabel(unit.id, ordinal, locale);
+        const numberLabel = formatUnitNumberLabel(unit, ordinal, locale);
         result.set(unit.id, `${numberLabel} ${noun}`);
       }
       let fallbackOrdinal = withPersisted.reduce(
@@ -14777,7 +14801,7 @@
       );
       for (const unit of withoutPersisted) {
         fallbackOrdinal += 1;
-        const numberLabel = formatUnitNumberLabel(unit.id, fallbackOrdinal, locale);
+        const numberLabel = formatUnitNumberLabel(unit, fallbackOrdinal, locale);
         result.set(unit.id, `${numberLabel} ${noun}`);
       }
     }
@@ -14786,7 +14810,7 @@
   function fallbackDisplayNameFromUnitId(unitId, locale) {
     const seed = parseSeedUnitIdParts(unitId);
     if (seed) {
-      const numberLabel = formatUnitNumberLabel(unitId, seed.ordinal, locale);
+      const numberLabel = formatUnitNumberLabel({ id: unitId }, seed.ordinal, locale);
       return `${numberLabel} ${getUnitDisplayNoun(seed.unitType)}`;
     }
     if (productionSpawnSequenceFromUnitId(unitId) !== null) return unitId;
@@ -24180,7 +24204,8 @@
       rosterById.set(unit.id, {
         id: unit.id,
         unitType: unit.unitType,
-        displayOrder: unit.displayOrder
+        displayOrder: unit.displayOrder,
+        player: unit.player
       });
     }
     for (const unit of rosterFromRemoved) {
@@ -24188,7 +24213,8 @@
       rosterById.set(unit.id, {
         id: unit.id,
         unitType: unit.unitType,
-        displayOrder: unit.displayOrder
+        displayOrder: unit.displayOrder,
+        player: unit.player
       });
     }
     for (const unit of killLabelUnits ?? []) {
@@ -24214,7 +24240,9 @@
     deps.updateSidebar();
     deps.updatePendingOrdersSidebar();
     deps.updateRangedSidebar();
-    deps.refreshStackCalloutIfOpen();
+    if (options.refreshStackCallout !== false) {
+      deps.refreshStackCalloutIfOpen();
+    }
     deps.redraw();
   }
   function createSidebarOrderRow(args) {
@@ -26976,6 +27004,7 @@
     }
   };
   var stackCalloutNonSelectableUnitIds = /* @__PURE__ */ new Set();
+  var sealiftSectionRenderGeneration = 0;
   function buildResolutionPlaybackState2(anim, elapsed) {
     return buildResolutionPlaybackState(anim, elapsed);
   }
@@ -27020,6 +27049,7 @@
     }
     rendererSharedState.stackCalloutModalActive = false;
     stackCalloutNonSelectableUnitIds = /* @__PURE__ */ new Set();
+    sealiftSectionRenderGeneration += 1;
     scheduleTerrainTooltipRestoreAfterPopoverClose();
   }
   function isStackOrBuildMapPopoverOpen() {
@@ -27075,7 +27105,7 @@
     if (shouldBlockToggleSelectionDuringHoverPlanning(unitId)) return;
     toggleUnitSelection2(unitId);
     showStackCallout(allUnitsAtHex, clientX, clientY);
-    syncUiAfterSelectionChange2({ refreshHoverPreview: false });
+    syncUiAfterSelectionChange2({ refreshHoverPreview: false, refreshStackCallout: false });
   }
   function onStackAllActionClick(action, selectableHumanIds, allUnitsAtHex, clientX, clientY) {
     if (selectableHumanIds.length === 0) return;
@@ -27092,7 +27122,7 @@
       addUnitsToSelection2(selectableHumanIds);
     } else removeUnitsFromSelection2(selectableHumanIds);
     showStackCallout(allUnitsAtHex, clientX, clientY);
-    syncUiAfterSelectionChange2({ refreshHoverPreview: false });
+    syncUiAfterSelectionChange2({ refreshHoverPreview: false, refreshStackCallout: false });
   }
   function applyStackCalloutSelectionButtonVisibility(calloutEl, nonSelectableUnitIds) {
     const listEl = document.getElementById("stack-callout-list");
@@ -27113,7 +27143,7 @@
     const selectedBlockedIds = normalized.filter((unitId) => rendererSharedState.selectedUnitIds.includes(unitId));
     if (selectedBlockedIds.length > 0) {
       removeUnitsFromSelection2(selectedBlockedIds);
-      syncUiAfterSelectionChange2({ refreshHoverPreview: false });
+      syncUiAfterSelectionChange2({ refreshHoverPreview: false, refreshStackCallout: false });
     }
     applyStackCalloutSelectionButtonVisibility(calloutEl, nonSelectable);
   }
@@ -27121,14 +27151,14 @@
     return units.filter((u) => u.player === "human" && !stackCalloutNonSelectableUnitIds.has(u.id)).map((u) => u.id);
   }
   function removeSealiftSection(calloutEl) {
-    const existing = calloutEl.querySelector(".stack-sealift-section");
-    if (existing) existing.remove();
+    calloutEl.querySelectorAll(".stack-sealift-section").forEach((el) => el.remove());
   }
   function buildSealiftUnitLabel(unitId, unitType) {
     void unitType;
     return formatUnitDisplayName(unitId);
   }
   async function renderSealiftSection(units, calloutEl) {
+    const generation = ++sealiftSectionRenderGeneration;
     removeSealiftSection(calloutEl);
     const h3Index = units[0]?.h3Index;
     if (!h3Index) return;
@@ -27144,11 +27174,13 @@
       } else {
         state = await window.gameApi.getSealiftStackState({ h3Index });
       }
+      if (generation !== sealiftSectionRenderGeneration) return;
       if (calloutEl.classList.contains("hidden")) return;
       if (calloutEl.getAttribute("data-h3-index") !== h3Index) return;
       if (!state.showSealiftSection) return;
       const nonSelectableEmbarkedIds = state.navalRows.flatMap((row) => [row.slot1UnitId, row.slot2UnitId]).filter((unitId) => typeof unitId === "string" && unitId.length > 0);
       setStackPopupNonSelectableUnitIds(calloutEl, nonSelectableEmbarkedIds);
+      if (generation !== sealiftSectionRenderGeneration) return;
       const section = document.createElement("div");
       section.className = "stack-sealift-section";
       for (const row of state.navalRows) {
@@ -27293,6 +27325,7 @@
         rowEl.appendChild(right);
         section.appendChild(rowEl);
       }
+      if (generation !== sealiftSectionRenderGeneration) return;
       calloutEl.appendChild(section);
     } catch (err) {
       console.error("sealift stack section failed:", err);

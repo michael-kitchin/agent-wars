@@ -380,6 +380,7 @@ export function buildKillToastFormatterBundle(
       id: unit.id,
       unitType: unit.unitType,
       displayOrder: unit.displayOrder,
+      player: unit.player,
     });
   }
   for (const unit of rosterFromRemoved) {
@@ -388,6 +389,7 @@ export function buildKillToastFormatterBundle(
       id: unit.id,
       unitType: unit.unitType,
       displayOrder: unit.displayOrder,
+      player: unit.player,
     });
   }
   for (const unit of killLabelUnits ?? []) {
@@ -414,17 +416,22 @@ export function buildKillToastFormatterBundle(
 
  * Purpose: Supports maintainability by documenting why `syncUiAfterSelectionChange` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Expected outcome: Sidebar, ranged, pending-order, and stack chrome stay aligned with the current selection. Pass `refreshStackCallout: false` when the caller already rebuilt the open stack popup so sealift does not render twice.
  * Exceptions: None.
  */
-export function syncUiAfterSelectionChange(deps: SyncUiDeps, options: { refreshHoverPreview?: boolean } = {}): void {
+export function syncUiAfterSelectionChange(
+  deps: SyncUiDeps,
+  options: { refreshHoverPreview?: boolean; refreshStackCallout?: boolean } = {}
+): void {
   if (options.refreshHoverPreview !== false) {
     void deps.refreshHoverRoutePreview();
   }
   deps.updateSidebar();
   deps.updatePendingOrdersSidebar();
   deps.updateRangedSidebar();
-  deps.refreshStackCalloutIfOpen();
+  if (options.refreshStackCallout !== false) {
+    deps.refreshStackCalloutIfOpen();
+  }
   deps.redraw();
 }
 

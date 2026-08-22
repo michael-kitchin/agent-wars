@@ -336,7 +336,7 @@ INFRASTRUCTURE STATUS:
 
 **Build:** Add naval transport mechanics. Naval units can carry land units across water using an explicit cargo assignment model. The `embarkedOn` field on each land unit identifies which naval unit it is assigned to (e.g. `"embarkedOn": "naval-2"`). Explicit assignment was chosen over co-location inference because coastal hexes are passable by both land and naval units, making co-location ambiguous.
 
-**Embark/disembark rules:** Embark requires a seaport (land unit and naval unit must be in the same hex with a seaport). Human players debark manually at any coastal hex or controlled water seaport (stack popup or sealift slot `(none)`). Auto-assignment on embark uses armor-priority ordering; players can reassign via the stack popup UI; the LLM assigns via the order format.
+**Embark/disembark rules:** Embark requires a seaport (land unit and naval unit must be in the same hex with a seaport; water seaports must be controlled by the acting player). Human players debark manually at any coastal hex or controlled water seaport (stack popup or sealift slot `(none)`). Auto-assignment on embark uses armor-priority ordering; players can reassign via the stack popup UI; the LLM assigns via the order format.
 
 **LLM auto-debark:** When an opponent land unit with an `embarkedOn` assignment receives an independent movement order (`explicit_move`, `disembark`, or standing-order march expansion at Ready), the engine clears cargo as a pre-step before applying the move. Human players cannot bypass manual debark.
 

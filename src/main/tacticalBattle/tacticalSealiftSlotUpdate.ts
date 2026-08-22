@@ -94,13 +94,14 @@ export function projectTacticalSealiftSlotChange(
     if (!canManualDebarkFromHex(args.h3Index, 'human')) {
       return { success: false, reason: 'Debark is not available at this location.' };
     }
-  } else if (baseState.contextMode === 'water') {
-    return { success: false, reason: 'Sealift assignments cannot be changed while at sea.' };
+  } else if (!canPlayerEmbarkFromTacticalRes4Hex(args.h3Index, 'human')) {
+    const atSea = baseState.contextMode === 'water';
+    return {
+      success: false,
+      reason: atSea ? 'Sealift assignments cannot be changed while at sea.' : 'Embarkation requires a valid port.',
+    };
   }
   const landKey = args.landUnitId?.trim() ?? '';
-  if (landKey.length > 0 && !canPlayerEmbarkFromTacticalRes4Hex(args.h3Index, 'human')) {
-    return { success: false, reason: 'Embarkation requires a valid port.' };
-  }
   if (landKey.length > 0 && !baseState.landOptions.some((o) => o.unitId === landKey)) {
     return { success: false, reason: 'Selected land unit is not available for this stack.' };
   }

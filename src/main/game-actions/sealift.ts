@@ -262,12 +262,12 @@ function getHexEmbarkContext(h3Index: string): HexEmbarkContext | null {
 }
 
 /**
- * Defines the `canPlayerEmbarkFromHex` function shape (function canPlayerEmbarkFromHex(h3Index: string, playerId: string): boolean).
-
- * Purpose: Supports maintainability by documenting why `canPlayerEmbarkFromHex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Returns whether the acting player may embark cargo at this hex.
+ *
+ * Purpose: Shared predicate for stack context mode, slot IPC, and LLM `applyEmbarkOrdersForPlayer`.
+ * When to use: Before treating a hex as a valid embark port.
+ * Expected outcome: True for native coastal, land seaports, and water seaports this player controls.
+ * Exceptions: False when the hex is missing from `hexes`.
  */
 function canPlayerEmbarkFromHex(h3Index: string, playerId: string): boolean {
   const context = getHexEmbarkContext(h3Index);
@@ -301,18 +301,19 @@ export function canManualDebarkFromHex(h3Index: string, playerId: string): boole
 }
 
 /**
- * Defines the `getSealiftStackContextModeForHex` function shape (export function getSealiftStackContextModeForHex(h3Index: string): SealiftContextMode).
-
- * Purpose: Supports maintainability by documenting why `getSealiftStackContextModeForHex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Classifies a hex for the human stack sealift UI.
+ *
+ * Purpose: Embark dropdowns enable only where the human may embark; water means no valid embark on that hex.
+ * When to use: `getSealiftStackStateImpl` and tactical stack state that reuses this classifier.
+ * Expected outcome: `coastal_port` for native coastal, land seaports, and controlled water seaports; `water` for open ocean and enemy or uncontrolled water seaports; `coastal_no_port` when movement terrain is coastal but embark is not allowed; `unsupported` when the hex is missing or inland without a seaport.
  * Exceptions: None.
  */
 export function getSealiftStackContextModeForHex(h3Index: string): SealiftContextMode {
+  logTrace('sealift getSealiftStackContextModeForHex', { h3Index });
   const context = getHexEmbarkContext(h3Index);
   if (!context) return 'unsupported';
-  if (context.normalizedMovementTerrain === 'water') return 'water';
   if (canPlayerEmbarkFromHex(h3Index, 'human')) return 'coastal_port';
+  if (context.normalizedMovementTerrain === 'water') return 'water';
   if (context.normalizedMovementTerrain === 'coastal') return 'coastal_no_port';
   return 'unsupported';
 }
@@ -530,12 +531,12 @@ export function getSealiftStackStateImpl(h3Index: string): SealiftStackState {
 }
 
 /**
- * Defines the `updateSealiftSlotImpl` function shape (export function updateSealiftSlotImpl(args: { h3Index: string; navalUnitId: string; slotIndex: 1 | 2; landUnitId: string | null; }): { success: boo).
-
- * Purpose: Supports maintainability by documenting why `updateSealiftSlotImpl` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Applies one human sealift slot edit (embark, reassign, or debark) at a strategic hex.
+ *
+ * Purpose: Stack popup IPC writes `unit_transport_assignments` after eligibility and capacity checks.
+ * When to use: Human sealift slot IPC only; LLM cargo uses `applyEmbarkOrdersForPlayer`.
+ * Expected outcome: Success with refreshed stack state, or a reason when the hex, units, or slot rules forbid the edit. Embark requires `canPlayerEmbarkFromHex`; debark requires `canManualDebarkFromHex`.
+ * Exceptions: None; returns `success: false` instead of throwing.
  */
 export function updateSealiftSlotImpl(args: {
   h3Index: string;
@@ -543,6 +544,12 @@ export function updateSealiftSlotImpl(args: {
   slotIndex: 1 | 2;
   landUnitId: string | null;
 }): { success: boolean; reason?: string; state?: SealiftStackState } {
+  logDebug('sealift updateSealiftSlotImpl', {
+    h3Index: args.h3Index,
+    navalUnitId: args.navalUnitId,
+    slotIndex: args.slotIndex,
+    hasLand: args.landUnitId != null,
+  });
   if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
   const state = getSealiftStackStateImpl(args.h3Index);
   const navalIds = state.navalRows.map((row) => row.navalUnitId);
@@ -552,11 +559,12 @@ export function updateSealiftSlotImpl(args: {
     if (!canManualDebarkFromHex(args.h3Index, 'human')) {
       return { success: false, reason: 'Debark is not available at this location.' };
     }
-  } else if (state.contextMode === 'water') {
-    return { success: false, reason: 'Sealift assignments cannot be changed while at sea.' };
-  }
-  if (args.landUnitId && !canPlayerEmbarkFromHex(args.h3Index, 'human')) {
-    return { success: false, reason: 'Embarkation requires a valid port.' };
+  } else if (!canPlayerEmbarkFromHex(args.h3Index, 'human')) {
+    const atSea = state.contextMode === 'water';
+    return {
+      success: false,
+      reason: atSea ? 'Sealift assignments cannot be changed while at sea.' : 'Embarkation requires a valid port.',
+    };
   }
   if (args.landUnitId && !state.landOptions.some((option) => option.unitId === args.landUnitId)) {
     return { success: false, reason: 'Selected land unit is not available for this stack.' };

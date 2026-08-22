@@ -254,6 +254,16 @@ const tacticalExitSessionAccessor: TacticalExitSessionAccessor = {
  */
 let stackCalloutNonSelectableUnitIds: ReadonlySet<string> = new Set<string>();
 
+/**
+ * Monotonic generation for in-flight stack sealift renders.
+ *
+ * Purpose: Overlapping `renderSealiftSection` awaits would otherwise append a second `.stack-sealift-section`.
+ * When to use: Increment at the start of each sealift render and when hiding the stack popup; ignore stale awaits.
+ * Expected outcome: Only the latest render appends sealift rows.
+ * Exceptions: None.
+ */
+let sealiftSectionRenderGeneration = 0;
+
 declare global {
     /**
    * Documents the `Window` interface as a named contract surface (interface Window).
@@ -348,11 +358,11 @@ function formatStackTooltip(units: GameStateSnapshot['units']): string {
 }
 
 /**
- * Defines the `hideStackCallout` function shape (function hideStackCallout(): void).
-
- * Purpose: Supports maintainability by documenting why `hideStackCallout` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Closes the stack unit list popup and invalidates in-flight sealift renders.
+ *
+ * Purpose: Hide stack chrome and prevent a late `getSealiftStackState` result from appending into a closed popup.
+ * When to use: Dismissing the stack callout, including hover-planning and Ctrl-release.
+ * Expected outcome: Popup hidden; `sealiftSectionRenderGeneration` advanced so stale sealift awaits return without appending.
  * Exceptions: None.
  */
 function hideStackCallout(): void {
@@ -370,6 +380,7 @@ function hideStackCallout(): void {
   }
   S.stackCalloutModalActive = false;
   stackCalloutNonSelectableUnitIds = new Set<string>();
+  sealiftSectionRenderGeneration += 1;
   scheduleTerrainTooltipRestoreAfterPopoverClose();
 }
 
@@ -507,7 +518,7 @@ function onStackSingleUnitToggleClick(
   if (shouldBlockToggleSelectionDuringHoverPlanning(unitId)) return;
   toggleUnitSelection(unitId);
   showStackCallout(allUnitsAtHex, clientX, clientY);
-  syncUiAfterSelectionChange({ refreshHoverPreview: false });
+  syncUiAfterSelectionChange({ refreshHoverPreview: false, refreshStackCallout: false });
 }
 
 /**
@@ -539,7 +550,7 @@ function onStackAllActionClick(
     addUnitsToSelection(selectableHumanIds);
   } else removeUnitsFromSelection(selectableHumanIds);
   showStackCallout(allUnitsAtHex, clientX, clientY);
-  syncUiAfterSelectionChange({ refreshHoverPreview: false });
+  syncUiAfterSelectionChange({ refreshHoverPreview: false, refreshStackCallout: false });
 }
 
 /**
@@ -578,7 +589,7 @@ function setStackPopupNonSelectableUnitIds(calloutEl: HTMLElement, unitIds: stri
   const selectedBlockedIds = normalized.filter((unitId) => S.selectedUnitIds.includes(unitId));
   if (selectedBlockedIds.length > 0) {
     removeUnitsFromSelection(selectedBlockedIds);
-    syncUiAfterSelectionChange({ refreshHoverPreview: false });
+    syncUiAfterSelectionChange({ refreshHoverPreview: false, refreshStackCallout: false });
   }
   applyStackCalloutSelectionButtonVisibility(calloutEl, nonSelectable);
 }
@@ -596,16 +607,15 @@ function getSelectableHumanIdsForStackCallout(units: GameStateSnapshot['units'])
 }
 
 /**
- * Defines the `removeSealiftSection` function shape (function removeSealiftSection(calloutEl: HTMLElement): void).
-
- * Purpose: Supports maintainability by documenting why `removeSealiftSection` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Removes every sealift assignment block from the stack popup.
+ *
+ * Purpose: Overlapping async renders can leave more than one `.stack-sealift-section`; a single `querySelector` would keep extras.
+ * When to use: Before fetching new sealift state and whenever the popup must not show stale cargo rows.
+ * Expected outcome: No `.stack-sealift-section` remains under `calloutEl`.
  * Exceptions: None.
  */
 function removeSealiftSection(calloutEl: HTMLElement): void {
-  const existing = calloutEl.querySelector('.stack-sealift-section');
-  if (existing) existing.remove();
+  calloutEl.querySelectorAll('.stack-sealift-section').forEach((el) => el.remove());
 }
 
 /**
@@ -622,14 +632,15 @@ function buildSealiftUnitLabel(unitId: string, unitType: string): string {
 }
 
 /**
- * Defines the `renderSealiftSection` function shape (async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl: HTMLElement): Promise<void>).
-
- * Purpose: Supports maintainability by documenting why `renderSealiftSection` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Fills the stack popup sealift controls for the current hex after loading stack state.
+ *
+ * Purpose: Cargo slot UI is async; a generation token drops stale awaits so each fleet is listed once.
+ * When to use: End of `showStackCallout` and after sealift slot IPC refreshes the open popup.
+ * Expected outcome: At most one sealift section for the latest stack hex; hidden or superseded renders do not append.
+ * Exceptions: Logs to the console if sealift IPC throws.
  */
 async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl: HTMLElement): Promise<void> {
+  const generation = ++sealiftSectionRenderGeneration;
   removeSealiftSection(calloutEl);
   const h3Index = units[0]?.h3Index;
   if (!h3Index) return;
@@ -649,6 +660,7 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
     } else {
       state = (await window.gameApi.getSealiftStackState!({ h3Index })) as SealiftStackState;
     }
+    if (generation !== sealiftSectionRenderGeneration) return;
     if (calloutEl.classList.contains('hidden')) return;
     if (calloutEl.getAttribute('data-h3-index') !== h3Index) return;
     if (!state.showSealiftSection) return;
@@ -656,6 +668,7 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
       .flatMap((row) => [row.slot1UnitId, row.slot2UnitId])
       .filter((unitId): unitId is string => typeof unitId === 'string' && unitId.length > 0);
     setStackPopupNonSelectableUnitIds(calloutEl, nonSelectableEmbarkedIds);
+    if (generation !== sealiftSectionRenderGeneration) return;
 
     const section = document.createElement('div');
     section.className = 'stack-sealift-section';
@@ -814,6 +827,7 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
       rowEl.appendChild(right);
       section.appendChild(rowEl);
     }
+    if (generation !== sealiftSectionRenderGeneration) return;
     calloutEl.appendChild(section);
   } catch (err) {
     console.error('sealift stack section failed:', err);
@@ -2834,10 +2848,12 @@ function buildKillToastFormatterBundle(
 
  * Purpose: Supports maintainability by documenting why `syncUiAfterSelectionChange` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Expected outcome: Sidebar, ranged, pending-order, and optional stack chrome stay aligned with the current selection.
  * Exceptions: None.
  */
-function syncUiAfterSelectionChange(options: { refreshHoverPreview?: boolean } = {}): void {
+function syncUiAfterSelectionChange(
+  options: { refreshHoverPreview?: boolean; refreshStackCallout?: boolean } = {}
+): void {
   return syncUiAfterSelectionChangeFromModule(
     {
       refreshHoverRoutePreview,

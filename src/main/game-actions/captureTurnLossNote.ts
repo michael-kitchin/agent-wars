@@ -170,6 +170,7 @@ export function captureTurnLossNoteFromResolution(args: CaptureTurnLossNoteArgs)
       id: u.id,
       unitType: u.unitType,
       displayOrder: u.displayOrder,
+      player: u.player,
     }));
   const displayLookup = buildUnitDisplayNameLookup(roster);
   const summary = buildTurnLossSummary({

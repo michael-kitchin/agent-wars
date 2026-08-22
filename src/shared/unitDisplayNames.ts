@@ -34,6 +34,15 @@ unitType: string;
    * Exceptions: None.
    */
 displayOrder?: number;
+    /**
+     * Owning side used to keep human and opponent formation sequences independent.
+     *
+     * Contract: `human` or `opponent` when known; omitted rows fall back to the `human-` / `opponent-` id prefix.
+     * When to use: Snapshot and kill-roster rows should pass the DB player so labels stay correct if the id shape varies.
+     * Expected outcome: Opponent rows use roman numerals on their own 1-based sequence; human rows use ordinals on theirs.
+     * Exceptions: Unknown values are ignored and the id prefix is used instead.
+     */
+    player?: string;
 }
 
 /**
@@ -161,19 +170,34 @@ function toRomanNumeral(value: number): string {
 }
 
 /**
- * Defines the `formatUnitNumberLabel` function shape (function formatUnitNumberLabel().
+ * Resolves which side owns a roster row for formation numbering and roman vs ordinal labels.
+ *
+ * Purpose: `player` is the DB source of truth; id prefixes cover rows that omit it.
+ * When to use: Sequence grouping and `formatUnitNumberLabel`.
+ * Expected outcome: `human`, `opponent`, or `other` when neither player nor prefix identifies a side.
+ * Exceptions: None.
+ */
+function unitDisplayOwner(unit: Pick<UnitDisplayIdentity, 'id' | 'player'>): 'human' | 'opponent' | 'other' {
+  if (unit.player === 'human' || unit.player === 'opponent') return unit.player;
+  if (unit.id.startsWith('opponent-')) return 'opponent';
+  if (unit.id.startsWith('human-')) return 'human';
+  return 'other';
+}
 
- * Purpose: Supports maintainability by documenting why `formatUnitNumberLabel` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+/**
+ * Formats the numeric part of a unit label as an English ordinal or a roman numeral.
+ *
+ * Purpose: Human formations use `1st`/`2nd`; opponent formations use `I`/`II`, using the same owner as sequence grouping.
+ * When to use: Inside lookup and id-only fallback after the formation number is known.
+ * Expected outcome: Opponent owner yields roman numerals; any other owner yields locale ordinals.
  * Exceptions: None.
  */
 function formatUnitNumberLabel(
-  unitId: string,
+  unit: Pick<UnitDisplayIdentity, 'id' | 'player'>,
   value: number,
   locale?: Intl.LocalesArgument
 ): string {
-  return unitId.startsWith('opponent-') ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
+  return unitDisplayOwner(unit) === 'opponent' ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
 }
 
 /**
@@ -212,7 +236,7 @@ function productionSpawnSequenceFromUnitId(unitId: string): number | null {
  *
  * Purpose: Prevents `CCLXXVI Squadron`-style labels when `display_order` mirrors the production spawn counter tail.
  * When to use: Inside `buildUnitDisplayNameLookup` when classifying persisted vs fallback ordinals.
- * Expected outcome: Valid per-type formation ordinals pass through; corrupted production rows behave as unset.
+ * Expected outcome: Valid per-player-per-type formation ordinals pass through; corrupted production rows behave as unset.
  * Exceptions: None.
  */
 function resolvePersistedDisplayOrderForUnitLabel(unit: UnitDisplayIdentity): number | undefined {
@@ -220,6 +244,42 @@ function resolvePersistedDisplayOrderForUnitLabel(unit: UnitDisplayIdentity): nu
   const spawnSequence = productionSpawnSequenceFromUnitId(unit.id);
   if (spawnSequence !== null && unit.displayOrder === spawnSequence) return undefined;
   return unit.displayOrder;
+}
+
+/**
+ * Partitions roster rows by owning side and unit type so formation numbers stay independent.
+ *
+ * Purpose: Allocation is per-player-per-type (`1st` vs `I` both start at 1); fallback labels must
+ * continue only that side's sequence, not the mixed max across both players.
+ * When to use: Inside `buildUnitDisplayNameLookup` before assigning persisted or fallback ordinals.
+ * Expected outcome: Owner from `player` when it is `human`/`opponent`, otherwise the id prefix, combined with `unitType`.
+ * Exceptions: None.
+ */
+function unitDisplaySequenceGroupKey(unit: UnitDisplayIdentity): string {
+  return `${unitDisplayOwner(unit)}:${unit.unitType}`;
+}
+
+/**
+ * Collapses repeated ids so a row without a usable `displayOrder` cannot overwrite a persisted formation label.
+ *
+ * Purpose: Kill-toast and similar callers may concatenate overlapping rosters for the same unit id.
+ * When to use: At the start of `buildUnitDisplayNameLookup` before grouping.
+ * Expected outcome: One row per id; a usable persisted `displayOrder` wins over an unset or spawn-sequence-corrupted row.
+ * Exceptions: None.
+ */
+function uniqueUnitsPreferringPersistedOrder(units: readonly UnitDisplayIdentity[]): UnitDisplayIdentity[] {
+  const byId = new Map<string, UnitDisplayIdentity>();
+  for (const unit of units) {
+    const existing = byId.get(unit.id);
+    if (!existing) {
+      byId.set(unit.id, unit);
+      continue;
+    }
+    const existingOrder = resolvePersistedDisplayOrderForUnitLabel(existing);
+    const nextOrder = resolvePersistedDisplayOrderForUnitLabel(unit);
+    if (existingOrder === undefined && nextOrder !== undefined) byId.set(unit.id, unit);
+  }
+  return [...byId.values()];
 }
 
 /**
@@ -306,7 +366,7 @@ export function buildStrategicUnitDisplayLabelResolver(
 export function buildKillLabelUnitRoster(
   killEdges: readonly { victimId: string; killerIds: string[] }[],
   liveUnits: readonly UnitDisplayIdentity[],
-  removedUnits: readonly { id: string; unitType: string; displayOrder?: number }[]
+  removedUnits: readonly { id: string; unitType: string; displayOrder?: number; player?: string }[]
 ): UnitDisplayIdentity[] {
   const participantIds = new Set<string>();
   for (const edge of killEdges) {
@@ -317,11 +377,21 @@ export function buildKillLabelUnitRoster(
 
   const byId = new Map<string, UnitDisplayIdentity>();
   for (const unit of liveUnits) {
-    byId.set(unit.id, { id: unit.id, unitType: unit.unitType, displayOrder: unit.displayOrder });
+    byId.set(unit.id, {
+      id: unit.id,
+      unitType: unit.unitType,
+      displayOrder: unit.displayOrder,
+      player: unit.player,
+    });
   }
   for (const unit of removedUnits) {
     if (byId.has(unit.id)) continue;
-    byId.set(unit.id, { id: unit.id, unitType: unit.unitType, displayOrder: unit.displayOrder });
+    byId.set(unit.id, {
+      id: unit.id,
+      unitType: unit.unitType,
+      displayOrder: unit.displayOrder,
+      player: unit.player,
+    });
   }
 
   const out: UnitDisplayIdentity[] = [];
@@ -333,11 +403,12 @@ export function buildKillLabelUnitRoster(
 }
 
 /**
- * Defines the `buildUnitDisplayNameLookup` function shape (export function buildUnitDisplayNameLookup().
-
- * Purpose: Supports maintainability by documenting why `buildUnitDisplayNameLookup` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Builds a `(unitId) => label` map using per-player, per-type formation ordinals.
+ *
+ * Purpose: Human units use `1st`/`2nd` and opponent units use `I`/`II`, each sequence starting at 1.
+ * When to use: Renderer snapshot apply, kill toasts, tactical parent names, and strategic validation labels.
+ * Expected outcome: Persisted `displayOrder` is the formation number; missing or spawn-sequence-corrupted
+ * orders continue only that side's sequence for the same unit type.
  * Exceptions: None.
  */
 export function buildUnitDisplayNameLookup(
@@ -345,15 +416,16 @@ export function buildUnitDisplayNameLookup(
   locale?: Intl.LocalesArgument
 ): Map<string, string> {
   const byGroup = new Map<string, UnitDisplayIdentity[]>();
-  for (const unit of units) {
-    const key = unit.unitType;
+  for (const unit of uniqueUnitsPreferringPersistedOrder(units)) {
+    const key = unitDisplaySequenceGroupKey(unit);
     const existing = byGroup.get(key);
     if (existing) existing.push(unit);
     else byGroup.set(key, [unit]);
   }
 
   const result = new Map<string, string>();
-  for (const [unitType, group] of byGroup.entries()) {
+  for (const group of byGroup.values()) {
+    const unitType = group[0]?.unitType ?? '';
     const withPersisted = group
       .filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) !== undefined)
       .sort(
@@ -368,7 +440,7 @@ export function buildUnitDisplayNameLookup(
     const noun = getUnitDisplayNoun(unitType);
     for (const unit of withPersisted) {
       const ordinal = resolvePersistedDisplayOrderForUnitLabel(unit) as number;
-      const numberLabel = formatUnitNumberLabel(unit.id, ordinal, locale);
+      const numberLabel = formatUnitNumberLabel(unit, ordinal, locale);
       result.set(unit.id, `${numberLabel} ${noun}`);
     }
     let fallbackOrdinal = withPersisted.reduce(
@@ -377,7 +449,7 @@ export function buildUnitDisplayNameLookup(
     );
     for (const unit of withoutPersisted) {
       fallbackOrdinal += 1;
-      const numberLabel = formatUnitNumberLabel(unit.id, fallbackOrdinal, locale);
+      const numberLabel = formatUnitNumberLabel(unit, fallbackOrdinal, locale);
       result.set(unit.id, `${numberLabel} ${noun}`);
     }
   }
@@ -395,7 +467,7 @@ export function buildUnitDisplayNameLookup(
 export function fallbackDisplayNameFromUnitId(unitId: string, locale?: Intl.LocalesArgument): string {
   const seed = parseSeedUnitIdParts(unitId);
   if (seed) {
-    const numberLabel = formatUnitNumberLabel(unitId, seed.ordinal, locale);
+    const numberLabel = formatUnitNumberLabel({ id: unitId }, seed.ordinal, locale);
     return `${numberLabel} ${getUnitDisplayNoun(seed.unitType)}`;
   }
   if (productionSpawnSequenceFromUnitId(unitId) !== null) return unitId;
