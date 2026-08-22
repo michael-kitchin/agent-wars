@@ -1,0 +1,8 @@
+---
+description: "13 — Mutable and immutable symbols"
+alwaysApply: true
+---
+
+# 13 — Mark symbols according to their purpose their intended mutability or immutability
+
+Classes, fields, variables, arguments, functions and other symbols should be marked according to their intended mutability or immutability, as appropriate for the chosen language level (examples: final in Java, const in TypeScript, and open in Kotlin).

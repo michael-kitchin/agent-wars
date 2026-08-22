@@ -21,7 +21,8 @@ import {
   type AssignOrderParams,
   type StandingOrderRow,
 } from './tool5StandingOrdersShared';
-export { expireAndUpdateStatus, generateOrdersForStandingOrders } from './tool5StandingOrdersGeneration';
+import { expireAndUpdateStatus, generateOrdersForStandingOrders } from './tool5StandingOrdersGeneration';
+export { expireAndUpdateStatus, generateOrdersForStandingOrders };
 
 /**
  * Documents the module-scope binding `WARNING_STATUSES` (WARNING_STATUSES).
@@ -595,9 +596,9 @@ export function getStandingOrderForUnit(
 /**
  * Builds the strategic Standing Order Status briefing block for the opponent AI.
  *
- * Purpose: Injects parent-unit standing-order tables into strategic Commander prompts only.
+ * Purpose: Injects parent-unit standing-order tables into strategic Commander prompts only. Arrived marches are expired first so completed missions are not listed as active.
  * When to use: Strategic `formatBriefing` / `buildSystemPromptForTools` when Orders tools are enabled.
- * Expected outcome: Markdown `# Standing Order Status` (+ units without orders); empty string in tactical mode.
+ * Expected outcome: Markdown `# Standing Order Status` (+ units without orders); empty string in tactical mode. Units already at their march destination appear under Units Without Standing Orders.
  * Exceptions: None.
  */
 export function getInjectionText(
@@ -613,6 +614,7 @@ export function getInjectionText(
     });
     return '';
   }
+  expireAndUpdateStatus(playerId, state);
   ensureStrategicCoordinateRegistryInitialized();
   logDebug('tool5StandingOrders getInjectionText', {
     playerId,

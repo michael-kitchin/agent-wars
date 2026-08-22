@@ -312,6 +312,60 @@ function testAssignMarchToCurrentHexDoesNotPersistStandingOrder(): void {
 }
 
 /**
+ * Ensures the standing-order briefing expires arrived marches before listing them as active missions.
+ *
+ * Purpose: Turn 9 strategic prompts still showed MARCH/en_route for units already on the destination hex, so the AI skipped reassignment and those units sat idle after expire ran post-response.
+ * When to use: After edits to `getInjectionText` or `expireAndUpdateStatus` arrival cleanup.
+ * Expected outcome: The arrived row is deleted; the unit appears under Units Without Standing Orders, not as an active MARCH.
+ * Exceptions: None.
+ */
+function testGetInjectionTextExpiresArrivedMarch(): void {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-tool5-'));
+  const dbPath = path.join(tempDir, 't.sqlite');
+  try {
+    openGameDatabaseAtPathForTests(dbPath);
+    resetGameForNewMatch();
+    const state = getGameState();
+    const unit = state.units.find((u) => u.player === 'opponent');
+    assert.ok(unit, 'Expected an opponent unit in seeded test state');
+    const [lat, lng] = cellToLatLng(unit!.h3Index);
+    dbRun(
+      `INSERT OR REPLACE INTO standing_orders (player_id, unit_id, order_type, params, computed_route, status, created_turn, origin_hex)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        'opponent',
+        unit!.id,
+        'march',
+        JSON.stringify({ type: 'march', destination: [lat, lng], avoidEnemies: true, engageEnRoute: false }),
+        null,
+        'en_route',
+        state.turnNumber,
+        JSON.stringify([lat, lng]),
+      ]
+    );
+
+    const text = getInjectionText('opponent', state);
+    const row = dbGetOne<{ c: number }>(
+      'SELECT COUNT(*) AS c FROM standing_orders WHERE player_id = ? AND unit_id = ?',
+      ['opponent', unit!.id]
+    );
+    assert.strictEqual(row?.c ?? 0, 0, 'Arrived march must be deleted before the briefing is rendered');
+    const withoutSection = text.slice(text.indexOf('## Units Without Standing Orders'));
+    assert.ok(
+      withoutSection.includes(`| ${unit!.id} |`),
+      'arrived unit must be listed as having no standing order'
+    );
+    const activeSection = text.slice(0, text.indexOf('## Units Without Standing Orders'));
+    assert.ok(
+      !activeSection.includes(`| ${unit!.id} |`),
+      'arrived march must not remain in the active standing-order table'
+    );
+  } finally {
+    closeGameDatabaseForTests();
+  }
+}
+
+/**
  * Defines the `testGenerateRemovesArrivedMarchOrder` function shape (function testGenerateRemovesArrivedMarchOrder(): void).
 
  * Purpose: Supports maintainability by documenting why `testGenerateRemovesArrivedMarchOrder` exists.
@@ -646,6 +700,7 @@ function run(): void {
   testQueryOrdersRequiresUnitIdOrAll();
   testCancelOrderWhenNoOrder();
   testGetInjectionTextEmpty();
+  testGetInjectionTextExpiresArrivedMarch();
   testAssignMarchToCurrentHexDoesNotPersistStandingOrder();
   testGenerateRemovesArrivedMarchOrder();
   testDefendAutoEngagementClosestInRangeEnemy();

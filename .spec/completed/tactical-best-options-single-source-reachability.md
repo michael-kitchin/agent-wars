@@ -6,8 +6,9 @@
 | --- | --- | --- |
 | Destination collector | `getValidDestinations` → `getLandMassReachableHexes` (hop BFS) / naval disk | `collectTacticalLegalMoveDestinationRes4Hexes` → single-source MP reachability |
 | Hex sets | Res1 land-mass | Res4 footprint + Ready enter costs |
-| Best Options interest | Enemy ∪ uncontrolled interesting infra | Enemy (human) ∪ interesting infra (same predicate helper) |
-| Empty interest | Empty rows for that unit | Approach fallback (tactical-only) |
+| Best Options interest | Enemy ∪ uncontrolled unoccupied interesting infra; infra-only does not suppress approach | Enemy (human) ∪ uncontrolled unoccupied interesting infra (same predicate helper); infra-only does not suppress approach |
+| Empty / infra-only interest | Approach fallback (grid distance to nearest observed enemy); infra capture only when approach cannot run | Approach fallback (same helper); infra capture only when approach cannot run |
+| Ranged Best Options | Enemy-occupied only | Human-occupied only (legal infra-only shots unchanged) |
 
 Destination **sets** are not shared — different maps and cost models. Pipeline and interest **shape** are shared.
 
@@ -15,7 +16,7 @@ Destination **sets** are not shared — different maps and cost models. Pipeline
 
 - Land: `collectInfantryArmorReachableWithinBudget` + shared `landStateKey` / `parseLandStateKey` / transit helpers from continuity.
 - Naval: `collectSimpleEnterCostReachableWithinBudget` reuses planner `enterCostForHex` (one Dijkstra).
-- Filters: `keepsBestOptionsThisTurnInterestHex` for strategic ground, tactical ground, and tactical ranged.
+- Filters: `keepsBestOptionsThisTurnInterestHex` in `possibleUnitActionsBestOptionsInterest.ts` for strategic ground and tactical ground. Tactical ranged Best Options keeps human-occupied cells only.
 
 ## Perf note
 

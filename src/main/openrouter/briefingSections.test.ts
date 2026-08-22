@@ -4,8 +4,14 @@
  */
 
 import assert from 'node:assert/strict';
+import { gridDisk } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
-import { buildSealiftBriefingBlock } from './briefingSections';
+import {
+  buildAirOperationsBriefingBlock,
+  buildSealiftBriefingBlock,
+  formatBriefingAvailableUnitTypes,
+  formatBriefingProductionQueueCell,
+} from './briefingSections';
 
 /** Water hex with no seaport (briefing B0). */
 const WATER_NO_PORT = '810ebffffffffff';
@@ -240,13 +246,72 @@ function testAboardShowsEmbarkedArmor(): void {
 }
 
 /**
- * Runs strategic sealift briefing tests.
+ * Ensures strikeable infra counts only human-controlled hexes, not uncontrolled cities in the envelope.
  *
- * Purpose: Node test entrypoint.
- * When to use: `node dist/main/openrouter/briefingSections.test.js`.
- * Expected outcome: Throws on failure; logs pass when all succeed.
- * Exceptions: Propagates assertion errors.
+ * Purpose: Turn 9 listed Strikeable Urban=8 while enemy airports/seaports were 0, which contradicts the tempo rule and invites bombing hexes the AI should capture.
+ * When to use: After edits to `countStrikeableEnemyInfrastructure` or the air-operations summary line.
+ * Expected outcome: Uncontrolled urban/airport in range is omitted; human-controlled urban/airport/seaport is counted.
+ * Exceptions: Throws if `gridDisk` cannot supply two neighbors of the base hex.
  */
+function testStrikeableInfraCountsOnlyHumanControlled(): void {
+  const base = WATER_NO_PORT;
+  const nearby = [...gridDisk(base, 1)].filter((h3) => h3 !== base);
+  const uncontrolled = nearby[0];
+  const humanHex = nearby[1];
+  assert.ok(uncontrolled && humanHex, 'expected two neighbors of the air base');
+  const md = buildAirOperationsBriefingBlock(
+    {
+      hexes: [base, uncontrolled, humanHex].map((h3Index) => ({
+        h3Index,
+        terrain: 'land',
+        terrainKind: 'plains',
+      })),
+      units: [{ id: 'opponent-air-1', player: 'opponent', unitType: 'air', h3Index: base }],
+      phase: 'planning',
+      turnNumber: 1,
+      pendingOrders: [],
+      res1Control: [
+        { h3Index: base, controllerPlayerId: 'opponent' },
+        { h3Index: humanHex, controllerPlayerId: 'human' },
+      ],
+      res1Infrastructure: [
+        { h3Index: base, urbanHexCount: 0, airportCount: 1, seaportCount: 0 },
+        { h3Index: uncontrolled, urbanHexCount: 5, airportCount: 1, seaportCount: 0 },
+        { h3Index: humanHex, urbanHexCount: 8, airportCount: 1, seaportCount: 1 },
+      ],
+    } as GameStateSnapshot,
+    (h3) => h3,
+    'strategic'
+  );
+  const airRow = md.split('\n').find((line) => line.includes('opponent-air-1'));
+  assert.ok(airRow, 'air unit row must be present');
+  const cells = airRow.split('|').map((c) => c.trim()).filter((c) => c.length > 0);
+  assert.equal(cells[5], '1', 'Strikeable Urban must count only the human-controlled hex');
+  assert.equal(cells[6], '1', 'Strikeable Airports must count only the human-controlled hex');
+  assert.equal(cells[7], '1', 'Strikeable Seaports must count only the human-controlled hex');
+  assert.match(md, /Enemy infrastructure in your current strike envelope: airports=1, seaports=1/);
+}
+
+/**
+ * Ensures production briefing copy hides types at deployment cap and marks stalled queues.
+ *
+ * Purpose: Turn 9 still listed armor as available and queued armor as healthy at 32/32, so empty hexes were filled with armor that cannot spawn.
+ * When to use: After edits to production briefing available-type / queue formatting.
+ * Expected outcome: Maxed types are omitted from available when another type remains; a hex that can only build the capped type still lists it; queued maxed types are annotated as blocked.
+ * Exceptions: None.
+ */
+function testProductionBriefingHidesMaxedTypesAndAnnotatesBlockedQueues(): void {
+  const maxed = new Set(['armor']);
+  assert.equal(
+    formatBriefingAvailableUnitTypes(['infantry', 'armor', 'naval', 'air'], maxed),
+    'infantry, naval, air'
+  );
+  assert.equal(formatBriefingAvailableUnitTypes(['armor'], maxed), 'armor');
+  assert.equal(formatBriefingProductionQueueCell('1 armor', 'armor', maxed), '1 armor (blocked: at cap)');
+  assert.equal(formatBriefingProductionQueueCell('1 infantry', 'infantry', maxed), '1 infantry');
+  assert.equal(formatBriefingProductionQueueCell('—', undefined, maxed), '—');
+}
+
 function run(): void {
   testStrategicEmbarkSentenceMatchesEngine();
   testNearestEmbarkUsesEngineEligibility();
@@ -255,6 +320,8 @@ function run(): void {
   testNearestEmbarkIncludesControlledWaterSeaport();
   testAboardCountsAssignedCargoNotCoLocatedLand();
   testAboardShowsEmbarkedArmor();
+  testStrikeableInfraCountsOnlyHumanControlled();
+  testProductionBriefingHidesMaxedTypesAndAnnotatesBlockedQueues();
   console.log('briefingSections.test.ts passed');
 }
 

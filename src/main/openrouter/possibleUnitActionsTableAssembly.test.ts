@@ -73,6 +73,64 @@ function testDeriveActionColumnMoveMelee(): void {
 }
 
 /**
+ * Ensures approach rows do not win the per-unit cap just because the hex is urban.
+ *
+ * Purpose: Friendly-occupied cities can still be legal approach dests (stacking while closing); ranking must not put them ahead of closer empty hexes.
+ * When to use: After changing `compareTableRowsForUnitPriority` or approach row assembly.
+ * Expected outcome: Among `approach` rows, shorter distance wins even when the farther hex has a higher urban count.
+ * Exceptions: None.
+ */
+function testSelectTopRowsPerUnitApproachIgnoresUrbanCount(): void {
+  const closerEmpty = '8f283082dcb519e0';
+  const fartherUrban = '8f283082dcb519e1';
+  const rows: PossibleActionTableRow[] = [
+    fixtureRow({
+      actionTypes: 'approach',
+      targetH3: fartherUrban,
+      distance: 2,
+      urbanHexCount: 5,
+    }),
+    fixtureRow({
+      actionTypes: 'approach',
+      targetH3: closerEmpty,
+      distance: 1,
+      urbanHexCount: 0,
+    }),
+  ];
+  const capped = selectTopRowsPerUnit(rows, new Map());
+  assert.strictEqual(capped[0]?.targetH3, closerEmpty);
+}
+
+/**
+ * Ensures move/melee capture interest still prefers urban hexes when distances differ.
+ *
+ * Purpose: Ignoring urban for approach must not change city-capture ranking among interest rows.
+ * When to use: Together with `testSelectTopRowsPerUnitApproachIgnoresUrbanCount`.
+ * Expected outcome: Higher urban count still ranks first for `move/melee`.
+ * Exceptions: None.
+ */
+function testSelectTopRowsPerUnitMoveMeleeStillPrefersUrban(): void {
+  const closerEmpty = '8f283082dcb519e2';
+  const fartherUrban = '8f283082dcb519e3';
+  const rows: PossibleActionTableRow[] = [
+    fixtureRow({
+      actionTypes: 'move/melee',
+      targetH3: closerEmpty,
+      distance: 1,
+      urbanHexCount: 0,
+    }),
+    fixtureRow({
+      actionTypes: 'move/melee',
+      targetH3: fartherUrban,
+      distance: 2,
+      urbanHexCount: 5,
+    }),
+  ];
+  const capped = selectTopRowsPerUnit(rows, new Map());
+  assert.strictEqual(capped[0]?.targetH3, fartherUrban);
+}
+
+/**
  * Documents the function binding `main` (main).
  *
  * Purpose: Node test driver for this file.
@@ -83,6 +141,8 @@ function testDeriveActionColumnMoveMelee(): void {
 function main(): void {
   testSelectTopRowsPerUnitKeepsDistinctHexRows();
   testDeriveActionColumnMoveMelee();
+  testSelectTopRowsPerUnitApproachIgnoresUrbanCount();
+  testSelectTopRowsPerUnitMoveMeleeStillPrefersUrban();
   console.log('possibleUnitActionsTableAssembly tests passed');
 }
 

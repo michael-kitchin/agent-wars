@@ -232,10 +232,10 @@ export const FRIENDLY_PLAYER = 'opponent';
 export const ACTION_MOVES_MELEE = 'move/melee';
 
 /**
- * Action label for tactical Best Options approach rows (close toward nearest enemy when no enemy/infra hex is in reach this beat).
+ * Action label for Best Options approach rows (close toward nearest enemy when no enemy/infra hex is in reach this turn).
  *
  * Purpose: Distinguishes interest-filtered move/melee targets from distance-reducing approach hexes in the Commander table.
- * When to use: Approach fallback branch in `collectAggregatedPossibleActionRows` only.
+ * When to use: Approach fallback branch in `collectAggregatedPossibleActionRows` (strategic and tactical).
  * Expected outcome: Rendered Action column shows `approach`.
  * Exceptions: None.
  */
@@ -246,6 +246,18 @@ export const ACTION_RANGED = 'ranged attack';
 
 /** Action label for air strike rows. */
 export const ACTION_AIR_STRIKES = 'air strike';
+
+/**
+ * Urban count used when ranking Best Options rows for the per-unit cap.
+ *
+ * Purpose: Approach dests may include friendly-occupied cities (stacking while closing); those must not outrank closer empty hexes via urban count.
+ * When to use: `compareTableRowsForUnitPriority` only.
+ * Expected outcome: `0` for rows whose action types include `approach`; otherwise the row's `urbanHexCount`.
+ * Exceptions: None.
+ */
+function urbanCountForRowPriority(row: PossibleActionTableRow): number {
+  return row.actionTypes.includes(ACTION_APPROACH) ? 0 : row.urbanHexCount;
+}
 
 /**
  * Markdown subsection titles keyed by bucket for stable briefing section ordering.
@@ -393,6 +405,7 @@ export function markdownTableLines(rows: string[][]): string[] {
  * Purpose: Deterministic tie-break when many legal targets exist for one unit.
  * When to use: `selectTopRowsPerUnit` sort step.
  * Expected outcome: Higher enemy pressure and shorter distance sort earlier; stable hex tie-break.
+ * Approach rows ignore urban/infra counts so closer empty closing hexes are not crowded out by friendly cities.
  * Exceptions: None.
  */
 function compareTableRowsForUnitPriority(
@@ -401,7 +414,9 @@ function compareTableRowsForUnitPriority(
   latLngByH3: Map<string, [number, number]>
 ): number {
   if (a.enemyUnitCount !== b.enemyUnitCount) return b.enemyUnitCount - a.enemyUnitCount;
-  if (a.urbanHexCount !== b.urbanHexCount) return b.urbanHexCount - a.urbanHexCount;
+  const urbanA = urbanCountForRowPriority(a);
+  const urbanB = urbanCountForRowPriority(b);
+  if (urbanA !== urbanB) return urbanB - urbanA;
   if (a.distance !== b.distance) return a.distance - b.distance;
   const byAction = a.actionTypes.localeCompare(b.actionTypes);
   if (byAction !== 0) return byAction;

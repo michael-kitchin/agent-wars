@@ -5,7 +5,12 @@
 import * as assert from 'assert';
 import { getToolFlags } from './openRouterToolGroups';
 import { buildFinalJsonContractInstruction, getFinalJsonOrdersExampleBlock } from './promptContracts';
-import { getMovementOrderInstruction, buildToolUsageGuidance } from './promptText';
+import {
+  getMovementOrderInstruction,
+  buildToolUsageGuidance,
+  getInitialUserMessage,
+  buildAvailableToolsIntro,
+} from './promptText';
 
 /**
  * Defines the `testExampleBlockParsesWithParser` function shape (function testExampleBlockParsesWithParser(): void).
@@ -72,7 +77,7 @@ function testTacticalExampleBlockLeadsWithExplicitMove(): void {
  *
  * Purpose: Regression for tactical AI prompts: planning + explicit_move must mention terrain-weighted reachability.
  * When to use: After edits to `getMovementOrderInstruction`.
- * Expected outcome: Tactical mode appends reachability/drop guidance; strategic planning text stays unchanged aside from that clause.
+ * Expected outcome: Tactical mode appends reachability/drop guidance; planning dests may copy Best Options Target Hexes or plan_route orderToHexCode.
  * Exceptions: Assertion failure on contract drift.
  */
 function testTacticalPlanningMovementInstructionAddsReachabilityClause(): void {
@@ -85,6 +90,9 @@ function testTacticalPlanningMovementInstructionAddsReachabilityClause(): void {
   const strategic = getMovementOrderInstruction(flags, 'strategic');
   assert.ok(strategic.includes('orderToHexCode'));
   assert.ok(!strategic.includes('first leg'));
+  const noBriefing = getMovementOrderInstruction(flags, 'tactical', false);
+  assert.ok(!noBriefing.includes('Best Options This Turn'));
+  assert.ok(noBriefing.includes('orderToHexCode'));
 }
 
 /**
@@ -101,6 +109,84 @@ function testStrategicSealiftGuidanceUsesCargoAboard(): void {
   assert.ok(text.includes('cargo already aboard'));
   assert.ok(text.includes('nearest embark hex'));
   assert.ok(!text.includes('co-located land'));
+}
+
+/**
+ * Ensures tactical prompts let the model copy Best Options this-beat hexes without one plan_route per unit.
+ *
+ * Purpose: Consultation on a 24-unit battle stopped after three plan_route calls because the prompt required orderToHexCode for every explicit_move.
+ * When to use: After edits to `buildToolUsageGuidance`, `getMovementOrderInstruction`, or `getInitialUserMessage` tactical planning copy.
+ * Expected outcome: Guidance names Best Options Target Hexes as copyable dests and does not require plan_route for every sub-unit.
+ * Exceptions: None.
+ */
+function testTacticalPromptAllowsCopyingBestOptionsHexes(): void {
+  const flags = getToolFlags(['plan_route']);
+  const guidance = buildToolUsageGuidance(flags, true, 'tactical');
+  assert.ok(guidance.includes('Best Options This Turn'));
+  assert.ok(guidance.includes('Target Hexes'));
+  assert.ok(!guidance.includes('one per unit that needs to move'));
+  const move = getMovementOrderInstruction(flags, 'tactical');
+  assert.ok(move.includes('Best Options This Turn'));
+  const user = getInitialUserMessage(flags, true, 'tactical');
+  assert.ok(!user.includes('Call plan_route for each sub-unit'));
+  assert.ok(user.includes('Best Options'));
+  assert.ok(user.includes('approach or move/melee'));
+  assert.ok(guidance.includes('approach or move/melee'));
+  const intro = buildAvailableToolsIntro(flags, true, 'tactical');
+  assert.ok(intro.includes('Best Options This Turn'));
+  assert.ok(!intro.includes('exact routing (plan_route)'));
+}
+
+/**
+ * Ensures strategic prompts allow Best Options dest copy for explicit_move without one plan_route per unit, and do not nudge overrides of standing orders.
+ *
+ * Purpose: The captured strategic system prompt used the same orderToHexCode-only dest contract as tactical. Strategic units usually already have standing marches; dest copy must not tell the model to explicit_move every row.
+ * When to use: After edits to strategic briefing tool intro, standing-order guidance, or `getInitialUserMessage`.
+ * Expected outcome: Best Options Target Hexes are copyable dests; standing-order primacy remains; no per-unit plan_route requirement.
+ * Exceptions: None.
+ */
+function testStrategicPromptAllowsCopyingBestOptionsHexesWithoutStandingOrderOverride(): void {
+  const flags = getToolFlags(undefined);
+  const guidance = buildToolUsageGuidance(flags, true, 'strategic');
+  assert.ok(guidance.includes('Best Options This Turn'));
+  assert.ok(guidance.includes('Target Hexes'));
+  assert.ok(!guidance.includes('one per unit that needs to move'));
+  assert.ok(!guidance.includes('Issue explicit_move for every'));
+  assert.ok(guidance.includes('one-step explicit_move'));
+  assert.ok(guidance.includes('do not need explicit orders'));
+  const move = getMovementOrderInstruction(flags, 'strategic');
+  assert.ok(move.includes('Best Options This Turn'));
+  const user = getInitialUserMessage(flags, true, 'strategic');
+  assert.ok(!user.includes('Call plan_route for each unit that needs a move'));
+  assert.ok(user.includes('Best Options'));
+  assert.ok(user.includes('one-step move'));
+  const intro = buildAvailableToolsIntro(flags, true, 'strategic');
+  assert.ok(intro.includes('Best Options This Turn'));
+  assert.ok(intro.includes('one-step move'));
+  assert.ok(!intro.includes('exact routing (plan_route)'));
+}
+
+/**
+ * Ensures production tool guidance tells the model not to queue types already at deployment cap.
+ *
+ * Purpose: The Turn 9 prompt said armor was at maximum but still told the model to fill every empty queue, and the model queued more armor.
+ * When to use: After edits to `buildToolUsageGuidance` or `getInitialUserMessage` production copy.
+ * Expected outcome: Strategic production guidance mentions skipping types at maximum in favor of still-buildable types.
+ * Exceptions: None.
+ */
+function testProductionGuidanceSkipsTypesAtDeploymentCap(): void {
+  const flags = getToolFlags(undefined);
+  const guidance = buildToolUsageGuidance(flags, true, 'strategic');
+  assert.ok(guidance.includes('at maximum'), 'tool guidance must mention deployment-cap maximums');
+  assert.ok(
+    /do not queue types at maximum/i.test(guidance),
+    'tool guidance must tell the model not to queue capped types'
+  );
+  const user = getInitialUserMessage(flags, true, 'strategic');
+  assert.ok(
+    /do not queue types at maximum/i.test(user),
+    'user message must tell the model not to queue capped types'
+  );
 }
 
 function testTacticalCallbacksClauseMentionsBeat(): void {
@@ -127,6 +213,8 @@ function testTacticalCallbacksClauseMentionsBeat(): void {
   });
   assert.ok(!strategic.includes('tactical beat'));
   assert.ok(strategic.includes('Actions: assign_order'));
+  assert.ok(strategic.includes('operational-map'));
+  assert.ok(strategic.includes('not plan_route orderToHexCode'));
 }
 
 function testExampleBlockIncludesOptionalTails(): void {
@@ -185,6 +273,18 @@ const tests = [
   {
     name: 'buildToolUsageGuidance strategic sealift uses cargo aboard',
     fn: testStrategicSealiftGuidanceUsesCargoAboard,
+  },
+  {
+    name: 'tactical prompt allows copying Best Options hexes without per-unit plan_route',
+    fn: testTacticalPromptAllowsCopyingBestOptionsHexes,
+  },
+  {
+    name: 'strategic prompt allows copying Best Options hexes without standing-order override',
+    fn: testStrategicPromptAllowsCopyingBestOptionsHexesWithoutStandingOrderOverride,
+  },
+  {
+    name: 'production guidance skips types at deployment cap',
+    fn: testProductionGuidanceSkipsTypesAtDeploymentCap,
   },
 ];
 

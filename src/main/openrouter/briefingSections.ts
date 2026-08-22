@@ -1,8 +1,13 @@
 import { executeTool6 } from '../tools/tool6Production';
-import { getMaxedUnitTypesForPlayer, getPlayerUnitCountsByType } from '../productionCaps';
+import {
+  getMaxedUnitTypesForPlayer,
+  getPlayerUnitCountsByType,
+  filterQueueableUnitTypes,
+  PRODUCTION_CAP_QUEUE_GUIDANCE,
+} from '../productionCaps';
 import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
 import type { GameStateSnapshot } from '../gameDb';
-import { logDebug } from '../logger';
+import { logDebug, logTrace } from '../logger';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { buildPromptTableLines } from '../promptTableUtils';
 import { getRangeEnvelopeByBase, type RangeEnvelopeCache } from './rangeSupport';
@@ -10,11 +15,54 @@ import { canEmbarkAtHex } from '../../shared/sealiftEmbarkEligibility';
 import { gridHopDistancesFrom } from '../tools/assessUnitProximity';
 
 /**
+ * Formats the Available Unit Types cell, omitting types already at the player's deployment cap unless no alternative remains.
+ *
+ * Purpose: The production table must not list capped types as buildable when another type can still spawn; a hex that can only build the capped type still lists it so pre-queue remains possible.
+ * When to use: Production briefing rows after `getMaxedUnitTypesForPlayer`.
+ * Expected outcome: Comma-separated queueable types, or `—` when the hex has no available types at all.
+ * Exceptions: None.
+ */
+export function formatBriefingAvailableUnitTypes(
+  available: readonly string[],
+  maxedTypes: ReadonlySet<string>
+): string {
+  logTrace('briefingSections formatBriefingAvailableUnitTypes', {
+    availableCount: available.length,
+    maxedCount: maxedTypes.size,
+  });
+  const kept = filterQueueableUnitTypes(available, maxedTypes);
+  return kept.length > 0 ? kept.join(', ') : '—';
+}
+
+/**
+ * Formats the Current Queue cell, marking entries whose unit type cannot spawn because the player is at cap.
+ *
+ * Purpose: Existing armor (etc.) queues look healthy in the briefing while spawn is blocked; the annotation tells the AI to replace them.
+ * When to use: Production briefing rows after formatting the next queue entry.
+ * Expected outcome: Unchanged label, or `${label} (blocked: at cap)` when `queuedUnitType` is maxed.
+ * Exceptions: None.
+ */
+export function formatBriefingProductionQueueCell(
+  queueLabel: string,
+  queuedUnitType: string | undefined,
+  maxedTypes: ReadonlySet<string>
+): string {
+  logTrace('briefingSections formatBriefingProductionQueueCell', {
+    queuedUnitType: queuedUnitType ?? null,
+    maxedCount: maxedTypes.size,
+  });
+  if (queuedUnitType && maxedTypes.has(queuedUnitType) && queueLabel !== '—') {
+    return `${queueLabel} (blocked: at cap)`;
+  }
+  return queueLabel;
+}
+
+/**
  * Defines the `countStrikeableEnemyInfrastructure` function shape (function countStrikeableEnemyInfrastructure(args: { strikeEnvelope: Set<string>; infraRows: NonNullable<GameStateSnapshot['res1Infrastructure']>; contr).
 
- * Purpose: Supports maintainability by documenting why `countStrikeableEnemyInfrastructure` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Counts human-controlled urban/airport/seaport hexes inside an air unit's strike envelope.
+ * When to use: Strategic air-operations briefing rows and the enemy-infra summary line.
+ * Expected outcome: Uncontrolled and friendly-controlled hexes are omitted so the tempo rule does not recommend bombing capture targets.
  * Exceptions: None.
  */
 function countStrikeableEnemyInfrastructure(args: {
@@ -27,7 +75,7 @@ function countStrikeableEnemyInfrastructure(args: {
   let seaports = 0;
   for (const row of args.infraRows) {
     if (!args.strikeEnvelope.has(row.h3Index)) continue;
-    if (args.controllerByHex.get(row.h3Index) === 'opponent') continue;
+    if (args.controllerByHex.get(row.h3Index) !== 'human') continue;
     if (Number(row.urbanHexCount ?? 0) > 0) urban += 1;
     if (Number(row.airportCount ?? 0) > 0) airports += 1;
     if (Number(row.seaportCount ?? 0) > 0) seaports += 1;
@@ -231,16 +279,18 @@ hasQueuedEntries: boolean;
  */
 function normalizeControlledHexQueueRow(
   row: ControlledHexQueueSnapshot,
-  formatHexLabel: (ll: [number, number]) => string
+  formatHexLabel: (ll: [number, number]) => string,
+  maxedTypes: ReadonlySet<string>
 ): NormalizedControlledHexQueueRow {
   const hex = Array.isArray(row.hex) ? (row.hex as [number, number]) : null;
   const hexText = hex ? formatHexLabel(hex) : '[unknown]';
   const urban = Number(row.urbanHexCount ?? 0);
   const airports = Number(row.airportCount ?? 0);
   const seaports = Number(row.seaportCount ?? 0);
-  const available = Array.isArray(row.availableUnitTypes)
-    ? (row.availableUnitTypes as unknown[]).map((x) => String(x)).join(', ')
-    : '';
+  const availableList = Array.isArray(row.availableUnitTypes)
+    ? (row.availableUnitTypes as unknown[]).map((x) => String(x))
+    : [];
+  const available = formatBriefingAvailableUnitTypes(availableList, maxedTypes);
   const entriesList = Array.isArray(row.entries) ? (row.entries as ProductionQueueEntrySnapshot[]) : [];
   const nextEntry = [...entriesList].sort((a, b) => {
     const queueIndexA = Number(a.queueIndex);
@@ -255,15 +305,17 @@ function normalizeControlledHexQueueRow(
     }
     return 0;
   })[0];
-  const entries = nextEntry
-    ? `${Number.isFinite(Number(nextEntry.count)) ? Number(nextEntry.count) : '?'} ${String(nextEntry.unitType ?? '?')}`
+  const queuedUnitType = nextEntry ? String(nextEntry.unitType ?? '') : undefined;
+  const entriesRaw = nextEntry
+    ? `${Number.isFinite(Number(nextEntry.count)) ? Number(nextEntry.count) : '?'} ${queuedUnitType ?? '?'}`
     : '—';
+  const entries = formatBriefingProductionQueueCell(entriesRaw, queuedUnitType, maxedTypes);
   return {
     hexText,
     urban,
     airports,
     seaports,
-    available: available || '—',
+    available,
     entries,
     hasQueuedEntries: entriesList.length > 0,
   };
@@ -316,6 +368,7 @@ export function buildProductionBriefingBlock(args: {
   );
   if (maxedTypes.length > 0) {
     lines.push(`You are currently at maximum for: ${maxedTypes.join(', ')}.`);
+    lines.push(PRODUCTION_CAP_QUEUE_GUIDANCE);
   }
   lines.push('Production progress/spawn resolves after Ready, after combat and control resolution.');
   if (queues.length === 0) {
@@ -325,8 +378,9 @@ export function buildProductionBriefingBlock(args: {
   lines.push('');
   lines.push('## Controlled Hex Queues');
   lines.push('');
+  const maxedTypeSet = new Set(maxedTypes);
   const normalizedRows = (queues as ControlledHexQueueSnapshot[]).map((row) =>
-    normalizeControlledHexQueueRow(row, args.formatHexLabel)
+    normalizeControlledHexQueueRow(row, args.formatHexLabel, maxedTypeSet)
   );
   normalizedRows.sort((a, b) => {
     if (a.urban !== b.urban) return b.urban - a.urban;

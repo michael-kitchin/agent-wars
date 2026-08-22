@@ -10,6 +10,7 @@ import {
   collectOmniscientNearbyUnits,
   estimatedTurnsFromGridDistance,
   gridHopDistancesFrom,
+  OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE,
   safeGridHexDistance,
   usesOmniscientGridProximity,
 } from './assessUnitProximity';
@@ -185,6 +186,20 @@ function testCollectOmniscientNearbyUnitsIncludesPentagonCrossingEnemy(): void {
 }
 
 /**
+ * Ensures the fog-off Unit Status honesty line does not require plan_route before every move.
+ *
+ * Purpose: Grid-hop distances are not march paths; this-turn dests still come from Best Options Target Hexes.
+ * When to use: After edits to `OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE`.
+ * Expected outcome: Mentions Best Options dest copy; does not say use plan_route before moving.
+ * Exceptions: None.
+ */
+function testOmniscientHonestyLineUsesBestOptionsDestCopy(): void {
+  assert.ok(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE.includes('grid hops'));
+  assert.ok(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE.includes('Best Options This Turn'));
+  assert.ok(!OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE.includes('Use plan_route before moving.'));
+}
+
+/**
  * Runs all assessUnitProximity tests.
  *
  * Purpose: Node test entrypoint for main-process discovery.
@@ -200,6 +215,7 @@ function run(): void {
   testCollectOmniscientNearbyUnitsSkipsInvalidOtherIndex();
   testEstimatedTurnsFromGridDistance();
   testCollectOmniscientNearbyUnitsIncludesPentagonCrossingEnemy();
+  testOmniscientHonestyLineUsesBestOptionsDestCopy();
   console.log('assessUnitProximity.test.ts passed');
 }
 

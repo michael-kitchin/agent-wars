@@ -154,11 +154,11 @@ export function gridHopDistancesFrom(origin: string, targets: readonly string[])
  *
  * Purpose: Single copy so briefing formatters and tests cannot drift.
  * When to use: Strategic formatBriefing when the omniscient grid scan is active.
- * Expected outcome: Tells the model that Unit Status distances are grid hops, not march paths.
+ * Expected outcome: Tells the model that Unit Status distances are grid hops, not march paths, and that this-turn dests come from Best Options Target Hexes.
  * Exceptions: None.
  */
 export const OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE =
-  'Nearest-enemy distances and threat ETAs are H3 grid hops (straight hex count), not march or sail paths. Use plan_route before moving.';
+  'Nearest-enemy distances and threat ETAs are H3 grid hops (straight hex count), not march or sail paths. Best Options This Turn Target Hexes are this-turn legal dests; use plan_route only for dests not listed for that unit.';
 
 /**
  * Minimal unit fields required to pair grid distances without a full snapshot type.

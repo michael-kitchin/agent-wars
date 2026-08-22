@@ -9,7 +9,7 @@ import { createPathfindingSession, executeTool1 } from '../tools/tool1Pathfindin
 import { executeTool2 } from '../tools/tool2Assessment';
 import { executeTool3 } from '../tools/tool3CombatEstimation';
 import { executeTool4, getInjectionText } from '../tools/tool4Memory';
-import { executeTool5, getInjectionText as getStandingOrderInjectionText, generateOrdersForStandingOrders } from '../tools/tool5StandingOrders';
+import { executeTool5, expireAndUpdateStatus, generateOrdersForStandingOrders, getInjectionText as getStandingOrderInjectionText } from '../tools/tool5StandingOrders';
 import { executeTool6 } from '../tools/tool6Production';
 import { runPrecomputation } from '../precomputation';
 import { formatBriefing } from '../briefingFormatter';
@@ -333,6 +333,7 @@ export async function requestOrdersFlow(
 
   let briefingOverride: string | undefined;
   if (!tacticalBattle) {
+    expireAndUpdateStatus('opponent', state);
     // Map-first contract: strategic prompts always include the Commander briefing with operational map.
     const precomputed = runPrecomputation(state, { latLngByH3, resolveToH3 });
     if (usePrecomputation) {

@@ -127,7 +127,7 @@ export const NAVAL_MOVEMENT_PROMPT_RULE = 'Naval units move on water/coastal hex
  * Exceptions: None.
  */
 export const NAVAL_PLAN_ROUTE_LAND_TARGET_HINT =
-  ' To move a naval unit toward a land target, call plan_route with that land unit\'s briefing hex code as the destination.';
+  ' To move a naval unit toward a land target, copy a Best Options Target Hex for that naval unit if listed; otherwise call plan_route with that land unit\'s briefing hex code as the destination.';
 /**
  * Documents the module-scope binding `NAVAL_PLAN_ROUTE_PROMPT_SUFFIX` (NAVAL_PLAN_ROUTE_PROMPT_SUFFIX).
 

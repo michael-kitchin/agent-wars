@@ -584,6 +584,107 @@ function testTacticalBestOptionsApproachFallbackWhenEnemyOutOfReach(): void {
 }
 
 /**
+ * Ensures Best Options does not treat a friendly-occupied urban hex as a this-turn ranged or melee target.
+ *
+ * Purpose: Regression for the tactical interest filter listing own stacks sitting on cities, which suppressed approach-to-enemy rows.
+ * When to use: After edits to tactical this-turn ground-move or ranged interest filters.
+ * Expected outcome: No ranged/move/melee row onto the friendly urban hex; approach rows toward the distant human instead.
+ * Exceptions: Throws when the fixture cannot place an adjacent urban neighbor and a human six steps away under the same parent.
+ */
+function testTacticalBestOptionsIgnoresFriendlyOccupiedUrbanHex(): void {
+  const res1 = tacticalRes1Cell(12, 34);
+  const res4Opp = tacticalRes4UnderRes1Corner(12, 34);
+  const sameParent = [...gridDisk(res4Opp, 8)].filter((h) => cellToParent(h, 1) === res1);
+  const res4FriendlyUrban = sameParent.find((h) => h !== res4Opp && gridDistance(res4Opp, h) === 1);
+  const res4Human = sameParent.find((h) => h !== res4Opp && h !== res4FriendlyUrban && gridDistance(res4Opp, h) === 6);
+  if (!res4FriendlyUrban || !res4Human) {
+    throw new Error('expected an adjacent urban neighbor and a human six steps away under the same res1 parent');
+  }
+  const footprint = sameParent.filter((h) => {
+    try {
+      return gridDistance(res4Opp, h) <= 6 || gridDistance(res4Human, h) <= 6;
+    } catch {
+      return false;
+    }
+  });
+  const terrain: Record<string, string> = {};
+  for (const h of footprint) terrain[h] = 'plains';
+  const tactical: TacticalBattleSnapshot = {
+    battleId: 't-best-options-friendly-urban',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: footprint,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: terrain,
+    res4IsUrbanByH3: { [res4FriendlyUrban]: true },
+    subUnits: [
+      {
+        id: 'opp-arm-shooter',
+        parentUnitId: 'parent-arm-a',
+        player: 'opponent',
+        unitType: 'armor',
+        h3Index: res4Opp,
+        displayName: 'Armor A',
+      },
+      {
+        id: 'opp-arm-on-city',
+        parentUnitId: 'parent-arm-b',
+        player: 'opponent',
+        unitType: 'armor',
+        h3Index: res4FriendlyUrban,
+        displayName: 'Armor B',
+      },
+      {
+        id: 'hum-far-city',
+        parentUnitId: 'parent-inf',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: res4Human,
+        displayName: 'Infantry',
+      },
+    ],
+  };
+  const strategic: GameStateSnapshot = {
+    turnNumber: 1,
+    phase: 'planning',
+    hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+    units: [],
+    pendingOrders: [],
+    res1Control: [{ h3Index: res1, controllerPlayerId: 'opponent' }],
+  };
+  const plan = buildTacticalAiPlanState(strategic, tactical);
+  const latLngByH3 = new Map<string, [number, number]>();
+  for (const h of plan.hexes.map((x) => x.h3Index)) {
+    latLngByH3.set(h, cellToLatLng(h) as [number, number]);
+  }
+  const fmt = (ll: [number, number]) => formatLatLng(ll, LATLNG_DECIMAL_PLACES);
+  const rows = collectAggregatedPossibleActionRows({
+    state: plan,
+    latLngByH3,
+    formatLatLng: fmt,
+    tacticalBattle: tactical,
+    forThisTurnOptionsTable: true,
+  });
+  const shooterRows = rows.filter((r) => r.unitId === 'opp-arm-shooter');
+  assert.ok(
+    !shooterRows.some((r) => r.targetH3 === res4FriendlyUrban && r.actionTypes.includes('ranged')),
+    'friendly-occupied urban hex must not appear as a ranged Best Options target'
+  );
+  assert.ok(
+    !shooterRows.some((r) => r.targetH3 === res4FriendlyUrban && r.actionTypes.includes('move/melee')),
+    'friendly-occupied urban hex must not appear as a move/melee Best Options target'
+  );
+  const approaches = shooterRows.filter((r) => r.actionTypes.includes('approach'));
+  assert.ok(approaches.length >= 1, 'expected approach rows when the only nearby interest hex is a friendly city');
+  assert.ok(
+    approaches.every((r) => gridDistance(r.targetH3, res4Human) < 6),
+    'approach targets must reduce distance to the distant human'
+  );
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
 
  * Purpose: Supports maintainability by documenting why `tests` exists.
@@ -613,6 +714,10 @@ const tests = [
   {
     name: 'collectAggregatedPossibleActionRows tactical Best Options approach fallback when enemy out of reach',
     fn: testTacticalBestOptionsApproachFallbackWhenEnemyOutOfReach,
+  },
+  {
+    name: 'collectAggregatedPossibleActionRows tactical Best Options ignores friendly-occupied urban hex',
+    fn: testTacticalBestOptionsIgnoresFriendlyOccupiedUrbanHex,
   },
 ];
 

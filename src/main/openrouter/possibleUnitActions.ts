@@ -5,8 +5,8 @@
  * Strategic vs tactical reachability (intentional parity of *pipeline*, not hex sets):
  * - Strategic ground: `getValidDestinations` → res1 `getLandMassReachableHexes` (hop BFS).
  * - Tactical ground: `collectTacticalLegalMoveDestinationRes4Hexes` → single-source MP reachability (Ready rules).
- * Best Options This Turn interest filters share `keepsBestOptionsThisTurnInterestHex` (enemy ∪ interesting infra);
- * tactical alone adds approach when interest is empty.
+ * Best Options This Turn interest/approach live in `possibleUnitActionsBestOptionsInterest.ts`
+ * (enemy ∪ uncontrolled unoccupied infra; empty interest falls back to approach).
  */
 
 import { gridDistance, gridDisk } from 'h3-js';
@@ -23,7 +23,6 @@ import { logHexControllerParityMismatch } from '../snapshotDbParity';
 import { compareHexIds, partitionHomelandNearestOther } from './possibleUnitActionsPartition';
 import {
   ACTION_AIR_STRIKES,
-  ACTION_APPROACH,
   ACTION_MOVES_MELEE,
   ACTION_RANGED,
   aggregateRows,
@@ -38,6 +37,15 @@ import {
   type RawPossibleActionRow,
 } from './possibleUnitActionsTableAssembly';
 import { collectRangedTargetHexes } from './possibleUnitActionsStrategicRanged';
+import {
+  applyInterestOrApproach,
+  describeTacticalBestOptionsInfrastructure,
+  filterGroundMoveHexesForThisTurnOptionsTable,
+  filterTacticalGroundMoveHexesForThisTurnOptionsTable,
+  filterTacticalRangedHexesForThisTurnOptionsTable,
+  tacticalBestOptionsUrbanHexCount,
+  type TacticalBestOptionsInterestContext,
+} from './possibleUnitActionsBestOptionsInterest';
 
 export { partitionHomelandNearestOther };
 export type { PossibleActionTableRow } from './possibleUnitActionsTableAssembly';
@@ -119,6 +127,15 @@ interface IndexedState {
    */
  enemyUnitsByHex: Map<string, Array<{ id: string; unitType: string }>>;
    /**
+   * Friendly (AI) units keyed by hex so this-turn interest can drop own-occupied uncontrolled infra.
+   *
+   * Contract: Opponent units only; contested hexes may appear in both this map and `enemyUnitsByHex`.
+   * When to use: Strategic Best Options occupancy filter.
+   * Expected outcome: Every opponent unit in the snapshot appears under its `h3Index`.
+   * Exceptions: None.
+   */
+ friendlyUnitsByHex: Map<string, Array<{ id: string; unitType: string }>>;
+   /**
    * Specifies the contract for the `hexSet` member (hexSet: Set<string>;).
 
    * Contract: Describes stable behavior for callers of `hexSet` in this codebase.
@@ -151,16 +168,21 @@ function buildIndexedState(state: GameStateSnapshot): IndexedState {
     controlByHex.set(row.h3Index, row.controllerPlayerId ?? null);
   }
   const enemyUnitsByHex = new Map<string, Array<{ id: string; unitType: string }>>();
+  const friendlyUnitsByHex = new Map<string, Array<{ id: string; unitType: string }>>();
   for (const unit of state.units) {
-    if (unit.player !== ENEMY_PLAYER) continue;
-    const list = enemyUnitsByHex.get(unit.h3Index) ?? [];
+    let bucket: Map<string, Array<{ id: string; unitType: string }>> | null = null;
+    if (unit.player === ENEMY_PLAYER) bucket = enemyUnitsByHex;
+    else if (unit.player === FRIENDLY_PLAYER) bucket = friendlyUnitsByHex;
+    if (!bucket) continue;
+    const list = bucket.get(unit.h3Index) ?? [];
     list.push({ id: unit.id, unitType: unit.unitType });
-    enemyUnitsByHex.set(unit.h3Index, list);
+    bucket.set(unit.h3Index, list);
   }
   return {
     infraByHex,
     controlByHex,
     enemyUnitsByHex,
+    friendlyUnitsByHex,
     hexSet: new Set(state.hexes.map((h) => h.h3Index)),
   };
 }
@@ -177,8 +199,13 @@ export type PossibleActionsIndexedState = IndexedState;
  * Exceptions: None.
  */
 export function buildPossibleActionsIndexedState(state: GameStateSnapshot): PossibleActionsIndexedState {
-  logDebug('possibleUnitActions buildPossibleActionsIndexedState', { turnNumber: state.turnNumber });
-  return buildIndexedState(state);
+  const indexed = buildIndexedState(state);
+  logDebug('possibleUnitActions buildPossibleActionsIndexedState', {
+    turnNumber: state.turnNumber,
+    enemyOccupiedHexCount: indexed.enemyUnitsByHex.size,
+    friendlyOccupiedHexCount: indexed.friendlyUnitsByHex.size,
+  });
+  return indexed;
 }
 
 /**
@@ -325,31 +352,6 @@ function enemyCell(indexed: IndexedState, h3: string): string {
 }
 
 /**
- * Summarizes nearest human unit ids from `fromH3` for Best Options approach rows (Target Units column).
- *
- * Purpose: Approach hexes are usually empty of enemies; the table still needs to show who the move closes on.
- * When to use: When appending approach fallback move rows in `collectAggregatedPossibleActionRows`.
- * Expected outcome: Comma-separated enemy unit ids at the minimum H3 distance; `—` when none are observed.
- * Exceptions: None; invalid distance pairs are skipped.
- */
-function nearestEnemyUnitIdsSummary(indexed: IndexedState, fromH3: string): string {
-  let nearestDist = Infinity;
-  const ids: string[] = [];
-  for (const [h3, units] of indexed.enemyUnitsByHex) {
-    const d = safeGridDistance(fromH3, h3);
-    if (d === null) continue;
-    if (d < nearestDist) {
-      nearestDist = d;
-      ids.length = 0;
-      for (const u of units) ids.push(u.id);
-    } else if (d === nearestDist) {
-      for (const u of units) ids.push(u.id);
-    }
-  }
-  if (!Number.isFinite(nearestDist) || ids.length === 0) return '—';
-  return [...new Set(ids)].sort((a, b) => a.localeCompare(b)).join(', ');
-}
-/**
  * Defines the `safeGridDistance` function shape (function safeGridDistance(from: string, to: string): number | null).
 
  * Purpose: Supports maintainability by documenting why `safeGridDistance` exists.
@@ -388,12 +390,15 @@ function appendRowsForLegalHexes(args: {
   isAirStrike: boolean;
   /** When set, overrides per-hex enemy occupancy text (used for approach rows targeting empty approach cells). */
   enemySummaryOverride?: string;
+  /** Tactical interest context so Target Infrastructure / urban rank use res4 flags instead of strategic res1 maps. */
+  tacticalInterest?: TacticalBestOptionsInterestContext;
 }): void {
   const parts = partitionHomelandNearestOther(args.legalHexes, args.homeland);
   const addForBucket = (bucket: PossibleActionTableRow['bucket'], hexList: string[]): void => {
     for (const h3 of sortHexesByLatLng(hexList, args.latLngByH3)) {
       const d = safeGridDistance(args.unitH3, h3);
       if (d === null) continue;
+      const tacticalCtx = args.tacticalInterest;
       args.rows.push({
         bucket,
         unitId: args.unitId,
@@ -402,9 +407,15 @@ function appendRowsForLegalHexes(args: {
         targetH3: h3,
         distance: d,
         enemySummary: args.enemySummaryOverride ?? enemyCell(args.indexed, h3),
-        featuresSummary: args.isAirStrike ? featuresCellForStrike(args.indexed, h3) : featuresCellForHex(args.indexed, h3),
+        featuresSummary: args.isAirStrike
+          ? featuresCellForStrike(args.indexed, h3)
+          : tacticalCtx
+            ? describeTacticalBestOptionsInfrastructure(h3, tacticalCtx)
+            : featuresCellForHex(args.indexed, h3),
         enemyUnitCount: (args.indexed.enemyUnitsByHex.get(h3) ?? []).length,
-        urbanHexCount: getInfra(args.indexed, h3).urban,
+        urbanHexCount: tacticalCtx
+          ? tacticalBestOptionsUrbanHexCount(h3, tacticalCtx)
+          : getInfra(args.indexed, h3).urban,
       });
     }
   };
@@ -466,149 +477,6 @@ function collectLegalFerryDestinationHexes(
   }
   return [...out];
 }
-/**
- * Shared Best Options This Turn interest predicate (enemy contact or interesting infrastructure).
- *
- * Purpose: Keeps strategic and tactical Best Options ground/ranged interest filters on the same rule shape.
- * When to use: After mode-specific adapters compute `enemyOccupied` / `interestingInfrastructure` for a hex.
- * Expected outcome: True when either signal is set.
- * Exceptions: None.
- */
-function keepsBestOptionsThisTurnInterestHex(signals: {
-  enemyOccupied: boolean;
-  interestingInfrastructure: boolean;
-}): boolean {
-  return signals.enemyOccupied || signals.interestingInfrastructure;
-}
-
-/**
- * Restricts **Best Options This Turn** move/melee rows to enemy-occupied hexes or uncontrolled res1 cells that still show urban, airport, or seaport infrastructure.
- *
- * Purpose: Strategic interest filter for the Commander Best Options table (same shape as tactical: enemy ∪ interesting infra).
- * When to use: Only from `collectAggregatedPossibleActionRows` when `forThisTurnOptionsTable` is true for non-air units in **strategic** mode (air ferry lists skip this filter).
- * Expected outcome: Filtered subset of `hexes` in caller iteration order.
- * Exceptions: None.
- */
-function filterGroundMoveHexesForThisTurnOptionsTable(indexed: IndexedState, hexes: string[]): string[] {
-  return hexes.filter((h3) => {
-    const enemyOccupied = (indexed.enemyUnitsByHex.get(h3)?.length ?? 0) > 0;
-    const controller = indexed.controlByHex.get(h3) ?? null;
-    const inf = getInfra(indexed, h3);
-    const interestingInfrastructure =
-      controller === null && (inf.urban > 0 || inf.airport > 0 || inf.seaport > 0);
-    return keepsBestOptionsThisTurnInterestHex({ enemyOccupied, interestingInfrastructure });
-  });
-}
-
-/**
- * Restricts tactical Best Options move/melee rows to human-occupied res4 cells or urban/airport/seaport infrastructure.
- *
- * Purpose: Same Best Options interest shape as strategic (`keepsBestOptionsThisTurnInterestHex`) without res1 control maps.
- * When to use: Only from `collectAggregatedPossibleActionRows` when `forThisTurnOptionsTable` and `tacticalBattle` are set for non-air units.
- * Expected outcome: Subset of `hexes` in caller iteration order.
- * Exceptions: None.
- */
-function filterTacticalGroundMoveHexesForThisTurnOptionsTable(
-  battle: TacticalBattleSnapshot,
-  hexes: string[],
-  humanOccupiedH3: ReadonlySet<string>,
-  tacticalRangedRows: ReadonlyArray<{
-    h3Index: string;
-    isUrban: boolean;
-    isAirport: boolean;
-    isSeaport: boolean;
-    isRubble: boolean;
-  }>
-): string[] {
-  const rowByH3 = new Map(tacticalRangedRows.map((r) => [r.h3Index, r] as const));
-  return hexes.filter((h3) => {
-    const enemyOccupied = humanOccupiedH3.has(h3);
-    const row = rowByH3.get(h3);
-    const interestingInfrastructure =
-      !!battle.res4IsUrbanByH3?.[h3] ||
-      !!battle.res4IsSeaportByH3?.[h3] ||
-      (!!row && !row.isRubble && (row.isUrban || row.isAirport || row.isSeaport));
-    return keepsBestOptionsThisTurnInterestHex({ enemyOccupied, interestingInfrastructure });
-  });
-}
-
-/**
- * Keeps this-beat-reachable tactical move hexes that strictly reduce H3 distance to the nearest human-occupied cell.
- *
- * Purpose: Best Options fallback when the interest filter (enemy/infra) yields no rows but units can still approach.
- * When to use: Only after `filterTacticalGroundMoveHexesForThisTurnOptionsTable` returns empty for a unit.
- * Expected outcome: Subset of `hexes` that approach at least one human cell; empty when no human is observed or no hex improves distance.
- * Exceptions: Hexes with invalid `gridDistance` are skipped.
- */
-function filterTacticalApproachMoveHexesForThisTurnOptionsTable(
-  unitH3: string,
-  hexes: string[],
-  humanOccupiedH3: ReadonlySet<string>
-): string[] {
-  if (humanOccupiedH3.size === 0 || hexes.length === 0) return [];
-  let nearestDist = Infinity;
-  const nearestHumans: string[] = [];
-  for (const humanH3 of humanOccupiedH3) {
-    try {
-      const d = gridDistance(unitH3, humanH3);
-      if (d < nearestDist) {
-        nearestDist = d;
-        nearestHumans.length = 0;
-        nearestHumans.push(humanH3);
-      } else if (d === nearestDist) {
-        nearestHumans.push(humanH3);
-      }
-    } catch {
-      /* skip bad pair */
-    }
-  }
-  if (!Number.isFinite(nearestDist) || nearestHumans.length === 0) return [];
-  return hexes.filter((h3) => {
-    try {
-      for (const humanH3 of nearestHumans) {
-        if (gridDistance(h3, humanH3) < nearestDist) return true;
-      }
-      return false;
-    } catch {
-      return false;
-    }
-  });
-}
-
-/**
- * Defines the `filterTacticalRangedHexesForThisTurnOptionsTable` function shape (function filterTacticalRangedHexesForThisTurnOptionsTable(battle: TacticalBattleSnapshot, attackerSubUnitId: string, hexes: string[], tacticalRangedRows: ReadonlyArray<{ h3Index: string; isUrban: boolean; isAirport: boolean; isSeaport: boolean; isRubble: boolean }>): string[]).
-
- * Purpose: Drops transport-only res4 ranged targets from the Best Options This Turn table while keeping enemy-occupied cells and urban, airport, or seaport infrastructure tiles.
- * When to use: Only from `collectAggregatedPossibleActionRows` after `collectTacticalLegalRangedTargetRes4Hexes` when `forThisTurnOptionsTable` and `tacticalBattle` are set.
- * Expected outcome: Subset of `hexes`; unknown `attackerSubUnitId` returns `hexes` unchanged.
- * Exceptions: None.
- */
-function filterTacticalRangedHexesForThisTurnOptionsTable(
-  battle: TacticalBattleSnapshot,
-  attackerSubUnitId: string,
-  hexes: string[],
-  tacticalRangedRows: ReadonlyArray<{
-    h3Index: string;
-    isUrban: boolean;
-    isAirport: boolean;
-    isSeaport: boolean;
-    isRubble: boolean;
-  }>,
-  humanOccupiedH3: ReadonlySet<string>
-): string[] {
-  const self = battle.subUnits.find((s) => s.id === attackerSubUnitId);
-  if (!self) return hexes;
-  const rowByH3 = new Map(tacticalRangedRows.map((r) => [r.h3Index, r] as const));
-  return hexes.filter((h3) => {
-    const enemyOccupied = humanOccupiedH3.has(h3);
-    const row = rowByH3.get(h3);
-    const interestingInfrastructure =
-      !!battle.res4IsUrbanByH3?.[h3] ||
-      !!battle.res4IsSeaportByH3?.[h3] ||
-      (!!row && !row.isRubble && (row.isUrban || row.isAirport || row.isSeaport));
-    return keepsBestOptionsThisTurnInterestHex({ enemyOccupied, interestingInfrastructure });
-  });
-}
 
 /**
  * Defines the `collectStrikeHexesForAirUnit` function shape (function collectStrikeHexesForAirUnit(airH3: string, indexed: IndexedState): string[]).
@@ -650,7 +518,7 @@ export function collectAggregatedPossibleActionRows(args: {
 
    * Contract: When true, narrows move/ranged candidate hexes for the operational-map Best Options This Turn table; when false or omitted, preserves legacy full-table row generation.
    * When to use: Set only from `buildStrategicOperationalMapSectionMarkdown` / `buildTacticalOperationalMapSectionMarkdown`.
-   * Expected outcome: Ground move/melee filter for non-air units (strategic: enemy/uncontrolled+infra; tactical: human-occupied/infra); strategic ranged lists only enemy-occupied hexes in range (same as full markdown); tactical ranged excludes transport-only cells; air ferry lists unchanged.
+   * Expected outcome: Ground move/melee filter for non-air units (strategic and tactical: human/enemy contact, else approach, else uncontrolled unoccupied infra); empty or infra-only interest falls back to approach in both modes; strategic ranged lists only enemy-occupied hexes in range (same as full markdown); tactical ranged Best Options lists only human-occupied cells (legal infra-only shots unchanged); air ferry lists unchanged.
    * Exceptions: None.
    */
   forThisTurnOptionsTable?: boolean;
@@ -683,6 +551,7 @@ export function collectAggregatedPossibleActionRows(args: {
       }>
     | undefined;
   let tacticalHumanOccupiedH3: ReadonlySet<string> | undefined;
+  let tacticalBestOptionsInterest: TacticalBestOptionsInterestContext | undefined;
   if (tacticalBattle) {
     tacticalHumanOccupiedH3 = new Set(
       tacticalBattle.subUnits.filter((s) => s.player === ENEMY_PLAYER).map((s) => s.h3Index)
@@ -695,7 +564,23 @@ export function collectAggregatedPossibleActionRows(args: {
     } catch {
       tacticalRangedRowsForFootprint = [];
     }
+    tacticalBestOptionsInterest = {
+      battle: tacticalBattle,
+      humanOccupiedH3: tacticalHumanOccupiedH3,
+      friendlyOccupiedH3: new Set(
+        tacticalBattle.subUnits.filter((s) => s.player === FRIENDLY_PLAYER).map((s) => s.h3Index)
+      ),
+      enclosingController: indexed.controlByHex.get(tacticalBattle.enclosingRes1H3Index) ?? null,
+      rowByH3: new Map((tacticalRangedRowsForFootprint ?? []).map((r) => [r.h3Index, r])),
+    };
+    logDebug('possibleUnitActions collectAggregatedPossibleActionRows tactical interest', {
+      enclosingController: tacticalBestOptionsInterest.enclosingController,
+      humanOccupiedHexCount: tacticalBestOptionsInterest.humanOccupiedH3.size,
+      friendlyOccupiedHexCount: tacticalBestOptionsInterest.friendlyOccupiedH3.size,
+    });
   }
+
+  const strategicEnemyOccupiedH3 = new Set(indexed.enemyUnitsByHex.keys());
 
   for (const unit of opponentUnits) {
     let moveHexes = excludeUnitCurrentHex(
@@ -710,28 +595,31 @@ export function collectAggregatedPossibleActionRows(args: {
     let moveEnemySummaryOverride: string | undefined;
     if (forThisTurn && unit.unitType !== 'air') {
       const before = moveHexes.length;
-      if (tacticalBattle && tacticalHumanOccupiedH3) {
-        const interest = filterTacticalGroundMoveHexesForThisTurnOptionsTable(
-          tacticalBattle,
-          moveHexes,
-          tacticalHumanOccupiedH3,
-          tacticalRangedRowsForFootprint ?? []
-        );
-        if (interest.length > 0) {
-          moveHexes = interest;
-        } else {
-          moveHexes = filterTacticalApproachMoveHexesForThisTurnOptionsTable(
-            unit.h3Index,
+      if (tacticalBattle && tacticalBestOptionsInterest && tacticalHumanOccupiedH3) {
+        const resolved = applyInterestOrApproach({
+          unitH3: unit.h3Index,
+          legalHexes: moveHexes,
+          interest: filterTacticalGroundMoveHexesForThisTurnOptionsTable(
             moveHexes,
-            tacticalHumanOccupiedH3
-          );
-          if (moveHexes.length > 0) {
-            moveActionType = ACTION_APPROACH;
-            moveEnemySummaryOverride = nearestEnemyUnitIdsSummary(indexed, unit.h3Index);
-          }
-        }
+            tacticalBestOptionsInterest
+          ),
+          enemyOccupiedH3: tacticalHumanOccupiedH3,
+          indexed,
+        });
+        moveHexes = resolved.hexes;
+        moveActionType = resolved.actionType;
+        moveEnemySummaryOverride = resolved.enemySummaryOverride;
       } else {
-        moveHexes = filterGroundMoveHexesForThisTurnOptionsTable(indexed, moveHexes);
+        const resolved = applyInterestOrApproach({
+          unitH3: unit.h3Index,
+          legalHexes: moveHexes,
+          interest: filterGroundMoveHexesForThisTurnOptionsTable(indexed, moveHexes),
+          enemyOccupiedH3: strategicEnemyOccupiedH3,
+          indexed,
+        });
+        moveHexes = resolved.hexes;
+        moveActionType = resolved.actionType;
+        moveEnemySummaryOverride = resolved.enemySummaryOverride;
       }
       if (thisTurnFilterStats) {
         thisTurnFilterStats.moveIn += before;
@@ -751,6 +639,7 @@ export function collectAggregatedPossibleActionRows(args: {
         latLngByH3,
         isAirStrike: false,
         enemySummaryOverride: moveEnemySummaryOverride,
+        tacticalInterest: tacticalBestOptionsInterest,
       });
     }
 
@@ -783,14 +672,12 @@ export function collectAggregatedPossibleActionRows(args: {
           ? collectTacticalLegalRangedTargetRes4Hexes(tacticalBattle, unit.id, tacticalRangedRows)
           : collectRangedTargetHexes(unit.h3Index, unit.unitType, indexed)
       );
-      if (forThisTurn && tacticalBattle && tacticalHumanOccupiedH3) {
+      if (forThisTurn && tacticalBattle && tacticalBestOptionsInterest) {
         const before = rangedHexes.length;
         rangedHexes = filterTacticalRangedHexesForThisTurnOptionsTable(
-          tacticalBattle,
           unit.id,
           rangedHexes,
-          tacticalRangedRows ?? [],
-          tacticalHumanOccupiedH3
+          tacticalBestOptionsInterest
         );
         if (thisTurnFilterStats) {
           thisTurnFilterStats.rangedIn += before;
@@ -809,6 +696,7 @@ export function collectAggregatedPossibleActionRows(args: {
           indexed,
           latLngByH3,
           isAirStrike: false,
+          tacticalInterest: tacticalBestOptionsInterest,
         });
       }
     }

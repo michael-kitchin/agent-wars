@@ -20,6 +20,7 @@ import {
   buildLatLngPreamble,
   buildTacticalLatLngPreamble,
   buildProductionSubmitClause,
+  buildAvailableToolsIntro,
   buildToolUsageGuidance,
   formatLatLng as formatLatLngWithPrecision,
   getMovementOrderInstruction,
@@ -158,26 +159,8 @@ export function buildSystemPromptForTools(
     }
     return m.promptLine;
   });
-  const toolsIntroPurpose = flags.planningEnabled
-    ? 'plan movement and assess the battlefield'
-    : flags.assessmentEnabled
-      ? 'assess the tactical situation'
-      : undefined;
   const hasPrecomputedBriefing = briefingOverride != null && briefingOverride.length > 0;
-  const selectiveToolHints: string[] = ['exact routing (plan_route)'];
-  if (flags.ordersEnabled && coordinateContext.mode !== 'tactical') {
-    selectiveToolHints.push('standing-order status is already in the briefing (query_orders only for rare detail)');
-  }
-  if (flags.memoryEnabled) selectiveToolHints.push('memory lookup (memory_read)');
-  if (flags.productionEnabled) selectiveToolHints.push('production queue checks/sets');
-  const toolsIntro = toolsIntroPurpose
-    ? hasPrecomputedBriefing
-      ? coordinateContext.mode === 'tactical'
-        ? 'Use the Commander\'s Briefing above for assessments and possible unit actions; use tools selectively for exact routing (plan_route) when needed.'
-        : `Use the Commander's Briefing above for assessments and possible unit actions; use tools selectively for ${selectiveToolHints.join(', ')} when needed.`
-      : `Use these tools to ${toolsIntroPurpose} before submitting orders. You may use multiple rounds of tool calls and mix tool types if that helps.` +
-        (flags.memoryEnabled ? ' Memory: use memory_read as needed; persist notes via memoryUpdates in your final JSON.' : '')
-    : 'Use only the tools listed below. Do not call tools that are not in the list.';
+  const toolsIntro = buildAvailableToolsIntro(flags, hasPrecomputedBriefing, coordinateContext.mode);
   const toolGuidance = buildToolUsageGuidance(flags, hasPrecomputedBriefing, coordinateContext.mode);
   const toolsSection =
     filtered.length === 0
@@ -227,7 +210,11 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
   const adjacentCellsBlock = flags.fallbackMovementEnabled
     ? buildAdjacentCellsFallbackBlock(state, opponentUnits, coordMap, getValidDestinationsUnoccupied)
     : '';
-  const movementOrderInstruction = getMovementOrderInstruction(flags, coordinateContext.mode);
+  const movementOrderInstruction = getMovementOrderInstruction(
+    flags,
+    coordinateContext.mode,
+    hasPrecomputedBriefing
+  );
   const submitMemoryClause = flags.memoryEnabled
     ? ' Use optional "memoryUpdates" for memory writes/deletes (applied from JSON only; there are no memory_write or memory_delete tools).'
     : ' When Memory tools are not listed above, omit "memoryUpdates" or use []; any entries are ignored.';

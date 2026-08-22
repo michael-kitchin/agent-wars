@@ -111,7 +111,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
       },
       required: ['unitId', 'destination'],
     },
-    promptLine: `plan_route(unitId, destination, options?) - Compute the optimal path for a unit to a destination hex. Returns multi-turn route and orderToHexCode: copy that code into explicit_move.destination for that unit.${NAVAL_PLAN_ROUTE_PROMPT_SUFFIX}`,
+    promptLine: `plan_route(unitId, destination, options?) - Path and orderToHexCode. Skip this tool when the dest is already a Best Options This Turn Target Hex for that unit (copy that hex into explicit_move). Otherwise copy orderToHexCode into explicit_move.destination.${NAVAL_PLAN_ROUTE_PROMPT_SUFFIX}`,
   },
   {
     name: 'check_distance',
@@ -125,7 +125,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
       },
       required: ['from', 'to', 'unitType'],
     },
-    promptLine: 'check_distance(from, to, unitType) - Quick distance and turn estimate between two hexes. Use to compare options before requesting full routes.',
+    promptLine: 'check_distance(from, to, unitType) - Quick distance and turn estimate between two hexes. Use to compare options; skip plan_route when the dest is already a Best Options Target Hex for that unit.',
   },
   {
     name: 'assess_unit',

@@ -1,6 +1,7 @@
 import type { GameStateSnapshot } from '../gameDb';
 import { computeRoundedPercentage } from '../../shared/progressFormatting';
 import { getValidDestinations } from '../oneStepMoveDestinations';
+import { PRODUCTION_CAP_QUEUE_GUIDANCE } from '../productionCaps';
 
 /**
  * Documents the `PromptToolFlags` interface as a named contract surface (export interface PromptToolFlags).
@@ -116,6 +117,15 @@ const PRODUCTION_REQUIREMENT_PRIORITY =
  */
 const PRODUCTION_REQUIREMENT_PRIORITY_INITIAL =
   'Set one unit type/count for each queue you choose to manage this turn.';
+/**
+ * Documents the module-scope binding `PRODUCTION_CAP_GUIDANCE` (PRODUCTION_CAP_GUIDANCE).
+ *
+ * Purpose: Stops the model from filling empty queues with types that cannot spawn because the player is at cap.
+ * When to use: Production tool-guidance, user-message, and submit-clause copy when production tools are enabled.
+ * Expected outcome: The sentence is included verbatim in those prompt surfaces.
+ * Exceptions: None.
+ */
+const PRODUCTION_CAP_GUIDANCE = PRODUCTION_CAP_QUEUE_GUIDANCE;
 
 /**
  * Defines the `buildLatLngPreamble` function shape (export function buildLatLngPreamble(h3Resolution: number, decimalPlaces: number): string).
@@ -172,9 +182,52 @@ export function formatLatLng(ll: [number, number], decimalPlaces: number): strin
 }
 
 /**
+ * Builds the Available Tools intro paragraph (before numbered tool lines).
+ *
+ * Purpose: One source for the briefing vs no-briefing tool intro, including Best Options dest copy and strategic standing-order primacy.
+ * When to use: `buildSystemPromptForTools` after computing tool flags and whether a briefing override is attached.
+ * Expected outcome: A single paragraph. Briefing+planning tells the model to copy Best Options Target Hexes into explicit_move and to call plan_route only for dests not listed for that unit. Strategic adds optional query_orders / memory / production hints and does not tell the model to explicit_move every unit.
+ * Exceptions: None.
+ */
+export function buildAvailableToolsIntro(
+  flags: PromptToolFlags,
+  hasPrecomputedBriefing = false,
+  coordinateMode: 'strategic' | 'tactical' = 'strategic'
+): string {
+  const toolsIntroPurpose = flags.planningEnabled
+    ? 'plan movement and assess the battlefield'
+    : flags.assessmentEnabled
+      ? 'assess the tactical situation'
+      : undefined;
+  if (!toolsIntroPurpose) {
+    return 'Use only the tools listed below. Do not call tools that are not in the list.';
+  }
+  if (!hasPrecomputedBriefing) {
+    return (
+      `Use these tools to ${toolsIntroPurpose} before submitting orders. You may use multiple rounds of tool calls and mix tool types if that helps.` +
+      (flags.memoryEnabled ? ' Memory: use memory_read as needed; persist notes via memoryUpdates in your final JSON.' : '')
+    );
+  }
+  if (coordinateMode === 'tactical') {
+    return "Use the Commander's Briefing above for assessments and possible unit actions. Copy Best Options This Turn Target Hexes into explicit_move; use plan_route only for dests not listed for that sub-unit.";
+  }
+  const extraHints: string[] = [];
+  if (flags.ordersEnabled) {
+    extraHints.push('standing-order status is already in the briefing (query_orders only for rare detail)');
+  }
+  if (flags.memoryEnabled) extraHints.push('memory lookup (memory_read)');
+  if (flags.productionEnabled) extraHints.push('production queue checks/sets');
+  const extra = extraHints.length > 0 ? ` Use tools selectively for ${extraHints.join(', ')} when needed.` : '';
+  return (
+    "Use the Commander's Briefing above for assessments and possible unit actions. Copy Best Options This Turn Target Hexes into explicit_move when you need a one-step move; use plan_route only for dests not listed for that unit." +
+    extra
+  );
+}
+
+/**
  * Builds mode-aware tool-usage coaching bullets for the Available Tools section.
  *
- * Purpose: Keeps strategic vs tactical briefing guidance aligned with which sections and tools are actually present.
+ * Purpose: Keeps strategic vs tactical briefing guidance aligned with which sections and tools are actually present, including copying Best Options dests instead of one plan_route per unit.
  * When to use: `buildSystemPromptForTools` after computing tool flags and whether a briefing override is attached.
  * Expected outcome: Markdown bullet lines; tactical mode omits supplemental-hex / assign_order coaching that does not apply in-battle.
  * Exceptions: None.
@@ -193,12 +246,14 @@ export function buildToolUsageGuidance(
     );
     if (flags.planningEnabled) {
       lines.push(
-        '- Use plan_route only when you need the exact orderToHexCode for a unit\'s move. Call it sparingly (e.g. one per unit that needs to move); the briefing already summarizes nearest enemies, distances, and legal options. After you have orderToHexCode for each unit that needs orders, submit — do not re-assess or re-route.'
+        coordinateMode === 'tactical'
+          ? '- Best Options This Turn Target Hexes are already this-beat legal destinations. Copy a Target Hex from that sub-unit\'s row into explicit_move.destination; do not call plan_route for those dests. Call plan_route only when you need a destination not listed for that sub-unit. After dests are chosen, submit — do not re-assess or re-route.'
+          : '- Best Options This Turn Target Hexes are already this-turn legal destinations. Copy a Target Hex from that unit\'s row into explicit_move.destination when you need a one-step move; do not call plan_route for those dests. Call plan_route only when you need a destination not listed for that unit. After dests are chosen, submit — do not re-assess or re-route.'
       );
     }
     if (coordinateMode === 'tactical') {
       lines.push(
-        '- Do not emit assign_order or cancel_order for tactical sub-unit ids (blocked this beat). Issue explicit_move for every sub-unit that should march this beat, plus ranged_attack and air strikes as needed. Standing orders do not move units in tactical battle.'
+        '- Do not emit assign_order or cancel_order for tactical sub-unit ids (blocked this beat). Issue explicit_move for every sub-unit that has a Best Options approach or move/melee row this beat, plus ranged_attack and air strikes as needed. Standing orders do not move units in tactical battle.'
       );
       lines.push(
         '- Tempo rule: if any unit can make a legal ranged_attack or air strike this turn, do it now. Ranged attacks and air strikes use turn-start positions and can be combined with movement orders in the same turn.'
@@ -208,7 +263,7 @@ export function buildToolUsageGuidance(
       );
     } else if (flags.ordersEnabled) {
       lines.push(
-        '- Standing orders: for every unit listed under ## Units Without Standing Orders in the briefing, add an orders[] entry with action assign_order (march/pursue for closing; defend to hold). Then use plan_route and explicit_move in orders[] only where you need a one-step move this turn.'
+        '- Standing orders: for every unit listed under ## Units Without Standing Orders in the briefing, add an orders[] entry with action assign_order (march/pursue for closing; defend to hold). When you need a one-step explicit_move this turn, copy a Best Options This Turn Target Hex for that unit; call plan_route only for dests not listed there.'
       );
       lines.push(
         '- Tempo rule: if any unit can make a legal ranged_attack or air strike this turn, do it now. Ranged attacks and air strikes use turn-start positions and can be combined with movement orders in the same turn.'
@@ -258,6 +313,7 @@ export function buildToolUsageGuidance(
     lines.push(
       `- Production requirement: ${PRODUCTION_REQUIREMENT_BASE}, queue at least one build this turn (via tools or productionOrders). ${PRODUCTION_REQUIREMENT_PRIORITY}`
     );
+    lines.push(`- ${PRODUCTION_CAP_GUIDANCE}`);
     lines.push(
       '- Queue production aggressively: set_build_queue on every controlled hex that can build, so queues keep running if you lose hexes and reinforcements spawn closer to the front.'
     );
@@ -307,11 +363,11 @@ export function buildAdjacentCellsFallbackBlock(
 }
 
 /**
- * Defines the `getMovementOrderInstruction` function shape (export function getMovementOrderInstruction(flags: PromptToolFlags, coordinateMode?: 'strategic' | 'tactical'): string).
+ * Builds the JSON-contract sentence that tells the model how to fill explicit_move.destination.
 
- * Purpose: Supports maintainability by documenting why `getMovementOrderInstruction` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: When planning tools are on and a briefing is present, dests may be copied from Best Options This Turn Target Hexes or from plan_route orderToHexCode. Without a briefing, dests come from plan_route only.
+ * When to use: `buildFinalJsonContractInstruction` after computing tool flags.
+ * Expected outcome: One or more sentences appended to the final JSON schema block; tactical mode also describes first-leg truncation.
  * Exceptions: None.
  */
 export function getMovementOrderInstruction(
@@ -319,16 +375,28 @@ export function getMovementOrderInstruction(
   /**
    * When `tactical`, appends march reachability guidance so explicit_move rows match terrain-weighted tactical validation (same checks as Ready commit).
    */
-  coordinateMode: 'strategic' | 'tactical' = 'strategic'
+  coordinateMode: 'strategic' | 'tactical' = 'strategic',
+  /**
+   * When false, there is no Best Options table; dests must come from plan_route orderToHexCode.
+   */
+  hasPrecomputedBriefing = true
 ): string {
   const memorySuffix = flags.memoryEnabled ? MOVEMENT_INSTRUCTION_MEMORY_SUFFIX : '';
   const tacticalMarchReachabilityClause =
     coordinateMode === 'tactical'
-      ? ' Tactical marches use terrain-weighted MP budgets per beat; when a finite-cost path exists, the server applies at most the first leg toward each explicit_move destination (same truncation as human Ready). When the continuity planner rejects the full destination but a footprint neighbor still advances you on the H3 grid toward that hex, the server may take that one-step fallback. Copy plan_route\'s orderToHexCode exactly, not a guessed adjacent code.'
+      ? hasPrecomputedBriefing
+        ? ' Tactical marches use terrain-weighted MP budgets per beat; when a finite-cost path exists, the server applies at most the first leg toward each explicit_move destination (same truncation as human Ready). When the continuity planner rejects the full destination but a footprint neighbor still advances you on the H3 grid toward that hex, the server may take that one-step fallback. Copy a Best Options This Turn Target Hex for that unit, or plan_route\'s orderToHexCode, not a guessed adjacent code.'
+        : ' Tactical marches use terrain-weighted MP budgets per beat; when a finite-cost path exists, the server applies at most the first leg toward each explicit_move destination (same truncation as human Ready). When the continuity planner rejects the full destination but a footprint neighbor still advances you on the H3 grid toward that hex, the server may take that one-step fallback. Copy plan_route\'s orderToHexCode exactly, not a guessed adjacent code.'
       : '';
   if (flags.planningEnabled) {
+    if (!hasPrecomputedBriefing) {
+      return (
+        ' For each explicit_move entry: set "destination" to the exact orderToHexCode from that unit\'s plan_route result (copy the two-character code exactly).' +
+        tacticalMarchReachabilityClause
+      );
+    }
     return (
-      ' For each explicit_move entry: set "destination" to the exact orderToHexCode from that unit\'s plan_route result (copy the two-character code exactly).' +
+      ' For each explicit_move entry: set "destination" to a Target Hex from that unit\'s Best Options This Turn row (copy the two-character code exactly), or to the exact orderToHexCode from that unit\'s plan_route result when the dest is not listed there.' +
       tacticalMarchReachabilityClause
     );
   }
@@ -367,6 +435,7 @@ export function buildProductionSubmitClause(flags: PromptToolFlags): string {
     ' {"action":"set_build_queue","hex":"<two-char code>","unitType":"infantry|armor|naval|air","count":1..99}.' +
     ' Any productionOrders item missing "action" or required fields is dropped.' +
     ` ${PRODUCTION_REQUIREMENT_BASE}, include at least one set_build_queue this turn.` +
+    ` ${PRODUCTION_CAP_GUIDANCE}` +
     ' Each set_build_queue item fully replaces the chosen hex queue with one unit type/count.'
   );
 }
@@ -385,11 +454,11 @@ export function buildHumanUnitsPromptLine(humanRoster: string): string {
 }
 
 /**
- * Defines the `getInitialUserMessage` function shape (export function getInitialUserMessage(flags: PromptToolFlags, hasPrecomputedBriefing = false, coordinateMode?: 'strategic' | 'tactical'): string).
+ * Builds the first user turn that asks the model to consult the briefing and submit orders JSON.
 
- * Purpose: Supports maintainability by documenting why `getInitialUserMessage` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: With a precomputed briefing, tells the model to copy Best Options Target Hexes into explicit_move and to call plan_route only for dests not listed for that unit.
+ * When to use: `requestOrdersFlow` after the system prompt and briefing are assembled.
+ * Expected outcome: One user-message string; tactical mode omits assign_order/cancel_order.
  * Exceptions: None.
  */
 export function getInitialUserMessage(
@@ -408,16 +477,16 @@ export function getInitialUserMessage(
       ? ' After your analysis, include memoryUpdates in your final JSON for strategy notes. '
       : '';
     const productionNote = flags.productionEnabled
-      ? ` Also ensure production is actively queued when viable: ${PRODUCTION_REQUIREMENT_BASE}, include at least one production action. ${PRODUCTION_REQUIREMENT_PRIORITY_INITIAL} Prefer setting queues on every eligible controlled hex so production survives territory swings and reinforcements stay close to the front. `
+      ? ` Also ensure production is actively queued when viable: ${PRODUCTION_REQUIREMENT_BASE}, include at least one production action. ${PRODUCTION_REQUIREMENT_PRIORITY_INITIAL} ${PRODUCTION_CAP_GUIDANCE} Prefer setting queues on every eligible controlled hex so production survives territory swings and reinforcements stay close to the front. `
       : '';
     if (hasPrecomputedBriefing) {
       if (coordinateMode === 'tactical') {
-        return `Use the Commander's Briefing above for unit status, attention flags, and possible unit actions this tactical beat. Call plan_route for each sub-unit that needs a move (orderToHexCode). Then submit final JSON with "message", "strategy", "orders" (explicit_move / ranged_attack as needed; do not use assign_order or cancel_order)${jsonOptionalTail}.`;
+        return `Use the Commander's Briefing above for unit status, attention flags, and possible unit actions this tactical beat. For every sub-unit with a Best Options approach or move/melee row, copy a Target Hex from that sub-unit's Best Options This Turn row into explicit_move.destination. Call plan_route only if you need a dest not listed for that sub-unit. Then submit final JSON with "message", "strategy", "orders" (explicit_move / ranged_attack as needed; do not use assign_order or cancel_order)${jsonOptionalTail}.`;
       }
       const ordersNudge = flags.ordersEnabled
-        ? ' For units without standing orders in the briefing, include assign_order entries in orders[]. Then use plan_route and explicit_move only where needed this turn. '
+        ? ' For units without standing orders in the briefing, include assign_order entries in orders[]. '
         : '';
-      return `Use the Commander's Briefing above for unit status, attention flags, possible unit actions, and supplemental hex intelligence.${ordersNudge}Call plan_route for each unit that needs a move (orderToHexCode).${memoryNote}${productionNote} Then submit final JSON with "message", "strategy", "orders" (assign_order / explicit_move / ranged_attack / cancel_order as needed)${jsonOptionalTail}.`;
+      return `Use the Commander's Briefing above for unit status, attention flags, possible unit actions, and supplemental hex intelligence.${ordersNudge}Copy Best Options This Turn Target Hexes into explicit_move when you need a one-step move this turn. Call plan_route only if you need a dest not listed for that unit.${memoryNote}${productionNote} Then submit final JSON with "message", "strategy", "orders" (assign_order / explicit_move / ranged_attack / cancel_order as needed)${jsonOptionalTail}.`;
     }
     return `Use the tools as needed to plan movement.${memoryNote}${productionNote} Then submit final JSON with "message", "strategy", "orders"${jsonOptionalTail}.`;
   }

@@ -34,7 +34,7 @@ Path BFS plus the requested radius (default 4). Pentagon pairs that fail `gridDi
 
 When the gate is true, strategic `formatBriefing` inserts this sentence immediately after `## Unit Status and Threats`, then a blank line, then the unit table:
 
-> Nearest-enemy distances and threat ETAs are H3 grid hops (straight hex count), not march or sail paths. Use plan_route before moving.
+> Nearest-enemy distances and threat ETAs are H3 grid hops (straight hex count), not march or sail paths. Best Options This Turn Target Hexes are this-turn legal dests; use plan_route only for dests not listed for that unit.
 
 The line is absent when fog is on, the fog flag is missing, or hexes are not resolution 1.
 

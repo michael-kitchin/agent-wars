@@ -21,6 +21,8 @@ import {
 import type { LatLng } from './tool1Pathfinding';
 import { logDebug, logError, logTrace } from '../logger';
 import { isTerrainClassificationCacheLoaded } from '../terrainClassificationCache';
+import { getMaxedUnitTypesForPlayer, shouldRejectCappedQueueType, filterQueueableUnitTypes } from '../productionCaps';
+import { parseGameSize } from '../../shared/gameSize';
 
 /**
  * Documents the module-scope binding `AI_PLAYER_ID` (AI_PLAYER_ID).
@@ -112,14 +114,18 @@ function resolveHexArgument(
 }
 
 /**
- * Defines the `summarizeQueue` function shape (function summarizeQueue(queue: HexBuildQueueView, latLngByH3: Map<string, LatLng>): Record<string, unknown>).
-
- * Purpose: Supports maintainability by documenting why `summarizeQueue` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Serializes one hex queue for opponent `query_production` / `set_build_queue` tool results.
+ *
+ * Purpose: AI summaries must list the same queueable types as the production briefing (omit capped types when an alternative exists).
+ * When to use: After reading or mutating a hex queue in this module.
+ * Expected outcome: Display lat/lng hex, filtered `availableUnitTypes`, and entry rows; does not change stored availability for the human UI.
  * Exceptions: None.
  */
-function summarizeQueue(queue: HexBuildQueueView, latLngByH3: Map<string, LatLng>): Record<string, unknown> {
+function summarizeQueue(
+  queue: HexBuildQueueView,
+  latLngByH3: Map<string, LatLng>,
+  maxedTypes: ReadonlySet<string>
+): Record<string, unknown> {
   const ll = latLngByH3.get(queue.h3Index);
   return {
     hex: ll ? toDisplayLatLng(ll) : null,
@@ -128,7 +134,7 @@ function summarizeQueue(queue: HexBuildQueueView, latLngByH3: Map<string, LatLng
     urbanHexCount: queue.urbanHexCount,
     airportCount: queue.airportCount,
     seaportCount: queue.seaportCount,
-    availableUnitTypes: queue.availableUnitTypes,
+    availableUnitTypes: filterQueueableUnitTypes(queue.availableUnitTypes, maxedTypes),
     buildSectionVisible: queue.buildSectionVisible,
     noBuildReason: queue.noBuildReason,
     entries: queue.entries.map((entry) => ({
@@ -141,12 +147,12 @@ function summarizeQueue(queue: HexBuildQueueView, latLngByH3: Map<string, LatLng
 }
 
 /**
- * Defines the `queryProduction` function shape (function queryProduction( args: { hex?: unknown; all?: unknown }, state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: numb).
-
- * Purpose: Supports maintainability by documenting why `queryProduction` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Reads opponent-controlled production queues for the AI, with cap-aware available types.
+ *
+ * Purpose: Briefing and `query_production` share this path so the model is not shown capped types as buildable when another type remains.
+ * When to use: `executeTool6` for `query_production`.
+ * Expected outcome: `{ status: 'ok', production }` for one hex or `{ controlledHexQueues }`; empty queues with `unavailableReason` when the terrain cache is missing.
+ * Exceptions: Returns `{ status: 'error' }` when a requested hex cannot be resolved.
  */
 function queryProduction(
   args: { hex?: unknown; all?: unknown },
@@ -163,33 +169,40 @@ function queryProduction(
       unavailableReason: 'terrain classification cache not loaded',
     };
   }
+  const maxedTypes = new Set(
+    getMaxedUnitTypesForPlayer(state.units, AI_PLAYER_ID, parseGameSize(state.gameSize))
+  );
   if (args.hex !== undefined) {
     const resolved = resolveHexArgument(args, resolveToH3);
     if (!resolved.ok) return { status: 'error', error: resolved.error };
     const queue = getHexBuildQueue(resolved.h3Index, AI_PLAYER_ID);
-    return { status: 'ok', production: summarizeQueue(queue, latLngByH3) };
+    return { status: 'ok', production: summarizeQueue(queue, latLngByH3, maxedTypes) };
   }
   const snapshots = state.hexes
     .map((hex) => getHexBuildQueue(hex.h3Index, AI_PLAYER_ID))
     .filter((queue) => queue.controlledByRequester)
-    .map((queue) => summarizeQueue(queue, latLngByH3));
+    .map((queue) => summarizeQueue(queue, latLngByH3, maxedTypes));
   return { status: 'ok', production: { controlledHexQueues: snapshots } };
 }
 
 /**
- * Defines the `setBuildQueue` function shape (function setBuildQueue( args: { hex?: unknown; unitType?: unknown; count?: unknown }, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: number, lng:).
-
- * Purpose: Supports maintainability by documenting why `setBuildQueue` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Replaces the opponent queue on one hex with a single unit type and count.
+ *
+ * Purpose: Tool calls and `productionOrders` JSON share this path so capped types are rejected when the hex can still build another type, while pre-queue remains allowed if every available type is at cap.
+ * When to use: `executeTool6` for `set_build_queue`.
+ * Expected outcome: `{ status: 'ok', production }` with the updated queue, or `{ status: 'error' }` for invalid hex/type/count, uncontrolled hex, unavailable type, or capped type with an alternative.
+ * Exceptions: None beyond the returned error payload.
  */
 function setBuildQueue(
   args: { hex?: unknown; unitType?: unknown; count?: unknown },
   latLngByH3: Map<string, LatLng>,
-  resolveToH3: (lat: number, lng: number) => string | undefined
+  resolveToH3: (lat: number, lng: number) => string | undefined,
+  state: GameStateSnapshot
 ): Record<string, unknown> {
-  logDebug('tool6Production setBuildQueue', { hasHex: args.hex !== undefined });
+  logDebug('tool6Production setBuildQueue', {
+    hasHex: args.hex !== undefined,
+    unitType: typeof args.unitType === 'string' ? args.unitType : null,
+  });
   const resolved = resolveHexArgument(args, resolveToH3);
   if (!resolved.ok) return { status: 'error', error: resolved.error };
   if (!isBuildUnitType(args.unitType)) {
@@ -215,6 +228,19 @@ function setBuildQueue(
       error: `set_build_queue unitType ${args.unitType} is not available for this hex.`,
     };
   }
+  const maxedTypes = new Set(
+    getMaxedUnitTypesForPlayer(state.units, AI_PLAYER_ID, parseGameSize(state.gameSize))
+  );
+  if (shouldRejectCappedQueueType(args.unitType, currentQueue.availableUnitTypes, maxedTypes)) {
+    logDebug('tool6Production setBuildQueue: rejected type at deployment cap', {
+      unitType: args.unitType,
+      h3Index: resolved.h3Index,
+    });
+    return {
+      status: 'error',
+      error: `set_build_queue unitType ${args.unitType} is at deployment cap; queue a still-available type instead.`,
+    };
+  }
   const orderedEntries = [...currentQueue.entries].sort((a, b) => a.queueIndex - b.queueIndex);
   if (orderedEntries.length > 0) {
     const entryToKeep = orderedEntries[0]!;
@@ -230,7 +256,7 @@ function setBuildQueue(
       }
       queueAfter = removeResult.queue;
     }
-    return { status: 'ok', production: summarizeQueue(queueAfter, latLngByH3) };
+    return { status: 'ok', production: summarizeQueue(queueAfter, latLngByH3, maxedTypes) };
   }
 
   const addResult = addHexBuildQueueEntry(resolved.h3Index, AI_PLAYER_ID);
@@ -245,7 +271,7 @@ function setBuildQueue(
   if (!updateResult.success || !updateResult.queue) {
     return { status: 'error', error: updateResult.reason ?? 'Failed to set build queue entry.' };
   }
-  return { status: 'ok', production: summarizeQueue(updateResult.queue, latLngByH3) };
+  return { status: 'ok', production: summarizeQueue(updateResult.queue, latLngByH3, maxedTypes) };
 }
 
 /**
@@ -272,7 +298,7 @@ export function executeTool6(
       all?: unknown;
     };
     if (toolName === 'query_production') return queryProduction(request, state, latLngByH3, resolveToH3);
-    if (toolName === 'set_build_queue') return setBuildQueue(request, latLngByH3, resolveToH3);
+    if (toolName === 'set_build_queue') return setBuildQueue(request, latLngByH3, resolveToH3, state);
     return { status: 'error', error: `Unknown tool: ${toolName}` };
   } catch (err) {
     logError('tool6Production executeTool6: exception', toolName, err);
