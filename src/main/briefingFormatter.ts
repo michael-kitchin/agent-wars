@@ -240,6 +240,17 @@ function maxThreatSeverity(
  * absent or holds only out-of-range rows.
  * Exceptions: None; unrecognised row shapes count as no attack.
  */
+/**
+ * How many unit ids the available-attack Attention Flags bullet names before summarising the remainder.
+ *
+ * Purpose: The bullet has to be complete enough to act on without becoming a wall of ids on a large roster. Units
+ * beyond this are still listed in Unit Status with `Action needed` = yes, which the bullet points at.
+ * When to use: `buildAttentionFlags` only.
+ * Expected outcome: Bullets stay roughly one screen line at typical shooter counts.
+ * Exceptions: None.
+ */
+const ATTENTION_ARMED_UNITS_LISTED = 12;
+
 function hasLegalAttackThisTurn(assessment: UnitAssessmentResult): boolean {
   const rows = (assessment.result.canAttackThisTurn ?? []) as Array<{ attackType?: unknown }>;
   return rows.some((r) => typeof r.attackType === 'string' && r.attackType !== 'none');
@@ -379,7 +390,7 @@ export function buildAttentionFlags(
    */
   standingOrdersActive = true
 ): string {
-  // Ranks 0-3 are threat severities; rank 4 is reserved for available-attack bullets, which must never displace
+  // Ranks 0-3 are threat severities; rank 4 is reserved for the available-attack bullet, which must never displace
   // a threat from the five-bullet cap.
   const severityRank = (sev: 'critical' | 'moderate' | 'low' | null): number => {
     if (sev === 'critical') return 0;
@@ -389,19 +400,13 @@ export function buildAttentionFlags(
   };
   type AttentionCandidate = { text: string; rank: number };
   const candidates: AttentionCandidate[] = [];
+  const armedUnitRefs: string[] = [];
   const soActive = coordinateMode === 'tactical' ? false : standingOrdersActive;
   for (const a of unitAssessments) {
     if (!needsAction(a, soActive)) continue;
     const threats = a.result.threats ?? [];
     const nearest = a.result.nearbyEnemies?.[0];
-    if (hasLegalAttackThisTurn(a)) {
-      // Ranked below every threat bullet so it can only take a slot no threat wanted, but present in both
-      // coordinate modes: a shot that goes unmentioned is a shot the model will not choose a target for.
-      candidates.push({
-        rank: 4,
-        text: `${formatUnitDisplayRef(a.unitId)} has a legal attack this turn — order the ranged_attack or air strike and pick the target.`,
-      });
-    }
+    if (hasLegalAttackThisTurn(a)) armedUnitRefs.push(formatUnitDisplayRef(a.unitId));
     if (!soActive) {
       const sev = maxThreatSeverity(threats);
       if ((sev === 'critical' || sev === 'moderate') && nearest) {
@@ -425,6 +430,20 @@ export function buildAttentionFlags(
         text: `${formatUnitDisplayRef(a.unitId)} standing order is in warning state (${order.status}) — decide follow-on orders.`,
       });
     }
+  }
+  if (armedUnitRefs.length > 0) {
+    // One bullet for the whole group rather than one each. Per-unit bullets ate the entire five-bullet cap the
+    // first time a handful of units had shots, hiding both the sixth shooter and any threat bullet behind them.
+    // Rank 4 keeps it below every threat bullet, so it can only ever take a slot no threat wanted.
+    const listed = armedUnitRefs.slice(0, ATTENTION_ARMED_UNITS_LISTED);
+    const overflow = armedUnitRefs.length - listed.length;
+    candidates.push({
+      rank: 4,
+      text:
+        `${armedUnitRefs.length} unit(s) have a legal attack this turn — order a ranged_attack or air strike for each ` +
+        `and choose the targets yourself: ${listed.join(', ')}` +
+        `${overflow > 0 ? `, and ${overflow} more marked Action needed = yes` : ''}.`,
+    });
   }
   if (candidates.length === 0) return 'None.';
   candidates.sort((a, b) => a.rank - b.rank || a.text.localeCompare(b.text));

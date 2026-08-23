@@ -355,9 +355,12 @@ function testUnitWithLegalShotIsNeverQuiet(): void {
   const row = table.split('\n').find((l) => l.includes('opp-shooter'));
   assert.ok(row && row.includes('| yes |'), `unit with a legal shot must read yes: ${row}`);
   assert.ok(row && !row.includes('quiet'), `unit with a legal shot must not be marked quiet: ${row}`);
-  assert.ok(
-    buildAttentionFlags(assessments, 'strategic', true).includes('opp-shooter'),
-    'a unit with a legal shot belongs in Attention Flags'
+  const flags = buildAttentionFlags(assessments, 'strategic', true);
+  assert.ok(flags.includes('opp-shooter'), 'a unit with a legal shot belongs in Attention Flags');
+  assert.strictEqual(
+    flags.split('\n').filter((l) => l.includes('legal attack')).length,
+    1,
+    'available attacks share one bullet so they cannot consume the five-bullet cap'
   );
 }
 
