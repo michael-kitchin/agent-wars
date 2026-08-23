@@ -3,7 +3,10 @@
  * All logic runs in the main process and uses the game database.
  */
 
-import { gridDistance, gridPathCells } from 'h3-js';
+import {
+  computeGridDistanceWithPathFallbackPure,
+  computeGridPathCellsPure,
+} from '../../shared/h3GridRangePure';
 import {
   dbGetOne,
   dbRun,
@@ -46,9 +49,13 @@ import {
 import {
   assignHumanMarchStandingOrder,
   cancelHumanStandingOrder,
+  holdFireUnitIdsForPlayer,
   queryHumanStandingOrders,
 } from '../tools/tool5StandingOrders';
-import { resolveTacticalRangedTargetForSubUnit } from '../tacticalBattle/tacticalRangedTargetResolve';
+import {
+  resolveTacticalRangedTargetForSubUnit,
+  withTacticalTempoAttacks,
+} from '../tacticalBattle/tacticalRangedTargetResolve';
 import { validateHumanTacticalMarchOrders } from '../tacticalBattle/tacticalBattleSession';
 import type {
   ApplyBuildQueueTemplateResult,
@@ -461,10 +468,13 @@ function validateOrder(
     return { valid: false, reason: 'Unit is on an invalid or outdated hex; start a new game.' };
   }
 
-  let dist: number;
-  try {
-    dist = gridDistance(unit.h3_index, toH3Index);
-  } catch {
+  const dist = computeGridDistanceWithPathFallbackPure(unit.h3_index, toH3Index);
+  if (dist === null) {
+    logError('gameActionsCore validateMoveOrder: no derivable distance between hexes', {
+      unitId,
+      fromH3Index: unit.h3_index,
+      toH3Index,
+    });
     return { valid: false, reason: 'Invalid hex or distance; try starting a new game.' };
   }
   const range = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unit_type] ?? 1;
@@ -505,11 +515,16 @@ function validateOrder(
     const routeH3: string[] = [unit.h3_index];
     const traversedH3: string[] = [];
     if (dist > 1) {
-      try {
-        traversedH3.push(...gridPathCells(unit.h3_index, toH3Index));
-      } catch {
+      const path = computeGridPathCellsPure(unit.h3_index, toH3Index);
+      if (path === null) {
+        logError('gameActionsCore validateMoveOrder: no derivable route between hexes', {
+          unitId,
+          fromH3Index: unit.h3_index,
+          toH3Index,
+        });
         return { valid: false, reason: 'Invalid hex or path; try starting a new game.' };
       }
+      traversedH3.push(...path);
     }
     for (const h3 of traversedH3) {
       if (routeH3[routeH3.length - 1] !== h3) routeH3.push(h3);
@@ -917,8 +932,11 @@ export function commitHumanTacticalDraftOrders(args: {
     if (!preBattle) {
       return { success: false, reason: 'No tactical battle is active.' };
     }
-    const opponentTacticalDraft = sanitizeOpponentTacticalDraftForReadyCommit(preBattle, args.opponentTacticalDraft);
-    // Explicit drafts only: strategic standing orders do not auto-move or auto-fire in tactical (aligned with AI).
+    const opponentTacticalDraft = sanitizeOpponentTacticalDraftForReadyCommit(
+      preBattle,
+      withTacticalTempoAttacks(preBattle, args.opponentTacticalDraft, holdFireUnitIdsForPlayer('opponent'))
+    );
+    // The human's own slice stays explicit: strategic standing orders neither move nor fire their pawns in tactical.
     const effectiveHumanMarches = [...args.movementOrders];
     logDebug('gameActions commitHumanTacticalDraftOrders explicit marches only', {
       explicitMarchCount: effectiveHumanMarches.length,

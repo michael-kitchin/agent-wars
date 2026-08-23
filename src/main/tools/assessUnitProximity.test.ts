@@ -9,6 +9,7 @@ import { getOrderedHexList } from '../mapData';
 import {
   collectOmniscientNearbyUnits,
   estimatedTurnsFromGridDistance,
+  gridHopDistanceBetween,
   gridHopDistancesFrom,
   OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE,
   safeGridHexDistance,
@@ -186,6 +187,32 @@ function testCollectOmniscientNearbyUnitsIncludesPentagonCrossingEnemy(): void {
 }
 
 /**
+ * Verifies single-pair hop distance measures a pentagon-crossing pair and matches H3 when available.
+ *
+ * Purpose: Best Options approach and the fog-on assess_unit scan silently dropped pairs where `gridDistance` throws, so stacks recommended empty cities and in-range enemies vanished from Unit Status.
+ * When to use: After changing `gridHopDistanceBetween` or the BFS depth cap.
+ * Expected outcome: Same value as `gridDistance` for a measurable neighbor; a positive hop count for the throwing pair, stable across the memo.
+ * Exceptions: None.
+ */
+function testGridHopDistanceBetweenCoversPentagonCrossingPair(): void {
+  const neighbor = gridDisk(res1Cell, 1).find((h) => h !== res1Cell);
+  assert.ok(neighbor, 'expected a ring-1 neighbor');
+  assert.strictEqual(gridHopDistanceBetween(res1Cell, res1Cell), 0);
+  assert.strictEqual(gridHopDistanceBetween(res1Cell, neighbor!), gridDistance(res1Cell, neighbor!));
+
+  const [origin, far] = res1PairWhereGridDistanceThrows();
+  assert.strictEqual(safeGridHexDistance(origin, far), null);
+  const hops = gridHopDistanceBetween(origin, far);
+  assert.ok(hops !== null && hops >= 1, 'pentagon-crossing pair must still report hops');
+  assert.strictEqual(gridHopDistanceBetween(origin, far), hops, 'second call must hit the fallback memo');
+  assert.strictEqual(
+    hops,
+    gridHopDistancesFrom(origin, [far]).get(far),
+    'wrapper must agree with an uncapped BFS for this pair'
+  );
+}
+
+/**
  * Ensures the fog-off Unit Status honesty line does not require plan_route before every move.
  *
  * Purpose: Grid-hop distances are not march paths; this-turn dests still come from Best Options Target Hexes.
@@ -215,6 +242,7 @@ function run(): void {
   testCollectOmniscientNearbyUnitsSkipsInvalidOtherIndex();
   testEstimatedTurnsFromGridDistance();
   testCollectOmniscientNearbyUnitsIncludesPentagonCrossingEnemy();
+  testGridHopDistanceBetweenCoversPentagonCrossingPair();
   testOmniscientHonestyLineUsesBestOptionsDestCopy();
   console.log('assessUnitProximity.test.ts passed');
 }

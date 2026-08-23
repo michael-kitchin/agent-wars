@@ -8,7 +8,7 @@ import { logDebug } from './logger';
 import { dbGetAll } from './gameDb';
 import type { GameStateSnapshot } from './gameDb';
 import type { CallbackSubscription } from './callbackSubscriptions';
-import { gridDistance } from 'h3-js';
+import { gridHopDistanceBetween } from './tools/assessUnitProximity';
 import { getRange } from './combatConstants';
 
 /**
@@ -354,24 +354,23 @@ hittableHumans: Set<string>;
 let lastAttackMixSnapshot: AttackMixSnapshot | null = null;
 
 /**
- * Defines the `canHitNow` function shape (function canHitNow().
-
- * Purpose: Supports maintainability by documenting why `canHitNow` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * True when `attacker` is close enough to strike `target` right now on the H3 grid.
+ *
+ * Purpose: Threat-based callback events must fire while an enemy can actually shoot, so this compares grid distance
+ * against the attacker's weapon range (melee-only types must share the hex).
+ * When to use: Subscription evaluation for unit-threat events; not for validating a submitted attack order.
+ * Expected outcome: Distance comes from `gridHopDistanceBetween`, so pairs that H3's fast distance APIs cannot measure
+ * across an icosahedron face crossing still resolve instead of silently reporting "cannot hit".
+ * Exceptions: None; a pair that stays unmeasurable is treated as out of reach.
  */
 function canHitNow(
   attacker: { unitType: string; h3Index: string },
   target: { h3Index: string }
 ): boolean {
-  try {
-    const dist = gridDistance(attacker.h3Index, target.h3Index);
-    const range = getRange(attacker.unitType as 'infantry' | 'armor' | 'naval');
-    return range > 0 ? dist <= range : dist === 0;
-  } catch {
-    return false;
-  }
+  const dist = gridHopDistanceBetween(attacker.h3Index, target.h3Index);
+  if (dist === null) return false;
+  const range = getRange(attacker.unitType as 'infantry' | 'armor' | 'naval');
+  return range > 0 ? dist <= range : dist === 0;
 }
 
 /**

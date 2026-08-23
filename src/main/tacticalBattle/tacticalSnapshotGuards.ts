@@ -2,7 +2,8 @@
  * Tactical snapshot guard helpers shared by movement projection and composite order application.
  */
 
-import { gridDisk, gridDistance } from 'h3-js';
+import { gridDisk } from 'h3-js';
+import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
 import type { TacticalMarchPlanResult } from '../../shared/tacticalRes4MovementPlanner';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import {
@@ -86,7 +87,8 @@ function landRes4FootprintRing1Neighbors(fromH3: string, res4Set: ReadonlySet<st
  * with `failureReason === 'no_path'`, for infantry/armor with a positive MP budget, when grid distance from origin to
  * the ordered hex is at least two (adjacent failures stay authoritative).
  * Expected outcome: `null` when no neighbor yields a reachable one-beat plan that strictly approaches `orderedToH3`.
- * Exceptions: `gridDistance` throws are treated as “no candidate”.
+ * Exceptions: None; distances come from the shared BFS fallback, so a res4 pair spanning an icosahedron face crossing
+ * still yields a candidate instead of disabling recovery for the whole beat.
  */
 function tacticalLandMarchBestEffortPlanTowardOrderedHex(args: {
   battle: TacticalMarchPlanBattleArgs;
@@ -98,13 +100,8 @@ function tacticalLandMarchBestEffortPlanTowardOrderedHex(args: {
 }): TacticalMarchPlanResult | null {
   if (args.movementPointBudget < 1) return null;
   if (args.moveType !== 'infantry' && args.moveType !== 'armor') return null;
-  let d0: number;
-  try {
-    d0 = gridDistance(args.fromH3, args.orderedToH3);
-  } catch {
-    return null;
-  }
-  if (d0 <= 1) return null;
+  const d0 = computeGridDistanceWithPathFallbackPure(args.fromH3, args.orderedToH3);
+  if (d0 === null || d0 <= 1) return null;
   const neighbors = landRes4FootprintRing1Neighbors(args.fromH3, args.res4Set);
   let best: TacticalMarchPlanResult | null = null;
   let bestRank = Infinity;
@@ -119,13 +116,8 @@ function tacticalLandMarchBestEffortPlanTowardOrderedHex(args: {
     if (!p.reachable) continue;
     const applied = p.firstStopWithinBudget.stopH3;
     if (applied === args.fromH3) continue;
-    let d1: number;
-    try {
-      d1 = gridDistance(applied, args.orderedToH3);
-    } catch {
-      continue;
-    }
-    if (d1 >= d0) continue;
+    const d1 = computeGridDistanceWithPathFallbackPure(applied, args.orderedToH3);
+    if (d1 === null || d1 >= d0) continue;
     const cost = Number.isFinite(p.totalCostToDestination) ? p.totalCostToDestination : Number.POSITIVE_INFINITY;
     const rank = d1 * 1e9 + cost;
     if (rank < bestRank) {

@@ -131,6 +131,50 @@ function testSelectTopRowsPerUnitMoveMeleeStillPrefersUrban(): void {
 }
 
 /**
+ * Ensures a this-turn air strike is not crowded out of the per-unit cap by high-urban ferry dests.
+ *
+ * Purpose: Turn 13 kept one legal strike (human-controlled seaport) but Best Options showed only ferry rows for that air unit, so the tempo rule could not fire.
+ * When to use: After edits to `compareTableRowsForUnitPriority` action ranking.
+ * Expected outcome: With one air-strike row and five high-urban ferry rows, the capped list includes the strike.
+ * Exceptions: None.
+ */
+function testSelectTopRowsPerUnitKeepsAirStrikeAheadOfFerry(): void {
+  const strikeHex = '8f283082dcb519a0';
+  const ferryHexes = [
+    '8f283082dcb519a1',
+    '8f283082dcb519a2',
+    '8f283082dcb519a3',
+    '8f283082dcb519a4',
+    '8f283082dcb519a5',
+  ];
+  const rows: PossibleActionTableRow[] = [
+    fixtureRow({
+      unitId: 'opponent-air-1',
+      unitType: 'air',
+      actionTypes: 'air strike',
+      targetH3: strikeHex,
+      urbanHexCount: 0,
+      distance: 2,
+    }),
+    ...ferryHexes.map((targetH3, i) =>
+      fixtureRow({
+        unitId: 'opponent-air-1',
+        unitType: 'air',
+        actionTypes: 'ferry',
+        targetH3,
+        urbanHexCount: 80 - i,
+        distance: 1,
+      })
+    ),
+  ];
+  const capped = selectTopRowsPerUnit(rows, new Map());
+  assert.ok(
+    capped.some((r) => r.targetH3 === strikeHex && r.actionTypes.includes('air strike')),
+    'air strike must survive the per-unit top-5 when ferry dests have higher urban counts'
+  );
+}
+
+/**
  * Documents the function binding `main` (main).
  *
  * Purpose: Node test driver for this file.
@@ -143,6 +187,7 @@ function main(): void {
   testDeriveActionColumnMoveMelee();
   testSelectTopRowsPerUnitApproachIgnoresUrbanCount();
   testSelectTopRowsPerUnitMoveMeleeStillPrefersUrban();
+  testSelectTopRowsPerUnitKeepsAirStrikeAheadOfFerry();
   console.log('possibleUnitActionsTableAssembly tests passed');
 }
 

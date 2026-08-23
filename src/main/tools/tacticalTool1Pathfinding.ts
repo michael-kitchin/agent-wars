@@ -2,7 +2,8 @@
  * Tactical Tool 1 pathfinding: plan_route / check_distance via res4 march planner (not strategic land-mass).
  */
 
-import { gridDisk, gridDistance } from 'h3-js';
+import { gridDisk } from 'h3-js';
+import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { planTacticalRes4MarchWithSessionCache } from '../tacticalBattle/tacticalMovementPlanningCache';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
@@ -107,7 +108,7 @@ function estimateTacticalTurnsRequired(totalCost: number, budget: number, pathLe
  * Purpose: Mirrors strategic plan_route land→water redirect so naval units can route toward land targets.
  * When to use: Before tactical naval plan_route / check_distance when the requested destination is not navigable for naval.
  * Expected outcome: Closest navigable footprint cell by H3 distance, or undefined when none exist.
- * Exceptions: None; gridDistance failures skip that candidate.
+ * Exceptions: None; distances use the shared BFS fallback so a cell across a face crossing stays a candidate.
  */
 function nearestNavigableNavalRes4To(
   battle: TacticalBattleSnapshot,
@@ -129,14 +130,10 @@ function nearestNavigableNavalRes4To(
     ) {
       continue;
     }
-    try {
-      const d = gridDistance(h3, landRefH3);
-      if (d < bestD) {
-        bestD = d;
-        best = h3;
-      }
-    } catch {
-      /* skip */
+    const d = computeGridDistanceWithPathFallbackPure(h3, landRefH3);
+    if (d !== null && d < bestD) {
+      bestD = d;
+      best = h3;
     }
   }
   return best;
@@ -355,13 +352,8 @@ function tacticalBestEffortNeighborPlan(args: {
   moveType: string;
   movementPointBudget: number;
 }): ReturnType<typeof planTacticalRes4MarchWithSessionCache> | null {
-  let d0: number;
-  try {
-    d0 = gridDistance(args.fromH3, args.orderedToH3);
-  } catch {
-    return null;
-  }
-  if (d0 <= 1) return null;
+  const d0 = computeGridDistanceWithPathFallbackPure(args.fromH3, args.orderedToH3);
+  if (d0 === null || d0 <= 1) return null;
   const neighbors: string[] = [];
   try {
     for (const n of gridDisk(args.fromH3, 1)) {
@@ -383,13 +375,8 @@ function tacticalBestEffortNeighborPlan(args: {
     if (!p.reachable) continue;
     const applied = p.firstStopWithinBudget.stopH3;
     if (applied === args.fromH3) continue;
-    let d1: number;
-    try {
-      d1 = gridDistance(applied, args.orderedToH3);
-    } catch {
-      continue;
-    }
-    if (d1 >= d0) continue;
+    const d1 = computeGridDistanceWithPathFallbackPure(applied, args.orderedToH3);
+    if (d1 === null || d1 >= d0) continue;
     const cost = Number.isFinite(p.totalCostToDestination) ? p.totalCostToDestination : Number.POSITIVE_INFINITY;
     const rank = d1 * 1e9 + cost;
     if (rank < bestRank) {

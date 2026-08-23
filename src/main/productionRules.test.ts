@@ -159,17 +159,20 @@ function testMaxedTypesRespectMatchSize(): void {
  *
  * Purpose: AI production must not fill queues with armor (etc.) at cap when infantry/air/naval can still spawn; pre-queue remains legal if that hex has no alternative.
  * When to use: After edits to `shouldRejectCappedQueueType` or `filterQueueableUnitTypes`.
- * Expected outcome: Reject armor when infantry is also available; allow armor when it is the only available type; filter omits armor unless it is the only remaining type.
+ * Expected outcome: Reject armor when infantry is also available; allow armor when it is the only available type or when every available type is at cap; filter omits armor unless no unmaxed alternative remains.
  * Exceptions: None.
  */
 function testCappedQueueTypeRejectedOnlyWhenAlternativeExists(): void {
   const maxed = new Set(['armor']);
   const mixed = ['infantry', 'armor', 'naval', 'air'];
+  const allMaxed = new Set(mixed);
   assert.equal(shouldRejectCappedQueueType('armor', mixed, maxed), true);
   assert.equal(shouldRejectCappedQueueType('infantry', mixed, maxed), false);
   assert.equal(shouldRejectCappedQueueType('armor', ['armor'], maxed), false);
+  assert.equal(shouldRejectCappedQueueType('armor', mixed, allMaxed), false);
   assert.deepEqual(filterQueueableUnitTypes(mixed, maxed), ['infantry', 'naval', 'air']);
   assert.deepEqual(filterQueueableUnitTypes(['armor'], maxed), ['armor']);
+  assert.deepEqual(filterQueueableUnitTypes(mixed, allMaxed), mixed);
   assert.deepEqual(filterQueueableUnitTypes([], maxed), []);
 }
 

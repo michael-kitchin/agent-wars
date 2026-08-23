@@ -1,4 +1,5 @@
-import { cellToLatLng, gridDistance } from 'h3-js';
+import { cellToLatLng } from 'h3-js';
+import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import type { AirStrikeTargetType } from '../../shared/ipcTypes';
 import { dbRun, dbGetAll, saveDatabase } from '../gameDb';
@@ -7,7 +8,7 @@ import { validateAirStrikeOrder } from '../game-actions/airValidation';
 import { isWithinAirStrikeGridRange } from '../game-actions/gridRange';
 import { createPathfindingSession, executePlanRouteWithSession, type PathfindingSession } from './tool1Pathfinding';
 import type { LatLng } from './tool1Pathfinding';
-import { logDebug } from '../logger';
+import { logDebug, logTrace } from '../logger';
 import {
   AIR_INELIGIBLE_ORDER_TYPES,
   parseComputedRoute,
@@ -31,14 +32,17 @@ export type StandingOrderGeneratedAirStrike = {
 };
 
 /**
- * Emits one defend-order ranged or air strike against the closest in-range enemy from the unit's current hex.
+ * Emits one ranged attack or air strike against the closest in-range enemy from the unit's current hex.
  *
- * Purpose: DEFEND units auto-engage without waiting to arrive at the defend post; air uses strikes, ground/naval use ranged.
- * When to use: From the `defend` branch of `generateOrdersForStandingOrders` after optional march toward defend hex.
- * Expected outcome: At most one attack row appended; no-op when no legal target exists.
- * Exceptions: None; grid errors skip individual enemies.
+ * Purpose: Shared "shoot the nearest thing you legally can" step. DEFEND units use it to auto-engage without waiting
+ * to arrive at the defend post, and the tempo sweep uses it to cover units the model left idle. Air produces strikes,
+ * ground and naval produce ranged attacks, and infantry produces nothing because its strategic range is zero.
+ * When to use: The `defend` branch of `generateOrdersForStandingOrders`, and `collectTempoRuleAttacks`. Callers are
+ * responsible for skipping units that already have an attack or are under `hold_fire`.
+ * Expected outcome: At most one attack row appended to the matching array; no-op when no legal target exists.
+ * Exceptions: None; enemies whose distance cannot be derived are ranked last rather than dropped.
  */
-function appendDefendStandingOrderEngagement(
+export function appendNearestLegalEngagement(
   unit: GameStateSnapshot['units'][number],
   playerId: string,
   unitId: string,
@@ -50,15 +54,14 @@ function appendDefendStandingOrderEngagement(
   if (unit.unitType === 'air') {
     let nearest: { h3Index: string; dist: number } | null = null;
     for (const enemy of enemies) {
-      if (!isWithinAirStrikeGridRange(unit.h3Index, enemy.h3Index, 'defendStandingOrderEngagement')) continue;
+      if (!isWithinAirStrikeGridRange(unit.h3Index, enemy.h3Index, 'nearestLegalEngagement')) continue;
       const valid = validateAirStrikeOrder(unitId, enemy.h3Index, 'units', { allowedPlayer: playerId });
       if (!valid.valid) continue;
-      try {
-        const dist = gridDistance(unit.h3Index, enemy.h3Index);
-        if (nearest === null || dist < nearest.dist) nearest = { h3Index: enemy.h3Index, dist };
-      } catch {
-        continue;
-      }
+      // Range and legality are already settled above, so an unmeasurable pair ranks last rather than
+      // forfeiting a strike the range gate just approved.
+      const dist =
+        computeGridDistanceWithPathFallbackPure(unit.h3Index, enemy.h3Index) ?? Number.POSITIVE_INFINITY;
+      if (nearest === null || dist < nearest.dist) nearest = { h3Index: enemy.h3Index, dist };
     }
     if (nearest) {
       airStrikes.push({ unitId, targetH3Index: nearest.h3Index, targetType: 'units' });
@@ -70,13 +73,10 @@ function appendDefendStandingOrderEngagement(
   if (weaponRange < 1) return;
   let nearest: { h3Index: string; dist: number } | null = null;
   for (const enemy of enemies) {
-    try {
-      const dist = gridDistance(unit.h3Index, enemy.h3Index);
-      if (dist <= weaponRange && (nearest === null || dist < nearest.dist)) {
-        nearest = { h3Index: enemy.h3Index, dist: dist };
-      }
-    } catch {
-      continue;
+    const dist = computeGridDistanceWithPathFallbackPure(unit.h3Index, enemy.h3Index);
+    if (dist === null) continue;
+    if (dist <= weaponRange && (nearest === null || dist < nearest.dist)) {
+      nearest = { h3Index: enemy.h3Index, dist };
     }
   }
   if (nearest) {
@@ -126,6 +126,26 @@ function updateStandingOrderComputedRoute(
   dbRun(
     'UPDATE standing_orders SET computed_route = ? WHERE player_id = ? AND unit_id = ?',
     [JSON.stringify(computedRoute), playerId, unitId]
+  );
+}
+
+/**
+ * Reads the unit ids a player has told to hold fire.
+ *
+ * Purpose: `hold_fire` is the only way to tell a unit not to shoot, so every automatic engagement path has to honour
+ * it or the order stops meaning anything. Tactical sub-units carry no standing orders of their own, so a beat looks
+ * its pawns up by strategic parent id against this same table.
+ * When to use: Before any pass that would generate an attack a player did not explicitly order.
+ * Expected outcome: Possibly empty set of strategic unit ids; never null.
+ * Exceptions: Propagates database read failures.
+ */
+export function holdFireUnitIdsForPlayer(playerId: string): Set<string> {
+  logTrace('tool5StandingOrders holdFireUnitIdsForPlayer', { playerId });
+  return new Set(
+    dbGetAll<{ unit_id: string }>(
+      "SELECT unit_id FROM standing_orders WHERE player_id = ? AND order_type = 'hold_fire'",
+      [playerId]
+    ).map((row) => row.unit_id)
   );
 }
 
@@ -278,7 +298,7 @@ export function generateOrdersForStandingOrders(
       } else if (defendH3 && mutateProgress) {
         updateStandingOrderComputedRoute(playerId, row.unit_id, { turnsRemaining: 0 });
       }
-      appendDefendStandingOrderEngagement(unit, playerId, row.unit_id, state, rangedAttacks, airStrikes);
+      appendNearestLegalEngagement(unit, playerId, row.unit_id, state, rangedAttacks, airStrikes);
       continue;
     }
 
@@ -322,17 +342,21 @@ export function generateOrdersForStandingOrders(
           });
         }
       }
-      if (params.engageEnRoute === true) {
-        const enemies = state.units.filter((u) => u.player !== playerId);
-        for (const e of enemies) {
-          try {
-            if (gridDistance(unit.h3Index, e.h3Index) === 1 && getRange(unit.unitType) >= 1) {
-              rangedAttacks.push({ unitId: row.unit_id, targetH3Index: e.h3Index });
-              break;
-            }
-          } catch {
-            continue;
+      const marchWeaponRange = getRange(unit.unitType);
+      if (params.engageEnRoute === true && marchWeaponRange >= 1) {
+        // Reach is the unit's own weapon range, matching the pursue and defend branches. Testing for
+        // adjacency instead would let naval (range 2) and air (range 3) march past a legal shot.
+        let nearestEnRoute: { h3Index: string; dist: number } | null = null;
+        for (const e of state.units) {
+          if (e.player === playerId) continue;
+          const enemyDistance = computeGridDistanceWithPathFallbackPure(unit.h3Index, e.h3Index);
+          if (enemyDistance === null || enemyDistance < 1 || enemyDistance > marchWeaponRange) continue;
+          if (nearestEnRoute === null || enemyDistance < nearestEnRoute.dist) {
+            nearestEnRoute = { h3Index: e.h3Index, dist: enemyDistance };
           }
+        }
+        if (nearestEnRoute) {
+          rangedAttacks.push({ unitId: row.unit_id, targetH3Index: nearestEnRoute.h3Index });
         }
       }
       continue;
@@ -352,19 +376,18 @@ export function generateOrdersForStandingOrders(
           originH3 = unit.h3Index;
         }
         if (originH3) {
-          try {
-            if (gridDistance(originH3, target.h3Index) > maxDistance) {
-              if (mutateProgress) {
-                dbRun('UPDATE standing_orders SET status = ? WHERE player_id = ? AND unit_id = ?', [
-                  'target_out_of_range',
-                  playerId,
-                  row.unit_id,
-                ]);
-              }
-              continue;
+          // An unmeasurable leash distance keeps the pursuit alive; cancelling on a measurement gap
+          // would abandon a target the unit can still reach.
+          const leashDistance = computeGridDistanceWithPathFallbackPure(originH3, target.h3Index);
+          if (leashDistance !== null && leashDistance > maxDistance) {
+            if (mutateProgress) {
+              dbRun('UPDATE standing_orders SET status = ? WHERE player_id = ? AND unit_id = ?', [
+                'target_out_of_range',
+                playerId,
+                row.unit_id,
+              ]);
             }
-          } catch {
-            // ignore
+            continue;
           }
         }
       }
@@ -400,12 +423,9 @@ export function generateOrdersForStandingOrders(
         }
       }
       if (getRange(unit.unitType) >= 1) {
-        try {
-          if (gridDistance(unit.h3Index, target.h3Index) <= getRange(unit.unitType)) {
-            rangedAttacks.push({ unitId: row.unit_id, targetH3Index: target.h3Index });
-          }
-        } catch {
-          // ignore
+        const targetDistance = computeGridDistanceWithPathFallbackPure(unit.h3Index, target.h3Index);
+        if (targetDistance !== null && targetDistance <= getRange(unit.unitType)) {
+          rangedAttacks.push({ unitId: row.unit_id, targetH3Index: target.h3Index });
         }
       }
       continue;
@@ -451,19 +471,14 @@ export function generateOrdersForStandingOrders(
       }
       const enemies = state.units.filter((u) => u.player !== playerId);
       for (const e of enemies) {
-        try {
-          if (gridDistance(unit.h3Index, e.h3Index) === 1) {
-            if (mutateProgress) {
-              dbRun(
-                'UPDATE standing_orders SET status = ? WHERE player_id = ? AND unit_id = ?',
-                ['contact', playerId, row.unit_id]
-              );
-            }
-            break;
-          }
-        } catch {
-          continue;
+        if (computeGridDistanceWithPathFallbackPure(unit.h3Index, e.h3Index) !== 1) continue;
+        if (mutateProgress) {
+          dbRun(
+            'UPDATE standing_orders SET status = ? WHERE player_id = ? AND unit_id = ?',
+            ['contact', playerId, row.unit_id]
+          );
         }
+        break;
       }
       continue;
     }

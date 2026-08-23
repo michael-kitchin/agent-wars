@@ -1,15 +1,16 @@
 /**
  * Best Options This Turn interest and approach filters for Commander briefing tables.
  *
- * Purpose: Keeps occupancy/control interest (enemy ∪ uncontrolled unoccupied infra) and empty-interest approach
- * out of `possibleUnitActions.ts` so both files stay under the source-size limit.
- * When to use: From `collectAggregatedPossibleActionRows` after legal this-turn dests are collected.
- * Expected outcome: Interest hexes as move/melee, or approach hexes that strictly close on the nearest observed enemy.
+ * Purpose: Keeps occupancy/control interest (enemy ∪ uncontrolled unoccupied infra), empty-interest approach,
+ * and this-turn air-strike filters out of `possibleUnitActions.ts` so both files stay under the source-size limit.
+ * When to use: From `collectAggregatedPossibleActionRows` after legal this-turn dests / strike hexes are collected.
+ * Expected outcome: Interest hexes as move/melee, or approach hexes that strictly close on the nearest observed enemy;
+ * this-turn air strikes limited to enemy-occupied or human-controlled infra (strategic) / human-occupied (tactical).
  * Exceptions: Does not change legal-target collectors or order validation.
  */
 
-import { gridDistance } from 'h3-js';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { gridHopDistanceBetween } from '../tools/assessUnitProximity';
 import { logDebug } from '../logger';
 import { ACTION_APPROACH, ACTION_MOVES_MELEE } from './possibleUnitActionsTableAssembly';
 
@@ -168,19 +169,15 @@ function infraCounts(
 }
 
 /**
- * H3 grid distance that returns null instead of throwing on invalid pairs.
+ * H3 hop distance for approach scoring, including the neighbor-BFS fallback.
  *
- * Purpose: Approach Target Units summaries must skip unmeasurable hex pairs without aborting the table.
- * When to use: `nearestEnemyUnitIdsSummary` only.
- * Expected outcome: A non-negative integer distance, or null when `gridDistance` throws.
+ * Purpose: Approach and its Target Units summary must still measure the nearest observed enemy when `gridDistance` throws at a pentagon edge, which otherwise left whole stacks recommending empty cities.
+ * When to use: `nearestEnemyUnitIdsSummary` and `filterApproachMoveHexesForThisTurnOptionsTable`.
+ * Expected outcome: A non-negative integer distance, or null when the pair is unmeasurable even by BFS.
  * Exceptions: None; callers must treat null as skip.
  */
 function safeGridDistance(from: string, to: string): number | null {
-  try {
-    return gridDistance(from, to);
-  } catch {
-    return null;
-  }
+  return gridHopDistanceBetween(from, to);
 }
 
 /**
@@ -286,7 +283,7 @@ export function filterTacticalGroundMoveHexesForThisTurnOptionsTable(
  * Purpose: Best Options fallback when the interest filter (enemy/infra) yields no rows but units can still close.
  * When to use: Strategic and tactical this-turn tables after the interest filter returns empty for a unit.
  * Expected outcome: Subset of `hexes` that approach at least one enemy cell; empty when no enemy is observed or no hex improves distance.
- * Exceptions: Hexes with invalid `gridDistance` are skipped.
+ * Exceptions: Hexes with no measurable H3 distance (direct APIs and neighbor BFS) are skipped.
  */
 function filterApproachMoveHexesForThisTurnOptionsTable(
   unitH3: string,
@@ -297,29 +294,23 @@ function filterApproachMoveHexesForThisTurnOptionsTable(
   let nearestDist = Infinity;
   const nearestEnemies: string[] = [];
   for (const enemyH3 of enemyOccupiedH3) {
-    try {
-      const d = gridDistance(unitH3, enemyH3);
-      if (d < nearestDist) {
-        nearestDist = d;
-        nearestEnemies.length = 0;
-        nearestEnemies.push(enemyH3);
-      } else if (d === nearestDist) {
-        nearestEnemies.push(enemyH3);
-      }
-    } catch {
-      /* skip bad pair */
+    const d = safeGridDistance(unitH3, enemyH3);
+    if (d === null) continue;
+    if (d < nearestDist) {
+      nearestDist = d;
+      nearestEnemies.length = 0;
+      nearestEnemies.push(enemyH3);
+    } else if (d === nearestDist) {
+      nearestEnemies.push(enemyH3);
     }
   }
   if (!Number.isFinite(nearestDist) || nearestEnemies.length === 0) return [];
   return hexes.filter((h3) => {
-    try {
-      for (const enemyH3 of nearestEnemies) {
-        if (gridDistance(h3, enemyH3) < nearestDist) return true;
-      }
-      return false;
-    } catch {
-      return false;
+    for (const enemyH3 of nearestEnemies) {
+      const next = safeGridDistance(h3, enemyH3);
+      if (next !== null && next < nearestDist) return true;
     }
+    return false;
   });
 }
 
@@ -409,6 +400,53 @@ export function describeTacticalBestOptionsInfrastructure(
  */
 export function tacticalBestOptionsUrbanHexCount(h3: string, ctx: TacticalBestOptionsInterestContext): number {
   return describeTacticalBestOptionsInfrastructure(h3, ctx).includes('urban') ? 1 : 0;
+}
+
+/**
+ * Restricts **Best Options This Turn** air-strike rows to enemy-occupied hexes or human-controlled infrastructure.
+ *
+ * Purpose: Legal strikes can hit any urban/airport/seaport in range, including own cities; the Commander table must not list those because the tempo rule says strike if listed. Matches Air Operations human-controlled infra counts.
+ * When to use: Only from `collectAggregatedPossibleActionRows` after `collectStrikeHexesForAirUnit` when `forThisTurnOptionsTable` is true in **strategic** mode.
+ * Expected outcome: Subset of `hexes` that have human occupants or human-controlled urban/airport/seaport; own and uncontrolled cities dropped.
+ * Exceptions: None.
+ */
+export function filterStrategicAirStrikeHexesForThisTurnOptionsTable(
+  indexed: BestOptionsInterestIndex,
+  hexes: string[]
+): string[] {
+  const kept = hexes.filter((h3) => {
+    if ((indexed.enemyUnitsByHex.get(h3)?.length ?? 0) > 0) return true;
+    if ((indexed.controlByHex.get(h3) ?? null) !== 'human') return false;
+    const inf = infraCounts(indexed, h3);
+    return inf.urban > 0 || inf.airport > 0 || inf.seaport > 0;
+  });
+  logDebug('possibleUnitActionsBestOptionsInterest filterStrategicAirStrikeHexesForThisTurnOptionsTable', {
+    inCount: hexes.length,
+    outCount: kept.length,
+  });
+  return kept;
+}
+
+/**
+ * Drops non-enemy res4 air-strike targets from the Best Options This Turn table.
+ *
+ * Purpose: Same tempo-rule filter as tactical ranged: empty urban tiles must not appear as this-beat strikes. Callers pass the battle footprint (not the strategic 3-hex disk).
+ * When to use: Only from `collectAggregatedPossibleActionRows` when `forThisTurnOptionsTable` and `tacticalBattle` are set, after listing footprint hexes.
+ * Expected outcome: Subset of `hexes` that are human-occupied.
+ * Exceptions: None.
+ */
+export function filterTacticalAirStrikeHexesForThisTurnOptionsTable(
+  attackerSubUnitId: string,
+  hexes: string[],
+  ctx: TacticalBestOptionsInterestContext
+): string[] {
+  const kept = hexes.filter((h3) => ctx.humanOccupiedH3.has(h3));
+  logDebug('possibleUnitActionsBestOptionsInterest filterTacticalAirStrikeHexesForThisTurnOptionsTable', {
+    attackerSubUnitId,
+    inCount: hexes.length,
+    outCount: kept.length,
+  });
+  return kept;
 }
 
 /**

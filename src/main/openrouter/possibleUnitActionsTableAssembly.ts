@@ -160,7 +160,7 @@ export interface RawPossibleActionRow {
   /**
    * Specifies the contract for the `actionType` member (actionType: string;).
 
-   * Contract: Single action label for this row before merge (move/melee, ranged attack, or air strike).
+   * Contract: Single action label for this row before merge (move/melee, approach, ferry, ranged attack, or air strike).
    * When to use: One raw row per (unit, target, action) before `aggregateRows`.
    * Expected outcome: A known label from this module's action constants.
    * Exceptions: None.
@@ -248,6 +248,16 @@ export const ACTION_RANGED = 'ranged attack';
 export const ACTION_AIR_STRIKES = 'air strike';
 
 /**
+ * Action label for air ferry destinations in possible-actions / Best Options tables.
+ *
+ * Purpose: Air units reposition airport-to-airport; labeling those dests `move/melee` invites explicit_move / tempo-rule misuse.
+ * When to use: `collectAggregatedPossibleActionRows` strategic air-move rows (tactical Best Options omits ferry).
+ * Expected outcome: Rendered Action column shows `ferry`.
+ * Exceptions: None.
+ */
+export const ACTION_FERRY = 'ferry';
+
+/**
  * Urban count used when ranking Best Options rows for the per-unit cap.
  *
  * Purpose: Approach dests may include friendly-occupied cities (stacking while closing); those must not outrank closer empty hexes via urban count.
@@ -257,6 +267,20 @@ export const ACTION_AIR_STRIKES = 'air strike';
  */
 function urbanCountForRowPriority(row: PossibleActionTableRow): number {
   return row.actionTypes.includes(ACTION_APPROACH) ? 0 : row.urbanHexCount;
+}
+
+/**
+ * Sort key so tempo-rule attacks are not crowded out of the per-unit top-5 by high-urban ferry or capture dests.
+ *
+ * Purpose: Air strike / ranged rows must remain visible when a unit also has many ferry or move/melee options; the prompt tells the model to strike now if the table lists a legal shot.
+ * When to use: `compareTableRowsForUnitPriority` after enemy occupancy, before urban count.
+ * Expected outcome: `0` for air strike, `1` for ranged, `2` for all other action types (lower sorts earlier).
+ * Exceptions: None.
+ */
+function tempoActionRankForRowPriority(row: PossibleActionTableRow): number {
+  if (row.actionTypes.includes(ACTION_AIR_STRIKES) || row.actionTypes.includes('air_strike')) return 0;
+  if (row.actionTypes.includes('ranged')) return 1;
+  return 2;
 }
 
 /**
@@ -291,9 +315,10 @@ const TABLE_HEADERS = ['Unit ID', 'Unit Type', 'Action Types', 'Hex', 'Distance'
 
 const ACTION_TYPE_ORDER: Record<string, number> = {
   [ACTION_APPROACH]: 0,
-  [ACTION_MOVES_MELEE]: 1,
-  [ACTION_RANGED]: 2,
-  [ACTION_AIR_STRIKES]: 3,
+  [ACTION_FERRY]: 1,
+  [ACTION_MOVES_MELEE]: 2,
+  [ACTION_RANGED]: 3,
+  [ACTION_AIR_STRIKES]: 4,
 };
 
 /**
@@ -313,13 +338,14 @@ export function excludeUnitCurrentHex(unitH3: string, hexes: string[]): string[]
  *
  * Purpose: Single source for rendered action text in the **Best Options This Turn** markdown table.
  * When to use: `renderThisTurnOptionsTableMarkdown` (via import).
- * Expected outcome: One of `air strike`, `ranged`, `approach`, `move/melee`, or the raw `actionTypes` string as fallback.
+ * Expected outcome: One of `air strike`, `ranged`, `approach`, `ferry`, `move/melee`, or the raw `actionTypes` string as fallback.
  * Exceptions: None.
  */
 export function deriveThisTurnOptionsActionColumn(r: PossibleActionTableRow): string {
   if (r.actionTypes.includes('air strike') || r.actionTypes.includes('air_strike')) return 'air strike';
   if (r.actionTypes.includes('ranged')) return 'ranged';
   if (r.actionTypes.includes('approach')) return 'approach';
+  if (r.actionTypes.includes('ferry')) return 'ferry';
   if (r.actionTypes.includes('move') || r.actionTypes.includes('melee')) return 'move/melee';
   return r.actionTypes;
 }
@@ -406,6 +432,7 @@ export function markdownTableLines(rows: string[][]): string[] {
  * When to use: `selectTopRowsPerUnit` sort step.
  * Expected outcome: Higher enemy pressure and shorter distance sort earlier; stable hex tie-break.
  * Approach rows ignore urban/infra counts so closer empty closing hexes are not crowded out by friendly cities.
+ * Air strike and ranged rows rank ahead of ferry/move so the tempo rule's listed shots survive the per-unit cap.
  * Exceptions: None.
  */
 function compareTableRowsForUnitPriority(
@@ -414,6 +441,9 @@ function compareTableRowsForUnitPriority(
   latLngByH3: Map<string, [number, number]>
 ): number {
   if (a.enemyUnitCount !== b.enemyUnitCount) return b.enemyUnitCount - a.enemyUnitCount;
+  const tempoA = tempoActionRankForRowPriority(a);
+  const tempoB = tempoActionRankForRowPriority(b);
+  if (tempoA !== tempoB) return tempoA - tempoB;
   const urbanA = urbanCountForRowPriority(a);
   const urbanB = urbanCountForRowPriority(b);
   if (urbanA !== urbanB) return urbanB - urbanA;

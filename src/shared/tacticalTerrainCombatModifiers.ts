@@ -4,9 +4,11 @@
  * ## Tactical terrain combat modifiers — locked semantics
  *
  * 1. **Mountain ranged block (air, armor, naval):** Tactical ranged uses implicit **line of sight (LOS)** via
- *    `gridPathCells(attackerH3, targetH3)` on res4 indexes. If **any** cell on that trace is **mountain**, the attack
- *    is not allowed for air, armor, or naval. **Infantry** is excluded from this rule. If `gridPathCells` throws,
- *    treat as **blocked** (fail closed). Ranged-phase return fire for ground units reuses this module via
+ *    `computeGridPathCellsPure(attackerH3, targetH3)` on res4 indexes. If **any** cell on that trace is **mountain**, the
+ *    attack is not allowed for air, armor, or naval. **Infantry** is excluded from this rule. Battles inside the twelve
+ *    res1 hexes that contain a pentagon have res4 pairs where H3's straight-line `gridPathCells` throws; those are traced
+ *    by the BFS fallback so clear terrain stays shootable. Only a pair with **no** derivable path at all is treated as
+ *    **blocked** (fail closed). Ranged-phase return fire for ground units reuses this module via
  *    `returnFireEligibility` / `tacticalRangedDirectFirePassesTerrainAndRange` (planning parity).
  * 2. **Forest / urban / rubble ranged cap (armor, infantry):** When the attacker’s **terrain anchor** cell is forest-class,
  *    **urban** (`res4IsUrbanByH3`), or **rubble** (`res4IsRubbleByH3`), **effective max ranged range is 1** H3 grid step.
@@ -18,8 +20,7 @@
  * Baseline ranges and budgets live in `tacticalRanges.ts`; this module **reduces** them when rules apply.
  */
 
-import { gridPathCells } from 'h3-js';
-import { isWithinGridRangePure } from './h3GridRangePure';
+import { computeGridPathCellsPure, isWithinGridRangePure } from './h3GridRangePure';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from './tacticalBattleTypes';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE, RANGED_RANGE_BY_UNIT_TYPE } from './tacticalRanges';
 import { tacticalRes4CellHasActiveTransportCorridor } from './tacticalRes4TransportLink';
@@ -109,7 +110,7 @@ export function tacticalRes4MovementCategory(battle: TacticalBattleTerrainPick, 
  * Returns true when the res4 cell is treated as **mountain** for implicit ranged LOS blocking.
  *
  * Contract: `tacticalRes4MovementCategory(...) === 'mountains'`.
- * When to use: Scanning `gridPathCells` traces for air/armor/naval ranged validation.
+ * When to use: Scanning `computeGridPathCellsPure` traces for air/armor/naval ranged validation.
  * Expected outcome: Stable for a fixed snapshot.
  * Exceptions: None.
  */
@@ -243,9 +244,12 @@ export function effectiveTacticalRangedMaxRangeForAttacker(
 /**
  * Describes whether mountain LOS rules apply and whether the shot is blocked (including LOS trace failures).
  *
- * Contract: `applies` false for infantry. For air/armor/naval: `blocked` true when any LOS cell is mountain or when `gridPathCells` throws (`traceFailed`).
+ * Contract: `applies` false for infantry. For air/armor/naval: `blocked` true when any LOS cell is mountain, or when no
+ * path can be derived at all (`traceFailed`). Pairs where `gridPathCells` throws at an icosahedron face crossing are
+ * traced by the `computeGridPathCellsPure` BFS fallback instead of counting as a failure, so a clear shot across a face
+ * boundary is no longer rejected as blocked terrain.
  * When to use: `validateGroupRangedTarget` logs at **error** when `traceFailed`; `blocked` gates the order.
- * Expected outcome: `blocked` false when LOS is clear and trace succeeded.
+ * Expected outcome: `blocked` false when LOS is clear and a path was derived.
  * Exceptions: None.
  */
 export function tacticalMountainLosBlockedState(
@@ -257,17 +261,16 @@ export function tacticalMountainLosBlockedState(
   if (unitType !== 'air' && unitType !== 'armor' && unitType !== 'naval') {
     return { applies: false, blocked: false, traceFailed: false };
   }
-  try {
-    const path = gridPathCells(attackerH3, targetH3);
-    for (const h of path) {
-      if (tacticalRes4CellIsMountain(battle, h)) {
-        return { applies: true, blocked: true, traceFailed: false };
-      }
-    }
-    return { applies: true, blocked: false, traceFailed: false };
-  } catch {
+  const path = computeGridPathCellsPure(attackerH3, targetH3);
+  if (path === null) {
     return { applies: true, blocked: true, traceFailed: true };
   }
+  for (const h of path) {
+    if (tacticalRes4CellIsMountain(battle, h)) {
+      return { applies: true, blocked: true, traceFailed: false };
+    }
+  }
+  return { applies: true, blocked: false, traceFailed: false };
 }
 
 /**

@@ -205,6 +205,43 @@ test('lightweight assessments report nearest enemy distance and critical adjacen
   });
 });
 
+test('lightweight assessments reuse nearby-enemy geometry for stacked same-type sub-units', () => {
+  withTempDb(() => {
+    const { battle, humanSubId, res4Opp } = buildLandBattleFixture();
+    battle.subUnits.push({
+      id: 'opp-parent-armor-2:01',
+      parentUnitId: 'opp-parent-armor-2',
+      player: 'opponent',
+      unitType: 'armor',
+      h3Index: res4Opp,
+      displayName: 'Opp Armor (02)',
+    });
+    battle.subUnits.push({
+      id: 'opp-parent-inf-stack:01',
+      parentUnitId: 'opp-parent-inf-stack',
+      player: 'opponent',
+      unitType: 'infantry',
+      h3Index: res4Opp,
+      displayName: 'Opp Infantry (01)',
+    });
+    const assessments = buildLightweightTacticalUnitAssessments(battle);
+    const armorRows = assessments.filter((a) => a.result.unit.type === 'armor');
+    const infantry = assessments.find((a) => a.unitId === 'opp-parent-inf-stack:01');
+    assert.equal(armorRows.length, 2);
+    assert.ok(infantry);
+    assert.equal(armorRows[0]!.result.unit.unitId, armorRows[0]!.unitId);
+    assert.equal(armorRows[1]!.result.unit.unitId, armorRows[1]!.unitId);
+    assert.notEqual(armorRows[0]!.unitId, armorRows[1]!.unitId);
+    const a0 = armorRows[0]!.result.nearbyEnemies.find((e) => e.unitId === humanSubId);
+    const a1 = armorRows[1]!.result.nearbyEnemies.find((e) => e.unitId === humanSubId);
+    assert.ok(a0 && a1);
+    assert.equal(a0.hexDistance, a1.hexDistance);
+    assert.equal(a0.inRangedRange, a1.inRangedRange);
+    const infHuman = infantry.result.nearbyEnemies.find((e) => e.unitId === humanSubId);
+    assert.ok(infHuman, 'co-located infantry must still be assessed');
+  });
+});
+
 test('lightweight assessments mark embarked cargo and omit standing orders', () => {
   withTempDb(() => {
     const { battle, parentId } = buildLandBattleFixture({
@@ -462,7 +499,7 @@ test('tactical system prompt omits Scenario Objective and includes battle goal p
     assert.ok(prompt.includes('tactical sub-unit ids'));
     assert.ok(prompt.includes('Do not emit assign_order'));
     assert.ok(prompt.includes('Standing orders do not move units'));
-    assert.ok(prompt.includes('Copy Best Options This Turn Target Hexes into explicit_move'));
+    assert.ok(prompt.includes('approach and move/melee Target Hexes into explicit_move'));
     assert.ok(!prompt.includes('query_orders'));
     assert.ok(!prompt.includes('# Standing Order Status'));
     assert.ok(!prompt.includes('Your units (ID, type, briefing hex)'));

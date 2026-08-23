@@ -1,5 +1,5 @@
 import { getHexController, isDbReady } from './gameDb';
-import { logDebug, logError } from './logger';
+import { logDebug, logError, logTrace } from './logger';
 
 /**
  * Maximum distinct keys stored in `seenParityLogKeys` and `seenParityCheckKeys` before FIFO eviction.
@@ -122,7 +122,9 @@ export function getParityCheckDbReadCountForTests(): number {
  * Purpose: Diagnostic guard that catches AI turns where the in-memory snapshot drifts from the DB truth.
  * When to use: Call after any AI calculation that reads `snapshotController` from `IndexedState`; dedup
  * ensures each `(h3Index, context)` pair only reads from the DB once per turn.
- * Expected outcome: Logs an error at most once per mismatch key per session; silent when parity holds.
+ * Expected outcome: Logs an error at most once per mismatch key per session; trace-only when parity holds
+ * or when the `(h3Index, context)` pair was already checked this turn.
+
  * Exceptions: DB errors are caught and logged separately; never throws.
  */
 export function logHexControllerParityMismatch(args: {
@@ -131,7 +133,7 @@ export function logHexControllerParityMismatch(args: {
   context: string;
   unitId?: string;
 }): void {
-  logDebug('snapshotDbParity logHexControllerParityMismatch', {
+  logTrace('snapshotDbParity logHexControllerParityMismatch', {
     context: args.context,
     h3Index: args.h3Index,
     unitId: args.unitId,

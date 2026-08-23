@@ -4,7 +4,7 @@
  * Internal assessment payloads use lat/lng tuples; values returned to the LLM are redacted to briefing hex codes via `encodeOpenRouterToolResultForLlm`.
  */
 
-import { gridDistance, gridDisk } from 'h3-js';
+import { gridDisk } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
 import { getDistanceAndTurns, getMovementBudgetForUnit, terrainIsPassableForDomain } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
@@ -21,6 +21,7 @@ import { logDebug, logError, logTrace } from '../logger';
 import { h3ToLatLng, type LatLng, type LatLngMap } from './h3LatLng';
 import {
   collectOmniscientNearbyUnits,
+  gridHopDistanceBetween,
   usesOmniscientGridProximity,
 } from './assessUnitProximity';
 
@@ -158,16 +159,16 @@ function getPathDistanceAndTurns(
 }
 
 /**
- * Defines the `getGridDistance` function shape (function getGridDistance(h3A: string, h3B: string): number).
-
- * Purpose: Supports maintainability by documenting why `getGridDistance` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Grid-step distance for the fog-on radius scan, including the neighbor-BFS fallback.
+ *
+ * Purpose: Nearby-enemy Unit Status must still see in-range humans when `gridDistance` throws at a pentagon edge; those pairs previously survived the prefilter only to be dropped when land/naval pathfinding also failed.
+ * When to use: Fog-on `executeAssessUnit` prefilter and `hexDistance` fallback, and the `assess_hex` range buckets.
+ * Expected outcome: Non-negative hops, or null when the pair is unmeasurable even by BFS.
+ * Exceptions: None; `executeAssessUnit` treats null as 999 so a path BFS can still run.
  */
-function getGridDistance(h3A: string, h3B: string): number {
-  logTrace('tool2Assessment getGridDistance');
-  return gridDistance(h3A, h3B);
+function getGridDistance(h3A: string, h3B: string): number | null {
+  logTrace('tool2Assessment getGridDistance', { h3A, h3B });
+  return gridHopDistanceBetween(h3A, h3B);
 }
 
 /**
@@ -316,16 +317,10 @@ function executeAssessUnit(
     const myRange = getRange(unit.unitType);
     for (const other of state.units) {
       if (other.id === unitId) continue;
-      const gridDist = (() => {
-        try {
-          return getGridDistance(unit.h3Index, other.h3Index);
-        } catch {
-          return 999;
-        }
-      })();
+      const gridDist = getGridDistance(unit.h3Index, other.h3Index) ?? 999;
       // Grid distance is a lower bound on BFS path distance, so units beyond the
       // radius at grid level can't be within radius by path either. 999 means the
-      // h3 gridDistance call failed (cross-pentagon), so we conservatively keep those.
+      // H3 hop APIs (including disk fallback) could not measure the pair, so we conservatively keep those.
       if (gridDist > radius && gridDist !== 999) { preFilteredCount++; continue; }
       const distResult = getPathDistanceAndTurns(unit.h3Index, other.h3Index, unit.unitType, hexSet, terrainByH3, state);
       const pathWithinRadius = distResult !== null && distResult.hexDistance <= radius;
@@ -403,13 +398,7 @@ function executeAssessUnit(
       for (const intel of staleIntel) {
         if (currentEnemyIds.has(intel.unitId)) continue;
         if (!hexSet.has(intel.lastKnownH3Index)) continue;
-        const gridDist = (() => {
-          try {
-            return getGridDistance(unit.h3Index, intel.lastKnownH3Index);
-          } catch {
-            return 999;
-          }
-        })();
+        const gridDist = getGridDistance(unit.h3Index, intel.lastKnownH3Index) ?? 999;
         if (gridDist > radius && gridDist !== 999) continue;
         const distResult = getPathDistanceAndTurns(unit.h3Index, intel.lastKnownH3Index, unit.unitType, hexSet, terrainByH3, state);
         const pathWithinRadius = distResult !== null && distResult.hexDistance <= radius;
@@ -500,43 +489,37 @@ function executeAssessHex(
   const rangedRange2: Array<{ unitId: string; type: string; position: LatLng; hexDistance: number; confidence: string; lastSeen: number }> = [];
   const meleeRange: Array<{ unitId: string; type: string; position: LatLng; hexDistance: number; confidence: string; lastSeen: number }> = [];
   for (const e of enemies) {
-    try {
-      const d = getGridDistance(e.h3Index, hexH3);
-      const r = getRange(e.unitType);
-      const entry = {
-        unitId: e.id,
-        type: e.unitType,
-        position: h3ToLatLng(e.h3Index, latLngByH3, 'cellCenter') as LatLng,
-        hexDistance: d,
-        confidence: 'current' as const,
-        lastSeen: state.turnNumber,
-      };
-      if (d === 0) meleeRange.push(entry);
-      else if (d === 1 && r >= 1) rangedRange1.push(entry);
-      else if (d === 2 && r >= 2) rangedRange2.push(entry);
-    } catch {
-      continue;
-    }
+    const d = getGridDistance(e.h3Index, hexH3);
+    if (d === null) continue;
+    const r = getRange(e.unitType);
+    const entry = {
+      unitId: e.id,
+      type: e.unitType,
+      position: h3ToLatLng(e.h3Index, latLngByH3, 'cellCenter') as LatLng,
+      hexDistance: d,
+      confidence: 'current' as const,
+      lastSeen: state.turnNumber,
+    };
+    if (d === 0) meleeRange.push(entry);
+    else if (d === 1 && r >= 1) rangedRange1.push(entry);
+    else if (d === 2 && r >= 2) rangedRange2.push(entry);
   }
   if (shouldIncludeStaleEnemyIntel(state)) {
     for (const intel of getEnemyIntelForPlayer(state)) {
       if (!hexSet.has(intel.lastKnownH3Index)) continue;
-      try {
-        const d = getGridDistance(intel.lastKnownH3Index, hexH3);
-        const entry = {
-          unitId: intel.unitId,
-          type: 'unknown',
-          position: h3ToLatLng(intel.lastKnownH3Index, latLngByH3, 'cellCenter') as LatLng,
-          hexDistance: d,
-          confidence: 'stale' as const,
-          lastSeen: intel.lastSeenTurn,
-        };
-        if (d === 0) meleeRange.push(entry);
-        else if (d === 1) rangedRange1.push(entry);
-        else if (d === 2) rangedRange2.push(entry);
-      } catch {
-        continue;
-      }
+      const d = getGridDistance(intel.lastKnownH3Index, hexH3);
+      if (d === null) continue;
+      const entry = {
+        unitId: intel.unitId,
+        type: 'unknown',
+        position: h3ToLatLng(intel.lastKnownH3Index, latLngByH3, 'cellCenter') as LatLng,
+        hexDistance: d,
+        confidence: 'stale' as const,
+        lastSeen: intel.lastSeenTurn,
+      };
+      if (d === 0) meleeRange.push(entry);
+      else if (d === 1) rangedRange1.push(entry);
+      else if (d === 2) rangedRange2.push(entry);
     }
   } else {
     logTrace('tool2Assessment executeAssessHex: omitting stale enemy intel for opponent perspective', { hexH3 });

@@ -1,4 +1,4 @@
-import { gridPathCells } from 'h3-js';
+import { computeGridPathCellsPure } from '../../shared/h3GridRangePure';
 import {
   allocateNextUnitDisplayOrder,
   clearBuildQueueAndProgressForHex,
@@ -472,13 +472,13 @@ export function collectTraversedHexesByPlayer(
     if (!unit) continue;
     if (!CONTROL_UNIT_TYPE_SET.has(unit.unitType)) continue;
     const player = unit.player === 'opponent' ? 'opponent' : 'human';
-    try {
-      const path = gridPathCells(unit.h3Index, order.toH3Index);
-      for (const h3 of path) traversed[player].add(h3);
-    } catch {
+    const path = computeGridPathCellsPure(unit.h3Index, order.toH3Index);
+    if (path === null) {
       traversed[player].add(unit.h3Index);
       traversed[player].add(order.toH3Index);
+      continue;
     }
+    for (const h3 of path) traversed[player].add(h3);
   }
   return traversed;
 }

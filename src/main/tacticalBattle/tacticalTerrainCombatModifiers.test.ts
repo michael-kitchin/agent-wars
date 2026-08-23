@@ -16,7 +16,11 @@ import {
   tacticalRangedDirectFirePassesTerrainAndRange,
 } from '../../shared/tacticalTerrainCombatModifiers';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
-import { firstRingCellDistinctFrom, tacticalRes4Cell } from './testSupport/tacticalRes4HexFixtures';
+import {
+  firstRingCellDistinctFrom,
+  tacticalRes4Cell,
+  tacticalRes4PentagonCrossingPair,
+} from './testSupport/tacticalRes4HexFixtures';
 
 const baseBattle = {
   strategicHexTerrain: 'land',
@@ -137,6 +141,36 @@ test('naval ranged blocked when implicit LOS crosses mountain; infantry not subj
   assert.equal(tacticalMountainBlocksImplicitLosForAirArmorNavalRanged(battle, a, b, 'naval'), true);
   assert.equal(tacticalMountainBlocksImplicitLosForAirArmorNavalRanged(battle, a, b, 'infantry'), false);
   const los = tacticalMountainLosBlockedState(battle, a, b, 'armor');
+  assert.equal(los.traceFailed, false);
+  assert.equal(los.blocked, true);
+});
+
+test('clear terrain stays shootable when the LOS trace crosses an icosahedron face boundary', () => {
+  const pair = tacticalRes4PentagonCrossingPair();
+  const battle = {
+    ...baseBattle,
+    res4TerrainKindByH3: Object.fromEntries(pair.res4ChildH3Indexes.map((h) => [h, 'plains'])),
+  };
+
+  for (const unitType of ['air', 'armor', 'naval'] as const) {
+    const los = tacticalMountainLosBlockedState(battle, pair.originH3Index, pair.crossingH3Index, unitType);
+    assert.equal(los.traceFailed, false, `${unitType} LOS trace must succeed across the face crossing`);
+    assert.equal(los.blocked, false, `${unitType} must not be blocked by clear plains`);
+  }
+});
+
+test('mountain still blocks LOS across an icosahedron face boundary', () => {
+  const pair = tacticalRes4PentagonCrossingPair();
+  const battle = {
+    ...baseBattle,
+    res4TerrainKindByH3: {
+      ...Object.fromEntries(pair.res4ChildH3Indexes.map((h) => [h, 'plains'])),
+      [pair.crossingH3Index]: 'mountain',
+    },
+  };
+
+  const los = tacticalMountainLosBlockedState(battle, pair.originH3Index, pair.crossingH3Index, 'naval');
+
   assert.equal(los.traceFailed, false);
   assert.equal(los.blocked, true);
 });

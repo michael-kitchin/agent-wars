@@ -13,6 +13,8 @@ import {
 } from './gameDb';
 import { buildLatLngCoordinateMap } from './mapData';
 import { generateOrdersForStandingOrders } from './tools/tool5StandingOrders';
+import { collectTempoRuleAttacks } from './tools/tempoRuleAttacks';
+import type { AirStrikeTargetType } from '../shared/ipcTypes';
 import { shouldEndTacticalBattleForAnnihilation } from '../shared/tacticalAnnihilation';
 import { getActiveTacticalBattleSnapshot } from './tacticalBattle/tacticalBattleSession';
 import {
@@ -372,6 +374,41 @@ resolveMeleeIntercept: (payload: ResolveMeleeInterceptIpcPayload) => ReadyResult
 };
 
 /**
+ * Builds the opponent's unconsulted turn: standing orders plus a tempo sweep over whatever is still idle.
+ *
+ * Purpose: These are the paths where no model reply exists, so nothing else can supply attacks. Without the sweep an
+ * unconsulted turn only fights with its DEFEND units, which makes the opponent's aggression depend on which standing
+ * order each unit happens to carry.
+ * When to use: The two `handleGameReady` branches that fall back to generated orders; the consulted path applies the
+ * same sweep itself after merging the model's orders.
+ * Expected outcome: Movement from standing orders, and attacks from standing orders plus the sweep, deduplicated so
+ * no unit fires twice.
+ * Exceptions: None.
+ */
+function buildUnconsultedOpponentOrders(aiState: GameStateSnapshot): {
+  movementOrders: { unitId: string; toH3Index: string }[];
+  rangedAttacks: { unitId: string; targetH3Index: string }[];
+  airStrikes: { unitId: string; targetH3Index: string; targetType: AirStrikeTargetType }[];
+} {
+  const hexList = aiState.hexes.map((h) => h.h3Index);
+  const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
+  const generated = generateOrdersForStandingOrders('opponent', aiState, latLngByH3, resolveToH3);
+  const tempo = collectTempoRuleAttacks({
+    playerId: 'opponent',
+    state: aiState,
+    alreadyAttackingUnitIds: new Set([
+      ...generated.rangedAttacks.map((r) => r.unitId),
+      ...generated.airStrikes.map((s) => s.unitId),
+    ]),
+  });
+  return {
+    movementOrders: generated.movementOrders,
+    rangedAttacks: [...generated.rangedAttacks, ...tempo.rangedAttacks],
+    airStrikes: [...generated.airStrikes, ...tempo.airStrikes],
+  };
+}
+
+/**
  * Defines the `handleGameReady` function shape (export async function handleGameReady().
 
  * Purpose: Supports maintainability by documenting why `handleGameReady` exists.
@@ -454,9 +491,7 @@ export async function handleGameReady(
         clearAiPendingOrders('opponent');
         aiConsulted = true;
       } else {
-        const hexList = aiState.hexes.map((h) => h.h3Index);
-        const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
-        const generated = generateOrdersForStandingOrders('opponent', aiState, latLngByH3, resolveToH3);
+        const generated = buildUnconsultedOpponentOrders(aiState);
         aiOrders = generated.movementOrders;
         aiRangedOrders = generated.rangedAttacks;
         aiAirStrikeOrders = generated.airStrikes;
@@ -491,9 +526,7 @@ export async function handleGameReady(
       aiSkipReason = result.error;
     }
   } else {
-    const hexList = aiState.hexes.map((h) => h.h3Index);
-    const { latLngByH3, resolveToH3 } = buildLatLngCoordinateMap(hexList);
-    const generated = generateOrdersForStandingOrders('opponent', aiState, latLngByH3, resolveToH3);
+    const generated = buildUnconsultedOpponentOrders(aiState);
     aiOrders = generated.movementOrders;
     aiRangedOrders = generated.rangedAttacks;
     aiAirStrikeOrders = generated.airStrikes;

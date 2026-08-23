@@ -6,10 +6,12 @@
  * the structured "Possible unit actions" briefing section.
  */
 
-import type { GameStateSnapshot } from './gameDb';
+import { isDbReady, type GameStateSnapshot } from './gameDb';
+import { isEmbarkedLandUnit } from './game-actions/sealift';
 import { executeTool2 } from './tools/tool2Assessment';
 import { usesOmniscientGridProximity } from './tools/assessUnitProximity';
-import { logDebug, logError } from './logger';
+import { getStandingOrderForUnit } from './tools/tool5StandingOrders';
+import { logDebug, logError, logTrace } from './logger';
 
 /**
  * Documents the `PrecomputationCoordMap` interface as a named contract surface (export interface PrecomputationCoordMap).
@@ -85,11 +87,171 @@ result: {
 }
 
 /**
+ * Documents the module-scope binding `PRECOMPUTE_ASSESS_UNIT_RADIUS` (PRECOMPUTE_ASSESS_UNIT_RADIUS).
+ *
+ * Purpose: Matches the briefing assess_unit radius so cache keys and tool calls stay aligned.
+ * When to use: `runUnitAssessments` tool args and same-hex cache keys.
+ * Expected outcome: Every precomputed unit uses radius 4.
+ * Exceptions: None.
+ */
+const PRECOMPUTE_ASSESS_UNIT_RADIUS = 4;
+
+/**
+ * Nearby-friendly payload cloned when reusing a stacked unit's assess_unit result.
+ *
+ * Purpose: Stack mates share enemy/threat geometry but each row must exclude itself from friendlies.
+ * When to use: `cloneAssessmentForStackedUnit` only.
+ * Expected outcome: Same fields assess_unit emits for co-located friendlies.
+ * Exceptions: None.
+ */
+interface NearbyFriendlyClone {
+  /**
+   * Specifies the contract for the `unitId` member (unitId: string;).
+   *
+   * Contract: Id of a co-located or nearby friendly, never the unit this row is for.
+   * When to use: Briefing/tool payloads that list nearby friendlies.
+   * Expected outcome: Matches `assess_unit` nearbyFriendlies.unitId.
+   * Exceptions: None.
+   */
+  unitId: string;
+  /**
+   * Specifies the contract for the `type` member (type: string;).
+   *
+   * Contract: Unit type of that friendly.
+   * When to use: Clone of assess_unit nearbyFriendlies.
+   * Expected outcome: Same string as the donor unit's type when hexDistance is 0.
+   * Exceptions: None.
+   */
+  type: string;
+  /**
+   * Specifies the contract for the `position` member (position: [number, number];).
+   *
+   * Contract: Lat/lng of the friendly's hex center.
+   * When to use: Clone of assess_unit nearbyFriendlies.
+   * Expected outcome: Same tuple as the cached assessment's unit.position for the donor.
+   * Exceptions: None.
+   */
+  position: [number, number];
+  /**
+   * Specifies the contract for the `hexDistance` member (hexDistance: number;).
+   *
+   * Contract: Path or grid hops from the assessed unit to this friendly.
+   * When to use: Clone of assess_unit nearbyFriendlies.
+   * Expected outcome: 0 when the friendly shares the assessed unit's hex.
+   * Exceptions: None.
+   */
+  hexDistance: number;
+  /**
+   * Specifies the contract for the `estimatedTurnsToReach` member (estimatedTurnsToReach: number | null;).
+   *
+   * Contract: Turns for that friendly to reach the assessed unit.
+   * When to use: Clone of assess_unit nearbyFriendlies.
+   * Expected outcome: 0 for a co-located donor; null when path distance was unavailable.
+   * Exceptions: None.
+   */
+  estimatedTurnsToReach: number | null;
+}
+
+/**
+ * True when the unit has a sealift assignment, without throwing when tests run with no DB.
+ *
+ * Purpose: Assessment cache must not mix embarked cargo with an independent stack mate of the same type.
+ * When to use: `unitAssessmentStackKey` only.
+ * Expected outcome: False when the database is closed; otherwise `isEmbarkedLandUnit`.
+ * Exceptions: None.
+ */
+function unitIsEmbarkedForAssessmentCache(unitId: string): boolean {
+  logTrace('precomputation unitIsEmbarkedForAssessmentCache', { unitId });
+  if (!isDbReady()) return false;
+  return isEmbarkedLandUnit(unitId);
+}
+
+/**
+ * Cache key for assess_unit results that share nearby-enemy geometry.
+ *
+ * Purpose: Same hex, type, player, radius, and embark state see the same enemies and threats; only unit id and standing order differ.
+ * When to use: `runUnitAssessments` before calling executeTool2.
+ * Expected outcome: Distinct types or embark states on the same hex do not share a key.
+ * Exceptions: None.
+ */
+function unitAssessmentStackKey(unit: {
+  id: string;
+  h3Index: string;
+  unitType: string;
+  player: string;
+}): string {
+  logTrace('precomputation unitAssessmentStackKey', {
+    unitId: unit.id,
+    h3Index: unit.h3Index,
+    unitType: unit.unitType,
+    player: unit.player,
+  });
+  const embarked = unitIsEmbarkedForAssessmentCache(unit.id) ? '1' : '0';
+  return `${unit.h3Index}|${unit.unitType}|${unit.player}|r${PRECOMPUTE_ASSESS_UNIT_RADIUS}|emb:${embarked}`;
+}
+
+/**
+ * Rewrites a cached assess_unit payload for another unit stacked on the same hex.
+ *
+ * Purpose: Avoid repeating path BFS for 20 armor on one city while still emitting one briefing row per unit id.
+ * When to use: Cache hit in `runUnitAssessments`.
+ * Expected outcome: Cloned nearbyEnemies/threats; standing order and unit id belong to the stacked unit; donor appears as a distance-0 friendly.
+ * Exceptions: None.
+ */
+function cloneAssessmentForStackedUnit(
+  cached: UnitAssessmentResult,
+  unit: { id: string; player: string }
+): UnitAssessmentResult['result'] {
+  logTrace('precomputation cloneAssessmentForStackedUnit', {
+    cachedUnitId: cached.unitId,
+    unitId: unit.id,
+  });
+  const cachedFriendlies = Array.isArray(cached.result.nearbyFriendlies)
+    ? (cached.result.nearbyFriendlies as NearbyFriendlyClone[])
+    : [];
+  const unitPosition: [number, number] = [...cached.result.unit.position];
+  const donorAsFriendly: NearbyFriendlyClone = {
+    unitId: cached.unitId,
+    type: cached.result.unit.type,
+    position: [...cached.result.unit.position],
+    hexDistance: 0,
+    estimatedTurnsToReach: 0,
+  };
+  const nearbyFriendlies = [
+    ...cachedFriendlies
+      .filter((friendly) => friendly.unitId !== unit.id)
+      .map((friendly) => ({
+        ...friendly,
+        position: [...friendly.position] as [number, number],
+      })),
+    donorAsFriendly,
+  ].sort((a, b) => a.hexDistance - b.hexDistance);
+  const canAttackThisTurn = Array.isArray(cached.result.canAttackThisTurn)
+    ? cached.result.canAttackThisTurn.map((entry) =>
+        entry && typeof entry === 'object' ? { ...entry } : entry
+      )
+    : cached.result.canAttackThisTurn;
+  return {
+    ...cached.result,
+    unit: {
+      ...cached.result.unit,
+      unitId: unit.id,
+      position: unitPosition,
+      currentStandingOrder: getStandingOrderForUnit(unit.player, unit.id),
+    },
+    nearbyEnemies: cached.result.nearbyEnemies.map((enemy) => ({ ...enemy })),
+    threats: cached.result.threats.map((threat) => ({ ...threat })),
+    canAttackThisTurn,
+    nearbyFriendlies,
+  };
+}
+
+/**
  * Runs assess_unit for every opponent unit and collects successful payloads.
  *
  * Purpose: Feeds Unit Status / Attention Flags. When fog is off on res1, each call uses grid hops for all other units.
  * When to use: Strategic precomputation before formatBriefing.
- * Expected outcome: One result per opponent unit whose assess_unit returned ok with nearbyEnemies.
+ * Expected outcome: One result per opponent unit whose assess_unit returned ok with nearbyEnemies. Same-hex same-type stacks reuse one scan.
  * Exceptions: Failed assessments are logged and omitted.
  */
 export function runUnitAssessments(
@@ -110,19 +272,35 @@ export function runUnitAssessments(
     }),
   });
   const results: UnitAssessmentResult[] = [];
+  const assessmentByStackKey = new Map<string, UnitAssessmentResult>();
+  let uniqueAssessments = 0;
+  let reusedAssessments = 0;
   for (const unit of opponentUnits) {
+    const stackKey = unitAssessmentStackKey(unit);
+    const cached = assessmentByStackKey.get(stackKey);
+    if (cached) {
+      reusedAssessments += 1;
+      results.push({
+        unitId: unit.id,
+        result: cloneAssessmentForStackedUnit(cached, unit),
+      });
+      continue;
+    }
     const out = executeTool2(
       'assess_unit',
-      { unitId: unit.id, radius: 4 },
+      { unitId: unit.id, radius: PRECOMPUTE_ASSESS_UNIT_RADIUS },
       state,
       latLngByH3,
       resolveToH3
     );
     if (out.status === 'ok' && out.unit && out.nearbyEnemies !== undefined) {
-      results.push({
+      const entry: UnitAssessmentResult = {
         unitId: unit.id,
         result: out as unknown as UnitAssessmentResult['result'],
-      });
+      };
+      assessmentByStackKey.set(stackKey, entry);
+      uniqueAssessments += 1;
+      results.push(entry);
     } else {
       if (out.status === 'error') {
         logError('precomputation runUnitAssessments: assess_unit error', {
@@ -135,6 +313,8 @@ export function runUnitAssessments(
   logDebug('precomputation runUnitAssessments complete', {
     requested: opponentUnits.length,
     successful: results.length,
+    uniqueAssessments,
+    reusedAssessments,
   });
   return results;
 }

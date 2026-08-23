@@ -11,6 +11,7 @@ import { executeTool3 } from '../tools/tool3CombatEstimation';
 import { executeTool4, getInjectionText } from '../tools/tool4Memory';
 import { executeTool5, expireAndUpdateStatus, generateOrdersForStandingOrders, getInjectionText as getStandingOrderInjectionText } from '../tools/tool5StandingOrders';
 import { executeTool6 } from '../tools/tool6Production';
+import { mergeOpponentAttackOrders } from '../tools/tempoRuleAttacks';
 import { runPrecomputation } from '../precomputation';
 import { formatBriefing } from '../briefingFormatter';
 import { formatTacticalBriefing } from './formatTacticalBriefing';
@@ -766,23 +767,12 @@ export async function requestOrdersFlow(
               mutateProgress: true,
               pathfindingSession: getOrCreateAiPlanningPathfindingSession(),
             })
-          : {
-              movementOrders: [] as { unitId: string; toH3Index: string }[],
-              rangedAttacks: [] as { unitId: string; targetH3Index: string }[],
-              airStrikes: [] as {
-                unitId: string;
-                targetH3Index: string;
-                targetType: 'units' | 'urban' | 'airport' | 'seaport';
-              }[],
-            };
+          : { movementOrders: [], rangedAttacks: [], airStrikes: [] };
       if (tacticalBattle && flags.ordersEnabled) {
         logDebug('openRouter requestOrdersFlow skipping standing-order generation for tactical opponent', {
           battleId: tacticalBattle.battleId,
         });
       }
-      const standingOrderMovement = standingGenerated.movementOrders;
-      const standingOrderRanged = standingGenerated.rangedAttacks;
-      const standingOrderAirExpanded = standingGenerated.airStrikes;
       const llmMovementOrders = dedupeByUnitKeepLast(parsed.movementOrders ?? []);
       const llmRangedOrders = dedupeByUnitKeepLast(parsed.rangedAttacks ?? []);
       const llmAirStrikes = dedupeByUnitKeepLast(parsed.airStrikes ?? []);
@@ -790,11 +780,15 @@ export async function requestOrdersFlow(
       const llmEmbarkOrders = dedupeByUnitKeepLast(parsed.embarkOrders ?? []);
       const llmMovementByUnit = new Map(llmMovementOrders.map((o) => [o.unitId, o.toH3Index]));
       const llmMovementUnitIds = new Set(llmMovementOrders.map((o) => o.unitId));
-      const mergedMovement = [...standingOrderMovement.filter((o) => !llmMovementUnitIds.has(o.unitId)), ...llmMovementOrders];
-      const llmRangedUnitIds = new Set(llmRangedOrders.map((r) => r.unitId));
-      const mergedRanged = [...standingOrderRanged.filter((o) => !llmRangedUnitIds.has(o.unitId)), ...llmRangedOrders];
-      const llmAirUnitIds = new Set(llmAirStrikes.map((s) => s.unitId));
-      const mergedAirStrikes = [...standingOrderAirExpanded.filter((s) => !llmAirUnitIds.has(s.unitId)), ...llmAirStrikes];
+      const mergedMovement = [...standingGenerated.movementOrders.filter((o) => !llmMovementUnitIds.has(o.unitId)), ...llmMovementOrders];
+      const { rangedAttacks: mergedRanged, airStrikes: mergedAirStrikes } = mergeOpponentAttackOrders({
+        state,
+        tacticalBattle,
+        standingOrderRanged: standingGenerated.rangedAttacks,
+        standingOrderAirStrikes: standingGenerated.airStrikes,
+        modelRanged: llmRangedOrders,
+        modelAirStrikes: llmAirStrikes,
+      });
 
       const validated: { unitId: string; toH3Index: string }[] = [];
       const dropReasons: string[] = [...(parsed.dropReasons ?? [])];
@@ -855,7 +849,7 @@ export async function requestOrdersFlow(
           seenUnits.add(order.unitId);
         } else {
           const sourceIsLlmOverride = llmMovementUnitIds.has(order.unitId);
-          const hasStandingForUnit = standingOrderMovement.some((o) => o.unitId === order.unitId);
+          const hasStandingForUnit = standingGenerated.movementOrders.some((o) => o.unitId === order.unitId);
           if (!sourceIsLlmOverride && hasStandingForUnit && result.reason === 'Invalid distance') {
             invalidStandingMovementUnits.add(order.unitId);
             continue;

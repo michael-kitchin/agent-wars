@@ -1,4 +1,4 @@
-import { gridDistance } from 'h3-js';
+import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
 import { getRange } from '../combatConstants';
 import { logDebug } from '../logger';
 
@@ -20,8 +20,9 @@ export type StrategicRangedTargetHexIndex = {
  *
  * Purpose: Isolates strategic ranged target discovery from the larger possible-actions builder.
  * When to use: `buildPossibleUnitActionsMarkdown` and strategic `collectAggregatedPossibleActionRows` ranged rows when `tacticalBattle` is absent (enemy-occupied res1 cells only).
- * Expected outcome: Same hex set as before extraction: every key of `indexed.enemyUnitsByHex` with finite `gridDistance` in `[0, getRange(unitType)]`.
- * Exceptions: `gridDistance` failures skip that enemy hex (same as prior try/catch loop).
+ * Expected outcome: Every key of `indexed.enemyUnitsByHex` whose distance falls in `[0, getRange(unitType)]`.
+ * Exceptions: None. Distances use the shared BFS fallback, because dropping a pair H3 cannot measure hid legal shots
+ * across icosahedron face crossings from the Best Options table the model is told to act on.
  */
 export function collectRangedTargetHexes(
   unitH3: string,
@@ -37,12 +38,8 @@ export function collectRangedTargetHexes(
   if (r < 1) return [];
   const out = new Set<string>();
   for (const enemyHex of indexed.enemyUnitsByHex.keys()) {
-    try {
-      const d = gridDistance(unitH3, enemyHex);
-      if (d >= 0 && d <= r) out.add(enemyHex);
-    } catch {
-      continue;
-    }
+    const d = computeGridDistanceWithPathFallbackPure(unitH3, enemyHex);
+    if (d !== null && d >= 0 && d <= r) out.add(enemyHex);
   }
   return [...out];
 }

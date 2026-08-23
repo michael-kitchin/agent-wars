@@ -275,12 +275,12 @@ function setBuildQueue(
 }
 
 /**
- * Defines the `executeTool6` function shape (export function executeTool6( toolName: string, args: unknown, state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: numb).
-
- * Purpose: Supports maintainability by documenting why `executeTool6` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Dispatches opponent production tool names onto query or queue-set handlers.
+ *
+ * Purpose: OpenRouter tool calls and `productionOrders` JSON share one entry so cap rejection and hex resolution stay consistent.
+ * When to use: From `requestOrdersFlow` / `processProductionOrdersArray` when the production tool group is enabled.
+ * Expected outcome: `{ status: 'ok' | 'error', ... }` from the named handler, or an unknown-tool error; exceptions are caught and returned as `{ status: 'error' }`.
+ * Exceptions: None beyond the returned error payload.
  */
 export function executeTool6(
   toolName: string,

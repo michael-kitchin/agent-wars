@@ -14,6 +14,7 @@ import {
   getInjectionText,
   getStandingOrderForUnit,
 } from './tool5StandingOrdersCore';
+import { holdFireUnitIdsForPlayer } from './tool5StandingOrdersGeneration';
 
 /**
  * Documents the module-scope binding `AI_PLAYER_ID` (AI_PLAYER_ID).
@@ -40,6 +41,7 @@ export {
   generateOrdersForStandingOrders,
   getInjectionText,
   getStandingOrderForUnit,
+  holdFireUnitIdsForPlayer,
 };
 export type { GenerateStandingOrdersOptions } from './tool5StandingOrdersGeneration';
 

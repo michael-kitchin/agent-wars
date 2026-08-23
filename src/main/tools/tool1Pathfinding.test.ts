@@ -6,8 +6,10 @@
 import * as assert from 'assert';
 import { gridDisk, latLngToCell } from 'h3-js';
 import { createPathfindingSession, executePlanRouteWithSession } from './tool1Pathfinding';
+import { resetPlanningPhaseSessionCacheForTests } from './tool1PathfindingSessionCache';
 import type { GameStateSnapshot } from '../gameDb';
 import type { Res1LandMassRecord } from '../../shared/landTraversalRes1';
+import { ensureTerrainClassificationCacheLoaded } from '../terrainClassificationCache';
 
 /**
  * Defines the `landMassForHexes` function shape (function landMassForHexes().
@@ -356,6 +358,91 @@ function testPlanRouteSessionDeadStateCacheSeparatesBlockedAndUnblockedSearches(
 }
 
 /**
+ * Opponent assign_order batches and human previews keep separate reusable planning-phase sessions.
+ *
+ * Purpose: Human-only reuse left each opponent assign_order rebuilding hex maps.
+ * When to use: After changing planning-phase session cache eligibility.
+ * Expected outcome: Second create for the same perspective returns the same object; human and opponent slots do not clobber each other.
+ * Exceptions: None.
+ */
+function testPlanningPhaseSessionReuseKeepsHumanAndOpponentSlots(): void {
+  resetPlanningPhaseSessionCacheForTests();
+  ensureTerrainClassificationCacheLoaded();
+  const { originH3, destinationH3 } = buildAdjacentHexPair();
+  const latLngByH3 = new Map<string, [number, number]>([
+    [originH3, [0.1, 0.1]],
+    [destinationH3, [0.9, 0.9]],
+  ]);
+  const resolveToH3 = (): string => originH3;
+  const units = [{ id: 'opponent-armor-1', player: 'opponent' as const, unitType: 'armor', h3Index: originH3 }];
+  const hexes = [
+    { h3Index: originH3, terrain: 'land', terrainKind: 'plains' },
+    { h3Index: destinationH3, terrain: 'land', terrainKind: 'plains' },
+  ];
+  const opponentState: GameStateSnapshot = {
+    hexes,
+    units,
+    phase: 'planning',
+    turnNumber: 91001,
+    pendingOrders: [],
+    playerPerspective: 'opponent',
+  };
+  const humanState: GameStateSnapshot = {
+    ...opponentState,
+    playerPerspective: 'human',
+  };
+
+  const opponentFirst = createPathfindingSession(opponentState, latLngByH3, resolveToH3);
+  const opponentSecond = createPathfindingSession(opponentState, latLngByH3, resolveToH3);
+  assert.strictEqual(opponentFirst, opponentSecond, 'opponent planning sessions should reuse');
+
+  const humanFirst = createPathfindingSession(humanState, latLngByH3, resolveToH3);
+  assert.notStrictEqual(humanFirst, opponentFirst, 'human and opponent sessions must not share');
+  const humanSecond = createPathfindingSession(humanState, latLngByH3, resolveToH3);
+  assert.strictEqual(humanFirst, humanSecond, 'human planning sessions should reuse');
+
+  const nextTurnState: GameStateSnapshot = { ...opponentState, turnNumber: 91002 };
+  const opponentNextTurn = createPathfindingSession(nextTurnState, latLngByH3, resolveToH3);
+  assert.notStrictEqual(opponentNextTurn, opponentFirst, 'a new turn must not reuse the previous session');
+}
+
+/**
+ * Test isolation: clearing the planning-phase cache must drop prior session objects.
+ *
+ * Purpose: Same-turn fixtures in one Node process must not inherit dead-state maps from an earlier test.
+ * When to use: After changing `resetPlanningPhaseSessionCacheForTests`.
+ * Expected outcome: After reset, the next create is a new object; a following create reuses that new object.
+ * Exceptions: None.
+ */
+function testPlanningPhaseSessionCacheResetIsolatesCreates(): void {
+  resetPlanningPhaseSessionCacheForTests();
+  ensureTerrainClassificationCacheLoaded();
+  const { originH3, destinationH3 } = buildAdjacentHexPair();
+  const latLngByH3 = new Map<string, [number, number]>([
+    [originH3, [0.1, 0.1]],
+    [destinationH3, [0.9, 0.9]],
+  ]);
+  const resolveToH3 = (): string => originH3;
+  const state: GameStateSnapshot = {
+    hexes: [
+      { h3Index: originH3, terrain: 'land', terrainKind: 'plains' },
+      { h3Index: destinationH3, terrain: 'land', terrainKind: 'plains' },
+    ],
+    units: [{ id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: originH3 }],
+    phase: 'planning',
+    turnNumber: 91011,
+    pendingOrders: [],
+    playerPerspective: 'opponent',
+  };
+  const first = createPathfindingSession(state, latLngByH3, resolveToH3);
+  resetPlanningPhaseSessionCacheForTests();
+  const afterReset = createPathfindingSession(state, latLngByH3, resolveToH3);
+  assert.notStrictEqual(first, afterReset, 'reset must drop the prior session object');
+  const reused = createPathfindingSession(state, latLngByH3, resolveToH3);
+  assert.strictEqual(afterReset, reused, 'reuse still applies after a clean reset');
+}
+
+/**
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Supports maintainability by documenting why `run` exists.
@@ -364,12 +451,15 @@ function testPlanRouteSessionDeadStateCacheSeparatesBlockedAndUnblockedSearches(
  * Exceptions: None.
  */
 function run(): void {
+  resetPlanningPhaseSessionCacheForTests();
   testPlanRouteLandUnitToWaterHexReturnsTerrainHint();
   testPlanRouteLandUnitRejectsOpenWaterMassDestination();
   testPlanRouteSessionParity();
   testPlanRouteRejectsWaterCrossingWithoutLandMassEdge();
   testPlanRouteSessionDeadStateCacheUsesOriginDestinationCompositeKey();
   testPlanRouteSessionDeadStateCacheSeparatesBlockedAndUnblockedSearches();
+  testPlanningPhaseSessionReuseKeepsHumanAndOpponentSlots();
+  testPlanningPhaseSessionCacheResetIsolatesCreates();
   console.log('tool1Pathfinding tests passed');
 }
 

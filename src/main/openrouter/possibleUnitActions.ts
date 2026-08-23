@@ -6,23 +6,31 @@
  * - Strategic ground: `getValidDestinations` → res1 `getLandMassReachableHexes` (hop BFS).
  * - Tactical ground: `collectTacticalLegalMoveDestinationRes4Hexes` → single-source MP reachability (Ready rules).
  * Best Options This Turn interest/approach live in `possibleUnitActionsBestOptionsInterest.ts`
- * (enemy ∪ uncontrolled unoccupied infra; empty interest falls back to approach).
+ * (enemy ∪ uncontrolled unoccupied infra; empty interest falls back to approach; this-turn air strikes
+ * list enemy-occupied or human-controlled infra only strategically, and human-occupied footprint cells
+ * tactically when the parent res1 airport is intact; tactical Best Options omits ferry).
  */
 
-import { gridDistance, gridDisk } from 'h3-js';
+import { cellToParent, gridDisk } from 'h3-js';
 import { type GameStateSnapshot, listRes4FeatureOverridesForGame } from '../gameDb';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { collectTacticalLegalMoveDestinationRes4Hexes } from '../../shared/collectTacticalLegalMoveDestinationRes4Hexes';
 import { unitHasDirectRangedPlanning } from '../../shared/rangePerimeterModel';
 import { getValidDestinations } from '../oneStepMoveDestinations';
-import { collectTacticalLegalRangedTargetRes4Hexes } from '../../shared/tacticalTerrainCombatModifiers';
+import {
+  collectTacticalLegalRangedTargetRes4Hexes,
+  effectiveTacticalMovementPointBudgetForMarchLeg,
+  tacticalMovementTerrainAnchorH3,
+} from '../../shared/tacticalTerrainCombatModifiers';
+import { computeGridDistancePure } from '../../shared/h3GridRangePure';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { isWithinAirFerryGridRange, isWithinAirStrikeGridRange } from '../game-actions/gridRange';
-import { logDebug } from '../logger';
+import { logDebug, logTrace } from '../logger';
 import { logHexControllerParityMismatch } from '../snapshotDbParity';
 import { compareHexIds, partitionHomelandNearestOther } from './possibleUnitActionsPartition';
 import {
   ACTION_AIR_STRIKES,
+  ACTION_FERRY,
   ACTION_MOVES_MELEE,
   ACTION_RANGED,
   aggregateRows,
@@ -41,6 +49,8 @@ import {
   applyInterestOrApproach,
   describeTacticalBestOptionsInfrastructure,
   filterGroundMoveHexesForThisTurnOptionsTable,
+  filterStrategicAirStrikeHexesForThisTurnOptionsTable,
+  filterTacticalAirStrikeHexesForThisTurnOptionsTable,
   filterTacticalGroundMoveHexesForThisTurnOptionsTable,
   filterTacticalRangedHexesForThisTurnOptionsTable,
   tacticalBestOptionsUrbanHexCount,
@@ -352,20 +362,33 @@ function enemyCell(indexed: IndexedState, h3: string): string {
 }
 
 /**
- * Defines the `safeGridDistance` function shape (function safeGridDistance(from: string, to: string): number | null).
-
- * Purpose: Supports maintainability by documenting why `safeGridDistance` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Ranking distance used when H3 cannot measure a pair that is still a legal destination.
+ *
+ * Purpose: `gridDistance` throws across many res1 icosahedron-face crossings even when `gridDisk` includes the dest. Dropping those rows hid entire air bases from Best Options while Air Operations still counted ferry dests.
+ * When to use: `tableRowDistance` fallback only; never as a range check.
+ * Expected outcome: Unmeasurable legal dests sort after measurable ones, then by urban count / lat-lng.
  * Exceptions: None.
  */
+const UNMEASURABLE_DEST_RANK_DISTANCE = 999;
 
-function safeGridDistance(from: string, to: string): number | null {
-  try {
-    return gridDistance(from, to);
-  } catch {
-    return null;
-  }
+/**
+ * Grid-step distance for Best Options / possible-action row ranking.
+ *
+ * Purpose: Prefer a real H3 distance when available; keep the legal dest when measurement fails instead of omitting the action.
+ * When to use: `appendRowsForLegalHexes` before pushing a row.
+ * Expected outcome: Non-negative integer; `UNMEASURABLE_DEST_RANK_DISTANCE` when both `gridDistance` and `gridPathCells` fail.
+ * Exceptions: None.
+ */
+function tableRowDistance(from: string, to: string, unitId: string): number {
+  const d = computeGridDistancePure(from, to);
+  if (d !== null) return d;
+  logDebug('possibleUnitActions tableRowDistance: unmeasurable pair, using rank fallback', {
+    unitId,
+    from,
+    to,
+    fallback: UNMEASURABLE_DEST_RANK_DISTANCE,
+  });
+  return UNMEASURABLE_DEST_RANK_DISTANCE;
 }
 
 /**
@@ -396,8 +419,7 @@ function appendRowsForLegalHexes(args: {
   const parts = partitionHomelandNearestOther(args.legalHexes, args.homeland);
   const addForBucket = (bucket: PossibleActionTableRow['bucket'], hexList: string[]): void => {
     for (const h3 of sortHexesByLatLng(hexList, args.latLngByH3)) {
-      const d = safeGridDistance(args.unitH3, h3);
-      if (d === null) continue;
+      const d = tableRowDistance(args.unitH3, h3, args.unitId);
       const tacticalCtx = args.tacticalInterest;
       args.rows.push({
         bucket,
@@ -434,6 +456,22 @@ function appendRowsForLegalHexes(args: {
 
 function airBaseHasIntactAirport(indexed: IndexedState, airH3: string): boolean {
   return getInfra(indexed, airH3).airport > 0;
+}
+
+/**
+ * True when the air unit's parent res1 hex still has an airport in the plan-state snapshot.
+ *
+ * Purpose: Tactical strike validation keys airport presence on `cellToParent(unit.h3Index, 1)`, not the res4 cell the aircraft occupies. Best Options must use the same gate so the tempo rule does not list a strike the engine will reject.
+ * When to use: Tactical branch of air-strike row collection in `collectAggregatedPossibleActionRows`.
+ * Expected outcome: `true` when snapshot infra for the parent res1 has `airport > 0`; `false` when parent lookup fails or the airport is gone.
+ * Exceptions: Returns false if `cellToParent` throws.
+ */
+function tacticalParentAirportIntact(indexed: IndexedState, airH3: string): boolean {
+  try {
+    return getInfra(indexed, cellToParent(airH3, 1)).airport > 0;
+  } catch {
+    return false;
+  }
 }
 /**
  * Defines the `collectLegalFerryDestinationHexes` function shape (function collectLegalFerryDestinationHexes().
@@ -500,6 +538,70 @@ function collectStrikeHexesForAirUnit(airH3: string, indexed: IndexedState): str
 }
 
 /**
+ * Returns a cached hex list or computes and stores it.
+ *
+ * Purpose: Stacked same-origin units share ferry disks, land-mass BFS dests, and strike rings.
+ * When to use: `collectAggregatedPossibleActionRows` destination collection.
+ * Expected outcome: First call runs `compute`; later calls with the same key return a copy so callers cannot mutate the cache.
+ * Exceptions: None.
+ */
+function rememberComputedHexList(
+  cache: Map<string, string[]>,
+  key: string,
+  compute: () => string[]
+): string[] {
+  const hit = cache.get(key);
+  if (hit) return [...hit];
+  const value = [...compute()];
+  cache.set(key, value);
+  return [...value];
+}
+
+/**
+ * Cache key for tactical MP reachability shared by stacked same-type sub-units.
+ *
+ * Purpose: Best Options was running one Dijkstra per opponent pawn; same origin, type, budget, and embark state share dests.
+ * When to use: `collectAggregatedPossibleActionRows` before `collectTacticalLegalMoveDestinationRes4Hexes`.
+ * Expected outcome: Air units share one empty dest list; unknown ids get a unique key; embarked cargo shares one empty dest list.
+ * Exceptions: None.
+ */
+function tacticalLegalMoveDestCacheKey(
+  battle: TacticalBattleSnapshot,
+  moverSubUnitId: string
+): string {
+  logTrace('possibleUnitActions tacticalLegalMoveDestCacheKey', { moverSubUnitId });
+  const u = battle.subUnits.find((s) => s.id === moverSubUnitId);
+  if (!u || u.unitType === 'air') return !u ? `missing:${moverSubUnitId}` : 'air';
+  if (u.embarkedOnSubUnitId) return 'embarked';
+  const budget = effectiveTacticalMovementPointBudgetForMarchLeg(
+    battle,
+    u,
+    battle.subUnits,
+    u.unitType
+  );
+  return `${u.h3Index}|${u.unitType}|b${budget}`;
+}
+
+/**
+ * Cache key for tactical ranged target rings shared by stacked same-type attackers.
+ *
+ * Purpose: Ranged discovery scans the footprint per attacker; same anchor and type share legal hexes.
+ * When to use: `collectAggregatedPossibleActionRows` before `collectTacticalLegalRangedTargetRes4Hexes`.
+ * Expected outcome: Missing attackers get a unique empty key; embarked cargo uses the host hex as anchor.
+ * Exceptions: None.
+ */
+function tacticalRangedDestCacheKey(
+  battle: TacticalBattleSnapshot,
+  attackerSubUnitId: string
+): string {
+  logTrace('possibleUnitActions tacticalRangedDestCacheKey', { attackerSubUnitId });
+  const u = battle.subUnits.find((s) => s.id === attackerSubUnitId);
+  if (!u) return `missing:${attackerSubUnitId}`;
+  const anchor = tacticalMovementTerrainAnchorH3(u, battle.subUnits);
+  return `${anchor}|${u.unitType}`;
+}
+
+/**
  * Defines the `collectAggregatedPossibleActionRows` function shape (export function collectAggregatedPossibleActionRows(args: { state: GameStateSnapshot; latLngByH3: Map<string, [number, number]>; formatLatLng: (ll: [number, number]) => string; tacticalBattle?: TacticalBattleSnapshot; forThisTurnOptionsTable?: boolean }): PossibleActionTableRow[]).
 
  * Purpose: Aggregates opponent legal moves, air strikes, and ranged targets into briefing table rows, optionally tightening targets for the Best Options This Turn prompt table.
@@ -518,7 +620,7 @@ export function collectAggregatedPossibleActionRows(args: {
 
    * Contract: When true, narrows move/ranged candidate hexes for the operational-map Best Options This Turn table; when false or omitted, preserves legacy full-table row generation.
    * When to use: Set only from `buildStrategicOperationalMapSectionMarkdown` / `buildTacticalOperationalMapSectionMarkdown`.
-   * Expected outcome: Ground move/melee filter for non-air units (strategic and tactical: human/enemy contact, else approach, else uncontrolled unoccupied infra); empty or infra-only interest falls back to approach in both modes; strategic ranged lists only enemy-occupied hexes in range (same as full markdown); tactical ranged Best Options lists only human-occupied cells (legal infra-only shots unchanged); air ferry lists unchanged.
+   * Expected outcome: Ground move/melee filter for non-air units (strategic and tactical: human/enemy contact, else approach, else uncontrolled unoccupied infra); empty or infra-only interest falls back to approach in both modes; strategic ranged lists only enemy-occupied hexes in range (same as full markdown); tactical ranged Best Options lists only human-occupied cells (legal infra-only shots unchanged); this-turn air strikes list enemy-occupied or human-controlled infra only (strategic) or human-occupied footprint cells when the parent res1 airport is intact (tactical); strategic air ferry dests stay listed and are labeled `ferry`; tactical Best Options omits ferry rows.
    * Exceptions: None.
    */
   forThisTurnOptionsTable?: boolean;
@@ -538,7 +640,7 @@ export function collectAggregatedPossibleActionRows(args: {
   const opponentUnits = state.units.filter((u) => u.player === FRIENDLY_PLAYER).sort((a, b) => a.id.localeCompare(b.id));
   const rawRows: RawPossibleActionRow[] = [];
   const thisTurnFilterStats = forThisTurn
-    ? { moveIn: 0, moveOut: 0, rangedIn: 0, rangedOut: 0 }
+    ? { moveIn: 0, moveOut: 0, rangedIn: 0, rangedOut: 0, airStrikeIn: 0, airStrikeOut: 0 }
     : null;
   const thisTurnStartedAt = forThisTurn && tacticalBattle ? performance.now() : null;
   let tacticalRangedRowsForFootprint:
@@ -582,16 +684,41 @@ export function collectAggregatedPossibleActionRows(args: {
 
   const strategicEnemyOccupiedH3 = new Set(indexed.enemyUnitsByHex.keys());
 
+  const opponentAirCount = opponentUnits.filter((u) => u.unitType === 'air').length;
+  if (tacticalBattle && opponentAirCount > 0) {
+    logDebug('possibleUnitActions collectAggregatedPossibleActionRows skipTacticalAirFerryRows', {
+      opponentAirCount,
+    });
+  }
+
+  const legalDestByKey = new Map<string, string[]>();
+  const ferryDestByKey = new Map<string, string[]>();
+  const strikeHexByOrigin = new Map<string, string[]>();
+  const rangedDestByKey = new Map<string, string[]>();
+  const strategicLandNavalOrigins = new Set<string>();
+
   for (const unit of opponentUnits) {
-    let moveHexes = excludeUnitCurrentHex(
-      unit.h3Index,
-      unit.unitType === 'air'
-        ? collectLegalFerryDestinationHexes(unit, indexed)
-        : tacticalBattle
-          ? collectTacticalLegalMoveDestinationRes4Hexes(tacticalBattle, unit.id)
-          : getValidDestinations(unit, state)
-    );
-    let moveActionType = ACTION_MOVES_MELEE;
+    const legalDests = (() => {
+      if (unit.unitType === 'air') {
+        if (tacticalBattle) return [];
+        return rememberComputedHexList(
+          ferryDestByKey,
+          `${unit.h3Index}|${unit.player}`,
+          () => collectLegalFerryDestinationHexes(unit, indexed)
+        );
+      }
+      if (tacticalBattle) {
+        return rememberComputedHexList(
+          legalDestByKey,
+          tacticalLegalMoveDestCacheKey(tacticalBattle, unit.id),
+          () => collectTacticalLegalMoveDestinationRes4Hexes(tacticalBattle, unit.id)
+        );
+      }
+      strategicLandNavalOrigins.add(`${unit.h3Index}|${unit.unitType}`);
+      return getValidDestinations(unit, state);
+    })();
+    let moveHexes = excludeUnitCurrentHex(unit.h3Index, legalDests);
+    let moveActionType = unit.unitType === 'air' ? ACTION_FERRY : ACTION_MOVES_MELEE;
     let moveEnemySummaryOverride: string | undefined;
     if (forThisTurn && unit.unitType !== 'air') {
       const before = moveHexes.length;
@@ -643,24 +770,59 @@ export function collectAggregatedPossibleActionRows(args: {
       });
     }
 
-    if (unit.unitType === 'air' && airBaseHasIntactAirport(indexed, unit.h3Index)) {
-      const strikeTargets = excludeUnitCurrentHex(
-        unit.h3Index,
-        collectStrikeHexesForAirUnit(unit.h3Index, indexed).filter((h3) => strikeKindsForHex(indexed, h3).length > 0)
-      );
-      if (strikeTargets.length > 0) {
-        appendRowsForLegalHexes({
-          rows: rawRows,
-          unitId: unit.id,
-          unitType: unit.unitType,
-          unitH3: unit.h3Index,
-          actionType: ACTION_AIR_STRIKES,
-          legalHexes: strikeTargets,
-          homeland,
-          indexed,
-          latLngByH3,
-          isAirStrike: true,
-        });
+    if (unit.unitType === 'air') {
+      const airCanStrike = tacticalBattle
+        ? tacticalParentAirportIntact(indexed, unit.h3Index)
+        : airBaseHasIntactAirport(indexed, unit.h3Index);
+      if (airCanStrike) {
+        let strikeTargets: string[];
+        if (tacticalBattle && forThisTurn && tacticalBestOptionsInterest) {
+          strikeTargets = rememberComputedHexList(
+            strikeHexByOrigin,
+            `tacticalThisTurn|${unit.h3Index}`,
+            () =>
+              filterTacticalAirStrikeHexesForThisTurnOptionsTable(
+                unit.id,
+                excludeUnitCurrentHex(unit.h3Index, [...indexed.hexSet]),
+                tacticalBestOptionsInterest
+              )
+          );
+          if (thisTurnFilterStats) {
+            thisTurnFilterStats.airStrikeIn += indexed.hexSet.size;
+            thisTurnFilterStats.airStrikeOut += strikeTargets.length;
+          }
+        } else {
+          strikeTargets = excludeUnitCurrentHex(
+            unit.h3Index,
+            rememberComputedHexList(strikeHexByOrigin, unit.h3Index, () =>
+              collectStrikeHexesForAirUnit(unit.h3Index, indexed).filter(
+                (h3) => strikeKindsForHex(indexed, h3).length > 0
+              )
+            )
+          );
+          if (forThisTurn) {
+            const before = strikeTargets.length;
+            strikeTargets = filterStrategicAirStrikeHexesForThisTurnOptionsTable(indexed, strikeTargets);
+            if (thisTurnFilterStats) {
+              thisTurnFilterStats.airStrikeIn += before;
+              thisTurnFilterStats.airStrikeOut += strikeTargets.length;
+            }
+          }
+        }
+        if (strikeTargets.length > 0) {
+          appendRowsForLegalHexes({
+            rows: rawRows,
+            unitId: unit.id,
+            unitType: unit.unitType,
+            unitH3: unit.h3Index,
+            actionType: ACTION_AIR_STRIKES,
+            legalHexes: strikeTargets,
+            homeland,
+            indexed,
+            latLngByH3,
+            isAirStrike: true,
+          });
+        }
       }
     }
 
@@ -669,8 +831,16 @@ export function collectAggregatedPossibleActionRows(args: {
       let rangedHexes = excludeUnitCurrentHex(
         unit.h3Index,
         tacticalBattle
-          ? collectTacticalLegalRangedTargetRes4Hexes(tacticalBattle, unit.id, tacticalRangedRows)
-          : collectRangedTargetHexes(unit.h3Index, unit.unitType, indexed)
+          ? rememberComputedHexList(
+              rangedDestByKey,
+              tacticalRangedDestCacheKey(tacticalBattle, unit.id),
+              () => collectTacticalLegalRangedTargetRes4Hexes(tacticalBattle, unit.id, tacticalRangedRows)
+            )
+          : rememberComputedHexList(
+              rangedDestByKey,
+              `${unit.h3Index}|${unit.unitType}`,
+              () => collectRangedTargetHexes(unit.h3Index, unit.unitType, indexed)
+            )
       );
       if (forThisTurn && tacticalBattle && tacticalBestOptionsInterest) {
         const before = rangedHexes.length;
@@ -702,12 +872,23 @@ export function collectAggregatedPossibleActionRows(args: {
     }
   }
 
+  logDebug('possibleUnitActions collectAggregatedPossibleActionRows destCache', {
+    opponentUnitCount: opponentUnits.length,
+    landNavalOriginKeys: tacticalBattle ? legalDestByKey.size : strategicLandNavalOrigins.size,
+    ferryOriginKeys: ferryDestByKey.size,
+    strikeOriginKeys: strikeHexByOrigin.size,
+    rangedOriginKeys: rangedDestByKey.size,
+    tactical: Boolean(tacticalBattle),
+  });
+
   if (forThisTurn && thisTurnFilterStats) {
     logDebug('possibleUnitActions collectAggregatedPossibleActionRows thisTurnOptionsFilterTotals', {
       groundMoveHexSlotsOffered: thisTurnFilterStats.moveIn,
       groundMoveHexSlotsKept: thisTurnFilterStats.moveOut,
       rangedHexSlotsOffered: thisTurnFilterStats.rangedIn,
       rangedHexSlotsKept: thisTurnFilterStats.rangedOut,
+      airStrikeHexSlotsOffered: thisTurnFilterStats.airStrikeIn,
+      airStrikeHexSlotsKept: thisTurnFilterStats.airStrikeOut,
       tactical: Boolean(tacticalBattle),
       elapsedMs: thisTurnStartedAt != null ? Math.round(performance.now() - thisTurnStartedAt) : undefined,
     });

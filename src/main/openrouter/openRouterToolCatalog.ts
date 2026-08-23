@@ -111,7 +111,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
       },
       required: ['unitId', 'destination'],
     },
-    promptLine: `plan_route(unitId, destination, options?) - Path and orderToHexCode. Skip this tool when the dest is already a Best Options This Turn Target Hex for that unit (copy that hex into explicit_move). Otherwise copy orderToHexCode into explicit_move.destination.${NAVAL_PLAN_ROUTE_PROMPT_SUFFIX}`,
+    promptLine: `plan_route(unitId, destination, options?) - Path and orderToHexCode. Skip this tool when the dest is already a Best Options This Turn Target Hex for that unit (copy approach/move/melee into explicit_move, ferry into ferryOrders). Otherwise copy orderToHexCode into explicit_move.destination.${NAVAL_PLAN_ROUTE_PROMPT_SUFFIX}`,
   },
   {
     name: 'check_distance',

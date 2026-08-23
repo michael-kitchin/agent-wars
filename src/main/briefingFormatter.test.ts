@@ -7,7 +7,7 @@ import * as assert from 'assert';
 import { gridDisk, latLngToCell } from 'h3-js';
 import type { GameStateSnapshot } from './gameDb';
 import type { PrecomputationResult, UnitAssessmentResult } from './precomputation';
-import { buildAttentionFlags, buildUnitStatusTable, formatBriefing } from './briefingFormatter';
+import { buildAttentionFlags, buildStrategicNarrative, buildUnitStatusTable, formatBriefing } from './briefingFormatter';
 import { getOrderedHexList } from './mapData';
 import { OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE } from './tools/assessUnitProximity';
 
@@ -321,6 +321,47 @@ function testUnitStatusAndAttentionIgnoreLowThreatsWhenStandingOrdersInactive():
 }
 
 /**
+ * A unit with a legal shot is never reported as needing nothing, whatever standing order it carries.
+ *
+ * Purpose: A captured turn showed a naval unit with a critical threat and a legal shot rendering `no (quiet)`,
+ * because a healthy march order was treated as covering it. That told the model to skip the unit, so the shot was
+ * only taken by the auto-fire fallback and the model never got to choose a better target. Auto-fire must not be able
+ * to hide a manual attack.
+ * When to use: After edits to `needsAction`, `isQuiet`, or how `canAttackThisTurn` is populated.
+ * Expected outcome: Action needed reads `yes` with no `(quiet)` suffix, and the unit appears in Attention Flags.
+ * Exceptions: None.
+ */
+function testUnitWithLegalShotIsNeverQuiet(): void {
+  const assessments: UnitAssessmentResult[] = [
+    {
+      unitId: 'opp-shooter',
+      result: {
+        status: 'ok',
+        unit: {
+          unitId: 'opp-shooter',
+          type: 'naval',
+          position: [3, 3],
+          currentStandingOrder: { orderType: 'march', status: 'in_progress' },
+        },
+        nearbyEnemies: [
+          { unitId: 'hum-1', hexDistance: 2, inRangedRange: true, inMeleeRange: false } as UnitAssessmentResult['result']['nearbyEnemies'][0],
+        ],
+        threats: [{ description: 'distant', severity: 'low', sourceUnit: 'hum-1' }],
+        canAttackThisTurn: [{ unitId: 'hum-1', attackType: 'ranged', reason: '' }],
+      } as unknown as UnitAssessmentResult['result'],
+    },
+  ];
+  const table = buildUnitStatusTable(assessments, { mode: 'strategic' as const }, true);
+  const row = table.split('\n').find((l) => l.includes('opp-shooter'));
+  assert.ok(row && row.includes('| yes |'), `unit with a legal shot must read yes: ${row}`);
+  assert.ok(row && !row.includes('quiet'), `unit with a legal shot must not be marked quiet: ${row}`);
+  assert.ok(
+    buildAttentionFlags(assessments, 'strategic', true).includes('opp-shooter'),
+    'a unit with a legal shot belongs in Attention Flags'
+  );
+}
+
+/**
  * Ensures Attention Flags severity-sort then cap at five bullets.
  *
  * Purpose: Regression for triage flooding when many units need attention.
@@ -363,6 +404,75 @@ function testAttentionFlagsSeveritySortAndCapFive(): void {
   assert.ok(!flags.includes('opp-mod-0'), 'moderate omitted when five criticals fill the cap');
   const critIdsListed = [0, 1, 2, 3, 4, 5].filter((i) => flags.includes(`opp-crit-${i}`));
   assert.equal(critIdsListed.length, 5, 'exactly five of six critical units appear');
+}
+
+/**
+ * Ensures the intro critical-threat sentence matches Action needed / Attention Flags when standing orders are healthy.
+ *
+ * Purpose: Turn 12 said 27 units "require immediate attention" while Action needed was no and Attention Flags were None.
+ * When to use: After edits to `buildStrategicNarrative` vs `needsAction`.
+ * Expected outcome: Healthy en_route marches with critical threats do not trigger the attention sentence; unordered critical units still do; SO-inactive still counts all critical threats.
+ * Exceptions: None.
+ */
+function testStrategicNarrativeCriticalSentenceMatchesNeedsAction(): void {
+  const healthyCritical: UnitAssessmentResult = {
+    unitId: 'opp-so-crit',
+    result: {
+      status: 'ok',
+      unit: {
+        unitId: 'opp-so-crit',
+        type: 'armor',
+        position: [1, 1],
+        currentStandingOrder: { type: 'march', destination: [2, 2], status: 'en_route' },
+      },
+      nearbyEnemies: [
+        { unitId: 'hum-1', hexDistance: 2, inRangedRange: false, inMeleeRange: false } as UnitAssessmentResult['result']['nearbyEnemies'][0],
+      ],
+      threats: [{ description: 'close', severity: 'critical', sourceUnit: 'hum-1' }],
+      canAttackThisTurn: [],
+    } as unknown as UnitAssessmentResult['result'],
+  };
+  const unorderedCritical: UnitAssessmentResult = {
+    unitId: 'opp-gap-crit',
+    result: {
+      status: 'ok',
+      unit: {
+        unitId: 'opp-gap-crit',
+        type: 'armor',
+        position: [3, 3],
+        currentStandingOrder: null,
+      },
+      nearbyEnemies: [
+        { unitId: 'hum-1', hexDistance: 2, inRangedRange: false, inMeleeRange: false } as UnitAssessmentResult['result']['nearbyEnemies'][0],
+      ],
+      threats: [{ description: 'close', severity: 'critical', sourceUnit: 'hum-1' }],
+      canAttackThisTurn: [],
+    } as unknown as UnitAssessmentResult['result'],
+  };
+  const state: GameStateSnapshot = {
+    ...fixtureState,
+    turnNumber: 12,
+    units: [
+      { id: 'opp-so-crit', player: 'opponent', unitType: 'armor', h3Index: fixtureOriginH3 },
+      { id: 'opp-gap-crit', player: 'opponent', unitType: 'armor', h3Index: fixtureOriginH3 },
+      { id: 'hum-1', player: 'human', unitType: 'infantry', h3Index: fixtureNeighborH3 },
+    ],
+  };
+  const healthyOnly = buildStrategicNarrative(state, [healthyCritical], true);
+  assert.ok(
+    !healthyOnly.includes('require immediate attention'),
+    `healthy standing orders must not demand immediate attention: ${healthyOnly}`
+  );
+  const withGap = buildStrategicNarrative(state, [healthyCritical, unorderedCritical], true);
+  assert.ok(
+    withGap.includes('1 unit(s) face a critical threat and require immediate attention'),
+    `unordered critical unit still needs the attention sentence: ${withGap}`
+  );
+  const soOff = buildStrategicNarrative(state, [healthyCritical], false);
+  assert.ok(
+    soOff.includes('1 unit(s) face a critical threat and require immediate attention'),
+    `standing-orders-off still reports all critical threats: ${soOff}`
+  );
 }
 
 /**
@@ -427,8 +537,16 @@ const tests = [
     fn: testUnitStatusAndAttentionIgnoreLowThreatsWhenStandingOrdersInactive,
   },
   {
+    name: 'unit with a legal shot is never quiet',
+    fn: testUnitWithLegalShotIsNeverQuiet,
+  },
+  {
     name: 'attention flags severity sort and cap five',
     fn: testAttentionFlagsSeveritySortAndCapFive,
+  },
+  {
+    name: 'strategic narrative critical sentence matches needsAction',
+    fn: testStrategicNarrativeCriticalSentenceMatchesNeedsAction,
   },
   {
     name: 'formatBriefing grid proximity honesty line',

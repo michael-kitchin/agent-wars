@@ -1,9 +1,9 @@
 /**
- * Tests for strategic Best Options This Turn occupancy and approach fallback.
+ * Tests for strategic Best Options This Turn occupancy, approach fallback, and this-turn air-strike filtering.
  *
- * Purpose: Locks that friendly-occupied uncontrolled cities are not move/melee interest, and that empty interest falls back to approach (including naval).
- * When to use: After edits to `possibleUnitActionsBestOptionsInterest.ts` or strategic this-turn approach wiring.
- * Expected outcome: Occupancy, empty-urban capture when no enemy, adjacent-enemy melee, contested melee, distant-enemy approach (including over empty cities), and naval approach contracts hold on real map hexes.
+ * Purpose: Locks that friendly-occupied uncontrolled cities are not move/melee interest, that empty interest falls back to approach (including naval), and that this-turn air strikes omit own/uncontrolled cities.
+ * When to use: After edits to `possibleUnitActionsBestOptionsInterest.ts` or strategic this-turn approach / air-strike wiring.
+ * Expected outcome: Occupancy, empty-urban capture when no enemy, adjacent-enemy melee, contested melee, distant-enemy approach (including over empty cities and when `gridDistance` throws), naval approach, and air-strike this-turn contracts hold on real map hexes.
  * Exceptions: Throws when the world map has no geodesic land-mass chain of the required length, or no geodesic water chain for the naval case.
  */
 
@@ -11,8 +11,13 @@ import * as assert from 'assert';
 import { cellToLatLng, gridDisk, gridDistance } from 'h3-js';
 import { canLandUnitTraverseEdge, landUnitCanOccupyHex } from '../../shared/landTraversalRes1';
 import type { GameStateSnapshot } from '../gameDb';
+import {
+  ensureStrategicCoordinateRegistryInitialized,
+  getH3IndexForCode,
+} from '../briefing/map/hex-coordinates';
 import { getOrderedHexList, LATLNG_DECIMAL_PLACES } from '../mapData';
 import { ensureTerrainClassificationCacheLoaded, getRes1LandMassByH3 } from '../terrainClassificationCache';
+import { AIR_FERRY_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { collectAggregatedPossibleActionRows } from './possibleUnitActions';
 import { formatLatLng } from './promptText';
 
@@ -364,6 +369,286 @@ function testStrategicBestOptionsNavalApproachWhenEnemyOutOfReach(): void {
 }
 
 /**
+ * Ensures Best Options this-turn air strikes match Air Operations: enemy units or human-controlled infra only.
+ *
+ * Purpose: Turn 12 listed air strikes on own cities while Strikeable Urban was 0; the tempo rule would bomb capture/home hexes.
+ * When to use: After edits to this-turn air-strike filtering in `collectAggregatedPossibleActionRows`.
+ * Expected outcome: Own and uncontrolled urban hexes omitted; human-controlled urban and enemy-occupied hexes kept; full (non-this-turn) rows still include own-city strikes; own airport remains a ferry dest labeled `ferry`.
+ * Exceptions: Throws when the world map cannot supply four distinct in-range neighbors of a base hex.
+ */
+function testStrategicBestOptionsAirStrikesOmitFriendlyAndUncontrolledInfra(): void {
+  const allHexes = getOrderedHexList();
+  const onMap = new Set(allHexes);
+  const base = allHexes[0]!;
+  const nearby = gridDisk(base, 1).filter((h) => h !== base && onMap.has(h));
+  if (nearby.length < 4) {
+    throw new Error('expected four distinct neighbors of the first map hex for the air-strike Best Options fixture');
+  }
+  const ownUrban = nearby[0]!;
+  const humanUrban = nearby[1]!;
+  const uncontrolledUrban = nearby[2]!;
+  const enemyHex = nearby[3]!;
+  const hexes = [base, ownUrban, humanUrban, uncontrolledUrban, enemyHex].map((h3Index) => ({
+    h3Index,
+    terrain: 'land' as const,
+    terrainKind: 'plains' as const,
+  }));
+  const state: GameStateSnapshot = {
+    turnNumber: 1,
+    phase: 'planning',
+    hexes,
+    units: [
+      { id: 'opponent-air-1', player: 'opponent', unitType: 'air', h3Index: base },
+      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: enemyHex },
+    ],
+    pendingOrders: [],
+    res1Infrastructure: [
+      { h3Index: base, urbanHexCount: 0, airportCount: 1, seaportCount: 0 },
+      { h3Index: ownUrban, urbanHexCount: 8, airportCount: 1, seaportCount: 0 },
+      { h3Index: humanUrban, urbanHexCount: 5, airportCount: 0, seaportCount: 0 },
+      { h3Index: uncontrolledUrban, urbanHexCount: 3, airportCount: 0, seaportCount: 0 },
+    ],
+    res1Control: [
+      { h3Index: base, controllerPlayerId: 'opponent' },
+      { h3Index: ownUrban, controllerPlayerId: 'opponent' },
+      { h3Index: humanUrban, controllerPlayerId: 'human' },
+    ],
+  };
+  const thisTurn = collectStrategicThisTurnRows(state);
+  const thisTurnStrikes = thisTurn.filter(
+    (r) => r.unitId === 'opponent-air-1' && r.actionTypes.includes('air strike')
+  );
+  assert.ok(
+    !thisTurnStrikes.some((r) => r.targetH3 === ownUrban),
+    'Best Options must not list an air strike on a friendly-controlled city'
+  );
+  assert.ok(
+    !thisTurnStrikes.some((r) => r.targetH3 === uncontrolledUrban),
+    'Best Options must not list an air strike on uncontrolled urban (capture, not bomb)'
+  );
+  assert.ok(
+    thisTurnStrikes.some((r) => r.targetH3 === humanUrban),
+    'Best Options must list an air strike on human-controlled urban'
+  );
+  assert.ok(
+    thisTurnStrikes.some((r) => r.targetH3 === enemyHex),
+    'Best Options must list an air strike on an enemy-occupied hex'
+  );
+  assert.ok(
+    thisTurn.some(
+      (r) => r.unitId === 'opponent-air-1' && r.targetH3 === ownUrban && r.actionTypes.includes('ferry')
+    ),
+    'own airport remains a ferry destination, labeled ferry not move/melee'
+  );
+  assert.ok(
+    !thisTurn.some(
+      (r) => r.unitId === 'opponent-air-1' && r.targetH3 === ownUrban && r.actionTypes.includes('move/melee')
+    ),
+    'air ferry dests must not be labeled move/melee in Best Options'
+  );
+
+  const latLngByH3 = new Map<string, [number, number]>();
+  for (const h of state.hexes) {
+    latLngByH3.set(h.h3Index, cellToLatLng(h.h3Index) as [number, number]);
+  }
+  const fullRows = collectAggregatedPossibleActionRows({
+    state,
+    latLngByH3,
+    formatLatLng: (ll) => formatLatLng(ll, LATLNG_DECIMAL_PLACES),
+  });
+  assert.ok(
+    fullRows.some(
+      (r) => r.unitId === 'opponent-air-1' && r.targetH3 === ownUrban && r.actionTypes.includes('air strike')
+    ),
+    'legal-target collector still includes own-city strikes outside the this-turn table'
+  );
+}
+
+/**
+ * Smallest k-ring radius containing `to`, used only to score the KE/EY approach fixture.
+ *
+ * Purpose: `gridDistance` / `gridPathCells` both fail for that pair; k-ring membership is the remaining H3 distance.
+ * When to use: Fixture construction and approach assertions in this file.
+ * Expected outcome: Positive integer when `to` is in `gridDisk(from, r)` for some `r` ≤ 64; null otherwise.
+ * Exceptions: None; disk enumeration failures return null.
+ */
+function kRingDistanceForFixture(from: string, to: string): number | null {
+  if (from === to) return 0;
+  try {
+    for (let r = 1; r <= 64; r++) {
+      if (gridDisk(from, r).includes(to)) return r;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+/**
+ * Builds the KE/EY pentagon-edge fixture used when H3 cannot measure origin-to-enemy grid distance.
+ *
+ * Purpose: Armor at KE listed empty-city `move/melee` while humans sat at EY; `gridDistance` and `gridPathCells` both fail for that pair even though k-ring distance is 5.
+ * When to use: `testStrategicBestOptionsApproachWhenGridDistanceThrows`.
+ * Expected outcome: Origin KE, enemy EY, a this-turn dest that strictly reduces disk distance, and an empty-urban dest that does not.
+ * Exceptions: Throws if briefing codes KE/EY are missing or no closing land dest exists.
+ */
+function pentagonEdgeApproachFixture(): {
+  origin: string;
+  enemy: string;
+  closerDest: string;
+  emptyUrban: string;
+  hexes: string[];
+  originDist: number;
+} {
+  ensureStrategicCoordinateRegistryInitialized();
+  ensureTerrainClassificationCacheLoaded();
+  const ctx = { mode: 'strategic' as const };
+  const origin = getH3IndexForCode('KE', ctx);
+  const enemy = getH3IndexForCode('EY', ctx);
+  if (!origin || !enemy) {
+    throw new Error('expected briefing codes KE and EY in the strategic registry');
+  }
+  const originDist = kRingDistanceForFixture(origin, enemy);
+  if (originDist === null) {
+    throw new Error('expected disk-fallback distance from KE to EY');
+  }
+  const land = getRes1LandMassByH3();
+  const onMap = new Set(getOrderedHexList());
+  const landDests = gridDisk(origin, 1).filter(
+    (h) => h !== origin && onMap.has(h) && landUnitCanOccupyHex(h, land) && canLandUnitTraverseEdge(origin, h, land)
+  );
+  const closerDest = landDests.find((h) => {
+    const next = kRingDistanceForFixture(h, enemy);
+    return next !== null && next < originDist;
+  });
+  const emptyUrban = landDests.find((h) => {
+    const next = kRingDistanceForFixture(h, enemy);
+    return next === null || next >= originDist;
+  });
+  if (!closerDest || !emptyUrban) {
+    throw new Error('expected both a closing land dest and a non-closing dest from KE');
+  }
+  return {
+    origin,
+    enemy,
+    closerDest,
+    emptyUrban,
+    hexes: [...new Set([origin, enemy, ...landDests])],
+    originDist,
+  };
+}
+
+/**
+ * Ensures approach still closes when H3 cannot measure origin-to-enemy grid distance.
+ *
+ * Purpose: Best Options used raw `gridDistance`, so KE/EY made nearest-enemy distance Infinity and empty cities replaced approach.
+ * When to use: After changing `filterApproachMoveHexesForThisTurnOptionsTable` distance handling.
+ * Expected outcome: Approach rows toward EY; empty uncontrolled urban on a non-closing dest is not `move/melee`.
+ * Exceptions: Throws when KE/EY are missing from the registry.
+ */
+function testStrategicBestOptionsApproachWhenGridDistanceThrows(): void {
+  const { origin, enemy, closerDest, emptyUrban, hexes, originDist } = pentagonEdgeApproachFixture();
+  assert.throws(() => gridDistance(origin, enemy), 'KE to EY must be unmeasurable via gridDistance');
+  const state: GameStateSnapshot = {
+    turnNumber: 1,
+    phase: 'planning',
+    hexes: hexes.map((h3Index) => ({ h3Index, terrain: 'land' as const, terrainKind: 'plains' as const })),
+    units: [
+      { id: 'opponent-inf-mover', player: 'opponent', unitType: 'infantry', h3Index: origin },
+      { id: 'human-inf-far', player: 'human', unitType: 'infantry', h3Index: enemy },
+    ],
+    pendingOrders: [],
+    res1Infrastructure: [{ h3Index: emptyUrban, urbanHexCount: 2, airportCount: 0, seaportCount: 0 }],
+    res1Control: [],
+  };
+  const rows = collectStrategicThisTurnRows(state).filter((r) => r.unitId === 'opponent-inf-mover');
+  assert.ok(
+    !rows.some((r) => r.targetH3 === emptyUrban && r.actionTypes.includes('move/melee')),
+    'empty urban must not replace approach when a dest still closes on the observed enemy'
+  );
+  const approaches = rows.filter((r) => r.actionTypes.includes('approach'));
+  assert.ok(approaches.length >= 1, 'expected approach rows when k-ring distance can still close');
+  assert.ok(
+    approaches.some((r) => r.targetH3 === closerDest),
+    'approach must include a dest that strictly reduces k-ring distance to the enemy'
+  );
+  assert.ok(
+    approaches.every((r) => {
+      const next = kRingDistanceForFixture(r.targetH3, enemy);
+      return next !== null && next < originDist;
+    }),
+    'every approach dest must strictly reduce k-ring distance'
+  );
+}
+
+/**
+ * Finds two map hexes inside ferry range whose H3 `gridDistance` throws (icosahedron face crossing).
+ *
+ * Purpose: Best Options used to drop legal ferry dests when distance ranking threw, which hid whole air bases from the table.
+ * When to use: `testStrategicBestOptionsKeepsFerryDestWhenGridDistanceThrows`.
+ * Expected outcome: `dest` is in `gridDisk(origin, AIR_FERRY_RANGE_HEXES)` and `gridDistance(origin, dest)` throws.
+ * Exceptions: Throws if the world map has no such pair.
+ */
+function findUnmeasurableFerryDiskPair(): { origin: string; dest: string } {
+  const onMap = new Set(getOrderedHexList());
+  for (const origin of onMap) {
+    let disk: string[];
+    try {
+      disk = gridDisk(origin, AIR_FERRY_RANGE_HEXES);
+    } catch {
+      continue;
+    }
+    for (const dest of disk) {
+      if (dest === origin || !onMap.has(dest)) continue;
+      try {
+        gridDistance(origin, dest);
+      } catch {
+        return { origin, dest };
+      }
+    }
+  }
+  throw new Error('expected a ferry-range map pair where gridDistance throws');
+}
+
+/**
+ * Ensures a legal ferry destination still appears in Best Options when H3 cannot measure grid distance.
+ *
+ * Purpose: Turn 12 Air Operations listed ferry dests for bases FI/FM/F4, but Best Options omitted those air units because `gridDistance` threw and row assembly skipped the dest.
+ * When to use: After edits to `appendRowsForLegalHexes` distance handling.
+ * Expected outcome: This-turn rows include a `ferry` action from origin to dest even though `gridDistance` throws for that pair.
+ * Exceptions: Throws when the world map has no unmeasurable in-disk pair.
+ */
+function testStrategicBestOptionsKeepsFerryDestWhenGridDistanceThrows(): void {
+  const { origin, dest } = findUnmeasurableFerryDiskPair();
+  assert.throws(() => gridDistance(origin, dest), 'fixture pair must be unmeasurable via gridDistance');
+  const state: GameStateSnapshot = {
+    turnNumber: 1,
+    phase: 'planning',
+    hexes: [
+      { h3Index: origin, terrain: 'land', terrainKind: 'plains' },
+      { h3Index: dest, terrain: 'land', terrainKind: 'plains' },
+    ],
+    units: [{ id: 'opponent-air-1', player: 'opponent', unitType: 'air', h3Index: origin }],
+    pendingOrders: [],
+    res1Infrastructure: [
+      { h3Index: origin, urbanHexCount: 0, airportCount: 1, seaportCount: 0 },
+      { h3Index: dest, urbanHexCount: 4, airportCount: 1, seaportCount: 0 },
+    ],
+    res1Control: [
+      { h3Index: origin, controllerPlayerId: 'opponent' },
+      { h3Index: dest, controllerPlayerId: 'opponent' },
+    ],
+  };
+  const thisTurn = collectStrategicThisTurnRows(state);
+  assert.ok(
+    thisTurn.some(
+      (r) => r.unitId === 'opponent-air-1' && r.targetH3 === dest && r.actionTypes.includes('ferry')
+    ),
+    'Best Options must list the legal ferry dest even when gridDistance throws'
+  );
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
  *
  * Purpose: Runs the strategic Best Options occupancy and approach contracts.
@@ -395,6 +680,18 @@ const tests = [
   {
     name: 'collectAggregatedPossibleActionRows strategic Best Options naval approach when enemy out of reach',
     fn: testStrategicBestOptionsNavalApproachWhenEnemyOutOfReach,
+  },
+  {
+    name: 'collectAggregatedPossibleActionRows strategic Best Options air strikes omit friendly and uncontrolled infra',
+    fn: testStrategicBestOptionsAirStrikesOmitFriendlyAndUncontrolledInfra,
+  },
+  {
+    name: 'collectAggregatedPossibleActionRows strategic Best Options keeps ferry dest when gridDistance throws',
+    fn: testStrategicBestOptionsKeepsFerryDestWhenGridDistanceThrows,
+  },
+  {
+    name: 'collectAggregatedPossibleActionRows strategic Best Options approaches when gridDistance throws',
+    fn: testStrategicBestOptionsApproachWhenGridDistanceThrows,
   },
 ];
 

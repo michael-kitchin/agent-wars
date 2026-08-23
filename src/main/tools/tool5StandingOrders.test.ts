@@ -8,8 +8,10 @@ import * as assert from 'assert';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { cellToLatLng, gridDisk, latLngToCell } from 'h3-js';
+import { cellToLatLng, gridDisk, gridDistance, latLngToCell } from 'h3-js';
+import { AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { getOrderedHexList } from '../mapData';
+import { safeGridHexDistance } from './assessUnitProximity';
 import { executeTool5, getInjectionText } from './tool5StandingOrders';
 import {
   dbGetOne,
@@ -610,6 +612,130 @@ function testDefendAutoEngagementAirUnitUsesAirStrikeNotRanged(): void {
 }
 
 /**
+ * Verifies DEFEND air auto-engagement still fires when H3 cannot measure the attacker/target pair.
+ *
+ * Purpose: The range gate uses a `gridDisk` fallback, but the nearest-target comparison used raw `gridDistance`;
+ * across an icosahedron face crossing it threw and silently discarded a strike the gate had just approved.
+ * When to use: After changes to `appendDefendStandingOrderEngagement` or the shared distance fallback.
+ * Expected outcome: Exactly one air strike, aimed at the unmeasurable hex.
+ * Exceptions: Skips when the seed lacks a human air unit with a throwing hex inside strike range.
+ */
+function testDefendAutoEngagementAirStrikeSurvivesUnmeasurablePair(): void {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-tool5-air-crossing-'));
+  const dbPath = path.join(tempDir, 't.sqlite');
+  try {
+    openGameDatabaseAtPathForTests(dbPath);
+    resetGameForNewMatch();
+    const state = getGameState();
+    const airUnit = state.units.find((u) => u.player === 'human' && u.unitType === 'air');
+    if (!airUnit) {
+      console.log('testDefendAutoEngagementAirStrikeSurvivesUnmeasurablePair: skip — no human air unit in seed');
+      return;
+    }
+    const hexByH3 = new Map(state.hexes.map((h) => [h.h3Index, h]));
+    const unmeasurableTarget = gridDisk(airUnit.h3Index, AIR_STRIKE_RANGE_HEXES).find((h3) => {
+      if (h3 === airUnit.h3Index || !hexByH3.has(h3)) return false;
+      try {
+        gridDistance(airUnit.h3Index, h3);
+        return false;
+      } catch {
+        return true;
+      }
+    });
+    if (!unmeasurableTarget) {
+      console.log('testDefendAutoEngagementAirStrikeSurvivesUnmeasurablePair: skip — no face crossing in strike range');
+      return;
+    }
+    const enemyType = hexByH3.get(unmeasurableTarget)!.terrain === 'water' ? 'naval' : 'infantry';
+    dbRun(
+      `INSERT INTO units (id, player, unit_type, h3_index, display_order) VALUES (?, 'opponent', ?, ?, 99)`,
+      ['opponent-air-crossing-target', enemyType, unmeasurableTarget]
+    );
+    const [defLat, defLng] = cellToLatLng(airUnit.h3Index);
+    const latLngByH3 = new Map(state.hexes.map((h) => [h.h3Index, cellToLatLng(h.h3Index) as [number, number]]));
+    const resolveToH3 = (a: number, b: number): string | undefined => {
+      try { return latLngToCell(a, b, 1); } catch { return undefined; }
+    };
+    dbRun(
+      `INSERT OR REPLACE INTO standing_orders (player_id, unit_id, order_type, params, computed_route, status, created_turn, origin_hex)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ['human', airUnit.id, 'defend', JSON.stringify({ type: 'defend', defendHex: [defLat, defLng] }), null, 'en_route', state.turnNumber, JSON.stringify(cellToLatLng(airUnit.h3Index))]
+    );
+    const generated = generateOrdersForStandingOrders('human', getGameState(), latLngByH3, resolveToH3);
+    assert.strictEqual(generated.airStrikes.length, 1, 'unmeasurable pair must not forfeit the strike');
+    assert.strictEqual(generated.airStrikes[0]!.targetH3Index, unmeasurableTarget);
+  } finally {
+    closeGameDatabaseForTests();
+  }
+}
+
+/**
+ * Verifies engage-en-route fires at the marching unit's own weapon range, not only at adjacency.
+ *
+ * Purpose: The march branch tested for distance exactly 1 while its pursue and defend siblings both compare against
+ * `getRange`, so a naval unit (range 2) marched past a legal shot without taking it.
+ * When to use: After edits to the `march` branch of `generateOrdersForStandingOrders`.
+ * Expected outcome: A naval unit marching with `engageEnRoute` fires on an enemy two hexes away.
+ * Exceptions: Skips when the seeded map lacks a naval unit with a reachable non-adjacent target hex.
+ */
+function testMarchEngageEnRouteUsesWeaponRange(): void {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-tool5-enroute-'));
+  const dbPath = path.join(tempDir, 't.sqlite');
+  try {
+    openGameDatabaseAtPathForTests(dbPath);
+    resetGameForNewMatch();
+    const state = getGameState();
+    const navalUnit = state.units.find((u) => u.player === 'human' && u.unitType === 'naval');
+    if (!navalUnit) {
+      console.log('testMarchEngageEnRouteUsesWeaponRange: skip — no human naval unit in seed');
+      return;
+    }
+    const hexByH3 = new Map(state.hexes.map((h) => [h.h3Index, h]));
+    const occupied = new Set(state.units.map((u) => u.h3Index));
+    // Exactly two hexes away: inside naval range 2, outside the old adjacency-only test.
+    const targetH3 = gridDisk(navalUnit.h3Index, 2).find(
+      (h3) => hexByH3.has(h3) && !occupied.has(h3) && safeGridHexDistance(navalUnit.h3Index, h3) === 2
+    );
+    const marchDest = state.hexes.find(
+      (h) => h.terrain === 'water' && h.h3Index !== navalUnit.h3Index && h.h3Index !== targetH3
+    );
+    if (!targetH3 || !marchDest) {
+      console.log('testMarchEngageEnRouteUsesWeaponRange: skip — seed lacks a range-2 target or march destination');
+      return;
+    }
+    dbRun(
+      `INSERT INTO units (id, player, unit_type, h3_index, display_order) VALUES (?, 'opponent', 'naval', ?, 98)`,
+      ['opponent-enroute-target', targetH3]
+    );
+    const latLngByH3 = new Map(state.hexes.map((h) => [h.h3Index, cellToLatLng(h.h3Index) as [number, number]]));
+    const resolveToH3 = (a: number, b: number): string | undefined => {
+      try { return latLngToCell(a, b, 1); } catch { return undefined; }
+    };
+    const [destLat, destLng] = cellToLatLng(marchDest.h3Index);
+    dbRun(
+      `INSERT OR REPLACE INTO standing_orders (player_id, unit_id, order_type, params, computed_route, status, created_turn, origin_hex)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        'human',
+        navalUnit.id,
+        'march',
+        JSON.stringify({ type: 'march', destination: [destLat, destLng], avoidEnemies: false, engageEnRoute: true }),
+        null,
+        'en_route',
+        state.turnNumber,
+        JSON.stringify(cellToLatLng(navalUnit.h3Index)),
+      ]
+    );
+    const generated = generateOrdersForStandingOrders('human', getGameState(), latLngByH3, resolveToH3);
+    const shot = generated.rangedAttacks.find((r) => r.unitId === navalUnit.id);
+    assert.ok(shot, 'naval march with engageEnRoute must fire at a target two hexes away');
+    assert.strictEqual(shot!.targetH3Index, targetH3);
+  } finally {
+    closeGameDatabaseForTests();
+  }
+}
+
+/**
  * Verifies a DEFEND order pointing away from an air unit's hex never turns into a march.
  *
  * Purpose: Regression for the air branch of defend handling; air units reposition by ferry only, and routing
@@ -705,6 +831,8 @@ function run(): void {
   testGenerateRemovesArrivedMarchOrder();
   testDefendAutoEngagementClosestInRangeEnemy();
   testDefendAutoEngagementAirUnitUsesAirStrikeNotRanged();
+  testDefendAutoEngagementAirStrikeSurvivesUnmeasurablePair();
+  testMarchEngageEnRouteUsesWeaponRange();
   testAirDefendDoesNotProduceMovementOrder();
   testHumanMarchDefaultsAvoidEnemiesFalse();
   console.log('tool5StandingOrders tests passed');

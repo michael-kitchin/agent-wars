@@ -151,9 +151,39 @@ function testSetBuildQueueAllowsCappedTypeWhenNoAlternative(): void {
   });
 }
 
+/**
+ * Ensures pre-queue remains allowed on a mixed-type hex when every available type is at cap.
+ *
+ * Purpose: Infantry and armor both at cap on a city that can build both is still a no-alternative case; spawn stays blocked until a unit dies.
+ * When to use: After edits to Tool 6 cap rejection.
+ * Expected outcome: `set_build_queue` armor succeeds when infantry is also at cap.
+ * Exceptions: None.
+ */
+function testSetBuildQueueAllowsCappedTypeWhenAllAvailableAreMaxed(): void {
+  withTempGameDb('aw-tool6-cap-all-', () => {
+    const h3Index = findOrProvisionOpponentBuildableHex(2);
+    const queue = getHexBuildQueue(h3Index, 'opponent');
+    assert.ok(queue.availableUnitTypes.includes('armor'));
+    assert.ok(queue.availableUnitTypes.includes('infantry'));
+    const state = withOpponentTypeAtCap(withOpponentTypeAtCap(getGameState(), 'armor'), 'infantry');
+    const { latLngByH3, resolveToH3 } = buildCoordHelpers(state);
+    const hex = latLngByH3.get(h3Index);
+    assert.ok(hex);
+    const result = executeTool6(
+      'set_build_queue',
+      { hex, unitType: 'armor', count: 1 },
+      state,
+      latLngByH3,
+      resolveToH3
+    );
+    assert.equal(result.status, 'ok');
+  });
+}
+
 function run(): void {
   testSetBuildQueueRejectsCappedTypeWhenAlternativeExists();
   testSetBuildQueueAllowsCappedTypeWhenNoAlternative();
+  testSetBuildQueueAllowsCappedTypeWhenAllAvailableAreMaxed();
   console.log('tool6Production.test.ts passed');
 }
 

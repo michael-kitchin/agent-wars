@@ -8,6 +8,7 @@
  */
 
 import { getResolution, gridDisk, gridDistance, isValidCell } from 'h3-js';
+import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
 import { getRange } from '../combatConstants';
 import { logDebug, logError, logTrace } from '../logger';
 import { getMovementBudgetForUnit } from '../pathfinding';
@@ -147,6 +148,19 @@ export function gridHopDistancesFrom(origin: string, targets: readonly string[])
     }
   }
   return dist;
+}
+
+/**
+ * H3 hop distance for one pair, covering pairs that `gridDistance` and `gridPathCells` both refuse to measure.
+ *
+ * Purpose: Best Options approach and the fog-on assess_unit radius scan must still measure pentagon-crossing pairs; dropping them hid legal moves and in-range enemies while the units were only a few hops apart.
+ * When to use: Single-pair distances where skipping the pair would hide an action; prefer `gridHopDistancesFrom` when scoring many targets from one origin.
+ * Expected outcome: Non-negative hop count matching `gridDistance` when that succeeds; otherwise the shared depth-capped BFS result, or null when no path can be derived.
+ * Exceptions: Never throws; this is a logging wrapper over `computeGridDistanceWithPathFallbackPure` so the shared and main layers cannot drift.
+ */
+export function gridHopDistanceBetween(origin: string, target: string): number | null {
+  logTrace('assessUnitProximity gridHopDistanceBetween', { origin, target });
+  return computeGridDistanceWithPathFallbackPure(origin, target);
 }
 
 /**

@@ -5,8 +5,8 @@
  * tool results use briefing hex codes after `encodeOpenRouterToolResultForLlm`.
  */
 
-import { gridDistance } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
+import { gridHopDistanceBetween } from './assessUnitProximity';
 import { getAttack, getDefense, getRange } from '../combatConstants';
 import { type CombatUnit } from '../combatResolution';
 import { logDebug, logError, logTrace } from '../logger';
@@ -166,20 +166,17 @@ export function executeEstimateCombat(
       const inRange: CombatUnit[] = [];
       const excluded: string[] = [];
       for (const u of attackerCombat) {
-        try {
-          const dist = gridDistance(u.h3Index, targetHexH3);
-          if (getRange(u.unitType) >= dist) inRange.push(u);
-          else excluded.push(u.id);
-        } catch {
-          excluded.push(u.id);
-        }
+        const dist = gridHopDistanceBetween(u.h3Index, targetHexH3);
+        if (dist !== null && getRange(u.unitType) >= dist) inRange.push(u);
+        else excluded.push(u.id);
       }
       if (inRange.length === 0 && attackerCombat.length > 0) {
         const u = attackerCombat[0]!;
-        const dist = (() => { try { return gridDistance(u.h3Index, targetHexH3); } catch { return 999; } })();
+        const dist = gridHopDistanceBetween(u.h3Index, targetHexH3);
+        const reach = dist === null ? 'an unmeasurable distance' : `distance ${dist}`;
         return {
           status: 'error',
-          error: `Attacker ${u.id} (range ${getRange(u.unitType)}) cannot reach target hex at distance ${dist}`,
+          error: `Attacker ${u.id} (range ${getRange(u.unitType)}) cannot reach target hex at ${reach}`,
         };
       }
       if (excluded.length > 0) warnings.push(`Excluded out-of-range attackers: ${excluded.join(', ')}`);

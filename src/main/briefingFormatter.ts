@@ -154,7 +154,7 @@ function sanitizeCallbackParamsForPrompt(params: unknown, ctx: CoordinateContext
  *
  * Purpose: Short turn-opening sentences for the Commander briefing (contact, optional standing-order gaps, critical threats).
  * When to use: Strategic `formatBriefing` after assessments are ready.
- * Expected outcome: Up to five sentences; omits standing-order coaching when Orders tools are disabled.
+ * Expected outcome: Up to five sentences; omits standing-order coaching when Orders tools are disabled; the critical-threat sentence counts only units that also need Action when standing orders are active.
  * Exceptions: None.
  */
 export function buildStrategicNarrative(
@@ -173,9 +173,11 @@ export function buildStrategicNarrative(
   const noOrder = standingOrdersActive
     ? unitAssessments.filter((a) => a.result.unit?.currentStandingOrder == null).length
     : 0;
-  const critical = unitAssessments.filter((a) =>
-    (a.result.threats ?? []).some((t) => t.severity === 'critical')
-  ).length;
+  const critical = unitAssessments.filter((a) => {
+    const isCritical = (a.result.threats ?? []).some((t) => t.severity === 'critical');
+    if (!isCritical) return false;
+    return standingOrdersActive ? needsAction(a, true) : true;
+  }).length;
   const observedEnemySentence =
     humanUnits.length > 0
       ? `Turn ${state.turnNumber}: you command ${aiUnits.length} unit(s); currently observed human units: ${humanUnits.length}.`
@@ -229,14 +231,35 @@ function maxThreatSeverity(
 }
 
 /**
+ * True when the assessment lists at least one attack the unit could legally make this turn.
+ *
+ * Purpose: Distinguishes "covered by a standing order" from "has nothing to do". Those are not the same, and
+ * conflating them is what let a unit with a critical threat and a legal shot render as `no (quiet)`.
+ * When to use: The `Action needed` and Attention Flags decisions, in both coordinate modes.
+ * Expected outcome: True for any `canAttackThisTurn` row whose `attackType` is not `none`; false when the list is
+ * absent or holds only out-of-range rows.
+ * Exceptions: None; unrecognised row shapes count as no attack.
+ */
+function hasLegalAttackThisTurn(assessment: UnitAssessmentResult): boolean {
+  const rows = (assessment.result.canAttackThisTurn ?? []) as Array<{ attackType?: unknown }>;
+  return rows.some((r) => typeof r.attackType === 'string' && r.attackType !== 'none');
+}
+
+/**
  * Marks units that deserve Attention Flags / Action needed = yes.
  *
- * Purpose: Triage Unit Status and Attention Flags without flooding on distant low threats.
+ * Purpose: Triage Unit Status and Attention Flags without flooding on distant low threats, while never letting a
+ * standing order hide a shot the model should be choosing itself.
  * When to use: Unit Status rows and Attention Flags assembly.
- * Expected outcome: When standing orders are inactive, only moderate/critical threats; when active, also missing/warning standing orders (threat gaps use moderate/critical only).
+ * Expected outcome: Always true when the unit has a legal attack. Otherwise: when standing orders are inactive,
+ * moderate/critical threats only; when active, also missing/warning standing orders.
  * Exceptions: None.
  */
 function needsAction(assessment: UnitAssessmentResult, standingOrdersActive: boolean): boolean {
+  // A shot the model could take is always worth surfacing. Auto-fire is a backstop for a turn the model skips,
+  // never a reason to tell it a unit needs nothing, or it loses the chance to pick a better target than the
+  // nearest one.
+  if (hasLegalAttackThisTurn(assessment)) return true;
   const actionable = hasActionableThreat(assessment);
   if (!standingOrdersActive) return actionable;
   const order = assessment.result.unit?.currentStandingOrder as { status?: string } | null | undefined;
@@ -250,11 +273,13 @@ function needsAction(assessment: UnitAssessmentResult, standingOrdersActive: boo
  *
  * Purpose: Softens Action needed for units with a healthy standing order and only low threats.
  * When to use: Strategic Unit Status rows when Orders tools are enabled.
- * Expected outcome: false when standing orders are inactive or threats are non-low / order missing/warning.
+ * Expected outcome: false when standing orders are inactive, the unit has a legal attack, or threats are non-low /
+ * order missing/warning.
  * Exceptions: None.
  */
 function isQuiet(assessment: UnitAssessmentResult, standingOrdersActive: boolean): boolean {
   if (!standingOrdersActive) return false;
+  if (hasLegalAttackThisTurn(assessment)) return false;
   const order = assessment.result.unit?.currentStandingOrder as { status?: string } | null | undefined;
   const threats = assessment.result.threats ?? [];
   const hasNonLow = threats.some((t) => t.severity !== 'low');
@@ -354,6 +379,8 @@ export function buildAttentionFlags(
    */
   standingOrdersActive = true
 ): string {
+  // Ranks 0-3 are threat severities; rank 4 is reserved for available-attack bullets, which must never displace
+  // a threat from the five-bullet cap.
   const severityRank = (sev: 'critical' | 'moderate' | 'low' | null): number => {
     if (sev === 'critical') return 0;
     if (sev === 'moderate') return 1;
@@ -367,6 +394,14 @@ export function buildAttentionFlags(
     if (!needsAction(a, soActive)) continue;
     const threats = a.result.threats ?? [];
     const nearest = a.result.nearbyEnemies?.[0];
+    if (hasLegalAttackThisTurn(a)) {
+      // Ranked below every threat bullet so it can only take a slot no threat wanted, but present in both
+      // coordinate modes: a shot that goes unmentioned is a shot the model will not choose a target for.
+      candidates.push({
+        rank: 4,
+        text: `${formatUnitDisplayRef(a.unitId)} has a legal attack this turn — order the ranged_attack or air strike and pick the target.`,
+      });
+    }
     if (!soActive) {
       const sev = maxThreatSeverity(threats);
       if ((sev === 'critical' || sev === 'moderate') && nearest) {

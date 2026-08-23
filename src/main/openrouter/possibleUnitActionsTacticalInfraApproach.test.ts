@@ -1,15 +1,17 @@
 /**
- * Tactical Best Options contracts for empty-city vs approach when the enclosing res1 is uncontrolled.
+ * Tactical Best Options contracts for empty-city vs approach when the enclosing res1 is uncontrolled,
+ * and for this-turn air strikes / ferry (footprint-wide human targets, no ferry rows).
  *
- * Purpose: Empty urban tiles in an uncontrolled battle must not crowd out closing with observed humans, and must not appear as blank ranged shots.
- * When to use: After edits to tactical this-turn interest, approach, or ranged Best Options filters.
- * Expected outcome: Far enemies yield approach (not empty-city move/ranged); city capture remains when no enemy is observed.
+ * Purpose: Empty urban tiles in an uncontrolled battle must not crowd out closing with observed humans, and must not appear as blank ranged shots. Tactical air Best Options must match Air Operations (strike anywhere in the battle at human-occupied cells) and omit ferry dests.
+ * When to use: After edits to tactical this-turn interest, approach, ranged, or air Best Options filters.
+ * Expected outcome: Far enemies yield approach (not empty-city move/ranged); city capture remains when no enemy is observed; air strikes list far humans and omit empty urban and ferry.
  * Exceptions: Throws when the fixture cannot place an adjacent urban neighbor and a human six steps away under the same parent.
  */
 
 import * as assert from 'assert';
 import { cellToLatLng, cellToParent, gridDisk, gridDistance } from 'h3-js';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { LATLNG_DECIMAL_PLACES } from '../mapData';
 import { buildTacticalAiPlanState } from '../tacticalBattle/buildTacticalAiPlanState';
 import { tacticalRes1Cell, tacticalRes4UnderRes1Corner } from '../tacticalBattle/testSupport/tacticalRes4HexFixtures';
@@ -172,9 +174,154 @@ function testTacticalBestOptionsKeepsEmptyUncontrolledUrbanWhenNoEnemy(): void {
 }
 
 /**
+ * Builds a tactical air Best Options fixture on a real enclosing-res1 airport snapshot (plan-state shape).
+ *
+ * Purpose: Production plan state keeps `res1Infrastructure` keyed by the enclosing res1 hex, not the air unit's res4 cell. Airport eligibility follows the parent of the air unit's cell (same as strike validation).
+ * When to use: This-turn air-strike range, airport-gate, empty-urban omit, and ferry-omit contracts in this file.
+ * Expected outcome: Opponent air at the corner cell; optional far human beyond strategic strike range; optional empty urban neighbor; parent-res1 airport intact unless `airportCount` is 0.
+ * Exceptions: Throws when the requested neighbors cannot be placed under the same parent.
+ */
+function tacticalAirBestOptionsBattle(args: {
+  includeFarHuman: boolean;
+  includeEmptyUrban: boolean;
+  airportCount: number;
+}): {
+  tactical: TacticalBattleSnapshot;
+  plan: GameStateSnapshot;
+  res4Air: string;
+  res4FarHuman: string | null;
+  res4EmptyUrban: string | null;
+} {
+  const res1 = tacticalRes1Cell(12, 34);
+  const res4Air = tacticalRes4UnderRes1Corner(12, 34);
+  const sameParent = [...gridDisk(res4Air, 8)].filter((h) => cellToParent(h, 1) === res1);
+  const res4EmptyUrban = sameParent.find((h) => h !== res4Air && gridDistance(res4Air, h) === 1);
+  const farDist = AIR_STRIKE_RANGE_HEXES + 3;
+  const res4FarHuman = sameParent.find(
+    (h) => h !== res4Air && h !== res4EmptyUrban && gridDistance(res4Air, h) === farDist
+  );
+  if (args.includeEmptyUrban && !res4EmptyUrban) {
+    throw new Error('expected an adjacent urban neighbor under the same res1 parent');
+  }
+  if (args.includeFarHuman && !res4FarHuman) {
+    throw new Error(`expected a human ${farDist} steps away under the same res1 parent`);
+  }
+  const far = args.includeFarHuman ? res4FarHuman! : res4Air;
+  const footprint = sameParent.filter((h) => {
+    try {
+      return gridDistance(res4Air, h) <= farDist || gridDistance(far, h) <= farDist;
+    } catch {
+      return false;
+    }
+  });
+  const terrain: Record<string, string> = {};
+  for (const h of footprint) terrain[h] = 'plains';
+  const subUnits: TacticalBattleSnapshot['subUnits'] = [
+    {
+      id: 'opp-air-strike',
+      parentUnitId: 'parent-air',
+      player: 'opponent',
+      unitType: 'air',
+      h3Index: res4Air,
+      displayName: 'Air',
+    },
+  ];
+  if (args.includeFarHuman) {
+    subUnits.push({
+      id: 'hum-far-air',
+      parentUnitId: 'parent-inf',
+      player: 'human',
+      unitType: 'infantry',
+      h3Index: res4FarHuman!,
+      displayName: 'Infantry',
+    });
+  }
+  const tactical: TacticalBattleSnapshot = {
+    battleId: 't-best-options-air-footprint',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: footprint,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: terrain,
+    res4IsUrbanByH3: args.includeEmptyUrban && res4EmptyUrban ? { [res4EmptyUrban]: true } : {},
+    subUnits,
+  };
+  const strategic: GameStateSnapshot = {
+    turnNumber: 1,
+    phase: 'planning',
+    hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+    units: [],
+    pendingOrders: [],
+    res1Infrastructure: [
+      { h3Index: res1, urbanHexCount: 1, airportCount: args.airportCount, seaportCount: 0 },
+    ],
+    res1Control: [{ h3Index: res1, controllerPlayerId: 'opponent' }],
+  };
+  return {
+    tactical,
+    plan: buildTacticalAiPlanState(strategic, tactical),
+    res4Air,
+    res4FarHuman: args.includeFarHuman ? res4FarHuman! : null,
+    res4EmptyUrban: args.includeEmptyUrban ? res4EmptyUrban! : null,
+  };
+}
+
+/**
+ * Ensures tactical Best Options air strikes use the battle footprint and enclosing-res1 airport, not the strategic 3-hex disk.
+ *
+ * Purpose: Air Operations says strike anywhere in the battle; the this-turn table used a 3-hex collector and an airport check on the air unit's res4 cell, so far humans and real plan-state airports were dropped.
+ * When to use: After edits to tactical this-turn air-strike collection in `collectAggregatedPossibleActionRows`.
+ * Expected outcome: Strike on a human beyond strategic strike range; no strike on empty urban; no ferry rows.
+ * Exceptions: Throws when the fixture cannot place those neighbors.
+ */
+function testTacticalBestOptionsAirStrikesUseFootprintAndOmitFerry(): void {
+  const { tactical, plan, res4FarHuman, res4EmptyUrban } = tacticalAirBestOptionsBattle({
+    includeFarHuman: true,
+    includeEmptyUrban: true,
+    airportCount: 1,
+  });
+  const rows = collectTacticalThisTurnRows(plan, tactical).filter((r) => r.unitId === 'opp-air-strike');
+  const strikes = rows.filter((r) => r.actionTypes.includes('air strike'));
+  assert.ok(
+    strikes.some((r) => r.targetH3 === res4FarHuman),
+    'tactical Best Options must list an air strike on a human beyond strategic strike range'
+  );
+  assert.ok(
+    !strikes.some((r) => r.targetH3 === res4EmptyUrban),
+    'tactical Best Options must not list an air strike on empty urban'
+  );
+  assert.ok(
+    !rows.some((r) => r.actionTypes.includes('ferry') || r.actionTypes.includes('move/melee')),
+    'tactical Best Options must not list ferry dests for air'
+  );
+}
+
+/**
+ * Ensures tactical Best Options omit air strikes when the air unit's parent res1 has no airport.
+ *
+ * Purpose: Order validation requires an intact parent-res1 airport; the table must not tempo-rule a strike the engine will reject.
+ * When to use: Together with `testTacticalBestOptionsAirStrikesUseFootprintAndOmitFerry`.
+ * Expected outcome: No air-strike rows when `airportCount` is 0 even if humans are in the footprint.
+ * Exceptions: None.
+ */
+function testTacticalBestOptionsAirStrikesRequireEnclosingAirport(): void {
+  const { tactical, plan } = tacticalAirBestOptionsBattle({
+    includeFarHuman: true,
+    includeEmptyUrban: false,
+    airportCount: 0,
+  });
+  const strikes = collectTacticalThisTurnRows(plan, tactical).filter(
+    (r) => r.unitId === 'opp-air-strike' && r.actionTypes.includes('air strike')
+  );
+  assert.strictEqual(strikes.length, 0, 'no this-turn air strikes without an enclosing airport');
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
  *
- * Purpose: Runs the tactical empty-urban vs approach contracts.
+ * Purpose: Runs the tactical empty-urban vs approach contracts and tactical air Best Options contracts.
  * When to use: `node dist/main/openrouter/possibleUnitActionsTacticalInfraApproach.test.js` after `build:main`.
  * Expected outcome: Each entry runs to completion or fails the process.
  * Exceptions: None.
@@ -187,6 +334,14 @@ const tests = [
   {
     name: 'collectAggregatedPossibleActionRows tactical Best Options keeps empty urban when no enemy',
     fn: testTacticalBestOptionsKeepsEmptyUncontrolledUrbanWhenNoEnemy,
+  },
+  {
+    name: 'collectAggregatedPossibleActionRows tactical Best Options air strikes use footprint and omit ferry',
+    fn: testTacticalBestOptionsAirStrikesUseFootprintAndOmitFerry,
+  },
+  {
+    name: 'collectAggregatedPossibleActionRows tactical Best Options air strikes require parent airport',
+    fn: testTacticalBestOptionsAirStrikesRequireEnclosingAirport,
   },
 ];
 

@@ -167,6 +167,47 @@ function testStrategicPromptAllowsCopyingBestOptionsHexesWithoutStandingOrderOve
 }
 
 /**
+ * Ensures strategic prompts send ferry Best Options hexes to ferryOrders, not explicit_move.
+ *
+ * Purpose: After air ferry dests were labeled `ferry`, HOW TO USE still said copy every Target Hex into explicit_move, which air cannot use.
+ * When to use: After edits to strategic `buildAvailableToolsIntro`, `buildToolUsageGuidance`, or `getInitialUserMessage`.
+ * Expected outcome: Ferry dest copy names ferryOrders; explicit_move copy is limited to approach / move/melee rows.
+ * Exceptions: None.
+ */
+function testStrategicPromptRoutesFerryBestOptionsToFerryOrders(): void {
+  const flags = getToolFlags(undefined);
+  const guidance = buildToolUsageGuidance(flags, true, 'strategic');
+  assert.ok(guidance.includes('ferryOrders'), 'tool guidance must name ferryOrders for ferry dests');
+  assert.ok(guidance.includes('ferry'), 'tool guidance must mention ferry rows');
+  assert.ok(
+    /approach or move\/melee/i.test(guidance),
+    'explicit_move copy must be limited to approach or move/melee rows'
+  );
+  const intro = buildAvailableToolsIntro(flags, true, 'strategic');
+  assert.ok(intro.includes('ferryOrders'));
+  assert.ok(!/^.*Copy Best Options This Turn Target Hexes into explicit_move/m.test(intro));
+  const user = getInitialUserMessage(flags, true, 'strategic');
+  assert.ok(user.includes('ferryOrders'));
+  const move = getMovementOrderInstruction(flags, 'strategic');
+  assert.ok(/approach or move\/melee/i.test(move));
+}
+
+/**
+ * Ensures standing-order coaching does not send march dests to the unit's current hex.
+ *
+ * Purpose: Turn 13 assigned march to FK for infantry already at FK; those orders were dropped as already arrived.
+ * When to use: After edits to strategic standing-order HOW TO USE copy.
+ * Expected outcome: Guidance tells the model not to march to the current Hex and to copy a Best Options dest or defend to hold.
+ * Exceptions: None.
+ */
+function testStrategicPromptDoesNotMarchToCurrentHex(): void {
+  const flags = getToolFlags(undefined);
+  const guidance = buildToolUsageGuidance(flags, true, 'strategic');
+  assert.ok(/already arrived/i.test(guidance), 'must warn that current-hex marches are dropped');
+  assert.ok(/defend to hold/i.test(guidance));
+}
+
+/**
  * Ensures production tool guidance tells the model not to queue types already at deployment cap.
  *
  * Purpose: The Turn 9 prompt said armor was at maximum but still told the model to fill every empty queue, and the model queued more armor.
@@ -281,6 +322,14 @@ const tests = [
   {
     name: 'strategic prompt allows copying Best Options hexes without standing-order override',
     fn: testStrategicPromptAllowsCopyingBestOptionsHexesWithoutStandingOrderOverride,
+  },
+  {
+    name: 'strategic prompt routes ferry Best Options hexes to ferryOrders',
+    fn: testStrategicPromptRoutesFerryBestOptionsToFerryOrders,
+  },
+  {
+    name: 'strategic prompt does not march to current hex',
+    fn: testStrategicPromptDoesNotMarchToCurrentHex,
   },
   {
     name: 'production guidance skips types at deployment cap',

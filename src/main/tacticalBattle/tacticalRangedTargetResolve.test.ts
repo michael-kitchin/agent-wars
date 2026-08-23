@@ -10,9 +10,14 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import {
   pickClosestEnemyTacticalRangedTargetForSubUnit,
   resolveTacticalRangedTargetForSubUnit,
-  generateTacticalDefendEngagementForPlayer,
+  collectTacticalTempoAttacks,
+  withTacticalTempoAttacks,
 } from './tacticalRangedTargetResolve';
-import { tacticalRes1Cell, tacticalRes4UnderRes1Corner } from './testSupport/tacticalRes4HexFixtures';
+import {
+  tacticalRes1Cell,
+  tacticalRes4PentagonCrossingPair,
+  tacticalRes4UnderRes1Corner,
+} from './testSupport/tacticalRes4HexFixtures';
 
 test('pickClosestEnemyTacticalRangedTargetForSubUnit prefers nearer human over farther', () => {
   const res1 = tacticalRes1Cell(12, 34);
@@ -102,7 +107,7 @@ test('resolveTacticalRangedTargetForSubUnit retargets away from anchor without e
   assert.strictEqual(resolved, res4Human);
 });
 
-test('generateTacticalDefendEngagementForPlayer emits ranged for non-air and air strike for air', () => {
+test('collectTacticalTempoAttacks emits ranged for non-air and air strike for air', () => {
   const res1 = tacticalRes1Cell(12, 34);
   const res4Armor = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01, lngEpsilon: 0.01 });
   const sameParent = [...gridDisk(res4Armor, 8)].filter((h) => cellToParent(h, 1) === res1);
@@ -145,17 +150,100 @@ test('generateTacticalDefendEngagementForPlayer emits ranged for non-air and air
       },
     ],
   };
-  const { rangedAttacks, airStrikes } = generateTacticalDefendEngagementForPlayer(
+  const { rangedAttacks, airStrikes } = collectTacticalTempoAttacks({
     battle,
-    'opponent',
-    ['opp-armor', 'opp-air']
-  );
+    playerId: 'opponent',
+    alreadyAttackingSubUnitIds: new Set<string>(),
+    holdFireParentUnitIds: new Set<string>(),
+  });
   assert.strictEqual(rangedAttacks.length, 1, 'armor should generate ranged');
   assert.strictEqual(rangedAttacks[0]!.unitId, 'opp-armor:01');
   assert.strictEqual(rangedAttacks[0]!.targetH3Index, res4HumanEnemy);
   assert.strictEqual(airStrikes.length, 1, 'air should generate air strike');
   assert.strictEqual(airStrikes[0]!.unitId, 'opp-air:01');
   assert.strictEqual(airStrikes[0]!.targetType, 'units');
+
+  const withExclusions = collectTacticalTempoAttacks({
+    battle,
+    playerId: 'opponent',
+    alreadyAttackingSubUnitIds: new Set(['opp-armor:01']),
+    holdFireParentUnitIds: new Set(['opp-air']),
+  });
+  assert.strictEqual(
+    withExclusions.rangedAttacks.length,
+    0,
+    'a sub-unit that already has an attack must not be given a second one'
+  );
+  assert.strictEqual(
+    withExclusions.airStrikes.length,
+    0,
+    "a parent under hold_fire must keep its sub-units silent"
+  );
+
+  // The model keeps its agency in tactical too: a target it chose survives the backfill untouched, and the
+  // sub-unit it named gains no second attack.
+  const modelTarget = res4Armor;
+  const backfilled = withTacticalTempoAttacks(
+    battle,
+    {
+      movementOrders: [],
+      rangedAttacks: [{ unitId: 'opp-armor:01', targetH3Index: modelTarget }],
+      airStrikes: [],
+      ferryOrders: [],
+      embarkOrders: [],
+    },
+    new Set<string>()
+  );
+  const armorRows = (backfilled?.rangedAttacks ?? []).filter((r) => r.unitId === 'opp-armor:01');
+  assert.strictEqual(armorRows.length, 1, 'the model-named sub-unit must keep exactly one attack');
+  assert.strictEqual(armorRows[0]!.targetH3Index, modelTarget, 'the model target must survive the backfill');
+  assert.strictEqual(
+    (backfilled?.airStrikes ?? []).length,
+    1,
+    'the air sub-unit the model ignored must still be given its shot'
+  );
+
+  assert.strictEqual(
+    withTacticalTempoAttacks(battle, undefined, new Set<string>())?.rangedAttacks.length,
+    1,
+    'an unconsulted beat with no draft at all must still produce the legal shots'
+  );
+});
+
+test('pickClosestEnemyTacticalRangedTargetForSubUnit keeps a legal shot gridDistance cannot measure', () => {
+  const pair = tacticalRes4PentagonCrossingPair();
+  const battle: TacticalBattleSnapshot = {
+    battleId: 'tb-ranged-crossing',
+    enclosingRes1H3Index: pair.res1H3Index,
+    res4ChildH3Indexes: pair.res4ChildH3Indexes,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: Object.fromEntries(pair.res4ChildH3Indexes.map((h) => [h, 'plains'])),
+    subUnits: [
+      {
+        id: 'opp-infantry:01',
+        parentUnitId: 'opp-infantry',
+        player: 'opponent',
+        unitType: 'infantry',
+        h3Index: pair.originH3Index,
+        displayName: 'Infantry',
+      },
+      {
+        id: 'hum-infantry:01',
+        parentUnitId: 'hum-infantry',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: pair.crossingH3Index,
+        displayName: 'Human Infantry',
+      },
+    ],
+  };
+
+  const picked = pickClosestEnemyTacticalRangedTargetForSubUnit(battle, 'opp-infantry:01');
+
+  assert.strictEqual(picked, pair.crossingH3Index);
 });
 
 /**

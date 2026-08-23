@@ -1,4 +1,8 @@
-import { cellToLatLng, gridDistance, gridDisk } from 'h3-js';
+import { gridDisk } from 'h3-js';
+import {
+  computeGridDistancePure,
+  computeGridDistanceWithPathFallbackPure,
+} from '../../shared/h3GridRangePure';
 import { findPath } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
 import type { LandMassByH3 } from '../../shared/landTraversalRes1';
@@ -35,47 +39,25 @@ error: string;
 }
 
 /**
- * Defines the `approximateDistanceKm` function shape (function approximateDistanceKm(fromH3: string, toH3: string): number).
-
- * Purpose: Supports maintainability by documenting why `approximateDistanceKm` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Returns the grid-step distance between two cells, reporting whether the BFS fallback was needed.
+ *
+ * Purpose: The "nearest water hex" scans rank candidates by this number, so every candidate has to be measured in the
+ * same unit. An earlier version returned great-circle **kilometres** when H3 threw, which made a face-crossing
+ * candidate score in the hundreds against neighbours scoring single digits — the genuinely closest cell could never
+ * win. Hex steps throughout removes that bias.
+ * When to use: Only from the nearest-hex scans in this module; `usedFallback` feeds their telemetry counters.
+ * Expected outcome: Non-negative hex-step count; `usedFallback` true only when the straight-line APIs failed.
+ * Exceptions: None; an underivable pair returns `ok: false` so the caller can count and skip it.
  */
-function approximateDistanceKm(fromH3: string, toH3: string): number {
-  const [fromLat, fromLng] = cellToLatLng(fromH3);
-  const [toLat, toLng] = cellToLatLng(toH3);
-  const toRad = Math.PI / 180;
-  const dLat = (toLat - fromLat) * toRad;
-  const dLng = (toLng - fromLng) * toRad;
-  const lat1 = fromLat * toRad;
-  const lat2 = toLat * toRad;
-  const sinDLat = Math.sin(dLat / 2);
-  const sinDLng = Math.sin(dLng / 2);
-  const a = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const EARTH_RADIUS_KM = 6371;
-  return EARTH_RADIUS_KM * c;
-}
-
-/**
- * Defines the `tryDistanceWithFallback` function shape (function tryDistanceWithFallback(referenceH3: string, candidateH3: string): { ok: true; distance: number; usedFallback: boolean } | { ok: false; error: string }).
-
- * Purpose: Supports maintainability by documenting why `tryDistanceWithFallback` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function tryDistanceWithFallback(referenceH3: string, candidateH3: string): { ok: true; distance: number; usedFallback: boolean } | { ok: false; error: string } {
-  try {
-    return { ok: true, distance: gridDistance(referenceH3, candidateH3), usedFallback: false };
-  } catch (gridErr) {
-    try {
-      return { ok: true, distance: approximateDistanceKm(referenceH3, candidateH3), usedFallback: true };
-    } catch (fallbackErr) {
-      return { ok: false, error: `${String(gridErr)} | fallback failed: ${String(fallbackErr)}` };
-    }
-  }
+function tryDistanceWithFallback(
+  referenceH3: string,
+  candidateH3: string
+): { ok: true; distance: number; usedFallback: boolean } | { ok: false; error: string } {
+  const direct = computeGridDistancePure(referenceH3, candidateH3);
+  if (direct !== null) return { ok: true, distance: direct, usedFallback: false };
+  const derived = computeGridDistanceWithPathFallbackPure(referenceH3, candidateH3);
+  if (derived !== null) return { ok: true, distance: derived, usedFallback: true };
+  return { ok: false, error: 'no derivable grid distance for pair' };
 }
 
 /**

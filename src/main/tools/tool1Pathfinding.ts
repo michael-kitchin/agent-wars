@@ -47,6 +47,10 @@ import {
 import { executeTacticalCheckDistance, executeTacticalPlanRoute } from './tacticalTool1Pathfinding';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { h3ToLatLng, type LatLng } from './h3LatLng';
+import {
+  rememberPlanningPhaseSession,
+  reusePlanningPhaseSession,
+} from './tool1PathfindingSessionCache';
 
 /**
  * Re-exports shared lat/lng tuple type for existing tool1Pathfinding LatLng importers.
@@ -151,155 +155,11 @@ statefulCache: PathfindingSessionStatefulCache;
 }
 
 /**
- * Documents the `PlanningPhaseSessionCache` type alias (type PlanningPhaseSessionCache).
-
- * Purpose: Supports maintainability by documenting why `PlanningPhaseSessionCache` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-type PlanningPhaseSessionCache = {
-    /**
-   * Specifies the contract for the `key` member (key: string;).
-
-   * Contract: Describes stable behavior for callers of `key` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-key: string;
-    /**
-   * Specifies the contract for the `session` member (session: PathfindingSession;).
-
-   * Contract: Describes stable behavior for callers of `session` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-session: PathfindingSession;
-};
-
-/**
- * Documents the module-scope binding `planningPhaseHumanSessionCache` (planningPhaseHumanSessionCache: PlanningPhaseSessionCache | null).
-
- * Purpose: Supports maintainability by documenting why `planningPhaseHumanSessionCache` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-let planningPhaseHumanSessionCache: PlanningPhaseSessionCache | null = null;
-/**
- * Documents the module-scope binding `humanPlanningSessionMetrics` (humanPlanningSessionMetrics).
-
- * Purpose: Supports maintainability by documenting why `humanPlanningSessionMetrics` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const humanPlanningSessionMetrics = {
-    /**
-   * Documents the object literal property `turnNumber` (turnNumber: -1).
-
-   * Purpose: Supports maintainability by documenting why `turnNumber` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-turnNumber: -1,
-    /**
-   * Documents the object literal property `created` (created: 0).
-
-   * Purpose: Supports maintainability by documenting why `created` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-created: 0,
-    /**
-   * Documents the object literal property `reused` (reused: 0).
-
-   * Purpose: Supports maintainability by documenting why `reused` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-reused: 0,
-};
-
-/**
- * Defines the `resetHumanPlanningSessionMetricsForTurn` function shape (function resetHumanPlanningSessionMetricsForTurn(turnNumber: number): void).
-
- * Purpose: Supports maintainability by documenting why `resetHumanPlanningSessionMetricsForTurn` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function resetHumanPlanningSessionMetricsForTurn(turnNumber: number): void {
-  if (humanPlanningSessionMetrics.turnNumber === turnNumber) return;
-  humanPlanningSessionMetrics.turnNumber = turnNumber;
-  humanPlanningSessionMetrics.created = 0;
-  humanPlanningSessionMetrics.reused = 0;
-  planningPhaseHumanSessionCache = null;
-}
-
-/**
- * Defines the `getHumanPlanningSessionMetrics` function shape (function getHumanPlanningSessionMetrics():).
-
- * Purpose: Supports maintainability by documenting why `getHumanPlanningSessionMetrics` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function getHumanPlanningSessionMetrics(): { turnNumber: number; created: number; reused: number } {
-  return {
-    turnNumber: humanPlanningSessionMetrics.turnNumber,
-    created: humanPlanningSessionMetrics.created,
-    reused: humanPlanningSessionMetrics.reused,
-  };
-}
-
-/**
- * Defines the `shouldReusePlanningPhaseSession` function shape (function shouldReusePlanningPhaseSession(state: GameStateSnapshot): boolean).
-
- * Purpose: Supports maintainability by documenting why `shouldReusePlanningPhaseSession` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function shouldReusePlanningPhaseSession(state: GameStateSnapshot): boolean {
-  return state.phase === 'planning' && state.playerPerspective === 'human';
-}
-
-/**
- * Defines the `buildPlanningPhaseSessionKey` function shape (function buildPlanningPhaseSessionKey(state: GameStateSnapshot): string).
-
- * Purpose: Supports maintainability by documenting why `buildPlanningPhaseSessionKey` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function buildPlanningPhaseSessionKey(state: GameStateSnapshot): string {
-  const unitsSignature = state.units
-    .map((u) => `${u.id}:${u.h3Index}`)
-    .sort()
-    .join('|');
-  const hexSignature = state.hexes.map((h) => h.h3Index).join('|');
-  return [
-    `turn:${state.turnNumber}`,
-    `phase:${state.phase}`,
-    `perspective:${state.playerPerspective ?? 'none'}`,
-    `fog:${state.fogOfWarEnabled === true ? '1' : '0'}`,
-    `units:${unitsSignature}`,
-    `hexes:${hexSignature}`,
-  ].join('||');
-}
-
-/**
  * Defines the `createPathfindingSession` function shape (export function createPathfindingSession( state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: number, lng: number) => string).
 
- * Purpose: Supports maintainability by documenting why `createPathfindingSession` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Builds hex/terrain maps once per planning-phase perspective when the board is unchanged.
+ * When to use: Tool 1, standing-order assign, and human march preview.
+ * Expected outcome: New session, or the cached planning-phase session for human/opponent when no land-mass override is passed.
  * Exceptions: None.
  */
 export function createPathfindingSession(
@@ -308,19 +168,9 @@ export function createPathfindingSession(
   resolveToH3: (lat: number, lng: number) => string | undefined,
   landMassOverride?: LandMassByH3
 ): PathfindingSession {
-  if (shouldReusePlanningPhaseSession(state)) {
-    resetHumanPlanningSessionMetricsForTurn(state.turnNumber);
-    const key = buildPlanningPhaseSessionKey(state);
-    if (planningPhaseHumanSessionCache?.key === key) {
-      humanPlanningSessionMetrics.reused += 1;
-      logDebug('tool1Pathfinding createPathfindingSession: reused planning-phase human session', {
-        turnNumber: state.turnNumber,
-        phase: state.phase,
-        playerPerspective: state.playerPerspective ?? null,
-        metrics: getHumanPlanningSessionMetrics(),
-      });
-      return planningPhaseHumanSessionCache.session;
-    }
+  if (landMassOverride === undefined) {
+    const reused = reusePlanningPhaseSession<PathfindingSession>(state);
+    if (reused) return reused;
   }
   logDebug('tool1Pathfinding createPathfindingSession', {
     turnNumber: state.turnNumber,
@@ -347,18 +197,8 @@ export function createPathfindingSession(
       deadStateByDestination: new Map(),
     },
   };
-  if (shouldReusePlanningPhaseSession(state)) {
-    humanPlanningSessionMetrics.created += 1;
-    planningPhaseHumanSessionCache = {
-      key: buildPlanningPhaseSessionKey(state),
-      session,
-    };
-    logDebug('tool1Pathfinding createPathfindingSession: cached planning-phase human session', {
-      turnNumber: state.turnNumber,
-      phase: state.phase,
-      playerPerspective: state.playerPerspective ?? null,
-      metrics: getHumanPlanningSessionMetrics(),
-    });
+  if (landMassOverride === undefined) {
+    rememberPlanningPhaseSession(state, session);
   }
   return session;
 }

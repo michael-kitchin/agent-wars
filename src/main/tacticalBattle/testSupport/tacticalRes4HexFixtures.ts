@@ -7,7 +7,8 @@
  * Exceptions: `firstRingCellDistinctFrom` throws when the ring unexpectedly has no other cell (should not happen for res4).
  */
 
-import { gridDisk, latLngToCell } from 'h3-js';
+import { cellToChildren, cellToParent, getPentagons, gridDisk, gridDistance, latLngToCell } from 'h3-js';
+import { gridHopDistanceBetween } from '../../tools/assessUnitProximity';
 import { res4GridDiskNeighborsOrdered } from '../../../shared/tacticalRes4TransportLink';
 
 /**
@@ -67,6 +68,97 @@ export function firstRingCellDistinctFrom(center: string): string {
     throw new Error('expected a distinct res4 ring-1 neighbor');
   }
   return neighbor;
+}
+
+/**
+ * Two nearby res-4 cells under one res-1 parent whose `gridDistance` throws at an icosahedron face crossing.
+ *
+ * Purpose: Names the geometry that made tactical briefings report a real neighbor as unreachable, so tests can assert the
+ * BFS fallback without hard-coding H3 literals that would silently rot if the fixture search changed.
+ * When to use: Returned by `tacticalRes4PentagonCrossingPair`.
+ * Expected outcome: `originH3Index` and `crossingH3Index` are distinct children of `res1H3Index`, present in
+ * `res4ChildH3Indexes`, `hopDistance` apart on the grid, and unmeasurable by `gridDistance`.
+ * Exceptions: None.
+ */
+export interface TacticalRes4PentagonCrossingPair {
+  /**
+   * Res-1 parent that encloses both cells, suitable for `enclosingRes1H3Index`.
+   *
+   * Contract: A pentagon-bearing parent; its res-4 children span an icosahedron face boundary.
+   * When to use: Battle snapshot `enclosingRes1H3Index`.
+   * Expected outcome: Stable across runs for a given h3-js version.
+   * Exceptions: None.
+   */
+  res1H3Index: string;
+  /**
+   * All res-4 children of the parent, usable as a full battle footprint.
+   *
+   * Contract: Contains both `originH3Index` and `crossingH3Index`; pentagon parents yield fewer than 343 children.
+   * When to use: Battle snapshot `res4ChildH3Indexes` and terrain maps keyed by footprint cell.
+   * Expected outcome: Non-empty array of valid res-4 indexes.
+   * Exceptions: None.
+   */
+  res4ChildH3Indexes: string[];
+  /**
+   * Cell to measure from.
+   *
+   * Contract: `gridDistance(originH3Index, crossingH3Index)` throws.
+   * When to use: Place the observing sub-unit here.
+   * Expected outcome: Distinct from `crossingH3Index`.
+   * Exceptions: None.
+   */
+  originH3Index: string;
+  /**
+   * Cell whose distance from the origin the fast H3 APIs cannot measure.
+   *
+   * Contract: `gridDistance(originH3Index, crossingH3Index)` throws while the BFS fallback succeeds.
+   * When to use: Place the enemy sub-unit here.
+   * Expected outcome: Distinct from `originH3Index`.
+   * Exceptions: None.
+   */
+  crossingH3Index: string;
+  /**
+   * True grid separation of the pair from the neighbor-BFS fallback.
+   *
+   * Contract: A small positive integer at or below the requested `maxHops`, never the old 99 placeholder.
+   * When to use: Expected value in distance, threat severity, and in-range assertions.
+   * Expected outcome: Matches `gridHopDistanceBetween(originH3Index, crossingH3Index)`.
+   * Exceptions: None.
+   */
+  hopDistance: number;
+}
+
+/**
+ * Finds a close res-4 pair inside one res-1 parent that `gridDistance` refuses to measure.
+ *
+ * Purpose: Battles fought in the twelve pentagon-bearing res-1 hexes contain pairs where H3's fast distance APIs throw;
+ * tactical code that swallowed those throws reported adjacent enemies as far away. Tests need such a pair to prove the
+ * fallback works, and discovering it beats pasting indexes that no longer demonstrate anything if h3-js shifts.
+ * When to use: Tactical tests covering distance, threat severity, or target selection across a face crossing.
+ * Expected outcome: A pair at most `maxHops` apart, searched over the res-1 parents of the res-4 pentagons.
+ * Exceptions: Throws when no qualifying pair exists, which would mean the underlying H3 behavior changed.
+ */
+export function tacticalRes4PentagonCrossingPair(maxHops: number = 2): TacticalRes4PentagonCrossingPair {
+  for (const pentagon of getPentagons(4)) {
+    const res1H3Index = cellToParent(pentagon, 1);
+    const res4ChildH3Indexes = cellToChildren(res1H3Index, 4);
+    for (let i = 0; i < res4ChildH3Indexes.length; i++) {
+      for (let j = i + 1; j < res4ChildH3Indexes.length; j++) {
+        const originH3Index = res4ChildH3Indexes[i]!;
+        const crossingH3Index = res4ChildH3Indexes[j]!;
+        try {
+          gridDistance(originH3Index, crossingH3Index);
+          continue;
+        } catch {
+          // A throwing pair is exactly what this fixture is looking for.
+        }
+        const hopDistance = gridHopDistanceBetween(originH3Index, crossingH3Index);
+        if (hopDistance === null || hopDistance > maxHops) continue;
+        return { res1H3Index, res4ChildH3Indexes, originH3Index, crossingH3Index, hopDistance };
+      }
+    }
+  }
+  throw new Error(`tacticalRes4PentagonCrossingPair: no unmeasurable res4 pair within ${maxHops} hops`);
 }
 
 /**

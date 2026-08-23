@@ -10,7 +10,11 @@
 import * as assert from 'assert';
 import { gridDisk } from 'h3-js';
 import type { GameStateSnapshot } from './gameDb';
-import { getValidDestinations } from './oneStepMoveDestinations';
+import {
+  getValidDestinations,
+  getValidDestinationsComputeCountForTests,
+  resetValidDestinationsCacheForTests,
+} from './oneStepMoveDestinations';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../shared/tacticalRanges';
 import { getOrderedHexList } from './mapData';
 import {
@@ -159,16 +163,71 @@ function testGetValidDestinationsDiskBranchProducesResults(): void {
 }
 
 /**
- * Documents the module-scope binding `tests` (tests).
-
- * Purpose: Supports maintainability by documenting why `tests` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Ensures stacked same-origin same-type units reuse one land-mass search, and callers cannot mutate the cache.
+ *
+ * Purpose: Order validation was recomputing one-step dests for every stacked pawn after Best Options had already
+ * done the unique-origin work; the source function must cache so both briefing and apply share it.
+ * When to use: After changing `getValidDestinations` caching.
+ * Expected outcome: Two armor on the same hex compute once; mutating the first result does not change the second;
+ * a different origin computes again.
  * Exceptions: None.
  */
+function testGetValidDestinationsReusesStackedSameOrigin(): void {
+  ensureTerrainClassificationCacheLoaded();
+  resetValidDestinationsCacheForTests();
+  const hexList = getOrderedHexList().slice(0, 40);
+  const state = minimalState(hexList);
+  const origin = hexList[0]!;
+  const first = getValidDestinations({ id: 'armor-a', h3Index: origin, unitType: 'armor' }, state);
+  const second = getValidDestinations({ id: 'armor-b', h3Index: origin, unitType: 'armor' }, state);
+  assert.strictEqual(
+    getValidDestinationsComputeCountForTests(),
+    1,
+    'stacked same-hex armor must share one dest computation'
+  );
+  assert.deepStrictEqual([...second].sort(), [...first].sort(), 'cached dest lists must match');
+  first.push('mutated-hex');
+  const third = getValidDestinations({ id: 'armor-c', h3Index: origin, unitType: 'armor' }, state);
+  assert.ok(!third.includes('mutated-hex'), 'callers must not mutate the dest cache');
+  const otherOrigin = hexList[1]!;
+  getValidDestinations({ id: 'armor-d', h3Index: otherOrigin, unitType: 'armor' }, state);
+  assert.strictEqual(getValidDestinationsComputeCountForTests(), 2, 'a different origin must compute dests again');
+}
+
+/**
+ * Ensures assume-debarked validation does not share dests with an ordinary march from the same hex.
+ *
+ * Purpose: Auto-debark reachability is a different legality set from stay-embarked; mixing them in one cache slot would accept illegal marches.
+ * When to use: After changing `validDestinationsCacheKey`.
+ * Expected outcome: Two computes for the same origin when `assumeDebarkedForReachability` differs; dest lists still match when the unit is not actually embarked.
+ * Exceptions: None.
+ */
+function testGetValidDestinationsAssumeDebarkedDoesNotShareSlot(): void {
+  ensureTerrainClassificationCacheLoaded();
+  resetValidDestinationsCacheForTests();
+  const hexList = getOrderedHexList().slice(0, 40);
+  const state = minimalState(hexList);
+  const origin = hexList[0]!;
+  const unit = { id: 'armor-debark', h3Index: origin, unitType: 'armor' };
+  const ordinary = getValidDestinations(unit, state);
+  const assumeDebarked = getValidDestinations(unit, state, { assumeDebarkedForReachability: true });
+  assert.strictEqual(
+    getValidDestinationsComputeCountForTests(),
+    2,
+    'assume-debarked and ordinary march must not share a dest cache slot'
+  );
+  assert.deepStrictEqual(
+    [...assumeDebarked].sort(),
+    [...ordinary].sort(),
+    'unembarked armor dests are the same whether or not assume-debarked is set'
+  );
+}
+
 const tests = [
   { name: 'getValidDestinations matches reference full scan', fn: testGetValidDestinationsMatchesFullScan },
   { name: 'getValidDestinations gridDisk branch returns destinations', fn: testGetValidDestinationsDiskBranchProducesResults },
+  { name: 'getValidDestinations reuses stacked same-origin dests', fn: testGetValidDestinationsReusesStackedSameOrigin },
+  { name: 'getValidDestinations assume-debarked does not share dest slot', fn: testGetValidDestinationsAssumeDebarkedDoesNotShareSlot },
 ];
 
 /**

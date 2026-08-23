@@ -453,6 +453,35 @@ function testFogOffIncludesPentagonCrossingEnemy(): void {
 }
 
 /**
+ * Verifies fog-on assess_unit still lists an in-radius enemy when `gridDistance` throws.
+ *
+ * Purpose: Unit Status showed `—` for air at a cell three k-ring steps from observed humans because the radius scan treated a pentagon-edge throw as unreachable once land BFS failed.
+ * When to use: After changing fog-on `getGridDistance` / radius prefilter.
+ * Expected outcome: human-armor-1 in nearbyEnemies at hexDistance 3 (k-ring), so a legal this-turn air strike is visible in Unit Status.
+ * Exceptions: None.
+ */
+function testFogOnIncludesInRadiusPentagonCrossingEnemy(): void {
+  const origin = '811ebffffffffff';
+  const enemy = '81357ffffffffff';
+  assert.throws(() => gridDistance(origin, enemy), 'fixture pair must throw from gridDistance');
+  const { state, coordMap } = buildAssessState(
+    [origin, enemy],
+    [
+      { id: 'opponent-air-1', player: 'opponent', unitType: 'air', h3Index: origin },
+      { id: 'human-armor-1', player: 'human', unitType: 'armor', h3Index: enemy },
+    ],
+    true
+  );
+  const out = assess(state, coordMap, 'opponent-air-1');
+  assert.strictEqual(out.status, 'ok');
+  const human = (out.nearbyEnemies as Array<{ unitId: string; hexDistance: number }>).find(
+    (e) => e.unitId === 'human-armor-1'
+  );
+  assert.ok(human, 'in-radius pentagon-crossing human must appear when fog is on');
+  assert.strictEqual(human!.hexDistance, 3);
+}
+
+/**
  * Verifies fog-off omniscient scan does not merge stale last-known rows.
  *
  * Purpose: Living enemies are already on the snapshot; ghosts must not appear as nearest enemy.
@@ -506,6 +535,7 @@ function run(): void {
   testFogOffReverseEtaTwoIsModerate();
   testFogOffAirAssessedUnitNullOwnEta();
   testFogOffIncludesPentagonCrossingEnemy();
+  testFogOnIncludesInRadiusPentagonCrossingEnemy();
   testFogOffOmitsStaleIntelGhost();
   console.log('tool2Assessment.test.ts passed');
 }

@@ -2,12 +2,13 @@
  * Resolves tactical res4 ranged targets for sub-units (closest in-range enemy cell with LOS) and generates per-beat DEFEND engagement orders.
  */
 
-import { gridDistance } from 'h3-js';
+import type { TacticalOpponentPlanPayload } from '../../shared/ipc/readyTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import {
   collectTacticalLegalRangedTargetRes4Hexes,
   tacticalMovementTerrainAnchorH3,
 } from '../../shared/tacticalTerrainCombatModifiers';
+import { gridHopDistanceBetween } from '../tools/assessUnitProximity';
 import { logDebug, logTrace } from '../logger';
 
 /**
@@ -16,7 +17,8 @@ import { logDebug, logTrace } from '../logger';
  * Purpose: Draft sanitization must not map strategic res1 targets onto the footprint anchor when enemies occupy other res4 cells (e.g. naval vs land on a coastal hex).
  * When to use: `sanitizeOpponentTacticalDraftForReadyCommit` when a proposed ranged target is missing or invalid.
  * Expected outcome: An enemy sub-unit `h3Index` in the battle footprint that passes tactical range and mountain LOS, or `undefined` when none exist.
- * Exceptions: None; invalid grid pairs are skipped.
+ * Exceptions: None. Legality is already settled by `collectTacticalLegalRangedTargetRes4Hexes`, so a cell whose distance
+ * stays unmeasurable ranks last instead of being dropped; that keeps a legal shot rather than skipping the beat's fire.
  */
 export function pickClosestEnemyTacticalRangedTargetForSubUnit(
   battle: TacticalBattleSnapshot,
@@ -37,19 +39,15 @@ export function pickClosestEnemyTacticalRangedTargetForSubUnit(
 
   let best: { h3: string; dist: number } | null = null;
   for (const h3 of enemyHexes) {
-    try {
-      const dist = gridDistance(anchor, h3);
-      if (best === null || dist < best.dist) best = { h3, dist };
-    } catch {
-      continue;
-    }
+    const dist = gridHopDistanceBetween(anchor, h3) ?? Number.POSITIVE_INFINITY;
+    if (best === null || dist < best.dist) best = { h3, dist };
   }
   if (best) {
     logDebug('tacticalRangedTargetResolve pickClosestEnemyTacticalRangedTargetForSubUnit: selected', {
       battleId: battle.battleId,
       attackerSubUnitId,
       targetH3Index: best.h3,
-      gridDistance: best.dist,
+      hopDistance: Number.isFinite(best.dist) ? best.dist : null,
     });
   }
   return best?.h3;
@@ -89,32 +87,54 @@ export function resolveTacticalRangedTargetForSubUnit(
 }
 
 /**
- * Generates DEFEND standing-order engagement rows for all in-battle sub-units of a player whose parent carries a DEFEND order.
+ * Inputs for `collectTacticalTempoAttacks`, grouped so callers name each exclusion at the call site.
  *
- * Purpose: Each tactical beat, DEFEND sub-units auto-fire at the closest legal enemy res4 cell — mirroring the strategic per-turn auto-engage added by `appendDefendStandingOrderEngagement`, but operating on the res4 grid inside the active tactical footprint.
- * When to use: Tests and any remaining caller that needs DEFEND auto-engagement rows for a player; human Ready no longer merges standing DEFEND in tactical.
- * Expected outcome: At most one ranged or air-strike row per sub-unit; air sub-units go into `airStrikes` (AA-defense phase applies); non-air go into `rangedAttacks`. No-op when no legal enemy exists for a given sub-unit.
- * Exceptions: None; grid errors on individual targets are silently skipped.
+ * Contract: `alreadyAttackingSubUnitIds` must hold every sub-unit that already has a ranged attack or air strike this
+ * beat, and `holdFireParentUnitIds` every strategic parent under a `hold_fire` standing order.
+ * When to use: Assembling the opponent's tactical attacks for a beat.
+ * Expected outcome: Both sets may be empty; an empty `alreadyAttackingSubUnitIds` sweeps the whole force.
+ * Exceptions: None.
  */
-export function generateTacticalDefendEngagementForPlayer(
-  battle: TacticalBattleSnapshot,
-  playerId: string,
-  defendParentUnitIds: readonly string[]
-): {
+export type TacticalTempoAttackArgs = {
+  /** Turn-start battle snapshot; tactical fire resolves before movement, so this must not be a post-move projection. */
+  battle: TacticalBattleSnapshot;
+  /** Player whose idle sub-units are swept. */
+  playerId: string;
+  /** Sub-units that already have an attack this beat, from the model or any earlier pass. */
+  alreadyAttackingSubUnitIds: ReadonlySet<string>;
+  /** Strategic parents told to hold fire; their sub-units are left alone. */
+  holdFireParentUnitIds: ReadonlySet<string>;
+};
+
+/**
+ * Emits one attack per idle sub-unit that has a legal shot, so a skipped beat does not forfeit tactical fire.
+ *
+ * Purpose: The tactical counterpart of the strategic tempo sweep. Tactical beats carry no standing orders, so before
+ * this existed the model's reply was the only source of opponent attacks and a model that returned nothing simply did
+ * not shoot. Targets come from `pickClosestEnemyTacticalRangedTargetForSubUnit`, which applies res4 range, terrain,
+ * and mountain line of sight, so emitted rows are already legal.
+ * When to use: Opponent tactical order assembly, after the model's own attacks are known.
+ * Expected outcome: At most one row per sub-unit; air goes to `airStrikes` so the AA-defense phase applies, everything
+ * else to `rangedAttacks`. No-op for sub-units with no legal enemy in reach.
+ * Exceptions: None; target choice never throws.
+ */
+export function collectTacticalTempoAttacks(args: TacticalTempoAttackArgs): {
   rangedAttacks: { unitId: string; targetH3Index: string }[];
   airStrikes: { unitId: string; targetH3Index: string; targetType: 'units' }[];
 } {
-  logDebug('tacticalRangedTargetResolve generateTacticalDefendEngagementForPlayer', {
+  const { battle, playerId, alreadyAttackingSubUnitIds, holdFireParentUnitIds } = args;
+  logDebug('tacticalRangedTargetResolve collectTacticalTempoAttacks', {
     battleId: battle.battleId,
     playerId,
-    defendParentCount: defendParentUnitIds.length,
+    alreadyAttackingCount: alreadyAttackingSubUnitIds.size,
+    holdFireParentCount: holdFireParentUnitIds.size,
   });
-  const defendSet = new Set(defendParentUnitIds);
   const rangedAttacks: { unitId: string; targetH3Index: string }[] = [];
   const airStrikes: { unitId: string; targetH3Index: string; targetType: 'units' }[] = [];
   for (const sub of battle.subUnits) {
     if (sub.player !== playerId) continue;
-    if (!defendSet.has(sub.parentUnitId)) continue;
+    if (alreadyAttackingSubUnitIds.has(sub.id)) continue;
+    if (holdFireParentUnitIds.has(sub.parentUnitId)) continue;
     const target = pickClosestEnemyTacticalRangedTargetForSubUnit(battle, sub.id);
     if (!target) continue;
     if (sub.unitType === 'air') {
@@ -123,11 +143,57 @@ export function generateTacticalDefendEngagementForPlayer(
       rangedAttacks.push({ unitId: sub.id, targetH3Index: target });
     }
   }
-  logDebug('tacticalRangedTargetResolve generateTacticalDefendEngagementForPlayer: result', {
+  logDebug('tacticalRangedTargetResolve collectTacticalTempoAttacks: result', {
     battleId: battle.battleId,
     playerId,
     rangedCount: rangedAttacks.length,
     airCount: airStrikes.length,
   });
   return { rangedAttacks, airStrikes };
+}
+
+/**
+ * Adds tempo attacks to a buffered opponent tactical plan, creating one when the beat produced no plan at all.
+ *
+ * Purpose: A tactical beat only gets a plan when the post-beat policy decides to consult the model. On every other
+ * beat the buffer is empty and the opponent used to sit out the beat entirely — a larger forfeiture than the model
+ * inactivity the strategic sweep was written for. Running at commit rather than only at consultation makes the
+ * guarantee hold for unconsulted beats, matching how the strategic fallback covers unconsulted turns.
+ * When to use: `commitHumanTacticalDraftOrders`, against the pre-battle snapshot and before draft sanitization, so
+ * added rows go through exactly the same validation as everything the model asked for.
+ * Expected outcome: The draft's own rows are untouched and keep the targets the model chose; sub-units it never
+ * mentioned gain at most one attack each. Returns the draft unchanged when there is nothing legal to add, which
+ * includes returning `undefined` when there was no draft either.
+ * Exceptions: None.
+ */
+export function withTacticalTempoAttacks(
+  preBattle: TacticalBattleSnapshot,
+  draft: TacticalOpponentPlanPayload | undefined,
+  holdFireParentUnitIds: ReadonlySet<string>
+): TacticalOpponentPlanPayload | undefined {
+  const sweep = collectTacticalTempoAttacks({
+    battle: preBattle,
+    playerId: 'opponent',
+    alreadyAttackingSubUnitIds: new Set([
+      ...(draft?.rangedAttacks ?? []).map((r) => r.unitId),
+      ...(draft?.airStrikes ?? []).map((s) => s.unitId),
+    ]),
+    holdFireParentUnitIds,
+  });
+  logDebug('tacticalRangedTargetResolve withTacticalTempoAttacks', {
+    battleId: preBattle.battleId,
+    hadDraft: Boolean(draft),
+    draftRanged: draft?.rangedAttacks.length ?? 0,
+    draftAir: draft?.airStrikes.length ?? 0,
+    sweepRanged: sweep.rangedAttacks.length,
+    sweepAir: sweep.airStrikes.length,
+  });
+  if (sweep.rangedAttacks.length === 0 && sweep.airStrikes.length === 0) return draft;
+  return {
+    movementOrders: draft?.movementOrders ?? [],
+    rangedAttacks: [...(draft?.rangedAttacks ?? []), ...sweep.rangedAttacks],
+    airStrikes: [...(draft?.airStrikes ?? []), ...sweep.airStrikes],
+    ferryOrders: draft?.ferryOrders ?? [],
+    embarkOrders: draft?.embarkOrders ?? [],
+  };
 }

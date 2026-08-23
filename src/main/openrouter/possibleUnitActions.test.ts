@@ -5,7 +5,13 @@
 import * as assert from 'assert';
 import { cellToLatLng, cellToParent, gridDisk, gridDistance } from 'h3-js';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { getRange } from '../combatConstants';
+import {
+  computeGridDistancePure,
+  computeGridDistanceWithPathFallbackPure,
+} from '../../shared/h3GridRangePure';
 import { getOrderedHexList, LATLNG_DECIMAL_PLACES } from '../mapData';
+import { collectRangedTargetHexes } from './possibleUnitActionsStrategicRanged';
 import { buildTacticalAiPlanState } from '../tacticalBattle/buildTacticalAiPlanState';
 import { tacticalRes1Cell, tacticalRes4UnderRes1Corner } from '../tacticalBattle/testSupport/tacticalRes4HexFixtures';
 import { formatLatLng } from './promptText';
@@ -226,7 +232,7 @@ function testUnitHexAppearsInSingleBucketWithPriority(): void {
     .split('\n')
     .filter((line) => line.startsWith(`| opponent-air-1 | air |`) && line.includes(`| ${ferryPos} |`));
   assert.strictEqual(rowLines.length, 1, 'expected one row for same unit+hex across all buckets');
-  assert.ok(rowLines[0]!.includes('move/melee'), 'expected merged row to include move/melee action');
+  assert.ok(rowLines[0]!.includes('ferry'), 'expected merged row to include ferry action');
   assert.ok(rowLines[0]!.includes('air strike'), 'expected merged row to include air strike action');
   assert.ok(md.includes('## Hexes Nearest to Enemy Homeland'), 'expected higher-priority nearest bucket to be used');
 }
@@ -498,6 +504,103 @@ function testTacticalBestOptionsGroundMovesIncludeAdjacentEnemyHex(): void {
 }
 
 /**
+ * Stacked tactical armor on the same cell keep their own Best Options rows and share legal dests.
+ *
+ * Purpose: Tactical dest cache must not drop a stacked pawn or mix infantry dests into armor rows.
+ * When to use: After changing `tacticalLegalMoveDestCacheKey` / collectAggregated tactical dest reuse.
+ * Expected outcome: Both armor unit ids list the adjacent human hex; co-located infantry still appears.
+ * Exceptions: Throws if the fixture cannot find an adjacent res4 neighbor under the parent.
+ */
+function testTacticalBestOptionsStackedArmorShareMoveDests(): void {
+  const res1 = tacticalRes1Cell(12, 34);
+  const res4Opp = tacticalRes4UnderRes1Corner(12, 34);
+  const sameParent = [...gridDisk(res4Opp, 4)].filter((h) => cellToParent(h, 1) === res1);
+  const res4Human = sameParent.find((h) => h !== res4Opp && gridDistance(res4Opp, h) === 1);
+  if (!res4Human) {
+    throw new Error('expected adjacent res4 neighbor under the same res1 parent');
+  }
+  const tactical: TacticalBattleSnapshot = {
+    battleId: 't-best-options-stack',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: [res4Opp, res4Human],
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: {
+      [res4Opp]: 'plains',
+      [res4Human]: 'plains',
+    },
+    subUnits: [
+      {
+        id: 'opp-arm-a',
+        parentUnitId: 'parent-arm-a',
+        player: 'opponent',
+        unitType: 'armor',
+        h3Index: res4Opp,
+        displayName: 'Armor A',
+      },
+      {
+        id: 'opp-arm-b',
+        parentUnitId: 'parent-arm-b',
+        player: 'opponent',
+        unitType: 'armor',
+        h3Index: res4Opp,
+        displayName: 'Armor B',
+      },
+      {
+        id: 'opp-inf-stack',
+        parentUnitId: 'parent-inf-stack',
+        player: 'opponent',
+        unitType: 'infantry',
+        h3Index: res4Opp,
+        displayName: 'Infantry',
+      },
+      {
+        id: 'hum-adj',
+        parentUnitId: 'parent-inf',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: res4Human,
+        displayName: 'Infantry',
+      },
+    ],
+  };
+  const strategic: GameStateSnapshot = {
+    turnNumber: 1,
+    phase: 'planning',
+    hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+    units: [],
+    pendingOrders: [],
+    humanHomeRegionHexes: [res4Human],
+    res1Control: [{ h3Index: res1, controllerPlayerId: 'opponent' }],
+  };
+  const plan = buildTacticalAiPlanState(strategic, tactical);
+  const latLngByH3 = new Map<string, [number, number]>();
+  for (const h of plan.hexes.map((x) => x.h3Index)) {
+    latLngByH3.set(h, cellToLatLng(h) as [number, number]);
+  }
+  const fmt = (ll: [number, number]) => formatLatLng(ll, LATLNG_DECIMAL_PLACES);
+  const rows = collectAggregatedPossibleActionRows({
+    state: plan,
+    latLngByH3,
+    formatLatLng: fmt,
+    tacticalBattle: tactical,
+    forThisTurnOptionsTable: true,
+  });
+  const destsFor = (unitId: string) =>
+    rows
+      .filter((r) => r.unitId === unitId && (r.actionTypes.includes('move') || r.actionTypes.includes('melee')))
+      .map((r) => r.targetH3)
+      .sort();
+  const armorA = destsFor('opp-arm-a');
+  const armorB = destsFor('opp-arm-b');
+  assert.ok(armorA.includes(res4Human), 'first stacked armor must keep the adjacent human dest');
+  assert.deepStrictEqual(armorA, armorB, 'stacked same-type armor must share legal dests');
+  assert.ok(destsFor('opp-inf-stack').includes(res4Human), 'co-located infantry must still get dests');
+}
+
+/**
  * Ensures Best Options falls back to approach hexes when no enemy/infra hex is reachable this beat.
  *
  * Purpose: Distant contact should still show legal closing moves (top-5 cap applied later by selectTopRowsPerUnit).
@@ -685,6 +788,135 @@ function testTacticalBestOptionsIgnoresFriendlyOccupiedUrbanHex(): void {
 }
 
 /**
+ * Ensures tactical Best Options air strikes list human-occupied cells only (same tempo-rule filter as tactical ranged).
+ *
+ * Purpose: Empty urban tiles must not crowd out, or substitute for, striking observed humans. Plan-state airports live on the enclosing res1 hex.
+ * When to use: After edits to this-turn air-strike filtering in `collectAggregatedPossibleActionRows`.
+ * Expected outcome: Air strike on the adjacent human; no air strike on an empty urban tile two steps away.
+ * Exceptions: Throws when the fixture cannot place those two neighbors under the same parent.
+ */
+function testTacticalBestOptionsAirStrikesOnlyHumanOccupied(): void {
+  const res1 = tacticalRes1Cell(12, 34);
+  const res4Air = tacticalRes4UnderRes1Corner(12, 34);
+  const sameParent = [...gridDisk(res4Air, 6)].filter((h) => cellToParent(h, 1) === res1);
+  const res4Human = sameParent.find((h) => h !== res4Air && gridDistance(res4Air, h) === 1);
+  const res4EmptyUrban = sameParent.find(
+    (h) => h !== res4Air && h !== res4Human && gridDistance(res4Air, h) === 2
+  );
+  if (!res4Human || !res4EmptyUrban) {
+    throw new Error('expected a human neighbor and an empty urban cell two steps away under the same res1 parent');
+  }
+  const footprint = sameParent.filter((h) => {
+    try {
+      return gridDistance(res4Air, h) <= 3;
+    } catch {
+      return false;
+    }
+  });
+  const terrain: Record<string, string> = {};
+  for (const h of footprint) terrain[h] = 'plains';
+  const tactical: TacticalBattleSnapshot = {
+    battleId: 't-best-options-air-strike',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: footprint,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: terrain,
+    res4IsUrbanByH3: { [res4EmptyUrban]: true },
+    subUnits: [
+      {
+        id: 'opp-air-strike',
+        parentUnitId: 'parent-air',
+        player: 'opponent',
+        unitType: 'air',
+        h3Index: res4Air,
+        displayName: 'Air',
+      },
+      {
+        id: 'hum-adj-air',
+        parentUnitId: 'parent-inf',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: res4Human,
+        displayName: 'Infantry',
+      },
+    ],
+  };
+  const strategic: GameStateSnapshot = {
+    turnNumber: 1,
+    phase: 'planning',
+    hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+    units: [],
+    pendingOrders: [],
+    res1Infrastructure: [{ h3Index: res1, urbanHexCount: 1, airportCount: 1, seaportCount: 0 }],
+    res1Control: [{ h3Index: res1, controllerPlayerId: 'opponent' }],
+  };
+  const plan = buildTacticalAiPlanState(strategic, tactical);
+  const latLngByH3 = new Map<string, [number, number]>();
+  for (const h of plan.hexes.map((x) => x.h3Index)) {
+    latLngByH3.set(h, cellToLatLng(h) as [number, number]);
+  }
+  const rows = collectAggregatedPossibleActionRows({
+    state: plan,
+    latLngByH3,
+    formatLatLng: (ll) => formatLatLng(ll, LATLNG_DECIMAL_PLACES),
+    tacticalBattle: tactical,
+    forThisTurnOptionsTable: true,
+  });
+  const strikes = rows.filter(
+    (r) => r.unitId === 'opp-air-strike' && r.actionTypes.includes('air strike')
+  );
+  assert.ok(
+    strikes.some((r) => r.targetH3 === res4Human),
+    'tactical Best Options must list an air strike on the adjacent human'
+  );
+  assert.ok(
+    !strikes.some((r) => r.targetH3 === res4EmptyUrban),
+    'tactical Best Options must not list an air strike on empty urban'
+  );
+}
+
+/**
+ * Verifies Best Options still lists a legal strategic ranged target H3 cannot measure directly.
+ *
+ * Purpose: `collectRangedTargetHexes` skipped any enemy hex whose `gridDistance` threw, so a legal shot across an
+ * icosahedron face crossing never reached the table the model is told to act on.
+ * When to use: After changes to `collectRangedTargetHexes` or the shared distance fallback.
+ * Expected outcome: The unmeasurable enemy hex appears for an air unit whose range covers the derived distance.
+ * Exceptions: Fails the assertion when the world hex list has no such pair.
+ */
+function testStrategicRangedTargetsIncludeUnmeasurablePair(): void {
+  const hexes = getOrderedHexList();
+  const airRange = getRange('air');
+  let pair: [string, string] | null = null;
+  for (const origin of hexes) {
+    for (const other of hexes) {
+      if (other === origin || computeGridDistancePure(origin, other) !== null) continue;
+      const derived = computeGridDistanceWithPathFallbackPure(origin, other);
+      if (derived !== null && derived >= 1 && derived <= airRange) {
+        pair = [origin, other];
+        break;
+      }
+    }
+    if (pair) break;
+  }
+  assert.ok(pair, 'expected a world res1 pair inside air range that gridDistance cannot measure');
+  const [unitH3, enemyHex] = pair!;
+  const indexed = { enemyUnitsByHex: new Map([[enemyHex, [{ unitType: 'armor' }]]]) };
+  assert.deepStrictEqual(collectRangedTargetHexes(unitH3, 'air', indexed), [enemyHex]);
+
+  // An out-of-range pair must still be excluded, so the fallback did not simply stop filtering.
+  const farEnemy = hexes.find(
+    (h) => (computeGridDistanceWithPathFallbackPure(unitH3, h) ?? 0) > airRange
+  );
+  assert.ok(farEnemy, 'expected some hex beyond air range');
+  const farIndexed = { enemyUnitsByHex: new Map([[farEnemy!, [{ unitType: 'armor' }]]]) };
+  assert.deepStrictEqual(collectRangedTargetHexes(unitH3, 'air', farIndexed), []);
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
 
  * Purpose: Supports maintainability by documenting why `tests` exists.
@@ -693,6 +925,10 @@ function testTacticalBestOptionsIgnoresFriendlyOccupiedUrbanHex(): void {
  * Exceptions: None.
  */
 const tests = [
+  {
+    name: 'collectRangedTargetHexes keeps a legal target gridDistance cannot measure',
+    fn: testStrategicRangedTargetsIncludeUnmeasurablePair,
+  },
   { name: 'partitionHomelandNearestOther prefers homeland', fn: testPartitionPrefersHomelandOverNearest },
   { name: 'partitionHomelandNearestOther uses nearest when no homeland hit', fn: testPartitionNearestWhenNoneInHomeland },
   { name: 'partitionHomelandNearestOther empty homeland -> other only', fn: testPartitionEmptyHomelandAllOther },
@@ -712,12 +948,20 @@ const tests = [
     fn: testTacticalBestOptionsGroundMovesIncludeAdjacentEnemyHex,
   },
   {
+    name: 'collectAggregatedPossibleActionRows tactical Best Options stacked armor share move dests',
+    fn: testTacticalBestOptionsStackedArmorShareMoveDests,
+  },
+  {
     name: 'collectAggregatedPossibleActionRows tactical Best Options approach fallback when enemy out of reach',
     fn: testTacticalBestOptionsApproachFallbackWhenEnemyOutOfReach,
   },
   {
     name: 'collectAggregatedPossibleActionRows tactical Best Options ignores friendly-occupied urban hex',
     fn: testTacticalBestOptionsIgnoresFriendlyOccupiedUrbanHex,
+  },
+  {
+    name: 'collectAggregatedPossibleActionRows tactical Best Options air strikes only human-occupied',
+    fn: testTacticalBestOptionsAirStrikesOnlyHumanOccupied,
   },
 ];
 
