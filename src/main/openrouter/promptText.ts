@@ -277,7 +277,7 @@ export function buildToolUsageGuidance(
       );
     } else if (flags.ordersEnabled) {
       lines.push(
-        '- Standing orders: for every unit listed under ## Units Without Standing Orders in the briefing, add an orders[] entry with action assign_order (march/pursue for closing; defend to hold). Do not march to the unit\'s current Hex — that order is dropped as already arrived. When you need a one-step explicit_move this turn, copy a Best Options approach or move/melee Target Hex that is not the current cell, or assign defend to hold. Copy ferry Target Hexes into ferryOrders. Call plan_route only for dests not listed there.'
+        '- Standing orders: for every unit listed under ## Units Without Standing Orders in the briefing, add an orders[] entry with action assign_order (march/pursue for closing; defend to hold). That table\'s Suggested Destination column already holds a legal hex that closes on the nearest enemy — march there unless you have a better destination in mind, and use defend only when you actually want the unit to hold. Never march to the unit\'s current Hex; that order is dropped as already arrived and the unit stays idle. When you need a one-step explicit_move this turn, copy a Best Options approach or move/melee Target Hex that is not the current cell, or assign defend to hold. Copy ferry Target Hexes into ferryOrders. Call plan_route only for dests not listed there.'
       );
       lines.push(buildTempoRuleLine('turn'));
     }

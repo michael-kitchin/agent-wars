@@ -10,7 +10,7 @@
  */
 
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import { gridHopDistanceBetween } from '../tools/assessUnitProximity';
+import { gridHopDistanceBetween, pickApproachHexesTowardNearestEnemy } from '../tools/assessUnitProximity';
 import { logDebug } from '../logger';
 import { ACTION_APPROACH, ACTION_MOVES_MELEE } from './possibleUnitActionsTableAssembly';
 
@@ -284,34 +284,16 @@ export function filterTacticalGroundMoveHexesForThisTurnOptionsTable(
  * When to use: Strategic and tactical this-turn tables after the interest filter returns empty for a unit.
  * Expected outcome: Subset of `hexes` that approach at least one enemy cell; empty when no enemy is observed or no hex improves distance.
  * Exceptions: Hexes with no measurable H3 distance (direct APIs and neighbor BFS) are skipped.
+ *
+ * Delegates to the shared `pickApproachHexesTowardNearestEnemy` so Standing Order Status suggested destinations offer the
+ * same hexes these rows do; keep the named wrapper because the surrounding table code reads in Best Options terms.
  */
 function filterApproachMoveHexesForThisTurnOptionsTable(
   unitH3: string,
   hexes: string[],
   enemyOccupiedH3: ReadonlySet<string>
 ): string[] {
-  if (enemyOccupiedH3.size === 0 || hexes.length === 0) return [];
-  let nearestDist = Infinity;
-  const nearestEnemies: string[] = [];
-  for (const enemyH3 of enemyOccupiedH3) {
-    const d = safeGridDistance(unitH3, enemyH3);
-    if (d === null) continue;
-    if (d < nearestDist) {
-      nearestDist = d;
-      nearestEnemies.length = 0;
-      nearestEnemies.push(enemyH3);
-    } else if (d === nearestDist) {
-      nearestEnemies.push(enemyH3);
-    }
-  }
-  if (!Number.isFinite(nearestDist) || nearestEnemies.length === 0) return [];
-  return hexes.filter((h3) => {
-    for (const enemyH3 of nearestEnemies) {
-      const next = safeGridDistance(h3, enemyH3);
-      if (next !== null && next < nearestDist) return true;
-    }
-    return false;
-  });
+  return pickApproachHexesTowardNearestEnemy(unitH3, hexes, enemyOccupiedH3);
 }
 
 /**

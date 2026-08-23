@@ -15,6 +15,19 @@ import type { HumanOrderPreviewSegment } from '../../shared/ipc/humanOrderPrevie
 export const AIR_INELIGIBLE_ORDER_TYPES: ReadonlySet<string> = new Set(['march', 'pursue', 'patrol']);
 
 /**
+ * Reports whether a unit type may be given a particular standing-order type.
+ *
+ * Purpose: The rejection in `assignOrder` and the briefing content that invites orders must agree, or the prompt will
+ * keep suggesting a march to an air unit that `assignOrder` then refuses.
+ * When to use: Before persisting an order, and before offering a movement destination for a unit in the briefing.
+ * Expected outcome: False only for air units given a hex-by-hex movement order; true otherwise.
+ * Exceptions: None.
+ */
+export function canAssignStandingOrderType(unitType: string, orderType: string): boolean {
+  return !(unitType === 'air' && AIR_INELIGIBLE_ORDER_TYPES.has(orderType));
+}
+
+/**
  * JSON payload persisted in `standing_orders.computed_route` for march and pursue orders.
  *
  * Purpose: Stores turn progress plus optional display cache so `listHumanStandingOrders` can reuse polylines without replanning.

@@ -164,6 +164,90 @@ export function gridHopDistanceBetween(origin: string, target: string): number |
 }
 
 /**
+ * Keeps the candidate hexes that strictly reduce hop distance to the nearest observed enemy cell.
+ *
+ * Purpose: Single definition of "closing the distance" so the Best Options approach rows and the Standing Order Status
+ * suggested destinations cannot drift; a suggestion the model copies must be one Best Options would also have offered.
+ * When to use: Pass already-legal this-turn destinations; this filter judges direction only and never re-checks legality.
+ * Expected outcome: Subset of `hexes` in caller order that closes on at least one nearest enemy; empty when no enemy is
+ * observed, no candidate is supplied, or nothing improves on the unit's current distance.
+ * Exceptions: Never throws; pairs that stay unmeasurable even by BFS are skipped rather than guessed at.
+ */
+export function pickApproachHexesTowardNearestEnemy(
+  unitH3: string,
+  hexes: readonly string[],
+  enemyOccupiedH3: ReadonlySet<string>
+): string[] {
+  if (hexes.length === 0) return [];
+  const nearest = nearestEnemyHexesFrom(unitH3, enemyOccupiedH3);
+  if (nearest === null) return [];
+  const closing = hexes.filter((h3) => {
+    const next = shortestHopDistanceToAny(h3, nearest.hexes);
+    return next !== null && next < nearest.distance;
+  });
+  logTrace('assessUnitProximity pickApproachHexesTowardNearestEnemy', {
+    unitH3,
+    candidateCount: hexes.length,
+    enemyOccupiedCount: enemyOccupiedH3.size,
+    nearestDist: nearest.distance,
+    closingCount: closing.length,
+  });
+  return closing;
+}
+
+/**
+ * Finds the closest observed enemy-occupied cells and how far away they are.
+ *
+ * Purpose: Approach filtering and approach *ranking* both need the same "who is nearest" answer, and computing it twice
+ * from separate scans is how the Best Options rows and the suggested destinations would silently disagree.
+ * When to use: Any caller scoring movement toward the enemy; pass the enemy hexes the caller is allowed to see.
+ * Expected outcome: The tied-nearest hexes plus their shared hop distance, or null when no enemy is measurable at all.
+ * Exceptions: Never throws; unmeasurable pairs are skipped, so a non-null result always has at least one hex.
+ */
+export function nearestEnemyHexesFrom(
+  originH3: string,
+  enemyOccupiedH3: ReadonlySet<string>
+): { hexes: string[]; distance: number } | null {
+  if (enemyOccupiedH3.size === 0) return null;
+  let distance = Infinity;
+  const hexes: string[] = [];
+  for (const enemyH3 of enemyOccupiedH3) {
+    const d = gridHopDistanceBetween(originH3, enemyH3);
+    if (d === null) continue;
+    if (d < distance) {
+      distance = d;
+      hexes.length = 0;
+      hexes.push(enemyH3);
+    } else if (d === distance) {
+      hexes.push(enemyH3);
+    }
+  }
+  if (!Number.isFinite(distance) || hexes.length === 0) return null;
+  return { hexes, distance };
+}
+
+/**
+ * Measures the shortest hop distance from one hex to any hex in a target list.
+ *
+ * Purpose: Approach candidates are scored against a tied set of nearest enemies, not a single one.
+ * When to use: Ranking or filtering candidate destinations against `nearestEnemyHexesFrom(...).hexes`.
+ * Expected outcome: The minimum measurable hop count, or null when every pair is unmeasurable.
+ * Exceptions: Never throws.
+ */
+export function shortestHopDistanceToAny(
+  originH3: string,
+  targetsH3: readonly string[]
+): number | null {
+  let best: number | null = null;
+  for (const targetH3 of targetsH3) {
+    const d = gridHopDistanceBetween(originH3, targetH3);
+    if (d === null) continue;
+    if (best === null || d < best) best = d;
+  }
+  return best;
+}
+
+/**
  * Honesty sentence when Unit Status distances use grid hops instead of march paths.
  *
  * Purpose: Single copy so briefing formatters and tests cannot drift.
