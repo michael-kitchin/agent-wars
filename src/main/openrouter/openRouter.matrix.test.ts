@@ -233,6 +233,7 @@ async function run(): Promise<void> {
         success: boolean;
         airStrikes?: AirStrikeOrder[];
         ferryOrders?: FerryOrder[];
+        dropReasons?: string[];
       }>;
       getToolNamesForEnabledGroups: (ids: string[]) => string[];
     };
@@ -510,7 +511,15 @@ async function run(): Promise<void> {
     });
     assert.strictEqual(airResult.success, true, 'valid air action JSON should parse successfully');
     assert.strictEqual(airResult.airStrikes?.length ?? 0, 1, 'air strike entries should carry through model JSON parsing');
-    assert.strictEqual(airResult.ferryOrders?.length ?? 0, 1, 'ferry entries should carry through model JSON parsing');
+    assert.strictEqual(
+      airResult.ferryOrders?.length ?? 0,
+      0,
+      'a strategic ferry naming an unknown unit and an enemy-held destination must not reach resolution'
+    );
+    assert.ok(
+      (airResult.dropReasons ?? []).some((reason) => reason.startsWith('Ferry ')),
+      'the rejected strategic ferry must be reported as a drop reason'
+    );
 
     const buildSystemPromptModule = require('./openRouterBuildSystemPrompt') as {
       buildSystemPromptForTools: (

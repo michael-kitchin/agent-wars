@@ -33,11 +33,47 @@ function infrastructureCellForThisTurnOptionsRow(r: PossibleActionTableRow): str
 }
 
 /**
+ * Merges option rows that offer the identical action and target into one row listing every unit that shares it.
+ *
+ * Purpose: Units stacked on one hex each produce the same handful of options, so the per-unit table repeats itself
+ * once per unit. A captured turn listed 518 rows carrying only 67 distinct options, and that redundancy dominated the
+ * prompt. Collapsing it keeps every unit addressable while cutting the block to roughly a quarter of its size.
+ * When to use: `renderThisTurnOptionsTableMarkdown`, after the per-unit cap has already chosen which options survive.
+ * Expected outcome: One entry per distinct `(action, hex, target units, infrastructure)` tuple, in first-appearance
+ * order, with `unitIds` in the order those units were encountered so the table stays stable turn to turn.
+ * Exceptions: None.
+ */
+function groupThisTurnOptionRowsByTarget(
+  rows: readonly { unitId: string; action: string; hex: string; targetUnits: string; infrastructure: string }[]
+): Array<{ unitIds: string[]; action: string; hex: string; targetUnits: string; infrastructure: string }> {
+  const byTarget = new Map<
+    string,
+    { unitIds: string[]; action: string; hex: string; targetUnits: string; infrastructure: string }
+  >();
+  for (const row of rows) {
+    const key = [row.action, row.hex, row.targetUnits, row.infrastructure].join('\u0000');
+    const existing = byTarget.get(key);
+    if (existing) {
+      if (!existing.unitIds.includes(row.unitId)) existing.unitIds.push(row.unitId);
+      continue;
+    }
+    byTarget.set(key, {
+      unitIds: [row.unitId],
+      action: row.action,
+      hex: row.hex,
+      targetUnits: row.targetUnits,
+      infrastructure: row.infrastructure,
+    });
+  }
+  return [...byTarget.values()];
+}
+
+/**
  * Renders the consolidated **Best Options This Turn** table from aggregated possible-action rows.
  *
  * Purpose: Single high-signal table replacing multi-bucket possible-actions markdown.
  * When to use: After `collectAggregatedPossibleActionRows`.
- * Expected outcome: Columns `Unit ID`, `Action`, `Target Hexes`, `Target Units` (enemy summary only), `Target Infrastructure` (hex features; air-strike rows omit `; strike: …`); at most five rows per unit; one target hex per row.
+ * Expected outcome: Columns `Unit IDs`, `Action`, `Target Hexes`, `Target Units` (enemy summary only), `Target Infrastructure` (hex features; air-strike rows omit `; strike: …`); at most five options per unit; one target hex per row, with units sharing an identical option listed together in `Unit IDs`.
  * Exceptions: Propagates `h3ToCode` failures for unknown tactical/strategic cells.
  */
 export function renderThisTurnOptionsTableMarkdown(
@@ -48,15 +84,23 @@ export function renderThisTurnOptionsTableMarkdown(
   logDebug('briefing-tables renderThisTurnOptionsTableMarkdown', { rowCount: rows.length, mode: context.mode });
   if (rows.length === 0) return '';
   const capped = selectTopRowsPerUnit(rows, latLngByH3);
-  const body = capped.map((r) => {
-    const hex = h3ToCode(r.targetH3, context);
-    const action = deriveThisTurnOptionsActionColumn(r);
-    const targetUnits = r.enemySummary.replace(/\|/g, ' ');
-    const infrastructure = infrastructureCellForThisTurnOptionsRow(r);
-    return [r.unitId, action, hex, targetUnits, infrastructure];
+  const grouped = groupThisTurnOptionRowsByTarget(
+    capped.map((r) => ({
+      unitId: r.unitId,
+      action: deriveThisTurnOptionsActionColumn(r),
+      hex: h3ToCode(r.targetH3, context),
+      targetUnits: r.enemySummary.replace(/\|/g, ' '),
+      infrastructure: infrastructureCellForThisTurnOptionsRow(r),
+    }))
+  );
+  logDebug('briefing-tables renderThisTurnOptionsTableMarkdown: grouped', {
+    cappedRowCount: capped.length,
+    groupedRowCount: grouped.length,
+    mode: context.mode,
   });
+  const body = grouped.map((g) => [g.unitIds.join(', '), g.action, g.hex, g.targetUnits, g.infrastructure]);
   const lines = buildPromptTableLines(
-    ['Unit ID', 'Action', 'Target Hexes', 'Target Units', 'Target Infrastructure'],
+    ['Unit IDs', 'Action', 'Target Hexes', 'Target Units', 'Target Infrastructure'],
     body
   );
   return `${lines.join('\n')}\n`;

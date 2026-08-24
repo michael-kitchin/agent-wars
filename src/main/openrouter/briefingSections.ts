@@ -3,6 +3,8 @@ import {
   getMaxedUnitTypesForPlayer,
   getPlayerUnitCountsByType,
   filterQueueableUnitTypes,
+  isEveryAvailableTypeAtCap,
+  ALL_AVAILABLE_TYPES_AT_CAP_NOTE,
   PRODUCTION_CAP_QUEUE_GUIDANCE,
 } from '../productionCaps';
 import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
@@ -17,9 +19,9 @@ import { gridHopDistancesFrom } from '../tools/assessUnitProximity';
 /**
  * Formats the Available Unit Types cell, omitting types already at the player's deployment cap unless no alternative remains.
  *
- * Purpose: The production table must not list capped types as buildable when another type can still spawn; a hex that can only build the capped type still lists it so pre-queue remains possible.
+ * Purpose: The production table must not list capped types as buildable when another type can still spawn; a hex that can only build capped types still lists them so pre-queue remains possible, but must say so or the cap guidance reads as an instruction to swap in a type the hex cannot build.
  * When to use: Production briefing rows after `getMaxedUnitTypesForPlayer`.
- * Expected outcome: Comma-separated queueable types, or `—` when the hex has no available types at all.
+ * Expected outcome: Comma-separated queueable types, suffixed with the all-at-cap note when every listed type is maxed, or `—` when the hex has no available types at all.
  * Exceptions: None.
  */
 export function formatBriefingAvailableUnitTypes(
@@ -31,7 +33,9 @@ export function formatBriefingAvailableUnitTypes(
     maxedCount: maxedTypes.size,
   });
   const kept = filterQueueableUnitTypes(available, maxedTypes);
-  return kept.length > 0 ? kept.join(', ') : '—';
+  if (kept.length === 0) return '—';
+  const label = kept.join(', ');
+  return isEveryAvailableTypeAtCap(kept, maxedTypes) ? `${label} (${ALL_AVAILABLE_TYPES_AT_CAP_NOTE})` : label;
 }
 
 /**

@@ -297,7 +297,7 @@ function testStrikeableInfraCountsOnlyHumanControlled(): void {
  *
  * Purpose: Turn 9 still listed armor as available and queued armor as healthy at 32/32, so empty hexes were filled with armor that cannot spawn.
  * When to use: After edits to production briefing available-type / queue formatting.
- * Expected outcome: Maxed types are omitted from available when another type remains; a hex that can only build the capped type still lists it; when every listed type is at cap the full list remains; queued maxed types are annotated as blocked.
+ * Expected outcome: Maxed types are omitted from available when another type remains; a hex that can only build capped types still lists them but is marked all-at-cap so the cap guidance is not read as "swap in another type"; queued maxed types are annotated as blocked.
  * Exceptions: None.
  */
 function testProductionBriefingHidesMaxedTypesAndAnnotatesBlockedQueues(): void {
@@ -306,11 +306,12 @@ function testProductionBriefingHidesMaxedTypesAndAnnotatesBlockedQueues(): void 
     formatBriefingAvailableUnitTypes(['infantry', 'armor', 'naval', 'air'], maxed),
     'infantry, naval, air'
   );
-  assert.equal(formatBriefingAvailableUnitTypes(['armor'], maxed), 'armor');
+  assert.equal(formatBriefingAvailableUnitTypes(['armor'], maxed), 'armor (all at cap)');
   assert.equal(
-    formatBriefingAvailableUnitTypes(['infantry', 'armor', 'naval', 'air'], new Set(['infantry', 'armor', 'naval', 'air'])),
-    'infantry, armor, naval, air'
+    formatBriefingAvailableUnitTypes(['infantry', 'armor', 'air'], new Set(['infantry', 'armor', 'air'])),
+    'infantry, armor, air (all at cap)'
   );
+  assert.equal(formatBriefingAvailableUnitTypes([], maxed), '—');
   assert.equal(formatBriefingProductionQueueCell('1 armor', 'armor', maxed), '1 armor (blocked: at cap)');
   assert.equal(formatBriefingProductionQueueCell('1 infantry', 'infantry', maxed), '1 infantry');
   assert.equal(formatBriefingProductionQueueCell('—', undefined, maxed), '—');

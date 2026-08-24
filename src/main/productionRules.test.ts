@@ -5,7 +5,13 @@ import {
   getAvailableBuildUnitTypes,
   isValidBuildCount,
 } from './productionRules';
-import { MAX_UNITS_PER_TYPE as MAX_UNITS_PER_TYPE_MAIN, getMaxedUnitTypesForPlayer, shouldRejectCappedQueueType, filterQueueableUnitTypes } from './productionCaps';
+import {
+  MAX_UNITS_PER_TYPE as MAX_UNITS_PER_TYPE_MAIN,
+  getMaxedUnitTypesForPlayer,
+  shouldRejectCappedQueueType,
+  filterQueueableUnitTypes,
+  isEveryAvailableTypeAtCap,
+} from './productionCaps';
 import { getMaxUnitsPerType } from '../shared/gameSize';
 import {
   estimateTurnsToCompleteQueuedProduction,
@@ -158,8 +164,8 @@ function testMaxedTypesRespectMatchSize(): void {
  * Ensures capped types are rejected only when the hex can still build another type.
  *
  * Purpose: AI production must not fill queues with armor (etc.) at cap when infantry/air/naval can still spawn; pre-queue remains legal if that hex has no alternative.
- * When to use: After edits to `shouldRejectCappedQueueType` or `filterQueueableUnitTypes`.
- * Expected outcome: Reject armor when infantry is also available; allow armor when it is the only available type or when every available type is at cap; filter omits armor unless no unmaxed alternative remains.
+ * When to use: After edits to `shouldRejectCappedQueueType`, `filterQueueableUnitTypes`, or `isEveryAvailableTypeAtCap`.
+ * Expected outcome: Reject armor when infantry is also available; allow armor when it is the only available type or when every available type is at cap; filter omits armor unless no unmaxed alternative remains; the all-at-cap probe agrees with that fallback and is false for an empty list.
  * Exceptions: None.
  */
 function testCappedQueueTypeRejectedOnlyWhenAlternativeExists(): void {
@@ -174,6 +180,9 @@ function testCappedQueueTypeRejectedOnlyWhenAlternativeExists(): void {
   assert.deepEqual(filterQueueableUnitTypes(['armor'], maxed), ['armor']);
   assert.deepEqual(filterQueueableUnitTypes(mixed, allMaxed), mixed);
   assert.deepEqual(filterQueueableUnitTypes([], maxed), []);
+  assert.equal(isEveryAvailableTypeAtCap(mixed, allMaxed), true);
+  assert.equal(isEveryAvailableTypeAtCap(mixed, maxed), false);
+  assert.equal(isEveryAvailableTypeAtCap([], allMaxed), false);
 }
 
 /**

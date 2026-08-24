@@ -10,6 +10,17 @@ export { MAX_UNITS_PER_TYPE, getPlayerUnitCountsByType, getMaxUnitsPerType, pars
 export type { GameSize };
 
 /**
+ * Marker appended to a briefing available-types cell when every type that hex can build is at the deployment cap.
+ *
+ * Purpose: `filterQueueableUnitTypes` falls back to listing capped types so pre-queueing stays possible, which otherwise
+ * reads as "these are buildable" and invites the model to swap in a type the hex cannot build at all.
+ * When to use: Production briefing available-type cells, and any prompt copy that must refer to that marker by name.
+ * Expected outcome: Verbatim inclusion so `PRODUCTION_CAP_QUEUE_GUIDANCE` and the table agree on one spelling.
+ * Exceptions: None.
+ */
+export const ALL_AVAILABLE_TYPES_AT_CAP_NOTE = 'all at cap';
+
+/**
  * Prompt and briefing copy for AI production when a type is at the per-side deployment cap.
  *
  * Purpose: One sentence shared by tool guidance, submit clauses, and the production briefing so the model is not told conflicting cap rules.
@@ -18,7 +29,8 @@ export type { GameSize };
  * Exceptions: None.
  */
 export const PRODUCTION_CAP_QUEUE_GUIDANCE =
-  'Do not queue types at maximum while other types can still be built; replace blocked queues with a still-available type.';
+  'Do not queue types at maximum while other types can still be built; replace blocked queues with a still-available type. ' +
+  `A hex whose available types are marked "${ALL_AVAILABLE_TYPES_AT_CAP_NOTE}" has no alternative — leave that queue as it is so it resumes when the cap frees up.`;
 
 /**
  * Stable iteration order for deployment-cap checks and maxed-type lists (infantry → armor → naval → air).
@@ -67,6 +79,27 @@ export function filterQueueableUnitTypes(
   });
   const unmaxed = available.filter((unitType) => !maxedTypes.has(unitType));
   return unmaxed.length > 0 ? unmaxed : [...available];
+}
+
+/**
+ * True when a hex can still build something but every one of those types is at the deployment cap.
+ *
+ * Purpose: Distinguishes "pick a different type here" from "nothing can spawn here until a unit dies", which
+ * `filterQueueableUnitTypes` alone cannot express because its fallback returns the capped list unchanged.
+ * When to use: Before rendering an available-types cell, or anywhere that must decide whether swapping the queued
+ * type could help.
+ * Expected outcome: False for an empty list and for any list containing at least one non-maxed type.
+ * Exceptions: None.
+ */
+export function isEveryAvailableTypeAtCap(
+  available: readonly string[],
+  maxedTypes: ReadonlySet<string>
+): boolean {
+  logTrace('productionCaps isEveryAvailableTypeAtCap', {
+    availableCount: available.length,
+    maxedCount: maxedTypes.size,
+  });
+  return available.length > 0 && available.every((unitType) => maxedTypes.has(unitType));
 }
 
 /**

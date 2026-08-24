@@ -128,6 +128,33 @@ const PRODUCTION_REQUIREMENT_PRIORITY_INITIAL =
 const PRODUCTION_CAP_GUIDANCE = PRODUCTION_CAP_QUEUE_GUIDANCE;
 
 /**
+ * Explains the Best Options table's shared `Unit IDs` cell so a grouped row is not read as belonging to one unit.
+ *
+ * Purpose: Units stacked on a hex share identical options, and the table lists them together rather than repeating the
+ * row per unit. Without this sentence the model can read a multi-id row as naming a single unit and skip the rest.
+ * When to use: Best Options coaching in both coordinate modes; keep it adjacent to the copy-a-Target-Hex instruction.
+ * Expected outcome: One sentence, embedded mid-bullet, so it stays next to the instruction it qualifies.
+ * Exceptions: None.
+ */
+const BEST_OPTIONS_SHARED_ROW_NOTE =
+  'One row can list several unit ids in Unit IDs when those units share the same option; every id listed there may use that row\'s Target Hex.';
+
+/**
+ * Tells the model to move air that has nothing in range, since air is the one arm that must relocate to matter.
+ *
+ * Purpose: Strike range is 3 and ferry range is 4, so a squadron based behind the line can never satisfy the tempo
+ * rule from where it stands and is passed over turn after turn. A captured turn had every squadron parked at home
+ * with ferry destinations listed in Best Options and no ferry orders issued at all. Like the tempo rule, this says
+ * nothing about the engine's fallback: the model picks better bases than "closest to the nearest enemy" when it
+ * engages with the decision, and stops picking at all once it believes the move happens regardless.
+ * When to use: Strategic tool-usage guidance. Tactical beats bound ferrying to the battle footprint instead.
+ * Expected outcome: One markdown bullet, worded for strategic ferry ranges.
+ * Exceptions: None.
+ */
+const AIR_REPOSITIONING_LINE =
+  '- Air repositioning: an air unit only contributes on a turn when an enemy is within strike range of its base, and ferrying costs it nothing else that turn. For every air unit with no strike listed in Best Options, take its ferry Target Hex toward the fighting and put it in ferryOrders; a squadron left at a quiet base is a whole unit contributing nothing. An air unit cannot strike and ferry on the same turn, so ferry only the ones with no shot.';
+
+/**
  * Builds the tempo-rule bullet telling the model to fire every unit that legally can, and to pick the targets itself.
  *
  * Purpose: Attacks resolve from turn-start positions and never cost a move, so declining one is always a loss. The
@@ -263,8 +290,8 @@ export function buildToolUsageGuidance(
     if (flags.planningEnabled) {
       lines.push(
         coordinateMode === 'tactical'
-          ? '- Best Options This Turn Target Hexes are already this-beat legal destinations. Copy a Target Hex from that sub-unit\'s approach or move/melee row into explicit_move.destination; copy an air strike Target Hex into airStrikes. Do not call plan_route for those dests. Call plan_route only when you need a destination not listed for that sub-unit. After dests are chosen, submit — do not re-assess or re-route.'
-          : '- Best Options This Turn Target Hexes are already this-turn legal destinations. Copy a Target Hex from that unit\'s approach or move/melee row into explicit_move.destination when you need a one-step move; copy a ferry Target Hex into ferryOrders; copy an air strike Target Hex into airStrikes. Do not call plan_route for those dests. Call plan_route only when you need a destination not listed for that unit. After dests are chosen, submit — do not re-assess or re-route.'
+          ? `- Best Options This Turn Target Hexes are already this-beat legal destinations. ${BEST_OPTIONS_SHARED_ROW_NOTE} Copy a Target Hex from a row listing that sub-unit into explicit_move.destination; copy an air strike Target Hex into airStrikes. Do not call plan_route for those dests. Call plan_route only when you need a destination not listed for that sub-unit. After dests are chosen, submit — do not re-assess or re-route.`
+          : `- Best Options This Turn Target Hexes are already this-turn legal destinations. ${BEST_OPTIONS_SHARED_ROW_NOTE} Copy a Target Hex from a row listing that unit into explicit_move.destination when you need a one-step move; copy a ferry Target Hex into ferryOrders; copy an air strike Target Hex into airStrikes. Do not call plan_route for those dests. Call plan_route only when you need a destination not listed for that unit. After dests are chosen, submit — do not re-assess or re-route.`
       );
     }
     if (coordinateMode === 'tactical') {
@@ -280,6 +307,7 @@ export function buildToolUsageGuidance(
         '- Standing orders: for every unit listed under ## Units Without Standing Orders in the briefing, add an orders[] entry with action assign_order (march/pursue for closing; defend to hold). That table\'s Suggested Destination column already holds a legal hex that closes on the nearest enemy — march there unless you have a better destination in mind, and use defend only when you actually want the unit to hold. Never march to the unit\'s current Hex; that order is dropped as already arrived and the unit stays idle. When you need a one-step explicit_move this turn, copy a Best Options approach or move/melee Target Hex that is not the current cell, or assign defend to hold. Copy ferry Target Hexes into ferryOrders. Call plan_route only for dests not listed there.'
       );
       lines.push(buildTempoRuleLine('turn'));
+      lines.push(AIR_REPOSITIONING_LINE);
     }
     if (flags.memoryEnabled) {
       lines.push(

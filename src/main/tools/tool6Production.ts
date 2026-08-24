@@ -199,60 +199,65 @@ function setBuildQueue(
   resolveToH3: (lat: number, lng: number) => string | undefined,
   state: GameStateSnapshot
 ): Record<string, unknown> {
-  logDebug('tool6Production setBuildQueue', {
-    hasHex: args.hex !== undefined,
-    unitType: typeof args.unitType === 'string' ? args.unitType : null,
-  });
+  const requestedType = typeof args.unitType === 'string' ? args.unitType : null;
+  logDebug('tool6Production setBuildQueue', { hasHex: args.hex !== undefined, unitType: requestedType });
+  const reject = (error: string, h3Index?: string): Record<string, unknown> => {
+    logDebug('tool6Production setBuildQueue: rejected', {
+      unitType: requestedType,
+      h3Index: h3Index ?? null,
+      stateTurn: state.turnNumber,
+      error,
+    });
+    return { status: 'error', error };
+  };
   const resolved = resolveHexArgument(args, resolveToH3);
-  if (!resolved.ok) return { status: 'error', error: resolved.error };
+  if (!resolved.ok) return reject(resolved.error);
   if (!isBuildUnitType(args.unitType)) {
-    return { status: 'error', error: 'set_build_queue requires unitType (infantry|armor|naval|air).' };
+    return reject('set_build_queue requires unitType (infantry|armor|naval|air).', resolved.h3Index);
   }
   const count = Number(args.count);
   if (!isValidBuildCount(count)) {
-    return {
-      status: 'error',
-      error: `set_build_queue count must be an integer from ${BUILD_ENTRY_MIN_COUNT} to ${BUILD_ENTRY_MAX_COUNT}.`,
-    };
+    return reject(
+      `set_build_queue count must be an integer from ${BUILD_ENTRY_MIN_COUNT} to ${BUILD_ENTRY_MAX_COUNT}.`,
+      resolved.h3Index
+    );
   }
   const currentQueue = getHexBuildQueue(resolved.h3Index, AI_PLAYER_ID);
   if (!currentQueue.controlledByRequester) {
-    return { status: 'error', error: currentQueue.noBuildReason ?? 'Hex is not controlled by requester.' };
+    return reject(currentQueue.noBuildReason ?? 'Hex is not controlled by requester.', resolved.h3Index);
   }
   if (!currentQueue.buildSectionVisible) {
-    return { status: 'error', error: currentQueue.noBuildReason ?? 'Build section is not available for this hex.' };
+    return reject(currentQueue.noBuildReason ?? 'Build section is not available for this hex.', resolved.h3Index);
   }
   if (!currentQueue.availableUnitTypes.includes(args.unitType)) {
-    return {
-      status: 'error',
-      error: `set_build_queue unitType ${args.unitType} is not available for this hex.`,
-    };
+    return reject(
+      `set_build_queue unitType ${args.unitType} is not available for this hex; available: ${
+        currentQueue.availableUnitTypes.join(', ') || 'none'
+      }.`,
+      resolved.h3Index
+    );
   }
   const maxedTypes = new Set(
     getMaxedUnitTypesForPlayer(state.units, AI_PLAYER_ID, parseGameSize(state.gameSize))
   );
   if (shouldRejectCappedQueueType(args.unitType, currentQueue.availableUnitTypes, maxedTypes)) {
-    logDebug('tool6Production setBuildQueue: rejected type at deployment cap', {
-      unitType: args.unitType,
-      h3Index: resolved.h3Index,
-    });
-    return {
-      status: 'error',
-      error: `set_build_queue unitType ${args.unitType} is at deployment cap; queue a still-available type instead.`,
-    };
+    return reject(
+      `set_build_queue unitType ${args.unitType} is at deployment cap; queue a still-available type instead.`,
+      resolved.h3Index
+    );
   }
   const orderedEntries = [...currentQueue.entries].sort((a, b) => a.queueIndex - b.queueIndex);
   if (orderedEntries.length > 0) {
     const entryToKeep = orderedEntries[0]!;
     const updateResult = updateHexBuildQueueEntry(resolved.h3Index, entryToKeep.id, args.unitType, count, AI_PLAYER_ID);
     if (!updateResult.success || !updateResult.queue) {
-      return { status: 'error', error: updateResult.reason ?? 'Failed to update primary queue entry.' };
+      return reject(updateResult.reason ?? 'Failed to update primary queue entry.', resolved.h3Index);
     }
     let queueAfter = updateResult.queue;
     for (const entry of orderedEntries.slice(1)) {
       const removeResult = removeHexBuildQueueEntry(resolved.h3Index, entry.id, AI_PLAYER_ID);
       if (!removeResult.success || !removeResult.queue) {
-        return { status: 'error', error: removeResult.reason ?? 'Failed to remove obsolete queue entry.' };
+        return reject(removeResult.reason ?? 'Failed to remove obsolete queue entry.', resolved.h3Index);
       }
       queueAfter = removeResult.queue;
     }
@@ -261,15 +266,15 @@ function setBuildQueue(
 
   const addResult = addHexBuildQueueEntry(resolved.h3Index, AI_PLAYER_ID);
   if (!addResult.success || !addResult.queue) {
-    return { status: 'error', error: addResult.reason ?? 'Failed to create build queue entry.' };
+    return reject(addResult.reason ?? 'Failed to create build queue entry.', resolved.h3Index);
   }
   const newEntry = [...addResult.queue.entries].sort((a, b) => b.queueIndex - a.queueIndex)[0];
   if (!newEntry) {
-    return { status: 'error', error: 'Failed to identify newly added entry.' };
+    return reject('Failed to identify newly added entry.', resolved.h3Index);
   }
   const updateResult = updateHexBuildQueueEntry(resolved.h3Index, newEntry.id, args.unitType, count, AI_PLAYER_ID);
   if (!updateResult.success || !updateResult.queue) {
-    return { status: 'error', error: updateResult.reason ?? 'Failed to set build queue entry.' };
+    return reject(updateResult.reason ?? 'Failed to set build queue entry.', resolved.h3Index);
   }
   return { status: 'ok', production: summarizeQueue(updateResult.queue, latLngByH3, maxedTypes) };
 }

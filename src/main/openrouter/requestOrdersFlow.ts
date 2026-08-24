@@ -12,6 +12,7 @@ import { executeTool4, getInjectionText } from '../tools/tool4Memory';
 import { executeTool5, expireAndUpdateStatus, generateOrdersForStandingOrders, getInjectionText as getStandingOrderInjectionText } from '../tools/tool5StandingOrders';
 import { executeTool6 } from '../tools/tool6Production';
 import { mergeOpponentAttackOrders } from '../tools/tempoRuleAttacks';
+import { buildStrategicOpponentFerryOrders } from '../tools/tempoRuleAirFerry';
 import { runPrecomputation } from '../precomputation';
 import { formatBriefing } from '../briefingFormatter';
 import { formatTacticalBriefing } from './formatTacticalBriefing';
@@ -953,9 +954,30 @@ export async function requestOrdersFlow(
         outAir = validatedAir;
         outFerry = validatedFerry;
         outEmbark = validatedEmb;
+      } else {
+        const strategicFerry = buildStrategicOpponentFerryOrders({
+          playerId: 'opponent',
+          state,
+          modelFerryOrders: llmFerryOrders,
+          airStrikeUnitIds: new Set(mergedAirStrikes.map((s) => s.unitId)),
+          displayLabelForUnit: aiOrderUnitLabel,
+        });
+        outFerry = strategicFerry.ferryOrders;
+        dropReasons.push(...strategicFerry.dropReasons);
       }
 
       markSuccessfulConsultation(parsed.strategy, parsed.message);
+      logDebug('openRouter requestOrders: orders applied', {
+        turnNumber: state.turnNumber,
+        tacticalBattleId: tacticalBattle?.battleId ?? null,
+        movement: validated.length,
+        ranged: validatedRanged.length,
+        airStrikes: outAir.length,
+        ferry: outFerry.length,
+        embark: outEmbark.length,
+        dropped: dropReasons.length,
+        dropReasons,
+      });
       if (onLog) {
         const ms = Date.now() - wallClockStart;
         const bits: string[] = [
@@ -966,6 +988,9 @@ export async function requestOrdersFlow(
           bits.push(`${outAir.length} air strike(s)`);
           bits.push(`${outFerry.length} ferry`);
           bits.push(`${outEmbark.length} embark`);
+        } else {
+          bits.push(`${outAir.length} air strike(s)`);
+          bits.push(`${outFerry.length} ferry`);
         }
         const dropNote = dropReasons.length > 0 ? `; ${dropReasons.length} validation note(s)` : '';
         const tokNote =

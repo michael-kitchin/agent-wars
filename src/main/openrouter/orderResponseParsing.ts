@@ -720,6 +720,12 @@ function processProductionOrdersArray(
     }
     droppedReasons.push(`production ${order.action} @ ${order.hex}: ${result.error ?? 'failed'}`);
   }
+  logDebug('openRouter processProductionOrdersArray', {
+    requestedCount: Array.isArray(entries) ? entries.length : 0,
+    appliedCount,
+    droppedCount: droppedReasons.length,
+    droppedReasons,
+  });
   return { appliedCount, droppedReasons };
 }
 
